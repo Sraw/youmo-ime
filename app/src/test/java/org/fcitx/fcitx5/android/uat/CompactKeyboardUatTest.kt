@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.graphics.RectF
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
@@ -13,6 +14,7 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.PunctuationPosition
+import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
@@ -162,6 +164,21 @@ class CompactKeyboardUatTest {
         val floating = FloatingKeyboard.textScale(FloatingKeyboard.widthDp(screen), screen)
         // the smaller, not the product (051-compact §1.3)
         assertEquals(size * minOf(KeyTextScale.COMPACT, floating), h.key("q").size(), 0.5f)
+        // narrow keys: each letter clear of its symbol in the top right (d and + crossed)
+        val letters = KeyboardHarness.all(h.inputView).filterIsInstance<AltTextKeyView>().filter { h.shown(it) && it.altText.text.isNotEmpty() }.toList()
+        assertTrue(letters.size.toString(), letters.size >= 26)
+        for (k in letters) {
+            val letter = ink(k.mainText)
+            val symbol = ink(k.altText)
+            assertFalse("${k.mainText.text}: $letter, ${k.altText.text}: $symbol", RectF.intersects(letter, symbol))
+        }
+    }
+
+    // [v]'s glyphs as drawn, moved and scaled, in its parent's coordinates
+    private fun ink(v: AutoScaleTextView): RectF = RectF().also {
+        assertTrue(v.inkBounds(it))
+        v.matrix.mapRect(it)
+        it.offset(v.left.toFloat(), v.top.toFloat())
     }
 
     @Test

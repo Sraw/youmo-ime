@@ -11,8 +11,10 @@ import com.google.android.material.chip.Chip
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
@@ -88,6 +90,7 @@ class ZhuyinShortcutsUatTest {
         h.swipe(n, 0f, -n.height * 1.3f)
         h.idle()
         assertEquals(h.api.calls.toString(), typed + 1, h.sent().size)
+        assertTrue(h.sent().last(), h.sent().last().startsWith("sendKey(sym=${UNICODE + Keyboard.zhuyinKey('ㄋ')},"))
         assertEquals(0 to 7, h.field.selectionStart to h.field.selectionEnd)
     }
 

@@ -11,6 +11,7 @@ import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
@@ -375,39 +376,57 @@ open class TextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.Text) 
         }
     }
 
-    /** Whether the label moves aside from a top right mark it would run into; [AltTextKeyView]'s letters keep their place. */
-    protected open val labelYieldsToMark: Boolean get() = true
+    /** What its top right corner draws, which the label gives way to: a shortcut's mark there. */
+    protected open val topRightCorner: View? get() = topRightMark
 
-    // a shortcut's icon beside the label, not over it: on 大千's narrow keys a symbol filled the key
-    // to its corner (ㄌ under the scissors, worse at 紧凑), so the label moves left as far as they met,
-    // no further than the face's edge, then down as far as the face has room, then smaller. After the face's own
-    // layout: the key's onLayout saw the icon before it was placed. A text mark (the user's 文字) is a
-    // share of the key wide whatever it says, so not measured against
+    /** Its corner symbol, wherever it is: [AltTextKeyView]'s. */
+    protected open val cornerSymbol: View? get() = null
+
+    private val labelInk = RectF()
+    private val markInk = RectF()
+
+    // the label out of the way of its corner's mark, where their ink meets (KeyMarkYield): 大千's
+    // symbols on its narrow keys (ㄌ under the scissors), a letter beside its symbol on the floating
+    // and one-handed keyboards at 紧凑. After the face's own layout: the key's onLayout saw the mark
+    // before it was placed
     private fun yieldToMark() {
-        val mark = topRightMark?.takeIf { labelYieldsToMark && it is ImageView }
-        mainText.translationX = 0f
-        mainText.translationY = 0f
-        mainText.scaleX = 1f
-        mainText.scaleY = 1f
-        if (mark == null || mark.bottom <= mainText.top) return
-        val gap = dp(1)
-        val overlap = mainText.right - (mark.left - gap)
-        val left = overlap.coerceIn(0, (mainText.left - hMargin - 2 * gap).coerceAtLeast(0))
-        mainText.translationX = -left.toFloat()
-        val down = if (overlap > left) mark.bottom + gap - mainText.top else 0
-        val room = appearanceView.height - vMargin - 2 * gap - mainText.bottom
-        val lower = down.coerceIn(0, room.coerceAtLeast(0))
-        mainText.translationY = lower.toFloat()
-        // still over it (紧凑 turned on a small phone): smaller towards its bottom left by what is left
-        // of the nearer way out, a fifth at most
-        val still = minOf((overlap - left).toFloat() / mainText.width, (down - lower).toFloat() / mainText.height)
-        if (still > 0f) {
-            mainText.pivotX = 0f
-            mainText.pivotY = mainText.height.toFloat()
-            mainText.scaleX = 1f - still.coerceAtMost(MAX_YIELD_SHRINK)
-            mainText.scaleY = mainText.scaleX
+        val mark = topRightCorner?.takeIf { it.visibility == View.VISIBLE }
+        // each one moved or shrunk last time, the corner's maybe another now
+        for (v in listOfNotNull(mainText, topRightMark, cornerSymbol)) {
+            v.translationX = 0f
+            v.translationY = 0f
+            v.scaleX = 1f
+            v.scaleY = 1f
+        }
+        if (mark == null || !mainText.inkBounds(labelInk)) return
+        if (mark is AutoScaleTextView) {
+            if (!mark.inkBounds(markInk)) return
+        } else {
+            markInk.set(0f, 0f, mark.width.toFloat(), mark.height.toFloat())
+        }
+        val y = KeyMarkYield.of(
+            ink(mainText, labelInk), ink(mark, markInk),
+            KeyMarkYield.Ink(hMargin.toFloat(), vMargin.toFloat(), (appearanceView.width - hMargin).toFloat(), (appearanceView.height - vMargin).toFloat()),
+            gap = dp(1).toFloat(), markShrinks = mark is AutoScaleTextView,
+        )
+        mainText.translationX = y.dx
+        mainText.translationY = y.dy
+        if (y.labelScale < 1f) {
+            mainText.pivotX = labelInk.left
+            mainText.pivotY = labelInk.bottom
+            mainText.scaleX = y.labelScale
+            mainText.scaleY = y.labelScale
+        }
+        if (y.markScale < 1f) {
+            mark.pivotX = markInk.right
+            mark.pivotY = markInk.top
+            mark.scaleX = y.markScale
+            mark.scaleY = y.markScale
         }
     }
+
+    // [r], in [v]'s coordinates, in the face's
+    private fun ink(v: View, r: RectF) = KeyMarkYield.Ink(v.left + r.left, v.top + r.top, v.left + r.right, v.top + r.bottom)
 
     init {
         appearanceView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> yieldToMark() }
@@ -456,9 +475,13 @@ open class TextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.Text) 
 class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText) :
     TextKeyView(ctx, theme, def) {
 
-    // its letter centred whatever its corners hold, as it always was: the symbol and the icon are
-    // placed beside it ([applyLayout])
-    override val labelYieldsToMark: Boolean get() = false
+    override val cornerSymbol: View? get() = altText
+
+    // its symbol, while that is in the top right corner and no mark is
+    override val topRightCorner: View?
+        get() = super.topRightCorner ?: altText.takeIf {
+            (it.layoutParams as ConstraintLayout.LayoutParams).run { topToTop == parentId && rightToRight == parentId }
+        }
 
     val altText = view(::AutoScaleTextView) {
         isClickable = false
@@ -672,6 +695,5 @@ class ImageTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.ImageT
 // a shortcut mark's size: an icon's side, a text's size and the share of the key's width it fits in
 private const val MARK_ICON_DP = 11
 private const val MARK_ICON_COMPACT_DP = 8
-private const val MAX_YIELD_SHRINK = 0.2f
 private const val MARK_TEXT_DP = 9f
 private const val MARK_TEXT_WIDTH = 0.45f
