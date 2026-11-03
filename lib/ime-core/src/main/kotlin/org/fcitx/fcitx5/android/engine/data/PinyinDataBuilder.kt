@@ -157,6 +157,11 @@ class PinyinDataBuilder {
      * ([ToneRules.full]); the rest in order of their text, so the same sources compile to the same file.
      * Each word's likeliest reading (its highest weight) is handed to [read] with its tones.
      */
+    // each word's reading of the highest weight: the first listed, of two alike
+    private fun likeliest(): Map<String, Entry> = HashMap<String, Entry>().also { m ->
+        entries.forEach { e -> m.merge(e.word, e) { old, new -> if (new.weight > old.weight) new else old } }
+    }
+
     private fun writeTones(out: DataFile.Writer, read: (Entry, ByteArray) -> Unit) {
         val chars = HashMap(charTones)
         fun usual(cps: IntArray, reading: List<Int>) =
@@ -178,8 +183,7 @@ class PinyinDataBuilder {
         out.add(Section.TONE_CHAR, ByteArray(keys.size) { chars.getValue(keys[it]).toByte() })
         // only a reading in the dictionary, whose tones its characters' usual ones would not give
         val exceptions = sortedMapOf<Int, MutableList<Pair<List<Int>, ByteArray>>>()
-        val likeliest = HashMap<String, Entry>()
-        entries.forEach { e -> likeliest.merge(e.word, e) { old, new -> if (new.weight > old.weight) new else old } }
+        val likeliest = likeliest()
         entries.distinctBy { it.word to it.syllables.toList() }.forEach { e ->
             val reading = e.syllables.toList()
             val own = wordTones[e.word]?.get(reading)
@@ -190,7 +194,7 @@ class PinyinDataBuilder {
             if (own == null && usual.any { it.toInt() == 0 }) return@forEach
             val ruled = if (own != null && (e.word to reading) in curated) own else ToneRules.tones(e.word, cps, reading, own, usual) { w, r -> wordTones[w]?.get(r) }
             val tones = ToneRules.full(ruled, usual)
-            if (likeliest[e.word]?.syllables?.contentEquals(e.syllables) == true) read(e, tones)
+            if (likeliest[e.word]?.syllables.contentEquals(e.syllables)) read(e, tones)
             if (!usual.contentEquals(tones)) exceptions.getOrPut(model.id(e.word)) { ArrayList() } += reading to tones
         }
         val runs = exceptions.flatMap { (id, list) -> list.map { id to it } }

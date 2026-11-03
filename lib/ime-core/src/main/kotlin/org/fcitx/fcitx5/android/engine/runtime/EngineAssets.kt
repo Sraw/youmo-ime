@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.runtime
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.CHAIZI_DATA
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog.CHAR_INFO_DATA
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.EMOJI_DATA
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.ENGLISH_DATA
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN_DATA
@@ -18,6 +19,7 @@ import org.fcitx.fcitx5.android.engine.english.EnglishData
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.phrase.Chaizi
+import org.fcitx.fcitx5.android.engine.phrase.CharInfo
 import org.fcitx.fcitx5.android.engine.phrase.EmojiData
 import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
@@ -281,6 +283,19 @@ internal class EngineAssets(
         } catch (e: IOException) {
             onError(IOException("cannot read $CHAIZI_DATA: no characters by their parts", e))
             Chaizi.EMPTY
+        }
+    }
+
+    /** Each character's radical, strokes and parts, for its card; none known if the app has not got them. */
+    val charInfo: CharInfo by lazy {
+        try {
+            CharInfo.load(blobs.load(CHAR_INFO_DATA), verify = false)
+        } catch (e: IOException) {
+            onError(IOException("cannot read $CHAR_INFO_DATA: no radicals or strokes on a character's card", e))
+            CharInfo.EMPTY
+        } catch (e: DataFormatException) {
+            onError(IOException("cannot read $CHAR_INFO_DATA: no radicals or strokes on a character's card", e))
+            CharInfo.EMPTY
         }
     }
 

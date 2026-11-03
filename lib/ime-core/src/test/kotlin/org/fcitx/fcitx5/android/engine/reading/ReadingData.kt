@@ -89,7 +89,8 @@ object ReadingData {
 
     private fun syl(vararg s: String) = IntArray(s.size) { Syllables.id(s[it]) }
 
-    val data: PinyinData by lazy {
+    /** The file, as the app's assets have it. */
+    val bytes: ByteArray by lazy {
         val b = PinyinDataBuilder().unigram(PinyinDataBuilder.UNKNOWN, -7f, 0f)
         listOf(
             Triple("进行", "jin xing", -2.5f), Triple("银行", "yin hang", -2.8f), Triple("行走", "xing zou", -3f),
@@ -98,7 +99,11 @@ object ReadingData {
             Triple("银", "yin", -3f), Triple("江", "jiang", -3f),
         ).forEach { (w, r, p) -> b.unigram(w, p, 0f).entry(w, syl(*r.split(' ').toTypedArray())) }
         // a rarer reading of the word, by the dictionary's weight: no example of it
-        b.entry("行", syl("hang"), -1f).entry("银行", syl("yin", "xing"), -2f)
+        b.entry("行", syl("hang"), -1f).entry("行", syl("heng"), -3f).entry("银行", syl("yin", "xing"), -2f)
+        // each character as the dictionary has it alone, which reads a word by its text (Predictor.reading)
+        for ((c, r) in listOf("道" to "dao", "树" to "shu", "子" to "zi", "进" to "jin", "走" to "zou", "爱" to "ai", "人" to "ren", "平" to "ping", "好" to "hao")) {
+            b.entry(c, syl(r))
+        }
         for ((source, text) in SOURCES) {
             ToneSources.chars(text.trimIndent().lineSequence(), source.field) { cp, s, t ->
                 b.charTone(cp, s, t)
@@ -106,6 +111,8 @@ object ReadingData {
             }
         }
         ToneSources.phrases(PHRASES.lineSequence(), "phrases", b::wordTones)
-        PinyinData.load(ByteBuffer.wrap(b.build().toByteArray()))
+        b.build().toByteArray()
     }
+
+    val data: PinyinData by lazy { PinyinData.load(ByteBuffer.wrap(bytes)) }
 }

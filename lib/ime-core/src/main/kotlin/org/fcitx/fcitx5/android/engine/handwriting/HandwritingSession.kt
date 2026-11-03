@@ -240,6 +240,13 @@ class HandwritingSession(
 
     // what was written read anew, or what may follow offered anew (a prediction turned off back in
     // it): the session, its pad and what is written on it kept after an undo (review-int S1)
+    // what the last character may be, after the sentence's characters before it; not what may follow
+    override fun lookedUp(index: Int): String? {
+        if (written.isEmpty()) return null
+        val text = sentences.getOrNull(index)?.text ?: return null
+        return text.removeSuffix(lastCharacter(text))
+    }
+
     override fun reread(): Snapshot? {
         // the undo may have unblocked a character the cached search left out (as pressed forgets it)
         decoder?.forgetSearch()

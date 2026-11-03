@@ -428,6 +428,9 @@ class PinyinSession(
         return misreading(data, c.text, input.substring(from, minOf(input.length, from + c.end)).filter { it != SyllableGraph.SEPARATOR })
     }
 
+    // a character by its parts (u mode), after what was picked before it; not an emoji, the other set aside
+    override fun lookedUp(index: Int) = candidates.getOrNull(index)?.text?.takeIf { !spell && !predicting && it in lastRead.aside && isOneHan(it) }?.let { pieces.joinToString("") { p -> p.text } }
+
     override fun readingOf(index: Int) = candidates.getOrNull(index)?.let { c -> entries(c)?.mapIndexed { i, e -> WordReading(e.text, c.words[i].takeIf { it < data.vocabulary.size } ?: -1, e.syllables) } }
 
     private fun pick(index: Int): Snapshot {
@@ -1108,3 +1111,6 @@ private fun joined(graph: SyllableGraph, parts: List<String>, ends: List<Int>, b
 // counted after it by its text (U-71) and turned off there (U-72). NO_WORD where the decoder's is it
 private fun ownWord(user: UserModel?, decoded: String, learned: String): Int =
     if (learned.length <= decoded.length || !learned.endsWith(decoded)) NO_WORD else user?.idsOfText(learned)?.firstOrNull() ?: NO_WORD
+
+// one Han character: a part's, not an emoji
+private fun isOneHan(text: String) = text.codePointCount(0, text.length) == 1 && Character.isIdeographic(text.codePointAt(0))

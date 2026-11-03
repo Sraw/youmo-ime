@@ -44,6 +44,34 @@ class HostCoreEnginesTest : EnginesFixture() {
         assertEquals("你", log.filterIsInstance<HostEvent.Commit>().first().text)
     }
 
+    // the handwriting pad's 注: 候选词注音 turned on with something typed keeps it, the candidates read again
+    @Test
+    fun `turning the readings on keeps what is typed and annotates what is shown`() {
+        val core = core(engines())
+        val log = mutableListOf<HostEvent>()
+        core.events += HostEvents { log += it }
+        core.activate(1)
+        core.setCapabilities(Capability.PREEDIT or Capability.CLIENT_UNFOCUS_COMMIT)
+        core.focus(true)
+        core.configure(EngineOptions())
+        "ni".forEach { core.sendKey(Key(it.code), virtual = true) }
+        assertTrue(log.filterIsInstance<HostEvent.Candidates>().last().candidates.all { it.readings.isEmpty() })
+        val before = log.size
+        core.configure(EngineOptions().apply { load("CandidateReading=Pinyin\n") })
+        assertEquals("ni", log.filterIsInstance<HostEvent.InputPanel>().last().preedit.toString())
+        assertEquals(listOf("nǐ"), log.filterIsInstance<HostEvent.Candidates>().last().candidates.first().readings)
+        assertTrue(log.drop(before).none { it is HostEvent.Commit })
+        // the same again, or another setting: nothing read again
+        val after = log.size
+        core.configure(EngineOptions().apply { load("CandidateReading=Pinyin\n") })
+        assertEquals(after, log.size)
+        // nothing typed: nothing to read again
+        core.reset()
+        val idle = log.size
+        core.configure(EngineOptions())
+        assertTrue(log.drop(idle).none { it is HostEvent.Candidates && it.candidates.isNotEmpty() })
+    }
+
     @Test
     fun `every listener hears every event, in the order they are added`() {
         val core = core(engines())
