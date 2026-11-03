@@ -68,8 +68,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
         /**
          * The keyboard to show as quick input ends, the full one having stood in for [was] since the
-         * input method's letters were [lettersThen]: [was] again; but another input method or keyboard
-         * chosen meanwhile (its letters [lettersNow], told before quick input's end) is its letters.
+         * input method's letters were [lettersThen]: [was] again; but letters changed meanwhile
+         * ([lettersNow]) are shown instead. Another input method chosen is shown at once by onImeUpdate
+         * (the stand-in lent to it); this only guards letters changed on some other way, a backstop.
          */
         fun afterQuickInput(was: String, lettersThen: String, lettersNow: String): String =
             if (lettersNow != lettersThen) lettersNow else was

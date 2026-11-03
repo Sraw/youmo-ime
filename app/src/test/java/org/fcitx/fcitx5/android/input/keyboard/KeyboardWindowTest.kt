@@ -160,8 +160,8 @@ class KeyboardWindowTest {
         }
     }
 
-    // quick input ended: the keyboard it stood in for, unless the input method (or its keyboard) changed
-    // meanwhile, which ends it: then the new one's letters, not 大千 under pinyin's nine keys
+    // quick input ended: the keyboard it stood in for, unless the letters changed meanwhile (onImeUpdate
+    // shows another input method's at once; this is the backstop): then the new ones, not 大千 under the nine keys
     @Test
     fun quickInputEndedShowsTheKeyboardStoodInForOrTheNewLetters() {
         assertEquals(ZhuyinKeyboard.NameFull, KeyboardWindow.afterQuickInput(ZhuyinKeyboard.NameFull, ZhuyinKeyboard.NameFull, ZhuyinKeyboard.NameFull))

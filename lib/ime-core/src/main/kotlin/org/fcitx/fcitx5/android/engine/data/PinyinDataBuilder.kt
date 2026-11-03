@@ -151,6 +151,11 @@ class PinyinDataBuilder {
         out.add(Section.WORD_LAYER, BitPacked.encode(size) { maxOf(layer[it], 0) })
     }
 
+    // each word's reading of the highest weight: the first listed, of two alike
+    private fun likeliest(): Map<String, Entry> = HashMap<String, Entry>().also { m ->
+        entries.forEach { e -> m.merge(e.word, e) { old, new -> if (new.weight > old.weight) new else old } }
+    }
+
     /**
      * The characters' tones, those the words' readings use among them, and the words whose tones are
      * not their characters' usual ones. Words of one character are read first: the usual tone they set
@@ -160,11 +165,6 @@ class PinyinDataBuilder {
      * own tone (桌子 zhuō zǐ), 子 typed zi˙ as Taiwan's users type it is no worse (the user, 2026-11-02).
      * Each word's likeliest reading (its highest weight) is handed to [read] with its tones.
      */
-    // each word's reading of the highest weight: the first listed, of two alike
-    private fun likeliest(): Map<String, Entry> = HashMap<String, Entry>().also { m ->
-        entries.forEach { e -> m.merge(e.word, e) { old, new -> if (new.weight > old.weight) new else old } }
-    }
-
     private fun writeTones(out: DataFile.Writer, read: (Entry, ByteArray) -> Unit) {
         val chars = HashMap(charTones)
         fun usual(cps: IntArray, reading: List<Int>) =
