@@ -1074,7 +1074,7 @@ private fun charInfo(options: Options, out: Appendable) {
     File(options.strokes!!).useLines { lines ->
         lines.dropWhile { it != "..." }.forEach { line ->
             val f = line.split('\t')
-            if (f.size >= 2 && f[0].codePointCount(0, f[0].length) == 1 && f[1].all { it in Strokes.KEYS }) builder.strokes(f[0].codePointAt(0), f[1].length)
+            if (f.size >= 2 && f[0].codePointCount(0, f[0].length) == 1 && f[1].all { it in Strokes.KEYS }) builder.strokes(f[0].codePointAt(0), f[1])
         }
     }
     File(options.orders!!).useLines { builder.orders(it, options.orders) }
@@ -1110,7 +1110,7 @@ private fun charInfo(options: Options, out: Appendable) {
 private const val UNIHAN_RS = "Unihan_IRGSources.txt"
 
 // of the characters handwriting knows, at least this share must be taken apart (97.8% are), and have
-// the mainland's stroke order (95.1% have: cnchar's are 6,939 simplified ones; a traditional one has
+// the mainland's stroke order (95.0% have: cnchar's are 6,939 simplified ones; a traditional one has
 // rime-stroke's); the rest all
 private val FLOORS = mapOf("parts" to 0.97, "the mainland's stroke order" to 0.94)
 private const val MISSING_SHOWN = 20

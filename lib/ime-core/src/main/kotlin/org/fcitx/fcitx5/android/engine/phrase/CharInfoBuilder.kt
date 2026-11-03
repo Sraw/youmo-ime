@@ -17,10 +17,14 @@ import org.fcitx.fcitx5.android.engine.stroke.Strokes
  *   kTotalStrokes (the mainland's count first), [unihan];
  * - CJKRadicals.txt, each radical's character ([radicals]): `149'` 讠;
  * - 汉语拆字字典's ways to take a character apart ([chaizi]): 江 `水 工` `氵 工`;
- * - rime-stroke's stroke orders' lengths, for a character Unihan counts no strokes of ([strokes]);
+ * - rime-stroke's stroke orders ([strokes]): the first's length for a character Unihan counts no
+ *   strokes of; all of them to check cnchar's against;
  * - cnchar's stroke orders as the mainland writes them ([orders]); rime-stroke's first order of a
  *   character is Taiwan's as often as not (出 丨乛丨乛丨, not 乛丨丨乛丨; 必 丶乛丶丶丿, not 丶乛丶丿丶; half
- *   of cnchar's 6,939 differ), and the user wants the mainland's standard (2026-11-02).
+ *   of cnchar's 6,939 differ), and the user wants the mainland's standard (2026-11-02). One none of
+ *   rime-stroke's orders of the character is, is left out: 7 of cnchar's are slips (皙 has 12 strokes,
+ *   白's 丿 missing). A character with the mainland's order counts its strokes as that order does:
+ *   Unihan counts the mainland's 范 骨 and the 艹 of 茔 荧 莹 as Taiwan's (9, 10, a 4-stroke 艹).
  *
  * The radical is written as the mainland does where the character's parts show it so (江 氵, 打 扌,
  * 草 艹: [VARIANTS]), else as CJKRadicals has it (和 口, 说 讠): Unicode's Kangxi radicals, not the
@@ -33,6 +37,9 @@ class CharInfoBuilder {
     private val radicalOf = HashMap<Int, String>()
     private val totalStrokes = HashMap<Int, Int>()
     private val strokeOrders = HashMap<Int, Int>()
+
+    // code point to rime-stroke's orders of it, all of them
+    private val rimeOrders = HashMap<Int, MutableSet<String>>()
 
     // code point to its stroke order as the mainland writes it, a [Strokes.KEYS] letter a stroke
     private val orders = HashMap<Int, String>()
@@ -91,9 +98,14 @@ class CharInfoBuilder {
         }
     }
 
-    /** [codePoint]'s strokes as its first stroke order counts them: for a character Unihan has no count of. */
-    fun strokes(codePoint: Int, count: Int) = apply {
-        if (count > 0) strokeOrders.putIfAbsent(codePoint, count)
+    /**
+     * One of rime-stroke's orders of [codePoint], in [Strokes.KEYS]' letters, its first first: the first
+     * counts the strokes of a character Unihan has no count of; all check the mainland's order ([orders]).
+     */
+    fun strokes(codePoint: Int, order: String) = apply {
+        if (order.isEmpty()) return@apply
+        strokeOrders.putIfAbsent(codePoint, order.length)
+        rimeOrders.getOrPut(codePoint) { HashSet() } += order
     }
 
     /**
@@ -123,8 +135,10 @@ class CharInfoBuilder {
         val variants = if (radical.endsWith('\'')) setOf(own) else VARIANTS[number].orEmpty()
         val way = ways[codePoint]?.let { all -> all.firstOrNull { w -> w.any { it in variants } } ?: all.first() }
         val shown = way?.firstOrNull { it in variants } ?: own
-        val strokes = totalStrokes[codePoint] ?: strokeOrders[codePoint] ?: 0
-        return CharInfo.Entry(String(Character.toChars(shown)), strokes, way?.map { String(Character.toChars(it)) }, orders[codePoint])
+        // cnchar's order only where rime-stroke has it too, or has none of the character
+        val order = orders[codePoint]?.takeIf { rimeOrders[codePoint]?.contains(it) ?: true }
+        val strokes = order?.length ?: totalStrokes[codePoint] ?: strokeOrders[codePoint] ?: 0
+        return CharInfo.Entry(String(Character.toChars(shown)), strokes, way?.map { String(Character.toChars(it)) }, order)
     }
 
     fun build(): DataFile.Writer {

@@ -297,7 +297,7 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   says was looked up (`Session.lookedUp`: handwriting's characters, full pinyin's `u` parts and stroke
   lookup, not what was typed nor what may follow; `paged`, the index from the page shown), its readings
   in `ordered(card = true)`'s order with up to two words each (`CharReadings`: a dictionary's words only,
-  phrase-pinyin-data's or `lexicon/tones.tsv`'s, the commonest in the model; the card's alone, the
+  phrase-pinyin-data's, `lexicon/tones.tsv`'s or `misreadings.tsv`'s, the commonest in the model; the card's alone, the
   dictionaries' neutral tones the candidates leave out, 和 huo, flagged `CARD_ONLY` and after the rest; a
   traditional character's words its simplified one's, `readFrom`), and `engine/charinfo.data`'s radical, strokes and parts (`CharInfo`), the
   parts' readings by `CandidateReadings`, the stroke order the mainland's (`CharInfo.Entry.order`,

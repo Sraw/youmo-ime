@@ -87,7 +87,7 @@ class CharInfoTest {
             .unihan(UNIHAN.lineSequence(), "Unihan_IRGSources.txt")
             .radicals(RADICALS.lineSequence(), "CJKRadicals.txt")
             .chaizi(CHAIZI.lineSequence())
-            .strokes(0x20000, 4)
+            .strokes(0x20000, "hspn")
             .orders(ORDERS.lineSequence(), "stroke-order-jian.json")
 
         val info: CharInfo by lazy { CharInfo.load(ByteBuffer.wrap(builder().build().toByteArray())) }
@@ -136,6 +136,23 @@ class CharInfoTest {
         }
         assertEquals(2 + 1, e.line)
         assertThrows(SourceException::class.java) { CharInfoBuilder().orders(sequenceOf("\"ab\": \"jj\""), "o.json") }
+    }
+
+    @Test
+    fun theMainlandsOrderIsOneOfRimeStrokesAndCountsTheStrokes() {
+        val rime = builder().strokes('行'.code, "ppshhz").strokes('行'.code, "ppshhs").strokes('和'.code, "phspnhzh")
+        assertEquals("ppshhs", rime.entry('行'.code)!!.order)
+        // a slip of cnchar's (皙's 12 strokes): left out, the card shows rime-stroke's first
+        assertNull(rime.entry('和'.code)!!.order)
+        assertEquals(8, rime.entry('和'.code)!!.strokes)
+        // Unihan counts 范's 艹 as Taiwan's, 4 strokes: 9; the mainland's order, 8
+        val fan = CharInfoBuilder()
+            .unihan(sequenceOf("U+8303\tkRSUnicode\t140.5", "U+8303\tkTotalStrokes\t9"), "u.txt")
+            .radicals(RADICALS.lineSequence(), "CJKRadicals.txt")
+            .orders(sequenceOf("\"范\": \"jffkkiru\""), "o.json")
+            .entry('范'.code)!!
+        assertEquals("hssnnhzz", fan.order)
+        assertEquals(8, fan.strokes)
     }
 
     @Test

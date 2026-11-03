@@ -73,7 +73,7 @@ internal class CharReadingsBuilder {
     /**
      * Word [id], [p] in the model (a probability), has [cps] read as [syllables] with [tones]: what
      * orders its characters' readings, and, of two to four characters and [listed] (a dictionary's
-     * word read so: phrase-pinyin-data's, `lexicon/tones.tsv`'s), may be one's example. Not the
+     * word read so: phrase-pinyin-data's, `lexicon/tones.tsv`'s, `misreadings.tsv`'s), may be one's example. Not the
      * model's others: some are two words run together (荣和, 去呢, 弦数; the user, 2026-11-02).
      */
     fun word(id: Int, cps: IntArray, syllables: List<Int>, tones: ByteArray, p: Double, listed: Boolean) {

@@ -147,7 +147,9 @@ class HandwritingEngineUatTest {
     // a character's card with the app's data
     private fun card(vararg written: String): CharCard = with(HostReplay(im = InputMethodCatalog.HANDWRITING)) {
         write(*written)
-        checkNotNull(engines.charCard(InputMethodCatalog.HANDWRITING, candidates.indexOf(written[0]), written[0]))
+        val i = candidates.indexOf(written[0])
+        check(i >= 0) { "${written[0]} not among $candidates" }
+        checkNotNull(engines.charCard(InputMethodCatalog.HANDWRITING, i, written[0]))
     }
 
     // a reading's words a dictionary's, not the model's others: 荣和, 去呢, 弦数 are two words run together (the user, 2026-11-02)
@@ -178,5 +180,11 @@ class HandwritingEngineUatTest {
         assertEquals("丶乛丶丿丶", card("必", "口").strokeOrder)
         assertEquals("丿一丨一乛丿丶", card("我", "口").strokeOrder)
         assertEquals("丶丿一丨丿丶乛丿一丿一丿丶", card("数", "口").strokeOrder)
+        // the count the order's: Unihan's 范 9 and 骨 10 are Taiwan's (a 4-stroke 艹; 骨's 冖)
+        assertEquals("一丨丨丶丶一乛乛" to 8, card("范", "口").let { it.strokeOrder to it.strokes })
+        assertEquals(9, card("骨", "口").strokes)
+        // cnchar's 皙 leaves out 白's 丿: rime-stroke's; and for 國, which cnchar has not
+        assertEquals("一丨丿丶丿丿一丨丿丨乛一一" to 13, card("皙", "口").let { it.strokeOrder to it.strokes })
+        assertEquals("丨乛一丨乛一一乛丶丿一", card("國", "口").strokeOrder)
     }
 }
