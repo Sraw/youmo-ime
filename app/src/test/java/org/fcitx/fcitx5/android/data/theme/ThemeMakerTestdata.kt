@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.data.theme
 
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import java.io.File
 
@@ -31,29 +32,31 @@ object ThemeMakerTestdata {
 
     fun check(name: String, text: String) = check(name, text.encodeToByteArray())
 
-    // the page itself (web/theme-maker/index.html): its generated blocks, the data it draws by
+    /** The file [name] as it is in the repo: for the app's own tests to read what the page reads. */
+    fun file(name: String) = File(dir, name)
+
+    // the page itself (web/theme-maker/index.html)
     private val page = File(dir.parentFile.parentFile, "index.html")
 
     /**
-     * The page's block `<script type="application/json" id="[id]">` holds [text], or is written so with
-     * -PupdateThemeMaker. Nothing while there is no page, or no such block in it yet: the page is
-     * written by hand, its blocks only here.
+     * The page's block `<script type="application/json" id="[id]">` holds [text] between a newline at
+     * each end, compared as text; written into the page with `-PupdateThemeMaker`, the rest of the page
+     * left as it is. The page's generated data: its format and the built-in themes
+     * (ThemeMakerFormatTest), the measured layouts and icons (ThemeMakerLayoutTest).
      */
     fun block(id: String, text: String) {
-        if (!page.exists()) return
         val html = page.readText()
         val open = "<script type=\"application/json\" id=\"$id\">"
-        val start = html.indexOf(open).takeIf { it >= 0 }?.plus(open.length) ?: return
-        val end = html.indexOf("</script>", start)
-        check(end > 0) { "$page: block $id not closed" }
+        val start = html.indexOf(open)
+        assertTrue("$page has no block $id", start >= 0)
+        val from = start + open.length
+        val end = html.indexOf("</script>", from)
+        assertTrue("$page: block $id is not closed", end >= 0)
         val now = "\n" + text + "\n"
         if (update) {
-            page.writeText(html.substring(0, start) + now + html.substring(end))
+            page.writeText(html.substring(0, from) + now + html.substring(end))
             return
         }
-        assertTrue("$page's block $id is not what the app makes now: run the test with -PupdateThemeMaker", html.substring(start, end) == now)
+        assertEquals("$page: block $id is not what the app makes now: run the test with -PupdateThemeMaker", now, html.substring(from, end))
     }
-
-    /** The file [name] as it is in the repo: for the app's own tests to read what the page reads. */
-    fun file(name: String) = File(dir, name)
 }

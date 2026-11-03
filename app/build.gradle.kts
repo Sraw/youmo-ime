@@ -129,6 +129,9 @@ android {
                 // the theme maker's shared cases (ThemeMakerRulesTest): compared, or with -PupdateThemeMaker written
                 it.systemProperty("themeMaker.testdata", rootProject.file("web/theme-maker/test/testdata").path)
                 it.systemProperty("themeMaker.update", project.hasProperty("updateThemeMaker").toString())
+                // compared with the page and its files: a change there is a reason to run again, not an up-to-date skip
+                it.inputs.dir(rootProject.file("web/theme-maker")).withPropertyName("themeMaker")
+                    .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
                 // ThemeLookScreenshotTest's whole set of themes × keyboards × modes, for the eye: -PthemeShots=<dir>
                 it.systemProperty("themeShots.dir", project.findProperty("themeShots")?.toString().orEmpty())
             }

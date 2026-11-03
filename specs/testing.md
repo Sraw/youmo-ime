@@ -215,11 +215,36 @@ page's four phones, both orientations, every board, normal / one-handed / floati
 typing, long-pressed and showing the clipboard; each key's cell, kind and theme name, each text,
 icon and fill with the palette field it is drawn in, read off a probe theme whose 24 colours all
 differ; the format's key names; the icons' vector paths). The layout test also writes the two into
-the page's `<script type="application/json" id="youmo-layout">` / `id="youmo-icons"` blocks once
-`web/theme-maker/index.html` has them, so the page needs no build. Each test compares its file with
+the page's `<script type="application/json" id="youmo-layout">` / `id="youmo-icons"` blocks, so
+the page needs no build. Each test compares its file with
 the repo's and fails on a difference;
 `./gradlew :app:testTextDebugUnitTest --tests '*ThemeMakerRulesTest' --tests '*ThemeMakerLayoutTest' -PupdateThemeMaker`
 writes them again, and the page's own test then shows what it must follow.
+
+The page's side: `node --test web/theme-maker/test/format.test.mjs` (Node 24; CI's unit test job and
+the Pages workflow run it) loads the page's `youmo-lib` block as the page runs it and holds it to
+each `rules.json` case (Float maths with `Math.fround`, the blur to the pixel), reads `theme.json`
+and both `from-app` zips, and builds `from-web.zip` from `theme.json` (the app's PNGs of
+`from-app.zip` under its names, and `tiny.ttf`, a 1 KB font of square glyphs made by
+`make-tiny-font.py`), comparing it byte for byte; `UPDATE=1 node --test …` writes it again.
+`ThemeMakerFormatTest` (app JVM) closes the loop: `from-web.zip` imports as `theme.json`, and an app
+export of it imports the same; and the page's generated blocks in `index.html` (`youmo-format`: the
+file's version, every type's fields from `ThemeFileJson`'s descriptors, the limits, the defaults;
+`youmo-presets`: the eleven built-in palettes) are what the app has, through
+`ThemeMakerTestdata.block`, which `-PupdateThemeMaker` lets write them. `youmo-layout` and
+`youmo-icons` are `ThemeMakerLayoutTest`'s the same way, and the page's test holds them to what the
+preview reads (format 1: views of items, every key name one `KeyNames` knows, every colour a palette
+field, every icon there). The test task takes `web/theme-maker` as an
+input, so a change to the page reruns it. Nothing in those blocks is edited by hand.
+
+Changing the page: edit `web/theme-maker/src/` (`page.html` with slots for the rest, `style.css`,
+`lib.js`: everything the tests hold to the app's rules, `ui.js`: the page), then
+`node web/theme-maker/tools/assemble.mjs`, which writes `index.html`: the sources put in, the
+generated blocks kept from the `index.html` there is, and the Content-Security-Policy's
+`script-src` set to the two scripts' SHA-256 (nothing else runs; an edit to `index.html` by hand
+breaks them). The page's test fails when `index.html` is not what assemble makes of `src/`, and
+when the CSP's hashes are not its scripts'. Commit `src/` and `index.html` together. The site is
+`index.html` alone: the Pages workflow leaves `src/`, `tools/` and `test/` out.
 
 ## Golden files from upstream fcitx
 

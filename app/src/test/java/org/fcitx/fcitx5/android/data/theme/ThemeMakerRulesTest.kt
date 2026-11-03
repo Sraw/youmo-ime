@@ -16,6 +16,7 @@ import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.phoneStorage
+import org.fcitx.fcitx5.android.input.Contrast
 import org.fcitx.fcitx5.android.input.theme.Area
 import org.fcitx.fcitx5.android.input.theme.Box
 import org.fcitx.fcitx5.android.input.theme.BoxBlur
@@ -35,10 +36,12 @@ import org.fcitx.fcitx5.android.input.theme.KindStyle
 import org.fcitx.fcitx5.android.input.theme.LookDefaults
 import org.fcitx.fcitx5.android.input.theme.NineSlice
 import org.fcitx.fcitx5.android.input.theme.NineSliceLayout
+import org.fcitx.fcitx5.android.input.theme.Palette
 import org.fcitx.fcitx5.android.input.theme.Picture
 import org.fcitx.fcitx5.android.input.theme.PictureWindow
 import org.fcitx.fcitx5.android.input.theme.PressEffect
 import org.fcitx.fcitx5.android.input.theme.Text
+import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import org.fcitx.fcitx5.android.input.theme.BarBase
 import org.fcitx.fcitx5.android.input.theme.BoardBase
 import org.junit.Assert.assertEquals
@@ -98,6 +101,52 @@ class ThemeMakerRulesTest {
                 })
             }
         }
+    }
+
+    // a key's own say over its face (KeyFaceGeometry.Border), which the measured layout gives each key as b
+    private fun borders() = buildJsonArray {
+        for (lookName in listOf("default", "flat")) for ((w, h) in listOf(100f to 160f, 400f to 60f)) for (kind in KeyKind.entries) {
+            for (border in KeyFaceGeometry.Border.entries) {
+                val face = KeyFaceGeometry.of(w, h, kind, looks.getValue(lookName), false, 2.75f, true, border)
+                add(buildJsonObject {
+                    put("keys", lookName)
+                    put("width", w); put("height", h); put("kind", kind.name.lowercase()); put("b", border.name.lowercase())
+                    put("face", area(face.face)); put("shadow", area(face.shadow)); put("pressed", area(face.pressed))
+                    put("border", face.border); put("radius", face.radius); put("oval", face.oval)
+                })
+            }
+        }
+    }
+
+    // which palette field each part is drawn in (ThemeColors), read off a palette whose fields all differ
+    private fun colors() = buildJsonObject {
+        val names = listOf(
+            "backgroundColor", "barColor", "keyboardColor", "keyBackgroundColor", "keyTextColor", "candidateTextColor",
+            "candidateLabelColor", "candidateCommentColor", "altKeyBackgroundColor", "altKeyTextColor",
+            "accentKeyBackgroundColor", "accentKeyTextColor", "keyPressHighlightColor", "keyShadowColor",
+            "popupBackgroundColor", "popupTextColor", "spaceBarColor", "dividerColor", "clipboardEntryColor",
+            "genericActiveBackgroundColor", "genericActiveForegroundColor", "keyBorderColor", "keyHintColor", "toolbarIconColor",
+        )
+        val v = IntArray(names.size) { it + 1 }
+        val p = Palette(
+            v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15], v[16],
+            v[17], v[18], v[19], v[20], v[21], v[22], v[23],
+        )
+        fun name(c: Int?) = c?.let { JsonPrimitive(names[it - 1]) } ?: JsonNull
+        for (blocks in listOf(true, false)) {
+            val keys = LookDefaults.KEYS.copy(blocks = blocks)
+            put(if (blocks) "blocks" else "flat", buildJsonObject {
+                put("board", name(ThemeColors.board(p, keys)))
+                put("panel", name(ThemeColors.panel(p, keys)))
+                put("faces", buildJsonObject { for (kind in KeyKind.entries) put(kind.name.lowercase(), name(ThemeColors.face(p, kind, blocks))) })
+            })
+        }
+        put("bar", buildJsonObject {
+            for ((n, b) in listOf("transparent" to BarBase.Transparent, "color" to BarBase.Color, "picture" to BarBase.Picture(0, 100))) {
+                put(n, name(ThemeColors.bar(p, b)))
+            }
+        })
+        put("dim", JsonArray(listOf(0, 1, 30, 50, 99, 100).map { JsonPrimitive(ThemeColors.dim(it)) }))
     }
 
     private fun nineSlice() = buildJsonArray {
@@ -242,9 +291,29 @@ class ThemeMakerRulesTest {
         "genericActiveBackgroundColor":-10577930,"genericActiveForegroundColor":-1,"version":"2.1"}
     """.trimIndent().replace("\n", "")
 
+    // one with what an older 2.1 left out: no brightness (70), no turn (0), a crop's edges missing (-1 each)
+    private val v21Partial = v21
+        .replace("\"brightness\":55,", "")
+        .replace(",\"cropRotation\":90", "")
+        .replace("\"cropRect\":{\"bottom\":1400,\"left\":10,\"right\":1090,\"top\":20}", "\"cropRect\":{\"left\":10,\"top\":20}")
+
+    private fun migrated(from: String) =
+        Json.parseToJsonElement(Json.encodeToString(CustomThemeSerializer, Json.decodeFromString(CustomThemeSerializer, from)))
+
     private fun migration() = buildJsonObject {
+        check(v21Partial.length < v21.length - 40) { "the partial 2.1 sample left nothing out" }
         put("from", Json.parseToJsonElement(v21))
-        put("to", Json.parseToJsonElement(Json.encodeToString(CustomThemeSerializer, Json.decodeFromString(CustomThemeSerializer, v21))))
+        put("to", migrated(v21))
+        put("partialFrom", Json.parseToJsonElement(v21Partial))
+        put("partialTo", migrated(v21Partial))
+    }
+
+    // Contrast.ratio, which the page's contrast warnings are: opaque and translucent text, light and dark grounds
+    private fun contrast() = buildJsonArray {
+        val colours = listOf(-1, -16777216, -10577930, 0x990d47a1.toInt(), 0x4BFFFFFF, -328966, -13816531, 0x1F000000, -1499549, 0x00123456)
+        for (fg in colours) for (bg in colours.filter { it ushr 24 == 0xFF }) {
+            add(buildJsonArray { add(JsonPrimitive(fg)); add(JsonPrimitive(bg)); add(JsonPrimitive(Contrast.ratio(fg, bg))) })
+        }
     }
 
     @Test
@@ -252,12 +321,15 @@ class ThemeMakerRulesTest {
         val rules = buildJsonObject {
             put("keys", buildJsonObject { looks.forEach { (name, keys) -> put(name, keysJson(keys)) } })
             put("geometry", geometry())
+            put("borders", borders())
+            put("colors", colors())
             put("nineSlice", nineSlice())
             put("pictures", pictures())
             put("blur", blur())
             put("styles", styles())
             put("budget", budget())
             put("migration", migration())
+            put("contrast", contrast())
         }
         ThemeMakerTestdata.check("rules.json", json.encodeToString(JsonElement.serializer(), rules) + "\n")
     }
@@ -274,6 +346,8 @@ class ThemeMakerRulesTest {
                     Crop("full-landscape.png", Box(0, 900, 1440, 1500), 90),
                     70, 4,
                 ),
+                // the letters show the picture: their colour, laid over it, at 30 % as the page turns it
+                palette = t.look.palette.run { copy(keyBackgroundColor = keyBackgroundColor and 0xFFFFFF or (0x4D shl 24)) },
                 base = BoardBase.Picture,
                 bar = BarBase.Picture(12, 60),
                 keys = t.look.keys.copy(
