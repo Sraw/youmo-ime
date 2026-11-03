@@ -81,7 +81,7 @@ class CharCardView(
         ).joinToString(SPACE)
         if (first.isNotEmpty()) addView(text(first))
         card.partsShown()?.let { addView(text(context.getString(R.string.char_card_parts) + " " + it)) }
-        card.strokeOrder?.let { addView(text(context.getString(R.string.char_card_order) + " " + it)) }
+        card.orderShown()?.let { addView(text(context.getString(R.string.char_card_order) + " " + it)) }
     }
 
     init {
@@ -113,11 +113,13 @@ class CharCardView(
             buttons?.let { addView(it, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(ROW_GAP * 2) }) }
         }
         // one sentence for TalkBack, not a stop at each line
+        val strokeNames = context.resources.getStringArray(R.array.char_card_stroke_names)
         contentDescription = card.spoken(
             CharCard.Words(
                 context.getString(R.string.char_card_readings) + " ", context.getString(R.string.char_card_radical) + " ",
-                context.getString(R.string.char_card_parts) + " ", "、", "，",
-            ) { context.getString(R.string.char_card_strokes, it) },
+                context.getString(R.string.char_card_parts) + " ", context.getString(R.string.char_card_order) + " ", "、", "，",
+                { context.getString(R.string.char_card_strokes, it) },
+            ) { strokeNames[it.ordinal] },
         )
         top.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
         info.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS

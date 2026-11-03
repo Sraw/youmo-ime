@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.data.BitPacked
 import org.fcitx.fcitx5.android.engine.data.DataFile
 import org.fcitx.fcitx5.android.engine.data.SourceException
 import org.fcitx.fcitx5.android.engine.phrase.CharInfo.Section
+import org.fcitx.fcitx5.android.engine.stroke.StrokeShape
 import org.fcitx.fcitx5.android.engine.stroke.Strokes
 
 /**
@@ -22,8 +23,9 @@ import org.fcitx.fcitx5.android.engine.stroke.Strokes
  * - `lexicon/stroke-order.tsv`, the stroke orders as the mainland writes them ([orders]), first taken
  *   from cnchar (MIT) and kept by this project since: rime-stroke's first order of a character is
  *   Taiwan's as often as not (出 丨乛丨乛丨, not 乛丨丨乛丨; 必 丶乛丶丶丿, not 丶乛丶丿丶), and the user wants the
- *   mainland's standard (2026-11-02). [build] fails on an order whose strokes are not as many as
- *   Unihan counts, or that is none of rime-stroke's orders of the character, unless its line says why
+ *   mainland's standard (2026-11-02), each stroke by its shape (行's last 竖钩, not a 竖; 九's 横折弯钩, not
+ *   any 折: the user, 2026-11-02). [build] fails on an order whose strokes are not as many as
+ *   Unihan counts, or whose kinds are none of rime-stroke's orders of the character, unless its line says why
  *   (and on a line that says why of neither):
  *   that is how cnchar's slips were found (皙 without 白's 丿, 德's 十 a 一丿). A character with the
  *   mainland's order counts its strokes as that order does (Unihan counts 范 as Taiwan's, 9).
@@ -43,9 +45,8 @@ class CharInfoBuilder {
     // code point to rime-stroke's orders of it, all of them
     private val rimeOrders = HashMap<Int, MutableSet<String>>()
 
-    // code point to its stroke order as the mainland writes it, a [Strokes.KEYS] letter a stroke; the
-    // line it is on, and the code points whose line says why it differs from Unihan's or rime-stroke's
-    private val orders = HashMap<Int, String>()
+    // code point to its stroke order as the mainland writes it, each stroke's shape; the line it is on, and the code points whose line says why it differs from Unihan's or rime-stroke's
+    private val orders = HashMap<Int, List<StrokeShape>>()
     private val orderLines = HashMap<Int, Int>()
     private val explained = HashSet<Int>()
     private var ordersSource = ""
@@ -115,10 +116,10 @@ class CharInfoBuilder {
     }
 
     /**
-     * `lexicon/stroke-order.tsv`'s `行<TAB>332112[<TAB>why]` lines (`#` a comment): a character's strokes in
-     * the order 《现代汉语通用字笔顺规范》 gives, by the standard's numbers (1 横, 2 竖, 3 撇, 4 点, 5 折), and,
+     * `lexicon/stroke-order.tsv`'s `行<TAB>P P S H H SG[<TAB>why]` lines (`#` a comment): a character's
+     * strokes in the order 《现代汉语通用字笔顺规范》 gives, each its shape by its [StrokeShape.code], and,
      * for one [build] would otherwise fail on, why its count is not Unihan's or its order none of
-     * rime-stroke's.
+     * rime-stroke's (which knows the five kinds only: the shapes' [StrokeShape.kind]s are checked).
      *
      * @throws SourceException on a line that is not one
      */
@@ -129,11 +130,12 @@ class CharInfoBuilder {
             val f = line.trimEnd('\r').split('\t')
             val c = f[0]
             if (c.codePointCount(0, c.length) != 1) throw SourceException(source, n + 1, "not one character: $c")
-            val order = f.getOrNull(1).orEmpty()
-            if (order.isEmpty() || order.any { it !in '1'..'5' }) throw SourceException(source, n + 1, "not a stroke order (1 to 5 a stroke): $order")
+            val codes = f.getOrNull(1).orEmpty().split(' ').filter { it.isNotEmpty() }
+            val order = codes.map { StrokeShape.of(it) ?: throw SourceException(source, n + 1, "not a stroke's shape (H, SG, HZG…): $it") }
+            if (order.isEmpty()) throw SourceException(source, n + 1, "$c with no strokes")
             val cp = c.codePointAt(0)
             if (cp in orders) throw SourceException(source, n + 1, "$c twice")
-            orders[cp] = order.map { Strokes.KEYS[it - '1'] }.joinToString("")
+            orders[cp] = order
             orderLines[cp] = n + 1
             if (f.getOrNull(2).orEmpty().isNotBlank()) explained += cp
         }
@@ -149,7 +151,7 @@ class CharInfoBuilder {
         val way = ways[codePoint]?.let { all -> all.firstOrNull { w -> w.any { it in variants } } ?: all.first() }
         val shown = way?.firstOrNull { it in variants } ?: own
         val order = orders[codePoint]
-        val strokes = order?.length ?: totalStrokes[codePoint] ?: strokeOrders[codePoint] ?: 0
+        val strokes = order?.size ?: totalStrokes[codePoint] ?: strokeOrders[codePoint] ?: 0
         return CharInfo.Entry(String(Character.toChars(shown)), strokes, way?.map { String(Character.toChars(it)) }, order)
     }
 
@@ -163,8 +165,9 @@ class CharInfoBuilder {
             val c = String(Character.toChars(cp))
             val count = totalStrokes[cp]
             val why = when {
-                count != null && count != order.length -> "$c ${order.length} strokes, Unihan $count"
-                rimeOrders[cp]?.contains(order) == false -> "$c ${Strokes.shown(order)}, rime-stroke ${rimeOrders.getValue(cp).joinToString("/", transform = Strokes::shown)}"
+                count != null && count != order.size -> "$c ${order.size} strokes, Unihan $count"
+                rimeOrders[cp]?.contains(StrokeShape.keys(order)) == false ->
+                    "$c ${Strokes.shown(StrokeShape.keys(order))}, rime-stroke ${rimeOrders.getValue(cp).joinToString("/", transform = Strokes::shown)}"
                 else -> null
             }
             when {
@@ -190,8 +193,8 @@ class CharInfoBuilder {
         val parts = taken.flatMap { (_, e) -> e.parts!!.map { it.codePointAt(0) } }.toIntArray()
         val ordered = chars.filter { it.second.order != null }
         val orderStarts = IntArray(ordered.size + 1)
-        ordered.forEachIndexed { i, (_, e) -> orderStarts[i + 1] = orderStarts[i] + e.order!!.length }
-        val strokes = ordered.flatMap { (_, e) -> e.order!!.map { Strokes.KEYS.indexOf(it) } }.toIntArray()
+        ordered.forEachIndexed { i, (_, e) -> orderStarts[i + 1] = orderStarts[i] + e.order!!.size }
+        val strokes = ordered.flatMap { (_, e) -> e.order!!.map { it.ordinal } }.toIntArray()
         return DataFile.Writer(DataFile.KIND_CHAR_INFO, CharInfo.VERSION)
             .add(Section.CHARS, BitPacked.encode(chars.size) { chars[it].first })
             .add(Section.RADICALS, BitPacked.encode(shown.toIntArray()))

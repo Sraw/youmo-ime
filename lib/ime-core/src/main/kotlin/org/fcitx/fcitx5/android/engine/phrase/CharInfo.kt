@@ -7,7 +7,7 @@ package org.fcitx.fcitx5.android.engine.phrase
 import org.fcitx.fcitx5.android.engine.data.BitPacked
 import org.fcitx.fcitx5.android.engine.data.DataFile
 import org.fcitx.fcitx5.android.engine.data.ensureFormat
-import org.fcitx.fcitx5.android.engine.stroke.Strokes
+import org.fcitx.fcitx5.android.engine.stroke.StrokeShape
 import java.nio.ByteBuffer
 
 /**
@@ -33,10 +33,10 @@ class CharInfo private constructor(
      * Of one character: its [radical] as the mainland writes it (江 氵, 说 讠), its [strokes] (0 if
      * not known), and the [parts] it is made of, the radical's among them where one is (氵 工); null
      * for a character not taken apart (乾, and those of one part: 一 乙); its stroke [order] as the
-     * mainland writes it, a [org.fcitx.fcitx5.android.engine.stroke.Strokes.KEYS] letter a stroke
-     * (行 ppshhs), null where not known (a traditional or rare character).
+     * mainland writes it, each stroke's shape (行 P P S H H SG), null where not known (a traditional or
+     * rare character).
      */
-    data class Entry(val radical: String, val strokes: Int, val parts: List<String>?, val order: String? = null)
+    data class Entry(val radical: String, val strokes: Int, val parts: List<String>?, val order: List<StrokeShape>? = null)
 
     init {
         ensureFormat(radical.size == chars.size && strokes.size == chars.size) { "character info disagrees with its characters" }
@@ -45,7 +45,7 @@ class CharInfo private constructor(
         partStart.checkRuns("parts", 0, parts.size)
         ensureFormat(orderStart.size == orderChars.size + 1) { "stroke orders disagree with their characters" }
         orderStart.checkRuns("stroke orders", 0, orders.size)
-        orders.checkBelow("strokes", Strokes.KEYS.length)
+        orders.checkBelow("strokes", StrokeShape.entries.size)
     }
 
     private fun find(table: BitPacked, codePoint: Int): Int {
@@ -60,7 +60,7 @@ class CharInfo private constructor(
         val p = find(partChars, codePoint)
         val partList = if (p < 0) null else (partStart[p] until partStart[p + 1]).map { String(Character.toChars(parts[it])) }
         val o = find(orderChars, codePoint)
-        val order = if (o < 0) null else (orderStart[o] until orderStart[o + 1]).map { Strokes.KEYS[orders[it]] }.joinToString("")
+        val order = if (o < 0) null else (orderStart[o] until orderStart[o + 1]).map { StrokeShape.entries[orders[it]] }
         return Entry(String(Character.toChars(radicals[radical[i]])), strokes[i], partList, order)
     }
 
@@ -84,8 +84,8 @@ class CharInfo private constructor(
     }
 
     companion object {
-        /** Layout of the sections; bump on any change to it. */
-        const val VERSION = 2
+        /** Layout of the sections; bump on any change to it (3: a stroke's shape, not its kind). */
+        const val VERSION = 3
 
         /** None known: an app without the file. */
         val EMPTY: CharInfo by lazy { load(ByteBuffer.wrap(CharInfoBuilder().build().toByteArray())) }

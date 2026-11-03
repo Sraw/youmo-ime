@@ -35,6 +35,7 @@ import org.fcitx.fcitx5.android.engine.learn.control.WordKind
 import org.fcitx.fcitx5.android.engine.reading.CharCard
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.engine.stroke.StrokeShape
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.bar.CandidateBarHeight
@@ -284,7 +285,7 @@ class HandwritingUatTest {
             CharCard.Row("héng", "ㄏㄥˊ", listOf("道行")),
             CharCard.Row("hàng", "ㄏㄤˋ", emptyList()),
         ),
-        "行", 6, listOf(CharCard.Part("彳", "chì"), CharCard.Part("亍", "chù")), "丿丿丨一一丨",
+        "行", 6, listOf(CharCard.Part("彳", "chì"), CharCard.Part("亍", "chù")), StrokeShape.parse("P P S H H SG"),
     )
 
     private fun held(text: String): ListPopupWindow {
@@ -312,10 +313,11 @@ class HandwritingUatTest {
         val s = h.service
         val radical = s.getString(R.string.char_card_radical)
         val parts = s.getString(R.string.char_card_parts)
-        val lines = listOf("$radical 行　" + s.getString(R.string.char_card_strokes, 6), "$parts 彳 亍（chì chù）", s.getString(R.string.char_card_order) + " 丿丿丨一一丨")
+        val lines = listOf("$radical 行　" + s.getString(R.string.char_card_strokes, 6), "$parts 彳 亍（chì chù）", s.getString(R.string.char_card_order) + " 丿丿丨一一亅")
         assertTrue(texts.toString(), texts.containsAll(listOf("行", "háng", "ㄏㄤˊ", "银行 行业") + lines))
         assertEquals(
-            "行，${s.getString(R.string.char_card_readings)} háng、xíng、héng、hàng，$radical 行，${s.getString(R.string.char_card_strokes, 6)}，$parts 彳 亍",
+            "行，${s.getString(R.string.char_card_readings)} háng、xíng、héng、hàng，$radical 行，${s.getString(R.string.char_card_strokes, 6)}，$parts 彳 亍，" +
+                "${s.getString(R.string.char_card_order)} 撇、撇、竖、横、横、竖钩",
             card.contentDescription,
         )
         // 上屏 and 复制 last in it, then the learning menu's lines; the card no line to pick
@@ -411,7 +413,7 @@ class HandwritingUatTest {
                 // the dictionaries' neutral tone, the card's alone (暖和)
                 CharCard.Row("huo", "˙ㄏㄨㄛ", emptyList()),
             ),
-            "口", 8, listOf(CharCard.Part("禾", "hé"), CharCard.Part("口", "kǒu")), "丿一丨丿丶丨乛一",
+            "口", 8, listOf(CharCard.Part("禾", "hé"), CharCard.Part("口", "kǒu")), StrokeShape.parse("P H S P D S HZ H"),
         )
         h.start()
         h.emit(HostEvent.ClientPreedit(FormattedText(arrayOf("乾"), intArrayOf(0), 1)))

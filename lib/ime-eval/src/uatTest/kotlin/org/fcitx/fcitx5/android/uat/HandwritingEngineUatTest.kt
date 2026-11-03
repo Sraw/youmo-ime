@@ -179,21 +179,34 @@ class HandwritingEngineUatTest {
     }
 
     // the mainland's stroke order (the user, 2026-11-02), where rime-stroke's first is not: 行 ppshhz,
-    // 出 szszs, 必 nznnp, 我 phzhznp
+    // 出 szszs, 必 nznnp, 我 phzhznp; each stroke by its shape (the user, 2026-11-02): 行's last a 竖钩
     @Test
     @Uat("HW-29")
     fun aCardsStrokeOrderIsTheMainlands() {
-        assertEquals("丿丿丨一一丨", card("行", "口").strokeOrder)
-        assertEquals("乛丨丨乛丨", card("出", "口").strokeOrder)
-        assertEquals("丶乛丶丿丶", card("必", "口").strokeOrder)
-        assertEquals("丿一丨一乛丿丶", card("我", "口").strokeOrder)
-        assertEquals("丶丿一丨丿丶乛丿一丿一丿丶", card("数", "口").strokeOrder)
+        assertEquals("丿丿丨一一亅", card("行", "口").orderShown())
+        assertEquals("㇗丨丨㇗丨", card("出", "口").orderShown())
+        assertEquals("丶㇃丶丿丶", card("必", "口").orderShown())
+        assertEquals("丿一亅㇀㇂丿丶", card("我", "口").orderShown())
+        assertEquals("丶丿一丨丿丶㇛丿一丿一丿㇏", card("数", "口").orderShown())
         // the count the order's: Unihan's 范 9 and 骨 10 are Taiwan's (a 4-stroke 艹; 骨's 冖)
-        assertEquals("一丨丨丶丶一乛乛" to 8, card("范", "口").let { it.strokeOrder to it.strokes })
-        assertEquals(9, card("骨", "口").strokes)
+        assertEquals("一丨丨丶丶㇀㇆乚" to 8, card("范", "口").let { it.orderShown() to it.strokes })
+        assertEquals("丨㇕㇕丶㇖丨㇆一一" to 9, card("骨", "口").let { it.orderShown() to it.strokes })
         // 皙 with 白's 丿, as corrected in lexicon/stroke-order.tsv (cnchar's left it out); for 國, which it has not, the stroke table's of Unihan's count, 11
-        assertEquals("一丨丿丶丿丿一丨丿丨乛一一" to 13, card("皙", "口").let { it.strokeOrder to it.strokes })
-        assertEquals("丨乛一丨乛一一乛丶丿一", card("國", "口").strokeOrder)
+        assertEquals("一丨丿丶丿丿一丨丿丨㇕一一" to 13, card("皙", "口").let { it.orderShown() to it.strokes })
+        assertEquals("丨乛一丨乛一一乛丶丿一", card("國", "口").orderShown())
+    }
+
+    // the turning strokes each their own shape (《GB13000.1字符集汉字折笔规范》), not one 折: cnchar writes
+    // 九 乙's 横折弯钩 as 风's 横斜钩, and 横撇 as 横钩, 竖折 as 竖弯, told apart by the part they are in
+    @Test
+    @Uat("HW-29")
+    fun aCardsTurningStrokesEachTheirShape() {
+        val shown = mapOf(
+            "口" to "丨㇕一", "己" to "㇕一乚", "乙" to "㇈", "九" to "丿㇈", "马" to "㇕㇉一",
+            "风" to "丿⺄丿丶", "又" to "㇇㇏", "写" to "丶㇖一㇉一", "欠" to "丿㇖丿㇏", "山" to "丨㇗丨", "四" to "丨㇕丿㇄一",
+            "心" to "丶㇃丶丶", "那" to "㇆一一丿㇌丨", "乃" to "㇡丿", "专" to "一一ㄣ丶", "凹" to "丨㇅丨㇕一", "朵" to "丿㇍一丨丿㇏",
+        )
+        assertEquals(shown, shown.mapValues { (c, _) -> card(c, "口").orderShown() })
     }
 
     // a character's own neutral tone (头 tou, 和 huo) the card's only: never on the candidate (the user, 2026-11-02)

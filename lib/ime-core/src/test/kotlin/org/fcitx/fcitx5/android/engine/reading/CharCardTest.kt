@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.phrase.CharInfo
 import org.fcitx.fcitx5.android.engine.phrase.CharInfoTest
+import org.fcitx.fcitx5.android.engine.stroke.StrokeShape
 import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -38,10 +39,11 @@ class CharCardTest {
         assertEquals("行", card.radical)
         assertEquals(6, card.strokes)
         assertEquals(listOf(CharCard.Part("彳", "chì"), CharCard.Part("亍", "chù")), card.parts)
-        // the mainland's order (charinfo.data's): 竖钩 a 竖, as its five kinds count it; not the stroke
-        // table's (rime-stroke's 乛), which is only for a character charinfo.data has no order of
-        assertEquals("丿丿丨一一丨", card.strokeOrder)
-        assertEquals("丿丿丨一一乛", card("行", info = CharInfo.EMPTY)!!.strokeOrder)
+        // the mainland's order (charinfo.data's), each stroke's shape: its last a 竖钩; not the stroke
+        // table's (rime-stroke's, the five kinds only: a 折), which is only for a character charinfo.data has no order of
+        assertEquals("丿丿丨一一亅", card.orderShown())
+        assertEquals(StrokeShape.parse("P P S H H SG"), card.strokeOrder)
+        assertEquals("丿丿丨一一乛", card("行", info = CharInfo.EMPTY)!!.orderShown())
     }
 
     @Test
@@ -56,6 +58,7 @@ class CharCardTest {
         val qian = card("乾")!!
         assertNull(qian.parts)
         assertNull(qian.strokeOrder)
+        assertNull(qian.orderShown())
         assertEquals(11, qian.strokes)
         // no word of either: as 通用规范 lists them
         assertEquals(listOf("gān", "qián"), qian.readings.map { it.pinyin })
@@ -64,14 +67,14 @@ class CharCardTest {
         assertEquals(listOf(CharCard.Row("jiāng", "ㄐㄧㄤ", emptyList())), bare.readings)
         assertNull(bare.radical)
         assertEquals(6, bare.strokes)
-        assertEquals("丶丶一一丨一", bare.strokeOrder)
+        assertEquals("丶丶一一丨一", bare.orderShown())
         assertEquals(CharCard("江", listOf(CharCard.Row("jiāng", "ㄐㄧㄤ", emptyList())), null, null, null, null), card("江", info = CharInfo.EMPTY, strokes = null))
         // the table's order of Unihan's count (打 5) where it has one, whichever it lists first; else its first,
         // the strokes counted as that order is
         fun table(text: String) = Strokes(CodeTable.load(ByteBuffer.wrap(Strokes.read(text.reader().buffered(), "stroke").build().toByteArray()))) { 0f }
-        assertEquals("一丨一丨乛" to 5, card("打", strokes = table("...\n打\thsh\n打\thshsz\n"))!!.let { it.strokeOrder to it.strokes })
+        assertEquals("一丨一丨乛" to 5, card("打", strokes = table("...\n打\thsh\n打\thshsz\n"))!!.let { it.orderShown() to it.strokes })
         val da = card("打", strokes = table("...\n打\thsh\n"))!!
-        assertEquals("一丨一" to 3, da.strokeOrder to da.strokes)
+        assertEquals("一丨一" to 3, da.orderShown() to da.strokes)
         assertEquals(5, card("打", strokes = null)!!.strokes)
         // a part with no reading
         assertEquals(listOf(CharCard.Part("氵", "shuǐ"), CharCard.Part("工", "gōng")), card("江")!!.parts)
@@ -105,8 +108,11 @@ class CharCardTest {
 
     @Test
     fun spokenAsOneSentence() {
-        val words = CharCard.Words("读音 ", "部首 ", "拆字 ", "、", "，") { "$it 画" }
-        assertEquals("行，读音 xíng、háng、héng、hàng，部首 行，6 画，拆字 彳 亍", card("行")!!.spoken(words))
+        val names = mapOf(StrokeShape.P to "撇", StrokeShape.S to "竖", StrokeShape.H to "横", StrokeShape.SG to "竖钩", StrokeShape.ZHE to "折")
+        val words = CharCard.Words("读音 ", "部首 ", "拆字 ", "笔顺 ", "、", "，", { "$it 画" }) { names.getValue(it) }
+        assertEquals("行，读音 xíng、háng、héng、hàng，部首 行，6 画，拆字 彳 亍，笔顺 撇、撇、竖、横、横、竖钩", card("行")!!.spoken(words))
+        // a stroke known by its kind only: the kind's name
+        assertEquals("行，读音 xíng、háng、héng、hàng，6 画，笔顺 撇、撇、竖、横、横、折", card("行", info = CharInfo.EMPTY)!!.spoken(words))
         assertEquals("江，读音 jiāng", card("江", info = CharInfo.EMPTY, strokes = null)!!.spoken(words))
     }
 }

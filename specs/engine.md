@@ -301,8 +301,9 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   dictionaries' neutral tones the candidates leave out, 和 huo, flagged `CARD_ONLY` and after the rest; a
   traditional character's words its simplified one's, `readFrom`), and `engine/charinfo.data`'s radical, strokes and parts (`CharInfo`), the
   parts' readings by `CandidateReadings`, the stroke order the mainland's (`CharInfo.Entry.order`,
-  `lexicon/stroke-order.tsv`'s) or, for a character without, the stroke table's (`Strokes`) of Unihan's count,
-  else its first (the table's orders sorted, not rime-stroke's own order), the strokes counted as the
+  `lexicon/stroke-order.tsv`'s, each stroke a `StrokeShape`: 行 丿丿丨一一亅, TalkBack reading each shape's name) or,
+  for a character without, the stroke table's (`Strokes`) of Unihan's count, else its first (the table's orders
+  sorted, not rime-stroke's own order; the five kinds only, a 折 `StrokeShape.ZHE`), the strokes counted as the
   order shown is (Unihan's count may be Taiwan's glyph's: 范 9 beside the mainland's 8); what is
   not known is null. The app shows it above the held candidate's menu (`CharCardView`, laid out by
   `CharCardLayout`).

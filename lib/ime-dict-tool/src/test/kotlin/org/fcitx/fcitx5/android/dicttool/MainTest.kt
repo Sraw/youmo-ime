@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.engine.english.EnglishData
 import org.fcitx.fcitx5.android.engine.english.EnglishText
 import org.fcitx.fcitx5.android.engine.phrase.CharInfo
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.stroke.StrokeShape
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -403,7 +404,7 @@ class MainTest {
 
     // a pinyin.data whose characters' readings are kMandarin's: 你 好 江, not 乾
     private fun charInfoInputs(
-        orders: String = "# 字  笔顺编号\n好\t531521\n江\t441121\n你\t3235234\n",
+        orders: String = "# 字  shapes\n好\tPD P H HP SG H\n江\tD D T H S H\n你\tP S P HG SG P D\n",
         strokes: String = "乾\thhsszhpnhhz\n",
     ): Array<String> {
         val pinyin = tmp.root.resolve("pinyin.data").path
@@ -437,8 +438,8 @@ class MainTest {
         assertTrue(out, out.contains("parts 3 (100.0%)"))
         assertTrue(out, out.contains("the mainland's stroke order 3 (100.0%)"))
         val info = CharInfo.load(ByteBuffer.wrap(output.readBytes()))
-        // 丿丨丿㇇亅丿丶 in the five kinds: 3235234
-        assertEquals(CharInfo.Entry("亻", 7, listOf("亻", "尔"), "pspzspn"), info.of('你'.code))
+        // each stroke's shape, as written: 尔's 横钩
+        assertEquals(CharInfo.Entry("亻", 7, listOf("亻", "尔"), StrokeShape.parse("P S P HG SG P D")), info.of('你'.code))
         // strokes from rime-stroke's order where Unihan counts none
         assertEquals(CharInfo.Entry("乙", 11, null), info.of('乾'.code))
     }
@@ -446,7 +447,7 @@ class MainTest {
     @Test
     fun tooFewCharactersWithTheMainlandsStrokeOrderFailTheBuild() {
         val output = tmp.root.resolve("charinfo.data")
-        val (code, _, err) = run("charinfo", "-o", output.path, *charInfoInputs("你\t3235234\n"), "--cover", file("chars.txt", "你好江"))
+        val (code, _, err) = run("charinfo", "-o", output.path, *charInfoInputs("你\tP S P HG SG P D\n"), "--cover", file("chars.txt", "你好江"))
         assertEquals(1, code)
         assertTrue(err, err.contains("2 characters without the mainland's stroke order") && err.contains("好江"))
     }
@@ -454,7 +455,7 @@ class MainTest {
     @Test
     fun anOrderUnlikeUnihansCountFailsTheBuild() {
         val output = tmp.root.resolve("charinfo.data")
-        val (code, _, err) = run("charinfo", "-o", output.path, *charInfoInputs("好\t531521\n你\t323523\n"))
+        val (code, _, err) = run("charinfo", "-o", output.path, *charInfoInputs("好\tPD P H HP SG H\n你\tP S P HG SG P\n"))
         assertEquals(1, code)
         assertTrue(err, err.contains("stroke-order.tsv:2") && err.contains("你 6 strokes, Unihan 7"))
     }
@@ -462,7 +463,7 @@ class MainTest {
     @Test
     fun anOrderNoneOfRimeStrokesFailsTheBuildAndLeavesTheFileThere() {
         val output = tmp.root.resolve("charinfo.data").apply { writeText("before") }
-        val (code, _, err) = run("charinfo", "-o", output.path, *charInfoInputs("江\t441121\n", "江\tnnhhsz\n"))
+        val (code, _, err) = run("charinfo", "-o", output.path, *charInfoInputs("江\tD D T H S H\n", "江\tnnhhsz\n"))
         assertEquals(1, code)
         assertTrue(err, err.contains("江 丶丶一一丨一, rime-stroke 丶丶一一丨乛, with no note why"))
         assertEquals("before", output.readText())
@@ -471,7 +472,7 @@ class MainTest {
     @Test
     fun anOrderWithANoteWhyIsTaken() {
         val output = tmp.root.resolve("charinfo.data")
-        assertEquals(0, run("charinfo", "-o", output.path, *charInfoInputs("江\t441121\tthe mainland's 竖 a 丨\n", "江\tnnhhsz\n")).first)
+        assertEquals(0, run("charinfo", "-o", output.path, *charInfoInputs("江\tD D T H S H\tthe mainland's 竖 a 丨\n", "江\tnnhhsz\n")).first)
     }
 
     @Test

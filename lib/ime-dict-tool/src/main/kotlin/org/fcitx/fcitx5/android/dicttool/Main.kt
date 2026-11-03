@@ -126,8 +126,9 @@ private val COMMANDS = listOf(
             stroke order, for its card: Unihan's kRSUnicode
             and kTotalStrokes, CJKRadicals, kfcd/chaizi,
             rime-stroke's orders where Unihan counts none,
-            the mainland's orders (lexicon/stroke-order.tsv;
-            one unlike Unihan's count or rime-stroke's
+            the mainland's orders, each stroke's shape
+            (lexicon/stroke-order.tsv; one unlike Unihan's
+            count or, in the five kinds, rime-stroke's
             orders with no note why, or noted with
             nothing to excuse, fails);
             how many of the characters handwriting knows
