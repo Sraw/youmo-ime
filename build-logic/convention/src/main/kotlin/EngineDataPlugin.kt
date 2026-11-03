@@ -200,15 +200,6 @@ class EngineDataPlugin : Plugin<Project> {
             "826f83be25cd18fb8a5015a514704504e1982e840ea14d058bf583e1cc620c83",
             "engine-data/CJKRadicals-17.0.0.txt",
         )
-        // each character's stroke order as the mainland writes it (《现代汉语通用字笔顺规范》), 6,939
-        // simplified characters: cnchar's (theajack/cnchar, MIT)
-        private const val CNCHAR_COMMIT = "b8397db3e08e88ebbf8acf92b5cbab1a7e4c1550"
-        private val ORDERS = Download(
-            "https://raw.githubusercontent.com/theajack/cnchar/$CNCHAR_COMMIT/src/cnchar/plugin/order/dict/stroke-order-jian.json",
-            "412e3beb587aa5e8b423655226b956eaef0496e8c06e486d7584b2f3e1dbcdcc",
-            "engine-data/cnchar-${CNCHAR_COMMIT.take(8)}-stroke-order-jian.json",
-        )
-
         const val OPENCC_TASK = "compileOpenccData"
 
         const val MODEL_TASK = "copySentenceModels"
@@ -258,7 +249,6 @@ class EngineDataPlugin : Plugin<Project> {
         val chaiziDownload = registerDownload(target, "downloadChaizi", CHAIZI, downloadsDir)
         val unihanZip = registerDownload(target, "downloadUnihanZip", UNIHAN_ZIP, downloadsDir)
         val radicals = registerDownload(target, "downloadCjkRadicals", RADICALS, downloadsDir)
-        val orders = registerDownload(target, "downloadStrokeOrders", ORDERS, downloadsDir)
 
         val tool = target.configurations.create(TOOL_CONFIGURATION) {
             isCanBeConsumed = false
@@ -322,7 +312,8 @@ class EngineDataPlugin : Plugin<Project> {
             this.radicals.set(radicals.flatMap { it.outputFile })
             this.chaizi.set(chaiziDownload.flatMap { it.outputFile })
             this.strokes.set(strokes.flatMap { it.outputFile })
-            this.orders.set(orders.flatMap { it.outputFile })
+            // the mainland's stroke orders, this project's (first taken from cnchar, MIT)
+            this.orders.set(target.rootProject.layout.projectDirectory.dir("lexicon").file("stroke-order.tsv"))
             pinyin.set(compile.flatMap { it.outputDir.file("engine/pinyin.data") })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-charinfo"))
         }
@@ -595,7 +586,8 @@ class EngineDataPlugin : Plugin<Project> {
     /**
      * `engine/charinfo.data`: ime-dict-tool's `charinfo`, each character's radical, strokes, parts and
      * stroke order; the build fails if a character handwriting knows has no reading, radical or strokes,
-     * or under 97% of them are taken apart, or under 94% have the mainland's stroke order.
+     * or under 97% of them are taken apart, or under 94% have the mainland's stroke order; or when one of
+     * lexicon/stroke-order.tsv's orders is unlike Unihan's count or rime-stroke's with no note why.
      */
     @CacheableTask
     abstract class CompileCharInfo : ToolDataTask() {

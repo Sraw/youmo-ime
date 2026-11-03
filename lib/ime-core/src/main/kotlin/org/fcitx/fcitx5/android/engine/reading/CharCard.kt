@@ -67,7 +67,7 @@ data class CharCard(
             }
             val entry = info.of(cp)
             val parts = entry?.parts?.map { p -> Part(p, readings.ordered(p.codePointAt(0)).firstOrNull()?.pinyin) }
-            // the mainland's order (charinfo.data's, cnchar's); rime-stroke's first for a character it lacks
+            // the mainland's order (charinfo.data's, lexicon/stroke-order.tsv's); rime-stroke's first for a character it lacks
             val order = entry?.order?.let(Strokes::shown)
                 ?: if (text.length == 1) strokes?.ordersOf(text[0])?.firstOrNull()?.let(Strokes::shown) else null
             // counted as the order shown is: Unihan's count may be Taiwan's glyph's (廴 3, its order 2)

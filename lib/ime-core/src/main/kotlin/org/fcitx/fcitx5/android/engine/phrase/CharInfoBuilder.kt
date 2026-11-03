@@ -18,13 +18,14 @@ import org.fcitx.fcitx5.android.engine.stroke.Strokes
  * - CJKRadicals.txt, each radical's character ([radicals]): `149'` 讠;
  * - 汉语拆字字典's ways to take a character apart ([chaizi]): 江 `水 工` `氵 工`;
  * - rime-stroke's stroke orders ([strokes]): the first's length for a character Unihan counts no
- *   strokes of; all of them to check cnchar's against;
- * - cnchar's stroke orders as the mainland writes them ([orders]); rime-stroke's first order of a
- *   character is Taiwan's as often as not (出 丨乛丨乛丨, not 乛丨丨乛丨; 必 丶乛丶丶丿, not 丶乛丶丿丶; half
- *   of cnchar's 6,939 differ), and the user wants the mainland's standard (2026-11-02). One none of
- *   rime-stroke's orders of the character is, is left out: 7 of cnchar's are slips (皙 has 12 strokes,
- *   白's 丿 missing). A character with the mainland's order counts its strokes as that order does:
- *   Unihan counts the mainland's 范 骨 and the 艹 of 茔 荧 莹 as Taiwan's (9, 10, a 4-stroke 艹).
+ *   strokes of; all of them to check the mainland's against;
+ * - `lexicon/stroke-order.tsv`, the stroke orders as the mainland writes them ([orders]), first taken
+ *   from cnchar (MIT) and kept by this project since: rime-stroke's first order of a character is
+ *   Taiwan's as often as not (出 丨乛丨乛丨, not 乛丨丨乛丨; 必 丶乛丶丶丿, not 丶乛丶丿丶), and the user wants the
+ *   mainland's standard (2026-11-02). [build] fails on an order whose strokes are not as many as
+ *   Unihan counts, or that is none of rime-stroke's orders of the character, unless its line says why:
+ *   that is how cnchar's slips were found (皙 without 白's 丿, 德's 十 a 一丿). A character with the
+ *   mainland's order counts its strokes as that order does (Unihan counts 范 as Taiwan's, 9).
  *
  * The radical is written as the mainland does where the character's parts show it so (江 氵, 打 扌,
  * 草 艹: [VARIANTS]), else as CJKRadicals has it (和 口, 说 讠): Unicode's Kangxi radicals, not the
@@ -41,8 +42,12 @@ class CharInfoBuilder {
     // code point to rime-stroke's orders of it, all of them
     private val rimeOrders = HashMap<Int, MutableSet<String>>()
 
-    // code point to its stroke order as the mainland writes it, a [Strokes.KEYS] letter a stroke
+    // code point to its stroke order as the mainland writes it, a [Strokes.KEYS] letter a stroke; the
+    // line it is on, and the code points whose line says why it differs from Unihan's or rime-stroke's
     private val orders = HashMap<Int, String>()
+    private val orderLines = HashMap<Int, Int>()
+    private val explained = HashSet<Int>()
+    private var ordersSource = ""
 
     // radical (85, 149') to its character's code point
     private val radicalChars = HashMap<String, Int>()
@@ -109,20 +114,27 @@ class CharInfoBuilder {
     }
 
     /**
-     * cnchar's `stroke-order-jian.json`, a `"行": "ssfjjg",` line a character: its strokes in the order
-     * 《现代汉语通用字笔顺规范》 gives, each one of 26 shapes (`stroke-table.json`), kept as the five
-     * kinds that standard groups them in ([KINDS]: 提 with 横, 竖钩 with 竖, 捺 with 点).
+     * `lexicon/stroke-order.tsv`'s `行<TAB>332112[<TAB>why]` lines (`#` a comment): a character's strokes in
+     * the order 《现代汉语通用字笔顺规范》 gives, by the standard's numbers (1 横, 2 竖, 3 撇, 4 点, 5 折), and,
+     * for one [build] would otherwise fail on, why its count is not Unihan's or its order none of
+     * rime-stroke's.
      *
-     * @throws SourceException on a line that is not one, or a shape not known
+     * @throws SourceException on a line that is not one
      */
     fun orders(lines: Sequence<String>, source: String) = apply {
+        ordersSource = source
         lines.forEachIndexed { n, line ->
-            val body = line.trim().removeSuffix(",")
-            if (body.isEmpty() || body == "{" || body == "}") return@forEachIndexed
-            val m = ORDER_LINE.matchEntire(body) ?: throw SourceException(source, n + 1, "expected \"字\": \"strokes\"")
-            val c = m.groupValues[1]
+            if (line.isBlank() || line.startsWith('#')) return@forEachIndexed
+            val f = line.split('\t')
+            val c = f[0]
             if (c.codePointCount(0, c.length) != 1) throw SourceException(source, n + 1, "not one character: $c")
-            orders[c.codePointAt(0)] = m.groupValues[2].map { KINDS[it] ?: throw SourceException(source, n + 1, "not a stroke: $it") }.joinToString("")
+            val order = f.getOrNull(1).orEmpty()
+            if (order.isEmpty() || order.any { it !in '1'..'5' }) throw SourceException(source, n + 1, "not a stroke order (1 to 5 a stroke): $order")
+            val cp = c.codePointAt(0)
+            if (cp in orders) throw SourceException(source, n + 1, "$c twice")
+            orders[cp] = order.map { Strokes.KEYS[it - '1'] }.joinToString("")
+            orderLines[cp] = n + 1
+            if (f.getOrNull(2).orEmpty().isNotBlank()) explained += cp
         }
     }
 
@@ -135,13 +147,29 @@ class CharInfoBuilder {
         val variants = if (radical.endsWith('\'')) setOf(own) else VARIANTS[number].orEmpty()
         val way = ways[codePoint]?.let { all -> all.firstOrNull { w -> w.any { it in variants } } ?: all.first() }
         val shown = way?.firstOrNull { it in variants } ?: own
-        // cnchar's order only where rime-stroke has it too, or has none of the character
-        val order = orders[codePoint]?.takeIf { rimeOrders[codePoint]?.contains(it) ?: true }
+        val order = orders[codePoint]
         val strokes = order?.length ?: totalStrokes[codePoint] ?: strokeOrders[codePoint] ?: 0
         return CharInfo.Entry(String(Character.toChars(shown)), strokes, way?.map { String(Character.toChars(it)) }, order)
     }
 
+    /** @throws SourceException naming the stroke orders, not explained, Unihan counts or rime-stroke writes otherwise */
     fun build(): DataFile.Writer {
+        val odd = orders.keys.filter { it !in explained }.sortedBy { orderLines.getValue(it) }.mapNotNull { cp ->
+            val order = orders.getValue(cp)
+            val c = String(Character.toChars(cp))
+            val count = totalStrokes[cp]
+            when {
+                count != null && count != order.length -> "$c ${order.length} strokes, Unihan $count"
+                rimeOrders[cp]?.contains(order) == false -> "$c ${Strokes.shown(order)}, rime-stroke ${rimeOrders.getValue(cp).joinToString("/", transform = Strokes::shown)}"
+                else -> null
+            }?.let { cp to it }
+        }
+        if (odd.isNotEmpty()) {
+            throw SourceException(
+                ordersSource, orderLines.getValue(odd[0].first),
+                "${odd.size} stroke orders unlike Unihan's count or rime-stroke's, with no note why: " + odd.joinToString("; ") { it.second },
+            )
+        }
         val chars = radicalOf.keys.sorted().mapNotNull { cp -> entry(cp)?.let { cp to it } }
         val shown = chars.map { it.second.radical.codePointAt(0) }.distinct().sorted()
         val index = shown.withIndex().associate { (i, cp) -> cp to i }
@@ -173,12 +201,6 @@ class CharInfoBuilder {
         private const val RS = "kRSUnicode"
         private const val TOTAL = "kTotalStrokes"
         private const val HEX = 16
-        private val ORDER_LINE = Regex("\"(.+)\": \"([a-z]+)\"")
-
-        /** cnchar's shapes by their five kinds, [Strokes.KEYS]' letters: 横 丨 丿 丶, every turning one 乛. */
-        val KINDS: Map<Char, Char> = mapOf(
-            'j' to "h", 'i' to "h", 'f' to "s", 'g' to "s", 's' to "p", 'k' to "n", 'd' to "n", 'l' to "n",
-        ).mapValues { it.value[0] } + "abcehmnopqrtuvwxyz".associateWith { 'z' }
 
         /**
          * Kangxi radicals by number, each as the mainland writes it on the side or top of a character

@@ -14,7 +14,8 @@ import java.nio.ByteBuffer
  * A character's radical, its strokes and its parts, for its card (`engine/charinfo.data`,
  * ime-dict-tool's `charinfo`): Unihan's kRSUnicode and kTotalStrokes (Unicode License v3) with
  * CJKRadicals.txt, the open 汉语拆字字典 (kfcd/chaizi, CC BY 3.0), rime-stroke for a character
- * Unihan counts no strokes of, and cnchar's stroke orders (MIT). How each is chosen: [CharInfoBuilder].
+ * Unihan counts no strokes of, and the mainland's stroke orders this project keeps (lexicon/stroke-order.tsv,
+ * first taken from cnchar, MIT). How each is chosen: [CharInfoBuilder].
  */
 class CharInfo private constructor(
     private val chars: BitPacked,

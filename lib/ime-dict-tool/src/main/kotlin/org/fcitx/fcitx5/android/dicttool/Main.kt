@@ -120,13 +120,15 @@ private val COMMANDS = listOf(
         inputs = 1..1,
     ) { options, out -> chaizi(options, out) },
     Command(
-        "charinfo -o <out> --unihan <Unihan.zip> --radicals <CJKRadicals.txt> --chaizi <chaizi-jt.txt> --strokes <stroke.dict.yaml> --orders <stroke-order-jian.json> --pinyin <pinyin.data> [--cover <chars.txt>]",
+        "charinfo -o <out> --unihan <Unihan.zip> --radicals <CJKRadicals.txt> --chaizi <chaizi-jt.txt> --strokes <stroke.dict.yaml> --orders <stroke-order.tsv> --pinyin <pinyin.data> [--cover <chars.txt>]",
         """
             each character's radical, strokes, parts and
             stroke order, for its card: Unihan's kRSUnicode
             and kTotalStrokes, CJKRadicals, kfcd/chaizi,
             rime-stroke's orders where Unihan counts none,
-            cnchar's orders as the mainland writes them;
+            the mainland's orders (lexicon/stroke-order.tsv;
+            one unlike Unihan's count or rime-stroke's
+            orders, with no note why, fails);
             how many of the characters handwriting knows
             (--cover) have each, and readings, checked
         """,
@@ -317,7 +319,7 @@ private class Options(
     val radicals: String?,
     val chaizi: String?,
     val strokes: String?,
-    /** `charinfo`: cnchar's stroke-order-jian.json. */
+    /** `charinfo`: lexicon/stroke-order.tsv. */
     val orders: String?,
     val cover: String?,
     /** `english-lm`: how many words, and at most how many of the pages' words to read. */
@@ -1089,8 +1091,8 @@ private fun charInfo(options: Options, out: Appendable) {
             "readings" to { cp -> readings.of(cp).isNotEmpty() },
             "radical" to { cp -> info.of(cp) != null },
             "strokes" to { cp -> (info.of(cp)?.strokes ?: 0) > 0 },
-            "parts" to { cp -> info.of(cp)?.parts != null },
-            "the mainland's stroke order" to { cp -> info.of(cp)?.order != null },
+            PARTS to { cp -> info.of(cp)?.parts != null },
+            MAINLAND_ORDER to { cp -> info.of(cp)?.order != null },
         )
         for ((what, test) in has) {
             val missing = chars.filterNot(test)
@@ -1110,9 +1112,11 @@ private fun charInfo(options: Options, out: Appendable) {
 private const val UNIHAN_RS = "Unihan_IRGSources.txt"
 
 // of the characters handwriting knows, at least this share must be taken apart (97.8% are), and have
-// the mainland's stroke order (95.0% have: cnchar's are 6,939 simplified ones; a traditional one has
+// the mainland's stroke order (95.1% have: lexicon/stroke-order.tsv's are 6,939 simplified ones; a traditional one has
 // rime-stroke's); the rest all
-private val FLOORS = mapOf("parts" to 0.97, "the mainland's stroke order" to 0.94)
+private const val PARTS = "parts"
+private const val MAINLAND_ORDER = "the mainland's stroke order"
+private val FLOORS = mapOf(PARTS to 0.97, MAINLAND_ORDER to 0.94)
 private const val MISSING_SHOWN = 20
 
 private fun strokes(output: String, input: String, out: Appendable) {
