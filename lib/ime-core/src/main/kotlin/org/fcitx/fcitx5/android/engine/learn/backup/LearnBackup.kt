@@ -105,7 +105,11 @@ object LearnBackup {
     /** The file name a backup is saved under, by the user or in the settings' zip. */
     const val EXTENSION = ".fxlb"
 
-    /** [state], the lists and [addresses] (none: not written) as a backup's bytes, headed by [head]. */
+    /**
+     * [state], the lists and [addresses] (none: not written) as a backup's bytes, headed by [head]: the
+     * rows [backedUp] takes, all of them in 退回恢复前's copy ([BackupHead.BEFORE_RESTORE]), the phone's
+     * own file, never listed nor handed around, which a revert lays over the phone's learning whole.
+     */
     fun bytes(
         head: BackupHead,
         state: LearnState,
@@ -128,7 +132,7 @@ object LearnBackup {
         // END must be the only 74, and last, or the file would not read
         LearnLog.writeSnapshot(state, state.cut, { record: ByteArray ->
             if (record[4] !in HEAD..LAST || record[4] == BackupMerge.ORIGIN) out.write(record)
-        }, keeps = ::backedUp)
+        }, keeps = if (head.kind == BackupHead.BEFORE_RESTORE) { _ -> true } else ::backedUp)
         for (w in added) out.write(word(ADDED, w))
         for (w in blocked) out.write(word(BLOCKED, w))
         if (addresses != null) {

@@ -126,7 +126,12 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    (user 2026-11-02, C54): most whole commits are never put in again, and the tables and handwriting kept no
    sentence before (S8), so a file the user hands around holds only those used again; the phone's snapshot
    keeps them, as the count must reach 3 across days and a fold keeps only the snapshot (the tail is the
-   last hour's commits), and a merge leaves the phone's own as they were. Only the start is looked at, not what is before it (C51):
+   last hour's commits), and a merge leaves the phone's own as they were. 退回恢复前's copy
+   (`BackupHead.BEFORE_RESTORE`) keeps them: the phone's own file, never listed nor in the settings'
+   zip (`Backups.DIR` is left out), laid over the learning whole by a revert. The settings' zip where
+   the engine gave no backup (`UserDataManager.export` with no `learning`: the record unreadable, say)
+   carries `learn.log` itself, all of it: kept so as not to lose the learning, as a parse of the file
+   would fail as the engine's did. Only the start is looked at, not what is before it (C51):
    a sentence never typed that starts with the same word gets the phrase first, in place of the word it
    wanted. Measured by `predict-learn --continuations on|off` (top1/top5 on held-out sentences after the tune
    half is typed three times): pinyin-chat 12.9/28.5% → 6.1/25.3%, pinyin 20.4/40.9% → 14.0/37.1%; the
