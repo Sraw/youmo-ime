@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- nothing leaves the browser: no request of any kind, so the line on the page is true; a link someone adds later is refused too -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src blob: data:">
+<!-- nothing leaves the browser: no request of any kind, so the line on the page is true; a link someone adds later is refused too.
+     Only the page's own two scripts run (by their hashes, assemble.py writes them; the page's test checks them) -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-4kiI+xAqv58BKDl5Ijwm7eUgnyRjv/pW6LbNyc5bYXs=' 'sha256-rBzUu73S23RAYxs9UlEJkQt27DWKY7jopOCEa+wqXkc='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
 <meta name="color-scheme" content="light dark">
 <title>幽默输入法 · 主题制作</title>
 <style>
@@ -64,7 +65,7 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 520px)
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 .seg button:disabled { opacity: .35; }
 
-.stage { position: relative; overflow: hidden; border-radius: 14px; border: 1px solid var(--line); }
+.stage { position: relative; overflow: hidden; border-radius: 14px; border: 1px solid var(--line); -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .stage svg { display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
 .stage-note { font-size: 12px; color: var(--muted); margin-top: 6px; }
 
@@ -795,7 +796,7 @@ dialog::backdrop { background: #0008; }
 
   // ---- errors the page tells apart ----
   class ThemeError extends Error {
-    // code: not-theme | newer | older | bad | missing | limit
+    // code: not-theme | newer | older | bad | missing | limit (detail: which) | image (one the app cannot read the size of)
     constructor(code, detail) {
       super(code + (detail ? ': ' + detail : ''));
       this.code = code;
@@ -882,17 +883,45 @@ dialog::backdrop { background: #0008; }
     return out;
   }
 
-  async function inflateRaw(bytes) {
-    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
-    return new Uint8Array(await new Response(stream).arrayBuffer());
+  /** [bytes] inflated, counted as they come: past [max] bytes it stops (a zip bomb is never whole in memory) and throws. */
+  async function inflateRaw(bytes, max, what) {
+    const reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+    const parts = [];
+    let n = 0;
+    for (;;) {
+      let r;
+      try {
+        r = await reader.read();
+      } catch (e) {
+        throw new ThemeError('not-theme', 'bad data in ' + what);
+      }
+      if (r.done) break;
+      n += r.value.length;
+      if (n > max) {
+        await reader.cancel().catch(() => {});
+        throw new ThemeError('not-theme', what + ' is more than its zip says');
+      }
+      parts.push(r.value);
+    }
+    const out = new Uint8Array(n);
+    let at = 0;
+    for (const p of parts) {
+      out.set(p, at);
+      at += p.length;
+    }
+    return out;
   }
 
   /**
    * A zip's entries by its central directory (so an entry with a data descriptor, as the app writes
-   * them, reads too): [{name, read: async () => Uint8Array}]. STORED and DEFLATE.
+   * them, reads too): [{name, size, read: async () => Uint8Array}], size what the zip says it unpacks to.
+   * STORED and DEFLATE; read never takes more than that size, nor from outside the zip.
    */
   function readZip(bytes) {
     const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const bad = (why) => {
+      throw new ThemeError('not-theme', why);
+    };
     let eocd = -1;
     for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 22 - 65535); i--) {
       if (dv.getUint32(i, true) === 0x06054b50) {
@@ -900,36 +929,40 @@ dialog::backdrop { background: #0008; }
         break;
       }
     }
-    if (eocd < 0) throw new ThemeError('not-theme', 'not a zip');
+    if (eocd < 0) bad('not a zip');
     const count = dv.getUint16(eocd + 10, true);
     let p = dv.getUint32(eocd + 16, true);
     const dec = new TextDecoder();
     const out = [];
     for (let n = 0; n < count; n++) {
-      if (p + 46 > bytes.length || dv.getUint32(p, true) !== 0x02014b50) throw new ThemeError('not-theme', 'bad central directory');
+      if (p + 46 > bytes.length || dv.getUint32(p, true) !== 0x02014b50) bad('bad central directory');
       const flags = dv.getUint16(p + 8, true);
       const method = dv.getUint16(p + 10, true);
       const crc = dv.getUint32(p + 16, true);
-      const size = dv.getUint32(p + 20, true);
+      const packed = dv.getUint32(p + 20, true);
+      const size = dv.getUint32(p + 24, true);
       const nameLen = dv.getUint16(p + 28, true);
       const extraLen = dv.getUint16(p + 30, true);
       const commentLen = dv.getUint16(p + 32, true);
       const local = dv.getUint32(p + 42, true);
+      if (p + 46 + nameLen > bytes.length) bad('bad central directory');
       const name = dec.decode(bytes.subarray(p + 46, p + 46 + nameLen));
       p += 46 + nameLen + extraLen + commentLen;
-      if (flags & 1) throw new ThemeError('not-theme', 'encrypted');
+      if (flags & 1) bad('encrypted');
       out.push({
         name,
-        size: dv.getUint32(p - 46 - nameLen - extraLen - commentLen + 24, true),
+        size,
         async read() {
-          if (dv.getUint32(local, true) !== 0x04034b50) throw new ThemeError('not-theme', 'bad local header');
+          if (local + 30 > bytes.length || dv.getUint32(local, true) !== 0x04034b50) bad('bad local header of ' + name);
           const start = local + 30 + dv.getUint16(local + 26, true) + dv.getUint16(local + 28, true);
-          const raw = bytes.subarray(start, start + size);
+          if (start + packed > bytes.length) bad(name + ' runs past the zip');
+          const raw = bytes.subarray(start, start + packed);
           let data;
           if (method === 0) data = raw.slice();
-          else if (method === 8) data = await inflateRaw(raw);
-          else throw new ThemeError('not-theme', 'compression ' + method);
-          if (crc32(data) !== crc) throw new ThemeError('not-theme', 'CRC of ' + name);
+          else if (method === 8) data = await inflateRaw(raw, size, name);
+          else bad('compression ' + method);
+          if (data.length !== size) bad(name + ' is not the size its zip says');
+          if (crc32(data) !== crc) bad('CRC of ' + name);
           return data;
         },
       });
@@ -1171,9 +1204,10 @@ dialog::backdrop { background: #0008; }
       if (!(k in obj)) throw new ThemeError('bad', 'field ' + k + ' missing');
       return obj[k];
     };
+    // as the app's jsonPrimitive.int: a number past an Int is refused, not cut to one
     const int = (v, w) => {
-      if (!Number.isInteger(v)) throw new ThemeError('bad', w + ' not an int');
-      return v | 0;
+      if (!Number.isInteger(v) || v < -2147483648 || v > 2147483647) throw new ThemeError('bad', w + ' not an int');
+      return v;
     };
     const palette = {};
     for (const k of PALETTE_21) palette[k] = int(need(k), k);
@@ -1234,60 +1268,206 @@ dialog::backdrop { background: #0008; }
     throw new ThemeError('newer', version);
   }
 
+  /** A file name the app takes as one file in its themes' directory (ThemeFilesManager.importedFile): never a path, a json, or SAVING. */
+  function isThemeFileName(name) {
+    return isPlainFileName(name) && !name.toLowerCase().endsWith('.json') && name !== '.saving' && utf8Length(name) <= 255;
+  }
+  /** As the app's isPlainFileName: not empty, not . or .., no slash. */
+  function isPlainFileName(name) {
+    return name.length > 0 && name !== '.' && name !== '..' && !name.includes('/');
+  }
+  const utf8Length = (s) => new TextEncoder().encode(s).length;
+  /** File(name).name: the last part of a path. */
+  const baseName = (name) => name.substring(name.lastIndexOf('/') + 1);
   /**
-   * A theme zip opened: the json at its top (one; folders and Mac's `._` files passed over, as the
-   * app does) and every file it names. {theme, migrated, files: {name: Uint8Array}}.
+   * An entry's name as the app's unpacking resolves it (File(dir, name).canonicalPath): the parts
+   * left once . and .. are taken; one out of the zip's top refuses the zip, as the app does.
+   */
+  function entryPath(name) {
+    const parts = [];
+    for (const x of name.split('/')) {
+      if (x === '' || x === '.') continue;
+      if (x === '..') {
+        if (!parts.length) throw new ThemeError('not-theme', 'entry ' + JSON.stringify(name) + ' outside the zip');
+        parts.pop();
+      } else parts.push(x);
+    }
+    return parts;
+  }
+
+  /** [theme] with each file name it has as [fn] makes it (ThemeLook.mapFiles). */
+  function mapFiles(theme, fn) {
+    const t = JSON.parse(JSON.stringify(theme));
+    const p = t.picture;
+    if (p) {
+      p.src = fn(p.src);
+      p.portrait.file = fn(p.portrait.file);
+      if (p.landscape) p.landscape.file = fn(p.landscape.file);
+    }
+    const img = (x) => {
+      if (x && x.type === 'image') x.file = fn(x.file);
+    };
+    const k = t.keys;
+    for (const s of [k.letter, k.function, k.space, k.enter, ...Object.values(k.overrides)]) {
+      img(s.fill);
+      img(s.pressed);
+    }
+    if (t.text.keyFont) t.text.keyFont = fn(t.text.keyFont);
+    if (t.text.candidateFont) t.text.candidateFont = fn(t.text.candidateFont);
+    return t;
+  }
+
+  /**
+   * An image file's width and height from its header, before it is decoded (as the app's probe reads
+   * them): PNG, JPEG, WebP; null for another, or one too short to say.
+   */
+  function imageSize(bytes) {
+    const n = bytes.length;
+    const u16be = (i) => (bytes[i] << 8) | bytes[i + 1];
+    const u32be = (i) => ((bytes[i] << 24) | (bytes[i + 1] << 16) | (bytes[i + 2] << 8) | bytes[i + 3]) >>> 0;
+    const u16le = (i) => bytes[i] | (bytes[i + 1] << 8);
+    const u24le = (i) => bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16);
+    const type = imageType(bytes);
+    if (type === 'png') return n >= 24 ? [u32be(16), u32be(20)] : null;
+    if (type === 'jpg') {
+      let i = 2;
+      while (i + 9 < n) {
+        if (bytes[i] !== 0xff) return null;
+        const m = bytes[i + 1];
+        if (m === 0xff) { i++; continue; }
+        if (m === 0xd8 || m === 0x01 || (m >= 0xd0 && m <= 0xd7)) { i += 2; continue; }
+        // a frame's start (SOF0..SOF15 but DHT, JPG, DAC): its height, then its width
+        if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return [u16be(i + 7), u16be(i + 5)];
+        i += 2 + u16be(i + 2);
+      }
+      return null;
+    }
+    if (type === 'webp') {
+      const tag = String.fromCharCode(bytes[12], bytes[13], bytes[14], bytes[15]);
+      if (tag === 'VP8 ' && n >= 30) return [u16le(26) & 0x3fff, u16le(28) & 0x3fff];
+      if (tag === 'VP8L' && n >= 25) {
+        const b = bytes;
+        return [1 + (b[21] | ((b[22] & 0x3f) << 8)), 1 + ((b[22] >> 6) | (b[23] << 2) | ((b[24] & 0x0f) << 10))];
+      }
+      if (tag === 'VP8X' && n >= 30) return [1 + u24le(24), 1 + u24le(27)];
+      return null;
+    }
+    if (type === 'gif') return n >= 10 ? [u16le(6), u16le(8)] : null;
+    return null;
+  }
+
+  /**
+   * A theme zip opened as the app imports one (ThemeFilesManager.importTheme): refused past
+   * ThemeAssetLimits by what the zip says before anything is unpacked (every entry counted, a folder's
+   * too), each entry unpacked no bigger than it says; the json at its top (one; a Mac's `._` passed
+   * over), every file it names found at the top by its last part (File(name).name; of two entries of a
+   * name the later, as unpacking writes it over the first), the pictures' and key images' sizes read
+   * from their headers before anything decodes them (PNG, JPEG, WebP, GIF: another is refused, where
+   * the app may read it). {theme, migrated, files: {name: Uint8Array}}, the
+   * theme's file names their last parts, as the app keeps them.
    */
   async function openZip(format, bytes) {
-    const entries = readZip(bytes).filter((e) => !e.name.includes('/') && !e.name.startsWith('._'));
-    const jsons = entries.filter((e) => e.name.endsWith('.json'));
+    const lim = format.limits;
+    const all = readZip(bytes);
+    let total = 0;
+    all.forEach((e, i) => {
+      const breach = entryBreach(lim, i + 1, e.size, total);
+      if (breach) throw new ThemeError('limit', breach);
+      total += e.size;
+    });
+    const top = new Map();
+    for (const e of all) {
+      const parts = entryPath(e.name);
+      if (parts.length === 1 && !e.name.endsWith('/')) top.set(parts[0], e);
+    }
+    const jsons = [...top.keys()].filter((n) => n.endsWith('.json') && !n.startsWith('._'));
     if (jsons.length !== 1) throw new ThemeError('not-theme', jsons.length + ' json files');
-    const { theme, migrated } = readTheme(format, new TextDecoder().decode(await jsons[0].read()));
-    const files = {};
+    const read = readTheme(format, new TextDecoder().decode(await top.get(jsons[0]).read()));
+    if (Object.keys(read.theme.keys.overrides).length > lim.overrides) throw new ThemeError('limit', 'overrides');
+    if (!isPlainFileName(read.theme.name)) throw new ThemeError('bad', 'name ' + JSON.stringify(read.theme.name));
+    for (const name of lookFiles(read.theme)) {
+      if (!isThemeFileName(baseName(name))) throw new ThemeError('missing', name);
+    }
+    const theme = mapFiles(read.theme, baseName);
+    const files = Object.create(null);
     for (const name of lookFiles(theme)) {
-      const e = entries.find((x) => x.name === name);
+      const e = top.get(name);
       if (!e) throw new ThemeError('missing', name);
       files[name] = await e.read();
     }
-    return { theme, migrated, files };
+    const side = (name, max, what) => {
+      const s = imageSize(files[name]);
+      if (!s) throw new ThemeError('image', name);
+      if (Math.max(s[0], s[1]) > max) throw new ThemeError('limit', what);
+    };
+    const p = theme.picture;
+    if (p) for (const c of [p.portrait, p.landscape]) if (c) side(c.file, lim.pictureSide, 'pictureSide');
+    for (const n of keyImageFiles(theme)) {
+      side(n, lim.keyImageSide, 'keyImageSide');
+      if (files[n].length > lim.keyImageBytes) throw new ThemeError('limit', 'keyImageBytes');
+    }
+    return { theme, migrated: read.migrated, files };
   }
 
-  /** The zip of [theme] and its [files] ({name: Uint8Array}), as the app exports one: each file once, the json last. */
+  /** ThemeAssetLimits.entry: the [count]th entry, [size] bytes, after [total] bytes before it; null when it passes. */
+  function entryBreach(lim, count, size, total) {
+    if (count > lim.entries) return 'entries';
+    if (size > lim.fileBytes) return 'fileBytes';
+    if (total + size > lim.totalBytes) return 'totalBytes';
+    return null;
+  }
+
+  const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+
+  /** The json entry's name in the zip: the theme's name, as the app writes it. */
+  const jsonName = (theme) => theme.name + '.json';
+
+  /**
+   * The zip of [theme] and its [files] ({name: Uint8Array}), as the app exports one: each file once,
+   * the json last; a name the app would not take as a file of its own refused.
+   */
   function exportZip(format, theme, files) {
+    if (!isPlainFileName(theme.name) || utf8Length(jsonName(theme)) > 255) throw new ThemeError('bad', 'name ' + JSON.stringify(theme.name));
     const names = lookFiles(theme);
     const entries = names.map((n) => {
-      if (!files[n]) throw new ThemeError('missing', n);
+      if (!isThemeFileName(n)) throw new ThemeError('bad', 'file name ' + JSON.stringify(n));
+      if (!has(files, n)) throw new ThemeError('missing', n);
       return [n, files[n]];
     });
-    entries.push([theme.name + '.json', new TextEncoder().encode(writeTheme(format, theme))]);
+    entries.push([jsonName(theme), new TextEncoder().encode(writeTheme(format, theme))]);
     return writeZip(entries);
   }
 
-  /** What the app refuses as it imports (ThemeAssetLimits), checked before a zip is offered: [{what, detail}]. */
+  /**
+   * What the app refuses as it imports (ThemeAssetLimits), checked before a zip is offered: [{what, detail}].
+   * Every entry is counted as the app counts it, the json too.
+   */
   function limitBreaches(format, theme, files, sizes) {
     const L = format.limits;
     const out = [];
     const names = lookFiles(theme);
+    const json = utf8Length(writeTheme(format, theme));
     if (names.length + 1 > L.entries) out.push({ what: 'entries', detail: names.length + 1 });
-    let total = 0;
+    let total = json;
     for (const n of names) {
-      const len = files[n] ? files[n].length : 0;
+      const len = has(files, n) ? files[n].length : 0;
       total += len;
       if (len > L.fileBytes) out.push({ what: 'fileBytes', detail: n });
     }
     if (total > L.totalBytes) out.push({ what: 'totalBytes', detail: total });
-    if (Object.keys(theme.keys.overrides).length > L.overrides) out.push({ what: 'overrides', detail: Object.keys(theme.keys.overrides).length });
+    const overrides = Object.keys(theme.keys.overrides).length;
+    if (overrides > L.overrides) out.push({ what: 'overrides', detail: overrides });
     const pic = theme.picture;
     if (pic) {
       for (const c of [pic.portrait, pic.landscape]) {
-        const s = c && sizes[c.file];
+        const s = c && has(sizes, c.file) ? sizes[c.file] : null;
         if (s && Math.max(s[0], s[1]) > L.pictureSide) out.push({ what: 'pictureSide', detail: c.file });
       }
     }
     for (const n of keyImageFiles(theme)) {
-      const s = sizes[n];
+      const s = has(sizes, n) ? sizes[n] : null;
       if (s && Math.max(s[0], s[1]) > L.keyImageSide) out.push({ what: 'keyImageSide', detail: n });
-      if (files[n] && files[n].length > L.keyImageBytes) out.push({ what: 'keyImageBytes', detail: n });
+      if (has(files, n) && files[n].length > L.keyImageBytes) out.push({ what: 'keyImageBytes', detail: n });
     }
     return out;
   }
@@ -1681,6 +1861,23 @@ dialog::backdrop { background: #0008; }
     return [Math.max(1, Math.round(bw * k)), Math.max(1, Math.round(bh * k))];
   }
 
+  /**
+   * How a key image is made no bigger than the app uses (3 × the largest key's dp it draws, [largest]),
+   * [size] px as it is with [img]'s insets and pxPerDp: null when it is that small already, else
+   * {scale, pxPerDp, insets}. Its corners keep their dp while pxPerDp can come down by whole steps;
+   * with none (insets all 0) or pxPerDp at 1 already, the image is scaled all the same, the corners
+   * (if any) with it.
+   */
+  function fitKeyImage(size, largest, img) {
+    const k = Math.min((3 * largest[0]) / size[0], (3 * largest[1]) / size[1]);
+    if (!(k < 1)) return null;
+    const corners = img.insets.some((x) => x > 0);
+    const p2 = Math.floor(img.pxPerDp * k);
+    const scale = corners && p2 >= 1 ? p2 / img.pxPerDp : k;
+    const pxPerDp = corners && p2 >= 1 ? p2 : corners ? 1 : img.pxPerDp;
+    return { scale, pxPerDp, insets: img.insets.map((x) => Math.floor(x * scale)) };
+  }
+
   /** DarkenColorFilter(100 − brightness): black at this alpha (0..255) over the picture. */
   /** ThemeColors: the palette field under the keyboard, under the bar (null: none), under a panel, a key's face. */
   const boardField = (keys) => (keys.blocks ? 'backgroundColor' : 'keyboardColor');
@@ -1694,14 +1891,18 @@ dialog::backdrop { background: #0008; }
   /** The alpha (30 %) a key's colour is turned down to when its face shows the picture: the app lays the colour over it. */
   const SEE_THROUGH_ALPHA = 0x4d;
 
-  /** The palette fields laid over the picture: of each kind whose face shows it, and of a single key's kind ([kindOf] its name). */
+  /**
+   * The palette fields laid over the picture: of each kind whose face shows it, and of a single key's
+   * kinds ([kindOf] its name: a kind, or the kinds a role's key is on its boards, the space on all boards a function
+   * key on the number board; the app lays each key's own).
+   */
   function seeThroughFields(theme, kindOf) {
     const K = theme.keys;
     const out = new Set();
     for (const k of ['letter', 'function', 'space', 'enter']) if (K[k].fill.type === 'picture') out.add(faceField(k, K.blocks));
     for (const [n, o] of Object.entries(K.overrides)) {
-      const kind = o.fill && o.fill.type === 'picture' ? kindOf(n) : undefined;
-      if (kind) out.add(faceField(kind, K.blocks));
+      const kinds = o.fill && o.fill.type === 'picture' ? kindOf(n) : undefined;
+      for (const kind of kinds ? [].concat(kinds) : []) out.add(faceField(kind, K.blocks));
     }
     return out;
   }
@@ -1756,7 +1957,7 @@ dialog::backdrop { background: #0008; }
 
   root.YoumoLib = {
     ThemeError, crc32, writeZip, readZip, readTheme, writeTheme, openZip, exportZip, lookFiles, keyImageFiles,
-    limitBreaches, from21, defaultLook, parseKeyName, isKnownKeyName, checkRanges, ordered, PALETTE_21,
+    limitBreaches, entryBreach, imageSize, mapFiles, isThemeFileName, isPlainFileName, baseName, entryPath, fitKeyImage, from21, defaultLook, parseKeyName, isKnownKeyName, checkRanges, ordered, PALETTE_21,
     keyFace, nineSlice, centerCrop, pictureUnder, blurShrink, blur, resolveStyle, imagesOn, budgetBytes, budgetSample,
     argb, channels, toHex, fromHex, css, withAlpha, contrast, over, luminance, deriveSimple, simpleOf, isDarkColor,
     invertLightness, cropToSource, cropFromSource, resizeInside, darkenAlpha, boardField, barField, panelField, faceField, SEE_THROUGH_ALPHA, seeThroughFields, seeThrough, imageType, fontType, contentId,
@@ -1845,6 +2046,7 @@ dialog::backdrop { background: #0008; }
     bad: '主题文件有错，App 也不会收',
     missing: '主题里缺文件',
     limit: '主题超出 App 的上限',
+    image: '主题里有图片读不出大小（只认 PNG、JPEG、WebP、GIF），App 也可能不收',
   };
   const LIMIT_WORDS = {
     entries: '文件太多', fileBytes: '单个文件超过 32 MB', totalBytes: '文件合计超过 64 MB', overrides: '单独设置的键超过 400 个',
@@ -1854,13 +2056,16 @@ dialog::backdrop { background: #0008; }
   // ---- state ----
   const S = {
     theme: null,
-    files: {}, // name → Uint8Array
-    urls: {}, // name → blob: URL
-    sizes: {}, // image name → [w, h]
-    bitmaps: {}, // image name → ImageBitmap
-    avg: {}, // picture cut → its average colour
-    blurred: {}, // `${file}|${radius}` → {url} or 'pending'
-    fonts: {}, // font file → family
+    // by file name, without a prototype: a theme's file may be named constructor or __proto__
+    files: Object.create(null), // name → Uint8Array
+    urls: Object.create(null), // name → blob: URL
+    sizes: Object.create(null), // image name → [w, h] (the source picture's own, though its bitmap is smaller)
+    bitmaps: Object.create(null), // image name → ImageBitmap
+    avg: Object.create(null), // picture cut → its average colour
+    blurred: Object.create(null), // `${file}|${radius}` → {url} or 'pending'
+    blurUsed: new Set(), // the blurred ones the last preview drew: the others are let go
+    fonts: Object.create(null), // font file → family
+    faces: Object.create(null), // font file → its FontFace
     view: { phone: LAYOUT.phones[0].id, land: false, board: 'qwerty', mode: 'normal', state: 'idle', sys: 'light' },
     tab: 'picture',
     keyTab: 'all',
@@ -1913,7 +2118,8 @@ dialog::backdrop { background: #0008; }
   function toast(text, err) {
     document.querySelectorAll('.toast').forEach((t) => t.remove());
     const t = h('div', { class: 'toast' + (err ? ' err' : ''), role: err ? 'alert' : 'status' }, text);
-    document.body.append(t);
+    // a modal dialog is above everything in the page: one said while it is open goes in it
+    (document.querySelector('dialog[open]') || document.body).append(t);
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => t.remove(), err ? 9000 : 5000);
   }
@@ -1938,21 +2144,33 @@ dialog::backdrop { background: #0008; }
     return L.imageType(bytes) || L.fontType(bytes) || 'bin';
   }
   /** A file the page adds: named by the theme, its role and its content, so new content is a new name and the same is kept once. */
-  async function addFile(role, bytes) {
-    const name = S.theme.name + '-' + role + '-' + L.contentId(bytes) + '.' + extOf(bytes);
-    await putFile(name, bytes);
+  async function addFile(role, bytes, maxSide, keepSide) {
+    const tail = '-' + role + '-' + L.contentId(bytes) + '.' + extOf(bytes);
+    // a file name is at most 255 bytes: a long theme name (an imported one's) is cut, never a character in half
+    let head = S.theme.name;
+    while (new TextEncoder().encode(head + tail).length > 255) head = [...head].slice(0, -1).join('');
+    const name = head + tail;
+    await putFile(name, bytes, maxSide, keepSide);
     return name;
   }
-  async function putFile(name, bytes) {
-    if (S.files[name]) return;
+  /**
+   * A file kept by name. An image's size is read from its header first, and one past [maxSide] (a
+   * key image's, a picture's, the source's) is not decoded: a small file can say 30000 × 30000 and take
+   * gigabytes. [keepSide]: the bitmap made no bigger than that (the source: kept whole only as bytes).
+   */
+  async function putFile(name, bytes, maxSide, keepSide) {
+    if (Object.hasOwn(S.files, name)) return;
     S.files[name] = bytes;
     S.urls[name] = URL.createObjectURL(new Blob([bytes]));
     if (L.imageType(bytes)) {
+      const size = L.imageSize(bytes);
+      if (size) S.sizes[name] = size;
+      if (!size || Math.max(size[0], size[1]) > (maxSide || LIM.pictureSide)) return; // not drawn here; export refuses it
       try {
-        const bm = await createImageBitmap(new Blob([bytes]));
+        const bm = await decodeShrunk(new Blob([bytes]), size, keepSide || maxSide || LIM.pictureSide);
         S.bitmaps[name] = bm;
-        S.sizes[name] = [bm.width, bm.height];
-      } catch (e) { /* not drawable here: the size stays unknown */ }
+        if (!S.sizes[name]) S.sizes[name] = [bm.width, bm.height];
+      } catch (e) { /* not drawable here: the size stays the header's */ }
     } else if (L.fontType(bytes)) {
       const family = 'youmo-' + L.contentId(bytes);
       try {
@@ -1960,13 +2178,53 @@ dialog::backdrop { background: #0008; }
         await face.load();
         document.fonts.add(face);
         S.fonts[name] = family;
+        S.faces[name] = face;
       } catch (e) { /* the browser can't read it: the app may still */ }
     }
   }
+  /** An image decoded no bigger than [side] on its longer side (and the canvas limit iOS has): the full one let go. */
+  async function decodeShrunk(blob, size, side) {
+    const fit = (w, hh) => {
+      const k = Math.min(1, side / Math.max(w, hh), Math.sqrt(CANVAS_PIXELS / (w * hh)));
+      return [Math.max(1, Math.floor(w * k)), Math.max(1, Math.floor(hh * k))];
+    };
+    let bm;
+    if (size && (size[0] > side || size[1] > side || size[0] * size[1] > CANVAS_PIXELS)) {
+      const [w, hh] = fit(size[0], size[1]);
+      try { bm = await createImageBitmap(blob, { resizeWidth: w, resizeHeight: hh, resizeQuality: 'high' }); } catch (e) { bm = null; }
+    }
+    if (!bm) bm = await createImageBitmap(blob);
+    if (bm.width <= side && bm.height <= side && bm.width * bm.height <= CANVAS_PIXELS) return bm;
+    // the browser took no size to decode to: drawn smaller, the full one closed
+    const [w, hh] = fit(bm.width, bm.height);
+    const c = canvasOf(w, hh);
+    const g = c.getContext('2d');
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(bm, 0, 0, w, hh);
+    bm.close();
+    return createImageBitmap(c);
+  }
   function dropFiles() {
-    for (const u of Object.values(S.urls)) URL.revokeObjectURL(u);
-    for (const b of Object.values(S.blurred)) if (b && b.url) URL.revokeObjectURL(b.url);
-    Object.assign(S, { files: {}, urls: {}, sizes: {}, bitmaps: {}, avg: {}, blurred: {}, fonts: {} });
+    for (const n of Object.keys(S.files)) dropFile(n);
+    for (const k of Object.keys(S.blurred)) dropBlurred(k);
+  }
+  /** A file let go: its URL, bitmap, font and blurred copies with it. */
+  function dropFile(n) {
+    if (S.urls[n]) URL.revokeObjectURL(S.urls[n]);
+    if (S.bitmaps[n]) S.bitmaps[n].close();
+    if (S.faces[n]) document.fonts.delete(S.faces[n]);
+    for (const m of [S.files, S.urls, S.sizes, S.bitmaps, S.avg, S.fonts, S.faces]) delete m[n];
+    for (const k of Object.keys(S.blurred)) if (k.startsWith(n + '|')) dropBlurred(k);
+  }
+  function dropBlurred(k) {
+    const b = S.blurred[k];
+    if (b && b.url) URL.revokeObjectURL(b.url);
+    if (b !== 'pending') delete S.blurred[k];
+  }
+  /** The files the theme no longer names let go (an old cut, a key image before it was made smaller). */
+  function dropUnused() {
+    const used = new Set(L.lookFiles(S.theme));
+    for (const n of Object.keys(S.files)) if (!used.has(n)) dropFile(n);
   }
   function canvasOf(w, h) {
     const c = document.createElement('canvas');
@@ -1974,7 +2232,12 @@ dialog::backdrop { background: #0008; }
     c.height = h;
     return c;
   }
-  const pngOf = (canvas) => new Promise((resolve) => canvas.toBlob(async (b) => resolve(new Uint8Array(await b.arrayBuffer())), 'image/png'));
+  // a canvas past this many pixels does not draw on iOS (16.7 MP): toBlob gives null
+  const CANVAS_PIXELS = 16777216;
+  const pngOf = (canvas) => new Promise((resolve, reject) => canvas.toBlob((b) => {
+    if (!b) return reject(new Error('图太大，浏览器画不出来'));
+    b.arrayBuffer().then((x) => resolve(new Uint8Array(x)), reject);
+  }, 'image/png'));
   /** The picture's pixels as the app's ints (0xAARRGGBB). */
   function argbPixels(img) {
     const d = img.data;
@@ -1999,6 +2262,7 @@ dialog::backdrop { background: #0008; }
   function blurredPicture(file, blurDp, density) {
     const radius = Math.max(1, Math.round((blurDp * density) / 4));
     const key = file + '|' + radius;
+    S.blurUsed.add(key);
     const got = S.blurred[key];
     if (got && got.url) return got.url;
     if (!got && S.bitmaps[file]) {
@@ -2022,6 +2286,7 @@ dialog::backdrop { background: #0008; }
         }
         sg.putImageData(id, 0, 0);
         const blob = await new Promise((r) => sc.toBlob(r, 'image/png'));
+        if (!S.bitmaps[file] || !blob) { delete S.blurred[key]; return; } // let go meanwhile, or not drawable
         S.blurred[key] = { url: URL.createObjectURL(blob) };
         renderPreview();
       }, 0);
@@ -2030,17 +2295,19 @@ dialog::backdrop { background: #0008; }
   }
 
   // ---- the theme ----
-  // a key name's kind, from the measured keys (a role on all boards: the first such key's)
+  // a key name's kinds, from the measured keys: a role on all boards is of each its keys are (the
+  // space a function key on the number board), and the app lays each key's own colour
   const KIND_OF = (() => {
-    const m = {};
+    const m = new Map();
+    const add = (n, k) => m.set(n, [...new Set([...(m.get(n) || []), k])]);
     for (const v of LAYOUT.views) for (const e of v.items) if (e.t === 'key' && e.n) {
-      if (!(e.n in m)) m[e.n] = e.k;
+      add(e.n, e.k);
       const key = e.n.substring(e.n.indexOf('/') + 1);
-      if (ROLES.includes(key) && !(('*/' + key) in m)) m['*/' + key] = e.k;
+      if (ROLES.includes(key)) add('*/' + key, e.k);
     }
     return m;
   })();
-  const kindOfName = (n) => KIND_OF[n];
+  const kindOfName = (n) => KIND_OF.get(n);
   // the colours over the picture now, as they are: none to give back
   const seenNow = () => Object.fromEntries([...L.seeThroughFields(S.theme, kindOfName)].map((f) => [f, null]));
   function presetTheme(p) {
@@ -2055,16 +2322,28 @@ dialog::backdrop { background: #0008; }
     const sim = L.deriveSimple(L.simpleOf(theme.palette), theme.isDark);
     S.manual = Object.keys(theme.palette).filter((k) => theme.palette[k] !== sim[k]);
     S.see = seenNow();
-    return Promise.all(Object.entries(files || {}).map(([n, b]) => putFile(n, b))).then(() => {
+    return Promise.all(Object.entries(files || {}).map(([n, b]) => putFile(n, b, ...capsOf(theme, n)))).then(() => {
       for (const c of pictureCuts()) if (S.bitmaps[c]) S.avg[c] = averageOf(S.bitmaps[c]);
     });
   }
+  // the source picture: decoded up to this side (a phone's photo), kept as a bitmap no bigger than a cut may be
+  const SRC_SIDE = 12000;
+  const SRC_PIXELS = 108e6;
+  /** [maxSide, keepSide] of [theme]'s file [n] for putFile: by what it is in the theme. */
+  function capsOf(theme, n) {
+    if (theme.picture && theme.picture.src === n) return [SRC_SIDE, LIM.pictureSide];
+    if (L.keyImageFiles(theme).includes(n)) return [LIM.keyImageSide];
+    return [LIM.pictureSide];
+  }
+  /** The source picture's own size (its bitmap may be smaller). */
+  const srcSize = (src) => S.sizes[src] || [S.bitmaps[src].width, S.bitmaps[src].height];
   function pictureCuts() {
     const p = S.theme.picture;
     return p ? [p.portrait.file, p.landscape && p.landscape.file].filter(Boolean) : [];
   }
   function changed(opts) {
     S.see = L.seeThrough(S.theme, kindOfName, S.see);
+    dropUnused();
     save();
     renderPreview();
     if (opts && opts.settings) renderSettings();
@@ -2098,13 +2377,14 @@ dialog::backdrop { background: #0008; }
     try {
       const saved = JSON.parse(localStorage.getItem(STORE) || 'null');
       if (!saved) return false;
-      Object.assign(S.view, saved.view || {});
-      if (saved.colorView) S.colorView = saved.colorView;
-      if (saved.tab) S.tab = saved.tab;
+      setView(saved.view);
+      if (chosen('colors', saved.colorView)) S.colorView = saved.colorView;
+      if (chosen('tab', saved.tab)) S.tab = saved.tab;
       const { theme } = L.readTheme(FORMAT, saved.theme);
       S.theme = theme;
       S.manual = saved.manual || [];
-      S.see = saved.see || seenNow();
+      // saved without its files, what showed the picture shows a colour now: the alphas turned down for it go back
+      S.see = L.seeThrough(S.theme, kindOfName, saved.see || {});
       return true;
     } catch (e) {
       return false;
@@ -2208,6 +2488,12 @@ dialog::backdrop { background: #0008; }
   const preview = { svg: null, box: null, note: null };
   let ids = 0;
   function renderPreview() {
+    S.blurUsed = new Set();
+    drawPreview();
+    // a blur radius, a cut no longer drawn: its copy let go (made again if it comes back)
+    for (const k of Object.keys(S.blurred)) if (!S.blurUsed.has(k)) dropBlurred(k);
+  }
+  function drawPreview() {
     const v = currentView();
     const d = density();
     const T = S.theme;
@@ -2412,7 +2698,10 @@ dialog::backdrop { background: #0008; }
     stage.addEventListener('pointermove', (ev) => {
       if (!start || !selecting()) return;
       const p = svgPoint(ev);
-      if (Math.hypot(p.x - start.x, p.y - start.y) > 6) start.moved = true;
+      if (Math.hypot(p.x - start.x, p.y - start.y) > 6) {
+        start.moved = true;
+        clearTimeout(longTimer); // a finger that moves scrolls or drags: not a long press
+      }
       if (start.moved && !start.touch) {
         clearTimeout(longTimer);
         S.pressed = -1;
@@ -2606,22 +2895,35 @@ dialog::backdrop { background: #0008; }
     if (!file) return;
     if (file.size > LIM.fileBytes) return toast('图片太大（超过 32 MB）', true);
     const bytes = await readBytes(file);
+    const size = L.imageSize(bytes);
+    if (size && (Math.max(size[0], size[1]) > SRC_SIDE || size[0] * size[1] > SRC_PIXELS)) return toast(`图片太大（${size[0]} × ${size[1]}）：先缩小一点`, true);
     let bm;
     try {
-      bm = await createImageBitmap(new Blob([bytes]));
+      // as small as a cut may be: a 48 MP photo kept whole would take 200 MB
+      bm = await decodeShrunk(new Blob([bytes]), size, LIM.pictureSide);
     } catch (e) {
       return toast('浏览器打不开这张图' + (/heic|heif/i.test(file.name) ? '：这个格式浏览器打不开，先转成 jpg' : ''), true);
     }
     const T = S.theme;
-    const src = await addFile('src', L.imageType(bytes) ? bytes : await pngOf(drawn(bm)));
+    let src;
+    try {
+      // one the app may not read (HEIC, AVIF) as a PNG of the bitmap: no bigger than a canvas draws
+      src = await addFile('src', L.imageType(bytes) ? bytes : await pngOf(drawn(bm)), SRC_SIDE, LIM.pictureSide);
+    } catch (e) {
+      bm.close();
+      return toast('这张图存不下来：' + e.message, true);
+    }
+    const avg = averageOf(bm);
+    bm.close();
     if (!T.picture) {
       // as the app's new theme from a picture: the translucent keys, dark or light by the picture
-      const dark = L.luminance(averageOf(bm)) < 0.4;
+      const dark = L.luminance(avg) < 0.4;
       const preset = PRESETS.find((x) => x.name === (dark ? 'TransparentDark' : 'TransparentLight'));
       if (preset) {
         T.palette = clone(preset.palette);
         T.isDark = preset.isDark;
         S.manual = [];
+        S.see = {}; // new colours: no alpha of the old ones to give back to them
       }
       T.base = { type: 'picture' };
     }
@@ -2653,7 +2955,8 @@ dialog::backdrop { background: #0008; }
   async function cutPicture(land, box, rotation) {
     const T = S.theme;
     const bm = S.bitmaps[T.picture.src];
-    const [sw, sh] = [bm.width, bm.height];
+    if (!bm) return toast('原图不在这里：重新选一张图', true);
+    const [sw, sh] = srcSize(T.picture.src);
     const turned = rotation % 180 ? [sh, sw] : [sw, sh];
     const [bw, bh] = boardPx(land);
     if (!box) {
@@ -2670,8 +2973,13 @@ dialog::backdrop { background: #0008; }
     // the source turned clockwise [rotation] into the turned picture's space
     g.translate(turned[0] / 2, turned[1] / 2);
     g.rotate((rotation * Math.PI) / 180);
-    g.drawImage(bm, -sw / 2, -sh / 2);
-    const file = await addFile(land ? 'landscape' : 'portrait', await pngOf(c));
+    g.drawImage(bm, -sw / 2, -sh / 2, sw, sh);
+    let file;
+    try {
+      file = await addFile(land ? 'landscape' : 'portrait', await pngOf(c));
+    } catch (e) {
+      return toast('裁不出来：' + e.message, true);
+    }
     const src = L.cropToSource(box, sw, sh, rotation);
     const crop = { file, cropRect: { bottom: src[3], left: src[0], right: src[2], top: src[1] }, rotation };
     if (land) T.picture.landscape = crop;
@@ -2683,12 +2991,13 @@ dialog::backdrop { background: #0008; }
     const T = S.theme;
     const bm = S.bitmaps[T.picture.src];
     if (!bm) return toast('原图不在这里：重新选一张图', true);
+    const [sw, sh] = srcSize(T.picture.src);
     const cur = land ? T.picture.landscape : T.picture.portrait;
     let rotation = cur ? cur.rotation : 0;
     const [bw, bh] = boardPx(land);
     const aspect = bw / bh;
     let box = null;
-    const turnedSize = () => (rotation % 180 ? [bm.height, bm.width] : [bm.width, bm.height]);
+    const turnedSize = () => (rotation % 180 ? [sh, sw] : [sw, sh]);
     const fit = () => {
       const [tw, th] = turnedSize();
       const k = Math.min(tw / bw, th / bh);
@@ -2696,7 +3005,7 @@ dialog::backdrop { background: #0008; }
     };
     if (cur && cur.cropRect && cur.cropRect.left >= 0 && cur.file !== T.picture.src) {
       const r = cur.cropRect;
-      box = L.cropFromSource([r.left, r.top, r.right, r.bottom], bm.width, bm.height, rotation);
+      box = L.cropFromSource([r.left, r.top, r.right, r.bottom], sw, sh, rotation);
     } else fit();
     const area = h('div', { class: 'crop-area' });
     const canvas = canvasOf(1, 1);
@@ -2716,7 +3025,7 @@ dialog::backdrop { background: #0008; }
       g.save();
       g.translate(canvas.width / 2, canvas.height / 2);
       g.rotate((rotation * Math.PI) / 180);
-      g.drawImage(bm, (-bm.width * scale) / 2, (-bm.height * scale) / 2, bm.width * scale, bm.height * scale);
+      g.drawImage(bm, (-sw * scale) / 2, (-sh * scale) / 2, sw * scale, sh * scale);
       g.restore();
       place();
     };
@@ -2752,6 +3061,7 @@ dialog::backdrop { background: #0008; }
       place();
     });
     frame.addEventListener('pointerup', () => (drag = null));
+    frame.addEventListener('pointercancel', () => (drag = null));
     area.addEventListener('wheel', (ev) => {
       ev.preventDefault();
       const k = ev.deltaY > 0 ? 1.06 : 1 / 1.06;
@@ -2905,21 +3215,33 @@ dialog::backdrop { background: #0008; }
     if (!file) return null;
     if (file.size > LIM.fileBytes) { toast('图片太大（超过 32 MB）', true); return null; }
     let bytes = await readBytes(file);
+    const size = L.imageSize(bytes);
+    if (size && size[0] * size[1] > SRC_PIXELS) { toast(`图片太大（${size[0]} × ${size[1]}）`, true); return null; }
     let bm;
-    try { bm = await createImageBitmap(new Blob([bytes])); } catch (e) { toast('浏览器打不开这张图', true); return null; }
-    let shrunk = false;
-    let side = Math.max(bm.width, bm.height);
-    let k = Math.min(1, LIM.keyImageSide / side);
-    for (let tries = 0; (k < 1 || bytes.length > LIM.keyImageBytes || !L.imageType(bytes)) && tries < 6; tries++) {
-      const c = canvasOf(Math.max(1, Math.round(bm.width * k)), Math.max(1, Math.round(bm.height * k)));
-      c.getContext('2d').drawImage(bm, 0, 0, c.width, c.height);
-      bytes = await pngOf(c);
-      shrunk = shrunk || k < 1;
-      k *= 0.75;
+    // decoded no bigger than a key image may be: then made again from that, if it was bigger
+    try { bm = await decodeShrunk(new Blob([bytes]), size, LIM.keyImageSide); } catch (e) { toast('浏览器打不开这张图', true); return null; }
+    const drawnSize = [bm.width, bm.height];
+    let again = !size || Math.max(size[0], size[1]) > LIM.keyImageSide;
+    let shrunk = again && !!size;
+    let k = 1;
+    try {
+      for (let tries = 0; (again || bytes.length > LIM.keyImageBytes || !L.imageType(bytes)) && tries < 6; tries++) {
+        const c = canvasOf(Math.max(1, Math.round(bm.width * k)), Math.max(1, Math.round(bm.height * k)));
+        c.getContext('2d').drawImage(bm, 0, 0, c.width, c.height);
+        bytes = await pngOf(c);
+        shrunk = shrunk || k < 1;
+        again = false;
+        k *= 0.75;
+      }
+    } catch (e) {
+      toast('这张图存不下来：' + e.message, true);
+      return null;
+    } finally {
+      bm.close();
     }
     if (shrunk) toast('图片超过 App 的上限（边长 1024、2 MB），已缩小');
-    const name = await addFile('key', bytes);
-    const [w, hh] = S.sizes[name] || [bm.width, bm.height];
+    const name = await addFile('key', bytes, LIM.keyImageSide);
+    const [w, hh] = S.sizes[name] || drawnSize;
     return { type: 'image', file: name, insets: [0, 0, 0, 0], pxPerDp: Math.min(LIM.pxPerDp, Math.max(1, Math.round(Math.max(w, hh) / 48))) };
   }
   /** The nine-slice editor: four lines on the image to drag (what is not stretched), and a wide and a narrow key drawn with it. */
@@ -3038,10 +3360,11 @@ dialog::backdrop { background: #0008; }
       };
       out.push(h('h3', {}, '底'), fillEditor(first.fill, true, (f) => write('fill', f), 'single'));
       out.push(h('p', { class: 'hint' }, `「跟随」是${kindName}的样子；只给常态配了图时，按下仍按那一类。`));
-      const seeKind = first.fill && first.fill.type === 'picture' && kindOfName(tg[0]);
-      if (seeKind) {
-        out.push(h('p', { class: 'hint' }, `盖在图上的是${KIND_LABEL[seeKind]}的底色：改它，${KIND_LABEL[seeKind]}都跟着变。`));
-        out.push(colorRow(kindField(seeKind)));
+      const seeKinds = (first.fill && first.fill.type === 'picture' && kindOfName(tg[0])) || [];
+      if (seeKinds.length) {
+        const words = seeKinds.map((k) => KIND_LABEL[k]).join('、');
+        out.push(h('p', { class: 'hint' }, `盖在图上的是${words}的底色：改它，${words}都跟着变。`));
+        for (const f of new Set(seeKinds.map(kindField))) out.push(colorRow(f));
       }
       out.push(h('h3', {}, '按下'), pressedEditor(first.pressed, true, (p) => write('pressed', p), 'single'));
       out.push(h('h3', {}, '键上的字'), radios('label', [['show', '显示'], ['hide', '隐藏（键角小字也隐藏）']], first.label, (x) => write('label', x)));
@@ -3168,7 +3491,7 @@ dialog::backdrop { background: #0008; }
       renderAll();
       toast(migrated ? '这是老版本 App 导出的主题，已按新格式读进来；导出后在 App 里导入会替换原来那个' : '已打开；导出后在 App 里导入会替换原来那个主题');
     } catch (e) {
-      if (e instanceof L.ThemeError) toast(ERR[e.code] + (e.code === 'bad' || e.code === 'missing' ? '：' + e.detail : ''), true);
+      if (e instanceof L.ThemeError) toast(ERR[e.code] + (e.code === 'limit' ? '：' + (LIMIT_WORDS[e.detail] || e.detail) : e.code === 'bad' || e.code === 'missing' || e.code === 'image' ? '：' + e.detail : ''), true);
       else toast(ERR['not-theme'], true);
     }
   }
@@ -3181,20 +3504,22 @@ dialog::backdrop { background: #0008; }
     const old = T.name;
     const name = uuid();
     // its own file names: the app deletes a theme's files with it, so two themes never share one
-    const names = {};
-    const files = {};
+    const names = new Map();
+    const files = Object.create(null);
     const p = T.picture;
     for (const f of [...L.lookFiles(T), p && p.src].filter(Boolean)) {
-      names[f] = f.startsWith(old + '-') ? name + f.slice(old.length) : name + '-' + f;
-      if (S.files[f]) files[names[f]] = S.files[f];
+      names.set(f, f.startsWith(old + '-') ? name + f.slice(old.length) : name + '-' + f);
+      if (Object.hasOwn(S.files, f)) files[names.get(f)] = S.files[f];
     }
-    const mapped = JSON.parse(JSON.stringify(T), (k, v) => (typeof v === 'string' && k !== 'name' && names[v] ? names[v] : v));
+    const mapped = L.mapFiles(T, (f) => names.get(f) || f);
     mapped.name = name;
     mapped.isDark = true;
     for (const k of Object.keys(mapped.palette)) mapped.palette[k] = L.invertLightness(mapped.palette[k]);
     const manual = S.manual.slice();
+    const see = { ...S.see }; // the alphas to give back: invertLightness keeps an alpha as it is
     await setTheme(mapped, files);
     S.manual = manual;
+    S.see = see;
     S.autoDark = false;
     renderAll();
     toast('已复制成深色版（新主题，颜色明暗翻过来）：导出后在 App 里是另一个主题');
@@ -3206,7 +3531,7 @@ dialog::backdrop { background: #0008; }
    */
   async function fitKeyImages() {
     const T = S.theme;
-    const largest = {};
+    const largest = Object.create(null);
     for (const v of LAYOUT.views) {
       if (v.phone !== LAYOUT.phones[0].id) continue; // dp sizes: one phone's are enough
       for (const e of v.els) {
@@ -3222,26 +3547,26 @@ dialog::backdrop { background: #0008; }
       }
     }
     let changedCount = 0;
-    const rescale = async (img, p2) => {
+    // fit: L.fitKeyImage's {scale, pxPerDp, insets}
+    const rescale = async (img, fit) => {
       const bm = S.bitmaps[img.file];
-      if (!bm || p2 >= img.pxPerDp) return null;
-      const k = p2 / img.pxPerDp;
-      const c = canvasOf(Math.max(1, Math.round(bm.width * k)), Math.max(1, Math.round(bm.height * k)));
+      if (!bm) return null;
+      const c = canvasOf(Math.max(1, Math.floor(bm.width * fit.scale)), Math.max(1, Math.floor(bm.height * fit.scale)));
       const g = c.getContext('2d');
       g.imageSmoothingQuality = 'high';
       g.drawImage(bm, 0, 0, c.width, c.height);
-      const file = await addFile('key', await pngOf(c));
-      return { type: img.type, file, insets: img.insets.map((x) => Math.round(x * k)), pxPerDp: p2 };
+      const file = await addFile('key', await pngOf(c), LIM.keyImageSide);
+      return { type: img.type, file, insets: fit.insets, pxPerDp: fit.pxPerDp };
     };
     const replace = async (want) => {
-      const done = {};
+      const done = new Map();
       const each = async (x) => {
         if (!x || x.type !== 'image') return x;
-        const p2 = want(x);
-        if (p2 == null) return x;
-        const key = x.file + '|' + x.pxPerDp + '|' + p2;
-        if (!(key in done)) done[key] = await rescale(x, p2);
-        if (done[key]) { changedCount++; return done[key]; }
+        const fit = want(x);
+        if (!fit) return x;
+        const key = JSON.stringify([x.file, x.pxPerDp, x.insets, fit]);
+        if (!done.has(key)) done.set(key, await rescale(x, fit));
+        if (done.get(key)) { changedCount++; return done.get(key); }
         return x;
       };
       for (const k of KINDS) { T.keys[k].fill = await each(T.keys[k].fill); T.keys[k].pressed = await each(T.keys[k].pressed); }
@@ -3250,15 +3575,18 @@ dialog::backdrop { background: #0008; }
     await replace((x) => {
       const m = largest[x.file];
       const size = S.sizes[x.file];
-      if (!m || !size) return null;
-      const k = Math.min((3 * m[0]) / size[0], (3 * m[1]) / size[1]);
-      return k < 1 ? Math.max(1, Math.floor(x.pxPerDp * k)) : null;
+      return m && size ? L.fitKeyImage(size, m, x) : null;
     });
     for (let round = 0; round < 4; round++) {
       const over = boardBudgets().filter((b) => b.bytes > LIM.boardImageBytes);
       if (!over.length) break;
       const files = new Set(over.flatMap((b) => b.files));
-      await replace((x) => (files.has(x.file) && x.pxPerDp > 1 ? Math.max(1, Math.floor(x.pxPerDp / 2)) : null));
+      await replace((x) => {
+        if (!files.has(x.file) || x.pxPerDp <= 1) return null;
+        const p2 = Math.max(1, Math.floor(x.pxPerDp / 2));
+        const scale = p2 / x.pxPerDp;
+        return { scale, pxPerDp: p2, insets: x.insets.map((v) => Math.floor(v * scale)) };
+      });
     }
     return changedCount;
   }
@@ -3319,19 +3647,38 @@ dialog::backdrop { background: #0008; }
       h('main', {}, h('section', { class: 'preview-col', 'aria-label': '预览' }, options, preview.stage, preview.note),
         h('section', { class: 'settings-col', 'aria-label': '设置' }, tabsBox, settingsBox)));
     bindPreview(preview.stage);
+    // a long press on the keys selects them: not the system's menu for the picture under them
+    preview.stage.addEventListener('contextmenu', (ev) => ev.preventDefault());
     let resizeTimer = 0;
     window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(renderPreview, 100); });
   }
 
   // #board=nine&land=1&tab=keys&key=single…: a view to open at (a link, a screenshot)
+  // what a link (#tab=…) or a saved view may set: only these, else a typo leaves the page blank
+  const CHOICES = {
+    phone: LAYOUT.phones.map((p) => p.id),
+    board: [...new Set(LAYOUT.views.map((v) => v.board))],
+    mode: [...new Set(LAYOUT.views.map((v) => v.mode))],
+    state: [...new Set(LAYOUT.views.map((v) => v.state))],
+    sys: ['light', 'dark'],
+    tab: TABS.map((t) => t[0]),
+    keys: ['all', 'kinds', 'single'],
+    kind: KINDS,
+    colors: ['simple', 'all'],
+  };
+  const chosen = (k, v) => (typeof v === 'string' && CHOICES[k].includes(v) ? v : null);
+  function setView(view) {
+    for (const k of ['phone', 'board', 'mode', 'state', 'sys']) if (view && chosen(k, view[k])) S.view[k] = view[k];
+    if (view && typeof view.land === 'boolean') S.view.land = view.land;
+  }
   function fromHash() {
     const q = new URLSearchParams(location.hash.slice(1));
-    for (const k of ['phone', 'board', 'mode', 'state', 'sys']) if (q.get(k)) S.view[k] = q.get(k);
+    setView(Object.fromEntries(['phone', 'board', 'mode', 'state', 'sys'].map((k) => [k, q.get(k)])));
     if (q.get('land')) S.view.land = q.get('land') === '1';
-    if (q.get('tab')) S.tab = q.get('tab');
-    if (q.get('keys')) S.keyTab = q.get('keys');
-    if (q.get('kind')) S.kind = q.get('kind');
-    if (q.get('colors')) S.colorView = q.get('colors');
+    if (chosen('tab', q.get('tab'))) S.tab = q.get('tab');
+    if (chosen('keys', q.get('keys'))) S.keyTab = q.get('keys');
+    if (chosen('kind', q.get('kind'))) S.kind = q.get('kind');
+    if (chosen('colors', q.get('colors'))) S.colorView = q.get('colors');
     if (q.get('select')) S.selected = q.get('select').split(',');
     if (q.get('preset')) {
       const p = PRESETS.find((x) => x.name === q.get('preset'));

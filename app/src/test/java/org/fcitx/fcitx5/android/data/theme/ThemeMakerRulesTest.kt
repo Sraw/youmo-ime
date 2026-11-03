@@ -16,6 +16,7 @@ import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.phoneStorage
+import org.fcitx.fcitx5.android.input.Contrast
 import org.fcitx.fcitx5.android.input.theme.Area
 import org.fcitx.fcitx5.android.input.theme.Box
 import org.fcitx.fcitx5.android.input.theme.BoxBlur
@@ -290,9 +291,29 @@ class ThemeMakerRulesTest {
         "genericActiveBackgroundColor":-10577930,"genericActiveForegroundColor":-1,"version":"2.1"}
     """.trimIndent().replace("\n", "")
 
+    // one with what an older 2.1 left out: no brightness (70), no turn (0), a crop's edges missing (-1 each)
+    private val v21Partial = v21
+        .replace("\"brightness\":55,", "")
+        .replace(",\"cropRotation\":90", "")
+        .replace("\"cropRect\":{\"bottom\":1400,\"left\":10,\"right\":1090,\"top\":20}", "\"cropRect\":{\"left\":10,\"top\":20}")
+
+    private fun migrated(from: String) =
+        Json.parseToJsonElement(Json.encodeToString(CustomThemeSerializer, Json.decodeFromString(CustomThemeSerializer, from)))
+
     private fun migration() = buildJsonObject {
+        check(v21Partial.length < v21.length - 40) { "the partial 2.1 sample left nothing out" }
         put("from", Json.parseToJsonElement(v21))
-        put("to", Json.parseToJsonElement(Json.encodeToString(CustomThemeSerializer, Json.decodeFromString(CustomThemeSerializer, v21))))
+        put("to", migrated(v21))
+        put("partialFrom", Json.parseToJsonElement(v21Partial))
+        put("partialTo", migrated(v21Partial))
+    }
+
+    // Contrast.ratio, which the page's contrast warnings are: opaque and translucent text, light and dark grounds
+    private fun contrast() = buildJsonArray {
+        val colours = listOf(-1, -16777216, -10577930, 0x990d47a1.toInt(), 0x4BFFFFFF, -328966, -13816531, 0x1F000000, -1499549, 0x00123456)
+        for (fg in colours) for (bg in colours.filter { it ushr 24 == 0xFF }) {
+            add(buildJsonArray { add(JsonPrimitive(fg)); add(JsonPrimitive(bg)); add(JsonPrimitive(Contrast.ratio(fg, bg))) })
+        }
     }
 
     @Test
@@ -308,6 +329,7 @@ class ThemeMakerRulesTest {
             put("styles", styles())
             put("budget", budget())
             put("migration", migration())
+            put("contrast", contrast())
         }
         ThemeMakerTestdata.check("rules.json", json.encodeToString(JsonElement.serializer(), rules) + "\n")
     }
