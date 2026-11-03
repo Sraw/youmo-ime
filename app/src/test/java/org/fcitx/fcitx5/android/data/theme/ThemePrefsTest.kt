@@ -87,11 +87,11 @@ class ThemePrefsTest {
     fun theOldKeyStyleSettingsOutliveTheResetOfTheHiddenOnes() {
         val prefs = ThemePrefs(sp)
         sp.edit(commit = true) {
-            putBoolean("key_ripple_effect", true)
+            putBoolean("key_border", false)
             putInt("key_radius", 9)
         }
         sp.edit { prefs.resetHidden(this) }
-        assertEquals(LegacyLook(keyRippleEffect = true, keyRadius = 9), prefs.legacyLook())
+        assertEquals(LegacyLook(keyBorder = false, keyRadius = 9), prefs.legacyLook())
     }
 
     // where they were, a line says where they went; nothing of them is left to set

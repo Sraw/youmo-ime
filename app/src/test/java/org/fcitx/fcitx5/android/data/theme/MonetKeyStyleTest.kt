@@ -10,7 +10,6 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.input.theme.LegacyLook
-import org.fcitx.fcitx5.android.input.theme.PressEffect
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -36,7 +35,7 @@ class MonetKeyStyleTest {
     // what AppPrefs, so ThemeManager.prefs, was made with (FcitxApplication)
     private val sp get() = PreferenceManager.getDefaultSharedPreferences(appContext)
 
-    private val old = LegacyLook(keyBorder = false, keyRippleEffect = true, keyRadius = 10)
+    private val old = LegacyLook(keyBorder = false, keyRadius = 10, vMargin = 2)
 
     @Before
     fun settled() {
@@ -44,7 +43,7 @@ class MonetKeyStyleTest {
         ThemeManager.prefs.followSystemDayNightTheme.setValue(false)
         // the old settings, a Monet theme in use: what an upgrade finds
         sp.edit(commit = true) {
-            putBoolean("key_border", false); putBoolean("key_ripple_effect", true); putInt("key_radius", 10)
+            putBoolean("key_border", false); putInt("key_radius", 10); putInt("key_vertical_margin", 2)
         }
         assertEquals(old, ThemeManager.prefs.legacyLook())
         val monet = ThemeMonet.getLight()
@@ -64,7 +63,7 @@ class MonetKeyStyleTest {
     private fun Theme.styled() {
         assertFalse(name, look.keys.blocks)
         assertEquals(name, 10, look.keys.radiusDp)
-        assertEquals(name, PressEffect.Ripple, look.keys.press)
+        assertEquals(name, 2, look.keys.gap.v)
     }
 
     private fun monet() = ThemeManager.getAllThemes().first { it is Theme.Monet && !it.isDark } as Theme.Monet

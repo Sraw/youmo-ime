@@ -30,14 +30,17 @@ object ThemeLookMigration {
         "key_vertical_margin_landscape", "key_spacing_level", "text_editing_button_radius", "clipboard_entry_radius",
     )
 
-    /** The old settings as [prefs] has them; null if none of them is there (a new install, or settled). */
+    /**
+     * The old settings as [prefs] has them; null if none of them is there (a new install, or settled).
+     * Those the old settings page did not show (the border's stroke, the ripple, the two radii of the
+     * text editing and clipboard pages) are the defaults whatever [prefs] has: no user could change
+     * them, so a backup's values say nothing of what the user wanted. Removed with the rest.
+     */
     fun legacy(prefs: SharedPreferences): LegacyLook? {
         if (KEYS.none(prefs::contains)) return null
         val d = LegacyLook()
         return LegacyLook(
             keyBorder = prefs.getBoolean("key_border", d.keyBorder),
-            keyBorderStroke = prefs.getBoolean("key_border_stroke", d.keyBorderStroke),
-            keyRippleEffect = prefs.getBoolean("key_ripple_effect", d.keyRippleEffect),
             keyRadius = prefs.getInt("key_radius", d.keyRadius),
             hMargin = prefs.getInt("key_horizontal_margin", d.hMargin),
             hMarginLandscape = prefs.getInt("key_horizontal_margin_landscape", d.hMarginLandscape),
@@ -88,15 +91,18 @@ object ThemeLookMigration {
         var failed = false
         var monet = false
         if (!legacy.isDefault) {
+            // one try a theme, a failed one too (null): getOrPut would try a null again, a second copy saved
             val copies = HashMap<String, Theme.Custom?>()
             for (slot in slots) {
                 when (val theme = slot.get()) {
                     is Theme.Custom -> Unit
                     is Theme.Monet -> monet = true
                     else -> {
-                        val copy = copies.getOrPut(theme.name) {
-                            Theme.Custom(UUID.randomUUID().toString(), theme.isDark, legacy.applyTo(theme.look)).takeIf(save)
+                        if (theme.name !in copies) {
+                            copies[theme.name] =
+                                Theme.Custom(UUID.randomUUID().toString(), theme.isDark, legacy.applyTo(theme.look)).takeIf(save)
                         }
+                        val copy = copies[theme.name]
                         if (copy == null) failed = true else slot.set(copy)
                     }
                 }
