@@ -89,8 +89,14 @@ class ToneTableTest {
         // listed dōng xi and zhuō zi: read in 西's and 子's own tones (the user, 2026-11-02)
         assertEquals(t(1, 1), d.tonesOf("东西", "dong xi"))
         assertEquals(t(1, 3), d.tonesOf("桌子", "zhuo zi"))
-        assertFalse(d.tones.allows('子'.code, Syllables.id("zi"), ToneMark.NEUTRAL))
-        assertTrue(d.tones.allows('子'.code, Syllables.id("zi"), 3))
+        // typed: in its own tone and, as a word reads it, with ˙ (the user, 2026-11-02); not in another
+        for ((c, syllable, own) in listOf(Triple('子', "zi", 3), Triple('西', "xi", 1))) {
+            assertTrue("$c ˙", d.tones.allows(c.code, Syllables.id(syllable), ToneMark.NEUTRAL))
+            assertTrue("$c $own", d.tones.allows(c.code, Syllables.id(syllable), own))
+            assertFalse("$c 2", d.tones.allows(c.code, Syllables.id(syllable), 2))
+        }
+        // no word reads 好 neutral: ˙ is not its tone
+        assertFalse(d.tones.allows('好'.code, Syllables.id("hao"), ToneMark.NEUTRAL))
         // 们 has no tone but the neutral one: kept
         assertEquals(t(3, ToneMark.NEUTRAL), d.tonesOf("我们", "wo men"))
         // a curated one is no different

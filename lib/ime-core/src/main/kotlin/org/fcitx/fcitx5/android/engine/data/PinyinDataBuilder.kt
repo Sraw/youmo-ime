@@ -137,6 +137,8 @@ class PinyinDataBuilder {
      * not their characters' usual ones. Words of one character are read first: the usual tone they set
      * is what the longer words are compared with, and what a longer word's neutral tone becomes
      * ([ToneRules.full]); the rest in order of their text, so the same sources compile to the same file.
+     * A neutral tone listed still marks its character as typed with ˙ ([ToneTable.allows]): shown in its
+     * own tone (桌子 zhuō zǐ), 子 typed zi˙ as Taiwan's users type it is no worse (the user, 2026-11-02).
      */
     private fun writeTones(out: DataFile.Writer) {
         val chars = HashMap(charTones)
@@ -150,7 +152,8 @@ class PinyinDataBuilder {
                     val key = cps[i] * ToneTable.KEY_SPAN + reading[i]
                     // a character listed alone (谁 shéi) is its usual tone, whatever Unihan listed first
                     val usual = if (cps.size == 1) tones[i].toInt() else (chars[key] ?: tones[i].toInt()) and ToneTable.USUAL_MASK
-                    chars[key] = ((chars[key] ?: 0) and ToneTable.USUAL_MASK.inv()) or usual or (1 shl (tones[i] - 1 + ToneTable.MASK_SHIFT))
+                    val typed = listOf(tones[i], listed[i]).filter { it > 0 }.fold(0) { m, t -> m or (1 shl (t - 1 + ToneTable.MASK_SHIFT)) }
+                    chars[key] = ((chars[key] ?: 0) and ToneTable.USUAL_MASK.inv()) or usual or typed
                 }
             }
         }

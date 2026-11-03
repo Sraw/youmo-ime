@@ -11,6 +11,9 @@ import org.fcitx.fcitx5.android.engine.learn.HabitRanker
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
+import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
+import org.fcitx.fcitx5.android.engine.reading.ToneMark
+import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -580,6 +583,33 @@ class PinyinUatTest {
             focus("")
             type("rq")
             expectAmong(today[1])
+        }
+    }
+
+    // readings in their characters' own tones, no 轻声 (the user, 2026-11-02): 桌子 zhuō zǐ, 东西 dōng xī;
+    // only a character with no tone but the neutral one keeps it (们). Typed, 子 and 西 still take ˙ as
+    // Taiwan types them, as well as their own tone: the zhuyin keyboards' decoder costs neither
+    @Test
+    @Uat("PY-110")
+    fun aReadingIsInItsCharactersOwnTones() {
+        val tones = UatEngines.pinyinData.tones
+        for ((c, syllable, own) in listOf(Triple('子', "zi", 3), Triple('西', "xi", 1))) {
+            assertTrue("$c ˙", tones.allows(c.code, Syllables.id(syllable), ToneMark.NEUTRAL))
+            assertTrue("$c $own", tones.allows(c.code, Syllables.id(syllable), own))
+        }
+        // the ones only a word lists neutral, without ˙ before the user's decision
+        for ((c, syllable) in listOf('儿' to "er", '嚷' to "rang", '姥' to "lao")) {
+            assertTrue("$c ˙", tones.allows(c.code, Syllables.id(syllable), ToneMark.NEUTRAL))
+        }
+        for ((style, want) in listOf(ReadingStyle.PINYIN to listOf("zhuō zǐ", "dōng xī", "wǒ men"), ReadingStyle.ZHUYIN to listOf("ㄓㄨㄛ ㄗˇ", "ㄉㄨㄥ ㄒㄧ", "ㄨㄛˇ ˙ㄇㄣ"))) {
+            with(EngineReplay(settings(EngineSettings(candidateReading = style)))) {
+                for ((typed, word) in listOf("zhuozi" to "桌子", "dongxi" to "东西", "women" to "我们").zip(want)) {
+                    type(typed.first)
+                    expectAmong(typed.second)
+                    assertEquals("$style ${typed.second}", word, readingOf(typed.second))
+                    backspace(typed.first.length)
+                }
+            }
         }
     }
 

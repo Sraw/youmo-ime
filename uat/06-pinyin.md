@@ -491,3 +491,9 @@
 - **操作**：点 j i a o s e，看候选栏；清空，点 u n v z i；清空，把 **候选字号** 依次调成最小、最大，各打一次 j i a o s e；横屏再打一次；打开悬浮候选窗再打一次。
 - **预期**：「角色」字的上方标着 jué sè，字体、颜色、居中和拼音注音一样，只是字小一些；它和旁边没有提示的候选字在同一条水平线上；候选栏的高度和不打字时一样，提示出现、消失时栏不跳。拆字出的「好」上方标 hǎo。字号最小时提示不小于 7sp，可能略碰到字顶。悬浮窗里每个候选一样高。码表的编码提示仍在候选右边。
 - **JVM**：`CandidateHintsUatTest`（栏高、和旁边候选的基线一样、悬浮窗候选同高；浅色深色、竖屏横屏、14/20/28sp 的图）、`EnginesReadingsTest.offShowsNoneButTheHintsAboveTheCandidates`（ime-core：笔画、拆字的提示变成读音）、`CandidateReadingsTest.aHintIsOneReadingACharacterWithItsTones`、`CandidateBarHeightTest.aHintsReadingFillsTheRoomBetweenItsBounds`；设备上不跑。
+
+### PY-110 [P1] 候选词注音一律标本调，不标轻声
+- **前提**：B0，**候选词注音** 选「拼音」。
+- **操作**：打 zhuozi，看「桌子」上方；清空，打 dongxi，看「东西」上方；清空，打 women，看「我们」上方。把 **候选词注音** 换成「注音」，再打一遍。
+- **预期**：拼音是 zhuō zǐ、dōng xī、wǒ men；注音是 ㄓㄨㄛ ㄗˇ、ㄉㄨㄥ ㄒㄧ、ㄨㄛˇ ˙ㄇㄣ。轻声的字按它的本调标（子 zǐ、西 xī），只有本身只读轻声的字（的 了 吗 呢 们 么）标轻声（用户 2026-11-02 定）。注音键盘上照台湾习惯打 ˙（ㄗ˙、ㄒㄧ˙）不算错，「桌子」「东西」照样排第一，见注音键盘那条线的 PY-109。
+- **JVM**：`PinyinUatTest.aReadingIsInItsCharactersOwnTones`（真数据，拼音和注音两种）、`ToneTableTest.aWordsNeutralToneIsItsCharactersOwn`（ime-core：读音本调，输入时 ˙ 和本调都不罚分）；设备上不跑。
