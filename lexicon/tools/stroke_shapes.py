@@ -40,7 +40,6 @@ E = [
     ('esfek', {0: 'HG', 3: 'HP'}),   # 皮, its 捺 a 点 (颇)
     ('ekeg', {0: 'HP', 2: 'HG'}),    # 予 矛
     ('efj', {0: 'HG'}),              # 疋 (旋 胥 蛋 疏)
-    ('ejffjj', {0: 'HG'}),           # 敢
     ('el', {0: 'HP'}),               # 又 夂 久 之 支
     ('ek', {0: 'HP'}),               # 又 and 巠's top at a part's start (劝 对 经)
     ('se', {1: 'HP'}),               # 𠂊 夕 (鱼 免 角 危 名 臽)
@@ -66,8 +65,23 @@ FIXED = {
     '黏': 'P H S P D P D SG D T P D S H S HZ H',
 }
 # what no rule settles (hanzipi: 承 52111534, its 6th a 折, 横撇 as 丞's), and 匹, whose 竖弯 cnchar
-# writes as a 竖弯钩 (u): 匸 closes it, as 四's
-OVERRIDE = {'承': 'HP SG H H H HP P N', '匹': 'H P SW SZ'}
+# writes as a 竖弯钩 (u): 匸 closes it, as 四's; 鸠's 九, on the left, a 横折提 (GF 2001's example, as 颓's)
+OVERRIDE = {'承': 'HP SG H H H HP P N', '匹': 'H P SW SZ', '鸠': 'P HZT P HZG D SZWG H'}
+# what 《GB13000.1字符集汉字折笔规范》's table of turning strokes (GF 2001-2001) gives otherwise than the
+# letter does, by its example characters: in a character with one of the parts, wherever the part's letters
+# are, its stroke so: 敢's 横折 (cnchar e); 互 母 乐 / 发 牙 降's 竖折 (cnchar n, 撇折), and 彑's, as 互's;
+# 要's 横折钩 (c); 执's 横斜钩 (o: 丸 alone, and in 孰 纨, not said, is left 横折弯钩)
+GF = [
+    ('敢', 'ejffjj', 0, 'HZ'),
+    ('互', 'jnej', 1, 'SZ'),
+    ('彑彖彘彝蠡', 'nej', 0, 'SZ'),
+    ('牙', 'jngs', 1, 'SZ'),
+    ('发', 'nselk', 0, 'SZ'),
+    ('夅', 'seljnf', 4, 'SZ'),          # 夂 㐄: not 车's 撇折 (辚's jnf)
+    ('舛', 'sekjnf', 4, 'SZ'),
+    ('要', 'jfcffjmsj', 2, 'HZG'),
+    ('执', 'jgisok', 4, 'HXG'),
+]
 KIND = {'H': 1, 'T': 1, 'S': 2, 'SG': 2, 'P': 3, 'D': 4, 'N': 4}
 CODES = set(PLAIN.values()) | {'HP', 'HG', 'XG', 'BXG', 'HPWG', 'HZZZG', 'HZZ', 'HZW', 'SZP', 'SZZ', 'SZ', 'SW', 'HXG', 'HZWG'}
 
@@ -138,6 +152,10 @@ def shapes(c, v, parts):
             out.append(e_shape(v, i))
         else:
             raise ValueError(f'{c}: a letter cnchar has not: {x}')
+    for of, letters, at, shape in GF:
+        if ({c} | parts(c)) & set(of):
+            for m in re.finditer('(?=' + letters + ')', v):
+                out[m.start() + at] = shape
     return out
 
 

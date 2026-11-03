@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.reading.CandidateReadings
 import org.fcitx.fcitx5.android.engine.reading.CharCard
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
+import org.fcitx.fcitx5.android.engine.stroke.StrokeShape
 import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -207,6 +208,30 @@ class HandwritingEngineUatTest {
             "心" to "丶㇃丶丶", "那" to "㇆一一丿㇌丨", "乃" to "㇡丿", "专" to "一一ㄣ丶", "凹" to "丨㇅丨㇕一", "朵" to "丿㇍一丨丿㇏",
         )
         assertEquals(shown, shown.mapValues { (c, _) -> card(c, "口").orderShown() })
+    }
+
+    // every example character of the standard's table of turning strokes (GF 2001-2001, 《GB13000.1字符集
+    // 汉字折笔规范》, its 25 shapes: http://www.moe.gov.cn/ewebeditor/uploadfile/2015/01/12/20150112170016626.pdf)
+    // has its shape: a rule wrong for a whole part shows here. Not here: 為 朮 卍 卐 亞 吳 奊 (none of the
+    // mainland's simplified ones: rime-stroke's five kinds), 撇钩's 乄; 心 (5.19 竖弯钩 in 宋体) is written with
+    // 楷体's 卧钩, and 达 (5.1 横折) with 辶's 横折折撇, as taught
+    @Test
+    @Uat("HW-29")
+    fun theStandardsExamplesEachTheirTurningStroke() {
+        val examples = mapOf(
+            "HZ" to "口见舆己罗马丑贯敢", "HP" to "又祭之社登令了", "HG" to "买宝皮饭", "SZ" to "山世岵母互乐发牙降",
+            "SW" to "四西", "ST" to "长瓜鼠以瓦叫收", "PZ" to "公离云红乡亥车东", "PD" to "女巡", "WG" to "犹家", "XG" to "代戈",
+            "HZZ" to "凹", "HZW" to "朵", "HZT" to "计颓鸠", "HZG" to "同门却永要万母仓也", "HXG" to "飞风执", "SZZ" to "鼎",
+            "SZP" to "专", "SWG" to "己匕电", "HZZZ" to "凸", "HZZP" to "及延", "HZWG" to "几丸艺亿", "HPWG" to "阳部",
+            "SZWG" to "马与钙号弓", "HZZZG" to "乃杨",
+        )
+        val missing = examples.flatMap { (code, chars) ->
+            val shape = StrokeShape.of(code)!!
+            chars.map { it.toString() }.filter { c -> card(c, "口").strokeOrder?.contains(shape) != true }.map { "$it $code" }
+        }
+        assertEquals(emptyList<String>(), missing)
+        assertEquals(StrokeShape.BXG, card("心", "口").strokeOrder!![1])
+        assertEquals(StrokeShape.HZZP, card("达", "口").strokeOrder!![4])
     }
 
     // a character's own neutral tone (头 tou, 和 huo) the card's only: never on the candidate (the user, 2026-11-02)

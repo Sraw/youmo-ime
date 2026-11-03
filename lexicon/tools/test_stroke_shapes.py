@@ -10,10 +10,11 @@ ORDERS = {
     '心': 'dykk', '戈': 'jysk', '那': 'rjjswf', '乃': 'ws', '山': 'fbf', '四': 'fcsbj', '牺': 'sjfijfcsbj',
     '又': 'el', '写': 'dejzj', '欠': 'sesl', '阙': 'kfrksjbfssesk', '尔': 'segsk', '子': 'egj', '孚': 'skksegj',
     '旁': 'kjksdekjrs', '买': 'ekkjsk', '予': 'ekeg', '皮': 'esfel', '凹': 'fvfcj', '朵': 'svjfsl', '专': 'jjxk',
-    '鼎': 'fcjjjxjsfjfc', '虱': 'osfcjfjk', '鲺': 'sefcjfjiojfcjfjk', '匹': 'jsub', '机': 'jfskso', '承': 'egjjjesl', '皙': 'jfskssjffcjj', '江': 'kkijfj',
+    '鼎': 'fcjjjxjsfjfc', '虱': 'osfcjfjk', '鲺': 'sefcjfjiojfcjfjk', '匹': 'jsub', '机': 'jfskso', '敢': 'ejffjjisjsl', '牙': 'jngs', '辚': 'jnfiksjfslsekjnf', '执': 'jgisok', '丸': 'sok', '彖': 'nejstsssl', '承': 'egjjjesl', '皙': 'jfskssjffcjj', '江': 'kkijfj',
 }
 CHAIZI = ['岚\t山 风\n', '牺\t牛 西\n', '西\t覀 儿\n', '鲺\t鱼 虱\n', '虱\t乁 一 虫\n', '机\t木 几\n', '几\t乁 丿\n',
-          '甲\t乙 丙\n', '乙\t丙 甲\n']
+          '甲\t乙 丙\n', '乙\t丙 甲\n', '辚\t车 粦\n', '粦\t米 舛\n',
+          '执\t扌 丸\n']
 
 
 def converted(tsv):
@@ -47,6 +48,13 @@ class StrokeShapesTest(unittest.TestCase):
         # v x: 凹 朵, 专 鼎
         self.assertEqual(('S HZZ S HZ H', 'P HZW H S P N'), (self.shapes('凹'), self.shapes('朵')))
         self.assertEqual(('H H SZP D', 'S HZ H H H SZZ H P S H S HZ'), (self.shapes('专'), self.shapes('鼎')))
+
+    def test_the_standards_examples_over_the_letter(self):
+        # GF 2001's table: 敢's 横折, 牙 彑's 竖折, 执's 横斜钩 (丸 alone 横折弯钩)
+        self.assertEqual(('HZ', 'H SZ SG P', 'SZ'), (self.shapes('敢').split()[0], self.shapes('牙'), self.shapes('彖').split()[0]))
+        self.assertEqual(('H SG T P HXG D', 'P HZWG D'), (self.shapes('执'), self.shapes('丸')))
+        # 舛's 竖折, not 车's 撇折, in 辚
+        self.assertEqual('H PZ S T D P H S P N P HP D H SZ S', self.shapes('辚'))
 
     def test_e_by_the_longest_part_it_is_in(self):
         self.assertEqual('HP N', self.shapes('又'))
