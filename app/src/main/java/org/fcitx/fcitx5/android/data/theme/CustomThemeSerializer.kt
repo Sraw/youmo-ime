@@ -111,10 +111,10 @@ object CustomThemeSerializer : JsonTransformingSerializer<Theme.Custom>(ThemeFil
 
     private const val VERSION = "version"
 
-    private const val CURRENT_VERSION = "3.0"
+    internal const val CURRENT_VERSION = "3.0"
     private const val FALLBACK_VERSION = "1.0"
 
-    private val knownVersions = strategies.map { it.version }
+    internal val knownVersions = strategies.map { it.version }
 
     private fun from21(obj: JsonObject): JsonObject {
         fun color(key: String) = obj.getValue(key).jsonPrimitive.int
