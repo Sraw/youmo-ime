@@ -76,6 +76,8 @@ class CharReadingsTest {
         assertEquals(listOf("树行子"), readings.examples(xing, 3))
         assertEquals(emptyList<String>(), readings.examples(xing, 4))
         assertEquals(listOf("爱好"), readings.examples('好'.code, 1))
+        // a dictionary's words only: 荣和, the model's commoner, is two words run together
+        assertEquals(listOf("和平"), readings.examples('和'.code, 0))
         // one reading: none kept
         assertEquals(emptyList<String>(), readings.examples('银'.code, 0))
         assertEquals(emptyList<String>(), readings.examples('a'.code, 0))

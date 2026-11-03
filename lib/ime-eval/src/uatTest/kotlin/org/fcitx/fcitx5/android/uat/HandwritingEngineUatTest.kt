@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.uat
 
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.reading.CharCard
 import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -141,5 +142,29 @@ class HandwritingEngineUatTest {
         // written again right away, as the device's step: no new focus
         write(*ren)
         assertEquals(order, candidates.take(3))
+    }
+
+    // a character's card with the app's data
+    private fun card(vararg written: String): CharCard = with(HostReplay(im = InputMethodCatalog.HANDWRITING)) {
+        write(*written)
+        checkNotNull(engines.charCard(InputMethodCatalog.HANDWRITING, candidates.indexOf(written[0]), written[0]))
+    }
+
+    // a reading's words a dictionary's, not the model's others: 荣和, 去呢, 弦数 are two words run together (the user, 2026-11-02)
+    @Test
+    @Uat("HW-29")
+    fun aCardsWordsAreADictionarys() {
+        val he = card("和", "口")
+        assertEquals(listOf("hé", "hè", "huò", "hú", "huó", "huo"), he.readings.map { it.pinyin })
+        assertEquals(listOf("和谐", "和平"), he.readings[0].examples)
+        // 和牌 is no dictionary's: hú has none
+        assertEquals(emptyList<String>(), he.readings[3].examples)
+        assertEquals(listOf("掺和", "搅和"), he.readings[5].examples)
+        assertEquals(listOf("呢喃", "毛呢"), card("呢", "口").readings.single { it.pinyin == "ní" }.examples)
+        assertEquals(emptyList<String>(), card("呢", "口").readings.single { it.pinyin == "ne" }.examples)
+        val shu = card("数", "口").readings.associate { it.pinyin to it.examples }
+        assertEquals(listOf("倒数", "数不胜数"), shu["shǔ"])
+        val words = listOf(he, card("呢", "口"), card("数", "口")).flatMap { c -> c.readings.flatMap { it.examples } }
+        assertTrue(words.toString(), words.none { it in setOf("荣和", "去呢", "弦数") })
     }
 }

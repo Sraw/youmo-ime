@@ -127,7 +127,8 @@ class PinyinDataBuilder {
         writeLayers(out)
         writeTones(out) { e, tones ->
             val id = model.id(e.word)
-            if (id < lmSize) charReadings.word(id, e.word.codePoints().toArray(), e.syllables.toList(), tones, Math.pow(10.0, model.tables.unigramProb(id).toDouble()))
+            val listed = wordTones[e.word]?.containsKey(e.syllables.toList()) == true
+            if (id < lmSize) charReadings.word(id, e.word.codePoints().toArray(), e.syllables.toList(), tones, Math.pow(10.0, model.tables.unigramProb(id).toDouble()), listed)
         }
         charReadings.write(out)
         model.tables.write(out, lmSize)
