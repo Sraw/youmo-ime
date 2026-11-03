@@ -119,7 +119,7 @@
 - **前提**：B0-手写，**候选词注音** 选拼音。
 - **操作**：写「行」，看候选栏；删光，写「银」再写「行」；把候选词注音改成注音符号，再写「行」。候选字号 20 和 28 各看一次，横屏再看一次。
 - **预期**：「行」上方标 xíng/háng…（前两个读音，「/」隔开，还有就加「…」）；写了「银」以后「行」标 háng/xíng…；只有一个读音的字（街）照旧一个；拼音放不下时字变小但不小于 7sp，再放不下候选变宽；注音符号是一个读音一竖列并排，还有更多时后面有「⋮」。栏高和只标一个读音时一样。
-- **JVM**：`CandidateReadingsUatTest.handwritingPortrait`（竖屏，拼音和注音、20 和 28sp、浅色和深色；图）、`CandidateReadingsUatTest.handwritingLandscape`（横屏；图）、`ReadingSpanTest`（拼音缩到下限再加宽，注音一列一个）、`EnginesHandwritingReadingsTest.aWrittenCharacterShowsItsReadingsTheWordsFirst`（ime-core，测试数据：行 xíng/háng…，银之后 háng 在前）；设备上留作冒烟。
+- **JVM**：`CandidateReadingsUatTest.handwritingPortrait`（竖屏，拼音和注音、20 和 28sp、浅色和深色；图）、`CandidateReadingsUatTest.handwritingLandscape`（横屏；图）、`ReadingSpanTest`（拼音缩到下限再加宽，注音一列一个）、`EnginesHandwritingReadingsTest.aWrittenCharacterShowsItsReadingsTheWordsFirst`（ime-core，测试数据：行 xíng/háng…，银之后 háng 在前）、`HandwritingEngineUatTest.theCandidatesLeaveOutACharactersOwnNeutralTone`（App 的数据：候选上 头 只有 tóu、和 没有 huo，字卡里有）；设备上留作冒烟。
 
 ### HW-28 [P1] 「注」键：点一下开关，写好的字不上屏
 - **前提**：B0-手写，**候选词注音** 关闭。

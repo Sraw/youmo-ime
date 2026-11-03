@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.reading
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.data.ReadingSource
@@ -42,6 +43,7 @@ class CharReadingsTest {
     }
 
     @Test
+    @Uat("HW-29")
     fun theCardListsTheDictionariesNeutralTonesTooAfterTheRest() {
         assertEquals(listOf("tóu", "tou"), readings.of('头'.code, card = true).map { it.pinyin })
         assertEquals(listOf("hé", "hè", "hú", "huó", "huò", "huo"), readings.of('和'.code, card = true).map { it.pinyin })
@@ -78,6 +80,9 @@ class CharReadingsTest {
         assertEquals(listOf("爱好"), readings.examples('好'.code, 1))
         // a dictionary's words only: 荣和, the model's commoner, is two words run together
         assertEquals(listOf("和平"), readings.examples('和'.code, 0))
+        // yet the model's others order the readings: 长大 puts zhǎng first, and is no example
+        assertEquals(listOf("zhǎng", "cháng"), readings.of('长'.code).map { it.pinyin })
+        assertEquals(emptyList<String>(), readings.examples('长'.code, 0))
         // one reading: none kept
         assertEquals(emptyList<String>(), readings.examples('银'.code, 0))
         assertEquals(emptyList<String>(), readings.examples('a'.code, 0))

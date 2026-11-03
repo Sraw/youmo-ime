@@ -100,7 +100,7 @@ case("HW-23", needs="jvm:HandwritingEngineUatTest.aCharacterDeletedRightAwayIsNo
 case("HW-26", needs="jvm:HandwritingEngineUatTest.aCharacterNotYetInIsShownTraditionalAtTheToggle")(lambda d: None)
 
 
-case("HW-27", needs="jvm:CandidateReadingsUatTest.handwritingPortrait、CandidateReadingsUatTest.handwritingLandscape、ReadingSpanTest")(lambda d: None)
+case("HW-27", needs="jvm:CandidateReadingsUatTest.handwritingPortrait、CandidateReadingsUatTest.handwritingLandscape、ReadingSpanTest、HandwritingEngineUatTest.theCandidatesLeaveOutACharactersOwnNeutralTone")(lambda d: None)
 
 
 case("HW-28", needs="jvm:HandwritingUatTest.theReadingKeyTurnsTheReadingsOnAndWhatIsWrittenStays、HandwritingKeyboardTest.theReadingKeyTurnsTheReadingsOnAsLastUsedAndOff")(lambda d: None)

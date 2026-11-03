@@ -99,6 +99,9 @@ object UatEngines {
 
     private fun mappedOnce(path: String): ByteBuffer = synchronized(mapped) { mapped.getOrPut(path) { load(path) } }.duplicate()
 
+    /** The app's data file at [path] (`engine/pinyin.data`), as the engines map it. */
+    fun data(path: String): ByteBuffer = mappedOnce(path)
+
     // where the install's id is kept, beside the user directory as the app's no-backup directory is: a restart keeps it, a fresh install not;
     // removed whole at exit, as deleteOnExit leaves a directory that is not empty
     private val installFile: File = File(tempDir("uat-install"), "install-id")

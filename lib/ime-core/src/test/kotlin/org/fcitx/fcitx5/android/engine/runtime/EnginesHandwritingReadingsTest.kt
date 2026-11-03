@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.HANDWRITING
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
@@ -35,6 +36,7 @@ class EnginesHandwritingReadingsTest : EnginesFixture() {
         onEvent(HANDWRITING, EngineEvent.CHAR, Keyboard.INK, payload = Action.Ink(piece, InkReading(texts.toList(), DoubleArray(texts.size))))
 
     @Test
+    @Uat("HW-27")
     fun aWrittenCharacterShowsItsReadingsTheWordsFirst() {
         val e = engines(ReadingStyle.PINYIN)
         val one = e.write(0, "行", "江")
@@ -69,6 +71,7 @@ class EnginesHandwritingReadingsTest : EnginesFixture() {
     }
 
     @Test
+    @Uat("HW-28")
     fun turnedOnWhatIsWrittenStaysAndIsReadAgain() {
         val e = engines(ReadingStyle.OFF)
         e.write(0, "银")
@@ -83,6 +86,7 @@ class EnginesHandwritingReadingsTest : EnginesFixture() {
     }
 
     @Test
+    @Uat("HW-29")
     fun theCardOfAWrittenCharacterOrOneLookedUp() {
         val e = engines(ReadingStyle.OFF)
         e.write(0, "银")
@@ -113,6 +117,7 @@ class EnginesHandwritingReadingsTest : EnginesFixture() {
 
     // the paged window's index, from the page shown (review 051-hw-reading M2)
     @Test
+    @Uat("HW-29")
     fun aCardOnTheSecondPageIsOfItsCharacter() {
         val e = engines(ReadingStyle.OFF).apply { settings = settings.copy(pageSize = 1) }
         e.write(0, "行", "江")

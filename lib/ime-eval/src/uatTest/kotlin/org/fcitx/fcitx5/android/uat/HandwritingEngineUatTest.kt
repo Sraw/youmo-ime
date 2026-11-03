@@ -6,7 +6,11 @@ package org.fcitx.fcitx5.android.uat
 
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.data.PinyinData
+import org.fcitx.fcitx5.android.engine.lattice.Predictor
+import org.fcitx.fcitx5.android.engine.reading.CandidateReadings
 import org.fcitx.fcitx5.android.engine.reading.CharCard
+import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -144,8 +148,12 @@ class HandwritingEngineUatTest {
         assertEquals(order, candidates.take(3))
     }
 
-    // a character's card with the app's data
-    private fun card(vararg written: String): CharCard = with(HostReplay(im = InputMethodCatalog.HANDWRITING)) {
+    // a character's card with the app's data, made once a test
+    private val cards = HashMap<List<String>, CharCard>()
+
+    private fun card(vararg written: String): CharCard = cards.getOrPut(written.toList()) { cardOf(*written) }
+
+    private fun cardOf(vararg written: String): CharCard = with(HostReplay(im = InputMethodCatalog.HANDWRITING)) {
         write(*written)
         val i = candidates.indexOf(written[0])
         check(i >= 0) { "${written[0]} not among $candidates" }
@@ -183,8 +191,32 @@ class HandwritingEngineUatTest {
         // the count the order's: Unihan's 范 9 and 骨 10 are Taiwan's (a 4-stroke 艹; 骨's 冖)
         assertEquals("一丨丨丶丶一乛乛" to 8, card("范", "口").let { it.strokeOrder to it.strokes })
         assertEquals(9, card("骨", "口").strokes)
-        // cnchar's 皙 leaves out 白's 丿: rime-stroke's; and for 國, which cnchar has not
+        // 皙 with 白's 丿, as corrected in lexicon/stroke-order.tsv (cnchar's left it out); rime-stroke's first for 國, which it has not
         assertEquals("一丨丿丶丿丿一丨丿丨乛一一" to 13, card("皙", "口").let { it.strokeOrder to it.strokes })
         assertEquals("丨乛一丨乛一一乛丶丿一", card("國", "口").strokeOrder)
+    }
+
+    // a character's own neutral tone (头 tou, 和 huo) the card's only: never on the candidate (the user, 2026-11-02)
+    @Test
+    @Uat("HW-27")
+    fun theCandidatesLeaveOutACharactersOwnNeutralTone() {
+        val data = PinyinData.load(UatEngines.data("engine/pinyin.data"))
+        val readings = CandidateReadings(data, data.tones) { Predictor.charReadingsOf(data.dictionary, data.vocabulary) }
+        assertEquals(listOf("tóu"), readings.ordered('头'.code).map { it.pinyin })
+        assertEquals(listOf("hé", "hè", "huò", "hú", "huó"), readings.ordered('和'.code).map { it.pinyin })
+        assertEquals(listOf("tóu"), readings.allOf("头", ReadingStyle.PINYIN))
+        assertEquals(listOf("hé/hè…"), readings.allOf("和", ReadingStyle.PINYIN))
+        assertEquals(listOf("tóu"), readings.of("头", ReadingStyle.PINYIN))
+        assertEquals(listOf("hé"), readings.of("和", ReadingStyle.PINYIN))
+        assertEquals(listOf("ㄊㄡˊ"), readings.allOf("头", ReadingStyle.ZHUYIN))
+        // the card has them, last
+        assertEquals("huo", card("和", "口").readings.last().pinyin)
+        assertEquals(listOf("tóu", "tou"), card("头", "口").readings.map { it.pinyin })
+        // and so through the engine: handwriting's 头 one reading
+        with(HostReplay(im = InputMethodCatalog.HANDWRITING)) {
+            engines.settings = engines.settings.copy(candidateReading = ReadingStyle.PINYIN)
+            write("头", "口")
+            assertEquals(listOf("tóu"), engines.candidates(InputMethodCatalog.HANDWRITING, 0, 1).single().readings)
+        }
     }
 }

@@ -45,6 +45,8 @@ object ReadingData {
             U+4EBA: rén  # 人
             U+5E73: píng  # 平
             U+4E7E: qián  # 乾
+            U+957F: cháng  # 长
+            U+5927: dà  # 大
         """,
         ReadingSource.PINLU to """
             U+884C: xíng,háng  # 行
@@ -64,6 +66,7 @@ object ReadingData {
             U+548C: hé,hè,hú,huó,huò  # 和
             U+5934: tóu,tou  # 头
             U+4E7E: gān,qián  # 乾
+            U+957F: cháng,zhǎng  # 长
         """,
         ReadingSource.TGHZ to """
             U+884C: háng,héng,xíng  # 行
@@ -90,6 +93,7 @@ object ReadingData {
         进行: jìn xíng
         行走: xíng zǒu
         银行: yín háng
+        银行: yín xíng
         道行: dào héng
         和平: hé píng
         还是: hái shì
@@ -107,11 +111,13 @@ object ReadingData {
             Triple("银", "yin", -3f), Triple("江", "jiang", -3f), Triple("还是", "hai shi", -3f),
             // the model's, not a dictionary's: two words run together, commoner than 和平 but no example
             Triple("荣和", "rong he", -2f),
+            // the model's alone, yet what puts 长's zhǎng before cháng
+            Triple("长大", "zhang da", -2f),
         ).forEach { (w, r, p) -> b.unigram(w, p, 0f).entry(w, syl(*r.split(' ').toTypedArray())) }
         // a rarer reading of the word, by the dictionary's weight: no example of it
         b.entry("行", syl("hang"), -1f).entry("行", syl("heng"), -3f).entry("银行", syl("yin", "xing"), -2f)
         // each character as the dictionary has it alone, which reads a word by its text (Predictor.reading)
-        for ((c, r) in listOf("荣" to "rong", "道" to "dao", "树" to "shu", "子" to "zi", "进" to "jin", "走" to "zou", "爱" to "ai", "人" to "ren", "平" to "ping", "好" to "hao")) {
+        for ((c, r) in listOf("大" to "da", "荣" to "rong", "道" to "dao", "树" to "shu", "子" to "zi", "进" to "jin", "走" to "zou", "爱" to "ai", "人" to "ren", "平" to "ping", "好" to "hao")) {
             b.entry(c, syl(r))
         }
         for ((source, text) in SOURCES) {

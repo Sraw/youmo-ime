@@ -380,6 +380,7 @@ class HandwritingUatTest {
 
     // floating in landscape: one column, as upright
     @Test
+    @Uat("HW-29")
     @Config(qualifiers = "zh-rCN-w851dp-h393dp-land-440dpi")
     fun theCardOnTheFloatingKeyboardIsOneColumn() {
         ThemeManager.prefs.floatingKeyboard.setValue(true)
@@ -398,6 +399,7 @@ class HandwritingUatTest {
 
     // 乾 not taken apart and no stroke order: those lines left out; 和's six readings scrolled past four
     @Test
+    @Uat("HW-29")
     @Config(qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi")
     fun aCardLeavesOutWhatIsNotKnownAndScrollsItsReadings() {
         h.api.charCards["乾"] = CharCard("乾", listOf(CharCard.Row("gān", "ㄍㄢ", listOf("乾坤")), CharCard.Row("qián", "ㄑㄧㄢˊ", listOf("乾隆"))), "乙", 11, null, null)

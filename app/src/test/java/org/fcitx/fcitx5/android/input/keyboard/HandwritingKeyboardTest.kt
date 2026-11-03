@@ -209,6 +209,7 @@ class HandwritingKeyboardTest {
     }
 
     @Test
+    @Uat("HW-28")
     fun itsLongPressSetsEachStyle() {
         val keyboard = keyboard()
         runAll()
@@ -226,6 +227,7 @@ class HandwritingKeyboardTest {
 
     // the character on the pad finished as a pause would (in the sentence, not committed), its strokes wiped, then the setting
     @Test
+    @Uat("HW-28")
     fun aTapMidCharacterFinishesItFirstAndCommitsNothing() {
         val keyboard = keyboard()
         runAll()
