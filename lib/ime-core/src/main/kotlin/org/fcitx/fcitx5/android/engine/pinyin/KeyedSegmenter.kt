@@ -39,6 +39,12 @@ interface KeyedSegmenter : Segmenter {
     /** How [syllable] read whole shows: its pinyin, its symbols on the zhuyin keyboards. */
     fun spelt(syllable: Int): String = Syllables.spelling(syllable)
 
+    /**
+     * How a syllable or initial the bar offers ([org.fcitx.fcitx5.android.engine.session.NineKeys.offered],
+     * in pinyin) shows: as it is, in symbols on the zhuyin keyboards (ㄋㄧ, not ni).
+     */
+    fun shownOffered(offered: String): String = offered
+
     /** Whether [c] of the input ends a syllable: the separator, a tone on the zhuyin keyboards. */
     fun separates(c: Char): Boolean = c == SyllableGraph.SEPARATOR
 

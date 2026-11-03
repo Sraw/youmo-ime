@@ -396,8 +396,10 @@ class PinyinSession(
 
     override fun endsInput(c: Char): Boolean = !reads(c) || !segmenter.readsAfter(input.substring(readFrom(), cursor), c)
 
+    // a zhuyin tone ends a syllable: with nothing typed there is none, and it is not typed (kept, it
+    // went unseen until the next syllable showed it as its code)
     override fun reads(c: Char): Boolean =
-        segmenter.reads(c) || (c == SyllableGraph.SEPARATOR || c == NINE_KEYS_SEPARATOR && nineKeys?.oneSeparates == true) && input.isNotEmpty() || c == ' ' && keyed?.tonesBySpace(input.substring(readFrom(), cursor)) == true
+        segmenter.reads(c) && (input.isNotEmpty() || ZhuyinKeys.toneOf(c) == 0) || (c == SyllableGraph.SEPARATOR || c == NINE_KEYS_SEPARATOR && nineKeys?.oneSeparates == true) && input.isNotEmpty() || c == ' ' && keyed?.tonesBySpace(input.substring(readFrom(), cursor)) == true
 
     override fun candidates(from: Int, count: Int): List<Choice> {
         readUntil(from + count)
@@ -941,7 +943,8 @@ class PinyinSession(
             // a prediction too: what was learned of it may be forgotten (see predictionOffers)
             actionable = candidates.isNotEmpty(),
             refines = unrefined != null,
-            syllables = nineKeys?.offered.orEmpty(),
+            // as the keys spell them: zhuyin's in symbols (taken, each still goes in as its pinyin)
+            syllables = nineKeys?.offered.orEmpty().map { keyed?.shownOffered(it) ?: it },
             syllablesId = nineKeys?.id ?: 0,
             cursor = if (cursor >= input.length) -1 else lastRead.places.preeditAt(cursor),
         )

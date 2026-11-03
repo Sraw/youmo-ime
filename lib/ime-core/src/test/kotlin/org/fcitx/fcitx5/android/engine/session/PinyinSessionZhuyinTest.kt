@@ -56,6 +56,21 @@ class PinyinSessionZhuyinTest {
         assertEquals("ㄋㄧ ㄏㄠ", out.preedit)
     }
 
+    // the bar's syllables in zhuyin as the code row is (design 051 §3.2), never pinyin's letters; one
+    // tapped still settles its syllable
+    @Test
+    fun theNineKeysOfferTheSyllablesInZhuyin() {
+        val keyboard = Keyboard(session(nine = true), nineKeys = true)
+        val out = keyboard.type(nine("ㄋㄧㄏㄠ"))
+        assertEquals("ㄋㄧ", out.syllables.first())
+        assertTrue(out.syllables.toString(), out.syllables.all { s -> s.all { it in ZhuyinKeys.SYMBOLS } })
+        val mi = out.syllables.indexOf("ㄇㄧ")
+        assertTrue(out.syllables.toString(), mi > 0)
+        val taken = keyboard.onEvent(EngineEvent.CHAR, Keyboard.syllableKey(mi, out.syllablesId).code)
+        // taken, it is pinyin in the input; shown in symbols all the same (here no word reads it: as typed)
+        assertTrue(taken.preedit, taken.preedit.startsWith("ㄇㄧ") && taken.preedit.endsWith("ㄏㄠ") && taken.preedit.none { it in 'a'..'z' })
+    }
+
     // design 051 Q3 A: a space gives a syllable with no tone its first, then picks the first candidate
     @Test
     fun dachensSpaceIsTheFirstToneThenThePick() {
@@ -66,6 +81,21 @@ class PinyinSessionZhuyinTest {
         assertEquals("中", toned.candidates[0])
         val picked = keyboard.onEvent(EngineEvent.CHAR, ' '.code)
         assertEquals("中", picked.commit)
+    }
+
+    // a tone ends a syllable: with nothing typed it ends nothing, typed nothing, and the next
+    // syllable starts clean (it was kept unseen, then shown as its code before ㄋㄧ)
+    @Test
+    fun aToneWithNothingTypedIsNotTyped() {
+        for (nine in listOf(false, true)) {
+            val keyboard = Keyboard(session(nine = nine), nineKeys = true)
+            val tone = if (nine) Keyboard.zhuyinNineTone(3) else Keyboard.zhuyinTone(3)
+            val out = keyboard.onEvent(EngineEvent.CHAR, tone)
+            assertEquals("", out.preedit)
+            assertEquals("", out.commit)
+            val typed = keyboard.type(if (nine) nine("ㄋㄧ") else dachen("ㄋㄧ"))
+            assertEquals("ㄋㄧ", typed.preedit)
+        }
     }
 
     // text not read as a word goes in as the zhuyin shown (注音文), never the codes

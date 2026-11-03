@@ -459,6 +459,11 @@ setting either: it reads the codes.
   syllable spelt by `Zhuyin.of`, a symbol a fixed key, an initial its zhuyin initial. A tone is a separator
   (`SyllableGraph.isSeparator`); `SyllableGraph.tone(edge)` reads it after the edge. On 大千 a space after a
   syllable with no tone is tone 1 (`KeyedSegmenter.tonesBySpace`), else it picks the first candidate.
+- **Keys and bar.** 注音九键 has the tones ˉ ˊ ˇ ˋ a key each down the left (˙ on ˉ's long press and
+  swipe); the key after ㄖㄥㄩ's group is 分词 (tone 0) while something is typed, else a comma as punctuation
+  maps it. A tone with nothing typed is not read (`PinyinSession.reads`): it types nothing. The bar's
+  syllables are shown in zhuyin (`KeyedSegmenter.shownOffered`; an initial as its symbol, r as ㄖ), and one
+  taken off it as well (`T9Segmenter.asTyped`), though its pinyin is what goes into the input.
 - **Tones.** Optional. `PinyinDecoder`'s `toneAllows` (`PinyinData.tones.allows`) adds `Penalties.tone`
   (−4) for each word whose character cannot take the tone typed: soft, a word is never dropped.
 - **Learning.** Kinds `zy:nine`, `zy:dachen` (`Kinds.isZhuyin`), grouped, no spellings linked (U-20 is

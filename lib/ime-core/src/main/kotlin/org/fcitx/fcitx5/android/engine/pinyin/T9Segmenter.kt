@@ -290,10 +290,27 @@ class T9Segmenter(
 
     /**
      * [text], of the input, as it is shown or committed: a letter typed as itself lower case, a
-     * grouped key's code its first letter ([NineKeyLetters.asTyped]).
+     * grouped key's code its first letter ([NineKeyLetters.asTyped]). In zhuyin a symbol or tone as
+     * itself, and a syllable taken off the bar (its pinyin in the input) in symbols: ㄇㄧ, not mi.
      */
-    override fun asTyped(text: CharSequence): String =
-        if (spelling == KeySpelling.Pinyin) letters.asTyped(text.toString()) else text.map { spelling.shown(it) ?: letters.asTyped(it.toString()) }.joinToString("")
+    override fun asTyped(text: CharSequence): String {
+        if (spelling == KeySpelling.Pinyin) return letters.asTyped(text.toString())
+        val out = StringBuilder()
+        var at = 0
+        while (at < text.length) {
+            val c = text[at]
+            if (c in 'a'..'z') {
+                var end = at
+                while (end < text.length && text[end] in 'a'..'z') end++
+                out.append(shownOffered(text.substring(at, end)))
+                at = end
+            } else {
+                out.append(spelling.shown(c) ?: letters.asTyped(c.toString()))
+                at++
+            }
+        }
+        return out.toString()
+    }
 
     /** Whether [c] is a key typed: one of the keys' codes (the nine keys' digits) or a letter typed as itself. */
     override fun isKey(c: Char): Boolean = letters.isCode(c) || spelling.isFixed(c)
@@ -308,6 +325,11 @@ class T9Segmenter(
     override fun started(syllable: Int, keys: Int): String = spelling.of(syllable).take(keys)
 
     override fun spelt(syllable: Int): String = spelling.of(syllable)
+
+    // an initial first: the bar offers m, n and r (ㄇ ㄋ ㄖ) as initials only, never as 呣 嗯 儿's syllables
+    override fun shownOffered(offered: String): String =
+        (if (spelling == KeySpelling.Bopomofo) spelling.initial(offered) else null)
+            ?: Syllables.id(offered).takeIf { it >= 0 }?.let(spelling::of) ?: offered
 
     override fun separates(c: Char): Boolean = spelling.separates(c)
 
