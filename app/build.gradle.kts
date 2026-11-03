@@ -113,8 +113,12 @@ android {
                 it.maxHeapSize = "3g"
                 // mockk's agent attached from inside the test JVM: by default ByteBuddy starts a second
                 // process to attach it, which under a full run's load at times fails and takes every
-                // mockk test of that JVM with it (JvmMockKGateway)
-                it.jvmArgs("-Djdk.attach.allowAttachSelf=true", "-XX:+EnableDynamicAgentLoading")
+                // mockk test of that JVM with it (JvmMockKGateway); the attach's own wait, 10 s, ran
+                // out under that load too (the JVM's attach listener slow to answer), given a minute
+                it.jvmArgs(
+                    "-Djdk.attach.allowAttachSelf=true", "-XX:+EnableDynamicAgentLoading",
+                    "-Dsun.tools.attach.attachTimeout=60000",
+                )
                 // fixtures found from any working directory (an IDE's run too): core/Fixtures.kt
                 it.systemProperty("uat.fixtures", rootProject.file("uat/fixtures").path)
                 // the theme maker's shared cases (ThemeMakerRulesTest): compared, or with -PupdateThemeMaker written
