@@ -19,6 +19,9 @@ import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.HostCore
 import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutRunner
+import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.until as waitUntil
 import org.fcitx.fcitx5.android.utils.appContext
@@ -232,5 +235,23 @@ class KeyShortcutsHostTest {
         swipe(h.key("v"), up = true)
         until("committed, then pasted") { h.field.text.endsWith("X") && preedit.isEmpty() }
         assertEquals("你好X", h.field.text.toString())
+    }
+
+    // a key's shortcut set to 快速输入 opens it as 符's long press and the bar's button do, what is
+    // typed put in first
+    @Test
+    fun aShortcutOfQuickInputOpensItAfterWhatIsTyped() {
+        val stored = AppPrefs.getInstance().internal.keyShortcuts
+        val was = stored.getValue()
+        stored.setValue(KeyShortcuts.Empty.with("full/q", KeyShortcut.Command(KeyCommand.QuickInput)).serialize())
+        try {
+            start()
+            type("nihao")
+            swipe(h.key("q"), up = true)
+            until("committed, then quick input open") { h.field.text.toString() == "你好" && fcitx.inputPanelCached.quickPhrase }
+            assertEquals("", preedit)
+        } finally {
+            stored.setValue(was)
+        }
     }
 }

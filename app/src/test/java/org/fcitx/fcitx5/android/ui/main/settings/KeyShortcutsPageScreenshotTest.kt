@@ -152,10 +152,11 @@ class KeyShortcutsPageScreenshotTest {
         KeyboardHarness.all(letter.window!!.decorView).filterIsInstance<TextView>()
             .first { it.text.toString() == st.s(R.string.shortcut_change) }.performClick()
         st.idle()
-        // no voice input in the build without it
+        // no voice input in the build without it; quick input after the clipboard
         val commands = KeyboardHarness.all((ShadowDialog.getLatestDialog() as AlertDialog).window!!.decorView)
             .filterIsInstance<TextView>().map { it.text.toString() }.toList()
         assertTrue(commands.toString(), st.s(R.string.shortcut_paste) in commands && st.s(R.string.shortcut_voice) !in commands)
+        assertEquals(commands.toString(), commands.indexOf(st.s(R.string.shortcut_clipboard)) + 1, commands.indexOf(st.s(R.string.quick_phrases)))
         captureScreen("dialog_commands")
         (ShadowDialog.getLatestDialog() as AlertDialog).dismiss()
         letter.dismiss()

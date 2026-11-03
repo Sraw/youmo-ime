@@ -25,6 +25,7 @@ class KeyShortcutLooks private constructor(@StringRes val label: Int, @DrawableR
             KeyCommand.FieldEnd -> KeyShortcutLooks(R.string.shortcut_field_end, R.drawable.ic_baseline_last_page_24)
             KeyCommand.EditMenu -> KeyShortcutLooks(R.string.shortcut_edit_menu, R.drawable.ic_cursor_move)
             KeyCommand.Clipboard -> KeyShortcutLooks(R.string.shortcut_clipboard, R.drawable.ic_clipboard)
+            KeyCommand.QuickInput -> KeyShortcutLooks(R.string.quick_phrases, R.drawable.ic_quick_phrase)
             KeyCommand.Emoji -> KeyShortcutLooks(R.string.shortcut_emoji, R.drawable.ic_baseline_tag_faces_24)
             KeyCommand.Voice -> KeyShortcutLooks(R.string.shortcut_voice, R.drawable.ic_baseline_keyboard_voice_24)
             KeyCommand.TradSimp -> KeyShortcutLooks(R.string.shortcut_trad_simp, R.drawable.ic_fcitx_status_chttrans_trad)

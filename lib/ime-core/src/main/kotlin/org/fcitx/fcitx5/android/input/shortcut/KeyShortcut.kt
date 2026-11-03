@@ -47,6 +47,7 @@ enum class KeyCommand(val key: String, val group: Group) {
     FieldEnd("field_end", Group.Edit),
     EditMenu("edit_menu", Group.Edit),
     Clipboard("clipboard", Group.Panel),
+    QuickInput("quick_input", Group.Panel),
     Emoji("emoji", Group.Panel),
     Voice("voice", Group.Panel),
     TradSimp("trad_simp", Group.Switch),
