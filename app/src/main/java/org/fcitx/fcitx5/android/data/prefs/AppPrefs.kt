@@ -764,12 +764,26 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     }
 
     /**
-     * The settings no version reads any more removed, as a 0.4 install or a backup of one has them:
-     * at every start, a backup restored being read at the next.
+     * The settings no version reads any more removed, as a 0.4 install or a backup of one has them,
+     * and 标点位置 stored where 快捷键图标位置 is moved ([settleMarkPositions]): at every start, a
+     * backup restored (an import, after [resetHiddenSettings] again) being read at the next.
      */
     fun dropRetired() {
         if (sharedPreferences.contains(ENGLISH_ON_NINE_KEYS)) sharedPreferences.edit { remove(ENGLISH_ON_NINE_KEYS) }
         migrateSwipe()
+        settleMarkPositions()
+    }
+
+    /**
+     * 标点位置 stored in 快捷键图标位置's place, which the settings page never stores (an import, a
+     * backup), stored as it reads ([KeyMarks.settled]). Read so only ([ManagedPreferenceUi.Apart.read]),
+     * it was not what the page's list held: 快捷键图标位置 moved away, the keyboard drew the symbol where
+     * it was stored and the page's summary said where it had read.
+     */
+    private fun settleMarkPositions() {
+        val symbol = keyboard.punctuationPosition.getValue()
+        val settled = KeyMarkPosition.of(KeyMarks.settled(symbol.at, keyboard.shortcutMarkPosition.getValue().at).symbol)
+        if (settled != symbol) keyboard.punctuationPosition.setValue(settled)
     }
 
     /**

@@ -132,6 +132,24 @@ abstract class ManagedPreferenceUi<T : Preference>(
 
             override val takenNote: Int get() = apart?.note ?: 0
 
+            // the other list changed: this one's pick read again ([Apart.read]), its summary with it, and
+            // stored so; the keyboard reads the two as stored. Held here: the preferences hold it weakly
+            private val otherChanged = SharedPreferences.OnSharedPreferenceChangeListener { _, changed ->
+                if (changed == key) return@OnSharedPreferenceChangeListener
+                val now = getPersistedString(null) ?: return@OnSharedPreferenceChangeListener
+                if (now != value) value = now
+            }
+
+            override fun onAttached() {
+                super.onAttached()
+                if (apart != null) sharedPreferences?.registerOnSharedPreferenceChangeListener(otherChanged)
+            }
+
+            override fun onDetached() {
+                sharedPreferences?.unregisterOnSharedPreferenceChangeListener(otherChanged)
+                super.onDetached()
+            }
+
             // the user's pick of that default: setValue sees no change, and persistString would see it stored
             override fun callChangeListener(newValue: Any?): Boolean {
                 if (!super.callChangeListener(newValue)) return false
@@ -154,7 +172,8 @@ abstract class ManagedPreferenceUi<T : Preference>(
     /**
      * A list kept apart from another's choice: [taken] the place the other holds (null for none),
      * offered greyed out with [note]; [read] what a stored value reads as, the two stored in one
-     * place (an import, a backup).
+     * place (an import, a backup) till the next start stores it so ([AppPrefs.dropRetired]). The
+     * list's pick is read again as the other changes.
      */
     class Apart<T>(val taken: () -> T?, @StringRes val note: Int, val read: (T) -> T = { it })
 

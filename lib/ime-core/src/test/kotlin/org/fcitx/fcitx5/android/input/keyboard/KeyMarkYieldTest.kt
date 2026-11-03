@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyMarkYield.Settled
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks.Slot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -144,7 +145,7 @@ class KeyMarkYieldTest {
         val down = Mark(Ink(16f, 2f, 24f, 10f), Slot.Top, drop = KeyMarkYield.DROP_DOWN_SHORTCUT,
             elsewhere = listOf(Slot.BottomLeft to corner.at(Slot.BottomLeft), Slot.BottomRight to corner.at(Slot.BottomRight)))
         val both = key(wide, up, down)
-        assertNothingMeets("function", both)
+        assertNothingMeets("function", listOf(up, down), both, least = false)
         assertSettled(Settled(wide, listOf(corner, corner.at(Slot.BottomLeft))), both)
     }
 
@@ -206,7 +207,25 @@ class KeyMarkYieldTest {
         assertSettled(Settled(ink, listOf(null)), l.keys[0])
     }
 
-    // ---- whatever is drawn never meets anything else drawn on its key
+    // the symbol no room clears: kept, over the glyph at its smallest; a shortcut meeting it left out instead
+    @Test
+    fun aSymbolIsNeverLeftOut() {
+        val glyph = Ink(2f, 1f, 38f, 49f)
+        val symbol = Mark(Ink(14f, 2f, 26f, 24f), Slot.TopRight, drop = KeyMarkYield.DROP_SYMBOL)
+        val shortcut = Mark(Ink(20f, 4f, 30f, 14f), Slot.TopLeft)
+        val s = key(glyph, symbol, shortcut)
+        assertNotNull("the symbol", s.marks[0])
+        assertTrue("over the glyph", s.marks[0]!!.meets(s.glyph, 0f))
+        assertNull(s.marks[1])
+        assertEquals(glyph.width * 0.8f, s.glyph.width, 0.01f)
+        // a letter's: every letter a quarter smaller, none more
+        val ink = Ink(4f, 4f, 36f, 46f)
+        val l = KeyMarkYield.letters(listOf(letter(ink, symbol), letter(ink)), gap = 1f)
+        assertEquals(0.75f, l.scale, 0.001f)
+        assertNotNull("the letter's symbol", l.keys[0].marks[0])
+    }
+
+    // ---- whatever is drawn never meets anything else drawn on its key, but a symbol no room clears
 
     private fun Random.ink(x0: Float, y0: Float, x1: Float, y1: Float, w: Float, h: Float): Ink {
         val x = x0 + nextFloat() * (x1 - x0 - w)
@@ -233,9 +252,16 @@ class KeyMarkYieldTest {
         listOf(Slot.TopLeft, Slot.TopRight, Slot.BottomLeft, Slot.BottomRight).filter { it != m.slot }.shuffled(this).take(1 + nextInt(3))
             .map { it to markAt(it, m.drop).ink.let { i -> Ink(i.left, i.top, i.left + m.ink.width, i.top + m.ink.height) } }
 
-    private fun assertNothingMeets(case: String, s: Settled) {
+    // [s] of [marks], [least] whether its glyph is as small as it goes: nothing drawn meets anything else
+    // drawn, but a symbol, never left out, its glyph then at its least
+    private fun assertNothingMeets(case: String, marks: List<Mark>, s: Settled, least: Boolean) {
+        marks.forEachIndexed { i, m -> if (m.drop == KeyMarkYield.DROP_SYMBOL) assertNotNull("$case: the symbol left out", s.marks[i]) }
         val drawn = listOf(s.glyph) + s.marks.filterNotNull()
-        for (i in drawn.indices) for (j in drawn.indices) if (i < j) assertFalse("$case: $i ${drawn[i]} meets $j ${drawn[j]}", drawn[i].meets(drawn[j], 0f))
+        val symbol = marks.indexOfFirst { it.drop == KeyMarkYield.DROP_SYMBOL }.takeIf { it >= 0 }?.let { s.marks[it] }
+        for (i in drawn.indices) for (j in drawn.indices) {
+            if (i >= j || !drawn[i].meets(drawn[j], 0f)) continue
+            assertTrue("$case: $i ${drawn[i]} meets $j ${drawn[j]}", i == 0 && drawn[j] === symbol && least)
+        }
     }
 
     @Test
@@ -247,7 +273,7 @@ class KeyMarkYieldTest {
             val marks = slots.shuffled(r).take(1 + r.nextInt(3)).mapIndexed { i, slot -> r.markAt(slot, KeyMarkYield.DROP_SYMBOL + i) }
                 .map { m -> if (m.drop == KeyMarkYield.DROP_SYMBOL || r.nextBoolean()) m else m.copy(elsewhere = r.corners(m)) }
             val s = key(glyph, *marks.toTypedArray())
-            assertNothingMeets("key $n $glyph $marks", s)
+            assertNothingMeets("key $n $glyph $marks", marks, s, abs(s.glyph.width - glyph.width * (1 - KeyMarkYield.MAX_LABEL_SHRINK)) < 0.01f)
             assertTrue("glyph $n", s.glyph.width >= glyph.width * (1 - KeyMarkYield.MAX_LABEL_SHRINK) - 0.01f)
             marks.forEachIndexed { i, m -> s.marks[i]?.let { assertTrue("mark $n $i", it.width >= m.ink.width * m.minScale - 0.01f) } }
         }
@@ -260,7 +286,8 @@ class KeyMarkYieldTest {
             }
             val l = KeyMarkYield.letters(keys, gap = 1f)
             assertTrue(l.scale >= 1 - KeyMarkYield.MAX_LETTER_SHRINK - 0.001f)
-            l.keys.forEachIndexed { k, s -> assertNothingMeets("letters $n key $k ${keys[k]}", s) }
+            val least = abs(l.scale - (1 - KeyMarkYield.MAX_LETTER_SHRINK)) < 0.001f
+            l.keys.forEachIndexed { k, s -> assertNothingMeets("letters $n key $k ${keys[k]}", keys[k].marks, s, least) }
         }
     }
 }

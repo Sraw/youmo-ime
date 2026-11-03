@@ -293,4 +293,8 @@ class KeyMarksEverywhereUatTest {
         each(turned)
         assertEquals(emptyList<String>(), dropped.keys.toList())
     }
+
+    // Not walked at a larger system font size: the keys' texts and marks are sized in dp (KeyView), and
+    // upright at fontScale 1.3 the walk printed what it does at 1 line for line. As a third test here it
+    // took the full run's JVM past its 3 GB
 }

@@ -12,6 +12,8 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
+import org.fcitx.fcitx5.android.input.keyboard.markSpots
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.uat.SettingsHarness
 import org.junit.After
@@ -132,5 +134,22 @@ class KeyMarkPositionSettingsTest {
         assertEquals("左下", st.pref(R.string.punctuation_position).summary)
         assertEquals("左上", st.pref(R.string.shortcut_mark_position).summary)
         assertEquals("左下（标点在这里）" to false, rows(dialog(R.string.shortcut_mark_position))[3])
+    }
+
+    // the two in one place (a backup restored, not yet stored apart at a start), then the other changed:
+    // the summary says where the keyboard draws it, as stored
+    @Test
+    @Uat("KB-66")
+    fun onePlaceStoredInBothThenTheOtherChangedTheSummaryIsTheKeyboards() {
+        prefs.set(keyboard.punctuationPosition, KeyMarkPosition.TopLeft)
+        prefs.set(keyboard.shortcutMarkPosition, KeyMarkPosition.TopLeft)
+        st.open(SettingsRoute.Keys)
+        assertEquals("左下", st.pref(R.string.punctuation_position).summary)
+        dialog(R.string.shortcut_mark_position).listView.performItemClick(null, 0, 0)
+        st.idle()
+        assertEquals(KeyMarkPosition.TopRight, keyboard.shortcutMarkPosition.getValue())
+        assertEquals(KeyMarks.At.TopLeft, markSpots().symbol)
+        assertEquals("左上", st.pref(R.string.punctuation_position).summary)
+        assertEquals(KeyMarkPosition.TopLeft, keyboard.punctuationPosition.getValue())
     }
 }

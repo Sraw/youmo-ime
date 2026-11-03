@@ -27,8 +27,11 @@ import kotlin.math.abs
  * Nothing of that enough: the key's shortcuts are tried in its other free corners ([Mark.elsewhere],
  * all at once, a function key's two kept mirrored), each moved and smaller there as before; what
  * still meets the glyph or another mark is left out, the most expendable first ([Mark.drop]: a
- * function key's down shortcut, then a shortcut, a symbol last; the swipes still work). Whatever is
- * drawn never meets anything else drawn on its key.
+ * function key's down shortcut, then a shortcut; the swipes still work). A symbol ([DROP_SYMBOL]) is
+ * never left out (the long press's first, the user's to see): a shortcut meeting it goes instead, and
+ * the glyph is as small as it goes ([MAX_LABEL_SHRINK], a letter's [MAX_LETTER_SHRINK]); were that
+ * not enough, it is drawn over the glyph. Else whatever is drawn never meets anything else drawn on
+ * its key; KeyMarksEverywhereUatTest walks every keyboard and finds no symbol over its glyph.
  */
 object KeyMarkYield {
 
@@ -49,7 +52,7 @@ object KeyMarkYield {
 
     /**
      * A mark's [ink] in its [slot], no smaller than [minScale] of it; [drop], how soon it is left out
-     * where nothing else clears it (the higher the sooner; [DROP_SYMBOL] the last); [elsewhere], the
+     * where nothing else clears it (the higher the sooner; [DROP_SYMBOL] never); [elsewhere], the
      * slots it is tried in before that, in turn, with its ink there (a key's marks that have them, as
      * many each, moved together: [KeyMarks.elsewhere]).
      */
@@ -143,9 +146,19 @@ object KeyMarkYield {
         // a shortcut that would need more than a quarter tried elsewhere first ([fitting])
         val live = apart.mapIndexed { k, marks -> fitting(keys[k], marks.filterNotNull()) }
         // what each letter would need, its marks as far in and small as they go; the most needed, for all,
-        // but a quarter at most: a mark that needs more is left out, its letter kept
-        val need = keys.flatMapIndexed { k, key -> live[k].map { need(key, it, gap) } }
-            .filter { it >= 1f - MAX_LETTER_SHRINK - STEP / 2 }.minOrNull() ?: 1f
+        // but a quarter at most: a shortcut that needs more is left out, its letter kept; a symbol is never
+        // left out, the letters a quarter smaller for it
+        val least = 1f - MAX_LETTER_SHRINK
+        val need = keys.flatMapIndexed { k, key ->
+            live[k].mapNotNull { m ->
+                val n = need(key, m, gap)
+                when {
+                    n >= least - STEP / 2 -> n
+                    m.drop == DROP_SYMBOL -> least
+                    else -> null
+                }
+            }
+        }.minOrNull() ?: 1f
         val scale = need.coerceAtLeast(1f - MAX_LETTER_SHRINK)
         // each mark then only as far in and small as the letter, so much smaller, leaves it
         return Letters(scale, keys.mapIndexed { k, key ->
@@ -176,7 +189,8 @@ object KeyMarkYield {
 
     // [marks], each where [place] puts it, less those still meeting [glyph] (none: only each other) or each
     // other: the movable ones first tried elsewhere, all at once (a function key's two stay mirrored), then
-    // the most expendable left out first. The marks as they end up (moved, before [place]) and their inks
+    // the most expendable left out first; a symbol never, kept where it meets. The marks as they end up
+    // (moved, before [place]) and their inks
     private fun dropped(glyph: Ink?, marks: List<Mark>, place: (Mark) -> Ink): Pair<List<Mark?>, List<Ink?>> {
         val now = marks.toMutableList<Mark?>()
         val out = marks.map(place).toMutableList<Ink?>()
@@ -187,6 +201,8 @@ object KeyMarkYield {
             }
             if (clash.isEmpty()) return now to out
             val worst = clash.maxBy { marks[it].drop }
+            // the symbol alone still meeting: drawn as it is (the user's hard rule: a symbol is never left out)
+            if (marks[worst].drop <= DROP_SYMBOL) return now to out
             if (now[worst]?.elsewhere.isNullOrEmpty()) {
                 out[worst] = null
                 now[worst] = null

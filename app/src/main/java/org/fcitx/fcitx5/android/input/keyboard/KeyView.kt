@@ -124,13 +124,15 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         data class Text(val text: String) : Mark
     }
 
-    // the shortcut marks drawn, by slot, an up shortcut's before a function key's down one; made as drawn
+    // the shortcut marks drawn, by the slot each is placed (laid out) in, an up shortcut's before a function
+    // key's down one; made as drawn. One with no room there is drawn in another corner by a translation
+    // ([settleMarks], KeyMarkYield's elsewhere), still under its placed slot
     private val markViews = linkedMapOf<KeyMarks.Slot, View>()
 
-    /** The shortcut's mark drawn in [slot], if one is. */
+    /** The shortcut's mark placed in [slot] (as KeyMarks placed it; drawn there or, with no room, in another corner), if one is. */
     internal fun markAt(slot: KeyMarks.Slot): View? = markViews[slot]
 
-    /** The shortcut marks drawn, by slot. */
+    /** The shortcut marks drawn, by the slot each is placed in ([markAt]). */
     internal val shortcutMarks: Map<KeyMarks.Slot, View> get() = markViews
 
     /**
@@ -167,15 +169,18 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         return ink(v, inkRect)
     }
 
-    /** What its marks keep clear of: its label or icon; null for none. */
-    protected open val glyph: View? get() = null
+    /**
+     * What its marks keep clear of: its label or icon, or both, one over the other, as one glyph (their
+     * inks' bounds, moved and smaller together); none for none.
+     */
+    protected open val glyphs: List<View> get() = emptyList()
 
     /** Its own symbol and the slot it is in, which only [AltTextKeyView] has. */
     protected open val symbol: Pair<View, KeyMarks.Slot>? get() = null
 
     /** Its glyph and marks back as laid out: each one moved, smaller or left out last time put back. */
     protected fun unsettle() {
-        for (v in listOfNotNull(glyph, symbol?.first) + markViews.values) {
+        for (v in glyphs + listOfNotNull(symbol?.first) + markViews.values) {
             v.translationX = 0f
             v.translationY = 0f
             v.scaleX = 1f
@@ -247,13 +252,23 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
     // tip). After the face's own layout: the key's onLayout saw the marks before they were placed
     protected open fun settleMarks() {
         unsettle()
-        val g = glyph ?: return
+        val parts = glyphs.mapNotNull { v -> inkOf(v)?.let { v to it } }
+        if (parts.isEmpty()) return
         val marks = yieldMarks()
         if (marks.isEmpty()) return
-        val ink = inkOf(g) ?: return
+        val ink = parts.map { it.second }.reduce { a, b -> KeyMarkYield.Ink(minOf(a.left, b.left), minOf(a.top, b.top), maxOf(a.right, b.right), maxOf(a.bottom, b.bottom)) }
         val s = KeyMarkYield.key(ink, marks.map { it.second }, room(), gap = dp(1).toFloat())
-        g.settle(ink, s.glyph)
+        parts.forEach { (v, part) -> v.settle(part, part.within(ink, s.glyph)) }
         marks.forEachIndexed { i, (v, m) -> v.settle(m.ink, s.marks[i]) }
+    }
+
+    // this part of [whole] where it is in [to], [whole] moved and as much smaller
+    private fun KeyMarkYield.Ink.within(whole: KeyMarkYield.Ink, to: KeyMarkYield.Ink): KeyMarkYield.Ink {
+        if (this == whole) return to
+        val s = if (whole.width > 0f) to.width / whole.width else 1f
+        val l = to.left + (left - whole.left) * s
+        val t = to.top + (top - whole.top) * s
+        return KeyMarkYield.Ink(l, t, l + width * s, t + height * s)
     }
 
     private fun showMark(slot: KeyMarks.Slot, mark: Mark) {
@@ -517,7 +532,7 @@ open class TextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.Text) 
         }
     }
 
-    override val glyph: View? get() = mainText
+    override val glyphs: List<View> get() = listOf(mainText)
 
     private var badge: ImageView? = null
 
@@ -681,21 +696,20 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
         altText.visibility = View.GONE
     }
 
-    // where the symbol is drawn as the swipes' marks are placed ([showMarks]); null, as 标点位置 says
-    private var marked = false
-    private var markedSymbol: KeyMarks.Slot? = null
+    // the swipes' marks placed with no symbol ([showMarks]: none to draw); else it is where 标点位置 puts
+    // it, as KeyMarks.place put it, worked out again for the orientation it is laid out in: a symbol at
+    // 底部 is in a corner on a low key, and the orientation changes after the marks were placed
+    private var markedNoSymbol = false
 
     override fun showMarks(placed: KeyMarks.Placed<Mark>) {
         super.showMarks(placed)
-        marked = true
-        markedSymbol = placed.slotOf(Mark.Symbol)
+        markedNoSymbol = placed.slotOf(Mark.Symbol) == null
         applyLayout(resources.configuration.orientation)
     }
 
     private fun applyLayout(orientation: Int) {
-        // a key no swipe marks: its symbol alone, where 标点位置 puts it
-        val slot = if (marked) {
-            markedSymbol
+        val slot = if (markedNoSymbol) {
+            null
         } else {
             val spots = markSpots()
             KeyMarks.symbolSlot(
@@ -732,7 +746,7 @@ class ImageKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.Image) :
     }
 
     // its icon's box, not ink: an icon's is its drawable's
-    override val glyph: View? get() = img
+    override val glyphs: List<View> get() = listOf(img)
 }
 
 private fun ImageView.configure(theme: Theme, @DrawableRes src: Int, variant: Variant) = apply {
@@ -792,6 +806,9 @@ class ImageTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.ImageT
             }
         }
     }
+
+    // its label and the icon over it, which the marks keep clear of as much as the label
+    override val glyphs: List<View> get() = listOf(img, mainText)
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         updateMargins(newConfig.orientation)

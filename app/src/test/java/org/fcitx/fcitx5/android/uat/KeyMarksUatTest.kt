@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.content.res.Configuration
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
@@ -12,6 +13,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
@@ -19,6 +21,7 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotSame
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -184,5 +187,37 @@ class KeyMarksUatTest {
         assertEquals(first, marks())
         fresh().start()
         assertEquals(first, marks())
+    }
+
+    // either remakes the keyboard (FcitxInputMethodService.recreateInputViewPrefs): KeySwipes places
+    // the marks of the keys it has swipes for again, but a key it has none for (a keyboard without
+    // shortcuts, 五笔's every root) lays its symbol out only as it is made
+    @Test
+    @Uat("KB-66")
+    fun eitherChangedTheKeyboardIsMadeAnew() {
+        h.start()
+        for ((pref, position) in listOf(
+            AppPrefs.getInstance().keyboard.punctuationPosition to KeyMarkPosition.BottomRight,
+            AppPrefs.getInstance().keyboard.shortcutMarkPosition to KeyMarkPosition.BottomLeft,
+        )) {
+            val before = h.inputView
+            prefs.set(pref, position)
+            h.idle()
+            assertNotSame(pref.key, before, h.inputView)
+        }
+    }
+
+    // turned with the marks placed: a symbol at 底部 under the letter upright, in the top right corner
+    // on a landscape key (KeyMarks.onKeys), as a keyboard made landscape has it
+    @Test
+    @Uat("KB-66")
+    fun turnedTheSymbolWhereTheNewOrientationPutsIt() {
+        symbolsAt(KeyMarkPosition.Bottom)
+        h.start()
+        val q = h.key("q") as AltTextKeyView
+        assertEquals(KeyMarks.Slot.Below, q.symbolSlot)
+        val landscape = Configuration(q.resources.configuration).apply { orientation = Configuration.ORIENTATION_LANDSCAPE }
+        q.dispatchConfigurationChanged(landscape)
+        assertEquals(KeyMarks.Slot.TopRight, q.symbolSlot)
     }
 }

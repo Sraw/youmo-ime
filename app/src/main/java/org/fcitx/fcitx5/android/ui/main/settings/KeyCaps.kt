@@ -69,8 +69,9 @@ object KeyCaps {
     }
 
     /**
-     * A key with [text] on it and [hint] small where the keyboard puts the first long-press
-     * character (as the theme's 标点位置 and 滑动 put it, as [KeyView][org.fcitx.fcitx5.android.input.keyboard.KeyView]
+     * A key with [text] on it and [hint] small where the keyboard puts its symbol, the first
+     * long-press character (按键's 标点位置, kept from 快捷键图标位置's place, as on the keyboard's
+     * height and orientation: [KeyMarks.symbolSlot], as [KeyView][org.fcitx.fcitx5.android.input.keyboard.KeyView]
      * places it); [dimmed] for a key whose long press is turned off. [state] is what a screen
      * reader says of what the outline and the fading show, which only the caller knows.
      * [marks], placed as the keyboard places them, in the hint's stead; [said], what a screen reader
