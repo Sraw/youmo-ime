@@ -71,12 +71,39 @@ class HostCoreEnginesTest : EnginesFixture() {
         "nihao".forEach { core.sendKey(Key(it.code), virtual = true) }
         val shown = log.filterIsInstance<HostEvent.Candidates>().last().candidates.map { it.text }
         assertTrue(core.select(shown.indexOf("你"), "你"))
-        // pinyin holds a part chosen till the rest is: nothing committed, the choice made again too
-        val chosen = log.filterIsInstance<HostEvent.InputPanel>().last().preedit.toString()
+        // pinyin holds a part chosen till the rest is: nothing committed; a pick sent again by its
+        // index could choose another word, so what is typed then is dropped for good (review M2)
         val commits = log.filterIsInstance<HostEvent.Commit>()
-        assertTrue(core.retype(core.clearTyped()!!))
-        assertEquals(chosen, log.filterIsInstance<HostEvent.InputPanel>().last().preedit.toString())
+        val picked = core.clearTyped()!!
+        assertNull("a pick is not typed again", picked.keys)
+        assertFalse(core.retype(picked))
+        assertTrue(core.isEmpty())
         assertEquals(commits, log.filterIsInstance<HostEvent.Commit>())
+        // typed again after: a fresh log, the keys kept again
+        "ni".forEach { core.sendKey(Key(it.code), virtual = true) }
+        assertEquals(2, core.clearTyped()!!.keys!!.size)
+    }
+
+    // review M2: a candidate's long-press action (forget, pin, block) sent again by its index could
+    // land on another word, the list reordered by it: none is typed again, nor what follows it
+    @Test
+    fun `what is typed after a candidate's action is never typed again`() {
+        val core = core(engines())
+        val log = mutableListOf<HostEvent>()
+        core.events += HostEvents { log += it }
+        core.activate(1)
+        core.setCapabilities(Capability.PREEDIT or Capability.CLIENT_UNFOCUS_COMMIT)
+        core.focus(true)
+        "ni".forEach { core.sendKey(Key(it.code), virtual = true) }
+        val shown = log.filterIsInstance<HostEvent.Candidates>().last().candidates.map { it.text }
+        val i = shown.indices.first { core.candidateActions(it).isNotEmpty() }
+        val action = core.candidateActions(i).first()
+        core.triggerCandidateAction(i, action.id, shown[i])
+        assertTrue("still typing", !core.isEmpty())
+        core.sendKey(Key('h'.code), virtual = true)
+        val typing = core.clearTyped()!!
+        assertNull(typing.keys)
+        assertFalse(core.retype(typing))
     }
 
     @Test

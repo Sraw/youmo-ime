@@ -53,7 +53,7 @@ class KeyRouter(
     private val answered = HashSet<String>()
 
     // what was typed since nothing was, to type it again when 清除 is taken back; null once a part of it
-    // was committed (a candidate chosen), what is left no longer what those keys type
+    // was committed, or a candidate chosen or acted on (what those keys typed then hung on the list shown)
     private var typed: MutableList<Typed>? = ArrayList()
 
     // failures by call, input method, event and class, their trace at the first, a count at the 2nd, 4th, 8th…
@@ -264,8 +264,11 @@ class KeyRouter(
         typed = when {
             s.preedit.isEmpty() -> ArrayList()
             s.commit.isNotEmpty() -> null
-            log == null -> null
-            else -> log.apply { if (s.handled) add(key) }
+            log == null || !s.handled -> log
+            // a candidate's action (forget, pin, block) or pick sent again by its index could land on
+            // another word, the list reordered since: what follows it is never typed again (review M2)
+            key.event in RETYPED -> log.apply { add(key) }
+            else -> null
         }
     }
 
@@ -592,6 +595,12 @@ class KeyRouter(
 
         /** `AndroidEngineConfig::pageSize`'s default (`androidengine.h:96-97`). */
         const val DEFAULT_PAGE_SIZE = 7
+
+        // the keys [retype] sends again: what they type does not hang on the candidates shown
+        private val RETYPED = setOf(
+            EngineEvent.CHAR, EngineEvent.HARD_CHAR, EngineEvent.KEYPAD, EngineEvent.BACKSPACE,
+            EngineEvent.CURSOR, EngineEvent.PAGE_UP, EngineEvent.PAGE_DOWN,
+        )
 
         // `EngineCandidateList::Chunk` (`:214`)
         internal const val CHUNK = 32
