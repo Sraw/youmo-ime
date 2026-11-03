@@ -15,9 +15,7 @@
          all: any other merged in from a dependency fails the build (AndroidAppConventionPlugin) -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- Don't strip the Cropper library's queries with tools:node="removeAll": under AGP 9 it also
-         dropped this one, so other input methods became invisible on Android 11+.
-         Its two extra queries (file pickers, camera apps) reveal nothing sensitive. -->
+    <!-- other input methods visible on Android 11+ (the IME switcher, the setup's list) -->
     <queries>
         <intent>
             <action android:name="android.view.InputMethod" />
@@ -57,14 +55,6 @@
             android:exported="false"
             android:launchMode="singleTask"
             android:parentActivityName=".ui.main.MainActivity" />
-        <activity
-            android:name=".ui.main.settings.theme.CustomThemeActivity"
-            android:configChanges="orientation|screenSize"
-            android:exported="false"
-            android:label="@string/edit_theme" />
-        <activity
-            android:name=".ui.main.CropImageActivity"
-            android:exported="false" />
         <activity
             android:name=".ui.main.MainActivity"
             android:exported="true"
@@ -141,17 +131,6 @@
                 android:name="android.view.im"
                 android:resource="@xml/input_method" />
         </service>
-
-        <!-- remove unneeded components from com.canhub.cropper -->
-        <!--suppress DeprecatedClassUsageInspection -->
-        <activity
-            android:name="com.canhub.cropper.CropImageActivity"
-            tools:node="remove" />
-
-        <provider
-            android:name="com.canhub.cropper.CropFileProvider"
-            android:authorities="${applicationId}.cropper.fileprovider"
-            tools:node="remove" />
 
         <provider
             android:name="androidx.startup.InitializationProvider"

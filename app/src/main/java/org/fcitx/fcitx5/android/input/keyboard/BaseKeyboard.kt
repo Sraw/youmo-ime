@@ -31,7 +31,11 @@ import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
+import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeAssets
+import org.fcitx.fcitx5.android.input.theme.KeyNames
+import org.fcitx.fcitx5.android.input.theme.KeyStyleResolver
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
@@ -77,6 +81,18 @@ abstract class BaseKeyboard(
 
     private val spaceSwipeMoveCursor = prefs.keyboard.spaceSwipeMoveCursor
     private val spaceKeys = mutableListOf<KeyView>()
+
+    // the theme's key images this keyboard draws, each file once: decoded off the main thread, the keys
+    // drawn as their kinds till they are in (ThemeAssets)
+    protected val keyImages: BoardImages by lazy {
+        val look = theme.look
+        // no board name (the number row, a search's keys): the kinds' and the roles' images still
+        val board = themeBoard
+        // its keys' and the places it draws apart from them (the nine keys' column)
+        val names = (keyLayout.flatten().mapNotNull { it.name } + board?.let { KeyNames.POSITIONS[it] }.orEmpty()).distinct()
+        ThemeAssets.boardImages(look, board, KeyStyleResolver.imagesOn(look.keys, board, names))
+    }
+
     @Keep
     private val spaceSwipeChangeListener = ManagedPreference.OnChangeListener<Boolean> { _, v ->
         spaceKeys.forEach { spaceSwipesCursor(it, v) }
@@ -354,6 +370,7 @@ abstract class BaseKeyboard(
             is KeyDef.Appearance.Image -> ImageKeyView(context, theme, def.appearance)
         }.apply {
             themeKey = def.name
+            style(themeBoard, keyImages)
             soundEffect = when (def) {
                 is SpaceKey -> InputFeedbacks.SoundEffect.SpaceBar
                 is MiniSpaceKey -> InputFeedbacks.SoundEffect.SpaceBar

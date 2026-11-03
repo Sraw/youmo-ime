@@ -110,7 +110,6 @@ import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.view
 import splitties.views.dsl.core.wrapContent
 import splitties.views.existingOrNewId
-import splitties.views.imageDrawable
 import splitties.views.imageResource
 import timber.log.Timber
 
@@ -124,18 +123,16 @@ class InputView(
     theme: Theme
 ) : BaseInputView(service, fcitx, theme) {
 
-    private val keyBorder by ThemeManager.prefs.keyBorder
-
     // the code row floating over the app (编码行), read once: the view is made anew as it changes
     private val codeFloats = KawaiiBarComponent.codeRowFloats()
 
-    private val customBackground = imageView {
-        scaleType = ImageView.ScaleType.CENTER_CROP
-    }
+    // under the whole keyboard: the theme's picture (laid as CENTER_CROP lays it, PictureHost) or its colour
+    private val customBackground = view(::View)
 
-    // the bar's colour, under the bar and the row above it for the code being typed: one taller bar
+    // the bar's base, under the bar and the row above it for the code being typed: one taller bar.
+    // None (the keyboard's base seen through), its colour, or the picture's part there
     private val barBackground = view(::View) {
-        backgroundColor = if (keyBorder) Color.TRANSPARENT else theme.barColor
+        background = ThemePictureDrawable.bar(theme.look)
     }
 
     private val placeholderOnClickListener = OnClickListener { }
@@ -402,13 +399,20 @@ class InputView(
 
         broadcaster.onImeUpdate(fcitx.runImmediately { inputMethodEntryCached })
 
-        customBackground.imageDrawable = theme.backgroundDrawable(keyBorder)
+        // the theme's picture or its colour, under it all; the picture lies where each key showing it finds it
+        customBackground.background = ThemePictureDrawable.board(theme.look)
 
         keyboardView = constraintLayout {
             // allow MotionEvent to be delivered to keyboard while pressing on padding views.
             // although it should be default for apps targeting Honeycomb (3.0, API 11) and higher,
             // but it's not the case on some devices ... just set it here
             isMotionEventSplittingEnabled = true
+            PictureHost.install(
+                this,
+                theme.look.picture?.let {
+                    PictureHost(theme.look, customBackground, resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
+                },
+            )
             add(customBackground, lParams {
                 centerVertically()
                 centerHorizontally()
@@ -479,7 +483,7 @@ class InputView(
             bottomOfParent()
         })
         floatingController.setUp(keyboardView)
-        codeStrip = if (!codeFloats) null else FloatingCodeStrip(context, theme, keyBorder, preedit.ui.root).also {
+        codeStrip = if (!codeFloats) null else FloatingCodeStrip(context, theme, preedit.ui.root).also {
             // under the key previews, as the embedded row is
             add(it, lParams(wrapContent, dp(KawaiiBarComponent.stripHeight(fcitx.runImmediately { inputMethodEntryCached }.uniqueName))) {
                 topOfParent()

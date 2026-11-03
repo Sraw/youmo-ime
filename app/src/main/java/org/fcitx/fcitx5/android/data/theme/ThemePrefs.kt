@@ -125,89 +125,21 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         section(R.string.section_key_style)
     }
 
-    // keys drawn apart: borderless, one letter was hard to tell from the next
-    val keyBorder = switch(R.string.key_border, "key_border", true)
-
-    val keyBorderStroke = hidden {
-        switch(
-            R.string.key_border_stroke, "key_border_stroke", false,
-            enableUiOn = { keyBorder.getValue() }
-        )
-    }
-
-    val keyRippleEffect = hidden { switch(R.string.key_ripple_effect, "key_ripple_effect", false) }
-
-    val keyHorizontalMargin: ManagedPreference.PInt
-    val keyHorizontalMarginLandscape: ManagedPreference.PInt
-    val keyVerticalMargin: ManagedPreference.PInt
-    val keyVerticalMarginLandscape: ManagedPreference.PInt
-
+    // the keys' look is the theme's since theme file 3.0 (blocks or flat, corners, gaps, a press's
+    // effect): made on the web page with the theme; what was set here before went into the theme in use (ThemeLookMigration)
     init {
-        val (horizontal, horizontalLandscape) = hidden(setByLevels = true) {
-            twinInt(
-                R.string.key_horizontal_margin,
-                R.string.portrait,
-                "key_horizontal_margin",
-                3,
-                R.string.landscape,
-                "key_horizontal_margin_landscape",
-                3,
-                0,
-                24,
-                "dp"
-            )
-        }
-        keyHorizontalMargin = horizontal
-        keyHorizontalMarginLandscape = horizontalLandscape
-        val (vertical, verticalLandscape) = hidden(setByLevels = true) {
-            twinInt(
-                R.string.key_vertical_margin,
-                R.string.portrait,
-                "key_vertical_margin",
-                7,
-                R.string.landscape,
-                "key_vertical_margin_landscape",
-                4,
-                0,
-                24,
-                "dp"
-            )
-        }
-        keyVerticalMargin = vertical
-        keyVerticalMarginLandscape = verticalLandscape
-        levels(
-            R.string.key_spacing, "key_spacing_level",
-            defaults(keyHorizontalMargin, keyHorizontalMarginLandscape, keyVerticalMargin, keyVerticalMarginLandscape),
-            listOf(
-                Level(R.string.level_compact, 2, 2, 5, 3),
-                Level(R.string.level_standard, 3, 3, 7, 4),
-                Level(R.string.level_loose, 5, 5, 9, 6),
-            )
-        )
+        note(R.string.key_style_in_theme, "key_style_note")
     }
 
-    val keyRadius = hidden(setByLevels = true) { int(R.string.key_radius, "key_radius", 4, 0, 48, "dp") }
-
-    init {
-        levels(
-            R.string.key_radius, "key_radius_level",
-            defaults(keyRadius),
-            listOf(
-                Level(R.string.level_square, 0),
-                Level(R.string.level_rounded, 4),
-                Level(R.string.level_round, 10),
-            )
-        )
-    }
-
-    /** The key style settings above as they were before theme file 3.0, while they are here ([ThemeLookMigration]). */
+    /** The key style settings as they were before theme file 3.0, while they are in the file ([ThemeLookMigration]). */
     fun legacyLook() = ThemeLookMigration.legacy(sharedPreferences)
 
-    val textEditingButtonRadius =
-        hidden { int(R.string.text_editing_button_radius, "text_editing_button_radius", 8, 0, 48, "dp") }
+    /** The old settings kept for the Monet themes' keys ([ThemeLookMigration.monet]). */
+    fun monetLook() = ThemeLookMigration.monet(sharedPreferences)
 
-    val clipboardEntryRadius =
-        hidden { int(R.string.clipboard_entry_radius, "clipboard_entry_radius", 2, 0, 48, "dp") }
+    /** [ThemeLookMigration.settle] on these settings. */
+    fun settleLook(slots: List<ThemeLookMigration.Slot>, save: (Theme.Custom) -> Boolean) =
+        ThemeLookMigration.settle(sharedPreferences, slots, save)
 
     enum class NavbarBackground(override val stringRes: Int) : ManagedPreferenceEnum {
         None(R.string.navbar_bkg_none),

@@ -84,6 +84,22 @@ abstract class ManagedPreferenceUi<T : Preference>(
         }
     }
 
+    /** A line of text, nothing to set: where a setting has gone. */
+    class Note(
+        @StringRes
+        val text: Int,
+        key: String,
+    ) : ManagedPreferenceUi<Preference>(key) {
+        override fun createUi(context: Context) = Preference(context).apply {
+            key = this@Note.key
+            isIconSpaceReserved = false
+            isSingleLineTitle = false
+            isSelectable = false
+            isPersistent = false
+            setSummary(this@Note.text)
+        }
+    }
+
     class Switch(
         @StringRes
         val title: Int,

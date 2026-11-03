@@ -33,6 +33,7 @@ import org.fcitx.fcitx5.android.input.dependency.imeScope
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.mechdancer.dependency.manager.must
@@ -65,7 +66,7 @@ class ClipboardChunksWindow(private val text: String) : InputWindow.ExtendedInpu
     private val shown = ClipboardChunks.cut(text, MAX_CHARS)
 
     private val ui by lazy {
-        ClipboardChunksUi(context, theme, ThemeManager.prefs.clipboardEntryRadius.getValue(), shown, cut = shown.length < text.length) {
+        ClipboardChunksUi(context, theme, ThemeColors.entryRadius(theme.look.keys), shown, cut = shown.length < text.length) {
             service.commitOverEngine(it)
             if (returnAfterPaste) windowManager.attachWindow(KeyboardWindow)
         }
@@ -131,7 +132,7 @@ class ClipboardChunksWindow(private val text: String) : InputWindow.ExtendedInpu
 class ClipboardChunksUi(
     override val ctx: Context,
     private val theme: Theme,
-    radiusDp: Int,
+    radiusDp: Float,
     private val text: String,
     private val cut: Boolean,
     private val onCommit: (String) -> Unit,
@@ -142,7 +143,7 @@ class ClipboardChunksUi(
     /** The pieces picked, in the order tapped or swept (a sweep's appended in text order). */
     val picked = ArrayList<Chunk>()
 
-    private val radius = ctx.dp(radiusDp).toFloat()
+    private val radius = ctx.dp(radiusDp)
 
     private fun barButton(label: Int, onClick: () -> Unit) = TextView(ctx).apply {
         text = ctx.getString(label)

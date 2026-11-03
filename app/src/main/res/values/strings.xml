@@ -2,7 +2,6 @@
 <resources>
     <string name="app_name_release">Youmo IME</string>
     <string name="app_name_debug">Youmo IME (Debug)</string>
-    <string name="save">Save</string>
     <string name="input_methods">Input Methods</string>
     <string name="advanced">Advanced</string>
     <string name="ignore_sys_cursor">Ignore system cursor position</string>
@@ -85,18 +84,7 @@
     <string name="reset">Reset</string>
     <string name="input_method_options">Input Method Options</string>
     <string name="theme">Theme</string>
-    <string name="key_ripple_effect">Enable key ripple effect</string>
-    <string name="key_border">Enable key border</string>
-    <string name="brightness">Brightness</string>
-    <string name="key_radius">Key corners</string>
-    <string name="text_editing_button_radius">Text editing button radius</string>
-    <string name="clipboard_entry_radius">Clipboard entry radius</string>
-    <string name="key_horizontal_margin">Key horizontal margin</string>
-    <string name="key_vertical_margin">Key vertical margin</string>
     <string name="configure">Configure</string>
-    <string name="choose_image">Choose Image…</string>
-    <string name="dark_keys">Dark Keys</string>
-    <string name="recrop_image">Re-Crop Image</string>
     <string name="navbar_background">Navigation bar background</string>
     <string name="navbar_bkg_none">No background</string>
     <string name="navbar_bkg_color_only">Follow keyboard color</string>
@@ -106,7 +94,6 @@
     <string name="popup_on_key_press">Popup on key press</string>
     <string name="disable_animation">Disable animation</string>
     <string name="import_from_file">Import from file…</string>
-    <string name="duplicate_builtin_theme">Duplicate builtin theme…</string>
     <string name="exception_logcat_created">Logcat process is already created</string>
     <string name="exception_theme_filename">The filename extension of %1$s does not indicate a theme</string>
     <string name="exception_libime_dict_filename">The filename extension of %1$s does not indicate a libime dict</string>
@@ -130,7 +117,6 @@
     <string name="exception_theme_version">This theme was made by a newer version of this keyboard (theme format %1$s): update it to use the theme</string>
     <string name="exception_theme_newer_kept">A theme of this name made by a newer version of this keyboard is here: this version cannot read it, so it is not replaced</string>
     <string name="theme_not_saved">The theme could not be saved: the phone\'s storage may be full</string>
-    <string name="exception_theme_src_image">Unable to save source image of theme background</string>
     <string name="follow_system_day_night_theme">Follow system day/night theme</string>
     <string name="follow_system_day_night_theme_summary">Override manual theme selection</string>
     <string name="light_mode_theme">Light mode theme</string>
@@ -171,9 +157,8 @@
     <string name="delete_all_except_pinned">Delete all items except pinned ones?</string>
     <string name="num_items_deleted">%1$d item(s) deleted</string>
     <string name="delete_theme">Delete Theme</string>
-    <string name="delete_theme_msg">Do you really want to delete theme \"%1$s\"?</string>
+    <string name="delete_theme_msg">Delete this theme? Its pictures and fonts go with it.</string>
     <string name="capture_heap_dump">Capture heap dump</string>
-    <string name="edit_theme">Edit Theme</string>
     <string name="removed_n_items">Removed %1$d item(s)</string>
     <string name="added_n_items">Added %1$d item(s)</string>
     <string name="whether_reset_switch_preference">Would you like to reset this preference to default?</string>
@@ -209,11 +194,6 @@
     <string name="calculation_replaces_sum">Tapping a sum\'s result replaces the sum</string>
     <string name="space_swipe_move_cursor">Swipe on space key to move cursor</string>
     <string name="please_wait">Please wait…</string>
-    <string name="rotate">Rotate</string>
-    <string name="flip">Flip</string>
-    <string name="flip_horizontally">Flip horizontally</string>
-    <string name="flip_vertically">Flip vertically</string>
-    <string name="crop">Crop</string>
     <string name="candidates_window">Candidate window for a physical keyboard</string>
     <string name="show_candidates_window">Show candidates window</string>
     <string name="candidates_window_radius">Candidates window radius</string>
@@ -259,7 +239,6 @@
     <string name="emoji_skin_tone_type_5">🏾 Type-5</string>
     <string name="emoji_skin_tone_type_6">🏿 Type-6</string>
     <string name="hide_unsupported_emojis">Hide unsupported Emojis</string>
-    <string name="key_border_stroke">Enable stroke for key border</string>
     <string name="keyboard_height_percent_base">Keyboard height percent base</string>
     <string name="display_metrics">Display metrics (Resources.getDisplayMetrics)</string>
     <string name="real_size">Real size (Display.getRealSize)</string>
@@ -517,12 +496,7 @@
     <string name="level_wide">Wide</string>
     <string name="level_little">A little</string>
     <string name="level_more">More</string>
-    <string name="key_spacing">Space between keys</string>
     <string name="level_compact">Compact</string>
-    <string name="level_loose">Roomy</string>
-    <string name="level_square">Square</string>
-    <string name="level_rounded">Rounded</string>
-    <string name="level_round">Round</string>
     <string name="level_short">Short</string>
     <string name="level_medium">Medium</string>
     <string name="level_long">Long</string>
@@ -904,6 +878,9 @@
     <string name="section_emoji">Emoji</string>
     <string name="section_animation">Animation</string>
     <string name="section_key_style">Key style</string>
+    <string name="key_style_in_theme">Key corners, borders, spacing and fonts are part of the theme now: themes are made on the web page (Themes → New theme → Make one on the web page…).</string>
+    <string name="key_style_moved">Key corners, borders and spacing follow the theme now: yours are saved into your themes.</string>
+    <string name="make_theme_on_web">Make one on the web page…</string>
     <string name="section_phrases">Phrases</string>
     <string name="punctuation_map_summary">What each punctuation key types in Chinese, such as ， for ,</string>
     <string name="custom_phrases_summary">A short code for a longer text as you type pinyin, such as dz for your address; long, many-line or now-and-then text goes in Quick input</string>

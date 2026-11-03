@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.After
@@ -57,7 +58,7 @@ import java.util.zip.ZipOutputStream
 class ThemeFilesManagerTest {
 
     // the manager's own: each test's application has another
-    private val dir get() = ThemeFilesManager.newCustomBackgroundImages().second.parentFile!!
+    private val dir get() = ThemeFilesManager.themeDir
 
     @Before
     fun empty() {
@@ -408,6 +409,26 @@ class ThemeFilesManagerTest {
     private fun blockWrites() = File(dir, ".saving").apply { deleteRecursively(); writeText("") }
 
     @Test
+    fun theThemeInUseWrittenAnewIsToldThoughItReadsTheSame() {
+        val told = mutableListOf<Theme>()
+        val listener = ThemeManager.OnThemeChangeListener { told += it }
+        ThemeManager.addOnChangedListener(listener)
+        try {
+            val inUse = ThemeManager.activeTheme
+            val g = ThemeAssets.generation
+            // another theme's files: what was decoded let go, the keyboard not made anew
+            ThemeManager.filesChanged("not in use")
+            assertEquals(emptyList<Theme>(), told)
+            // the one in use imported again (another picture, the same name and settings): made anew once
+            ThemeManager.filesChanged(inUse.name) { ThemeManager.refreshThemes() }
+            assertEquals(listOf(inUse), told)
+            assertEquals(g + 2, ThemeAssets.generation)
+        } finally {
+            ThemeManager.removeOnChangedListener(listener)
+        }
+    }
+
+    @Test
     fun aThemeNotWrittenLeavesItsFileAsItWas() {
         val theme = ThemePreset.TransparentDark.deriveCustomNoBackground("w")
         ThemeFilesManager.saveThemeFiles(theme)
@@ -425,6 +446,53 @@ class ThemeFilesManagerTest {
         assertEquals(changed, ThemeFilesManager.listThemes().single())
         // nothing left beside the themes once it is in place
         assertEquals(emptyList<String>(), File(dir, ".saving").list()!!.toList())
+    }
+
+    @Test
+    fun theKeyStyleIsSettledOnlyOnceEveryThemeOfTheOldFormatIsSavedAgain() {
+        // an upgrade: the old settings, a theme of 2.1, a built-in theme in use, a Monet one for the dark
+        val sp = androidx.preference.PreferenceManager.getDefaultSharedPreferences(appContext)
+        val prefs = ThemeManager.prefs
+        prefs.followSystemDayNightTheme.setValue(false)
+        ThemeManager.setNormalModeTheme(ThemePreset.PixelLight)
+        val monetDark = ThemeManager.getAllThemes().first { it is Theme.Monet && it.isDark }
+        prefs.darkModeTheme.setValue(monetDark)
+        sp.edit().putBoolean("key_border", false).putInt("key_radius", 10).commit()
+        File(dir, "m.json").writeText(older(json(ThemePreset.TransparentDark.deriveCustomNoBackground("m"))))
+        try {
+            // the 2.1 theme not saved again as the themes are listed; the disk writable again by the time
+            // the key style is settled: still not, as the old theme is drawn with the settings at the next start
+            blockWrites()
+            ThemeManager.refreshThemes()
+            assertTrue(ThemeFilesManager.rewriteFailed)
+            File(dir, ".saving").delete()
+            ShadowToast.reset()
+            ThemeManager.init(appContext.resources.configuration)
+            assertTrue(sp.contains("key_border") && sp.contains("key_radius"))
+            assertSame(ThemePreset.PixelLight, prefs.normalModeTheme.getValue())
+            assertEquals(listOf("m.json"), names())
+            assertNull(ShadowToast.getLatestToast())
+            // the next start: saved again, then settled, the user told once
+            ThemeManager.refreshThemes()
+            assertFalse(ThemeFilesManager.rewriteFailed)
+            ThemeManager.init(appContext.resources.configuration)
+            assertTrue(ThemeLookMigration.KEYS.none(sp::contains))
+            val copy = prefs.normalModeTheme.getValue() as Theme.Custom
+            assertEquals(10, copy.look.keys.radiusDp)
+            assertFalse(copy.look.keys.blocks)
+            assertEquals(appContext.getString(R.string.key_style_moved), ShadowToast.getTextOfLatestToast())
+            // the Monet themes made again with what they keep: the dark one in its slot drawn so
+            val monet = ThemeManager.getAllThemes().first { it is Theme.Monet && it.isDark }
+            assertEquals(10, monet.look.keys.radiusDp)
+            assertFalse(monet.look.keys.blocks)
+        } finally {
+            sp.edit().remove(ThemeLookMigration.MONET_KEY).commit()
+            ThemeLookMigration.monetLook = null
+            ThemeManager.onSystemPlatteChange(appContext.resources.configuration)
+            prefs.darkModeTheme.setValue(prefs.darkModeTheme.defaultValue)
+            ThemeManager.setNormalModeTheme(ThemeManager.DefaultTheme)
+            prefs.followSystemDayNightTheme.setValue(prefs.followSystemDayNightTheme.defaultValue)
+        }
     }
 
     @Test

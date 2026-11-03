@@ -9,13 +9,18 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
+import org.fcitx.fcitx5.android.input.theme.BarBase
+import org.fcitx.fcitx5.android.input.theme.Gap
+import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -40,11 +45,14 @@ class SettingsEffectUatTest {
     private var made: KeyboardHarness? = null
     private val h get() = made ?: fresh()
 
-    // a keyboard made anew: one closed is not started again
-    private fun fresh(): KeyboardHarness {
+    // a keyboard made anew, in [theme] if given: one closed is not started again
+    private fun fresh(theme: Theme? = null): KeyboardHarness {
         made?.close()
-        return KeyboardHarness().also { made = it }
+        return KeyboardHarness(theme ?: ThemePreset.PixelLight).also { made = it }
     }
+
+    // the light preset as the theme edit page's choices [f] make it
+    private fun edited(f: (ThemeLook) -> ThemeLook): Theme = Theme.Custom("edited", false, f(ThemePreset.PixelLight.look))
 
     @get:Rule
     val prefs = PrefsRule()
@@ -95,17 +103,15 @@ class SettingsEffectUatTest {
     @Test
     @Uat("ST-12")
     fun keyBorderSpacingAndCorners() {
-        prefs.set(theme.keyBorder, false)
+        // a theme the web page made flat: its bar in its colour
+        fresh(edited { it.copy(keys = it.keys.copy(blocks = false), bar = BarBase.Color) })
         h.start()
         h.capture("SettingsEffectUatTest/no_border")
-        fresh()
-        prefs.set(theme.keyBorder, true)
+        fresh(edited { it })
         h.start()
         // the drawn key is inset by its margin: what lies between two keys
         val gap = h.key("q").hMargin
-        fresh()
-        prefs.set(theme.keyHorizontalMargin, 5)
-        prefs.set(theme.keyRadius, 0)
+        fresh(edited { it.copy(keys = it.keys.copy(radiusDp = 0, gap = Gap(5, 9, 5, 6))) })
         h.start()
         val loose = h.key("q").hMargin
         assertTrue("gap $gap -> $loose", loose > gap)

@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.StateListDrawable
@@ -48,7 +49,10 @@ import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.input.theme.KeyFaceGeometry
+import org.fcitx.fcitx5.android.input.theme.KeyKind
 import org.fcitx.fcitx5.android.input.theme.KeyNames
+import org.fcitx.fcitx5.android.input.theme.KeyStyleResolver
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.constraintlayout.leftOfParent
@@ -123,6 +127,9 @@ class T9Keyboard(
 
         // the column's share of the width, and of the right one
         private const val SIDE = 0.16f
+
+        // the column's name in a theme (KeyNames.NINE)
+        private const val SIDE_KEY = "side"
         private const val RIGHT = 0.18f
 
         private const val DIGIT = (1f - SIDE - RIGHT) / 3
@@ -550,10 +557,18 @@ class T9Keyboard(
     }.apply {
         isVerticalScrollBarEnabled = false
         overScrollMode = OVER_SCROLL_NEVER
-        val prefs = ThemeManager.prefs
-        val h = dp(prefs.keyHorizontalMargin.getValue())
-        val v = dp(prefs.keyVerticalMargin.getValue())
-        background = insetRadiusDrawable(h, v, dp(prefs.keyRadius.getValue().toFloat()), theme.altKeyBackgroundColor)
+        // a function key's face as the theme has `nine/side`, drawn on flat keys too as before 3.0;
+        // its cells take the press
+        val keys = theme.look.keys
+        val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val h = dp(if (landscape) keys.gap.hLand else keys.gap.h)
+        val v = dp(if (landscape) keys.gap.vLand else keys.gap.v)
+        val density = resources.displayMetrics.density
+        drawAsKey(
+            theme, KeyStyleResolver.resolve(keys, KeyNames.NINE, SIDE_KEY, KeyKind.Function), KeyKind.Function, keyImages,
+            { w, hh -> KeyFaceGeometry.of(w, hh, KeyKind.Function, keys, landscape, density, true, KeyFaceGeometry.Border.On) },
+            press = false,
+        )
         setPadding(h, v, h, v)
         addView(items)
     }

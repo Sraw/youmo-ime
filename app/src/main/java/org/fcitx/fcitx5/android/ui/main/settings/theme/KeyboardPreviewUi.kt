@@ -8,7 +8,6 @@ package org.fcitx.fcitx5.android.ui.main.settings.theme
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Color
-import android.graphics.drawable.Drawable
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -21,6 +20,8 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.NavbarBackground
+import org.fcitx.fcitx5.android.input.PictureHost
+import org.fcitx.fcitx5.android.input.ThemePictureDrawable
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
@@ -42,7 +43,6 @@ import splitties.views.dsl.core.horizontalMargin
 import splitties.views.dsl.core.imageView
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.view
-import splitties.views.imageDrawable
 
 class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
 
@@ -80,7 +80,6 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
 
     private val navbarBackground = ThemeManager.prefs.navbarBackground
     private val keyboardBottomFlush = keyboardPrefs.keyboardBottomFlush
-    private val keyBorder by ThemeManager.prefs.keyBorder
 
     private val sizeChangeListener = ManagedPreference.OnChangeListener<Any> { _, _ ->
         recalculateSize()
@@ -207,13 +206,13 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         }
     }
 
-    fun setBackground(drawable: Drawable) {
-        bkg.imageDrawable = drawable
-    }
-
-    fun setTheme(theme: Theme, background: Drawable? = null) {
-        setBackground(background ?: theme.backgroundDrawable(keyBorder))
-        fakeKawaiiBar.backgroundColor = if (keyBorder) Color.TRANSPARENT else theme.barColor
+    fun setTheme(theme: Theme) {
+        val look = theme.look
+        // as the input view draws it: the keys over the picture find it here (PictureHost)
+        bkg.background = ThemePictureDrawable.board(look)
+        val landscape = ctx.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        PictureHost.install(fakeInputView, look.picture?.let { PictureHost(look, bkg, landscape) })
+        fakeKawaiiBar.background = ThemePictureDrawable.bar(look)
         shownTheme = theme
         makeKeyboard()
     }

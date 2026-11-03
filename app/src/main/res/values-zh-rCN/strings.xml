@@ -2,7 +2,6 @@
 <resources>
     <string name="app_name_release">幽默输入法</string>
     <string name="app_name_debug">幽默输入法 (调试)</string>
-    <string name="save">保存</string>
     <string name="input_methods">输入法</string>
     <string name="advanced">高级</string>
     <string name="ignore_sys_cursor">忽略系统光标位置</string>
@@ -85,18 +84,7 @@
     <string name="reset">重置</string>
     <string name="input_method_options">输入法设置</string>
     <string name="theme">主题</string>
-    <string name="key_ripple_effect">启用按键水波纹特效</string>
-    <string name="key_border">启用按键边框</string>
-    <string name="brightness">亮度</string>
-    <string name="key_radius">按键圆角</string>
-    <string name="text_editing_button_radius">文本编辑按钮圆角半径</string>
-    <string name="clipboard_entry_radius">剪贴板条目圆角半径</string>
-    <string name="key_horizontal_margin">按键横向边距</string>
-    <string name="key_vertical_margin">按键纵向边距</string>
     <string name="configure">配置</string>
-    <string name="choose_image">选择图片…</string>
-    <string name="dark_keys">暗色按键</string>
-    <string name="recrop_image">重新裁剪图片</string>
     <string name="navbar_background">导航栏背景</string>
     <string name="navbar_bkg_none">无背景</string>
     <string name="navbar_bkg_color_only">跟随键盘背景色</string>
@@ -106,7 +94,6 @@
     <string name="popup_on_key_press">按键时弹出显示字符</string>
     <string name="disable_animation">禁用动画</string>
     <string name="import_from_file">导入文件…</string>
-    <string name="duplicate_builtin_theme">复制内置主题…</string>
     <string name="exception_logcat_created">Logcat 进程已创建</string>
     <string name="exception_theme_filename">文件 %1$s 的拓展名不是主题</string>
     <string name="exception_libime_dict_filename">文件 %1$s 的拓展名不是 libime 词库</string>
@@ -130,7 +117,6 @@
     <string name="exception_theme_version">这个主题是更新版本的幽默输入法做的（主题格式 %1$s），更新输入法后才能用</string>
     <string name="exception_theme_newer_kept">已有一个同名的主题，是更新版本的幽默输入法做的：这一版读不了它，不替换</string>
     <string name="theme_not_saved">主题没能保存：手机存储空间可能满了</string>
-    <string name="exception_theme_src_image">无法保存主题背景原图片</string>
     <string name="follow_system_day_night_theme">跟随系统夜间模式</string>
     <string name="follow_system_day_night_theme_summary">覆盖手动主题选择</string>
     <string name="light_mode_theme">亮色模式主题</string>
@@ -171,9 +157,8 @@
     <string name="delete_all_except_pinned">要删除所有未置顶条目吗？</string>
     <string name="num_items_deleted">已删除 %1$d 项</string>
     <string name="delete_theme">删除主题</string>
-    <string name="delete_theme_msg">确定要删除主题“%1$s”吗？</string>
+    <string name="delete_theme_msg">删除这个主题吗？它的图片和字体也一起删掉。</string>
     <string name="capture_heap_dump">捕获堆内存转储</string>
-    <string name="edit_theme">编辑主题</string>
     <string name="removed_n_items">已移除 %1$d 个项目</string>
     <string name="added_n_items">已添加 %1$d 个项目</string>
     <string name="whether_reset_switch_preference">是否要将此设置重置为默认值？</string>
@@ -209,11 +194,6 @@
     <string name="calculation_replaces_sum">点算式结果时替换整个算式</string>
     <string name="space_swipe_move_cursor">划动空格键以移动光标</string>
     <string name="please_wait">请稍候…</string>
-    <string name="rotate">旋转</string>
-    <string name="flip">翻转</string>
-    <string name="flip_horizontally">水平翻转</string>
-    <string name="flip_vertically">垂直翻转</string>
-    <string name="crop">裁剪</string>
     <string name="candidates_window">实体键盘的候选窗</string>
     <string name="show_candidates_window">显示候选窗口</string>
     <string name="candidates_window_radius">候选窗口圆角半径</string>
@@ -259,7 +239,6 @@
     <string name="emoji_skin_tone_type_5">🏾 中等深肤色 (Type-5)</string>
     <string name="emoji_skin_tone_type_6">🏿 深肤色 (Type-6)</string>
     <string name="hide_unsupported_emojis">隐藏不支持的表情</string>
-    <string name="key_border_stroke">启用按键边框描边</string>
     <string name="keyboard_height_percent_base">键盘高度百分比</string>
     <string name="display_metrics">显示指标 (Resources.getDisplayMetrics)</string>
     <string name="real_size">真实尺寸 (Display.getRealSize)</string>
@@ -502,12 +481,7 @@
     <string name="level_wide">宽</string>
     <string name="level_little">少</string>
     <string name="level_more">多</string>
-    <string name="key_spacing">按键间距</string>
     <string name="level_compact">紧凑</string>
-    <string name="level_loose">宽松</string>
-    <string name="level_square">直角</string>
-    <string name="level_rounded">圆角</string>
-    <string name="level_round">大圆角</string>
     <string name="level_short">短</string>
     <string name="level_medium">中</string>
     <string name="level_long">长</string>
@@ -883,6 +857,9 @@
     <string name="section_emoji">表情</string>
     <string name="section_animation">动画</string>
     <string name="section_key_style">按键样式</string>
+    <string name="key_style_in_theme">按键的圆角、边框、间距、字体现在属于主题：主题在网页上制作（主题 → 新增主题 → 在网页上制作…）</string>
+    <string name="key_style_moved">按键的圆角、边框、间距现在跟着主题走，已经存进你的主题里。</string>
+    <string name="make_theme_on_web">在网页上制作…</string>
     <string name="section_phrases">短语</string>
     <string name="punctuation_map_summary">中文输入时每个标点打成什么，比如 , 打成 ，</string>
     <string name="custom_phrases_summary">打拼音时打一个缩写出一段话，比如 dz 出你的地址；长的、多行的、偶尔用的，存到「快速输入」</string>

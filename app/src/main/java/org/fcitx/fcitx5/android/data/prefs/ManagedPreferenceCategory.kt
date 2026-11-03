@@ -67,6 +67,11 @@ abstract class ManagedPreferenceCategory(
         ManagedPreferenceUi.Levels(title, key, sharedPreferences, keys, levels, enableUiOn).registerUi()
     }
 
+    /** A line of [text] among the settings, stored nowhere. */
+    protected fun note(@StringRes text: Int, key: String) {
+        ManagedPreferenceUi.Note(text, key).registerUi()
+    }
+
     protected fun switch(
         @StringRes
         title: Int,

@@ -22,16 +22,15 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
+import org.fcitx.fcitx5.android.utils.Const
 import org.fcitx.fcitx5.android.utils.applyNavBarInsetsBottomPadding
 import org.fcitx.fcitx5.android.utils.importErrorDialog
+import org.fcitx.fcitx5.android.utils.openUrl
 import org.fcitx.fcitx5.android.utils.queryFileName
 import org.fcitx.fcitx5.android.utils.toast
 import splitties.resources.styledDrawable
-import java.util.UUID
 
 class ThemeListFragment : Fragment() {
-
-    private lateinit var imageLauncher: ActivityResultLauncher<Theme.Custom?>
 
     private lateinit var importLauncher: ActivityResultLauncher<String>
 
@@ -53,28 +52,6 @@ class ThemeListFragment : Fragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        imageLauncher = registerForActivityResult(CustomThemeActivity.Contract()) { result ->
-            if (result == null) return@registerForActivityResult
-            when (result) {
-                is CustomThemeActivity.BackgroundResult.Created -> {
-                    val theme = result.theme
-                    // listed and put in use only once saved: a theme not saved would be gone at the next start
-                    if (!ThemeManager.saveTheme(theme)) return@registerForActivityResult
-                    themeListAdapter.prependTheme(theme)
-                    if (!followSystemDayNightTheme) {
-                        ThemeManager.setNormalModeTheme(theme)
-                    }
-                }
-                is CustomThemeActivity.BackgroundResult.Deleted -> {
-                    val name = result.name
-                    if (ThemeManager.deleteTheme(name)) themeListAdapter.removeTheme(name)
-                }
-                is CustomThemeActivity.BackgroundResult.Updated -> {
-                    val theme = result.theme
-                    if (ThemeManager.saveTheme(theme)) themeListAdapter.replaceTheme(theme)
-                }
-            }
-        }
         importLauncher =
             registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
                 if (uri == null) return@registerForActivityResult
@@ -92,7 +69,9 @@ class ThemeListFragment : Fragment() {
                             val inputStream = cr.openInputStream(uri)!!
                             ThemeFilesManager.importTheme(inputStream).getOrThrow()
                         }
-                        ThemeManager.refreshThemes()
+                        // one imported again under its name: its files new under the old names, the
+                        // keyboard drawn anew if it is the one in use
+                        ThemeManager.filesChanged(theme.name) { ThemeManager.refreshThemes() }
                         if (newCreated) {
                             themeListAdapter.prependTheme(theme)
                         } else {
@@ -133,8 +112,8 @@ class ThemeListFragment : Fragment() {
         themeListAdapter = object : ThemeListAdapter() {
             override fun onAddNewTheme() = addTheme()
             override fun onSelectTheme(theme: Theme) = selectTheme(theme)
-            override fun onEditTheme(theme: Theme.Custom) = editTheme(theme)
             override fun onExportTheme(theme: Theme.Custom) = exportTheme(theme)
+            override fun onDeleteTheme(theme: Theme.Custom) = deleteTheme(theme)
         }
         ThemeManager.refreshThemes()
         themeListAdapter.setThemes(ThemeManager.getAllThemes())
@@ -157,43 +136,23 @@ class ThemeListFragment : Fragment() {
         themeListAdapter.setSelectedThemes(active, light, dark)
     }
 
+    // themes are made on the web page only (exported there as a zip, imported here); the app picks,
+    // exports and deletes them
     private fun addTheme() {
-        // the themes not settled: the editor's images would go nowhere the next start reads, so none is begun
+        // the themes not settled: an import would go nowhere the next start reads
         if (ThemeManager.refuseIfNotSettled()) return
         val ctx = requireContext()
         val actions = arrayOf(
-            getString(R.string.choose_image),
             getString(R.string.import_from_file),
-            getString(R.string.duplicate_builtin_theme)
+            getString(R.string.make_theme_on_web),
         )
         AlertDialog.Builder(ctx)
             .setTitle(R.string.new_theme)
             .setNegativeButton(android.R.string.cancel, null)
             .setItems(actions) { _, i ->
                 when (i) {
-                    0 -> imageLauncher.launch(null)
-                    1 -> importLauncher.launch("application/zip")
-                    2 -> {
-                        val view = ResponsiveThemeListView(ctx).apply {
-                            // force AlertDialog's customPanel to grow
-                            minimumHeight = Int.MAX_VALUE
-                        }
-                        val dialog = AlertDialog.Builder(ctx)
-                            .setTitle(getString(R.string.duplicate_builtin_theme).removeSuffix("…"))
-                            .setNegativeButton(android.R.string.cancel, null)
-                            .setView(view)
-                            .create()
-                        view.adapter = object :
-                            SimpleThemeListAdapter<Theme.Builtin>(ThemeManager.BuiltinThemes) {
-                            override fun onClick(theme: Theme.Builtin) {
-                                val newTheme =
-                                    theme.deriveCustomNoBackground(UUID.randomUUID().toString())
-                                if (ThemeManager.saveTheme(newTheme)) themeListAdapter.prependTheme(newTheme)
-                                dialog.dismiss()
-                            }
-                        }
-                        dialog.show()
-                    }
+                    0 -> importLauncher.launch("application/zip")
+                    1 -> ctx.openUrl(Const.themeMakerUrl)
                 }
             }
             .show()
@@ -220,14 +179,21 @@ class ThemeListFragment : Fragment() {
         ThemeManager.setNormalModeTheme(theme)
     }
 
-    private fun editTheme(theme: Theme.Custom) {
-        if (ThemeManager.refuseIfNotSettled()) return
-        imageLauncher.launch(theme)
-    }
-
     private fun exportTheme(theme: Theme.Custom) {
         beingExported = theme
         exportLauncher.launch(theme.name + ".zip")
+    }
+
+    private fun deleteTheme(theme: Theme.Custom) {
+        if (ThemeManager.refuseIfNotSettled()) return
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.delete_theme)
+            .setMessage(R.string.delete_theme_msg)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                if (ThemeManager.deleteTheme(theme.name)) themeListAdapter.removeTheme(theme.name)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     override fun onDestroy() {

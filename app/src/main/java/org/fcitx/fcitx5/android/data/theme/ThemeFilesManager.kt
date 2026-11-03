@@ -150,12 +150,9 @@ object ThemeFilesManager {
     @VisibleForTesting
     internal var probe: AssetProbe = AndroidAssetProbe
 
-    fun newCustomBackgroundImages(): Triple<String, File, File> {
-        val themeName = UUID.randomUUID().toString()
-        val croppedImageFile = File(dir, "$themeName-cropped.png")
-        val srcImageFile = File(dir, "$themeName-src")
-        return Triple(themeName, croppedImageFile, srcImageFile)
-    }
+    /** Where the themes and their files are (made if it can be written). */
+    @VisibleForTesting
+    internal val themeDir get() = dir
 
     // the files by name only, as exported: an absolute path breaks once the files dir moves
     private fun Theme.Custom.withFileNames() = copy(look = look.mapFiles { File(it).name })
@@ -177,7 +174,16 @@ object ThemeFilesManager {
      * [legacy] (the key style settings before 3.0, while they are there) as its keys: drawn as it was.
      * A theme of 3.0 already is never changed by them, so an old backup restored leaves the new ones be.
      */
+    /**
+     * Whether the last [listThemes] could not save a theme of an older format again as 3.0: the old
+     * key style settings it was drawn with are kept till it is ([ThemeLookMigration.settle]).
+     */
+    @Volatile
+    var rewriteFailed = false
+        private set
+
     fun listThemes(legacy: LegacyLook? = null): MutableList<Theme.Custom> {
+        rewriteFailed = false
         if (writable && !swept) {
             swept = true
             val saving = File(dir, SAVING)
@@ -219,6 +225,7 @@ object ThemeFilesManager {
                     } catch (e: IOException) {
                         // this runs as the app starts: drawn as migrated all the same, saved at the next start
                         Timber.w(e, "Theme ${found.name} not saved again as 3.0")
+                        rewriteFailed = true
                     }
                 }
                 return@decode found

@@ -5,14 +5,7 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import androidx.core.view.allViews
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.fcitx.fcitx5.android.FcitxApplication
-import org.fcitx.fcitx5.android.data.theme.ThemeMakerTestdata
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.picker.PickerLayout
@@ -52,7 +45,7 @@ class ThemeKeyNamesTest {
         "k18" to listOf(GroupedKeyboard.layout(NineKeyLetters.G18) { emptyList() }.flatten()),
         "number" to NumberPad.entries.map { NumberKeyboard.layout(it).flatten() },
         "handwriting" to listOf(HandwritingKeyboard.layout(context).flatten()),
-        // 注音九键 not yet: the format's grid for it is not the keyboard's
+        "zhuyin-nine" to listOf(ZhuyinKeyboard.nineLayout().flatten()),
         "zhuyin" to listOf(ZhuyinKeyboard.fullLayout().flatten(), ZhuyinKeyboard.fullLayout(compact = true).flatten()),
         "symbols" to listOf(PickerLayout.panelKeys(context, symbolPicker().switchKey)),
         "emoji" to listOf(
@@ -101,53 +94,5 @@ class ThemeKeyNamesTest {
         assertEquals(KeyNames.NUMBER, keyboard.themeBoard)
         val names = keyboard.allViews.filterIsInstance<KeyView>().mapNotNull { it.themeKey }.toList()
         assertTrue(names.toString(), "backspace" in names && "1" in names)
-    }
-
-    private fun label(a: KeyDef.Appearance) = (a as? KeyDef.Appearance.Text)?.displayText ?: ""
-
-    // what a theme draws it as, near enough for a page to start from (the render's is the real one)
-    private fun kind(key: KeyDef) = when {
-        key.name == "space" -> "space"
-        key.name == "enter" || key.name == "confirm" -> "enter"
-        key.appearance.variant == KeyDef.Appearance.Variant.Normal -> "letter"
-        else -> "function"
-    }
-
-    /**
-     * The theme maker's first list of keys (web/theme-maker/test/testdata/key-layout.json): each
-     * board's rows, each key's name, label, width share and kind, and the format's names. A stand-in
-     * till the measured layouts (ThemeMakerLayoutTest) replace it; written with -PupdateThemeMaker.
-     */
-    @Test
-    fun theKeysAsAListForTheThemeMaker() {
-        val rows = mapOf(
-            "qwerty" to TextKeyboard.Layout,
-            "nine" to T9Keyboard.layout(NineKeyLetters.STANDARD),
-            "k14" to GroupedKeyboard.layout(NineKeyLetters.G14) { emptyList() },
-            "k18" to GroupedKeyboard.layout(NineKeyLetters.G18) { emptyList() },
-            "number" to NumberKeyboard.Layout,
-            "handwriting" to HandwritingKeyboard.layout(context),
-            "symbols" to listOf(PickerLayout.panelKeys(context, symbolPicker().switchKey)),
-            "emoji" to listOf(PickerLayout.listKeys(emojiPicker().switchKey, PickerWindow.SearchKey)),
-        )
-        val out = buildJsonObject {
-            put("roles", JsonArray(KeyNames.ROLES.map(::JsonPrimitive)))
-            put("positions", buildJsonObject { KeyNames.POSITIONS.forEach { (b, keys) -> put(b, JsonArray(keys.map(::JsonPrimitive))) } })
-            put("boards", buildJsonObject {
-                rows.forEach { (board, layout) ->
-                    put(board, JsonArray(layout.map { row ->
-                        JsonArray(row.map { key ->
-                            buildJsonObject {
-                                put("name", key.name)
-                                put("label", label(key.appearance))
-                                put("width", key.appearance.percentWidth)
-                                put("kind", kind(key))
-                            }
-                        })
-                    }))
-                }
-            })
-        }
-        ThemeMakerTestdata.check("key-layout.json", Json { prettyPrint = true }.encodeToString(JsonElement.serializer(), out) + "\n")
     }
 }

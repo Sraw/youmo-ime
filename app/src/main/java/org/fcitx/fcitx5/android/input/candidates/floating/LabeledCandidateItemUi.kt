@@ -14,6 +14,7 @@ import androidx.core.text.color
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.input.bar.CandidateBarHeight
 import org.fcitx.fcitx5.android.input.candidates.ReadingSpan
@@ -30,6 +31,7 @@ class LabeledCandidateItemUi(
 
     override val root = textView {
         setupTextView(this)
+        ThemeAssets.candidateTypeface(theme.look)?.let { typeface = it }
         // room above every candidate for a hint's reading at its floor (候选词注音 off; ReadingSpan), so the
         // window keeps one height whichever candidates it shows
         val fm = paint.fontMetrics

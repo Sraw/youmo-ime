@@ -13,11 +13,12 @@ import androidx.core.view.WindowCompat
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.NavbarBackground
+import org.fcitx.fcitx5.android.input.theme.BoardBase
+import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import org.fcitx.fcitx5.android.utils.DeviceUtil
 
 class NavigationBarManager {
 
-    private val keyBorder by ThemeManager.prefs.keyBorder
     private val navbarBackground by ThemeManager.prefs.navbarBackground
 
     private var shouldUpdateNavbarForeground = false
@@ -96,7 +97,8 @@ class NavigationBarManager {
         }
         if (shouldUpdateNavbarBackground) {
             window.setNavbarBackgroundColor(
-                if (!keyBorder && theme is Theme.Builtin) theme.keyboardColor else theme.backgroundColor
+                // the colour under the keys, as the theme has it; under a picture the theme's dark of it
+                if (theme.look.base == BoardBase.Picture) theme.backgroundColor else ThemeColors.board(theme.look.palette, theme.look.keys)
             )
         }
     }

@@ -64,6 +64,19 @@ class ThemeLookTest {
     }
 
     @Test
+    fun thePictureIsDecodedAheadAtTheBlursItIsShownAt() {
+        // under the keyboard at its own blur, the letters at theirs; a single key's too, each once
+        val withKey = FULL.copy(
+            bar = BarBase.Picture(PICTURE.blurDp, 80),
+            keys = FULL.keys.copy(overrides = FULL.keys.overrides + ("qwerty/a" to KeyOverride(KeyFill.Picture(3, 100), null, KeyLabel.Show))),
+        )
+        assertEquals(setOf(PICTURE.blurDp, 12, 3), withKey.pictureBlurs())
+        // a coloured base, the bar transparent: only the keys'
+        assertEquals(setOf(12), FULL.copy(base = BoardBase.Color, bar = BarBase.Transparent).pictureBlurs())
+        assertEquals(emptySet<Int>(), LookDefaults.look(PALETTE).pictureBlurs())
+    }
+
+    @Test
     fun filesMapBothWaysAndNothingElseChanges() {
         val paths = FULL.mapFiles { "/dir/$it" }
         assertEquals(FULL.files().map { "/dir/$it" }, paths.files())

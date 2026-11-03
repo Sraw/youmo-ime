@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.deriveCustomNoBackground
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.ui.main.settings.AddressSettingsFragment
@@ -226,35 +227,39 @@ class SettingsMenuUatTest {
 
     @Test
     @Uat("ST-35")
-    fun aBuiltInThemeCopied() {
+    fun themesAreMadeOnTheWebAndOnesOwnExportedOrDeletedFromALongPress() {
         val follow = ThemeManager.prefs.followSystemDayNightTheme
         follow.setValue(false)
-        ThemeManager.setNormalModeTheme(ThemePreset.PixelLight)
-        val had = ThemeManager.getAllThemes().filterIsInstance<Theme.Custom>().map { it.name }.toSet()
+        val mine = ThemePreset.PixelDark.deriveCustomNoBackground("mine")
+        assertTrue(ThemeManager.saveTheme(mine))
         try {
             st.open(SettingsRoute.Theme)
-            // 新增主题 → 复制内置主题…
+            // 新增主题: an import and the web page, nothing made here
             themeList().findViewHolderForAdapterPosition(0)!!.itemView.performClick()
             st.idle()
-            dialog().listView.performItemClick(null, 2, 2)
+            val adds = dialog().listView.adapter.let { a -> (0 until a.count).map { a.getItem(it).toString() } }
+            assertEquals(listOf("导入文件…", "在网页上制作…"), adds)
+            dialog().dismiss()
             st.idle()
-            val builtins = KeyboardHarness.all(dialog().window!!.decorView).filterIsInstance<RecyclerView>().first()
-            builtins.measure(0, 0)
-            builtins.layout(0, 0, 1080, 4000)
+            // one's own theme: no edit button, its long press 导出 or 删除
+            pick("mine")
+            assertEquals("mine", ThemeManager.activeTheme.name)
+            val at = (themeList().adapter as ThemeListAdapter).entries.indexOfFirst { it.name == "mine" } + 1
+            themeList().findViewHolderForAdapterPosition(at)!!.itemView.performLongClick()
             st.idle()
-            val at = ThemeManager.BuiltinThemes.indexOfFirst { it.name == ThemePreset.PixelDark.name }
-            builtins.scrollToPosition(at)
+            val actions = dialog().listView.adapter.let { a -> (0 until a.count).map { a.getItem(it).toString() } }
+            assertEquals(listOf("导出", "删除"), actions)
+            dialog().listView.performItemClick(null, 1, 1)
             st.idle()
-            builtins.findViewHolderForAdapterPosition(at)!!.itemView.performClick()
+            dialog().getButton(DialogInterface.BUTTON_POSITIVE).performClick()
             st.idle()
-            val added = ThemeManager.getAllThemes().filterIsInstance<Theme.Custom>().filter { it.name !in had }
-            assertEquals(added.toString(), 1, added.size)
-            pick(added.single().name)
-            assertEquals(added.single().name, ThemeManager.activeTheme.name)
-            assertTrue(keyboardIsDark())
+            assertTrue(ThemeManager.getAllThemes().none { it.name == "mine" })
+            assertTrue((themeList().adapter as ThemeListAdapter).entries.none { it.name == "mine" })
+            // the theme in use gone: the default's back
+            assertEquals(ThemeManager.prefs.normalModeTheme.defaultValue.name, ThemeManager.activeTheme.name)
         } finally {
+            ThemeManager.deleteTheme("mine")
             ThemeManager.setNormalModeTheme(ThemePreset.PixelLight)
-            ThemeManager.getAllThemes().filterIsInstance<Theme.Custom>().filter { it.name !in had }.forEach { ThemeManager.deleteTheme(it.name) }
             follow.setValue(follow.defaultValue)
         }
     }

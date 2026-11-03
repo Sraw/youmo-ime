@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.junit.Assert.assertEquals
+import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -88,19 +89,19 @@ class AppPrefsTest {
     @Config(application = FcitxApplication::class)
     fun aCategoryRegisteredAfterTheResetIsResetAsItRegisters() {
         sp.edit {
-            putBoolean("key_ripple_effect", true)
-            putInt("key_radius", 9)
+            putString("one_handed_side", "Left")
+            putInt("keyboard_side_padding", 9)
         }
         val prefs = AppPrefs(sp)
         prefs.resetHiddenSettings()
         val theme = prefs.registerProvider(::ThemePrefs)
-        assertFalse(theme.keyRippleEffect.getValue())
-        assertEquals("a level sets it", 9, theme.keyRadius.getValue())
+        assertEquals(OneHanded.Right, theme.oneHandedSide.getValue())
+        assertEquals("a level sets it", 9, sp.getInt("keyboard_side_padding", -1))
         // a later start, the reset done before it: nothing registered then is reset
-        sp.edit { putBoolean("key_ripple_effect", true) }
+        sp.edit { putString("one_handed_side", "Left") }
         val later = AppPrefs(sp)
         later.resetHiddenSettings()
-        assertTrue(later.registerProvider(::ThemePrefs).keyRippleEffect.getValue())
+        assertEquals(OneHanded.Left, later.registerProvider(::ThemePrefs).oneHandedSide.getValue())
     }
 
     // 0.4's glide typing switch (glide_typing) is this version's 滑行输入 switch, under the same key:

@@ -113,6 +113,8 @@ class KeyNamesTest {
         assertEquals(setOf(slice("fn-down.png"), slice("zq.png")), KeyStyleResolver.imagesOn(keys, "zhuyin", listOf("q")))
         // a name no board has does nothing to the others
         assertEquals(setOf(slice("fn-down.png"), slice("bs.png")), KeyStyleResolver.imagesOn(keys, "nine", listOf("backspace", "2")))
+        // a keyboard of no board name (the number row): the kinds' and its roles', no board's own
+        assertEquals(setOf(slice("fn-down.png"), slice("bs.png")), KeyStyleResolver.imagesOn(keys, null, listOf("backspace", "q")))
     }
 
     @Test

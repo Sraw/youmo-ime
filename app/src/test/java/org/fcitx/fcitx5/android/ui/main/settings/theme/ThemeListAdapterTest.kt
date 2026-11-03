@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.ui.main.settings.theme
 
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.deriveCustomNoBackground
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeThumbnailUi.State
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -13,7 +14,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * The marks on the theme list after a theme is deleted or edited: ThemeManager reports no change
+ * The marks on the theme list after a theme is deleted or imported again: ThemeManager reports no change
  * for either unless it was the active theme, so a mark left on the wrong row stays there.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -29,7 +30,7 @@ class ThemeListAdapterTest {
     private fun adapter(vararg themes: Theme) = object : ThemeListAdapter() {
         override fun onAddNewTheme() = Unit
         override fun onSelectTheme(theme: Theme) = Unit
-        override fun onEditTheme(theme: Theme.Custom) = Unit
+        override fun onDeleteTheme(theme: Theme.Custom) = Unit
         override fun onExportTheme(theme: Theme.Custom) = Unit
     }.apply { setThemes(themes.toList()) }
 
@@ -61,7 +62,7 @@ class ThemeListAdapterTest {
     }
 
     @Test
-    fun editingAThemeMovesItFirstAndTheMarksOfThoseItPassedWithThem() {
+    fun importingAThemeAgainMovesItFirstAndTheMarksOfThoseItPassedWithThem() {
         val list = adapter(a, x, y, b).apply { setSelectedThemes(a, light = x, dark = y) }
         list.replaceTheme(theme("b"))
         assertEquals(

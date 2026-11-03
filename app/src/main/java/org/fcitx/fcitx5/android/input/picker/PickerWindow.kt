@@ -61,7 +61,6 @@ class PickerWindow(
     private val popup: PopupComponent by manager.must()
     private val returnKeyDrawable: ReturnKeyDrawableComponent by manager.must()
 
-    private val keyBorder by ThemeManager.prefs.keyBorder
 
     private var locked by AppPrefs.getInstance().internal.symbolPanelLocked
 
@@ -202,7 +201,7 @@ class PickerWindow(
 
     override fun onCreateView() = PickerLayout(context, theme, switchKey, density, panel, if (search) SearchKey else null).apply {
         pickerLayout = this
-        val bordered = followKeyBorder && keyBorder
+        val bordered = followKeyBorder && theme.look.keys.blocks
         adapter = PickerGridAdapter(grid, keyActionListener, popupActionListener, data(), key.name, bordered, policy)
         grid.adapter = adapter
         side?.apply {

@@ -27,14 +27,21 @@ import androidx.annotation.ColorInt
 import androidx.annotation.DrawableRes
 import androidx.annotation.FloatRange
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.core.view.isInvisible
 import androidx.core.view.updateLayoutParams
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef.Appearance.Border
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef.Appearance.Variant
+import org.fcitx.fcitx5.android.input.theme.KeyFaceGeometry
+import org.fcitx.fcitx5.android.input.theme.KeyLabel
+import org.fcitx.fcitx5.android.input.theme.KeyStyle
+import org.fcitx.fcitx5.android.input.theme.KeyStyleResolver
 import org.fcitx.fcitx5.android.utils.styledFloat
 import org.fcitx.fcitx5.android.utils.unset
 import splitties.dimensions.dp
@@ -60,26 +67,21 @@ import kotlin.math.roundToInt
 abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearance) :
     CustomGestureView(ctx) {
 
-    val bordered: Boolean
-    val borderStroke: Boolean
-    val rippled: Boolean
-    val radius: Float
-    val hMargin: Int
-    val vMargin: Int
+    /** How the theme draws its keys ([Theme.look]): blocks or flat, corners, gaps, a press's effect, each kind's face. */
+    protected val keys = theme.look.keys
 
-    init {
-        val prefs = ThemeManager.prefs
-        bordered = prefs.keyBorder.getValue()
-        borderStroke = prefs.keyBorderStroke.getValue()
-        rippled = prefs.keyRippleEffect.getValue()
-        radius = dp(prefs.keyRadius.getValue().toFloat())
-        val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val hMarginPref =
-            if (landscape) prefs.keyHorizontalMarginLandscape else prefs.keyHorizontalMargin
-        val vMarginPref =
-            if (landscape) prefs.keyVerticalMarginLandscape else prefs.keyVerticalMargin
-        hMargin = if (def.margin) dp(hMarginPref.getValue()) else 0
-        vMargin = if (def.margin) dp(vMarginPref.getValue()) else 0
+    /** What a theme styles it as: by the face colour it had before theme file 3.0 ([themeKind]). */
+    val kind = def.themeKind
+
+    val bordered: Boolean = keys.blocks
+    val radius: Float = dp(keys.radiusDp.toFloat())
+    private val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val hMargin: Int = if (def.margin) dp(if (landscape) keys.gap.hLand else keys.gap.h) else 0
+    val vMargin: Int = if (def.margin) dp(if (landscape) keys.gap.vLand else keys.gap.v) else 0
+
+    // its face's shape at a size: the theme's, as the key's own border has it
+    private val geometry = { w: Float, h: Float ->
+        KeyFaceGeometry.of(w, h, kind, keys, landscape, resources.displayMetrics.density, def.margin, def.border.face)
     }
 
     /** Its name in a theme, its keyboard's [BaseKeyboard.themeBoard] the board: [KeyDef.name]. */
@@ -280,7 +282,7 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
     }
 
     private fun markView(slot: KeyMarks.Slot, mark: Mark): View? {
-        val color = theme.altKeyTextColor
+        val color = theme.look.palette.keyHintColor
         return when (mark) {
             is Mark.Icon -> ImageView(context).apply {
                 imageTintList = ColorStateList.valueOf(color)
@@ -343,66 +345,33 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         if (def.contentDescription != 0) {
             contentDescription = context.getString(def.contentDescription)
         }
-        // key border
-        if ((bordered && def.border != Border.Off) || def.border == Border.On) {
-            val bkgColor = when (def.variant) {
-                Variant.Normal, Variant.AltForeground -> theme.keyBackgroundColor
-                Variant.Alternative -> theme.altKeyBackgroundColor
-                Variant.Accent -> theme.accentKeyBackgroundColor
-            }
-            val borderOrShadowWidth = dp(1)
-            // background: key border
-            appearanceView.background = if (borderStroke) borderedKeyBackgroundDrawable(
-                bkgColor, theme.keyShadowColor,
-                radius, borderOrShadowWidth, hMargin, vMargin
-            ) else shadowedKeyBackgroundDrawable(
-                bkgColor, theme.keyShadowColor,
-                radius, borderOrShadowWidth, hMargin, vMargin
-            )
-            // foreground: press highlight or ripple
-            setupPressHighlight()
-        } else {
-            // normal press highlight for keys without special background
-            // special background is handled in `onSizeChanged()`
-            if (def.border != Border.Special) {
-                setupPressHighlight()
-            }
-        }
+        faces(KeyStyleResolver.resolve(keys, null, null, kind), BoardImages.NONE)
         add(appearanceView, lParams(matchParent, matchParent))
     }
 
-    private fun setupPressHighlight(mask: Drawable? = null) {
-        appearanceView.foreground = if (rippled) {
-            RippleDrawable(
-                ColorStateList.valueOf(theme.keyPressHighlightColor), null,
-                // ripple should be masked with an opaque color
-                mask ?: highlightMaskDrawable(Color.WHITE)
-            )
-        } else if (bordered && borderStroke) {
-            StateListDrawable().apply {
-                addState(
-                    intArrayOf(android.R.attr.state_pressed),
-                    borderedKeyBackgroundDrawable(
-                        Color.TRANSPARENT, theme.keyShadowColor,
-                        radius, dp(2), hMargin, vMargin
-                    )
-                )
-            }
-        } else {
-            StateListDrawable().apply {
-                addState(
-                    intArrayOf(android.R.attr.state_pressed),
-                    // use mask drawable as highlight directly
-                    mask ?: highlightMaskDrawable(theme.keyPressHighlightColor)
-                )
-            }
-        }
+    /**
+     * Draws it as the theme has the key [themeKey] of [board] (KeyStyleResolver: its own look, its
+     * role's on every board, its kind's), its images [images]'s; the kind's alone for no name. Its
+     * keyboard calls it once the key is named.
+     */
+    fun style(board: String?, images: BoardImages) {
+        val s = KeyStyleResolver.resolve(keys, board, themeKey, kind)
+        faces(s, images)
+        showLabel(s.label == KeyLabel.Show)
     }
 
-    private fun highlightMaskDrawable(@ColorInt color: Int): Drawable {
-        return if (bordered) insetRadiusDrawable(hMargin, vMargin, radius, color)
-        else InsetDrawable(ColorDrawable(color), hMargin, vMargin, hMargin, vMargin)
+    private fun faces(s: KeyStyle, images: BoardImages) = appearanceView.drawAsKey(theme, s, kind, images, geometry)
+
+    /** The theme's key text size, a share of each key's own ([Text.keyScale]). */
+    protected val textScale = theme.look.text.keyScale / 100f
+
+    /** The theme's key font at its weight, [bold] at 700; null for the system's as it is (no font, the normal weight). */
+    protected fun keyTypeface(bold: Boolean): Typeface? = theme.look.let {
+        ThemeAssets.typeface(it, it.text.keyFont, if (bold) BOLD_WEIGHT else it.text.keyWeight)
     }
+
+    /** Its label (text, icon, corner symbol) shown, or not: the key's image has it ([KeyLabel.Hide]). Its description stays. */
+    protected open fun showLabel(show: Boolean) = Unit
 
     override fun setEnabled(enabled: Boolean) {
         super.setEnabled(enabled)
@@ -436,44 +405,6 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
             )
         }
         super.onLayout(changed, left, top, right, bottom)
-    }
-
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        if (bordered) return
-        when (def.viewId) {
-            R.id.button_space -> {
-                val bkgRadius = dp(3f)
-                val minHeight = dp(26)
-                val hInset = dp(10)
-                val vInset = if (h < minHeight) 0 else min((h - minHeight) / 2, dp(16))
-                appearanceView.background = insetRadiusDrawable(
-                    hInset, vInset, bkgRadius, theme.spaceBarColor
-                )
-                // InsetDrawable sets padding to container view; remove padding to prevent text from bing clipped
-                appearanceView.padding = 0
-                // apply press highlight for background area
-                setupPressHighlight(
-                    insetRadiusDrawable(
-                        hInset, vInset, bkgRadius,
-                        if (rippled) Color.WHITE else theme.keyPressHighlightColor
-                    )
-                )
-            }
-            R.id.button_return -> {
-                val drawableSize = min(min(w, h), dp(35))
-                val hInset = (w - drawableSize) / 2
-                val vInset = (h - drawableSize) / 2
-                appearanceView.background = insetOvalDrawable(
-                    hInset, vInset, theme.accentKeyBackgroundColor
-                )
-                appearanceView.padding = 0
-                setupPressHighlight(
-                    insetOvalDrawable(
-                        hInset, vInset, if (rippled) Color.WHITE else theme.keyPressHighlightColor
-                    )
-                )
-            }
-        }
     }
 }
 
@@ -511,10 +442,10 @@ open class TextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.Text) 
         isFocusable = false
         background = null
         text = def.displayText
-        setTextSize(TypedValue.COMPLEX_UNIT_DIP, def.textSize * keyTextScale(ctx))
+        setTextSize(TypedValue.COMPLEX_UNIT_DIP, def.textSize * keyTextScale(ctx) * textScale)
         textDirection = View.TEXT_DIRECTION_FIRST_STRONG_LTR
-        // keep original typeface, apply textStyle only
-        setTypeface(typeface, def.textStyle)
+        // the theme's font, or the original typeface with textStyle only
+        keyTypeface(def.textStyle == Typeface.BOLD)?.let { typeface = it } ?: setTypeface(typeface, def.textStyle)
         setTextColor(
             when (def.variant) {
                 Variant.Normal -> theme.keyTextColor
@@ -530,6 +461,10 @@ open class TextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.Text) 
                 centerInParent()
             })
         }
+    }
+
+    override fun showLabel(show: Boolean) {
+        mainText.isInvisible = !show
     }
 
     override val glyphs: List<View> get() = listOf(mainText)
@@ -581,16 +516,21 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
         isClickable = false
         isFocusable = false
         // TODO hardcoded alt text size
-        setTextSize(TypedValue.COMPLEX_UNIT_DIP, 10.666667f * keyTextScale(ctx))
-        setTypeface(typeface, Typeface.BOLD)
+        setTextSize(TypedValue.COMPLEX_UNIT_DIP, 10.666667f * keyTextScale(ctx) * textScale)
+        keyTypeface(bold = true)?.let { typeface = it } ?: setTypeface(typeface, Typeface.BOLD)
         text = def.altText
         textDirection = View.TEXT_DIRECTION_FIRST_STRONG_LTR
         setTextColor(
             when (def.variant) {
-                Variant.Normal, Variant.AltForeground, Variant.Alternative -> theme.altKeyTextColor
+                Variant.Normal, Variant.AltForeground, Variant.Alternative -> theme.look.palette.keyHintColor
                 Variant.Accent -> theme.accentKeyTextColor
             }
         )
+    }
+
+    override fun showLabel(show: Boolean) {
+        super.showLabel(show)
+        altText.isInvisible = !show
     }
 
     // the slot its symbol is laid out in; null for not drawn
@@ -745,6 +685,10 @@ class ImageKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.Image) :
         }
     }
 
+    override fun showLabel(show: Boolean) {
+        img.isInvisible = !show
+    }
+
     // its icon's box, not ink: an icon's is its drawable's
     override val glyphs: List<View> get() = listOf(img)
 }
@@ -767,6 +711,11 @@ class ImageTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.ImageT
     TextKeyView(ctx, theme, def) {
     val img = imageView {
         configure(theme, def.src, def.variant)
+    }
+
+    override fun showLabel(show: Boolean) {
+        super.showLabel(show)
+        img.isInvisible = !show
     }
 
     init {
@@ -817,6 +766,7 @@ class ImageTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.ImageT
 
 // a shortcut mark's size: an icon's side, a text's size and the share of the key's width it fits in
 private const val MARK_ICON_DP = 11
+private const val BOLD_WEIGHT = 700
 private const val MARK_ICON_COMPACT_DP = 8
 private const val MARK_TEXT_DP = 9f
 private const val MARK_TEXT_WIDTH = 0.45f

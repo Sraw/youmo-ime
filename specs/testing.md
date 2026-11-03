@@ -132,6 +132,13 @@ build's bar adds a microphone. `app/build.gradle.kts` turns record, compare and 
 `testVoice*` task, which makes `captureRoboImage` a no-op there; every other assertion still runs. A
 voice case that is about how the microphone looks would need its own golden in a voice-only directory.
 
+`ThemeLookScreenshotTest` draws five sample themes (colours, a frosted picture, the picture cut out
+by the keys, nine-slice images with fonts, an image per key), light and dark, on eight boards in
+portrait, one-handed, floating and turned split; its pictures and images are made in the test. Only
+a few of those 320 are goldens (each theme's 26 keys, every board of the per-key theme, one of each
+mode). `-PthemeShots=<dir>` writes all 320 there as full-size PNGs, for looking through after a
+drawing change (the goldens still compare).
+
 ## Trying it on a device
 
 Unit tests do not see the keyboard. Anything a user sees or touches (layout, a gesture, the bar,
@@ -202,10 +209,16 @@ The theme maker page draws its preview by the app's rules and reads and writes i
 the app makes the files its tests read: `rules.json` (`ThemeMakerRulesTest`: `KeyFaceGeometry`,
 `NineSliceLayout`, `PictureWindow`, `BoxBlur`, `KeyStyleResolver`, `KeyImageBudget` and the 2.1 →
 3.0 migration over fixed cases), `theme.json` (a 3.0 theme with everything), `from-app.zip` and
-`from-app-2.1.zip` (an export of this app's and of one before 3.0), `key-layout.json`
-(`ThemeKeyNamesTest`: the format's key names and each board's keys, a stand-in until the measured
-layouts). Each test compares its file with the repo's and fails on a difference;
-`./gradlew :app:testTextDebugUnitTest --tests '*ThemeMakerRulesTest' --tests '*ThemeKeyNamesTest' -PupdateThemeMaker`
+`from-app-2.1.zip` (an export of this app's and of one before 3.0), `youmo-layout.json` and
+`youmo-icons.json` (`ThemeMakerLayoutTest`: the real keyboard measured under Robolectric on the
+page's four phones, both orientations, every board, normal / one-handed / floating, and the 26 keys
+typing, long-pressed and showing the clipboard; each key's cell, kind and theme name, each text,
+icon and fill with the palette field it is drawn in, read off a probe theme whose 24 colours all
+differ; the format's key names; the icons' vector paths). The layout test also writes the two into
+the page's `<script type="application/json" id="youmo-layout">` / `id="youmo-icons"` blocks once
+`web/theme-maker/index.html` has them, so the page needs no build. Each test compares its file with
+the repo's and fails on a difference;
+`./gradlew :app:testTextDebugUnitTest --tests '*ThemeMakerRulesTest' --tests '*ThemeMakerLayoutTest' -PupdateThemeMaker`
 writes them again, and the page's own test then shows what it must follow.
 
 ## Golden files from upstream fcitx
