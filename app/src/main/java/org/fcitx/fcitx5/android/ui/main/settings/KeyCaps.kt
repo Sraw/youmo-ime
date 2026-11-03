@@ -63,7 +63,7 @@ object KeyCaps {
         /** A command's icon. */
         data class Icon(@DrawableRes val res: Int) : Mark
 
-        /** The key's symbol where the page labels the key by it: not drawn, its corner kept from the shortcut. */
+        /** The key's symbol where the page labels the key by it (九键's digits): not drawn, its corner kept from the shortcut. */
         data object Unshown : Mark
     }
 

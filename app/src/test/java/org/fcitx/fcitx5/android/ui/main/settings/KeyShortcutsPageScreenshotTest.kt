@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.PunctuationPosition
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
+import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.uat.PrefsRule
@@ -52,10 +53,11 @@ class KeyShortcutsPageScreenshotTest {
 
     private val decor get() = st.activity.window.decorView
 
-    // q's text shortcut, b's long press turned off (faded, its @ gone)
-    private fun open() {
+    // q's text shortcut, b's long press turned off (faded, its @ gone); [more] set besides
+    private fun open(vararg more: Pair<String, KeyShortcut>) {
         val p = AppPrefs.getInstance().internal
-        prefs.set(p.keyShortcuts, KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好")).serialize())
+        val set = more.fold(KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好"))) { s, (name, shortcut) -> s.with(name, shortcut) }
+        prefs.set(p.keyShortcuts, set.serialize())
         prefs.set(p.popupOverrides, PopupOverrides.Empty.with("b", emptyList()).serialize())
         st.activity
         st.open(SettingsRoute.PopupOverrides)
@@ -104,6 +106,30 @@ class KeyShortcutsPageScreenshotTest {
         }
         // the backspace's clear up and restore down, each its icon: no names cut short
         assertEquals(2, icons(key(st.s(R.string.fn_key_backspace))))
+    }
+
+    // the number keys draw no symbol (a digit alone): a shortcut there goes where one alone goes on
+    // the keyboard, under the digit with 标点位置 下方, never into the corner a symbol would have left
+    @Test
+    fun aNumberKeysShortcutIsPlacedAsTheKeyboardPlacesIt() {
+        prefs.set(ThemeManager.prefs.punctuationPosition, PunctuationPosition.Bottom)
+        open("num/5" to KeyShortcut.Command(KeyCommand.Copy))
+        tab(R.string.shortcut_page_number)
+        assertEquals(1, icons(key("5")))
+        capture("number_bottom")
+        // the 14 keys' corners drawn too, under their letters there
+        tab(R.string.shortcut_page_g14)
+        assertTrue(KeyboardHarness.all(key("QW")).any { it is TextView && it.text.toString() == "1" })
+        capture("keys14_bottom")
+    }
+
+    @Test
+    @Config(qualifiers = "zh-rCN-w851dp-h393dp-land-440dpi")
+    fun landscape() {
+        open()
+        capture("full_landscape")
+        tab(R.string.shortcut_page_function)
+        capture("function_landscape")
     }
 
     // 标点位置 无: no marks on the page, as on the keyboard

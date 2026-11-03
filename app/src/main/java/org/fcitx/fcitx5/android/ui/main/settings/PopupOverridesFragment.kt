@@ -27,6 +27,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.popup.PopupEditor
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
+import org.fcitx.fcitx5.android.input.keyboard.GroupedKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
@@ -83,14 +84,26 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             add(ctx.horizontalLayout {
                 add(MaterialButton(ctx, null, MaterialR.attr.materialButtonOutlinedStyle).apply {
                     setText(R.string.shortcut_apply_presets)
-                    setOnClickListener { shortcuts = shortcuts.withPresets(page.form); rebuild() }
+                    setOnClickListener { confirm(R.string.shortcut_apply_presets_message) { shortcuts = shortcuts.withPresets(page.form) } }
                 }, lParams { marginEnd = ctx.dp(8) })
                 add(MaterialButton(ctx, null, MaterialR.attr.materialButtonOutlinedStyle).apply {
                     setText(R.string.shortcut_clear_page)
-                    setOnClickListener { shortcuts = shortcuts.cleared(page.names); rebuild() }
+                    setOnClickListener { confirm(R.string.shortcut_clear_page_message) { shortcuts = shortcuts.cleared(page.names) } }
                 }, lParams())
             }, lParams { topMargin = ctx.dp(12) })
         }
+    }
+
+    // a whole page's shortcuts replaced at a tap, there being no taking it back: asked first
+    private fun confirm(message: Int, change: () -> Unit) {
+        AlertDialog.Builder(requireContext())
+            .setMessage(message)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                change()
+                rebuild()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun tabs(ctx: Context) = HorizontalScrollView(ctx).apply {
@@ -129,6 +142,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     private fun shortcutPage(ctx: Context, page: KeyShortcutPages.Page) {
         val stored = shortcuts
         val function = page.form == KeyShortcuts.FUNCTION
+        val symbols = symbolsOf(page).iterator()
         page.rows.forEachIndexed { i, row ->
             val keys = if (function) row.take(1) else row
             with(content) { add(ctx.horizontalLayout {
@@ -137,13 +151,26 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                     val names = if (function) row.map { it.name } else listOf(key.name)
                     val label = if (function) getString(FunctionLabels.getValue(key.label)) else key.label
                     val said = names.map { said(it) ?: "–" }.joinToString(" / ").takeIf { names.any { said(it) != null } }
-                    val marks = if (function) functionMarks(names) else charMarks(KeyCaps.Mark.Unshown, key.name)
+                    val marks = if (function) functionMarks(names) else charMarks(symbols.next(), key.name)
                     add(KeyCaps.key(ctx, label, "", marked = names.any(stored::isSet), dimmed = false, marks = marks, said = said).apply {
                         setOnClickListener { editShortcuts(label, names) }
                     }, if (function) lParams(matchParent, ctx.dp(KeyHeight)) else keyParams(ctx, weight = 1f))
                 }
                 if (!function) weightSum = page.rows.maxOf { it.size }.toFloat()
             }, lParams(matchParent) { topMargin = ctx.dp(6) }) }
+        }
+    }
+
+    // each key's symbol on [page] as its keyboard draws it, in the page's order: the 14 and 18 keys'
+    // corners (GroupedKeyboard); none on the number keys, a digit alone on each; the nine keys' and
+    // 注音's labelled by theirs, so not drawn again, its place kept from the shortcut
+    private fun symbolsOf(page: KeyShortcutPages.Page): List<KeyCaps.Mark?> {
+        val n = page.names.size
+        return when (page.form) {
+            KeyShortcutPreset.GROUPED14 -> GroupedKeyboard.CORNERS.map(KeyCaps.Mark::Text)
+            KeyShortcutPreset.GROUPED18 -> GroupedKeyboard.CORNERS18.map(KeyCaps.Mark::Text)
+            KeyShortcutPreset.NUMBER -> List(n) { null }
+            else -> List(n) { KeyCaps.Mark.Unshown }
         }
     }
 

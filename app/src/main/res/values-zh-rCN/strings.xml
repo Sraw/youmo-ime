@@ -922,6 +922,8 @@
     <string name="shortcut_section_off">（现在关着，在“滑动”里打开）</string>
     <string name="shortcut_apply_presets">套用编辑快捷键</string>
     <string name="shortcut_clear_page">清除这一页的快捷键</string>
+    <string name="shortcut_apply_presets_message">把这一页的快捷键恢复成预设的编辑快捷键？这一页改过的会被替换。</string>
+    <string name="shortcut_clear_page_message">清除这一页所有键的快捷键（预设的也清除）？</string>
     <string name="shortcut_hint">点一个键，改它长按弹出的字符（第一个就是键角符号）和快捷键。</string>
     <string name="shortcut_now">现在：%s（在“滑动”里改）</string>
     <string name="shortcut_page_full">全键盘</string>

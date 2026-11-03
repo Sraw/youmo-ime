@@ -922,6 +922,8 @@
     <string name="shortcut_section_off">（現在關著，在「滑動」裡打開）</string>
     <string name="shortcut_apply_presets">套用編輯快捷鍵</string>
     <string name="shortcut_clear_page">清除這一頁的快捷鍵</string>
+    <string name="shortcut_apply_presets_message">把這一頁的快捷鍵恢復成預設的編輯快捷鍵？這一頁改過的會被替換。</string>
+    <string name="shortcut_clear_page_message">清除這一頁所有鍵的快捷鍵（預設的也清除）？</string>
     <string name="shortcut_hint">點一個鍵，改它長按彈出的字元（第一個就是鍵角符號）和快捷鍵。</string>
     <string name="shortcut_now">現在：%s（在「滑動」裡改）</string>
     <string name="shortcut_page_full">全鍵盤</string>
