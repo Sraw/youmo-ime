@@ -254,4 +254,91 @@ class KeyShortcutsHostTest {
             stored.setValue(was)
         }
     }
+
+    private fun backspaces(n: Int, leaving: String) {
+        repeat(n) { h.tap(backspace) }
+        until("deleted to [$leaving]") { h.field.text.toString() == leaving }
+    }
+
+    // KB-64: Backspaces one after another put back whole, the cursor where it was
+    @Test
+    fun backspacesOneAfterAnotherArePutBackWholeBySwipingDown() {
+        start("你好世界")
+        backspaces(3, leaving = "你")
+        swipe(backspace, up = false)
+        until("put back") { h.field.text.toString() == "你好世界" }
+        assertEquals(4, h.field.selectionStart)
+    }
+
+    // something committed after them: a run is over, not put back over it
+    @Test
+    fun aRunIsNotPutBackOnceSomethingIsCommitted() {
+        start("你好世界")
+        backspaces(2, leaving = "你好")
+        h.service.commitOverEngine("啊")
+        until("committed") { h.field.text.toString() == "你好啊" }
+        swipe(backspace, up = false)
+        synced()
+        assertEquals("你好啊", h.field.text.toString())
+    }
+
+    // review L3: a copy changes nothing of the field, the cursor back where it was: the run goes on
+    @Test
+    fun aCopyBetweenBackspacesEndsNoRun() {
+        val stored = AppPrefs.getInstance().internal.keyShortcuts
+        val was = stored.getValue()
+        stored.setValue(KeyShortcuts.Empty.with("full/c", KeyShortcut.Command(KeyCommand.Copy)).serialize())
+        try {
+            start("你好世界")
+            backspaces(1, leaving = "你好世")
+            swipe(h.key("c"), up = true)
+            until("copied") { appContext.getSystemService(ClipboardManager::class.java).primaryClip?.getItemAt(0)?.text?.toString() == "你好世" }
+            backspaces(1, leaving = "你好")
+            assertEquals(2, h.field.selectionStart)
+            swipe(backspace, up = false)
+            until("both put back") { h.field.text.toString() == "你好世界" }
+        } finally {
+            stored.setValue(was)
+        }
+    }
+
+    // review L4: the screen turned is the same input, its engine focused again: the run is kept
+    @Test
+    fun aRunOutlastsTheScreenTurning() {
+        start("你好世界")
+        backspaces(2, leaving = "你好")
+        h.turn()
+        synced()
+        swipe(backspace, up = false)
+        until("put back") { h.field.text.toString() == "你好世界" }
+    }
+
+    // review L5: a tap on the field puts the cursor somewhere: what is deleted after it is a run of its own
+    @Test
+    fun aTapOnTheFieldStartsAnotherRun() {
+        start("abc")
+        backspaces(1, leaving = "ab")
+        h.service.onViewClicked(false)
+        h.field.setSelection(1)
+        h.idle()
+        backspaces(1, leaving = "b")
+        swipe(backspace, up = false)
+        until("the second put back") { h.field.text.toString() == "ab" }
+        assertEquals(1, h.field.selectionStart)
+    }
+
+    // review G: a cut and a paste are the editor's (the context menu), changing the field: the run is
+    // over, though the paste leaves it reading as the run did
+    @Test
+    fun aRunIsNotPutBackAfterACutAndAPaste() {
+        start("你好世界")
+        backspaces(1, leaving = "你好世")
+        swipe(h.key("x"), up = true)
+        until("cut") { h.field.text.isEmpty() }
+        swipe(h.key("v"), up = true)
+        until("pasted") { h.field.text.toString() == "你好世" }
+        swipe(backspace, up = false)
+        synced()
+        assertEquals("你好世", h.field.text.toString())
+    }
 }

@@ -97,6 +97,7 @@ import org.fcitx.fcitx5.android.input.editing.EditingSession
 import org.fcitx.fcitx5.android.input.editing.EditorKeyPolicy
 import org.fcitx.fcitx5.android.input.editing.ForwardedKeys
 import org.fcitx.fcitx5.android.input.editing.InputConnectionEditor
+import org.fcitx.fcitx5.android.input.editing.WatchedEditor
 import org.fcitx.fcitx5.android.input.editing.KeyEventRelay
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import org.fcitx.fcitx5.android.input.hardware.TakenKey
@@ -106,6 +107,7 @@ import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
 import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
 import org.fcitx.fcitx5.android.input.learning.UndoChip
 import org.fcitx.fcitx5.android.input.shortcut.ClearedText
+import org.fcitx.fcitx5.android.input.shortcut.EditPlan
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.fcitx.fcitx5.android.utils.Locales
 import org.fcitx.fcitx5.android.utils.alpha
@@ -239,8 +241,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     val inAddressField: Boolean
         get() = currentInputEditorInfo?.let { AddressKeys.of(it.toEditorTraits()) != AddressKeys.NONE } == true
 
+    // the field's editor: what changes the field otherwise than a run of deletions ends the run (ClearedText.edited)
+    private val fieldEditor = WatchedEditor(InputConnectionEditor { currentInputConnection }) { clearedText.edited() }
+
     private val editingSession = EditingSession(
-        InputConnectionEditor { currentInputConnection },
+        fieldEditor,
         checkThread = if (BuildConfig.DEBUG) ({
             if (Looper.myLooper() != Looper.getMainLooper()) {
                 // logged rather than thrown: a debug build is also someone's daily keyboard
@@ -263,6 +268,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     /** 清除's clears, to put back (恢复) in the input they were made in alone (review M1). */
     val clearedText = ClearedText()
+
+    /** [block]'s changes to the field (a copy's selection and back) ending no run of deletions. */
+    fun <T> quietly(block: () -> T): T = fieldEditor.quietly(block)
 
     // the field the floating window's cursor and drag are of, last typed on with the hardware keyboard
     private var cursorField: EditorInfo? = null
@@ -489,6 +497,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     }
                 } else {
                     // KeyEvent from physical keyboard (or input method engine forwardKey)
+                    clearedText.edited()
                     // replay the original event if we still have it
                     if (keyEventRelay.replay(it.timestamp)) return@event
                     // no original event to replay: simulate one
@@ -513,11 +522,17 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             is HostEvent.DeleteSurrounding -> {
                 handleDeleteSurrounding(event.before, event.after)
             }
+            // something typed: a run of deletions before it is over
+            is HostEvent.InputPanel -> if (event.preedit.isNotEmpty()) clearedText.edited()
             is HostEvent.InputMethodChanged -> {
                 val im = event.im
                 hardwareKeyboard.inputMethodChanged(im)
-                // the session switched to knows nothing of the field yet: told it, after fcitx's reset of it (FieldPolicy)
-                if (fieldPolicy.inputMethodChanged(im)) tellContext(started = true)
+                // the session switched to knows nothing of the field yet: told it, after fcitx's reset of it (FieldPolicy).
+                // What it types is not a run's: a run ends. Not the same one focused again, as the screen turning has it (review L4)
+                if (fieldPolicy.inputMethodChanged(im)) {
+                    clearedText.edited()
+                    tellContext(started = true)
+                }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                     // (one not synced yet has no subtype: the status icon below is still updated)
                     val subtype = SubtypeManager.subtypeOf(im)
@@ -551,6 +566,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private fun handleBackspaceKey() {
         val deleting = selection.latest
+        keepDeleted(deleting.isNotEmpty())
         contextMemory.backspace(deleting.start, deleting.end)
         // a selection deleted, where a session takes one code point off what it knows (the app's
         // Session.ERASED, or English's own Backspace) and the cursor report, predicted, tells it
@@ -558,10 +574,51 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // it is what will be before the cursor
         // (told as no selection: what it reads is the field once the selection is gone, review-1c M2)
         if (deleting.isNotEmpty()) tellContext(selected = false)
-        if (pairing) backspacePair()
-        if (!editingSession.backspace(currentInputEditorInfo.toEditorTraits(packageName))) {
-            sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+        fieldEditor.quietly {
+            if (pairing) backspacePair()
+            if (!editingSession.backspace(currentInputEditorInfo.toEditorTraits(packageName))) {
+                sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+            }
         }
+    }
+
+    /**
+     * A deletion about to be made in the field, of the selection ([selection]) or else of one
+     * character before the cursor, kept to put back ([ClearedText.deleting]): not in a field kept from
+     * learning, nor in one taking key events alone (a terminal's), whose text is not what it shows.
+     */
+    private fun keepDeleted(selection: Boolean) {
+        val field = startedWith ?: return
+        if (inSensitiveField || currentInputEditorInfo.isTypeNull()) return
+        clearedText.deleting(field, selection) { before, after -> readAround(before, after, selected = selection) }
+    }
+
+    /**
+     * The field around the cursor as a run reads it, on the main thread before the deletion: one
+     * round trip where the editor gives its text around the selection at once (API 31), else a read
+     * of each side and the selection (review M2). Null where the editor gives neither.
+     */
+    private fun readAround(before: Int, after: Int, selected: Boolean): ClearedText.Read? {
+        val ic = currentInputConnection ?: return null
+        val tracked = selection.latest.let { minOf(it.start, it.end) }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val around = ic.getSurroundingText(before, after, 0)
+            val start = around?.let { minOf(it.selectionStart, it.selectionEnd) } ?: -1
+            val end = around?.let { maxOf(it.selectionStart, it.selectionEnd) } ?: -1
+            if (around != null && start >= 0 && end <= around.text.length) {
+                val text = around.text.toString()
+                val at = if (around.offset >= 0) around.offset + start else tracked
+                return ClearedText.Read(EditPlan.Field(text.substring(0, start), text.substring(start, end), text.substring(end)), at)
+            }
+        }
+        return ClearedText.Read(
+            EditPlan.Field(
+                ic.getTextBeforeCursor(before, 0)?.toString() ?: return null,
+                if (selected) ic.getSelectedText(0)?.toString().orEmpty() else "",
+                ic.getTextAfterCursor(after, 0)?.toString() ?: return null,
+            ),
+            tracked,
+        )
     }
 
     /** An empty pair put in goes whole: its closing one here, the opening one as ever. */
@@ -583,6 +640,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     /** The text-editing panel's Backspace, a key event as ever: what it takes is not kept as context. */
     fun sendBackspaceKey() {
         val deleting = selection.latest
+        keepDeleted(deleting.isNotEmpty())
         contextMemory.backspace(deleting.start, deleting.end)
         sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
     }
@@ -592,6 +650,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * takes away is not kept as context any more than Backspace's.
      */
     fun performContextMenuAction(id: Int) {
+        fieldEditor.changing()
         if ((id == android.R.id.cut || id == android.R.id.paste) && selection.latest.isNotEmpty()) contextMemory.cut()
         currentInputConnection?.performContextMenuAction(id)
     }
@@ -616,6 +675,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun handleReturnKey() {
+        clearedText.edited()
         when (val action = EditorKeyPolicy.onReturn(currentInputEditorInfo.toEditorTraits(packageName))) {
             EditorKeyPolicy.ReturnAction.SendEnter -> sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
             is EditorKeyPolicy.ReturnAction.PerformEditorAction ->
@@ -624,6 +684,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun handleArrowKey(direction: EditorKeyPolicy.Direction) {
+        clearedText.edited()
         val keyCode = when (direction) {
             EditorKeyPolicy.Direction.Left -> KeyEvent.KEYCODE_DPAD_LEFT
             EditorKeyPolicy.Direction.Right -> KeyEvent.KEYCODE_DPAD_RIGHT
@@ -755,6 +816,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun sendDownKeyEvent(eventTime: Long, keyEventCode: Int, metaState: Int = 0) {
+        clearedText.edited()
         currentInputConnection?.sendKeyEvent(
             KeyEvent(
                 eventTime,
@@ -786,8 +848,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         )
     }
 
+    /** The backspace swipe's selection deleted: kept to put back, as a Backspace's deletion. */
     fun deleteSelection() {
-        editingSession.deleteSelection()
+        if (selection.latest.isNotEmpty()) keepDeleted(selection = true)
+        fieldEditor.quietly { editingSession.deleteSelection() }
         // the engine reset first: what is left is read, for what of its commits the selection took (U-03)
         tellContext(selected = false)
     }
@@ -813,8 +877,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         if (alt) sendUpKeyEvent(eventTime, KeyEvent.KEYCODE_ALT_LEFT)
     }
 
+    /** The backspace swipe's selection: what it deletes is more of a run of deletions, not a change ending it. */
     fun applySelectionOffset(offsetStart: Int, offsetEnd: Int = 0) =
-        editingSession.applySelectionOffset(offsetStart, offsetEnd)
+        fieldEditor.quietly { editingSession.applySelectionOffset(offsetStart, offsetEnd) }
 
     fun cancelSelection() = editingSession.cancelSelection()
 
@@ -1043,6 +1108,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
     override fun onViewClicked(focusChanged: Boolean) {
         super.onViewClicked(focusChanged)
+        // a tap on the field, the cursor put somewhere: Backspace starts another run. Editors that
+        // do not tell it (a WebView's, Compose's) leave the run as it is (review L5)
+        if (!focusChanged) clearedText.moved()
         inputDeviceMgr.evaluateOnViewClicked(this)
     }
 
