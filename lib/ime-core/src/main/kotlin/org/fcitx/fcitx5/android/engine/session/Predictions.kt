@@ -256,9 +256,12 @@ class Predictions(
     fun press(index: Int, offer: Offer): Boolean {
         val c = offered.getOrNull(index)
         if (c == null || offer !in offers(index)) return false
-        if (offer == Offer.FORGET) {
-            // a phrase by its whole text (U-73)
-            forgotten(phrases[c]?.whole ?: c.text)
+        val phrase = phrases[c]
+        if (phrase != null) {
+            // a whole phrase (U-73): its count alone, not a word of its text, here or in the tables
+            habits.forgetPhrase(phrase.whole)
+        } else if (offer == Offer.FORGET) {
+            forgotten(c.text)
         } else {
             entry(index)?.let { block?.invoke(it) }
         }

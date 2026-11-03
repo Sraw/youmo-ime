@@ -65,6 +65,7 @@ class LearnRecordsTest {
         )),
         Pin(29_874_002, 3, Code("qp", "dz"), "地址", "di zhi", true),
         Forget(29_874_003, 3, "拟"),
+        LearnRecord.PhraseForget(29_874_003, "你好呀亲爱的"),
         NoPredict(29_874_004, "你", "好", false),
         TableOrderReset(29_874_005, "engine-wbx"),
         // blocked under a table's code, and no more

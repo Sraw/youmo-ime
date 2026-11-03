@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.learn
 
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Forget
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PhraseForget
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PhraseRow
 import org.fcitx.fcitx5.android.engine.learn.control.LogRewrites
 import org.fcitx.fcitx5.android.engine.session.PredictionOrder
@@ -78,14 +79,20 @@ class PhrasesTest {
         assertEquals(1, count(first))
     }
 
+    // C52, review MUST 1: a word forgotten, of its text too, leaves the phrase; the phrase deleted leaves the words
     @Test
     fun deletedByItsTextAWordForgottenLeavesIt() {
         whole("你好呀亲爱的")
         whole("你好呀亲爱的")
         log.forget("亲爱的")
-        assertEquals(2, count("你好呀亲爱的"))
         log.forget("你好呀亲爱的")
+        assertEquals(2, count("你好呀亲爱的"))
+        log.absorb(listOf(LearnRecord.MineRow("你好呀亲爱的", Mine("ni hao ya qin ai de", Mine.TAKEN_IN, 1, log.state.nextSeq, 1, 0, 0))))
+        log.forgetPhrase("你好呀亲爱的")
         assertNull(log.state.phrases["你好呀亲爱的"])
+        assertTrue("你好呀亲爱的" in log.state.mine)
+        // nothing to take off the words added by hand (LearningFacade: Changes.forgotten)
+        assertTrue(log.state.takeChanges().forgotten.isEmpty())
     }
 
     // 30 typing days of no use, used neither whole nor picked: forgotten, as a pair is
@@ -115,10 +122,30 @@ class PhrasesTest {
     }
 
     @Test
-    fun aForgetEventRemovesIt() {
+    fun onlyAPhraseForgetRemovesIt() {
         val state = LearnState()
         state.apply(PhraseRow("你好呀亲爱的", 3, 1))
         state.apply(Forget(1, 1, "你好呀亲爱的"))
+        assertEquals(3, state.phrases["你好呀亲爱的"]?.count)
+        state.apply(PhraseForget(1, "你好呀亲爱的"))
         assertTrue(state.phrases.isEmpty())
+    }
+
+    // an older build reads a PhraseForget as a type it does not know: kept as it is, through its fold,
+    // and applied by this one when it reads the log again (after the phrase's row, as written)
+    @Test
+    fun anOlderBuildKeepsAPhraseForget() {
+        val event = LearnRecords.encode(PhraseForget(1, "你好呀亲爱的"))
+        val unknown = LearnRecord.Unknown(LearnRecords.PHRASE_FORGET, event.copyOfRange(5, event.size - 4))
+        val older = LearnState()
+        older.apply(LearnRecord.Unknown(LearnRecords.PHRASE_ROW, LearnRecords.encode(PhraseRow("你好呀亲爱的", 3, 1)).let { it.copyOfRange(5, it.size - 4) }))
+        older.apply(unknown)
+        assertTrue(older.phrases.isEmpty())
+        val rows = older.snapshot(0)
+        assertEquals(listOf(LearnRecords.PHRASE_ROW, LearnRecords.PHRASE_FORGET), rows.filterIsInstance<LearnRecord.Unknown>().map { it.type })
+        val again = LearnState()
+        rows.forEach { again.apply(checkNotNull(LearnRecords.decode(LearnRecords.encode(it)))) }
+        assertTrue(again.phrases.isEmpty())
+        assertTrue(again.kept.isEmpty())
     }
 }

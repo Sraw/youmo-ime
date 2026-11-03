@@ -49,7 +49,7 @@ class RecordTypeIdsTest {
         val ALLOCATED = mapOf(
             "COMMIT" to 1, "UNDO" to 2, "PIN" to 3, "FORGET" to 4, "NO_PREDICT" to 5, "TABLE_ORDER_RESET" to 6,
             "EN_COMMIT" to 7, "EN_FORGET" to 8, "EN_ADD" to 9, "RESTORED" to 10, "IMPORT_BATCH" to 11,
-            "IMPORTED" to 12, "IMPORT_UNDO" to 13, "ABSORBED" to 14, "TABLE_BLOCK" to 15, "EN_CORRECT" to 28,
+            "IMPORTED" to 12, "IMPORT_UNDO" to 13, "ABSORBED" to 14, "TABLE_BLOCK" to 15, "PHRASE_FORGET" to 16, "EN_CORRECT" to 28,
             "HEAD" to 32, "KIND" to 33, "STAT_ROW" to 34, "FIRST_OF" to 35, "PENDING_ROW" to 36, "MINE_ROW" to 37,
             "PAIR_ROW" to 38, "PIN_ROW" to 39, "BAR_ROW" to 40, "EN_WORD_ROW" to 41, "EN_PAIR_ROW" to 42,
             "TABLE_WORD_ROW" to 43, "NO_PREDICT_ROW" to 44, "CUT" to 45, "BATCH_ROW" to 46, "IMPORTED_ROW" to 47,

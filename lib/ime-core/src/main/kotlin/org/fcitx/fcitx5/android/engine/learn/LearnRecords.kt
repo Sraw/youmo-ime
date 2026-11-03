@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord.NoPredict
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.NoPredictRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PairRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PendingRow
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PhraseForget
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PhraseRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Pin
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PinRow
@@ -52,8 +53,11 @@ import java.io.DataOutputStream
  * The format stays version 1 for good: [RecordFormat.hasHeader] wants the exact version, and a
  * build that reads another moves the file aside. A change is a new type, or fields appended to a
  * type's end, read only while some are left ([intOr], [utfOr]): an older reader stops before
- * them, as [RecordFormat.read] does not ask that a record be read to its end. Types are never
- * reused. Allocated: events 1–15 and 28 ([EN_CORRECT]); events 16–27, 29–31 free (31 the
+ * them, as [RecordFormat.read] does not ask that a record be read to its end. A field appended
+ * may be left out where it says nothing only while it is the type's last: [Commit.continued] is
+ * written only where there is one, so the next field appended to a commit needs it written
+ * always first, "" too (an older reader still stops before both). Types are never
+ * reused. Allocated: events 1–16 (16 [PHRASE_FORGET]) and 28 ([EN_CORRECT]); events 17–27, 29–31 free (31 the
  * last event type); rows 32–49 (49 [PHRASE_ROW]), 65 ([TABLE_BLOCK_ROW]) and 80 ([DATE_ROW]); 70–79 the backup
  * file's ([backup.LearnBackup]; 73 [backup.BackupMerge.ORIGIN] the one a log may also hold, 74 its
  * END, 75–79 kept for the file), never a log's. Free rows: 50–64, 66–69, 81 on. Only snapshot
@@ -89,7 +93,10 @@ object LearnRecords {
     const val ABSORBED_ROWS = 200
     const val TABLE_BLOCK: Byte = 15
 
-    // 16–27 free (see the class's allocation)
+    /** A whole phrase's count deleted (U-73, [PhraseForget]). */
+    const val PHRASE_FORGET: Byte = 16
+
+    // 17–27 free (see the class's allocation)
     const val EN_CORRECT: Byte = 28
 
     /** A snapshot's rows are of this type and after: its [HEAD] first, its [CUT] last. */
@@ -129,6 +136,7 @@ object LearnRecords {
         is Undo -> UNDO
         is Pin -> PIN
         is Forget -> FORGET
+        is PhraseForget -> PHRASE_FORGET
         is NoPredict -> NO_PREDICT
         is TableOrderReset -> TABLE_ORDER_RESET
         is TableBlock -> TABLE_BLOCK
@@ -182,7 +190,9 @@ object LearnRecords {
                 r.rows.forEach { row(it) }
                 writeByte(r.takes.size)
                 r.takes.forEach { take(it) }
-                // appended (U-73), only where there is one: an older reader stops before it
+                // appended (U-73), only where there is one: an older reader stops before it. The last
+                // field a commit may leave out: a field appended after it needs it written always
+                // ("" too), or a reader could not tell one from the other (see the class)
                 if (r.continued.isNotEmpty()) writeUTF(r.continued)
             }
             is Undo -> {
@@ -205,6 +215,10 @@ object LearnRecords {
             is Forget -> {
                 writeInt(r.minute)
                 writeInt(r.day)
+                writeUTF(r.text)
+            }
+            is PhraseForget -> {
+                writeInt(r.minute)
                 writeUTF(r.text)
             }
             is NoPredict -> {
@@ -541,6 +555,7 @@ object LearnRecords {
         private fun laterEvent(type: Byte, input: DataInputStream): LearnRecord = with(input) {
             when (type) {
                 TABLE_BLOCK -> TableBlock(readInt(), readUTF(), readUTF(), readUTF(), readBoolean())
+                PHRASE_FORGET -> PhraseForget(readInt(), readUTF())
                 EN_CORRECT -> EnCorrect(readInt(), readUTF())
                 else -> Unknown(type, ByteArray(available()).also { readFully(it) })
             }

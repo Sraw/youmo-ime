@@ -122,8 +122,10 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    wanted. Measured by `predict-learn --continuations on|off` (top1/top5 on held-out sentences after the tune
    half is typed three times): pinyin-chat 12.9/28.5% → 6.1/25.3%, pinyin 20.4/40.9% → 14.0/37.1%; the
    sentences typed, 36.4/62.0% → 55.8/74.8% and 58.9/83.8% → 73.6/90.2%. The user kept it first (D-C3,
-   2026-11-02) at that cost. Turned off everywhere as `NoPredict("", phrase)`, deleted
-   as a `Forget` of the phrase. Where nothing is learned (`Session.learning` false) the habits still rank, after no
+   2026-11-02) at that cost. Turned off everywhere as `NoPredict("", phrase)`; deleted as a
+   `PhraseForget` (event type 16), its count alone: a word of the same text (added by hand, imported, a
+   table's saved, learned) is not touched, nor do the tables forget anything, so the undo chip takes it
+   back (a `Forget` would take the words with it, past an undo). A word's `Forget` leaves the phrases (C52). Where nothing is learned (`Session.learning` false) the habits still rank, after no
    word, and nothing is recorded. A pinned sentence the model has not as one word is put in as
    the fewest of its words. `Session.why` (为什么排在这, U-81) says a candidate's tier and uses
    under the code of the level that ranked it, a prediction's under its `pred:` code; a candidate

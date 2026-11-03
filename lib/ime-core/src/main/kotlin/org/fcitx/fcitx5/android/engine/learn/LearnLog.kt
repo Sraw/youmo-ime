@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord.EnCorrect
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.EnCommit
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.EnForget
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Forget
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PhraseForget
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Head
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.NoPredict
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Pin
@@ -237,6 +238,11 @@ class LearnLog(
     fun forget(text: String) {
         val stamp = LearnClock.stamp(clock, state, commit = false)
         write(Forget(stamp.minute, stamp.day, text))
+    }
+
+    /** Forgets the whole phrase [text]'s count (U-73), nothing else of that text ([PhraseForget]). */
+    fun forgetPhrase(text: String) {
+        write(PhraseForget(LearnClock.stamp(clock, state, commit = false).minute, text))
     }
 
     /**

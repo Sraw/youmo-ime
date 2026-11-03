@@ -349,10 +349,13 @@ internal class SessionFactory(
      */
     private inner class ForgetsInTables(private val pinyin: Session) : Session by pinyin {
         override fun apply(action: Action): Snapshot {
-            val forgotten = if (action is Action.Forget && Offer.FORGET in pinyin.offers(action.index)) pinyin.candidates(action.index, 1).firstOrNull() else null
-            // the rest of a whole phrase forgets the phrase (U-73)
-            val text = forgotten?.let { c -> pinyin.why((action as Action.Forget).index)?.whole?.ifEmpty { null } ?: c.text }
-            return pinyin.apply(action).also { if (text != null) tables.forgetInTables(listOf(text)) }
+            // the rest of a whole phrase (U-73) forgets its count alone: a table's word of its text stays
+            val forgotten = if (action is Action.Forget && Offer.FORGET in pinyin.offers(action.index) && pinyin.why(action.index)?.whole.isNullOrEmpty()) {
+                pinyin.candidates(action.index, 1).firstOrNull()
+            } else {
+                null
+            }
+            return pinyin.apply(action).also { if (forgotten != null) tables.forgetInTables(listOf(forgotten.text)) }
         }
     }
 

@@ -566,8 +566,13 @@ class PinyinSession(
         // as offered: nothing recorded where nothing is to be kept
         val c = candidates.getOrNull(index)
         if (!learning || c == null || !forgettable(c)) return snapshot()
-        // a whole phrase by its text (U-73); it has no words
-        recorder.forget(predictions.phraseOf(c)?.whole ?: c.text)
+        val phrase = predictions.phraseOf(c)
+        if (phrase != null) {
+            // a whole phrase (U-73): its count alone, not a word of its text (added by hand, imported)
+            recorder.forgetPhrase(phrase.whole)
+            return again()
+        }
+        recorder.forget(c.text)
         // or the next pick learns it again, as the word before it
         val words = entries(c)
         if (words != null && before() in words) dropContext()

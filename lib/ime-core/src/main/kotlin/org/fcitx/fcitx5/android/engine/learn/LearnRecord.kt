@@ -220,6 +220,12 @@ sealed class LearnRecord {
 
     data class Pin(override val minute: Int, val day: Int, val code: Code, val text: String, val reading: String, val on: Boolean) : LearnRecord()
     data class Forget(override val minute: Int, val day: Int, val text: String) : LearnRecord()
+
+    /**
+     * A whole phrase (U-73) deleted from its long press: its count alone, no word of the same text
+     * (one added by hand, imported, a table's saved): those are not what was deleted. Type 16.
+     */
+    data class PhraseForget(override val minute: Int, val text: String) : LearnRecord()
     data class NoPredict(override val minute: Int, val prev: String, val text: String, val on: Boolean) : LearnRecord()
     data class TableOrderReset(override val minute: Int, val im: String) : LearnRecord()
 

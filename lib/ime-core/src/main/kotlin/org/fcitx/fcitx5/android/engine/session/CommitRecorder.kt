@@ -125,6 +125,9 @@ internal class CommitRecorder(
     /** [text] forgotten everywhere (U-84). */
     fun forget(text: String) = safely { habits.forget(text) }
 
+    /** The whole phrase [text]'s count forgotten (U-73), no word of that text. */
+    fun forgetPhrase(text: String) = safely { habits.forgetPhrase(text) }
+
     /** [block]'s value, or [otherwise]: a fault of building the rows is learning's, never the commit's (see Habits.failed). */
     inline fun <T> safely(otherwise: T, block: () -> T): T {
         if (!learns) return otherwise

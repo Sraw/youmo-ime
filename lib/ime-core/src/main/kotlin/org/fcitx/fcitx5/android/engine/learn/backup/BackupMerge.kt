@@ -197,7 +197,7 @@ object BackupMerge {
         // the same one on both sides kept once (rows: equal rows), the rest both sides'
         is NoPredictRow, is TableBlockRow, is Unknown, is BatchRow, is ImportedRow, is Head, Cut -> null
         // events: never in a snapshot
-        is LearnRecord.Commit, is LearnRecord.Undo, is LearnRecord.Pin, is LearnRecord.Forget, is LearnRecord.NoPredict,
+        is LearnRecord.Commit, is LearnRecord.Undo, is LearnRecord.Pin, is LearnRecord.Forget, is LearnRecord.PhraseForget, is LearnRecord.NoPredict,
         is LearnRecord.TableOrderReset, is LearnRecord.TableBlock, is LearnRecord.EnCommit, is LearnRecord.EnForget,
         is LearnRecord.EnAdd, is LearnRecord.EnCorrect, is LearnRecord.Restored, is LearnRecord.ImportBatch,
         is LearnRecord.Imported, is LearnRecord.ImportUndo, is LearnRecord.Absorbed,
@@ -261,7 +261,7 @@ object BackupMerge {
         is DateRow -> DateRow(r.day + by, r.localDay)
         // no typing day: a batch's day is a calendar one; a later build's row unread
         is Head, Cut, is PinRow, is NoPredictRow, is TableBlockRow, is BatchRow, is ImportedRow, is Unknown -> r
-        is LearnRecord.Commit, is LearnRecord.Undo, is LearnRecord.Pin, is LearnRecord.Forget, is LearnRecord.NoPredict,
+        is LearnRecord.Commit, is LearnRecord.Undo, is LearnRecord.Pin, is LearnRecord.Forget, is LearnRecord.PhraseForget, is LearnRecord.NoPredict,
         is LearnRecord.TableOrderReset, is LearnRecord.TableBlock, is LearnRecord.EnCommit, is LearnRecord.EnForget,
         is LearnRecord.EnAdd, is LearnRecord.EnCorrect, is LearnRecord.Restored, is LearnRecord.ImportBatch,
         is LearnRecord.Imported, is LearnRecord.ImportUndo, is LearnRecord.Absorbed,

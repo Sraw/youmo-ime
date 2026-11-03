@@ -174,7 +174,7 @@ internal class LearningOps(
         }
         return when (op) {
             is LearningOp.Menu -> menu(im, s, op)
-            is LearningOp.Delete -> if (Offer.FORGET in offers) delete(op) { act(EngineEvent.FORGET, op.index) } else LearningResult.Unavailable
+            is LearningOp.Delete -> if (Offer.FORGET in offers) delete(op, s.why(op.index)?.whole.orEmpty()) { act(EngineEvent.FORGET, op.index) } else LearningResult.Unavailable
             is LearningOp.Block -> if (Offer.BLOCK in offers) block(op) { act(EngineEvent.BLOCK, op.index) } else LearningResult.Unavailable
             is LearningOp.Pin -> event(Offer.PIN, EngineEvent.PIN)
             // a phrase's file holds it, not the learning record: no undo
@@ -193,9 +193,11 @@ internal class LearningOps(
         }
     }
 
-    private fun delete(op: LearningOp.Delete, act: () -> Boolean): LearningResult {
-        // a word added by hand comes off the list with it (Engines.changed): put back if taken back
-        val added = lexicon.addedPlaces(lexicon.addedOf(op.text))
+    // [whole]: the whole phrase (U-73) [op] is the rest of, "" for a word
+    private fun delete(op: LearningOp.Delete, whole: String, act: () -> Boolean): LearningResult {
+        // a word added by hand comes off the list with it (Engines.changed): put back if taken back.
+        // Not for a whole phrase, which takes no word with it, the rest's nor its own (U-73)
+        val added = if (whole.isEmpty()) lexicon.addedPlaces(lexicon.addedOf(op.text)) else emptyList()
         val forgets = tableForgets()
         val token = acted(inverse = { lexicon.reAdd(added) }, act) ?: return LearningResult.Unavailable
         // what the tables' own logs forgot (a phrase they saved, theirs or shared with pinyin) no

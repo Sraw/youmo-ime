@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord.NoPredict
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.NoPredictRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PairRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PendingRow
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PhraseForget
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PhraseRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Pin
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PinRow
@@ -205,6 +206,11 @@ class LearnState {
             is Undo -> undo(record)
             is Pin -> pin(record)
             is Forget -> forget(record.text)
+            is PhraseForget -> {
+                // its count alone (U-73): the words of the same text stay, as they are none of it
+                changes.recount = true
+                phrases.remove(record.text)
+            }
             is NoPredict -> if (record.on) noPredict += record.prev to record.text else noPredict -= record.prev to record.text
             is TableOrderReset -> tableOrderReset(record.im)
             is TableBlock -> tableBlock(TableBlockRow(record.im, record.code, record.text), record.on)
@@ -582,8 +588,7 @@ class LearnState {
         pending.remove(text)
         dropMine(text)
         pairs.keys.removeAll { it.prev == text || it.next == text }
-        // a whole phrase deleted from its long press (U-73): only by its own text, as a word's forget leaves those it is in (C52)
-        phrases.remove(text)
+        // nor a whole phrase of the same text (U-73, C52): deleting one is PhraseForget
         // the tables forget it too (Engines.forgottenEverywhere): their saved words as their logs have them
         if (tableWords.keys.removeAll { it.third == text }) tableWordsVersion++
         // an imported word deleted is gone (U-82 删除)
