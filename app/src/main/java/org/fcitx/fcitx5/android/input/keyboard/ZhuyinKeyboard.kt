@@ -41,13 +41,15 @@ import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
  * three a row, and on the left the tones ˉ ˊ ˇ ˋ a key each (˙ on ˉ's long press), as Taiwan's
  * 元書 has them: each ends the syllable and filters by its tone. The key after the last group is
  * 分词 while typing, punctuation else (pinyin's nine keys' 1). A group's long press each of its symbols. The bottom row is the grouped keyboards'.
+ * A symbol key's swipe reaches its shortcut ([ZhuyinShortcutHook]: 大千's by QWERTY place, the groups' by
+ * their place); the tones (ˉ swipes to ˙) and the slot have none, as the nine keys' 1.
  */
 @SuppressLint("ViewConstructor")
 class ZhuyinKeyboard(
     context: Context,
     theme: Theme,
     private val nine: Boolean,
-) : BaseKeyboard(context, theme, if (nine) nineLayout() else fullLayout()) {
+) : BaseKeyboard(context, theme, if (nine) nineLayout() else fullLayout(), shortcuts = true) {
 
     companion object {
         const val NameNine = "ZhuyinNine"
@@ -76,16 +78,21 @@ class ZhuyinKeyboard(
             }
         }
 
-        private fun key(text: String, size: Float, width: Float, action: KeyAction, popup: Array<KeyDef.Popup>) = KeyDef(
+        private fun key(text: String, size: Float, width: Float, action: KeyAction, popup: Array<KeyDef.Popup>, shortcut: String) = KeyDef(
             KeyDef.Appearance.Text(text, size, percentWidth = width),
             setOf(KeyDef.Behavior.Press(action)),
             popup,
+            shortcut,
         )
 
         internal fun fullLayout(): List<List<KeyDef>> = ROWS.mapIndexed { r, row ->
             val keys = row.map { q ->
                 val c = ZhuyinKeys.DACHEN_QWERTY.getValue(q)
-                key(c.toString(), 20f, if (r == 0) 1f / 11 else if (r == 3) 0.085f else 0.1f, sym(codeOf(c, nine = false)!!), arrayOf(KeyDef.Popup.Preview(c.toString())))
+                // its shortcut by the QWERTY key it sits on, the swipe's preview naming it
+                key(
+                    c.toString(), 20f, if (r == 0) 1f / 11 else if (r == 3) 0.085f else 0.1f, sym(codeOf(c, nine = false)!!),
+                    arrayOf(KeyDef.Popup.AltPreview(c.toString(), c.toString())), ZhuyinShortcutHook.fullKey(q),
+                )
             }
             if (r == 3) keys + BackspaceKey(0.15f) else keys
         } + listOf(GroupedKeyboard.bottomRow())
@@ -120,7 +127,13 @@ class ZhuyinKeyboard(
 
         internal fun nineLayout(): List<List<KeyDef>> {
             val groups = ZhuyinKeys.GROUP_SYMBOLS.mapIndexed { g, symbols ->
-                key(symbols, 18f, GROUP, sym(Keyboard.zhuyinNineKey(g)), arrayOf(KeyDef.Popup.Keyboard.Explicit(symbols.map { it.toString() }.toTypedArray())))
+                // its shortcut by its place in the grid, 1 to 11 (KeyShortcutPages.ZhuyinNine); the swipe's
+                // preview naming it, as the nine keys' digits have
+                key(
+                    symbols, 18f, GROUP, sym(Keyboard.zhuyinNineKey(g)),
+                    arrayOf(KeyDef.Popup.AltPreview(symbols, symbols), KeyDef.Popup.Keyboard.Explicit(symbols.map { it.toString() }.toTypedArray())),
+                    ZhuyinShortcutHook.nineKey("${g + 1}"),
+                )
             }
             val slot = KeyDef(
                 KeyDef.Appearance.Text(PUNCTUATION, 18f, percentWidth = GROUP),

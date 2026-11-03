@@ -32,6 +32,19 @@ class KeyShortcutPagesTest {
     }
 
     @Test
+    fun zhuyinNinesGroupsAreNamedByTheirPlaceThreeARow() {
+        val page = KeyShortcutPages.ZhuyinNine
+        assertEquals(listOf(3, 3, 3, 2), page.rows.map { it.size })
+        assertEquals((1..11).map { "zy9/$it" }, page.names)
+        assertEquals(listOf("ㄅㄉㄚ", "ㄍㄐㄞ", "ㄓㄗㄢㄦ"), page.rows.first().map { it.label })
+        assertEquals("ㄖㄥㄩ", page.rows.last().last().label)
+        // no preset: a group's symbols are no letters
+        assertTrue(page.names.all { KeyShortcutPreset.of(it) == KeyShortcut.None })
+        // its tab before 大千's
+        assertEquals(KeyShortcutPages.all.indexOf(KeyShortcutPages.ZhuyinFull) - 1, KeyShortcutPages.all.indexOf(page))
+    }
+
+    @Test
     fun aFunctionKeyHasItsWayUpThenDown() {
         val space = KeyShortcutPages.Function.rows.first()
         assertEquals(listOf("fn/space.up", "fn/space.down"), space.map { it.name })

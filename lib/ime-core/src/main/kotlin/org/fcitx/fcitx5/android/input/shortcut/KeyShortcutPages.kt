@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.shortcut
 
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 
 /**
  * The 按键字符和快捷键 page's tabs: each keyboard's character keys in its rows, as the keyboard
@@ -44,6 +45,15 @@ object KeyShortcutPages {
 
     val Grouped18 = grouped(KeyShortcutPreset.GROUPED18, NineKeyLetters.G18, intArrayOf(7, 6, 5))
 
+    /**
+     * 注音九键's 11 groups, three a row as the keyboard has them, each named by its place (1 to 11):
+     * a group's symbols are no letters, and its tones' column and the 分词 key take no shortcut.
+     */
+    val ZhuyinNine = Page(
+        KeyShortcutPreset.ZHUYIN_NINE,
+        ZhuyinKeys.GROUP_SYMBOLS.mapIndexed { g, symbols -> Key(symbols, KeyShortcuts.charKey(KeyShortcutPreset.ZHUYIN_NINE, "${g + 1}")) }.chunked(3),
+    )
+
     val ZhuyinFull = Page(
         KeyShortcutPreset.ZHUYIN_FULL,
         ZHUYIN_ROWS.map { (keys, symbols) -> keys.indices.map { Key("${symbols[it]}", KeyShortcuts.charKey(KeyShortcutPreset.ZHUYIN_FULL, "${keys[it]}")) } },
@@ -60,11 +70,8 @@ object KeyShortcutPages {
         FUNCTION_KEYS.map { key -> listOf(true, false).map { Key(key, KeyShortcuts.functionKey(key, it)) } },
     )
 
-    /**
-     * Every tab in order. 注音九键 has none yet: its keys' names come with its keyboard
-     * (ZhuyinShortcutHook in the app), where [KeyShortcutPreset.ZHUYIN_NINE] goes.
-     */
-    val all = listOf(Full, Nine, Grouped14, Grouped18, ZhuyinFull, Number, Function)
+    /** Every tab in order. */
+    val all = listOf(Full, Nine, Grouped14, Grouped18, ZhuyinNine, ZhuyinFull, Number, Function)
 
     private fun grouped(form: String, letters: NineKeyLetters, sizes: IntArray): Page {
         // a key's name as the keyboard's: its letters, the `;` left off (GroupedKeyboard)

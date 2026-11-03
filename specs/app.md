@@ -139,7 +139,7 @@ selection, else all before the cursor, else all after) is kept in memory (`Clear
 clears back last first while the field reads as each left it; what was typed is dropped and typed
 again by `HostCore.clearTyped`/`retype` (the router's log of the keys since nothing was typed). The
 marks on a key are placed by `KeyMarks`. 注音 keyboards name their keys `zyfull/<QWERTY letter>` and
-`zy9/…` (`ZhuyinShortcutHook`, until their keyboards land). A long press's keys (`PopupKeyboardUi`, `PopupMenuUi`) are one small size whatever the
+`zy9/1`…`zy9/11`, the groups by their place (`ZhuyinShortcutHook`; the tones and 注音九键's slot none, as 九键's 1). A long press's keys (`PopupKeyboardUi`, `PopupMenuUi`) are one small size whatever the
 key (`PopupComponent.LONG_PRESS_KEY_*`; as wide as the key pressed, 九键's 7 filled the screen),
 floating above it, the bubble gone; the finger picks by how far it moved since they opened, not
 where it is (`PopupFocus` in ime-core: 0.6 of a key a step, held past a row's ends, an empty slot's

@@ -71,6 +71,19 @@ class ZhuyinKeyboardTest {
         assertTrue(GroupedKeyboard.bottomRow().none { it.behaviors.any { b -> b is KeyDef.Behavior.Press && b.action == press(rows[3][3]) } })
     }
 
+    // their swipes' shortcuts: 大千's by QWERTY place, the groups' by theirs; no tone, no slot
+    @Test
+    fun theSymbolKeysAreNamedForTheirShortcuts() {
+        val full = ZhuyinKeyboard.fullLayout().dropLast(1).map { row -> row.filter { it.appearance is KeyDef.Appearance.Text }.map { it.shortcut } }
+        assertEquals(listOf("zyfull/1", "zyfull/q", "zyfull/a", "zyfull/z"), full.map { it.first() })
+        assertEquals("ㄤ on ;", "zyfull/;", full[2].last())
+        val nine = ZhuyinKeyboard.nineLayout().dropLast(1)
+        assertEquals((1..11).map { "zy9/$it" }, nine.flatMap { row -> row.mapNotNull { it.shortcut?.takeIf { s -> s.startsWith("zy9/") } } })
+        // a row: its tone, three of the grid (the last row's third the slot), the side key
+        assertTrue(nine.all { it.first().shortcut == null })
+        assertEquals(null, nine[3][3].shortcut)
+    }
+
     @Test
     fun theSlotIsTheSeparatorWhileTyping() {
         assertEquals(sym(Keyboard.zhuyinNineTone(0)), ZhuyinKeyboard.slotAction(typing = true))

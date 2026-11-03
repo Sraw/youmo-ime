@@ -491,3 +491,9 @@
 - **操作**：看键盘；点 ㄋ ㄧ ˇ ㄏ ㄠ ˇ，看码行和候选，点「你好」；点 ㄇ ㄚ，按空格，看码行和候选，再按空格；点 ㄉ ㄜ ˙，看候选，按空格；点 ㄅ ˇ，按回车。
 - **预期**：大千排列，第一行是 ㄅ ㄉ ˇ ˋ ㄓ ˊ ˙ ㄚ ㄞ ㄢ ㄦ；码行 `ㄋㄧˇ ㄏㄠˇ`，首选「你好」；ㄇㄚ 后按空格码行是 `ㄇㄚˉ`、首选「妈」，再按空格上屏「妈」；ㄉㄜ˙ 首选「的」；回车上屏 `ㄅˇ`。框里最后是「你好妈的ㄅˇ」。
 - **JVM**：`ZhuyinKeyboardTest.dachenHasEachSymbolAndToneWhereTaiwanPrintsIt`、`PinyinSessionZhuyinTest`（`dachenTypesAWordByItsSymbolsShownInZhuyin`、`dachensSpaceIsTheFirstToneThenThePick`、`enterCommitsTheZhuyinShown`）；设备上照跑。
+
+### PY-107 [P1] 注音全键盘的快捷键：按键位套用全键盘的
+- **前提**：B0-注音全键盘，滑动是默认（上滑快捷键），测试页输入框里有字。
+- **操作**：看键角；ㄇ 上滑；ㄋ 上滑。
+- **预期**：ㄇ（a 的位置）、ㄏ（c）、ㄌ（x）、ㄒ（v）、ㄈ（z）、ㄗ（y）的右上角画着全选、复制、剪切、粘贴、撤销、重做的图标，别的键没有；ㄇ 上滑全选；ㄋ 没有快捷键，上滑打出 ㄋ。**按键 → 按键字符和快捷键** 的「注音全键盘」页能改。
+- **JVM**：`ZhuyinShortcutsUatTest.dachensKeysTakeTheFullKeyboardsShortcutsByPlace`、`ZhuyinKeyboardTest.theSymbolKeysAreNamedForTheirShortcuts`；设备上照跑。
