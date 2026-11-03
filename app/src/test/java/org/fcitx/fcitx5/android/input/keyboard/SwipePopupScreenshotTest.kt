@@ -86,8 +86,10 @@ class SwipePopupScreenshotTest {
 
     private fun shoot(suffix: String) {
         longShortcuts()
-        // the edit menu's test copies "hello": its entry, kept in the app's object, would show in the bar of a later shot
+        // the edit menu's test copies "hello": its entry, kept in the app's object, would show in the bar of a later shot,
+        // and one stored late (the clipboard's own thread, a test run before in the same JVM) would still reach the bar
         org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.lastEntry = null
+        prefs.set(AppPrefs.getInstance().clipboard.clipboardSuggestion, false)
         KeyboardHarness(ThemePreset.PixelLight).use { h ->
             h.start()
             h.symbolHeld("g", "symbol_$suffix")

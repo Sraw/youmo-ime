@@ -111,10 +111,11 @@ android {
             // and of 1 GB once F1 moved the redroid UI cases here (about 1200 tests, four SDK sandboxes),
             // and of 2 GB with 0.5.1's streams merged (about 1500, the screenshots of every keyboard's marks);
             // with the themes' (ThemeMakerLayoutTest's 55 measured views) 4 GB ran out too, ThemeMakerLayoutTest
-            // thrashing 8 minutes first: a new JVM every 80 classes, what is kept dropped with it
+            // thrashing 8 minutes first: a new JVM every 40 classes, what is kept dropped with it (80 ran
+            // out again once feat/051's popups were merged; the test alone takes 8 s and little heap)
             all {
                 it.maxHeapSize = "3g"
-                it.forkEvery = 80
+                it.forkEvery = 40
                 // mockk's agent attached from inside the test JVM: by default ByteBuddy starts a second
                 // process to attach it, which under a full run's load at times fails and takes every
                 // mockk test of that JVM with it (JvmMockKGateway); the attach's own wait, 10 s, ran
