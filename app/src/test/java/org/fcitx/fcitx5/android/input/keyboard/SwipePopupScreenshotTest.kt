@@ -1,0 +1,176 @@
+/*
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+ */
+package org.fcitx.fcitx5.android.input.keyboard
+
+import android.content.ClipboardManager
+import android.view.View
+import android.widget.ImageView
+import android.widget.TextView
+import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.uat.PrefsRule
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+
+/**
+ * What a swipe shows while the finger is still down: a letter's shortcut named in its bubble, at
+ * the size of the keys' words and no wider than [SwipePreviewLabel] lets it be; the edit menu up
+ * where the notices go, clear of the finger. Against the goldens under src/test/screenshots,
+ * recorded again with `-Proborazzi.test.record=true` when the look changes on purpose.
+ */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(application = FcitxApplication::class, qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi")
+class SwipePopupScreenshotTest {
+
+    @get:Rule
+    val prefs = PrefsRule()
+
+    // q a long text, w 快速输入, e 恢复刚清除的: the longest words a bubble shows
+    private fun longShortcuts() = prefs.set(
+        AppPrefs.getInstance().internal.keyShortcuts,
+        KeyShortcuts.Empty
+            .with("full/q", KeyShortcut.Text("我的邮箱是 someone@example.com"))
+            .with("full/w", KeyShortcut.Command(KeyCommand.QuickInput))
+            .with("full/e", KeyShortcut.Command(KeyCommand.Restore))
+            .serialize(),
+    )
+
+    // [label]'s key swiped up past the threshold and held there, the bubble shown
+    private fun KeyboardHarness.held(label: String, name: String) {
+        val key = key(label)
+        val finger = finger(key, at(key))
+        for (i in 1..5) finger.move(at(key, dy = -10f * i, ms = 16))
+        capture("SwipePopupScreenshotTest/$name", inputView)
+        finger.up(at(key))
+    }
+
+    private fun KeyboardHarness.spaceHeld(name: String) {
+        val space = inputView.findViewById<View>(R.id.button_space)
+        val finger = finger(space, at(space))
+        for (i in 1..6) finger.move(at(space, dy = -10f * i, ms = 16))
+        capture("SwipePopupScreenshotTest/$name", inputView)
+        finger.up(at(space))
+    }
+
+    private fun shoot(suffix: String) {
+        longShortcuts()
+        // the edit menu's test copies "hello": its entry, kept in the app's object, would show in the bar of a later shot
+        org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.lastEntry = null
+        KeyboardHarness(ThemePreset.PixelLight).use { h ->
+            h.start()
+            h.held("a", "select_all_$suffix")
+            h.held("q", "text_$suffix")
+            h.held("w", "quick_input_$suffix")
+            h.held("e", "restore_$suffix")
+            h.spaceHeld("edit_menu_$suffix")
+        }
+    }
+
+    @Test
+    fun upright() = shoot("port")
+
+    @Test
+    fun compact() {
+        // 紧凑 is the level nearest both heights, so both are set (20 alone with landscape 49 is not it)
+        prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
+        prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
+        shoot("compact")
+    }
+
+    @Test
+    fun floating() {
+        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        shoot("floating")
+    }
+
+    @Test
+    @Config(qualifiers = "zh-rCN-w851dp-h393dp-land-440dpi")
+    fun turned() = shoot("land")
+
+    // what the bubbles say: the words fitted, a cut text told by its ellipsis
+    @Test
+    @Uat("KB-64")
+    fun theBubbleSaysTheShortcutFitted() {
+        longShortcuts()
+        KeyboardHarness(ThemePreset.PixelLight).use { h ->
+            h.start()
+            fun bubble(label: String): String {
+                val key = h.key(label)
+                val finger = h.finger(key, h.at(key))
+                for (i in 1..5) finger.move(h.at(key, dy = -10f * i, ms = 16))
+                val shown = KeyboardHarness.all(h.inputView).filterIsInstance<TextView>()
+                    .filter { h.shown(it) && generateSequence(it.parent as? View) { p -> p.parent as? View }.none { p -> p is KeyView || p === h.bar } }
+                    .map { it.text.toString() }.filter { it.isNotEmpty() }.toList()
+                finger.up(h.at(key))
+                return shown.last()
+            }
+            assertEquals("快速输入", bubble("w"))
+            assertEquals("恢复刚清除的", bubble("e"))
+            assertEquals("as much as fits at the least, then the ellipsis", "我的邮箱是 s…", bubble("q"))
+        }
+    }
+
+    // KB-62: the edit menu over the app, above the keyboard, not under the finger; the notice there put
+    // away; a cell left and lift copies, as when it was over the key
+    @Test
+    @Uat("KB-62")
+    fun theEditMenuIsAboveTheKeyboardAndPicksAsBefore() {
+        KeyboardHarness(ThemePreset.PixelLight).use { h ->
+            h.start(prefill = { it.setText("hello") })
+            h.service.say(R.string.text_copied)
+            h.after(500)
+            assertNotNull("a notice up first", h.notice())
+            // the icons outside the keys: the bar's, then the menu's cells as well
+            fun icons() = KeyboardHarness.all(h.inputView).filter { v ->
+                v is ImageView && h.shown(v) && generateSequence(v.parent as? View) { it.parent as? View }.none { it is KeyView }
+            }.toSet()
+            val before = icons()
+            val space = h.inputView.findViewById<View>(R.id.button_space)
+            val finger = h.finger(space, h.at(space))
+            for (i in 1..6) finger.move(h.at(space, dy = -10f * i, ms = 16))
+            val cells = icons() - before
+            assertEquals(5, cells.size)
+            val keyboardTop = h.box(h.keyboard).top
+            assertTrue("above the keyboard: ${cells.map(h::box)} over $keyboardTop", cells.all { h.box(it).bottom <= keyboardTop })
+            h.after(500)
+            assertNull("the notice put away", h.notice())
+            finger.move(h.at(space, dx = -35f, dy = -60f, ms = 16))
+            finger.up(h.at(space, dx = -35f, dy = -60f))
+            h.idle()
+            val clip = h.service.getSystemService(ClipboardManager::class.java).primaryClip
+            assertEquals("copied", "hello", clip?.getItemAt(0)?.text?.toString())
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "en-w393dp-h851dp-port-440dpi")
+    fun english() {
+        prefs.set(
+            AppPrefs.getInstance().internal.keyShortcuts,
+            KeyShortcuts.Empty.with("full/w", KeyShortcut.Command(KeyCommand.TradSimp)).serialize(),
+        )
+        KeyboardHarness(ThemePreset.PixelLight).use { h ->
+            h.start()
+            h.held("w", "trad_simp_en")
+        }
+    }
+}

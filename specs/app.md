@@ -133,7 +133,13 @@ past and back, a cancel; both ways off, a slide off the key takes the press back
 (space, backspace …) reach their own up and down shortcuts, a way off leaving them as they were;
 space and backspace lock a touch to one axis (`KeyGestureRecognizer.axisLock`). `KeySwipes` (app)
 wires it on the typing keyboards (`shortcuts = true`), buzzes at the threshold, opens the edit menu
-(`EditMenuLayout`, `PopupMenuUi.Fixed`) there; `KeyShortcutRunner` runs a shortcut after what is
+(`EditMenuLayout`, `PopupMenuUi.Fixed`) there: up where a notice its size goes (`EditMenuLayout.place`
+on `UndoChipPlacement`'s place, which `InputView` hands `PopupComponent.menuRoom`; over the bar where
+that is off the view), 粘贴 across from the key, not under the finger (the user, 0.5.1's test build),
+picked by how far the finger moves (`PopupFocus`), a notice shown put away (`onMenuShown`). A
+shortcut named in the key's bubble (`PopupAction.PreviewUpdateAction.words`) is fitted by
+`PreviewLabel`: a function key's size scaled as the keys' text, a bubble five of them wide, smaller
+to a least, then cut with an ellipsis; `KeyShortcutRunner` runs a shortcut after what is
 typed is in, the field's edits as `EditPlan` steps. 清除 (`EditPlan.clear`: what is typed, else the
 selection, else all before the cursor, else all after) is kept in memory (`ClearedText`, under the EditorInfo input started with, by identity, forgotten as
 input starts in another field or finishes; at most 16), 恢复 putting clears back last first while the

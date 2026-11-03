@@ -42,11 +42,12 @@ class PopupMenuUi(
     /**
      * A row whose cells stay where they are, the one in focus first [start]; [disabled] ones drawn
      * faded, picking nothing. Opened by a swipe up, the finger already above the key: back down onto
-     * the key cancels it.
+     * the key cancels it. [at]: its top-left corner in window pixels ([EditMenuLayout.place]), up
+     * where the notices go; null just over the key.
      */
-    class Fixed(val start: Int, val disabled: Set<Int>)
+    class Fixed(val start: Int, val disabled: Set<Int>, val at: EditMenuLayout.Spot? = null)
 
-    private val keySize = ctx.dp(48)
+    private val keySize = ctx.dp(CELL_DP)
 
     // words, not icons (an item of no icon: the handwriting pad's 注's 关 / 拼音 / 注音符号), in pills wide enough for them
     private val words = items.any { it.icon == 0 }
@@ -66,12 +67,12 @@ class PopupMenuUi(
     private val focusColumn = fixed?.start
         ?: calcInitialFocusedColumn(columnCount, itemWidth, outerBounds, triggerBounds)
 
-    override val offsetX = if (fixed != null) {
-        EditMenuLayout.rowLeft(triggerBounds.centerX(), itemWidth, outerBounds.left, outerBounds.right) - triggerBounds.left
-    } else {
-        ((triggerBounds.width() - itemWidth) / 2) - (itemWidth * focusColumn)
+    override val offsetX = when {
+        fixed?.at != null -> fixed.at.left - triggerBounds.left
+        fixed != null -> EditMenuLayout.rowLeft(triggerBounds.centerX(), itemWidth, outerBounds.left, outerBounds.right) - triggerBounds.left
+        else -> ((triggerBounds.width() - itemWidth) / 2) - (itemWidth * focusColumn)
     }
-    override val offsetY = ctx.dp(-52)
+    override val offsetY = fixed?.at?.let { it.top - triggerBounds.top } ?: ctx.dp(-52)
 
     private val columnOrder = if (fixed != null) IntArray(columnCount) { it } else createColumnOrder(columnCount, focusColumn)
 
@@ -153,11 +154,14 @@ class PopupMenuUi(
 
     override fun onTrigger() = items.getOrNull(focusedIndex)?.takeIf { fixed?.disabled?.contains(focusedIndex) != true }?.action
 
-    private companion object {
-        const val DISABLED_ALPHA = 0.3f
+    companion object {
+        /** A cell's width and height, in dp: a key's. */
+        const val CELL_DP = 48
+
+        private const val DISABLED_ALPHA = 0.3f
 
         // a pill of words, of a key's size; their text
-        const val WORDS_WIDTH = 1.75f
-        const val WORDS_SP = 14f
+        private const val WORDS_WIDTH = 1.75f
+        private const val WORDS_SP = 14f
     }
 }

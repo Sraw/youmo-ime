@@ -194,6 +194,14 @@ abstract class BaseInputView(
 
     private fun Rect.box() = UndoChipPlacement.Box(left, top, right, bottom)
 
+    /** Where a notice [width] × [height] said now goes (above the keyboard, docked): the edit menu goes there too. */
+    protected fun noticePlace(width: Int, height: Int): UndoChipPlacement.Place = undoPlace(width, height, aboveKeys = true)
+
+    /** The notice put away as typing does: the edit menu opened where it shows, its window over the menu. */
+    protected fun noticeTyped() {
+        undoChip?.typed()
+    }
+
     private val learningMenu by lazy { CandidateLearningMenu(themedContext, fcitx, service.lifecycleScope, ::chip) }
 
     private fun notice(message: String, undo: UndoChip.Undo?, aboveKeys: Boolean, steady: Boolean = false): Boolean {

@@ -5,6 +5,8 @@
 package org.fcitx.fcitx5.android.input.popup
 
 import android.graphics.Rect
+import android.text.TextPaint
+import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -15,6 +17,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.UndoChipPlacement
 import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
 import org.fcitx.fcitx5.android.input.dependency.context
 import org.fcitx.fcitx5.android.input.dependency.imeScope
@@ -22,6 +25,7 @@ import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
+import org.fcitx.fcitx5.android.input.keyboard.keyTextScale
 import org.fcitx.fcitx5.android.input.keyboard.longPressOf
 import org.fcitx.fcitx5.android.input.shortcut.EditMenuLayout
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
@@ -84,6 +88,17 @@ class PopupComponent :
     }
     private val hideThreshold = 100L
 
+    /**
+     * Where the edit menu goes, the input view's to say: a notice [width] × [height]'s place now
+     * and the bar's middle, in window pixels ([EditMenuLayout.place]). Null, or none given: over the key.
+     */
+    var menuRoom: ((width: Int, height: Int) -> MenuRoom?)? = null
+
+    /** The edit menu opened: a notice where it goes put away ([menuRoom]), a window over it else. */
+    var onMenuShown: () -> Unit = {}
+
+    class MenuRoom(val notice: UndoChipPlacement.Place, val barMiddle: Int)
+
     private val rootLocation = intArrayOf(0, 0)
     private val rootBounds: Rect = Rect()
 
@@ -131,16 +146,36 @@ class PopupComponent :
         showingEntryUi[viewId] = popup
     }
 
-    private fun updatePopup(viewId: Int, content: String) {
+    private fun updatePopup(viewId: Int, content: String, words: Boolean) {
         // a long press's keys shown, showKeyboard dismissed the bubble: a letter's preview, wrapped by
         // its long press, still sends this on every move, not to show it again over them
         if (viewId in showingContainerUi) return
         showingEntryUi[viewId]?.apply {
-            if (textView.text.contentEquals(content)) return
-            setText(content)
+            val fit = if (words && PreviewLabel.isWords(content)) wordsFit(content, this) else null
+            val text = fit?.text ?: content
+            val px = fit?.size ?: sp(PopupEntryUi.TEXT_SP)
+            if (textView.text.contentEquals(text) && textView.textSize == px) return
+            setText(text, fit?.size)
             place(this, trigger)
         }
     }
+
+    /**
+     * A swipe's shortcut named in [popup] ([PreviewLabel]): words at a function key's size, as the
+     * keys' text is scaled (紧凑, floating), in a bubble no wider than five of them or the key.
+     */
+    private fun wordsFit(label: String, popup: PopupEntryUi): PreviewLabel.Fit {
+        val scale = keyTextScale(context)
+        val size = sp(PreviewLabel.WORDS_SP * scale)
+        val room = PreviewLabel.room(popup.trigger.width().toFloat(), size, popupPadding.toFloat())
+        val paint = TextPaint(popup.textView.paint)
+        return PreviewLabel.fit(label, size, sp(PreviewLabel.MIN_SP * scale), room) { s, px ->
+            paint.textSize = px
+            paint.measureText(s)
+        }
+    }
+
+    private fun sp(value: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, value, context.resources.displayMetrics)
 
     /**
      * Over the key [bounds], [width] wide, by default as wide as the key's face (the bounds across)
@@ -244,6 +279,12 @@ class PopupComponent :
             dismissPopupEntry(viewId, it)
         }
         val cells = EditMenuLayout.CELLS
+        val cell = context.dp(PopupMenuUi.CELL_DP)
+        // up where the notices go, out from under the finger; a notice there put away, its window over the row
+        val at = menuRoom?.invoke(cell * cells.size, cell)?.let { room ->
+            EditMenuLayout.place(room.notice, bounds.centerX(), cell, rootBounds.left, rootBounds.right, rootBounds.top, room.barMiddle)
+        }
+        if (at != null) onMenuShown()
         val menuUi = PopupMenuUi(
             context,
             theme,
@@ -257,6 +298,7 @@ class PopupComponent :
             fixed = PopupMenuUi.Fixed(
                 start = EditMenuLayout.START,
                 disabled = cells.indices.filter { EditMenuLayout.disabled(cells[it], password) }.toSet(),
+                at = at,
             ),
         )
         showPopupContainer(viewId, menuUi)
@@ -340,7 +382,7 @@ class PopupComponent :
                 is PopupAction.ChangeFocusAction -> outResult = changeFocus(viewId, x, y)
                 is PopupAction.DismissAction -> dismissPopup(viewId)
                 is PopupAction.PreviewAction -> showPopup(viewId, content, bounds)
-                is PopupAction.PreviewUpdateAction -> updatePopup(viewId, content)
+                is PopupAction.PreviewUpdateAction -> updatePopup(viewId, content, words)
                 is PopupAction.ShowKeyboardAction -> showKeyboard(viewId, keyboard, bounds)
                 is PopupAction.ShowMenuAction -> showMenu(viewId, menu, bounds)
                 is PopupAction.ShowEditMenuAction -> showEditMenu(viewId, bounds, password)
