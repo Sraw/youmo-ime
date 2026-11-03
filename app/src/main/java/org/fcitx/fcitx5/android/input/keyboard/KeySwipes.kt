@@ -77,17 +77,17 @@ internal class KeySwipes(
     }
 
     /** What the preview of [view] of [def] shows, swiped [totalY]: its [popup]'s own content, or what the swipe reaches. */
-    fun preview(view: KeyView, def: KeyDef, totalY: Int, popup: KeyDef.Popup.AltPreview): String =
+    fun preview(view: KeyView, def: KeyDef, totalY: Int, popup: KeyDef.Popup.AltPreview): PopupAction.PreviewUpdateAction =
         when (val preview = KeySwipe.preview(swipeKey(view, def), swipeLayers, totalY, keyboard.inPasswordField)) {
-            KeySwipe.Preview.Symbol -> keyboard.swipeText(view).preview(popup.alternative)
-            is KeySwipe.Preview.Shortcut -> shortcutLabel(preview.shortcut)
-            KeySwipe.Preview.Own -> popup.content
+            KeySwipe.Preview.Symbol -> PopupAction.PreviewUpdateAction(view.id, keyboard.swipeText(view).preview(popup.alternative))
+            is KeySwipe.Preview.Shortcut -> PopupAction.PreviewUpdateAction(view.id, shortcutLabel(preview.shortcut), words = true)
+            KeySwipe.Preview.Own -> PopupAction.PreviewUpdateAction(view.id, popup.content)
         }
 
-    /** What the preview shows of [shortcut]: a command's name, a text as it is. */
+    /** What the preview shows of [shortcut]: a command's name, a text as it is (fitted to the bubble by [org.fcitx.fcitx5.android.input.popup.PopupComponent]). */
     private fun shortcutLabel(shortcut: KeyShortcut): String = when (shortcut) {
         is KeyShortcut.Command -> board.context.getString(KeyShortcutLooks.of(shortcut.command).label)
-        is KeyShortcut.Text -> KeyShortcut.clip(shortcut.text, PREVIEW_TEXT)
+        is KeyShortcut.Text -> shortcut.text
         KeyShortcut.None -> ""
     }
 
@@ -196,9 +196,6 @@ internal class KeySwipes(
             KeySwipe.Outcome.None -> false
         }
 }
-
-// a text shortcut's first characters in the preview, the rest of it too long to read there
-private const val PREVIEW_TEXT = 12
 
 /** Where the keys' marks go ([KeyMarks]) as 标点位置 says: the keyboard's, and the settings page's drawn like it. */
 internal fun markPosition(): KeyMarks.Position = when (ThemeManager.prefs.punctuationPosition.getValue()) {

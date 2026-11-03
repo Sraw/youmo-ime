@@ -213,3 +213,6 @@ case("KB-63", needs="jvm:BaseKeyboardTest.aKeysOwnTextShortcutIsWhatItsSwipeRuns
 
 
 case("KB-64", needs="jvm:DeletionRunTest")(lambda d: None)
+
+
+case("KB-65", needs="jvm:SwipePopupScreenshotTest.theBubbleSaysTheShortcutFitted、PreviewLabelTest")(lambda d: None)
