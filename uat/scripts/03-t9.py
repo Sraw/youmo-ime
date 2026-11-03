@@ -188,4 +188,15 @@ def t960(d):
     d.bksp(2)
     tone = zhuyin_hold(d, k["ˉ"])
     check("˙" in tone, f"长按 ˉ：{tone}")
-    return f"码行 {code}，音节条 {strip[:4]}，点 ㄇㄧ 后 {taken}；不打声调 {code2}，框里「{got}」"
+    # ㄓ is zhi and zh's initial alike: once on the bar, taken as the initial a final goes on from
+    d.tap(k["ㄓㄗㄢㄦ"], after=0.6)
+    s = d.screen()
+    zh = d.syllables(s)
+    check(zh.count("ㄓ") == 1, f"音节条 {zh}")
+    d.syllable_tap("ㄓ", s)
+    d.taps([k["ㄕㄙㄤㄨ"], k["ㄖㄥㄩ"]], gap=0.35, after=0.6)
+    c3 = d.cands()
+    code3 = d.preedit()
+    check(code3 == "ㄓㄨㄥ" and first(c3) == "中", f"点 ㄓ 再打 ㄨㄥ：码行「{code3}」，候选 {c3[:4]}")
+    d.bksp(4)
+    return f"码行 {code}，音节条 {strip[:4]}，点 ㄇㄧ 后 {taken}；不打声调 {code2}，框里「{got}」；ㄓ 条 {zh[:6]}，{code3}"

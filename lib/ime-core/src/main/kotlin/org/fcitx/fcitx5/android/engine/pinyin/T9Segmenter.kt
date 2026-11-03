@@ -331,6 +331,9 @@ class T9Segmenter(
         (if (spelling == KeySpelling.Bopomofo) spelling.initial(offered) else null)
             ?: Syllables.id(offered).takeIf { it >= 0 }?.let(spelling::of) ?: offered
 
+    override fun keyOf(offered: String): Char? =
+        if (spelling == KeySpelling.Bopomofo) spelling.initial(offered)?.singleOrNull()?.let(ZhuyinKeys::symbolCode) else null
+
     override fun separates(c: Char): Boolean = spelling.separates(c)
 
     override fun phraseWays(c: Char): List<String>? = when {

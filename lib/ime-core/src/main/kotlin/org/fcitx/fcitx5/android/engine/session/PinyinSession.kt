@@ -210,7 +210,7 @@ class PinyinSession(
         split = { textWords.boundaries(it) }, isAdded = { habitOrder.isAdded(it) },
     )
     private val nineKeys = keyed?.let { k ->
-        NineKeys(data, k.letters, recorder.pressed, k::isKey, k::initialsOf) { digits -> if (learning && recorder.learns) recorder.habits.bar(recorder.takeLayout, digits) else emptyMap() }
+        NineKeys(data, k.letters, recorder.pressed, k::isKey, k::initialsOf, k::keyOf, k::shownOffered) { digits -> if (learning && recorder.learns) recorder.habits.bar(recorder.takeLayout, digits) else emptyMap() }
     }
     private val habitOrder: HabitOrder = HabitOrder(data, user, recorder, decoder, addedWords)
     // 联想: what may follow the words committed here ([predict]); its forgetting and blocking are this session's
