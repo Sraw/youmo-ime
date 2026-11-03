@@ -93,7 +93,12 @@ toward the screen's middle (`floating`, fed the keyboard's rect and the room by
 5. **One at a time**: a new notice takes the shown one's place in the same box (words crossfaded,
    size eased); the one replaced lapses, its act standing. With 撤销 it stays 6 s, a line said 2 s
    (longer as accessibility asks); a tap puts it away, typing too, except a failure `EngineNotices.failed` says
-   (`steady`): the key it failed on reaches the keyboard after it; said once, it stays 6 s too. A
+   (`steady`): the key it failed on reaches the keyboard after it; said once, it stays 6 s too.
+   The edit menu opened over the notice's window (`UndoChip.covered` with the menu's box,
+   `NoticeState.cover`) puts away what typing would; a steady one is hidden, its time stopped, and
+   back for its 6 s as the menu goes (`uncover`). One said while the menu is up where it meets it is
+   hidden from the start (`show(hidden)`), shown and timed as the menu goes; one elsewhere (over
+   the bar) is left alone. A
    replaced row's 撤销 takes nothing back, and the fading row swallows taps (none reaches the box).
 6. **In the keyboard only this notice**: no `Toast` (Android 13 drops an input method's, see
    [pitfalls](pitfalls.md)), no `Snackbar`. A toast only when no keyboard is shown to say it on.
@@ -133,12 +138,37 @@ past and back, a cancel; both ways off, a slide off the key takes the press back
 (space, backspace …) reach their own up and down shortcuts, a way off leaving them as they were;
 space and backspace lock a touch to one axis (`KeyGestureRecognizer.axisLock`). `KeySwipes` (app)
 wires it on the typing keyboards (`shortcuts = true`), buzzes at the threshold, opens the edit menu
-(`EditMenuLayout`, `PopupMenuUi.Fixed`) there; `KeyShortcutRunner` runs a shortcut after what is
+(`EditMenuLayout`, `PopupMenuUi.Fixed`) there: up where a notice its size goes (`EditMenuLayout.place`
+on `UndoChipPlacement`'s place, which `InputView` hands `PopupComponent.menuRoom`; over the bar where
+that is off the view), 粘贴 across from the key, not under the finger (the user, 0.5.1's test build),
+picked by how far the finger moves (`PopupFocus`), a notice shown put away or, a failure, hidden till the menu goes (`onMenuShown`, `onMenuGone`,
+`UndoChip.covered`/`uncovered`). A
+shortcut named in the key's bubble (`PopupAction.PreviewUpdateAction.words`) is fitted by
+`PreviewLabel`: a function key's size scaled as the keys' text (a letter's too, `symbolSize`),
+characters counted and cut as seen (`BreakIterator` graphemes: a flag, a family, an accent are one), a bubble five of them wide, smaller
+to a least, then cut with an ellipsis; `KeyShortcutRunner` runs a shortcut after what is
 typed is in, the field's edits as `EditPlan` steps. 清除 (`EditPlan.clear`: what is typed, else the
 selection, else all before the cursor, else all after) is kept in memory (`ClearedText`, under the EditorInfo input started with, by identity, forgotten as
-input starts in another field or finishes; at most 16), 恢复 putting clears back last first while the
-field reads as each left it and nothing is typed (pinyin never reaching the field, a clear of what is
-typed drops those before it); what was typed is dropped and typed
+input starts in another field or finishes; at most 16) with the runs of deletions (`ClearedText.deleting`:
+Backspace pressed, held, the panel's, or the backspace swipe's selection deleted, one after another,
+from `handleBackspaceKey`, `sendBackspaceKey`, `deleteSelection`; not in a sensitive field nor a
+`TYPE_NULL` one). A run's first deletion reads the field (1000 before, 64 after; one round trip,
+`getSurroundingText`, from API 31, its offset telling whether the text before is all there is, else
+each side and the cursor tracked: `ClearedText.Read.whole`), the rest only counted: a key event takes what the editor calls a character, so what a run took is told when it is
+put back, from what is left (`ClearedText.settled`: all of it read, by its length; cut short, the one
+place its end meets, each press a code point at least and a character, `BreakIterator`'s, at most;
+what follows the cursor unchanged); a selection's deletion in a run reads again and settles it so
+far. Whatever else changes the field ends a run and drops the last run and all kept before it, a
+clear since kept (`edited`): the service's editor is a `WatchedEditor` (commits, compositions,
+selections, deletions, but a Backspace's or the swipe's own and the 复制 shortcut's, made `quietly`),
+and Enter, the arrows, key events sent, the context menu (`changing`), a hardware key, another input
+method (not the same one focused again as the screen turns), a preedit shown on the bar tell it too.
+A tap on the field the editor tells (`onViewClicked`, not a WebView's or Compose's) closes the run
+(`moved`): the next deletion starts another, the last still put back where the field reads as it
+left it. An empty pair Backspace takes whole changes what follows the cursor: that run is never put back. 恢复 putting the last clear or run
+back first while the field reads as each left it and nothing is typed (a run's text before the
+cursor, where it was; pinyin never reaching the field, a clear of what is typed drops those before it;
+a Backspace after one put back starts a run of its own); what was typed is dropped and typed
 again by `HostCore.clearTyped`/`retype` (the router's log of the keys since nothing was typed: plain
 keys alone, a pick, a key's pick (a digit, space: `Snapshot.picked`) or a candidate's action ending it,
 as sent again by its index it could land on another word), on the keyboard it was typed with alone

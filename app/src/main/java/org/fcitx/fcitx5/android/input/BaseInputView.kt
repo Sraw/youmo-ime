@@ -194,6 +194,19 @@ abstract class BaseInputView(
 
     private fun Rect.box() = UndoChipPlacement.Box(left, top, right, bottom)
 
+    /** Where a notice [width] × [height] said now goes (above the keyboard, docked): the edit menu goes there too. */
+    protected fun noticePlace(width: Int, height: Int): UndoChipPlacement.Place = undoPlace(width, height, aboveKeys = true)
+
+    /** The edit menu opened at [menu] (window pixels): a notice its window meets put away, or a failure hidden ([UndoChip.covered]). */
+    protected fun noticeCovered(menu: Rect) {
+        undoChip?.covered(menu)
+    }
+
+    /** The edit menu gone: a failure it hid back ([UndoChip.uncovered]). */
+    protected fun noticeUncovered() {
+        undoChip?.uncovered()
+    }
+
     private val learningMenu by lazy { CandidateLearningMenu(themedContext, fcitx, service.lifecycleScope, ::chip) }
 
     private fun notice(message: String, undo: UndoChip.Undo?, aboveKeys: Boolean, steady: Boolean = false): Boolean {

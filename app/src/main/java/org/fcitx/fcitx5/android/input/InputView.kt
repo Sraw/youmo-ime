@@ -495,6 +495,14 @@ class InputView(
             centerHorizontally()
         })
         floatingController.keepAbove(popup.root)
+        // the edit menu up where the notices go, out from under the finger; over the bar where that is off the view
+        popup.menuRoom = { width, height ->
+            val bar = kawaiiBar.view
+            val at = IntArray(2).also { bar.getLocationInWindow(it) }
+            PopupComponent.MenuRoom(noticePlace(width, height), at[1] + bar.height / 2)
+        }
+        popup.onMenuShown = ::noticeCovered
+        popup.onMenuGone = ::noticeUncovered
 
         keyboardPrefs.registerOnChangeListener(onKeyboardSizeChangeListener)
         advancedPrefs.registerOnChangeListener(onKeyboardSizeChangeListener)
