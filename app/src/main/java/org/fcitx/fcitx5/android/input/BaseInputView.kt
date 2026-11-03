@@ -252,33 +252,36 @@ abstract class BaseInputView(
         service.lifecycleScope.launch { learningMenu.forget(idx, text, pagedCandidates) }
     }
 
+    /**
+     * The long press's lines for the candidate [text] at [idx], and its character card: quick input's
+     * own lines for one of its entries (numbered over the whole list, not a page's); else the engine's
+     * menu, worded by the app (U-82), with a handwritten character's card, or one looked up's (the
+     * engine's alone), in the same trip; else, for an input method not the engine's, what the addon
+     * offers, as it words it: not the addon's words where the engine's list changed under the press
+     * (review-E-ui N8).
+     */
+    private suspend fun candidateMenu(idx: Int, text: String): Pair<List<CandidateLearningMenu.Line>, CharCard?> {
+        val im = fcitx.runImmediately { inputMethodEntryCached }.uniqueName
+        val engines = EngineBridge.isEngines(im)
+        val phrase = if (pagedCandidates) null else fcitx.runOnReady { quickPhraseAt(idx) }
+        if (phrase != null) return quickPhraseLines(idx, text, phrase) to null
+        val op = learningMenu.menuOf(idx, text, pagedCandidates)
+        val (learned, card) = fcitx.runOnReady { learning(op) to if (engines) charCard(idx, text, pagedCandidates) else null }
+        val lines = learningMenu.linesOf(learned, idx, text, pagedCandidates) ?: if (engines) emptyList() else {
+            fcitx.runOnReady { getCandidateActions(idx) }.map { action ->
+                CandidateLearningMenu.Line(action.text) {
+                    triggerCandidateAction(idx, action.id, text)
+                    null
+                }
+            }
+        }
+        return lines to card
+    }
+
     fun showCandidateActionMenu(idx: Int, text: String, view: View) {
         candidateActionMenu?.dismiss()
         service.lifecycleScope.launch {
-            // the engine's menu, worded by the app (U-82); else, for an input method not the engine's,
-            // what the addon offers, as it words it: not the addon's words where the engine's list
-            // changed under the press (review-E-ui N8)
-            val im = fcitx.runImmediately { inputMethodEntryCached }.uniqueName
-            val engines = EngineBridge.isEngines(im)
-            // quick input's, not the engine's: its entries numbered over the whole list, not a page's
-            val phrase = if (pagedCandidates) null else fcitx.runOnReady { quickPhraseAt(idx) }
-            // else the engine's, and a handwritten character's card, or one looked up's (the engine's alone), in the same trip
-            val (learned, card) = if (phrase != null) {
-                null to null
-            } else {
-                val op = learningMenu.menuOf(idx, text, pagedCandidates)
-                fcitx.runOnReady { learning(op) to if (engines) charCard(idx, text, pagedCandidates) else null }
-            }
-            val lines = phrase?.let { quickPhraseLines(idx, text, it) }
-                ?: learned?.let { learningMenu.linesOf(it, idx, text, pagedCandidates) }
-                ?: if (engines) emptyList() else {
-                fcitx.runOnReady { getCandidateActions(idx) }.map { action ->
-                    CandidateLearningMenu.Line(action.text) {
-                        triggerCandidateAction(idx, action.id, text)
-                        null
-                    }
-                }
-            }
+            val (lines, card) = candidateMenu(idx, text)
             // another long press may have shown its menu meanwhile
             candidateActionMenu?.dismiss()
             // nor on a candidate view recycled meanwhile: no window to show it in
