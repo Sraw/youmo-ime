@@ -41,7 +41,10 @@ class CharReadings internal constructor(
         start.checkRuns("character readings", 0, syllables.size)
         ensureFormat(tones.capacity() == syllables.size) { "reading tones disagree with their syllables" }
         syllables.checkBelow("reading syllables", Syllables.count)
-        for (i in 0 until tones.capacity()) ensureFormat(tones.get(i) in 1..ToneMark.NEUTRAL) { "reading tone at $i" }
+        for (i in 0 until tones.capacity()) {
+            val t = tones.get(i).toInt()
+            ensureFormat(t and CARD_ONLY.inv() in 1..ToneMark.NEUTRAL) { "reading tone at $i" }
+        }
         ensureFormat(exampleStart.size == syllables.size + 1) { "reading examples disagree with the readings" }
         exampleStart.checkRuns("reading examples", 0, examples.size)
         examples.checkBelow("reading examples", vocabulary.size)
@@ -52,14 +55,20 @@ class CharReadings internal constructor(
         return if (i < chars.size && chars[i] == codePoint) i else -1
     }
 
-    /** [codePoint]'s readings, the first the commonest; none for a code point with none (no Han character, or one no source reads). */
-    fun of(codePoint: Int): List<Reading> {
+    /**
+     * [codePoint]'s readings, the first the commonest; [card], the card's, the dictionaries' neutral tones
+     * the candidates leave out (子 zi) after them; none for a code point with none (no Han character, or one no source reads).
+     */
+    fun of(codePoint: Int, card: Boolean = false): List<Reading> {
         val i = at(codePoint)
         if (i < 0) return emptyList()
-        return (start[i] until start[i + 1]).map { Reading(syllables[it], tones.get(it).toInt()) }
+        return (start[i] until start[i + 1]).mapNotNull { r ->
+            val t = tones.get(r).toInt()
+            if (!card && t and CARD_ONLY != 0) null else Reading(syllables[r], t and CARD_ONLY.inv())
+        }
     }
 
-    /** The commonest words reading [codePoint] as its [reading]th reading, at most two; none for a character of one reading. */
+    /** The commonest words reading [codePoint] as its [reading]th reading of the card's ([of]), at most two; none for a character of one reading. */
     fun examples(codePoint: Int, reading: Int): List<String> {
         val i = at(codePoint)
         if (i < 0 || reading !in 0 until start[i + 1] - start[i]) return emptyList()
@@ -69,4 +78,9 @@ class CharReadings internal constructor(
 
     /** How many characters it has readings for: what the compile reports. */
     val characters: Int get() = chars.size
+
+    companion object {
+        /** Set in a reading's tone byte: one only the card lists. */
+        const val CARD_ONLY = 0x10
+    }
 }

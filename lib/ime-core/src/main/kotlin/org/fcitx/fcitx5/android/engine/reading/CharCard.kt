@@ -57,11 +57,13 @@ data class CharCard(
             if (text.isEmpty() || text.codePointCount(0, text.length) != 1) return null
             val cp = text.codePointAt(0)
             if (!Character.isIdeographic(cp)) return null
-            val ordered = readings.ordered(cp, before)
-            val own = charReadings.of(cp)
+            val ordered = readings.ordered(cp, before, card = true)
+            // a traditional character's words: its simplified one's, which it is read as
+            val from = readings.readFrom(cp)
+            val own = charReadings.of(from, card = true)
             val rows = ordered.map { r ->
                 val i = own.indexOf(r)
-                Row(r.pinyin, r.zhuyin, if (i < 0) emptyList() else charReadings.examples(cp, i))
+                Row(r.pinyin, r.zhuyin, if (i < 0) emptyList() else charReadings.examples(from, i))
             }
             val entry = info.of(cp)
             val parts = entry?.parts?.map { p -> Part(p, readings.ordered(p.codePointAt(0)).firstOrNull()?.pinyin) }

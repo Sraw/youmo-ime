@@ -42,6 +42,18 @@ class CharReadingsTest {
     }
 
     @Test
+    fun theCardListsTheDictionariesNeutralTonesTooAfterTheRest() {
+        assertEquals(listOf("tóu", "tou"), readings.of('头'.code, card = true).map { it.pinyin })
+        assertEquals(listOf("hé", "hè", "hú", "huó", "huò", "huo"), readings.of('和'.code, card = true).map { it.pinyin })
+        // 子's zi is 频率词典's alone, no dictionary's: not even the card's
+        assertEquals(listOf("zǐ"), readings.of('子'.code, card = true).map { it.pinyin })
+        assertEquals(of('的'), readings.of('的'.code, card = true).map { it.pinyin })
+        // its words by the card's place
+        assertEquals(emptyList<String>(), readings.examples('和'.code, 5))
+        assertEquals(listOf("和平"), readings.examples('和'.code, 0))
+    }
+
+    @Test
     fun yiInItsOwnToneAlone() {
         assertEquals(listOf("yī"), of('一'))
     }

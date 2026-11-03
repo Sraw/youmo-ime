@@ -77,6 +77,15 @@ class CharCardTest {
     }
 
     @Test
+    fun theDictionariesNeutralToneLastAndATraditionalCharactersWordsItsSimplifiedOnes() {
+        assertEquals(listOf("tóu", "tou"), card("头")!!.readings.map { it.pinyin })
+        val traditional = CandidateReadings(data, data.tones, { it.replace('還', '还') }) { Predictor.charReadingsOf(data.dictionary, data.vocabulary) }
+        val huan = CharCard.of("還", "", traditional, data.charReadings, CharInfoTest.info, strokes)!!
+        assertEquals(listOf("hái", "huán"), huan.readings.map { it.pinyin })
+        assertEquals(listOf("还是"), huan.readings.first().examples)
+    }
+
+    @Test
     fun thePartsWithTheirReadings() {
         assertEquals("彳 亍（chì chù）", card("行")!!.partsShown())
         assertNull(card("乾")!!.partsShown())

@@ -21,6 +21,7 @@ object ReadingData {
         ReadingSource.MANDARIN to """
             U+884C: xíng  # 行
             U+597D: hǎo  # 好
+            U+662F: shì  # 是
             U+5B50: zǐ  # 子
             U+7684: de  # 的
             U+4E00: yī  # 一
@@ -96,7 +97,7 @@ object ReadingData {
             Triple("进行", "jin xing", -2.5f), Triple("银行", "yin hang", -2.8f), Triple("行走", "xing zou", -3f),
             Triple("道行", "dao heng", -4f), Triple("树行子", "shu hang zi", -5f), Triple("爱好", "ai hao", -3f),
             Triple("好人", "hao ren", -3.5f), Triple("和平", "he ping", -3f), Triple("行", "xing", -2f), Triple("和", "he", -2f),
-            Triple("银", "yin", -3f), Triple("江", "jiang", -3f),
+            Triple("银", "yin", -3f), Triple("江", "jiang", -3f), Triple("还是", "hai shi", -3f),
         ).forEach { (w, r, p) -> b.unigram(w, p, 0f).entry(w, syl(*r.split(' ').toTypedArray())) }
         // a rarer reading of the word, by the dictionary's weight: no example of it
         b.entry("行", syl("hang"), -1f).entry("行", syl("heng"), -3f).entry("银行", syl("yin", "xing"), -2f)

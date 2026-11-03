@@ -64,16 +64,21 @@ class CandidateReadings(
         return if (out.all { it.isEmpty() }) emptyList() else out
     }
 
+    /** The code point [codePoint]'s readings are [CharReadings]' of: its own, else its simplified one's where it has none (還 还). */
+    fun readFrom(codePoint: Int): Int {
+        if (data.charReadings.of(codePoint, card = true).isNotEmpty()) return codePoint
+        val s = simplify(String(Character.toChars(codePoint)))
+        return if (s.codePointCount(0, s.length) == 1) s.codePointAt(0) else codePoint
+    }
+
     /**
-     * [codePoint]'s readings ([CharReadings], a traditional character's by its simplified one where it
-     * has none of its own), the one it has in a word [before] ends in first (银 then 行: háng): the
-     * longest such word of the dictionary, read as the model reads it likeliest.
+     * [codePoint]'s readings ([CharReadings] of [readFrom]; [card], the card's), the one it has in a word
+     * [before] ends in first (银 then 行: háng): the longest such word of the dictionary, read as the
+     * model reads it likeliest.
      */
-    fun ordered(codePoint: Int, before: String = ""): List<Reading> {
+    fun ordered(codePoint: Int, before: String = "", card: Boolean = false): List<Reading> {
         val c = String(Character.toChars(codePoint))
-        val all = data.charReadings.of(codePoint).ifEmpty {
-            simplify(c).takeIf { it.codePointCount(0, it.length) == 1 }?.let { data.charReadings.of(it.codePointAt(0)) }.orEmpty()
-        }
+        val all = data.charReadings.of(readFrom(codePoint), card)
         if (all.size < 2 || before.isEmpty()) return all
         val text = simplify(before + c).takeIf { it.length == before.length + c.length } ?: (before + c)
         val index = data.wordIndex
