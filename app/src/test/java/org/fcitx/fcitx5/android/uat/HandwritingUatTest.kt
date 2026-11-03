@@ -5,8 +5,11 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.content.ClipboardManager
+import android.graphics.Rect
 import android.os.Looper
+import android.os.SystemClock
 import android.text.InputType
+import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.BaseInputConnection
 import android.widget.LinearLayout
@@ -315,12 +318,11 @@ class HandwritingUatTest {
             "行，${s.getString(R.string.char_card_readings)} háng、xíng、héng、hàng，$radical 行，${s.getString(R.string.char_card_strokes, 6)}，$parts 彳 亍",
             card.contentDescription,
         )
-        val buttons = KeyboardHarness.all(menu.row(1)).filterIsInstance<TextView>().map { it.text.toString() }.toList()
-        assertEquals(listOf(s.getString(R.string.clipboard_split_commit), s.getString(R.string.a11y_copy)), buttons)
-        // the learning menu's lines after them, the card and buttons no lines to pick
-        val menuLines = (2 until menu.listView!!.adapter.count).map { menu.listView!!.adapter.getItem(it).toString() }
+        // 上屏 and 复制 last in it, then the learning menu's lines; the card no line to pick
+        assertEquals(listOf(s.getString(R.string.clipboard_split_commit), s.getString(R.string.a11y_copy)), texts.takeLast(2))
+        val menuLines = (1 until menu.listView!!.adapter.count).map { menu.listView!!.adapter.getItem(it).toString() }
         assertTrue(menuLines.toString(), h.service.getString(R.string.learning_block) in menuLines)
-        assertFalse(menu.listView!!.adapter.isEnabled(0) || menu.listView!!.adapter.isEnabled(1))
+        assertFalse(menu.listView!!.adapter.isEnabled(0))
         h.relayout()
         h.capture("HandwritingUatTest/char_card_port", menu.listView!!.rootView)
         // a candidate with no card: the title as before
@@ -339,7 +341,7 @@ class HandwritingUatTest {
         written("银行")
         var menu = held("行")
         h.api.calls.clear()
-        val copy = KeyboardHarness.all(menu.row(1)).filterIsInstance<TextView>().single { it.text == h.service.getString(R.string.a11y_copy) }
+        val copy = KeyboardHarness.all(menu.row(0)).filterIsInstance<TextView>().single { it.text == h.service.getString(R.string.a11y_copy) }
         assertTrue(copy.performClick())
         h.idle()
         val clip = h.service.getSystemService(ClipboardManager::class.java).primaryClip!!
@@ -349,7 +351,7 @@ class HandwritingUatTest {
         assertEquals(null, h.inputView.candidateActionMenu)
         // 上屏: as the candidate tapped
         menu = held("行")
-        KeyboardHarness.all(menu.row(1)).filterIsInstance<TextView>().single { it.text == h.service.getString(R.string.clipboard_split_commit) }.performClick()
+        KeyboardHarness.all(menu.row(0)).filterIsInstance<TextView>().single { it.text == h.service.getString(R.string.clipboard_split_commit) }.performClick()
         h.idle()
         assertTrue(h.api.calls.toString(), "select(0, 行)" in h.api.calls)
         assertEquals(null, h.inputView.candidateActionMenu)
@@ -367,6 +369,11 @@ class HandwritingUatTest {
         // three readings, then scrolled
         assertTrue("${card.readingsScroll.measuredHeight}", card.readingsScroll.measuredHeight < card.readingsScroll.getChildAt(0).measuredHeight)
         h.relayout()
+        // 上屏 and 复制 in the right column, under the radical and the rest
+        val copy = KeyboardHarness.all(card).filterIsInstance<TextView>().single { it.text == h.service.getString(R.string.a11y_copy) }
+        val at = Rect().also(copy::getDrawingRect).also { card.offsetDescendantRectToMyCoords(copy, it) }
+        val readings = Rect().also(card.readingsScroll::getDrawingRect).also { card.offsetDescendantRectToMyCoords(card.readingsScroll, it) }
+        assertTrue("$at right of $readings", at.left >= readings.right)
         h.capture("HandwritingUatTest/char_card_land", h.inputView.candidateActionMenu!!.listView!!.rootView)
     }
 
@@ -386,5 +393,51 @@ class HandwritingUatTest {
         } finally {
             ThemeManager.prefs.floatingKeyboard.setValue(false)
         }
+    }
+
+    // 乾 not taken apart and no stroke order: those lines left out; 和's six readings scrolled past four
+    @Test
+    @Config(qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi")
+    fun aCardLeavesOutWhatIsNotKnownAndScrollsItsReadings() {
+        h.api.charCards["乾"] = CharCard("乾", listOf(CharCard.Row("gān", "ㄍㄢ", listOf("乾坤")), CharCard.Row("qián", "ㄑㄧㄢˊ", listOf("乾隆"))), "乙", 11, null, null)
+        h.api.charCards["和"] = CharCard(
+            "和",
+            listOf(
+                CharCard.Row("hé", "ㄏㄜˊ", listOf("和平", "和谐")), CharCard.Row("hè", "ㄏㄜˋ", listOf("附和")),
+                CharCard.Row("huó", "ㄏㄨㄛˊ", listOf("和面")), CharCard.Row("huò", "ㄏㄨㄛˋ", listOf("和稀泥")), CharCard.Row("hú", "ㄏㄨˊ", emptyList()),
+                // the dictionaries' neutral tone, the card's alone (暖和)
+                CharCard.Row("huo", "˙ㄏㄨㄛ", emptyList()),
+            ),
+            "口", 8, listOf(CharCard.Part("禾", "hé"), CharCard.Part("口", "kǒu")), "丿一丨丿丶丨乛一",
+        )
+        h.start()
+        h.emit(HostEvent.ClientPreedit(FormattedText(arrayOf("乾"), intArrayOf(0), 1)))
+        h.api.candidates = arrayOf(CandidateWord("", "乾", ""), CandidateWord("", "和", ""))
+        h.emit(HostEvent.Candidates(2, h.api.candidates.toList()))
+        var menu = held("乾")
+        val qian = menu.row(0) as CharCardView
+        val texts = KeyboardHarness.all(qian).filterIsInstance<TextView>().map { it.text.toString() }.toList()
+        assertFalse(texts.toString(), texts.any { it.startsWith(h.service.getString(R.string.char_card_parts)) || it.startsWith(h.service.getString(R.string.char_card_order)) })
+        h.relayout()
+        h.capture("HandwritingUatTest/char_card_qian", menu.listView!!.rootView)
+        menu.dismiss()
+        menu = held("和")
+        val he = menu.row(0) as CharCardView
+        he.measure(View.MeasureSpec.makeMeasureSpec(h.service.dp(393), View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+        assertTrue("${he.readingsScroll.measuredHeight}", he.readingsScroll.measuredHeight < he.readingsScroll.getChildAt(0).measuredHeight)
+        h.relayout()
+        h.capture("HandwritingUatTest/char_card_he", menu.listView!!.rootView)
+        // dragged up in the menu's list: the readings scroll, not the list (review 051-hw-reading M1)
+        val list = menu.listView!!
+        val box = Rect().also(he.readingsScroll::getDrawingRect).also { list.offsetDescendantRectToMyCoords(he.readingsScroll, it) }
+        val x = box.exactCenterX()
+        val y = box.exactCenterY()
+        val t = SystemClock.uptimeMillis()
+        fun at(action: Int, dy: Float, ms: Long) = MotionEvent.obtain(t, t + ms, action, x, y + dy, 0).also { list.dispatchTouchEvent(it); it.recycle() }
+        at(MotionEvent.ACTION_DOWN, 0f, 0)
+        for (i in 1..10) at(MotionEvent.ACTION_MOVE, -i * box.height() / 10f, i * 16L)
+        at(MotionEvent.ACTION_UP, -box.height().toFloat(), 200)
+        h.idle()
+        assertTrue("scrolled ${he.readingsScroll.scrollY}", he.readingsScroll.scrollY > 0)
     }
 }

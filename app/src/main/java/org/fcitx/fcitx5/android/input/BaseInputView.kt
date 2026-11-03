@@ -240,7 +240,11 @@ abstract class BaseInputView(
             // what the addon offers, as it words it: not the addon's words where the engine's list
             // changed under the press (review-E-ui N8)
             val im = fcitx.runImmediately { inputMethodEntryCached }.uniqueName
-            val lines = learningMenu.lines(idx, text, pagedCandidates) ?: if (EngineBridge.isEngines(im)) emptyList() else {
+            val engines = EngineBridge.isEngines(im)
+            // and a handwritten character's card, or one looked up's (the engine's alone), in the same trip
+            val op = learningMenu.menuOf(idx, text, pagedCandidates)
+            val (learned, card) = fcitx.runOnReady { learning(op) to if (engines) charCard(idx, text, pagedCandidates) else null }
+            val lines = learningMenu.linesOf(learned, idx, text, pagedCandidates) ?: if (engines) emptyList() else {
                 fcitx.runOnReady { getCandidateActions(idx) }.map { action ->
                     CandidateLearningMenu.Line(action.text) {
                         triggerCandidateAction(idx, action.id, text)
@@ -248,8 +252,6 @@ abstract class BaseInputView(
                     }
                 }
             }
-            // a handwritten character's card, or one looked up's (the engine's alone): in place of the title
-            val card = if (EngineBridge.isEngines(im)) fcitx.runOnReady { charCard(idx, text) } else null
             // another long press may have shown its menu meanwhile
             candidateActionMenu?.dismiss()
             // nor on a candidate view recycled meanwhile: no window to show it in
@@ -265,8 +267,8 @@ abstract class BaseInputView(
             }
             // as wide as PopupMenu lets its menus grow
             val widest = CharCardLayout.width(resources.displayMetrics.widthPixels, dp(320), twoColumns())
-            // the card, then 上屏 and 复制, then the lines; else the title, then the lines
-            val head = cardRows(card, accent, { candidateActionMenu?.dismiss() }) { fcitx.launchOnReady { it.select(idx, text) } }
+            // the card (上屏 and 复制 in it), then the lines; else the title, then the lines
+            val head = listOfNotNull(cardRow(card, accent, { candidateActionMenu?.dismiss() }) { fcitx.launchOnReady { it.select(idx, text) } })
             // a line picked may show others in its place (a block's confirmation, the reason): the same popup
             var shown = lines
             val adapter = object : ArrayAdapter<CharSequence>(themedContext, android.R.layout.simple_list_item_1, ArrayList()) {
@@ -372,13 +374,12 @@ abstract class BaseInputView(
         CharCardLayout.twoColumns(resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE, floatingKeyboard)
 
     /**
-     * The menu's first rows for [card]: the card, then 上屏 ([commit], as the candidate tapped) and 复制 (the
-     * character alone to the clipboard, nothing typed changed), each closing the menu ([close]); none for no card.
+     * The menu's first row for [card]: the card, with 上屏 ([commit], as the candidate tapped) and 复制 (the
+     * character alone to the clipboard, nothing typed changed) in it, each closing the menu ([close]); none for no card.
      */
-    private fun cardRows(card: CharCard?, accent: Int, close: () -> Unit, commit: () -> Unit): List<View> {
-        card ?: return emptyList()
+    private fun cardRow(card: CharCard?, accent: Int, close: () -> Unit, commit: () -> Unit): View? {
+        card ?: return null
         val textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, ThemeManager.prefs.candidateTextSize.getValue().toFloat(), resources.displayMetrics)
-        val view = CharCardView(themedContext, card, textSize, twoColumns(), accent)
         val buttons = LinearLayout(themedContext).apply {
             fun button(label: Int, act: () -> Unit) = TextView(themedContext).apply {
                 text = context.getString(label)
@@ -394,7 +395,7 @@ abstract class BaseInputView(
             addView(button(R.string.clipboard_split_commit, commit), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             addView(button(R.string.a11y_copy) { copy(card.text) }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         }
-        return listOf(view, buttons)
+        return CharCardView(themedContext, card, textSize, twoColumns(), accent, buttons)
     }
 
     // the character alone to the clipboard: nothing committed, what is typed stays

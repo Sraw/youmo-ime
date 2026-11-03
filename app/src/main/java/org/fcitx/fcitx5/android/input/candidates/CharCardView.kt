@@ -9,6 +9,7 @@ import android.content.Context
 import android.graphics.Color
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -27,8 +28,9 @@ import kotlin.math.min
  * A character's card, the first row of its held candidate's menu (BaseInputView.showCandidateActionMenu):
  * the character large on the left, each reading on its right (pinyin, zhuyin, up to two words), the
  * readings scrolled past [CharCardLayout.readingRows]; then the radical, strokes, parts and stroke order,
- * under them or, [twoColumns], beside them. What the card does not know it leaves out. TalkBack reads it
- * as one sentence ([CharCard.spoken]).
+ * under them or, [twoColumns], beside them; [buttons] (上屏, 复制) last, under them all or, [twoColumns],
+ * in the right column. What the card does not know it leaves out. TalkBack reads it as one sentence
+ * ([CharCard.spoken]), the buttons each on its own.
  */
 @SuppressLint("ViewConstructor")
 class CharCardView(
@@ -38,6 +40,7 @@ class CharCardView(
     textSize: Float,
     twoColumns: Boolean,
     accent: Int,
+    buttons: View? = null,
 ) : LinearLayout(context) {
 
     private val secondary = context.styledColorOrDefault(android.R.attr.textColorSecondary, Color.GRAY)
@@ -94,15 +97,21 @@ class CharCardView(
             }, LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { marginEnd = dp(CELL_GAP * 2) })
             addView(readingsScroll, LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { gravity = Gravity.CENTER_VERTICAL })
         }
+        if (info.childCount == 0) info.visibility = GONE
         if (twoColumns) {
-            // the readings as wide as they are, the rest what is left
+            // the readings as wide as they are, the rest what is left: the radical and the rest, the buttons under them
             addView(top, LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-            addView(info, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(CELL_GAP * 2) })
+            val side = LinearLayout(context).apply {
+                orientation = VERTICAL
+                addView(info, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+                buttons?.let { addView(it, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(ROW_GAP * 2) }) }
+            }
+            addView(side, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(CELL_GAP * 2) })
         } else {
             addView(top, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
             addView(info, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(ROW_GAP * 2) })
+            buttons?.let { addView(it, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(ROW_GAP * 2) }) }
         }
-        if (info.childCount == 0) info.visibility = GONE
         // one sentence for TalkBack, not a stop at each line
         contentDescription = card.spoken(
             CharCard.Words(
@@ -114,8 +123,17 @@ class CharCardView(
         info.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
     }
 
-    // a scroller no higher than its first [rows] rows (and half the next, to show there are more)
+    // a scroller no higher than its first [rows] rows (and half the next, to show there are more); in the
+    // menu's ListView, which would take a vertical drag past the touch slop though it cannot scroll, the
+    // drag kept here while there is more to scroll to (review 051-hw-reading M1)
     private class Capped(context: Context, private val rows: Int) : ScrollView(context) {
+        override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+            if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
+                parent?.requestDisallowInterceptTouchEvent(canScrollVertically(1) || canScrollVertically(-1))
+            }
+            return super.dispatchTouchEvent(ev)
+        }
+
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
             super.onMeasure(widthMeasureSpec, heightMeasureSpec)
             val table = getChildAt(0) as? ViewGroup ?: return

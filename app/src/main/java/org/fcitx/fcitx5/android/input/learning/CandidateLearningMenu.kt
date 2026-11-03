@@ -40,8 +40,14 @@ class CandidateLearningMenu(
      * null where the engine has no menu for it: not one of its input methods, or nothing to do
      * with it (a field that learns nothing).
      */
-    suspend fun lines(index: Int, text: String, paged: Boolean): List<Line>? {
-        val menu = fcitx.runOnReady { learning(LearningMenu.onCandidate(LearningOp.Menu(index, text), paged)) }
+    suspend fun lines(index: Int, text: String, paged: Boolean): List<Line>? =
+        linesOf(fcitx.runOnReady { learning(menuOf(index, text, paged)) }, index, text, paged)
+
+    /** The op asking the engine for the menu [lines] shows: for a caller asking it with more in one round trip. */
+    fun menuOf(index: Int, text: String, paged: Boolean): LearningOp = LearningMenu.onCandidate(LearningOp.Menu(index, text), paged)
+
+    /** [lines] of the engine's answer to [menuOf]. */
+    fun linesOf(menu: LearningResult, index: Int, text: String, paged: Boolean): List<Line>? {
         if (menu !is LearningResult.Menu || menu.items.isEmpty()) return null
         return LearningMenu.rows(menu).map { row ->
             val op = LearningMenu.op(row, index, text, paged)

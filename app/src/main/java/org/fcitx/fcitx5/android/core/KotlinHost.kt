@@ -217,7 +217,7 @@ class KotlinHost(
     override suspend fun userWordCounts() = withContext(dispatcher) { bridge.engines.userWordCounts() }
     override suspend fun sameCodes(texts: List<String>, ims: List<String>) = withContext(dispatcher) { bridge.engines.sameCodes(texts, ims) }
     override suspend fun pinyinOf(text: String) = withContext(dispatcher) { bridge.engines.pinyinOf(text) }
-    override suspend fun charCard(index: Int, text: String) = onHost { inputMethodEntryCached.uniqueName.takeIf(EngineBridge::isEngines)?.let { bridge.engines.charCard(it, index, text) } }
+    override suspend fun charCard(index: Int, text: String, paged: Boolean) = onHost { inputMethodEntryCached.uniqueName.takeIf(EngineBridge::isEngines)?.let { bridge.engines.charCard(it, index, text, paged) } }
     override suspend fun wordBoundaries(texts: List<String>) = withContext(dispatcher) {
         aTextAtATime(texts) { bridge.engines.wordBoundaries(it) }
     }

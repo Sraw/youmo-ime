@@ -210,10 +210,10 @@ interface LexiconApi {
     suspend fun pinyinOf(text: String): String?
 
     /**
-     * The card of candidate [index] of the input method shown, if it still shows [text]: a handwritten
+     * The card of candidate [index] (of the page shown if [paged]) of the input method shown, if it still shows [text]: a handwritten
      * character's or one looked up (see [Engines.charCard]); null for any other.
      */
-    suspend fun charCard(index: Int, text: String): CharCard?
+    suspend fun charCard(index: Int, text: String, paged: Boolean): CharCard?
 
     /** Adds [text] read as [pinyin]; false if it does not read so. */
     suspend fun addUserWord(text: String, pinyin: String): Boolean

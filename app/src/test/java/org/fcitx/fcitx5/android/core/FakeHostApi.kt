@@ -91,7 +91,7 @@ class FakeHostApi : HostApi {
     /** What [charCard] answers, by the candidate's text: no data to make one of, so none unless set here. */
     val charCards = mutableMapOf<String, CharCard>()
 
-    override suspend fun charCard(index: Int, text: String): CharCard? = charCards[text]
+    override suspend fun charCard(index: Int, text: String, paged: Boolean): CharCard? = charCards[text]
 
     // no model: each char a word of its own
     override suspend fun wordBoundaries(texts: List<String>) = texts.associateWith { IntArray(it.length + 1) { i -> i } }
