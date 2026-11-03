@@ -140,6 +140,7 @@ class CandidateLearningMenu(
         Reason.IMPORTED -> context.getString(R.string.learning_why_imported)
         Reason.DICTIONARY -> context.getString(R.string.learning_why_dictionary)
         Reason.PREDICTION -> context.getString(R.string.learning_why_prediction)
+        Reason.PHRASE -> (why?.uses ?: 0).let { context.resources.getQuantityString(R.plurals.learning_why_phrase, it, it) }
         Reason.UNKNOWN -> context.getString(R.string.learning_why_unknown)
     }
 }

@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.Row
 import org.fcitx.fcitx5.android.engine.learn.Words
 import org.fcitx.fcitx5.android.engine.learn.rankView
+import org.fcitx.fcitx5.android.engine.user.Continuations
 
 /**
  * 联想 in the user's order (U-70, PLAN §2.7), for every input method that offers it: the
@@ -32,32 +33,71 @@ class PredictionOrder(
     /** The id of a text, the model's word of it else the user's: a word picked here is filed by its text alone. */
     private val idOf: (String) -> Int,
 ) {
-    /** What is offered [after] a word: [candidates] in order, each with its tier ([ranks]). */
-    class Offer(val after: String, val candidates: List<Candidate>, val ranks: Map<Candidate, HabitRanker.Ranked<Candidate>>) {
+    /**
+     * What is offered [after] a word: [candidates] in order, each with its tier ([ranks]); those
+     * that are the rest of a whole phrase ([phrases], U-73) with it.
+     */
+    class Offer(
+        val after: String,
+        val candidates: List<Candidate>,
+        val ranks: Map<Candidate, HabitRanker.Ranked<Candidate>>,
+        val phrases: Map<Candidate, Continuations.Found> = emptyMap(),
+    ) {
         companion object {
             val NONE = Offer("", emptyList(), emptyMap())
         }
     }
 
-    /** What may follow [prev] (after [prev2]; see [Predictor.predict] for [tail] and [learnedAfter]), as [habits] rank it. */
-    fun offer(habits: Habits, prev2: Int, prev: Int, learnedAfter: Int = prev, tail: () -> Int = { NO_WORD }): Offer {
-        if (prev == NO_WORD) return Offer.NONE
-        val offered = predictor.predict(prev2, prev, RANKED, learnedAfter, tail)
+    /**
+     * What may follow [prev] (after [prev2]; see [Predictor.predict] for [tail] and [learnedAfter]), as [habits] rank it:
+     * the rest of the whole phrases [continued] first (D-C3), most used first, then the words as U-70 ranks them, but
+     * for one it put first (picked twice running there) which stays in front. After no word of the model's
+     * ([prev] [NO_WORD]: the user's new word, a rare one) the phrases alone, after [last], the word put in last.
+     */
+    fun offer(
+        habits: Habits,
+        prev2: Int,
+        prev: Int,
+        learnedAfter: Int = prev,
+        tail: () -> Int = { NO_WORD },
+        continued: List<Continuations.Found> = emptyList(),
+        last: String = "",
+    ): Offer {
+        val phrases = continued.associateBy { Candidate(it.rest, 0, 0f, IntArray(0), IntArray(0)) }
+        if (prev == NO_WORD) return if (phrases.isEmpty() || last.isEmpty()) Offer.NONE else phrasesAlone(habits, last, phrases)
+        val rests = continued.mapTo(HashSet()) { it.rest }
+        // a word of the same text as a phrase's rest: once, as the phrase
+        val offered = predictor.predict(prev2, prev, RANKED, learnedAfter, tail).filter { it.text !in rests }
         // the word as put in (你好, not its 好): the habits, 不再联想 and 为什么 filed under it (review-uat-fixes S11)
         val after = predictor.after
         val code = code(after)
-        val present = offered.mapTo(HashSet()) { it.text }
+        val present = offered.mapTo(HashSet()) { it.text }.apply { addAll(rests) }
         // picked here once and gone from the best since (they moved on): back among them
         // after the word as put in too: candidate() files its 不再联想 check under the word it is given (F2651)
         val learned = if (learnedAfter == NO_WORD) prev else learnedAfter
         val back = habits.used(code).mapNotNull { w ->
             if (!present.add(w.text)) null else idOf(w.text).takeIf { it != NO_WORD }?.let { predictor.candidate(learned, it) }
         }
-        if (offered.isEmpty() && back.isEmpty()) return Offer(after, emptyList(), emptyMap())
+        if (offered.isEmpty() && back.isEmpty() && phrases.isEmpty()) return Offer(after, emptyList(), emptyMap())
         val items = offered.map { item(it, injected = false) } + back.map { item(it, injected = true) }
-        val ranked = HabitRanker.rank(items, code, after, view(habits))
-        return Offer(after, ranked.map { it.value }, ranked.associateBy { it.value })
+        val view = view(habits)
+        val byHabit = HabitRanker.rank(items, code, after, view)
+        val whole = ranked(phrases.keys, code, view)
+        // the phrases in front of the words (D-C3), but for a word the user put first here (U-70: picked twice running) or pinned
+        val ahead = byHabit.firstOrNull()?.takeIf { it.tier == HabitRanker.Tier.PINNED || it.tier == HabitRanker.Tier.FIRST_HERE }
+        val ranked = listOfNotNull(ahead) + whole + byHabit.drop(if (ahead == null) 0 else 1)
+        return Offer(after, ranked.map { it.value }, ranked.associateBy { it.value }, phrases)
     }
+
+    // the phrases (U-73) after a word the model has not, filed after it as put in: a pick of one is learned there
+    private fun phrasesAlone(habits: Habits, after: String, phrases: Map<Candidate, Continuations.Found>): Offer {
+        val ranked = ranked(phrases.keys, code(after), view(habits))
+        return Offer(after, ranked.map { it.value }, ranked.associateBy { it.value }, phrases)
+    }
+
+    // the phrases' rests in the order found (most used first), each with its uses here
+    private fun ranked(rests: Collection<Candidate>, code: Code, view: HabitRanker.View) =
+        rests.map { c -> HabitRanker.Ranked(item(c, injected = false), HabitRanker.Tier.DICTIONARY, view.uses(code, words(c.text))) }
 
     private fun item(c: Candidate, injected: Boolean) =
         HabitRanker.Item(c, words(c.text), single = c.text.codePointCount(0, c.text.length) == 1 && Han.all(c.text), injected = injected)

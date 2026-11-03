@@ -161,10 +161,12 @@ internal val COMMANDS = listOf(
         o["misses"]?.let { path -> File(path).printWriter().use { w -> r.misses.forEach(w::println) } }
         0
     },
-    Command("predict-learn", "<pinyin.data> <set.tsv> [--user-weight <w>]", 2..2, "user-weight") { args, out, _ ->
+    Command("predict-learn", "<pinyin.data> <set.tsv> [--user-weight <w>] [--continuations on|off]", 2..2, "user-weight", "continuations") { args, out, _ ->
         val (dataPath, setPath) = args.operands
         val userWeight = args.options["user-weight"]?.toFloat() ?: Predictor.USER_WEIGHT
-        val rows = PredictLearning(loadData(dataPath), userWeight).measure(readSet(setPath))
+        val continuations = args.options["continuations"] ?: "on"
+        require(continuations in ON_OFF) { "--continuations: on or off" }
+        val rows = PredictLearning(loadData(dataPath), userWeight, continuations == "on").measure(readSet(setPath))
         rows.forEach { (label, score) -> out.appendLine("%-28s %s".format(label, score)) }
         0
     },

@@ -292,6 +292,21 @@ class BackupMergeTest {
         assertEquals("[37:1]", merged.wordUses.getValue("拟好").getValue("ni hao").toString())
     }
 
+    // U-73: a whole phrase's count and last day, each the larger; another install's day moved
+    @Test
+    fun aPhraseMergesByItsTextAndMoves() {
+        val phone = state(10, LearnRecord.PhraseRow("你好呀亲爱的", 2, 9), LearnRecord.PhraseRow("我到楼下了", 4, 8))
+        val backup = state(10, LearnRecord.PhraseRow("你好呀亲爱的", 5, 7), LearnRecord.PhraseRow("我到楼下了", 1, 10))
+        val merged = BackupMerge.merge(phone, backup, from = 1L, sameInstall = true, minute = 2000)
+        assertEquals(5 to 9, merged.phrases.getValue("你好呀亲爱的").let { it.count to it.lastDay })
+        assertEquals(4 to 10, merged.phrases.getValue("我到楼下了").let { it.count to it.lastDay })
+        val moved = BackupMerge.merge(state(40), state(100, LearnRecord.PhraseRow("好的谢谢老板", 3, 99)), from = 2L, sameInstall = false, minute = 2000)
+        assertEquals(39, moved.phrases.getValue("好的谢谢老板").lastDay)
+        // the phone's used once, which no backup has (LearnBackup.backedUp), stays as it was
+        val once = BackupMerge.merge(state(10, LearnRecord.PhraseRow("我到家了呀", 1, 9)), state(10), from = 1L, sameInstall = true, minute = 2000)
+        assertEquals(1 to 9, once.phrases.getValue("我到家了呀").let { it.count to it.lastDay })
+    }
+
     // U-86 keeps a table's 调频 counts a restore brought, so it keeps the offset they were moved by:
     // the same backup restored again after it lands on the same days (D-M1)
     @Test

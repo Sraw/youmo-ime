@@ -172,6 +172,22 @@ class BackupControlTest {
         assertEquals(stored, BackupMerge.origins(LearnLog.replay(root.file(LearnLog.FILE).read())))
     }
 
+    // review of 051-predict (2): 退回恢复前's copy is the phone's own file, never handed around: a whole
+    // phrase used once (C54 keeps it out of a backup) comes back with the revert, as it was
+    @Test
+    fun aRevertKeepsAPhraseUsedOnce() {
+        val control = control()
+        learn("你好呀亲爱的")
+        assertEquals(1, log.state.phrases.getValue("你好呀亲爱的").count)
+        assertTrue(control.run(BackupOp.Restore(backupOf(2L, "拟"))).ok)
+        assertTrue(control.run(BackupOp.Revert).ok)
+        assertEquals(1, log.state.phrases["你好呀亲爱的"]?.count)
+        assertEquals(1, LearnLog.replay(root.file(LearnLog.FILE).read()).phrases["你好呀亲爱的"]?.count)
+        // a copy the user saves leaves it out still
+        val saved = LearnBackup.read(control.run(BackupOp.Copy).bytes!!)
+        assertNull(saved.state.phrases["你好呀亲爱的"])
+    }
+
     // review-int-records S3: a backup's batch is numbered past one the phone undid (F2811: whose 撤销 the restore ends)
     @Test
     fun aBackupsBatchTakesNotTheIdOfOneUndone() {

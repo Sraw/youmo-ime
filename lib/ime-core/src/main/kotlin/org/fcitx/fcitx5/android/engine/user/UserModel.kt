@@ -771,6 +771,16 @@ class UserModel(
 
     override fun notPredicted(prev: String, next: String) = predictionsOff(prev, next)
 
+    /** The whole phrases the user committed often enough (U-73), as [HabitCounts] keeps them. */
+    val continuations = Continuations()
+
+    /**
+     * What is left of the whole phrases [before] ends a start of (see [Continuations.find]): none
+     * turned off (NoPredict after "", U-73), none a blocked word is in, blocking being everywhere.
+     */
+    fun continuationsAfter(before: String, starts: IntArray, last: String, limit: Int = Continuations.LIMIT): List<Continuations.Found> =
+        continuations.find(before, starts, last, limit) { whole -> !predictionsOff("", whole) && blockedEntries.none { it.text in whole } }
+
     /** The words the user owns ([own]), not blocked, with how often each was typed lately. */
     fun ownWords(): List<Pair<Entry, Float>> = owned.mapNotNull { id -> entries[id]?.takeIf { it !in blockedEntries }?.let { it to counts[key(NO_WORD, id)] } }
 

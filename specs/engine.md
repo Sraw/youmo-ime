@@ -112,7 +112,34 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    by their text alone, so they move neither pinyin's order nor the decoder's counts; a word put in
    right after another 3 times (`Predictor.PAIRS`), any way, is offered after it (`UserModel.forEachPredicted`,
    counted apart from the decoder's pairs, which leave out words of no reading), one turned off
-   there (不再联想) never. Where nothing is learned (`Session.learning` false) the habits still rank, after no
+   there (不再联想) never. A whole commit of 3 to 12 letters (`learn/Phrases`) is counted as a phrase
+   (`LearnState.phrases`, snapshot row `PhraseRow`, type 49; a 联想 that went on with one counts it through
+   `Commit.continued`, appended); not one of Chinese numerals alone (`Phrases.NUMERALS`: 一二三, 幺三八,
+   贰仟伍佰; a number put in as words, user 2026-11-02), one with other words in it is (三个人). Used whole 3
+   times, the rest of it (2 characters or more) is offered first
+   after the text before ends its start from a word's start, covering the last word put in
+   (`user/Continuations`, kept in `UserModel.continuations` by `HabitCounts`; U-73): at most 2, in front of
+   the words but a word the user put first there; two phrases of the same rest, once (the one used most).
+   After a word the model has not (the user's new word, a rare one: `prev` `NO_WORD`), the phrases alone,
+   filed after the text put in last (`Predictions` keeps it while the text before ends with it; pinyin its
+   own word), so a pick of one is learned. A backup (`LearnBackup.backedUp`) leaves out a phrase used once
+   (user 2026-11-02, C54): most whole commits are never put in again, and the tables and handwriting kept no
+   sentence before (S8), so a file the user hands around holds only those used again; the phone's snapshot
+   keeps them, as the count must reach 3 across days and a fold keeps only the snapshot (the tail is the
+   last hour's commits), and a merge leaves the phone's own as they were. 退回恢复前's copy
+   (`BackupHead.BEFORE_RESTORE`) keeps them: the phone's own file, never listed nor in the settings'
+   zip (`Backups.DIR` is left out), laid over the learning whole by a revert. The settings' zip where
+   the engine gave no backup (`UserDataManager.export` with no `learning`: the record unreadable, say)
+   carries `learn.log` itself, all of it: kept so as not to lose the learning, as a parse of the file
+   would fail as the engine's did. Only the start is looked at, not what is before it (C51):
+   a sentence never typed that starts with the same word gets the phrase first, in place of the word it
+   wanted. Measured by `predict-learn --continuations on|off` (top1/top5 on held-out sentences after the tune
+   half is typed three times): pinyin-chat 12.9/28.5% → 6.1/25.3%, pinyin 20.4/40.9% → 14.0/37.1%; the
+   sentences typed, 36.4/62.0% → 55.8/74.8% and 58.9/83.8% → 73.6/90.2%. The user kept it first (D-C3,
+   2026-11-02) at that cost. Turned off everywhere as `NoPredict("", phrase)`; deleted as a
+   `PhraseForget` (event type 16), its count alone: a word of the same text (added by hand, imported, a
+   table's saved, learned) is not touched, nor do the tables forget anything, so the undo chip takes it
+   back (a `Forget` would take the words with it, past an undo). A word's `Forget` leaves the phrases (C52). Where nothing is learned (`Session.learning` false) the habits still rank, after no
    word, and nothing is recorded. A pinned sentence the model has not as one word is put in as
    the fewest of its words. `Session.why` (为什么排在这, U-81) says a candidate's tier and uses
    under the code of the level that ranked it, a prediction's under its `pred:` code; a candidate

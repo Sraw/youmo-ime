@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.user
 
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
+import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.learn.LearnState
 import org.fcitx.fcitx5.android.engine.learn.Word
@@ -16,7 +17,7 @@ import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
  * §4): a word's, the whole commits' uses of it in the last 30 typing days ([LearnState.wordUses]);
  * a pair's, its count ([LearnState.pairs]) held to the uses of the word before it, so a pair
  * never says more of a word than the word's own count does; 联想's pairs as counted
- * ([UserModel.setPredicted]). Keyed by the model's ids: a word with
+ * ([UserModel.setPredicted]); the whole phrases used often enough, U-73 ([UserModel.continuations]). Keyed by the model's ids: a word with
  * none (pending, not a word yet) is not counted. A word of no reading (a table's, handwriting's)
  * is not counted at all: what those choose does not change pinyin's order (U-28 D28, U-29); it
  * still says how often the word before a pair was used, so what follows it is learned for 联想; a
@@ -118,7 +119,12 @@ class HabitCounts(private val user: UserModel) {
         }
         for ((id, n) in counted) user.setCount(id, n, read[id])
         for ((key, c) in state.pairs) pair(state, key, c.count)
+        user.continuations.clear()
+        for ((text, c) in state.phrases) phrase(text, c)
     }
+
+    // a whole phrase (U-73), offered once used as often as a pair is (U-71)
+    private fun phrase(text: String, c: LearnState.Counted?) = user.continuations.set(text, c?.count ?: 0, c?.lastDay ?: 0, Predictor.PAIRS)
 
     /**
      * What [commit], applied to [state], used: its words' counts and its pairs, as [rebuild] would
@@ -140,6 +146,8 @@ class HabitCounts(private val user: UserModel) {
         }
         for (text in touched) count(state, text, from)
         for (key in pairs) state.pairs[key]?.let { pair(state, key, it.count) }
+        for (row in commit.rows) if (row.whole) phrase(row.words.text, state.phrases[row.words.text])
+        if (commit.continued.isNotEmpty()) phrase(commit.continued, state.phrases[commit.continued])
     }
 
     // [text]'s count, its uses since [from] at each of its readings

@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.learn.Learner
 import org.fcitx.fcitx5.android.engine.learn.Row
 import org.fcitx.fcitx5.android.engine.learn.Words
+import org.fcitx.fcitx5.android.engine.user.Continuations
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -202,5 +203,40 @@ class PredictionOrderTest {
     @Test
     fun moreAreRankedThanThePredictorOffersAlone() {
         assertTrue(PredictionOrder.RANKED > Predictor.DEFAULT_LIMIT)
+    }
+
+    // U-73: the rest of a whole phrase, before the words; a word of its text once, as the phrase
+    @Test
+    fun aPhrasesRestGoesBeforeTheWords() {
+        val found = listOf(Continuations.Found("你好呀", "好呀", 3), Continuations.Found("你吗啊", "吗啊", 3))
+        val o = order.offer(learner.habits, NO_WORD, id("你"), continued = found)
+        assertEquals(listOf("好呀", "吗啊", "好", "吗", "呀", "啊", "你们"), o.candidates.map { it.text })
+        assertEquals("你好呀", o.phrases.getValue(o.candidates[0]).whole)
+        assertTrue(o.candidates.drop(2).none { it in o.phrases })
+        val same = order.offer(learner.habits, NO_WORD, id("你"), continued = listOf(Continuations.Found("你好", "好", 3)))
+        assertEquals(listOf("好", "吗", "呀", "啊", "你们"), same.candidates.map { it.text })
+        assertEquals("你好", same.phrases.getValue(same.candidates[0]).whole)
+    }
+
+    // U-70 still: a word picked twice running there goes in front of a phrase, once picked behind it
+    @Test
+    fun aWordPutFirstHereStaysBeforeAPhrase() {
+        val found = listOf(Continuations.Found("你好呀", "好呀", 3))
+        pick("啊")
+        assertEquals(listOf("好呀", "好", "啊"), order.offer(learner.habits, NO_WORD, id("你"), continued = found).candidates.take(3).map { it.text })
+        pick("啊")
+        assertEquals(listOf("啊", "好呀", "好"), order.offer(learner.habits, NO_WORD, id("你"), continued = found).candidates.take(3).map { it.text })
+    }
+
+    // after a word the model has not (the user's new word): the phrases alone, after it as put in (review of 051-predict)
+    @Test
+    fun afterNoWordOfTheModelsThePhrasesAlone() {
+        val found = listOf(Continuations.Found("龘你好", "你好", 3))
+        val o = order.offer(learner.habits, NO_WORD, NO_WORD, continued = found, last = "龘")
+        assertEquals(listOf("你好"), o.candidates.map { it.text })
+        assertEquals("龘", o.after)
+        assertEquals("龘你好", o.phrases.getValue(o.candidates[0]).whole)
+        assertTrue(order.offer(learner.habits, NO_WORD, NO_WORD, continued = found).candidates.isEmpty())
+        assertTrue(order.offer(learner.habits, NO_WORD, NO_WORD, last = "龘").candidates.isEmpty())
     }
 }

@@ -177,9 +177,10 @@ enum class BlockScope {
 /**
  * Why a candidate is where it is (U-81): the [tier] ranking put it in ([HabitRanker.Tier]; null
  * where the session does not say: shown as not known), its [uses] under [code] in the last 30
- * typing days, and the [code] it was ranked under.
+ * typing days, and the [code] it was ranked under; for the rest of a whole phrase (U-73), the
+ * phrase ([whole]), [uses] its whole commits.
  */
-data class Why(val tier: HabitRanker.Tier?, val uses: Int = 0, val code: Code? = null)
+data class Why(val tier: HabitRanker.Tier?, val uses: Int = 0, val code: Code? = null, val whole: String = "")
 
 /**
  * A row of a [LearningOp.ListItems]: a pin's [code] and word, a word [blocked] under a table's

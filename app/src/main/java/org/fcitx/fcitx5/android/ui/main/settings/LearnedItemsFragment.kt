@@ -80,7 +80,8 @@ class LearnedItemsFragment : PaddingPreferenceFragment() {
     }
 
     private fun detail(item: ListedItem): String {
-        val code = item.code ?: return getString(R.string.learning_no_predict_detail, item.prev)
+        // a whole phrase (U-73) is off everywhere, after no word
+        val code = item.code ?: return if (item.prev.isEmpty()) getString(R.string.learning_no_predict_phrase_detail) else getString(R.string.learning_no_predict_detail, item.prev)
         val table = code.kind.takeIf { it.startsWith(TABLE) }?.let { names[it.removePrefix(TABLE)] }
         return getString(if (item.blocked) R.string.learning_table_blocked_detail else R.string.learning_pinned_detail, keys(code), table ?: label(requireContext(), code))
     }

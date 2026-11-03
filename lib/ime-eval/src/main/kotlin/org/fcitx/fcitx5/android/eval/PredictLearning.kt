@@ -4,14 +4,15 @@
  */
 package org.fcitx.fcitx5.android.eval
 
+import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
-import org.fcitx.fcitx5.android.engine.learn.Habits
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.session.PredictionOrder
+import org.fcitx.fcitx5.android.engine.user.Continuations
 
 /**
  * What learning gains 联想: the sentences of a set split into words, and after each word but the
@@ -19,9 +20,10 @@ import org.fcitx.fcitx5.android.engine.session.PredictionOrder
  * user's habits as a session ranks them ([PredictionOrder]). The [Halves.TUNE] half before anything
  * is learned, after it was typed once and after three times (a user's own phrases, typed again:
  * a pair counts from its third time, U-71), the [Halves.HELD_OUT] half after that (text not typed
- * before, which learning must not make worse), each with the user's pairs at [weight].
+ * before, which learning must not make worse), each with the user's pairs at [weight]; the whole
+ * phrases typed three times going on after their start ([continuations], U-73) or not.
  */
-class PredictLearning(private val data: PinyinData, private val weight: Float) {
+class PredictLearning(private val data: PinyinData, private val weight: Float, private val continuations: Boolean = true) {
     private val textWords = TextWords(data.model, data.wordIndex)
 
     fun measure(samples: List<Sample>): List<Pair<String, PredictRun.Score>> {
@@ -31,7 +33,7 @@ class PredictLearning(private val data: PinyinData, private val weight: Float) {
         // as the app's session has it
         val predictor = Predictor(data.model, data.vocabulary, data.dictionary, user.model, weight, coarse = CoarseWords.of({ data.wordIndex.find(it) }))
         val order = PredictionOrder(predictor) { user.model.idsOfText(it).firstOrNull() ?: data.wordIndex.find(it) }
-        val score = { set: List<Sample> -> score(set, order, user.habits) }
+        val score = { set: List<Sample> -> score(set, order, predictor, user) }
         val rows = mutableListOf("tune, nothing learned" to score(tune), "held-out, nothing learned" to score(heldOut))
         val typist = KeystrokeRun(PinyinSession(data, PinyinSegmenter(), user = user.model, prediction = false, learnTo = user.learnTo()))
         tune.forEach { typist.type(it) }
@@ -42,14 +44,23 @@ class PredictLearning(private val data: PinyinData, private val weight: Float) {
         return rows
     }
 
-    private fun score(samples: List<Sample>, order: PredictionOrder, habits: Habits): PredictRun.Score {
+    private fun score(samples: List<Sample>, order: PredictionOrder, predictor: Predictor, user: EvalUser): PredictRun.Score {
         val continuations = continuations(samples)
         val offers = continuations.map { c ->
             val words = textWords.lastTwo(c.context)
             val (prev2, prev) = TextWords.previous(words)
-            order.offer(habits, prev2, prev).candidates.map { it.text }.distinct()
+            // the word before as Predictions.wordBefore has it (the user's too)
+            val last = if (prev == NO_WORD) "" else predictor.textOf(prev)
+            order.offer(user.habits, prev2, prev, continued = phrases(c.context, last, user), last = last).candidates.map { it.text }.distinct()
         }
         return PredictRun.score(continuations, offers)
+    }
+
+    // the whole phrases [context] ends a start of, after its last word [last], as Predictions.continued finds them
+    private fun phrases(context: String, last: String, user: EvalUser): List<Continuations.Found> {
+        if (!continuations || last.isEmpty()) return emptyList()
+        val tail = Continuations.tail(context)
+        return user.model.continuationsAfter(tail, textWords.boundaries(tail), last)
     }
 
     /** After each word of each sample's text but the last, the text to it and what follows. */

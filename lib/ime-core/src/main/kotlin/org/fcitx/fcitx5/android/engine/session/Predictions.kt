@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.engine.learn.Row
 import org.fcitx.fcitx5.android.engine.learn.Word
 import org.fcitx.fcitx5.android.engine.learn.Words
 import org.fcitx.fcitx5.android.engine.learn.control.Why
+import org.fcitx.fcitx5.android.engine.user.Continuations
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 
@@ -67,6 +68,9 @@ class Predictions(
     // how the habits ranked [offered]: what 为什么排在这 says (U-81)
     private var ranks: Map<Candidate, HabitRanker.Ranked<Candidate>> = emptyMap()
 
+    // those of [offered] that are the rest of a whole phrase (U-73), with it
+    private var phrases: Map<Candidate, Continuations.Found> = emptyMap()
+
     // the field cleared itself (a chat's message sent, [Action.Context.cleared]): [before] still
     // scores, but no word of it is one the next pick learns a pair with (USER-DECISIONS 2026-10-20)
     var cleared = false
@@ -78,6 +82,10 @@ class Predictions(
 
     /** The last word put in, as the user model has it: what is picked next is learned after it. */
     var lastEntry: Entry? = null
+
+    // the text put in last, while [before] ends with it: the word a whole phrase goes on after where
+    // the predictor has none of it (the user's new word, a rare one; U-73)
+    private var written = ""
 
     /** What the field's commits are not learned for ([Commit.NO_PAIRS], [Commit.NO_PREDICT], U-91): as the session's last [Action.Context] said. */
     var learnFlags = 0
@@ -94,12 +102,15 @@ class Predictions(
     /** The text before the cursor is [text], as kept. */
     fun goOnFrom(text: String) {
         before = kept(text)
+        written = ""
     }
 
     /** [text] went into the editor, [entry] its word as learned (or none). */
     fun wrote(text: String, entry: Entry?) {
         before = kept(before + text)
         lastEntry = entry
+        // as nothing is learned of it (a password), nor is it kept to learn a phrase after
+        written = if (learning()) text else ""
         cleared = false
     }
 
@@ -107,6 +118,7 @@ class Predictions(
     fun forgetBefore() {
         before = ""
         lastEntry = null
+        written = ""
         cleared = false
     }
 
@@ -118,6 +130,7 @@ class Predictions(
         val drop = if (before.length >= 2 && Character.isLowSurrogate(before.last())) 2 else 1
         before = before.dropLast(drop)
         lastEntry = null
+        written = ""
     }
 
     /**
@@ -151,7 +164,30 @@ class Predictions(
         val w = words
         // nothing where nothing is learned (a password), nor in a search field (U-91)
         val shows = learning() && learnFlags and Commit.NO_PREDICT == 0
-        show(if (o == null || w == null || !shows) PredictionOrder.Offer.NONE else TextWords.previous(w.lastTwo(simplify(before))).let { (prev2, prev) -> o.offer(habits, prev2, prev) })
+        show(
+            if (o == null || w == null || !shows) {
+                PredictionOrder.Offer.NONE
+            } else {
+                val text = simplify(before)
+                // after no word of the predictor's, what was put in last: its phrases alone
+                val last = wordBefore().ifEmpty { simplify(written).takeIf { !cleared && text.endsWith(it) }.orEmpty() }
+                TextWords.previous(w.lastTwo(text)).let { (prev2, prev) -> o.offer(habits, prev2, prev, continued = continued(text, last), last = last) }
+            },
+        )
+    }
+
+    /**
+     * What is left of the whole phrases (U-73) [text], the text before as the predictor reads it,
+     * ends a start of, [last] the word put in last: none where nothing is learned or offered, nor
+     * after no word.
+     */
+    internal fun continued(text: String, last: String): List<Continuations.Found> {
+        val u = user
+        val w = words
+        if (u == null || w == null || u.continuations.isEmpty()) return emptyList()
+        if (last.isEmpty() || !learning() || learnFlags and Commit.NO_PREDICT != 0) return emptyList()
+        val tail = Continuations.tail(text)
+        return u.continuationsAfter(tail, w.boundaries(tail), last)
     }
 
     /**
@@ -159,14 +195,24 @@ class Predictions(
      * ones), offered: as [PredictionOrder.offer] has it, learned after [learnedAfter], [tail] the
      * model's word a word it lacks ends with. Whether to offer any is the session's to say.
      */
-    internal fun offer(prev2: Int, prev: Int, learnedAfter: Int = prev, tail: () -> Int = { NO_WORD }) =
-        show(order?.offer(habits, prev2, prev, learnedAfter, tail) ?: PredictionOrder.Offer.NONE)
+    internal fun offer(
+        prev2: Int,
+        prev: Int,
+        learnedAfter: Int = prev,
+        tail: () -> Int = { NO_WORD },
+        continued: List<Continuations.Found> = emptyList(),
+        last: String = "",
+    ) = show(order?.offer(habits, prev2, prev, learnedAfter, tail, continued, last) ?: PredictionOrder.Offer.NONE)
 
     private fun show(offer: PredictionOrder.Offer) {
         offered = offer.candidates
         ranks = offer.ranks
         after = offer.after
+        phrases = offer.phrases
     }
+
+    /** The whole phrase (U-73) [c], one of [offered], is the rest of; null for a word. */
+    internal fun phraseOf(c: Candidate): Continuations.Found? = phrases[c]
 
     /**
      * The offer taken away. [lastEntry] stays, as pinyin keeps it: the text before still ends with
@@ -190,7 +236,15 @@ class Predictions(
     fun pick(index: Int): String? {
         val c = offered.getOrNull(index) ?: return null
         val entry = entry(index)
-        picked = if (after.isEmpty()) null else record(PredictionOrder.code(after), PredictionOrder.words(c.text).list, 'D', offered.firstOrNull()?.text.orEmpty(), after)
+        val first = offered.firstOrNull()?.text.orEmpty()
+        val phrase = phrases[c]
+        picked = when {
+            after.isEmpty() -> null
+            phrase == null -> record(PredictionOrder.code(after), PredictionOrder.words(c.text).list, 'D', first, after)
+            // the phrase used whole once more (U-73), as the pick of its rest after the word before
+            !learning() || !habits.learns -> null
+            else -> habits.recordContinued(listOf(PredictionOrder.row(c.text, after, first)), learnFlags, phrase.whole)
+        }
         wrote(c.text, entry)
         predict()
         return c.text
@@ -201,6 +255,8 @@ class Predictions(
     fun offers(index: Int): Set<Offer> {
         val u = user
         if (!learning() || u == null) return emptySet()
+        // a whole phrase is deleted, nothing more: no word to block (U-73)
+        if (offered.getOrNull(index)?.let(phrases::get) != null) return setOf(Offer.FORGET)
         val c = offered.getOrNull(index)?.takeIf { it.words.size == 1 } ?: return emptySet()
         return OfferRules.offers(
             learning = true,
@@ -214,7 +270,11 @@ class Predictions(
     fun press(index: Int, offer: Offer): Boolean {
         val c = offered.getOrNull(index)
         if (c == null || offer !in offers(index)) return false
-        if (offer == Offer.FORGET) {
+        val phrase = phrases[c]
+        if (phrase != null) {
+            // a whole phrase (U-73): its count alone, not a word of its text, here or in the tables
+            habits.forgetPhrase(phrase.whole)
+        } else if (offer == Offer.FORGET) {
             forgotten(c.text)
         } else {
             entry(index)?.let { block?.invoke(it) }
@@ -231,8 +291,10 @@ class Predictions(
      */
     fun why(index: Int): Why? = predictor?.takeIf { index in offered.indices }?.let {
         val r = ranks[offered[index]]
+        // a whole phrase says how often it was used whole (U-73)
+        val phrase = phrases[offered[index]]
         // the offer's own word, not the predictor's last (a later candidate() call moves that)
-        Why(r?.tier, r?.uses ?: 0, Code(Kinds.PREDICTION, after))
+        if (phrase != null) Why(r?.tier, phrase.count, Code(Kinds.PREDICTION, after), phrase.whole) else Why(r?.tier, r?.uses ?: 0, Code(Kinds.PREDICTION, after))
     }
 
     /** What may follow offered anew (a prediction turned off, an undo): on the [pager]'s page if it still has some, else the first. */

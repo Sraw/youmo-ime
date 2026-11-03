@@ -83,6 +83,9 @@ object LearningMenu {
         /** A prediction: it follows the word before. */
         PREDICTION,
 
+        /** The rest of a whole phrase (U-73): it was put in whole [Why.uses] times. */
+        PHRASE,
+
         /** The ranking did not say: shown as not known. */
         UNKNOWN,
     }
@@ -91,6 +94,7 @@ object LearningMenu {
         val reason = why?.tier?.reason()
         return when {
             why == null -> Reason.UNKNOWN
+            why.whole.isNotEmpty() -> Reason.PHRASE
             // a 联想 says so by its code, its tier telling only what the user did after that word: the
             // predictor's order is no dictionary's, nor keys typed (verify-int-step1a V1)
             why.code?.kind == Kinds.PREDICTION -> reason?.takeIf { it in DONE_AFTER } ?: Reason.PREDICTION

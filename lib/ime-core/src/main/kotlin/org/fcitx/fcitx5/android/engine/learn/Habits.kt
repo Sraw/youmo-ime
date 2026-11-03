@@ -21,8 +21,14 @@ interface Habits {
     val today: Int
 
     fun record(rows: List<Row>, takes: List<Take> = emptyList(), flags: Int = 0): Commit?
+
+    /** A 联想 picked ([rows]) that went on with the whole phrase [continued] (U-73): a use of it whole. */
+    fun recordContinued(rows: List<Row>, flags: Int, continued: String): Commit? = record(rows, flags = flags)
     fun pin(code: Code, text: String, reading: String, on: Boolean)
     fun forget(text: String)
+
+    /** Forgets the whole phrase [text] (U-73): its count, no word of that text. */
+    fun forgetPhrase(text: String)
 
     /** A fault of learning's own ([e]), never the user's commit's: reported, and nothing more learned this run. */
     fun failed(e: RuntimeException) = Unit
@@ -114,6 +120,7 @@ interface Habits {
         override fun record(rows: List<Row>, takes: List<Take>, flags: Int): Commit? = null
         override fun pin(code: Code, text: String, reading: String, on: Boolean) = Unit
         override fun forget(text: String) = Unit
+        override fun forgetPhrase(text: String) = Unit
         override fun uses(code: Code, words: Words) = 0
         override fun corrections(code: Code, words: Words) = 0
         override fun first(code: Code, prev: String): Words? = null
@@ -165,8 +172,10 @@ class LogHabits(private val log: () -> LearnLog, private val onError: (IOExcepti
     override val rewrites get() = guarded(0L) { log().rewrites }
 
     override fun record(rows: List<Row>, takes: List<Take>, flags: Int) = guarded(null) { log().record(rows, takes, flags) }
+    override fun recordContinued(rows: List<Row>, flags: Int, continued: String) = guarded(null) { log().record(rows, flags = flags, continued = continued) }
     override fun pin(code: Code, text: String, reading: String, on: Boolean) = guarded(Unit) { log().pin(code, text, reading, on) }
     override fun forget(text: String) = guarded(Unit) { log().forget(text) }
+    override fun forgetPhrase(text: String) = guarded(Unit) { log().forgetPhrase(text) }
 
     override fun blockUnder(code: Code, text: String, on: Boolean) = guarded(Unit) {
         log().event { minute, _ -> LearnRecord.TableBlock(minute, Kinds.tableOf(code.kind), code.keys, text, on) }

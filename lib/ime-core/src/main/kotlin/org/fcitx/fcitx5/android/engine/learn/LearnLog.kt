@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord.EnCorrect
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.EnCommit
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.EnForget
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Forget
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PhraseForget
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Head
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.NoPredict
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Pin
@@ -129,11 +130,11 @@ class LearnLog(
      * a commit too long for a record losing its level-3 rows first, then itself. Null if nothing
      * was kept.
      */
-    fun record(rows: List<Row>, takes: List<Take> = emptyList(), flags: Int = 0): Commit? {
+    fun record(rows: List<Row>, takes: List<Take> = emptyList(), flags: Int = 0, continued: String = ""): Commit? {
         if (rows.isEmpty()) return null
         val stamp = LearnClock.stamp(clock, state, commit = true)
         // a count of takes is a byte: more in one commit than anyone takes, the first so many
-        var commit = Commit(state.nextSeq, stamp.minute, stamp.day, stamp.localDay, flags, rows, takes.take(MAX_TAKES))
+        var commit = Commit(state.nextSeq, stamp.minute, stamp.day, stamp.localDay, flags, rows, takes.take(MAX_TAKES), continued)
         var bytes = encoded(commit)
         if (bytes == null) {
             commit = commit.copy(rows = rows.filter { it.flags and (Row.PICK or Row.WHOLE) != 0 })
@@ -237,6 +238,11 @@ class LearnLog(
     fun forget(text: String) {
         val stamp = LearnClock.stamp(clock, state, commit = false)
         write(Forget(stamp.minute, stamp.day, text))
+    }
+
+    /** Forgets the whole phrase [text]'s count (U-73), nothing else of that text ([PhraseForget]). */
+    fun forgetPhrase(text: String) {
+        write(PhraseForget(LearnClock.stamp(clock, state, commit = false).minute, text))
     }
 
     /**
@@ -405,10 +411,16 @@ class LearnLog(
 
         private fun fits(record: ByteArray) = record.size <= 4 + RecordFormat.MAX_RECORD + 4
 
-        /** [state] as a snapshot cut at [cut], each record handed to [write]. */
-        fun writeSnapshot(state: LearnState, cut: Int, write: (ByteArray) -> Unit, kinds: Map<Int, String> = emptyMap()) {
+        /** [state] as a snapshot cut at [cut], each record handed to [write]; only those it [keeps]. */
+        fun writeSnapshot(
+            state: LearnState,
+            cut: Int,
+            write: (ByteArray) -> Unit,
+            kinds: Map<Int, String> = emptyMap(),
+            keeps: (LearnRecord) -> Boolean = { true },
+        ) {
             val writer = LearnRecords.SnapshotWriter(write, kinds)
-            state.snapshot(cut).forEach(writer::write)
+            state.snapshot(cut).forEach { if (keeps(it)) writer.write(it) }
         }
 
         /** The state the log [bytes] (header and records) say: what a start would read. */

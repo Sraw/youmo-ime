@@ -381,6 +381,7 @@
     <string name="my_words_no_predict">不再聯想的搭配</string>
     <string name="learning_pinned_detail">在 %1$s 下第一 · %2$s</string>
     <string name="learning_no_predict_detail">不再跟在「%1$s」後面聯想</string>
+    <string name="learning_no_predict_phrase_detail">整段：哪裡都不再聯想</string>
     <string name="learning_suggest_again">恢復聯想</string>
     <string name="learning_kind_full">全拼</string>
     <string name="learning_kind_shuangpin">雙拼</string>
@@ -405,6 +406,9 @@
     </plurals>
     <plurals name="learning_why_used">
         <item quantity="other">最近在這串鍵下用過 %d 次</item>
+    </plurals>
+    <plurals name="learning_why_phrase">
+        <item quantity="other">這段話你完整打過 %d 次</item>
     </plurals>
     <plurals name="learning_clear_all_blocked">
         <item quantity="other">封鎖的 %d 個詞會重新出現</item>

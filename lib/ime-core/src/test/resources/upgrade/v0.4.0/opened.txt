@@ -24,6 +24,7 @@ MineRow(text=鲸喵屿, value=Mine(reading=jing miao yu, how=0, since=1, sinceSe
 PairRow(prev=喵, next=屿, nextReading=yu, count=2, lastDay=1)
 PairRow(prev=屿, next=鲸, nextReading=jing, count=1, lastDay=1)
 PairRow(prev=鲸, next=喵, nextReading=miao, count=2, lastDay=1)
+PhraseRow(text=鲸喵屿, count=2, lastDay=1)
 WordUseRow(你, ni, [1:1])
 WordUseRow(国家, guo jia, [1:1])
 WordUseRow(鲸喵屿, jing miao yu, [1:2])

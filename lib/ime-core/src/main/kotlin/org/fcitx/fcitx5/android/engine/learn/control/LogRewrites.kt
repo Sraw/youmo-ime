@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord.MineRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.NoPredictRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PairRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PendingRow
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PhraseRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PinRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.StatRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableBlockRow
@@ -107,7 +108,7 @@ internal object LogRewrites {
      * table's settings; its uses and firsts both), imports, an English word's flags (never
      * corrected, added) without its uses; HEAD as it is, so typing days and seqs go on (review
      * E-M1). The rest goes, what this build does not know too: the uses and corrections under each
-     * code, the firsts, the texts typed once, the pairs, the nine keys' bar, English's uses and
+     * code, the firsts, the texts typed once, the pairs, the whole phrases (U-73), the nine keys' bar, English's uses and
      * pairs; but a restore's offsets ([BackupMerge.ORIGIN]) stay till 全部清空, as the rows they moved do. [all] 「全部清空」: everything, as installed; the counters of HEAD go on, so what is
      * written after is newer than what was.
      */
@@ -116,7 +117,7 @@ internal object LogRewrites {
             is Head, is Cut -> r
             is StatRow -> r.takeIf { !all && isTable(r.code.kind) }
             is FirstRow -> r.takeIf { !all && isTable(r.code.kind) }
-            is PendingRow, is PairRow, is BarRow, is EnPairRow, is WordUseRow, is DateRow -> null
+            is PendingRow, is PairRow, is BarRow, is EnPairRow, is WordUseRow, is DateRow, is PhraseRow -> null
             is EnWordRow -> if (all || r.flags == 0) null else EnWordRow(r.word, r.flags, DayCounts())
             // the offsets a restore moved another install's days by: the rows they moved may stay
             // (a table's order), and the same backup restored again must land on the same days (D-M1)
@@ -125,7 +126,7 @@ internal object LogRewrites {
             // only 全部清空 clears them. Every type named, no else: a new row is decided here (review R11)
             is MineRow, is PinRow, is NoPredictRow, is TableBlockRow, is TableWordRow, is BatchRow, is ImportedRow -> r.takeIf { !all }
             // events: never in a snapshot
-            is Commit, is Undo, is LearnRecord.Pin, is LearnRecord.Forget, is LearnRecord.NoPredict,
+            is Commit, is Undo, is LearnRecord.Pin, is LearnRecord.Forget, is LearnRecord.PhraseForget, is LearnRecord.NoPredict,
             is LearnRecord.TableOrderReset, is LearnRecord.TableBlock, is EnCommit, is LearnRecord.EnForget,
             is LearnRecord.EnAdd, is LearnRecord.EnCorrect, is LearnRecord.Restored, is LearnRecord.ImportBatch,
             is LearnRecord.Imported, is LearnRecord.ImportUndo, is Absorbed,
