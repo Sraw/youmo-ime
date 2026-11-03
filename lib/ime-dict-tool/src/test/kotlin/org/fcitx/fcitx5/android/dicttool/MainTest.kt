@@ -67,6 +67,20 @@ class MainTest {
         val id = (0 until data.vocabulary.size).first { data.vocabulary.word(it) == "你好" }
         val reading = intArrayOf(Syllables.id("ni"), Syllables.id("hao"))
         assertEquals(listOf<Byte>(3, 4), data.tones.tones("你好", reading, id)?.toList())
+        // kMandarin's file: a character's readings, those the modern dictionaries lack
+        assertTrue(out, out.contains("readings: 2 characters' in order"))
+        assertEquals(listOf("hǎo", "hào"), data.charReadings.of('好'.code).map { it.pinyin })
+    }
+
+    @Test
+    fun aFileNamedForNoFieldGivesTonesButNoReadings() {
+        val lm = file("lm.arpa", ReadersTest.TINY_ARPA)
+        val dict = file("dict.txt", "你\tni\t0\n好 hao\n你好 ni'hao\n")
+        val unihan = file("unihan.txt", "U+4F60: nǐ  # 你\n")
+        val output = tmp.root.resolve("pinyin.data").path
+        val (code, out, err) = run("pinyin", "-o", output, "--lm", lm, "--char-tones", unihan, dict)
+        assertEquals(err, 0, code)
+        assertTrue(out, out.contains("readings: 0 characters' in order"))
     }
 
     @Test

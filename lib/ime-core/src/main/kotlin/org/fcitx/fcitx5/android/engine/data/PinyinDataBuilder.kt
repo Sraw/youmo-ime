@@ -59,6 +59,9 @@ class PinyinDataBuilder {
     private val wordTones = HashMap<String, HashMap<List<Int>, ByteArray>>()
     private val curated = HashSet<Pair<String, List<Int>>>()
 
+    // each character's readings in order, and their words (CharReadings)
+    private val charReadings = CharReadingsBuilder()
+
     /**
      * [codePoint] read as [syllable] may have [tone] (1–4, [ToneMark.NEUTRAL]). Called in order of
      * likelihood: the first tone given for a character and syllable is its usual one.
@@ -70,6 +73,17 @@ class PinyinDataBuilder {
         val key = codePoint * ToneTable.KEY_SPAN + syllable
         val old = charTones[key] ?: tone
         charTones[key] = old or (1 shl (tone - 1 + ToneTable.MASK_SHIFT))
+    }
+
+    /**
+     * [codePoint] has the reading [syllable] in [tone], as [source] lists it: called in the order the
+     * source lists them. Which a character's card shows, and in what order: [CharReadingsBuilder].
+     */
+    fun charReading(source: ReadingSource, codePoint: Int, syllable: Int, tone: Int) = apply {
+        require(codePoint in 0 until ToneTable.MAX_CODE_POINT && syllable in 0 until Syllables.count && tone in 1..ToneMark.NEUTRAL) {
+            "reading $syllable $tone of U+${codePoint.toString(16)}"
+        }
+        charReadings.add(source, codePoint, syllable, tone)
     }
 
     /**
@@ -111,7 +125,11 @@ class PinyinDataBuilder {
         writeVocabulary(out)
         writeDictionary(out) { id -> model.tables.unigramProb(if (id < lmSize) id else unknown) }
         writeLayers(out)
-        writeTones(out)
+        writeTones(out) { e, tones ->
+            val id = model.id(e.word)
+            if (id < lmSize) charReadings.word(id, e.word.codePoints().toArray(), e.syllables.toList(), tones, Math.pow(10.0, model.tables.unigramProb(id).toDouble()))
+        }
+        charReadings.write(out)
         model.tables.write(out, lmSize)
         return out
     }
@@ -137,8 +155,9 @@ class PinyinDataBuilder {
      * not their characters' usual ones. Words of one character are read first: the usual tone they set
      * is what the longer words are compared with, and what a longer word's neutral tone becomes
      * ([ToneRules.full]); the rest in order of their text, so the same sources compile to the same file.
+     * Each word's likeliest reading (its highest weight) is handed to [read] with its tones.
      */
-    private fun writeTones(out: DataFile.Writer) {
+    private fun writeTones(out: DataFile.Writer, read: (Entry, ByteArray) -> Unit) {
         val chars = HashMap(charTones)
         fun usual(cps: IntArray, reading: List<Int>) =
             ByteArray(cps.size) { i -> ((chars[cps[i] * ToneTable.KEY_SPAN + reading[i]] ?: 0) and ToneTable.USUAL_MASK).toByte() }
@@ -159,6 +178,8 @@ class PinyinDataBuilder {
         out.add(Section.TONE_CHAR, ByteArray(keys.size) { chars.getValue(keys[it]).toByte() })
         // only a reading in the dictionary, whose tones its characters' usual ones would not give
         val exceptions = sortedMapOf<Int, MutableList<Pair<List<Int>, ByteArray>>>()
+        val likeliest = HashMap<String, Entry>()
+        entries.forEach { e -> likeliest.merge(e.word, e) { old, new -> if (new.weight > old.weight) new else old } }
         entries.distinctBy { it.word to it.syllables.toList() }.forEach { e ->
             val reading = e.syllables.toList()
             val own = wordTones[e.word]?.get(reading)
@@ -169,6 +190,7 @@ class PinyinDataBuilder {
             if (own == null && usual.any { it.toInt() == 0 }) return@forEach
             val ruled = if (own != null && (e.word to reading) in curated) own else ToneRules.tones(e.word, cps, reading, own, usual) { w, r -> wordTones[w]?.get(r) }
             val tones = ToneRules.full(ruled, usual)
+            if (likeliest[e.word]?.syllables?.contentEquals(e.syllables) == true) read(e, tones)
             if (!usual.contentEquals(tones)) exceptions.getOrPut(model.id(e.word)) { ArrayList() } += reading to tones
         }
         val runs = exceptions.flatMap { (id, list) -> list.map { id to it } }
@@ -226,7 +248,7 @@ class PinyinDataBuilder {
         const val UNKNOWN = "<unk>"
 
         // 一 and 不 as the dictionaries list them, not as said before another syllable (yí bù)
-        private val OWN_TONES = mapOf(
+        internal val OWN_TONES = mapOf(
             '一'.code to Syllables.id("yi") to 1,
             '不'.code to Syllables.id("bu") to 4,
         )

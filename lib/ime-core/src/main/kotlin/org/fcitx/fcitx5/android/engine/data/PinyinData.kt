@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.data
 
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.reading.CharReadings
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicLongArray
 
@@ -57,6 +58,17 @@ class PinyinData private constructor(file: DataFile) {
         file.section(Section.TONE_TONES),
     )
 
+    /** Each character's readings in order, and words reading it each way: see [CharReadings]. */
+    val charReadings = CharReadings(
+        file.bitPacked(Section.READING_CHARS),
+        file.bitPacked(Section.READING_START),
+        file.bitPacked(Section.READING_SYLLABLES),
+        file.section(Section.READING_TONES),
+        file.bitPacked(Section.READING_EXAMPLE_START),
+        file.bitPacked(Section.READING_EXAMPLES),
+        vocabulary,
+    )
+
     /** Words often read wrongly, by word: see [Misreadings]. */
     val misreadings: Map<String, Misreadings> by lazy {
         meta.mapNotNull { (key, value) ->
@@ -99,11 +111,17 @@ class PinyinData private constructor(file: DataFile) {
         const val TONE_WORD_START = 26
         const val TONE_SYLLABLES = 27
         const val TONE_TONES = 28
+        const val READING_CHARS = 29
+        const val READING_START = 30
+        const val READING_SYLLABLES = 31
+        const val READING_TONES = 32
+        const val READING_EXAMPLE_START = 33
+        const val READING_EXAMPLES = 34
     }
 
     companion object {
-        /** Layout of the sections below; bump on any change to it. 2: the trigram runs' starts in [EliasFano]; 3: [tones]. */
-        const val VERSION = 3
+        /** Layout of the sections below; bump on any change to it. 2: the trigram runs' starts in [EliasFano]; 3: [tones]; 4: [charReadings]. */
+        const val VERSION = 4
 
         internal const val META_SYLLABLE_COUNT = "syllables.count"
         internal const val META_SYLLABLE_CHECKSUM = "syllables.checksum"

@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.Misreadings
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.ReadingSource
 import org.fcitx.fcitx5.android.engine.data.ToneSources
 import org.fcitx.fcitx5.android.engine.data.SourceException
 import org.fcitx.fcitx5.android.engine.data.WordIndex
@@ -906,7 +907,7 @@ private fun pinyin(options: Options, out: Appendable) {
     }
     if (misread.isNotEmpty()) out.appendLine("misread: ${misread.size} words, typed by their misreadings too")
     // from the least trusted: a later source's reading of a word replaces an earlier one's
-    options.charTones?.split(',')?.forEach { path -> File(path).useLines { ToneSources.chars(it, path, builder::charTone) } }
+    options.charTones?.split(',')?.forEach { charTones(it, builder) }
     options.phraseTones?.let { path -> File(path).useLines { ToneSources.phrases(it, path, builder::wordTones) } }
     val curated = { w: String, s: IntArray, t: ByteArray -> builder.wordTones(w, s, t, curated = true); Unit }
     options.tones?.let { path -> File(path).useLines { ToneSources.curated(it, path, curated) } }
@@ -918,6 +919,18 @@ private fun pinyin(options: Options, out: Appendable) {
     out.appendLine("vocabulary: ${data.vocabulary.size} words, ${data.model.vocabularySize} of them in the model")
     out.appendLine("trie: ${data.dictionary.nodeCount} nodes")
     out.appendLine("tones: ${data.tones.characters} characters' readings, ${data.tones.exceptions} words' own")
+    out.appendLine("readings: ${data.charReadings.characters} characters' in order")
+}
+
+// each file's field (its name's, as pinyin-data names them) lists readings a character's card shows, in order
+private fun charTones(path: String, builder: PinyinDataBuilder) {
+    val source = ReadingSource.of(File(path).name)
+    File(path).useLines {
+        ToneSources.chars(it, path) { cp, s, t ->
+            builder.charTone(cp, s, t)
+            source?.let { f -> builder.charReading(f, cp, s, t) }
+        }
+    }
 }
 
 private fun table(output: String, input: String, words: String?, pinyin: String?, out: Appendable) {
