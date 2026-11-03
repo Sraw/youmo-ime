@@ -120,12 +120,13 @@ private val COMMANDS = listOf(
         inputs = 1..1,
     ) { options, out -> chaizi(options, out) },
     Command(
-        "charinfo -o <out> --unihan <Unihan.zip> --radicals <CJKRadicals.txt> --chaizi <chaizi-jt.txt> --strokes <stroke.dict.yaml> --pinyin <pinyin.data> [--cover <chars.txt>]",
+        "charinfo -o <out> --unihan <Unihan.zip> --radicals <CJKRadicals.txt> --chaizi <chaizi-jt.txt> --strokes <stroke.dict.yaml> --orders <stroke-order-jian.json> --pinyin <pinyin.data> [--cover <chars.txt>]",
         """
-            each character's radical, strokes and parts,
-            for its card: Unihan's kRSUnicode and
-            kTotalStrokes, CJKRadicals, kfcd/chaizi,
-            rime-stroke's orders where Unihan counts none;
+            each character's radical, strokes, parts and
+            stroke order, for its card: Unihan's kRSUnicode
+            and kTotalStrokes, CJKRadicals, kfcd/chaizi,
+            rime-stroke's orders where Unihan counts none,
+            cnchar's orders as the mainland writes them;
             how many of the characters handwriting knows
             (--cover) have each, and readings, checked
         """,
@@ -316,6 +317,8 @@ private class Options(
     val radicals: String?,
     val chaizi: String?,
     val strokes: String?,
+    /** `charinfo`: cnchar's stroke-order-jian.json. */
+    val orders: String?,
     val cover: String?,
     /** `english-lm`: how many words, and at most how many of the pages' words to read. */
     val vocabulary: Int,
@@ -440,6 +443,7 @@ private class Options(
                 radicals = values["--radicals"],
                 chaizi = values["--chaizi"],
                 strokes = values["--strokes"],
+                orders = values["--orders"],
                 cover = values["--cover"],
                 // the start's id must fit an n-gram key too (EnglishCounts)
                 vocabulary = values.count("--vocabulary", VOCABULARY, 1 until NgramKey.MAX_WORDS - 2) ?: return null,
@@ -1073,6 +1077,7 @@ private fun charInfo(options: Options, out: Appendable) {
             if (f.size >= 2 && f[0].codePointCount(0, f[0].length) == 1 && f[1].all { it in Strokes.KEYS }) builder.strokes(f[0].codePointAt(0), f[1].length)
         }
     }
+    File(options.orders!!).useLines { builder.orders(it, options.orders) }
     val output = File(options.output!!)
     output.outputStream().use { builder.build().writeTo(it) }
     val info = CharInfo.load(ByteBuffer.wrap(output.readBytes()))
@@ -1085,12 +1090,13 @@ private fun charInfo(options: Options, out: Appendable) {
             "radical" to { cp -> info.of(cp) != null },
             "strokes" to { cp -> (info.of(cp)?.strokes ?: 0) > 0 },
             "parts" to { cp -> info.of(cp)?.parts != null },
+            "the mainland's stroke order" to { cp -> info.of(cp)?.order != null },
         )
         for ((what, test) in has) {
             val missing = chars.filterNot(test)
             val share = 1 - missing.size.toDouble() / chars.size
             out.appendLine("  of ${File(cover).name}'s ${chars.size}: $what ${chars.size - missing.size} (${"%.1f".format(Locale.ROOT, share * 100)}%)")
-            val floor = if (what == "parts") PARTS_FLOOR else 1.0
+            val floor = FLOORS[what] ?: 1.0
             if (share < floor) {
                 val some = missing.take(MISSING_SHOWN).joinToString("") { String(Character.toChars(it)) }
                 throw SourceException(cover, 0, "${missing.size} characters without $what, below ${floor * 100}%: $some")
@@ -1103,8 +1109,10 @@ private fun charInfo(options: Options, out: Appendable) {
 // Unihan.zip's file of kRSUnicode and kTotalStrokes
 private const val UNIHAN_RS = "Unihan_IRGSources.txt"
 
-// of the characters handwriting knows, at least this share must be taken apart (97.8% are); the rest all
-private const val PARTS_FLOOR = 0.97
+// of the characters handwriting knows, at least this share must be taken apart (97.8% are), and have
+// the mainland's stroke order (95.1% have: cnchar's are 6,939 simplified ones; a traditional one has
+// rime-stroke's); the rest all
+private val FLOORS = mapOf("parts" to 0.97, "the mainland's stroke order" to 0.94)
 private const val MISSING_SHOWN = 20
 
 private fun strokes(output: String, input: String, out: Appendable) {

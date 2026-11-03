@@ -89,7 +89,8 @@ class EnginesHandwritingReadingsTest : EnginesFixture() {
         e.write(1, "行", "江")
         val card = e.charCard(HANDWRITING, 0, "行")
         assertEquals(listOf("háng", "xíng", "héng", "hàng"), card?.readings?.map { it.pinyin })
-        assertEquals("丿丿丨一一乛", card?.strokeOrder)
+        // charinfo.data's, the mainland's (竖钩 a 竖), over the stroke table's first (乛)
+        assertEquals("丿丿丨一一丨", card?.strokeOrder)
         assertEquals("氵", e.charCard(HANDWRITING, 1, "江")?.radical)
         // not what is there now, or no such candidate
         assertNull(e.charCard(HANDWRITING, 0, "江"))

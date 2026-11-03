@@ -630,6 +630,7 @@
     <string name="engine_data_pinyin_data">Unihan 读音的整理：mozillazg/pinyin-data</string>
     <string name="engine_data_phrase_pinyin">词的声调：mozillazg/phrase-pinyin-data，本项目校订</string>
     <string name="engine_data_chaizi">拆字数据：开放词典《汉语拆字字典》kfcd/chaizi，本项目给部件注音</string>
+    <string name="engine_data_stroke_order">字卡的笔顺：cnchar（theajack/cnchar），按大陆规范笔顺</string>
     <string name="im_auto_select">只有一个候选时直接上屏</string>
     <string name="im_auto_select_summary">编码打满时也直接上屏第一个</string>
     <string name="im_hint">显示编码提示</string>

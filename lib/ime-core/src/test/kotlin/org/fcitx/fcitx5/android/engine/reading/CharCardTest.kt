@@ -18,7 +18,7 @@ class CharCardTest {
 
     private val data = ReadingData.data
     private val readings = CandidateReadings(data, data.tones) { Predictor.charReadingsOf(data.dictionary, data.vocabulary) }
-    private val strokes = Strokes(CodeTable.load(ByteBuffer.wrap(Strokes.read("...\n行\tppshhz\n行\tppshhs\n江\tnnhhsh\n".reader().buffered(), "stroke").build().toByteArray()))) { 0f }
+    private val strokes = Strokes(CodeTable.load(ByteBuffer.wrap(Strokes.read("...\n行\tppshhz\n江\tnnhhsh\n".reader().buffered(), "stroke").build().toByteArray()))) { 0f }
 
     private fun card(text: String, before: String = "", info: CharInfo = CharInfoTest.info, strokes: Strokes? = this.strokes) =
         CharCard.of(text, before, readings, data.charReadings, info, strokes)
@@ -38,8 +38,10 @@ class CharCardTest {
         assertEquals("行", card.radical)
         assertEquals(6, card.strokes)
         assertEquals(listOf(CharCard.Part("彳", "chì"), CharCard.Part("亍", "chù")), card.parts)
-        // the first order the stroke table has: 竖钩 a 竖, as the mainland's five classes count it
+        // the mainland's order (charinfo.data's): 竖钩 a 竖, as its five kinds count it; not the stroke
+        // table's (rime-stroke's 乛), which is only for a character charinfo.data has no order of
         assertEquals("丿丿丨一一丨", card.strokeOrder)
+        assertEquals("丿丿丨一一乛", card("行", info = CharInfo.EMPTY)!!.strokeOrder)
     }
 
     @Test

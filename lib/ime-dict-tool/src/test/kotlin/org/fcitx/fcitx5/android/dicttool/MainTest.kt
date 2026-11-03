@@ -402,7 +402,7 @@ class MainTest {
     }
 
     // a pinyin.data whose characters' readings are kMandarin's: 你 好 江, not 乾
-    private fun charInfoInputs(): Array<String> {
+    private fun charInfoInputs(orders: String = "{\n\t\"好\": \"msjegj\",\n\t\"江\": \"kkijfj\",\n\t\"你\": \"sfsegsk\"\n}\n"): Array<String> {
         val pinyin = tmp.root.resolve("pinyin.data").path
         val dict = file("dict.txt", "你\tni\t0\n好\thao\t0\n江\tjiang\t0\n")
         val unihan = file("kMandarin.txt", "U+4F60: nǐ  # 你\nU+597D: hǎo  # 好\nU+6C5F: jiāng  # 江\n")
@@ -420,6 +420,7 @@ class MainTest {
             "--radicals", file("CJKRadicals.txt", "5; 2F04; 4E59\n9; 2F08; 4EBA\n38; 2F25; 5973\n85; 2F54; 6C34\n"),
             "--chaizi", file("chaizi-jt.txt", "你\t人 尔\t亻 尔\n好\t女 子\n江\t水 工\t氵 工\n"),
             "--strokes", file("stroke.dict.yaml", "---\nname: stroke\n...\n\n乾\thhsszhpnhhz\n"),
+            "--orders", file("stroke-order-jian.json", orders),
             "--pinyin", pinyin,
         )
     }
@@ -431,10 +432,20 @@ class MainTest {
         assertEquals(err, 0, code)
         assertTrue(out, out.contains("charinfo: 4 characters, 3 of them taken apart"))
         assertTrue(out, out.contains("parts 3 (100.0%)"))
+        assertTrue(out, out.contains("the mainland's stroke order 3 (100.0%)"))
         val info = CharInfo.load(ByteBuffer.wrap(output.readBytes()))
-        assertEquals(CharInfo.Entry("亻", 7, listOf("亻", "尔")), info.of('你'.code))
+        // cnchar's 丿丨丿㇇亅丿丶 in the five kinds: 3235234
+        assertEquals(CharInfo.Entry("亻", 7, listOf("亻", "尔"), "pspzspn"), info.of('你'.code))
         // strokes from rime-stroke's order where Unihan counts none
         assertEquals(CharInfo.Entry("乙", 11, null), info.of('乾'.code))
+    }
+
+    @Test
+    fun tooFewCharactersWithTheMainlandsStrokeOrderFailTheBuild() {
+        val output = tmp.root.resolve("charinfo.data")
+        val (code, _, err) = run("charinfo", "-o", output.path, *charInfoInputs("{\n\t\"你\": \"sfsegsk\"\n}\n"), "--cover", file("chars.txt", "你好江"))
+        assertEquals(1, code)
+        assertTrue(err, err.contains("2 characters without the mainland's stroke order") && err.contains("好江"))
     }
 
     @Test

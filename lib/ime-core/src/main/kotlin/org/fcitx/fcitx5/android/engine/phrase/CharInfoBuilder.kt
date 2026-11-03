@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.data.BitPacked
 import org.fcitx.fcitx5.android.engine.data.DataFile
 import org.fcitx.fcitx5.android.engine.data.SourceException
 import org.fcitx.fcitx5.android.engine.phrase.CharInfo.Section
+import org.fcitx.fcitx5.android.engine.stroke.Strokes
 
 /**
  * Compiles [CharInfo] on the build host (ime-dict-tool's `charinfo`) and in tests, from:
@@ -16,7 +17,10 @@ import org.fcitx.fcitx5.android.engine.phrase.CharInfo.Section
  *   kTotalStrokes (the mainland's count first), [unihan];
  * - CJKRadicals.txt, each radical's character ([radicals]): `149'` 讠;
  * - 汉语拆字字典's ways to take a character apart ([chaizi]): 江 `水 工` `氵 工`;
- * - rime-stroke's stroke orders' lengths, for a character Unihan counts no strokes of ([strokes]).
+ * - rime-stroke's stroke orders' lengths, for a character Unihan counts no strokes of ([strokes]);
+ * - cnchar's stroke orders as the mainland writes them ([orders]); rime-stroke's first order of a
+ *   character is Taiwan's as often as not (出 丨乛丨乛丨, not 乛丨丨乛丨; 必 丶乛丶丶丿, not 丶乛丶丿丶; half
+ *   of cnchar's 6,939 differ), and the user wants the mainland's standard (2026-11-02).
  *
  * The radical is written as the mainland does where the character's parts show it so (江 氵, 打 扌,
  * 草 艹: [VARIANTS]), else as CJKRadicals has it (和 口, 说 讠): Unicode's Kangxi radicals, not the
@@ -29,6 +33,9 @@ class CharInfoBuilder {
     private val radicalOf = HashMap<Int, String>()
     private val totalStrokes = HashMap<Int, Int>()
     private val strokeOrders = HashMap<Int, Int>()
+
+    // code point to its stroke order as the mainland writes it, a [Strokes.KEYS] letter a stroke
+    private val orders = HashMap<Int, String>()
 
     // radical (85, 149') to its character's code point
     private val radicalChars = HashMap<String, Int>()
@@ -89,6 +96,24 @@ class CharInfoBuilder {
         if (count > 0) strokeOrders.putIfAbsent(codePoint, count)
     }
 
+    /**
+     * cnchar's `stroke-order-jian.json`, a `"行": "ssfjjg",` line a character: its strokes in the order
+     * 《现代汉语通用字笔顺规范》 gives, each one of 26 shapes (`stroke-table.json`), kept as the five
+     * kinds that standard groups them in ([KINDS]: 提 with 横, 竖钩 with 竖, 捺 with 点).
+     *
+     * @throws SourceException on a line that is not one, or a shape not known
+     */
+    fun orders(lines: Sequence<String>, source: String) = apply {
+        lines.forEachIndexed { n, line ->
+            val body = line.trim().removeSuffix(",")
+            if (body.isEmpty() || body == "{" || body == "}") return@forEachIndexed
+            val m = ORDER_LINE.matchEntire(body) ?: throw SourceException(source, n + 1, "expected \"字\": \"strokes\"")
+            val c = m.groupValues[1]
+            if (c.codePointCount(0, c.length) != 1) throw SourceException(source, n + 1, "not one character: $c")
+            orders[c.codePointAt(0)] = m.groupValues[2].map { KINDS[it] ?: throw SourceException(source, n + 1, "not a stroke: $it") }.joinToString("")
+        }
+    }
+
     /** [codePoint]'s radical and parts, as [build] chooses them; null for a character Unihan gives no radical. */
     fun entry(codePoint: Int): CharInfo.Entry? {
         val radical = radicalOf[codePoint] ?: return null
@@ -99,7 +124,7 @@ class CharInfoBuilder {
         val way = ways[codePoint]?.let { all -> all.firstOrNull { w -> w.any { it in variants } } ?: all.first() }
         val shown = way?.firstOrNull { it in variants } ?: own
         val strokes = totalStrokes[codePoint] ?: strokeOrders[codePoint] ?: 0
-        return CharInfo.Entry(String(Character.toChars(shown)), strokes, way?.map { String(Character.toChars(it)) })
+        return CharInfo.Entry(String(Character.toChars(shown)), strokes, way?.map { String(Character.toChars(it)) }, orders[codePoint])
     }
 
     fun build(): DataFile.Writer {
@@ -110,6 +135,10 @@ class CharInfoBuilder {
         val starts = IntArray(taken.size + 1)
         taken.forEachIndexed { i, (_, e) -> starts[i + 1] = starts[i] + e.parts!!.size }
         val parts = taken.flatMap { (_, e) -> e.parts!!.map { it.codePointAt(0) } }.toIntArray()
+        val ordered = chars.filter { it.second.order != null }
+        val orderStarts = IntArray(ordered.size + 1)
+        ordered.forEachIndexed { i, (_, e) -> orderStarts[i + 1] = orderStarts[i] + e.order!!.length }
+        val strokes = ordered.flatMap { (_, e) -> e.order!!.map { Strokes.KEYS.indexOf(it) } }.toIntArray()
         return DataFile.Writer(DataFile.KIND_CHAR_INFO, CharInfo.VERSION)
             .add(Section.CHARS, BitPacked.encode(chars.size) { chars[it].first })
             .add(Section.RADICALS, BitPacked.encode(shown.toIntArray()))
@@ -118,6 +147,9 @@ class CharInfoBuilder {
             .add(Section.PART_CHARS, BitPacked.encode(taken.size) { taken[it].first })
             .add(Section.PART_START, BitPacked.encode(starts))
             .add(Section.PARTS, BitPacked.encode(parts))
+            .add(Section.ORDER_CHARS, BitPacked.encode(ordered.size) { ordered[it].first })
+            .add(Section.ORDER_START, BitPacked.encode(orderStarts))
+            .add(Section.ORDERS, BitPacked.encode(strokes))
     }
 
     private fun codePoint(field: String): Int? =
@@ -127,6 +159,12 @@ class CharInfoBuilder {
         private const val RS = "kRSUnicode"
         private const val TOTAL = "kTotalStrokes"
         private const val HEX = 16
+        private val ORDER_LINE = Regex("\"(.+)\": \"([a-z]+)\"")
+
+        /** cnchar's shapes by their five kinds, [Strokes.KEYS]' letters: 横 丨 丿 丶, every turning one 乛. */
+        val KINDS: Map<Char, Char> = mapOf(
+            'j' to "h", 'i' to "h", 'f' to "s", 'g' to "s", 's' to "p", 'k' to "n", 'd' to "n", 'l' to "n",
+        ).mapValues { it.value[0] } + "abcehmnopqrtuvwxyz".associateWith { 'z' }
 
         /**
          * Kangxi radicals by number, each as the mainland writes it on the side or top of a character

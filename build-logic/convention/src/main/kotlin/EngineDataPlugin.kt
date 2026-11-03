@@ -200,6 +200,14 @@ class EngineDataPlugin : Plugin<Project> {
             "826f83be25cd18fb8a5015a514704504e1982e840ea14d058bf583e1cc620c83",
             "engine-data/CJKRadicals-17.0.0.txt",
         )
+        // each character's stroke order as the mainland writes it (《现代汉语通用字笔顺规范》), 6,939
+        // simplified characters: cnchar's (theajack/cnchar, MIT)
+        private const val CNCHAR_COMMIT = "b8397db3e08e88ebbf8acf92b5cbab1a7e4c1550"
+        private val ORDERS = Download(
+            "https://raw.githubusercontent.com/theajack/cnchar/$CNCHAR_COMMIT/src/cnchar/plugin/order/dict/stroke-order-jian.json",
+            "412e3beb587aa5e8b423655226b956eaef0496e8c06e486d7584b2f3e1dbcdcc",
+            "engine-data/cnchar-${CNCHAR_COMMIT.take(8)}-stroke-order-jian.json",
+        )
 
         const val OPENCC_TASK = "compileOpenccData"
 
@@ -250,6 +258,7 @@ class EngineDataPlugin : Plugin<Project> {
         val chaiziDownload = registerDownload(target, "downloadChaizi", CHAIZI, downloadsDir)
         val unihanZip = registerDownload(target, "downloadUnihanZip", UNIHAN_ZIP, downloadsDir)
         val radicals = registerDownload(target, "downloadCjkRadicals", RADICALS, downloadsDir)
+        val orders = registerDownload(target, "downloadStrokeOrders", ORDERS, downloadsDir)
 
         val tool = target.configurations.create(TOOL_CONFIGURATION) {
             isCanBeConsumed = false
@@ -313,6 +322,7 @@ class EngineDataPlugin : Plugin<Project> {
             this.radicals.set(radicals.flatMap { it.outputFile })
             this.chaizi.set(chaiziDownload.flatMap { it.outputFile })
             this.strokes.set(strokes.flatMap { it.outputFile })
+            this.orders.set(orders.flatMap { it.outputFile })
             pinyin.set(compile.flatMap { it.outputDir.file("engine/pinyin.data") })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-charinfo"))
         }
@@ -583,9 +593,9 @@ class EngineDataPlugin : Plugin<Project> {
     }
 
     /**
-     * `engine/charinfo.data`: ime-dict-tool's `charinfo`, each character's radical, strokes and parts;
-     * the build fails if a character handwriting knows has no reading, radical or strokes, or under 97%
-     * of them are taken apart.
+     * `engine/charinfo.data`: ime-dict-tool's `charinfo`, each character's radical, strokes, parts and
+     * stroke order; the build fails if a character handwriting knows has no reading, radical or strokes,
+     * or under 97% of them are taken apart, or under 94% have the mainland's stroke order.
      */
     @CacheableTask
     abstract class CompileCharInfo : ToolDataTask() {
@@ -605,6 +615,10 @@ class EngineDataPlugin : Plugin<Project> {
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val strokes: RegularFileProperty
 
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val orders: RegularFileProperty
+
         /** The compiled pinyin data: whether each character handwriting knows has readings. */
         @get:InputFile
         @get:PathSensitive(PathSensitivity.NONE)
@@ -621,7 +635,8 @@ class EngineDataPlugin : Plugin<Project> {
             runTool("charinfo.data", "1g") {
                 listOf(
                     "charinfo", "-o", it, "--unihan", unihan.get().asFile.path, "--radicals", radicals.get().asFile.path,
-                    "--chaizi", chaizi.get().asFile.path, "--strokes", strokes.get().asFile.path, "--pinyin", pinyin.get().asFile.path,
+                    "--chaizi", chaizi.get().asFile.path, "--strokes", strokes.get().asFile.path,
+                    "--orders", orders.get().asFile.path, "--pinyin", pinyin.get().asFile.path,
                 ) + (cover.orNull?.let { c -> listOf("--cover", c.asFile.path) } ?: emptyList())
             }
         }

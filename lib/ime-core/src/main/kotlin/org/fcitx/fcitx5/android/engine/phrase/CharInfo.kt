@@ -7,13 +7,14 @@ package org.fcitx.fcitx5.android.engine.phrase
 import org.fcitx.fcitx5.android.engine.data.BitPacked
 import org.fcitx.fcitx5.android.engine.data.DataFile
 import org.fcitx.fcitx5.android.engine.data.ensureFormat
+import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import java.nio.ByteBuffer
 
 /**
  * A character's radical, its strokes and its parts, for its card (`engine/charinfo.data`,
  * ime-dict-tool's `charinfo`): Unihan's kRSUnicode and kTotalStrokes (Unicode License v3) with
- * CJKRadicals.txt, the open 汉语拆字字典 (kfcd/chaizi, CC BY 3.0) and rime-stroke for a character
- * Unihan counts no strokes of. How each is chosen: [CharInfoBuilder].
+ * CJKRadicals.txt, the open 汉语拆字字典 (kfcd/chaizi, CC BY 3.0), rime-stroke for a character
+ * Unihan counts no strokes of, and cnchar's stroke orders (MIT). How each is chosen: [CharInfoBuilder].
  */
 class CharInfo private constructor(
     private val chars: BitPacked,
@@ -23,19 +24,27 @@ class CharInfo private constructor(
     private val partChars: BitPacked,
     private val partStart: BitPacked,
     private val parts: BitPacked,
+    private val orderChars: BitPacked,
+    private val orderStart: BitPacked,
+    private val orders: BitPacked,
 ) {
     /**
      * Of one character: its [radical] as the mainland writes it (江 氵, 说 讠), its [strokes] (0 if
      * not known), and the [parts] it is made of, the radical's among them where one is (氵 工); null
-     * for a character not taken apart (乾, and those of one part: 一 乙).
+     * for a character not taken apart (乾, and those of one part: 一 乙); its stroke [order] as the
+     * mainland writes it, a [org.fcitx.fcitx5.android.engine.stroke.Strokes.KEYS] letter a stroke
+     * (行 ppshhs), null where not known (a traditional or rare character).
      */
-    data class Entry(val radical: String, val strokes: Int, val parts: List<String>?)
+    data class Entry(val radical: String, val strokes: Int, val parts: List<String>?, val order: String? = null)
 
     init {
         ensureFormat(radical.size == chars.size && strokes.size == chars.size) { "character info disagrees with its characters" }
         radical.checkBelow("radicals", radicals.size)
         ensureFormat(partStart.size == partChars.size + 1) { "parts disagree with their characters" }
         partStart.checkRuns("parts", 0, parts.size)
+        ensureFormat(orderStart.size == orderChars.size + 1) { "stroke orders disagree with their characters" }
+        orderStart.checkRuns("stroke orders", 0, orders.size)
+        orders.checkBelow("strokes", Strokes.KEYS.length)
     }
 
     private fun find(table: BitPacked, codePoint: Int): Int {
@@ -49,7 +58,9 @@ class CharInfo private constructor(
         if (i < 0) return null
         val p = find(partChars, codePoint)
         val partList = if (p < 0) null else (partStart[p] until partStart[p + 1]).map { String(Character.toChars(parts[it])) }
-        return Entry(String(Character.toChars(radicals[radical[i]])), strokes[i], partList)
+        val o = find(orderChars, codePoint)
+        val order = if (o < 0) null else (orderStart[o] until orderStart[o + 1]).map { Strokes.KEYS[orders[it]] }.joinToString("")
+        return Entry(String(Character.toChars(radicals[radical[i]])), strokes[i], partList, order)
     }
 
     /** How many characters it knows. */
@@ -66,11 +77,14 @@ class CharInfo private constructor(
         const val PART_CHARS = 5
         const val PART_START = 6
         const val PARTS = 7
+        const val ORDER_CHARS = 8
+        const val ORDER_START = 9
+        const val ORDERS = 10
     }
 
     companion object {
         /** Layout of the sections; bump on any change to it. */
-        const val VERSION = 1
+        const val VERSION = 2
 
         /** None known: an app without the file. */
         val EMPTY: CharInfo by lazy { load(ByteBuffer.wrap(CharInfoBuilder().build().toByteArray())) }
@@ -85,6 +99,9 @@ class CharInfo private constructor(
                 file.bitPacked(Section.PART_CHARS),
                 file.bitPacked(Section.PART_START),
                 file.bitPacked(Section.PARTS),
+                file.bitPacked(Section.ORDER_CHARS),
+                file.bitPacked(Section.ORDER_START),
+                file.bitPacked(Section.ORDERS),
             )
         }
     }

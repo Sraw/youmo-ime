@@ -74,11 +74,21 @@ class CharInfoTest {
             ab	a b
         """.trimIndent()
 
+        // as cnchar's stroke-order-jian.json has them
+        val ORDERS = """
+            {
+            	"江": "kkijfj",
+            	"行": "ssfjjg",
+            	"和": "sjfskfcj"
+            }
+        """.trimIndent()
+
         fun builder(): CharInfoBuilder = CharInfoBuilder()
             .unihan(UNIHAN.lineSequence(), "Unihan_IRGSources.txt")
             .radicals(RADICALS.lineSequence(), "CJKRadicals.txt")
             .chaizi(CHAIZI.lineSequence())
             .strokes(0x20000, 4)
+            .orders(ORDERS.lineSequence(), "stroke-order-jian.json")
 
         val info: CharInfo by lazy { CharInfo.load(ByteBuffer.wrap(builder().build().toByteArray())) }
     }
@@ -87,7 +97,7 @@ class CharInfoTest {
 
     @Test
     fun theRadicalAsTheMainlandWritesItWhereThePartsShowIt() {
-        assertEquals(CharInfo.Entry("氵", 6, listOf("氵", "工")), of("江"))
+        assertEquals(CharInfo.Entry("氵", 6, listOf("氵", "工"), "nnhhsh"), of("江"))
         assertEquals(CharInfo.Entry("扌", 5, listOf("扌", "丁")), of("打"))
         // 草's own name for its top (草 早) is no way apart; 艹 早 is
         assertEquals(CharInfo.Entry("艹", 9, listOf("艹", "早")), of("草"))
@@ -99,8 +109,8 @@ class CharInfoTest {
     fun aSimplifiedRadicalAndOneAsKangxiHasIt() {
         assertEquals(CharInfo.Entry("讠", 9, listOf("讠", "兑")), of("说"))
         assertEquals(CharInfo.Entry("贝", 17, listOf("亡", "口", "月", "贝", "凡")), of("赢"))
-        assertEquals(CharInfo.Entry("口", 8, listOf("禾", "口")), of("和"))
-        assertEquals(CharInfo.Entry("行", 6, listOf("彳", "亍")), of("行"))
+        assertEquals(CharInfo.Entry("口", 8, listOf("禾", "口"), "phspnszh"), of("和"))
+        assertEquals(CharInfo.Entry("行", 6, listOf("彳", "亍"), "ppshhs"), of("行"))
     }
 
     @Test
@@ -111,6 +121,21 @@ class CharInfoTest {
         assertNull(of("一"))
         assertEquals(11, info.size)
         assertEquals(8, info.taken)
+    }
+
+    @Test
+    fun theMainlandsStrokeOrderInItsFiveKinds() {
+        // 提 a 横, 竖钩 a 竖 (行 ends 丨, as 《现代汉语通用字笔顺规范》 counts it; rime-stroke's first: 乛), 横折 a 乛
+        assertEquals("nnhhsh", of("江")!!.order)
+        assertEquals("ppshhs", of("行")!!.order)
+        assertEquals("phspnszh", of("和")!!.order)
+        assertNull(of("打")!!.order)
+        assertEquals(CharInfoBuilder.KINDS.keys, ('a'..'z').toSet())
+        val e = assertThrows(SourceException::class.java) {
+            CharInfoBuilder().orders(sequenceOf("{", "\t\"江\": \"kkijfj\",", "\t\"行\": \"ssf1\""), "o.json")
+        }
+        assertEquals(2 + 1, e.line)
+        assertThrows(SourceException::class.java) { CharInfoBuilder().orders(sequenceOf("\"ab\": \"jj\""), "o.json") }
     }
 
     @Test

@@ -67,7 +67,9 @@ data class CharCard(
             }
             val entry = info.of(cp)
             val parts = entry?.parts?.map { p -> Part(p, readings.ordered(p.codePointAt(0)).firstOrNull()?.pinyin) }
-            val order = if (text.length == 1) strokes?.ordersOf(text[0])?.firstOrNull()?.let(Strokes::shown) else null
+            // the mainland's order (charinfo.data's, cnchar's); rime-stroke's first for a character it lacks
+            val order = entry?.order?.let(Strokes::shown)
+                ?: if (text.length == 1) strokes?.ordersOf(text[0])?.firstOrNull()?.let(Strokes::shown) else null
             return CharCard(text, rows, entry?.radical, entry?.strokes?.takeIf { it > 0 } ?: order?.length, parts, order)
         }
     }

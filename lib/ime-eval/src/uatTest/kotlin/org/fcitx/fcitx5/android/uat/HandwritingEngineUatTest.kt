@@ -167,4 +167,16 @@ class HandwritingEngineUatTest {
         val words = listOf(he, card("呢", "口"), card("数", "口")).flatMap { c -> c.readings.flatMap { it.examples } }
         assertTrue(words.toString(), words.none { it in setOf("荣和", "去呢", "弦数") })
     }
+
+    // the mainland's stroke order (the user, 2026-11-02), where rime-stroke's first is not: 行 ppshhz,
+    // 出 szszs, 必 nznnp, 我 phzhznp
+    @Test
+    @Uat("HW-29")
+    fun aCardsStrokeOrderIsTheMainlands() {
+        assertEquals("丿丿丨一一丨", card("行", "口").strokeOrder)
+        assertEquals("乛丨丨乛丨", card("出", "口").strokeOrder)
+        assertEquals("丶乛丶丿丶", card("必", "口").strokeOrder)
+        assertEquals("丿一丨一乛丿丶", card("我", "口").strokeOrder)
+        assertEquals("丶丿一丨丿丶乛丿一丿一丿丶", card("数", "口").strokeOrder)
+    }
 }
