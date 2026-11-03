@@ -266,8 +266,9 @@ class KeyRouter(
             s.commit.isNotEmpty() -> null
             log == null || !s.handled -> log
             // a candidate's action (forget, pin, block) or pick sent again by its index could land on
-            // another word, the list reordered since: what follows it is never typed again (review M2)
-            key.event in RETYPED -> log.apply { add(key) }
+            // another word, the list reordered since: what follows it is never typed again (review M2).
+            // A key's pick the same: a digit, space, the keypad's digit (Snapshot.picked)
+            !s.picked && key.event in RETYPED -> log.apply { add(key) }
             else -> null
         }
     }

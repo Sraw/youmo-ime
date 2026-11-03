@@ -370,4 +370,6 @@ data class Snapshot(
     val deleteBefore: Int = 0,
     val cursor: Int = -1,
     val lookingUp: Boolean = false,
+    /** A key chose a candidate (a digit, space: Keyboard's [Action.Select]); what it took hangs on the list shown. */
+    val picked: Boolean = false,
 )
