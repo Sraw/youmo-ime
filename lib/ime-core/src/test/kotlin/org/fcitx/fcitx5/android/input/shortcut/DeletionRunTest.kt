@@ -27,15 +27,19 @@ class DeletionRunTest {
         textAfterCursor(after).toString(),
     )
 
+    // the field as a run reads it, the app giving at most [gives] of each side
+    private fun FakeEditor.read(before: Int, after: Int, gives: Int = Int.MAX_VALUE) =
+        ClearedText.Read(field(minOf(before, gives), minOf(after, gives)), minOf(selectionStart, selectionEnd))
+
     /** One Backspace: [units] before the cursor deleted as the editor's one character, or the selection. */
-    private fun FakeEditor.backspace(kept: ClearedText, units: Int = 1) {
+    private fun FakeEditor.backspace(kept: ClearedText, units: Int = 1, gives: Int = Int.MAX_VALUE) {
         val selection = selectionStart != selectionEnd
-        kept.deleting(f, selection) { b, a -> field(b, a) }
+        kept.deleting(f, selection) { b, a -> read(b, a, gives) }
         if (selection) commitText("", 1) else deleteSurroundingText(units, 0, false)
     }
 
-    private fun FakeEditor.restore(kept: ClearedText, typing: Boolean = false): Boolean =
-        kept.take(f, field(), typing)?.also { EditPlan.apply(it.restore, this) {} } != null
+    private fun FakeEditor.restore(kept: ClearedText, typing: Boolean = false, gives: Int = 10_000): Boolean =
+        kept.take(f, field(gives, gives), typing)?.also { EditPlan.apply(it.restore, this) {} } != null
 
     @Test
     @Uat("KB-64")
@@ -139,7 +143,7 @@ class DeletionRunTest {
         val editor = FakeEditor("abcd")
         val watched = WatchedEditor(editor) { kept.edited() }
         repeat(2) {
-            kept.deleting(f, false) { b, a -> editor.field(b, a) }
+            kept.deleting(f, false) { b, a -> editor.read(b, a) }
             watched.quietly { watched.deleteSurroundingText(1, 0, true) }
         }
         assertTrue(editor.restore(kept))
@@ -301,9 +305,116 @@ class DeletionRunTest {
         editor.backspace(kept)
         val other = Any()
         assertEquals(null, kept.take(other, editor.field(), typing = false))
-        kept.deleting(other, false) { b, a -> editor.field(b, a) }
+        kept.deleting(other, false) { b, a -> editor.read(b, a) }
         assertEquals(null, kept.take(f, editor.field(), typing = false))
         kept.forget()
         assertEquals(null, kept.take(other, editor.field(), typing = false))
+    }
+
+    // review M1: a clear since the run is told by the field alone, kept however the field is edited
+    @Test
+    fun aClearSinceTheRunOutlastsAnEditAsAClearAloneDoes() {
+        val kept = ClearedText()
+        val editor = FakeEditor("abc def")
+        editor.backspace(kept)
+        val clearing = EditPlan.clear(editor.field(), 6, 6, 10_000, password = false)
+        EditPlan.apply(clearing.steps, editor) {}
+        kept.remember(f, clearing.cleared)
+        assertEquals("", editor.text)
+        kept.edited()
+        assertTrue(editor.restore(kept))
+        assertEquals("abc de", editor.text)
+        assertFalse("the run, left by a field edited since, is gone", editor.restore(kept))
+
+        // a clear alone: an edit changing nothing the field reads leaves it
+        val alone = FakeEditor("xyz")
+        val cleared = EditPlan.clear(alone.field(), 3, 3, 10_000, password = false)
+        EditPlan.apply(cleared.steps, alone) {}
+        kept.remember(f, cleared.cleared)
+        kept.edited()
+        assertTrue(alone.restore(kept))
+        assertEquals("xyz", alone.text)
+    }
+
+    // the app changed what is before the cursor, as long as the run left it: nothing put back, not hello's o after help
+    @Test
+    fun whatIsLeftNotTheStartOfWhatWasReadIsNotTheRunsAndNothingIsPutBack() {
+        val kept = ClearedText()
+        val editor = FakeEditor("hello")
+        editor.backspace(kept)
+        editor.setSelection(3, 4)
+        editor.commitText("p", 1)
+        assertEquals("help", editor.text)
+        assertFalse(editor.restore(kept))
+        assertEquals("help", editor.text)
+    }
+
+    // cut short, two lengths the presses can have taken (an e and its accent, or two accents and an e's): neither put back
+    @Test
+    fun whereTheEndMeetsInTwoPlacesThePressesMayHaveTakenNothingIsPutBack() {
+        val kept = ClearedText()
+        val accented = "e\u0301".repeat(ClearedText.READ_BEFORE)
+        val editor = FakeEditor(accented)
+        repeat(2) { editor.backspace(kept) }
+        assertFalse(editor.restore(kept))
+        assertEquals(accented.length - 2, editor.text.length)
+    }
+
+    // review L6: the same character a long way, every length meeting the end: a few presses' search
+    @Test
+    fun aRunFarIntoALongFieldOfOneCharacterIsToldQuickly() {
+        val kept = ClearedText()
+        val ha = "哈".repeat(5_000)
+        val editor = FakeEditor(ha)
+        repeat(300) { editor.backspace(kept) }
+        val start = System.nanoTime()
+        assertTrue(editor.restore(kept))
+        val ms = (System.nanoTime() - start) / 1e6
+        println("DeletionRunTest: 300 of 5000 哈 put back in $ms ms")
+        assertEquals(ha, editor.text)
+        assertTrue("$ms ms", ms < 500)
+    }
+
+    // review M7: an app giving less than asked of a field longer than that: its start is not the read's
+    @Test
+    fun anAppGivingLessThanAskedIsReadAsCutShort() {
+        val kept = ClearedText()
+        val a = "a".repeat(500)
+        val editor = FakeEditor(a)
+        repeat(30) { editor.backspace(kept, gives = 100) }
+        assertTrue(editor.restore(kept, gives = 100))
+        assertEquals(a, editor.text)
+        assertEquals(500, editor.selectionStart)
+    }
+
+    // a tap on the field: the next Backspace starts another run, the last put back where it still can be
+    @Test
+    fun aTapOnTheFieldStartsAnotherRun() {
+        val kept = ClearedText()
+        val editor = FakeEditor("abcdef")
+        editor.backspace(kept)
+        kept.moved()
+        editor.setSelection(2, 2)
+        editor.backspace(kept)
+        assertEquals("acde", editor.text)
+        assertTrue(editor.restore(kept))
+        assertEquals("abcde", editor.text)
+        assertEquals(2, editor.selectionStart)
+        assertFalse("the first, its cursor elsewhere", editor.restore(kept))
+
+        // tapped where it was: the run kept to put back, a Backspace then one of its own
+        val same = FakeEditor("abc")
+        same.backspace(kept)
+        kept.moved()
+        assertTrue(same.restore(kept))
+        assertEquals("abc", same.text)
+        same.backspace(kept)
+        kept.moved()
+        same.backspace(kept)
+        assertEquals("a", same.text)
+        assertTrue(same.restore(kept))
+        assertEquals("ab", same.text)
+        assertTrue(same.restore(kept))
+        assertEquals("abc", same.text)
     }
 }

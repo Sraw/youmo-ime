@@ -57,7 +57,8 @@ class KeyShortcutRunner(
         when (command) {
             KeyCommand.SelectAll -> menu(EditPlan.Menu.SelectAll)
             KeyCommand.Copy -> {
-                apply(EditPlan.copy(range.start, range.end))
+                // the field as it was, the cursor back: a run of Backspaces goes on after it, as after the panel's copy (review L3)
+                service.quietly { apply(EditPlan.copy(range.start, range.end)) }
                 if (copyIsSaid(service.currentInputEditorInfo)) service.say(R.string.text_copied)
             }
             KeyCommand.Cut -> apply(EditPlan.cut(range.start, range.end))

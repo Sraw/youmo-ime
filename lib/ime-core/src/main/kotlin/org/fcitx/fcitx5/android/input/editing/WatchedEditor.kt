@@ -6,8 +6,9 @@ package org.fcitx.fcitx5.android.input.editing
 
 /**
  * [inner], each change it makes to the field's text or cursor told to [changed] first, but those
- * made [quietly] (a Backspace's own deletion, the backspace swipe's selection). Finishing or marking
- * a composition leaves both as they are, and is not told.
+ * made [quietly] (a Backspace's own deletion, the backspace swipe's selection, a copy's). Finishing or
+ * marking a composition leaves both as they are, and is not told. A change made past it (a menu
+ * action, a key event) is told by [changing].
  */
 class WatchedEditor(private val inner: InputEditor, private val changed: () -> Unit) : InputEditor by inner {
 
@@ -22,27 +23,28 @@ class WatchedEditor(private val inner: InputEditor, private val changed: () -> U
         }
     }
 
-    private fun change() {
+    /** A change about to be made to the field some other way: told unless made [quietly]. */
+    fun changing() {
         if (quiet == 0) changed()
     }
 
     override fun commitText(text: String, newCursorPosition: Int) {
-        change()
+        changing()
         inner.commitText(text, newCursorPosition)
     }
 
     override fun setComposingText(text: CharSequence, newCursorPosition: Int) {
-        change()
+        changing()
         inner.setComposingText(text, newCursorPosition)
     }
 
     override fun setSelection(start: Int, end: Int) {
-        change()
+        changing()
         inner.setSelection(start, end)
     }
 
     override fun deleteSurroundingText(before: Int, after: Int, inCodePoints: Boolean) {
-        change()
+        changing()
         inner.deleteSurroundingText(before, after, inCodePoints)
     }
 }

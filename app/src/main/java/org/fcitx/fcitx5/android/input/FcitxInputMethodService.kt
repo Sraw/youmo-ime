@@ -269,6 +269,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     /** 清除's clears, to put back (恢复) in the input they were made in alone (review M1). */
     val clearedText = ClearedText()
 
+    /** [block]'s changes to the field (a copy's selection and back) ending no run of deletions. */
+    fun <T> quietly(block: () -> T): T = fieldEditor.quietly(block)
+
     // the field the floating window's cursor and drag are of, last typed on with the hardware keyboard
     private var cursorField: EditorInfo? = null
 
@@ -522,11 +525,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             // something typed: a run of deletions before it is over
             is HostEvent.InputPanel -> if (event.preedit.isNotEmpty()) clearedText.edited()
             is HostEvent.InputMethodChanged -> {
-                clearedText.edited()
                 val im = event.im
                 hardwareKeyboard.inputMethodChanged(im)
-                // the session switched to knows nothing of the field yet: told it, after fcitx's reset of it (FieldPolicy)
-                if (fieldPolicy.inputMethodChanged(im)) tellContext(started = true)
+                // the session switched to knows nothing of the field yet: told it, after fcitx's reset of it (FieldPolicy).
+                // What it types is not a run's: a run ends. Not the same one focused again, as the screen turning has it (review L4)
+                if (fieldPolicy.inputMethodChanged(im)) {
+                    clearedText.edited()
+                    tellContext(started = true)
+                }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                     // (one not synced yet has no subtype: the status icon below is still updated)
                     val subtype = SubtypeManager.subtypeOf(im)
@@ -584,14 +590,35 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private fun keepDeleted(selection: Boolean) {
         val field = startedWith ?: return
         if (inSensitiveField || currentInputEditorInfo.isTypeNull()) return
-        clearedText.deleting(field, selection) { before, after ->
-            val ic = currentInputConnection ?: return@deleting null
-            EditPlan.Field(
-                ic.getTextBeforeCursor(before, 0)?.toString() ?: return@deleting null,
-                if (selection) ic.getSelectedText(0)?.toString().orEmpty() else "",
-                ic.getTextAfterCursor(after, 0)?.toString() ?: return@deleting null,
-            )
+        clearedText.deleting(field, selection) { before, after -> readAround(before, after, selected = selection) }
+    }
+
+    /**
+     * The field around the cursor as a run reads it, on the main thread before the deletion: one
+     * round trip where the editor gives its text around the selection at once (API 31), else a read
+     * of each side and the selection (review M2). Null where the editor gives neither.
+     */
+    private fun readAround(before: Int, after: Int, selected: Boolean): ClearedText.Read? {
+        val ic = currentInputConnection ?: return null
+        val tracked = selection.latest.let { minOf(it.start, it.end) }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val around = ic.getSurroundingText(before, after, 0)
+            val start = around?.let { minOf(it.selectionStart, it.selectionEnd) } ?: -1
+            val end = around?.let { maxOf(it.selectionStart, it.selectionEnd) } ?: -1
+            if (around != null && start >= 0 && end <= around.text.length) {
+                val text = around.text.toString()
+                val at = if (around.offset >= 0) around.offset + start else tracked
+                return ClearedText.Read(EditPlan.Field(text.substring(0, start), text.substring(start, end), text.substring(end)), at)
+            }
         }
+        return ClearedText.Read(
+            EditPlan.Field(
+                ic.getTextBeforeCursor(before, 0)?.toString() ?: return null,
+                if (selected) ic.getSelectedText(0)?.toString().orEmpty() else "",
+                ic.getTextAfterCursor(after, 0)?.toString() ?: return null,
+            ),
+            tracked,
+        )
     }
 
     /** An empty pair put in goes whole: its closing one here, the opening one as ever. */
@@ -623,7 +650,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * takes away is not kept as context any more than Backspace's.
      */
     fun performContextMenuAction(id: Int) {
-        clearedText.edited()
+        fieldEditor.changing()
         if ((id == android.R.id.cut || id == android.R.id.paste) && selection.latest.isNotEmpty()) contextMemory.cut()
         currentInputConnection?.performContextMenuAction(id)
     }
@@ -1081,6 +1108,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
     override fun onViewClicked(focusChanged: Boolean) {
         super.onViewClicked(focusChanged)
+        // a tap on the field, the cursor put somewhere: Backspace starts another run. Editors that
+        // do not tell it (a WebView's, Compose's) leave the run as it is (review L5)
+        if (!focusChanged) clearedText.moved()
         inputDeviceMgr.evaluateOnViewClicked(this)
     }
 
