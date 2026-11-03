@@ -35,10 +35,12 @@ import org.fcitx.fcitx5.android.input.theme.KindStyle
 import org.fcitx.fcitx5.android.input.theme.LookDefaults
 import org.fcitx.fcitx5.android.input.theme.NineSlice
 import org.fcitx.fcitx5.android.input.theme.NineSliceLayout
+import org.fcitx.fcitx5.android.input.theme.Palette
 import org.fcitx.fcitx5.android.input.theme.Picture
 import org.fcitx.fcitx5.android.input.theme.PictureWindow
 import org.fcitx.fcitx5.android.input.theme.PressEffect
 import org.fcitx.fcitx5.android.input.theme.Text
+import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import org.fcitx.fcitx5.android.input.theme.BarBase
 import org.fcitx.fcitx5.android.input.theme.BoardBase
 import org.junit.Assert.assertEquals
@@ -98,6 +100,52 @@ class ThemeMakerRulesTest {
                 })
             }
         }
+    }
+
+    // a key's own say over its face (KeyFaceGeometry.Border), which the measured layout gives each key as b
+    private fun borders() = buildJsonArray {
+        for (lookName in listOf("default", "flat")) for ((w, h) in listOf(100f to 160f, 400f to 60f)) for (kind in KeyKind.entries) {
+            for (border in KeyFaceGeometry.Border.entries) {
+                val face = KeyFaceGeometry.of(w, h, kind, looks.getValue(lookName), false, 2.75f, true, border)
+                add(buildJsonObject {
+                    put("keys", lookName)
+                    put("width", w); put("height", h); put("kind", kind.name.lowercase()); put("b", border.name.lowercase())
+                    put("face", area(face.face)); put("shadow", area(face.shadow)); put("pressed", area(face.pressed))
+                    put("border", face.border); put("radius", face.radius); put("oval", face.oval)
+                })
+            }
+        }
+    }
+
+    // which palette field each part is drawn in (ThemeColors), read off a palette whose fields all differ
+    private fun colors() = buildJsonObject {
+        val names = listOf(
+            "backgroundColor", "barColor", "keyboardColor", "keyBackgroundColor", "keyTextColor", "candidateTextColor",
+            "candidateLabelColor", "candidateCommentColor", "altKeyBackgroundColor", "altKeyTextColor",
+            "accentKeyBackgroundColor", "accentKeyTextColor", "keyPressHighlightColor", "keyShadowColor",
+            "popupBackgroundColor", "popupTextColor", "spaceBarColor", "dividerColor", "clipboardEntryColor",
+            "genericActiveBackgroundColor", "genericActiveForegroundColor", "keyBorderColor", "keyHintColor", "toolbarIconColor",
+        )
+        val v = IntArray(names.size) { it + 1 }
+        val p = Palette(
+            v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15], v[16],
+            v[17], v[18], v[19], v[20], v[21], v[22], v[23],
+        )
+        fun name(c: Int?) = c?.let { JsonPrimitive(names[it - 1]) } ?: JsonNull
+        for (blocks in listOf(true, false)) {
+            val keys = LookDefaults.KEYS.copy(blocks = blocks)
+            put(if (blocks) "blocks" else "flat", buildJsonObject {
+                put("board", name(ThemeColors.board(p, keys)))
+                put("panel", name(ThemeColors.panel(p, keys)))
+                put("faces", buildJsonObject { for (kind in KeyKind.entries) put(kind.name.lowercase(), name(ThemeColors.face(p, kind, blocks))) })
+            })
+        }
+        put("bar", buildJsonObject {
+            for ((n, b) in listOf("transparent" to BarBase.Transparent, "color" to BarBase.Color, "picture" to BarBase.Picture(0, 100))) {
+                put(n, name(ThemeColors.bar(p, b)))
+            }
+        })
+        put("dim", JsonArray(listOf(0, 1, 30, 50, 99, 100).map { JsonPrimitive(ThemeColors.dim(it)) }))
     }
 
     private fun nineSlice() = buildJsonArray {
@@ -252,6 +300,8 @@ class ThemeMakerRulesTest {
         val rules = buildJsonObject {
             put("keys", buildJsonObject { looks.forEach { (name, keys) -> put(name, keysJson(keys)) } })
             put("geometry", geometry())
+            put("borders", borders())
+            put("colors", colors())
             put("nineSlice", nineSlice())
             put("pictures", pictures())
             put("blur", blur())

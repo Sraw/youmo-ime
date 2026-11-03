@@ -15237,6 +15237,1535 @@
             "oval": false
         }
     ],
+    "borders": [
+        {
+            "keys": "default",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "letter",
+            "b": "default",
+            "face": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                91.75,
+                143.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "letter",
+            "b": "on",
+            "face": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                91.75,
+                143.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "letter",
+            "b": "off",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "letter",
+            "b": "special",
+            "face": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                91.75,
+                143.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "function",
+            "b": "default",
+            "face": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                91.75,
+                143.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "function",
+            "b": "on",
+            "face": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                91.75,
+                143.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "function",
+            "b": "off",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "function",
+            "b": "special",
+            "face": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                91.75,
+                143.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "space",
+            "b": "default",
+            "face": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                91.75,
+                143.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "space",
+            "b": "on",
+            "face": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                91.75,
+                143.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "space",
+            "b": "off",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "space",
+            "b": "special",
+            "face": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                91.75,
+                143.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "enter",
+            "b": "default",
+            "face": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                91.75,
+                143.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "enter",
+            "b": "on",
+            "face": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                91.75,
+                143.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "enter",
+            "b": "off",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "enter",
+            "b": "special",
+            "face": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                91.75,
+                143.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "letter",
+            "b": "default",
+            "face": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                391.75,
+                43.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "letter",
+            "b": "on",
+            "face": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                391.75,
+                43.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "letter",
+            "b": "off",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "letter",
+            "b": "special",
+            "face": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                391.75,
+                43.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "function",
+            "b": "default",
+            "face": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                391.75,
+                43.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "function",
+            "b": "on",
+            "face": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                391.75,
+                43.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "function",
+            "b": "off",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "function",
+            "b": "special",
+            "face": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                391.75,
+                43.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "space",
+            "b": "default",
+            "face": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                391.75,
+                43.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "space",
+            "b": "on",
+            "face": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                391.75,
+                43.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "space",
+            "b": "off",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "space",
+            "b": "special",
+            "face": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                391.75,
+                43.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "enter",
+            "b": "default",
+            "face": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                391.75,
+                43.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "enter",
+            "b": "on",
+            "face": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                391.75,
+                43.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "enter",
+            "b": "off",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "default",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "enter",
+            "b": "special",
+            "face": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                391.75,
+                43.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "letter",
+            "b": "default",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 0.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "letter",
+            "b": "on",
+            "face": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                91.75,
+                143.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "letter",
+            "b": "off",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 0.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "letter",
+            "b": "special",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 0.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "function",
+            "b": "default",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 0.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "function",
+            "b": "on",
+            "face": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                91.75,
+                143.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "function",
+            "b": "off",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 0.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "function",
+            "b": "special",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 0.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "space",
+            "b": "default",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 0.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "space",
+            "b": "on",
+            "face": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                91.75,
+                143.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "space",
+            "b": "off",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                27.5,
+                44.0,
+                72.5,
+                116.0
+            ],
+            "border": 0.0,
+            "radius": 8.25,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "space",
+            "b": "special",
+            "face": [
+                27.5,
+                44.0,
+                72.5,
+                116.0
+            ],
+            "shadow": null,
+            "pressed": [
+                27.5,
+                44.0,
+                72.5,
+                116.0
+            ],
+            "border": 0.0,
+            "radius": 8.25,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "enter",
+            "b": "default",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 0.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "enter",
+            "b": "on",
+            "face": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                91.75,
+                143.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                91.75,
+                140.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "enter",
+            "b": "off",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                1.875,
+                31.875,
+                98.125,
+                128.125
+            ],
+            "border": 0.0,
+            "radius": 48.125,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 100.0,
+            "height": 160.0,
+            "kind": "enter",
+            "b": "special",
+            "face": [
+                1.875,
+                31.875,
+                98.125,
+                128.125
+            ],
+            "shadow": null,
+            "pressed": [
+                1.875,
+                31.875,
+                98.125,
+                128.125
+            ],
+            "border": 0.0,
+            "radius": 48.125,
+            "oval": true
+        },
+        {
+            "keys": "flat",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "letter",
+            "b": "default",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 0.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "letter",
+            "b": "on",
+            "face": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                391.75,
+                43.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "letter",
+            "b": "off",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 0.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "letter",
+            "b": "special",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 0.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "function",
+            "b": "default",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 0.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "function",
+            "b": "on",
+            "face": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                391.75,
+                43.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "function",
+            "b": "off",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 0.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "function",
+            "b": "special",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 0.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "space",
+            "b": "default",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 0.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "space",
+            "b": "on",
+            "face": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                391.75,
+                43.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "space",
+            "b": "off",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                27.5,
+                0.0,
+                372.5,
+                60.0
+            ],
+            "border": 0.0,
+            "radius": 8.25,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "space",
+            "b": "special",
+            "face": [
+                27.5,
+                0.0,
+                372.5,
+                60.0
+            ],
+            "shadow": null,
+            "pressed": [
+                27.5,
+                0.0,
+                372.5,
+                60.0
+            ],
+            "border": 0.0,
+            "radius": 8.25,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "enter",
+            "b": "default",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 0.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "enter",
+            "b": "on",
+            "face": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "shadow": [
+                8.25,
+                19.25,
+                391.75,
+                43.5
+            ],
+            "pressed": [
+                8.25,
+                19.25,
+                391.75,
+                40.75
+            ],
+            "border": 0.0,
+            "radius": 11.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "enter",
+            "b": "off",
+            "face": null,
+            "shadow": null,
+            "pressed": [
+                170.0,
+                0.0,
+                230.0,
+                60.0
+            ],
+            "border": 0.0,
+            "radius": 30.0,
+            "oval": false
+        },
+        {
+            "keys": "flat",
+            "width": 400.0,
+            "height": 60.0,
+            "kind": "enter",
+            "b": "special",
+            "face": [
+                170.0,
+                0.0,
+                230.0,
+                60.0
+            ],
+            "shadow": null,
+            "pressed": [
+                170.0,
+                0.0,
+                230.0,
+                60.0
+            ],
+            "border": 0.0,
+            "radius": 30.0,
+            "oval": true
+        }
+    ],
+    "colors": {
+        "blocks": {
+            "board": "backgroundColor",
+            "panel": null,
+            "faces": {
+                "letter": "keyBackgroundColor",
+                "function": "altKeyBackgroundColor",
+                "space": "keyBackgroundColor",
+                "enter": "accentKeyBackgroundColor"
+            }
+        },
+        "flat": {
+            "board": "keyboardColor",
+            "panel": "barColor",
+            "faces": {
+                "letter": "keyBackgroundColor",
+                "function": "altKeyBackgroundColor",
+                "space": "spaceBarColor",
+                "enter": "accentKeyBackgroundColor"
+            }
+        },
+        "bar": {
+            "transparent": null,
+            "color": "barColor",
+            "picture": null
+        },
+        "dim": [
+            255,
+            252,
+            178,
+            127,
+            2,
+            0
+        ]
+    },
     "nineSlice": [
         {
             "srcWidth": 90,

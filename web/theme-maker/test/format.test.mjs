@@ -50,6 +50,32 @@ test('a key face is laid as the app lays it', () => {
   }
 });
 
+test("a key's own say over its face (the layout's b) is the app's", () => {
+  assert.equal(rules.borders.length, 64);
+  for (const c of rules.borders) {
+    const g = L.keyFace(c.width, c.height, c.kind, rules.keys[c.keys], false, 2.75, true, c.b);
+    const what = JSON.stringify({ k: c.keys, w: c.width, h: c.height, kind: c.kind, b: c.b });
+    sameArea(g.face, c.face, 'face ' + what);
+    sameArea(g.shadow, c.shadow, 'shadow ' + what);
+    sameArea(g.pressed, c.pressed, 'pressed ' + what);
+    assert.equal(g.border, fr(c.border), 'border ' + what);
+    assert.equal(g.radius, fr(c.radius), 'radius ' + what);
+    assert.equal(g.oval, c.oval, 'oval ' + what);
+  }
+});
+
+test('each part is drawn in the palette field the app draws it in', () => {
+  const c = rules.colors;
+  for (const blocks of [true, false]) {
+    const want = c[blocks ? 'blocks' : 'flat'];
+    assert.equal(L.boardField({ blocks }), want.board);
+    assert.equal(L.panelField({ blocks }), want.panel);
+    for (const kind of ['letter', 'function', 'space', 'enter']) assert.equal(L.faceField(kind, blocks), want.faces[kind], kind);
+  }
+  for (const [type, want] of Object.entries(c.bar)) assert.equal(L.barField({ type }), want, type);
+  assert.deepEqual([0, 1, 30, 50, 99, 100].map(L.darkenAlpha), c.dim);
+});
+
 test('a nine-slice image is cut as the app cuts it', () => {
   for (const c of rules.nineSlice) {
     const pieces = L.nineSlice(c.srcWidth, c.srcHeight, c.insets, c.pxPerDp, c.target.map(fr), c.density);
@@ -281,8 +307,15 @@ test('the measured layout and icons have what the preview draws', () => {
   const phones = new Set(layout.phones.map((p) => p.id));
   const box = (r) => assert.ok(Array.isArray(r) && r.length === 4 && r.every(Number.isFinite) && r[2] >= 0 && r[3] >= 0, JSON.stringify(r));
   const color = (c) => assert.ok(layout.palette.includes(c) || /^#[0-9A-F]{8}$/i.test(c), c);
-  const text = (e) => { box(e.r); color(e.c); assert.ok(typeof e.s === 'string' && e.z > 0 && Number.isFinite(e.y)); };
-  const icon = (e) => { box(e.r); color(e.c); assert.ok(icons[e.i], e.i); };
+  const text = (e) => {
+    box(e.r); color(e.c);
+    assert.ok(typeof e.s === 'string' && e.z > 0 && Number.isFinite(e.y));
+    // the alignment and x come together: where the line is set in a view wider than it
+    const al = typeof e.al === 'string' ? e.al : typeof e.a === 'string' ? e.a : undefined;
+    assert.equal(al === undefined, e.x === undefined, JSON.stringify(e));
+    if (al !== undefined) assert.ok(['l', 'c', 'r'].includes(al) && Number.isFinite(e.x), JSON.stringify(e));
+  };
+  const icon = (e) => { box(e.r); color(e.c); assert.ok(icons[e.i], e.i); assert.ok(e.rot === undefined || Number.isFinite(e.rot)); };
   for (const v of layout.views) {
     assert.ok(phones.has(v.phone), v.phone);
     assert.ok(['normal', 'one-handed', 'floating'].includes(v.mode), v.mode);
@@ -291,6 +324,7 @@ test('the measured layout and icons have what the preview draws', () => {
       if (e.t === 'key') {
         box(e.r);
         assert.ok(['letter', 'function', 'space', 'enter'].includes(e.k), e.k);
+        assert.ok(['default', 'on', 'off', 'special'].includes(e.b), e.b);
         if (e.n) assert.ok(L.isKnownKeyName(layout.names, e.n), e.n);
         for (const x of e.l || []) text(x);
         for (const x of e.i || []) icon(x);
