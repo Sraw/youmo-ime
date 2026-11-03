@@ -57,7 +57,8 @@ object EditMenuLayout {
     ): Spot {
         val across = notice.slide == UndoChipPlacement.Slide.Up || notice.slide == UndoChipPlacement.Slide.Down
         val left = if (across) rowLeft(keyCenter, cell, outerLeft, outerRight) else notice.left
-        val top = if (notice.top >= roomTop) notice.top else barMiddle - cell / 2
+        // over the bar, but not off the view's top either (a bar shorter than a cell, high up)
+        val top = if (notice.top >= roomTop) notice.top else (barMiddle - cell / 2).coerceAtLeast(roomTop)
         return Spot(left, top)
     }
 }

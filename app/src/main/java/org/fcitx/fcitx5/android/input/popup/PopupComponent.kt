@@ -95,7 +95,7 @@ class PopupComponent :
     var menuRoom: ((width: Int, height: Int) -> MenuRoom?)? = null
 
     /** The edit menu opened where the notices go ([menuRoom]): the notice's window, over it, put away or hidden. */
-    var onMenuShown: () -> Unit = {}
+    var onMenuShown: (menu: Rect) -> Unit = {}
 
     /** That menu gone: a notice [onMenuShown] hid is back. */
     var onMenuGone: () -> Unit = {}
@@ -172,14 +172,23 @@ class PopupComponent :
      */
     private fun wordsFit(label: String, popup: PopupEntryUi): PreviewLabel.Fit {
         val scale = keyTextScale(context)
+        val width = popup.trigger.width()
+        // asked again on every move of the finger past the threshold: measured once for the same label
+        lastFit?.takeIf { it.label == label && it.scale == scale && it.width == width }?.let { return it.fit }
         val size = sp(PreviewLabel.WORDS_SP * scale)
-        val room = PreviewLabel.room(popup.trigger.width().toFloat(), size, popupPadding.toFloat())
+        val room = PreviewLabel.room(width.toFloat(), size, popupPadding.toFloat())
         val paint = TextPaint(popup.textView.paint)
-        return PreviewLabel.fit(label, size, sp(PreviewLabel.MIN_SP * scale), room) { s, px ->
+        val fit = PreviewLabel.fit(label, size, sp(PreviewLabel.MIN_SP * scale), room) { s, px ->
             paint.textSize = px
             paint.measureText(s)
         }
+        lastFit = FitFor(label, scale, width, fit)
+        return fit
     }
+
+    private class FitFor(val label: String, val scale: Float, val width: Int, val fit: PreviewLabel.Fit)
+
+    private var lastFit: FitFor? = null
 
     /** A key's letter or symbol in the bubble: scaled as the keys' text is (紧凑, floating), as the words are. */
     private fun symbolSize() = sp(PreviewLabel.symbolSize(keyTextScale(context)))
@@ -295,7 +304,7 @@ class PopupComponent :
         }
         if (at != null) {
             menuAbove = viewId
-            onMenuShown()
+            onMenuShown(Rect(at.left, at.top, at.left + cell * cells.size, at.top + cell))
         }
         val menuUi = PopupMenuUi(
             context,

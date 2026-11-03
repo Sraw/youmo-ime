@@ -15,6 +15,8 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.popup.PopupComponent
+import org.fcitx.fcitx5.android.input.InputView
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
@@ -215,6 +217,34 @@ class SwipePopupScreenshotTest {
             h.idle()
             assertTrue("back", h.notice()?.contentView?.isShown == true)
             assertEquals("nothing typed", "hello", h.field.text.toString())
+        }
+    }
+
+    // review L1: the menu taken down with everything (another window, the keyboard's onDetached): the
+    // failure back then, and the finger lifted after does not bring it back a second time
+    @Test
+    fun aFailureIsBackWhenTheMenuGoesWithEverythingAndOnlyOnce() {
+        KeyboardHarness(ThemePreset.PixelLight).use { h ->
+            h.start(prefill = { it.setText("hello") })
+            h.service.say("读不出来", steady = true)
+            h.after(500)
+            val said = h.notice()!!.contentView
+            val popup = InputView::class.java.getDeclaredField("popup").apply { isAccessible = true }.get(h.inputView) as PopupComponent
+            val gone = popup.onMenuGone
+            var goes = 0
+            popup.onMenuGone = { goes++; gone() }
+            val space = h.inputView.findViewById<View>(R.id.button_space)
+            val finger = h.finger(space, h.at(space))
+            for (i in 1..6) finger.move(h.at(space, dy = -10f * i, ms = 16))
+            h.after(500)
+            assertFalse("hidden under the menu", said.isShown)
+            popup.dismissAll()
+            assertEquals(1, goes)
+            assertTrue("back", said.isShown)
+            finger.up(h.at(space, dy = -60f))
+            h.idle()
+            assertEquals("the lift after: nothing to bring back", 1, goes)
+            assertTrue(h.notice()?.contentView?.isShown == true)
         }
     }
 

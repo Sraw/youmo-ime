@@ -308,5 +308,7 @@ class EditPlanTest {
         val beside = UndoChipPlacement.Place(left = 700, top = 1200, slide = UndoChipPlacement.Slide.Right)
         assertEquals(EditMenuLayout.Spot(700, 1200), EditMenuLayout.place(beside, 300, 100, 0, 1080, roomTop = 0, barMiddle = 1050))
         assertEquals("no room above", EditMenuLayout.Spot(150, 1000), EditMenuLayout.place(above, 500, 100, 0, 1080, roomTop = 950, barMiddle = 1050))
+        // review L7: a bar's middle less than half a cell below the view's top: not off it
+        assertEquals("over the bar, inside the view", EditMenuLayout.Spot(150, 1000), EditMenuLayout.place(above, 500, 100, 0, 1080, roomTop = 1000, barMiddle = 1020))
     }
 }

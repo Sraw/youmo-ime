@@ -197,9 +197,9 @@ abstract class BaseInputView(
     /** Where a notice [width] × [height] said now goes (above the keyboard, docked): the edit menu goes there too. */
     protected fun noticePlace(width: Int, height: Int): UndoChipPlacement.Place = undoPlace(width, height, aboveKeys = true)
 
-    /** The edit menu opened where the notice shows, its window over the menu: put away, or a failure hidden ([UndoChip.covered]). */
-    protected fun noticeCovered() {
-        undoChip?.covered()
+    /** The edit menu opened at [menu] (window pixels): a notice its window meets put away, or a failure hidden ([UndoChip.covered]). */
+    protected fun noticeCovered(menu: Rect) {
+        undoChip?.covered(menu)
     }
 
     /** The edit menu gone: a failure it hid back ([UndoChip.uncovered]). */

@@ -74,9 +74,51 @@ class PreviewLabelTest {
     fun aVeryLongTextIsMeasuredOnlyAsFarAsItCouldShow() {
         var longest = 0
         PreviewLabel.fit("字".repeat(200), 16f, 12f, room) { s, size -> longest = maxOf(longest, s.length); ems(s, size) }
-        assertEquals(PreviewLabel.MAX_TEXT, longest)
+        assertEquals("its first MAX_TEXT and the ellipsis", PreviewLabel.MAX_TEXT + 1, longest)
+        // review L4: cut there, told by the ellipsis however much room there is
         val emoji = "a".repeat(PreviewLabel.MAX_TEXT - 1) + "😀"
-        assertEquals("not half an emoji", "a".repeat(PreviewLabel.MAX_TEXT - 1), PreviewLabel.fit(emoji, 1f, 1f, 1000f, ems).text)
+        assertEquals("not half an emoji, the cut told", "a".repeat(PreviewLabel.MAX_TEXT - 1) + "…", PreviewLabel.fit(emoji, 1f, 1f, 1000f, ems).text)
+        val forty = "字".repeat(PreviewLabel.MAX_TEXT)
+        assertEquals("all of it there: no ellipsis", forty, PreviewLabel.fit(forty, 1f, 1f, 1000f, ems).text)
+        assertEquals("only spaces past it: nothing cut", forty, PreviewLabel.fit("$forty  \n ", 1f, 1f, 1000f, ems).text)
+        assertTrue("a cut one is words", PreviewLabel.isWords(" ".repeat(PreviewLabel.MAX_TEXT) + "字字"))
+    }
+
+    // review L2: measured by UTF-16 units, as a paint may weigh a pair: a cut never leaves half of one
+    private val units: (String, Float) -> Float = { s, size -> s.length * size }
+
+    private fun String.whole(): Boolean = indices.none { i ->
+        (this[i].isHighSurrogate() && (i + 1 >= length || !this[i + 1].isLowSurrogate())) ||
+            (this[i].isLowSurrogate() && (i == 0 || !this[i - 1].isHighSurrogate()))
+    }
+
+    @Test
+    fun aCutNeverSplitsASurrogatePair() {
+        for (roomUnits in 2..12) {
+            for (label in listOf("一二三😀😀😀😀😀😀", "😀😀😀😀😀😀😀😀", "a😀b😀c😀d😀e😀f😀")) {
+                val got = PreviewLabel.fit(label, 1f, 1f, roomUnits.toFloat() - 0.5f, units).text
+                assertTrue("$label in $roomUnits: $got", got.whole())
+            }
+        }
+    }
+
+    // review L3: a character as seen is one, however many code points: a symbol's size, never cut apart
+    @Test
+    fun aCharacterAsSeenIsOne() {
+        for (one in listOf("❤️", "🇨🇳", "👍🏽", "👨‍👩‍👧", "e\u0301")) {
+            assertFalse(one, PreviewLabel.isWords(one))
+        }
+        assertTrue(PreviewLabel.isWords("🇨🇳🇯🇵"))
+        // at the least 80 / 12 = 6.67 units: the family (8) does not go in, nor any part of it
+        val family = "👨‍👩‍👧"
+        assertEquals(Fit("一二…", 12f), PreviewLabel.fit("一二$family$family$family", 16f, 12f, room, units))
+        assertEquals("a flag's two halves together", Fit("一二三…", 12f), PreviewLabel.fit("一二三🇨🇳🇨🇳", 16f, 12f, room, units))
+        assertEquals("a skin tone with its hand", Fit("一二三…", 12f), PreviewLabel.fit("一二三👍🏽👍🏽", 16f, 12f, room, units))
+        // abcdé… is 7 units: the é goes whole, not its e kept without the accent
+        assertEquals("an accent with its letter", Fit("abcd…", 12f), PreviewLabel.fit("abcde\u0301fgh", 16f, 12f, room, units))
+        // the MAX_TEXT cut too: not inside the family that straddles it
+        val straddling = "a".repeat(PreviewLabel.MAX_TEXT - 3) + family
+        assertEquals("a".repeat(PreviewLabel.MAX_TEXT - 3) + "…", PreviewLabel.fit(straddling, 1f, 1f, 1000f, units).text)
     }
 
     @Test

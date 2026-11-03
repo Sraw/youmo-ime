@@ -22,7 +22,7 @@ class NoticeState<U : Any> {
     // on its way out: a key typed meanwhile lets it go on rather than start it again
     private var leaving = false
 
-    // a steady one hidden under the edit menu ([cover]), to come back as it goes
+    // hidden under the edit menu ([cover], or [show] while it is up), to come back as it goes
     private var hidden = false
 
     /** What a menu opened where the notice is ([cover]) does to it. */
@@ -41,13 +41,15 @@ class NoticeState<U : Any> {
      * A notice in the place of any shown (rule 5: one at a time), with [undo] to take back, or none.
      * [steady]: a failure, said once as a key fails; the key comes after it and must not put it away
      * unseen, and it stays as long as one with 撤销 (rule 4), a line said 2 s being gone before it is read.
+     * [hidden]: said while the edit menu is up where it would show: under the menu till it goes
+     * ([uncover]), its time not started, any notice alike (none lost to the menu, none over it).
      */
-    fun show(undo: U?, steady: Boolean): Shown<U> {
+    fun show(undo: U?, steady: Boolean, hidden: Boolean = false): Shown<U> {
         val lapsed = pending
         pending = undo
         this.steady = steady
         leaving = false
-        hidden = false
+        this.hidden = hidden
         return Shown(lapsed, if (undo != null || steady) UNDO_MS else SAID_MS)
     }
 
@@ -72,7 +74,7 @@ class NoticeState<U : Any> {
         else -> Cover.Hide.also { hidden = true }
     }
 
-    /** The menu gone: whether a notice [cover] hid is shown again (and timed again, for as long as at first). */
+    /** The menu gone: whether a notice [cover] or [show] hid is shown (and timed from then, for as long as at first). */
     fun uncover(): Boolean = (hidden && !leaving).also { hidden = false }
 
     /** Gone from the screen: the next [typed] has nothing on its way out to leave alone. */

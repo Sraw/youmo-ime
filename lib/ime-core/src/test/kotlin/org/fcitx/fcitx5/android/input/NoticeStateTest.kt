@@ -102,6 +102,15 @@ class NoticeStateTest {
             n.gone()
             assertFalse(n.uncover())
         },
+        // review M1: said while the menu is up where it goes, any notice: not over the menu, not lost
+        "one said under the menu is hidden, and back once as it goes" to {
+            val n = NoticeState<String>()
+            n.show(null, steady = false, hidden = true)
+            assertEquals("hidden already", Cover.None, n.cover())
+            assertTrue(n.uncover())
+            assertFalse(n.uncover())
+            assertTrue("then put away by typing as any", n.typed())
+        },
         "a new one in its place is shown, not hidden" to {
             val n = NoticeState<String>().apply { show(null, steady = true) }
             n.cover()
