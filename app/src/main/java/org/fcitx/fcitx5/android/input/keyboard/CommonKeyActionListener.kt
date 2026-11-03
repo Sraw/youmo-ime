@@ -130,7 +130,7 @@ class CommonKeyActionListener :
                     KeyCommand.Clear -> {
                         val field = service.startedField
                         service.postFcitxJob {
-                            val typing = clearTyped()
+                            val typing = clearTyped(KeyShortcutRunner::keyboardOf)
                             ContextCompat.getMainExecutor(context).execute { shortcutRunner.clear(typing, field) }
                         }
                     }

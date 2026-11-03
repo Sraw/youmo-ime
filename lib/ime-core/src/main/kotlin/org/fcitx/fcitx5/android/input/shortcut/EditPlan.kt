@@ -57,7 +57,7 @@ object EditPlan {
 
     /**
      * 清除 with nothing typed, the field read as [field], its selection [start]..[end] as the editor
-     * reported it: the selection; else all before the cursor; else all after it. A side read whole
+     * reported it: the selection (either a range or text selected says there is one); else all before the cursor; else all after it. A side read whole
      * goes by its length from the cursor, where the editor has it (the reported cursor may lag); one
      * cut short at [limit] to the field's edge, nothing kept. A selection whose text the app gave
      * none of (or too long to) is deleted and not kept: with no text read it is no empty one, the
@@ -66,11 +66,15 @@ object EditPlan {
     fun clear(field: Field, start: Int, end: Int, limit: Int, password: Boolean): Clearing {
         val (before, selected, after) = field
         val from = minOf(start, end)
+        // a selection the editor's report has not caught up with (collapsed yet, its text given: review2):
+        // it starts where the text before it ends, where that was read whole; else not kept
+        val selectedFrom = if (start != end) from else before.length.takeIf { it < limit }
         return when {
-            start != end -> Clearing(
+            start != end || selected.isNotEmpty() -> Clearing(
                 listOf(Step.Replace("")),
-                Cleared(Field(before, "", after), listOf(Step.Select(from, from), Step.Replace(selected), Step.Select(from, from + selected.length)))
-                    .takeIf { selected.isNotEmpty() && selected.length < limit },
+                selectedFrom?.let {
+                    Cleared(Field(before, "", after), listOf(Step.Select(it, it), Step.Replace(selected), Step.Select(it, it + selected.length)))
+                }?.takeIf { selected.isNotEmpty() && selected.length < limit },
             )
             before.length >= limit -> Clearing(listOf(Step.Select(0, from), Step.Replace("")), null)
             before.isNotEmpty() -> Clearing(
@@ -119,16 +123,6 @@ class ClearedText {
     fun forget() {
         field = null
         clears.clear()
-    }
-
-    /**
-     * What was typed ended where it was (the views made anew for a setting: ViewRebuild.endsComposition),
-     * the keyboard maybe another: a clear of what was typed forgotten, as the end dropped what is typed.
-     * Its keys are the keyboard's that typed them, which another reads otherwise or, a code of no session
-     * its keys turn to, commits as letters at its next key. The field's clears stay, the field as it was.
-     */
-    fun forgetTyped() {
-        clears.removeAll { it.typed != null }
     }
 
     /**

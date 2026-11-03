@@ -225,6 +225,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     /** nothing said out loud goes into a password, its characters shown or not */
     val inPasswordField get() = fieldPolicy.password
 
+    /** A password or a field asking for no learning (`IME_FLAG_NO_PERSONALIZED_LEARNING`): nothing of it kept. */
+    val inSensitiveField get() = capabilityFlags.hasAny(CapabilityFlag.PasswordOrSensitive)
+
     /**
      * A URL's or an email's field, where what is typed is what is meant ([PendingInputPolicy]). Read
      * on the main thread as a key is pressed: by the time fcitx gets to it, another field may have started.
@@ -333,13 +336,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     /**
      * Before the views are made anew for [why]: what was typed ended where [ViewRebuild.endsComposition]
      * ([endComposition]). The new views show the caches as they are, then the end's events empty
-     * their code row and bar. A clear of what was typed goes with it: the keyboard may be another
-     * ([ClearedText.forgetTyped]).
+     * their code row and bar.
      */
     private fun rebuilding(why: ViewRebuild) {
-        if (!why.endsComposition) return
-        endComposition()
-        clearedText.forgetTyped()
+        if (why.endsComposition) endComposition()
     }
 
     /**

@@ -208,19 +208,6 @@ class EditPlanTest {
         assertEquals("", text.text)
     }
 
-    // the keyboard changed: what was typed is the keys of the one before; the text cleared since stays
-    @Test
-    fun aKeyboardMadeAnewForgetsWhatWasTypedButNotTheText() {
-        val kept = ClearedText()
-        val editor = FakeEditor("hello", cursor = 5)
-        kept.remember(f, EditPlan.Cleared(editor.field(), emptyList(), typed = "ni"))
-        editor.clear(kept)
-        kept.forgetTyped()
-        assertTrue(editor.restore(kept))
-        assertEquals("hello", editor.text)
-        assertNull("ni forgotten", kept.take(f, editor.field(), typing = false))
-    }
-
     // review M1: another field that reads the same (another chat's empty box, the same view) is
     // another input started: nothing put back there; input started anew or finished forgets all
     @Test
@@ -278,6 +265,30 @@ class EditPlanTest {
         val after = FakeEditor("hello", cursor = 0)
         after.run(EditPlan.clear(after.field(), 3, 3, 1000, password = false).steps)
         assertEquals("", after.text)
+    }
+
+    // review2: a selection the report has not caught up with (collapsed yet, the app giving its text):
+    // the selection goes, never all before it, and is put back where the text before it ends
+    @Test
+    fun aSelectionTheReportLagsIsWhatGoesAndComesBack() {
+        val kept = ClearedText()
+        val editor = FakeEditor("one two three")
+        editor.setSelection(4, 8)
+        val clearing = EditPlan.clear(editor.field(), 2, 2, 1000, password = false)
+        editor.run(clearing.steps)
+        assertEquals("one three", editor.text)
+        kept.remember(f, clearing.cleared)
+        assertTrue(editor.restore(kept))
+        assertEquals("one two three", editor.text)
+        assertEquals(4, editor.selectionStart)
+        assertEquals(8, editor.selectionEnd)
+        // where the text before it is cut short, where it starts is not known: deleted, not kept
+        val long = FakeEditor("abcdefgh")
+        long.setSelection(5, 6)
+        val cut = EditPlan.clear(long.field(4), 0, 0, 4, password = false)
+        long.run(cut.steps)
+        assertEquals("abcdegh", long.text)
+        assertNull(cut.cleared)
     }
 
     @Test

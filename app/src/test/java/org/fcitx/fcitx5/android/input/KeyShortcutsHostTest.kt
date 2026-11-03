@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.view.View
+import android.view.inputmethod.EditorInfo
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.KotlinHost
@@ -25,6 +26,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * The swipes' shortcuts carried out (051-c §4): 清除 and 恢复 on backspace (up and down by default),
@@ -152,6 +155,53 @@ class KeyShortcutsHostTest {
         synced()
         assertEquals("", preedit)
         assertEquals("你好", h.field.text.toString())
+    }
+
+    // review2: a clear on its way (the host's part done, the main thread's not yet) as another field
+    // starts does nothing there: it was the first's
+    @Test
+    fun aClearUnderWayIsNotMadeInAFieldStartedSince() {
+        start("给 A 的话")
+        val held = CountDownLatch(1)
+        h.service.postFcitxJob { held.await(5, TimeUnit.SECONDS) }
+        swipe(backspace, up = true)
+        h.start(fieldId = 2, prefill = { it.setText("给 B 的话"); it.setSelection(5) })
+        held.countDown()
+        synced()
+        assertEquals("给 B 的话", h.field.text.toString())
+    }
+
+    // review2: the screen turned restarts input with the same EditorInfo, the same input: its clear
+    // stays. Finished, then started so again, it is gone (onFinishInput forgets, review M1)
+    @Test
+    fun aClearOutlastsTheScreenTurningButNotTheInputFinishing() {
+        start("你好")
+        swipe(backspace, up = true)
+        until("cleared") { h.field.text.isEmpty() }
+        h.turn()
+        swipe(backspace, up = false)
+        until("put back") { h.field.text.toString() == "你好" }
+        swipe(backspace, up = true)
+        until("cleared again") { h.field.text.isEmpty() }
+        h.service.onFinishInput()
+        h.turn()
+        swipe(backspace, up = false)
+        synced()
+        assertEquals("", h.field.text.toString())
+    }
+
+    // review2: a field that asks for no learning keeps nothing of a clear, as a password does
+    @Test
+    fun aFieldKeptFromLearningIsClearedWithNothingToPutBack() {
+        home = File(appContext.filesDir, "shortcuts-host").apply { deleteRecursively() }
+        fcitx = startedHost(ScriptedEngine(home))
+        h = keyboardOn(fcitx)
+        h.start(imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING, prefill = { it.setText("秘密"); it.setSelection(2) })
+        swipe(backspace, up = true)
+        until("cleared") { h.field.text.isEmpty() }
+        swipe(backspace, up = false)
+        synced()
+        assertEquals("", h.field.text.toString())
     }
 
     // review M1: another field, as empty as the clear left the first, gets nothing of it

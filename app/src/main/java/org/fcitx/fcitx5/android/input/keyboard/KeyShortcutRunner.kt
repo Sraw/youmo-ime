@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 import android.view.KeyEvent
 import androidx.core.content.ContextCompat
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.host.HostCore
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardWindow
@@ -85,13 +86,15 @@ class KeyShortcutRunner(
      */
     fun clear(typing: HostCore.Retyping?, field: Any? = service.startedField) {
         if (field == null || field !== service.startedField) return
-        val password = service.inPasswordField
+        // a field kept from learning is kept from this too (review2): nothing of it remembered
+        val sensitive = service.inSensitiveField
         val kept = if (typing != null) {
-            typing.keys?.let { EditPlan.Cleared(read() ?: return, emptyList(), typing) }
+            // a field not read is said cleared, those before it broken off as for one not kept (review2)
+            typing.keys?.let { read()?.let { now -> EditPlan.Cleared(now, emptyList(), typing) } }
         } else {
             val now = read() ?: return
             val range = service.currentInputSelection
-            val clearing = EditPlan.clear(now, range.start, range.end, READ_LIMIT, password)
+            val clearing = EditPlan.clear(now, range.start, range.end, READ_LIMIT, sensitive)
             if (clearing.steps.isEmpty()) return
             apply(clearing.steps)
             clearing.cleared
@@ -109,9 +112,11 @@ class KeyShortcutRunner(
         val back = field?.let { read()?.let { now -> cleared.take(field, now, typing()) } } ?: return service.say(R.string.nothing_to_restore)
         val typed = back.typed as? HostCore.Retyping
         if (typed == null) return apply(back.restore)
-        // the input method changed since, or the field: said, the clear gone all the same (review S4)
+        // the input method changed since, its keyboard (review2), or the field: said, the clear gone all
+        // the same (review S4)
+        val keyboard = keyboardOf(typed.im)
         service.postFcitxJob {
-            if (!retype(typed)) ContextCompat.getMainExecutor(service).execute { service.say(R.string.nothing_to_restore) }
+            if (!retype(typed, keyboard)) ContextCompat.getMainExecutor(service).execute { service.say(R.string.nothing_to_restore) }
         }
     }
 
@@ -141,8 +146,11 @@ class KeyShortcutRunner(
         },
     )
 
-    private companion object {
+    companion object {
         // what a clear reads of each side to keep it: a field longer is cleared with nothing kept
-        const val READ_LIMIT = 10_000
+        private const val READ_LIMIT = 10_000
+
+        /** [im]'s keyboard as chosen now: what was typed is typed again on the same alone ([HostCore.retype]). */
+        fun keyboardOf(im: String): ImKeyboard = AppPrefs.getInstance().keyboard.imKeyboards().of(im)
     }
 }

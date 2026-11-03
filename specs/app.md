@@ -138,11 +138,13 @@ typed is in, the field's edits as `EditPlan` steps. 清除 (`EditPlan.clear`: wh
 selection, else all before the cursor, else all after) is kept in memory (`ClearedText`, under the EditorInfo input started with, by identity, forgotten as
 input starts in another field or finishes; at most 16), 恢复 putting clears back last first while the
 field reads as each left it and nothing is typed (pinyin never reaching the field, a clear of what is
-typed drops those before it, and is forgotten as the views are made anew for a setting, `ClearedText.forgetTyped`:
-its keys are the keyboard's that typed them); what was typed is dropped and typed
+typed drops those before it); what was typed is dropped and typed
 again by `HostCore.clearTyped`/`retype` (the router's log of the keys since nothing was typed: plain
-keys alone, a pick or a candidate's action ending it, as sent again by its index it could land on
-another word). The
+keys alone, a pick, a key's pick (a digit, space: `Snapshot.picked`) or a candidate's action ending it,
+as sent again by its index it could land on another word), on the keyboard it was typed with alone
+(`HostCore.Retyping.keyboard`, the app's `KeyShortcutRunner.keyboardOf`: another's keys' codes go to
+a session of their own). A field kept from learning (`PasswordOrSensitive`) is cleared with nothing kept;
+an app's own `restartInput` is another input, its clears forgotten. The
 marks on a key are placed by `KeyMarks`, on the keyboard and on 按键字符和快捷键's keys (`KeyCaps`) alike;
 五笔's 全部字根 leaves the letters' shortcuts unmarked (`BaseKeyboard.charShortcutMarks`). 注音 keyboards name their keys `zyfull/<QWERTY letter>` and
 `zy9/…` (`ZhuyinShortcutHook`, until their keyboards land). A long press's keys (`PopupKeyboardUi`, `PopupMenuUi`) are one small size whatever the

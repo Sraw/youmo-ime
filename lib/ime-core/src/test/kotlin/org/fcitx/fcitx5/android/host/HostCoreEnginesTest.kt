@@ -84,6 +84,28 @@ class HostCoreEnginesTest : EnginesFixture() {
         assertEquals(2, core.clearTyped()!!.keys!!.size)
     }
 
+    // review2: the keyboard is the app's to tell, the keys' codes each going to a session of their own
+    // (KeyboardPair): the nine keys' typed again on the full keyboard would type a session shown on none
+    @Test
+    fun `what is typed is typed again on the keyboard it was typed with alone`() {
+        val core = core(engines())
+        val log = mutableListOf<HostEvent>()
+        core.events += HostEvents { log += it }
+        core.activate(1)
+        core.setCapabilities(Capability.PREEDIT or Capability.CLIENT_UNFOCUS_COMMIT)
+        core.focus(true)
+        fun preedit() = log.filterIsInstance<HostEvent.InputPanel>().last().preedit.toString()
+        "64".forEach { core.sendKey(Key(KeySyms.fromUnicode(Keyboard.pinyinNineKey(it))), virtual = true) }
+        assertEquals("ni", preedit())
+        val typing = core.clearTyped { "nine keys of $it" }!!
+        assertEquals("nine keys of ${InputMethodCatalog.PINYIN}", typing.keyboard)
+        assertFalse("another keyboard", core.retype(typing, "full keys"))
+        assertTrue(core.isEmpty())
+        assertTrue(core.retype(typing, "nine keys of ${InputMethodCatalog.PINYIN}"))
+        assertEquals("ni", preedit())
+        assertTrue(log.none { it is HostEvent.Commit })
+    }
+
     // review2 M2: a digit or the keypad's digit picks while something is typed, a part of it
     // chosen as a pick's is: never typed again, the list reordered since could give another word
     @Test

@@ -264,25 +264,32 @@ class HostCore(
     }
 
     /** What is typed dropped, nothing committed ([KeyRouter.clearTyped]): null with nothing typed. */
-    fun clearTyped(): Retyping? = pipeline.batch {
+    fun clearTyped(keyboard: (im: String) -> Any? = { null }): Retyping? = pipeline.batch {
         // 联想's words with nothing typed are not what is typed
         val ic = contexts.active?.takeIf { it.hasFocus && (it.panel.preedit.isNotEmpty() || it.panel.clientPreedit.isNotEmpty()) }
             ?: return@batch null
         val im = contexts.inputMethod(ic)
-        Retyping(im, router.clearTyped(ic, im)).also { pipeline.reset(ic) }
+        Retyping(im, router.clearTyped(ic, im), keyboard(im)).also { pipeline.reset(ic) }
     }
 
-    /** What [clearTyped] dropped typed again, in the input method it was typed in; false when it cannot be. */
-    fun retype(typing: Retyping): Boolean = pipeline.batch {
+    /**
+     * What [clearTyped] dropped typed again, in the input method it was typed in on the [keyboard] it
+     * was typed with; false when it cannot be. The keyboard is the app's to tell: its keys' codes go to
+     * a session of their own (KeyboardPair), so another's would type the one before's, shown on none.
+     */
+    fun retype(typing: Retyping, keyboard: Any? = null): Boolean = pipeline.batch {
         val ic = contexts.active?.takeIf { it.hasFocus } ?: return@batch false
         val keys = typing.keys ?: return@batch false
-        if (contexts.inputMethod(ic) != typing.im) return@batch false
+        if (contexts.inputMethod(ic) != typing.im || keyboard != typing.keyboard) return@batch false
         router.retype(ic, typing.im, keys)
         true
     }
 
-    /** What 清除 dropped while something was typed: [keys] null when it cannot be typed again. */
-    data class Retyping(val im: String, val keys: List<KeyRouter.Typed>?)
+    /**
+     * What 清除 dropped while something was typed: [keys] null when it cannot be typed again; [keyboard]
+     * the one [im] was typed with, as the app told it ([clearTyped]).
+     */
+    data class Retyping(val im: String, val keys: List<KeyRouter.Typed>?, val keyboard: Any? = null)
 
     /** `repositionCursor` (`:454-458`): a tap at [position] in the code row. */
     fun moveCursor(position: Int) = pipeline.batch {
