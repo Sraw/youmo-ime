@@ -20,7 +20,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * 快捷键标记位置's five places (uat/02 KB-64) on the full keyboard, standard and 紧凑, and on 九键,
+ * 快捷键标记位置's five places (uat/02 KB-66) on the full keyboard, standard and 紧凑, and on 九键,
  * 大千 and handwriting: the goldens under src/test/screenshots/KeyMarksScreenshotTest, looked at one
  * by one for a mark on another or on a letter (KeyMarksEverywhereUatTest measures it everywhere).
  */
@@ -48,14 +48,14 @@ class KeyMarksScreenshotTest {
     }
 
     @Test
-    @Uat("KB-64")
+    @Uat("KB-66")
     fun everyPositionOnTheKeyboards() {
         prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
         for (at in ShortcutMarkPosition.entries) for ((name, board) in boards) shoot(name, at, board)
     }
 
     @Test
-    @Uat("KB-64")
+    @Uat("KB-66")
     fun everyPositionCompact() {
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
         for (at in ShortcutMarkPosition.entries) shoot("full_compact", at, boards[0].second)

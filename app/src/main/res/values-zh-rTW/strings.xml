@@ -983,7 +983,7 @@
     <string name="shortcut_undo">復原</string>
     <string name="shortcut_redo">重做</string>
     <string name="shortcut_clear">清除</string>
-    <string name="shortcut_restore">恢復剛清除的</string>
+    <string name="shortcut_restore">恢復剛刪除的</string>
     <string name="shortcut_field_start">游標到開頭</string>
     <string name="shortcut_field_end">游標到結尾</string>
     <string name="shortcut_edit_menu">編輯選單</string>

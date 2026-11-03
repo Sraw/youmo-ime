@@ -21,6 +21,8 @@ sealed class PopupAction {
     data class PreviewUpdateAction(
         override val viewId: Int,
         val content: String,
+        /** A swipe's shortcut named: words, smaller and kept narrow ([org.fcitx.fcitx5.android.input.popup.PreviewLabel]). */
+        val words: Boolean = false,
     ) : PopupAction()
 
     data class DismissAction(

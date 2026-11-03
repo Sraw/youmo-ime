@@ -29,7 +29,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Where the keys draw their marks (uat/02 KB-64): every shortcut's where 快捷键标记位置 says, the
+ * Where the keys draw their marks (uat/02 KB-66): every shortcut's where 快捷键标记位置 says, the
  * symbol on the right by the way that swipes to it (the other right corner where the shortcut is),
  * the same the first time the keyboard opens as after any setting changes. 0.5.1's testers saw the
  * symbols pushed to the bottom right by the shortcuts at first, then the shortcuts bottom right after
@@ -88,7 +88,7 @@ class KeyMarksUatTest {
     }
 
     @Test
-    @Uat("KB-64")
+    @Uat("KB-66")
     fun theShortcutsWhereChosenTheSymbolsByTheirWay() {
         h.start()
         // the default: 左上; 滑动 上滑快捷键，下滑符号, so the symbols bottom right
@@ -119,7 +119,7 @@ class KeyMarksUatTest {
     }
 
     @Test
-    @Uat("KB-64")
+    @Uat("KB-66")
     fun theFirstOpenIsAsAfterAnySettingChanges() {
         h.start()
         val first = marks()

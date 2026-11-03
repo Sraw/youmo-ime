@@ -135,7 +135,7 @@ class KeyShortcutsPageScreenshotTest {
     }
 
     // 快捷键标记位置 as the keyboard has it: each position's full and function keys, the symbols out of
-    // the shortcut's corner (uat/02 KB-64)
+    // the shortcut's corner (uat/02 KB-66)
     @Test
     fun theMarksWhereTheShortcutPositionSays() {
         for (at in ShortcutMarkPosition.entries.filter { it != ShortcutMarkPosition.TopLeft }) {

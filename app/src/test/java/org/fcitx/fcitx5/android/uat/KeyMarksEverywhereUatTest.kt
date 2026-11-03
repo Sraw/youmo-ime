@@ -42,7 +42,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The marks on every key of every keyboard (uat/02 KB-65), for each 快捷键标记位置 and as the keys are
+ * The marks on every key of every keyboard (uat/02 KB-67), for each 快捷键标记位置 and as the keys are
  * drawn (standard, 紧凑, floating, one-handed, landscape; 标点位置 底部; 滑动 either way): what each key
  * draws, its label or icon, its symbol and its shortcuts' marks, as drawn (moved, smaller, left out:
  * KeyMarkYield), never two over each other. Their ink: a text's glyphs, an icon's box.
@@ -231,7 +231,7 @@ class KeyMarksEverywhereUatTest {
     }
 
     @Test
-    @Uat("KB-65")
+    @Uat("KB-67")
     @Config(qualifiers = "w393dp-h851dp-port-440dpi")
     fun noKeyDrawsTwoThingsOverEachOtherUpright() {
         each(upright)
@@ -239,7 +239,7 @@ class KeyMarksEverywhereUatTest {
     }
 
     @Test
-    @Uat("KB-65")
+    @Uat("KB-67")
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun noKeyDrawsTwoThingsOverEachOtherTurned() {
         each(turned)

@@ -82,7 +82,7 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
             selectAllButton.setOnClickListener {
                 // activate select button after operation
                 userSelection = true
-                service.currentInputConnection?.performContextMenuAction(android.R.id.selectAll)
+                service.performContextMenuAction(android.R.id.selectAll)
             }
             cutButton.setOnClickListener {
                 // deactivate select button after operation

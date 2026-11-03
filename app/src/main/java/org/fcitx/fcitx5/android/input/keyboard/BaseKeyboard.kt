@@ -519,9 +519,7 @@ abstract class BaseKeyboard(
                                         PopupAction.PreviewAction(view.id, popup.content, view.bounds)
                                     )
                                     GestureType.Move -> {
-                                        onPopupAction(
-                                            PopupAction.PreviewUpdateAction(view.id, swipes.preview(view, def, event.totalY, popup))
-                                        )
+                                        onPopupAction(swipes.preview(view, def, event.totalY, popup))
                                     }
                                     GestureType.Up -> {
                                         onPopupAction(PopupAction.DismissAction(view.id))
