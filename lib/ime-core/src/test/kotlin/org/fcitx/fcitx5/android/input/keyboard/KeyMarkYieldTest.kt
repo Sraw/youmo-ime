@@ -150,4 +150,78 @@ class KeyMarkYieldTest {
         assertEquals(1f - KeyMarkYield.MAX_LETTER_SHRINK, small.scale, 1e-4f)
         assertEquals(1f, small.corners[0].scale, 0f)
     }
+
+    // [ink] flipped about the 40-wide face's middle: a top right case as a top left one
+    private fun flip(ink: Ink) = Ink(40f - ink.right, ink.top, 40f - ink.left, ink.bottom)
+
+    @Test
+    fun aTopLeftMarkIsClearedRightOrDownAsTheTopRightOneLeftOrDown() {
+        // every top right case of the above, flipped: the same yield, its x the other way
+        val cases = listOf(
+            Ink(10f, 15f, 28f, 35f) to Ink(29f, 2f, 38f, 11f),
+            Ink(10f, 8f, 32f, 30f) to Ink(29f, 2f, 38f, 11f),
+            Ink(8f, 10f, 35f, 30f) to Ink(16f, 2f, 38f, 11f),
+            Ink(1f, 8f, 32f, 30f) to Ink(29f, 2f, 38f, 12f),
+            Ink(3f, 7f, 34f, 44f) to Ink(29f, 2f, 38f, 12f),
+            Ink(1f, 4f, 39f, 45f) to Ink(30f, 1f, 39f, 13f),
+        )
+        for ((label, mark) in cases) for (shrinks in listOf(false, true)) {
+            val right = of(label, mark, shrinks)
+            val left = KeyMarkYield.ofTopLeft(flip(label), flip(mark), face, gap = 1f, markShrinks = shrinks)
+            assertYield(right.copy(dx = -right.dx), left)
+        }
+        // 4 over the icon's right edge: 4 right
+        assertYield(Yield(4f, 0f, 1f, 1f), KeyMarkYield.ofTopLeft(Ink(8f, 8f, 30f, 30f), Ink(2f, 2f, 11f, 11f), face, gap = 1f, markShrinks = false))
+    }
+
+    private fun both(letter: Ink, symbol: Ink?, shortcut: Ink?, shortcutDp: Float = 10f, icon: Boolean = true) =
+        KeyMarkYield.LetterKey(letter, letter.bottom, symbol, room, 10f, shortcut, shortcutDp, icon)
+
+    @Test
+    fun aLettersShortcutMovesLeftOrUpTheLetterStays() {
+        // the symbol's case flipped: 3 over the shortcut's right, left 3 of the 4 there
+        val r = KeyMarkYield.letters(listOf(both(Ink(9f, 15f, 30f, 35f), null, Ink(5f, 8f, 11f, 20f))), gap = 1f)
+        assertEquals(1f, r.scale, 0f)
+        assertEquals(KeyMarkYield.Corner.None, r.corners[0])
+        assertEquals(KeyMarkYield.Corner(-3f, 0f, 1f), r.leftCorners[0])
+        // apart from both corners: nothing
+        val apart = KeyMarkYield.letters(listOf(both(Ink(14f, 15f, 26f, 35f), Ink(29f, 2f, 38f, 11f), Ink(2f, 2f, 11f, 11f))), gap = 1f)
+        assertEquals(listOf(KeyMarkYield.Corner.None), apart.leftCorners)
+        assertEquals(listOf(KeyMarkYield.Corner.None), apart.corners)
+    }
+
+    @Test
+    fun anIconNoSmallerThanItsReadableLeast() {
+        // flipped from the symbol's: the letter's top at 5 under a 10 dp icon; an icon goes to 7 dp, a text to 6
+        val letter = Ink(2f, 5f, 30f, 35f)
+        val shortcut = Ink(3f, 3f, 10f, 13f)
+        val icon = KeyMarkYield.letters(listOf(both(letter, null, shortcut)), gap = 1f)
+        assertEquals(KeyMarkYield.MIN_ICON_DP / 10f, icon.leftCorners[0].scale, 1e-4f)
+        // into the corner: (1, 1) top left, 7 tall, its bottom at 8, the letter about (16, 35) by its top: 35 - 9 = 26 of 30
+        assertEquals(-2f, icon.leftCorners[0].dx, 0f)
+        assertEquals(26f / 30f, icon.scale, 1e-4f)
+        val text = KeyMarkYield.letters(listOf(both(letter, null, shortcut, icon = false)), gap = 1f)
+        assertEquals(27f / 30f, text.scale, 1e-4f)
+        // both corners: the letter as small as the more crowded needs, each mark then only as small as that leaves it
+        val two = KeyMarkYield.letters(listOf(both(letter, Ink(30f, 3f, 37f, 13f), shortcut)), gap = 1f)
+        assertEquals(26f / 30f, two.scale, 1e-4f)
+        assertEquals(KeyMarkYield.MIN_ICON_DP / 10f, two.leftCorners[0].scale, 1e-4f)
+    }
+
+    @Test
+    fun aFunctionKeysIconMovesRightOfItsMarksThenShrinks() {
+        val top = Ink(2f, 2f, 10f, 10f)
+        val bottom = Ink(2f, 40f, 10f, 48f)
+        // apart (the gap kept, or below the top one): as it is
+        assertYield(Yield.None, KeyMarkYield.ofIcon(Ink(11f, 15f, 30f, 35f), top, bottom, face, gap = 1f))
+        assertYield(Yield.None, KeyMarkYield.ofIcon(Ink(5f, 12f, 25f, 38f), top, bottom, face, gap = 1f))
+        // 3 over the top one: 3 right, never down (into the bottom one)
+        assertYield(Yield(3f, 0f, 1f, 1f), KeyMarkYield.ofIcon(Ink(8f, 8f, 28f, 30f), top, null, face, gap = 1f))
+        // over both, the bottom one wider: as far as that one needs
+        assertYield(Yield(5f, 0f, 1f, 1f), KeyMarkYield.ofIcon(Ink(8f, 8f, 28f, 42f), top, Ink(2f, 40f, 12f, 48f), face, gap = 1f))
+        // 9 needed, the face's edge 5 away: 5 right and 4 of its 20 shrunk about its right side
+        assertYield(Yield(5f, 0f, 16f / 20f, 1f), KeyMarkYield.ofIcon(Ink(14f, 8f, 34f, 30f), Ink(2f, 2f, 22f, 10f), null, face, gap = 1f))
+        // no more than a fifth smaller
+        assertYield(Yield(0f, 0f, 1f - KeyMarkYield.MAX_LABEL_SHRINK, 1f), KeyMarkYield.ofIcon(Ink(14f, 8f, 39f, 30f), Ink(2f, 2f, 38f, 10f), null, face, gap = 1f))
+    }
 }
