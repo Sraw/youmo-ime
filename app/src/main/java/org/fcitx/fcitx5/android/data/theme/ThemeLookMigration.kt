@@ -16,8 +16,10 @@ import java.util.UUID
  * 1. As the themes are read ([ThemeFilesManager.listThemes] with [legacy]): each of an older format
  *    is saved as 3.0 with them. One of 3.0 is never changed, so an old backup restored (the old
  *    settings come back with it) leaves the themes made since as they are.
- * 2. [settle], once the keys are drawn from the themes: a built-in or Monet theme in use is copied
- *    with them and the copy put in its place, then the settings are removed.
+ * 2. [settle], once the keys are drawn from the themes: a built-in theme in use is copied with them
+ *    and the copy put in its place, then the settings are removed. A Monet theme in use is not copied
+ *    (a copy's colours would stop following the wallpaper): the settings are kept for the Monet
+ *    themes' keys ([monet]).
  */
 object ThemeLookMigration {
 
@@ -44,28 +46,67 @@ object ThemeLookMigration {
         )
     }
 
+    /** Where the old settings are kept for the Monet themes' keys, once settled: their values joined. */
+    const val MONET_KEY = "monet_key_style"
+
+    /** The old settings the Monet themes are drawn with, [settle]d into [prefs]; null for none (the defaults). */
+    fun monet(prefs: SharedPreferences): LegacyLook? = prefs.getString(MONET_KEY, null)?.let(::decode)
+
+    /**
+     * What the Monet themes' keys are drawn with, read as the themes are ([ThemeManager]): their look is
+     * made from the wallpaper's colours, not read from a file. Set before a Monet theme's look is first asked.
+     */
+    @Volatile
+    var monetLook: LegacyLook? = null
+
+    internal fun encode(l: LegacyLook) = listOf(
+        l.keyBorder, l.keyBorderStroke, l.keyRippleEffect, l.keyRadius,
+        l.hMargin, l.hMarginLandscape, l.vMargin, l.vMarginLandscape,
+    ).joinToString(",")
+
+    internal fun decode(text: String): LegacyLook? {
+        val v = text.split(',')
+        @Suppress("MagicNumber")
+        if (v.size != 8) return null
+        val b = v.take(3).map { it.toBooleanStrictOrNull() ?: return null }
+        val n = v.drop(3).map { it.toIntOrNull() ?: return null }
+        return LegacyLook(b[0], b[1], b[2], n[0], n[1], n[2], n[3], n[4])
+    }
+
     /** A theme in use: light, dark or the one chosen, read and set. */
     class Slot(val get: () -> Theme, val set: (Theme.Custom) -> Unit)
 
     /**
-     * Step 2: each theme in [slots] that is not the user's own (built in, Monet) is copied with the
-     * old settings as its keys, the copy [save]d and put in the slot (one copy a theme, however many
-     * slots have it); then the old settings are removed. True if the user is to be told, once: the
-     * settings were not the defaults. Run twice, the second finds nothing to do.
+     * Step 2: each built-in theme in [slots] is copied with the old settings as its keys, the copy
+     * [save]d and put in the slot (one copy a theme, however many slots have it); a Monet theme in one
+     * keeps them for its keys ([MONET_KEY]). Then the old settings are removed, but if a copy could
+     * not be saved: kept, to be tried at the next start. True if the user is to be told, once: the
+     * settings were not the defaults and are settled. Run twice, the second finds nothing to do.
      */
-    fun settle(prefs: SharedPreferences, slots: List<Slot>, save: (Theme.Custom) -> Unit): Boolean {
+    fun settle(prefs: SharedPreferences, slots: List<Slot>, save: (Theme.Custom) -> Boolean): Boolean {
         val legacy = legacy(prefs) ?: return false
+        var failed = false
+        var monet = false
         if (!legacy.isDefault) {
-            val copies = HashMap<String, Theme.Custom>()
+            val copies = HashMap<String, Theme.Custom?>()
             for (slot in slots) {
-                val theme = slot.get()
-                if (theme is Theme.Custom) continue
-                val copy = copies.getOrPut(theme.name) {
-                    Theme.Custom(UUID.randomUUID().toString(), theme.isDark, legacy.applyTo(theme.look)).also(save)
+                when (val theme = slot.get()) {
+                    is Theme.Custom -> Unit
+                    is Theme.Monet -> monet = true
+                    else -> {
+                        val copy = copies.getOrPut(theme.name) {
+                            Theme.Custom(UUID.randomUUID().toString(), theme.isDark, legacy.applyTo(theme.look)).takeIf(save)
+                        }
+                        if (copy == null) failed = true else slot.set(copy)
+                    }
                 }
-                slot.set(copy)
             }
         }
+        if (monet) {
+            prefs.edit { putString(MONET_KEY, encode(legacy)) }
+            monetLook = legacy
+        }
+        if (failed) return false
         prefs.edit { KEYS.forEach(::remove) }
         return !legacy.isDefault
     }

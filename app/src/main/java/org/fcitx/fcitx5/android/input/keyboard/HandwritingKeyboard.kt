@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Rect
 import android.view.MotionEvent
 import android.view.View
@@ -23,6 +24,7 @@ import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
+import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
@@ -33,7 +35,10 @@ import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
 import org.fcitx.fcitx5.android.input.handwriting.InkPad
 import org.fcitx.fcitx5.android.input.handwriting.ReadingToggle
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
+import org.fcitx.fcitx5.android.input.theme.KeyFaceGeometry
+import org.fcitx.fcitx5.android.input.theme.KeyKind
 import org.fcitx.fcitx5.android.input.theme.KeyNames
+import org.fcitx.fcitx5.android.input.theme.KeyStyleResolver
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.constraintlayout.leftOfParent
@@ -137,10 +142,15 @@ class HandwritingKeyboard(
         pause = { AppPrefs.getInstance().keyboard.handwritingPause.getValue().millis },
         onFinish = ::finish,
     ).apply {
-        val prefs = ThemeManager.prefs
-        val h = dp(prefs.keyHorizontalMargin.getValue())
-        val v = dp(prefs.keyVerticalMargin.getValue())
-        background = insetRadiusDrawable(h, v, dp(prefs.keyRadius.getValue().toFloat()), theme.keyBackgroundColor)
+        // a letter key's face, drawn on flat keys too as before 3.0; nothing pressed (it is written on)
+        val keys = theme.look.keys
+        val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val density = resources.displayMetrics.density
+        drawAsKey(
+            theme, KeyStyleResolver.resolve(keys, null, null, KeyKind.Letter), KeyKind.Letter, BoardImages.NONE,
+            { w, h -> KeyFaceGeometry.of(w, h, KeyKind.Letter, keys, landscape, density, true, KeyFaceGeometry.Border.On) },
+            press = false,
+        )
     }
 
     init {

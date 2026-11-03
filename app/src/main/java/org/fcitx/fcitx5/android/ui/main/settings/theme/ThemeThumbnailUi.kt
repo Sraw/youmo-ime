@@ -6,9 +6,7 @@ package org.fcitx.fcitx5.android.ui.main.settings.theme
 
 import android.content.Context
 import android.content.res.ColorStateList
-import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.ShapeDrawable
-import android.graphics.drawable.shapes.OvalShape
+import android.graphics.Color
 import android.os.Build
 import android.view.View
 import android.view.ViewOutlineProvider
@@ -16,6 +14,8 @@ import android.widget.ImageView
 import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.theme.BoardBase
+import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import org.fcitx.fcitx5.android.utils.rippleDrawable
 import splitties.dimensions.dp
 import splitties.views.backgroundColor
@@ -47,9 +47,8 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
 
     val bar = view(::View)
 
-    val spaceBar = view(::View)
-
-    val returnKey = view(::View)
+    // the theme's keys in little (ThemeThumbnailKeys)
+    val keys = view(::View)
 
     val checkMark = imageView {
         scaleType = ImageView.ScaleType.FIT_CENTER
@@ -71,16 +70,8 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
         outlineProvider = ViewOutlineProvider.BOUNDS
         elevation = dp(2f)
         add(bkg, lParams(matchParent, matchParent))
-        add(bar, lParams(matchParent, dp(14)))
-        add(spaceBar, lParams(height = dp(10)) {
-            centerHorizontally()
-            bottomOfParent(dp(6))
-            matchConstraintPercentWidth = 0.5f
-        })
-        add(returnKey, lParams(dp(14), dp(14)) {
-            rightOfParent(dp(4))
-            bottomOfParent(dp(4))
-        })
+        add(bar, lParams(matchParent, dp(BAR_DP)))
+        add(keys, lParams(matchParent, matchParent))
         add(checkMark, lParams(dp(60), dp(60)) {
             centerInParent()
         })
@@ -98,16 +89,12 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
         root.apply {
             foreground = rippleDrawable(theme.keyPressHighlightColor)
         }
-        bkg.imageDrawable = theme.backgroundDrawable()
-        bar.backgroundColor = theme.barColor
-        spaceBar.background = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = ctx.dp(2f)
-            setColor(theme.spaceBarColor)
-        }
-        returnKey.background = ShapeDrawable(OvalShape()).apply {
-            paint.color = theme.accentKeyBackgroundColor
-        }
+        val look = theme.look
+        // the picture under the keyboard if it is there, its colour else; the bar's colour if it has one
+        bkg.imageDrawable = if (look.base == BoardBase.Picture) theme.backgroundDrawable() else null
+        bkg.backgroundColor = ThemeColors.board(look.palette, look.keys)
+        bar.backgroundColor = ThemeColors.bar(look.palette, look.bar) ?: Color.TRANSPARENT
+        keys.background = ThemeThumbnailKeys(look, ctx.resources.displayMetrics.density, ctx.dp(BAR_DP).toFloat())
         val foregroundTint = ColorStateList.valueOf(theme.altKeyTextColor)
         editButton.apply {
             visibility = if (theme is Theme.Custom) View.VISIBLE else View.GONE
@@ -135,5 +122,9 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
             State.LightMode -> R.drawable.ic_baseline_light_mode_24
             State.DarkMode -> R.drawable.ic_baseline_dark_mode_24
         }
+    }
+
+    private companion object {
+        const val BAR_DP = 14
     }
 }

@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.input.keyboard.BackspaceKey
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
+import org.fcitx.fcitx5.android.input.theme.PressEffect
 import org.fcitx.fcitx5.android.utils.alpha
 import org.fcitx.fcitx5.android.utils.pressHighlightDrawable
 import org.fcitx.fcitx5.android.utils.rippleDrawable
@@ -43,7 +44,7 @@ class EmojiSearchUi(context: Context, private val theme: Theme) : LinearLayout(c
         arrayOf(Popup.Preview(letter))
     )
 
-    private val keyRipple by ThemeManager.prefs.keyRippleEffect
+    private val keyRipple = theme.look.keys.press == PressEffect.Ripple
 
     private val query = TextView(context).apply {
         textSize = 16f

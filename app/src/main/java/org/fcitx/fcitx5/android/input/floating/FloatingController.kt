@@ -37,7 +37,7 @@ import splitties.dimensions.dp
  */
 class FloatingController(
     private val root: ViewGroup,
-    theme: Theme,
+    private val theme: Theme,
     private val find: (View?) -> FloatingController?,
 ) {
     private val context = root.context
@@ -238,9 +238,10 @@ class FloatingController(
     // the keys' radius and margins as KeyView draws them; square where the keys are (按键圆角 直角)
     private fun cornerPx(): Float {
         val landscape = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val h = (if (landscape) prefs.keyHorizontalMarginLandscape else prefs.keyHorizontalMargin).getValue()
-        val v = (if (landscape) prefs.keyVerticalMarginLandscape else prefs.keyVerticalMargin).getValue()
-        return context.dp(FloatingKeyboard.cornerDp(prefs.keyRadius.getValue(), h, v, prefs.keyBorder.getValue())).toFloat()
+        val keys = theme.look.keys
+        val h = if (landscape) keys.gap.hLand else keys.gap.h
+        val v = if (landscape) keys.gap.vLand else keys.gap.v
+        return context.dp(FloatingKeyboard.cornerDp(keys.radiusDp, h, v, keys.blocks)).toFloat()
     }
 
     private fun View.bounds() = Bounds(left.toFloat(), top.toFloat(), width.toFloat(), height.toFloat())

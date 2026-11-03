@@ -29,7 +29,7 @@ class ClipboardSwipeTest {
 
     private fun grid(text: String, cut: Boolean = false): ClipboardChunksUi {
         val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
-        val ui = ClipboardChunksUi(activity, ThemePreset.PixelLight, 8, text, cut) {}
+        val ui = ClipboardChunksUi(activity, ThemePreset.PixelLight, 8f, text, cut) {}
         activity.setContentView(ui.root, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, HEIGHT))
         ui.show(ClipboardChunks.chunks(text))
         idle(0)

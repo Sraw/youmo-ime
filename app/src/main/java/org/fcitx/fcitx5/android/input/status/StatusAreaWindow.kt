@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.Keyboa
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.KeyboardChoice
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.OneHandedToggle
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.ThemeList
+import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.utils.AppUtil
@@ -102,13 +103,9 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
         }
     }
 
-    private val keyBorder by ThemeManager.prefs.keyBorder
-
     val view by lazy {
         context.recyclerView {
-            if (!keyBorder) {
-                backgroundColor = theme.barColor
-            }
+            ThemeColors.panel(theme.look.palette, theme.look.keys)?.let { backgroundColor = it }
             layoutManager = gridLayoutManager(4)
             adapter = this@StatusAreaWindow.adapter
         }

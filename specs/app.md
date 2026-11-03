@@ -554,8 +554,44 @@ keys** (`LegacyLook.applyTo`, while they are in the prefs and not the defaults),
 its mtime kept. A 3.0 theme is never changed by them, so a backup from before restored (the
 settings come back with it) leaves the themes made since as they were. `ThemeLookMigration.settle`
 (copy a built-in or Monet theme in use with them, put the copy in its place, remove the settings,
-tell once) runs once the keys are drawn from the themes, not before: until then the settings still
-draw the keys.
+tell once) runs at `ThemeManager`'s start (`settleKeyStyle`), not while the themes are not
+settled or a migration's write-back failed this start (`ThemeFilesManager.rewriteFailed`): a copy
+not saved leaves its slot and every setting for the next start. A Monet theme in use is not copied
+(its colours follow the wallpaper): the settings are kept, encoded, as hidden `monet_key_style`
+(`ThemeLookMigration.MONET_KEY`), and `Theme.Monet`'s look is the defaults with them
+(`ThemeLookMigration.monetLook`). The page's 按键样式 keeps only 标点位置 and a line saying where the rest went.
+
+### Drawing a theme
+
+Every key is drawn by `KeyFaceDrawable` (`input/keyboard/`; `View.drawAsKey`): shadow, fill, border, in
+the shape ime-core's `KeyFaceGeometry` gives (blocks or flat, `KeyDef.Appearance.Border` →
+`KeyFaceGeometry.Border`: a flat keyboard's T9 column and handwriting pad keep their face, `On`). The
+fill is a colour, a nine-slice image (`NineSliceLayout`, drawn at the sample it was decoded at; the
+colour till the board's images are in, then `invalidateSelf`) or the picture showing through
+(`ThemePictureDrawable`/`PictureHost`: the picture as `PictureWindow.centerCrop` lays it under the
+whole keyboard, found at the view's place in the window, so a key, the bar and the base line up).
+Pressed: a darker shade (`Tint`), a colour or an image as a `StateListDrawable` foreground, or a
+`RippleDrawable` (`Ripple`). The bar is none (blocks: the base shows), its colour, or the picture's
+part (`ThemePictureDrawable.bar`); panels (expanded candidates, clipboard, status area) use the bar's
+colour only over flat keys (`ThemeColors.panel`). Key text is `keyScale` of its size in the theme's
+font (`ThemeAssets.typeface`, the weight asked); hints, marks and the bar's icons take
+`keyHintColor` and `toolbarIconColor`.
+
+`ThemeAssets` (`data/theme/`) decodes off the main thread and caches for one theme's files at a time:
+the picture once an orientation at the width it is drawn (halved while wider, so a 4096 cut is not
+held whole), its blurs from that (`BoxBlur`), each once; a board's key images when the board is made
+(`boardImages`, the names it can reach: `KeyStyleResolver.imagesOn`), at the sample
+`KeyImageBudget` gives, the boards least recently made dropped past 24 MB; fonts once. A theme of
+other files (another picture, a crop, a key image) drops it all; a colour, brightness or blur changed
+keeps what was decoded. `saveTheme` clears it (a file of the same name may have new bytes).
+
+The theme edit page (`CustomThemeActivity`) has the picture's brightness, blur, crop and dark keys,
+the base (picture or colour), and the keys in ime-core's `ThemeEditLevels` steps (the old settings'
+levels: blocks/flat, corners 0/4/10, border 0/1/2, gaps, press); a value of no step (set on the web
+page) shows 自定义 (`ThemeLookChoicesUi`). The rest (colours, key images, fonts) is the web page's
+(`ThemeLookChoicesUi.THEME_MAKER_URL`, also 新增主题 → 在网页上制作…). The preview draws a crop
+not yet saved from a cache file (`cut*.tmp`). Thumbnails (`ThemeThumbnailUi`) draw four rows of the
+theme's keys in little (`ThemeThumbnailKeys`, colours only: no image decoded) over its base.
 
 Import (`ThemeFilesManager.importTheme`) takes the json and every file it names, by file name only
 (never a path, never a `.json`, never `.saving`); it checks all before copying any, so a refusal leaves nothing.

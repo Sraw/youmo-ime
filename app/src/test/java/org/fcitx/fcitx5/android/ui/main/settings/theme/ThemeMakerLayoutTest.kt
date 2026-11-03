@@ -42,10 +42,12 @@ import org.fcitx.fcitx5.android.input.theme.KeyKind
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.input.theme.LookDefaults
 import org.fcitx.fcitx5.android.input.theme.Palette
+import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.uat.PrefsRule
+import org.junit.Assume.assumeFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -118,6 +120,8 @@ class ThemeMakerLayoutTest {
 
     @Test
     fun theLayoutsAndIconsThePageDraws() {
+        // the page draws the text build's bar; the voice build's has a microphone more
+        assumeFalse(VoiceFeature.AVAILABLE)
         val icons = sortedSetOf<String>()
         val views = shots().map { measure(it, icons) }
         val layout = buildString {
@@ -191,16 +195,24 @@ class ThemeMakerLayoutTest {
 
     private class Space(val origin: IntArray, val density: Float) {
         fun dp(px: Number) = (px.toFloat() / density * 100).roundToInt() / 100.0
+        // the box the view covers as drawn: a turned one (the bar's menu arrow is the expand arrow turned a
+        // quarter) by its corners as its matrix puts them, not by where its own top left corner went
         fun rect(v: View): JsonArray {
             val at = IntArray(2).also { v.getLocationInWindow(it) }
+            val w = v.width.toFloat()
+            val h = v.height.toFloat()
+            val c = floatArrayOf(0f, 0f, w, 0f, 0f, h, w, h).also { v.matrix.mapPoints(it) }
+            val xs = c.filterIndexed { i, _ -> i % 2 == 0 }
+            val ys = c.filterIndexed { i, _ -> i % 2 == 1 }
             return buildJsonArray {
-                add(JsonPrimitive(dp(at[0] - origin[0])))
-                add(JsonPrimitive(dp(at[1] - origin[1])))
-                add(JsonPrimitive(dp(v.width * v.scaleX)))
-                add(JsonPrimitive(dp(v.height * v.scaleY)))
+                add(JsonPrimitive(dp(at[0] - origin[0] + xs.min() - c[0])))
+                add(JsonPrimitive(dp(at[1] - origin[1] + ys.min() - c[1])))
+                add(JsonPrimitive(dp(xs.max() - xs.min())))
+                add(JsonPrimitive(dp(ys.max() - ys.min())))
             }
         }
         fun top(v: View) = IntArray(2).also { v.getLocationInWindow(it) }[1] - origin[1]
+        fun left(v: View) = IntArray(2).also { v.getLocationInWindow(it) }[0] - origin[0]
     }
 
     private fun view(h: KeyboardHarness, shot: Shot, icons: MutableSet<String>): String {
@@ -297,13 +309,14 @@ class ThemeMakerLayoutTest {
         }
 
         private fun fill(v: View, part: String) {
-            val bg = v.background ?: return
-            val (color, radius) = solid(bg) ?: return
-            // the bar's own colour, or none: where the page draws the theme's bar, whatever it is
+            // the bar's own colour, the picture's part, or none (a bar of blocks): where the page draws
+            // the theme's bar, whatever it is
             if (isBarBackground(v)) {
                 items += buildJsonObject { put("t", "bar"); put("r", s.rect(v)) }
                 return
             }
+            val bg = v.background ?: return
+            val (color, radius) = solid(bg) ?: return
             if (color ushr 24 == 0) return
             items += buildJsonObject {
                 put("t", "fill")
@@ -357,6 +370,22 @@ class ThemeMakerLayoutTest {
             putColor(v.currentTextColor)
             if (v.typeface?.isBold == true) put("w", BOLD)
             put("y", s.dp(s.top(v) + v.baseline * v.scaleY))
+            anchor(v)?.let { (a, x) -> put("a", a); put("x", s.dp(x)) }
+        }
+
+        // where the text's line is drawn across: its alignment and the x it keeps (the left, the middle or
+        // the right of the line), so a font of other widths on the page lands as the app's would
+        private fun anchor(v: TextView): Pair<String, Float>? {
+            val layout = v.layout ?: return null
+            val left = s.left(v) + (v.totalPaddingLeft - v.scrollX) * v.scaleX
+            val l = left + layout.getLineLeft(0) * v.scaleX
+            val r = left + layout.getLineRight(0) * v.scaleX
+            val inner = (v.width - v.totalPaddingLeft - v.totalPaddingRight).toFloat()
+            return when {
+                layout.getLineLeft(0) <= 0.5f -> "l" to l
+                layout.getLineRight(0) >= inner - 0.5f -> "r" to r
+                else -> "c" to (l + r) / 2
+            }
         }
 
         private fun icon(v: ImageView): JsonObject? {
@@ -369,6 +398,8 @@ class ThemeMakerLayoutTest {
                 put("r", s.rect(v))
                 put("i", name)
                 tint(v)?.let { putColor(it) }
+                // drawn turned this many degrees about its middle
+                v.rotation.roundToInt().takeIf { it % 360 != 0 }?.let { put("rot", it) }
             }
         }
     }

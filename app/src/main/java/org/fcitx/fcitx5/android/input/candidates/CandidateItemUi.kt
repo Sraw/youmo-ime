@@ -12,6 +12,7 @@ import androidx.core.text.color
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
@@ -39,6 +40,7 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme) : Ui {
         isSingleLine = true
         gravity = gravityCenter
         setTextColor(theme.candidateTextColor)
+        ThemeAssets.candidateTypeface(theme.look)?.let { typeface = it }
     }
 
     override val root = view(::CustomGestureView) {

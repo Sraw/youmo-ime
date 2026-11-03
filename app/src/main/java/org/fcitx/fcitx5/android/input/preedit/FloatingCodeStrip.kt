@@ -11,6 +11,9 @@ import android.view.View
 import android.widget.FrameLayout
 import androidx.core.graphics.ColorUtils
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.theme.BarBase
+import org.fcitx.fcitx5.android.input.theme.BoardBase
+import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import splitties.dimensions.dp
 
 /**
@@ -20,7 +23,7 @@ import splitties.dimensions.dp
  * places it ([CodeStripPlacement]) and shows it while there is a code.
  */
 @SuppressLint("ViewConstructor")
-class FloatingCodeStrip(ctx: Context, theme: Theme, keyBorder: Boolean, content: View) : FrameLayout(ctx) {
+class FloatingCodeStrip(ctx: Context, theme: Theme, content: View) : FrameLayout(ctx) {
 
     /** As wide as the board at most, in pixels; 0 for no cap. */
     var maxWidth = 0
@@ -40,12 +43,14 @@ class FloatingCodeStrip(ctx: Context, theme: Theme, keyBorder: Boolean, content:
 
     private val radius = dp(CORNER_DP).toFloat()
 
-    // the colour the bar looks: the keyboard's under bordered keys, the bar's own else; a theme's
+    // the colour the bar looks: the keyboard's under a bar of none, the bar's own else; a theme's
     // picture is not carried out to the strip. A see-through bar (the Transparent themes, 15% black)
     // is the keyboard's colour seen through it: made 90% opaque as it is, black text sat on black
     private val shape = GradientDrawable().apply {
-        val picture = theme is Theme.Custom && theme.backgroundImage != null
-        val looks = if (keyBorder || picture) theme.backgroundColor else ColorUtils.compositeColors(theme.barColor, theme.backgroundColor)
+        val look = theme.look
+        val picture = look.picture != null && (look.base == BoardBase.Picture || look.bar is BarBase.Picture)
+        val bar = ThemeColors.bar(look.palette, look.bar)
+        val looks = if (bar == null || picture) theme.backgroundColor else ColorUtils.compositeColors(bar, theme.backgroundColor)
         setColor(ColorUtils.setAlphaComponent(looks, ALPHA))
     }
 

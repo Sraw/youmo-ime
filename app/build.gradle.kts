@@ -109,9 +109,12 @@ android {
             // Robolectric keeps what each test's keyboard left in the app's objects till the JVM
             // ends; the UAT classes, a keyboard or more a test, ran out of Gradle's 512 MB default,
             // and of 1 GB once F1 moved the redroid UI cases here (about 1200 tests, four SDK sandboxes),
-            // and of 2 GB with 0.5.1's streams merged (about 1500, the screenshots of every keyboard's marks)
+            // and of 2 GB with 0.5.1's streams merged (about 1500, the screenshots of every keyboard's marks);
+            // with the themes' (ThemeMakerLayoutTest's 55 measured views) 4 GB ran out too, ThemeMakerLayoutTest
+            // thrashing 8 minutes first: a new JVM every 80 classes, what is kept dropped with it
             all {
                 it.maxHeapSize = "3g"
+                it.forkEvery = 80
                 // mockk's agent attached from inside the test JVM: by default ByteBuddy starts a second
                 // process to attach it, which under a full run's load at times fails and takes every
                 // mockk test of that JVM with it (JvmMockKGateway); the attach's own wait, 10 s, ran
@@ -125,6 +128,8 @@ android {
                 // the theme maker's shared cases (ThemeMakerRulesTest): compared, or with -PupdateThemeMaker written
                 it.systemProperty("themeMaker.testdata", rootProject.file("web/theme-maker/test/testdata").path)
                 it.systemProperty("themeMaker.update", project.hasProperty("updateThemeMaker").toString())
+                // ThemeLookScreenshotTest's whole set of themes × keyboards × modes, for the eye: -PthemeShots=<dir>
+                it.systemProperty("themeShots.dir", project.findProperty("themeShots")?.toString().orEmpty())
             }
         }
     }

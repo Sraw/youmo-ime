@@ -10,7 +10,6 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Rect
-import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Parcelable
@@ -38,6 +37,7 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.parcelize.Parcelize
 import org.fcitx.fcitx5.android.R
@@ -48,7 +48,6 @@ import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
 import org.fcitx.fcitx5.android.ui.main.CropImageActivity.CropContract
 import org.fcitx.fcitx5.android.ui.main.CropImageActivity.CropOption
 import org.fcitx.fcitx5.android.ui.main.CropImageActivity.CropResult
-import org.fcitx.fcitx5.android.utils.DarkenColorFilter
 import org.fcitx.fcitx5.android.utils.item
 import org.fcitx.fcitx5.android.utils.parcelable
 import org.fcitx.fcitx5.android.utils.styledColor
@@ -197,6 +196,11 @@ class CustomThemeActivity : AppCompatActivity() {
             add(brightnessSeekBar, lParams(matchConstraints, wrapContent) {
                 below(brightnessLabel)
                 centerHorizontally(itemMargin)
+                above(choices.root)
+            })
+            add(choices.root, lParams(matchConstraints, wrapContent) {
+                below(brightnessSeekBar)
+                centerHorizontally()
                 bottomOfParent()
             })
         }.wrapInScrollView {
@@ -230,7 +234,9 @@ class CustomThemeActivity : AppCompatActivity() {
         var cropRect: Rect? = null
         var cropRotation: Int = 0
         lateinit var croppedBitmap: Bitmap
-        lateinit var filteredDrawable: BitmapDrawable
+
+        // the cut drawn in the preview: the theme's file, or one just cropped, written to the cache till saved
+        var previewFile: File? = null
         lateinit var srcImageFile: File
         lateinit var croppedImageFile: File
     }
@@ -253,13 +259,41 @@ class CustomThemeActivity : AppCompatActivity() {
         val colours = template.deriveCustomNoBackground(theme.name)
         theme = theme.copy(isDark = colours.isDark, look = theme.look.copy(palette = colours.look.palette))
             .withBackground(background.copy(brightness = brightnessSeekBar.progress))
-        previewUi.setTheme(theme, filteredDrawable)
+        choices.show(theme.look)
+        refreshPreview()
+    }
+
+    // the base, the bar and the keys over the picture are drawn from its file as the keyboard draws them
+    // (PictureHost): the cut being made, at the brightness on the slider
+    private fun previewTheme(): Theme.Custom {
+        var t = theme
+        whenHasBackground { bg ->
+            t = t.withBackground(bg.copy(brightness = brightnessSeekBar.progress, croppedFilePath = previewFile?.path ?: bg.croppedFilePath))
+        }
+        return t
+    }
+
+    // the preview's keyboard made anew, once a frame however many changes a slider dragged gives
+    private val previewRefresh = Runnable { previewUi.setTheme(previewTheme()) }
+
+    private fun refreshPreview() {
+        ui.removeCallbacks(previewRefresh)
+        ui.postOnAnimation(previewRefresh)
+    }
+
+    // the choices' look: the keys, the base, the blur (ThemeLookChoicesUi)
+    private val choices by lazy {
+        ThemeLookChoicesUi(this, theme.look) {
+            theme = theme.copy(look = it)
+            refreshPreview()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // a copy of a picked photo a killed process left: none is wanted before this page picks one
-        cacheDir.listFiles()?.filter { it.name.startsWith(SRC_COPY) && it.name.endsWith(".tmp") }?.forEach { it.delete() }
+        cacheDir.listFiles()?.filter { (it.name.startsWith(SRC_COPY) || it.name.startsWith(PREVIEW_CUT)) && it.name.endsWith(".tmp") }
+            ?.forEach { it.delete() }
         // recover from bundle
         val originTheme = intent?.parcelable<Theme.Custom>(ORIGIN_THEME)?.also { t ->
             theme = t
@@ -269,7 +303,7 @@ class CustomThemeActivity : AppCompatActivity() {
                 cropRect = it.cropRect
                 cropRotation = it.cropRotation
                 croppedBitmap = BitmapFactory.decodeFile(it.croppedFilePath)
-                filteredDrawable = BitmapDrawable(resources, croppedBitmap)
+                previewFile = croppedImageFile
             }
             newCreated = false
         }
@@ -327,8 +361,7 @@ class CustomThemeActivity : AppCompatActivity() {
                         cropRect = it.rect
                         cropRotation = it.rotation
                         croppedBitmap = it.bitmap
-                        filteredDrawable = BitmapDrawable(resources, croppedBitmap)
-                        updateState()
+                        writePreviewCut(it.bitmap)
                     }
                 }
             }
@@ -402,8 +435,21 @@ class CustomThemeActivity : AppCompatActivity() {
     private fun BackgroundStates.updateState() {
         val progress = brightnessSeekBar.progress
         brightnessValue.text = "$progress%"
-        filteredDrawable.colorFilter = DarkenColorFilter(100 - progress)
-        previewUi.setBackground(filteredDrawable)
+        refreshPreview()
+    }
+
+    // the cut written to the cache off the main thread, then drawn: the theme's own file is written at done()
+    private fun BackgroundStates.writePreviewCut(bitmap: Bitmap) {
+        lifecycleScope.launch {
+            val file = File(cacheDir, "$PREVIEW_CUT${System.nanoTime()}.tmp")
+            val written = withContext(Dispatchers.IO) {
+                runCatching { file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) } }.isSuccess
+            }
+            if (!written) return@launch
+            previewFile?.takeIf { it.name.startsWith(PREVIEW_CUT) }?.delete()
+            previewFile = file
+            updateState()
+        }
     }
 
     private fun cancel() {
@@ -516,7 +562,10 @@ class CustomThemeActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        whenHasBackground { srcImageCopy?.delete() }
+        whenHasBackground {
+            srcImageCopy?.delete()
+            previewFile?.takeIf { it.name.startsWith(PREVIEW_CUT) }?.delete()
+        }
         super.onDestroy()
     }
 
@@ -526,6 +575,9 @@ class CustomThemeActivity : AppCompatActivity() {
 
         // the picked photo's copy in cacheDir, till saved into the theme
         private const val SRC_COPY = "src"
+
+        // a cut drawn in the preview, till saved into the theme
+        private const val PREVIEW_CUT = "cut"
     }
 }
 

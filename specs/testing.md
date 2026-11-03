@@ -132,6 +132,13 @@ build's bar adds a microphone. `app/build.gradle.kts` turns record, compare and 
 `testVoice*` task, which makes `captureRoboImage` a no-op there; every other assertion still runs. A
 voice case that is about how the microphone looks would need its own golden in a voice-only directory.
 
+`ThemeLookScreenshotTest` draws five sample themes (colours, a frosted picture, the picture cut out
+by the keys, nine-slice images with fonts, an image per key), light and dark, on eight boards in
+portrait, one-handed, floating and turned split; its pictures and images are made in the test. Only
+a few of those 320 are goldens (each theme's 26 keys, every board of the per-key theme, one of each
+mode). `-PthemeShots=<dir>` writes all 320 there as full-size PNGs, for looking through after a
+drawing change (the goldens still compare).
+
 ## Trying it on a device
 
 Unit tests do not see the keyboard. Anything a user sees or touches (layout, a gesture, the bar,

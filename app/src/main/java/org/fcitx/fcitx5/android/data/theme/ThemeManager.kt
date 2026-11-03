@@ -41,9 +41,12 @@ object ThemeManager {
 
     val DefaultTheme = ThemePreset.PixelDark
 
-    private var monetThemes = listOf(ThemeMonet.getLight(), ThemeMonet.getDark())
+    val prefs = AppPrefs.getInstance().registerProvider(::ThemePrefs).also {
+        // before a Monet theme's look is made
+        ThemeLookMigration.monetLook = it.monetLook()
+    }
 
-    val prefs = AppPrefs.getInstance().registerProvider(::ThemePrefs)
+    private var monetThemes = listOf(ThemeMonet.getLight(), ThemeMonet.getDark())
 
     // before the themes, which an older format's are read with (the key style settings before 3.0)
     private val customThemes: MutableList<Theme.Custom> = ThemeFilesManager.listThemes(prefs.legacyLook())
@@ -86,7 +89,15 @@ object ThemeManager {
     }
 
     private fun fireChange() {
+        prefetch()
         onChangeListeners.forEach { it.onThemeChange(_activeTheme) }
+    }
+
+    // the theme's picture decoded ahead, off the main thread, as wide as the screen (the keyboard's, nearly)
+    private fun prefetch() {
+        val dm = appContext.resources.displayMetrics
+        val landscape = appContext.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        ThemeAssets.prefetch(_activeTheme.look, landscape, dm.widthPixels, dm.density)
     }
 
     /** Saves [theme]; whether it was, none while the themes are not settled or it could not be written (the user told). */
@@ -104,6 +115,8 @@ object ThemeManager {
         customThemes.indexOfFirst { it.name == theme.name }.also {
             if (it >= 0) customThemes[it] = theme else customThemes.add(0, theme)
         }
+        // its files may be new under the same names (a picture cut again)
+        ThemeAssets.clear()
         if (activeTheme.name == theme.name) {
             activeTheme = theme
         }
@@ -158,9 +171,25 @@ object ThemeManager {
 
     fun init(configuration: Configuration) {
         isDarkMode = configuration.isDarkMode()
+        _activeTheme = evaluateActiveTheme()
+        settleKeyStyle()
         // fire all `OnThemeChangedListener`s on theme preferences change
         prefs.registerOnChangeListener(onThemePrefsChange)
+        prefetch()
+    }
+
+    // the key style settings before theme file 3.0 into the themes in use (ThemeLookMigration step 2), once
+    // the themes of an older format are saved with them; not while the files are not settled or one was not
+    private fun settleKeyStyle() {
+        if (!ThemeFilesManager.writable || ThemeFilesManager.rewriteFailed) return
+        val slots = listOf(prefs.normalModeTheme, prefs.lightModeTheme, prefs.darkModeTheme).map { p ->
+            ThemeLookMigration.Slot(get = p::getValue, set = { p.setValue(it) })
+        }
+        val tell = prefs.settleLook(slots, ::saveTheme)
+        // a Monet theme's look made again with what it keeps
+        monetThemes = listOf(ThemeMonet.getLight(), ThemeMonet.getDark())
         _activeTheme = evaluateActiveTheme()
+        if (tell) appContext.toast(R.string.key_style_moved, Toast.LENGTH_LONG)
     }
 
     fun onSystemPlatteChange(newConfig: Configuration) {
