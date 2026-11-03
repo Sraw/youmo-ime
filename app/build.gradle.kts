@@ -107,9 +107,14 @@ android {
             isIncludeAndroidResources = false
             // Robolectric keeps what each test's keyboard left in the app's objects till the JVM
             // ends; the UAT classes, a keyboard or more a test, ran out of Gradle's 512 MB default,
-            // and of 1 GB once F1 moved the redroid UI cases here (about 1200 tests, four SDK sandboxes)
+            // and of 1 GB once F1 moved the redroid UI cases here (about 1200 tests, four SDK sandboxes),
+            // and of 2 GB with 0.5.1's streams merged (about 1500, the screenshots of every keyboard's marks)
             all {
-                it.maxHeapSize = "2g"
+                it.maxHeapSize = "3g"
+                // mockk's agent attached from inside the test JVM: by default ByteBuddy starts a second
+                // process to attach it, which under a full run's load at times fails and takes every
+                // mockk test of that JVM with it (JvmMockKGateway)
+                it.jvmArgs("-Djdk.attach.allowAttachSelf=true", "-XX:+EnableDynamicAgentLoading")
                 // fixtures found from any working directory (an IDE's run too): core/Fixtures.kt
                 it.systemProperty("uat.fixtures", rootProject.file("uat/fixtures").path)
                 // the theme maker's shared cases (ThemeMakerRulesTest): compared, or with -PupdateThemeMaker written
