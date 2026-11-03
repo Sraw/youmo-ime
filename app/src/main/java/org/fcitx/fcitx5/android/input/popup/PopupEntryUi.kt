@@ -33,7 +33,7 @@ class PopupEntryUi(override val ctx: Context, theme: Theme, keyHeight: Int, radi
     val textView = view(::AutoScaleTextView) {
         // where wider than the bubble can be, not drawn past its sides
         scaleMode = AutoScaleTextView.Mode.Proportional
-        textSize = TEXT_SP
+        textSize = PreviewLabel.SYMBOL_SP
         gravity = gravityCenter
         setTextColor(theme.popupTextColor)
     }
@@ -51,15 +51,10 @@ class PopupEntryUi(override val ctx: Context, theme: Theme, keyHeight: Int, radi
         })
     }
 
-    /** [text] shown at [px] (a swipe's shortcut named, [PreviewLabel]), else at a character's size. */
-    fun setText(text: String, px: Float? = null) {
-        if (px == null) textView.textSize = TEXT_SP else textView.setTextSize(TypedValue.COMPLEX_UNIT_PX, px)
+    /** [text] shown at [px]: a character's size or a shortcut's words' ([PreviewLabel]), as the keys' text is scaled. */
+    fun setText(text: String, px: Float) {
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_PX, px)
         textView.text = text
-    }
-
-    companion object {
-        /** A character's size in the bubble, in sp: a letter key's. */
-        const val TEXT_SP = 23f
     }
 
     /** How wide [text] is drawn, in px. */

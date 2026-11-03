@@ -94,8 +94,14 @@ class PopupComponent :
      */
     var menuRoom: ((width: Int, height: Int) -> MenuRoom?)? = null
 
-    /** The edit menu opened: a notice where it goes put away ([menuRoom]), a window over it else. */
+    /** The edit menu opened where the notices go ([menuRoom]): the notice's window, over it, put away or hidden. */
     var onMenuShown: () -> Unit = {}
+
+    /** That menu gone: a notice [onMenuShown] hid is back. */
+    var onMenuGone: () -> Unit = {}
+
+    // the key whose edit menu is up where the notices go, for [onMenuGone]
+    private var menuAbove: Int? = null
 
     class MenuRoom(val notice: UndoChipPlacement.Place, val barMiddle: Int)
 
@@ -124,14 +130,14 @@ class PopupComponent :
                 dismissJobs.remove(viewId)?.cancel()
             }
             lastShowTime = System.currentTimeMillis()
-            setText(content)
+            setText(content, symbolSize())
             place(this, bounds)
             return
         }
         val popup = (freeEntryUi.poll()
             ?: PopupEntryUi(context, theme, popupKeyHeight, popupRadius)).apply {
             lastShowTime = System.currentTimeMillis()
-            setText(content)
+            setText(content, symbolSize())
         }
         place(popup, bounds)
         // make sure that popup.root does not have parent view before adding it under root container
@@ -153,9 +159,9 @@ class PopupComponent :
         showingEntryUi[viewId]?.apply {
             val fit = if (words && PreviewLabel.isWords(content)) wordsFit(content, this) else null
             val text = fit?.text ?: content
-            val px = fit?.size ?: sp(PopupEntryUi.TEXT_SP)
+            val px = fit?.size ?: symbolSize()
             if (textView.text.contentEquals(text) && textView.textSize == px) return
-            setText(text, fit?.size)
+            setText(text, px)
             place(this, trigger)
         }
     }
@@ -174,6 +180,9 @@ class PopupComponent :
             paint.measureText(s)
         }
     }
+
+    /** A key's letter or symbol in the bubble: scaled as the keys' text is (紧凑, floating), as the words are. */
+    private fun symbolSize() = sp(PreviewLabel.symbolSize(keyTextScale(context)))
 
     private fun sp(value: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, value, context.resources.displayMetrics)
 
@@ -284,7 +293,10 @@ class PopupComponent :
         val at = menuRoom?.invoke(cell * cells.size, cell)?.let { room ->
             EditMenuLayout.place(room.notice, bounds.centerX(), cell, rootBounds.left, rootBounds.right, rootBounds.top, room.barMiddle)
         }
-        if (at != null) onMenuShown()
+        if (at != null) {
+            menuAbove = viewId
+            onMenuShown()
+        }
         val menuUi = PopupMenuUi(
             context,
             theme,
@@ -349,6 +361,13 @@ class PopupComponent :
             showingContainerUi.remove(viewId)
             root.removeView(it.root)
         }
+        menuGone(viewId)
+    }
+
+    private fun menuGone(viewId: Int?) {
+        if (viewId == null || viewId != menuAbove) return
+        menuAbove = null
+        onMenuGone()
     }
 
     private fun dismissPopupEntry(viewId: Int, popup: PopupEntryUi) {
@@ -368,6 +387,7 @@ class PopupComponent :
             root.removeView(container.root)
         }
         showingContainerUi.clear()
+        menuGone(menuAbove)
         // too too
         showingEntryUi.forEach { (_, entry) ->
             root.removeView(entry.root)

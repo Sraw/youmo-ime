@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -63,6 +64,16 @@ class SwipePopupScreenshotTest {
         finger.up(at(key))
     }
 
+    // [label]'s key swiped down to its symbol and held: a character in the bubble, scaled as the keys' text
+    // (紧凑, floating). Held still, the long press would show its keys over it before the shot
+    private fun KeyboardHarness.symbolHeld(label: String, name: String) {
+        val key = key(label)
+        val finger = finger(key, at(key))
+        for (i in 1..5) finger.move(at(key, dy = 10f * i, ms = 16))
+        capture("SwipePopupScreenshotTest/$name", inputView)
+        finger.up(at(key))
+    }
+
     private fun KeyboardHarness.spaceHeld(name: String) {
         val space = inputView.findViewById<View>(R.id.button_space)
         val finger = finger(space, at(space))
@@ -77,6 +88,7 @@ class SwipePopupScreenshotTest {
         org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.lastEntry = null
         KeyboardHarness(ThemePreset.PixelLight).use { h ->
             h.start()
+            h.symbolHeld("g", "symbol_$suffix")
             h.held("a", "select_all_$suffix")
             h.held("q", "text_$suffix")
             h.held("w", "quick_input_$suffix")
@@ -105,6 +117,25 @@ class SwipePopupScreenshotTest {
     @Test
     @Config(qualifiers = "zh-rCN-w851dp-h393dp-land-440dpi")
     fun turned() = shoot("land")
+
+    // team-lead, 0.5.1: the letter in the bubble scaled as the keys' text, 紧凑 0.9 of the standard's
+    @Test
+    fun theLetterIsScaledAsTheKeys() {
+        fun letterPx(): Float = KeyboardHarness(ThemePreset.PixelLight).use { h ->
+            h.start()
+            val key = h.key("g")
+            val finger = h.finger(key, h.at(key))
+            val size = KeyboardHarness.all(h.inputView).filterIsInstance<TextView>()
+                .filter { h.shown(it) && it.text.toString() == "g" }
+                .first { generateSequence(it.parent as? View) { p -> p.parent as? View }.none { p -> p is KeyView } }.textSize
+            finger.up(h.at(key))
+            size
+        }
+        val standard = letterPx()
+        prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
+        prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
+        assertEquals(standard * 0.9f, letterPx(), 0.5f)
+    }
 
     // what the bubbles say: the words fitted, a cut text told by its ellipsis
     @Test
@@ -158,6 +189,32 @@ class SwipePopupScreenshotTest {
             h.idle()
             val clip = h.service.getSystemService(ClipboardManager::class.java).primaryClip
             assertEquals("copied", "hello", clip?.getItemAt(0)?.text?.toString())
+        }
+    }
+
+    // KB-62: a failure said as a key failed is not put away by the menu (it would be lost unread): hidden
+    // under it, back as it goes with nothing picked
+    @Test
+    @Uat("KB-62")
+    fun aFailureIsHiddenUnderTheEditMenuAndBackAsItGoes() {
+        KeyboardHarness(ThemePreset.PixelLight).use { h ->
+            h.start(prefill = { it.setText("hello") })
+            h.service.say("读不出来", steady = true)
+            h.after(500)
+            val said = h.notice()!!.contentView
+            assertTrue("shown first", said.isShown)
+            val space = h.inputView.findViewById<View>(R.id.button_space)
+            val finger = h.finger(space, h.at(space))
+            for (i in 1..6) finger.move(h.at(space, dy = -10f * i, ms = 16))
+            h.after(500)
+            assertNotNull("still up", h.notice())
+            assertFalse("hidden under the menu", said.isShown)
+            // down off the key: nothing picked, the menu gone
+            finger.move(h.at(space, dy = 200f, ms = 16))
+            finger.up(h.at(space, dy = 200f))
+            h.idle()
+            assertTrue("back", h.notice()?.contentView?.isShown == true)
+            assertEquals("nothing typed", "hello", h.field.text.toString())
         }
     }
 

@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input
 
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.input.NoticeState.Companion.SAID_MS
+import org.fcitx.fcitx5.android.input.NoticeState.Cover
 import org.fcitx.fcitx5.android.input.NoticeState.Companion.UNDO_MS
 import org.fcitx.fcitx5.android.input.NoticeState.Shown
 import org.junit.Assert.assertEquals
@@ -72,4 +73,41 @@ class NoticeStateTest {
         assertEquals("删", s.dismiss())
         assertNull(s.dismiss())
     }
+
+    // 051-fix-popup: the edit menu goes where the notices go, under their window
+    @Test
+    fun theEditMenuPutsAwayOrHides() = assertRows(
+        "what was done goes, as typing would" to {
+            val n = NoticeState<String>().apply { show("删", steady = false) }
+            assertEquals(Cover.Away, n.cover())
+            assertFalse("not back", n.uncover())
+        },
+        "a failure is hidden, and back as the menu goes" to {
+            val n = NoticeState<String>().apply { show(null, steady = true) }
+            assertEquals(Cover.Hide, n.cover())
+            assertEquals("hidden once", Cover.None, n.cover())
+            assertTrue(n.uncover())
+            assertFalse("back once", n.uncover())
+            assertTrue("still steady", !n.typed())
+        },
+        "one going already is left to go" to {
+            val n = NoticeState<String>().apply { show(null, steady = true); dismiss() }
+            assertEquals(Cover.None, n.cover())
+            assertFalse(n.uncover())
+        },
+        "a hidden one put away meanwhile (the keyboard gone) is not back" to {
+            val n = NoticeState<String>().apply { show(null, steady = true) }
+            n.cover()
+            n.dismiss()
+            n.gone()
+            assertFalse(n.uncover())
+        },
+        "a new one in its place is shown, not hidden" to {
+            val n = NoticeState<String>().apply { show(null, steady = true) }
+            n.cover()
+            n.show(null, steady = true)
+            assertFalse(n.uncover())
+            assertEquals("the new one hides in turn", Cover.Hide, n.cover())
+        },
+    )
 }

@@ -197,9 +197,14 @@ abstract class BaseInputView(
     /** Where a notice [width] × [height] said now goes (above the keyboard, docked): the edit menu goes there too. */
     protected fun noticePlace(width: Int, height: Int): UndoChipPlacement.Place = undoPlace(width, height, aboveKeys = true)
 
-    /** The notice put away as typing does: the edit menu opened where it shows, its window over the menu. */
-    protected fun noticeTyped() {
-        undoChip?.typed()
+    /** The edit menu opened where the notice shows, its window over the menu: put away, or a failure hidden ([UndoChip.covered]). */
+    protected fun noticeCovered() {
+        undoChip?.covered()
+    }
+
+    /** The edit menu gone: a failure it hid back ([UndoChip.uncovered]). */
+    protected fun noticeUncovered() {
+        undoChip?.uncovered()
     }
 
     private val learningMenu by lazy { CandidateLearningMenu(themedContext, fcitx, service.lifecycleScope, ::chip) }

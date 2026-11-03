@@ -93,7 +93,9 @@ toward the screen's middle (`floating`, fed the keyboard's rect and the room by
 5. **One at a time**: a new notice takes the shown one's place in the same box (words crossfaded,
    size eased); the one replaced lapses, its act standing. With 撤销 it stays 6 s, a line said 2 s
    (longer as accessibility asks); a tap puts it away, typing too, except a failure `EngineNotices.failed` says
-   (`steady`): the key it failed on reaches the keyboard after it; said once, it stays 6 s too. A
+   (`steady`): the key it failed on reaches the keyboard after it; said once, it stays 6 s too.
+   The edit menu opened where the notices go (`NoticeState.cover`) puts away what typing would; a
+   steady one is hidden, its time stopped, and back for its 6 s as the menu goes (`uncover`). A
    replaced row's 撤销 takes nothing back, and the fading row swallows taps (none reaches the box).
 6. **In the keyboard only this notice**: no `Toast` (Android 13 drops an input method's, see
    [pitfalls](pitfalls.md)), no `Snackbar`. A toast only when no keyboard is shown to say it on.
@@ -136,9 +138,10 @@ wires it on the typing keyboards (`shortcuts = true`), buzzes at the threshold, 
 (`EditMenuLayout`, `PopupMenuUi.Fixed`) there: up where a notice its size goes (`EditMenuLayout.place`
 on `UndoChipPlacement`'s place, which `InputView` hands `PopupComponent.menuRoom`; over the bar where
 that is off the view), 粘贴 across from the key, not under the finger (the user, 0.5.1's test build),
-picked by how far the finger moves (`PopupFocus`), a notice shown put away (`onMenuShown`). A
+picked by how far the finger moves (`PopupFocus`), a notice shown put away or, a failure, hidden till the menu goes (`onMenuShown`, `onMenuGone`,
+`UndoChip.covered`/`uncovered`). A
 shortcut named in the key's bubble (`PopupAction.PreviewUpdateAction.words`) is fitted by
-`PreviewLabel`: a function key's size scaled as the keys' text, a bubble five of them wide, smaller
+`PreviewLabel`: a function key's size scaled as the keys' text (a letter's too, `symbolSize`), a bubble five of them wide, smaller
 to a least, then cut with an ellipsis; `KeyShortcutRunner` runs a shortcut after what is
 typed is in, the field's edits as `EditPlan` steps. 清除 (`EditPlan.clear`: what is typed, else the
 selection, else all before the cursor, else all after) is kept in memory (`ClearedText`, under the EditorInfo input started with, by identity, forgotten as

@@ -17,6 +17,15 @@ package org.fcitx.fcitx5.android.input.popup
  */
 object PreviewLabel {
 
+    /** A character's size (a letter, a symbol, a label of one), in sp before the keys' scale: a letter key's. */
+    const val SYMBOL_SP = 23f
+
+    /**
+     * A character's size at the keys' text [scale] (紧凑 0.9, floating by its width), in sp: the
+     * bubble's letter grows and shrinks with the key's under it, as the words do (team-lead, 0.5.1).
+     */
+    fun symbolSize(scale: Float): Float = SYMBOL_SP * scale
+
     /** The words' size, in sp before the keys' scale (紧凑, floating): a function key's label's. */
     const val WORDS_SP = 16f
 

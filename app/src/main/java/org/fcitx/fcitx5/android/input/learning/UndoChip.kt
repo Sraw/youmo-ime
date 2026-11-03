@@ -91,6 +91,9 @@ class UndoChip(
 
     private val timeout = Runnable { dismiss(animated = true) }
 
+    // how long the one shown stays, for its time again after [uncovered]
+    private var shownFor = 0L
+
     /** Whether one is up, coming or going. */
     val showing: Boolean get() = window?.isShowing == true
 
@@ -113,6 +116,8 @@ class UndoChip(
             return false
         }
         this.aboveKeys = aboveKeys
+        // a new one in the place of one hidden under the menu ([covered]) is shown
+        if (box?.visibility == View.INVISIBLE) shown(true)
         val row = row(message, undo)
         val to = place(row.layoutParams.width, row.layoutParams.height, aboveKeys)
         val shown = window
@@ -128,6 +133,7 @@ class UndoChip(
             // as long as its user needs
             a.getRecommendedTimeoutMillis(shownMs.toInt(), AccessibilityManager.FLAG_CONTENT_TEXT or AccessibilityManager.FLAG_CONTENT_CONTROLS).toLong()
         } ?: shownMs
+        this.shownFor = shownFor
         anchor.postDelayed(timeout, shownFor)
         return true
     }
@@ -152,6 +158,38 @@ class UndoChip(
     /** A key typed, a word put in: put away as a tap would, unless [show] said steady or it is going already. */
     fun typed() {
         if (state.typed()) dismiss(animated = true)
+    }
+
+    /**
+     * The edit menu opened where this is, under its window ([NoticeState.cover]): one typing puts away
+     * goes; a steady one is hidden, its time stopped, not to be lost while the finger picks.
+     */
+    fun covered() {
+        if (window?.isShowing != true) return
+        when (state.cover()) {
+            NoticeState.Cover.Away -> dismiss(animated = true)
+            NoticeState.Cover.Hide -> {
+                anchor.removeCallbacks(timeout)
+                shown(false)
+            }
+            NoticeState.Cover.None -> Unit
+        }
+    }
+
+    /** The edit menu gone: one [covered] hid is back, for as long as it was first shown. */
+    fun uncovered() {
+        if (!state.uncover() || window?.isShowing != true) return
+        shown(true)
+        anchor.postDelayed(timeout, shownFor)
+    }
+
+    // hidden, it neither shows nor takes a touch meant for what is under it
+    private fun shown(visible: Boolean) {
+        box?.visibility = if (visible) View.VISIBLE else View.INVISIBLE
+        window?.apply {
+            isTouchable = visible
+            update()
+        }
     }
 
     /** Put away: [animated], back into the keyboard; else at once (the keyboard itself going). */

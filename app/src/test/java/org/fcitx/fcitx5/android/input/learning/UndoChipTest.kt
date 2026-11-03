@@ -357,6 +357,47 @@ class UndoChipTest {
         assertTrue("6 s from the second, not 2 s from the first", chip.showing)
     }
 
+    // 051-fix-popup: the edit menu opened where the notices go, under their window
+    @Test
+    fun theEditMenuPutsAwayWhatWasDoneAndHidesAFailureTillItGoes() {
+        val chip = chip()
+        chip.show("已复制")
+        chip.covered()
+        assertFalse("put away, as typing would", chip.showing)
+        chip.uncovered()
+        assertFalse("not back", chip.showing)
+
+        chip.show("读不出来", steady = true)
+        val said = windows().single().find("读不出来")!!
+        idle(UNDO_MS - 1000)
+        chip.covered()
+        assertTrue("still up", chip.showing)
+        assertFalse("but hidden under the menu", said.isShown)
+        val flags = (windows().single().layoutParams as WindowManager.LayoutParams).flags
+        assertTrue("taking no touch", (flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE) != 0)
+        // its time stopped while hidden: a long pick does not lose it
+        idle(UNDO_MS)
+        assertTrue(chip.showing)
+        chip.uncovered()
+        assertTrue("back", said.isShown)
+        // shown again for as long as at first
+        idle(UNDO_MS - 1)
+        assertTrue(chip.showing)
+        idle(1)
+        assertFalse(chip.showing)
+    }
+
+    @Test
+    fun aNoticeInThePlaceOfOneHiddenIsShown() {
+        val chip = chip()
+        chip.show("读不出来", steady = true)
+        chip.covered()
+        chip.show("又读不出来", steady = true)
+        assertTrue(windows().single().find("又读不出来")!!.isShown)
+        chip.uncovered()
+        assertTrue(windows().single().find("又读不出来")!!.isShown)
+    }
+
     @Test
     fun typingPutsAwayWhatWasDoneButNotAFailureSaidAsTheKeyFailed() {
         val chip = chip()

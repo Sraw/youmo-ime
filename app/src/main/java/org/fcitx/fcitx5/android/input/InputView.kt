@@ -497,7 +497,8 @@ class InputView(
             val at = IntArray(2).also { bar.getLocationInWindow(it) }
             PopupComponent.MenuRoom(noticePlace(width, height), at[1] + bar.height / 2)
         }
-        popup.onMenuShown = ::noticeTyped
+        popup.onMenuShown = ::noticeCovered
+        popup.onMenuGone = ::noticeUncovered
 
         keyboardPrefs.registerOnChangeListener(onKeyboardSizeChangeListener)
         advancedPrefs.registerOnChangeListener(onKeyboardSizeChangeListener)
