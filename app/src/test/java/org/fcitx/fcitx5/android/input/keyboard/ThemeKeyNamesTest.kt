@@ -52,6 +52,8 @@ class ThemeKeyNamesTest {
         "k18" to listOf(GroupedKeyboard.layout(NineKeyLetters.G18) { emptyList() }.flatten()),
         "number" to NumberPad.entries.map { NumberKeyboard.layout(it).flatten() },
         "handwriting" to listOf(HandwritingKeyboard.Layout.flatten()),
+        // 注音九键 not yet: the format's grid for it is not the keyboard's
+        "zhuyin" to listOf(ZhuyinKeyboard.fullLayout().flatten(), ZhuyinKeyboard.fullLayout(compact = true).flatten()),
         "symbols" to listOf(PickerLayout.panelKeys(context, symbolPicker().switchKey)),
         "emoji" to listOf(
             PickerLayout.listKeys(emojiPicker().switchKey, PickerWindow.SearchKey),

@@ -30,6 +30,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
+import org.fcitx.fcitx5.android.input.theme.KeyNames
 
 /**
  * Pinyin typed in zhuyin (design 051), on one of two keyboards, both sending codes of their own
@@ -49,7 +50,14 @@ class ZhuyinKeyboard(
     context: Context,
     theme: Theme,
     private val nine: Boolean,
-) : BaseKeyboard(context, theme, if (nine) nineLayout() else fullLayout(keyboardCompact()), shortcuts = true) {
+) : BaseKeyboard(
+    context,
+    theme,
+    if (nine) nineLayout() else fullLayout(keyboardCompact()),
+    // 注音九键's keys are not named yet: the format's grid for it is not the keyboard's (tones on the left)
+    themeBoard = if (nine) null else KeyNames.ZHUYIN,
+    shortcuts = true,
+) {
 
     companion object {
         const val NameNine = "ZhuyinNine"
@@ -78,10 +86,12 @@ class ZhuyinKeyboard(
             }
         }
 
-        private fun key(text: String, size: Float, width: Float, action: KeyAction, popup: Array<KeyDef.Popup>, shortcut: String) = KeyDef(
+        @Suppress("LongParameterList")
+        private fun key(text: String, size: Float, width: Float, action: KeyAction, popup: Array<KeyDef.Popup>, shortcut: String, name: String? = null) = KeyDef(
             KeyDef.Appearance.Text(text, size, percentWidth = width),
             setOf(KeyDef.Behavior.Press(action)),
             popup,
+            name = name,
             shortcut = shortcut,
         )
 
@@ -89,10 +99,10 @@ class ZhuyinKeyboard(
         internal fun fullLayout(compact: Boolean = false): List<List<KeyDef>> = ROWS.mapIndexed { r, row ->
             val keys = row.map { q ->
                 val c = ZhuyinKeys.DACHEN_QWERTY.getValue(q)
-                // its shortcut by the QWERTY key it sits on, the swipe's preview naming it
+                // its shortcut and its theme name (KeyNames.ZHUYIN) by the QWERTY key it sits on, the swipe's preview naming it
                 key(
                     c.toString(), 20f * KeyTextScale.dachen(compact), if (r == 0) 1f / 11 else if (r == 3) 0.085f else 0.1f, sym(codeOf(c, nine = false)!!),
-                    arrayOf(KeyDef.Popup.AltPreview(c.toString(), c.toString())), ZhuyinShortcutHook.fullKey(q),
+                    arrayOf(KeyDef.Popup.AltPreview(c.toString(), c.toString())), ZhuyinShortcutHook.fullKey(q), name = q.toString(),
                 )
             }
             if (r == 3) keys + BackspaceKey(0.15f) else keys
