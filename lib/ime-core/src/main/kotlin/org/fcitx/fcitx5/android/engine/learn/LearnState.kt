@@ -205,12 +205,7 @@ class LearnState {
             is Commit -> return commit(record)
             is Undo -> undo(record)
             is Pin -> pin(record)
-            is Forget -> forget(record.text)
-            is PhraseForget -> {
-                // its count alone (U-73): the words of the same text stay, as they are none of it
-                changes.recount = true
-                phrases.remove(record.text)
-            }
+            is Forget, is PhraseForget -> forgotten(record)
             is NoPredict -> if (record.on) noPredict += record.prev to record.text else noPredict -= record.prev to record.text
             is TableOrderReset -> tableOrderReset(record.im)
             is TableBlock -> tableBlock(TableBlockRow(record.im, record.code, record.text), record.on)
@@ -566,6 +561,13 @@ class LearnState {
                 if (b.value == null) dropMine(b.text) else setMine(b.text, b.value)
             }
         }
+    }
+
+    private fun forgotten(record: LearnRecord) {
+        if (record is Forget) return forget(record.text)
+        // a whole phrase's count alone (U-73): the words of the same text stay, as they are none of it
+        changes.recount = true
+        if (record is PhraseForget) phrases.remove(record.text)
     }
 
     /** U-84: [text] forgotten under every code and after every word; its firsts no undo puts back. */
