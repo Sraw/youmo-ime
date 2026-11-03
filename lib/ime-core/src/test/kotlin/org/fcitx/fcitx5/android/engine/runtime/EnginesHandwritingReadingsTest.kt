@@ -110,6 +110,17 @@ class EnginesHandwritingReadingsTest : EnginesFixture() {
         assertNull(engines(ReadingStyle.OFF).charCard(HANDWRITING, 0, "行"))
     }
 
+    // the paged window's index, from the page shown (review 051-hw-reading M2)
+    @Test
+    fun aCardOnTheSecondPageIsOfItsCharacter() {
+        val e = engines(ReadingStyle.OFF).apply { settings = settings.copy(pageSize = 1) }
+        e.write(0, "行", "江")
+        assertEquals(listOf("江"), e.onEvent(HANDWRITING, EngineEvent.PAGE_DOWN, 0).candidates)
+        assertEquals("氵", e.charCard(HANDWRITING, 0, "江", paged = true)?.radical)
+        assertNull(e.charCard(HANDWRITING, 0, "江"))
+        assertNull(e.charCard(HANDWRITING, 0, "行", paged = true))
+    }
+
     @Test
     fun noCardFileNoRadical() {
         charInfo = null

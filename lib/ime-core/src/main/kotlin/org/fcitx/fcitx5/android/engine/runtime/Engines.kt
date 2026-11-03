@@ -415,13 +415,17 @@ class Engines(
     }
 
     /**
-     * The card of the [index]th of [im]'s candidates, [text]: a character looked up (handwriting's, by
-     * its parts or strokes: [Session.lookedUp]); null for any other, or if [text] is no longer there.
+     * The card of the [index]th of [im]'s candidates ([paged], of the page shown: the paged window's), [text]:
+     * a character looked up (handwriting's, by its parts or strokes: [Session.lookedUp]); null for any
+     * other, or if [text] is no longer there.
      */
-    fun charCard(im: String, index: Int, text: String): CharCard? = checked {
-        val session = sessions[pairs.shownSession(im)] ?: return@checked null
-        val before = session.lookedUp(index) ?: return@checked null
-        if (session.candidates(index, 1).firstOrNull()?.text != text) return@checked null
+    fun charCard(im: String, index: Int, text: String, paged: Boolean = false): CharCard? = checked {
+        val shown = pairs.shownSession(im)
+        val session = sessions[shown] ?: return@checked null
+        val at = index + if (paged) keyboards[shown]?.first ?: 0 else 0
+        // the text first: what lookedUp reads is what candidates read up to
+        if (session.candidates(at, 1).firstOrNull()?.text != text) return@checked null
+        val before = session.lookedUp(at) ?: return@checked null
         CharCard.of(text, before, candidateReadings, assets.pinyinData.charReadings, assets.charInfo, assets.strokes())
     }
 

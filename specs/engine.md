@@ -295,8 +295,10 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   sets the same option.
   A character's card (`CharCard.of`, `Engines.charCard(im, index, text)`): for a candidate the session
   says was looked up (`Session.lookedUp`: handwriting's characters, full pinyin's `u` parts and stroke
-  lookup, not what was typed nor what may follow), its readings in `ordered`'s order with up to two
-  words each (`CharReadings`), and `engine/charinfo.data`'s radical, strokes and parts (`CharInfo`), the
+  lookup, not what was typed nor what may follow; `paged`, the index from the page shown), its readings
+  in `ordered(card = true)`'s order with up to two words each (`CharReadings`: the card's alone, the
+  dictionaries' neutral tones the candidates leave out, 和 huo, flagged `CARD_ONLY` and after the rest; a
+  traditional character's words its simplified one's, `readFrom`), and `engine/charinfo.data`'s radical, strokes and parts (`CharInfo`), the
   parts' readings by `CandidateReadings`, the stroke order the stroke table's first (`Strokes`); what is
   not known is null. The app shows it above the held candidate's menu (`CharCardView`, laid out by
   `CharCardLayout`).

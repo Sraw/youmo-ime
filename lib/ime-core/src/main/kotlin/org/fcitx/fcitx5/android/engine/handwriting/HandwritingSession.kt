@@ -238,8 +238,6 @@ class HandwritingSession(
     override fun why(index: Int): Why? =
         if (written.isEmpty()) predictions.why(index) else ranks.getOrNull(index)?.let { Why(it.tier, it.uses, rankedUnder) }
 
-    // what was written read anew, or what may follow offered anew (a prediction turned off back in
-    // it): the session, its pad and what is written on it kept after an undo (review-int S1)
     // what the last character may be, after the sentence's characters before it; not what may follow
     override fun lookedUp(index: Int): String? {
         if (written.isEmpty()) return null
@@ -247,6 +245,8 @@ class HandwritingSession(
         return text.removeSuffix(lastCharacter(text))
     }
 
+    // what was written read anew, or what may follow offered anew (a prediction turned off back in
+    // it): the session, its pad and what is written on it kept after an undo (review-int S1)
     override fun reread(): Snapshot? {
         // the undo may have unblocked a character the cached search left out (as pressed forgets it)
         decoder?.forgetSearch()
