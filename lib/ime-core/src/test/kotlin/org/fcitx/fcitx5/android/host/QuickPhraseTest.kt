@@ -44,7 +44,8 @@ class QuickPhraseTest {
         val e = trigger()
         assertTrue(e.filtered && e.accepted)
         assertTrue(rig.quickPhrase.isActive(rig.ic))
-        assertEquals("Quick Phrase: ", rig.aux)
+        // none of the user's entries yet: the hint after the label
+        assertEquals("Quick Phrase: type a key, or tap + Add for your own", rig.aux)
         rig.press(KeySyms.ESCAPE)
         assertFalse(rig.quickPhrase.isActive(rig.ic))
         rig.press(TempKeys.SEMICOLON, KeyStates.SUPER)
@@ -55,11 +56,14 @@ class QuickPhraseTest {
 
     @Test
     fun theTableIsAskedForAtTheFirstLookupNotBefore() {
-        // the app loads it on a thread of its own at start (KotlinHost.startup): nothing may wait on it sooner
+        // the app loads it on a thread of its own at start (KotlinHost.startup): nothing may wait on it
+        // sooner; quick input opened lists the user's entries, its first lookup
         var asked = 0
         val rig = TempModeRig(QuickPhraseTable.EMPTY, { null }, tableSource = { asked++; table })
-        rig.press(TempKeys.GRAVE, KeyStates.SUPER)
+        rig.press('a'.code)
         assertEquals(0, asked)
+        rig.press(TempKeys.GRAVE, KeyStates.SUPER)
+        assertTrue(asked > 0)
         rig.type("xy")
         assertTrue(asked > 0)
         assertEquals(listOf("one", "two"), rig.page)
@@ -265,9 +269,9 @@ class QuickPhraseTest {
             assertEquals(listOf("new"), rig.page)
         }
         assertRows(
-            "a table" to { replaced { it.reload(table()) } },
-            // reloadConfig hands a table read later, off the host thread
-            "a lazy table (the app's path, F4037/F4098)" to { val t = table(); replaced { it.reload { t } } },
+            "a table" to { replaced { it.reload(QuickPhraseBook(table())) } },
+            // reloadConfig hands a book read later, off the host thread
+            "a lazy book (the app's path, F4037/F4098)" to { val t = QuickPhraseBook(table()); replaced { it.reload { t } } },
         )
     }
 }

@@ -358,7 +358,7 @@
     <string name="learning_span_ten_minutes">最近 10 分钟</string>
     <string name="learning_span_hour">最近 1 小时</string>
     <string name="learning_span_today">今天</string>
-    <string name="learning_clear_recent_message">这段时间里学到的一切都忘掉，就像没打过字。你自己做的不撤：固定、屏蔽、不再联想、删除、导入、加的词、英文里不再自动改的词；你导出的文件也不动。这段时间里存的自动备份一并作废，马上重存一份；清掉以后不能再「退回恢复前」。</string>
+    <string name="learning_clear_recent_message">这段时间里学到的一切都忘掉，就像没打过字。你自己做的不撤：快速输入、固定、屏蔽、不再联想、删除、导入、加的词、英文里不再自动改的词；你导出的文件也不动。这段时间里存的自动备份一并作废，马上重存一份；清掉以后不能再「退回恢复前」。</string>
     <string name="learning_clear">清掉</string>
     <string name="learning_cleared">已清掉</string>
     <string name="learning_not_done">候选已经变了，没做</string>
@@ -389,9 +389,9 @@
     <string name="learning_kind_handwriting">手写</string>
     <string name="learning_clear_learned">清空学到的</string>
     <string name="learning_clear_learned_summary">学到的顺序和次数；你的词、固定、屏蔽都留下</string>
-    <string name="learning_clear_learned_message">清掉：\n· 各处学到的顺序、改选和使用次数，只上屏过一次的记录\n· 前后搭配和学到的联想\n· 英文的次数和排序\n· 表情和符号面板的「最近」\n\n留下：\n· 手动加的词、固定、屏蔽、不再联想、英文里不再自动改的词\n· 你的词（次数清零，仍是你的词）\n· 导入的词（回到没用过的样子）\n· 码表调频学到的顺序（到码表设置里恢复）\n\n自定义短语不在这里清，到「自定义短语」里删。这次安装存的自动备份一并删掉，清空以后不能再「退回恢复前」；以前装的、拷来的备份不动，恢复它们会带回清掉的。</string>
+    <string name="learning_clear_learned_message">清掉：\n· 各处学到的顺序、改选和使用次数，只上屏过一次的记录\n· 前后搭配和学到的联想\n· 英文的次数和排序\n· 表情和符号面板的「最近」\n\n留下：\n· 手动加的词、固定、屏蔽、不再联想、英文里不再自动改的词\n· 你的词（次数清零，仍是你的词）\n· 导入的词（回到没用过的样子）\n· 码表调频学到的顺序（到码表设置里恢复）\n\n自定义短语、快速输入不在这里清，到它们自己的页里删。这次安装存的自动备份一并删掉，清空以后不能再「退回恢复前」；以前装的、拷来的备份不动，恢复它们会带回清掉的。</string>
     <string name="learning_clear_all">全部清空（回到刚装好）</string>
-    <string name="learning_clear_all_message">回到刚装好，清掉：\n· 各处学到的顺序、改选和次数，前后搭配和学到的联想\n· 英文的次数和排序，表情和符号面板的「最近」\n· 你的词、手动加的词、导入的词\n· 固定、屏蔽、不再联想、英文里不再自动改的词\n· 码表调频学到的顺序\n\n留下：\n· 自定义短语（到「自定义短语」里删）\n\n这次安装存的自动备份一并删掉，清空以后不能再「退回恢复前」；以前装的、拷来的备份不动，恢复它们会带回清掉的。</string>
+    <string name="learning_clear_all_message">回到刚装好，清掉：\n· 各处学到的顺序、改选和次数，前后搭配和学到的联想\n· 英文的次数和排序，表情和符号面板的「最近」\n· 你的词、手动加的词、导入的词\n· 固定、屏蔽、不再联想、英文里不再自动改的词\n· 码表调频学到的顺序\n\n留下：\n· 自定义短语（到「自定义短语」里删）\n· 快速输入的条目和顺序（到「快速输入」里删）\n\n这次安装存的自动备份一并删掉，清空以后不能再「退回恢复前」；以前装的、拷来的备份不动，恢复它们会带回清掉的。</string>
     <string name="learning_clear_do">清空</string>
     <string name="learning_sort_recent">最近学到的在前</string>
     <string name="learning_filter_unused">只看很久没用的</string>
@@ -845,7 +845,7 @@
     <string name="section_key_style">按键样式</string>
     <string name="section_phrases">短语</string>
     <string name="punctuation_map_summary">中文输入时每个标点打成什么，比如 , 打成 ，</string>
-    <string name="custom_phrases_summary">打一个缩写出一段话，比如 dz 出你的地址</string>
+    <string name="custom_phrases_summary">打拼音时打一个缩写出一段话，比如 dz 出你的地址；长的、多行的、偶尔用的，存到「快速输入」</string>
     <string name="im_page_size_summary">只用于实体键盘的候选窗，所有输入法都用，包括英文</string>
     <string name="home_input_methods_summary">添加、排序，每种输入法自己的选项</string>
     <string name="home_shared_input_summary">各输入法共用：联想、表情、滑行、模糊音、标点</string>
@@ -983,4 +983,27 @@
     <string name="fn_key_separator">分词（14/18 键）</string>
     <string name="fn_key_up">上滑</string>
     <string name="fn_key_down">下滑</string>
+    <string name="quick_phrases">快速输入</string>
+    <string name="quick_phrases_summary">长按「符」，打关键词的开头挑一段存好的文字；什么都不打时列出全部</string>
+    <string name="quick_phrases_page_hint">长按「符」进来，打关键词的开头挑一段存好的文字；什么都不打时列出全部，像翻笔记本。打拼音时顺手出的缩写，用「自定义短语」。</string>
+    <string name="host_quick_phrase_add">＋添加</string>
+    <string name="host_quick_phrase_hint">打关键词，或点＋添加自己的</string>
+    <string name="quick_phrase_key">关键词</string>
+    <string name="quick_phrase_content">内容</string>
+    <string name="quick_phrase_key_invalid">关键词不能有空格，最多 30 个字</string>
+    <string name="quick_phrase_content_too_long">内容最多 5000 字</string>
+    <string name="quick_phrase_duplicate">已经有一条关键词和内容都一样的</string>
+    <string name="quick_phrase_search">搜索关键词或内容</string>
+    <string name="quick_phrase_built_in">自带的</string>
+    <string name="quick_phrase_built_in_emoji">颜文字（yawn、happy 这些词）</string>
+    <string name="quick_phrase_built_in_emoji_eac">表情代码（:smile: 这样）</string>
+    <string name="quick_phrase_built_in_latex">LaTeX 符号（\\alpha 这样）</string>
+    <string name="quick_phrase_import_done">导入 %1$d 条，跳过 %2$d 条重复</string>
+    <string name="quick_phrase_deleted">已删除</string>
+    <string name="quick_phrase_new">新加快速输入</string>
+    <string name="quick_phrase_change">改快速输入</string>
+    <string name="quick_phrase_commit">上屏</string>
+    <string name="quick_phrase_copy">复制</string>
+    <string name="quick_phrase_lines">（%1$d 行）</string>
+    <string name="clipboard_save_quick_phrase">存为快速输入</string>
 </resources>

@@ -55,3 +55,41 @@
 - **操作**：打 `4E2D`（14 键没有 ⇧，角标里也没有 +；Unicode 输入不带 `U+` 也认得出编码）：向下划 UI 出 4，点 ER 的左半出 e，向下划 ER 出 2，点 DF 的左半出 d；看候选，点「中」。
 - **预期**：候选里有「中」，点了框里是「中」；编码里和框里都没有私用区的字（键盘内部的码）。
 - **JVM**：`Keys14UatTest.unicodeOnTheFourteenKeysTakesTheCodeFromCornersAndHalves`（4E2D 出中、上屏，编码里没有私用区字符）；设备上不跑。
+
+### QU-10 [P1] 快速输入列出自己的条目
+- **前提**：设置 → 词库与短语 → 快速输入里存了 `gh` → 一个网址、`addr` → 两行地址。
+- **操作**：长按「符」，什么都不打；点 addr；再长按「符」。
+- **预期**：栏上依次是两条的开头（多行的带 ⏎），最后是「＋添加」，没有高亮；点了整段两行原样上屏；再进时 addr 排第一。
+- **JVM**：`QuickPhraseMineTest.nothingTypedListsMineThenAddWithNothingLit`、`QuickPhraseBookTest.mineInOrderOfUseThenFileOrder`。
+
+### QU-11 [P1] 九键 / 14 键按键找关键词
+- **前提**：同 QU-10，B0-九键。
+- **操作**：长按「符」，打 4、4。
+- **预期**：编码显示 44，候选里先是 gh 的网址，再是内置的 ghost；空格上屏网址。改了九键字母后按新字母找。
+- **JVM**：`QuickPhraseMineTest.theNineKeysFindAKeyByItsLettersShowingDigits`、`the14KeysFindByTheWholeKeyAndBackspaceKeepsStep`。
+
+### QU-12 [P2] 九键、手写长按「符」进快速输入
+- **操作**：九键、手写上长按「符」。
+- **预期**：进快速输入；手写时换成全键盘，退出后回到手写板。
+- **JVM**：`LayoutSwitchKeyTest.theNineKeysAndHandwritingsSymbolsKeyHoldsQuickInputTheirNumbersKeyOnlyTaps`；换键盘在设备上看。
+
+### QU-13 [P1] 密码框里不记顺序
+- **操作**：密码框里长按「符」，点第二条。
+- **预期**：上屏；下次进来顺序没变。
+- **JVM**：`QuickPhraseMineTest.inAPasswordFieldMineCommitsButItsUseIsNotKept`。
+
+### QU-14 [P1] 借手机时不列自己的条目
+- **前提**：开「借手机」。
+- **操作**：长按「符」，再打 gh。
+- **预期**：什么都不打时栏空；打 gh 只有内置的 ghost。
+- **JVM**：`QuickPhraseMineTest.habitsOffShowNoneOfMine`。
+
+### QU-15 [P2] 设置页加、改、删、导入导出
+- **操作**：快速输入页里加一条、改它、左滑删再撤销；导出再导入。
+- **预期**：每一步键盘上马上看得到；重复的拒绝；导入报加了几条、跳过几条重复的。
+- **JVM**：`QuickPhraseManagerTest`（四项）。
+
+### QU-16 [P0] 条目跟着备份走
+- **操作**：备份全部，清数据后从备份恢复。
+- **预期**：条目、顺序、关掉的内置表都回来。
+- **JVM**：`UserDataManagerTest.quickInputsEntriesOrderAndSwitchesRoundTripThroughABackup`。

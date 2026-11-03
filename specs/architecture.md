@@ -49,7 +49,7 @@ One process. Inside it:
   engine) and drops timers not yet due.
 - **`host-config`** (`ConfigWriter`): writes each changed config file in the background, merged
   per file, atomically; flushed at stop and before `save()` returns.
-- **`host-quickphrase`**: reads the quick phrase tables once at start, beside the engine's load; a
+- **`host-quickphrase`**: reads the quick phrase tables (and the user's `mine.mb`/`mine.used`, `QuickPhraseBook.load`) once at start, beside the engine's load; a
   lookup before they are read waits. charselect's search index is built on a thread of its own
   after the first Unicode trigger.
 - **IO / Default dispatchers**: file work (imports, backups, the clipboard database), and the

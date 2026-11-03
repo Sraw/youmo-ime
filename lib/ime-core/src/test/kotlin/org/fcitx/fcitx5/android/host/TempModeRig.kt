@@ -13,21 +13,30 @@ internal class TempModeRig(
     data: () -> ByteArray?,
     clipboard: String = "",
     tableSource: () -> QuickPhraseTable = { table },
+    hooks: QuickPhraseHooks = QuickPhraseHooks.NONE,
+    book: (() -> QuickPhraseBook)? = null,
 ) {
     val log = mutableListOf<String>()
+
+    /** What went out past the commit filters ([TempModeHost.commitAsIs]), each also in [commits]. */
+    val asIs = mutableListOf<String>()
     val engineKeys = mutableListOf<Int>()
     var panel: TempPanel = TempPanel.EMPTY
     lateinit var pipeline: KeyPipeline
 
     private val host = object : TempModeHost {
         override fun commit(ic: InputContext, text: String) = pipeline.commit(ic, text)
+        override fun commitAsIs(ic: InputContext, text: String) {
+            asIs += text
+            pipeline.commitAsIs(ic, text)
+        }
         override fun showPanel(ic: InputContext, panel: TempPanel) {
             this@TempModeRig.panel = panel
             pipeline.updatePanel(ic)
         }
     }
 
-    val quickPhrase = QuickPhrase(host, tableSource)
+    val quickPhrase = QuickPhrase(host, book ?: { QuickPhraseBook(tableSource()) }, hooks = hooks)
     val unicode = UnicodeInput(host, data, { clipboard })
 
     private val output = object : HostOutput {

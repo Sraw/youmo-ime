@@ -587,7 +587,7 @@ class ToolbarUatTest {
         val config = ToolbarConfig.parse(toolbarButtons.getValue())
         assertEquals(
             ToolbarConfig.Layout(
-                listOf(ToolbarButton.Redo, ToolbarButton.CursorMove, ToolbarButton.Clipboard, ToolbarButton.More),
+                listOf(ToolbarButton.Redo, ToolbarButton.CursorMove, ToolbarButton.Clipboard, ToolbarButton.QuickPhrase, ToolbarButton.More),
                 listOf(ToolbarButton.Theme, ToolbarButton.Emoji, ToolbarButton.Voice, ToolbarButton.Hide)
             ),
             config.layout(everywhere)
@@ -597,7 +597,7 @@ class ToolbarUatTest {
         val pinned = listOfNotNull(R.string.theme, R.string.a11y_key_emoji, R.string.voice_input.takeIf { VoiceFeature.AVAILABLE }, R.string.hide_keyboard)
         assertEquals(pinned.map(::s), barButtons())
         expand()
-        assertEquals((listOf(R.string.redo, R.string.text_editing, R.string.clipboard, R.string.status_area) + pinned).map(::s), barButtons())
+        assertEquals((listOf(R.string.redo, R.string.text_editing, R.string.clipboard, R.string.quick_phrases, R.string.status_area) + pinned).map(::s), barButtons())
     }
 
     @Test

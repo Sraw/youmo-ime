@@ -95,6 +95,18 @@ sealed class SettingsRoute : Parcelable {
     @Serializable
     data object PinyinCustomPhrase : SettingsRoute()
 
+    /**
+     * 快速输入's page; [edit]: its editor open at once on [key] and [content], an entry the user has
+     * when [existing] (else a new one filled in so), as the keyboard opens it.
+     */
+    @Serializable
+    data class QuickPhrase(
+        val edit: Boolean = false,
+        val key: String = "",
+        val content: String = "",
+        val existing: Boolean = false,
+    ) : SettingsRoute()
+
     @Serializable
     data object UserWords : SettingsRoute()
 
@@ -197,6 +209,9 @@ sealed class SettingsRoute : Parcelable {
             fragment<PunctuationEditorFragment, Punctuation>()
             fragment<PinyinCustomPhraseFragment, PinyinCustomPhrase> {
                 label = ctx.getString(R.string.custom_phrases)
+            }
+            fragment<QuickPhraseFragment, QuickPhrase> {
+                label = ctx.getString(R.string.quick_phrases)
             }
             fragment<PopupOverridesFragment, PopupOverrides> {
                 label = ctx.getString(R.string.long_press_characters)

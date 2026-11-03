@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.utils
 
 import android.content.Context
 import android.content.Intent
+import org.fcitx.fcitx5.android.host.QuickPhraseEntry
 import org.fcitx.fcitx5.android.ui.main.ClipboardEditActivity
 import org.fcitx.fcitx5.android.ui.main.MainActivity
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
@@ -33,7 +34,7 @@ object AppUtil {
      */
     fun isLaunchRoute(route: SettingsRoute) = when (route) {
         SettingsRoute.Keys, SettingsRoute.InputMethodList, SettingsRoute.Theme,
-        is SettingsRoute.InputMethodConfig -> true
+        is SettingsRoute.InputMethodConfig, is SettingsRoute.QuickPhrase -> true
         else -> false
     }
 
@@ -48,6 +49,21 @@ object AppUtil {
 
     fun launchMainToInputMethodConfig(context: Context, uniqueName: String, displayName: String) =
         launchMainToDest(context, SettingsRoute.InputMethodConfig(displayName, uniqueName))
+
+    /**
+     * Quick input's page with its editor open: [entry] to change, or a new one, [content] filled in
+     * (the clipboard's 存为快速输入) with [key] as the key suggested.
+     */
+    fun launchQuickPhraseEditor(context: Context, entry: QuickPhraseEntry? = null, content: String = "", key: String = "") =
+        launchMainToDest(
+            context,
+            SettingsRoute.QuickPhrase(
+                edit = true,
+                key = entry?.key ?: key,
+                content = entry?.content ?: content,
+                existing = entry != null,
+            ),
+        )
 
     fun launchClipboardEdit(context: Context, id: Int, lastEntry: Boolean = false) {
         context.startActivity<ClipboardEditActivity> {

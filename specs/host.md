@@ -201,11 +201,25 @@ is `selectCandidate(ic, globalIndex)`. Paging constants (5 a page, Up/Down, Tab/
   `trigger(ic)` (the keyboard button). Matches come from `QuickPhraseTable` only: no callback
   providers, no spell hints, so every match commits and the digits select. Space commits the
   cursor's, Return what was typed, Backspace/Delete on empty leave, Home/End/Left/Right move,
-  30 characters at most.
+  30 characters at most. Beyond fcitx (design 051-quickphrase): `readsCodes`, so it gets the
+  keyboard's private-use codes and `QuickPhraseKeys` turns each into the set of characters it may be
+  (nine keys by the user's letters, a 14/18 key's whole group), kept in step with the buffer; with
+  nothing typed it lists the user's entries and a ＋添加 (`QuickPhraseHooks.add`), Space then leaves
+  with a space and digits are typed; the user's entries commit through `commitAsIs` (no chttrans or
+  full width) and their use goes to `QuickPhraseHooks.used` except in a `PASSWORD_OR_SENSITIVE`
+  field; `withMine` false (借手机) hides them. `Panel.quickPhrase` tells the app the panel is quick
+  input's (the handwriting pad swaps for the full keyboard); `HostCore.quickPhraseAt` gives the
+  entry under a long press.
+- `QuickPhraseBook`: the user's entries (`data/quickphrase.d/mine.mb`, fcitx's `.mb`, so the export is
+  the file) in order of use (`mine.used`, `millis<TAB>key<TAB>quoted content`), then the built-in
+  `QuickPhraseTable`; the user's match by key prefix case aside, the built-in ones case kept. Of the
+  user's directory only `mine.*` and `*.disable` are read. The app's `QuickPhraseManager` writes both
+  files whole under one lock (page and keyboard both write).
 - `QuickPhraseTable` (`quickphraseprovider.cpp:29-104`): `data/QuickPhrase.mb` from the first
   `PkgDataDir` that has it, then `data/quickphrase.d/*.mb` by name (an earlier directory's file hides
   a later one's of the same name; `<name>.disable` anywhere hides it), multimap in code point order.
-  The app passes the user's directory first, then the built-in one; `reload` swaps the table.
+  `QuickPhraseBook.load` passes only the user directory's `.disable` files, then the built-in one;
+  `reload` swaps the book.
 - `UnicodeInput` (`modules/unicode/unicodetempmode.cpp`): Ctrl+Alt+Shift+U or `trigger(ic)` searches
   (opening on the clipboard's latest text's characters), Ctrl+Shift+U types hex. `CharSelectData`
   (`charselectdata.cpp`) reads the same `charselectdata` file, at the first trigger as fcitx does

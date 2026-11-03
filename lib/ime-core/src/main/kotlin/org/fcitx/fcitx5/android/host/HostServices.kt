@@ -15,6 +15,9 @@ interface HostServices {
     /** `InputContext::commitString` / `commitStringWithCursor`: the commit filters, then out at once. */
     fun commit(ic: InputContext, text: String, cursor: Int = -1)
 
+    /** [text] out at once through no commit filter: what the user wrote down, as written. */
+    fun commitAsIs(ic: InputContext, text: String) = commit(ic, text)
+
     /** `InputContext::deleteSurroundingText(-before, before + after)`, out at once. */
     fun deleteSurrounding(ic: InputContext, before: Int, after: Int)
 
@@ -77,6 +80,12 @@ interface HostStrings {
 
     /** quickphrase's `_("Quick Phrase: ")`, the aux label. */
     val quickPhrase: String get() = "Quick Phrase: "
+
+    /** Quick input's last candidate with nothing typed, the way to a new entry of the user's. */
+    val quickPhraseAdd: String get() = "+ Add"
+
+    /** After [quickPhrase] with nothing typed and none of the user's entries yet. */
+    val quickPhraseHint: String get() = "type a key, or tap + Add for your own"
 
     /** unicode's aux, hint and the names fcitx makes up. */
     val unicode: UnicodeStrings get() = UnicodeStrings()

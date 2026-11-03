@@ -17,8 +17,9 @@ class ModuleInputs(
     val chttransEnabled: Set<String> = emptySet(),
     val converter: () -> ChineseConverter? = { null },
     val quickPhraseTable: QuickPhraseTable = QuickPhraseTable.EMPTY,
-    /** Where quick input gets its table at its first lookup: [quickPhraseTable], or one still loading elsewhere. */
-    val quickPhrases: () -> QuickPhraseTable = { quickPhraseTable },
+    /** Where quick input gets its book at its first lookup: [quickPhraseTable] alone, or one still loading elsewhere. */
+    val quickPhrases: () -> QuickPhraseBook = QuickPhraseBook(quickPhraseTable).let { book -> { book } },
+    val quickPhraseHooks: QuickPhraseHooks = QuickPhraseHooks.NONE,
     val charSelectData: () -> ByteArray? = { null },
     /** The clipboard's latest text, which Unicode lists the characters of when opened. */
     val clipboard: () -> String = { "" },
@@ -68,9 +69,10 @@ class ChineseModules(private val inputs: ModuleInputs, private val strings: Host
         ) { services.persistConf(ModuleConfigs.CHTTRANS) }
         val temp = object : TempModeHost {
             override fun commit(ic: InputContext, text: String) = services.commit(ic, text)
+            override fun commitAsIs(ic: InputContext, text: String) = services.commitAsIs(ic, text)
             override fun showPanel(ic: InputContext, panel: TempPanel) = services.showPanel(ic, panel)
         }
-        quickPhrase = QuickPhrase(temp, inputs.quickPhrases, strings.quickPhrase)
+        quickPhrase = QuickPhrase(temp, inputs.quickPhrases, strings.quickPhrase, inputs.quickPhraseHooks, strings.quickPhraseAdd, strings.quickPhraseHint)
         unicode = UnicodeInput(temp, inputs.charSelectData, inputs.clipboard, strings.unicode)
         return HostModules(
             tempModes = listOf(quickPhrase, unicode),

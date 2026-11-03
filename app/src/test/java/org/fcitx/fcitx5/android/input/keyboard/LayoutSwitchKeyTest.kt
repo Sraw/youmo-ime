@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.junit.Assert.assertEquals
@@ -38,10 +39,12 @@ class LayoutSwitchKeyTest {
     }
 
     @Test
-    fun theNineKeysSwitchKeysOnlyTap() {
+    @Uat("QU-12")
+    fun theNineKeysAndHandwritingsSymbolsKeyHoldsQuickInputTheirNumbersKeyOnlyTaps() {
         val symbols = T9Keyboard.layout(NineKeyLetters.STANDARD).bottomKey("符")
         assertEquals(KeyAction.LayoutSwitchAction(PickerWindow.Key.Symbol.name), symbols.tapped())
-        assertNull(symbols.held())
+        assertEquals(KeyAction.QuickPhraseAction, symbols.held())
+        assertEquals(KeyAction.QuickPhraseAction, HandwritingKeyboard.Layout.bottomKey("符").held())
         val numbers = T9Keyboard.layout(NineKeyLetters.STANDARD).bottomKey("123")
         assertEquals(KeyAction.LayoutSwitchAction(NumberKeyboard.Name), numbers.tapped())
         assertNull(numbers.held())

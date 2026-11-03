@@ -166,6 +166,9 @@ class KeyPipeline(
         output.commit(ic, commitFilters.fold(text) { acc, f -> f.filter(ic, acc) }, cursor)
     }
 
+    /** [text] out at once, past [commitFilters]. */
+    fun commitAsIs(ic: InputContext, text: String) = output.commit(ic, text, -1)
+
     fun deleteSurrounding(ic: InputContext, before: Int, after: Int) = output.deleteSurrounding(ic, before, after)
 
     /** `Instance::outputFilter`: [outputFilters] in order. */

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.core
 
+import org.fcitx.fcitx5.android.host.QuickPhraseBook
 import kotlinx.coroutines.flow.SharedFlow
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
@@ -85,6 +86,9 @@ interface TypingApi {
     suspend fun moveCursor(position: Int)
 
     suspend fun triggerQuickPhrase()
+
+    /** What quick input's candidate [index] is, for the card its long press opens; null for ＋添加, or none shown. */
+    suspend fun quickPhraseAt(index: Int): QuickPhraseBook.Found?
     suspend fun triggerUnicode()
 
     suspend fun focus(focus: Boolean = true)

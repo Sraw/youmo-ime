@@ -36,7 +36,10 @@ enum class ToolbarButton(val key: String) {
     InputMethodSettings("input_method_settings"),
 
     /** 键盘: the input method's keyboards to pick from (KeyboardPicker), where it has a choice */
-    Keyboard("keyboard");
+    Keyboard("keyboard"),
+
+    /** 快速输入, as a long press on 符 opens it */
+    QuickPhrase("quick_phrase");
 
     companion object {
         fun ofKey(key: String) = entries.firstOrNull { it.key == key }
@@ -109,9 +112,12 @@ data class ToolbarConfig(val items: List<Item>) {
         const val DIVIDER = "|"
         private const val HIDDEN = "-"
 
-        /** The bar as it always was: what v0.4 had, and the panel's others hidden on the toolbar. */
+        /**
+         * The bar as it always was: what v0.4 had, 快速输入 after it (new installs; an upgrade's bar gets
+         * it hidden, as any button added later), and the panel's others hidden on the toolbar.
+         */
         val DEFAULT = ToolbarConfig(
-            listOf(ToolbarButton.Undo, ToolbarButton.Redo, ToolbarButton.CursorMove, ToolbarButton.Clipboard)
+            listOf(ToolbarButton.Undo, ToolbarButton.Redo, ToolbarButton.CursorMove, ToolbarButton.Clipboard, ToolbarButton.QuickPhrase)
                 .map { Item.Button(it, true) } +
                 listOf(
                     ToolbarButton.TradSimp, ToolbarButton.Floating, ToolbarButton.OneHanded, ToolbarButton.Habits,

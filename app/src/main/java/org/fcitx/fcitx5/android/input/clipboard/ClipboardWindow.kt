@@ -100,6 +100,10 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(), Inpu
                 AppUtil.launchClipboardEdit(context, id)
             }
 
+            override fun onSaveQuickPhrase(entry: ClipboardEntry) {
+                AppUtil.launchQuickPhraseEditor(context, content = entry.text)
+            }
+
             override fun onSplit(entry: ClipboardEntry) {
                 windowManager.attachWindow(ClipboardChunksWindow(entry.text))
             }

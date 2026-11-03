@@ -73,6 +73,8 @@ import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction
+import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.preedit.PreeditComponent
@@ -364,6 +366,10 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     ToolbarButton.Theme -> { _ -> panelActions.themes() }
                     ToolbarButton.InputMethodSettings -> { _ -> panelActions.inputMethodSettings() }
                     ToolbarButton.Keyboard -> { v -> panelActions.chooseKeyboard(v) }
+                    // as a long press on 符: what is typed goes in first
+                    ToolbarButton.QuickPhrase -> { _ ->
+                        commonKeyActionListener.listener.onKeyAction(KeyAction.QuickPhraseAction, KeyActionListener.Source.Keyboard)
+                    }
                 }
                 action?.let { buttons.getValue(button).setOnClickListener(it) }
             }

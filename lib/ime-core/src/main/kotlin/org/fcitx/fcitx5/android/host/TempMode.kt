@@ -28,6 +28,9 @@ interface TempMode {
 
     /** Leave the mode: focus out, reset or an input method switch while active. */
     fun reset(ic: InputContext)
+
+    /** Whether a keyboard's code reaches [keyEvent] as it came, not as [Keyboard.typedLetter]'s letter. */
+    val readsCodes: Boolean get() = false
 }
 
 /**
@@ -50,7 +53,7 @@ class TempModeManager(private val modes: List<TempMode>) {
             e.accept()
             return
         }
-        val letter = Keyboard.typedLetter(KeySyms.toUnicode(e.key.sym))
+        val letter = if (mode.readsCodes) null else Keyboard.typedLetter(KeySyms.toUnicode(e.key.sym))
         // KeyEvent is immutable: the mode gets a letter's, its use the one's that came
         val seen = if (letter == null) e else KeyEvent(Key(KeySyms.fromUnicode(letter.code), e.origKey.states), e.release, e.virtual, e.timestamp, e.payload)
         if (mode.keyEvent(ic, seen)) e.accept()

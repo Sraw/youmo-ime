@@ -151,7 +151,7 @@ class ChineseModulesHostTest {
         core.triggerQuickPhrase()
         val ic = core.contexts.active!!
         assertFalse("the code above the candidates, not in the app", ic.has(Capability.PREEDIT))
-        assertEquals("快速输入: ", log.filterIsInstance<HostEvent.InputPanel>().last().auxUp.toString())
+        assertEquals("快速输入: type a key, or tap + Add for your own", log.filterIsInstance<HostEvent.InputPanel>().last().auxUp.toString())
         host.events.clear()
         "dz".forEach { core.sendKey(Key(it.code), virtual = true) }
         assertTrue("the engine sees none of the temp mode's keys", host.events.isEmpty())
