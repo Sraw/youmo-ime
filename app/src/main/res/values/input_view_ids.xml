@@ -8,4 +8,6 @@
     <item name="button_panel_lock" type="id"/>
     <item name="code_row_text" type="id" />
     <item name="code_row_syllables" type="id" />
+    <!-- the theme picture a view lies over (PictureHost) -->
+    <item name="theme_picture_host" type="id" />
 </resources>

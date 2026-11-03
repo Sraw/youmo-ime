@@ -63,6 +63,26 @@ class KeyFaceGeometryTest {
     }
 
     @Test
+    fun aKeysOwnBorderOverrulesTheStyle() {
+        val flat = keys.copy(blocks = false)
+        val b = KeyFaceGeometry.Border.entries
+        fun of(kind: KeyKind, k: Keys, border: KeyFaceGeometry.Border) = KeyFaceGeometry.of(150f, 160f, kind, k, false, 2f, true, border)
+        // 确定 is a block on a flat keyboard; a lit 查词 key in Return's colour is no circle there
+        assertEquals(KeyFaceGeometry.of(150f, 160f, KeyKind.Enter, keys, false, 2f), of(KeyKind.Enter, flat, KeyFaceGeometry.Border.On))
+        assertNull(of(KeyKind.Enter, flat, KeyFaceGeometry.Border.Default).face)
+        assertTrue(of(KeyKind.Enter, flat, KeyFaceGeometry.Border.Special).oval)
+        // a cell the column is drawn over: pressed as a block is, no face
+        val off = of(KeyKind.Function, keys, KeyFaceGeometry.Border.Off)
+        assertNull(off.face)
+        assertNull(off.shadow)
+        assertEquals(8f, off.radius)
+        // blocks: Default and Special alike
+        for (border in b - KeyFaceGeometry.Border.Off) {
+            assertEquals(border.name, KeyFaceGeometry.of(150f, 160f, KeyKind.Space, keys, false, 2f), of(KeyKind.Space, keys, border))
+        }
+    }
+
+    @Test
     fun nineSliceKeepsCornersAndStretchesTheRest() {
         // a 90×90 image, 30 px corners at 3 px a dp, drawn at 2 px a dp: 20 px corners
         val slice = NineSlice("f", Insets(30, 30, 30, 30), 3)

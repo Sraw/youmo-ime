@@ -5,7 +5,9 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.input.keyboard.KeyDef.Appearance.Border
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef.Appearance.Variant
+import org.fcitx.fcitx5.android.input.theme.KeyFaceGeometry
 import org.fcitx.fcitx5.android.input.theme.KeyKind
 
 /**
@@ -20,4 +22,13 @@ val KeyDef.Appearance.themeKind: KeyKind
         variant == Variant.Accent -> KeyKind.Enter
         variant == Variant.Alternative -> KeyKind.Function
         else -> KeyKind.Letter
+    }
+
+/** A key's own say over its face (KeyFaceGeometry.Border), as its definition has it. */
+val Border.face: KeyFaceGeometry.Border
+    get() = when (this) {
+        Border.Default -> KeyFaceGeometry.Border.Default
+        Border.On -> KeyFaceGeometry.Border.On
+        Border.Off -> KeyFaceGeometry.Border.Off
+        Border.Special -> KeyFaceGeometry.Border.Special
     }

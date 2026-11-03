@@ -35,6 +35,23 @@ data class KeyFace(
  */
 object KeyFaceGeometry {
 
+    /**
+     * A key's own say over its face, which the keyboard's style ([Keys.blocks]) gives way to: [On] a
+     * face though the keys are flat (确定); [Off] none though they are blocks (the nine keys' column
+     * cells, drawn by the column); [Special] the space's bar or Return's circle when flat; [Default] a
+     * face when blocks, none when flat (Return's colour on a lit 查词 key is no circle).
+     */
+    enum class Border { Default, On, Off, Special }
+
+    /** [of] for a key whose own say is [border]. */
+    fun of(width: Float, height: Float, kind: KeyKind, keys: Keys, landscape: Boolean, density: Float, margin: Boolean, border: Border): KeyFace =
+        when {
+            border == Border.On -> of(width, height, kind, keys.copy(blocks = true), landscape, density, margin)
+            border == Border.Off -> of(width, height, kind, keys, landscape, density, margin).copy(face = null, shadow = null, border = 0f, oval = false)
+            keys.blocks || border == Border.Special -> of(width, height, kind, keys, landscape, density, margin)
+            else -> of(width, height, KeyKind.Letter, keys, landscape, density, margin)
+        }
+
     fun of(width: Float, height: Float, kind: KeyKind, keys: Keys, landscape: Boolean, density: Float, margin: Boolean = true): KeyFace {
         val h = if (!margin) 0f else (if (landscape) keys.gap.hLand else keys.gap.h) * density
         val v = if (!margin) 0f else (if (landscape) keys.gap.vLand else keys.gap.v) * density

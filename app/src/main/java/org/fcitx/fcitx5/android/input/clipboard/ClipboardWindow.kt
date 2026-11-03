@@ -39,6 +39,7 @@ import org.fcitx.fcitx5.android.input.dependency.imeScope
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.utils.AppUtil
@@ -70,8 +71,6 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(), Inpu
     private val clipboardReturnAfterPaste by prefs.clipboardReturnAfterPaste
     private val clipboardMaskSensitive by prefs.clipboardMaskSensitive
 
-    private val clipboardEntryRadius by ThemeManager.prefs.clipboardEntryRadius
-
     private val clipboardEntriesPager by lazy {
         Pager(PagingConfig(pageSize = 16)) { ClipboardManager.allEntries() }
     }
@@ -85,7 +84,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(), Inpu
     private val adapter: ClipboardAdapter by lazy {
         object : ClipboardAdapter(
             theme,
-            context.dp(clipboardEntryRadius.toFloat()),
+            context.dp(ThemeColors.entryRadius(theme.look.keys)),
             clipboardMaskSensitive
         ) {
             override fun onPin(id: Int) {

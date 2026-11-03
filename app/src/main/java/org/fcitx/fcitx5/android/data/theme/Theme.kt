@@ -328,8 +328,11 @@ sealed class Theme : Parcelable {
             genericActiveForegroundColor = onPrimary
         )
 
+        // the key style settings before 3.0, if one was in use when they were settled: not copied, to follow the wallpaper
         @IgnoredOnParcel
-        override val look: ThemeLook by lazy { LookDefaults.look(palette()) }
+        override val look: ThemeLook by lazy {
+            LookDefaults.look(palette()).let { ThemeLookMigration.monetLook?.applyTo(it) ?: it }
+        }
 
         @OptIn(ExperimentalStdlibApi::class)
         fun toCustom() = Custom(

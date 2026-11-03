@@ -21,6 +21,8 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.NavbarBackground
+import org.fcitx.fcitx5.android.input.PictureHost
+import org.fcitx.fcitx5.android.input.ThemePictureDrawable
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
@@ -80,7 +82,6 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
 
     private val navbarBackground = ThemeManager.prefs.navbarBackground
     private val keyboardBottomFlush = keyboardPrefs.keyboardBottomFlush
-    private val keyBorder by ThemeManager.prefs.keyBorder
 
     private val sizeChangeListener = ManagedPreference.OnChangeListener<Any> { _, _ ->
         recalculateSize()
@@ -207,13 +208,24 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         }
     }
 
+    /** A picture being cut on the edit page in place of the theme's own, laid as CENTER_CROP lays it. */
     fun setBackground(drawable: Drawable) {
+        bkg.background = null
         bkg.imageDrawable = drawable
     }
 
     fun setTheme(theme: Theme, background: Drawable? = null) {
-        setBackground(background ?: theme.backgroundDrawable(keyBorder))
-        fakeKawaiiBar.backgroundColor = if (keyBorder) Color.TRANSPARENT else theme.barColor
+        val look = theme.look
+        if (background != null) {
+            setBackground(background)
+        } else {
+            // as the input view draws it: the keys over the picture find it here (PictureHost)
+            bkg.imageDrawable = null
+            bkg.background = ThemePictureDrawable.board(look)
+        }
+        val landscape = ctx.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        PictureHost.install(fakeInputView, look.picture?.let { PictureHost(look, bkg, landscape) })
+        fakeKawaiiBar.background = ThemePictureDrawable.bar(look)
         shownTheme = theme
         makeKeyboard()
     }

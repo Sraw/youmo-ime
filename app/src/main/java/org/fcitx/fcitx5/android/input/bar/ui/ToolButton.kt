@@ -40,7 +40,7 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         }
 
     constructor(context: Context, @DrawableRes icon: Int, theme: Theme) : this(context) {
-        image.imageTintList = ColorStateList.valueOf(theme.altKeyTextColor)
+        image.imageTintList = ColorStateList.valueOf(theme.look.palette.toolbarIconColor)
         setIcon(icon)
         setPressHighlightColor(theme.keyPressHighlightColor)
         add(image, lParams(wrapContent, wrapContent, gravityCenter))

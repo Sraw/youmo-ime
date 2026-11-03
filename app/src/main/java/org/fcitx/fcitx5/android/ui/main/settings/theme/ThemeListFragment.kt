@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
 import org.fcitx.fcitx5.android.utils.applyNavBarInsetsBottomPadding
 import org.fcitx.fcitx5.android.utils.importErrorDialog
+import org.fcitx.fcitx5.android.utils.openUrl
 import org.fcitx.fcitx5.android.utils.queryFileName
 import org.fcitx.fcitx5.android.utils.toast
 import splitties.resources.styledDrawable
@@ -164,7 +165,8 @@ class ThemeListFragment : Fragment() {
         val actions = arrayOf(
             getString(R.string.choose_image),
             getString(R.string.import_from_file),
-            getString(R.string.duplicate_builtin_theme)
+            getString(R.string.duplicate_builtin_theme),
+            getString(R.string.make_theme_on_web),
         )
         AlertDialog.Builder(ctx)
             .setTitle(R.string.new_theme)
@@ -194,6 +196,8 @@ class ThemeListFragment : Fragment() {
                         }
                         dialog.show()
                     }
+                    // made there, exported as a zip, imported here (导入文件…)
+                    3 -> ctx.openUrl(ThemeLookChoicesUi.THEME_MAKER_URL)
                 }
             }
             .show()

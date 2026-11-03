@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.input.keyboard.ImageLayoutSwitchKey
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.keyboard.ReturnKey
 import org.fcitx.fcitx5.android.input.keyboard.showReturnAction
+import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import org.fcitx.fcitx5.android.utils.singleSideBorderDrawable
 import splitties.dimensions.dp
 import splitties.views.backgroundColor
@@ -80,9 +81,6 @@ class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout
         }
     }
 
-    private val keyBorder by ThemeManager.prefs.keyBorder
-    private val keyVerticalMargin by ThemeManager.prefs.keyVerticalMargin
-    private val keyVerticalMarginLandscape by ThemeManager.prefs.keyVerticalMarginLandscape
 
     val recyclerView = recyclerView {
         // disable item cross-fade animation
@@ -102,9 +100,10 @@ class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout
         id = R.id.expanded_candidate_view
 
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val inset = dp(if (landscape) keyVerticalMarginLandscape else keyVerticalMargin)
-        if (!keyBorder) {
-            backgroundColor = theme.barColor
+        val keys = theme.look.keys
+        val inset = dp(if (landscape) keys.gap.vLand else keys.gap.v)
+        ThemeColors.panel(theme.look.palette, keys)?.let {
+            backgroundColor = it
             embeddedKeyboard.background =
                 singleSideBorderDrawable(dp(1), theme.dividerColor, Gravity.LEFT, inset)
         }

@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.motion.Motion
+import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import org.fcitx.fcitx5.android.utils.motionSettings
 import splitties.dimensions.dp
 import splitties.views.backgroundColor
@@ -45,12 +46,8 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
         add(enableUi.root, lParams(matchParent, matchParent))
     }
 
-    private val keyBorder by ThemeManager.prefs.keyBorder
-
     override val root = coordinatorLayout {
-        if (!keyBorder) {
-            backgroundColor = theme.barColor
-        }
+        ThemeColors.panel(theme.look.palette, theme.look.keys)?.let { backgroundColor = it }
         add(viewAnimator, defaultLParams(matchParent, matchParent))
     }
 

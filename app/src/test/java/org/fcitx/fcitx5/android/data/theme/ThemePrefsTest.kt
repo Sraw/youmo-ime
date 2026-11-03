@@ -8,8 +8,10 @@ import android.content.Context
 import androidx.core.content.edit
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceUi
+import org.fcitx.fcitx5.android.input.theme.LegacyLook
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -39,19 +41,10 @@ class ThemePrefsTest {
     @Test
     fun aLevelListShowsTheLevelOfWhatItsPreferencesHold() {
         val prefs = ThemePrefs(sp)
-        // untouched: standard height (after 紧凑 and 矮), no padding, standard spacing, rounded keys
-        val lists = listOf(
-            "keyboard_height_level", "keyboard_side_padding_level", "keyboard_bottom_padding_level",
-            "key_spacing_level", "key_radius_level",
-        )
+        // untouched: standard height (after 紧凑 and 矮), no padding
+        val lists = listOf("keyboard_height_level", "keyboard_side_padding_level", "keyboard_bottom_padding_level")
         // 贴底 is first, before 无
-        assertEquals(listOf(2, 0, 1, 1, 1), lists.map { prefs.level(it) })
-        prefs.keyRadius.setValue(10)
-        listOf(prefs.keyHorizontalMargin, prefs.keyHorizontalMarginLandscape).forEach { it.setValue(5) }
-        prefs.keyVerticalMargin.setValue(9)
-        prefs.keyVerticalMarginLandscape.setValue(6)
-        assertEquals(2, prefs.level("key_radius_level"))
-        assertEquals(2, prefs.level("key_spacing_level"))
+        assertEquals(listOf(2, 0, 1), lists.map { prefs.level(it) })
     }
 
     // 紧凑 the lowest, first, each of its numbers ime-core's: the keyboard reads 紧凑 by those
@@ -88,19 +81,24 @@ class ThemePrefsTest {
         assertEquals(3, list.current())
     }
 
-    // AppPrefs.registerProvider resets these hidden settings as ThemeManager registers ThemePrefs, after the reset
-    // at the start (AppPrefsTest.aCategoryRegisteredAfterTheResetIsResetAsItRegisters): what a level sets must outlive it
+    // the key style settings before 3.0 are no preferences now, only what ThemeLookMigration reads: the
+    // reset of the hidden settings as ThemeManager registers ThemePrefs leaves them for it
     @Test
-    fun whatALevelSetsIsKeptWhenTheHiddenSettingsGoBackToTheirDefaults() {
+    fun theOldKeyStyleSettingsOutliveTheResetOfTheHiddenOnes() {
         val prefs = ThemePrefs(sp)
-        val set = listOf(
-            prefs.keyHorizontalMargin, prefs.keyHorizontalMarginLandscape,
-            prefs.keyVerticalMargin, prefs.keyVerticalMarginLandscape, prefs.keyRadius,
-        )
-        set.forEach { it.setValue(9) }
-        prefs.keyRippleEffect.setValue(true)
+        sp.edit(commit = true) {
+            putBoolean("key_ripple_effect", true)
+            putInt("key_radius", 9)
+        }
         sp.edit { prefs.resetHidden(this) }
-        assertEquals(List(set.size) { 9 }, set.map { it.getValue() })
-        assertFalse("not a level's", prefs.keyRippleEffect.getValue())
+        assertEquals(LegacyLook(keyRippleEffect = true, keyRadius = 9), prefs.legacyLook())
+    }
+
+    // where they were, a line says where they went; nothing of them is left to set
+    @Test
+    fun theKeyStyleSectionIsThePunctuationAndALine() {
+        val keys = ThemePrefs(sp).managedPreferencesUi.map { it.key }
+        assertTrue("key_style_note" in keys)
+        for (gone in listOf("key_border", "key_spacing_level", "key_radius_level")) assertFalse(gone, gone in keys)
     }
 }

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.popup
 
+import android.content.res.Configuration
 import android.graphics.Rect
 import android.view.View
 import android.view.ViewGroup
@@ -51,7 +52,8 @@ class PopupComponent :
     private val showingContainerUi = HashMap<Int, PopupContainerUi>()
 
     private val keyBottomMargin by lazy {
-        context.dp(ThemeManager.prefs.keyVerticalMargin.getValue())
+        val gap = theme.look.keys.gap
+        context.dp(if (context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) gap.vLand else gap.v)
     }
     private val minPopupWidth by lazy {
         context.dp(38)
@@ -80,7 +82,7 @@ class PopupComponent :
         context.dp(LONG_PRESS_LIFT)
     }
     private val popupRadius by lazy {
-        context.dp(ThemeManager.prefs.keyRadius.getValue()).toFloat()
+        context.dp(theme.look.keys.radiusDp).toFloat()
     }
     private val hideThreshold = 100L
 
