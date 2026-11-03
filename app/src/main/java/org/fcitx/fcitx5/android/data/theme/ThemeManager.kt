@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.data.theme
 
 import android.content.res.Configuration
+import android.widget.Toast
 import androidx.annotation.Keep
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
@@ -17,6 +18,8 @@ import org.fcitx.fcitx5.android.utils.WeakHashSet
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.isDarkMode
 import org.fcitx.fcitx5.android.utils.toast
+import timber.log.Timber
+import java.io.IOException
 
 object ThemeManager {
 
@@ -40,7 +43,10 @@ object ThemeManager {
 
     private var monetThemes = listOf(ThemeMonet.getLight(), ThemeMonet.getDark())
 
-    private val customThemes: MutableList<Theme.Custom> = ThemeFilesManager.listThemes()
+    val prefs = AppPrefs.getInstance().registerProvider(::ThemePrefs)
+
+    // before the themes, which an older format's are read with (the key style settings before 3.0)
+    private val customThemes: MutableList<Theme.Custom> = ThemeFilesManager.listThemes(prefs.legacyLook())
 
     fun getTheme(name: String) =
         customThemes.find { it.name == name } ?: BuiltinThemes.find { it.name == name }
@@ -49,7 +55,7 @@ object ThemeManager {
 
     fun refreshThemes() {
         customThemes.clear()
-        customThemes.addAll(ThemeFilesManager.listThemes())
+        customThemes.addAll(ThemeFilesManager.listThemes(prefs.legacyLook()))
         activeTheme = evaluateActiveTheme()
     }
 
@@ -83,12 +89,18 @@ object ThemeManager {
         onChangeListeners.forEach { it.onThemeChange(_activeTheme) }
     }
 
-    val prefs = AppPrefs.getInstance().registerProvider(::ThemePrefs)
-
-    /** Saves [theme]; whether it was, none while the themes are not settled (the user told). */
+    /** Saves [theme]; whether it was, none while the themes are not settled or it could not be written (the user told). */
     fun saveTheme(theme: Theme.Custom): Boolean {
         if (refuseIfNotSettled()) return false
-        ThemeFilesManager.saveThemeFiles(theme)
+        try {
+            ThemeFilesManager.saveThemeFiles(theme)
+        } catch (e: IOException) {
+            // a full disk, say: its file as it was, the list too. Told in the user's words: the exception's
+            // message is a path of the app's files
+            Timber.w(e, "Theme ${theme.name} not saved")
+            appContext.toast(R.string.theme_not_saved, Toast.LENGTH_LONG)
+            return false
+        }
         customThemes.indexOfFirst { it.name == theme.name }.also {
             if (it >= 0) customThemes[it] = theme else customThemes.add(0, theme)
         }

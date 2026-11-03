@@ -22,12 +22,27 @@ import org.fcitx.fcitx5.android.input.picker.PickerWindow
 
 val NumLockState = KeyStates(KeyState.NumLock, KeyState.Virtual)
 
+// a theme's names of keys by what they type (KeyNames' roles): the same key on every keyboard
+private val SYMBOL_NAMES = mapOf(";" to "semicolon", "*" to "star", "," to "comma", "." to "period")
+
+// an address's own keys, beside the comma and period they are shown in place of
+private val ADDRESS_NAMES = mapOf("/" to "slash", "@" to "at", "." to "dot")
+
+/** A theme's name of a key that goes to [to]: the symbols, the number keyboard, back to the letters. */
+private fun switchName(to: String) = when (to) {
+    PickerWindow.Key.Symbol.name -> "symbols"
+    NumberKeyboard.Name -> "numbers"
+    TextKeyboard.Name -> "back"
+    else -> null
+}
+
 class SymbolKey(
     val symbol: String,
     percentWidth: Float = 0.1f,
     variant: Variant = Variant.Normal,
     popup: Array<Popup>? = null,
     viewId: Int = -1,
+    name: String? = SYMBOL_NAMES[symbol],
 ) : KeyDef(
     Appearance.Text(
         displayText = symbol,
@@ -42,7 +57,8 @@ class SymbolKey(
     popup ?: arrayOf(
         Popup.Preview(symbol),
         Popup.Keyboard.Preset(symbol)
-    )
+    ),
+    name,
 )
 
 /** A key left blank ([NumberPad]'s), so the keys around it stay where they are: no press, nothing for TalkBack. */
@@ -55,7 +71,13 @@ class BlankKey(percentWidth: Float, variant: Variant = Variant.Alternative) : Ke
  * What an address is made of ([AddressKeys]), committed as it is: through the engine `/` would
  * be 、 in Chinese. Its long press offers [more], hidden till an address field shows it.
  */
-class AddressKey(text: String, viewId: Int, percentWidth: Float = 0.1f, more: List<String> = emptyList()) : KeyDef(
+class AddressKey(
+    text: String,
+    viewId: Int,
+    percentWidth: Float = 0.1f,
+    more: List<String> = emptyList(),
+    name: String = ADDRESS_NAMES[text] ?: "domain",
+) : KeyDef(
     Appearance.Text(
         displayText = text,
         textSize = if (text.length > 1) 16f else 23f,
@@ -65,6 +87,7 @@ class AddressKey(text: String, viewId: Int, percentWidth: Float = 0.1f, more: Li
     ),
     setOf(Behavior.Press(KeyAction.CommitAction(text))),
     if (more.isEmpty()) arrayOf(Popup.Preview(text)) else arrayOf(Popup.Preview(text), Popup.Keyboard.Explicit(more.toTypedArray())),
+    name,
 )
 
 /** Room between a split keyboard's halves ([SplitKeyboard]): no key, nothing drawn. */
@@ -89,7 +112,8 @@ class AlphabetKey(
     popup ?: arrayOf(
         Popup.AltPreview(character, punctuation),
         Popup.Keyboard.Preset(character)
-    )
+    ),
+    character.lowercase(),
 )
 
 class CapsKey(percentWidth: Float = 0.15f) : KeyDef(
@@ -105,7 +129,8 @@ class CapsKey(percentWidth: Float = 0.15f) : KeyDef(
         Behavior.Press(KeyAction.CapsAction(false)),
         Behavior.LongPress(KeyAction.CapsAction(true)),
         Behavior.DoubleTap(KeyAction.CapsAction(true))
-    )
+    ),
+    name = "shift",
 )
 
 /**
@@ -124,6 +149,7 @@ class LookUpKey(on: Boolean, percentWidth: Float = 0.15f) : KeyDef(
         viewId = if (on) R.id.button_lookup_on else R.id.button_lookup,
     ),
     setOf(Behavior.Press(KeyAction.SymAction(KeySym(UNICODE + Keyboard.LOOKUP), KeyStates.Virtual))),
+    name = if (on) "lookup-on" else "lookup",
 )
 
 class LayoutSwitchKey(
@@ -131,7 +157,8 @@ class LayoutSwitchKey(
     val to: String = "",
     percentWidth: Float = 0.15f,
     variant: Variant = Variant.Alternative,
-    longPress: KeyAction? = null
+    longPress: KeyAction? = null,
+    name: String? = switchName(to),
 ) : KeyDef(
     Appearance.Text(
         displayText,
@@ -143,7 +170,8 @@ class LayoutSwitchKey(
     setOfNotNull(
         Behavior.Press(KeyAction.LayoutSwitchAction(to)),
         longPress?.let { Behavior.LongPress(it) }
-    )
+    ),
+    name = name,
 )
 
 class BackspaceKey(
@@ -161,7 +189,8 @@ class BackspaceKey(
     setOf(
         Behavior.Press(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_BackSpace))),
         Behavior.Repeat(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_BackSpace)))
-    )
+    ),
+    name = "backspace",
 )
 
 class LanguageKey : KeyDef(
@@ -174,7 +203,8 @@ class LanguageKey : KeyDef(
     setOf(
         Behavior.Press(KeyAction.LangSwitchAction),
         Behavior.LongPress(KeyAction.ShowInputMethodPickerAction)
-    )
+    ),
+    name = "lang",
 )
 
 class SpaceKey : KeyDef(
@@ -194,7 +224,8 @@ class SpaceKey : KeyDef(
     setOf(
         Behavior.Press(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_space))),
         Behavior.LongPress(KeyAction.SpaceLongPressAction())
-    )
+    ),
+    name = "space",
 )
 
 class ReturnKey(percentWidth: Float = 0.15f) : KeyDef(
@@ -219,6 +250,7 @@ class ReturnKey(percentWidth: Float = 0.15f) : KeyDef(
             )
         )
     ),
+    name = "enter",
 )
 
 /**
@@ -248,6 +280,7 @@ class ConfirmKey(percentWidth: Float = 0.15f) : KeyDef(
             )
         )
     ),
+    name = "confirm",
 )
 
 class ImageLayoutSwitchKey(
@@ -258,7 +291,8 @@ class ImageLayoutSwitchKey(
     variant: Variant = Variant.AltForeground,
     viewId: Int = -1,
     /** Required: the key goes somewhere different at each call site, so no default fits. */
-    @StringRes contentDescription: Int
+    @StringRes contentDescription: Int,
+    name: String? = switchName(to),
 ) : KeyDef(
     Appearance.Image(
         src = icon,
@@ -269,7 +303,8 @@ class ImageLayoutSwitchKey(
     ),
     setOf(
         Behavior.Press(KeyAction.LayoutSwitchAction(to))
-    )
+    ),
+    name = name,
 )
 
 class ImagePickerSwitchKey(
@@ -280,7 +315,8 @@ class ImagePickerSwitchKey(
     variant: Variant = Variant.AltForeground,
     viewId: Int = -1,
     /** Required: the key goes somewhere different at each call site, so no default fits. */
-    @StringRes contentDescription: Int
+    @StringRes contentDescription: Int,
+    name: String? = to.name.lowercase(),
 ) : KeyDef(
     Appearance.Image(
         src = icon,
@@ -291,7 +327,8 @@ class ImagePickerSwitchKey(
     ),
     setOf(
         Behavior.Press(KeyAction.PickerSwitchAction(to))
-    )
+    ),
+    name = name,
 )
 
 class TextPickerSwitchKey(
@@ -299,7 +336,8 @@ class TextPickerSwitchKey(
     to: PickerWindow.Key,
     percentWidth: Float = 0.1f,
     variant: Variant = Variant.AltForeground,
-    viewId: Int = -1
+    viewId: Int = -1,
+    name: String? = to.name.lowercase(),
 ) : KeyDef(
     Appearance.Text(
         displayText = text,
@@ -311,7 +349,8 @@ class TextPickerSwitchKey(
     ),
     setOf(
         Behavior.Press(KeyAction.PickerSwitchAction(to))
-    )
+    ),
+    name = name,
 )
 
 class MiniSpaceKey : KeyDef(
@@ -324,7 +363,8 @@ class MiniSpaceKey : KeyDef(
     ),
     setOf(
         Behavior.Press(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_space)))
-    )
+    ),
+    name = "space",
 )
 
 class NumPadKey(
@@ -342,5 +382,6 @@ class NumPadKey(
     ),
     setOf(
         Behavior.Press(KeyAction.SymAction(KeySym(sym), NumLockState))
-    )
+    ),
+    name = displayText,
 )

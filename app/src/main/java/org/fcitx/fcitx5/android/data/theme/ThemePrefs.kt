@@ -202,6 +202,9 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         )
     }
 
+    /** The key style settings above as they were before theme file 3.0, while they are here ([ThemeLookMigration]). */
+    fun legacyLook() = ThemeLookMigration.legacy(sharedPreferences)
+
     val textEditingButtonRadius =
         hidden { int(R.string.text_editing_button_radius, "text_editing_button_radius", 8, 0, 48, "dp") }
 

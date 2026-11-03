@@ -112,6 +112,9 @@ android {
                 it.maxHeapSize = "2g"
                 // fixtures found from any working directory (an IDE's run too): core/Fixtures.kt
                 it.systemProperty("uat.fixtures", rootProject.file("uat/fixtures").path)
+                // the theme maker's shared cases (ThemeMakerRulesTest): compared, or with -PupdateThemeMaker written
+                it.systemProperty("themeMaker.testdata", rootProject.file("web/theme-maker/test/testdata").path)
+                it.systemProperty("themeMaker.update", project.hasProperty("updateThemeMaker").toString())
             }
         }
     }

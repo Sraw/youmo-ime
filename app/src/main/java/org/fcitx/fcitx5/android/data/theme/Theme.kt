@@ -10,15 +10,21 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.os.Parcelable
+import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
-import kotlinx.serialization.Serializable
+import kotlinx.parcelize.TypeParceler
+import org.fcitx.fcitx5.android.input.theme.BoardBase
+import org.fcitx.fcitx5.android.input.theme.Box
+import org.fcitx.fcitx5.android.input.theme.Crop
+import org.fcitx.fcitx5.android.input.theme.LookDefaults
+import org.fcitx.fcitx5.android.input.theme.Palette
+import org.fcitx.fcitx5.android.input.theme.Picture
+import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.utils.DarkenColorFilter
-import org.fcitx.fcitx5.android.utils.RectSerializer
 import org.fcitx.fcitx5.android.utils.alpha
 import org.fcitx.fcitx5.android.utils.appContext
 import java.io.File
 
-@Serializable
 sealed class Theme : Parcelable {
 
     abstract val name: String
@@ -55,48 +61,65 @@ sealed class Theme : Parcelable {
     abstract val genericActiveBackgroundColor: Int
     abstract val genericActiveForegroundColor: Int
 
+    /** All the theme draws with: a custom theme's own, a built-in or Monet one's its colours with [LookDefaults]. */
+    abstract val look: ThemeLook
+
+    /** The colours as [ThemeLook] holds them; the three of 3.0 as they were drawn before. */
+    protected fun palette() = Palette(
+        backgroundColor, barColor, keyboardColor, keyBackgroundColor, keyTextColor, candidateTextColor,
+        candidateLabelColor, candidateCommentColor, altKeyBackgroundColor, altKeyTextColor,
+        accentKeyBackgroundColor, accentKeyTextColor, keyPressHighlightColor, keyShadowColor,
+        popupBackgroundColor, popupTextColor, spaceBarColor, dividerColor, clipboardEntryColor,
+        genericActiveBackgroundColor, genericActiveForegroundColor,
+    )
+
     open fun backgroundDrawable(keyBorder: Boolean = false): Drawable {
         return ColorDrawable(if (keyBorder) backgroundColor else keyboardColor)
     }
 
-    @Serializable
+    /**
+     * The user's own, saved as a file: all of it is its [look] (theme file 3.0), the colours too;
+     * its files by absolute path in memory, by name in the file ([ThemeFilesManager]).
+     */
     @Parcelize
+    @TypeParceler<ThemeLook, ThemeLookParceler>
     data class Custom(
         override val name: String,
         override val isDark: Boolean,
-        /**
-         * absolute paths of cropped and src png files; their names only in the saved json
-         */
-        val backgroundImage: CustomBackground?,
-        override val backgroundColor: Int,
-        override val barColor: Int,
-        override val keyboardColor: Int,
-        override val keyBackgroundColor: Int,
-        override val keyTextColor: Int,
-        override val candidateTextColor: Int,
-        override val candidateLabelColor: Int,
-        override val candidateCommentColor: Int,
-        override val altKeyBackgroundColor: Int,
-        override val altKeyTextColor: Int,
-        override val accentKeyBackgroundColor: Int,
-        override val accentKeyTextColor: Int,
-        override val keyPressHighlightColor: Int,
-        override val keyShadowColor: Int,
-        override val popupBackgroundColor: Int,
-        override val popupTextColor: Int,
-        override val spaceBarColor: Int,
-        override val dividerColor: Int,
-        override val clipboardEntryColor: Int,
-        override val genericActiveBackgroundColor: Int,
-        override val genericActiveForegroundColor: Int
+        override val look: ThemeLook,
     ) : Theme() {
+        override val backgroundColor get() = look.palette.backgroundColor
+        override val barColor get() = look.palette.barColor
+        override val keyboardColor get() = look.palette.keyboardColor
+        override val keyBackgroundColor get() = look.palette.keyBackgroundColor
+        override val keyTextColor get() = look.palette.keyTextColor
+        override val candidateTextColor get() = look.palette.candidateTextColor
+        override val candidateLabelColor get() = look.palette.candidateLabelColor
+        override val candidateCommentColor get() = look.palette.candidateCommentColor
+        override val altKeyBackgroundColor get() = look.palette.altKeyBackgroundColor
+        override val altKeyTextColor get() = look.palette.altKeyTextColor
+        override val accentKeyBackgroundColor get() = look.palette.accentKeyBackgroundColor
+        override val accentKeyTextColor get() = look.palette.accentKeyTextColor
+        override val keyPressHighlightColor get() = look.palette.keyPressHighlightColor
+        override val keyShadowColor get() = look.palette.keyShadowColor
+        override val popupBackgroundColor get() = look.palette.popupBackgroundColor
+        override val popupTextColor get() = look.palette.popupTextColor
+        override val spaceBarColor get() = look.palette.spaceBarColor
+        override val dividerColor get() = look.palette.dividerColor
+        override val clipboardEntryColor get() = look.palette.clipboardEntryColor
+        override val genericActiveBackgroundColor get() = look.palette.genericActiveBackgroundColor
+        override val genericActiveForegroundColor get() = look.palette.genericActiveForegroundColor
+
+        /**
+         * The picture as the background image page edits it: its portrait cut (absolute paths),
+         * the source, the brightness, the crop.
+         */
         @Parcelize
-        @Serializable
         data class CustomBackground(
             val croppedFilePath: String,
             val srcFilePath: String,
             val brightness: Int = 70,
-            val cropRect: @Serializable(RectSerializer::class) Rect?,
+            val cropRect: Rect?,
             val cropRotation: Int = 0
         ) : Parcelable {
             fun toDrawable(): Drawable? {
@@ -107,6 +130,23 @@ sealed class Theme : Parcelable {
                     colorFilter = DarkenColorFilter(100 - brightness)
                 }
             }
+        }
+
+        val backgroundImage: CustomBackground?
+            get() = look.picture?.let {
+                CustomBackground(
+                    it.portrait.file, it.src, it.brightness,
+                    it.portrait.cropRect?.let { b -> Rect(b.left, b.top, b.right, b.bottom) },
+                    it.portrait.rotation,
+                )
+            }
+
+        /** This theme with [background] as its picture's portrait cut, source and brightness; under the keyboard if it was not. */
+        fun withBackground(background: CustomBackground): Custom {
+            val crop = Crop(background.croppedFilePath, background.cropRect?.let { Box(it.left, it.top, it.right, it.bottom) }, background.cropRotation)
+            val picture = look.picture?.copy(src = background.srcFilePath, portrait = crop, brightness = background.brightness)
+                ?: Picture(background.srcFilePath, crop, null, background.brightness, 0)
+            return copy(look = look.copy(picture = picture, base = if (look.picture == null) BoardBase.Picture else look.base))
         }
 
         override fun backgroundDrawable(keyBorder: Boolean): Drawable {
@@ -194,32 +234,10 @@ sealed class Theme : Parcelable {
             genericActiveForegroundColor.toInt()
         )
 
-        fun deriveCustomNoBackground(name: String) = Custom(
-            name,
-            isDark,
-            null,
-            backgroundColor,
-            barColor,
-            keyboardColor,
-            keyBackgroundColor,
-            keyTextColor,
-            candidateTextColor,
-            candidateLabelColor,
-            candidateCommentColor,
-            altKeyBackgroundColor,
-            altKeyTextColor,
-            accentKeyBackgroundColor,
-            accentKeyTextColor,
-            keyPressHighlightColor,
-            keyShadowColor,
-            popupBackgroundColor,
-            popupTextColor,
-            spaceBarColor,
-            dividerColor,
-            clipboardEntryColor,
-            genericActiveBackgroundColor,
-            genericActiveForegroundColor
-        )
+        @IgnoredOnParcel
+        override val look: ThemeLook by lazy { LookDefaults.look(palette()) }
+
+        fun deriveCustomNoBackground(name: String) = Custom(name, isDark, look)
 
         fun deriveCustomBackground(
             name: String,
@@ -231,34 +249,20 @@ sealed class Theme : Parcelable {
         ) = Custom(
             name,
             isDark,
-            Custom.CustomBackground(
-                croppedBackgroundImage,
-                originBackgroundImage,
-                brightness,
-                cropBackgroundRect,
-                cropBackgroundRotation
-            ),
-            backgroundColor,
-            barColor,
-            keyboardColor,
-            keyBackgroundColor,
-            keyTextColor,
-            candidateTextColor,
-            candidateLabelColor,
-            candidateCommentColor,
-            altKeyBackgroundColor,
-            altKeyTextColor,
-            accentKeyBackgroundColor,
-            accentKeyTextColor,
-            keyPressHighlightColor,
-            keyShadowColor,
-            popupBackgroundColor,
-            popupTextColor,
-            spaceBarColor,
-            dividerColor,
-            clipboardEntryColor,
-            genericActiveBackgroundColor,
-            genericActiveForegroundColor
+            LookDefaults.look(
+                palette(),
+                Picture(
+                    src = originBackgroundImage,
+                    portrait = Crop(
+                        croppedBackgroundImage,
+                        cropBackgroundRect?.let { Box(it.left, it.top, it.right, it.bottom) },
+                        cropBackgroundRotation
+                    ),
+                    landscape = null,
+                    brightness = brightness,
+                    blurDp = 0
+                )
+            )
         )
     }
 
@@ -324,32 +328,14 @@ sealed class Theme : Parcelable {
             genericActiveForegroundColor = onPrimary
         )
 
+        @IgnoredOnParcel
+        override val look: ThemeLook by lazy { LookDefaults.look(palette()) }
+
         @OptIn(ExperimentalStdlibApi::class)
         fun toCustom() = Custom(
             name = name + "#" + this.accentKeyBackgroundColor.toHexString(), // Use primary color as identifier
             isDark = isDark,
-            backgroundImage = null,
-            backgroundColor = backgroundColor,
-            barColor = barColor,
-            keyboardColor = keyboardColor,
-            keyBackgroundColor = keyBackgroundColor,
-            keyTextColor = keyTextColor,
-            candidateTextColor = candidateTextColor,
-            candidateLabelColor = candidateLabelColor,
-            candidateCommentColor = candidateCommentColor,
-            altKeyBackgroundColor = altKeyBackgroundColor,
-            altKeyTextColor = altKeyTextColor,
-            accentKeyBackgroundColor = accentKeyBackgroundColor,
-            accentKeyTextColor = accentKeyTextColor,
-            keyPressHighlightColor = keyPressHighlightColor,
-            keyShadowColor = keyShadowColor,
-            popupBackgroundColor = popupBackgroundColor,
-            popupTextColor = popupTextColor,
-            spaceBarColor = spaceBarColor,
-            dividerColor = dividerColor,
-            clipboardEntryColor = clipboardEntryColor,
-            genericActiveBackgroundColor = genericActiveBackgroundColor,
-            genericActiveForegroundColor = genericActiveForegroundColor
+            look = look
         )
     }
 }

@@ -196,6 +196,18 @@ saying so; parity.py's other commands need no device); results in `uat/runs/`
 (`uat/gates/README.md`). A `.debug` build is upgraded by putting the fixture's files into its own
 directories and gets backups retargeted to its id; the release APK is upgraded with `install -r`.
 
+## The theme maker's shared files (`web/theme-maker/test/testdata/`)
+
+The theme maker page draws its preview by the app's rules and reads and writes its theme files, so
+the app makes the files its tests read: `rules.json` (`ThemeMakerRulesTest`: `KeyFaceGeometry`,
+`NineSliceLayout`, `PictureWindow`, `BoxBlur`, `KeyStyleResolver`, `KeyImageBudget` and the 2.1 →
+3.0 migration over fixed cases), `theme.json` (a 3.0 theme with everything), `from-app.zip` and
+`from-app-2.1.zip` (an export of this app's and of one before 3.0), `key-layout.json`
+(`ThemeKeyNamesTest`: the format's key names and each board's keys, a stand-in until the measured
+layouts). Each test compares its file with the repo's and fails on a difference;
+`./gradlew :app:testTextDebugUnitTest --tests '*ThemeMakerRulesTest' --tests '*ThemeKeyNamesTest' -PupdateThemeMaker`
+writes them again, and the page's own test then shows what it must follow.
+
 ## Golden files from upstream fcitx
 
 The host is fcitx ported to Kotlin, and the native sources are not in the tree. What fcitx does is kept

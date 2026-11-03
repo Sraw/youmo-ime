@@ -500,6 +500,63 @@ Rules for settings, all decided:
 5. Test the decision in ime-core; if the page is hand-drawn, the search index too.
 6. Describe it in `docs/settings.md`.
 
+## Theme files (`data/theme/`)
+
+A custom theme is `files/host-theme/<name>.json` and the files it names beside it, by file name
+(a picture's source and its portrait and landscape cuts, key images, fonts). The json is format
+**3.0**: `version` first, then `name`, `isDark`, `palette` (24 colours: the 21 of 2.1 and
+`keyBorderColor`, `keyHintColor`, `toolbarIconColor`), `picture` (or null), `base`, `bar`, `keys`,
+`text`. It is ime-core's `ThemeLook` (`input/theme/`) one to one, through `ThemeLookJson.kt` (the
+only place the two meet): no field has a default, a field missing or not known is an error, and a
+value out of range is refused as the `ThemeLook` is made. `keys.overrides` maps a key's name
+(`KeyNames`: `<board>/<key>`, `*/<role>` for a function key on every board) to its own fill,
+pressed face and label; a name no board here has (a later build's board) is read, kept and drawn
+by none. A key's style is its board's own name, then `*/` (roles only), then its kind's; each field
+falls through by itself (`KeyStyleResolver`). Every key a theme can reach has `KeyDef.name`, its
+keyboard the board (`BaseKeyboard.themeBoard`, `KeyView.themeKey`); `ThemeKeyNamesTest` holds the
+two to `KeyNames`.
+
+Reading an older json (`CustomThemeSerializer`, newest first: 3.0 ← 2.1 ← 2.0 ← 1.0): 2.1 → 3.0
+keeps the colours and the picture (one portrait cut, its rect and turn, brightness; no blur), and
+gives the default keys, text and a transparent bar (`LookDefaults.look`). The key style settings
+before 3.0 were global (`ThemePrefs`' border, stroke, ripple, radius, gaps); `ThemeLookMigration`
+moves them into the themes by one rule: **a theme read in an older format gets the settings as its
+keys** (`LegacyLook.applyTo`, while they are in the prefs and not the defaults), saved again as 3.0 with
+its mtime kept. A 3.0 theme is never changed by them, so a backup from before restored (the
+settings come back with it) leaves the themes made since as they were. `ThemeLookMigration.settle`
+(copy a built-in or Monet theme in use with them, put the copy in its place, remove the settings,
+tell once) runs once the keys are drawn from the themes, not before: until then the settings still
+draw the keys.
+
+Import (`ThemeFilesManager.importTheme`) takes the json and every file it names, by file name only
+(never a path, never a `.json`, never `.saving`); it checks all before copying any, so a refusal leaves nothing.
+Only the zip's top-level files are taken (`extract(flat = true)`): an entry in a folder (a Mac's `__MACOSX/`)
+is counted and its bytes metered, never written. Limits (`ThemeAssetLimits`, the numbers in the messages
+read from it), counted as the zip is unpacked (a zip bomb stops at the first entry past one; a directory
+is an entry): 300 entries, 32 MB a file, 64 MB in all; a picture's cuts 4096 px a side (the source photo
+is not limited); a key image 1024 px a side and 2 MB; a font a file's 32 MB and it must load; 400
+overrides. The json is the zip's top `.json` that is not a Mac's `._` attributes file. A file another
+theme names is a clash (`exception_theme_file_clash`): a listed theme's files, and of a json not listed
+(a later build's, one that does not decode) every string in it that is the name of a file in the dir,
+read loosely; one no json names (an orphan: an older backup's json put back over a 3.0 theme's) is taken
+over. A json of the theme's name that is not listed is replaced, its files with it if it decodes (a file
+of it missing), except a later build's: kept, the import refused (`exception_theme_newer_kept`). A
+later build's format imported is refused in the user's words (`CustomThemeSerializer.UnknownVersion`).
+
+Every write is whole or not at all: a theme's json and an import's files are written in `.saving/` in
+the theme dir (a directory: no import's file can be one there, no listing reads one), synced, then
+renamed into place (a migration's json given its old time first), the dir synced after (where the
+system lets a directory be: Linux does); what a kill left there, or a plain file of that name, is
+cleared at the process's first listing. An import writes its files and its json there, then renames
+the files into place and the json last, and only then deletes the files the theme it replaces had and
+it does not name (never one another theme names, a json or `.saving`); if any step fails, the files it added are deleted (one of the old theme's renamed
+over by then keeps the new bytes: only a rename in one directory can fail there). A migration saved
+again while listing that fails (a full disk) is logged and drawn migrated all the same, saved at the
+next start; `ThemeManager.saveTheme` tells the user (`theme_not_saved`, no path) and returns false. Export writes each named file once (only files of the theme dir:
+a planted json's other paths are refused before anything is written), then the json; delete removes
+the json and every named file that is in the theme dir. Listing skips a theme with a file missing, and
+one that does not read (told once, `user_data_unreadable`), leaving its file as it is.
+
 ## Persistence and backups
 
 `UserDataManager` exports one zip: `shared_prefs`, the clipboard database (less what an app marked

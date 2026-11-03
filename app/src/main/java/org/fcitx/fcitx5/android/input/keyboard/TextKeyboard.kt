@@ -40,6 +40,7 @@ import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.input.popup.PopupOverridesCache
 import org.fcitx.fcitx5.android.input.popup.PopupPreset
+import org.fcitx.fcitx5.android.input.theme.KeyNames
 import splitties.views.imageResource
 
 @SuppressLint("ViewConstructor")
@@ -47,7 +48,7 @@ class TextKeyboard private constructor(
     context: Context,
     theme: Theme,
     split: Split?,
-) : BaseKeyboard(context, theme, split?.keys ?: Layout, split?.widths), AutoCapsKeys {
+) : BaseKeyboard(context, theme, split?.keys ?: Layout, split?.widths, KeyNames.QWERTY), AutoCapsKeys {
 
     // the halves: 双拼's ing is L's long press there (LS-29), a table's code key has a key of its own
     private val isSplit = split != null

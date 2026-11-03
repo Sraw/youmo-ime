@@ -27,6 +27,7 @@ import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupOverridesCache
+import org.fcitx.fcitx5.android.input.theme.KeyNames
 import splitties.views.existingOrNewId
 
 /**
@@ -62,7 +63,10 @@ class GroupedKeyboard(
     private val letters: NineKeyLetters = NineKeyLetters.G14,
     private val wire: (Char) -> Int = Char::code,
     private val semicolon: Boolean = true,
-) : BaseKeyboard(context, theme, layout(letters, wire, semicolon, ::symbolsOf)) {
+) : BaseKeyboard(
+    context, theme, layout(letters, wire, semicolon, ::symbolsOf),
+    themeBoard = if (letters == NineKeyLetters.G18) KeyNames.K18 else KeyNames.K14,
+) {
 
     companion object {
         const val Name14 = "Grouped14"
@@ -148,7 +152,8 @@ class GroupedKeyboard(
             )
         }
 
-        private fun groupKey(group: String, code: Char, corner: String, width: Float, symbolsOf: (String) -> List<String>, wire: (Char) -> Int): KeyDef {
+        // named by its place ([name], r1c1…): the same key whatever letters a scheme puts on it
+        private fun groupKey(group: String, code: Char, corner: String, width: Float, symbolsOf: (String) -> List<String>, wire: (Char) -> Int, name: String): KeyDef {
             return KeyDef(
                 KeyDef.Appearance.AltText(displayText = group.uppercase(), altText = corner, textSize = 20f, percentWidth = width),
                 setOf(
@@ -159,6 +164,7 @@ class GroupedKeyboard(
                     KeyDef.Popup.AltPreview(group.uppercase(), corner),
                     longPressOf(group, corner, symbolsOf),
                 ),
+                name = name,
             )
         }
 
@@ -175,7 +181,7 @@ class GroupedKeyboard(
             val shape = shapeOf(letters)
             val first = shape.rows.runningFold(0, Int::plus)
             fun row(r: Int) = (first[r] until first[r + 1]).map {
-                groupKey(groups[it], letters.codes[it], shape.corners[it], shape.widths[r], symbolsOf, wire)
+                groupKey(groups[it], letters.codes[it], shape.corners[it], shape.widths[r], symbolsOf, wire, "r${r + 1}c${it - first[r] + 1}")
             }
             return listOf(
                 row(0),
@@ -189,6 +195,7 @@ class GroupedKeyboard(
                         ),
                         // while typing the separator; else the full keyboard's ', typed by the app
                         setOf(KeyDef.Behavior.Press(KeyAction.HostKeyAction("'"))),
+                        name = "apostrophe",
                     ),
                 ) + row(2) + BackspaceKey(SIDE),
                 listOf(

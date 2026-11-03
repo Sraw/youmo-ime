@@ -80,6 +80,9 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         vMargin = if (def.margin) dp(vMarginPref.getValue()) else 0
     }
 
+    /** Its name in a theme, its keyboard's [BaseKeyboard.themeBoard] the board: [KeyDef.name]. */
+    var themeKey: String? = null
+
     private val cachedLocation = intArrayOf(0, 0)
     private val cachedBounds = Rect()
     // where it is now, asked each time: the floating keyboard moves by translation, which lays

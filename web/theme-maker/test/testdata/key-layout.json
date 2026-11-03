@@ -1,0 +1,1271 @@
+{
+    "roles": [
+        "shift",
+        "backspace",
+        "space",
+        "enter",
+        "confirm",
+        "symbols",
+        "numbers",
+        "back",
+        "lang",
+        "comma",
+        "period",
+        "semicolon",
+        "star",
+        "apostrophe",
+        "reset",
+        "lookup",
+        "lookup-on",
+        "slash",
+        "at",
+        "dot",
+        "domain",
+        "search",
+        "lock",
+        "emoji",
+        "emoticon"
+    ],
+    "positions": {
+        "qwerty": [
+            "a",
+            "b",
+            "c",
+            "d",
+            "e",
+            "f",
+            "g",
+            "h",
+            "i",
+            "j",
+            "k",
+            "l",
+            "m",
+            "n",
+            "o",
+            "p",
+            "q",
+            "r",
+            "s",
+            "t",
+            "u",
+            "v",
+            "w",
+            "x",
+            "y",
+            "z"
+        ],
+        "zhuyin": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "0",
+            "-",
+            "q",
+            "w",
+            "e",
+            "r",
+            "t",
+            "y",
+            "u",
+            "i",
+            "o",
+            "p",
+            "a",
+            "s",
+            "d",
+            "f",
+            "g",
+            "h",
+            "j",
+            "k",
+            "l",
+            ";",
+            "z",
+            "x",
+            "c",
+            "v",
+            "b",
+            "n",
+            "m",
+            ",",
+            ".",
+            "/"
+        ],
+        "nine": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "0",
+            "side"
+        ],
+        "zhuyin-nine": [
+            "r1c1",
+            "r1c2",
+            "r1c3",
+            "r2c1",
+            "r2c2",
+            "r2c3",
+            "r3c1",
+            "r3c2",
+            "r3c3",
+            "r4c1",
+            "r4c2",
+            "r4c3",
+            "0",
+            "side"
+        ],
+        "k14": [
+            "r1c1",
+            "r1c2",
+            "r1c3",
+            "r1c4",
+            "r1c5",
+            "r2c1",
+            "r2c2",
+            "r2c3",
+            "r2c4",
+            "r2c5",
+            "r3c1",
+            "r3c2",
+            "r3c3",
+            "r3c4"
+        ],
+        "k18": [
+            "r1c1",
+            "r1c2",
+            "r1c3",
+            "r1c4",
+            "r1c5",
+            "r1c6",
+            "r1c7",
+            "r2c1",
+            "r2c2",
+            "r2c3",
+            "r2c4",
+            "r2c5",
+            "r2c6",
+            "r3c1",
+            "r3c2",
+            "r3c3",
+            "r3c4",
+            "r3c5"
+        ],
+        "number": [
+            "0",
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "+",
+            "-",
+            "*",
+            "/",
+            ",",
+            "=",
+            ".",
+            "#",
+            "(",
+            ")",
+            ":"
+        ],
+        "symbols": [],
+        "emoji": [],
+        "handwriting": []
+    },
+    "boards": {
+        "qwerty": [
+            [
+                {
+                    "name": "q",
+                    "label": "Q",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "w",
+                    "label": "W",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "e",
+                    "label": "E",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r",
+                    "label": "R",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "t",
+                    "label": "T",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "y",
+                    "label": "Y",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "u",
+                    "label": "U",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "i",
+                    "label": "I",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "o",
+                    "label": "O",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "p",
+                    "label": "P",
+                    "width": 0.1,
+                    "kind": "letter"
+                }
+            ],
+            [
+                {
+                    "name": "a",
+                    "label": "A",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "s",
+                    "label": "S",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "d",
+                    "label": "D",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "f",
+                    "label": "F",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "g",
+                    "label": "G",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "h",
+                    "label": "H",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "j",
+                    "label": "J",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "k",
+                    "label": "K",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "l",
+                    "label": "L",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "semicolon",
+                    "label": ";",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "star",
+                    "label": "*",
+                    "width": 0.1,
+                    "kind": "letter"
+                }
+            ],
+            [
+                {
+                    "name": "shift",
+                    "label": "",
+                    "width": 0.15,
+                    "kind": "function"
+                },
+                {
+                    "name": "lookup",
+                    "label": "拼",
+                    "width": 0.15,
+                    "kind": "function"
+                },
+                {
+                    "name": "lookup-on",
+                    "label": "拼",
+                    "width": 0.15,
+                    "kind": "function"
+                },
+                {
+                    "name": "z",
+                    "label": "Z",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "x",
+                    "label": "X",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "c",
+                    "label": "C",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "v",
+                    "label": "V",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "b",
+                    "label": "B",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "n",
+                    "label": "N",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "m",
+                    "label": "M",
+                    "width": 0.1,
+                    "kind": "letter"
+                },
+                {
+                    "name": "backspace",
+                    "label": "",
+                    "width": 0.15,
+                    "kind": "function"
+                }
+            ],
+            [
+                {
+                    "name": "symbols",
+                    "label": "符",
+                    "width": 0.12,
+                    "kind": "function"
+                },
+                {
+                    "name": "numbers",
+                    "label": "123",
+                    "width": 0.12,
+                    "kind": "function"
+                },
+                {
+                    "name": "comma",
+                    "label": ",",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "slash",
+                    "label": "/",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "at",
+                    "label": "@",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "space",
+                    "label": " ",
+                    "width": 0.0,
+                    "kind": "space"
+                },
+                {
+                    "name": "period",
+                    "label": ".",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "dot",
+                    "label": ".",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "domain",
+                    "label": ".com",
+                    "width": 0.14,
+                    "kind": "function"
+                },
+                {
+                    "name": "lang",
+                    "label": "",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "enter",
+                    "label": "",
+                    "width": 0.15,
+                    "kind": "enter"
+                },
+                {
+                    "name": "confirm",
+                    "label": "",
+                    "width": 0.15,
+                    "kind": "enter"
+                }
+            ]
+        ],
+        "nine": [
+            [
+                {
+                    "name": "side",
+                    "label": "",
+                    "width": 0.16,
+                    "kind": "letter"
+                },
+                {
+                    "name": "1",
+                    "label": "，。？！",
+                    "width": 0.22000001,
+                    "kind": "letter"
+                },
+                {
+                    "name": "2",
+                    "label": "ABC",
+                    "width": 0.22000001,
+                    "kind": "letter"
+                },
+                {
+                    "name": "3",
+                    "label": "DEF",
+                    "width": 0.22000001,
+                    "kind": "letter"
+                },
+                {
+                    "name": "backspace",
+                    "label": "",
+                    "width": 0.18,
+                    "kind": "function"
+                }
+            ],
+            [
+                {
+                    "name": null,
+                    "label": "",
+                    "width": 0.16,
+                    "kind": "letter"
+                },
+                {
+                    "name": "4",
+                    "label": "GHI",
+                    "width": 0.22000001,
+                    "kind": "letter"
+                },
+                {
+                    "name": "5",
+                    "label": "JKL",
+                    "width": 0.22000001,
+                    "kind": "letter"
+                },
+                {
+                    "name": "6",
+                    "label": "MNO",
+                    "width": 0.22000001,
+                    "kind": "letter"
+                },
+                {
+                    "name": "reset",
+                    "label": "重输",
+                    "width": 0.18,
+                    "kind": "function"
+                }
+            ],
+            [
+                {
+                    "name": null,
+                    "label": "",
+                    "width": 0.16,
+                    "kind": "letter"
+                },
+                {
+                    "name": "7",
+                    "label": "PQRS",
+                    "width": 0.22000001,
+                    "kind": "letter"
+                },
+                {
+                    "name": "8",
+                    "label": "TUV",
+                    "width": 0.22000001,
+                    "kind": "letter"
+                },
+                {
+                    "name": "9",
+                    "label": "WXYZ",
+                    "width": 0.22000001,
+                    "kind": "letter"
+                },
+                {
+                    "name": "0",
+                    "label": "0",
+                    "width": 0.18,
+                    "kind": "function"
+                }
+            ],
+            [
+                {
+                    "name": "symbols",
+                    "label": "符",
+                    "width": 0.16,
+                    "kind": "function"
+                },
+                {
+                    "name": "numbers",
+                    "label": "123",
+                    "width": 0.14,
+                    "kind": "function"
+                },
+                {
+                    "name": "space",
+                    "label": " ",
+                    "width": 0.0,
+                    "kind": "space"
+                },
+                {
+                    "name": "lang",
+                    "label": "",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "enter",
+                    "label": "",
+                    "width": 0.18,
+                    "kind": "enter"
+                }
+            ]
+        ],
+        "k14": [
+            [
+                {
+                    "name": "r1c1",
+                    "label": "QW",
+                    "width": 0.2,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r1c2",
+                    "label": "ER",
+                    "width": 0.2,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r1c3",
+                    "label": "TY",
+                    "width": 0.2,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r1c4",
+                    "label": "UI",
+                    "width": 0.2,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r1c5",
+                    "label": "OP",
+                    "width": 0.2,
+                    "kind": "letter"
+                }
+            ],
+            [
+                {
+                    "name": "r2c1",
+                    "label": "AS",
+                    "width": 0.2,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r2c2",
+                    "label": "DF",
+                    "width": 0.2,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r2c3",
+                    "label": "GH",
+                    "width": 0.2,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r2c4",
+                    "label": "JK",
+                    "width": 0.2,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r2c5",
+                    "label": "L",
+                    "width": 0.2,
+                    "kind": "letter"
+                }
+            ],
+            [
+                {
+                    "name": "apostrophe",
+                    "label": "分词",
+                    "width": 0.15,
+                    "kind": "function"
+                },
+                {
+                    "name": "r3c1",
+                    "label": "ZX",
+                    "width": 0.175,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r3c2",
+                    "label": "CV",
+                    "width": 0.175,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r3c3",
+                    "label": "BN",
+                    "width": 0.175,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r3c4",
+                    "label": "M",
+                    "width": 0.175,
+                    "kind": "letter"
+                },
+                {
+                    "name": "backspace",
+                    "label": "",
+                    "width": 0.15,
+                    "kind": "function"
+                }
+            ],
+            [
+                {
+                    "name": "symbols",
+                    "label": "符",
+                    "width": 0.12,
+                    "kind": "function"
+                },
+                {
+                    "name": "numbers",
+                    "label": "123",
+                    "width": 0.12,
+                    "kind": "function"
+                },
+                {
+                    "name": "comma",
+                    "label": ",",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "slash",
+                    "label": "/",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "at",
+                    "label": "@",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "space",
+                    "label": " ",
+                    "width": 0.0,
+                    "kind": "space"
+                },
+                {
+                    "name": "period",
+                    "label": ".",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "dot",
+                    "label": ".",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "domain",
+                    "label": ".com",
+                    "width": 0.14,
+                    "kind": "function"
+                },
+                {
+                    "name": "lang",
+                    "label": "",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "enter",
+                    "label": "",
+                    "width": 0.15,
+                    "kind": "enter"
+                }
+            ]
+        ],
+        "k18": [
+            [
+                {
+                    "name": "r1c1",
+                    "label": "Q",
+                    "width": 0.14285715,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r1c2",
+                    "label": "WE",
+                    "width": 0.14285715,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r1c3",
+                    "label": "RT",
+                    "width": 0.14285715,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r1c4",
+                    "label": "Y",
+                    "width": 0.14285715,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r1c5",
+                    "label": "U",
+                    "width": 0.14285715,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r1c6",
+                    "label": "IO",
+                    "width": 0.14285715,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r1c7",
+                    "label": "P",
+                    "width": 0.14285715,
+                    "kind": "letter"
+                }
+            ],
+            [
+                {
+                    "name": "r2c1",
+                    "label": "A",
+                    "width": 0.16666667,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r2c2",
+                    "label": "SD",
+                    "width": 0.16666667,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r2c3",
+                    "label": "FG",
+                    "width": 0.16666667,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r2c4",
+                    "label": "H",
+                    "width": 0.16666667,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r2c5",
+                    "label": "JK",
+                    "width": 0.16666667,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r2c6",
+                    "label": "L;",
+                    "width": 0.16666667,
+                    "kind": "letter"
+                }
+            ],
+            [
+                {
+                    "name": "apostrophe",
+                    "label": "分词",
+                    "width": 0.15,
+                    "kind": "function"
+                },
+                {
+                    "name": "r3c1",
+                    "label": "Z",
+                    "width": 0.14,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r3c2",
+                    "label": "XC",
+                    "width": 0.14,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r3c3",
+                    "label": "V",
+                    "width": 0.14,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r3c4",
+                    "label": "BN",
+                    "width": 0.14,
+                    "kind": "letter"
+                },
+                {
+                    "name": "r3c5",
+                    "label": "M",
+                    "width": 0.14,
+                    "kind": "letter"
+                },
+                {
+                    "name": "backspace",
+                    "label": "",
+                    "width": 0.15,
+                    "kind": "function"
+                }
+            ],
+            [
+                {
+                    "name": "symbols",
+                    "label": "符",
+                    "width": 0.12,
+                    "kind": "function"
+                },
+                {
+                    "name": "numbers",
+                    "label": "123",
+                    "width": 0.12,
+                    "kind": "function"
+                },
+                {
+                    "name": "comma",
+                    "label": ",",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "slash",
+                    "label": "/",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "at",
+                    "label": "@",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "space",
+                    "label": " ",
+                    "width": 0.0,
+                    "kind": "space"
+                },
+                {
+                    "name": "period",
+                    "label": ".",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "dot",
+                    "label": ".",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "domain",
+                    "label": ".com",
+                    "width": 0.14,
+                    "kind": "function"
+                },
+                {
+                    "name": "lang",
+                    "label": "",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "enter",
+                    "label": "",
+                    "width": 0.15,
+                    "kind": "enter"
+                }
+            ]
+        ],
+        "number": [
+            [
+                {
+                    "name": "+",
+                    "label": "+",
+                    "width": 0.15,
+                    "kind": "function"
+                },
+                {
+                    "name": "1",
+                    "label": "1",
+                    "width": 0.0,
+                    "kind": "letter"
+                },
+                {
+                    "name": "2",
+                    "label": "2",
+                    "width": 0.0,
+                    "kind": "letter"
+                },
+                {
+                    "name": "3",
+                    "label": "3",
+                    "width": 0.0,
+                    "kind": "letter"
+                },
+                {
+                    "name": "/",
+                    "label": "/",
+                    "width": 0.15,
+                    "kind": "function"
+                }
+            ],
+            [
+                {
+                    "name": "-",
+                    "label": "-",
+                    "width": 0.15,
+                    "kind": "function"
+                },
+                {
+                    "name": "4",
+                    "label": "4",
+                    "width": 0.0,
+                    "kind": "letter"
+                },
+                {
+                    "name": "5",
+                    "label": "5",
+                    "width": 0.0,
+                    "kind": "letter"
+                },
+                {
+                    "name": "6",
+                    "label": "6",
+                    "width": 0.0,
+                    "kind": "letter"
+                },
+                {
+                    "name": "space",
+                    "label": "",
+                    "width": 0.15,
+                    "kind": "space"
+                }
+            ],
+            [
+                {
+                    "name": "*",
+                    "label": "*",
+                    "width": 0.15,
+                    "kind": "function"
+                },
+                {
+                    "name": "7",
+                    "label": "7",
+                    "width": 0.0,
+                    "kind": "letter"
+                },
+                {
+                    "name": "8",
+                    "label": "8",
+                    "width": 0.0,
+                    "kind": "letter"
+                },
+                {
+                    "name": "9",
+                    "label": "9",
+                    "width": 0.0,
+                    "kind": "letter"
+                },
+                {
+                    "name": "backspace",
+                    "label": "",
+                    "width": 0.15,
+                    "kind": "function"
+                }
+            ],
+            [
+                {
+                    "name": "back",
+                    "label": "ABC",
+                    "width": 0.15,
+                    "kind": "function"
+                },
+                {
+                    "name": ",",
+                    "label": ",",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "symbols",
+                    "label": "!?#",
+                    "width": 0.13333,
+                    "kind": "function"
+                },
+                {
+                    "name": "0",
+                    "label": "0",
+                    "width": 0.23334,
+                    "kind": "letter"
+                },
+                {
+                    "name": "=",
+                    "label": "=",
+                    "width": 0.13333,
+                    "kind": "function"
+                },
+                {
+                    "name": ".",
+                    "label": ".",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "enter",
+                    "label": "",
+                    "width": 0.15,
+                    "kind": "enter"
+                }
+            ]
+        ],
+        "handwriting": [
+            [
+                {
+                    "name": null,
+                    "label": "",
+                    "width": 0.85,
+                    "kind": "letter"
+                },
+                {
+                    "name": "backspace",
+                    "label": "",
+                    "width": 0.14999998,
+                    "kind": "function"
+                }
+            ],
+            [
+                {
+                    "name": null,
+                    "label": "",
+                    "width": 0.85,
+                    "kind": "letter"
+                },
+                {
+                    "name": "comma",
+                    "label": "，",
+                    "width": 0.14999998,
+                    "kind": "function"
+                }
+            ],
+            [
+                {
+                    "name": null,
+                    "label": "",
+                    "width": 0.85,
+                    "kind": "letter"
+                },
+                {
+                    "name": "period",
+                    "label": "。",
+                    "width": 0.14999998,
+                    "kind": "function"
+                }
+            ],
+            [
+                {
+                    "name": "symbols",
+                    "label": "符",
+                    "width": 0.14999998,
+                    "kind": "function"
+                },
+                {
+                    "name": "numbers",
+                    "label": "123",
+                    "width": 0.14,
+                    "kind": "function"
+                },
+                {
+                    "name": "space",
+                    "label": " ",
+                    "width": 0.0,
+                    "kind": "space"
+                },
+                {
+                    "name": "lang",
+                    "label": "",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "enter",
+                    "label": "",
+                    "width": 0.14999998,
+                    "kind": "enter"
+                }
+            ]
+        ],
+        "symbols": [
+            [
+                {
+                    "name": "back",
+                    "label": "Back",
+                    "width": 0.15,
+                    "kind": "function"
+                },
+                {
+                    "name": "lock",
+                    "label": "",
+                    "width": 0.12,
+                    "kind": "function"
+                },
+                {
+                    "name": "numbers",
+                    "label": "",
+                    "width": 0.12,
+                    "kind": "function"
+                },
+                {
+                    "name": "space",
+                    "label": " ",
+                    "width": 0.0,
+                    "kind": "space"
+                },
+                {
+                    "name": "backspace",
+                    "label": "",
+                    "width": 0.15,
+                    "kind": "function"
+                },
+                {
+                    "name": "enter",
+                    "label": "",
+                    "width": 0.15,
+                    "kind": "enter"
+                }
+            ]
+        ],
+        "emoji": [
+            [
+                {
+                    "name": "back",
+                    "label": "ABC",
+                    "width": 0.15,
+                    "kind": "function"
+                },
+                {
+                    "name": "search",
+                    "label": "",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "emoticon",
+                    "label": ":-)",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "space",
+                    "label": " ",
+                    "width": 0.0,
+                    "kind": "space"
+                },
+                {
+                    "name": "period",
+                    "label": ".",
+                    "width": 0.1,
+                    "kind": "function"
+                },
+                {
+                    "name": "backspace",
+                    "label": "",
+                    "width": 0.15,
+                    "kind": "function"
+                },
+                {
+                    "name": "enter",
+                    "label": "",
+                    "width": 0.15,
+                    "kind": "enter"
+                }
+            ]
+        ]
+    }
+}

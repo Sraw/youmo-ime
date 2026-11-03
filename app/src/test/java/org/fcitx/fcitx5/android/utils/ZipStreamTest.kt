@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.utils
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -84,5 +85,47 @@ class ZipStreamTest {
         val top = zip("./" to null, "a" to "x").use { it.extract(dest) }
         assertEquals(listOf("a"), top.map { it.name })
         assertEquals("x", File(dest, "a").readText())
+    }
+
+    @Test
+    fun theCheckSeesEachEntrysCountItsSizeAndTheTotalBefore() {
+        val seen = mutableListOf<Triple<Int, Long, Long>>()
+        zip("a" to "12345", "d/" to null, "b" to "").use { it.extract(dest) { c, s, t -> seen += Triple(c, s, t) } }
+        // before each entry (size 0) and after each chunk; a directory is an entry of the count too
+        assertEquals(listOf(Triple(1, 0L, 0L), Triple(1, 5L, 0L), Triple(2, 0L, 5L), Triple(3, 0L, 5L)), seen)
+    }
+
+    @Test
+    fun emptyDirectoriesCountTowardsALimit() {
+        // a zip of nothing but directories would pass any count of files
+        val many = (1..5).map { "d$it/" to null }.toTypedArray()
+        assertThrows(IllegalStateException::class.java) {
+            zip(*many).use { z -> z.extract(dest) { count, _, _ -> check(count <= 3) } }
+        }
+    }
+
+    @Test
+    fun flatUnpacksTheTopsFilesOnlyAndStillCountsAndMetersTheRest() {
+        val seen = mutableListOf<Triple<Int, Long, Long>>()
+        val top = zip("a" to "12", "__MACOSX/" to null, "__MACOSX/._a" to "xyz", "b" to "4").use {
+            it.extract(dest, flat = true) { c, s, t -> seen += Triple(c, s, t) }
+        }
+        assertEquals(setOf("a", "b"), top.map { it.name }.toSet())
+        assertEquals(setOf("a", "b"), dest.list()!!.toSet())
+        // the folder's file read through the check (a zip bomb in one is stopped as at the top), not kept
+        assertEquals(
+            listOf(Triple(1, 0L, 0L), Triple(1, 2L, 0L), Triple(2, 0L, 2L), Triple(3, 0L, 2L), Triple(3, 3L, 2L), Triple(4, 0L, 5L), Triple(4, 1L, 5L)),
+            seen,
+        )
+    }
+
+    @Test
+    fun aCheckThatThrowsStopsBeforeTheChunkPastTheLimitIsWritten() {
+        val big = "x".repeat(3 * DEFAULT_BUFFER_SIZE)
+        assertThrows(IllegalStateException::class.java) {
+            zip("big" to big).use { z -> z.extract(dest) { _, size, _ -> check(size <= DEFAULT_BUFFER_SIZE) } }
+        }
+        // the zip's reader hands out chunks of up to a buffer: none past the limit reaches the disk
+        assertTrue(File(dest, "big").length() <= DEFAULT_BUFFER_SIZE)
     }
 }

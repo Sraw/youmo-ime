@@ -11,13 +11,14 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
+import org.fcitx.fcitx5.android.input.theme.KeyNames
 
 @SuppressLint("ViewConstructor")
 class NumberKeyboard(
     context: Context,
     theme: Theme,
     pad: NumberPad = NumberPad.FULL,
-) : BaseKeyboard(context, theme, layout(pad)) {
+) : BaseKeyboard(context, theme, layout(pad), themeBoard = KeyNames.NUMBER) {
 
     companion object {
         const val Name = NumberPad.FULL_LAYOUT
@@ -37,6 +38,7 @@ class NumberKeyboard(
                 null -> KeyDef(
                     KeyDef.Appearance.Text(label, 23f, percentWidth = percentWidth, variant = variant),
                     setOf(KeyDef.Behavior.Press(KeyAction.CommitAction(label))),
+                    name = label,
                 )
                 else -> NumPadKey(label, sym, 23f, percentWidth, variant)
             }

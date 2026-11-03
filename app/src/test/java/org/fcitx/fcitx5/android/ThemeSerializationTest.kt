@@ -5,12 +5,18 @@
 package org.fcitx.fcitx5.android
 
 import android.graphics.Rect
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import org.fcitx.fcitx5.android.data.theme.CustomThemeSerializer
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.input.theme.KeyLabel
+import org.fcitx.fcitx5.android.input.theme.KeyOverride
+import org.fcitx.fcitx5.android.input.theme.KeyPressed
+import org.fcitx.fcitx5.android.input.theme.LookDefaults
 import org.junit.Assert
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -207,10 +213,51 @@ class ThemeSerializationTest {
 
     @Test
     fun version21() {
-        // the current schema: decoding must not report a migration
+        // the last before the look: migrated, its colours and picture kept, the default keys
         val (decoded, migrated) = Fixtures.v21.toCustomTheme()
-        Assert.assertEquals("Migration shouldn't happen", false, migrated)
+        Assert.assertEquals("Migration should happen", true, migrated)
+        Assert.assertEquals(-10577930, decoded.genericActiveBackgroundColor)
+        Assert.assertEquals(LookDefaults.KEYS, decoded.look.keys)
         Assert.assertEquals("Round trip", decoded, decoded.toJson().toCustomTheme().first)
+    }
+
+    @Test
+    fun version3() {
+        // the current schema: decoding must not report a migration
+        val theme = Fixtures.v21.toCustomTheme().first
+        val (decoded, migrated) = theme.toJson().toCustomTheme()
+        Assert.assertEquals("Migration shouldn't happen", false, migrated)
+        Assert.assertEquals(theme, decoded)
+    }
+
+    // this with the object at [path] changed by [change]
+    private fun JsonObject.at(vararg path: String, change: (JsonObject) -> JsonObject): JsonObject =
+        if (path.isEmpty()) change(this)
+        else JsonObject(this + (path[0] to getValue(path[0]).jsonObject.at(*path.drop(1).toTypedArray(), change = change)))
+
+    @Test
+    fun version3IsReadOnlyAsItIsWritten() {
+        // a picture with no landscape cut, no font, an override with no fill: every nullable field written as null
+        val theme = Fixtures.v21.toCustomTheme().first.let { t ->
+            val q = KeyOverride(null, KeyPressed.Color(1), KeyLabel.Hide)
+            t.copy(look = t.look.copy(keys = t.look.keys.copy(overrides = mapOf("qwerty/q" to q))))
+        }
+        val written = Json.parseToJsonElement(theme.toJson()).jsonObject
+        Assert.assertEquals(theme to false, written.toString().toCustomTheme())
+        val refused = mapOf(
+            "a field more" to written.at { JsonObject(it + ("extra" to JsonPrimitive(1))) },
+            "a field more in a key's style" to written.at("keys", "letter") { JsonObject(it + ("extra" to JsonPrimitive(1))) },
+            "no bar" to written.at { JsonObject(it - "bar") },
+            "no picture (nullable)" to written.at { JsonObject(it - "picture") },
+            "no landscape cut (nullable)" to written.at("picture") { JsonObject(it - "landscape") },
+            "no key font (nullable)" to written.at("text") { JsonObject(it - "keyFont") },
+            "no override fill (nullable)" to written.at("keys", "overrides", "qwerty/q") { JsonObject(it - "fill") },
+            "a fill of no known type" to written.at("keys", "letter", "fill") { JsonObject(it + ("type" to JsonPrimitive("gradient"))) },
+            "a base of no known type" to written.at("base") { JsonObject(it + ("type" to JsonPrimitive("video"))) },
+        )
+        for ((case, json) in refused) {
+            Assert.assertThrows(case, SerializationException::class.java) { json.toString().toCustomTheme() }
+        }
     }
 
     @Test
@@ -224,7 +271,8 @@ class ThemeSerializationTest {
     @Test
     fun unknownVersionIsRejected() {
         val raw = Fixtures.v21.replace("\"version\":\"2.1\"", "\"version\":\"99.0\"")
-        Assert.assertThrows(IllegalStateException::class.java) { raw.toCustomTheme() }
+        val e = Assert.assertThrows(CustomThemeSerializer.UnknownVersion::class.java) { raw.toCustomTheme() }
+        Assert.assertEquals("99.0", e.version)
     }
 
     @Test
@@ -239,7 +287,7 @@ class ThemeSerializationTest {
     @Test
     fun serializingStampsCurrentVersion() {
         val theme = Fixtures.v21.toCustomTheme().first
-        Assert.assertTrue("Serialized form carries a version", theme.toJson().contains("\"version\":\"2.1\""))
+        Assert.assertTrue("Serialized form carries a version", theme.toJson().startsWith("{\"version\":\"3.0\""))
     }
 
     /**
