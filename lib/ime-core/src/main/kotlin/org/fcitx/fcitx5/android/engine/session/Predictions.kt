@@ -109,7 +109,8 @@ class Predictions(
     fun wrote(text: String, entry: Entry?) {
         before = kept(before + text)
         lastEntry = entry
-        written = text
+        // as nothing is learned of it (a password), nor is it kept to learn a phrase after
+        written = if (learning()) text else ""
         cleared = false
     }
 

@@ -272,4 +272,21 @@ class PredictionsTest {
         p.predict()
         assertTrue(p.offered.isEmpty())
     }
+
+    // review of 051-predict (2): what is put in where nothing is learned (a password) is not kept as the
+    // word a phrase goes on after, the learning back on or not
+    @Test
+    fun aPasswordsTextIsNoWordAPhraseGoesOnAfter() {
+        repeat(Predictor.PAIRS) {
+            learner.habits.record(listOf(Row(Row.PICK or Row.WHOLE, Code(Kinds.HANDWRITING, ""), "", Words.of("龘山人天"), 'A', Row.DICTIONARY, "")))
+        }
+        learning = false
+        p.wrote("龘", null)
+        learning = true
+        p.predict()
+        assertTrue(p.offered.isEmpty())
+        p.wrote("龘", null)
+        p.predict()
+        assertEquals(listOf("山人天"), p.offered.map { it.text })
+    }
 }
