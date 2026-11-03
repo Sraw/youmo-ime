@@ -9,6 +9,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Rect
+import android.graphics.RectF
 import android.text.Layout
 import android.text.Spanned
 import android.text.StaticLayout
@@ -222,6 +223,30 @@ class AutoScaleTextView @JvmOverloads constructor(
                 drawText(text.toString(), 0.0f, 0.0f, paint)
             }
         }
+    }
+
+    private val inkBounds = Rect()
+
+    /**
+     * Where its glyphs are drawn, in its own coordinates, into [out]: their ink, not the line's
+     * height and advance the view is sized by (a key's label giving way to its corner's mark,
+     * KeyMarkYield). False for none: nothing to draw, or a styled text, its lines' ink unmeasured.
+     */
+    fun inkBounds(out: RectF): Boolean {
+        if (text.isEmpty()) return false
+        // what it is styled with known only once its transform is (laid out, nothing drawn yet)
+        if (needsCalculateTransform) {
+            calculateTransform(width, height)
+            needsCalculateTransform = false
+        }
+        if (styled != null) return false
+        paint.getTextBounds(text.toString(), 0, text.length, inkBounds)
+        if (inkBounds.isEmpty) return false
+        out.set(
+            baselineX + inkBounds.left * textScaleX, baselineY + inkBounds.top * textScaleY,
+            baselineX + inkBounds.right * textScaleX, baselineY + inkBounds.bottom * textScaleY,
+        )
+        return true
     }
 
     // a styled text of more than one line (a table's roots on a key, TextKeyboard): sized and centred whole

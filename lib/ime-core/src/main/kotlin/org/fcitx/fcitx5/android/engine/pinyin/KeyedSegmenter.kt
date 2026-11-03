@@ -35,4 +35,35 @@ interface KeyedSegmenter : Segmenter {
      * it (PhraseKeys): each way it is typed in letters. Its own letters on full pinyin's keyboards.
      */
     fun takenAs(spelling: String): List<String> = listOf(spelling)
+
+    /** How [syllable] read whole shows: its pinyin, its symbols on the zhuyin keyboards. */
+    fun spelt(syllable: Int): String = Syllables.spelling(syllable)
+
+    /**
+     * How a syllable or initial the bar offers ([org.fcitx.fcitx5.android.engine.session.NineKeys.offered],
+     * in pinyin) shows: as it is, in symbols on the zhuyin keyboards (ㄋㄧ, not ni).
+     */
+    fun shownOffered(offered: String): String = offered
+
+    /**
+     * The key an initial the bar offers is taken as: on the zhuyin keyboards its symbol typed as
+     * itself (ㄓ for zh), which a final typed next goes on from and which alone reads its whole
+     * syllable (zhi), as a long press's; null where it is taken as its letters and a separator (简拼).
+     */
+    fun keyOf(offered: String): Char? = null
+
+    /** Whether [c] of the input ends a syllable: the separator, a tone on the zhuyin keyboards. */
+    fun separates(c: Char): Boolean = c == SyllableGraph.SEPARATOR
+
+    /** The pinyin letters [c] of the input may be in a custom phrase's key, null for none of the kind (see PhraseKeys.of's ways): zhuyin's keys'. */
+    fun phraseWays(c: Char): List<String>? = null
+
+    /** What a space after a syllable with no tone puts in, null where a space picks the first candidate: 大千's first tone. */
+    val spaceTone: Char? get() = null
+
+    /** Whether a space after [before], the input not yet picked up to the cursor, is [spaceTone]: after a key, a syllable with no tone yet (design 051 Q3 A). */
+    fun tonesBySpace(before: CharSequence): Boolean = spaceTone != null && before.isNotEmpty() && isKey(before.last())
+
+    /** Whether a character read as a syllable may have a tone typed after it (zhuyin's keys'): PinyinDecoder's toneAllows; null, none is asked. */
+    val toneAllows: ((codePoint: Int, syllable: Int, tone: Int) -> Boolean)? get() = null
 }

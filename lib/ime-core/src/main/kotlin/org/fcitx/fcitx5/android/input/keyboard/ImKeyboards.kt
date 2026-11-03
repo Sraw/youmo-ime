@@ -13,7 +13,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
  * chosen (KeyboardPair). The app stores its own enums' names for these (PinyinKeyboard,
  * ShuangpinKeyboard, EnglishKeyboard in AppPrefs): those never renamed, this one free to be.
  */
-enum class ImKeyboard { FULL, KEYS18, KEYS14, NINE_KEYS }
+enum class ImKeyboard { FULL, KEYS18, KEYS14, NINE_KEYS, ZHUYIN_NINE, ZHUYIN_FULL }
 
 /**
  * Which keyboards each input method offers, and which layout the screen shows for it: the input
@@ -31,6 +31,8 @@ object ImKeyboards {
         SHUANGPIN18,
         SHUANGPIN14,
         SHUANGPIN_NINE,
+        ZHUYIN_NINE,
+        ZHUYIN_FULL,
         ENGLISH_NINE,
         HANDWRITING,
     }
@@ -57,7 +59,8 @@ object ImKeyboards {
      * 双拼's 14 keys not under a [scheme] that types `;` (微软: ing), which no key of theirs has (I1 Q5).
      */
     fun choices(im: String, scheme: ShuangpinScheme): List<ImKeyboard> = when (im) {
-        InputMethodCatalog.PINYIN -> ALL
+        // pinyin typed in zhuyin too (design 051 Q1 A): its words, two keyboards of its own
+        InputMethodCatalog.PINYIN -> ALL + ImKeyboard.ZHUYIN_NINE + ImKeyboard.ZHUYIN_FULL
         InputMethodCatalog.SHUANGPIN -> if (has14(scheme)) ALL else ALL - ImKeyboard.KEYS14
         InputMethodCatalog.ENGLISH -> listOf(ImKeyboard.FULL, ImKeyboard.NINE_KEYS)
         else -> emptyList()
@@ -87,6 +90,16 @@ object ImKeyboards {
     fun fallback(im: String, chosen: ImKeyboard, scheme: ShuangpinScheme): ImKeyboard? =
         effective(im, chosen, scheme).takeIf { it != chosen && choices(im, scheme).isNotEmpty() }
 
+    /** What [im]'s keys were typed on: the layout shown, and for 双拼 its [scheme], which reads the same letters otherwise. */
+    data class TypedWith(val layout: Layout, val scheme: ShuangpinScheme?)
+
+    /**
+     * What [im] is typed with now ([layoutOf], 双拼's scheme too): what was typed is typed again on
+     * the same alone (清除's 恢复, HostCore.retype), another's keys meaning other keys or syllables.
+     */
+    fun typedWith(im: String, chosen: Chosen, scheme: ShuangpinScheme): TypedWith =
+        TypedWith(layoutOf(im, chosen, scheme), scheme.takeIf { im == InputMethodCatalog.SHUANGPIN })
+
     /**
      * The layout input method [im] shows, each one's keyboard as [chosen] has it, 双拼's under
      * [scheme]; in a [password] field English's the full keyboard whatever it chose, a letter a key.
@@ -100,12 +113,16 @@ object ImKeyboards {
                 ImKeyboard.KEYS18 -> Layout.PINYIN18
                 ImKeyboard.KEYS14 -> Layout.PINYIN14
                 ImKeyboard.NINE_KEYS -> Layout.PINYIN_NINE
+                ImKeyboard.ZHUYIN_NINE -> Layout.ZHUYIN_NINE
+                ImKeyboard.ZHUYIN_FULL -> Layout.ZHUYIN_FULL
             }
             InputMethodCatalog.SHUANGPIN -> when (keyboard) {
                 ImKeyboard.FULL -> Layout.TEXT
                 ImKeyboard.KEYS18 -> Layout.SHUANGPIN18
                 ImKeyboard.KEYS14 -> Layout.SHUANGPIN14
                 ImKeyboard.NINE_KEYS -> Layout.SHUANGPIN_NINE
+                // not offered: effective has made them FULL
+                ImKeyboard.ZHUYIN_NINE, ImKeyboard.ZHUYIN_FULL -> Layout.TEXT
             }
             InputMethodCatalog.ENGLISH -> if (keyboard == ImKeyboard.NINE_KEYS && !password) Layout.ENGLISH_NINE else Layout.TEXT
             else -> Layout.TEXT

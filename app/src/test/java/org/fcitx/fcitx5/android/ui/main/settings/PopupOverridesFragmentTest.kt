@@ -5,14 +5,20 @@
 package org.fcitx.fcitx5.android.ui.main.settings
 
 import android.widget.EditText
+import android.widget.RadioButton
+import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.pinyin.g14
 import org.fcitx.fcitx5.android.engine.pinyin.nineSp
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
+import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.uat.SettingsHarness
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
@@ -114,7 +120,8 @@ class PopupOverridesFragmentTest {
                 .performClick()
             st.idle()
             val dialog = ShadowDialog.getLatestDialog() as AlertDialog
-            val field = KeyboardHarness.all(dialog.window!!.decorView).filterIsInstance<EditText>().single()
+            // the long press's field first, the shortcut's text below it
+            val field = KeyboardHarness.all(dialog.window!!.decorView).filterIsInstance<EditText>().first()
             field.setText("\uF8C1")
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             st.idle()
@@ -122,5 +129,47 @@ class PopupOverridesFragmentTest {
             assertNotNull(field.error)
             assertEquals(before, pref.getValue())
         }
-    }
+
+        // a letter's dialog has its shortcut below its characters: a text typed there is what its swipe runs
+        @Test
+        fun aLettersShortcutIsSetInItsDialog() {
+            val pref = AppPrefs.getInstance().internal.keyShortcuts
+            st.activity
+            st.open(SettingsRoute.PopupOverrides)
+            KeyboardHarness.all(st.activity.window.decorView)
+                .first { it.contentDescription?.toString()?.substringBefore(',') == "q" && it.hasOnClickListeners() }
+                .performClick()
+            st.idle()
+            val dialog = ShadowDialog.getLatestDialog() as AlertDialog
+            val views = KeyboardHarness.all(dialog.window!!.decorView).toList()
+            // none, a command, a text
+            views.filterIsInstance<RadioButton>()[2].performClick()
+            views.filterIsInstance<EditText>().last().setText("你好")
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            st.idle()
+            assertEquals(KeyShortcut.Text("你好"), KeyShortcuts.parse(pref.getValue()).resolve("full/q"))
+            pref.setValue("")
+        }
+    
+        // a whole page's shortcuts cleared only once the user says so: cancelled, nothing changed
+        @Test
+        fun aPageIsClearedOfItsShortcutsOnlyOnceConfirmed() {
+            val pref = AppPrefs.getInstance().internal.keyShortcuts
+            st.activity
+            st.open(SettingsRoute.PopupOverrides)
+            fun clearPage(): AlertDialog {
+                KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>()
+                    .first { it.text.toString() == st.s(R.string.shortcut_clear_page) }.performClick()
+                st.idle()
+                return ShadowDialog.getLatestDialog() as AlertDialog
+            }
+            clearPage().getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+            st.idle()
+            assertEquals(KeyShortcut.Command(KeyCommand.SelectAll), KeyShortcuts.parse(pref.getValue()).resolve("full/a"))
+            clearPage().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            st.idle()
+            assertEquals(KeyShortcut.None, KeyShortcuts.parse(pref.getValue()).resolve("full/a"))
+            pref.setValue("")
+        }
+}
 }

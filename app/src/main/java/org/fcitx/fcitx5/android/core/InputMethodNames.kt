@@ -26,6 +26,8 @@ object InputMethodNames {
         InputMethodCatalog.T9 to R.string.im_t9,
         InputMethodCatalog.PINYIN_KEYS18 to R.string.im_pinyin_keys18,
         InputMethodCatalog.PINYIN_KEYS to R.string.im_pinyin_keys,
+        InputMethodCatalog.ZHUYIN_NINE to R.string.im_zhuyin_nine,
+        InputMethodCatalog.ZHUYIN to R.string.im_zhuyin,
         InputMethodCatalog.SHUANGPIN to R.string.im_shuangpin,
         InputMethodCatalog.SHUANGPIN_KEYS18 to R.string.im_shuangpin_keys18,
         InputMethodCatalog.SHUANGPIN_KEYS14 to R.string.im_shuangpin_keys14,

@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.ui.main.settings.behavior.KeysSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.SoundSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings
 import org.fcitx.fcitx5.android.ui.main.settings.im.flat
+import org.fcitx.fcitx5.android.ui.search.SettingsSearch
 import org.fcitx.fcitx5.android.ui.search.SettingsSearch.Entry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -211,5 +212,18 @@ class SettingsIndexTest {
             val row = pageOf(ctx, route.uniqueName).findPreference<Preference>(via!!)
             assertTrue("$entry", row != null && generateSequence(row) { it.parent }.all { it.isVisible })
         }
+    }
+
+    // 051-c §1.8: the shortcuts and the swipe found by the words a user would type, in the app's language
+    @Test
+    @Config(qualifiers = "zh-rCN")
+    fun theShortcutsAndTheSwipeAreFoundByTheirWords() {
+        val ctx = RuntimeEnvironment.getApplication()
+        val search = SettingsSearch(SettingsIndex.build(ctx))
+        fun found(term: String) = search.find(term).map { it.target }
+        for (term in listOf("快捷键", "全选", "复制", "粘贴")) {
+            assertTrue("$term: ${found(term)}", SettingsIndex.Target(SettingsRoute.PopupOverrides, null) in found(term))
+        }
+        assertTrue(found("滑动").toString(), found("滑动").any { it.route == SettingsRoute.Keys && it.key == AppPrefs.SWIPE_LAYERS })
     }
 }

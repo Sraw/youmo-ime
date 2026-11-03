@@ -194,6 +194,9 @@ class NineKeyLetters private constructor(
          */
         fun ofCode(c: Int): NineKeyLetters? = if (c > Char.MAX_VALUE.code) null else GROUPED.firstOrNull { it.isCode(c.toChar()) }
 
+        /** Keys of zhuyin symbols, [codes] theirs ([ZhuyinKeys]): no separator of their own, never grouped(tag)'s. */
+        internal fun zhuyin(keys: List<String>, codes: String) = NineKeyLetters(keys, codes, separator = null)
+
         private fun grouped(first: Char, vararg keys: String) =
             NineKeyLetters(keys.toList(), keys.map { first + (it[0] - 'a') }.joinToString(""), separator = null)
 

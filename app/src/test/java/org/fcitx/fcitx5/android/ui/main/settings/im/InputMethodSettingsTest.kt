@@ -175,13 +175,14 @@ class InputMethodSettingsTest {
         assertEquals(listOf(InputMethodCatalog.HANDWRITING), notFor(EngineSettings.BUILT_IN_PHRASES))
         assertEquals(emptyList<String>(), notFor(EngineSettings.MODEL_LEVEL))
         assertEquals(emptyList<String>(), notFor(InputMethodSettings.PUNCTUATION))
-        assertEquals(listOf(InputMethodCatalog.T9, InputMethodCatalog.PINYIN_KEYS18, InputMethodCatalog.PINYIN_KEYS, InputMethodCatalog.SHUANGPIN_NINE), notFor("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}"))
+        assertEquals(listOf(InputMethodCatalog.T9, InputMethodCatalog.PINYIN_KEYS18, InputMethodCatalog.PINYIN_KEYS, InputMethodCatalog.SHUANGPIN_NINE, InputMethodCatalog.ZHUYIN_NINE, InputMethodCatalog.ZHUYIN), notFor("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}"))
         // u and v are both on 8 (9 keys' 双拼 too): the pair alone is said to be no use to the nine keys, the others are
         val fuzzy = rows.filterIsInstance<Flags>().single()
-        assertEquals(mapOf(Fuzzy.V_U.name to listOf(InputMethodCatalog.T9, InputMethodCatalog.SHUANGPIN_NINE)), fuzzy.notFor)
+        assertEquals(mapOf(Fuzzy.V_U.name to listOf(InputMethodCatalog.T9, InputMethodCatalog.SHUANGPIN_NINE, InputMethodCatalog.ZHUYIN_NINE, InputMethodCatalog.ZHUYIN)), fuzzy.notFor)
         // each a name the app has: one it does not know would be said by its id
         val named = appInputMethods.toSet() + InputMethodCatalog.T9 + InputMethodCatalog.PINYIN_KEYS18 + InputMethodCatalog.PINYIN_KEYS +
-            InputMethodCatalog.SHUANGPIN_KEYS18 + InputMethodCatalog.SHUANGPIN_KEYS14 + InputMethodCatalog.SHUANGPIN_NINE
+            InputMethodCatalog.SHUANGPIN_KEYS18 + InputMethodCatalog.SHUANGPIN_KEYS14 + InputMethodCatalog.SHUANGPIN_NINE +
+            InputMethodCatalog.ZHUYIN_NINE + InputMethodCatalog.ZHUYIN
         rows.forEach { row ->
             val all = when (row) {
                 is Toggle -> row.notFor
@@ -212,7 +213,7 @@ class InputMethodSettingsTest {
     @Test
     fun pinyinsOwnOptionsSayTheyAreNoUseToThe14Keys() {
         val rows = InputMethodSettings.of(InputMethodCatalog.PINYIN)!!.flat().filterIsInstance<Toggle>().associateBy { it.key }
-        val keys = listOf(InputMethodCatalog.T9, InputMethodCatalog.PINYIN_KEYS18, InputMethodCatalog.PINYIN_KEYS)
+        val keys = listOf(InputMethodCatalog.T9, InputMethodCatalog.PINYIN_KEYS18, InputMethodCatalog.PINYIN_KEYS, InputMethodCatalog.ZHUYIN_NINE, InputMethodCatalog.ZHUYIN)
         assertEquals(keys, rows.getValue(EngineSettings.CHAIZI).notFor)
         assertEquals(keys, rows.getValue(EngineSettings.LATIN_WORDS).notFor)
     }

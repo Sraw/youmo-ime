@@ -492,6 +492,33 @@ setting either: it reads the codes.
   is, listed and forgotten by its old name (`ShuangpinNames` names all eight).
 - No tap position on G18 yet; `Keyboard.TAPS` leaves indices 26–51 for it (design k14-tap §1.4).
 
+### 注音 on the nine keys and on 大千
+
+拼音's 键盘 setting also offers 注音九键 and 注音全键盘 (大千, keys named by their QWERTY place); the engine reads the codes.
+
+- **Codes.** `Keyboard.ZHUYIN_NINE` (0xF0450+: 11 groups, 分词, the tone key and its five tones, the 37
+  symbols) and `Keyboard.ZHUYIN_FULL` (0xF0490+: 37 symbols, 5 tones), routed by `KeyboardPair` to the
+  sessions `InputMethodCatalog.ZHUYIN_NINE` / `ZHUYIN`. `Keyboard.keyedChar` turns them into the input's
+  BMP characters (`ZhuyinKeys.BLOCK`, U+F880–F8B5, freed by `Action.Syllable.IDS` going from 99 to 98).
+- **Segmenter.** `T9Segmenter` over `ZhuyinKeys.NINE` / `DACHEN` with a `KeySpelling.Bopomofo`: each
+  syllable spelt by `Zhuyin.of`, a symbol a fixed key, an initial its zhuyin initial. A tone is a separator
+  (`SyllableGraph.isSeparator`); `SyllableGraph.tone(edge)` reads it after the edge. On 大千 a space after a
+  syllable with no tone is tone 1 (`KeyedSegmenter.tonesBySpace`), else it picks the first candidate.
+- **Keys and bar.** 注音九键 has the tones ˉ ˊ ˇ ˋ a key each down the left (˙ on ˉ's long press and
+  swipe); the key after ㄖㄥㄩ's group is 分词 (tone 0) while something is typed, else a comma as punctuation
+  maps it. A tone with nothing typed is not read (`PinyinSession.reads`): it types nothing. The bar's
+  syllables are shown in zhuyin (`KeyedSegmenter.shownOffered`; an initial as its symbol, r as ㄖ), and one
+  taken off it as well (`T9Segmenter.asTyped`), though its pinyin is what goes into the input. An initial
+  taken goes in as its symbol typed as itself (`KeyedSegmenter.keyOf`), no separator: a final typed next
+  goes on from it, and alone it reads its whole syllable (ㄓ is zhi). So a whole syllable shown as an
+  initial is (zhi, chi, shi, ri, zi, ci, si) is left off the bar for the initial (`NineKeys.offer`).
+- **Tones.** Optional. `PinyinDecoder`'s `toneAllows` (`PinyinData.tones.allows`) adds `Penalties.tone`
+  (−4) for each word whose character cannot take the tone typed: soft, a word is never dropped.
+- **Learning.** Kinds `zy:nine`, `zy:dachen` (`Kinds.isZhuyin`), grouped, no spellings linked (U-20 is
+  pinyin's). Custom phrases match each symbol's pinyin fragments (`ZhuyinKeys.PINYIN_WAYS`).
+- **Top-1** (decoder alone, pinyin.tsv / pinyin-chat.tsv, `ime-eval zhuyin`): 全拼 93.9 / 70.0%, 注音全键盘
+  93.2 / 69.4%, with tones 93.9 / 69.8%; 九键拼音 87.6 / 51.5%, 注音九键 86.0 / 48.7%, with tones 89.0 / 53.0%.
+
 ## Tables
 
 `TableSession` ranks entries whose code starts with the input as libime does (codes up to

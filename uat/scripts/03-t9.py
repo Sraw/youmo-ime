@@ -1,6 +1,8 @@
 """uat/03-t9.md (B0-九键). The .md is the source of truth; each function follows its case's
 前提/操作/预期."""
 
+import time
+
 from uat import case, check, first
 
 
@@ -137,3 +139,64 @@ case("T9-58", needs="jvm:T9UatTest.theGlobeGoesToEnglishOnItsOwnKeyboard")(lambd
 
 
 case("T9-59", needs="jvm:NineKeysUatTest.zeroWhileTypingCommitsTheFirstThenZero")(lambda d: None)
+
+
+def zhuyin_hold(d, xy):
+    """a long press on xy: the popup's texts while the finger is down, then lifted where it went down"""
+    d.touch(("down", *xy), ("sleep", 0.9))
+    texts = d.screen().texts(where="all")
+    d.touch(("up", *xy))
+    time.sleep(0.5)
+    return texts
+
+
+@case("T9-60", base="B0-注音九键", mutates="learn")
+def t960(d):
+    k = d.keys(refresh=True)
+    s = d.screen()
+    kb = d.need_keyboard()
+    tones = sorted((n for n in kb.walk() if n.clickable and n.texts() and n.texts()[0] in "ˉˊˇˋ"), key=lambda n: n.c[1])
+    check([n.texts()[0] for n in tones] == list("ˉˊˇˋ"), f"左列 {[n.texts() for n in tones]}")
+    slot = k.get("，")
+    check(slot is not None and "~" in k, f"键 {sorted(k)[:40]}")
+    # a tone with nothing typed types nothing
+    d.tap(k["ˉ"], after=0.6)
+    check(d.preedit() == "" and d.field_text() == "", f"没打字时点 ˉ：码行「{d.preedit()}」，框里「{d.field_text()}」")
+    d.taps([k[x] for x in ("ㄇㄋㄜ", "ㄔㄘㄣㄧ", "ˇ", "ㄏㄒㄠㄡ", "ㄏㄒㄠㄡ", "ˇ")], gap=0.35, after=0.6)
+    c = d.cands()
+    s = d.screen()
+    code, strip = d.preedit(s), d.syllables(s)
+    faces = [n.texts()[0] for n in d.need_keyboard().walk() if n.clickable and n.texts()]
+    check(code == "ㄋㄧˇ ㄏㄠˇ", f"码行「{code}」")
+    check(first(c) == "你好", f"候选 {c[:4]}")
+    check("分词" in faces and "~" in faces, f"打字时的键 {faces}")
+    check(strip[:1] == ["ㄋㄧ"] and "ㄇㄧ" in strip and not any(ch.isascii() and ch.isalpha() for x in strip for ch in x), f"音节条 {strip}")
+    d.syllable_tap("ㄇㄧ", s)
+    taken = d.preedit()
+    check(taken.startswith("ㄇㄧ"), f"点 ㄇㄧ 后码行「{taken}」")
+    d.bksp(8)
+    d.taps([k[x] for x in ("ㄇㄋㄜ", "ㄔㄘㄣㄧ")] + [slot] + [k["ㄏㄒㄠㄡ"]] * 2, gap=0.35, after=0.6)
+    c2 = d.cands()
+    code2 = d.preedit()
+    check(code2 == "ㄋㄧ'ㄏㄠ" and first(c2) == "你好", f"不打声调：码行「{code2}」，候选 {c2[:4]}")
+    d.tap(k[","], after=0.6)
+    got = d.expect_field("你好，")
+    faces = [n.texts()[0] for n in d.need_keyboard().walk() if n.clickable and n.texts()]
+    check("分词" not in faces, f"上屏后的键 {faces}")
+    group = zhuyin_hold(d, k["ㄇㄋㄜ"])
+    check(all(x in group for x in "ㄇㄋㄜ"), f"长按 ㄇㄋㄜ：{group}")
+    d.bksp(2)
+    tone = zhuyin_hold(d, k["ˉ"])
+    check("˙" in tone, f"长按 ˉ：{tone}")
+    # ㄓ is zhi and zh's initial alike: once on the bar, taken as the initial a final goes on from
+    d.tap(k["ㄓㄗㄢㄦ"], after=0.6)
+    s = d.screen()
+    zh = d.syllables(s)
+    check(zh.count("ㄓ") == 1, f"音节条 {zh}")
+    d.syllable_tap("ㄓ", s)
+    d.taps([k["ㄕㄙㄤㄨ"], k["ㄖㄥㄩ"]], gap=0.35, after=0.6)
+    c3 = d.cands()
+    code3 = d.preedit()
+    check(code3 == "ㄓㄨㄥ" and first(c3) == "中", f"点 ㄓ 再打 ㄨㄥ：码行「{code3}」，候选 {c3[:4]}")
+    d.bksp(4)
+    return f"码行 {code}，音节条 {strip[:4]}，点 ㄇㄧ 后 {taken}；不打声调 {code2}，框里「{got}」；ㄓ 条 {zh[:6]}，{code3}"

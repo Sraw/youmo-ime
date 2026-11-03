@@ -545,6 +545,14 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     private fun tradSimpEntry() = statusEntries.firstOrNull { it.name == PanelActions.TRAD_SIMP }
 
+    /** 切简繁 as the bar's button does it: a key's shortcut (KeyShortcutRunner). */
+    fun tradSimp() {
+        tradSimpEntry()?.let(panelActions::activate)
+    }
+
+    /** The keyboard picker over the bar: a key's shortcut (KeyShortcutRunner). */
+    fun chooseKeyboard() = panelActions.chooseKeyboard(view)
+
     // the preference as last parsed, with what it read: arranged on every start and input method
     private var parsed: Pair<String, ToolbarConfig>? = null
 

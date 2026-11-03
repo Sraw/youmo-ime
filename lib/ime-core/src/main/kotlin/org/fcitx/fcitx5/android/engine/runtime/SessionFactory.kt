@@ -9,6 +9,8 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog.HANDWRITING
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN_KEYS
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN_KEYS18
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog.ZHUYIN
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog.ZHUYIN_NINE
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.SHUANGPIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.SHUANGPIN_KEYS14
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.SHUANGPIN_KEYS18
@@ -44,6 +46,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
+import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.pinyin.UserLatinWords
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
@@ -150,6 +153,10 @@ internal class SessionFactory(
             // the 18 keys: 双拼's groups (I1 Q4: G18 first, measured; another grouping if it falls short), ; no
             // letter of pinyin's; as the 14 keys otherwise, learned under qk:<G18's tag>
             PINYIN_KEYS18 -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = NineKeyLetters.G18), spell = true))
+            // pinyin in zhuyin (design 051 §3.3): the nine keys' way with symbols for letters, a tone a separator
+            // the decoder weighs; learned under zy:nine and zy:dachen, apart from pinyin's keyboards
+            ZHUYIN_NINE -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = ZhuyinKeys.NINE, toneAllows = assets.pinyinData.tones::allows), spell = true, kind = Kinds.ZHUYIN_NINE))
+            ZHUYIN -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = ZhuyinKeys.DACHEN, toneAllows = assets.pinyinData.tones::allows), spell = true, kind = Kinds.ZHUYIN_DACHEN))
             ENGLISH -> {
                 val data = englishData()
                 EnglishSession(

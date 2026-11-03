@@ -59,6 +59,14 @@ class KeyGestureRecognizer {
     var swipeRepeatEnabled: Boolean = false
     var doubleTapEnabled: Boolean = false
 
+    /**
+     * One axis a touch: the first move past the slop picks X or Y by which it went further, and
+     * the other counts no steps for the rest of the touch. For a key swiped both ways (the space
+     * moves the cursor sideways and has a shortcut up), so a cursor moved and then lifted a little
+     * is no swipe up, nor a swipe up drifting sideways a cursor move.
+     */
+    var axisLock: Boolean = false
+
     var swipeThresholdX: Float = 24f
     var swipeThresholdY: Float = 24f
 
@@ -77,13 +85,14 @@ class KeyGestureRecognizer {
         val swipe: Boolean,
         val swipeRepeat: Boolean,
         val doubleTap: Boolean,
+        val axisLock: Boolean,
         val swipeThresholdX: Float,
         val swipeThresholdY: Float,
         val doubleTapTimeoutMs: Long,
     )
 
     private fun live() = Settings(
-        longPressEnabled, repeatEnabled, swipeEnabled, swipeRepeatEnabled, doubleTapEnabled,
+        longPressEnabled, repeatEnabled, swipeEnabled, swipeRepeatEnabled, doubleTapEnabled, axisLock,
         swipeThresholdX, swipeThresholdY, doubleTapTimeoutMs,
     )
 
@@ -136,11 +145,20 @@ class KeyGestureRecognizer {
 
     val swipeTotalY: Int get() = swipeY.total
 
+    /** Whether this touch's vertical swipe reached a step at some point, though it may be back at 0: swiped and taken back. */
+    var swipedY: Boolean = false
+        private set
+
+    private enum class Axis { Undecided, X, Y }
+
+    private var lockedAxis = Axis.Undecided
+
     private var maybeDoubleTap = false
 
     // where the touch went down and where it is now, for a drag past the slop on a key whose
     // swipe repeats
     private var downX = 0f
+    private var downY = 0f
     private var lastX = 0f
     private var lastClickTime = 0L
 
@@ -154,6 +172,7 @@ class KeyGestureRecognizer {
     fun onDown(x: Float, y: Float) {
         frozen = live()
         downX = x
+        downY = y
         lastX = x
         if (settings.swipe) {
             swipeX.last = x
@@ -218,17 +237,16 @@ class KeyGestureRecognizer {
             )
         }
 
-        // both axes read the *previous* anchor, so consume before moving it
-        val countX = swipeX.consume(x, settings.swipeThresholdX)
-        val countY = swipeY.consume(y, settings.swipeThresholdY)
+        // both axes read the *previous* anchor, so consume before moving it; while the axis is
+        // to be picked, neither moves: the axis picked counts from where the touch went down
+        val held = axisPending(x, y)
+        val countX = stepsX(x, held)
+        val countY = stepsY(y, held)
         if (countX != 0 || countY != 0) {
             if (settings.swipeRepeat) swipeRepeatTriggered = true
             if (settings.longPress && !longPressTriggered) cancelLongPress = true
             if (settings.repeat && !repeatStarted) cancelRepeat = true
         }
-        swipeX.last = x
-        swipeY.last = y
-
         return MoveOutcome(
             movedOutsideNow = movedOutsideNow,
             countX = countX,
@@ -238,6 +256,33 @@ class KeyGestureRecognizer {
             cancelRepeat = cancelRepeat,
             releasePressedState = releasePressed,
         )
+    }
+
+    // [axisLock]: whether the axis is still to be picked, the finger within the slop of where it went
+    // down; picked, once past it, by which way it went further
+    private fun axisPending(x: Float, y: Float): Boolean {
+        if (!settings.axisLock || lockedAxis != Axis.Undecided) return false
+        val dx = abs(x - downX)
+        val dy = abs(y - downY)
+        if (maxOf(dx, dy) <= touchSlop) return true
+        lockedAxis = if (dx >= dy) Axis.X else Axis.Y
+        return false
+    }
+
+    // a move's steps sideways, and its anchor moved on; none [held] or locked to the other axis
+    private fun stepsX(x: Float, held: Boolean): Int {
+        if (held) return 0
+        val steps = if (lockedAxis == Axis.Y) 0 else swipeX.consume(x, settings.swipeThresholdX)
+        swipeX.last = x
+        return steps
+    }
+
+    private fun stepsY(y: Float, held: Boolean): Int {
+        if (held) return 0
+        val steps = if (lockedAxis == Axis.X) 0 else swipeY.consume(y, settings.swipeThresholdY)
+        swipeY.last = y
+        if (swipeY.total != 0) swipedY = true
+        return steps
     }
 
     /**
@@ -274,6 +319,8 @@ class KeyGestureRecognizer {
         val settings = settings
         frozen = null
         touchMovedOutside = false
+        swipedY = false
+        lockedAxis = Axis.Undecided
         if (settings.swipe) {
             if (settings.swipeRepeat) swipeRepeatTriggered = false
             swipeX.reset()

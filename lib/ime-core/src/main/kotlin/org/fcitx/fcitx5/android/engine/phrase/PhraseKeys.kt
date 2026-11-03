@@ -62,13 +62,25 @@ class PhraseKeys private constructor(
          * [typed] on keys of [letters], as a phrase's key may be; null where it can be none (a
          * character no key types, nothing but separators). [taken] spells a syllable taken off the
          * bar, the lower-case letters before a separator, in a key's letters: each way it may be.
+         * [ways], where not null, are the letters a character of [typed] may be in a key, before
+         * anything else: a zhuyin key's in pinyin (ㄧ i, y or yi), an empty list skipped (a tone).
          */
-        fun of(typed: CharSequence, letters: NineKeyLetters, taken: (String) -> List<String> = { listOf(it) }): PhraseKeys? {
+        fun of(
+            typed: CharSequence,
+            letters: NineKeyLetters,
+            ways: (Char) -> List<String>? = { null },
+            taken: (String) -> List<String> = { listOf(it) },
+        ): PhraseKeys? {
             val slots = ArrayList<List<String>>(typed.length)
             var i = 0
             while (i < typed.length) {
                 val c = typed[i]
+                val spelt = ways(c)
                 when {
+                    spelt != null -> {
+                        if (spelt.isNotEmpty()) slots += spelt
+                        i++
+                    }
                     c == SyllableGraph.SEPARATOR -> i++
                     letters.isCode(c) -> {
                         val on = letters.letters(c)

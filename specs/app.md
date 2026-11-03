@@ -125,9 +125,34 @@ an appearance (text, image, width, variant) and behaviours (`Press`, `LongPress`
 `SpaceLongPressAction` …). `CommonKeyActionListener` performs them. A key's long-press
 characters come from `PopupPreset` (built in) overridden by the user's `PopupOverrides`; the first
 of them is also what swiping the key types and the small label in its corner: one concept, one
-setting. Which way a vertical swipe types it is `SymbolSwipe` (ime-core): the chosen way the corner
-character, the other way the letter as a tap, swiping off nothing (a slide off the key takes the
-press back). A long press's keys (`PopupKeyboardUi`, `PopupMenuUi`) are one small size whatever the
+setting. A vertical swipe reaches one of two layers, the corner symbol or the key's shortcut
+(`KeyDef.shortcut` names it, `KeyShortcuts` in ime-core holds the user's over `KeyShortcutPreset`'s,
+stored in `key_shortcuts`); the 滑动 setting (`SwipeLayers`, seven choices) says which way reaches
+which. `KeySwipe` (ime-core) decides the lift: a layer with nothing, or a way off, is a tap; swiped
+past and back, a cancel; both ways off, a slide off the key takes the press back. Function keys
+(space, backspace …) reach their own up and down shortcuts, a way off leaving them as they were;
+space and backspace lock a touch to one axis (`KeyGestureRecognizer.axisLock`). `KeySwipes` (app)
+wires it on the typing keyboards (`shortcuts = true`), buzzes at the threshold, opens the edit menu
+(`EditMenuLayout`, `PopupMenuUi.Fixed`) there; `KeyShortcutRunner` runs a shortcut after what is
+typed is in, the field's edits as `EditPlan` steps. 清除 (`EditPlan.clear`: what is typed, else the
+selection, else all before the cursor, else all after) is kept in memory (`ClearedText`, under the EditorInfo input started with, by identity, forgotten as
+input starts in another field or finishes; at most 16), 恢复 putting clears back last first while the
+field reads as each left it and nothing is typed (pinyin never reaching the field, a clear of what is
+typed drops those before it); what was typed is dropped and typed
+again by `HostCore.clearTyped`/`retype` (the router's log of the keys since nothing was typed: plain
+keys alone, a pick, a key's pick (a digit, space: `Snapshot.picked`) or a candidate's action ending it,
+as sent again by its index it could land on another word), on the keyboard it was typed with alone
+(`HostCore.Retyping.keyboard`, the app's `KeyShortcutRunner.keyboardOf`: `ImKeyboards.typedWith`, the
+layout shown and 双拼's scheme; another's keys' codes go to a session of their own). A selection the
+editor's report lags is cleared, not kept. A field kept from learning (`PasswordOrSensitive`) is cleared with nothing kept;
+an app's own `restartInput` is another input, its clears forgotten. The
+marks on a key are placed by `KeyMarks`, on the keyboard and on 按键字符和快捷键's keys (`KeyCaps`) alike;
+五笔's 全部字根 leaves the letters' shortcuts unmarked (`BaseKeyboard.charShortcutMarks`), shown as 键名 at 紧凑 though (`TableKeyboard.atHeight`, the setting kept); at 键盘高度 紧凑 (`KeyboardHeightLevels.isCompact`, read as the keys
+are made by `keyboardCompact()`) one mark a key, top right (a key's symbol over its shortcut, a function
+key's up one), and the keys' text 0.9 (`KeyTextScale`, the smaller of it and floating's; 大千's symbols 0.9 again, `KeyTextScale.dachen`, cut off on a 360 dp phone otherwise). The service
+makes the keys anew only when a height change crosses into or out of 紧凑 (`compactBuilt`, as
+`floatingBuilt`); the theme page's preview does the same in `recalculateSize`. A key's label and what its top right corner draws (an icon, a text shortcut, a letter's symbol) keep apart only where their ink meets (`KeyMarkYield`, by `AutoScaleTextView.inkBounds`). A `TextKeyView` (大千's narrow keys; `yieldToMark`): the label moves left or down, whichever is less; neither alone: one way as far as the face has room, then a text mark a quarter smaller and the label a fifth at most, the way that shrinks less. An `AltTextKeyView` (letters; `KeyMarkYield.letters`, run by `BaseKeyboard.onLayout` over all its letter keys once they are laid out): the letter stays, the corner's symbol moves into the corner (right or up, then both), then smaller to 6 dp; what still meets, every letter of the keyboard the same smaller about its baseline, a quarter at most (floating at 紧凑 with Shift: 0.86). The icon 8 dp at 紧凑. 注音 keyboards name their keys `zyfull/<QWERTY letter>` and
+`zy9/1`…`zy9/11`, the groups by their place (`ZhuyinShortcutHook`; the tones and 注音九键's slot none, as 九键's 1). A long press's keys (`PopupKeyboardUi`, `PopupMenuUi`) are one small size whatever the
 key (`PopupComponent.LONG_PRESS_KEY_*`; as wide as the key pressed, 九键's 7 filled the screen),
 floating above it, the bubble gone; the finger picks by how far it moved since they opened, not
 where it is (`PopupFocus` in ime-core: 0.6 of a key a step, held past a row's ends, an empty slot's
@@ -474,7 +499,11 @@ Rules for settings, all decided:
 - **One concept, one setting.** Do not split what the user sees as one thing into two knobs (the
   long-press character is the swipe character is the corner label).
 - **Levels over numbers.** Sizes, delays, vibration and volume are shown as a few named levels
-  (`levels(...)`, e.g. 矮/标准/高/很高) over the int preferences, which are `hidden(setByLevels = true)`.
+  (`levels(...)`, e.g. 紧凑/矮/标准/高/很高) over the int preferences, which are `hidden(setByLevels = true)`.
+  The level shown is the nearest to what the preferences hold, each key's distance over its levels'
+  span (`LevelPick` in ime-core); the level itself is not stored, so adding one can show an old odd
+  value as a neighbouring level, its numbers unchanged. 键盘高度's levels are `KeyboardHeightLevels`'
+  (ime-core), as the keyboard reads 紧凑 by the same numbers.
 - **`hidden { }`** marks a preference with no UI: it is reset to its default once on upgrade and after
   a restore (`resetHiddenSettings`), so an old value set where the UI used to be cannot linger.
 - **Searchable.** `SettingsIndex` builds the search from the same declarations (managed categories

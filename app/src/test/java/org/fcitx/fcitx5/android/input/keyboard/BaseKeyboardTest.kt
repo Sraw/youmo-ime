@@ -13,11 +13,18 @@ import androidx.core.view.isVisible
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.setViewTreeLifecycleOwner
+import java.util.concurrent.TimeUnit
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.InputMethodSubMode
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard.SwipeChoice
+import org.fcitx.fcitx5.android.input.popup.PopupAction
+import org.fcitx.fcitx5.android.input.popup.PopupActionListener
+import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -29,7 +36,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
-import java.util.concurrent.TimeUnit
 
 /**
  * Under the vivo keypress workaround the keyboard hands each key a one-finger event of its own
@@ -38,7 +44,7 @@ import java.util.concurrent.TimeUnit
  * hold through the space's long press ([KeyAction.SpaceLongPressAction]). A finger on a disabled
  * key gives no key the touch, but keeps it the keyboard's, or a second finger reached no key.
  *
- * What a letter's swipe types ([SwipeChoice], [symbolSwipe]): the key's own, the first of the long
+ * What a letter's swipe types ([SwipeChoice], [KeySwipe]): the key's own, the first of the long
  * press, or nothing where the user turned that long press off; the preview shows the same.
  *
  * A keyboard is built under the app, whose preferences the keys read; the keys' descriptions are
@@ -192,18 +198,6 @@ class BaseKeyboardTest {
         assertEquals("é", SwipeChoice.of("é").preview("1"))
     }
 
-    @Test
-    fun onlyAnUpNoOneTookNorTheSystemCancelledIsASwipe() {
-        fun up(consumed: Boolean = false, cancelled: Boolean = false) = CustomGestureView.Event(
-            CustomGestureView.GestureType.Up, consumed, 0f, 0f, 0, 0, 0, 50, cancelled
-        )
-        assertEquals(SymbolSwipe.Outcome.Symbol, up().symbolSwipe(SwipeSymbolDirection.Down))
-        assertEquals("taken by the long press", SymbolSwipe.Outcome.None, up(consumed = true).symbolSwipe(SwipeSymbolDirection.Down))
-        assertEquals("cancelled", SymbolSwipe.Outcome.None, up(cancelled = true).symbolSwipe(SwipeSymbolDirection.Down))
-        assertEquals("the other way", SymbolSwipe.Outcome.Tap, up().symbolSwipe(SwipeSymbolDirection.Up))
-        assertEquals("swipes off", SymbolSwipe.Outcome.None, up().symbolSwipe(SwipeSymbolDirection.Disabled))
-    }
-
     // PY-41: the text build's space long press does nothing, yet took the touch from a slow drag
     @Test
     fun aSpaceLongPressThatDoesNothingLeavesTheSwipeBe() {
@@ -278,13 +272,80 @@ class BaseKeyboardTest {
         key.dispatchTouchEvent(touch(MotionEvent.ACTION_UP, listOf(0), listOf(x to y + dy)))
     }
 
+    // 滑动 at its default (shortcuts up, symbols down): a's select all up, its symbol down, s with nothing up a tap
+    @Test
+    @Config(application = FcitxApplication::class)
+    fun aLettersSwipeUpIsItsShortcutAndDownItsSymbol() {
+        val actions = mutableListOf<KeyAction>()
+        val keyboard = keyboard(actions).apply {
+            measure(exactly(1080), exactly(800))
+            layout(0, 0, 1080, 800)
+        }
+        drag(letter(keyboard, "A"), -45f)
+        assertEquals(listOf(KeyAction.ShortcutAction(KeyShortcut.Command(KeyCommand.SelectAll))), actions.filterIsInstance<KeyAction.ShortcutAction>())
+        actions.clear()
+        drag(letter(keyboard, "S"), -45f)
+        assertEquals("nothing up there: a tap", listOf("s"), actions.filterIsInstance<KeyAction.HostKeyAction>().map { it.act })
+        actions.clear()
+        drag(letter(keyboard, "A"), 45f)
+        assertTrue("its symbol, no shortcut: $actions", actions.isNotEmpty() && actions.none { it is KeyAction.ShortcutAction })
+        actions.clear()
+        keyboard.inPasswordField = true
+        drag(letter(keyboard, "C"), -45f)
+        assertEquals("no copy of a password, nor a c", emptyList<KeyAction>(), actions.filter { it is KeyAction.ShortcutAction || it is KeyAction.HostKeyAction })
+    }
+
+    // the space swiped up opens the edit menu over it; the backspace swiped up clears, down restores
+    @Test
+    @Config(application = FcitxApplication::class)
+    fun theSpaceUpIsTheEditMenuAndTheBackspaceUpAndDownClearAndRestore() {
+        val actions = mutableListOf<KeyAction>()
+        val popups = mutableListOf<PopupAction>()
+        val keyboard = keyboard(actions).apply {
+            popupActionListener = PopupActionListener { popups += it }
+            measure(exactly(1080), exactly(800))
+            layout(0, 0, 1080, 800)
+        }
+        val space = keyboard.allViews.filterIsInstance<KeyView>().first { it.def.viewId == R.id.button_space }
+        drag(space, -45f)
+        assertTrue(popups.toString(), popups.any { it is PopupAction.ShowEditMenuAction })
+        val backspace = keyboard.allViews.filterIsInstance<KeyView>().first { it.def.viewId == R.id.button_backspace }
+        actions.clear()
+        drag(backspace, -45f)
+        drag(backspace, 45f)
+        assertEquals(
+            listOf(KeyCommand.Clear, KeyCommand.Restore),
+            actions.filterIsInstance<KeyAction.ShortcutAction>().map { (it.shortcut as KeyShortcut.Command).command },
+        )
+    }
+
+    // a text shortcut set for a key is committed as its shortcut; the swipe off takes it all the same
+    @Test
+    @Config(application = FcitxApplication::class)
+    fun aKeysOwnTextShortcutIsWhatItsSwipeRuns() {
+        val stored = AppPrefs.getInstance().internal.keyShortcuts
+        val was = stored.getValue()
+        stored.setValue(KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好")).serialize())
+        try {
+            val actions = mutableListOf<KeyAction>()
+            val keyboard = keyboard(actions).apply {
+                measure(exactly(1080), exactly(800))
+                layout(0, 0, 1080, 800)
+            }
+            drag(letter(keyboard, "Q"), -400f)
+            assertEquals(listOf(KeyAction.ShortcutAction(KeyShortcut.Text("你好"))), actions.filterIsInstance<KeyAction.ShortcutAction>())
+        } finally {
+            stored.setValue(was)
+        }
+    }
+
     // ST-15: a swipe the other way (up, the symbol being down) types the letter once, on the key or off it
     @Test
     @Config(application = FcitxApplication::class)
     fun aSwipeTheOtherWayTypesTheLetterOnce() {
-        val direction = AppPrefs.getInstance().keyboard.swipeSymbolDirection
+        val direction = AppPrefs.getInstance().keyboard.swipeLayers
         val was = direction.getValue()
-        direction.setValue(SwipeSymbolDirection.Down)
+        direction.setValue(SwipeLayersChoice.SymbolDownOnly)
         try {
             for ((what, dy) in listOf("on the key" to -45f, "off the key" to -400f)) {
                 val actions = mutableListOf<KeyAction>()
@@ -304,9 +365,9 @@ class BaseKeyboardTest {
     @Test
     @Config(application = FcitxApplication::class)
     fun withSwipingOffSlidingOffAKeyTypesNothing() {
-        val direction = AppPrefs.getInstance().keyboard.swipeSymbolDirection
+        val direction = AppPrefs.getInstance().keyboard.swipeLayers
         val was = direction.getValue()
-        direction.setValue(SwipeSymbolDirection.Disabled)
+        direction.setValue(SwipeLayersChoice.Off)
         try {
             val actions = mutableListOf<KeyAction>()
             val keyboard = keyboard(actions).apply {

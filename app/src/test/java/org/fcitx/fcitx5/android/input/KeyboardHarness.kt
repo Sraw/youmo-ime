@@ -205,6 +205,14 @@ class KeyboardHarness(
         relayout()
     }
 
+    /** The screen turned: input restarted in the same field with the same EditorInfo (resetStateForNewConfiguration). */
+    fun turn() {
+        doStartInput(connection, info, restarting = true)
+        service.onStartInputView(info, true)
+        idle()
+        relayout()
+    }
+
     // InputMethodService's own entry (hidden): sets the connection the service commits through, then onStartInput
     private fun doStartInput(ic: InputConnection, info: EditorInfo, restarting: Boolean) {
         InputMethodService::class.java

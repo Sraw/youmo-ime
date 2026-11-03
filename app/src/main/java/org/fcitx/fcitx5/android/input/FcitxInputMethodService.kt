@@ -102,7 +102,9 @@ import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import org.fcitx.fcitx5.android.input.hardware.TakenKey
 import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
 import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
+import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
 import org.fcitx.fcitx5.android.input.learning.UndoChip
+import org.fcitx.fcitx5.android.input.shortcut.ClearedText
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.fcitx.fcitx5.android.utils.Locales
 import org.fcitx.fcitx5.android.utils.alpha
@@ -226,6 +228,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     /** nothing said out loud goes into a password, its characters shown or not */
     val inPasswordField get() = fieldPolicy.password
 
+    /** A password or a field asking for no learning (`IME_FLAG_NO_PERSONALIZED_LEARNING`): nothing of it kept. */
+    val inSensitiveField get() = capabilityFlags.hasAny(CapabilityFlag.PasswordOrSensitive)
+
     /**
      * A URL's or an email's field, where what is typed is what is meant ([PendingInputPolicy]). Read
      * on the main thread as a key is pressed: by the time fcitx gets to it, another field may have started.
@@ -251,6 +256,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     // Set on the main thread, read on fcitx's too (commitOverEngine)
     @Volatile
     private var startedWith: EditorInfo? = null
+
+    /** The input started last, null between fields: the token a clear is kept under ([ClearedText]). */
+    val startedField: EditorInfo? get() = startedWith
+
+    /** 清除's clears, to put back (恢复) in the input they were made in alone (review M1). */
+    val clearedText = ClearedText()
 
     // the field the floating window's cursor and drag are of, last typed on with the hardware keyboard
     private var cursorField: EditorInfo? = null
@@ -294,7 +305,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         prefs.advanced.disableAnimation,
     )
 
+    private val keyboardHeightPrefs = listOf(prefs.keyboard.keyboardHeightPercent, prefs.keyboard.keyboardHeightPercentLandscape)
+
     private fun replaceInputView(theme: Theme, start: Boolean = false): InputView {
+        compactBuilt = keyboardCompact()
         val newInputView = InputView(this, fcitx, theme)
         setInputView(newInputView)
         inputDeviceMgr.setInputView(newInputView)
@@ -364,6 +378,19 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         replaceInputView(ThemeManager.activeTheme, start = true)
     }
 
+    // 紧凑 as the views were last made: its keys' text and marks are set as they are made (keyboardCompact)
+    private var compactBuilt = keyboardCompact()
+
+    // 键盘高度 into or out of 紧凑 makes the keys anew; another level only resizes them (InputView).
+    // A level sets both of its numbers in one edit, so each call sees both
+    @Keep
+    private val keyboardHeightListener = ManagedPreference.OnChangeListener<Int> { _, _ ->
+        val compact = keyboardCompact()
+        if (compact == compactBuilt) return@OnChangeListener
+        rebuilding(ViewRebuild.SETTING)
+        replaceInputView(ThemeManager.activeTheme, start = true)
+    }
+
     @Keep
     private val recreateCandidatesViewListener = ManagedPreferenceProvider.OnChangeListener {
         rebuilding(ViewRebuild.SETTING)
@@ -418,6 +445,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             it.registerOnChangeListener(recreateInputViewListener)
         }
         prefs.candidates.registerOnChangeListener(recreateCandidatesViewListener)
+        keyboardHeightPrefs.forEach { it.registerOnChangeListener(keyboardHeightListener) }
         ThemeManager.addOnChangedListener(onThemeChangeListener)
         // a fcitx not ready yet syncs them itself once it is, in the app's language as here
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -1104,6 +1132,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // restarted, the same field: what it had of the floating window stays its
         if (restarting && cursorField === startedWith) cursorField = attribute
         startedWith = attribute
+        // another field's clears are never put back here, nor kept once it is left; the screen turned is the same input
+        if (!again) clearedText.forget()
         // what commitOverEngine put in last, a paste into a password maybe, is not kept: the reset above
         // keeps it from being taken back anyway
         lastPosted.forget()
@@ -1470,6 +1500,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         capabilityFlags = CapabilityFlags.DefaultFlags
         startedWith = null
+        clearedText.forget()
         // not the finished field's EditorInfo kept; the same field's touch keyboard put away finishes no input (F1793)
         cursorField = null
         lastPosted.forget()
@@ -1495,6 +1526,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             it.unregisterOnChangeListener(recreateInputViewListener)
         }
         prefs.candidates.unregisterOnChangeListener(recreateCandidatesViewListener)
+        keyboardHeightPrefs.forEach { it.unregisterOnChangeListener(keyboardHeightListener) }
         ThemeManager.removeOnChangedListener(onThemeChangeListener)
         // the last field learned from as the service goes (another keyboard picked, the system stopping it): not at a hide or
         // a bar made anew, the same field maybe to come back to. A process killed outright still loses it

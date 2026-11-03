@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.view.View
+import android.widget.ImageView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -12,6 +13,7 @@ import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.UNICODE
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
@@ -20,11 +22,13 @@ import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.engine.table.TableRoots
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -48,6 +52,16 @@ class TablesKeysUatTest {
     // the keyboard of [im], as the engine tells it after its first answer
     private fun harness(im: String, name: String, state: TableKeyboard?): KeyboardHarness =
         KeyboardHarness(im = entry(im, name)).also { h = it }.start().apply { told(state) }
+
+    // the letter key whose corner shows [letter] (a table's roots on its face)
+    private fun letterKey(h: KeyboardHarness, letter: String) = KeyboardHarness.all(h.inputView).filterIsInstance<AltTextKeyView>()
+        .first { h.shown(it) && it.altText.text.toString() == letter }
+
+    // the command icons drawn on [letter]'s key: its shortcut's mark
+    private fun KeyboardHarness.shortcutIcons(letter: String) = KeyboardHarness.all(letterKey(this, letter)).count { it is ImageView && shown(it) }
+
+    @get:Rule
+    val prefs = PrefsRule()
 
     private fun KeyboardHarness.told(state: TableKeyboard?) {
         EngineState.tableKeyboardState.value = state
@@ -145,15 +159,54 @@ class TablesKeysUatTest {
         h.told(wubi(KeyLabels.NAMES))
         val names = h.texts()
         for (n in listOf("王", "土", "大", "木", "工", "纟", "z")) assertTrue("$n in $names", n in names)
+        assertEquals("a's select all marked beside its name", 1, h.shortcutIcons("a"))
         h.capture("TablesKeysUatTest/wubi_names", h.inputView)
         h.told(wubi(KeyLabels.ROOTS))
         assertTrue(h.texts().toString(), "王龶戋\n五一" in h.texts())
+        // the roots fill the key: no shortcut drawn over them, its swipe up selecting all the same
+        assertEquals(0, h.shortcutIcons("a"))
         h.capture("TablesKeysUatTest/wubi_roots", h.inputView)
+        h.field.setText("你好")
+        val a = letterKey(h, "a")
+        h.swipe(a, 0f, -a.height.toFloat())
+        assertEquals(0 to 2, h.field.selectionStart to h.field.selectionEnd)
         // held: its roots, large, nothing typed
         val before = h.api.calls.size
         val shown = h.longPress(h.key("王龶戋\n五一"))
         assertTrue(shown.toString(), "王 龶 戋 五 一" in shown)
         assertTrue(h.api.calls.drop(before).toString(), h.api.calls.drop(before).none { it.startsWith("sendKey") && "up=false" in it })
+    }
+
+    @Test
+    @Uat("TBL-51")
+    fun wubisAllRootsAreItsNamesAtCompact() {
+        val keyboard = AppPrefs.getInstance().keyboard
+        fun level(portrait: Int, landscape: Int) {
+            prefs.set(keyboard.keyboardHeightPercent, portrait)
+            prefs.set(keyboard.keyboardHeightPercentLandscape, landscape)
+        }
+        val h = harness(InputMethodCatalog.WUBI, "五笔", wubi(KeyLabels.NAMES))
+        level(20, 34)
+        h.idle()
+        h.relayout()
+        val names = h.texts()
+        val namesMarks = h.shortcutIcons("a")
+        h.told(wubi(KeyLabels.ROOTS))
+        // 紧凑: the names, as with 键名 set, its marks too
+        assertEquals(names, h.texts())
+        assertTrue(names.toString(), "王" in names && "王龶戋\n五一" !in names)
+        assertEquals(namesMarks, h.shortcutIcons("a"))
+        h.capture("TablesKeysUatTest/wubi_roots_compact", h.inputView)
+        // held: its symbols, not the roots large
+        val shown = h.longPress(h.key("王"))
+        assertFalse(shown.toString(), "王 龶 戋 五 一" in shown)
+        h.idle()
+        // out of 紧凑, all the roots again: the setting was kept
+        level(38, 60)
+        h.idle()
+        h.relayout()
+        assertTrue(h.texts().toString(), "王龶戋\n五一" in h.texts())
+        assertEquals(0, h.shortcutIcons("a"))
     }
 
     @Test

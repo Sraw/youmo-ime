@@ -518,3 +518,15 @@
 - **操作**：打 zhuozi，看「桌子」上方；清空，打 dongxi，看「东西」上方；清空，打 women，看「我们」上方。把 **候选词注音** 换成「注音」，再打一遍。
 - **预期**：拼音是 zhuō zǐ、dōng xī、wǒ men；注音是 ㄓㄨㄛ ㄗˇ、ㄉㄨㄥ ㄒㄧ、ㄨㄛˇ ˙ㄇㄣ。轻声的字按它的本调标（子 zǐ、西 xī），只有本身只读轻声的字（的 了 吗 呢 们 么）标轻声（用户 2026-11-02 定）。注音键盘上照台湾习惯打 ˙（ㄗ˙、ㄒㄧ˙）不算错，「桌子」「东西」照样排第一，见注音键盘那条线的 PY-109。
 - **JVM**：`PinyinUatTest.aReadingIsInItsCharactersOwnTones`（真数据，拼音和注音两种）、`ToneTableTest.aWordsNeutralToneIsItsCharactersOwn`（ime-core：读音本调，输入时 ˙ 和本调都不罚分）；设备上不跑。
+
+### PY-109 [P1] 注音全键盘（大千）：打声调，空格当一声，回车上屏注音
+- **前提**：B0-注音全键盘。
+- **操作**：看键盘；点 ㄋ ㄧ ˇ ㄏ ㄠ ˇ，看码行和候选，点「你好」；点 ㄇ ㄚ，按空格，看码行和候选，再按空格；点 ㄉ ㄜ ˙，看候选，按空格；点 ㄅ ˇ，按回车。
+- **预期**：大千排列，第一行是 ㄅ ㄉ ˇ ˋ ㄓ ˊ ˙ ㄚ ㄞ ㄢ ㄦ；码行 `ㄋㄧˇ ㄏㄠˇ`，首选「你好」；ㄇㄚ 后按空格码行是 `ㄇㄚˉ`、首选「妈」，再按空格上屏「妈」；ㄉㄜ˙ 首选「的」；回车上屏 `ㄅˇ`。框里最后是「你好妈的ㄅˇ」。
+- **JVM**：`ZhuyinKeyboardTest.dachenHasEachSymbolAndToneWhereTaiwanPrintsIt`、`PinyinSessionZhuyinTest`（`dachenTypesAWordByItsSymbolsShownInZhuyin`、`dachensSpaceIsTheFirstToneThenThePick`、`enterCommitsTheZhuyinShown`）、`PinyinUatTest.aNeutralToneTypedOrNotPutsTheWordFirst`（真数据：ㄓㄨㄛㄗ、ㄉㄨㄥㄒㄧ 打 ˙、打本调、不打声调，「桌子」「东西」都排第一，大千和注音九键都是）；设备上照跑。
+
+### PY-107 [P1] 注音全键盘的快捷键：按键位套用全键盘的
+- **前提**：B0-注音全键盘，滑动是默认（上滑快捷键），测试页输入框里有字。
+- **操作**：看键角；ㄇ 上滑；ㄋ 上滑。
+- **预期**：ㄇ（a 的位置）、ㄏ（c）、ㄌ（x）、ㄒ（v）、ㄈ（z）、ㄗ（y）的右上角画着全选、复制、剪切、粘贴、撤销、重做的图标，别的键没有；ㄇ 上滑全选；ㄋ 没有快捷键，上滑打出 ㄋ。**按键 → 按键字符和快捷键** 的「注音全键盘」页能改。
+- **JVM**：`ZhuyinShortcutsUatTest.dachensKeysTakeTheFullKeyboardsShortcutsByPlace`、`ZhuyinKeyboardTest.theSymbolKeysAreNamedForTheirShortcuts`；设备上照跑。

@@ -53,7 +53,7 @@ class HandwritingKeyboard(
     /** The pad's piece finished (the pen up long enough), told after its readings are delivered. */
     private val finished: (piece: Int) -> Unit = {},
     private val recognition: HandwritingRecognition = HandwritingRecognition.shared,
-) : BaseKeyboard(context, theme, Layout, themeBoard = KeyNames.HANDWRITING) {
+) : BaseKeyboard(context, theme, Layout, themeBoard = KeyNames.HANDWRITING, shortcuts = true) {
 
     companion object {
         const val Name = "Handwriting"

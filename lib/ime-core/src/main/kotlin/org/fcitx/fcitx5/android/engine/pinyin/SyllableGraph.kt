@@ -78,8 +78,21 @@ class SyllableGraph internal constructor(
     /** The typed text from [from] to [to], without the separators it ends with. */
     fun text(from: Int, to: Int): String {
         var until = to
-        while (until > from && input[until - 1] == SEPARATOR) until--
+        while (until > from && isSeparator(input[until - 1])) until--
         return input.substring(from, until)
+    }
+
+    /**
+     * The tone typed after [edge]'s syllable on the zhuyin keyboards ([ZhuyinKeys.toneOf]), 1 to 5
+     * (5 轻声); 0 for none, the separator alone too.
+     */
+    fun tone(edge: Int): Int {
+        var at = edgeTo[edge]
+        while (at > edgeFrom[edge] && isSeparator(input[at - 1])) {
+            ZhuyinKeys.toneOf(input[at - 1]).let { if (it > 0) return it }
+            at--
+        }
+        return 0
     }
 
     override fun toString(): String = (0 until edgeCount).joinToString("\n") { e ->
@@ -88,5 +101,8 @@ class SyllableGraph internal constructor(
 
     companion object {
         const val SEPARATOR = '\''
+
+        /** Whether [c] ends a syllable: [SEPARATOR], or a tone of the zhuyin keyboards, which no other input has. */
+        fun isSeparator(c: Char): Boolean = c == SEPARATOR || ZhuyinKeys.toneOf(c) > 0
     }
 }

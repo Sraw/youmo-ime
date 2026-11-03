@@ -15,6 +15,8 @@ import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard.FULL
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard.KEYS14
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard.KEYS18
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard.NINE_KEYS
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard.ZHUYIN_FULL
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard.ZHUYIN_NINE
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards.Chosen
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards.Layout
 import org.junit.Assert.assertEquals
@@ -30,7 +32,7 @@ class ImKeyboardsTest {
 
     @Test
     fun eachInputMethodOffersItsKeyboardsInOrder() {
-        assertEquals(listOf(FULL, KEYS18, KEYS14, NINE_KEYS), ImKeyboards.choices(PINYIN, ziranma))
+        assertEquals(listOf(FULL, KEYS18, KEYS14, NINE_KEYS, ZHUYIN_NINE, ZHUYIN_FULL), ImKeyboards.choices(PINYIN, ziranma))
         assertEquals(listOf(FULL, KEYS18, KEYS14, NINE_KEYS), ImKeyboards.choices(SHUANGPIN, ziranma))
         assertEquals(listOf(FULL, NINE_KEYS), ImKeyboards.choices(ENGLISH, ziranma))
         assertEquals(emptyList<ImKeyboard>(), ImKeyboards.choices(WUBI, ziranma))
@@ -69,6 +71,8 @@ class ImKeyboardsTest {
             Triple(PINYIN, KEYS18, Layout.PINYIN18),
             Triple(PINYIN, KEYS14, Layout.PINYIN14),
             Triple(PINYIN, NINE_KEYS, Layout.PINYIN_NINE),
+            Triple(PINYIN, ZHUYIN_NINE, Layout.ZHUYIN_NINE),
+            Triple(PINYIN, ZHUYIN_FULL, Layout.ZHUYIN_FULL),
             Triple(SHUANGPIN, FULL, Layout.TEXT),
             Triple(SHUANGPIN, KEYS18, Layout.SHUANGPIN18),
             Triple(SHUANGPIN, KEYS14, Layout.SHUANGPIN14),
@@ -78,6 +82,8 @@ class ImKeyboardsTest {
         assertRows(rows, { "${it.first} ${it.second}" }) { (im, k, layout) ->
             assertEquals(layout, ImKeyboards.layoutOf(im, Chosen(pinyin = k, shuangpin = k), ziranma))
         }
+        // zhuyin is pinyin's alone: 双拼 set so (no build writes it) shows the full keyboard
+        assertEquals(Layout.TEXT, ImKeyboards.layoutOf(SHUANGPIN, Chosen(shuangpin = ZHUYIN_NINE), ziranma))
         // English has no 18 or 14 keys: one set so (no build writes it) shows the full keyboard
         assertEquals(Layout.TEXT, ImKeyboards.layoutOf(ENGLISH, Chosen(english = KEYS14), ziranma))
         // a table has no choice: whatever pinyin's is
@@ -99,5 +105,19 @@ class ImKeyboardsTest {
         assertFalse(ImKeyboards.spellsWords(predictive = true, suggests = true, password = true, address = false, noSuggestions = false))
         assertFalse(ImKeyboards.spellsWords(predictive = true, suggests = true, password = false, address = true, noSuggestions = false))
         assertFalse(ImKeyboards.spellsWords(predictive = true, suggests = true, password = false, address = false, noSuggestions = true))
+    }
+
+    // 清除's 恢复 types again on the same alone: the layout shown, and 双拼's scheme, which reads
+    // the same letters as other syllables (review2)
+    @Test
+    fun whatIsTypedWithIsTheLayoutAndShuangpinsScheme() {
+        val chosen = Chosen(pinyin = NINE_KEYS, shuangpin = KEYS14)
+        val xiaohe = ShuangpinScheme.XIAOHE
+        assertEquals(ImKeyboards.typedWith(PINYIN, chosen, xiaohe), ImKeyboards.typedWith(PINYIN, chosen, ShuangpinScheme.ZIRANMA))
+        assertEquals(Layout.PINYIN_NINE, ImKeyboards.typedWith(PINYIN, chosen, xiaohe).layout)
+        assertTrue(ImKeyboards.typedWith(PINYIN, chosen, xiaohe) != ImKeyboards.typedWith(PINYIN, Chosen(), xiaohe))
+        assertTrue("another scheme", ImKeyboards.typedWith(SHUANGPIN, Chosen(), xiaohe) != ImKeyboards.typedWith(SHUANGPIN, Chosen(), ShuangpinScheme.ZIRANMA))
+        // the 14 keys under 微软 are the 18: the layout shown, not the choice
+        assertEquals(Layout.SHUANGPIN18, ImKeyboards.typedWith(SHUANGPIN, chosen, ShuangpinScheme.MICROSOFT).layout)
     }
 }

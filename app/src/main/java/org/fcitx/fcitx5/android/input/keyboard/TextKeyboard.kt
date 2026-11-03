@@ -31,6 +31,7 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.glide.Glide
+import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
@@ -48,7 +49,7 @@ class TextKeyboard private constructor(
     context: Context,
     theme: Theme,
     split: Split?,
-) : BaseKeyboard(context, theme, split?.keys ?: Layout, split?.widths, KeyNames.QWERTY), AutoCapsKeys {
+) : BaseKeyboard(context, theme, split?.keys ?: Layout, split?.widths, KeyNames.QWERTY, shortcuts = true), AutoCapsKeys {
 
     // the halves: 双拼's ing is L's long press there (LS-29), a table's code key has a key of its own
     private val isSplit = split != null
@@ -126,12 +127,12 @@ class TextKeyboard private constructor(
                 // and 123 open quick phrase and Unicode input, which have no key in this row
                 LayoutSwitchKey("符", PickerWindow.Key.Symbol.name, 0.12f, longPress = KeyAction.QuickPhraseAction),
                 LayoutSwitchKey("123", NumberKeyboard.Name, 0.12f, longPress = KeyAction.UnicodeAction),
-                SymbolKey(",", 0.1f, KeyDef.Appearance.Variant.Alternative, viewId = R.id.button_comma),
+                SymbolKey(",", 0.1f, KeyDef.Appearance.Variant.Alternative, viewId = R.id.button_comma, shortcut = "comma"),
                 // an address field's in place of the comma and the full stop (AddressKeys), hidden else
                 AddressKey("/", R.id.button_slash),
                 AddressKey("@", R.id.button_at),
                 SpaceKey(),
-                SymbolKey(".", 0.1f, KeyDef.Appearance.Variant.Alternative, viewId = R.id.button_period),
+                SymbolKey(".", 0.1f, KeyDef.Appearance.Variant.Alternative, viewId = R.id.button_period, shortcut = "period"),
                 // as it is: through the engine . would be 。
                 AddressKey(".", R.id.button_dot),
                 AddressKey(AddressKeys.DOMAINS.first(), R.id.button_domain, 0.14f, AddressKeys.DOMAINS),
@@ -248,6 +249,10 @@ class TextKeyboard private constructor(
     // for another, or none said yet of the one shown: its letters' roots, its 拼 key, its code keys
     private var table: TableKeyboard? = null
 
+    // a table's every root on the letters leaves no corner free of them: the shortcuts unmarked, swiped all the same
+    override val charShortcutMarks: Boolean
+        get() = table?.let { it.labels == KeyLabels.ROOTS && it.roots != null } != true
+
     // Return as it was last shown: while something is typed, a table shows 确定 in its place
     private var returnAppearance = ReturnKeyAppearance.Enter
 
@@ -284,7 +289,8 @@ class TextKeyboard private constructor(
 
     // [state] of the table shown, or of another input method's (none of this one's then)
     private fun showTable(state: TableKeyboard?) {
-        val shown = state?.takeIf { it.im == imeName }
+        // 全部字根 shown as 键名 at 紧凑, read as the keys are made (made anew into and out of it)
+        val shown = state?.takeIf { it.im == imeName }?.atHeight(keyboardCompact())
         if (shown == table) return
         // another table's roots as well: 五笔's 键名 to 仓颉's, both NAMES, told before the switch shows
         val relabels = shown?.labels != table?.labels || shown?.roots !== table?.roots
@@ -294,6 +300,7 @@ class TextKeyboard private constructor(
             keysLaidOut = false
             updateAlphabetKeys()
             updatePunctuationKeys()
+            showSwipeMarks()
         }
         showSemicolonKey()
     }

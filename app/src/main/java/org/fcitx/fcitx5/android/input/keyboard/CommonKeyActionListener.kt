@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.broadcast.PreeditEmptyStateComponent
 import org.fcitx.fcitx5.android.input.dependency.context
 import org.fcitx.fcitx5.android.input.dependency.fcitx
@@ -33,11 +34,14 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyAction.LangSwitchAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.MoveSelectionAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.PickerSwitchAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.QuickPhraseAction
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction.ShortcutAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.ShowInputMethodPickerAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.SpaceLongPressAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.SymAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.UnicodeAction
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
+import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.utils.switchToNextIME
@@ -57,6 +61,11 @@ class CommonKeyActionListener :
     private val windowManager: InputWindowManager by manager.must()
     private val inputView by manager.inputView()
     private val popup: PopupComponent by manager.must()
+    private val bar: KawaiiBarComponent by manager.must()
+
+    private val shortcutRunner by lazy {
+        KeyShortcutRunner(service, windowManager, bar::tradSimp, bar::chooseKeyboard) { !preeditState.isEmpty }
+    }
 
     private var lastPickerType by AppPrefs.getInstance().internal.lastPickerType
 
@@ -114,6 +123,22 @@ class CommonKeyActionListener :
                 is CommitAction -> service.commitOverEngine(action.text, action.replacing)
                 // the engine sends the key that commits its word, carrying the glide, itself (HostApi.offerGlide)
                 is GlideAction -> service.postFcitxJob { offerGlide(action.glide) }
+                // the field's own commands after what is typed is in, on the main thread where its editor is
+                is ShortcutAction -> when ((action.shortcut as? KeyShortcut.Command)?.command) {
+                    // 清除 drops what is typed, committing nothing; 恢复 leaves it be. The field's then, as
+                    // input may move on to another before the host answers
+                    KeyCommand.Clear -> {
+                        val field = service.startedField
+                        service.postFcitxJob {
+                            val typing = clearTyped(KeyShortcutRunner::keyboardOf)
+                            ContextCompat.getMainExecutor(context).execute { shortcutRunner.clear(typing, field) }
+                        }
+                    }
+                    KeyCommand.Restore -> shortcutRunner.restore()
+                    else -> afterPendingInput {
+                        ContextCompat.getMainExecutor(context).execute { shortcutRunner.run(action.shortcut) }
+                    }
+                }
                 is QuickPhraseAction -> afterPendingInput { triggerQuickPhrase() }
                 is UnicodeAction -> afterPendingInput { triggerUnicode() }
                 is LangSwitchAction -> {

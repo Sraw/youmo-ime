@@ -18,6 +18,12 @@ open class KeyDef(
      * its place (`q`, `2`, `r1c3`) or its role (`backspace`); null for a key a theme does not style by itself.
      */
     val name: String? = null,
+    /**
+     * What the key's swipe shortcuts are stored under ([org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts]):
+     * a character key's `form/key` (`full/a`), a function key's own name (`space`); null for a key
+     * with none, as on the panels' keyboards.
+     */
+    val shortcut: String? = null,
 ) {
     sealed class Appearance(
         val percentWidth: Float,

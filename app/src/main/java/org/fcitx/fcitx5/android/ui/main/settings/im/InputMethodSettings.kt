@@ -264,10 +264,10 @@ object InputMethodSettings {
                 // one slip read on them, ü typed v, is none on its nine keys: u and v share 8 (the 18 and 14 keys keep them apart)
                 Toggle(
                     "${EngineSettings.FUZZY}/${EngineSettings.TYPOS}", text(R.string.im_typos), R.string.im_typos_summary,
-                    notFor = listOf(InputMethodCatalog.T9, InputMethodCatalog.PINYIN_KEYS18, InputMethodCatalog.PINYIN_KEYS, InputMethodCatalog.SHUANGPIN_NINE),
+                    notFor = listOf(InputMethodCatalog.T9, InputMethodCatalog.PINYIN_KEYS18, InputMethodCatalog.PINYIN_KEYS, InputMethodCatalog.SHUANGPIN_NINE, InputMethodCatalog.ZHUYIN_NINE, InputMethodCatalog.ZHUYIN),
                 ),
                 // u and v are both on 8
-                Flags(EngineSettings.FUZZY, R.string.im_fuzzy, R.string.im_fuzzy_none, FUZZY, notFor = mapOf(Fuzzy.V_U.name to listOf(InputMethodCatalog.T9, InputMethodCatalog.SHUANGPIN_NINE))),
+                Flags(EngineSettings.FUZZY, R.string.im_fuzzy, R.string.im_fuzzy_none, FUZZY, notFor = mapOf(Fuzzy.V_U.name to listOf(InputMethodCatalog.T9, InputMethodCatalog.SHUANGPIN_NINE, InputMethodCatalog.ZHUYIN_NINE, InputMethodCatalog.ZHUYIN))),
             )
         ),
     )
@@ -300,7 +300,7 @@ object InputMethodSettings {
     val NINE_KEYS: List<Item> = listOf(multiTap, nineKeyLetters, nineKeySymbols)
 
     // which are no use on pinyin's grouped keyboards
-    private val pinyinKeys = listOf(InputMethodCatalog.T9, InputMethodCatalog.PINYIN_KEYS18, InputMethodCatalog.PINYIN_KEYS)
+    private val pinyinKeys = listOf(InputMethodCatalog.T9, InputMethodCatalog.PINYIN_KEYS18, InputMethodCatalog.PINYIN_KEYS, InputMethodCatalog.ZHUYIN_NINE, InputMethodCatalog.ZHUYIN)
 
     private val pinyin = listOf(
         sharedLink,

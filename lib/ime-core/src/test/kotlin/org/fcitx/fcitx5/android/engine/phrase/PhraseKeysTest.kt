@@ -74,7 +74,7 @@ class PhraseKeysTest {
         // 自然码: zhuang vd, 双 ud; an initial zh is v
         assertTrue("vd" in segmenter.takenAs("zhuang"))
         assertEquals(listOf("v"), segmenter.takenAs("zh"))
-        val typed = checkNotNull(PhraseKeys.of("zhuang'" + codes(NineKeyLetters.G18, "ud"), NineKeyLetters.G18, segmenter::takenAs))
+        val typed = checkNotNull(PhraseKeys.of("zhuang'" + codes(NineKeyLetters.G18, "ud"), NineKeyLetters.G18, taken = segmenter::takenAs))
         assertTrue(typed.reads("vdud"))
         assertFalse(typed.reads("zhuangud"))
     }

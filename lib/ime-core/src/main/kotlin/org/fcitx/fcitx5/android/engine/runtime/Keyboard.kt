@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.runtime
 
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession.Companion.NO_PIECE
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
@@ -215,12 +216,15 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
         // on the nine keys a digit is a key: one not read (0) ends the input, as punctuation does
         val digit = c.digitToIntOrNull()?.takeUnless { nineKeys }
         return when {
-            composing && c == ' ' -> session.apply(Action.Select(0))
+            composing && c == ' ' -> select(0)
             // 1 is the first; 0 the tenth
-            composing && digit != null -> session.apply(Action.Select((digit + DIGITS - 1) % DIGITS))
+            composing && digit != null -> select((digit + DIGITS - 1) % DIGITS)
             else -> ended(c)
         }
     }
+
+    // a key's pick: told as one ([Snapshot.picked]), never a key to type again (KeyRouter's log)
+    private fun select(index: Int) = session.apply(Action.Select(index)).copy(picked = true)
 
     // the app types the key after what the session committed; but one that left something composing
     // (strokes' first of part of the pinyin picked, the rest typed) took it: typed, it would land before that
@@ -234,7 +238,7 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
         val digit = codePoint - '0'.code
         val picks = !english || composing && session.picksByDigit
         if (!picks || digit !in 0 until DIGITS) return char(codePoint)
-        return if (composing) session.apply(Action.Select((digit + DIGITS - 1) % DIGITS)) else passOn()
+        return if (composing) select((digit + DIGITS - 1) % DIGITS) else passOn()
     }
 
     // keys the session takes while something is typed, the app's otherwise
@@ -450,8 +454,43 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
         /** The character for 双拼's 14 keys' key of G14 code [code]. */
         fun shuangpin14Key(code: Char): Int = SHUANGPIN_14.first + groupIndex(NineKeyLetters.G14_BLOCK, code)
 
-        /** [PINYIN_NINE], [PINYIN_18] and [SHUANGPIN_14] together: the keyed keyboards' codes past the BMP. */
-        val KEYED_CODES = PINYIN_NINE.first..SHUANGPIN_14.last
+        /**
+         * Characters 注音九键 sends ([ZhuyinKeys.NINE]'s groups): [zhuyinNineKey] for a group,
+         * [zhuyinNineTone] for its tone key (0 bare, ending a syllable of any tone), [zhuyinNineSymbol]
+         * for a symbol picked off a key's long press or 连按. Read as [ZhuyinKeys]' codes by the session
+         * ([keyedChar]): codes, not the symbols, so a ㄅ from the symbols page stays text.
+         */
+        val ZHUYIN_NINE = 0xF0450 until 0xF0450 + ZhuyinKeys.GROUPS + 1 + ZhuyinKeys.TONES + ZhuyinKeys.SYMBOLS.length
+
+        /** The character for 注音九键's group [group], 0 to 10 in the keys' order ([ZhuyinKeys.NINE]). */
+        fun zhuyinNineKey(group: Int): Int {
+            require(group in 0 until ZhuyinKeys.GROUPS) { "zhuyin group $group" }
+            return ZHUYIN_NINE.first + group
+        }
+
+        /** The character for 注音九键's tone key: [tone] 0 bare, 1 to 5 (5 轻声) picked off it. */
+        fun zhuyinNineTone(tone: Int): Int {
+            require(tone in 0..ZhuyinKeys.TONES) { "tone $tone" }
+            return ZHUYIN_NINE.first + ZhuyinKeys.GROUPS + tone
+        }
+
+        /** The character for [symbol] (ㄅ to ㄩ) typed as itself on 注音九键. */
+        fun zhuyinNineSymbol(symbol: Char): Int = ZHUYIN_NINE.first + ZhuyinKeys.GROUPS + 1 + ZhuyinKeys.TONES + ZhuyinKeys.indexOf(symbol)
+
+        /** Characters 注音全键盘 (大千) sends: a symbol each ([zhuyinKey]) and the four tones and 轻声 ([zhuyinTone]). */
+        val ZHUYIN_FULL = 0xF0490 until 0xF0490 + ZhuyinKeys.SYMBOLS.length + ZhuyinKeys.TONES
+
+        /** The character for 大千's key of [symbol] (ㄅ to ㄩ). */
+        fun zhuyinKey(symbol: Char): Int = ZHUYIN_FULL.first + ZhuyinKeys.indexOf(symbol)
+
+        /** The character for 大千's tone [tone], 1 to 5 (5 轻声). */
+        fun zhuyinTone(tone: Int): Int {
+            require(tone in 1..ZhuyinKeys.TONES) { "tone $tone" }
+            return ZHUYIN_FULL.first + ZhuyinKeys.SYMBOLS.length + tone - 1
+        }
+
+        /** [PINYIN_NINE], [PINYIN_18], [SHUANGPIN_14], [ZHUYIN_NINE] and [ZHUYIN_FULL] together: the keyed keyboards' codes past the BMP. */
+        val KEYED_CODES = PINYIN_NINE.first..ZHUYIN_FULL.last
 
         private fun groupIndex(block: IntRange, code: Char): Int {
             require(code.code in block) { "code ${code.code} of no block $block" }
@@ -461,12 +500,14 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
         /**
          * The key a keyed keyboard's code past the BMP ([KEYED_CODES]) stands for in its session's
          * input: the digit of [PINYIN_NINE]'s, the G18 or G14 code of [PINYIN_18]'s and
-         * [SHUANGPIN_14]'s; null for any other.
+         * [SHUANGPIN_14]'s, [ZhuyinKeys]' of [ZHUYIN_NINE]'s and [ZHUYIN_FULL]'s; null for any other.
          */
         fun keyedChar(codePoint: Int): Char? = when (codePoint) {
             in PINYIN_NINE -> '0' + (codePoint - PINYIN_NINE.first)
             in PINYIN_18 -> (NineKeyLetters.G18_BLOCK.first + (codePoint - PINYIN_18.first)).toChar()
             in SHUANGPIN_14 -> (NineKeyLetters.G14_BLOCK.first + (codePoint - SHUANGPIN_14.first)).toChar()
+            in ZHUYIN_NINE -> ZhuyinKeys.nineChar(codePoint - ZHUYIN_NINE.first)
+            in ZHUYIN_FULL -> ZhuyinKeys.fullChar(codePoint - ZHUYIN_FULL.first)
             else -> null
         }
 

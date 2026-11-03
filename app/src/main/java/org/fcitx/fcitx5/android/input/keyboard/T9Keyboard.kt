@@ -41,11 +41,13 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.glide.Glide
-import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.lParams
@@ -103,7 +105,9 @@ class T9Keyboard(
     private val shuangpin: Boolean = false,
     /** 九键双拼's 5 shows `;` (JKL;): only under a scheme that types it (微软's ing). */
     semicolon: Boolean = true,
-) : BaseKeyboard(context, theme, layout(letters, symbols, english, shuangpin, semicolon), themeBoard = KeyNames.NINE), AutoCapsKeys {
+) : BaseKeyboard(
+    context, theme, layout(letters, symbols, english, shuangpin, semicolon), themeBoard = KeyNames.NINE, shortcuts = true,
+), AutoCapsKeys {
 
     companion object {
         const val Name = "T9"
@@ -246,6 +250,7 @@ class T9Keyboard(
                 ),
             ),
             name = digit.toString(),
+            shortcut = KeyShortcuts.charKey(KeyShortcutPreset.NINE, digit.toString()),
         )
 
         /**
@@ -410,6 +415,8 @@ class T9Keyboard(
                         arrayOf(KeyDef.Popup.Keyboard.Explicit(it.toTypedArray(), asIs = true))
                     },
                     name = "1",
+                    // a character key, as the digits are: its swipe types 1 as ever
+                    shortcut = KeyShortcuts.charKey(KeyShortcutPreset.NINE, "1"),
                 ),
                 digitKey('2', on('2'), symbols.symbols('2')),
                 digitKey('3', on('3'), symbols.symbols('3')),
@@ -427,6 +434,7 @@ class T9Keyboard(
                         KeyDef.Appearance.Text("重输", 16f, percentWidth = RIGHT, variant = KeyDef.Appearance.Variant.Alternative),
                         setOf(KeyDef.Behavior.Press(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_Escape)))),
                         name = "reset",
+                        shortcut = "retype",
                     )
                 },
             ),
@@ -439,6 +447,7 @@ class T9Keyboard(
                     KeyDef.Appearance.Text("0", 20f, percentWidth = RIGHT, variant = KeyDef.Appearance.Variant.Alternative),
                     setOf(KeyDef.Behavior.Press(KeyAction.HostKeyAction("0"))),
                     name = "0",
+                    shortcut = "zero",
                 ),
             ),
             listOf(

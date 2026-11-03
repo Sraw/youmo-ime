@@ -186,13 +186,15 @@ internal class KeyboardPair(
         /** The sessions a pair hands grouped keys' codes to: a keyboard of the nine keys' kind (Keyboard's nineKeys). */
         val KEYED = setOf(
             InputMethodCatalog.PINYIN_KEYS, InputMethodCatalog.PINYIN_KEYS18, InputMethodCatalog.T9,
+            InputMethodCatalog.ZHUYIN_NINE, InputMethodCatalog.ZHUYIN,
             InputMethodCatalog.SHUANGPIN_KEYS18, InputMethodCatalog.SHUANGPIN_KEYS14, InputMethodCatalog.SHUANGPIN_NINE,
         )
 
         /**
          * Pinyin's: the 14 keys' codes (a tap's with its place too) to [InputMethodCatalog.PINYIN_KEYS],
          * the 18 keys' to [InputMethodCatalog.PINYIN_KEYS18], the nine keys' (their digits, a letter 连按
-         * types, [Keyboard.LETTERS], and a glide over them) to [InputMethodCatalog.T9]; [keyboard] making
+         * types, [Keyboard.LETTERS], and a glide over them) to [InputMethodCatalog.T9], 注音九键's and 大千's
+         * to [InputMethodCatalog.ZHUYIN_NINE] and [InputMethodCatalog.ZHUYIN]; [keyboard] making
          * each session's.
          */
         fun pinyin(keyboard: (String) -> Keyboard) = KeyboardPair(
@@ -219,6 +221,8 @@ internal class KeyboardPair(
         fun pinyinKeyed(c: Int): String? = when {
             c in Keyboard.TAPS -> InputMethodCatalog.PINYIN_KEYS
             c in Keyboard.PINYIN_18 -> InputMethodCatalog.PINYIN_KEYS18
+            c in Keyboard.ZHUYIN_NINE -> InputMethodCatalog.ZHUYIN_NINE
+            c in Keyboard.ZHUYIN_FULL -> InputMethodCatalog.ZHUYIN
             c in Keyboard.PINYIN_NINE || c in Keyboard.LETTERS -> InputMethodCatalog.T9
             NineKeyLetters.ofCode(c) == NineKeyLetters.G14 -> InputMethodCatalog.PINYIN_KEYS
             else -> null

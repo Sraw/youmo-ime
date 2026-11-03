@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceUi.Levels.Level
 import org.fcitx.fcitx5.android.input.bar.CandidateBarHeight
 import org.fcitx.fcitx5.android.input.floating.FloatingHandleSide
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightLevels
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SplitDock
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
@@ -53,12 +54,9 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         levels(
             R.string.keyboard_height, "keyboard_height_level",
             defaults(keyboard.keyboardHeightPercent, keyboard.keyboardHeightPercentLandscape),
-            listOf(
-                Level(R.string.level_low, 26, 42),
-                Level(R.string.level_standard, 30, 49),
-                Level(R.string.level_tall, 34, 55),
-                Level(R.string.level_taller, 38, 60),
-            )
+            // ime-core's, which the keyboard reads 紧凑 by
+            listOf(R.string.level_compact, R.string.level_low, R.string.level_standard, R.string.level_tall, R.string.level_taller)
+                .zip(KeyboardHeightLevels.ALL) { label, l -> Level(label, l.portrait, l.landscape) }
         )
         levels(
             R.string.keyboard_side_padding, "keyboard_side_padding_level",

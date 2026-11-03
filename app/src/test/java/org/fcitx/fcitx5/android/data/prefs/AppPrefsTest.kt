@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
+import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -138,7 +139,7 @@ class AppPrefsTest {
             listOf(
                 // 0.4's Full and Keys14 as they were; Keys18 and NineKeys since I1
                 Row(
-                    "全拼's keyboard", listOf("Full", "Keys18", "Keys14", "NineKeys"), PinyinKeyboard.entries, "pinyin_keyboard", AppPrefs.PINYIN_KEYBOARD,
+                    "全拼's keyboard", listOf("Full", "Keys18", "Keys14", "NineKeys", "ZhuyinNine", "ZhuyinFull"), PinyinKeyboard.entries, "pinyin_keyboard", AppPrefs.PINYIN_KEYBOARD,
                     { it.keyboard.pinyinKeyboard.setValue(PinyinKeyboard.Keys14) }, "Keys14", "Keys16",
                     { it.keyboard.pinyinKeyboard.getValue() }, PinyinKeyboard.Full,
                 ),
@@ -164,5 +165,28 @@ class AppPrefsTest {
             sp.edit { putString(row.key, row.unknown) }
             assertEquals(row.default, row.read(AppPrefs(sp)))
         }
+    }
+
+    // 0.5's 划动输入标点符号及数字 becomes 滑动: the symbol the way it was, shortcuts the other way, off all off
+    @Test
+    fun theOldSwipeSettingBecomesTheTwoWays() {
+        for ((old, now) in listOf(
+            "Down" to SwipeLayersChoice.ShortcutUpSymbolDown,
+            "Up" to SwipeLayersChoice.SymbolUpShortcutDown,
+            "Disabled" to SwipeLayersChoice.Off,
+        )) {
+            sp.edit { clear(); putString("swipe_symbol_behavior", old) }
+            val prefs = AppPrefs(sp)
+            prefs.dropRetired()
+            assertEquals(old, now, prefs.keyboard.swipeLayers.getValue())
+            assertFalse(old, sp.contains("swipe_symbol_behavior"))
+        }
+        // one set already is kept
+        sp.edit { clear(); putString("swipe_symbol_behavior", "Up"); putString("swipe_layers", SwipeLayersChoice.Off.name) }
+        AppPrefs(sp).apply { dropRetired() }.let { assertEquals(SwipeLayersChoice.Off, it.keyboard.swipeLayers.getValue()) }
+        // stored as another type (a bad backup): the default, and no crash at every start
+        sp.edit { clear(); putInt("swipe_symbol_behavior", 1) }
+        AppPrefs(sp).apply { dropRetired() }.let { assertEquals(SwipeLayersChoice.ShortcutUpSymbolDown, it.keyboard.swipeLayers.getValue()) }
+        assertFalse(sp.contains("swipe_symbol_behavior"))
     }
 }

@@ -24,7 +24,8 @@ enum class SpelledForm {
     companion object {
         /** How [keys] under [kind] spell [reading] (syllables apart by spaces); null where none is: a word of one syllable, a kind of no readings, fewer keys than syllables (no spelling of it). */
         fun of(kind: String, keys: String, reading: String): SpelledForm? {
-            if (Kinds.byText(kind) || reading.isEmpty()) return null
+            // zhuyin's keys spell no pinyin letters: its keyboards link no spellings (design 051, a trade-off kept simple)
+            if (Kinds.byText(kind) || Kinds.isZhuyin(kind) || reading.isEmpty()) return null
             val syllables = reading.split(' ')
             return of(Kinds.isShuangpin(kind), keys.count { it != '\'' }, syllables.size, syllables.sumOf { it.length })
         }
