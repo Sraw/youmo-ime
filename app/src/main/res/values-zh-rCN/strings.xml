@@ -188,7 +188,7 @@
     <string name="exception_user_data_too_old">这个备份来自 0.3.0 或更早的版本，这一版不再读取那时学到的内容。请先在 0.4.x 里恢复它、打几个字、停一下、重新备份，再在这里恢复新的备份</string>
     <string name="user_data_imported">已导入来自 %1$s 的用户数据，正在重启…</string>
     <string name="user_data_exported">已备份到 %1$s</string>
-    <string name="confirm_import_user_data">导入用户数据会覆盖设置、自定义短语、标点和剪贴板，学到的和词库与手机上现有的合并；重启应用后生效。继续吗？</string>
+    <string name="confirm_import_user_data">导入用户数据会覆盖设置、自定义短语、快速输入、标点和剪贴板（备份里没有的，手机上的也删掉：0.5.1 以前的备份没有快速输入，自己加的条目和关掉的自带表都会没了），学到的和词库与手机上现有的合并；重启应用后生效。继续吗？</string>
     <string name="clear_clp_db_confirm">剪贴板数据库将会被完全清空，包括已置顶的条目。继续吗？</string>
     <string name="clear_clp_db_not_all">部分剪贴板数据未能清除，可能仍然存在，或在下次启动时重新出现；再次清空，或重启后再清空，或许有效。</string>
     <string name="expand_keypress_area">将按键范围扩展至边缘</string>
@@ -910,10 +910,14 @@
     <string name="quick_phrase_built_in_latex">LaTeX 符号（\\alpha 这样）</string>
     <string name="quick_phrase_import_done">导入 %1$d 条，跳过 %2$d 条重复</string>
     <string name="quick_phrase_deleted">已删除</string>
+    <string name="quick_phrase_too_long_to_save">超过 5000 字，存不成快速输入</string>
+    <string name="quick_phrase_import_done_too_long">导入 %1$d 条，跳过 %2$d 条重复、%3$d 条超过 5000 字</string>
+    <string name="quick_phrase_discard_confirm">放弃这次的修改？</string>
+    <string name="quick_phrase_discard">放弃</string>
+    <string name="quick_phrase_keep_editing">继续编辑</string>
     <string name="quick_phrase_new">新加快速输入</string>
     <string name="quick_phrase_change">改快速输入</string>
     <string name="quick_phrase_commit">上屏</string>
     <string name="quick_phrase_copy">复制</string>
-    <string name="quick_phrase_lines">（%1$d 行）</string>
     <string name="clipboard_save_quick_phrase">存为快速输入</string>
 </resources>

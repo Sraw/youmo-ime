@@ -211,10 +211,16 @@ is `selectCandidate(ic, globalIndex)`. Paging constants (5 a page, Up/Down, Tab/
   input's (the handwriting pad swaps for the full keyboard); `HostCore.quickPhraseAt` gives the
   entry under a long press.
 - `QuickPhraseBook`: the user's entries (`data/quickphrase.d/mine.mb`, fcitx's `.mb`, so the export is
-  the file) in order of use (`mine.used`, `millis<TAB>key<TAB>quoted content`), then the built-in
-  `QuickPhraseTable`; the user's match by key prefix case aside, the built-in ones case kept. Of the
-  user's directory only `mine.*` and `*.disable` are read. The app's `QuickPhraseManager` writes both
-  files whole under one lock (page and keyboard both write).
+  the file) in order of use (`mine.used`, `millis<TAB>key<TAB>content escaped as fcitx's value`), then the built-in
+  `QuickPhraseTable`; the user's match by key prefix case aside, the built-in ones case kept. Two
+  entries whose keys differ only in case and whose content is the same are one (`QuickPhraseEntry.sameAs`):
+  refused when saved, skipped when imported, the first kept when read. Of the
+  user's directory only `mine.*` and `*.disable` are read. `mine.mb` is read with a leading UTF-8 BOM
+  dropped; the lines fcitx skips, a duplicate, and a content over `MAX_CONTENT` (5000 UTF-16 units, the
+  page's limit) are left out, and so are gone from the file at its next write. The app's
+  `QuickPhraseManager` writes both files whole under one lock (page and keyboard both write).
+  `HostCore.refreshQuickPhrase` (after `reloadConfig`) shows an open quick input's list again from
+  the new book, so an entry deleted from its card goes at once.
 - `QuickPhraseTable` (`quickphraseprovider.cpp:29-104`): `data/QuickPhrase.mb` from the first
   `PkgDataDir` that has it, then `data/quickphrase.d/*.mb` by name (an earlier directory's file hides
   a later one's of the same name; `<name>.disable` anywhere hides it), multimap in code point order.

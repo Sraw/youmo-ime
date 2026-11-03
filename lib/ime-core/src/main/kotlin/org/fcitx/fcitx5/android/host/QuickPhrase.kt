@@ -105,6 +105,11 @@ class QuickPhrase(
         this.book = book
     }
 
+    /** The list made again from the book as it is now, if the mode is on in [ic]; what is typed stays. */
+    fun refresh(ic: InputContext) {
+        if (ic.propertyFor(state).active) updateUI(ic)
+    }
+
     /** What the candidate at [globalIndex] of the list shown is: null for ＋添加, or none. */
     fun entryAt(ic: InputContext, globalIndex: Int): QuickPhraseBook.Found? =
         ic.propertyFor(state).takeIf { it.active }?.found?.getOrNull(globalIndex)

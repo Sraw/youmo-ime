@@ -49,9 +49,17 @@ class SettingsHarness(
     // put back at close: a keyboard harness still open beside this one keeps its own (TB-18)
     private val before = HostDaemon.testConnection
 
-    val activity: MainActivity by lazy {
+    private val controller by lazy {
         HostDaemon.testConnection = { FakeHostConnection(scope, api, host) }
-        Robolectric.buildActivity(MainActivity::class.java, intent).setup().get().also { idle() }
+        Robolectric.buildActivity(MainActivity::class.java, intent).setup().also { idle() }
+    }
+
+    val activity: MainActivity get() = controller.get()
+
+    /** The activity made anew, its pages' saved state given back, as a rotation or a theme change does. */
+    fun recreate() {
+        controller.recreate()
+        idle()
     }
 
     fun idle() = shadowOf(Looper.getMainLooper()).idle()

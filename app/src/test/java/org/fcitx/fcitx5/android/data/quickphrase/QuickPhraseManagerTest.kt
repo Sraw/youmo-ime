@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.data.quickphrase
 
+import org.fcitx.fcitx5.android.host.QuickPhraseBook
 import org.fcitx.fcitx5.android.host.QuickPhraseEntry
 import org.fcitx.fcitx5.android.host.QuickPhraseFiles
 import org.junit.Assert.assertEquals
@@ -58,10 +59,20 @@ class QuickPhraseManagerTest {
     @Test
     fun importAddsNewOnesAndCountsTheSkipped() {
         QuickPhraseManager.put(null, gh, now = 1, dir = dir)
-        val file = QuickPhraseFiles.formatMine(listOf(gh, addr)) + "bad\n"
-        assertEquals(1 to 1, QuickPhraseManager.import(file.toByteArray(), dir = dir))
+        val long = QuickPhraseEntry("long", "x".repeat(QuickPhraseBook.MAX_CONTENT + 1))
+        val file = QuickPhraseFiles.formatMine(listOf(gh, addr, long)) + "bad\n"
+        assertEquals(QuickPhraseManager.Imported(1, 1, 1), QuickPhraseManager.import(file.toByteArray(), dir = dir))
         assertEquals(setOf(gh, addr), QuickPhraseManager.load(dir).toSet())
-        assertEquals(0 to 2, QuickPhraseManager.import(file.toByteArray(), dir = dir))
+        assertEquals(QuickPhraseManager.Imported(0, 2, 1), QuickPhraseManager.import(file.toByteArray(), dir = dir))
+    }
+
+    // review L11: a key in another case is found by the same keys, so it is the same entry
+    @Test
+    fun aKeyInAnotherCaseIsADuplicateButAnEntrysOwnCaseMayChange() {
+        QuickPhraseManager.put(null, gh, now = 1, dir = dir)
+        assertEquals(QuickPhraseManager.Put.Duplicate, QuickPhraseManager.put(null, gh.copy(key = "GH"), dir = dir))
+        assertEquals(QuickPhraseManager.Put.Saved, QuickPhraseManager.put(gh, gh.copy(key = "Gh"), now = 2, dir = dir))
+        assertEquals(listOf(gh.copy(key = "Gh")), QuickPhraseManager.load(dir))
     }
 
     @Test

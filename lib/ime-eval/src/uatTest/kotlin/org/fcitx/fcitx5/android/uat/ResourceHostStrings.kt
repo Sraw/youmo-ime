@@ -26,6 +26,8 @@ class ResourceHostStrings(res: File, qualifier: String) : HostStrings {
     override val defaultGroup = s("host_default_group")
     override val half = s("host_half")
     override val quickPhrase = s("host_quick_phrase_aux")
+    override val quickPhraseAdd = s("host_quick_phrase_add")
+    override val quickPhraseHint = s("host_quick_phrase_hint")
     override val unicode = UnicodeStrings(
         aux = s("host_unicode_aux"),
         hint = s("host_unicode_hint"),

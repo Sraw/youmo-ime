@@ -6,6 +6,8 @@ package org.fcitx.fcitx5.android.utils
 
 import android.content.Context
 import android.content.Intent
+import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.host.QuickPhraseBook
 import org.fcitx.fcitx5.android.host.QuickPhraseEntry
 import org.fcitx.fcitx5.android.ui.main.ClipboardEditActivity
 import org.fcitx.fcitx5.android.ui.main.MainActivity
@@ -52,18 +54,22 @@ object AppUtil {
 
     /**
      * Quick input's page with its editor open: [entry] to change, or a new one, [content] filled in
-     * (the clipboard's 存为快速输入) with [key] as the key suggested.
+     * (the clipboard's 存为快速输入) with [key] as the key suggested. A content longer than the page
+     * saves is refused here, told, and the page not opened (false): the clipboard keeps clips of
+     * megabytes, which would also not fit in the Intent (TransactionTooLargeException, the process gone).
      */
-    fun launchQuickPhraseEditor(context: Context, entry: QuickPhraseEntry? = null, content: String = "", key: String = "") =
+    fun launchQuickPhraseEditor(context: Context, entry: QuickPhraseEntry? = null, content: String = "", key: String = ""): Boolean {
+        val text = entry?.content ?: content
+        if (text.length > QuickPhraseBook.MAX_CONTENT) {
+            context.toast(R.string.quick_phrase_too_long_to_save)
+            return false
+        }
         launchMainToDest(
             context,
-            SettingsRoute.QuickPhrase(
-                edit = true,
-                key = entry?.key ?: key,
-                content = entry?.content ?: content,
-                existing = entry != null,
-            ),
+            SettingsRoute.QuickPhrase(edit = true, key = entry?.key ?: key, content = text, existing = entry != null),
         )
+        return true
+    }
 
     fun launchClipboardEdit(context: Context, id: Int, lastEntry: Boolean = false) {
         context.startActivity<ClipboardEditActivity> {
