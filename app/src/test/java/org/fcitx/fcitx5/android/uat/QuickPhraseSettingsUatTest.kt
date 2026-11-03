@@ -39,8 +39,11 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
+import org.robolectric.shadows.ShadowToast
 import java.io.File
 import java.time.Duration
+import java.util.concurrent.CountDownLatch
+import kotlin.concurrent.thread
 
 /**
  * Quick input's settings page (uat/11 QU-15, QU-19) over a fake engine and the real files: add,
@@ -179,6 +182,14 @@ class QuickPhraseSettingsUatTest {
         until("turned on") { QuickPhraseManager.builtInOn("latex.mb") }
         st.idle()
         assertTrue(switch(R.string.quick_phrase_built_in_latex).isChecked)
+        // review L-1: turned twice before either is saved, read back as last turned
+        val emoji = switch(R.string.quick_phrase_built_in_emoji)
+        emoji.performClick()
+        emoji.performClick()
+        st.idle()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+        assertTrue(QuickPhraseManager.builtInOn("emoji.mb"))
+        assertTrue(switch(R.string.quick_phrase_built_in_emoji).isChecked)
     }
 
     // review M1: no field cuts what is filled in; too long is told at OK, nothing saved
@@ -194,7 +205,7 @@ class QuickPhraseSettingsUatTest {
         assertEquals(long.length, fields(d)[1].text.length)
         ok(d)
         assertTrue(d.isShowing)
-        assertEquals(s(R.string.quick_phrase_content_too_long), fields(d)[1].error)
+        assertEquals(s(R.string.quick_phrase_content_too_long, QuickPhraseBook.MAX_CONTENT), fields(d)[1].error)
         // a key filled in is not cut either: 30 emoji are 60 UTF-16 units, a good key
         val emoji = "😀".repeat(QuickPhraseBook.MAX_KEY)
         fill(emoji, "x".repeat(QuickPhraseBook.MAX_CONTENT), d)
@@ -265,5 +276,79 @@ class QuickPhraseSettingsUatTest {
         st.idle()
         assertFalse(d.isShowing)
         assertEquals(d, ShadowDialog.getLatestDialog())
+    }
+
+    // review M-1: OK tapped, the activity made anew while the file is written: the save, finished,
+    // is not offered again as an editor whose OK would say 已经有了
+    @Test
+    fun anEntryBeingSavedOverARotationIsNotEditedAgain() {
+        open(gh)
+        KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<FloatingActionButton>().single().performClick()
+        st.idle()
+        fill(addr.key, addr.content)
+        // the files' lock held: the save waits
+        val release = CountDownLatch(1)
+        val held = CountDownLatch(1)
+        thread {
+            synchronized(QuickPhraseManager) {
+                held.countDown()
+                release.await()
+            }
+        }
+        held.await()
+        ok()
+        assertTrue(dialog().isShowing)
+        st.recreate()
+        release.countDown()
+        saved("saved meanwhile", listOf(addr, gh))
+        until("told") { ShadowToast.getTextOfLatestToast() == s(R.string.quick_phrase_saved) }
+        until("listed") { addr.content in shown() }
+        assertEquals(0, ShadowDialog.getShownDialogs().count { it.isShowing })
+    }
+
+    // review M-2: pasted beyond any use, kept over a rotation one past the limit (a Bundle holds no
+    // more), still told too long at OK
+    @Test
+    fun aHugePasteIsKeptOverARotationOnlyOnePastTheLimit() {
+        open(gh)
+        KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<FloatingActionButton>().single().performClick()
+        st.idle()
+        fill("k".repeat(QuickPhraseBook.MAX_CONTENT * 2), "长".repeat(QuickPhraseBook.MAX_CONTENT * 4))
+        st.recreate()
+        val d = dialog()
+        assertEquals(listOf(QuickPhraseBook.MAX_CONTENT + 1, QuickPhraseBook.MAX_CONTENT + 1), fields(d).map { it.text.length })
+        ok(d)
+        assertEquals(s(R.string.quick_phrase_key_invalid), fields(d)[0].error)
+        fill("long", null, d)
+        ok(d)
+        assertEquals(s(R.string.quick_phrase_content_too_long, QuickPhraseBook.MAX_CONTENT), fields(d)[1].error)
+        assertEquals(listOf(gh), QuickPhraseManager.load())
+    }
+
+    // review L-2, L-3: 取消 with something changed asks too; the question goes with the page, the
+    // editor shown again with what was typed
+    @Test
+    fun cancelWithSomethingChangedAsksAndTheQuestionGoesWithThePage() {
+        open(gh)
+        row(gh.content).performClick()
+        st.idle()
+        val d = dialog()
+        fill(null, "https://gitlab.com", d)
+        d.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+        st.idle()
+        val ask = dialog()
+        assertNotSame(d, ask)
+        assertTrue(d.isShowing)
+        st.recreate()
+        assertFalse(ask.isShowing)
+        val again = dialog()
+        assertEquals(listOf("gh", "https://gitlab.com"), fields(again).map { it.text.toString() })
+        assertEquals(1, ShadowDialog.getShownDialogs().count { it.isShowing })
+        // 取消 with nothing changed closes at once
+        fill(null, gh.content, again)
+        again.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+        st.idle()
+        assertFalse(again.isShowing)
+        assertEquals(0, ShadowDialog.getShownDialogs().count { it.isShowing })
     }
 }

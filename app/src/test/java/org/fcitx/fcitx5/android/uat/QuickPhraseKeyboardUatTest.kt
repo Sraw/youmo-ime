@@ -224,7 +224,7 @@ class QuickPhraseKeyboardUatTest {
         held("长长长")
         h.menuPick(s(R.string.clipboard_save_quick_phrase))
         assertNull(shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity)
-        assertEquals(s(R.string.quick_phrase_too_long_to_save), ShadowToast.getTextOfLatestToast())
+        assertEquals(s(R.string.quick_phrase_too_long_to_save, QuickPhraseBook.MAX_CONTENT), ShadowToast.getTextOfLatestToast())
         // a password (shown as dots): not offered
         org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.lastClipTimestamp = -1L
         org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.lastEntry = null

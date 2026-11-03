@@ -61,7 +61,7 @@ object AppUtil {
     fun launchQuickPhraseEditor(context: Context, entry: QuickPhraseEntry? = null, content: String = "", key: String = ""): Boolean {
         val text = entry?.content ?: content
         if (text.length > QuickPhraseBook.MAX_CONTENT) {
-            context.toast(R.string.quick_phrase_too_long_to_save)
+            context.toast(context.getString(R.string.quick_phrase_too_long_to_save, QuickPhraseBook.MAX_CONTENT))
             return false
         }
         launchMainToDest(

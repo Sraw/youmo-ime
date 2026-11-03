@@ -144,6 +144,33 @@ class HostCoreEnginesTest : EnginesFixture() {
         engines.close()
     }
 
+    // review L-6: the keyboard's way after a card's 删除 (KotlinHost.readModuleFiles): the book read
+    // again, then the open list shown again from it; the entry gone at once, what was typed kept
+    @Test
+    fun `an entry deleted while quick input is open leaves its list at the reload`() {
+        val engines = engines()
+        var built: HostModules? = null
+        val modules = ChineseModules(ModuleInputs(PunctuationProfile.parse(""), quickPhrases = { QuickPhraseBook(QuickPhraseTable.EMPTY, listOf(QuickPhraseEntry("tf", "头发"), QuickPhraseEntry("tg", "头盖"))) }))
+        val core = HostCore(EnginesHost(engines), clock, Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "Default"), firstRun = true) {
+            modules.build(it).also { m -> built = m }
+        }
+        val log = mutableListOf<HostEvent>()
+        core.events += HostEvents { log += it }
+        core.activate(1)
+        core.focus(true)
+        core.triggerQuickPhrase()
+        core.sendKey(Key('t'.code), virtual = true)
+        fun shown() = log.filterIsInstance<HostEvent.Candidates>().last().candidates.map { it.text }
+        assertEquals(listOf("头发", "头盖"), shown().take(2))
+        built!!.quickPhrase!!.reload(QuickPhraseBook(QuickPhraseTable.EMPTY, listOf(QuickPhraseEntry("tg", "头盖"))))
+        core.refreshQuickPhrase()
+        assertEquals(listOf("头盖"), shown().filter { it.startsWith("头") })
+        // what was typed kept: the next key narrows the new list
+        core.sendKey(Key('g'.code), virtual = true)
+        assertEquals(listOf("头盖"), shown().filter { it.startsWith("头") })
+        engines.close()
+    }
+
     // review LOW (S13): an Ink key quick input had, never reaching handwriting, holds its reading
     // for the next, as before the key carried it; dropped, the stroke's ink stayed on the pad
     @Test

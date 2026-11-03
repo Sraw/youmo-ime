@@ -38,6 +38,7 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.FcitxApplication
@@ -93,6 +94,9 @@ class QuickPhraseFragment : ProgressFragment() {
     private var editor: Editor? = null
     private var editorWas: Bundle? = null
 
+    // 放弃修改？ over the editor: gone with the page, the editor shown again without it
+    private var discard: AlertDialog? = null
+
     private lateinit var importLauncher: ActivityResultLauncher<String>
     private lateinit var exportLauncher: ActivityResultLauncher<String>
 
@@ -115,13 +119,14 @@ class QuickPhraseFragment : ProgressFragment() {
 
     override suspend fun initialize(): View {
         all = try {
-            withContext(Dispatchers.IO) { QuickPhraseManager.load() }
+            // after any change still being saved (made on the page before a rotation)
+            withContext(changes) { QuickPhraseManager.load() }
         } catch (e: IOException) {
             Timber.w(e, "quick phrases")
             requireContext().toast(e)
             emptyList()
         }
-        on.putAll(withContext(Dispatchers.IO) { builtIns() })
+        on.putAll(withContext(changes) { builtIns() })
         viewModel.toolbarButton.value = ButtonMode.NONE
         val ctx = requireContext()
         adapter = Adapter()
@@ -141,9 +146,16 @@ class QuickPhraseFragment : ProgressFragment() {
         addMenu()
         val was = editorWas
         editorWas = null
-        if (was != null) {
+        val typedWas = was?.entry(TYPED)
+        // OK tapped before, and its entry there now
+        val savedWas = typedWas?.takeIf { t -> was.getBoolean(SAVING) && all.any { it.sameAs(t) } }
+        if (savedWas != null) {
+            // OK was tapped and the old page's save finished meanwhile: saved, nothing to show again
             asked = true
-            edit(was.entry(OLD), was.entry(FILLED), was.entry(TYPED))
+            ctx.toast(R.string.quick_phrase_saved)
+        } else if (was != null) {
+            asked = true
+            edit(was.entry(OLD), was.entry(FILLED), typedWas)
         } else if (args.edit && !asked) {
             asked = true
             val entry = QuickPhraseEntry(args.key, args.content)
@@ -202,7 +214,8 @@ class QuickPhraseFragment : ProgressFragment() {
     private fun <T> change(what: String, op: () -> T, failed: () -> Unit = {}, after: (T) -> Unit = {}) {
         // outlives the page: a change made just before leaving it is still saved
         FcitxApplication.getInstance().coroutineScope.launch(Dispatchers.Main.immediate) {
-            val (done, read) = withContext(Dispatchers.IO) {
+            // one at a time, in the order made: a switch turned twice quickly is read back as last turned
+            val (done, read) = withContext(changes) {
                 val done = try {
                     Result.success(op())
                 } catch (e: IOException) {
@@ -227,8 +240,10 @@ class QuickPhraseFragment : ProgressFragment() {
                 on.clear()
                 on.putAll(it.on)
             }
+            // before the rows are bound again: a switch whose write failed, unread, turns back
+            done.onFailure { failed() }
             filter()
-            done.fold(after) { failed() }
+            done.onSuccess(after)
         }
     }
 
@@ -242,10 +257,21 @@ class QuickPhraseFragment : ProgressFragment() {
     ) {
         val typed get() = QuickPhraseEntry(key.str, content.str)
 
+        /** OK tapped, its save not answered yet. */
+        var saving = false
+
+        // what was typed kept within a Bundle's means (hundreds of thousands of characters pasted
+        // would not fit the transaction), one past the limit: put back, still told too long at OK
         fun saved() = Bundle().apply {
             putEntry(OLD, entry)
             putEntry(FILLED, filled)
-            putEntry(TYPED, typed)
+            putEntry(TYPED, typed.run { QuickPhraseEntry(key.take(KEPT), content.take(KEPT)) })
+            putBoolean(SAVING, saving)
+        }
+
+        /** Back or 取消: at once with nothing changed, asked first otherwise. */
+        fun leave() {
+            if (typed == filled) dialog.cancel() else confirmDiscard(dialog)
         }
     }
 
@@ -295,9 +321,8 @@ class QuickPhraseFragment : ProgressFragment() {
         dialog.setOnDismissListener { if (editor === ed) editor = null }
         dialog.setCanceledOnTouchOutside(false)
         // Back with something changed asks first: what was typed is not lost to a slip
-        dialog.onBackPressedDispatcher.addCallback(dialog) {
-            if (ed.typed == ed.filled) dialog.cancel() else confirmDiscard(dialog)
-        }
+        dialog.onBackPressedDispatcher.addCallback(dialog) { ed.leave() }
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener { ed.leave() }
         if (typed != null && typed.key.isEmpty()) keyField.requestFocus()
         dialog.onPositiveButtonClick { save(ed) }
     }
@@ -319,7 +344,7 @@ class QuickPhraseFragment : ProgressFragment() {
             ed.content.error = if (content.isEmpty()) {
                 getString(R.string._cannot_be_empty, getString(R.string.quick_phrase_content))
             } else {
-                getString(R.string.quick_phrase_content_too_long)
+                getString(R.string.quick_phrase_content_too_long, QuickPhraseBook.MAX_CONTENT)
             }
             ed.content.requestFocus()
             return false
@@ -332,11 +357,16 @@ class QuickPhraseFragment : ProgressFragment() {
         }
         val buttons = listOf(AlertDialog.BUTTON_POSITIVE, AlertDialog.BUTTON_NEUTRAL).mapNotNull(ed.dialog::getButton)
         buttons.forEach { it.isEnabled = false }
-        change("quick phrase save", { QuickPhraseManager.put(ed.entry, new) }, failed = { buttons.forEach { it.isEnabled = true } }) { put ->
+        ed.saving = true
+        val failed = {
+            ed.saving = false
+            buttons.forEach { it.isEnabled = true }
+        }
+        change("quick phrase save", { QuickPhraseManager.put(ed.entry, new) }, failed) { put ->
             if (put == QuickPhraseManager.Put.Saved) {
                 ed.dialog.dismiss()
             } else {
-                buttons.forEach { it.isEnabled = true }
+                failed()
                 ed.content.error = getString(R.string.quick_phrase_duplicate)
             }
         }
@@ -344,10 +374,11 @@ class QuickPhraseFragment : ProgressFragment() {
     }
 
     private fun confirmDiscard(editorDialog: AlertDialog) {
-        AlertDialog.Builder(requireContext())
+        discard = AlertDialog.Builder(requireContext())
             .setMessage(R.string.quick_phrase_discard_confirm)
             .setNegativeButton(R.string.quick_phrase_keep_editing, null)
             .setPositiveButton(R.string.quick_phrase_discard) { _, _ -> editorDialog.cancel() }
+            .setOnDismissListener { discard = null }
             .show()
     }
 
@@ -383,7 +414,7 @@ class QuickPhraseFragment : ProgressFragment() {
                     val said = if (r.tooLong == 0) {
                         ctx.getString(R.string.quick_phrase_import_done, r.added, r.duplicates)
                     } else {
-                        ctx.getString(R.string.quick_phrase_import_done_too_long, r.added, r.duplicates, r.tooLong)
+                        ctx.getString(R.string.quick_phrase_import_done_too_long, r.added, r.duplicates, r.tooLong, QuickPhraseBook.MAX_CONTENT)
                     }
                     appContext.mainExecutor.execute { ctx.toast(said) }
                 })
@@ -453,7 +484,7 @@ class QuickPhraseFragment : ProgressFragment() {
                     s.setOnCheckedChangeListener { _, checked ->
                         // before the change's list is bound again (filter): the row keeps what was turned
                         on[name] = checked
-                        change("quick phrase table", { QuickPhraseManager.setBuiltIn(name, checked) })
+                        change("quick phrase table", { QuickPhraseManager.setBuiltIn(name, checked) }, failed = { on[name] = !checked })
                     }
                 }
             }
@@ -506,6 +537,7 @@ class QuickPhraseFragment : ProgressFragment() {
     override fun onDestroyView() {
         undo?.dismiss()
         undo = null
+        discard?.dismiss()
         // its state is saved (onSaveInstanceState comes first) and shown again by the page made anew
         editor?.let {
             editorWas = it.saved()
@@ -521,6 +553,14 @@ class QuickPhraseFragment : ProgressFragment() {
         private const val OLD = "old"
         private const val FILLED = "filled"
         private const val TYPED = "typed"
+        private const val SAVING = "saving"
+
+        // a field's text kept over a rotation: one past the content's limit, the key's far below
+        private const val KEPT = QuickPhraseBook.MAX_CONTENT + 1
+
+        // every page's changes, one after another (they outlive the page)
+        @OptIn(ExperimentalCoroutinesApi::class)
+        private val changes = Dispatchers.IO.limitedParallelism(1)
 
         private fun Bundle.putEntry(name: String, entry: QuickPhraseEntry?) {
             if (entry != null) putStringArray(name, arrayOf(entry.key, entry.content))
