@@ -51,7 +51,7 @@ class ThemeKeyNamesTest {
         "k14" to listOf(GroupedKeyboard.layout(NineKeyLetters.G14) { emptyList() }.flatten()),
         "k18" to listOf(GroupedKeyboard.layout(NineKeyLetters.G18) { emptyList() }.flatten()),
         "number" to NumberPad.entries.map { NumberKeyboard.layout(it).flatten() },
-        "handwriting" to listOf(HandwritingKeyboard.Layout.flatten()),
+        "handwriting" to listOf(HandwritingKeyboard.layout(context).flatten()),
         // 注音九键 not yet: the format's grid for it is not the keyboard's
         "zhuyin" to listOf(ZhuyinKeyboard.fullLayout().flatten(), ZhuyinKeyboard.fullLayout(compact = true).flatten()),
         "symbols" to listOf(PickerLayout.panelKeys(context, symbolPicker().switchKey)),
@@ -126,7 +126,7 @@ class ThemeKeyNamesTest {
             "k14" to GroupedKeyboard.layout(NineKeyLetters.G14) { emptyList() },
             "k18" to GroupedKeyboard.layout(NineKeyLetters.G18) { emptyList() },
             "number" to NumberKeyboard.Layout,
-            "handwriting" to HandwritingKeyboard.Layout,
+            "handwriting" to HandwritingKeyboard.layout(context),
             "symbols" to listOf(PickerLayout.panelKeys(context, symbolPicker().switchKey)),
             "emoji" to listOf(PickerLayout.listKeys(emojiPicker().switchKey, PickerWindow.SearchKey)),
         )

@@ -41,7 +41,7 @@ rm -rf lib/fcitx5 lib/fcitx5-chinese-addons
 构建会自动下载数据，并按 SHA-256 校验：
 
 - libime 发布的词典和码表文本源，rime-stroke 的笔画表；
-- Unicode 的 `emoji-test.txt`、CLDR 的 `annotations/zh.xml`（表情），kfcd/chaizi 的 `chaizi-jt.txt`（拆字）；
+- Unicode 的 `emoji-test.txt`、CLDR 的 `annotations/zh.xml`（表情），kfcd/chaizi 的 `chaizi-jt.txt`（拆字）；字卡的笔顺不下载，是仓库里的 `lexicon/stroke-order.tsv`；
 - `voice` 还有 X-ASR 原版模型包（取其中的词表）和 silero VAD；
 - 本仓库 release 里的数据，每类一个，版本写在 `build-logic` 里：
 
@@ -87,7 +87,7 @@ signKeyPwd=...
 | `lib/handwriting` | 手写识别的运行库（onnxruntime 和一个小 JNI）和句子模型的矩阵核心（`libyoumo-matrix`） |
 | `lib/ime-eval` | 评测：用测试集模拟打字，算首选正确率等指标 |
 | `lib/ime-dict-tool` | 从文本源构建引擎数据（只在构建时用，不进安装包） |
-| `lexicon/` | 新词的来源和校对记录 |
+| `lexicon/` | 新词的来源和校对记录；字卡的笔顺（`stroke-order.tsv`） |
 
 | 做什么 | 命令 |
 |---|---|
@@ -138,7 +138,7 @@ gettext ≥ 0.20 installed; coming back needs the two lines again.
 The build downloads its data and checks the SHA-256 of each file:
 
 - the dictionary and code table text sources published by libime, and rime-stroke's stroke table;
-- Unicode's `emoji-test.txt` and CLDR's `annotations/zh.xml` (emoji), kfcd/chaizi's `chaizi-jt.txt` (拆字);
+- Unicode's `emoji-test.txt` and CLDR's `annotations/zh.xml` (emoji), kfcd/chaizi's `chaizi-jt.txt` (拆字); a character card's stroke orders are not downloaded but `lexicon/stroke-order.tsv` in the repository;
 - for `voice`, X-ASR's original model archive (for its token list) and silero VAD;
 - this repository's data releases, one of each kind, their versions pinned in `build-logic`:
 
@@ -184,7 +184,7 @@ A change to what users see or to a setting updates the [user's manual](docs/READ
 | `lib/handwriting` | The handwriting recognizers' runtime (onnxruntime and a small JNI) and the sentence models' matrix kernel (`libyoumo-matrix`) |
 | `lib/ime-eval` | Evaluation: types the test sets and measures top-1 accuracy and more |
 | `lib/ime-dict-tool` | Builds the engine data from text sources (build time only, not in the APK) |
-| `lexicon/` | Where the new words come from, and their curation |
+| `lexicon/` | Where the new words come from, and their curation; the card's stroke orders (`stroke-order.tsv`) |
 
 | To | Run |
 |---|---|

@@ -31,6 +31,7 @@ import org.fcitx.fcitx5.android.engine.platform.UserFiles
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmClock
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmThreads
 import org.fcitx.fcitx5.android.engine.reading.CandidateReadings
+import org.fcitx.fcitx5.android.engine.reading.CharCard
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
 import org.fcitx.fcitx5.android.engine.session.Action
@@ -326,12 +327,18 @@ class Engines(
         factory.invalidate()
     }
 
-    /** What the user set; the sessions are made again for a change, what was typed dropped. */
+    /**
+     * What the user set; the sessions are made again for a change, what was typed dropped. But for
+     * 候选词注音 alone (the handwriting pad's 注): what is typed stays, and the host has what is on show
+     * read again ([Keyboard.RECALL]), annotated the new way.
+     */
     var settings = EngineSettings()
         set(value) {
             hostThread.check()
             if (value == field) return
+            val readingOnly = value == field.copy(candidateReading = value.candidateReading)
             field = value
+            if (readingOnly) return
             dropSessions()
             assets.dropDecoderExtensionsIfLearned()
             // what a lower level no longer runs leaves memory, read again if the level goes up
@@ -386,7 +393,7 @@ class Engines(
         val style = settings.candidateReading
         val readings = s.candidates.mapIndexed { i, text ->
             // a hint is the true reading (角色 typed jiaose: jué sè, not as typed)
-            hintAbove(text, if (im in pairs) s.hints.getOrElse(i) { "" } else "", style).ifEmpty { candidateReadings.of(text, style, session.readingOf(s.first + i)) }
+            hintAbove(text, if (im in pairs) s.hints.getOrElse(i) { "" } else "", style).ifEmpty { read(im, session, s.first + i, text, style) }
         }
         return s.copy(readings = readings, hints = if (im in pairs) emptyList() else s.hints)
     }
@@ -399,6 +406,27 @@ class Engines(
         if (im !in pairs || s.hints.none { it.isNotEmpty() }) return s
         val readings = s.candidates.mapIndexed { i, text -> hintAbove(text, s.hints.getOrElse(i) { "" }) }
         return s.copy(readings = readings, hints = s.hints.mapIndexed { i, h -> if (readings.getOrNull(i).isNullOrEmpty()) h else "" })
+    }
+
+    // the candidate at [index] of [session]'s as 候选词注音 writes it: handwriting's last character with all its readings
+    private fun read(im: String, session: Session, index: Int, text: String, style: ReadingStyle): List<String> {
+        val before = if (im == HANDWRITING) session.lookedUp(index) else null
+        return if (before != null) candidateReadings.allOf(text, style, before) else candidateReadings.of(text, style, session.readingOf(index))
+    }
+
+    /**
+     * The card of the [index]th of [im]'s candidates ([paged], of the page shown: the paged window's), [text]:
+     * a character looked up (handwriting's, by its parts or strokes: [Session.lookedUp]); null for any
+     * other, or if [text] is no longer there.
+     */
+    fun charCard(im: String, index: Int, text: String, paged: Boolean = false): CharCard? = checked {
+        val shown = pairs.shownSession(im)
+        val session = sessions[shown] ?: return@checked null
+        val at = index + if (paged) keyboards[shown]?.first ?: 0 else 0
+        // the text first: what lookedUp reads is what candidates read up to
+        if (session.candidates(at, 1).firstOrNull()?.text != text) return@checked null
+        val before = session.lookedUp(at) ?: return@checked null
+        CharCard.of(text, before, candidateReadings, assets.pinyinData.charReadings, assets.charInfo, assets.strokes())
     }
 
     private fun hintAbove(text: String, hint: String, style: ReadingStyle = ReadingStyle.PINYIN): List<String> =
@@ -536,7 +564,7 @@ class Engines(
         val style = settings.candidateReading
         choices.mapIndexed { i, c ->
             val hint = if (im in pairs) c.hint else ""
-            Choice(c.text, c.hint.takeIf { im !in pairs }.orEmpty(), hintAbove(c.text, hint, style).ifEmpty { candidateReadings.of(c.text, style, session.readingOf(from + i)) })
+            Choice(c.text, c.hint.takeIf { im !in pairs }.orEmpty(), hintAbove(c.text, hint, style).ifEmpty { read(im, session, from + i, c.text, style) })
         }
     }
 

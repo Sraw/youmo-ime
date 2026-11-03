@@ -64,6 +64,55 @@ class CandidateReadings(
         return if (out.all { it.isEmpty() }) emptyList() else out
     }
 
+    /** The code point [codePoint]'s readings are [CharReadings]' of: its own, else its simplified one's where it has none (還 还). */
+    fun readFrom(codePoint: Int): Int {
+        if (data.charReadings.of(codePoint, card = true).isNotEmpty()) return codePoint
+        val s = simplify(String(Character.toChars(codePoint)))
+        return if (s.codePointCount(0, s.length) == 1) s.codePointAt(0) else codePoint
+    }
+
+    /**
+     * [codePoint]'s readings ([CharReadings] of [readFrom]; [card], the card's), the one it has in a word
+     * [before] ends in first (银 then 行: háng): the longest such word of the dictionary, read as the
+     * model reads it likeliest.
+     */
+    fun ordered(codePoint: Int, before: String = "", card: Boolean = false): List<Reading> {
+        val c = String(Character.toChars(codePoint))
+        val all = data.charReadings.of(readFrom(codePoint), card)
+        if (all.size < 2 || before.isEmpty()) return all
+        val text = simplify(before + c).takeIf { it.length == before.length + c.length } ?: (before + c)
+        val index = data.wordIndex
+        var from = maxOf(0, text.length - MAX_WORD)
+        if (from > 0 && Character.isLowSurrogate(text[from])) from++
+        while (from < before.length) {
+            val id = index.find(text, from, text.length)
+            val syllables = if (id >= 0) predictor.reading(id) else null
+            if (syllables != null && syllables.size == text.codePointCount(from, text.length)) {
+                val tones = table.tones(text.substring(from), syllables, id)
+                val read = tones?.let { Reading(syllables.last(), it.last().toInt()) }
+                if (read != null && read in all) return listOf(read) + (all - read)
+            }
+            from += if (Character.isHighSurrogate(text[from])) 2 else 1
+        }
+        return all
+    }
+
+    /**
+     * [text], one character, written as [style] has it with all its readings ([ordered] after [before]):
+     * the first [MAX_SHOWN] apart by [SEPARATOR], [MORE] after them if it has more; what [of] gives for
+     * any other text, or a character of one reading.
+     */
+    fun allOf(text: String, style: ReadingStyle, before: String = ""): List<String> {
+        if (style == ReadingStyle.OFF || text.isEmpty() || text.codePointCount(0, text.length) != 1) return of(text, style)
+        val cp = text.codePointAt(0)
+        if (!Character.isIdeographic(cp)) return of(text, style)
+        val all = ordered(cp, before)
+        if (all.size < 2) return of(text, style)
+        val shown = all.take(MAX_SHOWN).map { written(it.syllable, it.tone, style) }
+        if (shown.any { it.isEmpty() }) return of(text, style)
+        return listOf(shown.joinToString(SEPARATOR.toString()) + if (all.size > MAX_SHOWN) MORE.toString() else "")
+    }
+
     /**
      * A pinyin hint of [text] (a misreading's true "jué sè", a part's or a stroke lookup's "hao") as one reading
      * a character, written as [style] has it (pinyin while 候选词注音 is off): the hint's own tones where it has
@@ -129,6 +178,15 @@ class CandidateReadings(
     }
 
     companion object {
+        /** Between a character's readings, as [allOf] writes them: xíng/háng. */
+        const val SEPARATOR = '/'
+
+        /** After them, when the character has more than are shown: hé/hè…. */
+        const val MORE = '…'
+
+        /** At most this many of a character's readings are shown in a candidate. */
+        const val MAX_SHOWN = 2
+
         // the longest word looked for in a candidate's text, in chars
         private const val MAX_WORD = 8
         private const val ASCII = 0x7f

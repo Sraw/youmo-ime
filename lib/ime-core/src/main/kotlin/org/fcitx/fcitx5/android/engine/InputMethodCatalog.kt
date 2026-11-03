@@ -161,6 +161,9 @@ object InputMethodCatalog {
 
     /** Characters by the pinyin of their parts (Chaizi), for full pinyin; read if the app has it. */
     const val CHAIZI_DATA = "engine/chaizi.data"
+
+    /** Each character's radical, strokes and parts (CharInfo), for its card; read if the app has it. */
+    const val CHAR_INFO_DATA = "engine/charinfo.data"
     /** Read if the app has one; without it the engine types by the decoder alone. */
     const val SENTENCE_MODEL = "engine/sentence-model.safetensors"
     /** Six times the work of [SENTENCE_MODEL], and right more often: see [PinyinSession]'s refiner. */

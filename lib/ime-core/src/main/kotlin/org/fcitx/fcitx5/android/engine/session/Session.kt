@@ -74,6 +74,13 @@ interface Session {
     fun readingOf(index: Int): List<WordReading>? = null
 
     /**
+     * The text before the candidate at [index] of all, if it is a character looked up rather than
+     * typed by its reading (handwriting's last character, a character by its parts or strokes): the
+     * readings and the card of one go by it (CandidateReadings.ordered, CharCard). Null for any other.
+     */
+    fun lookedUp(index: Int): String? = null
+
+    /**
      * What was learned changed under the input (a long press taken back, a clear): the candidates
      * read anew, to be shown ([Keyboard.AGAIN]); null where nothing is on show to read again.
      */

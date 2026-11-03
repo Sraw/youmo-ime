@@ -6,8 +6,11 @@ package org.fcitx.fcitx5.android.host
 
 import java.util.concurrent.CopyOnWriteArrayList
 import org.fcitx.fcitx5.android.core.FormattedText
+import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.session.Action
 
 /**
@@ -252,6 +255,8 @@ class HostCore(
         val settings = options.toSettings()
         val schemeChanged = scheme != null && scheme != settings.scheme
         scheme = settings.scheme
+        val readingChanged = reading != null && reading != settings.candidateReading
+        reading = settings.candidateReading
         router.settings(settings)
         // 双拼's keyboard is the scheme's too (ImKeyboards: no 14 keys under 微软): the keyboard on show
         // told anew, as for a switch, with the engine's settings in place
@@ -259,10 +264,16 @@ class HostCore(
         if (schemeChanged && active != null && contexts.inputMethod(active) == InputMethodCatalog.SHUANGPIN) {
             emit(HostEvent.InputMethodChanged(InputMethodCatalog.SHUANGPIN))
         }
+        // 候选词注音 alone changed (the handwriting pad's 注): what is typed stays (Engines.settings), and what
+        // is on show is read again to be annotated the new way
+        if (readingChanged && !isEmpty()) sendKey(Key(UNICODE + Keyboard.RECALL, KeyStates.VIRTUAL), virtual = true)
     }
 
     // the 双拼 scheme [configure] last gave the engine, null before the first
     private var scheme: ShuangpinScheme? = null
+
+    // 候选词注音 as [configure] last gave it, null before the first
+    private var reading: ReadingStyle? = null
 
     /** `isInputPanelEmpty`. */
     fun isEmpty() = contexts.active?.panel?.empty ?: true

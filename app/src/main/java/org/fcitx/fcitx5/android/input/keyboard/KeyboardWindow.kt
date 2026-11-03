@@ -21,6 +21,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
@@ -116,6 +117,8 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
                 deliver = { reading, piece -> ink { offerInk(reading, piece) } },
                 // the character done, for the engine to weigh its sentence again (性能档位 high)
                 finished = { piece -> ink { inkFinished(piece) } },
+                // 注: the shared setting, as its row in the settings sets it (SharedInputFragment)
+                setReading = { style -> service.postFcitxJob { setImOptions(InputMethodCatalog.PINYIN, mapOf(EngineSettings.CANDIDATE_READING to style.key)) } },
             )
         },
     )

@@ -54,7 +54,7 @@ class LabeledCandidateItemUi(
                     val baseline = root.paddingTop + if (root.includeFontPadding) -fm.top else -fm.ascent
                     ReadingSpan.annotate(this, candidate.text, candidate.readings, altFg, ReadingSpan.hintSize(root.paint, baseline, floor), baseline)
                 } else {
-                    ReadingSpan.annotate(this, candidate.text, candidate.readings, altFg)
+                    ReadingSpan.annotate(this, candidate.text, candidate.readings, altFg, floor = floor)
                 }
             }
             if (candidate.comment.isNotBlank()) {

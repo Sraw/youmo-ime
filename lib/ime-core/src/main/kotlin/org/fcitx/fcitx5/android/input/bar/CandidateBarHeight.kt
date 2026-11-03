@@ -42,6 +42,17 @@ object CandidateBarHeight {
         return (room / line).coerceIn(minOf(floor, most), most)
     }
 
+    /**
+     * The text size of a handwritten character's readings above it (xíng/háng…): a reading's [READING_SCALE]
+     * of [textSize] where they fit over the character ([charWidth]; [width] theirs at that size), else as
+     * small as fits but no smaller than [floor] (the candidate is widened then). [floor] 0: never smaller.
+     */
+    fun readingsSize(textSize: Float, charWidth: Float, width: Float, floor: Float): Float {
+        val most = textSize * READING_SCALE
+        if (width <= charWidth || floor <= 0f) return most
+        return (most * charWidth / width).coerceIn(minOf(floor, most), most)
+    }
+
     fun dp(textSp: Int, reading: ReadingStyle = ReadingStyle.OFF): Int {
         val bar = DEFAULT_DP + 2 * (textSp - DEFAULT_TEXT_SP)
         return if (reading == ReadingStyle.PINYIN) bar + Math.round(textSp * READING_LINE) else bar

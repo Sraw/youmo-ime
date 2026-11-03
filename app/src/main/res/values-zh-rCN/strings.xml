@@ -624,6 +624,48 @@
     <string name="im_candidate_reading_off">关闭</string>
     <string name="im_candidate_reading_pinyin">拼音</string>
     <string name="im_candidate_reading_zhuyin">注音符号</string>
+    <string name="hw_reading_key_on">%1$s，已开</string>
+    <string name="hw_reading_key_off">%1$s，已关</string>
+    <string name="char_card_readings">读音</string>
+    <string name="char_card_radical">部首</string>
+    <string name="char_card_strokes">%1$d 画</string>
+    <string name="char_card_parts">拆字</string>
+    <string name="char_card_order">笔顺</string>
+    <string-array name="char_card_stroke_names">
+        <item>横</item>
+        <item>提</item>
+        <item>竖</item>
+        <item>竖钩</item>
+        <item>撇</item>
+        <item>点</item>
+        <item>捺</item>
+        <item>横折</item>
+        <item>横撇</item>
+        <item>横钩</item>
+        <item>横折钩</item>
+        <item>横折提</item>
+        <item>横折弯</item>
+        <item>横折折</item>
+        <item>横斜钩</item>
+        <item>横折弯钩</item>
+        <item>横撇弯钩</item>
+        <item>横折折撇</item>
+        <item>横折折折钩</item>
+        <item>横折折折</item>
+        <item>竖折</item>
+        <item>竖弯</item>
+        <item>竖提</item>
+        <item>竖折撇</item>
+        <item>竖折折</item>
+        <item>竖弯钩</item>
+        <item>竖折折钩</item>
+        <item>撇折</item>
+        <item>撇点</item>
+        <item>弯钩</item>
+        <item>斜钩</item>
+        <item>卧钩</item>
+        <item>折</item>
+    </string-array>
     <string name="im_model_level">性能档位</string>
     <string name="im_model_level_summary">档位越高越准，也越费电</string>
     <string name="im_model_level_low">低档：只按词频和搭配，最省电</string>
@@ -638,10 +680,11 @@
     <string name="engine_data_handwriting">手写识别模型：本项目用 Make Me a Hanzi 的笔画（来自文鼎字体）和开源手写字体训练</string>
     <string name="engine_data_stroke">笔画表：rime-stroke</string>
     <string name="engine_data_emoji">表情列表和关键词：Unicode 的 emoji-test.txt 和 CLDR</string>
-    <string name="engine_data_unihan">字的声调：Unicode 的 Unihan 字库（kMandarin、kHanyuPinlu、kXHC1983、kTGHZ2013、kHanyuPinyin）</string>
+    <string name="engine_data_unihan">字的读音和声调、部首、笔画：Unicode 的 Unihan 字库（kMandarin、kHanyuPinlu、kXHC1983、kTGHZ2013、kHanyuPinyin、kRSUnicode、kTotalStrokes）和部首表 CJKRadicals</string>
     <string name="engine_data_pinyin_data">Unihan 读音的整理：mozillazg/pinyin-data</string>
     <string name="engine_data_phrase_pinyin">词的声调：mozillazg/phrase-pinyin-data，本项目校订</string>
     <string name="engine_data_chaizi">拆字数据：开放词典《汉语拆字字典》kfcd/chaizi，本项目给部件注音</string>
+    <string name="engine_data_stroke_order">字卡的笔顺（大陆规范笔顺）：最初取自 cnchar（theajack/cnchar），之后由本项目维护校正</string>
     <string name="im_auto_select">只有一个候选时直接上屏</string>
     <string name="im_auto_select_summary">编码打满时也直接上屏第一个</string>
     <string name="im_hint">显示编码提示</string>

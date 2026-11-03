@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
+import org.fcitx.fcitx5.android.engine.reading.CharCard
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.runtime.Engines
@@ -88,6 +89,11 @@ class FakeHostApi : HostApi {
     val readings = mutableMapOf<String, String>()
 
     override suspend fun pinyinOf(text: String): String? = readings[text]
+
+    /** What [charCard] answers, by the candidate's text: no data to make one of, so none unless set here. */
+    val charCards = mutableMapOf<String, CharCard>()
+
+    override suspend fun charCard(index: Int, text: String, paged: Boolean): CharCard? = charCards[text]
 
     // no model: each char a word of its own
     override suspend fun wordBoundaries(texts: List<String>) = texts.associateWith { IntArray(it.length + 1) { i -> i } }

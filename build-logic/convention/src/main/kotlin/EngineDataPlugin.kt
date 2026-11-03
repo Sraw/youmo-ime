@@ -25,6 +25,7 @@ import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.OutputFile
@@ -176,6 +177,8 @@ class EngineDataPlugin : Plugin<Project> {
         )
 
         const val CHAIZI_TASK = "compileChaiziData"
+        private const val HANDWRITING_PLUGIN = "org.fcitx.fcitx5.android.handwriting-data"
+        private const val HANDWRITING_TASK = "extractHandwritingModels"
         // characters by their parts, the open 汉语拆字字典 (CC BY 3.0), at a commit of its
         private const val CHAIZI_COMMIT = "e177ab54ce4edf255315a60593ffecbd8167e96b"
         private val CHAIZI = Download(
@@ -184,6 +187,19 @@ class EngineDataPlugin : Plugin<Project> {
             "engine-data/chaizi-${CHAIZI_COMMIT.take(8)}-jt.txt",
         )
 
+        const val CHAR_INFO_TASK = "compileCharInfo"
+        // each character's radical and strokes, for its card: Unihan's kRSUnicode and kTotalStrokes,
+        // each radical's character (Unicode License v3, as the readings' Unihan)
+        private val UNIHAN_ZIP = Download(
+            "https://www.unicode.org/Public/17.0.0/ucd/Unihan.zip",
+            "f7a48b2b545acfaa77b2d607ae28747404ce02baefee16396c5d2d7a8ef34b5e",
+            "engine-data/Unihan-17.0.0.zip",
+        )
+        private val RADICALS = Download(
+            "https://www.unicode.org/Public/17.0.0/ucd/CJKRadicals.txt",
+            "826f83be25cd18fb8a5015a514704504e1982e840ea14d058bf583e1cc620c83",
+            "engine-data/CJKRadicals-17.0.0.txt",
+        )
         const val OPENCC_TASK = "compileOpenccData"
 
         const val MODEL_TASK = "copySentenceModels"
@@ -231,6 +247,8 @@ class EngineDataPlugin : Plugin<Project> {
         val emojiTest = registerDownload(target, "downloadEmojiTest", EMOJI_TEST, downloadsDir)
         val emojiWords = registerDownload(target, "downloadEmojiWords", EMOJI_WORDS, downloadsDir)
         val chaiziDownload = registerDownload(target, "downloadChaizi", CHAIZI, downloadsDir)
+        val unihanZip = registerDownload(target, "downloadUnihanZip", UNIHAN_ZIP, downloadsDir)
+        val radicals = registerDownload(target, "downloadCjkRadicals", RADICALS, downloadsDir)
 
         val tool = target.configurations.create(TOOL_CONFIGURATION) {
             isCanBeConsumed = false
@@ -287,6 +305,24 @@ class EngineDataPlugin : Plugin<Project> {
             pinyin.set(compile.flatMap { it.outputDir.file("engine/pinyin.data") })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-chaizi"))
         }
+        val charInfo = target.tasks.register<CompileCharInfo>(CHAR_INFO_TASK) {
+            classpath.from(tool)
+            toolCode.set(fingerprint.flatMap { it.outputFile })
+            this.unihan.set(unihanZip.flatMap { it.outputFile })
+            this.radicals.set(radicals.flatMap { it.outputFile })
+            this.chaizi.set(chaiziDownload.flatMap { it.outputFile })
+            this.strokes.set(strokes.flatMap { it.outputFile })
+            // the mainland's stroke orders, this project's (first taken from cnchar, MIT)
+            this.orders.set(target.rootProject.layout.projectDirectory.dir("lexicon").file("stroke-order.tsv"))
+            pinyin.set(compile.flatMap { it.outputDir.file("engine/pinyin.data") })
+            outputDir.set(target.layout.buildDirectory.dir("generated/engine-charinfo"))
+        }
+        // the characters handwriting knows, each of which must have a card: HandwritingDataPlugin's, applied after this
+        target.pluginManager.withPlugin(HANDWRITING_PLUGIN) {
+            charInfo.configure {
+                cover.set(target.tasks.named<ExtractTask>(HANDWRITING_TASK).flatMap { it.outputDir.file("handwriting/chars.txt") })
+            }
+        }
         // OpenCC 1.2.0's s2tw dictionaries, committed (lib/ime-dict-tool/opencc/README.md): frozen data
         val opencc = target.tasks.register<CompileOpenccData>(OPENCC_TASK) {
             classpath.from(tool)
@@ -331,6 +367,7 @@ class EngineDataPlugin : Plugin<Project> {
             variant.sources.assets?.addGeneratedSourceDirectory(english, CompileEnglishData::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(emoji, CompileEmojiData::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(chaizi, CompileChaiziData::outputDir)
+            variant.sources.assets?.addGeneratedSourceDirectory(charInfo, CompileCharInfo::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(opencc, CompileOpenccData::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(tables, CompileTables::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(model, CopyModels::outputDir)
@@ -543,6 +580,58 @@ class EngineDataPlugin : Plugin<Project> {
         fun compile() {
             // the pinyin data mapped, as for the emoji
             runTool("chaizi.data", "1g") { listOf("chaizi", "-o", it, "--pinyin", pinyin.get().asFile.path, source.get().asFile.path) }
+        }
+    }
+
+    /**
+     * `engine/charinfo.data`: ime-dict-tool's `charinfo`, each character's radical, strokes, parts and
+     * stroke order; the build fails if a character handwriting knows has no reading, radical or strokes,
+     * or under 97% of them are taken apart, or under 94% have the mainland's stroke order; or when one of
+     * lexicon/stroke-order.tsv's orders is unlike Unihan's count or, in the five kinds, rime-stroke's with no note why, or has a note
+     * with nothing to excuse.
+     */
+    @CacheableTask
+    abstract class CompileCharInfo : ToolDataTask() {
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val unihan: RegularFileProperty
+
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val radicals: RegularFileProperty
+
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val chaizi: RegularFileProperty
+
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val strokes: RegularFileProperty
+
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val orders: RegularFileProperty
+
+        /** The compiled pinyin data: whether each character handwriting knows has readings. */
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NONE)
+        abstract val pinyin: RegularFileProperty
+
+        @get:InputFile
+        @get:Optional
+        @get:PathSensitive(PathSensitivity.NONE)
+        abstract val cover: RegularFileProperty
+
+        @TaskAction
+        fun compile() {
+            // Unihan's 100,000 characters' lines and the pinyin data mapped
+            runTool("charinfo.data", "1g") {
+                listOf(
+                    "charinfo", "-o", it, "--unihan", unihan.get().asFile.path, "--radicals", radicals.get().asFile.path,
+                    "--chaizi", chaizi.get().asFile.path, "--strokes", strokes.get().asFile.path,
+                    "--orders", orders.get().asFile.path, "--pinyin", pinyin.get().asFile.path,
+                ) + (cover.orNull?.let { c -> listOf("--cover", c.asFile.path) } ?: emptyList())
+            }
         }
     }
 

@@ -32,6 +32,11 @@ class LicensesFragment : PaddingPreferenceFragment() {
             VoiceFeature.Credit(getString(R.string.engine_data_stroke), "LGPL-3.0-only", "https://github.com/rime/rime-stroke"),
             VoiceFeature.Credit(getString(R.string.engine_data_emoji), "Unicode-3.0", "https://www.unicode.org/license.txt"),
             VoiceFeature.Credit(getString(R.string.engine_data_chaizi), "CC-BY-3.0", "https://github.com/kfcd/chaizi"),
+            // MIT: its notice kept, the licence's text at the link
+            VoiceFeature.Credit(
+                getString(R.string.engine_data_stroke_order), "MIT, Copyright (c) 2017 - present theajack",
+                "https://github.com/theajack/cnchar/blob/b8397db3e08e88ebbf8acf92b5cbab1a7e4c1550/LICENSE",
+            ),
             VoiceFeature.Credit(getString(R.string.engine_data_unihan), "Unicode-3.0", "https://www.unicode.org/license.txt"),
             VoiceFeature.Credit(getString(R.string.engine_data_pinyin_data), "MIT", "https://github.com/mozillazg/pinyin-data"),
             VoiceFeature.Credit(getString(R.string.engine_data_phrase_pinyin), "MIT", "https://github.com/mozillazg/phrase-pinyin-data"),

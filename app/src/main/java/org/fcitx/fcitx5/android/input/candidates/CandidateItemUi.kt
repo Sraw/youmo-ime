@@ -54,6 +54,9 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme) : Ui {
         })
     }
 
+    // the smallest a reading is drawn (hints', and a handwritten character's several)
+    private val floor get() = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, CandidateBarHeight.HINT_FLOOR_SP, ctx.resources.displayMetrics)
+
     fun updateCandidate(candidate: CandidateWord) {
         val fg = theme.candidateTextColor
         val altFg = theme.candidateCommentColor
@@ -67,10 +70,10 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme) : Ui {
                 if (hint && candidate.readings.isNotEmpty()) {
                     val fm = text.paint.fontMetrics
                     val baseline = (ctx.dp(CandidateBarHeight.dp(textSp)) - (fm.bottom - fm.top)) / 2 - fm.top
-                    val size = ReadingSpan.hintSize(text.paint, baseline, TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, CandidateBarHeight.HINT_FLOOR_SP, ctx.resources.displayMetrics))
+                    val size = ReadingSpan.hintSize(text.paint, baseline, floor)
                     ReadingSpan.annotate(this, candidate.text, candidate.readings, altFg, size, baseline)
                 } else {
-                    ReadingSpan.annotate(this, candidate.text, candidate.readings, altFg)
+                    ReadingSpan.annotate(this, candidate.text, candidate.readings, altFg, floor = floor)
                 }
             }
             if (candidate.comment.isNotBlank()) {

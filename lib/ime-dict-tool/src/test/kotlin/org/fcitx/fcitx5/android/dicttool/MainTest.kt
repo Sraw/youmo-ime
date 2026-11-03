@@ -9,7 +9,9 @@ import org.fcitx.fcitx5.android.engine.data.Misreadings
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.english.EnglishData
 import org.fcitx.fcitx5.android.engine.english.EnglishText
+import org.fcitx.fcitx5.android.engine.phrase.CharInfo
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.stroke.StrokeShape
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -24,6 +26,8 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 class MainTest {
 
@@ -67,6 +71,20 @@ class MainTest {
         val id = (0 until data.vocabulary.size).first { data.vocabulary.word(it) == "你好" }
         val reading = intArrayOf(Syllables.id("ni"), Syllables.id("hao"))
         assertEquals(listOf<Byte>(3, 4), data.tones.tones("你好", reading, id)?.toList())
+        // kMandarin's file: a character's readings, those the modern dictionaries lack
+        assertTrue(out, out.contains("readings: 2 characters' in order"))
+        assertEquals(listOf("hǎo", "hào"), data.charReadings.of('好'.code).map { it.pinyin })
+    }
+
+    @Test
+    fun aFileNamedForNoFieldGivesTonesButNoReadings() {
+        val lm = file("lm.arpa", ReadersTest.TINY_ARPA)
+        val dict = file("dict.txt", "你\tni\t0\n好 hao\n你好 ni'hao\n")
+        val unihan = file("unihan.txt", "U+4F60: nǐ  # 你\n")
+        val output = tmp.root.resolve("pinyin.data").path
+        val (code, out, err) = run("pinyin", "-o", output, "--lm", lm, "--char-tones", unihan, dict)
+        assertEquals(err, 0, code)
+        assertTrue(out, out.contains("readings: 0 characters' in order"))
     }
 
     @Test
@@ -382,6 +400,87 @@ class MainTest {
         assertEquals(err, 0, code)
         assertTrue(out, out.contains("chaizi: 1 characters, 1 of them by their parts, 1 spellings"))
         assertEquals(listOf("caoba\t芭"), output.readLines().filter { !it.startsWith('#') })
+    }
+
+    // a pinyin.data whose characters' readings are kMandarin's: 你 好 江, not 乾
+    private fun charInfoInputs(
+        orders: String = "# 字  shapes\n好\tPD P H HP SG H\n江\tD D T H S H\n你\tP S P HG SG P D\n",
+        strokes: String = "乾\thhsszhpnhhz\n",
+    ): Array<String> {
+        val pinyin = tmp.root.resolve("pinyin.data").path
+        val dict = file("dict.txt", "你\tni\t0\n好\thao\t0\n江\tjiang\t0\n")
+        val unihan = file("kMandarin.txt", "U+4F60: nǐ  # 你\nU+597D: hǎo  # 好\nU+6C5F: jiāng  # 江\n")
+        assertEquals(0, run("pinyin", "-o", pinyin, "--lm", file("lm.arpa", ReadersTest.TINY_ARPA), "--char-tones", unihan, dict).first)
+        val zip = tmp.root.resolve("Unihan.zip")
+        ZipOutputStream(zip.outputStream()).use { z ->
+            z.putNextEntry(ZipEntry("Unihan_IRGSources.txt"))
+            val rs = "U+4F60\tkRSUnicode\t9.5\nU+4F60\tkTotalStrokes\t7\nU+597D\tkRSUnicode\t38.3\nU+597D\tkTotalStrokes\t6\n" +
+                "U+6C5F\tkRSUnicode\t85.3\nU+6C5F\tkTotalStrokes\t6\nU+4E7E\tkRSUnicode\t5.10\n"
+            z.write(rs.toByteArray())
+            z.closeEntry()
+        }
+        return arrayOf(
+            "--unihan", zip.path,
+            "--radicals", file("CJKRadicals.txt", "5; 2F04; 4E59\n9; 2F08; 4EBA\n38; 2F25; 5973\n85; 2F54; 6C34\n"),
+            "--chaizi", file("chaizi-jt.txt", "你\t人 尔\t亻 尔\n好\t女 子\n江\t水 工\t氵 工\n"),
+            "--strokes", file("stroke.dict.yaml", "---\nname: stroke\n...\n\n$strokes"),
+            "--orders", file("stroke-order.tsv", orders),
+            "--pinyin", pinyin,
+        )
+    }
+
+    @Test
+    fun charInfoIsCompiledAndCoversTheCharactersHandwritingKnows() {
+        val output = tmp.root.resolve("charinfo.data")
+        val (code, out, err) = run("charinfo", "-o", output.path, *charInfoInputs(), "--cover", file("chars.txt", "你好江，a"))
+        assertEquals(err, 0, code)
+        assertTrue(out, out.contains("charinfo: 4 characters, 3 of them taken apart"))
+        assertTrue(out, out.contains("parts 3 (100.0%)"))
+        assertTrue(out, out.contains("the mainland's stroke order 3 (100.0%)"))
+        val info = CharInfo.load(ByteBuffer.wrap(output.readBytes()))
+        // each stroke's shape, as written: 尔's 横钩
+        assertEquals(CharInfo.Entry("亻", 7, listOf("亻", "尔"), StrokeShape.parse("P S P HG SG P D")), info.of('你'.code))
+        // strokes from rime-stroke's order where Unihan counts none
+        assertEquals(CharInfo.Entry("乙", 11, null), info.of('乾'.code))
+    }
+
+    @Test
+    fun tooFewCharactersWithTheMainlandsStrokeOrderFailTheBuild() {
+        val output = tmp.root.resolve("charinfo.data")
+        val (code, _, err) = run("charinfo", "-o", output.path, *charInfoInputs("你\tP S P HG SG P D\n"), "--cover", file("chars.txt", "你好江"))
+        assertEquals(1, code)
+        assertTrue(err, err.contains("2 characters without the mainland's stroke order") && err.contains("好江"))
+    }
+
+    @Test
+    fun anOrderUnlikeUnihansCountFailsTheBuild() {
+        val output = tmp.root.resolve("charinfo.data")
+        val (code, _, err) = run("charinfo", "-o", output.path, *charInfoInputs("好\tPD P H HP SG H\n你\tP S P HG SG P\n"))
+        assertEquals(1, code)
+        assertTrue(err, err.contains("stroke-order.tsv:2") && err.contains("你 6 strokes, Unihan 7"))
+    }
+
+    @Test
+    fun anOrderNoneOfRimeStrokesFailsTheBuildAndLeavesTheFileThere() {
+        val output = tmp.root.resolve("charinfo.data").apply { writeText("before") }
+        val (code, _, err) = run("charinfo", "-o", output.path, *charInfoInputs("江\tD D T H S H\n", "江\tnnhhsz\n"))
+        assertEquals(1, code)
+        assertTrue(err, err.contains("江 丶丶一一丨一, rime-stroke 丶丶一一丨乛, with no note why"))
+        assertEquals("before", output.readText())
+    }
+
+    @Test
+    fun anOrderWithANoteWhyIsTaken() {
+        val output = tmp.root.resolve("charinfo.data")
+        assertEquals(0, run("charinfo", "-o", output.path, *charInfoInputs("江\tD D T H S H\tthe mainland's 竖 a 丨\n", "江\tnnhhsz\n")).first)
+    }
+
+    @Test
+    fun aCharacterHandwritingKnowsWithoutAReadingFailsTheBuild() {
+        val output = tmp.root.resolve("charinfo.data")
+        val (code, _, err) = run("charinfo", "-o", output.path, *charInfoInputs(), "--cover", file("chars.txt", "你乾"))
+        assertEquals(1, code)
+        assertTrue(err, err.contains("1 characters without readings") && err.contains("乾"))
     }
 
     @Test

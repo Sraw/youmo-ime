@@ -217,6 +217,8 @@ class InputView(
     // docked, below the keyboard is the screen's edge; floating, dragged to the top, there is room below (F3205)
     override val undoBelowOk: Boolean get() = floating
 
+    override val floatingKeyboard: Boolean get() = floating
+
     // the same bottom FloatingPlacer keeps the keyboard above: this view's bottom less the inset
     // dispatched to it, in window pixels. The decor may already fit the bar (API < 35, floating),
     // so the raw root insets subtracted from the decor's height can count the bar twice or not at all

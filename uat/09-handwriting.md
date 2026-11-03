@@ -7,8 +7,8 @@
 ### HW-01 [P0] 手写键盘的样子
 - **前提**：B0-手写。
 - **操作**：看键盘。
-- **预期**：大部分是书写板；右边是 ⌫、"，"、"。"；下面一排是符、123、空格、地球键、回车。
-- **JVM**：`HandwritingUatTest.theHandwritingKeyboard`（书写板占大半、右边 ⌫ ， 。、下排 符 123 等；图）；设备上不跑。
+- **预期**：大部分是书写板；右边是 ⌫、"，"、"。"、注；下面一排是符、123、空格、地球键、回车。
+- **JVM**：`HandwritingUatTest.theHandwritingKeyboard`（书写板占大半、右边 ⌫ ， 。 注、下排 符 123 等；图）；设备上不跑。
 
 ### HW-02 [P0] 写一个字，候选是这个字的几种可能
 - **前提**：B0-手写。
@@ -114,3 +114,27 @@
 - **操作**：写「人」，记下候选顺序，点第三个上屏，马上点 ⌫ 删掉；再写「人」，看候选。
 - **预期**：顺序和第一次一样（删掉的那次不算用过）。
 - **JVM**：`HandwritingEngineUatTest.aCharacterDeletedRightAwayIsNotUsed`（:lib:ime-eval:uatTest，真数据）（点第三个又删掉，再写顺序不变）；设备上不跑。
+
+### HW-27 [P1] 候选词注音打开时，手写的多音字标全部读音
+- **前提**：B0-手写，**候选词注音** 选拼音。
+- **操作**：写「行」，看候选栏；删光，写「银」再写「行」；把候选词注音改成注音符号，再写「行」。候选字号 20 和 28 各看一次，横屏再看一次。
+- **预期**：「行」上方标 xíng/háng…（前两个读音，「/」隔开，还有就加「…」）；写了「银」以后「行」标 háng/xíng…；只有一个读音的字（街）照旧一个；拼音放不下时字变小但不小于 7sp，再放不下候选变宽；注音符号是一个读音一竖列并排，还有更多时后面有「⋮」。栏高和只标一个读音时一样。
+- **JVM**：`CandidateReadingsUatTest.handwritingPortrait`（竖屏，拼音和注音、20 和 28sp、浅色和深色；图）、`CandidateReadingsUatTest.handwritingLandscape`（横屏；图）、`ReadingSpanTest`（拼音缩到下限再加宽，注音一列一个）、`EnginesHandwritingReadingsTest.aWrittenCharacterShowsItsReadingsTheWordsFirst`（ime-core，测试数据：行 xíng/háng…，银之后 háng 在前）、`HandwritingEngineUatTest.theCandidatesLeaveOutACharactersOwnNeutralTone`（App 的数据：候选上 头 只有 tóu、和 没有 huo，字卡里有）；设备上留作冒烟。
+
+### HW-28 [P1] 「注」键：点一下开关，写好的字不上屏
+- **前提**：B0-手写，**候选词注音** 关闭。
+- **操作**：写「银」「行」（还带下划线）；点右边最下面的「注」；再点一次；长按「注」，选 **注音符号**；写一笔还没停笔时点「注」。
+- **预期**：第一次点后候选栏变高、候选标上拼音，「注」变成强调色，框里「银行」还带下划线（没上屏，不用重写）；再点一次关掉，栏变回原高；长按选注音符号后标注音；设置里的 **候选词注音** 跟着变。写到一半点「注」时先把这个字写完再切换，也不上屏。读屏读「候选词注音，已开」「候选词注音，已关」。
+- **JVM**：`HandwritingUatTest.theReadingKeyTurnsTheReadingsOnAndWhatIsWrittenStays`（点「注」设成拼音、不 focusOutIn 不上屏、组字留着、栏变高、读屏文字；图）、`HandwritingKeyboardTest.theReadingKeyTurnsTheReadingsOnAsLastUsedAndOff`、`HandwritingKeyboardTest.itsLongPressSetsEachStyle`、`HandwritingKeyboardTest.aTapMidCharacterFinishesItFirstAndCommitsNothing`、`EnginesHandwritingReadingsTest.turnedOnWhatIsWrittenStaysAndIsReadAgain`（ime-core：只改注音时写好的字留着并重标）；设备上留作冒烟。
+
+### HW-29 [P1] 长按手写的字出字卡
+- **前提**：B0-手写。
+- **操作**：写「银」「行」，长按候选里的「行」；竖屏、横屏、悬浮键盘各看一次。全拼里打 `ushuigong` 长按「江」；打 `upps` 长按「行」。
+- **预期**：菜单最上面是字卡：大的「行」；读音每个一行，háng 在前（和候选栏同一个顺序），每行有拼音、注音符号、最多两个例词（只取词典里的词，没有「荣和」「去呢」「弦数」这种两个词拼成的）；部首「行」、6 画、拆字「彳 亍（chì chù）」、笔顺（大陆规范笔顺，每笔按具体笔形：丿丿丨一一亅；读屏读出「撇、撇、竖、横、横、竖钩」）。字卡里有 **上屏**、**复制**，再下面是原来的 **忘掉学到的** / **屏蔽**。竖屏和悬浮是一列，横屏左右两列（上屏、复制在右列）。长按「和」：读音多于四个，用手指在读音上往上滑能滑动，最后是轻声 huo（候选栏里不标）。拆字、笔画查字的字也有字卡；直接打拼音出的字没有。读屏把字卡读成一句。
+- **JVM**：`HandwritingUatTest.aHeldCharactersCardThenItsButtonsAndTheMenu`（字卡内容、读屏一句、按钮、菜单行；图）、`HandwritingUatTest.theCardInLandscapeIsTwoColumns`（图）、`HandwritingUatTest.theCardOnTheFloatingKeyboardIsOneColumn`（图）、`HandwritingUatTest.aCardLeavesOutWhatIsNotKnownAndScrollsItsReadings`（乾没有拆字、笔顺两行；和的六个读音，在菜单列表里拖动时滚的是读音；图）、`CharReadingsTest.theCardListsTheDictionariesNeutralTonesTooAfterTheRest`、`EnginesHandwritingReadingsTest.aCardOnTheSecondPageIsOfItsCharacter`（分页候选窗第二页的字卡）、`EnginesHandwritingReadingsTest.theCardOfAWrittenCharacterOrOneLookedUp`（ime-core：手写、拆字、笔画查字有字卡，打出的没有）、`HandwritingEngineUatTest.aCardsWordsAreADictionarys`（App 的数据：和、呢、数的例词都是词典里的）、`HandwritingEngineUatTest.aCardsStrokeOrderIsTheMainlands`（行、出、必、我、数的笔顺是大陆的）、`HandwritingEngineUatTest.aCardsTurningStrokesEachTheirShape`（口 己 乙 九 马 冖 等的折笔）、`HandwritingEngineUatTest.theStandardsExamplesEachTheirTurningStroke`（《GB13000.1 字符集汉字折笔规范》折笔笔形表的例字，每个都有它那种折笔）；设备上留作冒烟。
+
+### HW-30 [P1] 字卡的复制不上屏，上屏和点候选一样
+- **前提**：B0-手写。
+- **操作**：写「银」「行」，长按「行」，点 **复制**；在别的地方粘贴；再长按「行」，点 **上屏**。
+- **预期**：复制后菜单关上，剪贴板里只有「行」，框里「银行」还带下划线，什么都没上屏；点上屏和直接点候选「行」一样，上屏「银行」。
+- **JVM**：`HandwritingUatTest.copyPutsTheCharacterAloneOnTheClipboardAndCommitIsATap`（剪贴板「行」、不 select 不发键、组字留着；上屏是 select）；设备上留作冒烟。

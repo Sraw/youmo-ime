@@ -6,9 +6,12 @@ package org.fcitx.fcitx5.android.input.popup
 
 import android.content.Context
 import android.graphics.Rect
+import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
 import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.OvalShape
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.View
 import android.widget.ImageView
 import androidx.core.graphics.ColorUtils
@@ -21,6 +24,7 @@ import splitties.views.dsl.core.add
 import splitties.views.dsl.core.horizontalLayout
 import splitties.views.dsl.core.imageView
 import splitties.views.dsl.core.lParams
+import splitties.views.dsl.core.textView
 import splitties.views.imageDrawable
 
 class PopupMenuUi(
@@ -44,31 +48,28 @@ class PopupMenuUi(
 
     private val keySize = ctx.dp(48)
 
-    private val inactiveBackground = InsetDrawable(
-        ShapeDrawable(OvalShape()).apply {
-            paint.color = theme.accentKeyBackgroundColor
-        },
-        (keySize - ctx.dp(33)) / 2
-    )
+    // words, not icons (an item of no icon: the handwriting pad's 注's 关 / 拼音 / 注音符号), in pills wide enough for them
+    private val words = items.any { it.icon == 0 }
+    private val itemWidth = if (words) (keySize * WORDS_WIDTH).toInt() else keySize
 
-    private val activeBackground = InsetDrawable(
-        ShapeDrawable(OvalShape()).apply {
-            paint.color = ColorUtils.compositeColors(
-                theme.keyPressHighlightColor,
-                theme.accentKeyBackgroundColor
-            )
-        },
-        (keySize - ctx.dp(34)) / 2
-    )
+    private fun background(color: Int, inset: Int) = if (words) {
+        InsetDrawable(GradientDrawable().apply { setColor(color); cornerRadius = (keySize - inset).toFloat() / 2 }, ctx.dp(2), inset / 2, ctx.dp(2), inset / 2)
+    } else {
+        InsetDrawable(ShapeDrawable(OvalShape()).apply { paint.color = color }, inset / 2)
+    }
+
+    private val inactiveBackground = background(theme.accentKeyBackgroundColor, keySize - ctx.dp(33))
+
+    private val activeBackground = background(ColorUtils.compositeColors(theme.keyPressHighlightColor, theme.accentKeyBackgroundColor), keySize - ctx.dp(34))
 
     private val columnCount = items.size
     private val focusColumn = fixed?.start
-        ?: calcInitialFocusedColumn(columnCount, keySize, outerBounds, triggerBounds)
+        ?: calcInitialFocusedColumn(columnCount, itemWidth, outerBounds, triggerBounds)
 
     override val offsetX = if (fixed != null) {
-        EditMenuLayout.rowLeft(triggerBounds.centerX(), keySize, outerBounds.left, outerBounds.right) - triggerBounds.left
+        EditMenuLayout.rowLeft(triggerBounds.centerX(), itemWidth, outerBounds.left, outerBounds.right) - triggerBounds.left
     } else {
-        ((triggerBounds.width() - keySize) / 2) - (keySize * focusColumn)
+        ((triggerBounds.width() - itemWidth) / 2) - (itemWidth * focusColumn)
     }
     override val offsetY = ctx.dp(-52)
 
@@ -76,14 +77,24 @@ class PopupMenuUi(
 
     private var focusedIndex = columnOrder[focusColumn]
 
-    private val keyViews = items.map {
-        imageView {
-            background = inactiveBackground
-            scaleType = ImageView.ScaleType.CENTER_INSIDE
-            imageDrawable = drawable(it.icon)!!.apply {
-                setTint(theme.accentKeyTextColor)
+    private val keyViews: List<View> = items.map {
+        if (it.icon == 0) {
+            textView {
+                background = inactiveBackground
+                text = it.label
+                gravity = Gravity.CENTER
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, WORDS_SP)
+                setTextColor(theme.accentKeyTextColor)
             }
-            contentDescription = it.label
+        } else {
+            imageView {
+                background = inactiveBackground
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                imageDrawable = drawable(it.icon)!!.apply {
+                    setTint(theme.accentKeyTextColor)
+                }
+                contentDescription = it.label
+            }
         }
     }.also { views ->
         fixed?.disabled?.forEach { views.getOrNull(it)?.alpha = DISABLED_ALPHA }
@@ -96,7 +107,7 @@ class PopupMenuUi(
     override val root = horizontalLayout root@{
         for (i in 0 until columnCount) {
             val view = keyViews[columnOrder[i]]
-            add(view, lParams(keySize, keySize))
+            add(view, lParams(itemWidth, keySize))
         }
     }
 
@@ -117,7 +128,7 @@ class PopupMenuUi(
         rows = listOf(columnOrder.copyOf()),
         startRow = 0,
         startColumn = focusColumn,
-        stepX = keySize * PopupFocus.STEP,
+        stepX = itemWidth * PopupFocus.STEP,
         stepY = keySize * PopupFocus.STEP,
         cancelBelow = triggerBounds.height().toFloat(),
         // the key's bottom edge, in onChangeFocus's coordinates (the popup's, offsetY up); the edit
@@ -144,5 +155,9 @@ class PopupMenuUi(
 
     private companion object {
         const val DISABLED_ALPHA = 0.3f
+
+        // a pill of words, of a key's size; their text
+        const val WORDS_WIDTH = 1.75f
+        const val WORDS_SP = 14f
     }
 }

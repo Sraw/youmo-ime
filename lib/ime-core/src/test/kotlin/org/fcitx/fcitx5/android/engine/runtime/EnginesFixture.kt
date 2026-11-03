@@ -29,7 +29,7 @@ import java.util.concurrent.Executor
 /** What [EnginesTest] and the like type with: the data, served as the app's assets serve it ([load]). */
 open class EnginesFixture {
 
-    private val pinyin = PinyinDataBuilder()
+    protected var pinyin: ByteArray = PinyinDataBuilder()
         .unigram("<unk>", -7f, 0f)
         .unigram("你", -2f, 0f)
         .unigram("拟", -3f, 0f)
@@ -94,6 +94,9 @@ open class EnginesFixture {
     protected var emoji: ByteArray? = EmojiData.format(emptyList(), emptyMap()).toByteArray()
     protected var chaizi: ByteArray? = Chaizi.format(emptyMap()).toByteArray()
 
+    // none: a test of the characters' cards puts its own
+    protected var charInfo: ByteArray? = null
+
     protected val loaded = ArrayList<String>()
 
     // Engines' warm-ups run as they are handed over, on the test's thread: what they load is in
@@ -121,6 +124,7 @@ open class EnginesFixture {
             InputMethodCatalog.ENGLISH_DATA -> english
             InputMethodCatalog.EMOJI_DATA -> emoji
             InputMethodCatalog.CHAIZI_DATA -> chaizi
+            InputMethodCatalog.CHAR_INFO_DATA -> charInfo
             else -> throw IllegalArgumentException(path)
         }
         // as the app's assets do of a file it has not got

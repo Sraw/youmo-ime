@@ -59,6 +59,7 @@ val appDataOutputs = listOf(
     "compileEnglishData" to "engine-english",
     "compileEmojiData" to "engine-emoji",
     "compileChaiziData" to "engine-chaizi",
+    "compileCharInfo" to "engine-charinfo",
     "compileEngineTables" to "engine-tables",
     "copySentenceModels" to "engine-models",
     "compileOpenccData" to "engine-opencc",

@@ -6,6 +6,8 @@
 package org.fcitx.fcitx5.android.input
 
 import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.res.Configuration
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.data.quickphrase.QuickPhraseManager
@@ -17,14 +19,18 @@ import java.io.IOException
 import android.graphics.Rect
 import android.os.SystemClock
 import android.util.SparseArray
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.widget.ArrayAdapter
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.ListAdapter
 import android.widget.ListPopupWindow
+import android.widget.TextView
 import androidx.annotation.VisibleForTesting
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.text.bold
@@ -39,19 +45,24 @@ import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineBridge
 import org.fcitx.fcitx5.android.daemon.HostConnection
+import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
+import org.fcitx.fcitx5.android.engine.reading.CharCard
 import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.input.candidates.CharCardView
 import org.fcitx.fcitx5.android.input.learning.CandidateLearningMenu
 import org.fcitx.fcitx5.android.input.learning.UndoChip
+import org.fcitx.fcitx5.android.input.popup.CharCardLayout
 import org.fcitx.fcitx5.android.utils.navbarFrameHeight
 import org.fcitx.fcitx5.android.utils.popIn
 import org.fcitx.fcitx5.android.utils.styledColorOrDefault
 import splitties.dimensions.dp
+import splitties.resources.styledDrawable
 import splitties.views.dsl.core.withTheme
 import timber.log.Timber
 import kotlin.math.max
@@ -248,9 +259,19 @@ abstract class BaseInputView(
             // what the addon offers, as it words it: not the addon's words where the engine's list
             // changed under the press (review-E-ui N8)
             val im = fcitx.runImmediately { inputMethodEntryCached }.uniqueName
+            val engines = EngineBridge.isEngines(im)
             // quick input's, not the engine's: its entries numbered over the whole list, not a page's
             val phrase = if (pagedCandidates) null else fcitx.runOnReady { quickPhraseAt(idx) }
-            val lines = phrase?.let { quickPhraseLines(idx, text, it) } ?: learningMenu.lines(idx, text, pagedCandidates) ?: if (EngineBridge.isEngines(im)) return@launch else {
+            // else the engine's, and a handwritten character's card, or one looked up's (the engine's alone), in the same trip
+            val (learned, card) = if (phrase != null) {
+                null to null
+            } else {
+                val op = learningMenu.menuOf(idx, text, pagedCandidates)
+                fcitx.runOnReady { learning(op) to if (engines) charCard(idx, text, pagedCandidates) else null }
+            }
+            val lines = phrase?.let { quickPhraseLines(idx, text, it) }
+                ?: learned?.let { learningMenu.linesOf(it, idx, text, pagedCandidates) }
+                ?: if (engines) emptyList() else {
                 fcitx.runOnReady { getCandidateActions(idx) }.map { action ->
                     CandidateLearningMenu.Line(action.text) {
                         triggerCandidateAction(idx, action.id, text)
@@ -261,46 +282,55 @@ abstract class BaseInputView(
             // another long press may have shown its menu meanwhile
             candidateActionMenu?.dismiss()
             // nor on a candidate view recycled meanwhile: no window to show it in
-            if (lines.isEmpty() || !view.isAttachedToWindow) return@launch
+            if ((lines.isEmpty() && card == null) || !view.isAttachedToWindow) return@launch
             InputFeedbacks.hapticFeedback(view, longPress = true)
+            val accent = context.styledColorOrDefault(android.R.attr.colorAccent, theme.genericActiveForegroundColor)
             val title = buildSpannedString {
                 bold {
-                    color(context.styledColorOrDefault(android.R.attr.colorAccent, theme.genericActiveForegroundColor)) {
+                    color(accent) {
                         append(text)
                     }
                 }
             }
+            // as wide as PopupMenu lets its menus grow
+            val widest = CharCardLayout.width(resources.displayMetrics.widthPixels, dp(320), twoColumns())
+            // the card (上屏 and 复制 in it), then the lines; else the title, then the lines
+            val head = listOfNotNull(cardRow(card, accent, { candidateActionMenu?.dismiss() }) { fcitx.launchOnReady { it.select(idx, text) } })
             // a line picked may show others in its place (a block's confirmation, the reason): the same popup
             var shown = lines
             val adapter = object : ArrayAdapter<CharSequence>(themedContext, android.R.layout.simple_list_item_1, ArrayList()) {
                 override fun areAllItemsEnabled() = false
-                override fun isEnabled(position: Int) = position > 0 && shown[position - 1].enabled
+                override fun isEnabled(position: Int) = position >= head.size.coerceAtLeast(1) && shown[position - head.size.coerceAtLeast(1)].enabled
+                override fun getViewTypeCount() = 1 + head.size
+                override fun getItemViewType(position: Int) = if (position < head.size) position + 1 else 0
+                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
+                    head.getOrNull(position) ?: super.getView(position, convertView, parent)
             }
-            adapter.add(title)
+            if (head.isEmpty()) adapter.add(title) else head.forEach { _ -> adapter.add(text) }
             adapter.addAll(shown.map { it.label })
             // not a PopupMenu: that one takes the window focus from the editor, and some (the
             // launcher's search) finish composing when they lose it and start the input anew when
             // they get it back, so what was typed is gone before the action reaches it. Not
             // focusable, the menu lets a touch outside it through as well: see [dispatchTouchEvent]
             val menu = ListPopupWindow(themedContext, null, android.R.attr.popupMenuStyle)
-            // as wide as PopupMenu lets its menus grow
-            val widest = max(resources.displayMetrics.widthPixels / 2, dp(320))
+            // the card's menu its width whatever its lines; a title's no wider than they need
+            fun width() = if (head.isEmpty()) min(adapter.widest(FrameLayout(themedContext)), widest) else widest
             candidateActionMenu = menu.apply {
                 isModal = false
                 anchorView = view
                 setAdapter(adapter)
-                setContentWidth(min(adapter.widest(FrameLayout(themedContext)), widest))
+                setContentWidth(width())
                 setOnItemClickListener { _, _, position, _ ->
-                    val next = shown[position - 1].pick()
+                    val next = shown[position - head.size.coerceAtLeast(1)].pick()
                     if (next == null) {
                         dismiss()
                         return@setOnItemClickListener
                     }
                     shown = next
                     adapter.clear()
-                    adapter.add(title)
+                    if (head.isEmpty()) adapter.add(title) else head.forEach { _ -> adapter.add(text) }
                     adapter.addAll(next.map { it.label })
-                    setContentWidth(min(adapter.widest(FrameLayout(themedContext)), widest))
+                    setContentWidth(width())
                     show()
                 }
                 setOnDismissListener {
@@ -407,6 +437,42 @@ abstract class BaseInputView(
         }
     }
 
+    /** Whether the keyboard floats: a character's card is then in one column, as upright (CharCardLayout). */
+    protected open val floatingKeyboard: Boolean get() = false
+
+    private fun twoColumns() =
+        CharCardLayout.twoColumns(resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE, floatingKeyboard)
+
+    /**
+     * The menu's first row for [card]: the card, with 上屏 ([commit], as the candidate tapped) and 复制 (the
+     * character alone to the clipboard, nothing typed changed) in it, each closing the menu ([close]); none for no card.
+     */
+    private fun cardRow(card: CharCard?, accent: Int, close: () -> Unit, commit: () -> Unit): View? {
+        card ?: return null
+        val textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, ThemeManager.prefs.candidateTextSize.getValue().toFloat(), resources.displayMetrics)
+        val buttons = LinearLayout(themedContext).apply {
+            fun button(label: Int, act: () -> Unit) = TextView(themedContext).apply {
+                text = context.getString(label)
+                gravity = Gravity.CENTER
+                minHeight = dp(BUTTON_HEIGHT)
+                setTextColor(accent)
+                background = context.styledDrawable(android.R.attr.selectableItemBackground)
+                setOnClickListener {
+                    act()
+                    close()
+                }
+            }
+            addView(button(R.string.clipboard_split_commit, commit), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(button(R.string.a11y_copy) { copy(card.text) }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        }
+        return CharCardView(themedContext, card, textSize, twoColumns(), accent, buttons)
+    }
+
+    // the character alone to the clipboard: nothing committed, what is typed stays
+    private fun copy(text: String) {
+        context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(text, text))
+    }
+
     // the menu's window [decor] grown from the middle of the candidate [pressed], wherever it opened
     private fun growFrom(decor: View, pressed: View) {
         val at = IntArray(2).also(decor::getLocationOnScreen)
@@ -489,5 +555,10 @@ abstract class BaseInputView(
     override fun onDetachedFromWindow() {
         handleEvents = false
         super.onDetachedFromWindow()
+    }
+
+    private companion object {
+        // 上屏 and 复制's height, as a menu line's
+        const val BUTTON_HEIGHT = 48
     }
 }

@@ -36,7 +36,7 @@ object KeyNames {
     val ROLES: List<String> = listOf(
         "shift", "backspace", "space", "enter", "confirm", "symbols", "numbers", "back", "lang",
         "comma", "period", "semicolon", "star", "apostrophe", "reset", "lookup", "lookup-on",
-        "slash", "at", "dot", "domain", "search", "lock", "emoji", "emoticon",
+        "slash", "at", "dot", "domain", "search", "lock", "emoji", "emoticon", "reading",
     )
 
     private val letters = ('a'..'z').map(Char::toString)

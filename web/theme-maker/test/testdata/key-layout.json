@@ -24,7 +24,8 @@
         "search",
         "lock",
         "emoji",
-        "emoticon"
+        "emoticon",
+        "reading"
     ],
     "positions": {
         "qwerty": [
@@ -1144,6 +1145,20 @@
                 {
                     "name": "period",
                     "label": "。",
+                    "width": 0.14999998,
+                    "kind": "function"
+                }
+            ],
+            [
+                {
+                    "name": null,
+                    "label": "",
+                    "width": 0.85,
+                    "kind": "letter"
+                },
+                {
+                    "name": "reading",
+                    "label": "注",
                     "width": 0.14999998,
                     "kind": "function"
                 }

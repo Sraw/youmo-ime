@@ -109,6 +109,9 @@ class StrokeLookup(
 
     override fun why(index: Int): Why? = if (looking) null else pinyin.why(index)
 
+    // a character found by its strokes, nothing typed before it (the lookup starts only then)
+    override fun lookedUp(index: Int): String? = if (looking) found[index]?.let { "" } else pinyin.lookedUp(index)
+
     override fun reread(): Snapshot? = if (looking) null else pinyin.reread()
 
     override val rereads get() = !looking && pinyin.rereads
