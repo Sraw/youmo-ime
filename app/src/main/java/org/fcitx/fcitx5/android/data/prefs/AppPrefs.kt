@@ -742,7 +742,8 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
      */
     private fun migrateSwipe() {
         if (!sharedPreferences.contains(SWIPE_SYMBOL_BEHAVIOR)) return
-        val legacy = sharedPreferences.getString(SWIPE_SYMBOL_BEHAVIOR, null)
+        // stored as another type (a bad backup, edited by hand): read as unset, never a crash at every start
+        val legacy = runCatching { sharedPreferences.getString(SWIPE_SYMBOL_BEHAVIOR, null) }.getOrNull()
         sharedPreferences.edit {
             if (!sharedPreferences.contains(SWIPE_LAYERS)) {
                 putString(SWIPE_LAYERS, SwipeLayersChoice.of(SwipeLayers.fromLegacy(legacy)).name)

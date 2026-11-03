@@ -184,5 +184,9 @@ class AppPrefsTest {
         // one set already is kept
         sp.edit { clear(); putString("swipe_symbol_behavior", "Up"); putString("swipe_layers", SwipeLayersChoice.Off.name) }
         AppPrefs(sp).apply { dropRetired() }.let { assertEquals(SwipeLayersChoice.Off, it.keyboard.swipeLayers.getValue()) }
+        // stored as another type (a bad backup): the default, and no crash at every start
+        sp.edit { clear(); putInt("swipe_symbol_behavior", 1) }
+        AppPrefs(sp).apply { dropRetired() }.let { assertEquals(SwipeLayersChoice.ShortcutUpSymbolDown, it.keyboard.swipeLayers.getValue()) }
+        assertFalse(sp.contains("swipe_symbol_behavior"))
     }
 }
