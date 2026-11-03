@@ -115,6 +115,26 @@ class QuickPhraseMineTest {
         assertEquals(listOf(gh, addr), book.mine)
     }
 
+    // review L3: an entry deleted from its card goes from the list at once, what is typed kept
+    @Test
+    fun refreshedAfterAReloadTheListIsTheNewBooks() {
+        open()
+        rig.quickPhrase.reload(QuickPhraseBook(builtIn, listOf(gh)))
+        assertEquals(listOf(QuickPhraseExcerpt.of(gh.content), "北京市海淀区⏎", "+ Add"), rig.page)
+        rig.quickPhrase.refresh(rig.ic)
+        assertEquals(listOf(QuickPhraseExcerpt.of(gh.content), "+ Add"), rig.page)
+        rig.type("g")
+        rig.quickPhrase.reload(QuickPhraseBook(builtIn))
+        rig.quickPhrase.refresh(rig.ic)
+        assertEquals("g", rig.preedit)
+        assertEquals(listOf("ghost"), comments)
+        // off, nothing is shown
+        rig.press(KeySyms.ESCAPE)
+        rig.quickPhrase.refresh(rig.ic)
+        assertFalse(rig.quickPhrase.isActive(rig.ic))
+        assertEquals(emptyList<String>(), rig.page)
+    }
+
     @Test
     fun addLeavesAndAsksTheApp() {
         open()

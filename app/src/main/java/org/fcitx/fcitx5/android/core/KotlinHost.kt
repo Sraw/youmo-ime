@@ -544,6 +544,8 @@ class KotlinHost(
         publishTraditional()
         contexts.active?.let(::updateStatusArea)
         modules?.quickPhrase?.reload(quickPhrasesLater())
+        // open now (an entry deleted from its card): its list from the files as they are
+        refreshQuickPhrase()
         readConfig(EngineOptions.PATH).onSuccess { loadOptions(it, directBoot) }
         if (!directBoot) tellUnseen()
         configure(options)

@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.input.bar.ToolbarConfig.Item
 import org.fcitx.fcitx5.android.input.bar.ToolbarConfig.Layout
 import org.fcitx.fcitx5.android.input.bar.ToolbarConfig.Situation
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ToolbarConfigTest {
@@ -99,11 +100,13 @@ class ToolbarConfigTest {
     }
 
     @Test
-    fun quickInputComesInHiddenOnAnUpgradeShownOnANewInstall() {
-        // design 051-quickphrase 6 A: a bar stored before 0.5.1 keeps its look
-        val old = ToolbarConfig.parse("undo,redo,cursor_move,clipboard,|,emoji,voice,hide")
-        assertEquals(Item.Button(ToolbarButton.QuickPhrase, false), old.items.single { it is Item.Button && it.button == ToolbarButton.QuickPhrase })
-        assertEquals(true, ToolbarConfig.DEFAULT.items.contains(Item.Button(ToolbarButton.QuickPhrase, true)))
+    fun quickInputIsShownOnABarNeverArrangedNewOrUpgradedHiddenOnOneArranged() {
+        // the user's call (2026-11-02): a bar never arranged, an upgrade's too, stores nothing and
+        // shows 快速输入; one arranged before 0.5.1 keeps its look, the button hidden
+        assertEquals(Item.Button(ToolbarButton.QuickPhrase, true), ToolbarConfig.parse("").items.single { it is Item.Button && it.button == ToolbarButton.QuickPhrase })
+        assertTrue(ToolbarButton.QuickPhrase in ToolbarConfig.parse("").layout(everything).toolbar)
+        val arranged = ToolbarConfig.parse("undo,redo,cursor_move,clipboard,|,emoji,voice,hide")
+        assertEquals(Item.Button(ToolbarButton.QuickPhrase, false), arranged.items.single { it is Item.Button && it.button == ToolbarButton.QuickPhrase })
         assertEquals(ToolbarButton.QuickPhrase, ToolbarButton.ofKey("quick_phrase"))
     }
 

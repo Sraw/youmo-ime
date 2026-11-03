@@ -7,7 +7,29 @@ package org.fcitx.fcitx5.android.host
 import org.fcitx.fcitx5.android.core.FcitxUtils
 
 /** One of the user's own quick phrases: [key] typed to find it, [content] what it puts in. */
-data class QuickPhraseEntry(val key: String, val content: String)
+data class QuickPhraseEntry(val key: String, val content: String) {
+    /**
+     * The same entry to the user: the key case aside, as typing finds it ([QuickPhraseBook.find]), the
+     * content as it is. Two such would be listed for the same keys with the same text.
+     */
+    fun sameAs(other: QuickPhraseEntry): Boolean = content == other.content && folded(key) == folded(other.key)
+
+    internal val identity: Pair<String, String> get() = folded(key) to content
+
+    private companion object {
+        // each code point lowered as find lowers them, not String.lowercase's locale and special cases
+        fun folded(key: String): String {
+            val out = StringBuilder(key.length)
+            var i = 0
+            while (i < key.length) {
+                val c = key.codePointAt(i)
+                out.appendCodePoint(Character.toLowerCase(c))
+                i += Character.charCount(c)
+            }
+            return out.toString()
+        }
+    }
+}
 
 /**
  * What quick input offers: the user's own entries ([mine], `data/quickphrase.d/mine.mb` of the
@@ -23,7 +45,7 @@ class QuickPhraseBook(
     private val times = HashMap(used)
 
     // the file's order, the tie-break between two never used
-    private val entries = mine.distinct()
+    private val entries = QuickPhraseFiles.distinct(mine)
 
     @Volatile
     private var ordered: List<QuickPhraseEntry> = order()
@@ -73,7 +95,10 @@ class QuickPhraseBook(
         /** The longest key: quick input takes at most 30 characters ([QuickPhrase]). */
         const val MAX_KEY = 30
 
-        /** The longest content. */
+        /**
+         * The longest content, in UTF-16 units: what the page saves and an import takes. One longer
+         * (the clipboard's) is refused before the page is opened, its text in the Intent besides.
+         */
         const val MAX_CONTENT = 5000
 
         private fun starts(key: String, typed: List<Set<Int>>, ignoreCase: Boolean): Boolean {
@@ -114,9 +139,27 @@ class QuickPhraseBook(
  */
 object QuickPhraseFiles {
 
-    /** The entries of a `.mb` file, in order, each once; lines fcitx skips left out. */
+    private val BOM = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte())
+
+    /**
+     * The lines of a `.mb` file as entries, in order, lines fcitx skips left out; a UTF-8 BOM at its
+     * start (a file saved by Windows' Notepad) is not part of the first key.
+     */
+    fun parseLines(bytes: ByteArray): List<QuickPhraseEntry> {
+        val text = if (bytes.size >= BOM.size && (BOM.indices).all { bytes[it] == BOM[it] }) bytes.copyOfRange(BOM.size, bytes.size) else bytes
+        return QuickPhraseTable.parse(text).map { (k, v) -> QuickPhraseEntry(k, v) }
+    }
+
+    /**
+     * The user's entries of `mine.mb`: [parseLines], each once ([distinct]), none longer than
+     * [QuickPhraseBook.MAX_CONTENT] (only a file made elsewhere has one). What is left out here is
+     * gone from the file at its next write.
+     */
     fun parseMine(bytes: ByteArray): List<QuickPhraseEntry> =
-        QuickPhraseTable.parse(bytes).map { (k, v) -> QuickPhraseEntry(k, v) }.distinct()
+        distinct(parseLines(bytes).filter { it.content.length <= QuickPhraseBook.MAX_CONTENT })
+
+    /** [entries] each once ([QuickPhraseEntry.sameAs]), the first of each kept. */
+    fun distinct(entries: List<QuickPhraseEntry>): List<QuickPhraseEntry> = entries.distinctBy { it.identity }
 
     /** [entries] as a `.mb` file reads them back ([parseMine]). */
     fun formatMine(entries: List<QuickPhraseEntry>): String =
@@ -138,28 +181,35 @@ object QuickPhraseFiles {
     fun formatUsed(used: Map<QuickPhraseEntry, Long>, entries: Collection<QuickPhraseEntry>): String {
         val kept = entries.toSet()
         return used.entries.filter { it.key in kept }.sortedBy { it.value }
-            .joinToString("") { "${it.value}\t${it.key.key}\t${quoted(it.key.content)}\n" }
+            .joinToString("") { "${it.value}\t${it.key.key}\t${FcitxUtils.escapeForValue(it.key.content)}\n" }
     }
-
-    // always quoted: a content of one word unquoted would read back the same, but a tab in it would not
-    private fun quoted(s: String): String = FcitxUtils.escapeForValue(s).let { if (it.startsWith('"')) it else "\"$it\"" }
 
     /** Whether [key] can be a key: not empty, no whitespace (a `.mb` line's key ends at the first), at most [QuickPhraseBook.MAX_KEY]. */
     fun validKey(key: String): Boolean =
         key.isNotEmpty() && key.none { it.isWhitespace() } && key.codePointCount(0, key.length) <= QuickPhraseBook.MAX_KEY
 
+    /** What [merge] made: [entries] after it, and how many lines it skipped as already there or too long. */
+    data class Merged(val entries: List<QuickPhraseEntry>, val duplicates: Int, val tooLong: Int)
+
     /**
-     * [lines] of a `.mb` file added after [mine]: the ones whose key is good ([validKey]) and that are
-     * not there already. The entries after, and how many were skipped as already there.
+     * [lines] of a `.mb` file ([parseLines]) added after [mine]: the ones whose key is good
+     * ([validKey]), whose content is not longer than [QuickPhraseBook.MAX_CONTENT], and that are not
+     * there already ([QuickPhraseEntry.sameAs]).
      */
-    fun merge(mine: List<QuickPhraseEntry>, lines: List<QuickPhraseEntry>): Pair<List<QuickPhraseEntry>, Int> {
-        val out = LinkedHashSet(mine)
-        var skipped = 0
+    fun merge(mine: List<QuickPhraseEntry>, lines: List<QuickPhraseEntry>): Merged {
+        val out = ArrayList(mine)
+        val seen = mine.mapTo(HashSet()) { it.identity }
+        var duplicates = 0
+        var tooLong = 0
         for (e in lines) {
-            if (!validKey(e.key) || e.content.isEmpty()) continue
-            if (!out.add(e)) skipped++
+            when {
+                !validKey(e.key) || e.content.isEmpty() -> {}
+                e.content.length > QuickPhraseBook.MAX_CONTENT -> tooLong++
+                !seen.add(e.identity) -> duplicates++
+                else -> out += e
+            }
         }
-        return out.toList() to skipped
+        return Merged(out, duplicates, tooLong)
     }
 }
 

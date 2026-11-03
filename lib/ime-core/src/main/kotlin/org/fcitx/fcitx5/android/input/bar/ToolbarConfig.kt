@@ -113,8 +113,10 @@ data class ToolbarConfig(val items: List<Item>) {
         private const val HIDDEN = "-"
 
         /**
-         * The bar as it always was: what v0.4 had, 快速输入 after it (new installs; an upgrade's bar gets
-         * it hidden, as any button added later), and the panel's others hidden on the toolbar.
+         * The bar as it always was: what v0.4 had, 快速输入 after it, and the panel's others hidden on
+         * the toolbar. A bar never arranged is this one, an upgrade's too (the user's call, 2026-11-02:
+         * 快速输入 shown to them as well); one the user arranged gets 快速输入 hidden, as any button
+         * added later ([parse]).
          */
         val DEFAULT = ToolbarConfig(
             listOf(ToolbarButton.Undo, ToolbarButton.Redo, ToolbarButton.CursorMove, ToolbarButton.Clipboard, ToolbarButton.QuickPhrase)

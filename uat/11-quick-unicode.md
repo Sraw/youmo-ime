@@ -71,7 +71,7 @@
 ### QU-12 [P2] 九键、手写长按「符」进快速输入
 - **操作**：九键、手写上长按「符」。
 - **预期**：进快速输入；手写时换成全键盘，退出后回到手写板。
-- **JVM**：`LayoutSwitchKeyTest.theNineKeysAndHandwritingsSymbolsKeyHoldsQuickInputTheirNumbersKeyOnlyTaps`；换键盘在设备上看。
+- **JVM**：`LayoutSwitchKeyTest.theNineKeysAndHandwritingsSymbolsKeyHoldsQuickInputTheirNumbersKeyOnlyTaps`；换键盘 `QuickPhraseKeyboardUatTest.handwritingLendsItsPlaceToTheFullKeyboardWhileQuickInputLasts`，快速输入时按语言键换了输入法不回手写板 `anotherInputMethodChosenDuringQuickInputKeepsItsOwnLetters`。
 
 ### QU-13 [P1] 密码框里不记顺序
 - **操作**：密码框里长按「符」，点第二条。
@@ -86,10 +86,25 @@
 
 ### QU-15 [P2] 设置页加、改、删、导入导出
 - **操作**：快速输入页里加一条、改它、左滑删再撤销；导出再导入。
-- **预期**：每一步键盘上马上看得到；重复的拒绝；导入报加了几条、跳过几条重复的。
-- **JVM**：`QuickPhraseManagerTest`（四项）。
+- **预期**：每一步键盘上马上看得到；重复的拒绝（关键词只差大小写也算）；导入报加了几条、跳过几条重复的（和几条超过 5000 字的）；自带表的开关关了不弹回，能再打开。
+- **JVM**：`QuickPhraseManagerTest`（五项）；`QuickPhraseSettingsUatTest.anEntryAddedChangedFoundAndDeleted`、`aBuiltInTableTurnedOffStaysOffAndTurnsOnAgain`。
 
 ### QU-16 [P0] 条目跟着备份走
 - **操作**：备份全部，清数据后从备份恢复。
 - **预期**：条目、顺序、关掉的内置表都回来。
 - **JVM**：`UserDataManagerTest.quickInputsEntriesOrderAndSwitchesRoundTripThroughABackup`。
+
+### QU-17 [P2] 候选长按的卡片
+- **操作**：快速输入里长按自己的一条，依次试「复制」「上屏」「编辑」「删除」，删了再点「撤销」；长按一条自带的。
+- **预期**：自己的有上屏、复制、编辑、删除，复制的是整段；删了同一菜单里出「已删除」「撤销」，候选栏马上少了这条，撤销后回来；自带的只有上屏、复制。
+- **JVM**：`QuickPhraseKeyboardUatTest.aCandidatesCardCommitsCopiesEditsDeletesAndUndoes`；列表马上刷新 `QuickPhraseMineTest.refreshedAfterAReloadTheListIsTheNewBooks`。
+
+### QU-18 [P2] 剪贴板「存为快速输入」
+- **操作**：剪贴板里长按一条普通的，选「存为快速输入」；再长按一条超过 5000 字的、一条密码。
+- **预期**：普通的打开快速输入页的编辑框，内容已填好；超长的提示存不成、不打开页面；密码那条没有这一项。
+- **JVM**：`QuickPhraseKeyboardUatTest.theClipboardSavesAnEntryAsQuickInputButNotAPasswordNorOneTooLong`。
+
+### QU-19 [P2] 编辑框不丢字、不截字
+- **操作**：编辑框里打几个字后转屏（或切深色）；再按返回；粘一段超过 5000 字的内容点确定。
+- **预期**：转屏后编辑框还在、字还在；按返回先问要不要放弃；超长的提示「内容最多 5000 字」，不截掉、不保存。
+- **JVM**：`QuickPhraseSettingsUatTest.theEditorAndWhatWasTypedOutliveTheActivityMadeAnew`、`aContentTooLongIsToldAtOkAndNeverCut`。

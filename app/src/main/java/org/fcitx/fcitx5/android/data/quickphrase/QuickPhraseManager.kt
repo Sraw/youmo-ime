@@ -57,16 +57,16 @@ object QuickPhraseManager {
     fun load(dir: File = dir()): List<QuickPhraseEntry> = QuickPhraseBook(QuickPhraseTable.EMPTY, readMine(dir), readUsed(dir)).mine
 
     /**
-     * [new] in place of [old] (null: added at the end), first in the order of use from [now]. One
-     * already there with the same key and content is refused ([Put.Duplicate]); [old] gone meanwhile
-     * (deleted from the keyboard), [new] is added.
+     * [new] in place of [old] (null: added at the end), first in the order of use from [now]. Another
+     * already there with the same key, case aside, and content is refused ([Put.Duplicate],
+     * [QuickPhraseEntry.sameAs]); [old] gone meanwhile (deleted from the keyboard), [new] is added.
      * @throws IOException if the files cannot be read or written
      */
     @Synchronized
     fun put(old: QuickPhraseEntry?, new: QuickPhraseEntry, now: Long = System.currentTimeMillis(), dir: File? = null): Put {
         val target = dir ?: dirToSave()
         val mine = readMine(target)
-        if (new != old && new in mine) return Put.Duplicate
+        if (mine.any { it != old && it.sameAs(new) }) return Put.Duplicate
         val at = old?.let(mine::indexOf) ?: -1
         val out = if (at >= 0) mine.toMutableList().also { it[at] = new } else mine + new
         val used = readUsed(target) + (new to now)
@@ -92,18 +92,21 @@ object QuickPhraseManager {
         writeUsed(target, readUsed(target) + (entry to at), mine)
     }
 
+    /** What an [import] did: [added] entries, and the lines skipped as already there or too long. */
+    data class Imported(val added: Int, val duplicates: Int, val tooLong: Int)
+
     /**
-     * The entries of a `.mb` file's [bytes] added after the user's, those already there and those
-     * with no good key skipped: how many were added and how many skipped as already there.
+     * The entries of a `.mb` file's [bytes] added after the user's ([QuickPhraseFiles.merge]): those
+     * already there, too long or with no good key skipped.
      * @throws IOException as [put]
      */
     @Synchronized
-    fun import(bytes: ByteArray, dir: File? = null): Pair<Int, Int> {
+    fun import(bytes: ByteArray, dir: File? = null): Imported {
         val target = dir ?: dirToSave()
         val mine = readMine(target)
-        val (out, skipped) = QuickPhraseFiles.merge(mine, QuickPhraseFiles.parseMine(bytes))
-        if (out.size != mine.size) write(target, out, readUsed(target))
-        return (out.size - mine.size) to skipped
+        val merged = QuickPhraseFiles.merge(mine, QuickPhraseFiles.parseLines(bytes))
+        if (merged.entries.size != mine.size) write(target, merged.entries, readUsed(target))
+        return Imported(merged.entries.size - mine.size, merged.duplicates, merged.tooLong)
     }
 
     /** The user's entries as a `.mb` file, in the order of use, the one fcitx5 on a computer reads too. */

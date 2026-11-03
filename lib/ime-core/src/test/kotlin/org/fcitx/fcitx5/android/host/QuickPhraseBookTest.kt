@@ -43,6 +43,21 @@ class QuickPhraseBookTest {
         assertTrue(text.startsWith("addr \"北京市海淀区\\n3 号楼 502\"\n"))
     }
 
+    // review L5, L11: Notepad's BOM is no part of a key; the same key in another case is the same entry
+    @Test
+    fun mineFileDropsABomTooLongContentAndCaseOnlyDuplicates() {
+        val bom = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte())
+        val long = QuickPhraseEntry("long", "x".repeat(QuickPhraseBook.MAX_CONTENT + 1))
+        val text = QuickPhraseFiles.formatMine(listOf(gh, hi, hi.copy(key = "HI"), long, addr)).toByteArray()
+        assertEquals(listOf(gh, hi, addr), QuickPhraseFiles.parseMine(bom + text))
+        assertEquals("gh", QuickPhraseFiles.parseLines(bom + text).first().key)
+        assertEquals(5, QuickPhraseFiles.parseLines(text).size)
+        assertTrue(hi.sameAs(hi.copy(key = "hI")))
+        assertFalse(hi.sameAs(hi.copy(content = "您好")))
+        // the book of such a file lists the first alone
+        assertEquals(listOf(hi), QuickPhraseBook(QuickPhraseTable.EMPTY, listOf(hi, hi.copy(key = "HI"))).mine)
+    }
+
     @Test
     fun usedFileKeepsOnlyEntriesStillThere() {
         val used = mapOf(gh to 5L, addr to 9L, QuickPhraseEntry("gone", "x\ty") to 7L)
@@ -55,10 +70,19 @@ class QuickPhraseBookTest {
     }
 
     @Test
-    fun importSkipsDuplicatesAndBadKeys() {
-        val (out, skipped) = QuickPhraseFiles.merge(listOf(gh), listOf(gh, addr, QuickPhraseEntry("x".repeat(31), "long"), QuickPhraseEntry("e", "")))
-        assertEquals(listOf(gh, addr), out)
-        assertEquals(1, skipped)
+    fun importSkipsDuplicatesTooLongAndBadKeys() {
+        val long = QuickPhraseEntry("long", "x".repeat(QuickPhraseBook.MAX_CONTENT + 1))
+        val longest = QuickPhraseEntry("longest", "x".repeat(QuickPhraseBook.MAX_CONTENT))
+        val merged = QuickPhraseFiles.merge(
+            listOf(gh),
+            // GH: gh again, its key's case aside, as typing finds both
+            listOf(gh, gh.copy(key = "GH"), addr, addr, long, longest, QuickPhraseEntry("x".repeat(31), "long"), QuickPhraseEntry("e", "")),
+        )
+        assertEquals(listOf(gh, addr, longest), merged.entries)
+        assertEquals(3, merged.duplicates)
+        assertEquals(1, merged.tooLong)
+        // another content under the key is another entry
+        assertEquals(2, QuickPhraseFiles.merge(listOf(gh), listOf(gh.copy(content = "x"))).entries.size)
         assertTrue(QuickPhraseFiles.validKey("x".repeat(30)))
         assertFalse(QuickPhraseFiles.validKey(""))
         assertFalse(QuickPhraseFiles.validKey("a b"))

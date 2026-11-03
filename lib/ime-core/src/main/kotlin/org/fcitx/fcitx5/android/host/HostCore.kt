@@ -227,6 +227,15 @@ class HostCore(
         return modules.quickPhrase?.entryAt(ic, index)
     }
 
+    /**
+     * Quick input's list shown again from its book as [QuickPhrase.reload] left it, if it is open: an
+     * entry its card deleted goes at once, not at the next key.
+     */
+    fun refreshQuickPhrase() = pipeline.batch {
+        val ic = contexts.active ?: return@batch
+        modules.quickPhrase?.refresh(ic)
+    }
+
     /** `triggerUnicode` (`native-lib.cpp:298-303`): Unicode search on the active context. */
     fun triggerUnicode() = pipeline.batch {
         val ic = contexts.active ?: return@batch

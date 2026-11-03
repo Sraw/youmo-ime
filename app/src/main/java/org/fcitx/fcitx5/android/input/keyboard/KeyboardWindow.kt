@@ -349,7 +349,12 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         spaceKeys.current = ime
         preedit.ui.syllables.owned = stripHidden()
         val letters = lettersOf(ime.uniqueName, keyboardPrefs.imKeyboards(), EngineState.shuangpinScheme, service.inPasswordField)
-        val shown = lettersLayout.inputMethodChanged(letters, currentKeyboardName)
+        // left for another input method while quick input had the place of the pad or a zhuyin keyboard:
+        // the full keyboard there is that one's, so the new letters are shown as it would be, and quick
+        // input's end, told after this, brings it no more back (review Q1)
+        val lent = standingInFor != null && letters != standingInFor
+        if (lent) standingInFor = null
+        val shown = lettersLayout.inputMethodChanged(letters, if (lent && currentKeyboardName == TextKeyboard.Name) lettersLayout.letters else currentKeyboardName)
         // a layout shown anew is told the input method as it is attached
         if (shown != null) showLayout(shown) else currentKeyboard?.let(spaceKeys::show)
         english = ime.uniqueName == InputMethodNames.KEYBOARD

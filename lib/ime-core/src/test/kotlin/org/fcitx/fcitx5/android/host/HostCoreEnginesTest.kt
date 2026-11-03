@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.engine.runtime.EnginesHost
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.runtime.type
 import org.fcitx.fcitx5.android.engine.session.Action
+import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -226,6 +227,92 @@ class HostCoreEnginesTest : EnginesFixture() {
         engines.onEvent(InputMethodCatalog.WUBI, EngineEvent.RESET, 0)
         engines.settings = wubiShown
         assertTrue("2026年10月17日" in engines.type(InputMethodCatalog.WUBI, "jjad").candidates)
+        engines.close()
+    }
+
+    // review M5: through the core and its chttrans, the user's own entry goes out as it is
+    // (HostCore.commitAsIs, past the commit filters) and the built-in one converted; neither reaches
+    // the engine, so nothing is learnt of them and nothing is predicted after them
+    @Test
+    fun `quick input's own entry goes out as it is under traditional, a built-in one converted, neither learnt nor predicted from`() {
+        val engines = engines()
+        val sent = mutableListOf<Int>()
+        val real = EnginesHost(engines)
+        val host = object : EngineHost by real {
+            override fun event(im: String, event: Int, arg: Int, learning: Boolean, payload: Action?): Snapshot? {
+                sent += event
+                return real.event(im, event, arg, learning, payload)
+            }
+        }
+        val builtIn = QuickPhraseTable.load(
+            listOf(
+                object : PkgDataDir {
+                    override fun read(path: String) = if (path == "data/quickphrase.d/t.mb") "tf 头发\n".toByteArray() else null
+                    override fun list(dir: String) = listOf("t.mb")
+                },
+            ),
+        )
+        val book = QuickPhraseBook(builtIn, listOf(QuickPhraseEntry("tf", "头发")))
+        val converter = ChineseConverterTest.converter(phrases = mapOf("头发" to "頭髮"), characters = mapOf("发" to "發", "头" to "頭"))
+        val modules = ChineseModules(
+            ModuleInputs(
+                PunctuationProfile.parse(""),
+                chttransEnabled = setOf(InputMethodCatalog.PINYIN),
+                converter = { converter },
+                quickPhrases = { book },
+            ),
+        )
+        val profile = Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "Default")
+        val core = HostCore(host, clock, profile, firstRun = true, modules = modules::build)
+        val log = mutableListOf<HostEvent>()
+        core.events += HostEvents { log += it }
+        core.activate(1)
+        core.setCapabilities(Capability.PREEDIT or Capability.CLIENT_UNFOCUS_COMMIT)
+        core.focus(true)
+        assertEquals(InputMethodCatalog.PINYIN, core.currentInputMethod())
+        val learnt = engines.userWords()
+        fun pick(index: Int): String {
+            core.triggerQuickPhrase()
+            "tf".forEach { core.sendKey(Key(it.code), virtual = true) }
+            val shown = log.filterIsInstance<HostEvent.Candidates>().last().candidates.map { it.text }
+            assertEquals(shown.toString(), 2, shown.size)
+            log.clear()
+            sent.clear()
+            assertTrue(core.select(index, shown[index]))
+            return log.filterIsInstance<HostEvent.Commit>().single().text
+        }
+        assertEquals("头发", pick(0))
+        assertTrue("the engine told nothing of it: $sent", sent.none { it == EngineEvent.PICK || it == EngineEvent.CHAR })
+        assertTrue("nothing predicted after it", log.filterIsInstance<HostEvent.Candidates>().all { it.candidates.isEmpty() })
+        assertEquals("頭髮", pick(1))
+        assertEquals(learnt, engines.userWords())
+        engines.close()
+    }
+
+    // review L-6: the keyboard's way after a card's 删除 (KotlinHost.readModuleFiles): the book read
+    // again, then the open list shown again from it; the entry gone at once, what was typed kept
+    @Test
+    fun `an entry deleted while quick input is open leaves its list at the reload`() {
+        val engines = engines()
+        var built: HostModules? = null
+        val modules = ChineseModules(ModuleInputs(PunctuationProfile.parse(""), quickPhrases = { QuickPhraseBook(QuickPhraseTable.EMPTY, listOf(QuickPhraseEntry("tf", "头发"), QuickPhraseEntry("tg", "头盖"))) }))
+        val core = HostCore(EnginesHost(engines), clock, Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "Default"), firstRun = true) {
+            modules.build(it).also { m -> built = m }
+        }
+        val log = mutableListOf<HostEvent>()
+        core.events += HostEvents { log += it }
+        core.activate(1)
+        core.focus(true)
+        core.triggerQuickPhrase()
+        core.sendKey(Key('t'.code), virtual = true)
+        fun shown() = log.filterIsInstance<HostEvent.Candidates>().last().candidates.map { it.text }
+        assertEquals(listOf("头发", "头盖"), shown().take(2))
+        built!!.quickPhrase!!.reload(QuickPhraseBook(QuickPhraseTable.EMPTY, listOf(QuickPhraseEntry("tg", "头盖"))))
+        core.refreshQuickPhrase()
+        assertEquals(listOf("头盖"), shown().filter { it.startsWith("头") })
+        // what was typed kept: the next key narrows the new list
+        core.sendKey(Key('g'.code), virtual = true)
+        assertEquals(listOf("头盖"), shown().filter { it.startsWith("头") })
         engines.close()
     }
 

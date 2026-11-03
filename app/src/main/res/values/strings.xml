@@ -198,7 +198,7 @@
     <string name="exception_user_data_too_old">This backup is from 0.3.0 or earlier, whose learning this version no longer reads. Restore it in 0.4.x, type a few characters and pause, back up again, then restore that here</string>
     <string name="user_data_imported">User data on %1$s has been imported, restarting…</string>
     <string name="user_data_exported">Backed up to %1$s</string>
-    <string name="confirm_import_user_data">Importing user data overrides the settings, custom phrases, punctuation and the clipboard, and merges the words and what was learned with this phone\'s; the app restarts for it to take effect. Proceed?</string>
+    <string name="confirm_import_user_data">Importing user data overrides the settings, custom phrases, quick input, punctuation and the clipboard (what the backup lacks is deleted here too: a backup from before 0.5.1 has no quick input, so your own entries go and the built-in tables you turned off come back on), and merges the words and what was learned with this phone\'s; the app restarts for it to take effect. Proceed?</string>
     <string name="clear_clp_db_confirm">Clipboard database would be completely cleared, including pinned items. Proceed?</string>
     <string name="clear_clp_db_not_all">Some clipboard data could not be cleared. It may still be there or come back at the next start; clearing again, or after a restart, may help.</string>
     <string name="expand_keypress_area">Expand keypress area to the edge</string>
@@ -1058,7 +1058,7 @@
     <string name="quick_phrase_key">Key</string>
     <string name="quick_phrase_content">Content</string>
     <string name="quick_phrase_key_invalid">A key has no spaces and at most 30 characters</string>
-    <string name="quick_phrase_content_too_long">At most 5000 characters</string>
+    <string name="quick_phrase_content_too_long">At most %d characters</string>
     <string name="quick_phrase_duplicate">The same key and content are there already</string>
     <string name="quick_phrase_search">Search keys or content</string>
     <string name="quick_phrase_built_in">Built in</string>
@@ -1067,10 +1067,15 @@
     <string name="quick_phrase_built_in_latex">LaTeX symbols (such as \\alpha)</string>
     <string name="quick_phrase_import_done">%1$d imported, %2$d duplicates skipped</string>
     <string name="quick_phrase_deleted">Deleted</string>
+    <string name="quick_phrase_too_long_to_save">Over %d characters: too long for quick input</string>
+    <string name="quick_phrase_saved">Saved</string>
+    <string name="quick_phrase_import_done_too_long">%1$d imported, %2$d duplicates and %3$d over %4$d characters skipped</string>
+    <string name="quick_phrase_discard_confirm">Discard your changes?</string>
+    <string name="quick_phrase_discard">Discard</string>
+    <string name="quick_phrase_keep_editing">Keep editing</string>
     <string name="quick_phrase_new">New quick input</string>
     <string name="quick_phrase_change">Edit quick input</string>
     <string name="quick_phrase_commit">Type it</string>
     <string name="quick_phrase_copy">Copy</string>
-    <string name="quick_phrase_lines">(%1$d lines)</string>
     <string name="clipboard_save_quick_phrase">Save as quick input</string>
 </resources>
