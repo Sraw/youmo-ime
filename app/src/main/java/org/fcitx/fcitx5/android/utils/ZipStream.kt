@@ -12,11 +12,20 @@ import java.util.zip.ZipInputStream
 /**
  * [check], when given, is asked as each entry is unpacked, a chunk at a time, with the entry's count,
  * what it has of it so far and what the entries before it had: it throws to stop, on the chunk that
- * is past a limit, not after a zip bomb is all on the disk.
+ * is past a limit, not after a zip bomb is all on the disk. Every entry is counted, a directory's
+ * too (size 0): else a zip of empty directories would pass any count.
+ *
+ * [flat]: only the files at the zip's top are unpacked; a directory, or a file in one, is counted and
+ * its bytes read through [check] all the same, and nothing of it written (a Mac's archive of loose
+ * files has a `__MACOSX/` of their attributes beside them).
  *
  * @return top-level files in zip file
  */
-fun ZipInputStream.extract(destDir: File, check: ((count: Int, size: Long, total: Long) -> Unit)? = null): List<File> {
+fun ZipInputStream.extract(
+    destDir: File,
+    flat: Boolean = false,
+    check: ((count: Int, size: Long, total: Long) -> Unit)? = null,
+): List<File> {
     var count = 0
     var total = 0L
     var entry = nextEntry
@@ -28,15 +37,20 @@ fun ZipInputStream.extract(destDir: File, check: ((count: Int, size: Long, total
         if (!canonicalPath.startsWith(canonicalDest + File.separator) &&
             !(entry.isDirectory && canonicalPath == canonicalDest)
         ) throw SecurityException("Zip entry outside of the destination: ${entry.name}")
-        if (!entry.isDirectory) {
-            // a zip need not have entries for the directories of its files
-            file.parentFile?.mkdirs()
-            count++
-            file.outputStream().use { out ->
-                total += if (check == null) copyTo(out) else copyChecked(out) { size -> check(count, size, total) }
+        count++
+        val entryCount = count
+        val checked = check?.let { c -> { size: Long -> c(entryCount, size, total) } }
+        when {
+            entry.isDirectory -> {
+                checked?.invoke(0)
+                if (!flat) file.mkdirs()
             }
-        } else {
-            file.mkdirs()
+            flat && file.parentFile?.canonicalPath != canonicalDest -> total += copyChecked(Discard, checked)
+            else -> {
+                // a zip need not have entries for the directories of its files
+                file.parentFile?.mkdirs()
+                file.outputStream().use { out -> total += copyChecked(out, checked) }
+            }
         }
         entry = nextEntry
     }
@@ -45,7 +59,8 @@ fun ZipInputStream.extract(destDir: File, check: ((count: Int, size: Long, total
 
 // the entry's bytes into [out], [check] asked with what it has so far before a chunk is written:
 // one that throws leaves the chunk past the limit unwritten
-private fun ZipInputStream.copyChecked(out: OutputStream, check: (size: Long) -> Unit): Long {
+private fun ZipInputStream.copyChecked(out: OutputStream, check: ((size: Long) -> Unit)?): Long {
+    if (check == null) return copyTo(out)
     var size = 0L
     val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
     check(size)
@@ -56,4 +71,11 @@ private fun ZipInputStream.copyChecked(out: OutputStream, check: (size: Long) ->
         check(size)
         out.write(buffer, 0, n)
     }
+}
+
+// what a flat unpacking reads of an entry it does not keep (OutputStream.nullOutputStream is API 33)
+private object Discard : OutputStream() {
+    override fun write(b: Int) = Unit
+
+    override fun write(b: ByteArray, off: Int, len: Int) = Unit
 }
