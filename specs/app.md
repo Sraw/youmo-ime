@@ -142,8 +142,9 @@ typed drops those before it); what was typed is dropped and typed
 again by `HostCore.clearTyped`/`retype` (the router's log of the keys since nothing was typed: plain
 keys alone, a pick, a key's pick (a digit, space: `Snapshot.picked`) or a candidate's action ending it,
 as sent again by its index it could land on another word), on the keyboard it was typed with alone
-(`HostCore.Retyping.keyboard`, the app's `KeyShortcutRunner.keyboardOf`: another's keys' codes go to
-a session of their own). A field kept from learning (`PasswordOrSensitive`) is cleared with nothing kept;
+(`HostCore.Retyping.keyboard`, the app's `KeyShortcutRunner.keyboardOf`: `ImKeyboards.typedWith`, the
+layout shown and 双拼's scheme; another's keys' codes go to a session of their own). A selection the
+editor's report lags is cleared, not kept. A field kept from learning (`PasswordOrSensitive`) is cleared with nothing kept;
 an app's own `restartInput` is another input, its clears forgotten. The
 marks on a key are placed by `KeyMarks`, on the keyboard and on 按键字符和快捷键's keys (`KeyCaps`) alike;
 五笔's 全部字根 leaves the letters' shortcuts unmarked (`BaseKeyboard.charShortcutMarks`). 注音 keyboards name their keys `zyfull/<QWERTY letter>` and

@@ -84,8 +84,9 @@ class HostCoreEnginesTest : EnginesFixture() {
         assertEquals(2, core.clearTyped()!!.keys!!.size)
     }
 
-    // review2: the keyboard is the app's to tell, the keys' codes each going to a session of their own
-    // (KeyboardPair): the nine keys' typed again on the full keyboard would type a session shown on none
+    // review2: the keyboard is the app's to tell (its layout and 双拼's scheme: ImKeyboards.typedWith),
+    // the keys' codes each going to a session of their own (KeyboardPair): the nine keys' typed again
+    // on the full keyboard would type a session shown on none
     @Test
     fun `what is typed is typed again on the keyboard it was typed with alone`() {
         val core = core(engines())

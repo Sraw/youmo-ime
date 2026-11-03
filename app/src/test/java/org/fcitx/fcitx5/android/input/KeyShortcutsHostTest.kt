@@ -16,6 +16,10 @@ import org.fcitx.fcitx5.android.core.keyboardOn
 import org.fcitx.fcitx5.android.core.startedHost
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.host.HostCore
+import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutRunner
+import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.until as waitUntil
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
@@ -26,8 +30,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
 /**
  * The swipes' shortcuts carried out (051-c §4): 清除 and 恢复 on backspace (up and down by default),
@@ -157,18 +159,23 @@ class KeyShortcutsHostTest {
         assertEquals("你好", h.field.text.toString())
     }
 
-    // review2: a clear on its way (the host's part done, the main thread's not yet) as another field
-    // starts does nothing there: it was the first's
+    // review2: a clear on its way as another field starts (the host's part done, the main thread's
+    // not yet) does nothing there: it was the first's. The main thread's part run as the listener runs
+    // it, with the field it was asked in, once the second has started: no thread's timing in it
     @Test
     fun aClearUnderWayIsNotMadeInAFieldStartedSince() {
         start("给 A 的话")
-        val held = CountDownLatch(1)
-        h.service.postFcitxJob { held.await(5, TimeUnit.SECONDS) }
-        swipe(backspace, up = true)
-        h.start(fieldId = 2, prefill = { it.setText("给 B 的话"); it.setSelection(5) })
-        held.countDown()
+        val asked = h.service.startedField
+        h.start(fieldId = 2, prefill = { it.setText("给 B 的话"); it.setSelection(it.text.length) })
+        val runner = KeyShortcutRunner(h.service, InputWindowManager(), {}, {}) { false }
+        runner.clear(null, asked)
+        runner.clear(HostCore.Retyping(InputMethodCatalog.PINYIN, emptyList()), asked)
         synced()
         assertEquals("给 B 的话", h.field.text.toString())
+        // in its own field it clears
+        runner.clear(null, h.service.startedField)
+        synced()
+        assertEquals("", h.field.text.toString())
     }
 
     // review2: the screen turned restarts input with the same EditorInfo, the same input: its clear

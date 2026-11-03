@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 import android.view.KeyEvent
 import androidx.core.content.ContextCompat
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.host.HostCore
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
@@ -150,7 +151,8 @@ class KeyShortcutRunner(
         // what a clear reads of each side to keep it: a field longer is cleared with nothing kept
         private const val READ_LIMIT = 10_000
 
-        /** [im]'s keyboard as chosen now: what was typed is typed again on the same alone ([HostCore.retype]). */
-        fun keyboardOf(im: String): ImKeyboard = AppPrefs.getInstance().keyboard.imKeyboards().of(im)
+        /** What [im] is typed with now, its layout and 双拼's scheme: what was typed is typed again on the same alone ([HostCore.retype]). */
+        fun keyboardOf(im: String): ImKeyboards.TypedWith =
+            ImKeyboards.typedWith(im, AppPrefs.getInstance().keyboard.imKeyboards(), EngineState.shuangpinScheme)
     }
 }

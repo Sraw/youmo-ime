@@ -100,4 +100,18 @@ class ImKeyboardsTest {
         assertFalse(ImKeyboards.spellsWords(predictive = true, suggests = true, password = false, address = true, noSuggestions = false))
         assertFalse(ImKeyboards.spellsWords(predictive = true, suggests = true, password = false, address = false, noSuggestions = true))
     }
+
+    // 清除's 恢复 types again on the same alone: the layout shown, and 双拼's scheme, which reads
+    // the same letters as other syllables (review2)
+    @Test
+    fun whatIsTypedWithIsTheLayoutAndShuangpinsScheme() {
+        val chosen = Chosen(pinyin = NINE_KEYS, shuangpin = KEYS14)
+        val xiaohe = ShuangpinScheme.XIAOHE
+        assertEquals(ImKeyboards.typedWith(PINYIN, chosen, xiaohe), ImKeyboards.typedWith(PINYIN, chosen, ShuangpinScheme.ZIRANMA))
+        assertEquals(Layout.PINYIN_NINE, ImKeyboards.typedWith(PINYIN, chosen, xiaohe).layout)
+        assertTrue(ImKeyboards.typedWith(PINYIN, chosen, xiaohe) != ImKeyboards.typedWith(PINYIN, Chosen(), xiaohe))
+        assertTrue("another scheme", ImKeyboards.typedWith(SHUANGPIN, Chosen(), xiaohe) != ImKeyboards.typedWith(SHUANGPIN, Chosen(), ShuangpinScheme.ZIRANMA))
+        // the 14 keys under 微软 are the 18: the layout shown, not the choice
+        assertEquals(Layout.SHUANGPIN18, ImKeyboards.typedWith(SHUANGPIN, chosen, ShuangpinScheme.MICROSOFT).layout)
+    }
 }

@@ -66,15 +66,14 @@ object EditPlan {
     fun clear(field: Field, start: Int, end: Int, limit: Int, password: Boolean): Clearing {
         val (before, selected, after) = field
         val from = minOf(start, end)
-        // a selection the editor's report has not caught up with (collapsed yet, its text given: review2):
-        // it starts where the text before it ends, where that was read whole; else not kept
-        val selectedFrom = if (start != end) from else before.length.takeIf { it < limit }
         return when {
+            // a selection the editor's report has not caught up with (collapsed yet, its text given) goes
+            // too, never all before it; not kept, where it starts not known (the text before it an app
+            // may cut short whatever it is asked for: review2)
             start != end || selected.isNotEmpty() -> Clearing(
                 listOf(Step.Replace("")),
-                selectedFrom?.let {
-                    Cleared(Field(before, "", after), listOf(Step.Select(it, it), Step.Replace(selected), Step.Select(it, it + selected.length)))
-                }?.takeIf { selected.isNotEmpty() && selected.length < limit },
+                Cleared(Field(before, "", after), listOf(Step.Select(from, from), Step.Replace(selected), Step.Select(from, from + selected.length)))
+                    .takeIf { start != end && selected.isNotEmpty() && selected.length < limit },
             )
             before.length >= limit -> Clearing(listOf(Step.Select(0, from), Step.Replace("")), null)
             before.isNotEmpty() -> Clearing(

@@ -268,27 +268,18 @@ class EditPlanTest {
     }
 
     // review2: a selection the report has not caught up with (collapsed yet, the app giving its text):
-    // the selection goes, never all before it, and is put back where the text before it ends
+    // the selection goes, never all before it; not kept, where it starts not known from the report
     @Test
-    fun aSelectionTheReportLagsIsWhatGoesAndComesBack() {
+    fun aSelectionTheReportLagsIsWhatGoesNotKept() {
         val kept = ClearedText()
         val editor = FakeEditor("one two three")
         editor.setSelection(4, 8)
         val clearing = EditPlan.clear(editor.field(), 2, 2, 1000, password = false)
         editor.run(clearing.steps)
         assertEquals("one three", editor.text)
+        assertNull(clearing.cleared)
         kept.remember(f, clearing.cleared)
-        assertTrue(editor.restore(kept))
-        assertEquals("one two three", editor.text)
-        assertEquals(4, editor.selectionStart)
-        assertEquals(8, editor.selectionEnd)
-        // where the text before it is cut short, where it starts is not known: deleted, not kept
-        val long = FakeEditor("abcdefgh")
-        long.setSelection(5, 6)
-        val cut = EditPlan.clear(long.field(4), 0, 0, 4, password = false)
-        long.run(cut.steps)
-        assertEquals("abcdegh", long.text)
-        assertNull(cut.cleared)
+        assertFalse(editor.restore(kept))
     }
 
     @Test
