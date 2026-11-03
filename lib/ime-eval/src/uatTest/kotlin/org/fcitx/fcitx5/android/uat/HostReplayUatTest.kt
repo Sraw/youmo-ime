@@ -255,8 +255,9 @@ class HostReplayUatTest {
     @Test
     fun theQuickInputPromptIsInTheDevicesLanguage() = with(HostReplay(engines = UatEngines.fresh(), strings = checkNotNull(ResourceHostStrings.device()))) {
         quick()
-        // values-zh-rCN's host_quick_phrase_aux, its quotes keeping the space
-        assertEquals("快速输入: ", row)
+        // values-zh-rCN's host_quick_phrase_aux, its quotes keeping the space, then its host_quick_phrase_hint
+        // (none of the user's own entries yet)
+        assertEquals("快速输入: 打关键词，或点＋添加自己的", row)
         backspace()
         unicode()
         assertEquals("Unicode：(输入编码或者描述来搜索 Unicode 字符)", row)
