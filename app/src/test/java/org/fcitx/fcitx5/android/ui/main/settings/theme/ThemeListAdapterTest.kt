@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.ui.main.settings.theme
 
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.deriveCustomNoBackground
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeThumbnailUi.State
 import org.junit.Assert.assertEquals
 import org.junit.Test

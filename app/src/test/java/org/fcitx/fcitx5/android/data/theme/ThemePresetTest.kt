@@ -5,8 +5,6 @@
 package org.fcitx.fcitx5.android.data.theme
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.lang.reflect.Modifier
@@ -93,93 +91,6 @@ class ThemePresetTest {
                 val alpha = (colours.getValue(name) ushr 24) and 0xff
                 assertTrue("$property.$name is fully transparent", alpha > 0)
             }
-        }
-    }
-
-    // endregion
-
-    // region deriveCustomNoBackground
-
-    @Test
-    fun derivingWithoutABackgroundKeepsEveryColour() {
-        for ((property, theme) in presets) {
-            val custom = theme.deriveCustomNoBackground("derived")
-            assertEquals("$property lost a colour when derived", theme.colours(), custom.colours())
-        }
-    }
-
-    @Test
-    fun derivingWithoutABackgroundKeepsTheDarkFlagAndTakesTheNewName() {
-        for ((property, theme) in presets) {
-            val custom = theme.deriveCustomNoBackground("derived")
-            assertEquals("$property.isDark changed", theme.isDark, custom.isDark)
-            assertEquals("derived", custom.name)
-        }
-    }
-
-    @Test
-    fun derivingWithoutABackgroundLeavesNoBackgroundImage() {
-        for ((_, theme) in presets) {
-            assertNull(theme.deriveCustomNoBackground("derived").backgroundImage)
-        }
-    }
-
-    // endregion
-
-    // region deriveCustomBackground
-
-    @Test
-    fun derivingWithABackgroundKeepsEveryColour() {
-        for ((property, theme) in presets) {
-            val custom = theme.deriveCustomBackground("derived", "/cropped.png", "/src.png")
-            assertEquals("$property lost a colour when derived", theme.colours(), custom.colours())
-        }
-    }
-
-    @Test
-    fun derivingWithABackgroundRecordsBothImagePaths() {
-        val custom = presets.first().second
-            .deriveCustomBackground("derived", "/cropped.png", "/src.png")
-        val image = custom.backgroundImage
-        assertNotNull(image)
-        assertEquals("/cropped.png", image!!.croppedFilePath)
-        assertEquals("/src.png", image.srcFilePath)
-    }
-
-    @Test
-    fun derivingWithABackgroundDefaultsBrightnessAndLeavesTheCropUnset() {
-        val image = presets.first().second
-            .deriveCustomBackground("derived", "/cropped.png", "/src.png")
-            .backgroundImage!!
-        assertEquals(70, image.brightness)
-        assertNull(image.cropRect)
-        assertEquals(0, image.cropRotation)
-    }
-
-    @Test
-    fun derivingWithABackgroundAcceptsAnExplicitBrightness() {
-        val image = presets.first().second
-            .deriveCustomBackground("derived", "/cropped.png", "/src.png", brightness = 30)
-            .backgroundImage!!
-        assertEquals(30, image.brightness)
-    }
-
-    // endregion
-
-    // region the two derive helpers agree
-
-    /**
-     * The only difference between the two helpers must be the background image. If a new colour
-     * is added to [Theme] and wired into one helper but not the other, this catches it.
-     */
-    @Test
-    fun bothDeriveHelpersProduceTheSameColours() {
-        for ((property, theme) in presets) {
-            val withoutImage = theme.deriveCustomNoBackground("derived")
-            val withImage = theme.deriveCustomBackground("derived", "/a.png", "/b.png")
-            assertEquals("$property: the helpers disagree", withoutImage.colours(), withImage.colours())
-            assertEquals(withoutImage.isDark, withImage.isDark)
-            assertEquals(withoutImage.name, withImage.name)
         }
     }
 

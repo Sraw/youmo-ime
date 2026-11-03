@@ -13,6 +13,8 @@ import kotlinx.serialization.json.jsonObject
 import org.fcitx.fcitx5.android.data.theme.CustomThemeSerializer
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.backgroundImage
+import org.fcitx.fcitx5.android.data.theme.deriveCustomBackground
 import org.fcitx.fcitx5.android.input.theme.KeyLabel
 import org.fcitx.fcitx5.android.input.theme.KeyOverride
 import org.fcitx.fcitx5.android.input.theme.KeyPressed

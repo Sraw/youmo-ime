@@ -4,26 +4,14 @@
  */
 package org.fcitx.fcitx5.android.data.theme
 
-import android.graphics.BitmapFactory
-import android.graphics.Rect
-import android.graphics.drawable.BitmapDrawable
-import android.graphics.drawable.ColorDrawable
-import android.graphics.drawable.Drawable
 import android.os.Parcelable
 import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.TypeParceler
-import org.fcitx.fcitx5.android.input.theme.BoardBase
-import org.fcitx.fcitx5.android.input.theme.Box
-import org.fcitx.fcitx5.android.input.theme.Crop
 import org.fcitx.fcitx5.android.input.theme.LookDefaults
 import org.fcitx.fcitx5.android.input.theme.Palette
-import org.fcitx.fcitx5.android.input.theme.Picture
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
-import org.fcitx.fcitx5.android.utils.DarkenColorFilter
 import org.fcitx.fcitx5.android.utils.alpha
-import org.fcitx.fcitx5.android.utils.appContext
-import java.io.File
 
 sealed class Theme : Parcelable {
 
@@ -73,10 +61,6 @@ sealed class Theme : Parcelable {
         genericActiveBackgroundColor, genericActiveForegroundColor,
     )
 
-    open fun backgroundDrawable(keyBorder: Boolean = false): Drawable {
-        return ColorDrawable(if (keyBorder) backgroundColor else keyboardColor)
-    }
-
     /**
      * The user's own, saved as a file: all of it is its [look] (theme file 3.0), the colours too;
      * its files by absolute path in memory, by name in the file ([ThemeFilesManager]).
@@ -109,50 +93,6 @@ sealed class Theme : Parcelable {
         override val clipboardEntryColor get() = look.palette.clipboardEntryColor
         override val genericActiveBackgroundColor get() = look.palette.genericActiveBackgroundColor
         override val genericActiveForegroundColor get() = look.palette.genericActiveForegroundColor
-
-        /**
-         * The picture as the background image page edits it: its portrait cut (absolute paths),
-         * the source, the brightness, the crop.
-         */
-        @Parcelize
-        data class CustomBackground(
-            val croppedFilePath: String,
-            val srcFilePath: String,
-            val brightness: Int = 70,
-            val cropRect: Rect?,
-            val cropRotation: Int = 0
-        ) : Parcelable {
-            fun toDrawable(): Drawable? {
-                val cropped = File(croppedFilePath)
-                if (!cropped.exists()) return null
-                val bitmap = BitmapFactory.decodeFile(cropped.path) ?: return null
-                return BitmapDrawable(appContext.resources, bitmap).apply {
-                    colorFilter = DarkenColorFilter(100 - brightness)
-                }
-            }
-        }
-
-        val backgroundImage: CustomBackground?
-            get() = look.picture?.let {
-                CustomBackground(
-                    it.portrait.file, it.src, it.brightness,
-                    it.portrait.cropRect?.let { b -> Rect(b.left, b.top, b.right, b.bottom) },
-                    it.portrait.rotation,
-                )
-            }
-
-        /** This theme with [background] as its picture's portrait cut, source and brightness; under the keyboard if it was not. */
-        fun withBackground(background: CustomBackground): Custom {
-            val crop = Crop(background.croppedFilePath, background.cropRect?.let { Box(it.left, it.top, it.right, it.bottom) }, background.cropRotation)
-            val picture = look.picture?.copy(src = background.srcFilePath, portrait = crop, brightness = background.brightness)
-                ?: Picture(background.srcFilePath, crop, null, background.brightness, 0)
-            return copy(look = look.copy(picture = picture, base = if (look.picture == null) BoardBase.Picture else look.base))
-        }
-
-        override fun backgroundDrawable(keyBorder: Boolean): Drawable {
-            return backgroundImage?.toDrawable() ?: super.backgroundDrawable(keyBorder)
-        }
-
     }
 
     @Parcelize
@@ -236,34 +176,6 @@ sealed class Theme : Parcelable {
 
         @IgnoredOnParcel
         override val look: ThemeLook by lazy { LookDefaults.look(palette()) }
-
-        fun deriveCustomNoBackground(name: String) = Custom(name, isDark, look)
-
-        fun deriveCustomBackground(
-            name: String,
-            croppedBackgroundImage: String,
-            originBackgroundImage: String,
-            brightness: Int = 70,
-            cropBackgroundRect: Rect? = null,
-            cropBackgroundRotation: Int = 0
-        ) = Custom(
-            name,
-            isDark,
-            LookDefaults.look(
-                palette(),
-                Picture(
-                    src = originBackgroundImage,
-                    portrait = Crop(
-                        croppedBackgroundImage,
-                        cropBackgroundRect?.let { Box(it.left, it.top, it.right, it.bottom) },
-                        cropBackgroundRotation
-                    ),
-                    landscape = null,
-                    brightness = brightness,
-                    blurDp = 0
-                )
-            )
-        )
     }
 
     @Parcelize
