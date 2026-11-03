@@ -191,8 +191,10 @@ class HandwritingKeyboardTest {
         key.performClick()
         runAll()
         assertEquals(listOf(ReadingStyle.PINYIN), readings)
-        // zhuyin picked in the settings: on, the tap turns it off, the next on in zhuyin
+        // zhuyin picked in the settings (and kept as last used, by the service: CandidateReadingsUatTest): on,
+        // the tap turns it off, the next on in zhuyin
         setting(ReadingStyle.ZHUYIN)
+        AppPrefs.getInstance().internal.lastCandidateReading.setValue(ReadingStyle.ZHUYIN.key)
         assertEquals(keyboard.context.getString(R.string.hw_reading_key_on, name), key.contentDescription)
         key.performClick()
         runAll()

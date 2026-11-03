@@ -100,6 +100,7 @@ import org.fcitx.fcitx5.android.input.editing.InputConnectionEditor
 import org.fcitx.fcitx5.android.input.editing.KeyEventRelay
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import org.fcitx.fcitx5.android.input.hardware.TakenKey
+import org.fcitx.fcitx5.android.input.handwriting.ReadingToggle
 import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
 import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
 import org.fcitx.fcitx5.android.input.learning.UndoChip
@@ -412,6 +413,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 rebuilding(ViewRebuild.READING)
                 replaceInputView(ThemeManager.activeTheme, start = true)
             }
+        }
+        // the style last used, from the settings or the 注 key, whichever keyboard is up: what 注 turns on again
+        lifecycleScope.launch {
+            val last = AppPrefs.getInstance().internal.lastCandidateReading
+            EngineState.candidateReading.collect { last.setValue(ReadingToggle.last(it, last.getValue())) }
         }
         pkgNameCache = PackageNameCache(this)
         getSystemService(InputManager::class.java).registerInputDeviceListener(inputDeviceListener, null)

@@ -119,7 +119,7 @@ class HandwritingKeyboard(
     private val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
     private val lang: ImageKeyView by lazy { findViewById(R.id.button_lang) }
     private val readingKey: TextKeyView by lazy { findViewById(R.id.button_reading) }
-    private var lastReading: String by AppPrefs.getInstance().internal.lastCandidateReading
+    private val lastReading: String by AppPrefs.getInstance().internal.lastCandidateReading
 
     private val showLangSwitchKey = AppPrefs.getInstance().keyboard.showLangSwitchKey
 
@@ -224,9 +224,8 @@ class HandwritingKeyboard(
         }
     }
 
-    // 注 as 候选词注音 is: the accent's colour on, TalkBack told which; the style kept for a tap to turn on again
+    // 注 as 候选词注音 is: the accent's colour on, TalkBack told which (the style last used kept by FcitxInputMethodService)
     private fun showReading(style: ReadingStyle) {
-        lastReading = ReadingToggle.last(style, lastReading)
         val on = style != ReadingStyle.OFF
         readingKey.mainText.setTextColor(if (on) theme.accentKeyBackgroundColor else theme.altKeyTextColor)
         val name = context.getString(R.string.im_candidate_reading)

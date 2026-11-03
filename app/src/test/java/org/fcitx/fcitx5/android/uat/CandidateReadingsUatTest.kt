@@ -4,12 +4,14 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.os.Looper
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.core.EngineState
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
@@ -23,6 +25,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import splitties.dimensions.dp
@@ -80,6 +83,24 @@ class CandidateReadingsUatTest {
     fun portrait() {
         for (style in listOf(ReadingStyle.PINYIN, ReadingStyle.ZHUYIN)) for (sp in listOf(20, 28)) {
             shown(style, sp, "${style.key.lowercase()}_${sp}sp_port")
+        }
+    }
+
+    // the style last used kept whichever keyboard is up (review 051-hw-reading M3): pinyin's here, zhuyin set
+    // and then off in the settings; 注 turns zhuyin on again
+    @Test
+    fun theStyleLastUsedIsKeptFromTheSettingsToo() {
+        val last = AppPrefs.getInstance().internal.lastCandidateReading
+        last.setValue("")
+        try {
+            KeyboardHarness().also { harness = it }.start()
+            EngineState.candidateReadingState.value = ReadingStyle.ZHUYIN
+            shadowOf(Looper.getMainLooper()).idle()
+            EngineState.candidateReadingState.value = ReadingStyle.OFF
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(ReadingStyle.ZHUYIN.key, last.getValue())
+        } finally {
+            last.setValue("")
         }
     }
 
