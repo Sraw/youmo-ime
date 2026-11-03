@@ -576,7 +576,7 @@
     <string name="keyboard_zhuyin_full">Zhuyin (Dachen)</string>
     <string name="im_zhuyin_nine">Pinyin (Zhuyin 9 keys)</string>
     <string name="im_zhuyin">Pinyin (Zhuyin Dachen)</string>
-    <string name="zhuyin_traditional_hint">Zhuyin is usually written in Traditional Chinese: tap 简繁 in ⋯ for it.</string>
+    <string name="zhuyin_traditional_hint">Zhuyin is usually written in Traditional Chinese: tap Simplified in ⋯ to switch.</string>
     <string name="keyboard_nine">9 keys</string>
     <string name="im_pinyin_keys18">Pinyin (18 keys)</string>
     <string name="im_shuangpin_keys14">Shuangpin (14 keys)</string>

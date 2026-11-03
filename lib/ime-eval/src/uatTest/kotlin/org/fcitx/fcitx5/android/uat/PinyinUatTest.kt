@@ -5,7 +5,9 @@
 package org.fcitx.fcitx5.android.uat
 
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.runtime.ModelLevel
 import org.fcitx.fcitx5.android.engine.learn.HabitRanker
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
@@ -581,6 +583,37 @@ class PinyinUatTest {
             type("rq")
             expectAmong(today[1])
         }
+    }
+
+    // 子 and 西 shown in their own tones (桌子 zhuō zǐ), typed with ˙ as Taiwan types them, in their
+    // own tone or with none: the same word first each way, on both zhuyin keyboards (the user, 2026-11-02)
+    @Test
+    @Uat("PY-109")
+    fun aNeutralToneTypedOrNotPutsTheWordFirst() {
+        val typings = mapOf("桌子" to listOf("ㄓㄨㄛˉㄗ˙", "ㄓㄨㄛˉㄗˇ", "ㄓㄨㄛㄗ"), "东西" to listOf("ㄉㄨㄥˉㄒㄧ˙", "ㄉㄨㄥˉㄒㄧˉ", "ㄉㄨㄥㄒㄧ"))
+        // the keyboards' codes go to pinyin, which hands them to its zhuyin sessions (InputMethodCatalog.ZHUYIN)
+        for ((im, codeOf) in listOf("大千" to ::dachenCode, "注音九键" to ::nineCode)) {
+            for ((word, typed) in typings.flatMap { (w, ts) -> ts.map { w to it } }) {
+                with(EngineReplay()) {
+                    typed.forEach { key(EngineReplay.symOf(codeOf(it))) }
+                    pause()
+                    assertEquals("$im $typed", word, candidates.first())
+                }
+            }
+        }
+        // where the keys alone do not say, the tone does: a tone 子 has not (ˊ) puts 桌子 elsewhere
+        with(EngineReplay()) {
+            "ㄓㄨㄛˉㄗˊ".forEach { key(EngineReplay.symOf(nineCode(it))) }
+            pause()
+            assertNotEquals("注音九键 ㄓㄨㄛˉㄗˊ", "桌子", candidates.first())
+        }
+    }
+
+    // a symbol or a tone as 大千 sends it; on 注音九键 a symbol is its group's key, a tone the tone key's
+    private fun dachenCode(c: Char) = ZhuyinKeys.MARKS.indexOf(c).let { if (it >= 0) Keyboard.zhuyinTone(it + 1) else Keyboard.zhuyinKey(c) }
+
+    private fun nineCode(c: Char) = ZhuyinKeys.MARKS.indexOf(c).let {
+        if (it >= 0) Keyboard.zhuyinNineTone(it + 1) else Keyboard.zhuyinNineKey(ZhuyinKeys.GROUP_SYMBOLS.indexOfFirst { g -> c in g })
     }
 
     @Test

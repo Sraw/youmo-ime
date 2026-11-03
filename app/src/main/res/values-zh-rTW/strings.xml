@@ -559,7 +559,7 @@
     <string name="keyboard_zhuyin_full">注音全鍵盤</string>
     <string name="im_zhuyin_nine">拼音 · 注音九鍵</string>
     <string name="im_zhuyin">拼音 · 注音全鍵盤</string>
-    <string name="zhuyin_traditional_hint">注音一般配繁體字：要繁體，在 ⋯ 裡點簡繁。</string>
+    <string name="zhuyin_traditional_hint">注音一般配繁體字：要繁體，在 ⋯ 裡點「簡體」切換。</string>
     <string name="keyboard_nine">九鍵</string>
     <string name="im_pinyin_keys18">拼音 · 18 鍵</string>
     <string name="im_shuangpin_keys14">雙拼 · 14 鍵</string>

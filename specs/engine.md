@@ -463,7 +463,10 @@ setting either: it reads the codes.
   swipe); the key after ㄖㄥㄩ's group is 分词 (tone 0) while something is typed, else a comma as punctuation
   maps it. A tone with nothing typed is not read (`PinyinSession.reads`): it types nothing. The bar's
   syllables are shown in zhuyin (`KeyedSegmenter.shownOffered`; an initial as its symbol, r as ㄖ), and one
-  taken off it as well (`T9Segmenter.asTyped`), though its pinyin is what goes into the input.
+  taken off it as well (`T9Segmenter.asTyped`), though its pinyin is what goes into the input. An initial
+  taken goes in as its symbol typed as itself (`KeyedSegmenter.keyOf`), no separator: a final typed next
+  goes on from it, and alone it reads its whole syllable (ㄓ is zhi). So a whole syllable shown as an
+  initial is (zhi, chi, shi, ri, zi, ci, si) is left off the bar for the initial (`NineKeys.offer`).
 - **Tones.** Optional. `PinyinDecoder`'s `toneAllows` (`PinyinData.tones.allows`) adds `Penalties.tone`
   (−4) for each word whose character cannot take the tone typed: soft, a word is never dropped.
 - **Learning.** Kinds `zy:nine`, `zy:dachen` (`Kinds.isZhuyin`), grouped, no spellings linked (U-20 is

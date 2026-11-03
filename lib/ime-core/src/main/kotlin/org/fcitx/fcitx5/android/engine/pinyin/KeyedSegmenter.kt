@@ -45,6 +45,13 @@ interface KeyedSegmenter : Segmenter {
      */
     fun shownOffered(offered: String): String = offered
 
+    /**
+     * The key an initial the bar offers is taken as: on the zhuyin keyboards its symbol typed as
+     * itself (ㄓ for zh), which a final typed next goes on from and which alone reads its whole
+     * syllable (zhi), as a long press's; null where it is taken as its letters and a separator (简拼).
+     */
+    fun keyOf(offered: String): Char? = null
+
     /** Whether [c] of the input ends a syllable: the separator, a tone on the zhuyin keyboards. */
     fun separates(c: Char): Boolean = c == SyllableGraph.SEPARATOR
 

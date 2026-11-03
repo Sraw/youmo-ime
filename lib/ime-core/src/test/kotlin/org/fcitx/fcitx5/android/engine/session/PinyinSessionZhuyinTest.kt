@@ -142,4 +142,61 @@ class PinyinSessionZhuyinTest {
         assertNull(SpelledForm.of(Kinds.ZHUYIN_DACHEN, "abcd", "ni hao"))
         assertEquals('a', SpelledForm.filedUnder(Kinds.ZHUYIN_NINE, "ab", "ni hao"))
     }
+
+    private fun Keyboard.take(syllables: List<String>, id: Int, shown: String) =
+        onEvent(EngineEvent.CHAR, Keyboard.syllableKey(syllables.indexOf(shown).also { assertTrue(syllables.toString(), it >= 0) }, id).code)
+
+    // ㄓ is zhi whole and zh's initial alike: the bar has it once, as the initial (taken, the symbol
+    // typed as itself), not twice where none could tell them apart
+    @Test
+    fun aWholeSyllableShownAsItsInitialIsOnTheBarOnceAsTheInitial() {
+        for (symbol in "ㄓㄔㄕㄖㄗㄘㄙ") {
+            val s = session(nine = true)
+            val keyboard = Keyboard(s, nineKeys = true)
+            val out = keyboard.type(nine(symbol.toString()))
+            assertEquals(out.syllables.toString(), 1, out.syllables.count { it == symbol.toString() })
+            val taken = keyboard.take(out.syllables, out.syllablesId, symbol.toString())
+            assertEquals(symbol.toString(), taken.preedit)
+            // taken again: the key it is already, nothing changes, and one ⌫ still gives the group key back
+            val again = keyboard.take(taken.syllables, taken.syllablesId, symbol.toString())
+            assertEquals(symbol.toString(), again.preedit)
+            assertEquals(out.syllables, s.apply(Action.Backspace).syllables)
+        }
+    }
+
+    // the initial taken goes on into a final typed next (ㄓ ㄨㄥ, 中); none after, its whole syllable (ㄖ, ri)
+    @Test
+    fun anInitialTakenGoesOnIntoTheFinalOrIsItsWholeSyllable() {
+        val zhong = Keyboard(session(nine = true), nineKeys = true)
+        val zh = zhong.type(nine("ㄓ"))
+        zhong.take(zh.syllables, zh.syllablesId, "ㄓ")
+        val out = zhong.type(nine("ㄨㄥ"))
+        assertEquals("ㄓㄨㄥ", out.preedit)
+        assertEquals("中", out.candidates[0])
+        val riqi = Keyboard(session(nine = true), nineKeys = true)
+        val r = riqi.type(nine("ㄖ"))
+        riqi.take(r.syllables, r.syllablesId, "ㄖ")
+        assertEquals("日期", riqi.type(nine("ㄑㄧ")).candidates[0])
+        // every initial is taken so, not only the seven a whole syllable shares: ㄋ (of ㄇㄋㄜ) taken is ㄋ picked
+        // off its key, as a long press picks it, and the keys after go on from it (ㄋ ㄧ ㄏㄠ, 你好). The zhuyin
+        // keyboards have no 简拼 (abbreviations off), so an initial alone is not a word's first syllable
+        val nh = Keyboard(session(nine = true), nineKeys = true)
+        val n = nh.type(nine("ㄋ"))
+        assertEquals("ㄋ", nh.take(n.syllables, n.syllablesId, "ㄋ").preedit)
+        assertEquals("你好", nh.type(nine("ㄧㄏㄠ")).candidates[0])
+        assertEquals("ㄋㄏ", Keyboard(session(nine = true), nineKeys = true).let { k ->
+            val m = k.type(nine("ㄋ"))
+            k.take(m.syllables, m.syllablesId, "ㄋ")
+            k.type(nine("ㄏ")).candidates[0]
+        })
+        // given back by ⌫ right after: the key as it was
+        val s = session(nine = true)
+        val back = Keyboard(s, nineKeys = true)
+        val typed = back.type(nine("ㄓ"))
+        back.take(typed.syllables, typed.syllablesId, "ㄓ")
+        val undone = s.apply(Action.Backspace)
+        assertEquals(typed.preedit, undone.preedit)
+        // the group key's, not ㄓ's alone: the group's other initial offered again
+        assertTrue(undone.syllables.toString(), "ㄗ" in undone.syllables)
+    }
 }

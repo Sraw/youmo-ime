@@ -31,16 +31,21 @@ internal class NineKeys(
     private val isKey: (Char) -> Boolean = T9Segmenter.Companion::isKey,
     /** The initials a key offers for 简拼 ([KeyedSegmenter.initialsOf]): the nine keys' its initial letters. */
     private val initialsOf: (Char) -> List<String> = { c -> T9Segmenter.initialsOf(letters, c) },
+    /** The key an initial is taken as ([KeyedSegmenter.keyOf]): zhuyin's symbol; null for its letters and a separator. */
+    private val keyOf: (String) -> Char? = { null },
+    /** How an offered syllable or initial shows ([KeyedSegmenter.shownOffered]). */
+    private val shown: (String) -> String = { it },
     /** How often each syllable was taken for some digits (the bar's habit, U-23): its order after the best reading's. */
     private val bar: (digits: String) -> Map<String, Int> = { emptyMap() },
 ) {
 
     /**
-     * A syllable taken at [at] for the keys [was], [spelling] in their place, a separator [added]
-     * after it; [then] the input after; [runs], what [pressed] had for the keys.
+     * A syllable taken at [at] for the keys [was], [put] in their place (its [spelling], or the key an
+     * initial is taken as), a separator [added] after it; [then] the input after; [runs], what
+     * [pressed] had for the keys.
      */
-    private class Taken(val at: Int, val was: String, val spelling: String, val added: Boolean, val then: String, val runs: List<PressedKeys.Run>) {
-        val length get() = spelling.length
+    private class Taken(val at: Int, val was: String, val spelling: String, val put: String, val added: Boolean, val then: String, val runs: List<PressedKeys.Run>) {
+        val length get() = put.length
     }
 
     private val taken = ArrayList<Taken>() // the last last
@@ -118,8 +123,11 @@ internal class NineKeys(
         val initials = if (at == key) initialsOf(input[at]) else emptyList()
         val presses = HashMap<String, Int>()
         for ((s, length) in found) presses[Syllables.spelling(s)] = length
-        val shown = (order.map { Syllables.spelling(it) } + initials).take(Action.Syllable.MAX)
-        show(shown, at, shown.map { s -> presses[s] ?: 1 })
+        // an initial taken as a key that alone reads a syllable shown the same (zhuyin's ㄓ, zhi's and
+        // zh's): the initial only, which is the syllable too unless a final follows
+        val keyed = initials.filter { keyOf(it) != null }.mapTo(HashSet(), shown)
+        val offered = (order.map { Syllables.spelling(it) }.filterNot { shown(it) in keyed } + initials).take(Action.Syllable.MAX)
+        show(offered, at, offered.map { s -> presses[s] ?: 1 })
     }
 
     // the start of the taken letters before [key] and its separator, if [graph] (of the input from [from]) reads
@@ -173,12 +181,18 @@ internal class NineKeys(
         val was = input.substring(at, at + offeredPresses[index])
         val lengthBefore = input.length
         val runs = pressed.runs(at, at + was.length)
-        input.replace(at, at + was.length, spelling)
-        val end = at + spelling.length
-        val added = end == input.length || input[end] != SyllableGraph.SEPARATOR
+        // an initial taken as a key: the key, which goes on into the next, no separator (no syllable is
+        // spelt as an initial is: m, n and r alone are never offered, syllablesAt)
+        val key = keyOf(spelling)
+        val put = key?.toString() ?: spelling
+        // the key it is already (ㄓ typed as itself, ㄓ taken): nothing to take
+        if (put == was) return cursor
+        input.replace(at, at + was.length, put)
+        val end = at + put.length
+        val added = key == null && (end == input.length || input[end] != SyllableGraph.SEPARATOR)
         if (added) input.insert(end, SyllableGraph.SEPARATOR)
-        pressed.replace(at, at + was.length, spelling.length, runs.joinToString("") { it.keys }, added = if (added) 1 else 0)
-        taken += Taken(at, was, spelling, added, input.toString(), runs)
+        pressed.replace(at, at + was.length, put.length, runs.joinToString("") { it.keys }, added = if (added) 1 else 0)
+        taken += Taken(at, was, spelling, put, added, input.toString(), runs)
         return if (cursor < at) cursor else maxOf(cursor, at + was.length) + input.length - lengthBefore
     }
 
