@@ -577,6 +577,8 @@ class ToolbarUatTest {
             assertFalse(st.texts().contains(st.s(R.string.status_area)))
             check(st.s(R.string.undo))
             check(st.s(R.string.theme))
+            // 快速输入, not on the bar by default (the user's call, 2026-11-02), ticked
+            check(st.s(R.string.quick_phrases))
             // the theme dragged below the divider: always there
             val divider = adapter.entries.indexOf(ToolbarConfig.Item.Divider)
             val theme = adapter.indexOf(ToolbarButton.Theme)

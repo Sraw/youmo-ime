@@ -113,16 +113,16 @@ data class ToolbarConfig(val items: List<Item>) {
         private const val HIDDEN = "-"
 
         /**
-         * The bar as it always was: what v0.4 had, 快速输入 after it, and the panel's others hidden on
-         * the toolbar. A bar never arranged is this one, an upgrade's too (the user's call, 2026-11-02:
-         * 快速输入 shown to them as well); one the user arranged gets 快速输入 hidden, as any button
-         * added later ([parse]).
+         * The bar as it always was: what v0.4 had, and the panel's others hidden on the toolbar. 快速输入
+         * among them, first: one to add, not on the bar till the user ticks it (the user's call,
+         * 2026-11-02; 符's long press and the gestures' command open it as ever). A bar the user
+         * arranged gets it hidden too, as any button added later ([parse]).
          */
         val DEFAULT = ToolbarConfig(
-            listOf(ToolbarButton.Undo, ToolbarButton.Redo, ToolbarButton.CursorMove, ToolbarButton.Clipboard, ToolbarButton.QuickPhrase)
+            listOf(ToolbarButton.Undo, ToolbarButton.Redo, ToolbarButton.CursorMove, ToolbarButton.Clipboard)
                 .map { Item.Button(it, true) } +
                 listOf(
-                    ToolbarButton.TradSimp, ToolbarButton.Floating, ToolbarButton.OneHanded, ToolbarButton.Habits,
+                    ToolbarButton.QuickPhrase, ToolbarButton.TradSimp, ToolbarButton.Floating, ToolbarButton.OneHanded, ToolbarButton.Habits,
                     ToolbarButton.ClearRecent, ToolbarButton.Theme, ToolbarButton.InputMethodSettings, ToolbarButton.Keyboard,
                 ).map { Item.Button(it, false) } +
                 Item.Divider +

@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.input.bar.ToolbarConfig.Item
 import org.fcitx.fcitx5.android.input.bar.ToolbarConfig.Layout
 import org.fcitx.fcitx5.android.input.bar.ToolbarConfig.Situation
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -31,7 +32,7 @@ class ToolbarConfigTest {
     fun neverSetTheBarIsZeroFoursBar() {
         assertEquals(ToolbarConfig.DEFAULT, ToolbarConfig.parse(""))
         assertEquals(
-            Layout(listOf(Undo, Redo, CursorMove, Clipboard, ToolbarButton.QuickPhrase, More), listOf(Emoji, Voice, Hide)),
+            Layout(listOf(Undo, Redo, CursorMove, Clipboard, More), listOf(Emoji, Voice, Hide)),
             ToolbarConfig.DEFAULT.layout(everything)
         )
     }
@@ -100,13 +101,17 @@ class ToolbarConfigTest {
     }
 
     @Test
-    fun quickInputIsShownOnABarNeverArrangedNewOrUpgradedHiddenOnOneArranged() {
-        // the user's call (2026-11-02): a bar never arranged, an upgrade's too, stores nothing and
-        // shows 快速输入; one arranged before 0.5.1 keeps its look, the button hidden
-        assertEquals(Item.Button(ToolbarButton.QuickPhrase, true), ToolbarConfig.parse("").items.single { it is Item.Button && it.button == ToolbarButton.QuickPhrase })
-        assertTrue(ToolbarButton.QuickPhrase in ToolbarConfig.parse("").layout(everything).toolbar)
+    fun quickInputIsNotOnTheBarTillTickedNeverArrangedNorArranged() {
+        // the user's call (2026-11-02): one to add, on neither build's bar by default, a bar never
+        // arranged (new or upgraded) nor one arranged before 0.5.1
+        fun quick(c: ToolbarConfig) = c.items.single { it is Item.Button && it.button == ToolbarButton.QuickPhrase }
+        assertEquals(Item.Button(ToolbarButton.QuickPhrase, false), quick(ToolbarConfig.parse("")))
+        assertFalse(ToolbarButton.QuickPhrase in ToolbarConfig.parse("").layout(everything).toolbar)
         val arranged = ToolbarConfig.parse("undo,redo,cursor_move,clipboard,|,emoji,voice,hide")
-        assertEquals(Item.Button(ToolbarButton.QuickPhrase, false), arranged.items.single { it is Item.Button && it.button == ToolbarButton.QuickPhrase })
+        assertEquals(Item.Button(ToolbarButton.QuickPhrase, false), quick(arranged))
+        // ticked, it is on the toolbar where it stands in the list
+        val ticked = ToolbarConfig.parse("undo,redo,cursor_move,clipboard,quick_phrase,|,emoji,voice,hide")
+        assertEquals(listOf(Undo, Redo, CursorMove, Clipboard, ToolbarButton.QuickPhrase, More), ticked.layout(everything).toolbar)
         assertEquals(ToolbarButton.QuickPhrase, ToolbarButton.ofKey("quick_phrase"))
     }
 
