@@ -411,10 +411,16 @@ class LearnLog(
 
         private fun fits(record: ByteArray) = record.size <= 4 + RecordFormat.MAX_RECORD + 4
 
-        /** [state] as a snapshot cut at [cut], each record handed to [write]. */
-        fun writeSnapshot(state: LearnState, cut: Int, write: (ByteArray) -> Unit, kinds: Map<Int, String> = emptyMap()) {
+        /** [state] as a snapshot cut at [cut], each record handed to [write]; only those it [keeps]. */
+        fun writeSnapshot(
+            state: LearnState,
+            cut: Int,
+            write: (ByteArray) -> Unit,
+            kinds: Map<Int, String> = emptyMap(),
+            keeps: (LearnRecord) -> Boolean = { true },
+        ) {
             val writer = LearnRecords.SnapshotWriter(write, kinds)
-            state.snapshot(cut).forEach(writer::write)
+            state.snapshot(cut).forEach { if (keeps(it)) writer.write(it) }
         }
 
         /** The state the log [bytes] (header and records) say: what a start would read. */

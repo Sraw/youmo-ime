@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.learn.backup
 
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord
 import org.fcitx.fcitx5.android.engine.learn.LearnRecords
 import org.fcitx.fcitx5.android.engine.learn.LearnState
 import org.fcitx.fcitx5.android.engine.store.RecordFormat
@@ -127,7 +128,7 @@ object LearnBackup {
         // END must be the only 74, and last, or the file would not read
         LearnLog.writeSnapshot(state, state.cut, { record: ByteArray ->
             if (record[4] !in HEAD..LAST || record[4] == BackupMerge.ORIGIN) out.write(record)
-        })
+        }, keeps = ::backedUp)
         for (w in added) out.write(word(ADDED, w))
         for (w in blocked) out.write(word(BLOCKED, w))
         if (addresses != null) {
@@ -145,6 +146,17 @@ object LearnBackup {
         out.write(FORMAT.record(END) { writeInt(out.size() + END_SIZE) })
         return out.toByteArray()
     }
+
+    /**
+     * Whether a backup takes the snapshot's row [r]: a whole phrase (U-73) used once is not (user
+     * 2026-11-02, C54). Most whole commits are never put in whole again, and the tables and handwriting
+     * kept no sentence before them (S8): a backup, a file the user hands around, holds those used
+     * again. The phone counts each still, or none would reach the 3 times that offer it.
+     */
+    fun backedUp(r: LearnRecord): Boolean = r !is LearnRecord.PhraseRow || r.count >= MIN_PHRASE_USES
+
+    /** A whole phrase's uses (U-73) a backup takes it from. */
+    const val MIN_PHRASE_USES = 2
 
     private fun word(type: Byte, w: ListedWord) = FORMAT.record(type) {
         writeUTF(w.text)

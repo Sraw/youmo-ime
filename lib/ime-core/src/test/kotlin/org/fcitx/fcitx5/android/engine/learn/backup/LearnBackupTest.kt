@@ -113,6 +113,19 @@ class LearnBackupTest {
         assertEquals(listOf(LearnRecord.Unknown(60, byteArrayOf(1, 2, 3))), read.state.kept)
     }
 
+    // user 2026-11-02 (C54): a whole phrase used once stays on the phone, out of a backup; used twice it goes in
+    @Test
+    fun aPhraseUsedOnceIsNotBackedUp() {
+        val state = learned()
+        state.apply(LearnRecord.PhraseRow("你好呀亲爱的", 1, 3))
+        state.apply(LearnRecord.PhraseRow("我到楼下了", 2, 3))
+        val read = LearnBackup.read(LearnBackup.bytes(head, state, emptyList(), emptyList()))
+        assertEquals(setOf("我到楼下了"), read.state.phrases.keys)
+        assertEquals(2, read.state.phrases.getValue("我到楼下了").count)
+        // the phone's own record keeps it, or none would reach the 3 uses that offer it
+        assertTrue(LearnRecord.PhraseRow("你好呀亲爱的", 1, 3) in state.snapshot(0))
+    }
+
     // review-int-records M1: the offsets a restore stored come back with the backup, 退回恢复前's copy too
     @Test
     fun theOffsetsARestoreStoredReadBack() {
