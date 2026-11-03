@@ -97,6 +97,8 @@ class KotlinHostTest {
         AppPrefs.getInstance().internal.nineKeysUnseen.setValue(false)
         AppPrefs.getInstance().keyboard.pinyinKeyboard.run { setValue(defaultValue) }
         AppPrefs.getInstance().internal.nineKeysMerged.run { setValue(defaultValue) }
+        // published by the host, read by the keyboard window: not the next test's
+        EngineState.traditionalIms = null
         EngineNotices.sayer = null
         directBoot(false)
     }
@@ -163,6 +165,7 @@ class KotlinHostTest {
             fcitx.activate(1, "org.example")
             fcitx.focus(true)
             assertEquals("fcitx-chttrans-active", fcitx.statusArea().first { it.name == "chttrans" }.icon)
+            assertEquals(setOf(InputMethodCatalog.PINYIN), EngineState.traditionalIms)
         }
     }
 
@@ -425,10 +428,16 @@ class KotlinHostTest {
         fcitx.activate(1, "org.example")
         fcitx.focus(true)
         assertEquals("fcitx-chttrans-inactive", trad().icon)
+        // what the keyboard's 注音 hint reads: the list as started, read again, toggled
+        assertEquals(emptySet<String>(), EngineState.traditionalIms)
         config(ModuleConfigs.CHTTRANS).apply { parentFile!!.mkdirs() }
             .writeText(ModuleConfigs.chttransText(null, setOf(InputMethodCatalog.PINYIN)))
         fcitx.reloadConfig()
         assertEquals("fcitx-chttrans-active", trad().icon)
+        assertEquals(setOf(InputMethodCatalog.PINYIN), EngineState.traditionalIms)
+        fcitx.activateAction(trad().id)
+        assertEquals("fcitx-chttrans-inactive", trad().icon)
+        assertEquals(emptySet<String>(), EngineState.traditionalIms)
     }
 
     @Test

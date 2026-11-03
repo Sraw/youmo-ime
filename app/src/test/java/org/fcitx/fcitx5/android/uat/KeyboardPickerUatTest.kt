@@ -56,6 +56,7 @@ class KeyboardPickerUatTest {
     fun close() {
         harness?.close()
         EngineState.shuangpinScheme = schemeWas
+        EngineState.traditionalIms = null
     }
 
     private fun s(id: Int) = h.service.getString(id)
@@ -119,8 +120,23 @@ class KeyboardPickerUatTest {
         assertTrue(h.texts().toString(), "重输" in h.texts())
         assertEquals(four to s(R.string.keyboard_nine), picked())
         h.start()
-        // 大千 picked: said once that 繁体 is in ⋯
-        assertEquals(four to s(R.string.keyboard_nine), picked(R.string.keyboard_zhuyin_full))
+        // 注音九键 picked while pinyin is already traditional: nothing to tell, nor marked told
+        EngineState.traditionalIms = setOf(InputMethodCatalog.PINYIN)
+        picked(R.string.keyboard_zhuyin_nine)
+        assertEquals(PinyinKeyboard.ZhuyinNine, keyboard.pinyinKeyboard.getValue())
+        assertFalse(AppPrefs.getInstance().internal.zhuyinTraditionalTold.getValue())
+        // picked before the host has said which are traditional: nothing told yet, nor marked told
+        EngineState.traditionalIms = null
+        h.start()
+        picked(R.string.keyboard_nine)
+        h.start()
+        picked(R.string.keyboard_zhuyin_nine)
+        assertEquals(PinyinKeyboard.ZhuyinNine, keyboard.pinyinKeyboard.getValue())
+        assertFalse(AppPrefs.getInstance().internal.zhuyinTraditionalTold.getValue())
+        EngineState.traditionalIms = emptySet()
+        h.start()
+        // 大千 picked on 简体: said once that 繁体 is in ⋯
+        assertEquals(four to s(R.string.keyboard_zhuyin_nine), picked(R.string.keyboard_zhuyin_full))
         assertEquals(PinyinKeyboard.ZhuyinFull, keyboard.pinyinKeyboard.getValue())
         assertTrue(AppPrefs.getInstance().internal.zhuyinTraditionalTold.getValue())
         assertTrue(h.texts().toString(), "ㄅ" in h.texts())

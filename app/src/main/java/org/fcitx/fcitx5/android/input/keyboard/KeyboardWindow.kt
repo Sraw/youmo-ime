@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
@@ -210,7 +211,11 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private fun tellZhuyinOnce(target: String) {
         if (target != ZhuyinKeyboard.NameNine && target != ZhuyinKeyboard.NameFull) return
         val told = AppPrefs.getInstance().internal.zhuyinTraditionalTold
+        // already traditional (简繁 on for pinyin): nothing to tell, and it is told the first time it is not.
+        // Not known yet (the host not up): nor now, it may be; told when shown once it is known
         if (told.getValue()) return
+        val traditional = EngineState.traditionalIms ?: return
+        if (InputMethodCatalog.PINYIN in traditional) return
         told.setValue(true)
         // posted: picked from ⋯, the panel closing as the layout shows would take a notice said now with it
         keyboardView.post { service.say(R.string.zhuyin_traditional_hint) }
