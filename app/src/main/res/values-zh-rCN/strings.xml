@@ -935,6 +935,7 @@
     <string name="shortcut_apply_presets">套用编辑快捷键</string>
     <string name="shortcut_clear_page">清除这一页的快捷键</string>
     <string name="shortcut_hint">点一个键，改它长按弹出的字符（第一个就是键角符号）和快捷键。</string>
+    <string name="shortcut_hint_page">点一个键，改它的快捷键。</string>
     <string name="shortcut_now">现在：%s（在“滑动”里改）</string>
     <string name="shortcut_page_full">全键盘</string>
     <string name="shortcut_page_nine">九键</string>

@@ -72,11 +72,14 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         content.apply {
             removeAllViews()
             add(tabs(ctx), lParams(matchParent))
-            add(text(ctx, getString(R.string.shortcut_hint), body = true), lParams(matchParent) { topMargin = ctx.dp(8) })
+            // the long press's characters only on the full keyboard's tab; the others change the shortcut alone
+            val hint = if (page === KeyShortcutPages.Full) R.string.shortcut_hint else R.string.shortcut_hint_page
+            add(text(ctx, getString(hint), body = true), lParams(matchParent) { topMargin = ctx.dp(8) })
             add(text(ctx, getString(R.string.shortcut_now, getString(layers.stringRes)), body = false), lParams(matchParent) { topMargin = ctx.dp(4) })
             if (page === KeyShortcutPages.Full) fullPage(ctx) else shortcutPage(ctx, page)
             add(ctx.horizontalLayout {
-                add(MaterialButton(ctx, null, MaterialR.attr.materialButtonOutlinedStyle).apply {
+                // a tab with no presets (注音九键, the numbers) has none to put back
+                if (page.hasPresets) add(MaterialButton(ctx, null, MaterialR.attr.materialButtonOutlinedStyle).apply {
                     setText(R.string.shortcut_apply_presets)
                     setOnClickListener { shortcuts = shortcuts.withPresets(page.form); rebuild() }
                 }, lParams { marginEnd = ctx.dp(8) })
@@ -114,7 +117,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         page.rows.forEachIndexed { i, row ->
             val keys = if (function) row.take(1) else row
             with(content) { add(ctx.horizontalLayout {
-                gravity = Gravity.CENTER_HORIZONTAL
+                gravity = if (page.leftAligned) Gravity.START else Gravity.CENTER_HORIZONTAL
                 keys.forEach { key ->
                     val names = if (function) row.map { it.name } else listOf(key.name)
                     val label = if (function) getString(FunctionLabels.getValue(key.label)) else key.label

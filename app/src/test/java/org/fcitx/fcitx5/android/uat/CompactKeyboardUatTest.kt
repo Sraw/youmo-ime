@@ -20,6 +20,8 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
+import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.KeyTextScale
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -73,7 +75,8 @@ class CompactKeyboardUatTest {
     private fun TextKeyView.size() = mainText.textSize
 
     private fun AltTextKeyView.cornerTopRight(): Boolean =
-        altText.visibility == View.VISIBLE && h.box(altText).bottom <= h.box(mainText).centerY()
+        altText.visibility == View.VISIBLE && h.box(altText).centerY() < h.box(mainText).centerY() &&
+            h.box(altText).left >= h.box(mainText).right
 
     private fun backspace(): KeyView =
         KeyboardHarness.all(h.inputView).filterIsInstance<KeyView>().first { it.def.viewId == R.id.button_backspace }
@@ -144,6 +147,37 @@ class CompactKeyboardUatTest {
         level(38, 60)
         h.idle()
         assertNotSame("out of it", small, h.keyboard)
+    }
+
+    @Test
+    @Uat("ST-51")
+    fun floatingTakesTheSmallerOfItsScaleAndCompacts() {
+        h.start()
+        val size = h.key("q").size()
+        fresh()
+        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        compact()
+        h.start()
+        val screen = h.service.resources.configuration.screenWidthDp
+        val floating = FloatingKeyboard.textScale(FloatingKeyboard.widthDp(screen), screen)
+        // the smaller, not the product (051-compact §1.3)
+        assertEquals(size * minOf(KeyTextScale.COMPACT, floating), h.key("q").size(), 0.5f)
+    }
+
+    @Test
+    @Uat("ST-51")
+    @Config(qualifiers = "w851dp-h393dp-land-440dpi")
+    fun turnedItIsCompactToo() {
+        h.start()
+        val size = h.key("q").size()
+        val height = h.box(h.key("q")).height()
+        fresh()
+        compact()
+        h.start()
+        assertEquals(size * 0.9f, h.key("q").size(), 0.5f)
+        // 34% of the height against 标准's 49%
+        assertTrue("${h.box(h.key("q")).height()} of $height", h.box(h.key("q")).height() < height * 0.8)
+        assertTrue((h.key("w") as AltTextKeyView).cornerTopRight())
     }
 
     @Test

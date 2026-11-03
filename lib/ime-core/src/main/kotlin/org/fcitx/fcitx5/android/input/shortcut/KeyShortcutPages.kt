@@ -16,9 +16,15 @@ object KeyShortcutPages {
 
     data class Key(val label: String, val name: String)
 
-    /** A tab: [form] (a [KeyShortcutPreset] constant, or [KeyShortcuts.FUNCTION]) and its [rows]. */
-    data class Page(val form: String, val rows: List<List<Key>>) {
+    /**
+     * A tab: [form] (a [KeyShortcutPreset] constant, or [KeyShortcuts.FUNCTION]) and its [rows], a row
+     * shorter than the rest [leftAligned] as the keyboard has it or centred.
+     */
+    data class Page(val form: String, val rows: List<List<Key>>, val leftAligned: Boolean = false) {
         val names: List<String> get() = rows.flatten().map { it.name }
+
+        /** Whether a key of it has a preset: 套用编辑快捷键 has none to put back otherwise (注音九键, the numbers). */
+        val hasPresets: Boolean get() = names.any { KeyShortcutPreset.of(it) != KeyShortcut.None }
     }
 
     private val FULL_ROWS = listOf("qwertyuiop", "asdfghjkl", "zxcvbnm")
@@ -52,6 +58,8 @@ object KeyShortcutPages {
     val ZhuyinNine = Page(
         KeyShortcutPreset.ZHUYIN_NINE,
         ZhuyinKeys.GROUP_SYMBOLS.mapIndexed { g, symbols -> Key(symbols, KeyShortcuts.charKey(KeyShortcutPreset.ZHUYIN_NINE, "${g + 1}")) }.chunked(3),
+        // ㄈㄌㄝ and ㄖㄥㄩ under the first two, the 分词 key in the third place
+        leftAligned = true,
     )
 
     val ZhuyinFull = Page(

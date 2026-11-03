@@ -45,6 +45,12 @@ class KeyShortcutPagesTest {
     }
 
     @Test
+    fun zhuyinNineAndTheNumbersHaveNoPresetsAndZhuyinNinesShortRowIsLeft() {
+        assertEquals(listOf(KeyShortcutPages.ZhuyinNine, KeyShortcutPages.Number), KeyShortcutPages.all.filterNot { it.hasPresets })
+        assertEquals(listOf(KeyShortcutPages.ZhuyinNine), KeyShortcutPages.all.filter { it.leftAligned })
+    }
+
+    @Test
     fun aFunctionKeyHasItsWayUpThenDown() {
         val space = KeyShortcutPages.Function.rows.first()
         assertEquals(listOf("fn/space.up", "fn/space.down"), space.map { it.name })

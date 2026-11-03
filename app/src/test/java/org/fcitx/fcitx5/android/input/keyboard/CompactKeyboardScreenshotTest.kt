@@ -10,6 +10,8 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
@@ -104,6 +106,37 @@ class CompactKeyboardScreenshotTest {
     @Uat("ST-51")
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun everyKeyboardTurned() = shoot("land")
+
+    // the full keyboard with the layouts 紧凑 meets: floating, one-handed, dark; split turned
+    private fun shootFull(name: String, theme: Theme = ThemePreset.PixelLight) {
+        prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
+        prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
+        KeyboardHarness(theme).use { h ->
+            h.start()
+            h.capture("CompactKeyboardScreenshotTest/$name", h.inputView)
+        }
+    }
+
+    @Test
+    @Uat("ST-51")
+    @Config(qualifiers = "w393dp-h851dp-port-440dpi")
+    fun floatingOneHandedAndDark() {
+        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        shootFull("floating_port")
+        ThemeManager.prefs.floatingKeyboard.setValue(false)
+        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
+        shootFull("one_handed_port")
+        ThemeManager.prefs.oneHanded.setValue(OneHanded.Off)
+        shootFull("dark_port", ThemePreset.PixelDark)
+    }
+
+    @Test
+    @Uat("ST-51")
+    @Config(qualifiers = "w851dp-h393dp-land-440dpi")
+    fun splitTurned() {
+        prefs.set(ThemeManager.prefs.splitKeyboard, SplitKeyboardMode.Always)
+        shootFull("split_land")
+    }
 
     @Test
     @Uat("ST-51")

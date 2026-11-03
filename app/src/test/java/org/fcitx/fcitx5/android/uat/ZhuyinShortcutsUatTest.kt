@@ -82,7 +82,16 @@ class ZhuyinShortcutsUatTest {
         h.swipe(m, 0f, -m.height * 1.3f)
         h.idle()
         assertEquals(0 to 7, h.field.selectionStart to h.field.selectionEnd)
+        // ㄋ has none: up types it, as a tap
+        val n = h.faced("ㄋ")
+        val typed = h.sent().size
+        h.swipe(n, 0f, -n.height * 1.3f)
+        h.idle()
+        assertEquals(h.api.calls.toString(), typed + 1, h.sent().size)
+        assertEquals(0 to 7, h.field.selectionStart to h.field.selectionEnd)
     }
+
+    private fun KeyboardHarness.sent() = api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
 
     @Test
     @Uat("T9-61")
@@ -112,6 +121,9 @@ class ZhuyinShortcutsUatTest {
         st.idle()
         val texts = st.texts()
         for (g in listOf("ㄅㄉㄚ", "ㄓㄗㄢㄦ", "ㄖㄥㄩ")) assertTrue("$g in $texts", g in texts)
+        // no presets to put back; the hint of changing a key's shortcut alone, not its long press
+        assertTrue(texts.toString(), st.s(R.string.shortcut_apply_presets) !in texts && st.s(R.string.shortcut_clear_page) in texts)
+        assertTrue(texts.toString(), st.s(R.string.shortcut_hint_page) in texts)
         st.capture("ZhuyinShortcutsUatTest/page_zy9")
     }
 }

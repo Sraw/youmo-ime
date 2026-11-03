@@ -957,6 +957,7 @@
     <string name="shortcut_apply_presets">Apply edit shortcuts</string>
     <string name="shortcut_clear_page">Clear this page\'s shortcuts</string>
     <string name="shortcut_hint">Tap a key to change the characters its long press offers (the first is its corner symbol) and its shortcut.</string>
+    <string name="shortcut_hint_page">Tap a key to change its shortcut.</string>
     <string name="shortcut_now">Now: %s (change it in Swipe)</string>
     <string name="shortcut_page_full">Full</string>
     <string name="shortcut_page_nine">9 keys</string>
