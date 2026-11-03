@@ -67,3 +67,12 @@ case("QU-15", needs="jvm:QuickPhraseManagerTest")(lambda d: None)
 
 
 case("QU-16", needs="jvm:UserDataManagerTest.quickInputsEntriesOrderAndSwitchesRoundTripThroughABackup")(lambda d: None)
+
+
+case("QU-17", needs="jvm:QuickPhraseKeyboardUatTest.aCandidatesCardCommitsCopiesEditsDeletesAndUndoes、QuickPhraseMineTest.refreshedAfterAReloadTheListIsTheNewBooks")(lambda d: None)
+
+
+case("QU-18", needs="jvm:QuickPhraseKeyboardUatTest.theClipboardSavesAnEntryAsQuickInputButNotAPasswordNorOneTooLong")(lambda d: None)
+
+
+case("QU-19", needs="jvm:QuickPhraseSettingsUatTest.theEditorAndWhatWasTypedOutliveTheActivityMadeAnew、QuickPhraseSettingsUatTest.aContentTooLongIsToldAtOkAndNeverCut")(lambda d: None)

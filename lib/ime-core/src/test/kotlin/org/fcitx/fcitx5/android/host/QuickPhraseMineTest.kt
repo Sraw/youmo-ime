@@ -117,6 +117,7 @@ class QuickPhraseMineTest {
 
     // review L3: an entry deleted from its card goes from the list at once, what is typed kept
     @Test
+    @Uat("QU-17")
     fun refreshedAfterAReloadTheListIsTheNewBooks() {
         open()
         rig.quickPhrase.reload(QuickPhraseBook(builtIn, listOf(gh)))
