@@ -177,6 +177,18 @@ class PinyinSessionZhuyinTest {
         val r = riqi.type(nine("ㄖ"))
         riqi.take(r.syllables, r.syllablesId, "ㄖ")
         assertEquals("日期", riqi.type(nine("ㄑㄧ")).candidates[0])
+        // every initial is taken so, not only the seven a whole syllable shares: ㄋ (of ㄇㄋㄜ) taken is ㄋ picked
+        // off its key, as a long press picks it, and the keys after go on from it (ㄋ ㄧ ㄏㄠ, 你好). The zhuyin
+        // keyboards have no 简拼 (abbreviations off), so an initial alone is not a word's first syllable
+        val nh = Keyboard(session(nine = true), nineKeys = true)
+        val n = nh.type(nine("ㄋ"))
+        assertEquals("ㄋ", nh.take(n.syllables, n.syllablesId, "ㄋ").preedit)
+        assertEquals("你好", nh.type(nine("ㄧㄏㄠ")).candidates[0])
+        assertEquals("ㄋㄏ", Keyboard(session(nine = true), nineKeys = true).let { k ->
+            val m = k.type(nine("ㄋ"))
+            k.take(m.syllables, m.syllablesId, "ㄋ")
+            k.type(nine("ㄏ")).candidates[0]
+        })
         // given back by ⌫ right after: the key as it was
         val s = session(nine = true)
         val back = Keyboard(s, nineKeys = true)
