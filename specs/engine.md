@@ -282,6 +282,24 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   their hint emptied; the views draw them as pinyin above in the bar's own height (`ReadingSpan`'s hint
   mode, sized by `CandidateBarHeight.hintSize`, floor `HINT_FLOOR_SP`), the baseline unmoved. An emoji's
   or a table's hint, no syllable a Han character, stays a hint.
+  Handwriting's candidates of one Han character (not what may follow) show all its readings instead
+  (`CandidateReadings.allOf`): the first `MAX_SHOWN` (2) of `ordered(cp, before)` joined by `SEPARATOR`
+  (`/`), `MORE` (`…`) after them for more; `ordered` is `PinyinData.charReadings`' order (`CharReadings`,
+  compiled by `CharReadingsBuilder`), the reading of the word the text before makes with the character
+  first (`Predictor.reading`: 银 then 行, háng); a traditional character by its simplified one's. The bar
+  draws them by `ReadingSpan` (pinyin smaller to `CandidateBarHeight.readingsSize`'s 7 sp floor, then the
+  candidate wider; zhuyin a column a reading). A settings change that touches only `candidateReading`
+  keeps the sessions (`Engines.settings`); the host then sends `Keyboard.RECALL` (`HostCore.configure`)
+  so what is composing is read again, and the app makes its views anew with `ViewRebuild.READING`, which
+  does not end the composition. Handwriting's 注 key (`ReadingToggle`: off ↔ the last style used)
+  sets the same option.
+  A character's card (`CharCard.of`, `Engines.charCard(im, index, text)`): for a candidate the session
+  says was looked up (`Session.lookedUp`: handwriting's characters, full pinyin's `u` parts and stroke
+  lookup, not what was typed nor what may follow), its readings in `ordered`'s order with up to two
+  words each (`CharReadings`), and `engine/charinfo.data`'s radical, strokes and parts (`CharInfo`), the
+  parts' readings by `CandidateReadings`, the stroke order the stroke table's first (`Strokes`); what is
+  not known is null. The app shows it above the held candidate's menu (`CharCardView`, laid out by
+  `CharCardLayout`).
 - **Strokes.** `u` with nothing typed starts `StrokeLookup` (`h s p n z` = 横竖撇捺折); any other
   letter turns it back into pinyin (`usb`, or `uan` as a slip for `yan`), typed at the strokes'
   cursor, which they keep as pinyin keeps its own.

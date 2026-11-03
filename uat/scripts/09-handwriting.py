@@ -98,3 +98,15 @@ case("HW-23", needs="jvm:HandwritingEngineUatTest.aCharacterDeletedRightAwayIsNo
 
 
 case("HW-26", needs="jvm:HandwritingEngineUatTest.aCharacterNotYetInIsShownTraditionalAtTheToggle")(lambda d: None)
+
+
+case("HW-27", needs="jvm:CandidateReadingsUatTest.handwritingPortrait、CandidateReadingsUatTest.handwritingLandscape、ReadingSpanTest")(lambda d: None)
+
+
+case("HW-28", needs="jvm:HandwritingUatTest.theReadingKeyTurnsTheReadingsOnAndWhatIsWrittenStays、HandwritingKeyboardTest.theReadingKeyTurnsTheReadingsOnAsLastUsedAndOff")(lambda d: None)
+
+
+case("HW-29", needs="jvm:HandwritingUatTest.aHeldCharactersCardThenItsButtonsAndTheMenu、HandwritingUatTest.theCardInLandscapeIsTwoColumns")(lambda d: None)
+
+
+case("HW-30", needs="jvm:HandwritingUatTest.copyPutsTheCharacterAloneOnTheClipboardAndCommitIsATap")(lambda d: None)
