@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import splitties.views.dsl.core.add
@@ -88,7 +89,8 @@ class KeyShortcutSection(private val ctx: Context, title: String, off: Boolean, 
     }
 
     private fun chooseCommand() {
-        val commands = KeyCommand.entries
+        // voice input only where the build has it (051-c §1.5)
+        val commands = KeyCommand.entries.filter { VoiceFeature.AVAILABLE || it != KeyCommand.Voice }
         AlertDialog.Builder(ctx)
             .setTitle(R.string.shortcut_command)
             .setSingleChoiceItems(commands.map { ctx.getString(KeyShortcutLooks.of(it).label) }.toTypedArray(), commands.indexOf(command)) { d, i ->

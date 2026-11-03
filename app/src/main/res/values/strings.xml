@@ -684,8 +684,7 @@
     <string name="picker_objects">Objects</string>
     <string name="picker_symbols">Symbols</string>
     <string name="picker_flags">Flags</string>
-    <string name="long_press_page_hint">Tap a key to change the characters it offers when you hold it. The small character on it is the first of them: what holding and letting go gives, and what swiping the key types.</string>
-    <string name="long_press_legend">Outlined keys are ones you changed. A faded key offers nothing when held, and types nothing when swiped.</string>
+    <string name="long_press_legend">Outlined keys are ones you changed. A faded key offers nothing when held, and swiped the symbol\'s way it types the key itself; its shortcut works as usual.</string>
     <string name="long_press_none">Holding this key offers nothing.</string>
     <string name="long_press_add_hint">Add, space between several</string>
     <string name="punctuation_page_hint">While typing Chinese, the key on the left types the punctuation on the right; a key with several offers a choice. Tap one to change or remove it.</string>

@@ -667,8 +667,7 @@
     <string name="picker_objects">物品</string>
     <string name="picker_symbols">符号</string>
     <string name="picker_flags">旗帜</string>
-    <string name="long_press_page_hint">点一个键，修改长按它弹出的字符。键上的小字就是其中第一个：长按后直接松手，或者滑动这个键，得到的都是它。</string>
-    <string name="long_press_legend">带框的键是改过的；变淡的键长按不弹出字符，滑动也不输入。</string>
+    <string name="long_press_legend">带框的键是改过的；变淡的键长按不弹出字符，往符号那层滑等于点这个键，快捷键照常。</string>
     <string name="long_press_none">长按这个键不弹出字符。</string>
     <string name="long_press_add_hint">添加字符，空格分隔</string>
     <string name="punctuation_page_hint">打中文时，按左边的键打出右边的标点；一个键对应几个标点时可以选。点一项可修改或删除。</string>
