@@ -13,7 +13,7 @@ cd "$work"
 gtest=googletest-1.13.0
 if [ ! -d $gtest ]; then
   curl -sSL -o $gtest.tar.gz https://github.com/google/googletest/archive/refs/tags/v1.13.0.tar.gz
-  echo "ad7fdba11ea011c1d925b3289cf4af2c66a352e18d4c7264392fead75e919363  $gtest.tar.gz" | sha256sum -c --quiet
+  echo "ad7fdba11ea011c1d925b3289cf4af2c66a352e18d4c7264392fead75e919363  $gtest.tar.gz" | shasum -a 256 -c -s
   tar xzf $gtest.tar.gz
 fi
 [ -f libgtest.a ] || {
@@ -26,7 +26,7 @@ fi
 ssp=simple-sentencepiece-0.7
 if [ ! -d $ssp ]; then
   curl -sSL -o $ssp.tar.gz https://github.com/pkufool/simple-sentencepiece/archive/refs/tags/v0.7.tar.gz
-  echo "1748a822060a35baa9f6609f84efc8eb54dc0e74b9ece3d82367b7119fdc75af  $ssp.tar.gz" | sha256sum -c --quiet
+  echo "1748a822060a35baa9f6609f84efc8eb54dc0e74b9ece3d82367b7119fdc75af  $ssp.tar.gz" | shasum -a 256 -c -s
   tar xzf $ssp.tar.gz
 fi
 
