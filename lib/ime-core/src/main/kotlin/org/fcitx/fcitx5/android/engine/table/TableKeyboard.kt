@@ -35,6 +35,13 @@ data class TableKeyboard(
         }
     }
 
+    /**
+     * As the keys show it at 键盘高度 紧凑 when [compact]: all the roots in two lines too small to read
+     * on a key that short, their names instead (the setting kept, all of them again out of 紧凑), and
+     * the letters' shortcuts marked as with the names.
+     */
+    fun atHeight(compact: Boolean): TableKeyboard = if (compact && labels == KeyLabels.ROOTS) copy(labels = KeyLabels.NAMES) else this
+
     /** What [letter]'s long press shows instead of its symbols, large: all its roots, while the keys show them. */
     fun rootsOf(letter: Char): List<String>? = if (labels == KeyLabels.ROOTS) roots?.all?.get(letter) else null
 

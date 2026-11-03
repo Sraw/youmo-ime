@@ -630,7 +630,7 @@
     <string name="im_wubi_key_labels_summary">顯示五筆 86 的鍵名或每個鍵的全部字根；顯示全部字根時，長按鍵看大圖</string>
     <string name="im_wubi_key_labels_none">字母</string>
     <string name="im_wubi_key_labels_names">鍵名（王土大木工…）</string>
-    <string name="im_wubi_key_labels_roots">全部字根</string>
+    <string name="im_wubi_key_labels_roots">全部字根（鍵盤高度緊湊時顯示鍵名）</string>
     <string name="key_confirm">確定</string>
     <string name="im_order_by_use">調頻</string>
     <string name="im_order_by_use_summary">碼表原有的字詞按你的選擇排。關著時位置不變，適合靠位置盲打</string>

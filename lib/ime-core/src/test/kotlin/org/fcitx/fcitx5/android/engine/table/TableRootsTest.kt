@@ -57,6 +57,21 @@ class TableRootsTest {
     }
 
     @Test
+    fun atCompactAllTheRootsAreShownAsTheirNames() {
+        fun keyboard(labels: KeyLabels) = TableKeyboard("engine-wubi", setOf(';'), true, labels, TableRoots.WUBI86)
+        val compact = keyboard(KeyLabels.ROOTS).atHeight(compact = true)
+        assertEquals(keyboard(KeyLabels.NAMES), compact)
+        assertEquals("王", compact.label('g'))
+        assertNull(compact.rootsOf('g'))
+        // out of 紧凑 as set; names and letters alike at both
+        assertEquals(keyboard(KeyLabels.ROOTS), keyboard(KeyLabels.ROOTS).atHeight(compact = false))
+        for (labels in listOf(KeyLabels.NONE, KeyLabels.NAMES)) {
+            assertEquals(keyboard(labels), keyboard(labels).atHeight(compact = true))
+            assertEquals(keyboard(labels), keyboard(labels).atHeight(compact = false))
+        }
+    }
+
+    @Test
     fun anExtraKeyIsOneTheFaceHasNowhereElse() {
         val slots = listOf(';', '*')
         // 二笔: , and . are the bottom row's, ' / * on the corners; ; is left

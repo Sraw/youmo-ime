@@ -147,7 +147,7 @@ layout shown and 双拼's scheme; another's keys' codes go to a session of their
 editor's report lags is cleared, not kept. A field kept from learning (`PasswordOrSensitive`) is cleared with nothing kept;
 an app's own `restartInput` is another input, its clears forgotten. The
 marks on a key are placed by `KeyMarks`, on the keyboard and on 按键字符和快捷键's keys (`KeyCaps`) alike;
-五笔's 全部字根 leaves the letters' shortcuts unmarked (`BaseKeyboard.charShortcutMarks`); at 键盘高度 紧凑 (`KeyboardHeightLevels.isCompact`, read as the keys
+五笔's 全部字根 leaves the letters' shortcuts unmarked (`BaseKeyboard.charShortcutMarks`), shown as 键名 at 紧凑 though (`TableKeyboard.atHeight`, the setting kept); at 键盘高度 紧凑 (`KeyboardHeightLevels.isCompact`, read as the keys
 are made by `keyboardCompact()`) one mark a key, top right (a key's symbol over its shortcut, a function
 key's up one), and the keys' text 0.9 (`KeyTextScale`, the smaller of it and floating's; 大千's symbols 0.9 again, `KeyTextScale.dachen`, cut off on a 360 dp phone otherwise). The service
 makes the keys anew only when a height change crosses into or out of 紧凑 (`compactBuilt`, as

@@ -288,7 +288,8 @@ class TextKeyboard private constructor(
 
     // [state] of the table shown, or of another input method's (none of this one's then)
     private fun showTable(state: TableKeyboard?) {
-        val shown = state?.takeIf { it.im == imeName }
+        // 全部字根 shown as 键名 at 紧凑, read as the keys are made (made anew into and out of it)
+        val shown = state?.takeIf { it.im == imeName }?.atHeight(keyboardCompact())
         if (shown == table) return
         // another table's roots as well: 五笔's 键名 to 仓颉's, both NAMES, told before the switch shows
         val relabels = shown?.labels != table?.labels || shown?.roots !== table?.roots

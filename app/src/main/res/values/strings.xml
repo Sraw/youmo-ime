@@ -647,7 +647,7 @@
     <string name="im_wubi_key_labels_summary">The Wubi 86 key names or all of a key\'s roots; with all roots, hold a key to see them large</string>
     <string name="im_wubi_key_labels_none">Letters</string>
     <string name="im_wubi_key_labels_names">Key names (王土大木工…)</string>
-    <string name="im_wubi_key_labels_roots">All roots</string>
+    <string name="im_wubi_key_labels_roots">All roots (key names at the Compact keyboard height)</string>
     <string name="key_confirm">OK</string>
     <string name="im_order_by_use">Order by use</string>
     <string name="im_order_by_use_summary">The table\'s own words go by what you pick. Off, each stays where the table puts it, for typing by position</string>
