@@ -82,4 +82,26 @@ class ContinuationsTest {
     private companion object {
         const val LEAST = 3
     }
+
+    // two phrases left with the same rest are one candidate: the one used most (review of 051-predict)
+    @Test
+    fun oneRestOnceTheMostUsedPhrase() {
+        c.set("好呀亲爱的", 5, 1, LEAST)
+        val found = c.find("你好呀", intArrayOf(0, 1, 2), "呀", 2) { true }
+        assertEquals(listOf("亲爱的"), found.map { it.rest })
+        assertEquals("好呀亲爱的", found.single().whole)
+        c.set("好呀亲爱的", 3, 1, LEAST)
+        // as many uses: the last used
+        assertEquals("你好呀亲爱的", c.find("你好呀", intArrayOf(0, 1, 2), "呀", 2) { true }.single().whole)
+    }
+
+    @Test
+    fun theTailIsAPhrasesLengthNoCharacterCut() {
+        assertEquals("你好", Continuations.tail("你好"))
+        val long = "一".repeat(20)
+        assertEquals(12, Continuations.tail(long).length)
+        // 𠀀 (two chars) cut in two at the start: dropped whole
+        val cut = "𠀀" + "好".repeat(11)
+        assertEquals("好".repeat(11), Continuations.tail(cut))
+    }
 }

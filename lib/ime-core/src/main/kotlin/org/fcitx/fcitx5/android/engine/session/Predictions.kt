@@ -12,7 +12,6 @@ import org.fcitx.fcitx5.android.engine.learn.Code
 import org.fcitx.fcitx5.android.engine.learn.HabitRanker
 import org.fcitx.fcitx5.android.engine.learn.Habits
 import org.fcitx.fcitx5.android.engine.learn.Kinds
-import org.fcitx.fcitx5.android.engine.learn.Phrases
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.learn.Row
 import org.fcitx.fcitx5.android.engine.learn.Word
@@ -84,6 +83,10 @@ class Predictions(
     /** The last word put in, as the user model has it: what is picked next is learned after it. */
     var lastEntry: Entry? = null
 
+    // the text put in last, while [before] ends with it: the word a whole phrase goes on after where
+    // the predictor has none of it (the user's new word, a rare one; U-73)
+    private var written = ""
+
     /** What the field's commits are not learned for ([Commit.NO_PAIRS], [Commit.NO_PREDICT], U-91): as the session's last [Action.Context] said. */
     var learnFlags = 0
 
@@ -99,12 +102,14 @@ class Predictions(
     /** The text before the cursor is [text], as kept. */
     fun goOnFrom(text: String) {
         before = kept(text)
+        written = ""
     }
 
     /** [text] went into the editor, [entry] its word as learned (or none). */
     fun wrote(text: String, entry: Entry?) {
         before = kept(before + text)
         lastEntry = entry
+        written = text
         cleared = false
     }
 
@@ -112,6 +117,7 @@ class Predictions(
     fun forgetBefore() {
         before = ""
         lastEntry = null
+        written = ""
         cleared = false
     }
 
@@ -123,6 +129,7 @@ class Predictions(
         val drop = if (before.length >= 2 && Character.isLowSurrogate(before.last())) 2 else 1
         before = before.dropLast(drop)
         lastEntry = null
+        written = ""
     }
 
     /**
@@ -161,7 +168,9 @@ class Predictions(
                 PredictionOrder.Offer.NONE
             } else {
                 val text = simplify(before)
-                TextWords.previous(w.lastTwo(text)).let { (prev2, prev) -> o.offer(habits, prev2, prev, continued = continued(text, wordBefore())) }
+                // after no word of the predictor's, what was put in last: its phrases alone
+                val last = wordBefore().ifEmpty { simplify(written).takeIf { !cleared && text.endsWith(it) }.orEmpty() }
+                TextWords.previous(w.lastTwo(text)).let { (prev2, prev) -> o.offer(habits, prev2, prev, continued = continued(text, last), last = last) }
             },
         )
     }
@@ -176,9 +185,7 @@ class Predictions(
         val w = words
         if (u == null || w == null || u.continuations.isEmpty()) return emptyList()
         if (last.isEmpty() || !learning() || learnFlags and Commit.NO_PREDICT != 0) return emptyList()
-        // a phrase's start is no longer than the phrase
-        var tail = text.takeLast(Phrases.MAX)
-        if (tail.isNotEmpty() && Character.isLowSurrogate(tail[0])) tail = tail.substring(1)
+        val tail = Continuations.tail(text)
         return u.continuationsAfter(tail, w.boundaries(tail), last)
     }
 
@@ -187,8 +194,14 @@ class Predictions(
      * ones), offered: as [PredictionOrder.offer] has it, learned after [learnedAfter], [tail] the
      * model's word a word it lacks ends with. Whether to offer any is the session's to say.
      */
-    internal fun offer(prev2: Int, prev: Int, learnedAfter: Int = prev, tail: () -> Int = { NO_WORD }, continued: List<Continuations.Found> = emptyList()) =
-        show(order?.offer(habits, prev2, prev, learnedAfter, tail, continued) ?: PredictionOrder.Offer.NONE)
+    internal fun offer(
+        prev2: Int,
+        prev: Int,
+        learnedAfter: Int = prev,
+        tail: () -> Int = { NO_WORD },
+        continued: List<Continuations.Found> = emptyList(),
+        last: String = "",
+    ) = show(order?.offer(habits, prev2, prev, learnedAfter, tail, continued, last) ?: PredictionOrder.Offer.NONE)
 
     private fun show(offer: PredictionOrder.Offer) {
         offered = offer.candidates

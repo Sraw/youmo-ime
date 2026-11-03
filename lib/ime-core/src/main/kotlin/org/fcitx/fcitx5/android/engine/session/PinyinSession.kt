@@ -765,9 +765,9 @@ class PinyinSession(
             // what was put in after it is counted after that word, as the record has its text (原 UAT PY-71)
             val decoded = if (prev == NO_WORD) "" else text(prev)
             val whole = if (decoded.isEmpty() || learned.length <= decoded.length || !learned.endsWith(decoded)) NO_WORD else data.wordIndex.find(learned)
-            predictions.offer(prev2, prev, if (whole == NO_WORD) prev else whole, tail, predictions.continued(recorder.textBefore(), learned))
+            predictions.offer(prev2, prev, if (whole == NO_WORD) prev else whole, tail, predictions.continued(recorder.textBefore(), learned), learned)
         } else {
-            predictions.offer(NO_WORD, own, tail = { if (prev < data.vocabulary.size) prev else tail() }, continued = predictions.continued(recorder.textBefore(), learned))
+            predictions.offer(NO_WORD, own, tail = { if (prev < data.vocabulary.size) prev else tail() }, continued = predictions.continued(recorder.textBefore(), learned), last = learned)
         }
         return Read(candidates = predictions.offered)
     }

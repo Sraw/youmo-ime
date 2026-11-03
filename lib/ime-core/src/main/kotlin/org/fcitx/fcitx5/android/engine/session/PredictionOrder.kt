@@ -51,7 +51,8 @@ class PredictionOrder(
     /**
      * What may follow [prev] (after [prev2]; see [Predictor.predict] for [tail] and [learnedAfter]), as [habits] rank it:
      * the rest of the whole phrases [continued] first (D-C3), most used first, then the words as U-70 ranks them, but
-     * for one it put first (picked twice running there) which stays in front.
+     * for one it put first (picked twice running there) which stays in front. After no word of the model's
+     * ([prev] [NO_WORD]: the user's new word, a rare one) the phrases alone, after [last], the word put in last.
      */
     fun offer(
         habits: Habits,
@@ -60,9 +61,10 @@ class PredictionOrder(
         learnedAfter: Int = prev,
         tail: () -> Int = { NO_WORD },
         continued: List<Continuations.Found> = emptyList(),
+        last: String = "",
     ): Offer {
-        if (prev == NO_WORD) return Offer.NONE
         val phrases = continued.associateBy { Candidate(it.rest, 0, 0f, IntArray(0), IntArray(0)) }
+        if (prev == NO_WORD) return if (phrases.isEmpty() || last.isEmpty()) Offer.NONE else phrasesAlone(habits, last, phrases)
         val rests = continued.mapTo(HashSet()) { it.rest }
         // a word of the same text as a phrase's rest: once, as the phrase
         val offered = predictor.predict(prev2, prev, RANKED, learnedAfter, tail).filter { it.text !in rests }
@@ -80,12 +82,22 @@ class PredictionOrder(
         val items = offered.map { item(it, injected = false) } + back.map { item(it, injected = true) }
         val view = view(habits)
         val byHabit = HabitRanker.rank(items, code, after, view)
-        val whole = phrases.keys.map { c -> HabitRanker.Ranked(item(c, injected = false), HabitRanker.Tier.DICTIONARY, view.uses(code, words(c.text))) }
+        val whole = ranked(phrases.keys, code, view)
         // the phrases in front of the words (D-C3), but for a word the user put first here (U-70: picked twice running) or pinned
         val ahead = byHabit.firstOrNull()?.takeIf { it.tier == HabitRanker.Tier.PINNED || it.tier == HabitRanker.Tier.FIRST_HERE }
         val ranked = listOfNotNull(ahead) + whole + byHabit.drop(if (ahead == null) 0 else 1)
         return Offer(after, ranked.map { it.value }, ranked.associateBy { it.value }, phrases)
     }
+
+    // the phrases (U-73) after a word the model has not, filed after it as put in: a pick of one is learned there
+    private fun phrasesAlone(habits: Habits, after: String, phrases: Map<Candidate, Continuations.Found>): Offer {
+        val ranked = ranked(phrases.keys, code(after), view(habits))
+        return Offer(after, ranked.map { it.value }, ranked.associateBy { it.value }, phrases)
+    }
+
+    // the phrases' rests in the order found (most used first), each with its uses here
+    private fun ranked(rests: Collection<Candidate>, code: Code, view: HabitRanker.View) =
+        rests.map { c -> HabitRanker.Ranked(item(c, injected = false), HabitRanker.Tier.DICTIONARY, view.uses(code, words(c.text))) }
 
     private fun item(c: Candidate, injected: Boolean) =
         HabitRanker.Item(c, words(c.text), single = c.text.codePointCount(0, c.text.length) == 1 && Han.all(c.text), injected = injected)

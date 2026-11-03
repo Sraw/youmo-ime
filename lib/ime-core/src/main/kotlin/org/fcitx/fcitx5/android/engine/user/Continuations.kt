@@ -63,10 +63,21 @@ class Continuations {
                 if (p.text !in found && rest.codePointCount(0, rest.length) >= MIN_REST && offered(p.text)) found[p.text] = Found(p.text, rest, p.count)
             }
         }
-        return found.values.sortedWith(compareByDescending<Found> { it.count }.thenByDescending { of(it.whole)?.lastDay ?: 0 }.thenBy { it.whole }).take(limit)
+        // two phrases of the same rest (你好呀亲爱的 and 好呀亲爱的 after 你好呀) are one candidate: the one used most
+        return found.values.sortedWith(compareByDescending<Found> { it.count }.thenByDescending { of(it.whole)?.lastDay ?: 0 }.thenBy { it.whole })
+            .distinctBy { it.rest }.take(limit)
     }
 
     companion object {
+        /**
+         * The end of the text before the cursor [text] a phrase's start may be in: no longer than a
+         * phrase, a character not cut in two. What [find] is given, by the sessions and the evaluation alike.
+         */
+        fun tail(text: String): String {
+            val tail = text.takeLast(Phrases.MAX)
+            return if (tail.isNotEmpty() && Character.isLowSurrogate(tail[0])) tail.substring(1) else tail
+        }
+
         /** What is left of a phrase to offer it: one character is a word's 联想's (U-71). */
         const val MIN_REST = 2
 

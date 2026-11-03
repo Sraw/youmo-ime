@@ -227,4 +227,16 @@ class PredictionOrderTest {
         pick("啊")
         assertEquals(listOf("啊", "好呀", "好"), order.offer(learner.habits, NO_WORD, id("你"), continued = found).candidates.take(3).map { it.text })
     }
+
+    // after a word the model has not (the user's new word): the phrases alone, after it as put in (review of 051-predict)
+    @Test
+    fun afterNoWordOfTheModelsThePhrasesAlone() {
+        val found = listOf(Continuations.Found("龘你好", "你好", 3))
+        val o = order.offer(learner.habits, NO_WORD, NO_WORD, continued = found, last = "龘")
+        assertEquals(listOf("你好"), o.candidates.map { it.text })
+        assertEquals("龘", o.after)
+        assertEquals("龘你好", o.phrases.getValue(o.candidates[0]).whole)
+        assertTrue(order.offer(learner.habits, NO_WORD, NO_WORD, continued = found).candidates.isEmpty())
+        assertTrue(order.offer(learner.habits, NO_WORD, NO_WORD, last = "龘").candidates.isEmpty())
+    }
 }

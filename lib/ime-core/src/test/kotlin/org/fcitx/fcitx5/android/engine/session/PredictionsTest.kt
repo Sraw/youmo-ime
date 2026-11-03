@@ -252,4 +252,24 @@ class PredictionsTest {
         learning = false
         assertEquals(emptyList<Any>(), p.continued("高", "高"))
     }
+
+    // a handwriting's or a table's word the model has not, last: its phrase all the same, its pick
+    // learned after it (review of 051-predict; pinyin goes on from its own word)
+    @Test
+    fun aPhraseGoesOnAfterAWordTheModelHasNot() {
+        repeat(Predictor.PAIRS) {
+            learner.habits.record(listOf(Row(Row.PICK or Row.WHOLE, Code(Kinds.HANDWRITING, ""), "", Words.of("龘山人天"), 'A', Row.DICTIONARY, "")))
+        }
+        p.wrote("龘", null)
+        p.predict()
+        assertEquals(listOf("山人天"), p.offered.map { it.text })
+        assertEquals("山人天", p.pick(0))
+        assertEquals(Predictor.PAIRS + 1, learner.log.state.phrases.getValue("龘山人天").count)
+        // deleted back: what was written last is no longer before the cursor
+        p.goOnFrom("")
+        p.wrote("龘", null)
+        p.deleted()
+        p.predict()
+        assertTrue(p.offered.isEmpty())
+    }
 }
