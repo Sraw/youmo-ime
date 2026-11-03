@@ -21,6 +21,8 @@ import org.fcitx.fcitx5.android.engine.english.EnglishDataBuilder
 import org.fcitx.fcitx5.android.engine.english.EnglishText
 import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.phrase.Chaizi
+import org.fcitx.fcitx5.android.engine.phrase.CharInfo
+import org.fcitx.fcitx5.android.engine.phrase.CharInfoBuilder
 import org.fcitx.fcitx5.android.engine.phrase.EmojiData
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.stroke.Strokes
@@ -40,6 +42,7 @@ import java.util.Formatter
 import java.util.Locale
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
+import java.util.zip.ZipFile
 import kotlin.math.abs
 import kotlin.system.exitProcess
 
@@ -116,6 +119,18 @@ private val COMMANDS = listOf(
         """,
         inputs = 1..1,
     ) { options, out -> chaizi(options, out) },
+    Command(
+        "charinfo -o <out> --unihan <Unihan.zip> --radicals <CJKRadicals.txt> --chaizi <chaizi-jt.txt> --strokes <stroke.dict.yaml> --pinyin <pinyin.data> [--cover <chars.txt>]",
+        """
+            each character's radical, strokes and parts,
+            for its card: Unihan's kRSUnicode and
+            kTotalStrokes, CJKRadicals, kfcd/chaizi,
+            rime-stroke's orders where Unihan counts none;
+            how many of the characters handwriting knows
+            (--cover) have each, and readings, checked
+        """,
+        inputs = 0..0,
+    ) { options, out -> charInfo(options, out) },
     Command(
         "hotwords -o <out> <pack.words>",
         """
@@ -296,6 +311,12 @@ private class Options(
     val pinyin: String?,
     /** `emoji`: Unicode's emoji-test.txt. */
     val test: String?,
+    /** `charinfo`: Unicode's Unihan.zip and CJKRadicals.txt, kfcd/chaizi's chaizi-jt.txt, rime-stroke's dictionary, and the characters handwriting knows. */
+    val unihan: String?,
+    val radicals: String?,
+    val chaizi: String?,
+    val strokes: String?,
+    val cover: String?,
     /** `english-lm`: how many words, and at most how many of the pages' words to read. */
     val vocabulary: Int,
     val tokens: Long,
@@ -415,6 +436,11 @@ private class Options(
                 words = values["--words"],
                 pinyin = values["--pinyin"],
                 test = values["--test"],
+                unihan = values["--unihan"],
+                radicals = values["--radicals"],
+                chaizi = values["--chaizi"],
+                strokes = values["--strokes"],
+                cover = values["--cover"],
                 // the start's id must fit an n-gram key too (EnglishCounts)
                 vocabulary = values.count("--vocabulary", VOCABULARY, 1 until NgramKey.MAX_WORDS - 2) ?: return null,
                 tokens = values.read("--tokens", Long.MAX_VALUE) { it.toLongOrNull()?.takeIf { n -> n >= 1 } } ?: return null,
@@ -1031,6 +1057,55 @@ private val CHAIZI_HEADER = """
     chaizi.data, ime-dict-tool's chaizi: characters by the pinyin of their parts, from the open
     汉语拆字字典 (https://github.com/kfcd/chaizi, CC BY 3.0, https://creativecommons.org/licenses/by/3.0/)
 """.trimIndent()
+
+private fun charInfo(options: Options, out: Appendable) {
+    val builder = CharInfoBuilder()
+    ZipFile(options.unihan!!).use { zip ->
+        val entry = zip.getEntry(UNIHAN_RS) ?: throw FileNotFoundException("${options.unihan}: no $UNIHAN_RS")
+        zip.getInputStream(entry).bufferedReader().useLines { builder.unihan(it, UNIHAN_RS) }
+    }
+    File(options.radicals!!).useLines { builder.radicals(it, options.radicals) }
+    File(options.chaizi!!).useLines { builder.chaizi(it) }
+    // rime-stroke's `字<TAB>strokes` lines, after the header's `...`
+    File(options.strokes!!).useLines { lines ->
+        lines.dropWhile { it != "..." }.forEach { line ->
+            val f = line.split('\t')
+            if (f.size >= 2 && f[0].codePointCount(0, f[0].length) == 1 && f[1].all { it in Strokes.KEYS }) builder.strokes(f[0].codePointAt(0), f[1].length)
+        }
+    }
+    val output = File(options.output!!)
+    output.outputStream().use { builder.build().writeTo(it) }
+    val info = CharInfo.load(ByteBuffer.wrap(output.readBytes()))
+    out.appendLine("charinfo: ${info.size} characters, ${info.taken} of them taken apart")
+    options.cover?.let { cover ->
+        val readings = PinyinData.load(map(options.pinyin!!)).charReadings
+        val chars = File(cover).readText().codePoints().filter { Character.UnicodeScript.of(it) == Character.UnicodeScript.HAN }.distinct().toArray()
+        val has = listOf<Pair<String, (Int) -> Boolean>>(
+            "readings" to { cp -> readings.of(cp).isNotEmpty() },
+            "radical" to { cp -> info.of(cp) != null },
+            "strokes" to { cp -> (info.of(cp)?.strokes ?: 0) > 0 },
+            "parts" to { cp -> info.of(cp)?.parts != null },
+        )
+        for ((what, test) in has) {
+            val missing = chars.filterNot(test)
+            val share = 1 - missing.size.toDouble() / chars.size
+            out.appendLine("  of ${File(cover).name}'s ${chars.size}: $what ${chars.size - missing.size} (${"%.1f".format(Locale.ROOT, share * 100)}%)")
+            val floor = if (what == "parts") PARTS_FLOOR else 1.0
+            if (share < floor) {
+                val some = missing.take(MISSING_SHOWN).joinToString("") { String(Character.toChars(it)) }
+                throw SourceException(cover, 0, "${missing.size} characters without $what, below ${floor * 100}%: $some")
+            }
+        }
+    }
+    out.appendLine("wrote $output: ${output.length()} bytes")
+}
+
+// Unihan.zip's file of kRSUnicode and kTotalStrokes
+private const val UNIHAN_RS = "Unihan_IRGSources.txt"
+
+// of the characters handwriting knows, at least this share must be taken apart (97.8% are); the rest all
+private const val PARTS_FLOOR = 0.97
+private const val MISSING_SHOWN = 20
 
 private fun strokes(output: String, input: String, out: Appendable) {
     val builder = File(input).bufferedReader().use { Strokes.read(it, input) }
