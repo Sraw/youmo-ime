@@ -51,12 +51,12 @@ class StrokeShapesTest(unittest.TestCase):
         self.assertEqual(('H H SZP D', 'S HZ H H H SZZ H P S H S HZ'), (self.shapes('专'), self.shapes('鼎')))
 
     def test_the_standards_examples_over_the_letter(self):
-        # GF 2001's table: 敢's 横折, 牙 彑's 竖折, 执's 横斜钩 (丸 alone 横折弯钩)
+        # GF 2001's table: 敢's 横折, 牙 彑's 竖折; 执's 横斜钩 宋体's only, 丸's 横折弯钩 as taught
         self.assertEqual(('HZ', 'H SZ SG P', 'SZ'), (self.shapes('敢').split()[0], self.shapes('牙'), self.shapes('彖').split()[0]))
-        self.assertEqual(('H SG T P HXG D', 'P HZWG D'), (self.shapes('执'), self.shapes('丸')))
+        self.assertEqual(('H SG T P HZWG D', 'P HZWG D'), (self.shapes('执'), self.shapes('丸')))
         # 舛's 竖折, not 车's 撇折, in 辚
         self.assertEqual('H PZ S T D P H S P N P HP D H SZ S', self.shapes('辚'))
-        self.assertEqual(('H SZ HP H', 'SZ P HP N D', 'HPWG S P HP N H SZ S', 'H S HZG S S H PD P H'),
+        self.assertEqual(('H SZ HP H', 'SZ P HP N D', 'HPWG S P HP N H SZ S', 'H S HZ S S H PD P H'),
                          tuple(self.shapes(c) for c in '互发降要'))
         # chaizi's □ (a part it cannot write, in thousands of lines) is no part: not every part through it
         self.assertEqual({'人'}, stroke_shapes.parts_of(['亥\t□ 人\n', '□\t彑 丸\n'])('亥'))

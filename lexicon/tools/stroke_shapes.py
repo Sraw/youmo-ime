@@ -68,9 +68,10 @@ FIXED = {
 # writes as a 竖弯钩 (u): 匸 closes it, as 四's; 鸠's 九, on the left, a 横折提 (GF 2001's example, as 颓's)
 OVERRIDE = {'承': 'HP SG H H H HP P N', '匹': 'H P SW SZ', '鸠': 'P HZT P HZG D SZWG H'}
 # what 《GB13000.1字符集汉字折笔规范》's table of turning strokes (GF 2001-2001) gives otherwise than the
-# letter does, by its example characters: in a character with one of the parts, wherever the part's letters
-# are, its stroke so: 敢's 横折 (cnchar e); 互 母 乐 / 发 牙 降's 竖折 (cnchar n, 撇折), and 彑's, as 互's;
-# 要's 横折钩 (c); 执's 横斜钩 (o: 丸 alone, and in 孰 纨, not said, is left 横折弯钩)
+# letter does, by its example characters, where 楷体 as taught writes it so too: in a character with one of
+# the parts, wherever the part's letters are, its stroke so: 敢's 横折 (cnchar e); 互 母 乐 / 发 牙 降's 竖折
+# (cnchar n, 撇折), and 彑 舛 韋's, as 互 降's. Not followed, the standard's 宋体 only: 要's 横折钩 (taught a
+# 横折), 执's 横斜钩 (taught 丸's 横折弯钩)
 GF = [
     ('敢', 'ejffjj', 0, 'HZ'),
     ('互', 'jnej', 1, 'SZ'),
@@ -80,8 +81,6 @@ GF = [
     ('夅', 'seljnf', 4, 'SZ'),          # 夂 㐄: not 车's 撇折 (辚's jnf)
     ('舛', 'sekjnf', 4, 'SZ'),
     ('韋暐韡', 'cjjnf', 3, 'SZ'),        # 韋's foot is 㐄 too (chaizi has not 暐 韡)
-    ('要', 'jfcffjmsj', 2, 'HZG'),
-    ('执', 'jgisok', 4, 'HXG'),
 ]
 KIND = {'H': 1, 'T': 1, 'S': 2, 'SG': 2, 'P': 3, 'D': 4, 'N': 4}
 CODES = set(PLAIN.values()) | {'HP', 'HG', 'XG', 'BXG', 'HPWG', 'HZZZG', 'HZZ', 'HZW', 'SZP', 'SZZ', 'SZ', 'SW', 'HXG', 'HZWG'}

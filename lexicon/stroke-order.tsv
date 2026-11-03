@@ -27,11 +27,12 @@
 # (横撇 and 横钩, 竖折 and 竖弯, 斜钩 and 卧钩, …); they were told apart by the part of the character a
 # stroke is in (冖 宀 欠 饣 尔 虍 买 皮 疋's 横钩, 又 夕 子 水's 横撇; 心's 卧钩; 四 西 酉's 竖弯; 风 飞 气
 # 卂's 横斜钩, else 横折弯钩: 九 乙 几), and the standard's table's example characters where it says
-# otherwise (敢's 横折; 互 彑 牙 发 夅 舛 韋's 竖折, cnchar's 撇折; 要's 横折钩, though taught as a 横折;
-# 执's 横斜钩; 鸠's 横折提), lexicon/tools/stroke_shapes.py's rules; run again, it shows by a diff what
-# was corrected by hand since.
-# The standard, GF 2001-2001, analyses 宋体: 心's 卧钩 is 楷体's, kept as taught, and 辶's 横折折撇 too
-# (it has 达 a 横折).
+# otherwise (敢's 横折; 互 彑 牙 发 夅 舛 韋's 竖折, cnchar's 撇折; 鸠's 横折提), lexicon/tools/
+# stroke_shapes.py's rules; run again, it shows by a diff what was corrected by hand since.
+# A stroke's shape is 楷体's as taught. The standard, GF 2001-2001 (its table's example characters, and by
+# them each with the same part), is what it is checked by; but it analyses 宋体, and a shape 宋体's only
+# is not followed: 心's 卧钩 (楷体's), 辶's 横折折撇 (it has 达 a 横折), 要's 横折 (its 横折钩), 执's 丸's
+# 横折弯钩 (its 横斜钩).
 # cnchar's licence, as the MIT licence asks:
 #
 # The MIT License (MIT)
@@ -158,7 +159,7 @@
 亮	D H S HZ H D HG P HZWG
 亲	D H D P H H SG P D
 亳	D H S HZ H D HG P H SWG
-亵	D H H SG T P HXG D P ST P N
+亵	D H H SG T P HZWG D P ST P N
 人	P N
 亻	P S
 亿	P S HZWG
@@ -576,7 +577,7 @@
 劵	D P H H P N HZG P
 劼	H S H S HZ H HZG P
 劾	D H PZ P P D HZG P
-势	H SG T P HXG D HZG P
+势	H SG T P HZWG D HZG P
 勃	H S D HG HP SG T HZG P
 勇	HP D S HZ H H S HZG P
 勉	P HP S HZ H P SWG HZG P
@@ -1140,7 +1141,7 @@
 垦	HZ H H ST P N H S H
 垧	H S T P S HZG S HZ H
 垩	H S S D P H H S H
-垫	H SG T P HXG D H S H
+垫	H SG T P HZWG D H S H
 垭	H S T H S S D P H
 垮	H S T H P N H H SZWG
 垲	H S T S SZ S HZ H SWG
@@ -1622,7 +1623,7 @@
 崮	S SZ S S HZ H S S HZ H H
 崴	S SZ S H P H PD P H XG P D
 崽	S SZ S S HZ H S H D BXG D D
-崾	S SZ S H S HZG S S H PD P H
+崾	S SZ S H S HZ S S H PD P H
 嵇	P H S P D H P SWG D S SZ S
 嵊	S SZ S P H S S H T P SWG P N
 嵋	S SZ S HZ S H P S HZ H H H
@@ -2088,7 +2089,7 @@
 扛	H SG T H S H
 扣	H SG T S HZ H
 扦	H SG T P H S
-执	H SG T P HXG D
+执	H SG T P HZWG D
 扩	H SG T D H P
 扪	H SG T D S HZG
 扫	H SG T HZ H H
@@ -2183,7 +2184,7 @@
 挎	H SG T H P N H H SZWG
 挑	H SG T P D T SWG P D
 挖	H SG T D D HG P D HZWG
-挚	H SG T P HXG D P H H SG
+挚	H SG T P HZWG D P H H SG
 挛	D H S S P D P H H SG
 挝	H SG T H SG D D HZZP N
 挞	H SG T H P D D HZZP N
@@ -3386,7 +3387,7 @@
 烩	D P P D P N H H PZ D
 烫	D D T HZZZG P P D P P N
 烬	D P P D HZ H P N D D
-热	H SG T P HXG D D D D D
+热	H SG T P HZWG D D D D D
 烯	D P P D P D H P S HZG S
 烷	D P P D D D HG H H P SWG
 烹	D H S HZ H HP SG D D D D
@@ -4380,7 +4381,7 @@
 紫	S H S T P SWG PZ PZ D SG P D
 累	S HZ H S H PZ PZ D SG P D
 絮	PD P H S HZ H PZ PZ D SG P D
-絷	H SG T P HXG D PZ PZ D SG P D
+絷	H SG T P HZWG D PZ PZ D SG P D
 綦	H S S H H H P N PZ PZ D SG P D
 綮	D HZ H P P H P N PZ PZ D SG P D
 縻	D H P H S P D H S P N PZ PZ D SG P D
@@ -4762,7 +4763,7 @@
 腩	P HZG H H H S S HZG D P H H S
 腭	P HZG H H S HZ H S HZ H H H SZWG
 腮	P HZG H H S HZ H S H D BXG D D
-腰	P HZG H H H S HZG S S H PD P H
+腰	P HZG H H H S HZ S S H PD P H
 腱	P HZG H H HZ H H H H S HZZP N
 腴	P HZG H H P S H HZ H H P N
 腹	P HZG H H P H S HZ H H P HP N
@@ -5265,7 +5266,7 @@
 蛩	H S T P HZWG D S HZ H S H D
 蛭	S HZ H S H D H PZ D H S H
 蛮	D H S S P D S HZ H S H D
-蛰	H SG T P HXG D S HZ H S H D
+蛰	H SG T P HZWG D S HZ H S H D
 蛱	S HZ H S H D H D P H P N
 蛲	S HZ H S H D H XG P H P SWG
 蛳	S HZ H S H D S P H S HZG S
@@ -5452,7 +5453,7 @@
 襦	D HP S P D H D HG S D D D D H P S HZG S S
 襻	D HP S P D H S P D P D P D H S P D H P N P H H SG
 西	H S HZ P SW H
-要	H S HZG S S H PD P H
+要	H S HZ S S H PD P H
 覃	H S HZ S S H S HZ H H H S
 覆	H S HZ S S H P P S P H S HZ H H P HP N
 见	S HZ P SWG
@@ -5694,7 +5695,7 @@
 贺	HZG P S HZ H S HZ P D
 贻	S HZ P D PZ D S HZ H
 贼	S HZ P D H H P XG P D
-贽	H SG T P HXG D S HZ P D
+贽	H SG T P HZWG D S HZ P D
 贾	H S HZ S S H S HZ P D
 贿	S HZ P D H P S HZG H H
 赀	S H S T P SWG S HZ P D
@@ -6875,7 +6876,7 @@
 鸳	P HP D HZG SWG P HZG D SZWG H
 鸵	P HZG D SZWG T D D HG P SWG
 鸶	PZ PZ PZ PZ H P HZG D SZWG H
-鸷	H SG T P HXG D P HZG D SZWG H
+鸷	H SG T P HZWG D P HZG D SZWG H
 鸸	H P S HZG S S P HZG D SZWG H
 鸹	P H S S HZ H P HZG D SZWG H
 鸺	P S H S P D P HZG D SZWG H
