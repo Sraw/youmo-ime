@@ -16,8 +16,10 @@ package org.fcitx.fcitx5.android.input.keyboard
  * swipes still working.
  *
  * 底部 is under the letter for the symbol, the bottom edge's middle for the shortcut. Landscape's and
- * 紧凑's keys are too low for either: there 底部 is the first corner of [LowOrder] the other's setting
- * does not take ([onKeys]), so no mark is left out for it.
+ * 紧凑's keys are too low for either ([onKeys]): the symbol's 底部 there is the top right (the bottom
+ * right where the shortcuts are), the shortcut's the first corner of [LowOrder] the symbol's place is
+ * not. A shortcut that still has no room on its key is tried in the key's other free corners
+ * ([elsewhere]) before it is left out.
  *
  * A function key has no symbol: its up shortcut in the chosen slot, its down one in that slot mirrored
  * top for bottom ([placeFunction]); one alone in the chosen slot.
@@ -55,21 +57,33 @@ object KeyMarks {
     fun settled(symbol: At, shortcut: At): Spots =
         Spots(if (symbol == shortcut && symbol != At.None) symbol.yielded else symbol, shortcut)
 
-    /** The corners 底部 goes to on low keys, the first the other mark does not take. */
+    /** The corners a shortcut's 底部 goes to on low keys, the first the symbol does not take; and where one with no room is tried. */
     val LowOrder = listOf(At.TopLeft, At.TopRight, At.BottomLeft, At.BottomRight)
 
     /**
-     * Where the two are drawn on a keyboard [landscape] or [compact]: as [settled], 底部 on such low
-     * keys the first corner of [LowOrder] the other's place is not (the other is never 底部 too).
+     * Where the two are drawn on a keyboard [landscape] or [compact]: as [settled]; on such low keys the
+     * symbol's 底部 the top right, the bottom right where the shortcut is (the corner 0.5.0 drew symbols
+     * in, then its side's other), the shortcut's 底部 the first corner of [LowOrder] the symbol's is not.
      */
     fun onKeys(symbolAt: At, shortcutAt: At, landscape: Boolean, compact: Boolean): Spots {
         val s = settled(symbolAt, shortcutAt)
         if (!landscape && !compact) return s
-        fun free(other: At) = LowOrder.first { it != other }
-        return Spots(
-            if (s.symbol == At.Bottom) free(s.shortcut) else s.symbol,
-            if (s.shortcut == At.Bottom) free(s.symbol) else s.shortcut,
-        )
+        val symbol = if (s.symbol != At.Bottom) s.symbol else if (s.shortcut == At.TopRight) At.BottomRight else At.TopRight
+        val shortcut = if (s.shortcut != At.Bottom) s.shortcut else LowOrder.first { it != symbol }
+        return Spots(symbol, shortcut)
+    }
+
+    /**
+     * Where a key's shortcut marks, in [slots] (a function key's up one, then its down one mirrored; or
+     * one alone), are tried in turn when they have no room there, before one is left out: each a slot
+     * for each, the first in a corner of [LowOrder]'s order, a function key's down one in that corner
+     * mirrored; none in [taken] (its symbol's slot) or where they are now.
+     */
+    fun elsewhere(slots: List<Slot>, taken: Collection<Slot>): List<List<Slot>> {
+        if (slots.isEmpty() || slots.size > 2) return emptyList()
+        return LowOrder.mapNotNull { it.corner }
+            .map { if (slots.size == 1) listOf(it) else listOf(it, it.mirrored) }
+            .filter { alt -> alt.none { it in taken || it in slots } }
     }
 
     /** A shortcut's slot at [at] as [onKeys] gave it; null for none drawn. */

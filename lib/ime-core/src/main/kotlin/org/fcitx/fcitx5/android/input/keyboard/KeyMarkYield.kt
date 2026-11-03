@@ -24,9 +24,11 @@ import kotlin.math.abs
  * the marks move and are smaller first; what still meets, every letter is as much smaller about its
  * baseline, a quarter at most ([MAX_LETTER_SHRINK]).
  *
- * Nothing of that enough: the marks still meeting the glyph or each other are left out, the most
- * expendable first ([Mark.drop]: a function key's down shortcut, then a shortcut, a symbol last; the
- * swipes still work). Whatever is drawn never meets anything else drawn on its key.
+ * Nothing of that enough: the key's shortcuts are tried in its other free corners ([Mark.elsewhere],
+ * all at once, a function key's two kept mirrored), each moved and smaller there as before; what
+ * still meets the glyph or another mark is left out, the most expendable first ([Mark.drop]: a
+ * function key's down shortcut, then a shortcut, a symbol last; the swipes still work). Whatever is
+ * drawn never meets anything else drawn on its key.
  */
 object KeyMarkYield {
 
@@ -47,9 +49,17 @@ object KeyMarkYield {
 
     /**
      * A mark's [ink] in its [slot], no smaller than [minScale] of it; [drop], how soon it is left out
-     * where nothing else clears it (the higher the sooner; [DROP_SYMBOL] the last).
+     * where nothing else clears it (the higher the sooner; [DROP_SYMBOL] the last); [elsewhere], the
+     * slots it is tried in before that, in turn, with its ink there (a key's marks that have them, as
+     * many each, moved together: [KeyMarks.elsewhere]).
      */
-    data class Mark(val ink: Ink, val slot: Slot, val minScale: Float = 1f, val drop: Int = DROP_SHORTCUT)
+    data class Mark(
+        val ink: Ink, val slot: Slot, val minScale: Float = 1f, val drop: Int = DROP_SHORTCUT,
+        val elsewhere: List<Pair<Slot, Ink>> = emptyList(),
+    ) {
+        // in its next slot elsewhere, the rest still to try
+        internal fun next(): Mark = copy(slot = elsewhere[0].first, ink = elsewhere[0].second, elsewhere = elsewhere.drop(1))
+    }
 
     /** Where a key's glyph and marks end up: [glyph]'s new ink; each mark's in order, null for left out. */
     data class Settled(val glyph: Ink, val marks: List<Ink?>)
@@ -109,7 +119,16 @@ object KeyMarkYield {
             s -= STEP
         }
         val small = glyph.scaled(1f - MAX_LABEL_SHRINK, cx, cy)
-        return Settled(small, dropped(small, marks, marks.map { into(small, it, room, gap, it.minScale) }))
+        // a shortcut that would be left out tried elsewhere (where it meets no other mark), the glyph as it
+        // was: all the above again from there
+        val placed = marks.map { into(small, it, room, gap, it.minScale) }
+        val stuck = placed.indices.any { i -> marks[i].elsewhere.isNotEmpty() && (placed[i].meets(small, 0f) || placed.indices.any { j -> j != i && placed[j].meets(placed[i], 0f) }) }
+        var moved = marks
+        while (stuck && moved.any { it.elsewhere.isNotEmpty() }) {
+            moved = moved.map { if (it.elsewhere.isEmpty()) it else it.next() }
+            if (allApart(moved.map { it.ink })) return keyApart(glyph, moved, room, gap)
+        }
+        return Settled(small, dropped(small, marks) { into(small, it, room, gap, it.minScale) }.second)
     }
 
     /** A letter key's: its [letter]'s ink and [baseline], its [marks], the [room] they move in. */
@@ -121,32 +140,62 @@ object KeyMarkYield {
     /** How a keyboard's letters, [keys], and their marks keep [gap] apart. */
     fun letters(keys: List<LetterKey>, gap: Float): Letters {
         val apart = keys.map { keptApart(it.marks) }
-        val live = apart.map { it.filterNotNull() }
+        // a shortcut that would need more than a quarter tried elsewhere first ([fitting])
+        val live = apart.mapIndexed { k, marks -> fitting(keys[k], marks.filterNotNull()) }
         // what each letter would need, its marks as far in and small as they go; the most needed, for all,
         // but a quarter at most: a mark that needs more is left out, its letter kept
-        val need = keys.flatMapIndexed { k, key ->
-            live[k].map { m -> letterScale(key.letter, into(key.letter, m, key.room, gap, m.minScale), m.slot, gap, mid(key.letter), key.baseline) }
-        }.filter { it >= 1f - MAX_LETTER_SHRINK - STEP / 2 }.minOrNull() ?: 1f
+        val need = keys.flatMapIndexed { k, key -> live[k].map { need(key, it, gap) } }
+            .filter { it >= 1f - MAX_LETTER_SHRINK - STEP / 2 }.minOrNull() ?: 1f
         val scale = need.coerceAtLeast(1f - MAX_LETTER_SHRINK)
         // each mark then only as far in and small as the letter, so much smaller, leaves it
         return Letters(scale, keys.mapIndexed { k, key ->
             val letter = if (scale < 1f) key.letter.scaled(scale, mid(key.letter), key.baseline) else key.letter
-            val settled = dropped(letter, live[k], live[k].map { into(letter, it, key.room, gap, it.minScale) }).iterator()
+            val settled = dropped(letter, live[k]) { into(letter, it, key.room, gap, it.minScale) }.second.iterator()
             Settled(letter, apart[k].map { if (it == null) null else settled.next() })
         })
     }
 
-    // [placed] (of [marks]) less those still meeting [glyph] (none: only each other) or each other, the most
-    // expendable first
-    private fun dropped(glyph: Ink?, marks: List<Mark>, placed: List<Ink>): List<Ink?> {
-        val out = placed.toMutableList<Ink?>()
+    // how much smaller [key]'s letter would be for [m], as far in and small as it goes
+    private fun need(key: LetterKey, m: Mark, gap: Float): Float =
+        letterScale(key.letter, into(key.letter, m, key.room, gap, m.minScale), m.slot, gap, mid(key.letter), key.baseline)
+
+    // [key]'s [marks], a movable one that would meet its letter even a quarter smaller (left out: touching is
+    // apart then, no gap) moved elsewhere with the others movable, the first place where none would and they
+    // are apart; as they were if none
+    private fun fitting(key: LetterKey, marks: List<Mark>): List<Mark> {
+        fun outOfReach(m: Mark) = need(key, m, 0f) < 1f - MAX_LETTER_SHRINK - STEP / 2
+        if (marks.none { it.elsewhere.isNotEmpty() && outOfReach(it) }) return marks
+        var moved = marks
+        while (moved.any { it.elsewhere.isNotEmpty() }) {
+            moved = moved.map { if (it.elsewhere.isEmpty()) it else it.next() }
+            val fits = moved.none { m -> m !in marks && outOfReach(m) }
+            if (fits && allApart(moved.map { it.ink })) return moved
+        }
+        return marks
+    }
+
+    // [marks], each where [place] puts it, less those still meeting [glyph] (none: only each other) or each
+    // other: the movable ones first tried elsewhere, all at once (a function key's two stay mirrored), then
+    // the most expendable left out first. The marks as they end up (moved, before [place]) and their inks
+    private fun dropped(glyph: Ink?, marks: List<Mark>, place: (Mark) -> Ink): Pair<List<Mark?>, List<Ink?>> {
+        val now = marks.toMutableList<Mark?>()
+        val out = marks.map(place).toMutableList<Ink?>()
         while (true) {
             val clash = out.indices.filter { i ->
                 val a = out[i] ?: return@filter false
                 glyph?.let { a.meets(it, 0f) } == true || out.indices.any { j -> j != i && out[j]?.meets(a, 0f) == true }
             }
-            if (clash.isEmpty()) return out
-            out[clash.maxBy { marks[it].drop }] = null
+            if (clash.isEmpty()) return now to out
+            val worst = clash.maxBy { marks[it].drop }
+            if (now[worst]?.elsewhere.isNullOrEmpty()) {
+                out[worst] = null
+                now[worst] = null
+                continue
+            }
+            for (i in now.indices) {
+                val m = now[i]?.takeIf { it.elsewhere.isNotEmpty() } ?: continue
+                now[i] = m.next().also { out[i] = place(it) }
+            }
         }
     }
 
@@ -163,15 +212,17 @@ object KeyMarkYield {
             if (allApart(small.map { it.ink })) return small
             s -= STEP
         }
-        val kept = dropped(null, marks, marks.map { it.ink })
-        return marks.mapIndexed { i, m -> m.takeIf { kept[i] != null } }
+        return dropped(null, marks) { it.ink }.first
     }
 
-    // this mark [s] its size about its corner, its smallest the same as it was
-    private fun Mark.smaller(s: Float): Mark {
+    // this mark [s] its size about its corner, its smallest the same as it was; so too where it is tried elsewhere
+    private fun Mark.smaller(s: Float): Mark =
+        copy(ink = smaller(ink, slot, s), minScale = minScale / s, elsewhere = elsewhere.map { (at, i) -> at to smaller(i, at, s) })
+
+    private fun smaller(ink: Ink, slot: Slot, s: Float): Ink {
         val f = ink.inFrame(slot)
         val x = if (slot.centred) mid(f) else f.right
-        return copy(ink = f.scaled(s, x, f.top).inFrame(slot), minScale = minScale / s)
+        return f.scaled(s, x, f.top).inFrame(slot)
     }
 
     private fun allApart(inks: List<Ink>): Boolean = inks.indices.all { i -> inks.indices.all { j -> j <= i || !inks[i].meets(inks[j], 0f) } }

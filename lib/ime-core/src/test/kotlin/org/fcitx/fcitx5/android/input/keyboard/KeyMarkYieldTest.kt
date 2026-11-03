@@ -125,6 +125,29 @@ class KeyMarkYieldTest {
         assertSettled(Settled(glyph, listOf(up.ink, null)), key(glyph, up, down))
     }
 
+    // a big glyph filling the face but its top: a shortcut with no room in its bottom corner tried in the key's
+    // other free corners, in turn, before it is left out; the glyph then as it was
+    @Test
+    fun aShortcutWithNoRoomTriedElsewhereBeforeLeftOut() {
+        val glyph = Ink(3f, 12f, 37f, 49f)
+        val br = Ink(24f, 20f, 36f, 46f)
+        val tl = Ink(4f, 2f, 12f, 10f)
+        val elsewhere = listOf(Slot.BottomLeft to br.at(Slot.BottomLeft).at(Slot.BottomRight), Slot.TopLeft to tl)
+        val shortcut = Mark(br, Slot.BottomRight, minScale = 0.8f, elsewhere = elsewhere)
+        assertSettled(Settled(glyph, listOf(tl)), key(glyph, shortcut))
+        // none free: left out, as before
+        assertNull(key(glyph, shortcut.copy(elsewhere = elsewhere.take(1))).marks[0])
+        // a function key's two moved together, its down one mirrored: from the edges' middles to the top left and under it
+        val wide = Ink(10f, 4f, 30f, 46f)
+        val corner = Ink(3f, 2f, 8f, 7f)
+        val up = Mark(Ink(16f, 40f, 24f, 48f), Slot.Bottom, elsewhere = listOf(Slot.TopLeft to corner, Slot.TopRight to corner.at(Slot.TopRight)))
+        val down = Mark(Ink(16f, 2f, 24f, 10f), Slot.Top, drop = KeyMarkYield.DROP_DOWN_SHORTCUT,
+            elsewhere = listOf(Slot.BottomLeft to corner.at(Slot.BottomLeft), Slot.BottomRight to corner.at(Slot.BottomRight)))
+        val both = key(wide, up, down)
+        assertNothingMeets("function", both)
+        assertSettled(Settled(wide, listOf(corner, corner.at(Slot.BottomLeft))), both)
+    }
+
     // a narrow key's two top corners: both smaller about their corners, as much, rather than one left out
     @Test
     fun marksMeetingEachOtherSmallerFirst() {
@@ -205,6 +228,11 @@ class KeyMarkYieldTest {
         return Mark(Ink(x, y, x + w, y + h), slot, minScale = 0.5f + nextFloat() * 0.5f, drop = drop)
     }
 
+    // [m] as big in one to three other corners
+    private fun Random.corners(m: Mark): List<Pair<Slot, Ink>> =
+        listOf(Slot.TopLeft, Slot.TopRight, Slot.BottomLeft, Slot.BottomRight).filter { it != m.slot }.shuffled(this).take(1 + nextInt(3))
+            .map { it to markAt(it, m.drop).ink.let { i -> Ink(i.left, i.top, i.left + m.ink.width, i.top + m.ink.height) } }
+
     private fun assertNothingMeets(case: String, s: Settled) {
         val drawn = listOf(s.glyph) + s.marks.filterNotNull()
         for (i in drawn.indices) for (j in drawn.indices) if (i < j) assertFalse("$case: $i ${drawn[i]} meets $j ${drawn[j]}", drawn[i].meets(drawn[j], 0f))
@@ -217,6 +245,7 @@ class KeyMarkYieldTest {
         repeat(4000) { n ->
             val glyph = r.ink(4f, 4f, 36f, 46f, 8f + r.nextFloat() * 26f, 10f + r.nextFloat() * 32f)
             val marks = slots.shuffled(r).take(1 + r.nextInt(3)).mapIndexed { i, slot -> r.markAt(slot, KeyMarkYield.DROP_SYMBOL + i) }
+                .map { m -> if (m.drop == KeyMarkYield.DROP_SYMBOL || r.nextBoolean()) m else m.copy(elsewhere = r.corners(m)) }
             val s = key(glyph, *marks.toTypedArray())
             assertNothingMeets("key $n $glyph $marks", s)
             assertTrue("glyph $n", s.glyph.width >= glyph.width * (1 - KeyMarkYield.MAX_LABEL_SHRINK) - 0.01f)
@@ -225,7 +254,9 @@ class KeyMarkYieldTest {
         repeat(500) { n ->
             val keys = List(1 + r.nextInt(6)) {
                 val ink = r.ink(4f, 4f, 36f, 46f, 10f + r.nextFloat() * 20f, 14f + r.nextFloat() * 24f)
-                LetterKey(ink, ink.bottom - r.nextFloat() * 4f, slots.shuffled(r).take(r.nextInt(3)).mapIndexed { i, slot -> r.markAt(slot, i + 1) }, room)
+                val marks = slots.shuffled(r).take(r.nextInt(3)).mapIndexed { i, slot -> r.markAt(slot, i + 1) }
+                    .map { m -> if (m.drop == KeyMarkYield.DROP_SYMBOL || r.nextBoolean()) m else m.copy(elsewhere = r.corners(m)) }
+                LetterKey(ink, ink.bottom - r.nextFloat() * 4f, marks, room)
             }
             val l = KeyMarkYield.letters(keys, gap = 1f)
             assertTrue(l.scale >= 1 - KeyMarkYield.MAX_LETTER_SHRINK - 0.001f)

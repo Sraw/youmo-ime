@@ -196,11 +196,36 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         }
         val out = mutableListOf<Pair<View, KeyMarkYield.Mark>>()
         symbol?.let { (v, slot) -> inkOf(v)?.let { out += v to KeyMarkYield.Mark(it, slot, minScale(v), KeyMarkYield.DROP_SYMBOL) } }
+        // the key's other free corners, tried before a shortcut with no room is left out
+        val elsewhere = KeyMarks.elsewhere(markViews.keys.toList(), listOfNotNull(symbol?.second))
         markViews.entries.forEachIndexed { i, (slot, v) ->
-            inkOf(v)?.let { out += v to KeyMarkYield.Mark(it, slot, minScale(v), KeyMarkYield.DROP_SHORTCUT + i) }
+            inkOf(v)?.let { ink ->
+                val tried = elsewhere.map { it[i] to inkIn(v, ink, slot, it[i]) }
+                out += v to KeyMarkYield.Mark(ink, slot, minScale(v), KeyMarkYield.DROP_SHORTCUT + i, tried)
+            }
         }
         return out
     }
+
+    // [v]'s [ink], laid out in [from], were it laid out in the corner [to] (markParams' place there): a text's
+    // glyphs as far in from the side it is drawn from (from an edge's middle: at the side), as far down its line
+    private fun inkIn(v: View, ink: KeyMarkYield.Ink, from: KeyMarks.Slot, to: KeyMarks.Slot): KeyMarkYield.Ink {
+        val side = hMargin + markInsetSide()
+        val left = if (to.left) side else appearanceView.width - side - v.width
+        val top = if (to.bottom) appearanceView.height - vMargin - markInset() - v.height else vMargin + markInset()
+        val inward = when {
+            from.left -> ink.left - v.left
+            from.right -> v.right - ink.right
+            else -> 0f
+        }
+        val x = if (to.left) left + inward else left + v.width - inward - ink.width
+        val y = top + (ink.top - v.top)
+        return KeyMarkYield.Ink(x, y, x + ink.width, y + ink.height)
+    }
+
+    // a mark's room from the face's top or bottom, and its side: 紧凑's closer in
+    private fun markInset() = dp(if (keyboardCompact()) 1 else 2)
+    private fun markInsetSide() = dp(if (keyboardCompact()) 2 else 3)
 
     /** This view, whose ink is [from], drawn as [to] (as wide to tall, from its own top left), or not at all (null). */
     protected fun View.settle(from: KeyMarkYield.Ink, to: KeyMarkYield.Ink?) {
@@ -264,10 +289,9 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
     // [slot]'s place on the face; 紧凑: smaller and into the corner, or on 大千's narrow low keys the
     // icon sat on the symbol
     private fun markParams(slot: KeyMarks.Slot, text: Boolean): ConstraintLayout.LayoutParams {
-        val compact = keyboardCompact()
-        val size = dp(if (compact) MARK_ICON_COMPACT_DP else MARK_ICON_DP)
-        val inset = dp(if (compact) 1 else 2)
-        val insetSide = dp(if (compact) 2 else 3)
+        val size = dp(if (keyboardCompact()) MARK_ICON_COMPACT_DP else MARK_ICON_DP)
+        val inset = markInset()
+        val insetSide = markInsetSide()
         return ConstraintLayout.LayoutParams(if (text) 0 else size, if (text) wrapContent else size).apply {
             if (text) matchConstraintPercentWidth = MARK_TEXT_WIDTH
             if (!slot.right) {

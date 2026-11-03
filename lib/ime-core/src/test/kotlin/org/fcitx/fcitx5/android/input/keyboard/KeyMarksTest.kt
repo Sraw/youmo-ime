@@ -37,17 +37,19 @@ class KeyMarksTest {
     }
 
     @Test
-    fun onLowKeysBottomIsTheFirstCornerTheOtherDoesNotTake() {
+    fun onLowKeysTheSymbolsBottomTopRightTheShortcutsTheFirstCornerFree() {
         for (squeezed in listOf(true to false, false to true)) {
             val (landscape, compact) = squeezed
-            // the symbol's: top left, the shortcuts' corner skipped
+            // the symbol's: top right, bottom right where the shortcuts are
             assertEquals(Placed.of(Slot.TopLeft to "全选", Slot.TopRight to "，"), place(At.Bottom, At.TopLeft, landscape, compact))
-            assertEquals(Placed.of(Slot.TopRight to "全选", Slot.TopLeft to "，"), place(At.Bottom, At.TopRight, landscape, compact))
-            assertEquals(Placed.of(Slot.BottomLeft to "全选", Slot.TopLeft to "，"), place(At.Bottom, At.BottomLeft, landscape, compact))
-            assertEquals(Placed.of(Slot.TopLeft to "，"), place(At.Bottom, At.None, landscape, compact))
-            // the shortcut's alike
+            assertEquals(Placed.of(Slot.TopRight to "全选", Slot.BottomRight to "，"), place(At.Bottom, At.TopRight, landscape, compact))
+            assertEquals(Placed.of(Slot.BottomLeft to "全选", Slot.TopRight to "，"), place(At.Bottom, At.BottomLeft, landscape, compact))
+            assertEquals(Placed.of(Slot.BottomRight to "全选", Slot.TopRight to "，"), place(At.Bottom, At.BottomRight, landscape, compact))
+            assertEquals(Placed.of(Slot.TopRight to "，"), place(At.Bottom, At.None, landscape, compact))
+            // the shortcut's: top left, top right, bottom left, bottom right, the first the symbol's is not
             assertEquals(Placed.of(Slot.TopLeft to "全选", Slot.TopRight to "，"), place(At.TopRight, At.Bottom, landscape, compact))
             assertEquals(Placed.of(Slot.TopRight to "全选", Slot.TopLeft to "，"), place(At.TopLeft, At.Bottom, landscape, compact))
+            assertEquals(Placed.of(Slot.TopLeft to "全选", Slot.BottomLeft to "，"), place(At.BottomLeft, At.Bottom, landscape, compact))
             assertEquals(Placed.of(Slot.TopLeft to "全选"), place(At.None, At.Bottom, landscape, compact))
             assertEquals(Spots(At.TopRight, At.TopLeft), KeyMarks.onKeys(At.Bottom, At.Bottom, landscape, compact))
         }
@@ -124,10 +126,31 @@ class KeyMarksTest {
             assertEquals(Placed<String>(), f(null, null, true, true, at, At.None))
         }
         assertEquals(Placed<String>(), f("清除", "恢复", true, true, At.None))
-        // 底部 on low keys: the first corner the symbols do not take, the down one under it
+        // 底部 on low keys: the first corner the symbol's is not, the down one mirrored
         assertEquals(Placed.of(Slot.TopLeft to "清除", Slot.BottomLeft to "恢复"), f("清除", "恢复", true, true, At.Bottom, low = true))
         assertEquals(Placed.of(Slot.TopRight to "清除", Slot.BottomRight to "恢复"), f("清除", "恢复", true, true, At.Bottom, At.TopLeft, low = true))
         assertEquals(Placed.of(Slot.TopLeft to "清除", Slot.BottomLeft to "恢复"), KeyMarks.placeFunction("清除", "恢复", true, true, At.TopRight, At.Bottom, false, true))
+    }
+
+    @Test
+    fun aShortcutWithNoRoomTriedInTheKeysOtherFreeCornersTopLeftFirst() {
+        // one alone: every other corner but the symbol's
+        assertEquals(listOf(listOf(Slot.TopLeft), listOf(Slot.BottomLeft)), KeyMarks.elsewhere(listOf(Slot.BottomRight), listOf(Slot.TopRight)))
+        assertEquals(listOf(listOf(Slot.TopRight), listOf(Slot.BottomRight)), KeyMarks.elsewhere(listOf(Slot.BottomLeft), listOf(Slot.TopLeft)))
+        assertEquals(
+            listOf(listOf(Slot.TopLeft), listOf(Slot.TopRight), listOf(Slot.BottomLeft), listOf(Slot.BottomRight)),
+            KeyMarks.elsewhere(listOf(Slot.Bottom), listOf(Slot.Below)),
+        )
+        // a function key's two: a corner and it mirrored, both free
+        assertEquals(
+            listOf(listOf(Slot.TopLeft, Slot.BottomLeft), listOf(Slot.TopRight, Slot.BottomRight), listOf(Slot.BottomLeft, Slot.TopLeft), listOf(Slot.BottomRight, Slot.TopRight)),
+            KeyMarks.elsewhere(listOf(Slot.Bottom, Slot.Top), emptyList()),
+        )
+        assertEquals(
+            listOf(listOf(Slot.TopRight, Slot.BottomRight), listOf(Slot.BottomRight, Slot.TopRight)),
+            KeyMarks.elsewhere(listOf(Slot.BottomLeft, Slot.TopLeft), emptyList()),
+        )
+        assertEquals(emptyList<List<Slot>>(), KeyMarks.elsewhere(emptyList(), emptyList()))
     }
 
     @Test

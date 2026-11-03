@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.ImageKeyView
 import org.fcitx.fcitx5.android.input.keyboard.ImageTextKeyView
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
@@ -46,8 +47,8 @@ import org.robolectric.annotation.GraphicsMode
  * (moved, smaller, left out: KeyMarkYield), never two over each other. Their ink: a text's glyphs, an
  * icon's box. 滑动 is not gone through: it moves no mark.
  *
- * What was left out to keep them apart is counted and printed (the report's numbers), and no symbol
- * ever is.
+ * Nothing is left out: a shortcut with no room in its place is drawn in another free corner of its
+ * key (KeyMarks.elsewhere); those moved are counted and printed (the report's numbers).
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -174,6 +175,16 @@ class KeyMarksEverywhereUatTest {
 
     private val dropped = sortedMapOf<String, Int>()
 
+    // shortcuts drawn in another corner than their setting's (KeyMarks.elsewhere), by case and key
+    private val moved = sortedMapOf<String, Int>()
+
+    // [r], drawn on a face [w] by [h], in [slot]'s half each way it has one
+    private fun inItsPlace(slot: KeyMarks.Slot, r: RectF, w: Int, h: Int): Boolean {
+        val right = r.centerX() > w / 2f
+        val bottom = r.centerY() > h / 2f
+        return (slot.centred || right == slot.right) && bottom == slot.bottom
+    }
+
     // the letters made smaller to keep clear (KeyMarkYield.letters: all of a keyboard's alike), by case
     private val smaller = sortedMapOf<String, Float>()
 
@@ -184,6 +195,12 @@ class KeyMarksEverywhereUatTest {
         for (i in d.indices) for (j in i + 1 until d.size) {
             assertTrue("$case key $name: ${d[i]} meets ${d[j]}", !RectF.intersects(d[i].second, d[j].second))
         }
+        val elsewhere = k.shortcutMarks.entries.filter { (slot, v) ->
+            val r = d.firstOrNull { it.first == "shortcut $slot" }?.second
+            val face = v.parent as View
+            r != null && !inItsPlace(slot, r, face.width, face.height)
+        }
+        if (elsewhere.isNotEmpty()) moved.merge("$case: $name ${elsewhere.joinToString { "shortcut ${it.key}" }}", 1, Int::plus)
         val out = leftOut(k)
         assertTrue("$case key $name: its symbol left out", "symbol" !in out)
         if (out.isNotEmpty()) dropped.merge("$case: $name ${out.joinToString()}", 1, Int::plus)
@@ -195,9 +212,13 @@ class KeyMarksEverywhereUatTest {
     }
 
     // The two settings make the keyboard anew (FcitxInputMethodService.recreateInputViewPrefs). Under
-    // Robolectric each new keyboard keeps about 3 MB till the JVM ends: 62 for each of 90 keyboards ran
-    // a full run out of its 3 GB. Not made anew here: its keys laid out again as a new one lays them
-    // out (check), the swipes' marks by their own listener (KeySwipes)
+    // Robolectric each old keyboard, about 3 MB, stays: its scroll views' scrollbar fade
+    // (View.ScrollabilityCache, posted for 300 ms on) waits in the paused main looper, whose clock
+    // idle() does not move; 62 for each of 90 keyboards ran a full run out of its 3 GB. On a device it
+    // runs and lets go (a heap dump's only path; the clock moved, none was left). Moving the clock
+    // after each would do too, with the symbol page and a table's keys set again after each rebuild: not
+    // made anew here, its keys laid out again as a new one lays them out (check), the swipes' marks by
+    // their own listener (KeySwipes)
     private fun noRebuilds(h: KeyboardHarness) {
         val field = h.service.javaClass.getDeclaredField("recreateInputViewListener").apply { isAccessible = true }
         @Suppress("UNCHECKED_CAST")
@@ -251,6 +272,8 @@ class KeyMarksEverywhereUatTest {
         }
         println("KeyMarksEverywhere left out (${dropped.size}):")
         dropped.keys.forEach { println("  $it") }
+        println("KeyMarksEverywhere moved elsewhere (${moved.size}):")
+        moved.keys.forEach { println("  $it") }
         println("KeyMarksEverywhere letters smaller (${smaller.size}):")
         smaller.forEach { (case, scale) -> println("  $case: ${"%.3f".format(scale)}") }
     }
@@ -260,7 +283,7 @@ class KeyMarksEverywhereUatTest {
     @Config(qualifiers = "w393dp-h851dp-port-440dpi")
     fun noKeyDrawsTwoThingsOverEachOtherUpright() {
         each(upright)
-        assertEquals(emptyList<String>(), dropped.keys.filter { "symbol" in it })
+        assertEquals(emptyList<String>(), dropped.keys.toList())
     }
 
     @Test
@@ -268,6 +291,6 @@ class KeyMarksEverywhereUatTest {
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun noKeyDrawsTwoThingsOverEachOtherTurned() {
         each(turned)
-        assertEquals(emptyList<String>(), dropped.keys.filter { "symbol" in it })
+        assertEquals(emptyList<String>(), dropped.keys.toList())
     }
 }

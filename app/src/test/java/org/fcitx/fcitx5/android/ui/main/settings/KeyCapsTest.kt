@@ -27,7 +27,7 @@ import org.robolectric.annotation.Config
 
 /**
  * The settings' keys put a key's symbol where the keyboard does: where 标点位置 says; 底部 under the
- * letter, but at 紧凑 the first corner of top left, top right, … that 快捷键图标位置 does not take.
+ * letter, but at 紧凑 top right (bottom right where 快捷键图标位置 is top right).
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -58,11 +58,12 @@ class KeyCapsTest {
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
         // the shortcuts top left (the default): top right
         assertTrue(corner(key(), Gravity.TOP or Gravity.END))
+        // the shortcuts top right: bottom right
         prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, KeyMarkPosition.TopRight)
-        assertTrue(corner(key(), Gravity.TOP or Gravity.START))
+        assertTrue(corner(key(), Gravity.BOTTOM or Gravity.END))
         // 滑动 moves nothing
         prefs.set(AppPrefs.getInstance().keyboard.swipeLayers, SwipeLayersChoice.SymbolUpShortcutDown)
-        assertTrue(corner(key(), Gravity.TOP or Gravity.START))
+        assertTrue(corner(key(), Gravity.BOTTOM or Gravity.END))
         // 无 is none whatever the height
         prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.None)
         assertEquals(1, key().childCount)
