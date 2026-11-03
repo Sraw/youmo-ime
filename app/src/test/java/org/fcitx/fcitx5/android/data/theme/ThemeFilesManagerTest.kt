@@ -57,7 +57,7 @@ import java.util.zip.ZipOutputStream
 class ThemeFilesManagerTest {
 
     // the manager's own: each test's application has another
-    private val dir get() = ThemeFilesManager.newCustomBackgroundImages().second.parentFile!!
+    private val dir get() = ThemeFilesManager.themeDir
 
     @Before
     fun empty() {

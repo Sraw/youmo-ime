@@ -18,7 +18,8 @@ import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
-import org.fcitx.fcitx5.android.input.theme.ThemeEditLevels
+import org.fcitx.fcitx5.android.input.theme.BarBase
+import org.fcitx.fcitx5.android.input.theme.Gap
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -102,14 +103,15 @@ class SettingsEffectUatTest {
     @Test
     @Uat("ST-12")
     fun keyBorderSpacingAndCorners() {
-        fresh(edited { ThemeEditLevels.blocks(it, false) })
+        // a theme the web page made flat: its bar in its colour
+        fresh(edited { it.copy(keys = it.keys.copy(blocks = false), bar = BarBase.Color) })
         h.start()
         h.capture("SettingsEffectUatTest/no_border")
         fresh(edited { it })
         h.start()
         // the drawn key is inset by its margin: what lies between two keys
         val gap = h.key("q").hMargin
-        fresh(edited { ThemeEditLevels.radius(ThemeEditLevels.gap(it, 2), 0) })
+        fresh(edited { it.copy(keys = it.keys.copy(radiusDp = 0, gap = Gap(5, 9, 5, 6))) })
         h.start()
         val loose = h.key("q").hMargin
         assertTrue("gap $gap -> $loose", loose > gap)

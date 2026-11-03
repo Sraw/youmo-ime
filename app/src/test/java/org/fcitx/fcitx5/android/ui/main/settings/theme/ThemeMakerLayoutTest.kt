@@ -370,7 +370,8 @@ class ThemeMakerLayoutTest {
             putColor(v.currentTextColor)
             if (v.typeface?.isBold == true) put("w", BOLD)
             put("y", s.dp(s.top(v) + v.baseline * v.scaleY))
-            anchor(v)?.let { (a, x) -> put("a", a); put("x", s.dp(x)) }
+            // `al`, not `a`: that is a colour's alpha (putColor), and the text has one too
+            anchor(v)?.let { (al, x) -> put("al", al); put("x", s.dp(x)) }
         }
 
         // where the text's line is drawn across: its alignment and the x it keeps (the left, the middle or

@@ -5,7 +5,9 @@
 package org.fcitx.fcitx5.android.ui.main.settings.theme
 
 import android.view.ViewGroup
+import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.RecyclerView
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import splitties.views.dsl.core.Ui
 
@@ -129,16 +131,13 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
                     onSelectTheme(theme)
                 }
                 root.setOnLongClickListener {
-                    if (theme is Theme.Custom) {
-                        onExportTheme(theme)
-                        true
-                    } else if (theme is Theme.Monet) {
-                        onExportTheme(theme.toCustom())
-                        true
-                    } else false
-                }
-                editButton.setOnClickListener {
-                    if (theme is Theme.Custom) onEditTheme(theme)
+                    when (theme) {
+                        is Theme.Custom -> onThemeActions(theme)
+                        // its look the wallpaper's colours now, its key style with them: a fixed copy
+                        is Theme.Monet -> onExportTheme(theme.toCustom())
+                        else -> return@setOnLongClickListener false
+                    }
+                    true
                 }
             }
             else -> throw IllegalArgumentException(INVALID_TYPE + it)
@@ -153,9 +152,18 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
 
     abstract fun onSelectTheme(theme: Theme)
 
-    abstract fun onEditTheme(theme: Theme.Custom)
-
     abstract fun onExportTheme(theme: Theme.Custom)
+
+    abstract fun onDeleteTheme(theme: Theme.Custom)
+
+    /** A theme of the user's long pressed: export it or delete it. */
+    private fun ThemeThumbnailUi.onThemeActions(theme: Theme.Custom) {
+        AlertDialog.Builder(ctx)
+            .setItems(arrayOf(ctx.getString(R.string.export), ctx.getString(R.string.delete))) { _, i ->
+                if (i == 0) onExportTheme(theme) else onDeleteTheme(theme)
+            }
+            .show()
+    }
 
     companion object {
         const val OFFSET = 1

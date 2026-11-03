@@ -8,7 +8,6 @@ package org.fcitx.fcitx5.android.ui.main.settings.theme
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Color
-import android.graphics.drawable.Drawable
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -44,7 +43,6 @@ import splitties.views.dsl.core.horizontalMargin
 import splitties.views.dsl.core.imageView
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.view
-import splitties.views.imageDrawable
 
 class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
 
@@ -208,21 +206,10 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         }
     }
 
-    /** A picture being cut on the edit page in place of the theme's own, laid as CENTER_CROP lays it. */
-    fun setBackground(drawable: Drawable) {
-        bkg.background = null
-        bkg.imageDrawable = drawable
-    }
-
-    fun setTheme(theme: Theme, background: Drawable? = null) {
+    fun setTheme(theme: Theme) {
         val look = theme.look
-        if (background != null) {
-            setBackground(background)
-        } else {
-            // as the input view draws it: the keys over the picture find it here (PictureHost)
-            bkg.imageDrawable = null
-            bkg.background = ThemePictureDrawable.board(look)
-        }
+        // as the input view draws it: the keys over the picture find it here (PictureHost)
+        bkg.background = ThemePictureDrawable.board(look)
         val landscape = ctx.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         PictureHost.install(fakeInputView, look.picture?.let { PictureHost(look, bkg, landscape) })
         fakeKawaiiBar.background = ThemePictureDrawable.bar(look)

@@ -150,12 +150,9 @@ object ThemeFilesManager {
     @VisibleForTesting
     internal var probe: AssetProbe = AndroidAssetProbe
 
-    fun newCustomBackgroundImages(): Triple<String, File, File> {
-        val themeName = UUID.randomUUID().toString()
-        val croppedImageFile = File(dir, "$themeName-cropped.png")
-        val srcImageFile = File(dir, "$themeName-src")
-        return Triple(themeName, croppedImageFile, srcImageFile)
-    }
+    /** Where the themes and their files are (made if it can be written). */
+    @VisibleForTesting
+    internal val themeDir get() = dir
 
     // the files by name only, as exported: an absolute path breaks once the files dir moves
     private fun Theme.Custom.withFileNames() = copy(look = look.mapFiles { File(it).name })

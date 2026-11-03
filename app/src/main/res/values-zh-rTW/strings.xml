@@ -2,7 +2,6 @@
 <resources>
     <string name="app_name_release">幽默輸入法</string>
     <string name="app_name_debug">幽默輸入法 (除錯)</string>
-    <string name="save">儲存</string>
     <string name="input_methods">輸入法</string>
     <string name="advanced">進階</string>
     <string name="ignore_sys_cursor">忽略系統游標位置</string>
@@ -85,11 +84,7 @@
     <string name="reset">重設</string>
     <string name="input_method_options">輸入法設定</string>
     <string name="theme">主題</string>
-    <string name="brightness">亮度</string>
     <string name="configure">配置</string>
-    <string name="choose_image">選擇圖片…</string>
-    <string name="dark_keys">深色按鍵</string>
-    <string name="recrop_image">重新裁剪圖片</string>
     <string name="navbar_background">導航列背景</string>
     <string name="navbar_bkg_none">無背景</string>
     <string name="navbar_bkg_color_only">與鍵盤背景色相符</string>
@@ -102,7 +97,6 @@
     <string name="popup_on_key_press">按鍵時彈出顯示字元</string>
     <string name="disable_animation">停用動畫</string>
     <string name="import_from_file">從檔案匯入…</string>
-    <string name="duplicate_builtin_theme">複製內建主題…</string>
     <string name="exception_logcat_created">Logcat 程序已經建立</string>
     <string name="exception_theme_filename">%1$s 的副檔名並不是主題</string>
     <string name="exception_libime_dict_filename">%1$s 的副檔名並不是 libime 詞庫</string>
@@ -126,7 +120,6 @@
     <string name="exception_theme_version">這個主題是較新版本的幽默輸入法做的（主題格式 %1$s），更新輸入法後才能用</string>
     <string name="exception_theme_newer_kept">已有一個同名的主題，是較新版本的幽默輸入法做的：這一版讀不了它，不替換</string>
     <string name="theme_not_saved">主題沒能儲存：手機儲存空間可能滿了</string>
-    <string name="exception_theme_src_image">無法儲存主題背景的原始影象</string>
     <string name="follow_system_day_night_theme">跟隨系統設定主題色調</string>
     <string name="follow_system_day_night_theme_summary">覆蓋目前的主題</string>
     <string name="light_mode_theme">日間模式主題</string>
@@ -167,9 +160,8 @@
     <string name="delete_all_except_pinned">要刪除所有未置頂條目嗎？</string>
     <string name="num_items_deleted">已刪除 %1$d 項</string>
     <string name="delete_theme">刪除主題</string>
-    <string name="delete_theme_msg">確定要刪除主題 “%1$s” 嗎？</string>
+    <string name="delete_theme_msg">刪除這個主題嗎？它的圖片和字型也一起刪掉。</string>
     <string name="capture_heap_dump">捕獲堆積記憶體傾印資料</string>
-    <string name="edit_theme">編輯主題</string>
     <string name="removed_n_items">已移除 %1$d 個項目</string>
     <string name="added_n_items">已新增 %1$d 個項目</string>
     <string name="whether_reset_switch_preference">是否要將此偏好設定重設為預設選項？</string>
@@ -205,11 +197,6 @@
     <string name="calculation_replaces_sum">點算式結果時取代整個算式</string>
     <string name="space_swipe_move_cursor">滑動空格以移動游標</string>
     <string name="please_wait">請稍候……</string>
-    <string name="rotate">旋轉</string>
-    <string name="flip">翻轉</string>
-    <string name="flip_horizontally">水平翻轉</string>
-    <string name="flip_vertically">垂直翻轉</string>
-    <string name="crop">裁剪</string>
     <string name="candidates_window">實體鍵盤的候選窗</string>
     <string name="show_candidates_window">顯示候選詞視窗</string>
     <string name="candidates_window_radius">候選詞視窗半徑</string>
@@ -498,10 +485,6 @@
     <string name="level_little">少</string>
     <string name="level_more">多</string>
     <string name="level_compact">緊湊</string>
-    <string name="level_loose">寬鬆</string>
-    <string name="level_square">直角</string>
-    <string name="level_rounded">圓角</string>
-    <string name="level_round">大圓角</string>
     <string name="level_short">短</string>
     <string name="level_medium">中</string>
     <string name="level_long">長</string>
@@ -877,25 +860,8 @@
     <string name="section_emoji">表情</string>
     <string name="section_animation">動畫</string>
     <string name="section_key_style">按鍵樣式</string>
-    <string name="key_style_in_theme">按鍵的圓角、邊框、間距、字型現在屬於主題：在主題頁編輯</string>
+    <string name="key_style_in_theme">按鍵的圓角、邊框、間距、字型現在屬於主題：主題在網頁上製作（主題 → 新主題 → 在網頁上製作…）</string>
     <string name="key_style_moved">按鍵的圓角、邊框、間距現在跟著主題走，已經存進你的主題裡。</string>
-    <string name="theme_base">鍵盤底</string>
-    <string name="theme_base_picture">主題圖</string>
-    <string name="theme_base_color">顏色</string>
-    <string name="theme_keys">按鍵</string>
-    <string name="theme_keys_blocks">分塊</string>
-    <string name="theme_keys_flat">平鋪</string>
-    <string name="theme_radius">圓角</string>
-    <string name="theme_border">邊框</string>
-    <string name="theme_border_thin">細</string>
-    <string name="theme_border_thick">粗</string>
-    <string name="theme_gap">間距</string>
-    <string name="theme_press">按下</string>
-    <string name="theme_press_tint">變色</string>
-    <string name="theme_press_ripple">水波紋</string>
-    <string name="theme_level_custom">自訂</string>
-    <string name="theme_blur">模糊</string>
-    <string name="theme_more_on_web">更多：顏色、按鍵圖片、字型 → 在網頁上改</string>
     <string name="make_theme_on_web">在網頁上製作…</string>
     <string name="section_phrases">短語</string>
     <string name="punctuation_map_summary">中文輸入時每個標點打成什麼，例如 , 打成 ，</string>

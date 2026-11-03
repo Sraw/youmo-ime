@@ -126,7 +126,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     }
 
     // the keys' look is the theme's since theme file 3.0 (blocks or flat, corners, gaps, a press's
-    // effect): edited with the theme; what was set here before went into the theme in use (ThemeLookMigration)
+    // effect): made on the web page with the theme; what was set here before went into the theme in use (ThemeLookMigration)
     init {
         note(R.string.key_style_in_theme, "key_style_note")
     }
