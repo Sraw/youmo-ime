@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.HostConfigDir
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.phoneStorage
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.quickphrase.QuickPhraseManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.ConfigHome
@@ -26,6 +27,8 @@ import org.fcitx.fcitx5.android.host.QuickPhraseBook
 import org.fcitx.fcitx5.android.host.QuickPhraseEntry
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPadView
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.ui.main.MainActivity
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.utils.parcelable
@@ -128,6 +131,42 @@ class QuickPhraseKeyboardUatTest {
         assertFalse(padShown())
         assertTrue(lettersShown())
     }
+
+    // the zhuyin keyboards send no letters either: 大千 and 注音九键 give way as the pad does, and an
+    // input method chosen meanwhile keeps its own letters, the zhuyin keyboard not brought back over them
+    @Test
+    @Uat("QU-12")
+    fun theZhuyinKeyboardsLendTheirPlaceAsThePadDoes() {
+        val told = AppPrefs.getInstance().internal.zhuyinTraditionalTold
+        val wasTold = told.getValue()
+        told.setValue(true)
+        try {
+            for (keyboard in listOf(ImKeyboard.ZHUYIN_FULL, ImKeyboard.ZHUYIN_NINE)) {
+                h.close()
+                h = KeyboardHarness(keyboards = ImKeyboards.Chosen(pinyin = keyboard)).apply {
+                    api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH)
+                    api.enabledIme = api.availableIme
+                }
+                h.start()
+                assertTrue("$keyboard: ${h.texts()}", zhuyinShown() && !lettersShown())
+                quickInput(true)
+                assertTrue("$keyboard: ${h.texts()}", lettersShown() && !zhuyinShown())
+                quickInput(false)
+                assertTrue("$keyboard: ${h.texts()}", zhuyinShown())
+                // another input method while it lasts: its letters stay after
+                quickInput(true)
+                h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
+                quickInput(false)
+                assertTrue("$keyboard: ${h.texts()}", lettersShown() && !zhuyinShown())
+                h.emit(HostEvent.InputMethodChanged(KeyboardHarness.PINYIN))
+                assertTrue("$keyboard: ${h.texts()}", zhuyinShown())
+            }
+        } finally {
+            told.setValue(wasTold)
+        }
+    }
+
+    private fun zhuyinShown() = h.texts().any { it.contains('ㄅ') }
 
     private fun candidates(vararg words: String) {
         h.api.candidates = Array(words.size) { CandidateWord(if (it == 0) "addr" else "", words[it], "") }
