@@ -8,6 +8,7 @@
 | Voice build, debug | `./gradlew :app:assembleVoiceDebug` |
 | One ABI only (much faster) | add `-PbuildABI=arm64-v8a` (phones) (also an arm64 emulator) or `-PbuildABI=x86_64` (an x86_64 emulator, redroid) |
 | Release, both builds, as shipped | `./gradlew :app:assembleTextRelease :app:assembleVoiceRelease -PbuildABI=arm64-v8a` |
+| A test build for profiling (simpleperf from the shell on an unrooted phone; never a release) | add `-PbuildProfileable=true` |
 | Engine data alone | `./gradlew :app:compileEngineData` (and `:app:compileEnglishData`, `:app:copySentenceModels`) |
 | Build-logic's own tests | `./gradlew -p build-logic test` |
 

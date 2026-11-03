@@ -21,6 +21,7 @@ android {
         // the id without the build type's suffix (.debug): UserDataOrigin's root, for importing backups
         buildConfigField("String", "APPLICATION_ID_ROOT", "\"$applicationId\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders["profileableShell"] = buildProfileable.toString()
     }
 
     buildFeatures {

@@ -165,6 +165,10 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
+        <!-- true only in a test build (-PbuildProfileable=true): simpleperf from the shell -->
+        <profileable
+            android:shell="${profileableShell}"
+            tools:targetApi="29" />
     </application>
 
 </manifest>

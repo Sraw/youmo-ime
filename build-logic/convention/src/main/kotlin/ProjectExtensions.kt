@@ -72,6 +72,10 @@ val Project.buildTimestamp
 val Project.buildAbiOverride: String?
     get() = epn("BUILD_ABI", "buildABI")
 
+// A test build's <profileable shell="true">, for simpleperf on an unrooted phone; never a release's
+val Project.buildProfileable: Boolean
+    get() = epn("BUILD_PROFILEABLE", "buildProfileable") == "true"
+
 val Project.signKeyBase64: String?
     get() = epn("SIGN_KEY_BASE64", "signKeyBase64")
 
