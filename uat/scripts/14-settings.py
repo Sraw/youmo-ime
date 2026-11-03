@@ -143,8 +143,9 @@ def custom_item(d, s=None):
     if not items:
         return None
     first = items[0]
+    # the icon, not the thumbnail's picture (an ImageView over the whole item, from the same corner)
     corner = any(k.cls == "ImageView" and abs(k.b[0] - first.b[0]) < 6 and abs(k.b[1] - first.b[1]) < 6
-                 and k.b[2] - k.b[0] > 0 for k in first.walk())
+                 and 0 < k.b[2] - k.b[0] < (first.b[2] - first.b[0]) // 2 for k in first.walk())
     return None if corner else first
 
 
@@ -168,7 +169,7 @@ def kb_picture(d, rows=1.0):
 
 def export_custom(d):
     """long-press one's own theme, 导出, save it in 下载; returns the new files' names"""
-    before = set(d.sh("ls /sdcard/Download/ 2>/dev/null").split())
+    before = set(d.sh("ls /sdcard/Download/ 2>/dev/null").splitlines())   # names with spaces: from-app (1).zip
     appearance_tab(d, "主题")
     item = custom_item(d)
     if not item:
@@ -181,7 +182,7 @@ def export_custom(d):
     if not s.find(text="下载"):
         raise Blocked(f"保存界面不在下载：{s.texts()[:8]}")
     d.tap_text("保存", where="all", scroll=False, after=2.5)
-    new = set(d.sh("ls /sdcard/Download/ 2>/dev/null").split()) - before
+    new = set(d.sh("ls /sdcard/Download/ 2>/dev/null").splitlines()) - before
     return sorted(new)
 
 
