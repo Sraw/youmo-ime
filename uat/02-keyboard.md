@@ -123,7 +123,7 @@
 - **JVM**：`KeyboardUatTest.searchFieldsReturnSearches`（搜索框回车键是搜索，按下执行搜索不换行）；设备上不跑。
 
 ### KB-21 [P1] "下一项"框的回车跳到下一个输入框
-- **前提**：B0；打开一个回车是"下一项"（`IME_ACTION_NEXT`）、下面还有一个框的原生输入框，点它。redroid 上用调试包的测试宿主 `TypingHostActivity` 带 `--ez next true`（「第一项」「第二项」两个框，见 README"测试宿主"；测试页的 WebView 浏览器不理输入法的"下一项"）；真机上也可以在 Chrome 里点测试页的「下一项」框（下面是「不要提示」框）。
+- **前提**：B0；打开一个回车是"下一项"（`IME_ACTION_NEXT`）、下面还有一个框的原生输入框，点它。模拟器上用调试包的测试宿主 `TypingHostActivity` 带 `--ez next true`（「第一项」「第二项」两个框，见 README"测试宿主"；测试页的 WebView 浏览器不理输入法的"下一项"）；真机上也可以在 Chrome 里点测试页的「下一项」框（下面是「不要提示」框）。
 - **操作**：点回车键。
 - **预期**：回车键图标是"下一项"箭头；点了以后焦点跳到下面的框（「第二项」，Chrome 里是「不要提示」）。
 - **JVM**：`KeyboardUatTest.nextFieldsReturnGoesOn`（下一项框回车键是下一项，按下执行 NEXT）；设备上不跑。

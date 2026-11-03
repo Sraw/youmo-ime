@@ -17,7 +17,7 @@ compiled is not done.
 | Native host tests | `lib/sherpa-onnx/host-test.sh` | the script | sherpa-onnx's C++ helpers, compiled for the host |
 | Instrumented | `app/src/androidTest` | CI (`emulator` label / weekly); locally `connectedTextDebugAndroidTest` | the real host, engine and keyboard (`KotlinHost`, `TestHost`): `HostTest`, `SoftKeyboardTest`, `TypingHostActivityTest`, `NativeMatrixKernelTest`, `HostConfigTest`, `HostEnglishTest`, `HostPreeditTest`, `SetupActivityDeviceTest`, `FileUtilTest`; `EngineEvalRunner` is the device runner behind `run-on-device.sh` |
 | Evaluation | `lib/ime-eval` | see below | ranking: whether the first candidate is the sentence meant |
-| On a device | redroid or a phone | by hand / scripts | what a user sees: layout, gestures, rotation, upgrade |
+| On a device | the Android emulator (arm64) or a phone | by hand / scripts | what a user sees: layout, gestures, rotation, upgrade |
 
 Minimum before a commit: `./gradlew :lib:ime-core:check :app:testTextDebugUnitTest detekt`, plus
 the tool or build-logic tests if those changed. Unit tests need no NDK or CMake.
@@ -137,17 +137,20 @@ voice case that is about how the microphone looks would need its own golden in a
 Unit tests do not see the keyboard. Anything a user sees or touches (layout, a gesture, the bar,
 a settings page, rotation, a field type, an upgrade) is tried on a device before it is called done.
 
-- **redroid** is the default: Android 14 in a Docker container on the host kernel, ~10 s to boot,
-  ~1.3 GB. Build `-PbuildABI=x86_64`, install, `ime enable` / `ime set` the service, drive it
-  with `adb shell input tap/swipe` at measured key coordinates, read the field back, screenshot the
-  bar. Scripted, that is `uat/tools/uat.py` (below); `dev/redroid/` is only an uncommitted
-  workbench. Root via `docker exec`.
-- **An emulator** for what redroid cannot do: another Android version, real telephony, a browser
-  (redroid has none, and the UAT's test page needs Chrome), a hardware keyboard (a uinput one in
-  redroid is the host's too). Close it before `assembleTextRelease`: R8 and a running emulator
-  (qemu ~6 GB resident) together make earlyoom kill the emulator. Voice (UAT 12) and the hardware
-  keyboard (17) run on a headless one, `uat.py emu-up` (port 5554, Xvfb; voice from a host PulseAudio
-  virtual source playing clips made by `uat/tools/voice-clips.py`).
+- **The Android emulator** is the default (since 2026-11, development on an Apple-silicon Mac;
+  redroid, Android in a Docker container on a Linux host kernel, was until then): the AVD `youmo`,
+  android-36 google_apis **arm64-v8a**, native under Hypervisor.framework, 1080x2340 at 440 dpi with
+  three-button nav as redroid had (the scripts' coordinates hold), booted headless from a snapshot
+  read-only in ~5 s, so every boot is a clean device and two run at once (2.6-3.9 GB resident each).
+  It runs the release's own ABI (build `-PbuildABI=arm64-v8a`), the arm64 voice build included, and
+  has its own kernel: the hardware keyboard (a uinput one, `uat/tools/emu-keyboard.sh`) is tested on
+  the same device as the rest; a uinput keyboard is still made nowhere but an emulator. Install,
+  `ime enable` / `ime set` the service, drive it with `adb shell input tap/swipe` at measured key
+  coordinates, read the field back, screenshot the bar. Scripted, that is `uat/tools/uat.py`
+  (below); `dev/emu/` is only an uncommitted workbench (it makes the AVD). Root via `adb root`.
+  Voice (UAT 12) needs the microphone fed with clips made by `uat/tools/voice-clips.py`: not wired
+  up yet (the emulators start `-no-audio`; on Linux it was a host PulseAudio virtual source), so the
+  cases that speak are blocked.
 - A real phone (arm64) for performance, voice latency and a real microphone.
 
 Worth checking by hand for keyboard changes: portrait and landscape; a password field (nothing
@@ -170,13 +173,13 @@ place of the unit tests. A change in behaviour changes its cases in the same cha
 `docs/` disagree, find which is wrong. A run is written down in `uat/runs/<date>-<device>-<version>.md`;
 the case files hold no results. `uat/README.md` has the format, the baselines and the reset.
 
-The runner, `uat/tools/uat.py`: `up` / `down` (two redroids, `youmo-redroid` on 5556 and
-`youmo-redroid2` on 5557), `run [--areas] [--ids] [--devices]` (`UAT_BUILD=release`: on the signed x86_64
+The runner, `uat/tools/uat.py`: `up` / `down` (two emulators, emulator-5554 and emulator-5556, from the
+AVD's snapshot), `run [--areas] [--ids] [--devices]` (`UAT_BUILD=release`: on the signed arm64
 release APK, the debug package uninstalled first and installed back only for the cases that type into
-its `TypingHostActivity`), `mark` (a visual case after its sheet is seen), `emu-up` / `emu-down`. One
+its `TypingHostActivity`), `mark` (a visual case after its sheet is seen). One
 script per case file (`uat/scripts/<file>.py`; handwriting's strokes in `hw_strokes.py`); a case in a
 .md with no script is reported blocked (没有脚本), never left out; a case whose `needs=` names another
-place (the emulator, the voice build, a release by hand, a real phone) is listed as 在别处跑, not counted
+place (the voice build, a release by hand, a real phone, the JVM) is listed as 在别处跑, not counted
 as skipped. The UI is read back by a resident `Dumper.java`, which waits for the screen to settle, so
 the runner polls for what it waits on rather than sleeping; visual cases go on contact sheets, reviewed
 per `uat/tools/sheet-review.md`. The debug build's `TypingHostActivity` is the native field for what the
@@ -187,7 +190,9 @@ Details in `uat/README.md`.
 
 Release gates 2, 3 and 5 of the host replacement (0.4.0) (in-place upgrade from the `uat/fixtures/upgrade`
 releases, backups both ways with them, start/latency/memory side by side) are one command each,
-`uat/gates/gates.py upgrade|backups|perf`, on a redroid of their own; results in `uat/runs/`
+`uat/gates/gates.py upgrade|backups|perf`, on a redroid of their own (not ported to the emulator yet:
+they, `uat/parity/parity.py prepare|run`, `uat/parity/record.sh` and `uat/fixtures/upgrade/make.py` exit
+saying so; parity.py's other commands need no device); results in `uat/runs/`
 (`uat/gates/README.md`). A `.debug` build is upgraded by putting the fixture's files into its own
 directories and gets backups retargeted to its id; the release APK is upgraded with `install -r`.
 

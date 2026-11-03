@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
-"""UAT runner for redroid: groups of cases per baseline, machine checks, contact sheets, two devices.
+"""UAT runner for the Android emulator: groups of cases per baseline, machine checks, contact sheets, two devices.
 
-  uat.py up | down [--port P]      the second redroid (youmo-redroid2, 127.0.0.1:5557), or a
-                                   UAT_CONTAINERS one (UAT_CPUSET: its host cores)
-  uat.py emu-up | emu-down         the emulator (emulator-5554, AVD dev/avd/youmo_kb) and its microphone
-  uat.py run [--areas 14,06] [--ids ST-01,PY-02] [--devices 5556,5557] [--flavor text|voice]
+  uat.py up | down [--port P]      an emulator (emulator-P, default the second: 5556) of the AVD youmo
+                                   from its snapshot "clean", read-only: every up a clean device
+  uat.py emu-up | emu-down         the same on 5554 (the first)
+  uat.py run [--areas 14,06] [--ids ST-01,PY-02] [--devices 5554,5556] [--flavor text|voice]
   uat.py mark <run> <id> 通过|失败 [note]
   uat.py list [--areas …]          the registered cases, their group and kind
 
 Cases live in uat/scripts/<file stem>.py (one per uat/*.md); the .md stays the source of truth:
 a script follows its case's 前提/操作/预期, and the caption under a screenshot is the case's 预期.
-Python 3 stdlib + PIL. Only `adb shell input tap/swipe/motionevent/keyevent/text`, uiautomator,
-am/pm/ime/settings drive the device: never a uinput device (redroid shares the host's kernel).
-The emulator (--devices 5554, for 17 实体键盘 and 12 语音) is a VM with its own kernel: there, and only
-there, a uinput keyboard (uat/tools/emu-keyboard.sh) and root over `adb root`; its microphone is the
-host's PulseAudio source uat-mic.monitor, which `Device.say` plays the clips of voice-clips.py into.
+Python 3 stdlib + PIL. `adb shell input tap/swipe/motionevent/keyevent/text`, uiautomator,
+am/pm/ime/settings drive the device. The devices are emulators (AVD youmo, android-36 google_apis
+arm64-v8a: the release ABI, native on Apple silicon; dev/emu/avd.sh makes it), VMs with their own
+kernel: root over `adb root`, and 17 实体键盘's USB keyboard a uinput one (uat/tools/emu-keyboard.sh),
+which is never made anywhere else. Nothing feeds the voice cases' microphone yet (`Device.say`: the
+emulators start -no-audio), so those cases are blocked.
 Output is kept short on purpose (counts and paths): an agent reading it re-reads its context.
 """
 import argparse
@@ -39,7 +40,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 UAT = os.path.join(REPO, "uat")
 OUT = os.path.join(REPO, "dev", "uat-out")
-# UAT_BUILD=release runs the cases on the x86_64 release APK (a release's gate: R8's code, its own package)
+# UAT_BUILD=release runs the cases on the arm64 release APK (a release's gate: R8's code, its own package)
 BUILD = os.environ.get("UAT_BUILD", "debug")
 if BUILD not in ("debug", "release"):
     sys.exit(f"UAT_BUILD={BUILD}: debug or release")
@@ -47,31 +48,53 @@ PKG = "io.github.sraw.youmo" + (".debug" if BUILD == "debug" else "")
 IME = f"{PKG}/org.fcitx.fcitx5.android.input.FcitxInputMethodService"
 MAIN = f"{PKG}/org.fcitx.fcitx5.android.ui.main.MainActivity"
 BROWSER = "org.chromium.webview_shell/.WebViewBrowserActivity"
-IMAGE = "redroid/redroid:14.0.0_64only-latest"
-# serial port -> container; only these two are ever started, stopped or rooted by this tool. A
-# container already running on the port under another name (a stream's own youmo-redroid-2) is that
-# port's: see container_for
-CONTAINERS = {"5556": "youmo-redroid", "5557": "youmo-redroid2"}
-# UAT_CONTAINERS=5563:youmo-flow-idle[,…]: a worktree's own redroid on its own port, which up/down
-# and run --devices then take as they take the two above
-CONTAINERS.update(dict(x.split(":", 1) for x in os.environ.get("UAT_CONTAINERS", "").split(",") if x))
+# the ABI of the APKs installed: the emulator's, which is the release's
+ABI = "arm64-v8a"
+# adb 37's mDNS bridge aborts on a service name seen on this LAN (the server dies every few seconds):
+# a server this tool starts has it off
+os.environ.setdefault("ADB_MDNS", "0")
+# the devices: emulators of one AVD, each on its console port (serial emulator-<port>). 5554 and 5556
+# are the two of a run; a worktree may start its own on another even port up to 5584 (uat.py up --port)
+AVD = os.environ.get("UAT_AVD", "youmo")
+SNAPSHOT = "clean"   # the AVD's state after dev/emu/avd.sh: zh-CN, three-button nav, the WebView shell
+# two by design: on the 32 GB Mac one emulator is 3-4.5 GB resident beside two heavy Gradle jobs
+# (~7 GB each); a third wants the builds serialized (YOUMO_HEAVY_SLOTS=1, dev/README.md)
+PORTS = ("5554", "5556")
 
 
-def container_for(port):
-    """the container publishing 127.0.0.1:<port>, else this tool's name for it. Another project's
-    container on the port (not youmo-*, not named for it in UAT_CONTAINERS) is never taken: up would start it, root into it and install there, run
-    would change its cores"""
-    out = subprocess.run(["docker", "ps", "--format", "{{.Names}} {{.Ports}}"], capture_output=True,
-                         text=True).stdout
-    for line in out.splitlines():
-        name, _, ports = line.partition(" ")
-        if f"127.0.0.1:{port}->5555/tcp" in ports:
-            if not name.startswith("youmo-") and name != CONTAINERS.get(port):
-                sys.exit(f"{name} publishes 127.0.0.1:{port}: another project's device, not touched")
-            return name
-    if port not in CONTAINERS:
-        sys.exit(f"no container for port {port}: 5556, 5557, or name one in UAT_CONTAINERS=<port>:<name>")
-    return CONTAINERS[port]
+def emu_port(port):
+    """port as the emulator's console port, or exit: even, 5554-5584 (adb's emulator range)"""
+    if not (port.isascii() and port.isdigit() and 5554 <= int(port) <= 5584 and int(port) % 2 == 0):
+        sys.exit(f"device {port}: an emulator console port, even, 5554-5584")
+    return str(int(port))
+
+
+AVD_NAME_TIMEOUT = 20   # s: the console answers at once, booting or not
+
+
+def avd_name(d):
+    """the AVD emulator-<port> runs: its name, "" when no emulator answers on the port, None when adb
+    hangs (an emulator there that does not answer its console)"""
+    try:
+        out = d.adb("emu", "avd", "name", timeout=AVD_NAME_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return None
+    lines = out.strip().splitlines()
+    return lines[0].strip() if lines else ""
+
+
+def not_ours(d, name):
+    what = (f"not answering (adb emu avd name hung {AVD_NAME_TIMEOUT} s)" if name is None
+            else "not up" if not name else f"AVD {name}")
+    sys.exit(f"{d.serial} is {what}: not this runner's ({AVD}), left as it is")
+
+
+def ours(d):
+    """exit unless emulator-<port> runs this AVD: another project's emulator on the port is never
+    installed on, cleared or killed (redroid's runner refused other containers the same way)"""
+    name = avd_name(d)
+    if name != AVD:
+        not_ours(d, name)
 
 
 def version_key(name):
@@ -85,18 +108,17 @@ def version_key(name):
 
 def http_port(port):
     """host side of `adb reverse tcp:8000` for the first device on this serial port: one per port,
-    so runs and gates on different devices never share a server (5556 → 8765, 5557 → 8766)"""
-    return 8765 + int(port) - 5556
-EMU_PORT = "5554"   # the emulator: emulator-5554, no container
-AVD_HOME, AVD = os.path.join(REPO, "dev", "avd"), "youmo_kb"
-MIC = "uat-mic"   # a PulseAudio (PipeWire) null sink; the emulator records its monitor
-SPEAKER = "uat-out"   # another, the emulator's output: not into uat-mic, where it came back as speech
+    so runs and gates on different devices never share a server (5554 → 8765, 5556 → 8766)"""
+    return 8765 + (int(port) - 5554) // 2
 CLIPS = os.path.join(OUT, "voice-clips")
-# host side of `adb reverse tcp:8000`: one per first device, so two runs at once (on 5556 and on 5557,
+# host side of `adb reverse tcp:8000`: one per first device, so two runs at once (on 5554 and on 5556,
 # from two checkouts) each serve their own fixtures rather than the other's
 HTTP_PORT = int(os.environ.get("UAT_HTTP_PORT", "0")) or None
-FONT = "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf"   # CJK; it draws no Latin
-FONT_LATIN = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+# the sheets' captions: a CJK font (it draws no Latin there) and a Latin one, the first present
+FONT = next((f for f in ("/System/Library/Fonts/Hiragino Sans GB.ttc", "/System/Library/Fonts/STHeiti Medium.ttc",
+                         "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf") if os.path.exists(f)), None)
+FONT_LATIN = next((f for f in ("/System/Library/Fonts/Helvetica.ttc", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+                   if os.path.exists(f)), None)
 
 
 # The pause after a touch. It was all slept after every touch (OLD); now a short part after it
@@ -128,15 +150,15 @@ class Elsewhere(Exception):
     pass
 
 
-# needs kinds that name where a case runs instead, in place()'s order (voice beats emu: a voice case
-# is only on the voice build, which runs on the emulator); unmet, tally and counts_line read it too
-ELSEWHERE = {"jvm": "JVM", "release": "发版时", "manual": "真机或手工", "voice": "语音版", "emu": "模拟器"}
+# needs kinds that name where a case runs instead, in place()'s order; unmet, tally and counts_line
+# read it too. (There was an "emu" kind while the runs were on redroid: the hardware keyboard needs the
+# emulator's own kernel; every device is an emulator now)
+ELSEWHERE = {"jvm": "JVM", "release": "发版时", "manual": "真机或手工", "voice": "语音版"}
 # when a case of an ELSEWHERE kind runs on this device and build after all (a kind not here never does).
-# release,redroid: scripted but too long for every run (a big lexicon), so only in a release's own run
-# (UAT_BUILD=release), and on redroid: on the 2 GB emulator each takes minutes
-RUNS_HERE = {"emu": lambda d, kinds: d.emu,
-             "voice": lambda d, kinds: d.flavor == "voice",
-             "release": lambda d, kinds: "redroid" in kinds and BUILD == "release" and not d.emu}
+# release,scripted: scripted but too long for every run (a big lexicon), so only in a release's own run
+# (UAT_BUILD=release)
+RUNS_HERE = {"voice": lambda d, kinds: d.flavor == "voice",
+             "release": lambda d, kinds: "scripted" in kinds and BUILD == "release"}
 # what a case in the .md with no script is registered as: tally reports each
 NO_SCRIPT = "block:没有脚本"
 
@@ -170,7 +192,7 @@ class Case:
             if k == "voice":
                 return Elsewhere, f"{ELSEWHERE[k]}：文字版没有语音输入（--flavor voice 装语音版再跑）"
             if k == "release":
-                where = "发版时在 redroid 上（UAT_BUILD=release）" if "redroid" in kinds else "发版时手动"
+                where = "发版时脚本跑（UAT_BUILD=release）" if "scripted" in kinds else "发版时手动"
                 return Elsewhere, f"{where}：{why}"
             return Elsewhere, f"{ELSEWHERE[k]}：{why}"
         return None
@@ -178,14 +200,12 @@ class Case:
     def heavy_here(self, ports):
         """whether this run on [ports] may run the case at all, before a device is picked: a heavy case
         that runs elsewhere goes with its group instead of waiting for every device to go idle only to be
-        listed as 在别处跑. The release,redroid ones as RUNS_HERE has them: BUILD=release and a device that
-        is not the emulator; any other ELSEWHERE kind counts as elsewhere (it would then run with its
-        group, not alone)"""
+        listed as 在别处跑. The release,scripted ones as RUNS_HERE has them: BUILD=release; any other
+        ELSEWHERE kind counts as elsewhere (it would then run with its group, not alone)"""
         where = place(self.needs)
         if where == "release":
-            return ("redroid" in self.needs.split(":", 1)[0].split(",") and BUILD == "release"
-                    and any(p != EMU_PORT for p in ports))
-        return where == "redroid"
+            return "scripted" in self.needs.split(":", 1)[0].split(",") and BUILD == "release"
+        return where == "device"
 
     @property
     def group(self):
@@ -205,10 +225,10 @@ def case(id, base="B0", page=None, mutates=False, clean=False, visual=False, nee
     """mutates: False (no commit, nothing changed), "learn" (commits text the engine may learn
     from), True (changes settings, words, the system). clean: the case needs no learning before it.
     visual: part of the 预期 is only seen on a screenshot -> 待看图 unless a machine check failed.
-    needs: "skip:<why>" / "block:<why>" when redroid cannot run it at all; "emu:<why>" for the emulator
-    only, "voice:<why>" for the voice build only, "emu,voice:<why>" both; "release:<why>" run by hand
-    at a release ("release,redroid:<why>": scripted, run on redroid only when UAT_BUILD=release), "manual:<why>" on a real phone, "jvm:<tests>" asserted by JVM tests carrying its @Uat (`uat.py jvm`
-    records it from those; the Class.method names, separated by 、, must each carry it too): those five are 在别处跑 where unmet, no reset. heavy: the case loads the host (a big
+    needs: "skip:<why>" / "block:<why>" when the emulator cannot run it at all; "voice:<why>" for the
+    voice build only; "release:<why>" run by hand at a release ("release,scripted:<why>": scripted,
+    run only when UAT_BUILD=release), "manual:<why>" on a real phone, "jvm:<tests>" asserted by JVM tests carrying its @Uat (`uat.py jvm`
+    records it from those; the Class.method names, separated by 、, must each carry it too): those four are 在别处跑 where unmet, no reset. heavy: the case loads the host (a big
     lexicon compiled, an upgrade, the heap measured): run last, alone, with the other devices idle,
     so its load does not break the timing (long presses, quick taps) of a case beside it."""
     if page is None:
@@ -413,9 +433,7 @@ class Device:
     def __init__(self, port, run=None, flavor="text"):
         self.port = str(port)
         self.flavor = flavor   # the build under test (--flavor): voice-only cases, SET-01's reinstall
-        self.emu = self.port == EMU_PORT
-        self.serial = f"emulator-{self.port}" if self.emu else f"127.0.0.1:{self.port}"
-        self.container = None if self.emu else container_for(self.port)
+        self.serial = f"emulator-{self.port}"
         self.run = run
         self.case = None
         self._keys = None
@@ -462,17 +480,12 @@ class Device:
         return int(self.sh("wm size").strip().splitlines()[-1].split()[-1].split("x")[1])
 
     def root(self, cmd):
-        if self.emu:   # adbd runs as root there (emu-up)
-            return self.sh(cmd)
-        return subprocess.run(["docker", "exec", self.container, "sh", "-c", cmd],
-                              capture_output=True, text=True).stdout
+        return self.sh(cmd)   # adbd runs as root (up)
 
     # --- the emulator's hardware keyboard and microphone
     def kb(self, *args):
-        """uat/tools/emu-keyboard.sh up|down|type …|key …|combo …, emulator only (the script
-        refuses anything else too)"""
-        if not self.emu:
-            raise Blocked("实体键盘只在模拟器上（redroid 里的 uinput 键盘会到宿主机）")
+        """uat/tools/emu-keyboard.sh up|down|type …|key …|combo …: the script refuses anything but an
+        emulator"""
         r = subprocess.run([os.path.join(UAT, "tools", "emu-keyboard.sh"), *args], capture_output=True,
                            text=True, env={**os.environ, "ANDROID_SERIAL": self.serial}, timeout=60)
         if r.returncode:
@@ -484,17 +497,10 @@ class Device:
         return "Test USB Keyboard" in self.sh("dumpsys input | grep -m1 'Test USB Keyboard'")
 
     def say(self, clip, wait=True):
-        """play dev/uat-out/voice-clips/<clip>.wav into the emulator's microphone; wait=False: in
-        the background (returns the player)"""
-        if not self.emu:
-            raise Blocked("没有麦克风输入：只在模拟器上")
-        f = os.path.join(CLIPS, f"{clip}.wav")
-        if not os.path.exists(f):
-            raise Blocked(f"没有 {f}：先跑 uat/tools/voice-clips.py")
-        p = subprocess.Popen(["pw-play", "--target", MIC, f], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if wait:
-            p.wait(30)
-        return p
+        """play dev/uat-out/voice-clips/<clip>.wav into the emulator's microphone: not wired up yet
+        (up() starts the emulators -no-audio; the redroid-era runner played clips into a PulseAudio
+        source the emulator recorded, Linux only)"""
+        raise Blocked("模拟器的麦克风还没接上语音片段（uat/README.md「实体键盘和语音」）")
 
     # --- reading the screen
     # the dump server (Dumper.java): one UiAutomation connection kept open, ~0.1 s a dump
@@ -1161,7 +1167,7 @@ class Device:
             # near the field's bottom-right corner: in a field with text the cursor lands at its end
             at = (f.b[2] - 40, f.b[3] - 25) if f.b[3] - f.b[1] > 150 else f.c
             self.tap(at, 0.8)
-            if self.emu and self.kb_plugged():
+            if self.kb_plugged():
                 # a hardware keyboard typed on: a tap in a web field tells the input method nothing,
                 # the touch keyboard comes back by the button by the cursor (HK-03)
                 s = self.screen()
@@ -1229,8 +1235,8 @@ class Device:
         raise Blocked(f"地球键切不到「{label}」：{self.im_label()}")
 
     def rotate(self, r):
-        """0 portrait, 1 landscape. redroid's display does not rotate (user_rotation is ignored), so
-        landscape is the display resized to 2340x1080: the apps get a landscape configuration
+        """0 portrait, 1 landscape. Landscape is the display resized to 2340x1080 (as on redroid, whose
+        display did not rotate; the cases' landscape coordinates were measured so): the apps get a landscape configuration
         (w851dp, "land") and go through the same configuration change as on a turn"""
         self.sh("wm size 2340x1080" if r else "wm size reset")
         self.rot = r
@@ -1552,12 +1558,11 @@ def reset(d, base, page):
 
 
 def plug(d, base):
-    """B0-实体: the emulator's USB keyboard plugged in; any other baseline there: unplugged"""
-    if d.emu:
-        want = base == "B0-实体"
-        if d.kb_plugged() != want:
-            d.kb("up" if want else "down")
-            time.sleep(1)
+    """B0-实体: the emulator's USB keyboard plugged in; any other baseline: unplugged"""
+    want = base == "B0-实体"
+    if d.kb_plugged() != want:
+        d.kb("up" if want else "down")
+        time.sleep(1)
 
 
 PREFILLED = ("long",)   # the test page's fields that come with text
@@ -1594,7 +1599,7 @@ def soft_reset(d, base, page):
 
 # Where the tree tells too little (a panel's rows have no ids),
 # a few scripts go by place: the portrait layout of 1080x2340 at 440 dpi, the default keyboard height
-# (redroid and the emulator alike). Named once here; a new device size or keyboard height changes them.
+# (measured on redroid, the same on the emulator with three-button nav). Named once here; a new device size or keyboard height changes them.
 BAR_BOTTOM = 1560                     # the toolbar / candidate bar's lower edge: the keys or a panel below
 PANEL_TOP, PANEL_BOTTOM = 1550, 2090  # a panel's content (symbols, emoji, clipboard rows)
 
@@ -1788,9 +1793,9 @@ def open_host(d, **extras):
         if not d.sh(f"pm path {HOST_PKG}").strip():
             dp = os.path.join(REPO, "app/build/outputs/apk/text/debug")
             apks = sorted((os.path.join(dp, f) for f in (os.listdir(dp) if os.path.isdir(dp) else [])
-                           if "x86_64" in f and f.endswith(".apk")), key=os.path.getmtime)
+                           if ABI in f and f.endswith(".apk")), key=os.path.getmtime)
             if not apks:
-                raise Blocked("正式包跑时要 debug 包当测试宿主：BUILD_ABI=x86_64 ./gradlew :app:assembleTextDebug")
+                raise Blocked(f"正式包跑时要 debug 包当测试宿主：BUILD_ABI={ABI} ./gradlew :app:assembleTextDebug")
             d.adb("install", "-r", apks[-1], check=True, timeout=600)
         d.sh(f"ime disable {HOST_PKG}/org.fcitx.fcitx5.android.input.FcitxInputMethodService")
         ensure_ime(d)
@@ -1904,7 +1909,7 @@ class Run:
             end = time.time()
             start = end - secs
             self.active.pop(dev, None)
-            # what the other device ran while this one did: two redroids share the host's CPU
+            # what the other device ran while this one did: two emulators share the host's CPU
             beside = [x[1] for x in self.spans if x[0] != dev and x[2] < end and x[3] > start] + \
                      [cid for p, (cid, s) in self.active.items() if p != dev and s < end]
             self.spans.append([dev, c.id, start, end])
@@ -2014,7 +2019,6 @@ class Scheduler:
     def device_loop(self, port):
         d = Device(port, self.run, self.flavor)
         try:
-            d.adb("connect", d.serial)
             if not d.start_dumper():
                 d.stop_dumper()   # falls back to `uiautomator dump`, ~2 s a read
             while True:
@@ -2201,14 +2205,11 @@ def table(results):
 
 def write_results(run, cases, version, ports, wall, sheets, flavor="text"):
     p = os.path.join(UAT, "runs", f"{run.name}.md")
-    if ports == [EMU_PORT]:
-        dev = (f"- 设备：Android 模拟器（AVD dev/avd/{AVD}，android-36 google_apis x86_64），1080×2340，440 dpi，"
-               f"简体中文；emulator-{EMU_PORT}；实体键盘是 uat/tools/emu-keyboard.sh 的 uinput USB 键盘，"
-               f"麦克风是宿主 PulseAudio 的 {MIC}.monitor（uat/tools/voice-clips.py 合成的语音放进去）")
-    else:
-        dev = f"- 设备：redroid 14 x86_64，1080×2340，440 dpi，简体中文；{len(ports)} 台（{', '.join('127.0.0.1:' + p for p in ports)}）"
+    dev = (f"- 设备：Android 模拟器（AVD {AVD}，android-36 google_apis {ABI}，快照 {SNAPSHOT} 只读启动），1080×2340，"
+           f"440 dpi，简体中文；{len(ports)} 台（{', '.join('emulator-' + p for p in ports)}）；"
+           f"实体键盘是 uat/tools/emu-keyboard.sh 的 uinput USB 键盘")
     lines = [f"# {run.name}", "", dev,
-             f"- 包：{'语音版' if flavor == 'voice' else '文字版'} x86_64 {BUILD}（{PKG}）{version}",
+             f"- 包：{'语音版' if flavor == 'voice' else '文字版'} {ABI} {BUILD}（{PKG}）{version}",
              # the ids of a short rerun say which rows are new; a whole run is just its count
              f"- 跑法：`uat/tools/uat.py run`（最近一次跑 {sum(1 for i in run.ids if run.results.get(i, ('',))[0] != '在别处跑')} 条"
              f"{'：' + ', '.join(run.ids) if len(run.ids) <= 12 else ''}，用时 {wall:.0f} s）；"
@@ -2272,73 +2273,70 @@ def flakes(names):
 
 # ---------------------------------------------------------------- devices and the page server
 
-def up(port="5557"):
-    name = container_for(port)   # one already on the port (a stream's own) is used, not a second made
-    serial = f"127.0.0.1:{port}"
-    if subprocess.run(["docker", "inspect", name], capture_output=True).returncode == 0:
-        # stopped (docker stop, or the emulator's turn): started again, a running one left as it is
-        subprocess.run(["docker", "start", name], check=True, capture_output=True)
-        print(f"{name} already exists")
-    else:
-        # UAT_CPUSET=0-5: the container held to those host cores (docker's --cpuset-cpus), so a
-        # heavy case on one device does not starve the timing of the other's
-        cpu = os.environ.get("UAT_CPUSET", "")
-        cpus = ["--cpuset-cpus", cpu] if cpu and cpu != "off" and "/" not in cpu else []
-        subprocess.run(["docker", "run", "-d", "--name", name, "--privileged", "--memory", "2048m", *cpus,
-                        "-p", f"127.0.0.1:{port}:5555", IMAGE,
-                        "androidboot.redroid_width=1080", "androidboot.redroid_height=2340",
-                        "androidboot.redroid_dpi=440", "androidboot.redroid_gpu_mode=host"],
-                       check=True, capture_output=True)
-    d = Device(port)
+def emulator_bin():
+    sdk = os.environ.get("ANDROID_HOME") or os.path.expanduser("~/Library/Android/sdk")
+    return os.path.join(sdk, "emulator", "emulator")
 
-    def booted():
-        subprocess.run(["adb", "connect", serial], capture_output=True)
-        return d.sh("getprop sys.boot_completed").strip() == "1" and "package:" in d.sh("pm path android")
-    for _ in range(90):
-        if booted():
+
+def up(port="5556"):
+    """emulator-<port> of the AVD from its snapshot, read-only (-read-only: two of one AVD at once,
+    nothing saved back), so a device this starts is clean; one already up is left as it is"""
+    port = emu_port(port)
+    d = Device(port)
+    if d.sh("getprop sys.boot_completed").strip() == "1":
+        ours(d)
+        print(f"{d.serial} already up")
+    else:
+        # one still booting is waited for if it is this AVD; another project's, or one not answering,
+        # is left: starting ours on its port would fail and the wait below would take that one
+        name = avd_name(d)
+        if name not in ("", AVD):
+            not_ours(d, name)
+        if not name:
+            os.makedirs(os.path.join(OUT, "emu"), exist_ok=True)
+            log = open(os.path.join(OUT, "emu", f"emulator-{port}.log"), "w")
+            # -gpu host: the Mac's GPU (its OpenGL; EMU_GPU=swiftshader_indirect for software, which the
+            # snapshot was not saved with: a cold boot). -no-audio: no microphone yet (Device.say)
+            subprocess.Popen([emulator_bin(), "-avd", AVD, "-port", port, "-snapshot", SNAPSHOT,
+                              "-no-snapshot-save", "-read-only", "-no-window", "-no-audio", "-no-boot-anim",
+                              "-gpu", os.environ.get("EMU_GPU", "host")],
+                             stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
+        for _ in range(180):
+            time.sleep(1)
+            if d.sh("getprop sys.boot_completed").strip() == "1":
+                break
+        else:
+            sys.exit(f"{d.serial} did not boot in 3 min (dev/uat-out/emu/emulator-{port}.log)")
+        ours(d)   # the port taken by another emulator between the look and the start: that one booted
+    subprocess.run(["adb", "-s", d.serial, "root"], capture_output=True)
+    subprocess.run(["adb", "-s", d.serial, "wait-for-device"], capture_output=True)
+    for _ in range(30):
+        if "package:" in d.sh("pm path android"):
             break
         time.sleep(1)
-    if d.sh("getprop persist.sys.locale").strip() != "zh-CN":
-        # the framework restarts for the language: boot_completed drops, adb may go offline
-        d.root("setprop persist.sys.locale zh-CN; setprop sys.boot_completed 0; stop; start")
-        time.sleep(3)
+    if d.sh("getprop persist.sys.locale").strip() != "zh-CN":   # a snapshot made without it
+        d.sh("setprop persist.sys.locale zh-CN; setprop sys.boot_completed 0; stop; start")
+        time.sleep(5)
         for _ in range(120):
-            if booted():
+            if d.sh("getprop sys.boot_completed").strip() == "1":
                 break
             time.sleep(1)
-    time.sleep(3)
-    install(d)
-    print(f"{name} up on {serial}")
+        time.sleep(3)
+    if "package:" not in d.sh("pm path org.chromium.webview_shell"):
+        sys.exit(f"{d.serial}: no org.chromium.webview_shell (the test page's browser): the snapshot is "
+                 "not dev/emu/avd.sh's")
+    print(f"{d.serial} up")
 
-
-def cpusets(n_devices, cores, setting):
-    """each redroid's host cores for a run (docker's --cpuset-cpus), or None to leave them as they are.
-    Default: the cores split evenly, in --devices order, so a heavy case on one device does not starve
-    the timing of the other's (2026-10-23: 30/45 → 39/45 flaky-area cases passing; the idle wait alone
-    barely helped). One device gets every core back: a split stays with the container after the run.
-    UAT_CPUSET=off leaves the containers alone; UAT_CPUSET=0-3/4-11 gives each its own"""
-    if setting == "off":
-        return None
-    if setting:
-        sets = setting.split("/")
-        if len(sets) != n_devices:
-            sys.exit(f"UAT_CPUSET={setting}: one set per device, /-separated ({n_devices})")
-        return sets
-    per = cores // n_devices
-    if per == 0:
-        sys.exit(f"{cores} cores for {n_devices} devices: set UAT_CPUSET or UAT_CPUSET=off")
-    # the cores the division leaves go to the last device
-    return [f"{i * per}-{(i + 1) * per - 1 if i < n_devices - 1 else cores - 1}" for i in range(n_devices)]
 
 
 def install(d, flavor="text"):
     # UAT_APK_REPO: another checkout's build under this one's cases (a red baseline: VO-23 on R15)
     apk_repo = os.environ.get("UAT_APK_REPO", REPO)
     apks = sorted((os.path.join(dp, f) for dp in [os.path.join(apk_repo, f"app/build/outputs/apk/{flavor}/{BUILD}")]
-                   if os.path.isdir(dp) for f in os.listdir(dp) if "x86_64" in f and f.endswith(".apk") and not f.endswith("-unsigned.apk")),
+                   if os.path.isdir(dp) for f in os.listdir(dp) if ABI in f and f.endswith(".apk") and not f.endswith("-unsigned.apk")),
                   key=os.path.getmtime)
     if not apks:
-        msg = f"no {flavor} {BUILD} x86_64 APK: BUILD_ABI=x86_64 ./gradlew :app:assemble{flavor.capitalize()}{BUILD.capitalize()}"
+        msg = f"no {flavor} {BUILD} {ABI} APK: BUILD_ABI={ABI} ./gradlew :app:assemble{flavor.capitalize()}{BUILD.capitalize()}"
         if BUILD == "release":
             msg += " (signed: the release key's environment set; an -unsigned.apk does not install)"
         if d.case:   # inside a case (SET-01): that case is blocked, the run goes on
@@ -2362,98 +2360,21 @@ def install(d, flavor="text"):
     d.sh(f"ime enable {IME}; ime set {IME}")
 
 
-def down(port="5557"):
-    if port == "5556":
-        sys.exit("down only removes the second device or a UAT_CONTAINERS one")
-    subprocess.run(["adb", "disconnect", f"127.0.0.1:{port}"], capture_output=True)
-    name = container_for(port)
-    if not name.startswith("youmo-") or name != CONTAINERS.get(port):   # another project's device on the port: not ours to remove
-        sys.exit(f"{name} is not this tool's container for {port}: left as it is")
-    subprocess.run(["docker", "rm", "-f", name], capture_output=True)
-    print(f"{name} removed")
 
 
-def emu_up():
-    """the emulator with a PulseAudio microphone; its own Android settings kept in the AVD"""
-    running = subprocess.run(["docker", "ps", "--format", "{{.Names}}"], capture_output=True, text=True).stdout.split()
-    ours = [c for c in CONTAINERS.values() if c in running]
-    if ours:   # qemu ~3-6 GB beside a redroid on 15 GB: earlyoom (specs/testing.md)
-        sys.exit(f"stop the redroids first (docker stop {' '.join(ours)})")
-    d = Device(EMU_PORT)
-    os.makedirs(os.path.join(OUT, "emu"), exist_ok=True)
-    if subprocess.run(["systemctl", "--user", "is-active", "-q", "pipewire-pulse"]).returncode:
-        subprocess.run(["systemctl", "--user", "start", "pipewire", "pipewire-pulse", "wireplumber"], check=True)
-        open(os.path.join(OUT, "emu", "pipewire-started"), "w").close()
-        time.sleep(2)
-    # the emulator's own stream format (44.1 kHz stereo); the clips are resampled as they play
-    have = subprocess.run(["pw-cli", "ls", "Node"], capture_output=True, text=True).stdout
-    for sink in (MIC, SPEAKER):
-        if f'"{sink}"' not in have:
-            subprocess.run(["pw-cli", "create-node", "adapter",
-                            f"{{ factory.name=support.null-audio-sink node.name={sink} node.description={sink} "
-                            "media.class=Audio/Sink audio.position=[FL FR] audio.rate=44100 object.linger=true }"],
-                           check=True, capture_output=True)
-    if d.sh("getprop sys.boot_completed").strip() != "1":
-        sdk = os.environ.get("ANDROID_HOME", os.path.expanduser("~/android_sdk"))
-        log = open(os.path.join(OUT, "emu", "emulator.log"), "w")
-        # -allow-host-audio: without it the microphone reads zeroes; PULSE_SOURCE picks the source.
-        # A window on Xvfb, not -no-window: -no-window runs qemu-system-x86_64-headless, built
-        # without PulseAudio ("Could not init `pa' audio driver", the guest's microphone silent)
-        subprocess.Popen(["xvfb-run", "-a", "-s", "-screen 0 1280x1024x24",
-                          os.path.join(sdk, "emulator", "emulator"), "-avd", AVD, "-no-boot-anim",
-                          "-no-snapshot", "-gpu", "swiftshader_indirect", "-port", EMU_PORT, "-allow-host-audio"],
-                         env={**os.environ, "ANDROID_AVD_HOME": AVD_HOME, "PULSE_SOURCE": f"{MIC}.monitor",
-                              "PULSE_SINK": SPEAKER},
-                         stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
-        for _ in range(240):
-            time.sleep(2)
-            if d.sh("getprop sys.boot_completed").strip() == "1":
-                break
-        else:
-            sys.exit("the emulator did not boot in 8 min (dev/uat-out/emu/emulator.log)")
-    subprocess.run(["adb", "-s", d.serial, "root"], capture_output=True)
-    subprocess.run(["adb", "-s", d.serial, "wait-for-device"], capture_output=True)
-    time.sleep(2)
-    if d.sh("getprop persist.sys.locale").strip() != "zh-CN":
-        d.sh("setprop persist.sys.locale zh-CN; setprop sys.boot_completed 0; stop; start")
-        time.sleep(5)
-        for _ in range(120):
-            if d.sh("getprop sys.boot_completed").strip() == "1":
-                break
-            time.sleep(1)
-        time.sleep(3)
-    if "package:" not in d.sh("pm path org.chromium.webview_shell"):
-        # the test page's browser, as on redroid: AOSP's WebView shell, taken from the redroid image
-        apk = os.path.join(OUT, "emu", "webview_shell.apk")
-        if not os.path.exists(apk):
-            subprocess.run(["docker", "create", "--name", "uat-apk-src", IMAGE], capture_output=True, check=True)
-            try:
-                subprocess.run(["docker", "cp", "uat-apk-src:/system/product/app/Browser2/Browser2.apk", apk],
-                               capture_output=True, check=True)
-            finally:
-                subprocess.run(["docker", "rm", "uat-apk-src"], capture_output=True)
-        d.adb("install", "-r", apk, check=True)
-    print(f"emulator up on {d.serial}")
+def down(port="5556"):
+    """emulator-<port> killed, if it is this AVD's (another project's emulator on the port is left)"""
+    d = Device(emu_port(port))
+    ours(d)
+    subprocess.run([os.path.join(UAT, "tools", "emu-keyboard.sh"), "down"], capture_output=True,
+                   env={**os.environ, "ANDROID_SERIAL": d.serial})
+    d.adb("emu", "kill")
+    for _ in range(30):
+        if d.serial not in subprocess.run(["adb", "devices"], capture_output=True, text=True).stdout:
+            break
+        time.sleep(1)
+    print(f"{d.serial} down")
 
-
-def emu_down():
-    d = Device(EMU_PORT)
-    if d.sh("getprop sys.boot_completed").strip() == "1":
-        subprocess.run([os.path.join(UAT, "tools", "emu-keyboard.sh"), "down"], capture_output=True,
-                       env={**os.environ, "ANDROID_SERIAL": d.serial})
-        subprocess.run(["adb", "-s", d.serial, "emu", "kill"], capture_output=True)
-        for _ in range(30):
-            if d.serial not in subprocess.run(["adb", "devices"], capture_output=True, text=True).stdout:
-                break
-            time.sleep(1)
-    for sink in (MIC, SPEAKER):
-        subprocess.run(["pw-cli", "destroy", sink], capture_output=True)
-    mark_f = os.path.join(OUT, "emu", "pipewire-started")
-    if os.path.exists(mark_f):   # started by emu-up: as it was
-        subprocess.run(["systemctl", "--user", "stop", "pipewire-pulse.socket", "pipewire.socket",
-                        "wireplumber", "pipewire-pulse", "pipewire"], capture_output=True)
-        os.remove(mark_f)
-    print("emulator down")
 
 
 def version(d):
@@ -2483,29 +2404,25 @@ def cmd_run(a):
              and (not areas or c.area in areas)]
     if not cases:
         sys.exit("no cases")
-    ports = a.devices.split(",")
-    for p in ports:
-        if p not in CONTAINERS and p != EMU_PORT:
-            sys.exit(f"unknown device {p}")
+    ports = [emu_port(p) for p in a.devices.split(",")]
     global HTTP_PORT
     HTTP_PORT = HTTP_PORT or http_port(ports[0])
     for p in ports:
         d = Device(p)
-        if not d.emu:
-            subprocess.run(["adb", "connect", d.serial], capture_output=True)
         if d.sh("getprop sys.boot_completed").strip() != "1":
-            sys.exit(f"{d.serial} is not up" + {"5557": " (uat.py up)", EMU_PORT: " (uat.py emu-up)"}.get(p, ""))
+            sys.exit(f"{d.serial} is not up (uat.py up --port {p})")
+        ours(d)
+        if d.sh("whoami").strip() != "root":   # started by hand: open_host and the keyboard need root
+            subprocess.run(["adb", "-s", d.serial, "root"], capture_output=True)
+            subprocess.run(["adb", "-s", d.serial, "wait-for-device"], capture_output=True)
+            for _ in range(30):   # adbd restarted: the package manager answers again before installing
+                if "package:" in d.sh("pm path android"):
+                    break
+                time.sleep(1)
         install(d, a.flavor)
         d.adb("reverse", "tcp:8000", f"tcp:{HTTP_PORT}", check=True)
-    if len({p == EMU_PORT for p in ports}) > 1:
-        sys.exit("the emulator runs alone, not beside a redroid")
-    sets = cpusets(len(ports), os.cpu_count() or 1, os.environ.get("UAT_CPUSET", "")) if EMU_PORT not in ports else None
-    for p, cpus in zip(ports, sets or []):
-        subprocess.run(["docker", "update", "--cpuset-cpus", cpus, container_for(p)], check=True, capture_output=True)
-        print(f"{container_for(p)}: host cores {cpus}")
     ver = version(Device(ports[0]))
-    kind = "emulator" if ports == [EMU_PORT] else "redroid"
-    name = f"{datetime.date.today().isoformat()}-{kind}-{ver}"
+    name = f"{datetime.date.today().isoformat()}-emulator-{ver}"
     run = Run(name, [c.id for c in cases])
     # a case since removed from the scripts leaves the record, or its last row comes back each run
     for cid in [k for k in run.results if k not in CASES]:
@@ -2690,28 +2607,27 @@ def cmd_jvm(a):
 
 
 def place(needs):
-    """where a case runs, from its needs=: redroid, or one of ELSEWHERE's keys (voice beats emu: a voice case
-    is only on the voice build, which runs on the emulator)"""
+    """where a case runs, from its needs=: device (the emulator runs), or one of ELSEWHERE's keys"""
     if not needs:
-        return "redroid"
+        return "device"
     kinds = needs.split(":", 1)[0].split(",")
     for k in ELSEWHERE:
         if k in kinds:
             return k
-    return "redroid"   # skip:/block: stay in redroid's runs, as 跳过/阻塞
+    return "device"   # skip:/block: stay in the emulator runs, as 跳过/阻塞
 
 
 def tally(cases, priority, jvm_line):
     """(counts, problems) for the README: cases {id: needs}, priority {id: "P0"…}, jvm_line {ids with a
-    **JVM** line in their .md}. smoke = still on redroid but asserted on the JVM too. A needs=jvm case
+    **JVM** line in their .md}. smoke = still on the device but asserted on the JVM too. A needs=jvm case
     without the .md line, a case missing from the .md, or one in the .md with no script (registered
     as NO_SCRIPT; it used to be blocked on every run and never reported) is a problem: the two would tell different stories"""
-    n = {k: 0 for k in ("redroid", *ELSEWHERE, "smoke")}
+    n = {k: 0 for k in ("device", *ELSEWHERE, "smoke")}
     prios, problems = {}, []
     for cid, needs in sorted(cases.items()):
         where = place(needs)
         n[where] += 1
-        if where == "redroid" and cid in jvm_line:
+        if where == "device" and cid in jvm_line:
             n["smoke"] += 1
         if where == "jvm" and cid not in jvm_line:
             problems.append(f"{cid}: needs=jvm but no **JVM** line in its .md")
@@ -2728,9 +2644,9 @@ def tally(cases, priority, jvm_line):
 
 def counts_line(n):
     """the README's sentence of counts"""
-    elsewhere = n["total"] - n["redroid"]
+    elsewhere = n["total"] - n["device"]
     return (f"现在共 {n['total']} 条（" + "、".join(f"{k} {v}" for k, v in n["prios"].items()) + "）："
-            f"redroid 上跑 {n['redroid']} 条（其中 {n['smoke']} 条在 JVM 上也断言，设备上留作冒烟或照跑），"
+            f"模拟器上跑 {n['device']} 条（其中 {n['smoke']} 条在 JVM 上也断言，设备上留作冒烟或照跑），"
             f"在别处跑 {elsewhere} 条（" + "、".join(f"{v} {n[k]}" for k, v in ELSEWHERE.items()) + "）。")
 
 
@@ -2767,12 +2683,12 @@ def main():
     r = sub.add_parser("run")
     r.add_argument("--areas")
     r.add_argument("--ids")
-    r.add_argument("--devices", default="5556,5557")
+    r.add_argument("--devices", default=",".join(PORTS))
     r.add_argument("--flavor", default="text", choices=["text", "voice"])
     l = sub.add_parser("list")
     l.add_argument("--areas")
     for n in ("up", "down"):
-        sub.add_parser(n).add_argument("--port", default="5557")
+        sub.add_parser(n).add_argument("--port", default=PORTS[1])
     sub.add_parser("emu-up")
     sub.add_parser("emu-down")
     m = sub.add_parser("mark")
@@ -2800,9 +2716,9 @@ def main():
     elif a.cmd == "down":
         down(a.port)
     elif a.cmd == "emu-up":
-        emu_up()
+        up(PORTS[0])
     elif a.cmd == "emu-down":
-        emu_down()
+        down(PORTS[0])
     elif a.cmd == "mark":
         mark(a.run, a.id, a.state, a.note)
     elif a.cmd == "flakes":

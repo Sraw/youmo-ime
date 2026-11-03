@@ -82,9 +82,9 @@ def build_editor():
     """the editor as two APKs (.a and .b, two apps), debug-signed, with the SDK's tools alone: javac,
     d8, aapt2 link (no resources), zipalign, apksigner. Rebuilt only when its sources changed"""
     src = os.path.join(HERE, "editor")
-    newest = max(os.path.getmtime(os.path.join(src, f)) for f in os.listdir(src))
+    changed = max(os.path.getmtime(os.path.join(src, f)) for f in os.listdir(src))
     apks = [os.path.join(OUT, f"editor-{p[-1]}.apk") for p in EDITORS]
-    if all(os.path.exists(a) and os.path.getmtime(a) >= newest for a in apks):
+    if all(os.path.exists(a) and os.path.getmtime(a) >= changed for a in apks):
         return apks
     sdk = os.environ.get("ANDROID_HOME", os.path.expanduser("~/android_sdk"))
     jar = os.path.join(sdk, "platforms", newest(os.listdir(os.path.join(sdk, "platforms"))), "android.jar")
@@ -736,6 +736,9 @@ def cmd_dry_run(a):
     print(f"header: engine {header['engine'][:12]}…, data {header['data']}, ims {header['ims']}")
 
 
+NOT_PORTED = "parity.py prepare/run: still made for redroid (Docker on Linux); not ported to the emulator yet"
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -767,11 +770,13 @@ def main():
     if a.cmd == "build-editor":
         print("\n".join(build_editor()))
     elif a.cmd == "prepare":
+        sys.exit(NOT_PORTED)
         d = uat.Device(a.port)
         d.start_dumper()
         prepare(d, a.apk)
         d.stop_dumper()
     elif a.cmd == "run":
+        sys.exit(NOT_PORTED)
         cmd_run(a)
     elif a.cmd == "merge":
         print(f"{merge(a.shards, a.out)} sequences: {a.out}")

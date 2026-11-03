@@ -425,6 +425,7 @@ def perf(d, out, runs=5):
 
 
 def main():
+    sys.exit("phase.py: still made for redroid (Docker on Linux); not ported to the emulator yet (uat/README.md)")
     port, step, *args = sys.argv[1:]
     if step == "install":
         d = Device(port)

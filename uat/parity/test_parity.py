@@ -3,8 +3,10 @@ import contextlib
 import io
 import json
 import os
+import sys
 import tempfile
 import unittest
+from unittest import mock
 
 import parity
 
@@ -170,6 +172,29 @@ class CommandsTest(unittest.TestCase):
         self.assertIn("io.github.sraw.parity.b/io.github.sraw.parity.ParityEditor --es field text", text)
         self.assertIn("--es field password", text)
         self.assertNotIn("uinput", text)
+
+
+class MainTest(unittest.TestCase):
+    """prepare and run want a redroid and exit; the commands without a device still run"""
+
+    def main(self, *argv):
+        with mock.patch.object(sys, "argv", ["parity.py", *argv]), \
+                mock.patch.object(parity.uat, "Device", side_effect=AssertionError("a device")):
+            parity.main()
+
+    def test_the_device_commands_exit_saying_not_ported(self):
+        for argv in (["prepare", "--port", "5556", "--apk", "a.apk"],
+                     ["run", "--port", "5556", "--apk", "a.apk", "--host", "kotlin", "s.jsonl", "out"]):
+            with self.assertRaises(SystemExit) as e:
+                self.main(*argv)
+            self.assertEqual(parity.NOT_PORTED, e.exception.code)
+
+    def test_the_commands_without_a_device_run(self):
+        for argv, fn in ((["uat-export", "out.jsonl"], "uat_export"), (["dry-run", "s.jsonl"], "cmd_dry_run"),
+                         (["merge", "out", "a", "b"], "merge"), (["build-editor"], "build_editor")):
+            with mock.patch.object(parity, fn, return_value=[]) as f, contextlib.redirect_stdout(io.StringIO()):
+                self.main(*argv)
+            f.assert_called_once()
 
 
 if __name__ == "__main__":

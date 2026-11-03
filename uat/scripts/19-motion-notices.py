@@ -23,7 +23,7 @@ case("MN-11", needs="jvm:MotionNoticeUatTest.aLongPressOnTheHandleLetsItFloatUnd
 case("MN-12", needs="jvm:MotionNoticeUatTest.oneHandedTheHandleAsWideAsTheKeyboard")(lambda d: None)
 
 
-case("MN-13", base="B0-设置", needs="manual:要 TalkBack（redroid 没有），在开得了 TalkBack 的真机或模拟器上手动做")(lambda d: None)
+case("MN-13", base="B0-设置", needs="manual:要 TalkBack 读屏，在模拟器（google_apis 镜像带 TalkBack）或真机上手动做")(lambda d: None)
 
 
 case("MN-20", needs="jvm:BarUatTest.candidateTextSizeChangesBarNotKeys")(lambda d: None)

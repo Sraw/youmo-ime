@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # A USB keyboard for the Android emulator, for uat/17-hardware-keyboard.md.
 #
-# Emulator only: it is a KVM guest with its own kernel. Never on redroid, whose container shares the
+# Emulator only: it is a VM guest (KVM, Hypervisor.framework) with its own kernel. Never on redroid, whose container shares the
 # host's kernel: a uinput keyboard made there is the host's keyboard too, and its keys reach the
 # host's console (Ctrl+Alt+Del would reboot it).
 #
@@ -14,6 +14,12 @@
 #   uat/tools/emu-keyboard.sh key SHIFT     # press and release keys in turn
 #   uat/tools/emu-keyboard.sh combo CTRL SPACE   # hold the first ones, press the last
 #   uat/tools/emu-keyboard.sh down          # unplug it
+# declare -A and ${x^^} need bash 4: macOS's /bin/bash is 3.2, and a non-login shell (ssh, launchd)
+# may not have Homebrew's first in PATH
+if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
+  for b in /opt/homebrew/bin/bash /usr/local/bin/bash; do [ -x "$b" ] && exec "$b" "$0" "$@"; done
+  echo "emu-keyboard.sh: needs bash 4 or newer (brew install bash)" >&2; exit 1
+fi
 set -euo pipefail
 
 declare -A C=(
@@ -53,7 +59,7 @@ case "${1:-}" in
 up)
   emulator || { echo "not an emulator: refusing" >&2; exit 1; }
   adb root >/dev/null; adb wait-for-device
-  keys=$(seq -s, 1 255)
+  keys=$(seq -s, 1 255 | sed "s/,$//")   # BSD seq ends with the separator: invalid JSON
   adb shell "echo '{\"id\":1,\"command\":\"register\",\"name\":\"Test USB Keyboard\",\"vid\":4660,\"pid\":22136,\"bus\":\"usb\",\"configuration\":[{\"type\":100,\"data\":[1]},{\"type\":101,\"data\":[$keys]}]}' > /data/local/tmp/kbfifo.log"
   adb shell "nohup sh -c 'tail -n +1 -f /data/local/tmp/kbfifo.log | uinput -' >/data/local/tmp/uinput.out 2>&1 &"
   sleep 2

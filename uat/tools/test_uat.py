@@ -8,6 +8,7 @@ import threading
 import time
 import unittest
 from types import SimpleNamespace
+from unittest import mock
 
 import uat
 
@@ -145,7 +146,7 @@ class HeavyTest(unittest.TestCase):
 
     def test_a_heavy_case_out_of_this_run_waits_for_no_one(self):
         # a release-only heavy case in an everyday run: with its group, not in the queue that waits for every device
-        r = case("R-1", "release,redroid:x", heavy=True)
+        r = case("R-1", "release,scripted:x", heavy=True)
         def queued(sch):
             return [[c.id for c in g] for g in sch.heavy], sorted(c.id for g in sch.pending for c in g)
         sch = uat.Scheduler([self.case("A-1"), r, self.case("H-1", True)], None, ["a"])
@@ -154,8 +155,6 @@ class HeavyTest(unittest.TestCase):
         try:
             uat.BUILD = "release"
             self.assertEqual(([["R-1"]], ["A-1"]), queued(uat.Scheduler([self.case("A-1"), r], None, ["a"])))
-            # the emulator alone never runs a release,redroid case (RUNS_HERE): with its group again
-            self.assertEqual(([], ["A-1", "R-1"]), queued(uat.Scheduler([self.case("A-1"), r], None, [uat.EMU_PORT])))
         finally:
             uat.BUILD = was
 
@@ -196,7 +195,7 @@ class JvmTest(unittest.TestCase):
     def test_needs_names_each_test_by_its_own_uat(self):
         found = {"WD-19": [("org.x.LexiconUatTest", "aPhrase")], "WD-35": [("org.x.LexiconUatTest", "clear")]}
         cases = {"WD-35": "jvm:LexiconUatTest.clear、LexiconUatTest.aPhrase、LexiconUatTest.gone、LexiconUatTest",
-                 "WD-36": "redroid:LexiconUatTest.gone"}   # not jvm: not checked
+                 "WD-36": "release:LexiconUatTest.gone"}   # not jvm: not checked
         self.assertEqual(["WD-35: needs= names LexiconUatTest.aPhrase, whose @Uat is WD-19's",
                           "WD-35: needs= names LexiconUatTest.gone, which has no @Uat"],
                          uat.needs_problems(cases, found))
@@ -234,42 +233,38 @@ class JvmTest(unittest.TestCase):
         self.assertEqual(("失败", 0.0, ""), uat.junit_results([os.path.join(self.tmp.name, "e")])[("org.x.A", "a")])
 
     def test_counts_place_each_case_once_and_flag_disagreements(self):
-        cases = {"KB-01": None, "KB-02": "jvm:KeyboardUatTest", "KB-03": "jvm:KeyboardUatTest", "HK-01": "emu:x",
-                 "VO-01": "emu,voice:x", "PR-13": "release:x", "MN-13": "manual:x", "TB-36": "skip:x", "XX-01": None}
+        cases = {"KB-01": None, "KB-02": "jvm:KeyboardUatTest", "KB-03": "jvm:KeyboardUatTest", "HK-01": None,
+                 "VO-01": "voice:x", "PR-13": "release:x", "MN-13": "manual:x", "TB-36": "skip:x", "XX-01": None}
         priority = {c: "P0" for c in cases if c != "XX-01"} | {"KB-01": "P1"}
         n, problems = uat.tally(cases, priority, {"KB-01", "KB-02"})
-        self.assertEqual((9, 3, 2, 1, 1, 1, 1, 1), (n["total"], n["redroid"], n["jvm"], n["emu"], n["voice"],
-                                                     n["release"], n["manual"], n["smoke"]))
+        self.assertEqual((9, 4, 2, 1, 1, 1, 1), (n["total"], n["device"], n["jvm"], n["voice"],
+                                                  n["release"], n["manual"], n["smoke"]))
         self.assertEqual({"P0": 7, "P1": 1}, n["prios"])
         self.assertEqual(["KB-03: needs=jvm but no **JVM** line in its .md", "XX-01: has a script but no case in the .md"],
                          problems)
-        self.assertIn("redroid 上跑 3 条（其中 1 条", uat.counts_line(n))
+        self.assertIn("模拟器上跑 4 条（其中 1 条", uat.counts_line(n))
 
     def test_a_case_in_the_md_without_a_script_is_a_problem(self):
         _, problems = uat.tally({"HK-36": uat.NO_SCRIPT}, {"HK-36": "P1"}, set())
         self.assertEqual(["HK-36: in the .md but no script (register it, needs= where it runs)"], problems)
 
-    def test_two_redroids_split_the_host_cores_unless_told_otherwise(self):
-        self.assertEqual(["0-5", "6-11"], uat.cpusets(2, 12, ""))
-        self.assertEqual(["0-3", "4-8"], uat.cpusets(2, 9, ""))   # the odd core to the last
-        self.assertEqual(["0-11"], uat.cpusets(1, 12, ""))   # one device: a split before undone
-        with self.assertRaises(SystemExit):
-            uat.cpusets(2, 1, "")
-        self.assertIsNone(uat.cpusets(2, 12, "off"))
-        self.assertEqual(["0-3", "4-11"], uat.cpusets(2, 12, "0-3/4-11"))
-        with self.assertRaises(SystemExit):
-            uat.cpusets(2, 12, "0-3")
+    def test_devices_are_emulator_console_ports_each_with_its_own_page_server(self):
+        self.assertEqual(["5554", "5556", "5584"], [uat.emu_port(p) for p in ("5554", "5556", "5584")])
+        for bad in ("5555", "5557", "5552", "5586", "127.0.0.1:5556", ""):
+            with self.assertRaises(SystemExit, msg=bad):
+                uat.emu_port(bad)
+        self.assertEqual([8765, 8766, 8780], [uat.http_port(p) for p in ("5554", "5556", "5584")])
 
     def test_a_jvm_case_runs_elsewhere_on_a_device(self):
         c = case("KB-22", "jvm:KeyboardUatTest")
-        state, why = c.unmet(SimpleNamespace(emu=False, flavor="text"))
+        state, why = c.unmet(SimpleNamespace(flavor="text"))
         self.assertIs(uat.Elsewhere, state)
         self.assertTrue(why.startswith("JVM"))
 
     def test_a_scripted_release_case_runs_only_in_a_release_run(self):
         # the big-lexicon cases (WD-14d, 14h, TBL-12c; user 2026-10-30): out of the everyday run, in the release's
-        c = case("WD-14d", "release,redroid:x")
-        device = SimpleNamespace(emu=False, flavor="text")
+        c = case("WD-14d", "release,scripted:x")
+        device = SimpleNamespace(flavor="text")
         self.assertEqual("release", uat.place(c.needs))
         self.assertIs(uat.Elsewhere, c.unmet(device)[0])
         was = uat.BUILD
@@ -278,18 +273,18 @@ class JvmTest(unittest.TestCase):
             self.assertIsNone(c.unmet(device))
             # one run by hand stays by hand
             self.assertIs(uat.Elsewhere, case("WD-14r", "release:x").unmet(device)[0])
-            # the emulator stays out of it (a 2 GB AVD takes minutes each), and the reasons say which is by hand
-            self.assertIs(uat.Elsewhere, c.unmet(SimpleNamespace(emu=True, flavor="text"))[0])
+            # and the reasons say which is by hand
             self.assertTrue(case("WD-14r", "release:x").unmet(device)[1].startswith("发版时手动"))
         finally:
             uat.BUILD = was
 
-    def test_a_voice_case_on_the_emulator_is_reported_as_voice_where_place_puts_it(self):
-        # emu,voice on redroid's text build: the voice reason, as place() files it under voice (F4263)
-        c = case("VO-01", "emu,voice:x")
-        state, why = c.unmet(SimpleNamespace(emu=False, flavor="text"))
+    def test_a_voice_case_on_the_text_build_is_reported_as_voice_where_place_puts_it(self):
+        # the voice reason, as place() files it under voice (F4263); the voice build runs it
+        c = case("VO-01", "voice:x")
+        state, why = c.unmet(SimpleNamespace(flavor="text"))
         self.assertEqual((uat.Elsewhere, "voice"), (state, uat.place(c.needs)))
         self.assertTrue(why.startswith(uat.ELSEWHERE["voice"]), why)
+        self.assertIsNone(c.unmet(SimpleNamespace(flavor="voice")))
 
     def test_sdk_versions_sort_as_numbers_a_pre_release_before_its_release(self):
         self.assertEqual("36.1.0", max(["9.0.0", "36.1.0", "36.0.0"], key=uat.version_key))
@@ -312,6 +307,94 @@ class JvmTest(unittest.TestCase):
             time.sleep = real
         self.assertEqual([uat.PAUSE["tap_text"]], slept)
         self.assertGreaterEqual(d._quiet_at, t0 + uat.OLD["tap_text"] - uat.PAUSE["tap_text"])
+
+
+# adb for UpTest: answers emu avd name from $FAKE_DIR/avd (an error when empty, a hang with
+# $FAKE_DIR/hang), sys.boot_completed 1 after $FAKE_DIR/boot_after asks, nothing to the rest; logs each call
+FAKE_ADB = r"""#!/bin/sh
+D=$FAKE_DIR
+[ "$1" = -s ] && shift 2
+echo "$*" >> "$D/log"
+case "$*" in
+  "emu avd name")
+    [ -f "$D/hang" ] && exec sleep 30
+    A=$(cat "$D/avd" 2>/dev/null)
+    if [ -n "$A" ]; then printf '%s\r\nOK\r\n' "$A"; else echo "error: no emulator detected" >&2; exit 1; fi ;;
+  "shell getprop sys.boot_completed")
+    n=$(($(cat "$D/boots" 2>/dev/null || echo 0) + 1)); echo $n > "$D/boots"
+    if [ $n -gt "$(cat "$D/boot_after" 2>/dev/null || echo 0)" ]; then echo 1; else echo; fi ;;
+esac
+"""
+
+
+class UpTest(unittest.TestCase):
+    """up() on a port another project's emulator holds: it exits before touching the device"""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = self.tmp.name
+        adb = os.path.join(self.dir, "adb")
+        with open(adb, "w") as f:
+            f.write(FAKE_ADB)
+        os.chmod(adb, 0o755)
+        self.popen = mock.MagicMock()   # the emulator's start; adb's (subprocess.run's) go through
+        real = uat.subprocess.Popen
+        popen = lambda args, *a, **k: self.popen(args, *a, **k) if args[0] == "EMULATOR" else real(args, *a, **k)  # noqa: E731
+        for p in (mock.patch.dict(os.environ, {"PATH": self.dir + os.pathsep + os.environ["PATH"],
+                                               "FAKE_DIR": self.dir}),
+                  mock.patch.object(uat, "OUT", self.dir), mock.patch.object(uat, "AVD_NAME_TIMEOUT", 1),
+                  mock.patch.object(uat.time, "sleep", lambda s: None),
+                  mock.patch.object(uat, "emulator_bin", lambda: "EMULATOR"),
+                  mock.patch.object(uat.subprocess, "Popen", popen)):
+            p.start()
+            self.addCleanup(p.stop)
+        self.addCleanup(self.tmp.cleanup)
+
+    def put(self, name, text=""):
+        with open(os.path.join(self.dir, name), "w") as f:
+            f.write(text)
+
+    def calls(self):
+        with open(os.path.join(self.dir, "log")) as f:
+            return f.read().splitlines()
+
+    def up(self, port="5556"):
+        with self.assertRaises(SystemExit) as e, contextlib.redirect_stdout(io.StringIO()):
+            uat.up(port)
+        return str(e.exception.code)
+
+    def test_another_avd_still_booting_is_not_started_over_nor_waited_for(self):
+        self.put("avd", "dsapp")
+        self.put("boot_after", "1000")
+        self.assertIn("AVD dsapp", self.up())
+        self.popen.assert_not_called()
+        self.assertEqual(["shell getprop sys.boot_completed", "emu avd name"], self.calls())
+
+    def test_an_emulator_that_does_not_answer_its_console_is_left(self):
+        self.put("hang")
+        self.put("boot_after", "1000")
+        self.assertIn("not answering", self.up())
+        self.popen.assert_not_called()
+        self.assertEqual(["shell getprop sys.boot_completed", "emu avd name"], self.calls())
+        with self.assertRaises(SystemExit):   # ours alone: an exit, not TimeoutExpired
+            uat.ours(uat.Device("5556"))
+
+    def test_another_avd_that_took_the_port_after_the_look_is_refused_before_root(self):
+        self.put("boot_after", "2")
+        self.popen.side_effect = lambda *a, **k: self.put("avd", "dsapp")
+        self.assertIn("AVD dsapp", self.up("05556"))
+        args = self.popen.call_args[0][0]
+        self.assertEqual("5556", args[args.index("-port") + 1])   # the normalised port, in the log name too
+        self.assertTrue(os.path.exists(os.path.join(self.dir, "emu", "emulator-5556.log")))
+        self.assertEqual("emu avd name", self.calls()[-1])
+        self.assertFalse([c for c in self.calls() if c == "root" or "setprop" in c], self.calls())
+
+    def test_this_avd_still_booting_is_waited_for_not_started_again(self):
+        self.put("avd", "youmo")
+        self.put("boot_after", "3")
+        self.assertIn("webview_shell", self.up())   # the fake has no packages: past the checks
+        self.popen.assert_not_called()
+        self.assertIn("root", self.calls())
 
 
 if __name__ == "__main__":

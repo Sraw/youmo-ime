@@ -20,6 +20,8 @@ sys.path.insert(0, os.path.join(HERE, "..", "..", "scripts"))
 import uat  # noqa: E402
 from uat import PKG, IME, Device, add_im, choose, home, script, ensure_ime, ime_ready  # noqa: E402
 
+sys.exit("make.py: still made for redroid (Docker on Linux); not ported to the emulator yet (uat/README.md)")
+
 version, apk, container, port = sys.argv[1:5]
 out = os.path.join(HERE, version)
 os.makedirs(out, exist_ok=True)

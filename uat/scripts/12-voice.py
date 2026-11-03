@@ -1,6 +1,6 @@
-"""uat/12-voice.md (语音输入, the voice build): on the emulator only (`uat.py run --devices 5554
---flavor voice`), whose microphone is the host's PulseAudio source; what is "said" is a clip of
-uat/tools/voice-clips.py played into it (Device.say). The .md is the source of truth."""
+"""uat/12-voice.md (语音输入, the voice build): `uat.py run --flavor voice`. What is "said" is a clip of
+uat/tools/voice-clips.py played into the emulator's microphone (Device.say: not wired up yet, so the
+cases that speak are blocked). The .md is the source of truth."""
 import json
 import os
 import re
@@ -10,12 +10,8 @@ import time
 from uat import CLIPS, OUT, PKG, Blocked, Fail, case, check, script
 
 LISTEN, HEARD_NOTHING, PREPARING, SILENT = "正在听…", "没有听清", "准备中…", "麦克风没有声音"
-EV = "emu,voice:语音只在模拟器上的语音版跑（--devices 5554 --flavor voice），redroid 没有麦克风输入"
+EV = "voice:语音只在语音版跑（--flavor voice）"
 
-
-def emu_only(d):
-    if not d.emu:
-        raise Blocked("没有麦克风输入：语音只在模拟器上跑（--devices 5554 --flavor voice）")
 
 
 def anywhere(s, text):
@@ -95,7 +91,6 @@ def hal_errors(d):
 def hold_space(d, timeout=60, wait_quiet=True, raw=False):
     """finger down on the space key until the hold shows (准备中… or 正在听…; the first use after a
     reset loads the models); returns the space key's centre. raw: through sendevent, to be lifted with raw_up"""
-    emu_only(d)
     if wait_quiet:
         quiet(d)
     x, y = d.keys(refresh=True)["space"]
@@ -284,7 +279,6 @@ def tries_note(n, misses):
 # to the field after 允许 are the framework's, which Robolectric does not run
 @case("VO-01", base="B0", mutates=True, needs=EV)
 def vo01(d):
-    emu_only(d)
     d.sh(f"pm revoke {PKG} android.permission.RECORD_AUDIO")
     x, y = d.keys(refresh=True)["space"]
     d.touch(("down", x, y), ("sleep", 1.2), ("up", x, y))
@@ -331,7 +325,6 @@ case("VO-08", needs="jvm:VoiceHoldUatTest.englishInChineseIsTypedAsWritten")(lam
 # digital silence shows no gain, so real noise is played
 @case("VO-09", base="B0-语音", mutates="learn", needs=EV)
 def vo09(d):
-    emu_only(d)
     lost = []
     for _ in range(4):
         host_calm()
@@ -367,7 +360,6 @@ def vo09(d):
 # recognizer; this one, that the stream with searchBlocked changes what is heard
 @case("VO-10", base="B0-设置", mutates=True, needs=EV)
 def vo10(d):
-    emu_only(d)
     script("13-words").block_word(d, "天气")
     d.open_page("text")
     _, t, n, miss = retried(d, "jintian", lambda t: plain(t).startswith("今天") and plain(t).endswith("很好"))
@@ -389,7 +381,6 @@ case("VO-13", needs="jvm:VoiceHoldUatTest.holdingTheSpaceForThePickerDoesNotTalk
 # change what is heard
 @case("VO-14", base="B0-设置", mutates=True, needs=EV)
 def vo14(d):
-    emu_only(d)
     script("13-words").add_word(d, "澜境花园")
     d.open_page("text")
     _, t, n, miss = retried(d, "lanjing", lambda t: "澜境花园" in t)
@@ -525,7 +516,6 @@ def counted_tries(d, clip, attempt, most=5):
 
 @case("VO-23", base="B0-语音", mutates="learn", needs=EV)
 def vo23(d):
-    emu_only(d)
     out = []
     for clip, want in (("jintian", "今天天气很好"), ("zouba", "我们走吧")):
         before_s = 0.45 + input_lag(d)
@@ -558,7 +548,6 @@ def vo23(d):
 
 @case("VO-24", base="B0-语音", mutates="learn", needs=EV)
 def vo24(d):
-    emu_only(d)
     out = []
     for clip, want in (("zouba-q44", "我们走吧"), ("nihao-q44", "你好")):
         def attempt(before):
@@ -593,7 +582,6 @@ def vo24(d):
 # device a smoke: the first sentence typed, and where the press fell written down
 @case("VO-25", base="B0-语音", mutates="learn", needs=EV)
 def vo25(d):
-    emu_only(d)
     d.sh("logcat -c")
     x, y = hold_space(d)
     time.sleep(0.3)
@@ -615,7 +603,6 @@ def vo25(d):
 # microphone's first sample not zero, and how long that took (the debug log's fromStartMs)
 @case("VO-26", base="B0-语音", mutates="learn", needs=EV)
 def vo26(d):
-    emu_only(d)
     broke = 0
     for _ in range(4):
         r = vo26_try(d)
@@ -670,7 +657,6 @@ def vo26_try(d):
 # the chat box, the panel's ↵ right after the lift sends the sentence, not an empty box before it
 @case("VO-28", base="B0-语音", mutates="learn", needs=EV, page="chat")
 def vo28(d):
-    emu_only(d)
     lost = []
     for _ in range(3):
         r = vo28_try(d)

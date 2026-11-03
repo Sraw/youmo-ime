@@ -36,13 +36,13 @@
 
 ### PR-07 [P1] 不要个性化学习的输入框里不学习
 <!-- learning: U-87 U-90 -->
-- **前提**：B0；打开一个要求"不要个性化学习"（`IME_FLAG_NO_PERSONALIZED_LEARNING`，浏览器无痕标签页里的框都这样要求）的输入框，点它。redroid 上用调试包的测试宿主：`TypingHostActivity` 带 `--ez noLearning true`（见 README"测试宿主"）；真机上也可以用 Chrome 的无痕标签页打开测试页的「普通文本」框。
+- **前提**：B0；打开一个要求"不要个性化学习"（`IME_FLAG_NO_PERSONALIZED_LEARNING`，浏览器无痕标签页里的框都这样要求）的输入框，点它。模拟器上用调试包的测试宿主：`TypingHostActivity` 带 `--ez noLearning true`（见 README"测试宿主"）；真机上也可以用 Chrome 的无痕标签页打开测试页的「普通文本」框。
 - **操作**：在这个框里点 w a n g x i a o m i n g，依次点「汪」「小明」，清空，再这样做一次；第三次点 w a n g x i a o m i n g；然后打开 **词库与短语 → 用户词库**。
 - **预期**：第三次第一个仍是「王小明」（不学，排序照旧）；用户词库里没有「汪小明」。
 - **JVM**：`PrivacyUatTest.aFieldThatAsksNotToLearnLearnsNothing`（:lib:ime-eval:uatTest，真数据）（不要个性化学习的框里选两次后仍是王小明，用户词库没有汪小明）；设备上不跑。
 
 ### PR-08 [P1] 敏感的剪贴板内容显示为圆点
-- **前提**：B0，**剪贴板与表情 → 隐藏敏感信息** 开着（默认）；设备是 Android 13 或更新。把一段标为敏感（`ClipDescription.EXTRA_IS_SENSITIVE`）的文字「mima1234」放上剪贴板，就像密码管理器复制密码：redroid 上用调试包的测试宿主 `TypingHostActivity` 带 `--es sensitiveClip mima1234`（见 README"测试宿主"），真机上也可以用 Bitwarden、Google 密码管理工具复制一个密码。
+- **前提**：B0，**剪贴板与表情 → 隐藏敏感信息** 开着（默认）；设备是 Android 13 或更新。把一段标为敏感（`ClipDescription.EXTRA_IS_SENSITIVE`）的文字「mima1234」放上剪贴板，就像密码管理器复制密码：模拟器上用调试包的测试宿主 `TypingHostActivity` 带 `--es sensitiveClip mima1234`（见 README"测试宿主"），真机上也可以用 Bitwarden、Google 密码管理工具复制一个密码。
 - **操作**：回测试页点「普通文本」框，看剪贴板提示；打开剪贴板面板。
 - **预期**：提示和面板里那一条都显示成圆点（•），哪里都没有明文「mima1234」。
 - **JVM**：`ImeSwitchUatTest.aSensitiveClipIsShownAsDots`（标为敏感的剪贴板内容在栏上和面板里都是圆点，没有明文；图）；设备上不跑。
@@ -58,7 +58,7 @@
 
 ### PR-10a [P1] 在已有导入词库的手机上恢复 0.3.2 的备份
 - **前提**：B0-设置，按 WD-11 把 `dict-words.txt` 并入基础词库；**备份与恢复 → 备份全部** 存到"下载"，按 WD-14u 的做法把它改成 0.3.2 的样子（`dict-words.txt.gz` 换成解压后的 `dict-words.txt`），存成 `youmo_032.zip` 放回"下载"；然后在词库页把 dict-words **关闭**。
-- **操作**：不重置，**备份与恢复 → 从备份恢复** 选 `youmo_032.zip` 并确认；等应用重启；回测试页打 k e m i a o t a n g p u（没有就过几秒再打，最多一分钟）；看词库页和词库目录（以 root 看 `/data/data/<包名>/files/host-data/pinyin/dictionaries`，redroid 用 `docker exec`）。
+- **操作**：不重置，**备份与恢复 → 从备份恢复** 选 `youmo_032.zip` 并确认；等应用重启；回测试页打 k e m i a o t a n g p u（没有就过几秒再打，最多一分钟）；看词库页和词库目录（以 root 看 `/data/data/<包名>/files/host-data/pinyin/dictionaries`，模拟器上 `adb root` 后直接 `adb shell`）。
 - **预期**：一分钟内 kemiaotangpu 的候选里有「氪喵糖铺」（照备份是开着的）；词库页"基础词库"一节 dict-words 只有一行，已开启；词库目录里只有 `dict-words.txt.gz`（和 `merged.ymd`），没有 `dict-words.txt`、`dict-words.txt.gz.disable`。
 - **JVM**：`BackupUatTest.a032BackupOverAnImportOfTheNameOff`（手机上关着的同名词库被 0.3.2 的备份换成开着的一行，有氪喵糖铺）；设备上不跑。
 

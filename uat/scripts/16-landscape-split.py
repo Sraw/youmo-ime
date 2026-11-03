@@ -1,5 +1,5 @@
 """uat/16-landscape-split.md (B0-横屏). The .md is the source of truth; each function follows its
-case's 前提/操作/预期. redroid's display does not turn: landscape is the display resized to
+case's 前提/操作/预期. Landscape is the display resized to (as on redroid, whose display did not turn)
 2340x1080 (851 dp wide, Device.rotate), which the app sees as a landscape screen."""
 from uat import Blocked, case, check
 

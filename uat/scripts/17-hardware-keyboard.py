@@ -1,5 +1,5 @@
-"""uat/17-hardware-keyboard.md (实体键盘): on the emulator only (`uat.py run --devices 5554`), whose
-USB keyboard is uat/tools/emu-keyboard.sh's uinput one (never on redroid: there it is the host's).
+"""uat/17-hardware-keyboard.md (实体键盘): on every device of a run (each an emulator), whose USB
+keyboard is uat/tools/emu-keyboard.sh's uinput one (B0-实体 plugs it in; the script refuses a non-emulator).
 "按 X" is a key of that keyboard (Device.kb). The .md is the source of truth."""
 import re
 import time
@@ -12,28 +12,18 @@ MANUAL_NO_CURSOR = ("manual:要一个不告诉输入法光标位置的应用（�
 BUTTON = "显示屏幕键盘"
 
 
-EMU = "emu:实体键盘只在模拟器上跑（--devices 5554）：redroid 里的 uinput 键盘会到宿主机"
-
-
-def emu_only(d):
-    if not d.emu:
-        raise Blocked("实体键盘只在模拟器上跑（--devices 5554）：redroid 里的 uinput 键盘会到宿主机")
-
 
 def typ(d, text, after=0.5):
-    emu_only(d)
     d.kb("type", text)
     time.sleep(after)
 
 
 def key(d, *names, after=0.5):
-    emu_only(d)
     d.kb("key", *names)
     time.sleep(after)
 
 
 def combo(d, *names, after=0.5):
-    emu_only(d)
     d.kb("combo", *names)
     time.sleep(after)
 
@@ -98,7 +88,7 @@ def back_on_screen(d, timeout=6):
     d.wait(lambda s: soft(s), timeout, what="the touch keyboard")
 
 
-@case("HK-01", base="B0-实体", needs=EMU)
+@case("HK-01", base="B0-实体")
 def hk01(d):
     typ(d, "ni")
     s = d.screen()
@@ -117,7 +107,7 @@ def hk01(d):
 case("HK-02", needs="jvm:HardwareKeysUatTest.spaceCommitsTheFirstADigitPicksByNumber、HardwareKeyUatTest.keysGoToTheEngineAndTheTouchKeyboardGoes")(lambda d: None)
 
 
-@case("HK-03", base="B0-实体", mutates="learn", needs=EMU)
+@case("HK-03", base="B0-实体", mutates="learn")
 def hk03(d):
     typ(d, "ni ")
     key(d, "ESC")
@@ -172,7 +162,7 @@ def lone_button(d):
     return s, b
 
 
-@case("HK-03c", base="B0-实体", mutates=True, needs=EMU)
+@case("HK-03c", base="B0-实体", mutates=True)
 def hk03c(d):
     s, b = lone_button(d)
     f = d.field(s)
@@ -199,7 +189,7 @@ def hk03c(d):
     return f"拖到 {b1.b}（偏移 {dx},{dy}）；打字后 {b2.b}；长文本里 {b3.b}"
 
 
-@case("HK-03d", base="B0-实体", mutates=True, needs=EMU)
+@case("HK-03d", base="B0-实体", mutates=True)
 def hk03d(d):
     s, b = lone_button(d)
     f = d.field(s)
@@ -219,9 +209,8 @@ def hk03d(d):
     return f"拖到 {b1.b}；叫出再收起后 {b2.b}"
 
 
-@case("HK-29", base="B0-实体", needs=EMU)
+@case("HK-29", base="B0-实体")
 def hk29(d):
-    emu_only(d)
     d.sh("am force-stop com.android.settings; am force-stop com.google.android.settings.intelligence; "
          "am start -W -a android.settings.SETTINGS")
     time.sleep(1.5)
@@ -302,7 +291,7 @@ case("HK-15", needs="jvm:HardwareKeyUatTest.shiftThenCtrlToo")(lambda d: None)
 case("HK-16", needs="jvm:HardwareKeyUatTest.ctrlCAndCtrlVAreForTheApp")(lambda d: None)
 
 
-@case("HK-17", base="B0-实体", needs=EMU)
+@case("HK-17", base="B0-实体")
 def hk17(d):
     others = [x for x in d.sh("ime list -s").split() if x and PKG not in x]
     if not others:
@@ -339,7 +328,7 @@ case("HK-22", needs="jvm:HardwareKeyUatTest.aShortcutsChoiceIsKeptWhenTheTouchKe
 case("HK-23", needs="jvm:HardwareKeysUatTest.englishTypesTheKeysAsPressed")(lambda d: None)
 
 
-@case("HK-24", base="B0-实体", page="password", needs=EMU)
+@case("HK-24", base="B0-实体", page="password")
 def hk24(d):
     typ(d, "abc123")
     s = d.screen()
@@ -391,7 +380,7 @@ def tip_seen(d, timeout=1.5, text="全角标点"):
     return None
 
 
-@case("HK-35", base="B0-实体", mutates=True, needs=EMU)
+@case("HK-35", base="B0-实体", mutates=True)
 def hk35(d):
     typ(d, "a")   # the touch keyboard away first
     key(d, "ESC")
@@ -435,7 +424,7 @@ def away(d):
     hclear(d)
 
 
-@case("HK-36", base="B0-实体", needs=EMU)
+@case("HK-36", base="B0-实体")
 def hk36(d):
     away(d)
     combo(d, "CTRL", "SHIFT", "F", after=0)
@@ -460,7 +449,7 @@ def hk36(d):
 # Android's window manager policy takes every key pressed with Meta held before an input method sees it
 # ("Dropped event because policy consumed it" for Meta and the key, down and up; hk37-debug.md): fcitx's
 # Super+` and Super+; triggers are kept, asserted on the JVM, and reached only where a system delivers them
-@case("HK-37", base="B0-实体", needs=EMU)
+@case("HK-37", base="B0-实体")
 def hk37(d):
     away(d)
     combo(d, "META", "GRAVE", after=0)
@@ -478,7 +467,7 @@ def hk37(d):
 case("HK-38", needs="jvm:QuickPhraseTest.superGraveAndSuperSemicolonTriggerOnPressOnly")(lambda d: None)
 
 
-@case("HK-39", base="B0-实体", needs=EMU)
+@case("HK-39", base="B0-实体")
 def hk39(d):
     away(d)
     combo(d, "CTRL", "ALT", "SHIFT", "U", after=0)
@@ -506,7 +495,7 @@ def hk39(d):
     return f"「{t}」{labels}，Alt+1 →「{f}」"
 
 
-@case("HK-40", base="B0-实体", needs=EMU)
+@case("HK-40", base="B0-实体")
 def hk40(d):
     away(d)
     combo(d, "CTRL", "SHIFT", "U")
@@ -521,7 +510,7 @@ def hk40(d):
     return f"「{f}」；之后拼音 `{p}`"
 
 
-@case("HK-41", base="B0-实体", needs=EMU)
+@case("HK-41", base="B0-实体")
 def hk41(d):
     away(d)
     im0 = d.sh("settings get secure default_input_method").strip()
@@ -541,7 +530,7 @@ def hk41(d):
     return f"两个快捷键后光标旁什么也没有，输入法没变；再打「{f}」"
 
 
-@case("HK-42", base="B0-实体", needs=EMU)
+@case("HK-42", base="B0-实体")
 def hk42(d):
     away(d)
     # the system takes it (as Super+`, HK-37): what is checked is that nothing reaches the pinyin
@@ -569,13 +558,12 @@ def show_touch(d, must=True):
 
 def to_14(d):
     """拼音's 键盘 set to 14 键, back on the test page"""
-    emu_only(d)
     d.hide_keyboard()
     pinyin_keyboard(d, "14 键")
     d.open_page("text")
 
 
-@case("HK-43", base="B0-实体", mutates=True, needs=EMU)
+@case("HK-43", base="B0-实体", mutates=True)
 def hk43(d):
     to_14(d)
     away(d)
@@ -594,7 +582,7 @@ def hk43(d):
     return f"「{f1}」；中途换屏幕键盘后「{f2}」"
 
 
-@case("HK-44", base="B0-实体", mutates=True, needs=EMU)
+@case("HK-44", base="B0-实体", mutates=True)
 def hk44(d):
     # the Escape half is KeyboardPairTest's (.md): on the device a hardware key puts the touch keyboard
     # away whoever gets the Escape (no 联想 left to see) and Esc leaves a web field's text alone, so
@@ -617,9 +605,8 @@ def hk44(d):
     return f"「{f1}」；Esc（冒烟，规则在 KeyboardPairTest）；ni 2 →「{f2}」"
 
 
-@case("HK-45", base="B0-实体", mutates=True, needs=EMU)
+@case("HK-45", base="B0-实体", mutates=True)
 def hk45(d):
-    emu_only(d)
     d.hide_keyboard()
     add_im(d, "双拼")
     gear(d, "双拼")
