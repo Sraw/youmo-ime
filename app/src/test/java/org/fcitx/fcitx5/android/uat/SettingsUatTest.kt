@@ -261,7 +261,7 @@ class SettingsUatTest {
         // glide: handwriting has none, the grouped keyboards' none the summary says; strokes: pinyin's and 双拼's alone
         assertTrue(summary(R.string.glide_typing).endsWith(notFor(c.HANDWRITING)))
         assertTrue(summary(R.string.stroke_filter).endsWith(notFor(*(c.TABLES.keys.toList() + c.HANDWRITING + c.ENGLISH).toTypedArray())))
-        assertTrue(summary(R.string.im_typos).endsWith(notFor(c.T9, c.PINYIN_KEYS18, c.PINYIN_KEYS, c.SHUANGPIN_NINE)))
+        assertTrue(summary(R.string.im_typos).endsWith(notFor(c.T9, c.PINYIN_KEYS18, c.PINYIN_KEYS, c.SHUANGPIN_NINE, c.ZHUYIN_NINE, c.ZHUYIN)))
         // no 不适用 line names English but 笔画筛选's: the Chinese section's title says it for its rows, and
         // every input method's other rows are English's too
         val chinese = st.preferences().filter { it.key != AppPrefs.STROKE_FILTER }.map { it.summary.toString() }
@@ -270,7 +270,7 @@ class SettingsUatTest {
         st.pref(R.string.im_fuzzy).performClick()
         idle()
         val fuzzy = KeyboardHarness.all(ShadowDialog.getLatestDialog().window!!.decorView).filterIsInstance<TextView>().map { it.text.toString() }.toList()
-        assertTrue(fuzzy.toString(), fuzzy.any { notFor(c.T9, c.SHUANGPIN_NINE) in it })
+        assertTrue(fuzzy.toString(), fuzzy.any { notFor(c.T9, c.SHUANGPIN_NINE, c.ZHUYIN_NINE, c.ZHUYIN) in it })
         ShadowDialog.getLatestDialog().dismiss()
         idle()
         val shared = listOf(R.string.im_page_size, R.string.im_prediction, R.string.im_model_level, R.string.im_typos, R.string.im_fuzzy).map(::s)
@@ -314,7 +314,7 @@ class SettingsUatTest {
             val keyboard = listed(R.string.pinyin_keyboard)
             assertEquals(s(R.string.pinyin_keyboard_full), keyboard.entry.toString())
             assertTrue(keyboard.summary.toString().contains(s(R.string.pinyin_keyboard_summary)))
-            for (t in listOf(R.string.im_chaizi, R.string.im_latin_words)) assertTrue(summary(t), summary(t).endsWith(notFor(c.T9, c.PINYIN_KEYS18, c.PINYIN_KEYS)))
+            for (t in listOf(R.string.im_chaizi, R.string.im_latin_words)) assertTrue(summary(t), summary(t).endsWith(notFor(c.T9, c.PINYIN_KEYS18, c.PINYIN_KEYS, c.ZHUYIN_NINE, c.ZHUYIN)))
             open(SettingsRoute.SharedInput)
             assertTrue(summary(R.string.im_typos), c.PINYIN_KEYS.let { InputMethodNames.of(activity, it, it) } in summary(R.string.im_typos))
             im(c.PINYIN)

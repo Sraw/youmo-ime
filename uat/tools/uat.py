@@ -1495,9 +1495,9 @@ IM_BASES = {"B0-五笔": ("五笔", "五笔", None),
             "B0-自然码": ("自然码", "自然码", None), "B0-五笔拼音": ("五笔拼音", "五笔拼音", None),
             "B0-英文": (None, "英文", None),
             "B0-18键": ("双拼", "双拼", "18 键"), "B0-九键双拼": ("双拼", "双拼", "九键")}
-# baselines that are B0 with 拼音's 键盘 set to this (0.5: 九键 is pinyin's keyboard, no 九键拼音 to add);
-# the space key still names 拼音
-PINYIN_KEYBOARDS = {"B0-14键": "14 键", "B0-九键": "九键"}
+# baselines that are B0 with 拼音's 键盘 set to this (0.5: 九键 is pinyin's keyboard, no 九键拼音 to add;
+# 0.5.1: the two 注音 keyboards are pinyin's too); the space key still names 拼音
+PINYIN_KEYBOARDS = {"B0-14键": "14 键", "B0-九键": "九键", "B0-注音九键": "注音九键", "B0-注音全键盘": "注音全键盘"}
 
 
 def add_im(d, name):
@@ -1700,7 +1700,7 @@ def gear(d, im_name):
 
 
 def pinyin_keyboard(d, option):
-    """输入法 → 拼音's 键盘 set to option (全键盘, 18 键, 14 键 or 九键); stays on the page"""
+    """输入法 → 拼音's 键盘 set to option (全键盘, 18 键, 14 键, 九键, 注音九键 or 注音全键盘); stays on the page"""
     gear(d, "拼音")
     choose(d, "键盘", option)
 

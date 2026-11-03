@@ -197,22 +197,25 @@ class GroupedKeyboard(
                         shortcut = "separator",
                     ),
                 ) + row(2) + BackspaceKey(SIDE),
-                listOf(
-                    LayoutSwitchKey("符", PickerWindow.Key.Symbol.name, 0.12f, longPress = KeyAction.QuickPhraseAction),
-                    LayoutSwitchKey("123", NumberKeyboard.Name, 0.12f, longPress = KeyAction.UnicodeAction),
-                    SymbolKey(",", 0.1f, KeyDef.Appearance.Variant.Alternative, viewId = R.id.button_comma, shortcut = "comma"),
-                    AddressKey("/", R.id.button_slash),
-                    AddressKey("@", R.id.button_at),
-                    // what is left of the row: at least 0.15 in every field (no 中/英: the space needs the width)
-                    SpaceKey(),
-                    SymbolKey(".", 0.1f, KeyDef.Appearance.Variant.Alternative, viewId = R.id.button_period, shortcut = "period"),
-                    AddressKey(".", R.id.button_dot),
-                    AddressKey(AddressKeys.DOMAINS.first(), R.id.button_domain, 0.14f, AddressKeys.DOMAINS),
-                    LanguageKey(),
-                    ReturnKey(),
-                ),
+                bottomRow(),
             )
         }
+
+        /** The bottom row, the zhuyin keyboards' too: 符 123 , (or the address keys) space . 中/英 return. */
+        internal fun bottomRow(): List<KeyDef> = listOf(
+            LayoutSwitchKey("符", PickerWindow.Key.Symbol.name, 0.12f, longPress = KeyAction.QuickPhraseAction),
+            LayoutSwitchKey("123", NumberKeyboard.Name, 0.12f, longPress = KeyAction.UnicodeAction),
+            SymbolKey(",", 0.1f, KeyDef.Appearance.Variant.Alternative, viewId = R.id.button_comma, shortcut = "comma"),
+            AddressKey("/", R.id.button_slash),
+            AddressKey("@", R.id.button_at),
+            // what is left of the row: at least 0.15 in every field (no 中/英: the space needs the width)
+            SpaceKey(),
+            SymbolKey(".", 0.1f, KeyDef.Appearance.Variant.Alternative, viewId = R.id.button_period, shortcut = "period"),
+            AddressKey(".", R.id.button_dot),
+            AddressKey(AddressKeys.DOMAINS.first(), R.id.button_domain, 0.14f, AddressKeys.DOMAINS),
+            LanguageKey(),
+            ReturnKey(),
+        )
 
         /**
          * What [action] from [source] types: a letter or digit of a long press committed as it is

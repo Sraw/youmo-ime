@@ -194,7 +194,7 @@ sealed class Action {
              * Ids of the syllables offered run from 0 to this, less one, then again: 99 so the
              * private use area's last 64 are left over (Keyboard.SYLLABLES), the grouped keyboards' codes there.
              */
-            const val IDS = 99
+            const val IDS = 98
 
             /** At most this many syllables are offered. */
             const val MAX = 64

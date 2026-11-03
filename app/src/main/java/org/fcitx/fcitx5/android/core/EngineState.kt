@@ -83,6 +83,14 @@ object EngineState {
         internal set
 
     /**
+     * The input methods 简繁 turns traditional (chttrans' list), for the keyboard's hints: set on the fcitx
+     * thread, read on the main one. Null till the host has read it: unknown, not none.
+     */
+    @Volatile
+    var traditionalIms: Set<String>? = null
+        internal set
+
+    /**
      * Whether the input method of the last [answer][EngineBridge.answer] has refining left (the bridge's last answer), its snapshot's
      * [refines][org.fcitx.fcitx5.android.engine.session.Snapshot.refines]: the host then sends it [EngineEvent.REFINE][org.fcitx.fcitx5.android.engine.runtime.EngineEvent.REFINE] while the user
      * pauses. Written on the fcitx thread once an event is answered, and left as it was while one

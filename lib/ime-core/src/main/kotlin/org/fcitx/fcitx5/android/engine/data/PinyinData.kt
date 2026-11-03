@@ -47,6 +47,16 @@ class PinyinData private constructor(file: DataFile) {
     /** The model's words by their text, made when first asked for, on whichever thread asks first (a table that learns, in the background): see [WordIndex]. */
     val wordIndex: WordIndex by lazy { WordIndex(vocabulary, model.vocabularySize) }
 
+    /** Which tone each character of a word has: see [ToneTable]. */
+    val tones = ToneTable(
+        file.bitPacked(Section.TONE_CHAR_KEYS),
+        file.section(Section.TONE_CHAR),
+        file.bitPacked(Section.TONE_WORDS),
+        file.bitPacked(Section.TONE_WORD_START),
+        file.bitPacked(Section.TONE_SYLLABLES),
+        file.section(Section.TONE_TONES),
+    )
+
     /** Words often read wrongly, by word: see [Misreadings]. */
     val misreadings: Map<String, Misreadings> by lazy {
         meta.mapNotNull { (key, value) ->
@@ -83,11 +93,17 @@ class PinyinData private constructor(file: DataFile) {
         const val DICT_WEIGHT = 20
         const val DICT_WEIGHT_CODEBOOK = 21
         const val WORD_LAYER = 22
+        const val TONE_CHAR_KEYS = 23
+        const val TONE_CHAR = 24
+        const val TONE_WORDS = 25
+        const val TONE_WORD_START = 26
+        const val TONE_SYLLABLES = 27
+        const val TONE_TONES = 28
     }
 
     companion object {
-        /** Layout of the sections below; bump on any change to it. 2: the trigram runs' starts in [EliasFano]. */
-        const val VERSION = 2
+        /** Layout of the sections below; bump on any change to it. 2: the trigram runs' starts in [EliasFano]; 3: [tones]. */
+        const val VERSION = 3
 
         internal const val META_SYLLABLE_COUNT = "syllables.count"
         internal const val META_SYLLABLE_CHECKSUM = "syllables.checksum"

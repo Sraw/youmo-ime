@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
@@ -86,6 +87,8 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         // the user's 按键字符 (its symbols) as 九键拼音 has them; its letters are 全拼's alone
         T9Keyboard.ShuangpinName to { T9Keyboard(context, theme, symbols = NineKeySymbols.parse(AppPrefs.getInstance().keyboard.t9Symbols.getValue()), shuangpin = true) },
         T9Keyboard.ShuangpinPlainName to { T9Keyboard(context, theme, symbols = NineKeySymbols.parse(AppPrefs.getInstance().keyboard.t9Symbols.getValue()), shuangpin = true, semicolon = false) },
+        ZhuyinKeyboard.NameNine to { ZhuyinKeyboard(context, theme, nine = true) },
+        ZhuyinKeyboard.NameFull to { ZhuyinKeyboard(context, theme, nine = false) },
         NumberKeyboard.Name to { NumberKeyboard(context, theme) },
         // a number's, phone's or date's field's own (FieldPad)
         *NumberPad.entries.filter { it != NumberPad.FULL }.map { pad -> pad.layout to { NumberKeyboard(context, theme, pad) } }.toTypedArray(),
@@ -206,10 +209,25 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     /** Told each layout shown: InputView, which puts the others at a side while the letters split. */
     var onLayoutShown: (() -> Unit)? = null
 
+    // a zhuyin keyboard first shown: Taiwan's users write 繁体, 简繁 is in ⋯ (design 051 Q11 A), said once
+    private fun tellZhuyinOnce(target: String) {
+        if (target != ZhuyinKeyboard.NameNine && target != ZhuyinKeyboard.NameFull) return
+        val told = AppPrefs.getInstance().internal.zhuyinTraditionalTold
+        // already traditional (简繁 on for pinyin): nothing to tell, and it is told the first time it is not.
+        // Not known yet (the host not up): nor now, it may be; told when shown once it is known
+        if (told.getValue()) return
+        val traditional = EngineState.traditionalIms ?: return
+        if (InputMethodCatalog.PINYIN in traditional) return
+        told.setValue(true)
+        // posted: picked from ⋯, the panel closing as the layout shows would take a notice said now with it
+        keyboardView.post { service.say(R.string.zhuyin_traditional_hint) }
+    }
+
     private fun showLayout(target: String) {
         detachCurrentLayout()
         attachLayout(target)
         onLayoutShown?.invoke()
+        tellZhuyinOnce(target)
         // the letters back from the symbols, Shift off as they attach: at a sentence start, on again
         updateAutoCaps()
         if (windowManager.isAttached(this)) {
@@ -361,6 +379,8 @@ internal fun nameOf(layout: ImKeyboards.Layout, scheme: ShuangpinScheme = Shuang
     ImKeyboards.Layout.SHUANGPIN18 -> if (scheme.types(';')) GroupedKeyboard.Name18 else GroupedKeyboard.Name18Plain
     ImKeyboards.Layout.SHUANGPIN14 -> GroupedKeyboard.NameShuangpin14
     ImKeyboards.Layout.SHUANGPIN_NINE -> if (scheme.types(';')) T9Keyboard.ShuangpinName else T9Keyboard.ShuangpinPlainName
+    ImKeyboards.Layout.ZHUYIN_NINE -> ZhuyinKeyboard.NameNine
+    ImKeyboards.Layout.ZHUYIN_FULL -> ZhuyinKeyboard.NameFull
     ImKeyboards.Layout.ENGLISH_NINE -> T9Keyboard.EnglishName
     ImKeyboards.Layout.HANDWRITING -> HandwritingKeyboard.Name
 }

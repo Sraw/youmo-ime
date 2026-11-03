@@ -139,7 +139,7 @@ class AppPrefsTest {
             listOf(
                 // 0.4's Full and Keys14 as they were; Keys18 and NineKeys since I1
                 Row(
-                    "全拼's keyboard", listOf("Full", "Keys18", "Keys14", "NineKeys"), PinyinKeyboard.entries, "pinyin_keyboard", AppPrefs.PINYIN_KEYBOARD,
+                    "全拼's keyboard", listOf("Full", "Keys18", "Keys14", "NineKeys", "ZhuyinNine", "ZhuyinFull"), PinyinKeyboard.entries, "pinyin_keyboard", AppPrefs.PINYIN_KEYBOARD,
                     { it.keyboard.pinyinKeyboard.setValue(PinyinKeyboard.Keys14) }, "Keys14", "Keys16",
                     { it.keyboard.pinyinKeyboard.getValue() }, PinyinKeyboard.Full,
                 ),

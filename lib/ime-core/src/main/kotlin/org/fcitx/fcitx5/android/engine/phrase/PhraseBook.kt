@@ -46,13 +46,14 @@ class PhraseBook(
         typed: CharSequence,
         builtIns: Boolean,
         letters: NineKeyLetters?,
+        ways: (Char) -> List<String>? = { null },
         taken: (String) -> List<String> = { listOf(it) },
     ): Pair<CustomPhrases, List<String>> {
         val offered = offered(builtIns)
         val keys = when {
             offered.isEmpty -> emptyList()
             letters == null -> listOf(typed.toString()).filter { it in offered }
-            else -> PhraseKeys.of(typed, letters, taken)?.let(offered::keysRead).orEmpty()
+            else -> PhraseKeys.of(typed, letters, ways, taken)?.let(offered::keysRead).orEmpty()
         }
         return offered to keys
     }

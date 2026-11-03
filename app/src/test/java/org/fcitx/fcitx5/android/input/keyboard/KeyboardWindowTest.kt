@@ -142,7 +142,7 @@ class KeyboardWindowTest {
     // the tall row goes with the letters that put syllables on it: kept in step with lettersOf
     @Test
     fun theTallCodeRowGoesWithTheGroupedLetters() {
-        val grouped = setOf(GroupedKeyboard.Name14, GroupedKeyboard.NamePinyin18, GroupedKeyboard.Name18, GroupedKeyboard.Name18Plain, GroupedKeyboard.NameShuangpin14, T9Keyboard.ShuangpinName, T9Keyboard.ShuangpinPlainName)
+        val grouped = setOf(GroupedKeyboard.Name14, GroupedKeyboard.NamePinyin18, GroupedKeyboard.Name18, GroupedKeyboard.Name18Plain, GroupedKeyboard.NameShuangpin14, T9Keyboard.ShuangpinName, T9Keyboard.ShuangpinPlainName, ZhuyinKeyboard.NameNine)
         for (layout in ImKeyboards.Layout.entries) {
             assertEquals("$layout", nameOf(layout) in grouped, CodeRowHeight.showsStrip(layout))
         }

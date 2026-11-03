@@ -126,6 +126,29 @@ class EngineDataPlugin : Plugin<Project> {
             "b3e93dce89c185f45c3d6e189b86b3a8626913352cc85e1094c786579a665791",
             "engine-data/stroke-$STROKES_COMMIT.dict.yaml",
         )
+        // the tones of pinyin.data: Unihan's readings (Unicode License v3) as mozillazg/pinyin-data
+        // (MIT) lists them, the likeliest list first, and phrase-pinyin-data's words (MIT); not its
+        // large_pinyin.txt, which has CC-CEDICT (share-alike) and 汉典's (no licence) in it
+        private const val UNIHAN_COMMIT = "fe29ad32bdf352b31a02b9936e537f575432e9a6"
+        private val UNIHAN = listOf(
+            "kMandarin" to "643c38f4a533ac6f25d16390c3b09df41bac8e8f476da88cd18371fdb299198a",
+            "kHanyuPinlu" to "260ef08aef066ae5e798ed9933e305094d03a87a5d0bcbced6d740cb9084f2f8",
+            "kXHC1983" to "7ade5b5750c92d39dec2151075ebcca323afe6af452349f54438d950b1dd4eeb",
+            "kTGHZ2013" to "83be5ecdfe0b8fcc1202ae45882a2f983c013db87ba68369d94a4dad775382bb",
+            "kHanyuPinyin" to "edb91d53e81b158242ecc2ea779c70a4ae9391054300eafe7fa60d18ad237504",
+        ).map { (name, sha256) ->
+            Download(
+                "https://raw.githubusercontent.com/mozillazg/pinyin-data/$UNIHAN_COMMIT/$name.txt",
+                sha256,
+                "engine-data/pinyin-data-$UNIHAN_COMMIT-$name.txt",
+            )
+        }
+        private const val PHRASES_COMMIT = "4afa3226ce53c9138b939e83c3bb294dbe0da511"
+        private val PHRASES = Download(
+            "https://raw.githubusercontent.com/mozillazg/phrase-pinyin-data/$PHRASES_COMMIT/pinyin.txt",
+            "5d4d86b1337bb2fca95bc5135564a821bfdb40597481ee3e3871bf52d4668622",
+            "engine-data/phrase-pinyin-data-$PHRASES_COMMIT-pinyin.txt",
+        )
         const val ENGLISH_TASK = "compileEnglishData"
         // FineWeb's English pages, counted by lib/ime-dict-tool's english-lm and pruned by its prune
         // at 3e-8 (its manifest.txt in the release says from what and how): the arpa the tool
@@ -201,6 +224,8 @@ class EngineDataPlugin : Plugin<Project> {
         val lm = registerExtract(target, "extractEngineModel", lmDownload, sourcesDir.map { it.dir("lm_mixed") })
         val words = registerDownload(target, WORDS_TASK, WORDS, downloadsDir)
         val strokes = registerDownload(target, "downloadStrokes", STROKES, downloadsDir)
+        val unihan = UNIHAN.map { registerDownload(target, "downloadUnihan" + it.file.substringAfterLast("-k").substringBefore("."), it, downloadsDir) }
+        val phrases = registerDownload(target, "downloadPhraseTones", PHRASES, downloadsDir)
         val englishDownload = registerDownload(target, "downloadEnglishModel", ENGLISH, downloadsDir)
         val englishLm = registerExtract(target, "extractEnglishModel", englishDownload, sourcesDir.map { it.dir("english") })
         val emojiTest = registerDownload(target, "downloadEmojiTest", EMOJI_TEST, downloadsDir)
@@ -233,6 +258,9 @@ class EngineDataPlugin : Plugin<Project> {
             remove.set(lexicon.file("remove.tsv"))
             readings.set(lexicon.file("readings.tsv"))
             misreadings.set(lexicon.file("misreadings.tsv"))
+            unihan.forEach { download -> charTones.from(download.flatMap { it.outputFile }) }
+            phraseTones.set(phrases.flatMap { it.outputFile })
+            tones.set(lexicon.file("tones.tsv"))
             // the Latin words typed inside Chinese (iPhone, APP), a layer of their own: lexicon/tools/latin.py
             dictionaries.from(lexicon.file("latin.words"))
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-assets"))
@@ -385,6 +413,19 @@ class EngineDataPlugin : Plugin<Project> {
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val misreadings: RegularFileProperty
 
+        // in order: a character's first reading is its usual one
+        @get:InputFiles
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val charTones: ConfigurableFileCollection
+
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val phraseTones: RegularFileProperty
+
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val tones: RegularFileProperty
+
         @get:OutputDirectory
         abstract val outputDir: DirectoryProperty
 
@@ -403,6 +444,8 @@ class EngineDataPlugin : Plugin<Project> {
                         "pinyin", "-o", output().path, "--lm", lm.get().asFile.path,
                         "--remove", remove.get().asFile.path, "--readings", readings.get().asFile.path,
                         "--misreadings", misreadings.get().asFile.path,
+                        "--char-tones", charTones.files.joinToString(",") { it.path },
+                        "--phrase-tones", phraseTones.get().asFile.path, "--tones", tones.get().asFile.path,
                     ) + dictionaries.files.map { it.path }
                 )
             }

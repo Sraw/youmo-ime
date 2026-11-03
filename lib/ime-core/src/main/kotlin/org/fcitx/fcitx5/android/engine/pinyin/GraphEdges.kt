@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.engine.pinyin
 
 import org.fcitx.fcitx5.android.engine.data.IntList
-import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Companion.SEPARATOR
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 
 /** The edges of a [SyllableGraph] being built, grouped by the node they leave. */
@@ -53,7 +52,7 @@ internal class GraphEdges private constructor(private val input: String) {
 
         fun skipSeparators(input: String, at: Int): Int {
             var i = at
-            while (i < input.length && input[i] == SEPARATOR) i++
+            while (i < input.length && SyllableGraph.isSeparator(input[i])) i++
             return i
         }
     }

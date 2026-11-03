@@ -78,6 +78,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         /** Whether [resetHiddenSettings] ran: on the first start of a version with it, and so once. */
         val hiddenSettingsReset = bool("hidden_settings_reset", false)
 
+        /** Whether a zhuyin keyboard has said once that 繁体 is in ⋯ (KeyboardWindow). */
+        val zhuyinTraditionalTold = bool("zhuyin_traditional_told", false)
+
         /**
          * Whether 0.4's 九键拼音 was merged into pinyin (KotlinHost.mergeNineKeys): pinyin's keyboard set
          * once, though the profile could not be written back without the old name. Not a 0.4 backup's,
@@ -824,7 +827,9 @@ enum class PinyinKeyboard(override val stringRes: Int, val keyboard: ImKeyboard)
     Full(R.string.pinyin_keyboard_full, ImKeyboard.FULL),
     Keys18(R.string.keyboard_18, ImKeyboard.KEYS18),
     Keys14(R.string.pinyin_keyboard_14, ImKeyboard.KEYS14),
-    NineKeys(R.string.keyboard_nine, ImKeyboard.NINE_KEYS);
+    NineKeys(R.string.keyboard_nine, ImKeyboard.NINE_KEYS),
+    ZhuyinNine(R.string.keyboard_zhuyin_nine, ImKeyboard.ZHUYIN_NINE),
+    ZhuyinFull(R.string.keyboard_zhuyin_full, ImKeyboard.ZHUYIN_FULL);
 
     companion object {
         fun of(keyboard: ImKeyboard) = entries.first { it.keyboard == keyboard }

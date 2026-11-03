@@ -572,6 +572,11 @@
     <string name="shuangpin_keyboard">Keyboard</string>
     <string name="shuangpin_keyboard_summary">The on-screen keyboard Shuangpin is typed on. Microsoft has no 14 keys. On the 9 keys many syllables share keys, so expect to pick more often. A hardware keyboard still types on the full layout.</string>
     <string name="keyboard_18">18 keys</string>
+    <string name="keyboard_zhuyin_nine">Zhuyin 9 keys</string>
+    <string name="keyboard_zhuyin_full">Zhuyin (Dachen)</string>
+    <string name="im_zhuyin_nine">Pinyin (Zhuyin 9 keys)</string>
+    <string name="im_zhuyin">Pinyin (Zhuyin Dachen)</string>
+    <string name="zhuyin_traditional_hint">Zhuyin is usually written in Traditional Chinese: tap 简繁 in ⋯ for it.</string>
     <string name="keyboard_nine">9 keys</string>
     <string name="im_pinyin_keys18">Pinyin (18 keys)</string>
     <string name="im_shuangpin_keys14">Shuangpin (14 keys)</string>
@@ -628,6 +633,9 @@
     <string name="engine_data_handwriting">Handwriting recognizers: trained by this project on Make Me a Hanzi\'s strokes (from Arphic\'s fonts) and open handwriting fonts</string>
     <string name="engine_data_stroke">Stroke table: rime-stroke</string>
     <string name="engine_data_emoji">Emoji list and keywords: Unicode\'s emoji-test.txt and CLDR</string>
+    <string name="engine_data_unihan">Tones of characters: Unicode\'s Unihan database (kMandarin, kHanyuPinlu, kXHC1983, kTGHZ2013, kHanyuPinyin)</string>
+    <string name="engine_data_pinyin_data">Unihan\'s readings as mozillazg/pinyin-data lists them</string>
+    <string name="engine_data_phrase_pinyin">Tones of words: mozillazg/phrase-pinyin-data, put right by this project</string>
     <string name="engine_data_chaizi">Character decompositions: the open dictionary kfcd/chaizi, its components given readings by this project</string>
     <string name="im_auto_select">Commit a lone candidate at once</string>
     <string name="im_auto_select_summary">And the first one once the code is full</string>

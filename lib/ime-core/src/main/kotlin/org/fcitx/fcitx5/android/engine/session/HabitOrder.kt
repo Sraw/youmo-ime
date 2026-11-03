@@ -158,7 +158,7 @@ internal class HabitOrder(
     private fun spelledHere(code: Code): List<Words> {
         val first = code.keys.firstOrNull { it != '\'' } ?: return emptyList()
         val words = habits.spelledFrom(code.kind, first)
-        if (words.isEmpty() || Kinds.byText(code.kind)) return emptyList()
+        if (words.isEmpty() || Kinds.byText(code.kind) || Kinds.isZhuyin(code.kind)) return emptyList()
         val shuangpin = Kinds.isShuangpin(code.kind)
         val keyboard = Kinds.keyboard(code.kind)
         val typed = code.keys.filter { it != '\'' }

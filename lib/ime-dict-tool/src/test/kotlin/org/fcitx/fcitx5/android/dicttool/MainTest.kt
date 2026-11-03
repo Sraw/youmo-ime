@@ -53,6 +53,23 @@ class MainTest {
     }
 
     @Test
+    fun pinyinDataTakesItsTonesFromEachSourceTheLastWinning() {
+        val lm = file("lm.arpa", ReadersTest.TINY_ARPA)
+        val dict = file("dict.txt", "你\tni\t0\n好 hao\n你好 ni'hao\n")
+        val unihan = file("kMandarin.txt", "U+4F60: nǐ  # 你\nU+597D: hǎo,hào  # 好\n")
+        val phrases = file("pinyin.txt", "你好: ní hǎo\n")
+        val tones = file("tones.tsv", "你好\tnǐ hào\t2026-11-01\ttest\n")
+        val output = tmp.root.resolve("pinyin.data").path
+        val (code, out, err) = run("pinyin", "-o", output, "--lm", lm, "--char-tones", unihan, "--phrase-tones", phrases, "--tones", tones, dict)
+        assertEquals(err, 0, code)
+        assertTrue(out, out.contains("tones: 2 characters' readings, 1 words' own"))
+        val data = PinyinData.load(ByteBuffer.wrap(File(output).readBytes()))
+        val id = (0 until data.vocabulary.size).first { data.vocabulary.word(it) == "你好" }
+        val reading = intArrayOf(Syllables.id("ni"), Syllables.id("hao"))
+        assertEquals(listOf<Byte>(3, 4), data.tones.tones("你好", reading, id)?.toList())
+    }
+
+    @Test
     fun pinyinDataIsCompiledAndChecksOutAgainstItsModel() {
         val lm = file("lm.arpa", ReadersTest.TINY_ARPA)
         val dict = file("dict.txt", "你\tni\t0\n好 hao\n你好 ni'hao\n嗯 xyz\n")

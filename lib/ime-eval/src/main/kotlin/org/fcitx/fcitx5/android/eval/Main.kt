@@ -64,8 +64,8 @@ internal val COMMANDS = listOf(
     },
     Command(
         "pinyin",
-        "<pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--merged <dictionary.txt> [--stale]] [--threads <n>] [--taps <hand>:<α>[:<seed>]]",
-        3..3, "scheme", "fuzzy", "half", "neighbours", "rerank", "refine", "weight", "limit", "beam", "sentences", "layers", "pack", "merged", "stale", "threads", "taps",
+        "<pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--merged <dictionary.txt> [--stale]] [--threads <n>] [--taps <hand>:<α>[:<seed>]] [--tones <chars.txt>[,<phrases.txt>], zhuyin's]",
+        3..3, "scheme", "fuzzy", "half", "neighbours", "rerank", "refine", "weight", "limit", "beam", "sentences", "layers", "pack", "merged", "stale", "threads", "taps", "tones",
     ) { args, _, _ ->
         val (dataPath, setPath, resultPath) = args.operands
         runPinyin(dataPath, setPath, resultPath, RunOptions(args.options), Models(args.options))
@@ -214,6 +214,16 @@ internal val COMMANDS = listOf(
             null
         } else writeT9Set(setPath, outPath, presses, keys, out, args.options["same"])
     },
+    Command("zhuyin", "<set.tsv> <zhuyin-set.tsv> [--keys nine|full] [--tones <chars.txt>[,<phrases.txt>]]", 2..2, "keys", "tones") { args, out, _ ->
+        val (setPath, outPath) = args.operands
+        val keys = ZhuyinSet.KEYS[args.options["keys"] ?: "full"] ?: return@Command null
+        val samples = readSet(setPath)
+        val converted = ZhuyinSet.convert(samples, keys, args.options["tones"]?.let(ZhuyinSet.Tones::of))
+        val toned = if ("tones" in args.options) ", tones typed" else ""
+        writeSet(outPath, "$setPath typed in zhuyin on ${args.options["keys"] ?: "full"} keys by `zhuyin`$toned; samples without one exact reading left out", converted)
+        out.appendLine("${converted.size} of ${samples.size} samples typed in zhuyin")
+        0
+    },
     Command("slips", "<set.tsv> <slip-set.tsv>", 2..2) { args, out, _ ->
         val (setPath, outPath) = args.operands
         writeSlipSet(setPath, outPath, out)
@@ -290,7 +300,7 @@ internal val COMMANDS = listOf(
 ) + PARITY_COMMANDS
 
 val USAGE = "usage: " + COMMANDS.joinToString("\n       ") { "${it.name} ${it.usage}" } + """
-schemes: ${(ShuangpinSet.SCHEMES.keys + ShuangpinSet.GROUPED.keys + T9Set.SCHEMES + NO_LATIN).joinToString(" ")}
+schemes: ${(ShuangpinSet.SCHEMES.keys + ShuangpinSet.GROUPED.keys + T9Set.SCHEMES + ZhuyinSet.SCHEMES.keys + NO_LATIN).joinToString(" ")}
 pairs: ${Fuzzy.entries.joinToString(" ") { it.name.lowercase() }}
 halves: ${Halves.NAMES.joinToString(" ")}
 presets: ${TableRun.PRESETS.keys.joinToString(" ")}
@@ -379,7 +389,7 @@ private fun optionsValid(options: Map<String, String>): Boolean {
     return listOf(
         valid("half") { it in Halves.NAMES },
         valid("presses") { T9Set.Presses.of(it) != null },
-        valid("scheme") { it == NO_LATIN || it in ShuangpinSet.SCHEMES || it in ShuangpinSet.GROUPED || it in T9Set.SCHEMES },
+        valid("scheme") { it == NO_LATIN || it in ShuangpinSet.SCHEMES || it in ShuangpinSet.GROUPED || it in T9Set.SCHEMES || it in ZhuyinSet.SCHEMES },
         valid("fuzzy") { fuzzyPairs(it) != null },
         valid("preset") { it in TableRun.PRESETS },
         // a table that does not order by use keeps its order whatever the text before: each row the same
@@ -391,7 +401,7 @@ private fun optionsValid(options: Map<String, String>): Boolean {
         valid("noise") { n -> n.toDoubleOrNull()?.let { it in 0.0..1.0 } == true },
         // the union; each command checks its own: english and pinyin-glide nine only, t9 nine, 14 or 18,
         // shuangpin 18, 14 or nine
-        valid("keys") { it in T9Set.KEYS || it in ShuangpinSet.KEYS },
+        valid("keys") { it in T9Set.KEYS || it in ShuangpinSet.KEYS || it in ZhuyinSet.KEYS },
         valid("user-counts") { it in setOf("full", "none", "multi") },
         valid("short-guard") { it in ON_OFF },
         // the taps type the 14 keys: a 14-key scheme
@@ -457,6 +467,8 @@ private class RunOptions(options: Map<String, String>) {
     private val scheme = options["scheme"]
     private val fuzzy = options["fuzzy"]?.let(::fuzzyPairs).orEmpty()
     private val neighbours = options["neighbours"] == "on"
+    // zhuyin's tones checked against the characters' readings
+    private val tones = options["tones"]?.let(ZhuyinSet.Tones::of)
     val half = options["half"]
     val beam = options["beam"]?.toInt() ?: PinyinDecoder.DEFAULT_BEAM
     /** How many whole-input readings the decoder gives the rerankers. */
@@ -483,6 +495,7 @@ private class RunOptions(options: Map<String, String>) {
     fun segmenter(data: PinyinData): Segmenter = when (scheme) {
         null -> PinyinSegmenter(fuzzy, neighbours = neighbours, latin = LatinWords.of(data.dictionary))
         NO_LATIN -> PinyinSegmenter(fuzzy, neighbours = neighbours)
+        in ZhuyinSet.SCHEMES -> T9Segmenter(fuzzy, abbreviations = false, letters = ZhuyinSet.SCHEMES.getValue(scheme), toneAllows = tones?.let { it::allows })
         in T9Set.SCHEMES -> T9Segmenter(fuzzy, abbreviations = T9Set.abbreviates(scheme), letters = T9Set.lettersOf(scheme))
         in ShuangpinSet.GROUPED -> ShuangpinSet.GROUPED.getValue(scheme).let { (s, letters) -> GroupedShuangpinSegmenter(s, letters, fuzzy) }
         else -> ShuangpinSegmenter(ShuangpinSet.SCHEMES.getValue(scheme), fuzzy)

@@ -509,6 +509,8 @@ class KotlinHost(
         made.events += HostEvents(::forward)
         made.configure(options)
         core = made
+        // the modules are built by HostCore's constructor: 简繁's list is there only now
+        publishTraditional()
         step("HostCore")
         if (wasFirstRun) firstRun = false
         Timber.i("Kotlin host ready in %d ms", (System.nanoTime() - started) / NANOS_PER_MILLI)
@@ -530,6 +532,7 @@ class KotlinHost(
         }
         // traditional per input method as the file now says, the toggle's icon told anew
         modules?.chttrans?.reload(ModuleConfigs.chttrans(confTexts[ModuleConfigs.CHTTRANS]))
+        publishTraditional()
         contexts.active?.let(::updateStatusArea)
         modules?.quickPhrase?.reload(quickPhrasesLater())
         readConfig(EngineOptions.PATH).onSuccess { loadOptions(it, directBoot) }
@@ -726,7 +729,13 @@ class KotlinHost(
         }
     }
 
+    private fun publishTraditional() {
+        EngineState.traditionalIms = modules?.chttrans?.enabledIm.orEmpty()
+    }
+
     private fun persist(change: Persist) {
+        // a toggle of 简繁 saves the list: the keyboard reads it from here (EngineState.traditionalIms)
+        if (change is Persist.ConfChanged && change.conf == ModuleConfigs.CHTTRANS) publishTraditional()
         val writer = writer ?: return
         when (change) {
             is Persist.ProfileChanged -> {

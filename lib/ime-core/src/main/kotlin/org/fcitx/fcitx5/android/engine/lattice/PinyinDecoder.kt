@@ -69,6 +69,13 @@ class PinyinDecoder(
      * what is typed short (impl/design-1b.md D32, S4). Null: [scorer]'s.
      */
     private val uncounted: WordScorer? = null,
+    /**
+     * Whether a character (a code point) read as a syllable may have a tone, 1 to 5 (the reading
+     * table's, ReadingTable.allows): a word with a character the tone typed after its syllable
+     * does not allow costs [Penalties.tone], kept, not dropped (design 051 Q4 A). Null, or no tone
+     * typed (any keyboard but zhuyin's), and nothing is asked.
+     */
+    private val toneAllows: ((codePoint: Int, syllable: Int, tone: Int) -> Boolean)? = null,
 ) {
     init {
         require(beam >= 1 && wordsPerReading >= 1) { "beam $beam, words per reading $wordsPerReading" }
@@ -112,6 +119,12 @@ class PinyinDecoder(
     private var stateWord = IntArray(0)
     private var statePrev = IntArray(0)
     private var stateBack = IntArray(0) // -1 for the empty sequence at the start
+    // the syllables and typed tones (0 none) of the path collect is on, [pathLength] of them, [pathToned] with a tone
+    private var pathSyllables = IntArray(PATH)
+    private var pathTones = IntArray(PATH)
+    private var pathLength = 0
+    private var pathToned = 0
+
     private val contexts = LongArray(beam) // of the beam being extended, from scorer
     private val runs = LongArray(beam) // the scorer's trigrams of each of contexts, by their bits
 
@@ -197,6 +210,7 @@ class PinyinDecoder(
             val matches = graph.matches(e)
             val edgeCost = cost + penalty(kind)
             val edgeShort = short || isShort(kind)
+            val tone = toneOf(graph, e)
             for (i in 0 until matches.size) {
                 val child = if (node < 0) -1 else dictionary.child(node, matches.syllable(i))
                 val userChild = if (userNode < 0 || user == null) -1 else user.child(userNode, matches.syllable(i))
@@ -204,6 +218,7 @@ class PinyinDecoder(
                 if (child < 0 && userChild < 0 && mergedChild < 0) continue
                 val c = edgeCost + penalty(matches.flags(i)) + nasal(kind, matches.syllable(i)) + penalties.tap * graph.against(e, i)
                 var more = false
+                enter(matches.syllable(i), tone)
                 if (child >= 0) {
                     val words = minOf(dictionary.wordCount(child), limit)
                     addWords(to, child, words, c, edgeShort)
@@ -212,6 +227,7 @@ class PinyinDecoder(
                 }
                 if (addOthers(to, userChild, mergedChild, c, edgeShort, limit)) more = true
                 if (to < graph.end && more) collect(graph, to, child, userChild, mergedChild, c, edgeShort, limit)
+                leave(tone)
             }
         }
     }
@@ -263,7 +279,7 @@ class PinyinDecoder(
     private fun addWords(to: Int, node: Int, words: Int, cost: Float, short: Boolean) {
         for (w in 0 until words) {
             val word = dictionary.word(node, w)
-            if (user?.blocked(word, node) != true) arcs.add(to, word, cost + dictionary.weight(node, w) + coarseness(word), short = short)
+            if (user?.blocked(word, node) != true) arcs.add(to, word, cost + dictionary.weight(node, w) + coarseness(word) + toneCost(word), short = short)
         }
     }
 
@@ -273,8 +289,44 @@ class PinyinDecoder(
     private fun addUserWords(to: Int, user: UserWords, node: Int, cost: Float, short: Boolean) {
         for (w in 0 until user.wordCount(node)) {
             val word = user.word(node, w)
-            if (!user.blocked(word, -1)) arcs.add(to, word, cost + coarseness(word), short = short)
+            if (!user.blocked(word, -1)) arcs.add(to, word, cost + coarseness(word) + toneCost(word), short = short)
         }
+    }
+
+    // the tone typed after [edge]'s syllable, 0 where none is asked of the words
+    private fun toneOf(graph: SyllableGraph, edge: Int) = if (toneAllows == null) 0 else graph.tone(edge)
+
+    // [syllable] and its typed [tone] onto the path collect is on
+    private fun enter(syllable: Int, tone: Int) {
+        if (pathLength == pathSyllables.size) {
+            pathSyllables = pathSyllables.copyOf(2 * pathLength)
+            pathTones = pathTones.copyOf(2 * pathLength)
+        }
+        pathSyllables[pathLength] = syllable
+        pathTones[pathLength] = tone
+        pathLength++
+        if (tone > 0) pathToned++
+    }
+
+    private fun leave(tone: Int) {
+        pathLength--
+        if (tone > 0) pathToned--
+    }
+
+    // [Penalties.tone] where a tone typed on the path to [word] is one a character of it does not have
+    private fun toneCost(word: Int): Float {
+        val allows = toneAllows ?: return 0f
+        if (pathToned == 0) return 0f
+        val text = if (word < vocabulary.size) vocabulary.word(word) else user?.text(word) ?: return 0f
+        // one code point a syllable, or no telling which character a tone is of
+        if (text.codePointCount(0, text.length) != pathLength) return 0f
+        var at = 0
+        for (k in 0 until pathLength) {
+            val cp = text.codePointAt(at)
+            if (pathTones[k] > 0 && !allows(cp, pathSyllables[k], pathTones[k])) return penalties.tone
+            at += Character.charCount(cp)
+        }
+        return 0f
     }
 
     // the first [words] of a merged dictionary's at [node], best first, as many as the dictionary's
@@ -282,13 +334,13 @@ class PinyinDecoder(
     private fun addMergedWords(to: Int, user: UserWords, merged: StartWords, node: Int, words: Int, cost: Float, short: Boolean) {
         for (w in 0 until words) {
             val word = merged.word(node, w)
-            if (!user.blocked(word, -1)) arcs.add(to, word, cost + coarseness(word), short = short)
+            if (!user.blocked(word, -1)) arcs.add(to, word, cost + coarseness(word) + toneCost(word), short = short)
         }
         // past the limit, the user's chosen ones still: a word they added, low in its dictionary (review S5)
         if (words < merged.wordCount(node) && user.anyMergedChosen()) {
             for (w in words until merged.wordCount(node)) {
                 val word = merged.word(node, w)
-                if (user.chosen(word) && !user.blocked(word, -1)) arcs.add(to, word, cost + coarseness(word), short = short)
+                if (user.chosen(word) && !user.blocked(word, -1)) arcs.add(to, word, cost + coarseness(word) + toneCost(word), short = short)
             }
         }
     }
@@ -707,6 +759,9 @@ class PinyinDecoder(
         private val NASALS = setOf("m", "n", "ng").map { Syllables.id(it) }.toIntArray()
 
         const val DEFAULT_BEAM = 16
+
+        // syllables of the path collect is on, room for at first
+        private const val PATH = 16
         const val DEFAULT_WORDS = 64
         // on the 256-sample evaluation set, 16 words are as accurate as 256 at a third of the
         // time, and a beam of 64 gains one sample of 256 at four times the time

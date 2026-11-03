@@ -1,0 +1,105 @@
+# word	reading	date	note
+# Tones put right: a word whose tones the sources (Unihan by character, phrase-pinyin-data by word)
+# give wrongly, its reading with tones (a space between syllables, no tone mark for the neutral tone).
+# Compiled after the sources, so a line here wins; misreadings.tsv's readings win over it. Readings as
+# 《现代汉语词典》 (7th ed.) has them; 一 and 不 always in their own tones (yī, bù).
+喜欢	xǐ huan	2026-11-01	neutral tone
+时候	shí hou	2026-11-01	neutral tone
+小时候	xiǎo shí hou	2026-11-01	neutral tone
+什么时候	shén me shí hou	2026-11-01	neutral tone
+回来	huí lai	2026-11-01	neutral tone
+回去	huí qu	2026-11-01	neutral tone
+起来	qǐ lai	2026-11-01	neutral tone
+下来	xià lai	2026-11-01	neutral tone
+谢谢	xiè xie	2026-11-01	neutral tone
+朋友	péng you	2026-11-01	neutral tone
+男朋友	nán péng you	2026-11-01	neutral tone
+女朋友	nǚ péng you	2026-11-01	neutral tone
+真是	zhēn shi	2026-11-01	neutral tone
+姐姐	jiě jie	2026-11-01	neutral tone
+妈妈	mā ma	2026-11-01	neutral tone
+爸爸	bà ba	2026-11-01	neutral tone
+哥哥	gē ge	2026-11-01	neutral tone
+妹妹	mèi mei	2026-11-01	neutral tone
+奶奶	nǎi nai	2026-11-01	neutral tone
+叔叔	shū shu	2026-11-01	neutral tone
+宝宝	bǎo bao	2026-11-01	neutral tone
+星星	xīng xing	2026-11-01	neutral tone
+告诉	gào su	2026-11-01	neutral tone
+厉害	lì hai	2026-11-01	neutral tone
+得很	de hěn	2026-11-01	neutral tone
+长得	zhǎng de	2026-11-01	neutral tone
+变得	biàn de	2026-11-01	neutral tone
+说得	shuō de	2026-11-01	neutral tone
+看得	kàn de	2026-11-01	neutral tone
+过得	guò de	2026-11-01	neutral tone
+衣服	yī fu	2026-11-01	neutral tone
+味道	wèi dao	2026-11-01	neutral tone
+麻将	má jiàng	2026-11-01	tone
+打麻将	dǎ má jiàng	2026-11-01	tone
+多少	duō shao	2026-11-01	neutral tone
+样子	yàng zi	2026-11-01	neutral tone
+老样子	lǎo yàng zi	2026-11-01	neutral tone
+名字	míng zi	2026-11-01	neutral tone
+妹子	mèi zi	2026-11-01	neutral tone
+主子	zhǔ zi	2026-11-01	neutral tone
+机子	jī zi	2026-11-01	neutral tone
+一下子	yī xià zi	2026-11-01	neutral tone
+一辈子	yī bèi zi	2026-11-01	neutral tone
+打算	dǎ suan	2026-11-01	neutral tone
+东西	dōng xi	2026-11-01	neutral tone
+运气	yùn qi	2026-11-01	neutral tone
+力气	lì qi	2026-11-01	neutral tone
+客气	kè qi	2026-11-01	neutral tone
+不客气	bù kè qi	2026-11-01	neutral tone
+不用客气	bù yòng kè qi	2026-11-01	neutral tone
+事情	shì qing	2026-11-01	neutral tone
+休息	xiū xi	2026-11-01	neutral tone
+消息	xiāo xi	2026-11-01	neutral tone
+眼睛	yǎn jing	2026-11-01	neutral tone
+照片	zhào piàn	2026-11-01	tone
+头发	tóu fa	2026-11-01	neutral tone
+踏实	tā shi	2026-11-01	neutral tone
+老实	lǎo shi	2026-11-01	neutral tone
+凉快	liáng kuai	2026-11-01	neutral tone
+姑娘	gū niang	2026-11-01	neutral tone
+早晨	zǎo chen	2026-11-01	neutral tone
+宝贝儿	bǎo bèi er	2026-11-01	neutral tone
+事儿	shì er	2026-11-01	neutral tone
+石榴	shí liu	2026-11-01	neutral tone
+这里	zhè li	2026-11-01	neutral tone
+那里	nà li	2026-11-01	neutral tone
+哪里	nǎ li	2026-11-01	neutral tone
+嘴里	zuǐ li	2026-11-01	neutral tone
+心里	xīn li	2026-11-01	neutral tone
+夜里	yè li	2026-11-01	neutral tone
+人家	rén jia	2026-11-01	neutral tone
+地方	dì fang	2026-11-01	neutral tone
+晚上	wǎn shang	2026-11-01	neutral tone
+漂亮	piào liang	2026-11-01	neutral tone
+认识	rèn shi	2026-11-01	neutral tone
+学生	xué sheng	2026-11-01	neutral tone
+先生	xiān sheng	2026-11-01	neutral tone
+明白	míng bai	2026-11-01	neutral tone
+麻烦	má fan	2026-11-01	neutral tone
+清楚	qīng chu	2026-11-01	neutral tone
+记住	jì zhu	2026-11-01	neutral tone
+窗户	chuāng hu	2026-11-01	neutral tone
+位置	wèi zhi	2026-11-01	neutral tone
+后面	hòu mian	2026-11-01	neutral tone
+聪明	cōng ming	2026-11-01	neutral tone
+欺负	qī fu	2026-11-01	neutral tone
+太阳	tài yang	2026-11-01	neutral tone
+小姐	xiǎo jie	2026-11-01	neutral tone
+嘀咕	dí gu	2026-11-01	neutral tone
+喇叭	lǎ ba	2026-11-01	neutral tone
+屁股	pì gu	2026-11-01	neutral tone
+下巴	xià ba	2026-11-01	neutral tone
+烧饼	shāo bing	2026-11-01	neutral tone
+记性	jì xing	2026-11-01	neutral tone
+主意	zhǔ yi	2026-11-01	neutral tone
+舍友	shè yǒu	2026-11-01	tone
+身处	shēn chǔ	2026-11-01	tone
+何为	hé wéi	2026-11-01	tone
+接发	jiē fà	2026-11-01	tone
+谁	shéi	2026-11-01	common reading

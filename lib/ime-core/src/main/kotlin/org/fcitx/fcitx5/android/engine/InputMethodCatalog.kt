@@ -30,6 +30,10 @@ object InputMethodCatalog {
     /** Pinyin on the 18 keys (NineKeyLetters.G18, 双拼's groups, `l;` read as `l`): a session [PINYIN] hands its codes to, as [PINYIN_KEYS]. */
     const val PINYIN_KEYS18 = "engine-pinyin#keys18"
 
+    /** Pinyin typed in zhuyin, 注音九键 and 注音全键盘 (大千, ZhuyinKeys): sessions [PINYIN] hands their codes to, as [PINYIN_KEYS]. */
+    const val ZHUYIN_NINE = "engine-pinyin#zhuyin9"
+    const val ZHUYIN = "engine-pinyin#zhuyin"
+
     const val SHUANGPIN = "engine-shuangpin"
 
     /**
@@ -105,7 +109,7 @@ object InputMethodCatalog {
      * one another input method gets (the keyboard shown behind a switch) is dropped, never read.
      */
     fun readsCode(im: String, c: Int): Boolean = when {
-        c in Keyboard.TAPS || c in Keyboard.PINYIN_NINE || c in Keyboard.PINYIN_18 -> im == PINYIN
+        c in Keyboard.TAPS || c in Keyboard.PINYIN_NINE || c in Keyboard.PINYIN_18 || c in Keyboard.ZHUYIN_NINE || c in Keyboard.ZHUYIN_FULL -> im == PINYIN
         c in Keyboard.SHUANGPIN_14 -> im == SHUANGPIN
         else -> when (NineKeyLetters.ofCode(c)) {
             null -> false
