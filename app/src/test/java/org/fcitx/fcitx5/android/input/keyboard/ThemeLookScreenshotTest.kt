@@ -71,7 +71,9 @@ class ThemeLookScreenshotTest {
 
     private val shots: File? = System.getProperty("themeShots.dir")?.takeIf { it.isNotEmpty() }?.let(::File)
 
-    private var decoder: ThemeAssets.Decoder? = null
+    private val realDecoder = ThemeAssets.decoder
+    private val realRunner = ThemeAssets.runner
+    private val realPoster = ThemeAssets.poster
 
     @Before
     fun setUp() {
@@ -79,16 +81,16 @@ class ThemeLookScreenshotTest {
         // decoded at once on this thread: each shot has its images in
         ThemeAssets.runner = { it.run() }
         ThemeAssets.poster = { it.run() }
-        val real = ThemeAssets.decoder
-        decoder = real
-        ThemeAssets.decoder = object : ThemeAssets.Decoder by real {
+        ThemeAssets.decoder = object : ThemeAssets.Decoder by realDecoder {
             override fun typeface(path: String): Typeface? = Typeface.MONOSPACE
         }
     }
 
     @After
     fun tearDown() {
-        decoder?.let { ThemeAssets.decoder = it }
+        ThemeAssets.decoder = realDecoder
+        ThemeAssets.runner = realRunner
+        ThemeAssets.poster = realPoster
         ThemeAssets.clear()
     }
 
@@ -235,6 +237,13 @@ class ThemeLookScreenshotTest {
             val name = "${theme.name}_${board.name}_$mode"
             if (golden) h.capture("ThemeLookScreenshotTest/$name", h.inputView)
             shots?.let { save(h, h.inputView, File(it, "$name.png")) }
+            // ⌫ held: its own pressed colour, not its face darkened
+            if (golden && theme.name.startsWith("each_key") && board.name == "full") {
+                val backspace = KeyboardHarness.all(h.inputView).filterIsInstance<KeyView>().first { it.themeKey == "backspace" && h.shown(it) }
+                backspace.isPressed = true
+                h.capture("ThemeLookScreenshotTest/${name}_backspace_down", h.inputView)
+                backspace.isPressed = false
+            }
         }
     }
 
