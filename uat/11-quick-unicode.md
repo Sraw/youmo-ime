@@ -70,8 +70,8 @@
 
 ### QU-12 [P2] 九键、手写长按「符」进快速输入
 - **操作**：九键、手写上长按「符」；注音九键、大千上从快捷键（或勾上的工具栏「快速输入」按钮）进快速输入。
-- **预期**：进快速输入；手写、注音九键、大千时换成全键盘，退出后回到原来的键盘；快速输入时换了输入法，退出后是新输入法的键盘。
-- **JVM**：`LayoutSwitchKeyTest.theNineKeysAndHandwritingsSymbolsKeyHoldsQuickInputTheirNumbersKeyOnlyTaps`；换键盘 `QuickPhraseKeyboardUatTest.handwritingLendsItsPlaceToTheFullKeyboardWhileQuickInputLasts`，快速输入时按语言键换了输入法不回手写板 `anotherInputMethodChosenDuringQuickInputKeepsItsOwnLetters`；注音两种键盘 `theZhuyinKeyboardsLendTheirPlaceAsThePadDoes`。
+- **预期**：进快速输入；手写、注音九键、大千时换成全键盘，退出后回到原来的键盘；快速输入时换了输入法，和平时换输入法一样，退出后是新输入法的键盘。
+- **JVM**：`LayoutSwitchKeyTest.theNineKeysAndHandwritingsSymbolsKeyHoldsQuickInputTheirNumbersKeyOnlyTaps`；换键盘 `QuickPhraseKeyboardUatTest.handwritingLendsItsPlaceToTheFullKeyboardWhileQuickInputLasts`，快速输入时按语言键换了输入法不回手写板 `anotherInputMethodChosenDuringQuickInputKeepsItsOwnLetters`，和不在快速输入时换的一样 `anInputMethodChosenDuringQuickInputShowsWhatItShowsOutOfIt`；注音两种键盘 `theZhuyinKeyboardsLendTheirPlaceAsThePadDoes`。
 
 ### QU-13 [P1] 密码框里不记顺序
 - **操作**：密码框里长按「符」，点第二条。

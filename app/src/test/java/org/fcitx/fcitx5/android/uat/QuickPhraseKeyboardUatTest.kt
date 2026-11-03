@@ -132,6 +132,25 @@ class QuickPhraseKeyboardUatTest {
         assertTrue(lettersShown())
     }
 
+    // the user's call (2026-11-02): an input method chosen during quick input shows what it shows out of
+    // it. On handwriting's pad English's letters come, quick input or not, and stay after it
+    @Test
+    @Uat("QU-12")
+    fun anInputMethodChosenDuringQuickInputShowsWhatItShowsOutOfIt() {
+        onHandwriting()
+        h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
+        val outOfIt = padShown() to lettersShown()
+        assertEquals(false to true, outOfIt)
+        h.emit(HostEvent.InputMethodChanged(handwriting))
+        assertTrue(padShown())
+        quickInput(true)
+        h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
+        quickInput(false)
+        assertEquals(outOfIt, padShown() to lettersShown())
+        h.emit(HostEvent.InputMethodChanged(handwriting))
+        assertTrue(padShown())
+    }
+
     // the zhuyin keyboards send no letters either: 大千 and 注音九键 give way as the pad does, and an
     // input method chosen meanwhile keeps its own letters, the zhuyin keyboard not brought back over them
     @Test

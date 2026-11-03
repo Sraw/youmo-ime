@@ -67,13 +67,23 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         }
 
         /**
+         * Whether quick input's stand-in for [was], the input method's letters then being [lettersThen],
+         * gives way to another input method's [letters] at once: as [was] would, shown
+         * ([LettersLayout.inputMethodChanged]). The letters themselves (the pad as handwriting's, a
+         * zhuyin keyboard) are the new ones' place; the pad over another's letters stays (review Q1,
+         * the user's call 2026-11-02: the same during quick input as out of it).
+         */
+        fun givesWay(was: String, lettersThen: String, letters: String): Boolean =
+            was == lettersThen && letters != lettersThen
+
+        /**
          * The keyboard to show as quick input ends, the full one having stood in for [was] since the
-         * input method's letters were [lettersThen]: [was] again; but letters changed meanwhile
-         * ([lettersNow]) are shown instead. Another input method chosen is shown at once by onImeUpdate
-         * (the stand-in lent to it); this only guards letters changed on some other way, a backstop.
+         * input method's letters were [lettersThen]: [was] again, unless it was the letters and they
+         * changed meanwhile ([lettersNow]); onImeUpdate shows those at once ([givesWay]), so this is a
+         * backstop. The pad over another's letters stays the pad, as it does out of quick input.
          */
         fun afterQuickInput(was: String, lettersThen: String, lettersNow: String): String =
-            if (lettersNow != lettersThen) lettersNow else was
+            if (was == lettersThen) lettersNow else was
     }
 
     override val key: EssentialWindow.Key
@@ -351,11 +361,18 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         preedit.ui.syllables.owned = stripHidden()
         val letters = lettersOf(ime.uniqueName, keyboardPrefs.imKeyboards(), EngineState.shuangpinScheme, service.inPasswordField)
         // left for another input method while quick input had the place of the pad or a zhuyin keyboard:
-        // the full keyboard there is that one's, so the new letters are shown as it would be, and quick
-        // input's end, told after this, brings it no more back (review Q1)
-        val lent = standingInFor != null && letters != standingInFor
+        // as that keyboard would, shown. Where it was the letters the new ones are shown now, and quick
+        // input's end, told after this, brings it no more back; the pad over another's letters stays,
+        // to come back at the end (review Q1, givesWay)
+        val stoodIn = standingInFor
+        val lent = stoodIn != null && givesWay(stoodIn, lettersWhenStoodIn, letters)
         if (lent) standingInFor = null
-        val shown = lettersLayout.inputMethodChanged(letters, if (lent && currentKeyboardName == TextKeyboard.Name) lettersLayout.letters else currentKeyboardName)
+        val current = when {
+            currentKeyboardName != TextKeyboard.Name || stoodIn == null -> currentKeyboardName
+            lent -> lettersLayout.letters
+            else -> stoodIn
+        }
+        val shown = lettersLayout.inputMethodChanged(letters, current)
         // a layout shown anew is told the input method as it is attached
         if (shown != null) showLayout(shown) else currentKeyboard?.let(spaceKeys::show)
         english = ime.uniqueName == InputMethodNames.KEYBOARD

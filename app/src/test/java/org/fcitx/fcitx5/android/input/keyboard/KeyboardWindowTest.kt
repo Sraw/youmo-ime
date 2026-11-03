@@ -169,5 +169,32 @@ class KeyboardWindowTest {
         assertEquals(HandwritingKeyboard.Name, KeyboardWindow.afterQuickInput(HandwritingKeyboard.Name, TextKeyboard.Name, TextKeyboard.Name))
         assertEquals(T9Keyboard.Name, KeyboardWindow.afterQuickInput(ZhuyinKeyboard.NameFull, ZhuyinKeyboard.NameFull, T9Keyboard.Name))
         assertEquals(ZhuyinKeyboard.NameFull, KeyboardWindow.afterQuickInput(ZhuyinKeyboard.NameNine, ZhuyinKeyboard.NameNine, ZhuyinKeyboard.NameFull))
+        // the pad over the nine keys, the letters gone to the 26 meanwhile: the pad, as out of quick input
+        assertEquals(HandwritingKeyboard.Name, KeyboardWindow.afterQuickInput(HandwritingKeyboard.Name, T9Keyboard.Name, TextKeyboard.Name))
+    }
+
+    // another input method chosen during quick input: the keyboard stood in for gives way to its letters
+    // as it would, shown (review Q1, the user's call 2026-11-02: the same as out of quick input)
+    @Test
+    fun theKeyboardStoodInForGivesWayAsItWouldShown() {
+        fun outOfQuickInput(was: String, lettersThen: String, letters: String): Boolean {
+            val l = LettersLayout(setOf(TextKeyboard.Name, T9Keyboard.Name, HandwritingKeyboard.Name, ZhuyinKeyboard.NameFull), TextKeyboard.Name, "symbol")
+            l.inputMethodChanged(lettersThen, l.letters)
+            return l.inputMethodChanged(letters, was) != null
+        }
+        val cases = listOf(
+            // handwriting's pad, English chosen: English's letters
+            Triple(HandwritingKeyboard.Name, HandwritingKeyboard.Name, TextKeyboard.Name),
+            // 大千, English chosen
+            Triple(ZhuyinKeyboard.NameFull, ZhuyinKeyboard.NameFull, TextKeyboard.Name),
+            // the same input method again: nothing changes
+            Triple(ZhuyinKeyboard.NameFull, ZhuyinKeyboard.NameFull, ZhuyinKeyboard.NameFull),
+            // the pad over the nine keys, English chosen: the pad stays
+            Triple(HandwritingKeyboard.Name, T9Keyboard.Name, TextKeyboard.Name),
+            Triple(HandwritingKeyboard.Name, TextKeyboard.Name, TextKeyboard.Name),
+        )
+        for ((was, then, now) in cases) {
+            assertEquals("$was $then $now", outOfQuickInput(was, then, now), KeyboardWindow.givesWay(was, then, now))
+        }
     }
 }
