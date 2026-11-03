@@ -174,7 +174,8 @@ class ThemeMakerLayoutTest {
                 State.TYPING -> typing(h)
                 State.LONG_PRESS -> h.press(h.key("a")).also { h.after(LONG_PRESS_MS); h.relayout() }
                 State.CLIPBOARD -> {
-                    CLIPS.forEach(h::copied)
+                    // a clip apart in time from the one before: on the same tick the list's order is SQLite's whim
+                    CLIPS.forEach { h.copied(it); h.after(CLIP_GAP_MS) }
                     h.clipboard(CLIPS.last())
                 }
             }
@@ -507,6 +508,7 @@ class ThemeMakerLayoutTest {
         const val LONG_PRESS_MS = 600L
         const val SETTLE_MS = 1000L
         val TYPED = listOf("你好", "你", "呢", "尼", "拟")
+        const val CLIP_GAP_MS = 10L
         val CLIPS = listOf("明天下午三点开会", "https://example.com/a", "收到，谢谢")
 
         // the palette's fields in the file's order

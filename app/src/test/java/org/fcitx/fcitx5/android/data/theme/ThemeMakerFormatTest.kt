@@ -180,7 +180,7 @@ class ThemeMakerFormatTest {
 
     private val real = ThemeFilesManager.probe
 
-    private val dir get() = ThemeFilesManager.newCustomBackgroundImages().second.parentFile!!
+    private val dir get() = ThemeFilesManager.themeDir
 
     @Before
     fun empty() {

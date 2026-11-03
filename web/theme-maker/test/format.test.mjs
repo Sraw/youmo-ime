@@ -307,13 +307,14 @@ test('the measured layout and icons have what the preview draws', () => {
   const phones = new Set(layout.phones.map((p) => p.id));
   const box = (r) => assert.ok(Array.isArray(r) && r.length === 4 && r.every(Number.isFinite) && r[2] >= 0 && r[3] >= 0, JSON.stringify(r));
   const color = (c) => assert.ok(layout.palette.includes(c) || /^#[0-9A-F]{8}$/i.test(c), c);
+  const alpha = (e) => assert.ok(e.a === undefined || (typeof e.a === 'number' && e.a >= 0 && e.a <= 1), JSON.stringify(e));
   const text = (e) => {
-    box(e.r); color(e.c);
+    box(e.r); color(e.c); alpha(e);
     assert.ok(typeof e.s === 'string' && e.z > 0 && Number.isFinite(e.y));
     // the alignment and x come together: where the line is set in a view wider than it
-    const al = typeof e.al === 'string' ? e.al : typeof e.a === 'string' ? e.a : undefined;
-    assert.equal(al === undefined, e.x === undefined, JSON.stringify(e));
-    if (al !== undefined) assert.ok(['l', 'c', 'r'].includes(al) && Number.isFinite(e.x), JSON.stringify(e));
+    assert.equal(e.al === undefined, e.x === undefined, JSON.stringify(e));
+    if (e.al !== undefined) assert.ok(['l', 'c', 'r'].includes(e.al) && Number.isFinite(e.x), JSON.stringify(e));
+    // a is an alpha only
   };
   const icon = (e) => { box(e.r); color(e.c); assert.ok(icons[e.i], e.i); assert.ok(e.rot === undefined || Number.isFinite(e.rot)); };
   for (const v of layout.views) {
@@ -330,7 +331,7 @@ test('the measured layout and icons have what the preview draws', () => {
         for (const x of e.i || []) icon(x);
       } else if (e.t === 'text') text(e);
       else if (e.t === 'icon') icon(e);
-      else if (e.t === 'fill') { box(e.r); color(e.c); }
+      else if (e.t === 'fill') { box(e.r); color(e.c); alpha(e); }
       else assert.ok(['base', 'bar'].includes(e.t), e.t);
     }
   }
