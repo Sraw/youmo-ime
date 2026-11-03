@@ -212,7 +212,7 @@ class HandwritingEngineUatTest {
 
     // every example character of the standard's table of turning strokes (GF 2001-2001, 《GB13000.1字符集
     // 汉字折笔规范》, its 25 shapes: http://www.moe.gov.cn/ewebeditor/uploadfile/2015/01/12/20150112170016626.pdf)
-    // has its shape: a rule wrong for a whole part shows here. Not here: 為 朮 卍 卐 亞 吳 奊 (none of the
+    // has its shape: a rule wrong for a whole part shows here. Not here: 為 夗 朮 卍 卐 亞 吳 奊 夨 (none of the
     // mainland's simplified ones: rime-stroke's five kinds), 撇钩's 乄; 心 (5.19 竖弯钩 in 宋体) is written with
     // 楷体's 卧钩, and 达 (5.1 横折) with 辶's 横折折撇, as taught
     @Test
@@ -230,6 +230,13 @@ class HandwritingEngineUatTest {
             chars.map { it.toString() }.filter { c -> card(c, "口").strokeOrder?.contains(shape) != true }.map { "$it $code" }
         }
         assertEquals(emptyList<String>(), missing)
+        // where the standard's example is not the letter's shape, every stroke: the one at its place
+        val corrected = mapOf(
+            "敢" to "㇕一丨丨一一㇀丿一丿㇏", "互" to "一㇗㇇一", "彖" to "㇗㇇一丿㇁丿丿丿㇏", "牙" to "一㇗亅丿",
+            "发" to "㇗丿㇇㇏丶", "降" to "㇌丨丿㇇㇏一㇗丨", "要" to "一丨㇆丨丨一㇛丿一", "执" to "一亅㇀丿⺄丶",
+            "鸠" to "丿㇊丿㇆丶㇉一",
+        )
+        assertEquals(corrected, corrected.mapValues { (c, _) -> card(c, "口").orderShown() })
         assertEquals(StrokeShape.BXG, card("心", "口").strokeOrder!![1])
         assertEquals(StrokeShape.HZZP, card("达", "口").strokeOrder!![4])
     }

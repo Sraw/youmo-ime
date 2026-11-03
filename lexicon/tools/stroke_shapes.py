@@ -79,6 +79,7 @@ GF = [
     ('发', 'nselk', 0, 'SZ'),
     ('夅', 'seljnf', 4, 'SZ'),          # 夂 㐄: not 车's 撇折 (辚's jnf)
     ('舛', 'sekjnf', 4, 'SZ'),
+    ('韋暐韡', 'cjjnf', 3, 'SZ'),        # 韋's foot is 㐄 too (chaizi has not 暐 韡)
     ('要', 'jfcffjmsj', 2, 'HZG'),
     ('执', 'jgisok', 4, 'HXG'),
 ]
@@ -104,7 +105,8 @@ def parts_of(chaizi):
             r, todo = set(), [c]
             while todo:
                 for p in direct.get(todo.pop(), ()):
-                    if p != c and p not in r:
+                    # □: chaizi's stand-in for a part it cannot write, shared by thousands: no part
+                    if p != c and p != '□' and p not in r:
                         r.add(p)
                         todo.append(p)
             memo[c] = r
@@ -154,7 +156,7 @@ def shapes(c, v, parts):
             raise ValueError(f'{c}: a letter cnchar has not: {x}')
     for of, letters, at, shape in GF:
         if ({c} | parts(c)) & set(of):
-            for m in re.finditer('(?=' + letters + ')', v):
+            for m in re.finditer('(?=' + re.escape(letters) + ')', v):
                 out[m.start() + at] = shape
     return out
 

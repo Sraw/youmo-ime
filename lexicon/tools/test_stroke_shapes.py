@@ -10,11 +10,12 @@ ORDERS = {
     '心': 'dykk', '戈': 'jysk', '那': 'rjjswf', '乃': 'ws', '山': 'fbf', '四': 'fcsbj', '牺': 'sjfijfcsbj',
     '又': 'el', '写': 'dejzj', '欠': 'sesl', '阙': 'kfrksjbfssesk', '尔': 'segsk', '子': 'egj', '孚': 'skksegj',
     '旁': 'kjksdekjrs', '买': 'ekkjsk', '予': 'ekeg', '皮': 'esfel', '凹': 'fvfcj', '朵': 'svjfsl', '专': 'jjxk',
-    '鼎': 'fcjjjxjsfjfc', '虱': 'osfcjfjk', '鲺': 'sefcjfjiojfcjfjk', '匹': 'jsub', '机': 'jfskso', '敢': 'ejffjjisjsl', '牙': 'jngs', '辚': 'jnfiksjfslsekjnf', '执': 'jgisok', '丸': 'sok', '彖': 'nejstsssl', '承': 'egjjjesl', '皙': 'jfskssjffcjj', '江': 'kkijfj',
+    '鼎': 'fcjjjxjsfjfc', '虱': 'osfcjfjk', '鲺': 'sefcjfjiojfcjfjk', '匹': 'jsub', '机': 'jfskso', '敢': 'ejffjjisjsl', '牙': 'jngs', '辚': 'jnfiksjfslsekjnf', '执': 'jgisok', '丸': 'sok', '互': 'jnej', '发': 'nselk', '降': 'wfseljnf', '要': 'jfcffjmsj',
+    '彖': 'nejstsssl', '承': 'egjjjesl', '皙': 'jfskssjffcjj', '江': 'kkijfj',
 }
 CHAIZI = ['岚\t山 风\n', '牺\t牛 西\n', '西\t覀 儿\n', '鲺\t鱼 虱\n', '虱\t乁 一 虫\n', '机\t木 几\n', '几\t乁 丿\n',
           '甲\t乙 丙\n', '乙\t丙 甲\n', '辚\t车 粦\n', '粦\t米 舛\n',
-          '执\t扌 丸\n']
+          '执\t扌 丸\n', '降\t阝 夅\n']
 
 
 def converted(tsv):
@@ -55,6 +56,10 @@ class StrokeShapesTest(unittest.TestCase):
         self.assertEqual(('H SG T P HXG D', 'P HZWG D'), (self.shapes('执'), self.shapes('丸')))
         # 舛's 竖折, not 车's 撇折, in 辚
         self.assertEqual('H PZ S T D P H S P N P HP D H SZ S', self.shapes('辚'))
+        self.assertEqual(('H SZ HP H', 'SZ P HP N D', 'HPWG S P HP N H SZ S', 'H S HZG S S H PD P H'),
+                         tuple(self.shapes(c) for c in '互发降要'))
+        # chaizi's □ (a part it cannot write, in thousands of lines) is no part: not every part through it
+        self.assertEqual({'人'}, stroke_shapes.parts_of(['亥\t□ 人\n', '□\t彑 丸\n'])('亥'))
 
     def test_e_by_the_longest_part_it_is_in(self):
         self.assertEqual('HP N', self.shapes('又'))

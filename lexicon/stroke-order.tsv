@@ -27,8 +27,9 @@
 # (横撇 and 横钩, 竖折 and 竖弯, 斜钩 and 卧钩, …); they were told apart by the part of the character a
 # stroke is in (冖 宀 欠 饣 尔 虍 买 皮 疋's 横钩, 又 夕 子 水's 横撇; 心's 卧钩; 四 西 酉's 竖弯; 风 飞 气
 # 卂's 横斜钩, else 横折弯钩: 九 乙 几), and the standard's table's example characters where it says
-# otherwise (敢's 横折; 互 彑 牙 发 夅 舛's 竖折, cnchar's 撇折; 要's 横折钩; 执's 横斜钩; 鸠's 横折提),
-# lexicon/tools/stroke_shapes.py's rules; run again, it shows by a diff what was corrected by hand since.
+# otherwise (敢's 横折; 互 彑 牙 发 夅 舛 韋's 竖折, cnchar's 撇折; 要's 横折钩, though taught as a 横折;
+# 执's 横斜钩; 鸠's 横折提), lexicon/tools/stroke_shapes.py's rules; run again, it shows by a diff what
+# was corrected by hand since.
 # The standard, GF 2001-2001, analyses 宋体: 心's 卧钩 is 楷体's, kept as taught, and 辶's 横折折撇 too
 # (it has 达 a 横折).
 # cnchar's licence, as the MIT licence asks:
@@ -2508,7 +2509,7 @@
 暄	S HZ H H D D HG H S HZ H H H
 暇	S HZ H H HZ H S H H HZ H HP N
 暌	S HZ H H HP D P P N H H P D
-暐	S HZ H H HZ S H S HZ H H PZ S
+暐	S HZ H H HZ S H S HZ H H SZ S
 暑	S HZ H H H S H P S HZ H H
 暖	S HZ H H P D D P H H P HP N
 暗	S HZ H H D H D P H S HZ H H
@@ -6560,7 +6561,7 @@
 鞯	H S S H S HZ H H S H S S H P S HP SG H
 鞲	H S S H S HZ H H S H H S S H S HZG S H H
 鞴	H S S H S HZ H H S H S S H P S HZG H H S
-韡	HZ S H S HZ H H PZ S H S S H H S S H H S
+韡	HZ S H S HZ H H SZ S H S S H H S S H H S
 韦	H H HZG S
 韧	H H HZG S HZG P D
 韩	H S S HZ H H H S H H HZG S
