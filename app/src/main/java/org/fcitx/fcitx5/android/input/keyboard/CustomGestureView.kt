@@ -34,7 +34,9 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
         val totalX: Int,
         val totalY: Int,
         /** an Up for a touch the system took away (ACTION_CANCEL): end what it shows, type nothing */
-        val cancelled: Boolean = false
+        val cancelled: Boolean = false,
+        /** the vertical swipe reached a step at some point this touch, though [totalY] may be back at 0 */
+        val swipedY: Boolean = false,
     )
 
     fun interface OnGestureListener {
@@ -71,7 +73,7 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
      * Where across the key the touch that clicks it came down ([downAt]), for the click listener
      * alone: set as the finger lifts, before the touch's state is reset, cleared once the click
      * returns. NaN for a click no touch made (TalkBack), one that left the key or swiped past the
-     * threshold, and for a swipe's own click (SymbolSwipe's Tap, made at the Up before this is set).
+     * threshold, and for a swipe's own click (KeySwipe's Tap, made at the Up before this is set).
      */
     var clickAt = Float.NaN
         private set
@@ -113,6 +115,13 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
         get() = recognizer.swipeThresholdY
         set(value) {
             recognizer.swipeThresholdY = value
+        }
+
+    /** One axis a touch ([KeyGestureRecognizer.axisLock]): a key swiped sideways and up. */
+    var axisLock
+        get() = recognizer.axisLock
+        set(value) {
+            recognizer.axisLock = value
         }
 
     var doubleTapEnabled
@@ -282,7 +291,7 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
     ) {
         val event = Event(
             type, recognizer.gestureConsumed, x, y,
-            countX, countY, recognizer.swipeTotalX, recognizer.swipeTotalY, cancelled
+            countX, countY, recognizer.swipeTotalX, recognizer.swipeTotalY, cancelled, recognizer.swipedY
         )
         val consumed = onGestureListener?.onGesture(this, event) ?: return
         if (consumed) {

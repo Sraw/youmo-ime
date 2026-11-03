@@ -112,6 +112,59 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         isDuplicateParentStateEnabled = true
     }
 
+    /** What a key draws of its swipes ([KeyMarks]): its corner symbol, a command's icon, a text's whole. */
+    sealed interface Mark {
+        data object Symbol : Mark
+        data class Icon(@DrawableRes val res: Int) : Mark
+        data class Text(val text: String) : Mark
+    }
+
+    // the shortcut marks drawn, top right and bottom right; made the first time one is drawn
+    private val markViews = arrayOfNulls<View>(2)
+
+    /**
+     * Draws [topRight] and [bottomRight] in their corners, [below] under the label; a [Mark.Symbol] is
+     * the key's own corner symbol, which only [AltTextKeyView] has, placed there by its override.
+     */
+    open fun showMarks(topRight: Mark?, bottomRight: Mark?, below: Mark?) {
+        listOf(topRight, bottomRight).forEachIndexed { i, mark -> showMark(i, mark?.takeIf { it != Mark.Symbol }) }
+    }
+
+    private fun showMark(corner: Int, mark: Mark?) {
+        markViews[corner]?.let { appearanceView.removeView(it) }
+        markViews[corner] = null
+        if (mark == null) return
+        val color = theme.altKeyTextColor
+        val v: View = when (mark) {
+            is Mark.Icon -> ImageView(context).apply {
+                imageTintList = ColorStateList.valueOf(color)
+                imageResource = mark.res
+            }
+            // a text's whole, shrunk sideways to fit the corner rather than cut (C6)
+            is Mark.Text -> AutoScaleTextView(context).apply {
+                setTextSize(TypedValue.COMPLEX_UNIT_DIP, MARK_TEXT_DP * keyTextScale(context))
+                setTextColor(color)
+                scaleMode = AutoScaleTextView.Mode.Horizontal
+                setSingleLine()
+                text = mark.text
+            }
+            Mark.Symbol -> return
+        }
+        v.isClickable = false
+        v.isFocusable = false
+        val size = dp(MARK_ICON_DP)
+        appearanceView.add(v, ConstraintLayout.LayoutParams(if (mark is Mark.Text) 0 else size, if (mark is Mark.Text) wrapContent else size).apply {
+            if (mark is Mark.Text) matchConstraintPercentWidth = MARK_TEXT_WIDTH
+            rightToRight = parentId; rightMargin = hMargin + dp(3)
+            if (corner == 0) {
+                topToTop = parentId; topMargin = vMargin + dp(2)
+            } else {
+                bottomToBottom = parentId; bottomMargin = vMargin + dp(2)
+            }
+        })
+        markViews[corner] = v
+    }
+
     init {
         // trigger setEnabled(true)
         isEnabled = true
@@ -426,7 +479,35 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
         altText.visibility = View.GONE
     }
 
+    // where the symbol is drawn as the swipes' marks are placed ([showMarks]); null, as 标点位置 says
+    private var symbolAt: Int? = null
+
+    override fun showMarks(topRight: Mark?, bottomRight: Mark?, below: Mark?) {
+        super.showMarks(topRight, bottomRight, below)
+        symbolAt = when (Mark.Symbol) {
+            topRight -> SYMBOL_TOP_RIGHT
+            bottomRight -> SYMBOL_BOTTOM_RIGHT
+            below -> SYMBOL_BELOW
+            else -> SYMBOL_NONE
+        }
+        applyLayout(resources.configuration.orientation)
+    }
+
+    private fun applyBottomRightAltTextPosition() {
+        applyTopRightAltTextPosition()
+        altText.updateLayoutParams<ConstraintLayout.LayoutParams> {
+            topToTop = unset; topMargin = 0
+            bottomToBottom = parentId; bottomMargin = vMargin
+        }
+    }
+
     private fun applyLayout(orientation: Int) {
+        when (symbolAt) {
+            SYMBOL_TOP_RIGHT -> return applyTopRightAltTextPosition()
+            SYMBOL_BOTTOM_RIGHT -> return applyBottomRightAltTextPosition()
+            SYMBOL_BELOW -> return applyBottomAltTextPosition()
+            SYMBOL_NONE -> return applyNoAltTextPosition()
+        }
         when (ThemeManager.prefs.punctuationPosition.getValue()) {
             PunctuationPosition.Bottom -> when (orientation) {
                 Configuration.ORIENTATION_LANDSCAPE -> applyTopRightAltTextPosition()
@@ -438,10 +519,17 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
-        if (ThemeManager.prefs.punctuationPosition.getValue() == PunctuationPosition.TopRight) {
+        if (symbolAt == null && ThemeManager.prefs.punctuationPosition.getValue() == PunctuationPosition.TopRight) {
             return
         }
         applyLayout(newConfig.orientation)
+    }
+
+    private companion object {
+        const val SYMBOL_TOP_RIGHT = 0
+        const val SYMBOL_BOTTOM_RIGHT = 1
+        const val SYMBOL_BELOW = 2
+        const val SYMBOL_NONE = 3
     }
 }
 
@@ -521,3 +609,8 @@ class ImageTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.ImageT
         updateMargins(newConfig.orientation)
     }
 }
+
+// a shortcut mark's size: an icon's side, a text's size and the share of the key's width it fits in
+private const val MARK_ICON_DP = 11
+private const val MARK_TEXT_DP = 9f
+private const val MARK_TEXT_WIDTH = 0.45f

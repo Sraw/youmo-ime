@@ -47,7 +47,7 @@ class TextKeyboard private constructor(
     context: Context,
     theme: Theme,
     split: Split?,
-) : BaseKeyboard(context, theme, split?.keys ?: Layout, split?.widths), AutoCapsKeys {
+) : BaseKeyboard(context, theme, split?.keys ?: Layout, split?.widths, shortcuts = true), AutoCapsKeys {
 
     // the halves: 双拼's ing is L's long press there (LS-29), a table's code key has a key of its own
     private val isSplit = split != null
@@ -125,12 +125,12 @@ class TextKeyboard private constructor(
                 // and 123 open quick phrase and Unicode input, which have no key in this row
                 LayoutSwitchKey("符", PickerWindow.Key.Symbol.name, 0.12f, longPress = KeyAction.QuickPhraseAction),
                 LayoutSwitchKey("123", NumberKeyboard.Name, 0.12f, longPress = KeyAction.UnicodeAction),
-                SymbolKey(",", 0.1f, KeyDef.Appearance.Variant.Alternative, viewId = R.id.button_comma),
+                SymbolKey(",", 0.1f, KeyDef.Appearance.Variant.Alternative, viewId = R.id.button_comma, shortcut = "comma"),
                 // an address field's in place of the comma and the full stop (AddressKeys), hidden else
                 AddressKey("/", R.id.button_slash),
                 AddressKey("@", R.id.button_at),
                 SpaceKey(),
-                SymbolKey(".", 0.1f, KeyDef.Appearance.Variant.Alternative, viewId = R.id.button_period),
+                SymbolKey(".", 0.1f, KeyDef.Appearance.Variant.Alternative, viewId = R.id.button_period, shortcut = "period"),
                 // as it is: through the engine . would be 。
                 AddressKey(".", R.id.button_dot),
                 AddressKey(AddressKeys.DOMAINS.first(), R.id.button_domain, 0.14f, AddressKeys.DOMAINS),

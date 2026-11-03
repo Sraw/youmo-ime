@@ -53,6 +53,8 @@ object KeyCaps {
     fun key(
         ctx: Context, text: String, hint: String, marked: Boolean, dimmed: Boolean, selected: Boolean = false,
         state: String? = null,
+        /** The key's shortcut, small in the bottom right corner (按键字符和快捷键). */
+        shortcut: String? = null,
     ) = FrameLayout(ctx).apply {
         background = background(ctx, marked, selected = selected)
         isClickable = true
@@ -83,6 +85,17 @@ object KeyCaps {
                 if (hint.isNotEmpty()) add(small, lParams(wrapContent, wrapContent))
             }, lParams(wrapContent, wrapContent, Gravity.CENTER))
             PunctuationPosition.None -> add(label, lParams(matchParent, matchParent))
+        }
+        if (!shortcut.isNullOrEmpty()) {
+            add(TextView(ctx).apply {
+                this.text = shortcut
+                textSize = 9f
+                maxLines = 1
+                setTextColor(ctx.styledColor(android.R.attr.colorPrimary))
+            }, lParams(wrapContent, wrapContent, Gravity.BOTTOM or Gravity.END) {
+                setMargins(0, 0, ctx.dp(3), ctx.dp(1))
+            })
+            contentDescription = "$contentDescription, $shortcut"
         }
     }
 

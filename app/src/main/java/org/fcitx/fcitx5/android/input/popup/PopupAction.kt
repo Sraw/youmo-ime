@@ -39,6 +39,13 @@ sealed class PopupAction {
         val bounds: Rect
     ) : PopupAction()
 
+    /** The edit menu (编辑菜单) over the key at [bounds], opened by its swipe; copy and cut greyed in a [password]. */
+    data class ShowEditMenuAction(
+        override val viewId: Int,
+        val bounds: Rect,
+        val password: Boolean,
+    ) : PopupAction()
+
     data class ChangeFocusAction(
         override val viewId: Int,
         val x: Float,

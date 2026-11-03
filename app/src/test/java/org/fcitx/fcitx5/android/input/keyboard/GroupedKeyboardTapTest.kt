@@ -97,7 +97,7 @@ class GroupedKeyboardTapTest {
 
     @Test
     fun aSwipeTheOtherWayIsATapWithNoPlace() {
-        // up, past the threshold, where the corner is down: SymbolSwipe's Tap, the code alone
+        // up, past the threshold, where the corner is down: KeySwipe's Tap, the code alone
         val bn = key("BN")
         touch(bn, bn.width * 0.75f, 0f to -bn.height.toFloat() / 2 + 1, 0f to -bn.height.toFloat() / 2 + 1)
         assertTrue(sent.toString(), sent.isNotEmpty() && sent.all { it == code(g14Code('b')) })

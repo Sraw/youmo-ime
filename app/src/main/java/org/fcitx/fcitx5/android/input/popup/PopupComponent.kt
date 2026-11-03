@@ -8,6 +8,8 @@ import android.graphics.Rect
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import java.util.LinkedList
+import kotlin.math.ceil
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -19,7 +21,10 @@ import org.fcitx.fcitx5.android.input.dependency.imeScope
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
+import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
 import org.fcitx.fcitx5.android.input.keyboard.longPressOf
+import org.fcitx.fcitx5.android.input.shortcut.EditMenuLayout
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.utils.popIn
 import org.mechdancer.dependency.Dependent
 import org.mechdancer.dependency.UniqueComponent
@@ -30,8 +35,6 @@ import splitties.dimensions.dp
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.frameLayout
 import splitties.views.dsl.core.lParams
-import java.util.LinkedList
-import kotlin.math.ceil
 
 class PopupComponent :
     UniqueComponent<PopupComponent>(), Dependent, ManagedHandler by managedHandler() {
@@ -236,6 +239,29 @@ class PopupComponent :
         showPopupContainer(viewId, menuUi)
     }
 
+    private fun showEditMenu(viewId: Int, bounds: Rect, password: Boolean) {
+        showingEntryUi[viewId]?.let {
+            dismissPopupEntry(viewId, it)
+        }
+        val cells = EditMenuLayout.CELLS
+        val menuUi = PopupMenuUi(
+            context,
+            theme,
+            rootBounds,
+            bounds,
+            { dismissPopup(viewId) },
+            cells.map {
+                KeyDef.Popup.Menu.Item(it.key, KeyShortcutLooks.of(it).icon, KeyAction.ShortcutAction(KeyShortcut.Command(it)))
+            }.toTypedArray(),
+            onFocusMoved = { InputFeedbacks.hapticFeedback(it) },
+            fixed = PopupMenuUi.Fixed(
+                start = EditMenuLayout.START,
+                disabled = cells.indices.filter { EditMenuLayout.disabled(cells[it], password) }.toSet(),
+            ),
+        )
+        showPopupContainer(viewId, menuUi)
+    }
+
     private fun showPopupContainer(viewId: Int, ui: PopupContainerUi) {
         root.apply {
             add(ui.root, lParams {
@@ -317,6 +343,7 @@ class PopupComponent :
                 is PopupAction.PreviewUpdateAction -> updatePopup(viewId, content)
                 is PopupAction.ShowKeyboardAction -> showKeyboard(viewId, keyboard, bounds)
                 is PopupAction.ShowMenuAction -> showMenu(viewId, menu, bounds)
+                is PopupAction.ShowEditMenuAction -> showEditMenu(viewId, bounds, password)
                 is PopupAction.TriggerAction -> outAction = triggerFocused(viewId)
             }
         }

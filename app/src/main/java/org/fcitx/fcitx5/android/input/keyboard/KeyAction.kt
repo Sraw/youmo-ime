@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.ScancodeMapping
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 
 sealed class KeyAction {
 
@@ -59,4 +60,7 @@ sealed class KeyAction {
 
     /** A glide across the letters, for the input method to read (GlideInput, InputMethodCatalog.glides). */
     class GlideAction(val glide: Glide) : KeyAction()
+
+    /** A key's swipe shortcut ([KeyShortcut], never None), run once what is typed is put in (KeyShortcutRunner). */
+    data class ShortcutAction(val shortcut: KeyShortcut) : KeyAction()
 }

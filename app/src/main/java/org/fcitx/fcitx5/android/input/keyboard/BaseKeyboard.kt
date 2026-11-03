@@ -62,6 +62,8 @@ abstract class BaseKeyboard(
     private val keyLayout: List<List<KeyDef>>,
     /** Each key's width in place of its own ([KeyDef.Appearance.percentWidth]): a split layout's. */
     private val keyWidths: List<List<Float>>? = null,
+    /** Whether its keys' swipes reach their shortcuts ([KeyDef.shortcut]): the typing keyboards', not a panel's. */
+    private val shortcuts: Boolean = false,
 ) : ConstraintLayout(context) {
 
     var keyActionListener: KeyActionListener? = null
@@ -70,15 +72,23 @@ abstract class BaseKeyboard(
 
     private val popupOnKeyPress by prefs.keyboard.popupOnKeyPress
     private val expandKeypressArea by prefs.keyboard.expandKeypressArea
-    private val swipeSymbolDirection by prefs.keyboard.swipeSymbolDirection
 
     private val spaceSwipeMoveCursor = prefs.keyboard.spaceSwipeMoveCursor
     private val spaceKeys = mutableListOf<KeyView>()
     @Keep
     private val spaceSwipeChangeListener = ManagedPreference.OnChangeListener<Boolean> { _, v ->
-        spaceKeys.forEach {
-            it.swipeEnabled = v
+        spaceKeys.forEach { spaceSwipesCursor(it, v) }
+    }
+
+    // a space with shortcuts swipes up whether it moves the cursor or not: only its sideways steps go
+    private fun spaceSwipesCursor(view: KeyView, on: Boolean) {
+        if (!shortcuts) {
+            view.swipeEnabled = on
+            return
         }
+        view.swipeEnabled = true
+        view.swipeRepeatEnabled = on
+        view.swipeThresholdX = if (on) selectionSwipeThreshold else disabledSwipeThreshold
     }
 
     private val spaceLongPress = prefs.keyboard.spaceKeyLongPressBehavior
@@ -163,6 +173,15 @@ abstract class BaseKeyboard(
 
     // a rather large threshold effectively disables swipe of the direction
     private val disabledSwipeThreshold = dp(800f)
+
+    private val swipes = KeySwipes(this, shortcuts, inputSwipeThreshold, disabledSwipeThreshold, object : KeySwipes.Keyboard {
+        override val inPasswordField get() = this@BaseKeyboard.inPasswordField
+        override fun swipeText(view: KeyView) = this@BaseKeyboard.swipeText(view)
+        override fun onAction(action: KeyAction, source: KeyActionListener.Source) = this@BaseKeyboard.onAction(action, source)
+        override fun onPopupAction(action: PopupAction) = this@BaseKeyboard.onPopupAction(action)
+        override fun onPopupChangeFocus(viewId: Int, x: Float, y: Float) = this@BaseKeyboard.onPopupChangeFocus(viewId, x, y)
+        override fun onPopupTrigger(viewId: Int, cancelled: Boolean) = this@BaseKeyboard.onPopupTrigger(viewId, cancelled)
+    })
 
     protected val keyRows: List<ConstraintLayout>
 
@@ -335,6 +354,7 @@ abstract class BaseKeyboard(
                 swipeRepeatEnabled = true
                 swipeThresholdX = selectionSwipeThreshold
                 swipeThresholdY = disabledSwipeThreshold
+                spaceSwipesCursor(this, spaceSwipeMoveCursor.getValue())
                 onGestureListener = OnGestureListener { view, event ->
                     when (event.type) {
                         GestureType.Move -> when (val count = event.countX) {
@@ -409,30 +429,8 @@ abstract class BaseKeyboard(
                             if (hapticOnRepeat) InputFeedbacks.hapticFeedback(view)
                         }
                     }
-                    is KeyDef.Behavior.Swipe -> {
-                        swipeEnabled = true
-                        swipeThresholdX = disabledSwipeThreshold
-                        swipeThresholdY = inputSwipeThreshold
-                        val oldOnGestureListener = onGestureListener ?: OnGestureListener.Empty
-                        onGestureListener = OnGestureListener { view, event ->
-                            when (event.type) {
-                                GestureType.Up -> when (event.symbolSwipe(swipeSymbolDirection)) {
-                                    SymbolSwipe.Outcome.Symbol -> {
-                                        swipeText(view as KeyView).typed(it.action)?.let { (action, source) -> onAction(action, source) }
-                                        // consumed when it types nothing too, or a swipe that stayed on the key would type it as a tap
-                                        true
-                                    }
-                                    SymbolSwipe.Outcome.Tap -> {
-                                        // the key's click, here: one that left the key is no click to the view; consumed, so one on it clicks once
-                                        view.performClick()
-                                        true
-                                    }
-                                    SymbolSwipe.Outcome.None -> false
-                                }
-                                else -> false
-                            } || oldOnGestureListener.onGesture(view, event)
-                        }
-                    }
+                    // its lift is the swipe's, below ([KeySwipes.attach])
+                    is KeyDef.Behavior.Swipe -> {}
                     is KeyDef.Behavior.DoubleTap -> {
                         doubleTapEnabled = true
                         onDoubleTapListener = { _ ->
@@ -441,12 +439,16 @@ abstract class BaseKeyboard(
                     }
                 }
             }
+            // set as its long press shows a popup, which then has the touch: no swipe of the key's after that
+            val longPopup = booleanArrayOf(false)
+            swipes.attach(this, def, longPopup)
             def.popup?.forEach { popup ->
                 when (popup) {
                     // TODO: gesture processing middleware
                     is KeyDef.Popup.Menu -> {
                         setOnLongClickListener { view ->
                             view as KeyView
+                            longPopup[0] = true
                             onPopupAction(PopupAction.ShowMenuAction(view.id, popup, view.bounds))
                             // do not consume this LongClick gesture
                             false
@@ -469,6 +471,7 @@ abstract class BaseKeyboard(
                     is KeyDef.Popup.Keyboard -> {
                         setOnLongClickListener { view ->
                             view as KeyView
+                            longPopup[0] = true
                             onPopupAction(PopupAction.ShowKeyboardAction(view.id, popup, view.bounds))
                             // do not consume this LongClick gesture
                             false
@@ -498,10 +501,8 @@ abstract class BaseKeyboard(
                                         PopupAction.PreviewAction(view.id, popup.content, view.bounds)
                                     )
                                     GestureType.Move -> {
-                                        val triggered = SymbolSwipe.typesSymbol(swipeSymbolDirection.direction, event.totalY)
-                                        val text = if (triggered) swipeText(view).preview(popup.alternative) else popup.content
                                         onPopupAction(
-                                            PopupAction.PreviewUpdateAction(view.id, text)
+                                            PopupAction.PreviewUpdateAction(view.id, swipes.preview(view, def, event.totalY, popup))
                                         )
                                     }
                                     GestureType.Up -> {
@@ -723,6 +724,12 @@ abstract class BaseKeyboard(
         // do nothing by default
     }
 
+    // the marks drawn once the subclass is made: they read its corners and symbols (swipeText)
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (shortcuts) swipes.showMarks()
+    }
+
     open fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
         // do nothing by default
     }
@@ -774,10 +781,6 @@ internal fun spaceLongPressTakesTouch(behavior: SpaceLongPressBehavior, voiceAva
     SpaceLongPressBehavior.Voice -> behavior.talks(voiceAvailable, inPasswordField)
     else -> true
 }
-
-/** What this Up types on a key that swipes for its symbol [direction]: see [SymbolSwipe]. */
-internal fun CustomGestureView.Event.symbolSwipe(direction: SwipeSymbolDirection) =
-    SymbolSwipe.onUp(direction.direction, totalY, consumed, cancelled)
 
 /** What the Space key shows of an input method: its [name], and [subMode]'s label (or else its name) in brackets. */
 internal fun spaceLabel(name: String, subMode: InputMethodSubMode): String {

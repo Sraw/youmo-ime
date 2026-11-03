@@ -14,6 +14,8 @@ import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.runtime.type
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -42,6 +44,39 @@ class HostCoreEnginesTest : EnginesFixture() {
         assertTrue("你" in shown)
         assertTrue(core.select(shown.indexOf("你"), "你"))
         assertEquals("你", log.filterIsInstance<HostEvent.Commit>().first().text)
+    }
+
+    // 清除 while typing: what is typed goes, nothing committed; 恢复 types it again, the same keys
+    @Test
+    fun `what is typed is cleared without a commit and typed again`() {
+        val core = core(engines())
+        val log = mutableListOf<HostEvent>()
+        core.events += HostEvents { log += it }
+        core.activate(1)
+        core.setCapabilities(Capability.PREEDIT or Capability.CLIENT_UNFOCUS_COMMIT)
+        core.focus(true)
+        assertNull("nothing typed", core.clearTyped())
+        "nihao".forEach { core.sendKey(Key(it.code), virtual = true) }
+        val typed = log.filterIsInstance<HostEvent.InputPanel>().last().preedit.toString()
+        val typing = core.clearTyped()!!
+        assertTrue(core.isEmpty())
+        assertTrue(log.none { it is HostEvent.Commit })
+        assertTrue(core.retype(typing))
+        assertEquals(typed, log.filterIsInstance<HostEvent.InputPanel>().last().preedit.toString())
+        assertTrue(log.none { it is HostEvent.Commit })
+        core.setCurrentInputMethod(InputMethodCatalog.ENGLISH)
+        assertFalse("another input method", core.retype(typing))
+        core.setCurrentInputMethod(InputMethodCatalog.PINYIN)
+        core.reset()
+        "nihao".forEach { core.sendKey(Key(it.code), virtual = true) }
+        val shown = log.filterIsInstance<HostEvent.Candidates>().last().candidates.map { it.text }
+        assertTrue(core.select(shown.indexOf("你"), "你"))
+        // pinyin holds a part chosen till the rest is: nothing committed, the choice made again too
+        val chosen = log.filterIsInstance<HostEvent.InputPanel>().last().preedit.toString()
+        val commits = log.filterIsInstance<HostEvent.Commit>()
+        assertTrue(core.retype(core.clearTyped()!!))
+        assertEquals(chosen, log.filterIsInstance<HostEvent.InputPanel>().last().preedit.toString())
+        assertEquals(commits, log.filterIsInstance<HostEvent.Commit>())
     }
 
     @Test

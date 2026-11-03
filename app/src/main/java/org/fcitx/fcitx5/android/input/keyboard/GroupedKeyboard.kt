@@ -21,12 +21,14 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
-import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupOverridesCache
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import splitties.views.existingOrNewId
 
 /**
@@ -62,7 +64,7 @@ class GroupedKeyboard(
     private val letters: NineKeyLetters = NineKeyLetters.G14,
     private val wire: (Char) -> Int = Char::code,
     private val semicolon: Boolean = true,
-) : BaseKeyboard(context, theme, layout(letters, wire, semicolon, ::symbolsOf)) {
+) : BaseKeyboard(context, theme, layout(letters, wire, semicolon, ::symbolsOf), shortcuts = true) {
 
     companion object {
         const val Name14 = "Grouped14"
@@ -148,7 +150,8 @@ class GroupedKeyboard(
             )
         }
 
-        private fun groupKey(group: String, code: Char, corner: String, width: Float, symbolsOf: (String) -> List<String>, wire: (Char) -> Int): KeyDef {
+        @Suppress("LongParameterList")
+        private fun groupKey(form: String, group: String, code: Char, corner: String, width: Float, symbolsOf: (String) -> List<String>, wire: (Char) -> Int): KeyDef {
             return KeyDef(
                 KeyDef.Appearance.AltText(displayText = group.uppercase(), altText = corner, textSize = 20f, percentWidth = width),
                 setOf(
@@ -159,6 +162,8 @@ class GroupedKeyboard(
                     KeyDef.Popup.AltPreview(group.uppercase(), corner),
                     longPressOf(group, corner, symbolsOf),
                 ),
+                // its letters, a `;` of 18's L; left off or not
+                KeyShortcuts.charKey(form, group.lowercase().replace(";", "")),
             )
         }
 
@@ -175,7 +180,7 @@ class GroupedKeyboard(
             val shape = shapeOf(letters)
             val first = shape.rows.runningFold(0, Int::plus)
             fun row(r: Int) = (first[r] until first[r + 1]).map {
-                groupKey(groups[it], letters.codes[it], shape.corners[it], shape.widths[r], symbolsOf, wire)
+                groupKey(if (letters == NineKeyLetters.G14) KeyShortcutPreset.GROUPED14 else KeyShortcutPreset.GROUPED18, groups[it], letters.codes[it], shape.corners[it], shape.widths[r], symbolsOf, wire)
             }
             return listOf(
                 row(0),
@@ -189,17 +194,18 @@ class GroupedKeyboard(
                         ),
                         // while typing the separator; else the full keyboard's ', typed by the app
                         setOf(KeyDef.Behavior.Press(KeyAction.HostKeyAction("'"))),
+                        shortcut = "separator",
                     ),
                 ) + row(2) + BackspaceKey(SIDE),
                 listOf(
                     LayoutSwitchKey("符", PickerWindow.Key.Symbol.name, 0.12f, longPress = KeyAction.QuickPhraseAction),
                     LayoutSwitchKey("123", NumberKeyboard.Name, 0.12f, longPress = KeyAction.UnicodeAction),
-                    SymbolKey(",", 0.1f, KeyDef.Appearance.Variant.Alternative, viewId = R.id.button_comma),
+                    SymbolKey(",", 0.1f, KeyDef.Appearance.Variant.Alternative, viewId = R.id.button_comma, shortcut = "comma"),
                     AddressKey("/", R.id.button_slash),
                     AddressKey("@", R.id.button_at),
                     // what is left of the row: at least 0.15 in every field (no 中/英: the space needs the width)
                     SpaceKey(),
-                    SymbolKey(".", 0.1f, KeyDef.Appearance.Variant.Alternative, viewId = R.id.button_period),
+                    SymbolKey(".", 0.1f, KeyDef.Appearance.Variant.Alternative, viewId = R.id.button_period, shortcut = "period"),
                     AddressKey(".", R.id.button_dot),
                     AddressKey(AddressKeys.DOMAINS.first(), R.id.button_domain, 0.14f, AddressKeys.DOMAINS),
                     LanguageKey(),

@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.engine.runtime.ImportLayer
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
+import org.fcitx.fcitx5.android.host.HostCore
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.StatusEntry
 
@@ -75,6 +76,12 @@ interface TypingApi {
     suspend fun select(idx: Int, text: String? = null): Boolean
     suspend fun isEmpty(): Boolean
     suspend fun reset()
+
+    /** What is typed dropped, nothing committed (清除); null with nothing typed. */
+    suspend fun clearTyped(): HostCore.Retyping?
+
+    /** What [clearTyped] dropped typed again; false when it cannot be. */
+    suspend fun retype(typing: HostCore.Retyping): Boolean
     suspend fun moveCursor(position: Int)
 
     suspend fun triggerQuickPhrase()

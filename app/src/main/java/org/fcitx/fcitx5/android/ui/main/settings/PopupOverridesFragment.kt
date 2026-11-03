@@ -10,6 +10,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.annotation.StringRes
@@ -18,12 +19,19 @@ import androidx.core.view.isVisible
 import com.google.android.flexbox.FlexWrap
 import com.google.android.flexbox.FlexboxLayout
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
 import com.google.android.material.R as MaterialR
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.popup.PopupEditor
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
+import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
 import org.fcitx.fcitx5.android.input.popup.PopupPreset
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPages
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.ui.main.settings.KeyShortcutSection.Companion.withChosen
 import org.fcitx.fcitx5.android.utils.onPositiveButtonClick
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
@@ -48,12 +56,125 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         get() = PopupOverrides.parse(pref.getValue())
         set(value) = pref.setValue(value.serialize())
 
+    private val shortcutsPref get() = AppPrefs.getInstance().internal.keyShortcuts
+
+    private var shortcuts: KeyShortcuts
+        get() = KeyShortcuts.parse(shortcutsPref.getValue())
+        set(value) = shortcutsPref.setValue(value.serialize())
+
+    // the tab shown ([KeyShortcutPages.all]), kept as the page is rebuilt
+    private var page = KeyShortcutPages.Full
+
+    private val layers get() = AppPrefs.getInstance().keyboard.swipeLayers.getValue()
+
     override fun rebuild() {
         val ctx = requireContext()
-        val current = overrides
         content.apply {
             removeAllViews()
-            add(text(ctx, getString(R.string.long_press_page_hint), body = true), lParams(matchParent))
+            add(tabs(ctx), lParams(matchParent))
+            add(text(ctx, getString(R.string.shortcut_hint), body = true), lParams(matchParent) { topMargin = ctx.dp(8) })
+            add(text(ctx, getString(R.string.shortcut_now, getString(layers.stringRes)), body = false), lParams(matchParent) { topMargin = ctx.dp(4) })
+            if (page === KeyShortcutPages.Full) fullPage(ctx) else shortcutPage(ctx, page)
+            add(ctx.horizontalLayout {
+                add(MaterialButton(ctx, null, MaterialR.attr.materialButtonOutlinedStyle).apply {
+                    setText(R.string.shortcut_apply_presets)
+                    setOnClickListener { shortcuts = shortcuts.withPresets(page.form); rebuild() }
+                }, lParams { marginEnd = ctx.dp(8) })
+                add(MaterialButton(ctx, null, MaterialR.attr.materialButtonOutlinedStyle).apply {
+                    setText(R.string.shortcut_clear_page)
+                    setOnClickListener { shortcuts = shortcuts.cleared(page.names); rebuild() }
+                }, lParams())
+            }, lParams { topMargin = ctx.dp(12) })
+        }
+    }
+
+    private fun tabs(ctx: Context) = HorizontalScrollView(ctx).apply {
+        isHorizontalScrollBarEnabled = false
+        add(ChipGroup(ctx).apply {
+            isSingleLine = true
+            isSingleSelection = true
+            KeyShortcutPages.all.forEach { p ->
+                addView(Chip(ctx).apply {
+                    isCheckable = true
+                    setText(pageTitle(p))
+                    isChecked = p === page
+                    setOnClickListener { page = p; rebuild() }
+                })
+            }
+        }, lParams(wrapContent, wrapContent))
+    }
+
+    // a character key's shortcut as the page shows it, where a way reaches it
+    private fun mark(name: String): String? = KeyShortcutSection.shortLabel(requireContext(), shortcuts.resolve(name))
+
+    /** A tab other than the full keyboard's: its keys in their rows, a tap editing the shortcut alone. */
+    private fun shortcutPage(ctx: Context, page: KeyShortcutPages.Page) {
+        val stored = shortcuts
+        val function = page.form == KeyShortcuts.FUNCTION
+        page.rows.forEachIndexed { i, row ->
+            val keys = if (function) row.take(1) else row
+            with(content) { add(ctx.horizontalLayout {
+                gravity = Gravity.CENTER_HORIZONTAL
+                keys.forEach { key ->
+                    val names = if (function) row.map { it.name } else listOf(key.name)
+                    val label = if (function) getString(FunctionLabels.getValue(key.label)) else key.label
+                    val shown = names.map { mark(it) ?: "–" }.joinToString(" / ").takeIf { names.any { mark(it) != null } }
+                    add(KeyCaps.key(ctx, label, "", marked = names.any(stored::isSet), dimmed = false, shortcut = shown).apply {
+                        setOnClickListener { editShortcuts(label, names) }
+                    }, if (function) lParams(matchParent, ctx.dp(KeyHeight)) else keyParams(ctx, weight = 1f))
+                }
+                if (!function) weightSum = page.rows.maxOf { it.size }.toFloat()
+            }, lParams(matchParent) { topMargin = ctx.dp(6) }) }
+        }
+    }
+
+    /** [names]' shortcuts (one, or a function key's up and down) edited, under [label]. */
+    private fun editShortcuts(label: String, names: List<String>) {
+        val ctx = requireContext()
+        val sections = names.map { section(ctx, it) }
+        val layout = ctx.verticalLayout {
+            val pad = ctx.dp(24)
+            setPadding(pad, ctx.dp(8), pad, 0)
+            sections.forEach { add(it.view, lParams(matchParent)) }
+        }
+        val current = shortcuts
+        val builder = AlertDialog.Builder(ctx)
+            .setTitle(label)
+            .setView(layout.wrapInScrollView())
+            .setPositiveButton(android.R.string.ok, null)
+            .setNegativeButton(android.R.string.cancel, null)
+        if (names.any(current::isSet)) {
+            builder.setNeutralButton(R.string.reset) { _, _ ->
+                shortcuts = names.fold(current) { s, n -> s.without(n) }
+                rebuild()
+            }
+        }
+        builder.show().onPositiveButtonClick onClick@{
+            val chosen = sections.map { it.chosen() ?: return@onClick false }
+            shortcuts = names.zip(chosen).fold(current) { s, (n, c) -> s.withChosen(n, c) }
+            rebuild()
+            true
+        }
+    }
+
+    // [name]'s section, titled by the way that reaches it now (a function key's name says its own)
+    private fun section(ctx: Context, name: String): KeyShortcutSection {
+        val layers = layers.layers
+        val (title, off) = if (KeyShortcuts.formOf(name) == KeyShortcuts.FUNCTION) {
+            val up = name.endsWith(".up")
+            getString(if (up) R.string.shortcut_section_up else R.string.shortcut_section_down) to
+                ((if (up) layers.up else layers.down) == SwipeLayers.Layer.Off)
+        } else {
+            val way = layers.wayOf(SwipeLayers.Layer.Shortcut)
+            getString(if (way == false) R.string.shortcut_section_down else R.string.shortcut_section_up) to (way == null)
+        }
+        return KeyShortcutSection(ctx, title, off, shortcuts.resolve(name))
+    }
+
+    private fun fullPage(ctx: Context) {
+        val current = overrides
+        content.apply {
+            add(text(ctx, getString(R.string.long_press_page_hint), body = true), lParams(matchParent) { topMargin = ctx.dp(8) })
 
             add(heading(ctx, R.string.letters), lParams(matchParent))
             Rows.forEachIndexed { i, row ->
@@ -87,6 +208,9 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         }
     }
 
+    // a letter's name in the shortcuts (full/a); the other keys have none of their own here
+    private fun shortcutName(label: String) = label.takeIf { it in Letters }?.let { KeyShortcuts.charKey(KeyShortcutPreset.FULL, it) }
+
     private fun key(ctx: Context, label: String, current: PopupOverrides): View {
         val shown = current.resolve(label, PopupPreset[label])?.toList().orEmpty()
         val custom = current[label]
@@ -95,7 +219,9 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             custom?.let { getString(R.string.edited_x, label) },
             getString(R.string.long_press_none).takeIf { shown.isEmpty() },
         ).joinToString(" ").ifEmpty { null }
-        return KeyCaps.key(ctx, label, shown.firstOrNull().orEmpty(), marked = custom != null, dimmed = shown.isEmpty(), state = state).apply {
+        val name = shortcutName(label)
+        val marked = custom != null || name?.let(shortcuts::isSet) == true
+        return KeyCaps.key(ctx, label, shown.firstOrNull().orEmpty(), marked = marked, dimmed = shown.isEmpty(), state = state, shortcut = name?.let(::mark)).apply {
             setOnClickListener { edit(label) }
         }
     }
@@ -127,12 +253,10 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
      * The characters drawn as the popup draws them, the first (what letting go gives) outlined.
      * A tap only selects one; what is done with it is up to the buttons below, apart from it: a
      * tap that moved or removed a character was a surprise, and a × beside it easily hit.
+     * Each view with its top margin in dp, in order: the characters, a line said when there are
+     * none, the buttons, [field] with its add button.
      */
-    private fun edit(label: String) {
-        val ctx = requireContext()
-        val preset = PopupPreset[label]
-        val current = overrides
-        val editor = PopupEditor(current.resolve(label, preset)?.toList().orEmpty())
+    private fun chars(ctx: Context, editor: PopupEditor, field: EditText): List<Pair<View, Int>> {
         val keys = FlexboxLayout(ctx).apply { flexWrap = FlexWrap.WRAP }
         val empty = text(ctx, getString(R.string.long_press_none), body = true)
         val actions = FlexboxLayout(ctx).apply { flexWrap = FlexWrap.WRAP }
@@ -161,12 +285,6 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             empty.isVisible = editor.items.isEmpty()
             buttons.forEach { (button, enabled) -> button.isEnabled = enabled() }
         }
-        val field = EditText(ctx).apply {
-            hint = getString(R.string.long_press_add_hint)
-            inputType = InputType.TYPE_CLASS_TEXT
-            imeOptions = EditorInfo.IME_ACTION_DONE
-            isSingleLine = true
-        }
         fun addTyped() {
             if (rejected(field)) return
             editor.add(field.text.toString())
@@ -182,24 +300,41 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                 setOnClickListener { addTyped() }
             }, lParams())
         }
+        render()
+        return listOf(keys to 12, empty to 0, actions to 4, addRow to 8)
+    }
+
+    /** A key's long press edited ([chars]), and its shortcut where it has one ([section]). */
+    private fun edit(label: String) {
+        val ctx = requireContext()
+        val preset = PopupPreset[label]
+        val current = overrides
+        val editor = PopupEditor(current.resolve(label, preset)?.toList().orEmpty())
+        val field = EditText(ctx).apply {
+            hint = getString(R.string.long_press_add_hint)
+            inputType = InputType.TYPE_CLASS_TEXT
+            imeOptions = EditorInfo.IME_ACTION_DONE
+            isSingleLine = true
+        }
+        val name = shortcutName(label)
+        val section = name?.let { section(ctx, it) }
         val layout = ctx.verticalLayout {
             val pad = ctx.dp(24)
             setPadding(pad, ctx.dp(8), pad, 0)
             add(text(ctx, getString(R.string.long_press_editor_hint), body = false), lParams(matchParent))
-            add(keys, lParams(matchParent) { topMargin = ctx.dp(12) })
-            add(empty, lParams(matchParent))
-            add(actions, lParams(matchParent) { topMargin = ctx.dp(4) })
-            add(addRow, lParams(matchParent) { topMargin = ctx.dp(8) })
+            chars(ctx, editor, field).forEach { (view, top) -> add(view, lParams(matchParent) { topMargin = ctx.dp(top) }) }
+            section?.let { add(it.view, lParams(matchParent)) }
         }
-        render()
         val builder = AlertDialog.Builder(ctx)
             .setTitle(getString(R.string.long_press_of, label))
             .setView(layout.wrapInScrollView())
             .setPositiveButton(android.R.string.ok, null)
             .setNegativeButton(android.R.string.cancel, null)
-        if (current[label] != null) {
+        val stored = shortcuts
+        if (current[label] != null || name?.let(stored::isSet) == true) {
             builder.setNeutralButton(R.string.reset) { _, _ ->
                 overrides = current.without(label)
+                name?.let { shortcuts = stored.without(it) }
                 rebuild()
             }
         }
@@ -207,8 +342,10 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             // a word left typed in the field counts as added; one holding a key code is said so, the dialog kept
             .onPositiveButtonClick onClick@{
                 if (rejected(field)) return@onClick false
+                val chosen = section?.let { it.chosen() ?: return@onClick false }
                 editor.add(field.text.toString())
                 overrides = current.withEdit(label, editor.items, preset)
+                if (name != null && chosen != null) shortcuts = stored.withChosen(name, chosen)
                 rebuild()
                 true
             }
@@ -277,6 +414,25 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         private val Letters = ('a'..'z').map { it.toString() }.toSet()
         private const val KeyHeight = 52
         private const val OtherKeyWidth = 44
+
+        private fun pageTitle(page: KeyShortcutPages.Page) = when (page.form) {
+            KeyShortcutPreset.FULL -> R.string.shortcut_page_full
+            KeyShortcutPreset.NINE -> R.string.shortcut_page_nine
+            KeyShortcutPreset.GROUPED14 -> R.string.shortcut_page_g14
+            KeyShortcutPreset.GROUPED18 -> R.string.shortcut_page_g18
+            KeyShortcutPreset.ZHUYIN_NINE -> R.string.shortcut_page_zy9
+            KeyShortcutPreset.ZHUYIN_FULL -> R.string.shortcut_page_zyfull
+            KeyShortcutPreset.NUMBER -> R.string.shortcut_page_number
+            else -> R.string.shortcut_page_function
+        }
+
+        // the function keys' names on the page ([KeyShortcutPages.FUNCTION_KEYS])
+        private val FunctionLabels = mapOf(
+            "space" to R.string.fn_key_space, "backspace" to R.string.fn_key_backspace, "return" to R.string.fn_key_return,
+            "shift" to R.string.fn_key_shift, "comma" to R.string.fn_key_comma, "period" to R.string.fn_key_period,
+            "symbols" to R.string.fn_key_symbols, "numbers" to R.string.fn_key_numbers, "lang" to R.string.fn_key_lang,
+            "retype" to R.string.fn_key_retype, "zero" to R.string.fn_key_zero, "separator" to R.string.fn_key_separator,
+        )
     }
 }
 

@@ -125,9 +125,21 @@ an appearance (text, image, width, variant) and behaviours (`Press`, `LongPress`
 `SpaceLongPressAction` …). `CommonKeyActionListener` performs them. A key's long-press
 characters come from `PopupPreset` (built in) overridden by the user's `PopupOverrides`; the first
 of them is also what swiping the key types and the small label in its corner: one concept, one
-setting. Which way a vertical swipe types it is `SymbolSwipe` (ime-core): the chosen way the corner
-character, the other way the letter as a tap, swiping off nothing (a slide off the key takes the
-press back). A long press's keys (`PopupKeyboardUi`, `PopupMenuUi`) are one small size whatever the
+setting. A vertical swipe reaches one of two layers, the corner symbol or the key's shortcut
+(`KeyDef.shortcut` names it, `KeyShortcuts` in ime-core holds the user's over `KeyShortcutPreset`'s,
+stored in `key_shortcuts`); the 滑动 setting (`SwipeLayers`, seven choices) says which way reaches
+which. `KeySwipe` (ime-core) decides the lift: a layer with nothing, or a way off, is a tap; swiped
+past and back, a cancel; both ways off, a slide off the key takes the press back. Function keys
+(space, backspace …) reach their own up and down shortcuts, a way off leaving them as they were;
+space and backspace lock a touch to one axis (`KeyGestureRecognizer.axisLock`). `KeySwipes` (app)
+wires it on the typing keyboards (`shortcuts = true`), buzzes at the threshold, opens the edit menu
+(`EditMenuLayout`, `PopupMenuUi.Fixed`) there; `KeyShortcutRunner` runs a shortcut after what is
+typed is in, the field's edits as `EditPlan` steps. 清除 (`EditPlan.clear`: what is typed, else the
+selection, else all before the cursor, else all after) is kept in memory (`ClearedText`), 恢复 putting
+clears back last first while the field reads as each left it; what was typed is dropped and typed
+again by `HostCore.clearTyped`/`retype` (the router's log of the keys since nothing was typed). The
+marks on a key are placed by `KeyMarks`. 注音 keyboards name their keys `zyfull/<QWERTY letter>` and
+`zy9/…` (`ZhuyinShortcutHook`, until their keyboards land). A long press's keys (`PopupKeyboardUi`, `PopupMenuUi`) are one small size whatever the
 key (`PopupComponent.LONG_PRESS_KEY_*`; as wide as the key pressed, 九键's 7 filled the screen),
 floating above it, the bubble gone; the finger picks by how far it moved since they opened, not
 where it is (`PopupFocus` in ime-core: 0.6 of a key a step, held past a row's ends, an empty slot's

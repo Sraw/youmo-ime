@@ -347,3 +347,22 @@
 - **操作**：在 A 的框里打 `nih`，看到候选；按最近任务键，点 B 的卡片，键盘在 B 的框里弹出。
 - **预期**：拼音栏和候选栏都是空的，没有 nih；接着打 a 只出 a 的候选。
 - **JVM**：`HostCoreContractTest.an app unbound clears the panel its focus out dropped, before no context is active`（ime-core：应用先解绑再换框时，清空的面板在还有活动上下文时发出）；redroid 上手动跑过一次（2026-11-02）。
+
+### KB-61 [P1] 字母上滑是快捷键，下滑是符号
+- **前提**：B0，滑动是默认（上滑快捷键，下滑符号），测试页输入框里有字。
+- **操作**：a 键上滑；s 键上滑；a 键下滑。密码框里 c 键上滑。
+- **预期**：a 上滑全选；s 没有快捷键，打出 s；a 下滑打出键角的 @；a、c、x、v、z、y 的键角画着快捷键图标。密码框里 c 上滑什么也不做。
+- **JVM**：`BaseKeyboardTest.aLettersSwipeUpIsItsShortcutAndDownItsSymbol`；设备上的冒烟见报告（真 `EditText` 里全选、复制、粘贴、撤销）。
+
+### KB-62 [P1] 空格上滑是编辑菜单，退格上滑清除、下滑恢复
+- **前提**：B0，滑动是默认，输入框里有字。
+- **操作**：空格上滑不松手，左挪一格松开；框里写 `one two three`，选中 `two` 退格上滑；光标放在 `one` 后再上滑两次；退格下滑三次；打拼音 `nihao` 时退格上滑，再下滑。
+- **预期**：空格上滑出一排五格（全选、剪切、复制、粘贴、撤销），粘贴在手指上方，左挪一格松开是复制。第一次上滑删掉 `two`，接着删掉光标前的 `one`，再删掉光标后的部分，框空了；每次提示"已清除"带撤销。下滑三次按倒序放回，最后 `two` 又是选中的。打拼音时上滑只清掉拼音串，什么都不上屏；下滑拼音串回来，候选照旧。清除后打了字再下滑，提示"没有可恢复的内容"。
+- **JVM**：`BaseKeyboardTest.theSpaceUpIsTheEditMenuAndTheBackspaceUpAndDownClearAndRestore`（弹出编辑菜单；退格上下滑发出清除、恢复）；清除和恢复对输入框做什么、倒序放回、改动后不放回见 ime-core `EditPlanTest`；拼音串清掉不上屏、放回同样的拼音见 `HostCoreEnginesTest`（`what is typed is cleared without a commit and typed again`）；设备上的冒烟见报告。
+
+### KB-63 [P2] 自己设的文字快捷键
+- **前提**：B0，**按键字符和快捷键** 里把 Q 的快捷键设成文字「你好」。
+- **操作**：Q 键上滑（滑出键外也一样）。
+- **预期**：打出「你好」；Q 的右上角是缩小的「你好」。
+- **JVM**：`BaseKeyboardTest.aKeysOwnTextShortcutIsWhatItsSwipeRuns`。
+
