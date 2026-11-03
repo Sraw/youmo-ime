@@ -37,7 +37,8 @@ class PhrasesTest {
     // user 2026-11-02: a number put in as words is no phrase; words with numerals in them are
     @Test
     fun chineseNumeralsAloneAreNot() {
-        for (t in listOf("一二三四五六七八九十一二", "幺三八零零", "两千五百万", "贰仟伍佰元".dropLast(1), "〇一二", "壹萬億")) whole(t)
+        // 三三两两, 一五一十: words all the same, of numerals alone (the rule's cost, as the user chose it)
+        for (t in listOf("一二三四五六七八九十一二", "幺三八零零", "两千五百万", "贰仟伍佰", "零一二", "壹萬億", "三三两两", "一五一十")) whole(t)
         assertTrue("${log.state.phrases}", log.state.phrases.isEmpty())
         for (t in listOf("三个人", "一起去", "贰仟伍佰元")) whole(t)
         assertEquals(setOf("三个人", "一起去", "贰仟伍佰元"), log.state.phrases.keys)
