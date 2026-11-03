@@ -25,11 +25,28 @@ class StrokeNamesTest {
 
     @Test
     fun aNameForEachShapeInItsOrder() {
-        for (values in listOf("values", "values-zh-rCN", "values-zh-rTW")) assertEquals(values, StrokeShape.entries.size, names(values).size)
-        val zh = names("values-zh-rCN")
-        val some = listOf(StrokeShape.H, StrokeShape.SG, StrokeShape.HZG, StrokeShape.HZWG, StrokeShape.SZWG, StrokeShape.BXG, StrokeShape.ZHE)
-        assertEquals(listOf("横", "竖钩", "横折钩", "横折弯钩", "竖折折钩", "卧钩", "折"), some.map { zh[it.ordinal] })
-        assertEquals(listOf("橫", "豎鉤", "橫折鉤", "橫折彎鉤", "豎折折鉤", "臥鉤", "折"), some.map { names("values-zh-rTW")[it.ordinal] })
-        assertEquals("vertical hook", names("values")[StrokeShape.SG.ordinal])
+        // zh-CN's as stroke-order.tsv's head names each code (横折钩 HZG), the five kinds' 折 after them
+        val head = File("../lexicon/stroke-order.tsv").readLines().takeWhile { it.startsWith("#") }
+        val named = head.flatMap { Regex("""([A-Z]+) (\p{IsHan}+) """).findAll(it).map { m -> m.groupValues[1] to m.groupValues[2] }.toList() }.toMap()
+        assertEquals(StrokeShape.entries.map { named[it.code] ?: "折" }, names("values-zh-rCN"))
+        assertEquals(
+            listOf(
+                "橫", "提", "豎", "豎鉤", "撇", "點", "捺", "橫折", "橫撇", "橫鉤", "橫折鉤", "橫折提", "橫折彎", "橫折折", "橫斜鉤", "橫折彎鉤",
+                "橫撇彎鉤", "橫折折撇", "橫折折折鉤", "橫折折折", "豎折", "豎彎", "豎提", "豎折撇", "豎折折", "豎彎鉤", "豎折折鉤", "撇折", "撇點",
+                "彎鉤", "斜鉤", "臥鉤", "折",
+            ),
+            names("values-zh-rTW"),
+        )
+        assertEquals(
+            listOf(
+                "horizontal", "rising", "vertical", "vertical hook", "left-falling", "dot", "right-falling", "horizontal turn",
+                "horizontal left-falling", "horizontal hook", "horizontal turn hook", "horizontal turn rising", "horizontal turn bend",
+                "horizontal turn turn", "horizontal slanting hook", "horizontal turn bend hook", "horizontal left-falling bend hook",
+                "horizontal turn turn left-falling", "horizontal turn turn turn hook", "horizontal turn turn turn", "vertical turn",
+                "vertical bend", "vertical rising", "vertical turn left-falling", "vertical turn turn", "vertical bend hook",
+                "vertical turn turn hook", "left-falling turn", "left-falling dot", "bent hook", "slanting hook", "lying hook", "turning",
+            ),
+            names("values"),
+        )
     }
 }

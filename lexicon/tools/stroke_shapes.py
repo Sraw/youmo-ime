@@ -51,7 +51,8 @@ E = [
     ('ge', {1: 'HP'}),               # 水
 ]
 # o: 横斜钩 in these and what is made of them, else 横折弯钩 (九 乙 几 瓦 丸 凡 亢 乞)
-HXG_PARTS = set('风凤飞气卂夙')
+# (虱's 乁 is 卂's, but chaizi has 乁 in 几 too: 虱 by name)
+HXG_PARTS = set('风凤飞气卂夙虱')
 # b: 竖弯 in these (their 丿 竖弯 一), else 竖折 (山 出 亡 世 区 凶 母 屯)
 SW_PARTS = set('四西酉覀')
 # the characters corrected by hand before the shapes were (cnchar's letters for them wrong)
@@ -64,8 +65,9 @@ FIXED = {
     '膝': 'P HZG H H H S P D P N SG D T P D',
     '黏': 'P H S P D P D SG D T P D S H S HZ H',
 }
-# what no rule settles (hanzipi: 承 52111534, its 6th a 折, 横撇 as 丞's)
-OVERRIDE = {'承': 'HP SG H H H HP P N'}
+# what no rule settles (hanzipi: 承 52111534, its 6th a 折, 横撇 as 丞's), and 匹, whose 竖弯 cnchar
+# writes as a 竖弯钩 (u): 匸 closes it, as 四's
+OVERRIDE = {'承': 'HP SG H H H HP P N', '匹': 'H P SW SZ'}
 KIND = {'H': 1, 'T': 1, 'S': 2, 'SG': 2, 'P': 3, 'D': 4, 'N': 4}
 CODES = set(PLAIN.values()) | {'HP', 'HG', 'XG', 'BXG', 'HPWG', 'HZZZG', 'HZZ', 'HZW', 'SZP', 'SZZ', 'SZ', 'SW', 'HXG', 'HZWG'}
 
@@ -82,18 +84,24 @@ def parts_of(chaizi):
         direct.setdefault(f[0], set()).update(p for way in f[1:] for p in way.split())
     memo = {}
 
-    def parts(c, seen=()):
+    def parts(c):
+        # each character's own walk: a cycle in chaizi cannot leave one with another's cut-short parts
         if c not in memo:
-            r = set()
-            for p in direct.get(c, ()):
-                if p != c and p not in seen:
-                    r |= {p} | parts(p, seen + (c,))
+            r, todo = set(), [c]
+            while todo:
+                for p in direct.get(todo.pop(), ()):
+                    if p != c and p not in r:
+                        r.add(p)
+                        todo.append(p)
             memo[c] = r
         return memo[c]
     return parts
 
 
 def e_shape(v, i):
+    """The shape of e, stroke i of letters v, by the longest pattern over it; a pattern is matched on the
+    letters, not the parts, so it may run across two (寂: 疋's efj over 宀's e and 叔's start, 横钩 as
+    宀's is): a new pattern is checked by the characters it changes."""
     best = {}
     for pat, at in E:
         for m in re.finditer('(?=' + re.escape(pat) + ')', v):
@@ -146,6 +154,9 @@ def convert(orders, chaizi, tsv):
         c, strokes = f[0], f[1]
         written = strokes.split()
         have = strokes if len(written) == 1 and strokes.isdigit() else kinds(written)
+        if c not in orders:   # added by hand (冖), cnchar has not the character
+            lines.append(line)
+            continue
         if c in FIXED or c in OVERRIDE:
             made = (FIXED.get(c) or OVERRIDE[c]).split()
         else:

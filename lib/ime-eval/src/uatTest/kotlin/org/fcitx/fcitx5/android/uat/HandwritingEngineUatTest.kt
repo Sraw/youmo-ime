@@ -203,7 +203,7 @@ class HandwritingEngineUatTest {
     fun aCardsTurningStrokesEachTheirShape() {
         val shown = mapOf(
             "口" to "丨㇕一", "己" to "㇕一乚", "乙" to "㇈", "九" to "丿㇈", "马" to "㇕㇉一",
-            "风" to "丿⺄丿丶", "又" to "㇇㇏", "写" to "丶㇖一㇉一", "欠" to "丿㇖丿㇏", "山" to "丨㇗丨", "四" to "丨㇕丿㇄一",
+            "风" to "丿⺄丿丶", "又" to "㇇㇏", "写" to "丶㇖一㇉一", "冖" to "丶㇖", "欠" to "丿㇖丿㇏", "山" to "丨㇗丨", "四" to "丨㇕丿㇄一",
             "心" to "丶㇃丶丶", "那" to "㇆一一丿㇌丨", "乃" to "㇡丿", "专" to "一一ㄣ丶", "凹" to "丨㇅丨㇕一", "朵" to "丿㇍一丨丿㇏",
         )
         assertEquals(shown, shown.mapValues { (c, _) -> card(c, "口").orderShown() })

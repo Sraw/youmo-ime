@@ -1116,7 +1116,7 @@ private fun charInfo(options: Options, out: Appendable) {
 private const val UNIHAN_RS = "Unihan_IRGSources.txt"
 
 // of the characters handwriting knows, at least this share must be taken apart (97.8% are), and have
-// the mainland's stroke order (95.1% have: lexicon/stroke-order.tsv's are 6,939 simplified ones; a traditional one has
+// the mainland's stroke order (95.1% have: lexicon/stroke-order.tsv's are 6,940 simplified ones; a traditional one has
 // rime-stroke's); the rest all
 private const val PARTS = "parts"
 private const val MAINLAND_ORDER = "the mainland's stroke order"

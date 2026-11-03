@@ -440,6 +440,7 @@
 再	H S HZG S H H
 冒	S HZ H H S HZ H H H
 冕	S HZ H H P HP S HZ H P SWG
+冖	D HG
 冗	D HG P HZWG
 写	D HG H SZWG H
 军	D HG H PZ H S
@@ -606,7 +607,7 @@
 匦	H H PZ S T P HZWG SZ
 匪	H S H H H S H H H SZ
 匮	H S HZ H S H S HZ P D SZ
-匹	H P SWG SZ
+匹	H P SW SZ
 区	H P D SZ
 医	H P H H P D SZ
 匾	H D HZ H P S HZG H S S SZ
@@ -5206,7 +5207,7 @@
 虫	S HZ H S H D
 虬	S HZ H S H D SWG
 虮	S HZ H S H D P HZWG
-虱	HZWG P S HZ H S H D
+虱	HXG P S HZ H S H D
 虹	S HZ H S H D H S H
 虺	H P SWG S HZ H S H D
 虻	S HZ H S H D D H SZ
@@ -6822,7 +6823,7 @@
 鲶	P HP S HZ H S H T P N D HP D BXG D D
 鲷	P HP S HZ H S H T P HZG H S H S HZ H
 鲸	P HP S HZ H S H T D H S HZ H SG P D
-鲺	P HP S HZ H S H T HZWG H S HZ H S H D
+鲺	P HP S HZ H S H T HXG H S HZ H S H D
 鲻	P HP S HZ H S H T PD PD PD S HZ H S H
 鲼	P HP S HZ H S H T H S H S S S HZ P D
 鲽	P HP S HZ H S H T H S S H SZ H S P N

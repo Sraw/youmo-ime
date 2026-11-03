@@ -10,9 +10,10 @@ ORDERS = {
     '心': 'dykk', '戈': 'jysk', '那': 'rjjswf', '乃': 'ws', '山': 'fbf', '四': 'fcsbj', '牺': 'sjfijfcsbj',
     '又': 'el', '写': 'dejzj', '欠': 'sesl', '阙': 'kfrksjbfssesk', '尔': 'segsk', '子': 'egj', '孚': 'skksegj',
     '旁': 'kjksdekjrs', '买': 'ekkjsk', '予': 'ekeg', '皮': 'esfel', '凹': 'fvfcj', '朵': 'svjfsl', '专': 'jjxk',
-    '鼎': 'fcjjjxjsfjfc', '承': 'egjjjesl', '皙': 'jfskssjffcjj', '江': 'kkijfj',
+    '鼎': 'fcjjjxjsfjfc', '虱': 'osfcjfjk', '鲺': 'sefcjfjiojfcjfjk', '匹': 'jsub', '机': 'jfskso', '承': 'egjjjesl', '皙': 'jfskssjffcjj', '江': 'kkijfj',
 }
-CHAIZI = ['岚\t山 风\n', '牺\t牛 西\n', '西\t覀 儿\n']
+CHAIZI = ['岚\t山 风\n', '牺\t牛 西\n', '西\t覀 儿\n', '鲺\t鱼 虱\n', '虱\t乁 一 虫\n', '机\t木 几\n', '几\t乁 丿\n',
+          '甲\t乙 丙\n', '乙\t丙 甲\n']
 
 
 def converted(tsv):
@@ -40,6 +41,9 @@ class StrokeShapesTest(unittest.TestCase):
         self.assertEqual(('HZG H H P HPWG S', 'HZZZG P'), (self.shapes('那'), self.shapes('乃')))
         # b: 四 西's 竖弯 (牺 has 西), 山's 竖折
         self.assertEqual(('S SZ S', 'S HZ P SW H', 'P H S T H S HZ P SW H'), (self.shapes('山'), self.shapes('四'), self.shapes('牺')))
+        # 虱's 乁 as 卂's, in 鲺 too; 几's, in 机, a 横折弯
+        self.assertEqual(('HXG P S HZ H S H D', 'HXG'), (self.shapes('虱'), self.shapes('鲺').split()[8]))
+        self.assertEqual('H S P D P HZWG', self.shapes('机'))
         # v x: 凹 朵, 专 鼎
         self.assertEqual(('S HZZ S HZ H', 'P HZW H S P N'), (self.shapes('凹'), self.shapes('朵')))
         self.assertEqual(('H H SZP D', 'S HZ H H H SZZ H P S H S HZ'), (self.shapes('专'), self.shapes('鼎')))
@@ -55,10 +59,16 @@ class StrokeShapesTest(unittest.TestCase):
         self.assertEqual('D H D P D HG D H HZG P', self.shapes('旁'))
         self.assertEqual(('HG D D H P D', 'HP D HG SG', 'HG P S HP N'), (self.shapes('买'), self.shapes('予'), self.shapes('皮')))
 
+    def test_every_part_of_a_part_even_round_a_cycle(self):
+        parts = stroke_shapes.parts_of(CHAIZI)
+        self.assertEqual({'鱼', '虱', '乁', '一', '虫'}, parts('鲺'))
+        # chaizi with a cycle: each its whole walk, whichever is asked first
+        self.assertEqual(({'乙', '丙'}, {'丙', '甲'}), (parts('甲'), parts('乙')))
+
     def test_a_line_corrected_by_hand_and_the_kinds_checked(self):
-        tsv = ['# head\n', '\n', '行\t332112\n', '皙\t1234331232511\n', '承\t52111534\n', '江\t441121\tsome note\n']
+        tsv = ['# head\n', '\n', '行\t332112\n', '皙\t1234331232511\n', '承\t52111534\n', '匹\t1355\n', '江\t441121\tsome note\n']
         lines, notes = converted(tsv)
-        self.assertEqual(['# head', '', '行\tP P S H H SG', '皙\tH S P D P P H S P S HZ H H', '承\tHP SG H H H HP P N',
+        self.assertEqual(['# head', '', '行\tP P S H H SG', '皙\tH S P D P P H S P S HZ H H', '承\tHP SG H H H HP P N', '匹\tH P SW SZ',
                           '江\tD D T H S H\tsome note'], lines)
         self.assertEqual([], notes)
         # run again on what it made: the same
@@ -67,6 +77,8 @@ class StrokeShapesTest(unittest.TestCase):
         lines, notes = converted(['口\tS HZ H H\n'])
         self.assertEqual(['口\tS HZ H H'], lines)
         self.assertEqual(['口: kept as written, 251 by the rules'], notes)
+        # a character cnchar has not, added by hand: kept
+        self.assertEqual((['冖\tD HG'], []), converted(['冖\tD HG\n']))
         # the digits of other kinds than the rules make: a slip in the rules or the file
         with self.assertRaises(ValueError):
             converted(['口\t252\n'])
