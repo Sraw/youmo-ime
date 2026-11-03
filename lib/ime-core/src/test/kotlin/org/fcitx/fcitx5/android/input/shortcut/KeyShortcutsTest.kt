@@ -40,6 +40,18 @@ class KeyShortcutsTest {
         assertEquals(text, KeyShortcuts.parse(stored).resolve("full/q"))
     }
 
+    // review S3: a text pasted from a PC, its lines ended by \r\n, stored and read back whole
+    @Test
+    fun textRoundTripsItsCarriageReturns() {
+        val text = KeyShortcut.Text("Best,\r\nMe\rand \\r")
+        val shortcuts = KeyShortcuts.Empty.with("full/q", text).with("full/w", paste)
+        val stored = shortcuts.serialize()
+        assertFalse(stored.contains('\r'))
+        assertEquals(shortcuts, KeyShortcuts.parse(stored))
+        // a \r in a line stored by hand is the text's, not a line's end
+        assertEquals(KeyShortcut.Text("a\rb"), KeyShortcuts.parse("full/q\ttext:a\rb").resolve("full/q"))
+    }
+
     @Test
     fun aBackslashBeforeNothingEscapedIsKept() {
         assertEquals(KeyShortcut.Text("a\\b\\"), KeyShortcuts.parse("full/q\ttext:a\\b\\").resolve("full/q"))
@@ -64,6 +76,11 @@ class KeyShortcutsTest {
         val long = "x".repeat(KeyShortcut.MAX_TEXT + 5)
         assertEquals(KeyShortcut.MAX_TEXT, (KeyShortcuts.parse("full/q\ttext:$long").resolve("full/q") as KeyShortcut.Text).text.length)
         assertThrows(IllegalArgumentException::class.java) { KeyShortcut.Text("") }
+        // an emoji across the end is left out whole, never half of it kept
+        val emoji = "x".repeat(KeyShortcut.MAX_TEXT - 1) + "\uD83D\uDE00"
+        assertEquals("x".repeat(KeyShortcut.MAX_TEXT - 1), (KeyShortcuts.parse("full/q\ttext:$emoji").resolve("full/q") as KeyShortcut.Text).text)
+        assertEquals("ab\uD83D\uDE00", KeyShortcut.clip("ab\uD83D\uDE00", 4))
+        assertEquals("ab", KeyShortcut.clip("ab\uD83D\uDE00c", 3))
     }
 
     @Test

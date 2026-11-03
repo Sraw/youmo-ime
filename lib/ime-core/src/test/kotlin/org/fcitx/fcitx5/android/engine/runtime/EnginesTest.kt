@@ -58,6 +58,20 @@ class EnginesTest : EnginesFixture() {
         assertEquals("你", engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, ' '.code).commit)
     }
 
+    // a key that picks says so (the router's log of what to type again ends at it: review2 M2);
+    // a key that types does not
+    @Test
+    fun aKeysPickIsToldAsOne() {
+        val engines = Engines(::load, null)
+        assertFalse(engines.type(InputMethodCatalog.PINYIN, "ni").picked)
+        assertTrue("space", engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, ' '.code).picked)
+        engines.type(InputMethodCatalog.PINYIN, "ni")
+        assertTrue("a digit", engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, '2'.code).picked)
+        engines.type(InputMethodCatalog.PINYIN, "ni")
+        assertTrue("the keypad's", engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.KEYPAD, '1'.code).picked)
+        assertFalse("nothing typed: the app's digit", engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, '1'.code).picked)
+    }
+
     // in the learning record under the user directory (PLAN §2.2), read again as English is next typed
     @Test
     fun theEnglishWordsLearnedAreKeptAcrossAStart() {

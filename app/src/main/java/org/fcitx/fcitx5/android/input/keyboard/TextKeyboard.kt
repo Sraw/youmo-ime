@@ -31,6 +31,7 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.glide.Glide
+import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
@@ -247,6 +248,10 @@ class TextKeyboard private constructor(
     // for another, or none said yet of the one shown: its letters' roots, its 拼 key, its code keys
     private var table: TableKeyboard? = null
 
+    // a table's every root on the letters leaves no corner free of them: the shortcuts unmarked, swiped all the same
+    override val charShortcutMarks: Boolean
+        get() = table?.let { it.labels == KeyLabels.ROOTS && it.roots != null } != true
+
     // Return as it was last shown: while something is typed, a table shows 确定 in its place
     private var returnAppearance = ReturnKeyAppearance.Enter
 
@@ -293,6 +298,7 @@ class TextKeyboard private constructor(
             keysLaidOut = false
             updateAlphabetKeys()
             updatePunctuationKeys()
+            showSwipeMarks()
         }
         showSemicolonKey()
     }

@@ -73,6 +73,8 @@ class KeyShortcuts private constructor(private val table: Map<String, KeyShortcu
                     '\\' -> append("\\\\")
                     '\t' -> append("\\t")
                     '\n' -> append("\\n")
+                    // a stored \r once ended the line it was in, the rest of the text lost (review S3)
+                    '\r' -> append("\\r")
                     else -> append(it)
                 }
             }
@@ -84,8 +86,15 @@ class KeyShortcuts private constructor(private val table: Map<String, KeyShortcu
             while (i < text.length) {
                 val c = text[i]
                 val next = text.getOrNull(i + 1)
-                if (c == '\\' && next != null && next in "\\tn") {
-                    append(if (next == 't') '\t' else if (next == 'n') '\n' else '\\')
+                if (c == '\\' && next != null && next in "\\tnr") {
+                    append(
+                        when (next) {
+                            't' -> '\t'
+                            'n' -> '\n'
+                            'r' -> '\r'
+                            else -> '\\'
+                        },
+                    )
                     i += 2
                 } else {
                     append(c)
@@ -96,15 +105,16 @@ class KeyShortcuts private constructor(private val table: Map<String, KeyShortcu
 
         private fun parseValue(value: String): KeyShortcut? = when {
             value == NONE -> KeyShortcut.None
-            value.startsWith(TEXT) -> unescape(value.removePrefix(TEXT))
-                .take(KeyShortcut.MAX_TEXT).takeIf { it.isNotEmpty() }?.let(KeyShortcut::Text)
+            value.startsWith(TEXT) -> KeyShortcut.clip(unescape(value.removePrefix(TEXT)), KeyShortcut.MAX_TEXT)
+                .takeIf { it.isNotEmpty() }?.let(KeyShortcut::Text)
             else -> KeyCommand.ofKey(value)?.let(KeyShortcut::Command)
         }
 
         /** Never throws: a line that does not parse is skipped; a later line for the same key wins. */
         fun parse(text: String): KeyShortcuts {
             val table = LinkedHashMap<String, KeyShortcut>()
-            text.lineSequence().mapNotNull(::parseLine).forEach { (name, shortcut) -> table[name] = shortcut }
+            // lines end at \n alone: lineSequence() would end one at a \r too, a text cut there (review S3)
+            text.splitToSequence('\n').mapNotNull(::parseLine).forEach { (name, shortcut) -> table[name] = shortcut }
             return if (table.isEmpty()) Empty else KeyShortcuts(table)
         }
 

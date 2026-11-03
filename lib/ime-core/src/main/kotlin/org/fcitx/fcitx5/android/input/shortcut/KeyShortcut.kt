@@ -22,12 +22,17 @@ sealed interface KeyShortcut {
     companion object {
         /** The longest text a shortcut types: a signature or an address, not a document. */
         const val MAX_TEXT = 200
+
+        /** [text]'s first [length] chars, one fewer where the last would be half a surrogate pair (an emoji's). */
+        fun clip(text: String, length: Int): String =
+            if (text.length > length && length > 0 && text[length - 1].isHighSurrogate()) text.take(length - 1) else text.take(length)
     }
 }
 
 /**
  * The commands a shortcut can run, by the [key] they are stored under (never renamed: a stored
- * key no command has any more reads as no shortcut). Offered in this order, grouped by [group].
+ * line whose key no command has any more is skipped, the key back to its preset, and the line gone
+ * the next time the shortcuts are saved). Offered in this order, grouped by [group].
  */
 enum class KeyCommand(val key: String, val group: Group) {
     SelectAll("select_all", Group.Edit),

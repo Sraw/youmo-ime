@@ -675,8 +675,7 @@
     <string name="picker_objects">物品</string>
     <string name="picker_symbols">符号</string>
     <string name="picker_flags">旗帜</string>
-    <string name="long_press_page_hint">点一个键，修改长按它弹出的字符。键上的小字就是其中第一个：长按后直接松手，或者滑动这个键，得到的都是它。</string>
-    <string name="long_press_legend">带框的键是改过的；变淡的键长按不弹出字符，滑动也不输入。</string>
+    <string name="long_press_legend">带框的键是改过的；变淡的键长按不弹出字符，往符号那层滑等于点这个键，快捷键照常。</string>
     <string name="long_press_none">长按这个键不弹出字符。</string>
     <string name="long_press_add_hint">添加字符，空格分隔</string>
     <string name="punctuation_page_hint">打中文时，按左边的键打出右边的标点；一个键对应几个标点时可以选。点一项可修改或删除。</string>
@@ -934,6 +933,8 @@
     <string name="shortcut_section_off">（现在关着，在“滑动”里打开）</string>
     <string name="shortcut_apply_presets">套用编辑快捷键</string>
     <string name="shortcut_clear_page">清除这一页的快捷键</string>
+    <string name="shortcut_apply_presets_message">把这一页的快捷键恢复成预设的编辑快捷键？这一页改过的会被替换。</string>
+    <string name="shortcut_clear_page_message">清除这一页所有键的快捷键（预设的也清除）？</string>
     <string name="shortcut_hint">点一个键，改它长按弹出的字符（第一个就是键角符号）和快捷键。</string>
     <string name="shortcut_hint_page">点一个键，改它的快捷键。</string>
     <string name="shortcut_now">现在：%s（在“滑动”里改）</string>

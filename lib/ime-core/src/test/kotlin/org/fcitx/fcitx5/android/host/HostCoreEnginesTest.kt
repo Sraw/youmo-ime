@@ -71,12 +71,92 @@ class HostCoreEnginesTest : EnginesFixture() {
         "nihao".forEach { core.sendKey(Key(it.code), virtual = true) }
         val shown = log.filterIsInstance<HostEvent.Candidates>().last().candidates.map { it.text }
         assertTrue(core.select(shown.indexOf("你"), "你"))
-        // pinyin holds a part chosen till the rest is: nothing committed, the choice made again too
-        val chosen = log.filterIsInstance<HostEvent.InputPanel>().last().preedit.toString()
+        // pinyin holds a part chosen till the rest is: nothing committed; a pick sent again by its
+        // index could choose another word, so what is typed then is dropped for good (review M2)
         val commits = log.filterIsInstance<HostEvent.Commit>()
-        assertTrue(core.retype(core.clearTyped()!!))
-        assertEquals(chosen, log.filterIsInstance<HostEvent.InputPanel>().last().preedit.toString())
+        val picked = core.clearTyped()!!
+        assertNull("a pick is not typed again", picked.keys)
+        assertFalse(core.retype(picked))
+        assertTrue(core.isEmpty())
         assertEquals(commits, log.filterIsInstance<HostEvent.Commit>())
+        // typed again after: a fresh log, the keys kept again
+        "ni".forEach { core.sendKey(Key(it.code), virtual = true) }
+        assertEquals(2, core.clearTyped()!!.keys!!.size)
+    }
+
+    // review2: the keyboard is the app's to tell (its layout and 双拼's scheme: ImKeyboards.typedWith),
+    // the keys' codes each going to a session of their own (KeyboardPair): the nine keys' typed again
+    // on the full keyboard would type a session shown on none
+    @Test
+    fun `what is typed is typed again on the keyboard it was typed with alone`() {
+        val core = core(engines())
+        val log = mutableListOf<HostEvent>()
+        core.events += HostEvents { log += it }
+        core.activate(1)
+        core.setCapabilities(Capability.PREEDIT or Capability.CLIENT_UNFOCUS_COMMIT)
+        core.focus(true)
+        fun preedit() = log.filterIsInstance<HostEvent.InputPanel>().last().preedit.toString()
+        "64".forEach { core.sendKey(Key(KeySyms.fromUnicode(Keyboard.pinyinNineKey(it))), virtual = true) }
+        assertEquals("ni", preedit())
+        val typing = core.clearTyped { "nine keys of $it" }!!
+        assertEquals("nine keys of ${InputMethodCatalog.PINYIN}", typing.keyboard)
+        assertFalse("another keyboard", core.retype(typing, "full keys"))
+        assertTrue(core.isEmpty())
+        assertTrue(core.retype(typing, "nine keys of ${InputMethodCatalog.PINYIN}"))
+        assertEquals("ni", preedit())
+        assertTrue(log.none { it is HostEvent.Commit })
+    }
+
+    // review2 M2: a digit or the keypad's digit picks while something is typed, a part of it
+    // chosen as a pick's is: never typed again, the list reordered since could give another word
+    @Test
+    fun `what is typed after a key picks a part of it is never typed again`() {
+        val core = core(engines())
+        val log = mutableListOf<HostEvent>()
+        core.events += HostEvents { log += it }
+        core.activate(1)
+        core.setCapabilities(Capability.PREEDIT or Capability.CLIENT_UNFOCUS_COMMIT)
+        core.focus(true)
+        fun candidates() = log.filterIsInstance<HostEvent.Candidates>().last().candidates.map { it.text }
+        // nihao's third is 你, a part, held till the rest is chosen. Space picks the same way (Keyboard's
+        // select) but takes the first, the whole sentence here: no part of it to hold
+        val picks = listOf(
+            Triple("3", "nihao", Key('3'.code)),
+            Triple("the keypad's 3", "nihao", Key(KeySyms.KP_0 + 3)),
+        )
+        for ((name, typed, key) in picks) {
+            core.reset()
+            typed.forEach { core.sendKey(Key(it.code), virtual = true) }
+            val shown = candidates()
+            assertTrue(name, core.sendKey(key, virtual = true))
+            assertTrue("$name: a part of $shown taken, the rest typed", !core.isEmpty())
+            assertTrue("$name: nothing committed: the pick alone tells", log.none { it is HostEvent.Commit })
+            val typing = core.clearTyped()!!
+            assertNull("$name: ${typing.keys}", typing.keys)
+            assertFalse(core.retype(typing))
+        }
+    }
+
+    // review M2: a candidate's long-press action (forget, pin, block) sent again by its index could
+    // land on another word, the list reordered by it: none is typed again, nor what follows it
+    @Test
+    fun `what is typed after a candidate's action is never typed again`() {
+        val core = core(engines())
+        val log = mutableListOf<HostEvent>()
+        core.events += HostEvents { log += it }
+        core.activate(1)
+        core.setCapabilities(Capability.PREEDIT or Capability.CLIENT_UNFOCUS_COMMIT)
+        core.focus(true)
+        "ni".forEach { core.sendKey(Key(it.code), virtual = true) }
+        val shown = log.filterIsInstance<HostEvent.Candidates>().last().candidates.map { it.text }
+        val i = shown.indices.first { core.candidateActions(it).isNotEmpty() }
+        val action = core.candidateActions(i).first()
+        core.triggerCandidateAction(i, action.id, shown[i])
+        assertTrue("still typing", !core.isEmpty())
+        core.sendKey(Key('h'.code), virtual = true)
+        val typing = core.clearTyped()!!
+        assertNull(typing.keys)
+        assertFalse(core.retype(typing))
     }
 
     @Test

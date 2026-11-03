@@ -102,6 +102,7 @@ import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
 import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
 import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
 import org.fcitx.fcitx5.android.input.learning.UndoChip
+import org.fcitx.fcitx5.android.input.shortcut.ClearedText
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.fcitx.fcitx5.android.utils.Locales
 import org.fcitx.fcitx5.android.utils.alpha
@@ -225,6 +226,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     /** nothing said out loud goes into a password, its characters shown or not */
     val inPasswordField get() = fieldPolicy.password
 
+    /** A password or a field asking for no learning (`IME_FLAG_NO_PERSONALIZED_LEARNING`): nothing of it kept. */
+    val inSensitiveField get() = capabilityFlags.hasAny(CapabilityFlag.PasswordOrSensitive)
+
     /**
      * A URL's or an email's field, where what is typed is what is meant ([PendingInputPolicy]). Read
      * on the main thread as a key is pressed: by the time fcitx gets to it, another field may have started.
@@ -250,6 +254,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     // Set on the main thread, read on fcitx's too (commitOverEngine)
     @Volatile
     private var startedWith: EditorInfo? = null
+
+    /** The input started last, null between fields: the token a clear is kept under ([ClearedText]). */
+    val startedField: EditorInfo? get() = startedWith
+
+    /** 清除's clears, to put back (恢复) in the input they were made in alone (review M1). */
+    val clearedText = ClearedText()
 
     // the field the floating window's cursor and drag are of, last typed on with the hardware keyboard
     private var cursorField: EditorInfo? = null
@@ -1113,6 +1123,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // restarted, the same field: what it had of the floating window stays its
         if (restarting && cursorField === startedWith) cursorField = attribute
         startedWith = attribute
+        // another field's clears are never put back here, nor kept once it is left; the screen turned is the same input
+        if (!again) clearedText.forget()
         // what commitOverEngine put in last, a paste into a password maybe, is not kept: the reset above
         // keeps it from being taken back anyway
         lastPosted.forget()
@@ -1479,6 +1491,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         capabilityFlags = CapabilityFlags.DefaultFlags
         startedWith = null
+        clearedText.forget()
         // not the finished field's EditorInfo kept; the same field's touch keyboard put away finishes no input (F1793)
         cursorField = null
         lastPosted.forget()

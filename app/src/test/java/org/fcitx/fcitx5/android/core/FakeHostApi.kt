@@ -224,12 +224,12 @@ class FakeHostApi : HostApi {
         calls += "reset()"
     }
 
-    override suspend fun clearTyped(): HostCore.Retyping? {
+    override suspend fun clearTyped(keyboard: (im: String) -> Any?): HostCore.Retyping? {
         calls += "clearTyped()"
         return null
     }
 
-    override suspend fun retype(typing: HostCore.Retyping): Boolean {
+    override suspend fun retype(typing: HostCore.Retyping, keyboard: Any?): Boolean {
         calls += "retype(${typing.im})"
         return false
     }

@@ -566,7 +566,7 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
         }
         // a key no swipe marks: its symbol alone, where 标点位置 puts one mark
         val placed = KeyMarks.place(
-            Unit, null, null, ThemeManager.prefs.punctuationPosition.getValue().marks,
+            Unit, null, null, markPosition(),
             landscape = orientation == Configuration.ORIENTATION_LANDSCAPE, compact = keyboardCompact(),
         )
         when {

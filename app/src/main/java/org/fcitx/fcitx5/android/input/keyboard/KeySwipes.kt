@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.data.theme.ThemePrefs.PunctuationPosition
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
 import org.fcitx.fcitx5.android.input.popup.PopupAction
@@ -34,6 +35,9 @@ internal class KeySwipes(
     /** What of [BaseKeyboard] a swipe reads and acts on. */
     interface Keyboard {
         val inPasswordField: Boolean
+
+        /** Whether a character key's shortcut is marked on it: its swipe runs it all the same. */
+        val charShortcutMarks: Boolean
         fun swipeText(view: KeyView): BaseKeyboard.SwipeChoice
         fun onAction(action: KeyAction, source: KeyActionListener.Source = KeyActionListener.Source.Keyboard)
         fun onPopupAction(action: PopupAction)
@@ -83,7 +87,7 @@ internal class KeySwipes(
     /** What the preview shows of [shortcut]: a command's name, a text as it is. */
     private fun shortcutLabel(shortcut: KeyShortcut): String = when (shortcut) {
         is KeyShortcut.Command -> board.context.getString(KeyShortcutLooks.of(shortcut.command).label)
-        is KeyShortcut.Text -> shortcut.text.take(PREVIEW_TEXT)
+        is KeyShortcut.Text -> KeyShortcut.clip(shortcut.text, PREVIEW_TEXT)
         KeyShortcut.None -> ""
     }
 
@@ -138,14 +142,15 @@ internal class KeySwipes(
     /** Each swiping key's marks ([KeyMarks]) as the settings are now: its symbol and its shortcut. */
     fun showMarks() {
         val layers = swipeLayers
-        val position = ThemeManager.prefs.punctuationPosition.getValue().marks
+        val position = markPosition()
         val compact = keyboardCompact()
         val landscape = board.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val charShortcuts = keyboard.charShortcutMarks
         swipingKeys.forEach { (view, def) ->
             val placed = when (val key = swipeKey(view, def)) {
                 is KeySwipe.Key.Char -> {
                     val symbol = KeyView.Mark.Symbol.takeIf { (view as? AltTextKeyView)?.altText?.text?.isNotEmpty() == true }
-                    KeyMarks.place(symbol, markOf(key.shortcut), layers.wayOf(SwipeLayers.Layer.Shortcut), position, landscape, compact)
+                    KeyMarks.place(symbol, markOf(key.shortcut).takeIf { charShortcuts }, layers.wayOf(SwipeLayers.Layer.Shortcut), position, landscape, compact)
                 }
                 is KeySwipe.Key.Function -> KeyMarks.placeFunction(
                     markOf(key.up), markOf(key.down), layers.up != SwipeLayers.Layer.Off, layers.down != SwipeLayers.Layer.Off, position, compact,
@@ -194,3 +199,10 @@ internal class KeySwipes(
 
 // a text shortcut's first characters in the preview, the rest of it too long to read there
 private const val PREVIEW_TEXT = 12
+
+/** Where the keys' marks go ([KeyMarks]) as 标点位置 says: the keyboard's, and the settings page's drawn like it. */
+internal fun markPosition(): KeyMarks.Position = when (ThemeManager.prefs.punctuationPosition.getValue()) {
+    PunctuationPosition.TopRight -> KeyMarks.Position.TopRight
+    PunctuationPosition.Bottom -> KeyMarks.Position.Bottom
+    PunctuationPosition.None -> KeyMarks.Position.None
+}

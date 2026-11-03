@@ -216,12 +216,15 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
         // on the nine keys a digit is a key: one not read (0) ends the input, as punctuation does
         val digit = c.digitToIntOrNull()?.takeUnless { nineKeys }
         return when {
-            composing && c == ' ' -> session.apply(Action.Select(0))
+            composing && c == ' ' -> select(0)
             // 1 is the first; 0 the tenth
-            composing && digit != null -> session.apply(Action.Select((digit + DIGITS - 1) % DIGITS))
+            composing && digit != null -> select((digit + DIGITS - 1) % DIGITS)
             else -> ended(c)
         }
     }
+
+    // a key's pick: told as one ([Snapshot.picked]), never a key to type again (KeyRouter's log)
+    private fun select(index: Int) = session.apply(Action.Select(index)).copy(picked = true)
 
     // the app types the key after what the session committed; but one that left something composing
     // (strokes' first of part of the pinyin picked, the rest typed) took it: typed, it would land before that
@@ -235,7 +238,7 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
         val digit = codePoint - '0'.code
         val picks = !english || composing && session.picksByDigit
         if (!picks || digit !in 0 until DIGITS) return char(codePoint)
-        return if (composing) session.apply(Action.Select((digit + DIGITS - 1) % DIGITS)) else passOn()
+        return if (composing) select((digit + DIGITS - 1) % DIGITS) else passOn()
     }
 
     // keys the session takes while something is typed, the app's otherwise

@@ -4,7 +4,10 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import android.view.View
+import android.widget.ImageView
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.theme.Theme
@@ -57,7 +60,7 @@ class KeyShortcutsScreenshotTest {
             h.start()
             // a's select all in its top right corner, its @ moved to the bottom right
             val a = h.key("a") as AltTextKeyView
-            assertEquals(android.view.View.VISIBLE, a.altText.visibility)
+            assertEquals(View.VISIBLE, a.altText.visibility)
             assertTrue(h.texts().contains("你好"))
             h.capture("KeyShortcutsScreenshotTest/default_light")
         }
@@ -84,5 +87,34 @@ class KeyShortcutsScreenshotTest {
         shot("nine")
         prefs.keyboard.pinyinKeyboard.setValue(PinyinKeyboard.Keys14)
         shot("keys14")
+    }
+
+    // the space swiped up: the edit menu over it, paste (straight up) picked, the cells the finger reaches next beside it
+    @Test
+    fun theEditMenuOverTheSpace() {
+        KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN).use { h ->
+            h.start()
+            // the icons up outside the keys: the bar's, then the menu's cells as well
+            fun icons() = KeyboardHarness.all(h.inputView).count { v ->
+                v is ImageView && h.shown(v) && generateSequence(v.parent as? View) { it.parent as? View }.none { it is KeyView }
+            }
+            val before = icons()
+            val space = h.inputView.findViewById<View>(R.id.button_space)
+            val finger = h.finger(space, h.at(space))
+            for (i in 1..6) finger.move(h.at(space, dy = -10f * i, ms = 16))
+            val menu = icons() - before
+            h.capture("KeyShortcutsScreenshotTest/edit_menu", h.inputView)
+            finger.up(h.at(space, dy = -60f))
+            assertEquals("select all, cut, copy, paste, undo", 5, menu)
+        }
+    }
+
+    // landscape's keys are low: one mark in the top right, two in their corners, the symbol never under the letter
+    @Test
+    @Config(qualifiers = "w851dp-h393dp-land-440dpi")
+    fun landscapeAndTheSymbolUnderTheLetterThere() {
+        shot("landscape")
+        position.setValue(PunctuationPosition.Bottom)
+        shot("landscape_bottom")
     }
 }

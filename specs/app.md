@@ -135,10 +135,19 @@ space and backspace lock a touch to one axis (`KeyGestureRecognizer.axisLock`). 
 wires it on the typing keyboards (`shortcuts = true`), buzzes at the threshold, opens the edit menu
 (`EditMenuLayout`, `PopupMenuUi.Fixed`) there; `KeyShortcutRunner` runs a shortcut after what is
 typed is in, the field's edits as `EditPlan` steps. 清除 (`EditPlan.clear`: what is typed, else the
-selection, else all before the cursor, else all after) is kept in memory (`ClearedText`), 恢复 putting
-clears back last first while the field reads as each left it; what was typed is dropped and typed
-again by `HostCore.clearTyped`/`retype` (the router's log of the keys since nothing was typed). The
-marks on a key are placed by `KeyMarks`; at 键盘高度 紧凑 (`KeyboardHeightLevels.isCompact`, read as the keys
+selection, else all before the cursor, else all after) is kept in memory (`ClearedText`, under the EditorInfo input started with, by identity, forgotten as
+input starts in another field or finishes; at most 16), 恢复 putting clears back last first while the
+field reads as each left it and nothing is typed (pinyin never reaching the field, a clear of what is
+typed drops those before it); what was typed is dropped and typed
+again by `HostCore.clearTyped`/`retype` (the router's log of the keys since nothing was typed: plain
+keys alone, a pick, a key's pick (a digit, space: `Snapshot.picked`) or a candidate's action ending it,
+as sent again by its index it could land on another word), on the keyboard it was typed with alone
+(`HostCore.Retyping.keyboard`, the app's `KeyShortcutRunner.keyboardOf`: `ImKeyboards.typedWith`, the
+layout shown and 双拼's scheme; another's keys' codes go to a session of their own). A selection the
+editor's report lags is cleared, not kept. A field kept from learning (`PasswordOrSensitive`) is cleared with nothing kept;
+an app's own `restartInput` is another input, its clears forgotten. The
+marks on a key are placed by `KeyMarks`, on the keyboard and on 按键字符和快捷键's keys (`KeyCaps`) alike;
+五笔's 全部字根 leaves the letters' shortcuts unmarked (`BaseKeyboard.charShortcutMarks`); at 键盘高度 紧凑 (`KeyboardHeightLevels.isCompact`, read as the keys
 are made by `keyboardCompact()`) one mark a key, top right (a key's symbol over its shortcut, a function
 key's up one), and the keys' text 0.9 (`KeyTextScale`, the smaller of it and floating's; 大千's symbols 0.9 again, `KeyTextScale.dachen`, cut off on a 360 dp phone otherwise). The service
 makes the keys anew only when a height change crosses into or out of 紧凑 (`compactBuilt`, as

@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.view.View
+import android.widget.ImageView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -20,6 +21,7 @@ import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.engine.table.TableRoots
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -48,6 +50,13 @@ class TablesKeysUatTest {
     // the keyboard of [im], as the engine tells it after its first answer
     private fun harness(im: String, name: String, state: TableKeyboard?): KeyboardHarness =
         KeyboardHarness(im = entry(im, name)).also { h = it }.start().apply { told(state) }
+
+    // the letter key whose corner shows [letter] (a table's roots on its face)
+    private fun letterKey(h: KeyboardHarness, letter: String) = KeyboardHarness.all(h.inputView).filterIsInstance<AltTextKeyView>()
+        .first { h.shown(it) && it.altText.text.toString() == letter }
+
+    // the command icons drawn on [letter]'s key: its shortcut's mark
+    private fun KeyboardHarness.shortcutIcons(letter: String) = KeyboardHarness.all(letterKey(this, letter)).count { it is ImageView && shown(it) }
 
     private fun KeyboardHarness.told(state: TableKeyboard?) {
         EngineState.tableKeyboardState.value = state
@@ -145,10 +154,17 @@ class TablesKeysUatTest {
         h.told(wubi(KeyLabels.NAMES))
         val names = h.texts()
         for (n in listOf("王", "土", "大", "木", "工", "纟", "z")) assertTrue("$n in $names", n in names)
+        assertEquals("a's select all marked beside its name", 1, h.shortcutIcons("a"))
         h.capture("TablesKeysUatTest/wubi_names", h.inputView)
         h.told(wubi(KeyLabels.ROOTS))
         assertTrue(h.texts().toString(), "王龶戋\n五一" in h.texts())
+        // the roots fill the key: no shortcut drawn over them, its swipe up selecting all the same
+        assertEquals(0, h.shortcutIcons("a"))
         h.capture("TablesKeysUatTest/wubi_roots", h.inputView)
+        h.field.setText("你好")
+        val a = letterKey(h, "a")
+        h.swipe(a, 0f, -a.height.toFloat())
+        assertEquals(0 to 2, h.field.selectionStart to h.field.selectionEnd)
         // held: its roots, large, nothing typed
         val before = h.api.calls.size
         val shown = h.longPress(h.key("王龶戋\n五一"))
