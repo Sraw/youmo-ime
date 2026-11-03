@@ -63,7 +63,9 @@ class CommonKeyActionListener :
     private val popup: PopupComponent by manager.must()
     private val bar: KawaiiBarComponent by manager.must()
 
-    private val shortcutRunner by lazy { KeyShortcutRunner(service, windowManager, bar::tradSimp, bar::chooseKeyboard) }
+    private val shortcutRunner by lazy {
+        KeyShortcutRunner(service, windowManager, bar::tradSimp, bar::chooseKeyboard) { !preeditState.isEmpty }
+    }
 
     private var lastPickerType by AppPrefs.getInstance().internal.lastPickerType
 
@@ -123,10 +125,14 @@ class CommonKeyActionListener :
                 is GlideAction -> service.postFcitxJob { offerGlide(action.glide) }
                 // the field's own commands after what is typed is in, on the main thread where its editor is
                 is ShortcutAction -> when ((action.shortcut as? KeyShortcut.Command)?.command) {
-                    // 清除 drops what is typed, committing nothing; 恢复 leaves it be
-                    KeyCommand.Clear -> service.postFcitxJob {
-                        val typing = clearTyped()
-                        ContextCompat.getMainExecutor(context).execute { shortcutRunner.clear(typing) }
+                    // 清除 drops what is typed, committing nothing; 恢复 leaves it be. The field's then, as
+                    // input may move on to another before the host answers
+                    KeyCommand.Clear -> {
+                        val field = service.startedField
+                        service.postFcitxJob {
+                            val typing = clearTyped()
+                            ContextCompat.getMainExecutor(context).execute { shortcutRunner.clear(typing, field) }
+                        }
                     }
                     KeyCommand.Restore -> shortcutRunner.restore()
                     else -> afterPendingInput {

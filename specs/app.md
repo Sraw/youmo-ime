@@ -135,9 +135,13 @@ space and backspace lock a touch to one axis (`KeyGestureRecognizer.axisLock`). 
 wires it on the typing keyboards (`shortcuts = true`), buzzes at the threshold, opens the edit menu
 (`EditMenuLayout`, `PopupMenuUi.Fixed`) there; `KeyShortcutRunner` runs a shortcut after what is
 typed is in, the field's edits as `EditPlan` steps. 清除 (`EditPlan.clear`: what is typed, else the
-selection, else all before the cursor, else all after) is kept in memory (`ClearedText`), 恢复 putting
-clears back last first while the field reads as each left it; what was typed is dropped and typed
-again by `HostCore.clearTyped`/`retype` (the router's log of the keys since nothing was typed). The
+selection, else all before the cursor, else all after) is kept in memory (`ClearedText`, under the EditorInfo input started with, by identity, forgotten as
+input starts in another field or finishes; at most 16), 恢复 putting clears back last first while the
+field reads as each left it and nothing is typed (pinyin never reaching the field, a clear of what is
+typed drops those before it); what was typed is dropped and typed
+again by `HostCore.clearTyped`/`retype` (the router's log of the keys since nothing was typed: plain
+keys alone, a pick or a candidate's action ending it, as sent again by its index it could land on
+another word). The
 marks on a key are placed by `KeyMarks`, on the keyboard and on 按键字符和快捷键's keys (`KeyCaps`) alike;
 五笔's 全部字根 leaves the letters' shortcuts unmarked (`BaseKeyboard.charShortcutMarks`). 注音 keyboards name their keys `zyfull/<QWERTY letter>` and
 `zy9/…` (`ZhuyinShortcutHook`, until their keyboards land). A long press's keys (`PopupKeyboardUi`, `PopupMenuUi`) are one small size whatever the

@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import android.view.KeyEvent
+import androidx.core.content.ContextCompat
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.host.HostCore
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
@@ -33,13 +34,12 @@ class KeyShortcutRunner(
     private val windowManager: InputWindowManager,
     private val tradSimp: () -> Unit,
     private val chooseKeyboard: () -> Unit,
+    /** Whether something is typed (the engine's preedit shown): no clear is put back over it. */
+    private val typing: () -> Boolean,
 ) {
-    private val cleared = ClearedText()
+    private val cleared: ClearedText get() = service.clearedText
 
     private val editor = InputConnectionEditor { service.currentInputConnection }
-
-    private val field: String
-        get() = service.currentInputEditorInfo?.let { "${it.packageName}/${it.fieldId}" } ?: ""
 
     fun run(shortcut: KeyShortcut) {
         when (shortcut) {
@@ -79,17 +79,19 @@ class KeyShortcutRunner(
     }
 
     /**
-     * 清除: [typing] what the engine dropped of what was typed (nothing committed), kept to type again;
-     * with nothing typed, the field cleared as [EditPlan.clear] says.
+     * 清除 in [field] (the input started then): [typing] what the engine dropped of what was typed
+     * (nothing committed), kept to type again; with nothing typed, the field cleared as [EditPlan.clear]
+     * says. Nothing done once input has moved on to another field.
      */
-    fun clear(typing: HostCore.Retyping?) {
+    fun clear(typing: HostCore.Retyping?, field: Any? = service.startedField) {
+        if (field == null || field !== service.startedField) return
         val password = service.inPasswordField
         val kept = if (typing != null) {
             typing.keys?.let { EditPlan.Cleared(read() ?: return, emptyList(), typing) }
         } else {
             val now = read() ?: return
             val range = service.currentInputSelection
-            val clearing = EditPlan.clear(now, minOf(range.start, range.end), READ_LIMIT, password)
+            val clearing = EditPlan.clear(now, range.start, range.end, READ_LIMIT, password)
             if (clearing.steps.isEmpty()) return
             apply(clearing.steps)
             clearing.cleared
@@ -103,18 +105,24 @@ class KeyShortcutRunner(
     }
 
     fun restore() {
-        val back = read()?.let { cleared.take(field, it) } ?: return service.say(R.string.nothing_to_restore)
-        val typing = back.typed as? HostCore.Retyping
-        if (typing != null) service.postFcitxJob { retype(typing) } else apply(back.restore)
+        val field = service.startedField
+        val back = field?.let { read()?.let { now -> cleared.take(field, now, typing()) } } ?: return service.say(R.string.nothing_to_restore)
+        val typed = back.typed as? HostCore.Retyping
+        if (typed == null) return apply(back.restore)
+        // the input method changed since, or the field: said, the clear gone all the same (review S4)
+        service.postFcitxJob {
+            if (!retype(typed)) ContextCompat.getMainExecutor(service).execute { service.say(R.string.nothing_to_restore) }
+        }
     }
 
-    // the field around its selection as a clear reads it; null without one
+    // the field around its selection as a clear reads it; null without one, or where the app gives
+    // neither side (no text read is no empty field: review S2)
     private fun read(): EditPlan.Field? {
         val ic = service.currentInputConnection ?: return null
         return EditPlan.Field(
-            ic.getTextBeforeCursor(READ_LIMIT, 0)?.toString() ?: "",
+            ic.getTextBeforeCursor(READ_LIMIT, 0)?.toString() ?: return null,
             ic.getSelectedText(0)?.toString() ?: "",
-            ic.getTextAfterCursor(READ_LIMIT, 0)?.toString() ?: "",
+            ic.getTextAfterCursor(READ_LIMIT, 0)?.toString() ?: return null,
         )
     }
 

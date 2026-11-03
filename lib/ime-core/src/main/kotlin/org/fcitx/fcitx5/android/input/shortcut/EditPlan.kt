@@ -22,6 +22,9 @@ object EditPlan {
 
         /** Over the selection: committed, or with "" deleted. */
         data class Replace(val text: String) : Step
+
+        /** [before] chars before the cursor and [after] after it deleted, from where the editor has it. */
+        data class Delete(val before: Int, val after: Int) : Step
     }
 
     /** The field as read around its selection, each side at most a limit's characters. */
@@ -53,24 +56,32 @@ object EditPlan {
     }
 
     /**
-     * 清除 with nothing typed, the field read as [field] with its selection from [start] (the editor's,
-     * so a side cut short at [limit] is cleared all the same): the selection; else all before the
-     * cursor; else all after it. Kept to put back when what went was read whole and is no [password].
+     * 清除 with nothing typed, the field read as [field], its selection [start]..[end] as the editor
+     * reported it: the selection; else all before the cursor; else all after it. A side read whole
+     * goes by its length from the cursor, where the editor has it (the reported cursor may lag); one
+     * cut short at [limit] to the field's edge, nothing kept. A selection whose text the app gave
+     * none of (or too long to) is deleted and not kept: with no text read it is no empty one, the
+     * side before it never cleared in its place (review S2). Nothing of a [password] is kept.
      */
-    fun clear(field: Field, start: Int, limit: Int, password: Boolean): Clearing {
+    fun clear(field: Field, start: Int, end: Int, limit: Int, password: Boolean): Clearing {
         val (before, selected, after) = field
+        val from = minOf(start, end)
         return when {
-            selected.isNotEmpty() -> Clearing(
+            start != end -> Clearing(
                 listOf(Step.Replace("")),
-                Cleared(Field(before, "", after), listOf(Step.Select(start, start), Step.Replace(selected), Step.Select(start, start + selected.length))),
+                Cleared(Field(before, "", after), listOf(Step.Select(from, from), Step.Replace(selected), Step.Select(from, from + selected.length)))
+                    .takeIf { selected.isNotEmpty() && selected.length < limit },
             )
+            before.length >= limit -> Clearing(listOf(Step.Select(0, from), Step.Replace("")), null)
             before.isNotEmpty() -> Clearing(
-                listOf(Step.Select(0, start), Step.Replace("")),
-                Cleared(Field("", "", after), listOf(Step.Select(0, 0), Step.Replace(before))).takeIf { before.length < limit },
+                listOf(Step.Delete(before.length, 0)),
+                Cleared(Field("", "", after), listOf(Step.Select(0, 0), Step.Replace(before))),
             )
+            // nothing before the cursor: all the field is after it
+            after.length >= limit -> Clearing(listOf(Step.ContextMenu(Menu.SelectAll), Step.Replace("")), null)
             after.isNotEmpty() -> Clearing(
-                listOf(Step.ContextMenu(Menu.SelectAll), Step.Replace("")),
-                Cleared(Field("", "", ""), listOf(Step.Replace(after), Step.Select(0, 0))).takeIf { after.length < limit },
+                listOf(Step.Delete(0, after.length)),
+                Cleared(Field("", "", ""), listOf(Step.Replace(after), Step.Select(0, 0))),
             )
             else -> Clearing(emptyList(), null)
         }.let { if (password) it.copy(cleared = null) else it }
@@ -85,6 +96,7 @@ object EditPlan {
                     is Step.ContextMenu -> menu(it.action)
                     is Step.Select -> editor.setSelection(it.start, it.end)
                     is Step.Replace -> editor.commitText(it.text, 1)
+                    is Step.Delete -> editor.deleteSurroundingText(it.before, it.after, false)
                 }
             }
         }
@@ -92,30 +104,53 @@ object EditPlan {
 }
 
 /**
- * The clears of the field in it, in memory only (a password's never), put back last first ([take])
- * while the field is as the clear left it: once anything else changed it, nothing is put back.
- * Another field's clears are forgotten as one is cleared there.
+ * The clears of the input started last, in memory only (a password's never), put back last first
+ * ([take]) while the field is as the clear left it and nothing is typed: once anything else changed
+ * it, nothing is put back. Forgotten ([forget]) as input starts in another field or finishes, so a
+ * clear is never put back in another field that reads the same, nor kept once its field is left
+ * (review M1); at most [MAX] kept.
  */
 class ClearedText {
 
-    private var field: String? = null
+    private var field: Any? = null
     private val clears = ArrayDeque<EditPlan.Cleared>()
 
-    /** [field] (the app's name for it) cleared: [cleared] kept, or null when that clear could not be. */
-    fun remember(field: String, cleared: EditPlan.Cleared?) {
-        if (field != this.field) clears.clear()
-        this.field = field
-        // one not kept breaks the chain: those before it were left by a field since changed
-        if (cleared == null) clears.clear() else clears.addLast(cleared)
+    /** All forgotten: input started anew or finished. */
+    fun forget() {
+        field = null
+        clears.clear()
     }
 
-    /** The last clear to put back in [field], read as [now]; null, all forgotten, when it changed since. */
-    fun take(field: String, now: EditPlan.Field): EditPlan.Cleared? {
-        val last = clears.lastOrNull()?.takeIf { field == this.field } ?: return null
-        if (last.left != now) {
+    /**
+     * [field] (the app's token for the input it started, told from another by identity alone)
+     * cleared: [cleared] kept, or null when that clear could not be.
+     */
+    fun remember(field: Any, cleared: EditPlan.Cleared?) {
+        if (field !== this.field) clears.clear()
+        this.field = field
+        // one not kept breaks the chain: those before it were left by a field since changed. What was
+        // typed is typing since those before it, which the field, never showing it, cannot tell (review S1)
+        if (cleared == null || cleared.typed != null) clears.clear()
+        if (cleared == null) return
+        clears.addLast(cleared)
+        if (clears.size > MAX) clears.removeFirst()
+    }
+
+    /**
+     * The last clear to put back in [field], read as [now]; null, all forgotten, when it changed since
+     * or something is [typing] (put back, a clear would drop it or go in under it: review S1).
+     */
+    fun take(field: Any, now: EditPlan.Field, typing: Boolean): EditPlan.Cleared? {
+        val last = clears.lastOrNull()?.takeIf { field === this.field } ?: return null
+        if (typing || last.left != now) {
             clears.clear()
             return null
         }
         return clears.removeLast()
+    }
+
+    companion object {
+        /** The clears kept at most: one cleared, typed and cleared again a field's whole life is no stack to grow without end. */
+        const val MAX = 16
     }
 }
