@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.PunctuationPosition
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -23,6 +24,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkYield
 import org.fcitx.fcitx5.android.input.keyboard.KeyTextScale
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -164,14 +166,61 @@ class CompactKeyboardUatTest {
         val floating = FloatingKeyboard.textScale(FloatingKeyboard.widthDp(screen), screen)
         // the smaller, not the product (051-compact §1.3)
         assertEquals(size * minOf(KeyTextScale.COMPACT, floating), h.key("q").size(), 0.5f)
-        // narrow keys: each letter clear of its symbol in the top right (d and + crossed)
+        // narrow keys: each letter clear of its symbol in the top right (d and + crossed), the
+        // symbols moved into their corners and smaller, the letters where they were (w sat lower, a
+        // further left), Shift's capitals too
+        val lower = lettersStayClearOfTheirSymbols()
+        // @ beside a: into the corner and smaller, as far as it goes, the letters as they were
+        assertTrue(lower.any { it.altText.scaleX < 1f })
+        assertEquals(1f, lower[0].mainText.scaleX, 0f)
+        h.tap(h.described("Shift"))
+        h.idle()
+        assertEquals("Q", h.key("Q").mainText.text.toString())
+        // A taller than a, @ as small as it goes: every letter as much smaller
+        val upper = lettersStayClearOfTheirSymbols()
+        assertTrue(upper[0].mainText.scaleX.toString(), upper[0].mainText.scaleX in (1f - KeyMarkYield.MAX_LETTER_SHRINK)..0.95f)
+    }
+
+    @Test
+    @Uat("ST-51")
+    fun oneHandedLettersStayInTheirRows() {
+        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
+        compact()
+        h.start()
+        // @, +, / and \ nudged into their corners, none smaller, the letters as they were
+        val lower = lettersStayClearOfTheirSymbols()
+        assertEquals(setOf("a", "d", "h", "m"), lower.filter { it.altText.moved() }.map { it.mainText.text.toString() }.toSet())
+        assertTrue(lower.all { it.altText.scaleX == 1f && it.mainText.scaleX == 1f })
+        h.tap(h.described("Shift"))
+        h.idle()
+        assertTrue(lettersStayClearOfTheirSymbols().any { it.altText.moved() })
+        // the standard height: the letters their size too
+        fresh()
+        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
+        h.start()
+        assertTrue(lettersStayClearOfTheirSymbols().all { it.mainText.scaleX == 1f })
+    }
+
+    private fun View.moved() = scaleX < 1f || translationX != 0f || translationY != 0f
+
+    // each letter and its symbol's ink apart; the letters unmoved, one size, a row's on one baseline
+    private fun lettersStayClearOfTheirSymbols(): List<AltTextKeyView> {
         val letters = KeyboardHarness.all(h.inputView).filterIsInstance<AltTextKeyView>().filter { h.shown(it) && it.altText.text.isNotEmpty() }.toList()
         assertTrue(letters.size.toString(), letters.size >= 26)
         for (k in letters) {
             val letter = ink(k.mainText)
             val symbol = ink(k.altText)
             assertFalse("${k.mainText.text}: $letter, ${k.altText.text}: $symbol", RectF.intersects(letter, symbol))
+            assertEquals(0f, k.mainText.translationX, 0f)
+            assertEquals(0f, k.mainText.translationY, 0f)
+            assertEquals(letters[0].mainText.scaleX, k.mainText.scaleX, 0f)
+            if (k.mainText.scaleX < 1f) assertEquals(k.mainText.baseline.toFloat(), k.mainText.pivotY, 0f)
         }
+        for ((_, row) in letters.groupBy { h.box(it).top }) {
+            val baselines = row.map { h.box(it.mainText).top + it.mainText.baseline }.distinct()
+            assertEquals(row.joinToString { it.mainText.text }, 1, baselines.size)
+        }
+        return letters
     }
 
     // [v]'s glyphs as drawn, moved and scaled, in its parent's coordinates

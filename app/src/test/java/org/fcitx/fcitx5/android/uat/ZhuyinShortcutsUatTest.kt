@@ -80,6 +80,16 @@ class ZhuyinShortcutsUatTest {
         assertEquals(1, icons(m))
         assertEquals(0, icons(h.faced("ㄋ")))
         for (face in listOf("ㄏ", "ㄌ", "ㄒ", "ㄈ", "ㄗ")) assertEquals(face, 1, icons(h.faced(face)))
+        // at the standard height only symbols whose ink meets their icon's give way, each down a
+        // little (ㄌ under the scissors the most), none smaller; ㄋ, no icon, and the rest as they were
+        val moved = KeyboardHarness.all(h.keyboard).filterIsInstance<TextKeyView>()
+            .filter { it.mainText.run { translationX != 0f || translationY != 0f || scaleX != 1f } }
+        assertEquals(setOf("ㄇ", "ㄈ", "ㄌ", "ㄏ", "ㄒ", "ㄗ"), moved.map { it.mainText.text.toString() }.toSet())
+        for (k in moved) k.mainText.run {
+            assertEquals(0f, translationX, 0f)
+            assertTrue("$text ${translationY}", translationY > 0f && translationY < k.height / 4f)
+            assertEquals(1f, scaleX, 0f)
+        }
         h.capture("ZhuyinShortcutsUatTest/dachen")
         h.swipe(m, 0f, -m.height * 1.3f)
         h.idle()

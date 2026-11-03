@@ -382,31 +382,42 @@ open class TextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.Text) 
     /** Its corner symbol, wherever it is: [AltTextKeyView]'s. */
     protected open val cornerSymbol: View? get() = null
 
-    private val labelInk = RectF()
-    private val markInk = RectF()
+    protected val labelInk = RectF()
+    protected val markInk = RectF()
 
-    // the label out of the way of its corner's mark, where their ink meets (KeyMarkYield): 大千's
-    // symbols on its narrow keys (ㄌ under the scissors), a letter beside its symbol on the floating
-    // and one-handed keyboards at 紧凑. After the face's own layout: the key's onLayout saw the mark
-    // before it was placed
-    private fun yieldToMark() {
-        val mark = topRightCorner?.takeIf { it.visibility == View.VISIBLE }
-        // each one moved or shrunk last time, the corner's maybe another now
+    /**
+     * Its corner's mark, each one moved or shrunk last time put back first (the corner's maybe
+     * another now), its ink and the label's measured; null for none, or ink not measured.
+     */
+    protected fun measureCorner(): View? {
         for (v in listOfNotNull(mainText, topRightMark, cornerSymbol)) {
             v.translationX = 0f
             v.translationY = 0f
             v.scaleX = 1f
             v.scaleY = 1f
         }
-        if (mark == null || !mainText.inkBounds(labelInk)) return
+        val mark = topRightCorner?.takeIf { it.visibility == View.VISIBLE }
+        if (mark == null || !mainText.inkBounds(labelInk)) return null
         if (mark is AutoScaleTextView) {
-            if (!mark.inkBounds(markInk)) return
+            if (!mark.inkBounds(markInk)) return null
         } else {
             markInk.set(0f, 0f, mark.width.toFloat(), mark.height.toFloat())
         }
+        return mark
+    }
+
+    /** The face's sides, its key's margins in. */
+    protected fun face() = KeyMarkYield.Ink(
+        hMargin.toFloat(), vMargin.toFloat(), (appearanceView.width - hMargin).toFloat(), (appearanceView.height - vMargin).toFloat(),
+    )
+
+    // the label out of the way of its corner's mark, where their ink meets (KeyMarkYield): 大千's
+    // symbols on its narrow keys (ㄌ under the scissors). After the face's own layout: the key's
+    // onLayout saw the mark before it was placed
+    protected open fun yieldToMark() {
+        val mark = measureCorner() ?: return
         val y = KeyMarkYield.of(
-            ink(mainText, labelInk), ink(mark, markInk),
-            KeyMarkYield.Ink(hMargin.toFloat(), vMargin.toFloat(), (appearanceView.width - hMargin).toFloat(), (appearanceView.height - vMargin).toFloat()),
+            ink(mainText, labelInk), ink(mark, markInk), face(),
             gap = dp(1).toFloat(), markShrinks = mark is AutoScaleTextView,
         )
         mainText.translationX = y.dx
@@ -426,7 +437,7 @@ open class TextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.Text) 
     }
 
     // [r], in [v]'s coordinates, in the face's
-    private fun ink(v: View, r: RectF) = KeyMarkYield.Ink(v.left + r.left, v.top + r.top, v.left + r.right, v.top + r.bottom)
+    protected fun ink(v: View, r: RectF) = KeyMarkYield.Ink(v.left + r.left, v.top + r.top, v.left + r.right, v.top + r.bottom)
 
     init {
         appearanceView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> yieldToMark() }
@@ -504,6 +515,49 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
             add(altText, lParams(wrapContent, wrapContent))
         }
         applyLayout(resources.configuration.orientation)
+    }
+
+    // the letter stays where it is, as its row's do: the keyboard settles them all at once (letters)
+    override fun yieldToMark() = Unit
+
+    private var corner: View? = null
+
+    /**
+     * Its letter and corner as [KeyMarkYield.letters] takes them, after [BaseKeyboard]'s layout;
+     * null for a letter not measured.
+     */
+    internal fun letterKey(): KeyMarkYield.LetterKey? {
+        corner = measureCorner()
+        if (corner == null && !mainText.inkBounds(labelInk)) return null
+        val face = face()
+        val mark = corner
+        return KeyMarkYield.LetterKey(
+            ink(mainText, labelInk),
+            baseline = (mainText.top + mainText.baseline).toFloat(),
+            symbol = mark?.let { ink(it, markInk) },
+            // clear of the face's rounded corner
+            room = KeyMarkYield.Ink(face.left, face.top + dp(1), face.right - dp(2), face.bottom),
+            symbolDp = ((mark as? AutoScaleTextView)?.textSize ?: mark?.height?.toFloat() ?: 0f) / resources.displayMetrics.density,
+        )
+    }
+
+    /** Its letter scaled by [scale] about its middle on its baseline, its corner as [c] says. */
+    internal fun settle(scale: Float, c: KeyMarkYield.Corner) {
+        if (scale < 1f) {
+            mainText.pivotX = labelInk.centerX()
+            mainText.pivotY = mainText.baseline.toFloat()
+            mainText.scaleX = scale
+            mainText.scaleY = scale
+        }
+        val mark = corner ?: return
+        mark.translationX = c.dx
+        mark.translationY = c.dy
+        if (c.scale < 1f) {
+            mark.pivotX = markInk.right
+            mark.pivotY = markInk.top
+            mark.scaleX = c.scale
+            mark.scaleY = c.scale
+        }
     }
 
     private fun applyTopRightAltTextPosition() {

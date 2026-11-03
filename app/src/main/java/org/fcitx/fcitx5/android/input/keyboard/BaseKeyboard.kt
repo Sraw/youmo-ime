@@ -231,6 +231,20 @@ abstract class BaseKeyboard(
         rowKeys.firstOrNull { view in it.keys }?.let { fitRow(it.keys, it.widths) }
     }
 
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        settleLetters()
+    }
+
+    // after the keys' own layout: their letters clear of their symbols (KeyMarkYield.letters), at one
+    // size and on one baseline (a letter moved alone sat out of its row: floating at 紧凑, w lower, a left)
+    private fun settleLetters() {
+        val keys = rowKeys.flatMap { it.keys }.filterIsInstance<AltTextKeyView>().filter { it.isVisible }
+            .mapNotNull { k -> k.letterKey()?.let { k to it } }
+        val letters = KeyMarkYield.letters(keys.map { it.second }, gap = dp(1).toFloat())
+        keys.forEachIndexed { i, (k, _) -> k.settle(letters.scale, letters.corners[i]) }
+    }
+
     init {
         isMotionEventSplittingEnabled = true
         keyRows = keyLayout.mapIndexed { rowIndex, row ->

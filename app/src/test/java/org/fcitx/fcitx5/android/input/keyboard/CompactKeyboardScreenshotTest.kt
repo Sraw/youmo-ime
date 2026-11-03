@@ -107,13 +107,19 @@ class CompactKeyboardScreenshotTest {
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun everyKeyboardTurned() = shoot("land")
 
-    // the full keyboard with the layouts 紧凑 meets: floating, one-handed, dark; split turned
-    private fun shootFull(name: String, theme: Theme = ThemePreset.PixelLight) {
+    // the full keyboard with the layouts 紧凑 meets: floating, one-handed, dark; split turned; [shift]:
+    // its capitals too, taller beside their symbols
+    private fun shootFull(name: String, theme: Theme = ThemePreset.PixelLight, shift: Boolean = false) {
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
         KeyboardHarness(theme).use { h ->
             h.start()
             h.capture("CompactKeyboardScreenshotTest/$name", h.inputView)
+            if (shift) {
+                h.tap(h.described("Shift"))
+                h.idle()
+                h.capture("CompactKeyboardScreenshotTest/${name}_shift", h.inputView)
+            }
         }
     }
 
@@ -122,10 +128,10 @@ class CompactKeyboardScreenshotTest {
     @Config(qualifiers = "w393dp-h851dp-port-440dpi")
     fun floatingOneHandedAndDark() {
         prefs.set(ThemeManager.prefs.floatingKeyboard, true)
-        shootFull("floating_port")
+        shootFull("floating_port", shift = true)
         ThemeManager.prefs.floatingKeyboard.setValue(false)
         prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
-        shootFull("one_handed_port")
+        shootFull("one_handed_port", shift = true)
         ThemeManager.prefs.oneHanded.setValue(OneHanded.Off)
         shootFull("dark_port", ThemePreset.PixelDark)
     }
