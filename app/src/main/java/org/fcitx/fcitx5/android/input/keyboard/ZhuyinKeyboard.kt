@@ -8,8 +8,17 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.view.View
 import androidx.annotation.Keep
+import androidx.annotation.VisibleForTesting
 import androidx.core.view.isVisible
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
@@ -17,6 +26,7 @@ import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
@@ -28,8 +38,9 @@ import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
  * [nine] false: 大千, the 41 keys where Taiwan's keyboards print them ([ZhuyinKeys.DACHEN_QWERTY], the
  * keys named by their QWERTY place), the tones ˊˇˋ˙ on the number row; a space after a syllable is
  * its first tone, the session's. [nine]: 注音九键, the symbols in [ZhuyinKeys.GROUP_SYMBOLS]' 11 groups,
- * three a row, the tone key last: a tap ends the syllable, its tone left to the engine (分词 too), its long press each tone; a
- * group's long press each of its symbols, typed as it is. The bottom row is the grouped keyboards'.
+ * three a row, and on the left the tones ˉ ˊ ˇ ˋ a key each (˙ on ˉ's long press), as Taiwan's
+ * 元書 has them: each ends the syllable and filters by its tone. The key after the last group is
+ * 分词 while typing, punctuation else (pinyin's nine keys' 1). A group's long press each of its symbols. The bottom row is the grouped keyboards'.
  */
 @SuppressLint("ViewConstructor")
 class ZhuyinKeyboard(
@@ -45,8 +56,12 @@ class ZhuyinKeyboard(
         // 大千's keys row by row, by their QWERTY place
         private val ROWS = listOf("1234567890-", "qwertyuiop", "asdfghjkl;", "zxcvbnm,./")
 
-        private const val SIDE = 0.16f
-        private const val GROUP = 0.28f
+        private const val SIDE = 0.14f
+        private const val GROUP = 0.24f
+
+        // the slot in the grid's last row: after the tone ˋ and the groups ㄈㄌㄝ and ㄖㄥㄩ
+        private const val SLOT_ROW = 3
+        private const val SLOT_COLUMN = 3
 
         private fun sym(code: Int) = KeyAction.SymAction(KeySym(UNICODE + code), KeyStates.Virtual)
 
@@ -75,18 +90,58 @@ class ZhuyinKeyboard(
             if (r == 3) keys + BackspaceKey(0.15f) else keys
         } + listOf(GroupedKeyboard.bottomRow())
 
+        /** The 分词 key's face while something is typed; else [PUNCTUATION]'s first, which it types. */
+        internal const val SEPARATOR = "分词"
+        internal const val PUNCTUATION = "，"
+        private val PUNCTUATION_MORE = arrayOf("。", "？", "！", "、", "：", "；")
+
+        /**
+         * The key in the grid after ㄖㄥㄩ's group: 分词 while [typing], else punctuation, as pinyin's nine keys' 1.
+         * Its comma a key sym, not the bottom row's [KeyAction.HostKeyAction]: [onAction] tells the two apart
+         * by it, and the bottom row's stays a comma while typing.
+         */
+        internal fun slotAction(typing: Boolean): KeyAction =
+            if (typing) sym(Keyboard.zhuyinNineTone(0)) else KeyAction.SymAction(KeySym(','.code), KeyStates.Virtual)
+
+        // ˉ ˊ ˇ ˋ: a tap each, as 元書's zhuyin nine keys; ˙ on ˉ's long press and swipe
+        private fun toneKey(tone: Int): KeyDef {
+            val mark = ZhuyinKeys.MARKS[tone - 1].toString()
+            val neutral = ZhuyinKeys.MARKS[4].toString()
+            return KeyDef(
+                KeyDef.Appearance.Text(mark, 20f, percentWidth = SIDE, variant = KeyDef.Appearance.Variant.Alternative),
+                if (tone == 1) {
+                    setOf(KeyDef.Behavior.Press(sym(Keyboard.zhuyinNineTone(1))), KeyDef.Behavior.Swipe(sym(Keyboard.zhuyinNineTone(5))))
+                } else {
+                    setOf(KeyDef.Behavior.Press(sym(Keyboard.zhuyinNineTone(tone))))
+                },
+                if (tone == 1) arrayOf(KeyDef.Popup.Preview(mark), KeyDef.Popup.Keyboard.Explicit(arrayOf(neutral))) else arrayOf(KeyDef.Popup.Preview(mark)),
+            )
+        }
+
         internal fun nineLayout(): List<List<KeyDef>> {
             val groups = ZhuyinKeys.GROUP_SYMBOLS.mapIndexed { g, symbols ->
                 key(symbols, 18f, GROUP, sym(Keyboard.zhuyinNineKey(g)), arrayOf(KeyDef.Popup.Keyboard.Explicit(symbols.map { it.toString() }.toTypedArray())))
             }
-            val tone = key(
-                ZhuyinKeys.MARKS, 16f, GROUP, sym(Keyboard.zhuyinNineTone(0)),
-                arrayOf(KeyDef.Popup.Keyboard.Explicit(ZhuyinKeys.MARKS.map { it.toString() }.toTypedArray())),
+            val slot = KeyDef(
+                KeyDef.Appearance.Text(PUNCTUATION, 18f, percentWidth = GROUP),
+                setOf(KeyDef.Behavior.Press(slotAction(typing = false))),
+                arrayOf(KeyDef.Popup.Keyboard.Explicit(PUNCTUATION_MORE, asIs = true)),
             )
-            val keys = groups + tone
-            // no 分词: the tone key's tap ends a syllable as one does
+            val keys = groups + slot
             val side = listOf(BackspaceKey(SIDE)) + listOf("?", "!", "~").map { SymbolKey(it, SIDE, KeyDef.Appearance.Variant.Alternative) }
-            return (0 until 4).map { r -> keys.subList(3 * r, 3 * r + 3) + side[r] } + listOf(GroupedKeyboard.bottomRow())
+            val rows = (0 until 4).map { r -> listOf(toneKey(r + 1)) + keys.subList(3 * r, 3 * r + 3) + side[r] }
+            check(rows[SLOT_ROW][SLOT_COLUMN] === slot)
+            return rows + listOf(GroupedKeyboard.bottomRow())
+        }
+
+        /**
+         * Whether [action] types a zhuyin symbol on 注音九键 (a group's or a long press's symbol): the
+         * slot is 分词 after it. Not a tone: one tapped with nothing typed types nothing, and the
+         * engine, its state unchanged, would never tell the slot back to punctuation.
+         */
+        internal fun typesSymbol(action: KeyAction): Boolean {
+            val code = (action as? KeyAction.SymAction)?.sym?.sym?.minus(UNICODE) ?: return false
+            return code in Keyboard.ZHUYIN_NINE && (code - Keyboard.ZHUYIN_NINE.first).let { it < ZhuyinKeys.GROUPS || it > ZhuyinKeys.GROUPS + ZhuyinKeys.TONES }
         }
 
         /** A symbol or tone a long press offered, as its code; anything else as it is. */
@@ -134,10 +189,54 @@ class ZhuyinKeyboard(
         listOf(R.id.button_comma to ",", R.id.button_period to ".").forEach { (id, p) ->
             findViewById<TextKeyView>(id).mainText.text = mapping.getOrDefault(p, p)
         }
+        // the slot's comma the same: ，or, as the bottom row's
+        comma = mapping.getOrDefault(",", ",")
+        if (!typing) slot?.mainText?.text = comma
+    }
+
+    // something typed, as the engine last told
+    private var typing = false
+
+    // the slot's face when nothing is typed: the comma it types, as punctuation maps it
+    private var comma = PUNCTUATION
+
+    private val slot: TextKeyView? by lazy {
+        if (!nine) null else keyRows[SLOT_ROW].getChildAt(SLOT_COLUMN) as TextKeyView
+    }
+
+    private var scope: CoroutineScope? = null
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (!nine) return
+        scope = CoroutineScope(Dispatchers.Main.immediate + Job()).also { s ->
+            s.launch {
+                EngineState.syllables.map { it.im == InputMethodCatalog.PINYIN && it.composing }.collectLatest(::showTyping)
+            }
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        scope?.cancel()
+        scope = null
+        super.onDetachedFromWindow()
+    }
+
+    @VisibleForTesting
+    internal fun showTyping(now: Boolean) {
+        if (now == typing) return
+        typing = now
+        slot?.mainText?.text = if (now) SEPARATOR else comma
     }
 
     override fun onAction(action: KeyAction, source: KeyActionListener.Source) {
-        super.onAction(resolve(action, source, nine), source)
+        // the slot's tap as the engine last told: 分词 while typing, punctuation else
+        val out = if (nine && source == KeyActionListener.Source.Keyboard && action == slotAction(typing = false)) slotAction(typing) else action
+        val sent = resolve(out, source, nine)
+        // a group or symbol sent to pinyin: the next tap of the slot is 分词, though the engine has not told
+        // yet (not to another input method, which would never tell it back)
+        if (nine && typesSymbol(sent) && EngineState.syllables.value.im == InputMethodCatalog.PINYIN) showTyping(true)
+        super.onAction(sent, source)
     }
 
     override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
