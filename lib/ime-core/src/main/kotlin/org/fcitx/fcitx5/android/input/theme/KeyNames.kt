@@ -41,7 +41,7 @@ object KeyNames {
 
     private val letters = ('a'..'z').map(Char::toString)
 
-    // a 3×4 grid's cells, row by row
+    // a grid's cells, row by row
     private fun cells(rows: List<Int>) = rows.flatMapIndexed { r, n -> (1..n).map { c -> "r${r + 1}c$c" } }
 
     /** Each board's keys named by their place. */
@@ -50,7 +50,8 @@ object KeyNames {
         // as on a computer's 大千 keyboard: ㄅ is 1, ㄆ q
         ZHUYIN to "1234567890-qwertyuiopasdfghjkl;zxcvbnm,./".map(Char::toString),
         NINE to (1..9).map(Int::toString) + "0" + "side",
-        ZHUYIN_NINE to cells(listOf(3, 3, 3, 3)) + "0" + "side",
+        // its 4×5 block: the tones (c1), the groups and the slot (c2–c4), ? ! ~ (c5); ⌫, r1c5, by its role
+        ZHUYIN_NINE to cells(listOf(5, 5, 5, 5)) - "r1c5",
         K14 to cells(listOf(5, 5, 4)),
         K18 to cells(listOf(7, 6, 5)),
         // the digits and every sign a pad has beside them (NumberPad)

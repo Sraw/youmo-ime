@@ -273,13 +273,39 @@ test('the built-in themes are the app\'s eleven', () => {
   }
 });
 
-test('the stand-in layout or the measured one has what the preview draws', () => {
-  assert.ok(layout.views.length > 0);
-  const roles = layout.names.roles;
+test('the measured layout and icons have what the preview draws', () => {
+  const icons = JSON.parse(block('youmo-icons'));
+  assert.equal(layout.format, 1);
+  assert.deepEqual(layout.palette, Object.keys(format.types.Palette));
+  assert.ok(layout.phones.length > 0 && layout.views.length > 0);
+  const phones = new Set(layout.phones.map((p) => p.id));
+  const box = (r) => assert.ok(Array.isArray(r) && r.length === 4 && r.every(Number.isFinite) && r[2] >= 0 && r[3] >= 0, JSON.stringify(r));
+  const color = (c) => assert.ok(layout.palette.includes(c) || /^#[0-9A-F]{8}$/i.test(c), c);
+  const text = (e) => { box(e.r); color(e.c); assert.ok(typeof e.s === 'string' && e.z > 0 && Number.isFinite(e.y)); };
+  const icon = (e) => { box(e.r); color(e.c); assert.ok(icons[e.i], e.i); };
   for (const v of layout.views) {
-    for (const e of v.els) {
-      if (e.t !== 'key' || !e.name) continue;
-      assert.ok(L.isKnownKeyName(layout.names, e.name) || roles.includes(L.parseKeyName(e.name).key), e.name);
+    assert.ok(phones.has(v.phone), v.phone);
+    assert.ok(['normal', 'one-handed', 'floating'].includes(v.mode), v.mode);
+    assert.equal(v.items.filter((e) => e.t === 'base').length, 1);
+    for (const e of v.items) {
+      if (e.t === 'key') {
+        box(e.r);
+        assert.ok(['letter', 'function', 'space', 'enter'].includes(e.k), e.k);
+        if (e.n) assert.ok(L.isKnownKeyName(layout.names, e.n), e.n);
+        for (const x of e.l || []) text(x);
+        for (const x of e.i || []) icon(x);
+      } else if (e.t === 'text') text(e);
+      else if (e.t === 'icon') icon(e);
+      else if (e.t === 'fill') { box(e.r); color(e.c); }
+      else assert.ok(['base', 'bar'].includes(e.t), e.t);
     }
+  }
+  for (const ic of Object.values(icons)) {
+    assert.ok(ic.vw > 0 && ic.vh > 0 && ic.paths.length > 0);
+    for (const p of ic.paths) assert.equal(typeof p.d, 'string');
+  }
+  // the default phone's portrait keyboard has every board the page offers, idle
+  for (const b of ['qwerty', 'nine', 'k14', 'k18', 'zhuyin', 'zhuyin-nine', 'number', 'symbols']) {
+    assert.ok(layout.views.some((v) => v.phone === layout.phones[0].id && !v.land && v.board === b && v.mode === 'normal' && v.state === 'idle'), b);
   }
 });

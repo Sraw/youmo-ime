@@ -141,7 +141,7 @@ class ThemeMakerFormatTest {
                 put("text", pretty.encodeToJsonElement(TextJson.of(LookDefaults.TEXT)))
             })
         }
-        ThemeMakerTestdata.checkBlock("youmo-format", pretty.encodeToString(JsonElement.serializer(), format))
+        ThemeMakerTestdata.block("youmo-format", pretty.encodeToString(JsonElement.serializer(), format))
     }
 
     @Test
@@ -159,7 +159,7 @@ class ThemeMakerFormatTest {
                 put("palette", Json.encodeToJsonElement(PaletteJson.of(t.look.palette)))
             })
         }
-        ThemeMakerTestdata.checkBlock("youmo-presets", pretty.encodeToString(JsonElement.serializer(), presets))
+        ThemeMakerTestdata.block("youmo-presets", pretty.encodeToString(JsonElement.serializer(), presets))
     }
 
     // an image is a PNG (its header's size), a font a TrueType or OpenType file: what an import reads, off Android
