@@ -114,10 +114,19 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    counted apart from the decoder's pairs, which leave out words of no reading), one turned off
    there (不再联想) never. A whole commit of 3 to 12 letters (`learn/Phrases`) is counted as a phrase
    (`LearnState.phrases`, snapshot row `PhraseRow`, type 49; a 联想 that went on with one counts it through
-   `Commit.continued`, appended); used whole 3 times, the rest of it (2 characters or more) is offered first
+   `Commit.continued`, appended); not one of Chinese numerals alone (`Phrases.NUMERALS`: 一二三, 幺三八,
+   贰仟伍佰; a number put in as words, user 2026-11-02), one with other words in it is (三个人). Used whole 3
+   times, the rest of it (2 characters or more) is offered first
    after the text before ends its start from a word's start, covering the last word put in
    (`user/Continuations`, kept in `UserModel.continuations` by `HabitCounts`; U-73): at most 2, in front of
-   the words but a word the user put first there. Only the start is looked at, not what is before it (C51):
+   the words but a word the user put first there; two phrases of the same rest, once (the one used most).
+   After a word the model has not (the user's new word, a rare one: `prev` `NO_WORD`), the phrases alone,
+   filed after the text put in last (`Predictions` keeps it while the text before ends with it; pinyin its
+   own word), so a pick of one is learned. A backup (`LearnBackup.backedUp`) leaves out a phrase used once
+   (user 2026-11-02, C54): most whole commits are never put in again, and the tables and handwriting kept no
+   sentence before (S8), so a file the user hands around holds only those used again; the phone's snapshot
+   keeps them, as the count must reach 3 across days and a fold keeps only the snapshot (the tail is the
+   last hour's commits), and a merge leaves the phone's own as they were. Only the start is looked at, not what is before it (C51):
    a sentence never typed that starts with the same word gets the phrase first, in place of the word it
    wanted. Measured by `predict-learn --continuations on|off` (top1/top5 on held-out sentences after the tune
    half is typed three times): pinyin-chat 12.9/28.5% → 6.1/25.3%, pinyin 20.4/40.9% → 14.0/37.1%; the
