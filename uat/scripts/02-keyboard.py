@@ -210,3 +210,6 @@ case("KB-62", needs="jvm:BaseKeyboardTest.theSpaceUpIsTheEditMenuAndTheBackspace
 
 
 case("KB-63", needs="jvm:BaseKeyboardTest.aKeysOwnTextShortcutIsWhatItsSwipeRuns")(lambda d: None)
+
+
+case("KB-64", needs="jvm:KeyMarksUatTest.theShortcutsTopLeftTheSymbolsTopRight、KeyMarksUatTest.theFirstOpenIsAsAfterAnySettingChanges、KeyMarksTest、KeyMarkYieldTest")(lambda d: None)

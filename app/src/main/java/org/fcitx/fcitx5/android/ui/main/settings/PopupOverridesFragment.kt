@@ -145,7 +145,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
 
     // a character key's [symbol] and [name]'s shortcut placed as the keyboard places them (KeySwipes)
     private fun charMarks(symbol: KeyCaps.Mark?, name: String?) =
-        KeyMarks.place(symbol, name?.let(::markOf), layers.layers.wayOf(SwipeLayers.Layer.Shortcut), markPosition(), landscape, keyboardCompact())
+        KeyMarks.place(symbol, name?.let(::markOf), layers.layers.wayOf(SwipeLayers.Layer.Shortcut) != null, markPosition(), landscape, keyboardCompact())
 
     /** A tab other than the full keyboard's: its keys in their rows, a tap editing the shortcut alone. */
     private fun shortcutPage(ctx: Context, page: KeyShortcutPages.Page) {
@@ -187,7 +187,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     private fun functionMarks(names: List<String>): KeyMarks.Placed<KeyCaps.Mark> {
         val (up, down) = names.map(::markOf)
         val l = layers.layers
-        return KeyMarks.placeFunction(up, down, l.up != SwipeLayers.Layer.Off, l.down != SwipeLayers.Layer.Off, markPosition(), keyboardCompact())
+        return KeyMarks.placeFunction(up, down, l.up != SwipeLayers.Layer.Off, l.down != SwipeLayers.Layer.Off, markPosition())
     }
 
     /** [names]' shortcuts (one, or a function key's up and down) edited, under [label]. */

@@ -238,13 +238,13 @@ abstract class BaseKeyboard(
         settleLetters()
     }
 
-    // after the keys' own layout: their letters clear of their symbols (KeyMarkYield.letters), at one
+    // after the keys' own layout: their letters clear of their symbols and shortcuts (KeyMarkYield.letters), at one
     // size and on one baseline (a letter moved alone sat out of its row: floating at 紧凑, w lower, a left)
     private fun settleLetters() {
         val keys = rowKeys.flatMap { it.keys }.filterIsInstance<AltTextKeyView>().filter { it.isVisible }
             .mapNotNull { k -> k.letterKey()?.let { k to it } }
         val letters = KeyMarkYield.letters(keys.map { it.second }, gap = dp(1).toFloat())
-        keys.forEachIndexed { i, (k, _) -> k.settle(letters.scale, letters.corners[i]) }
+        keys.forEachIndexed { i, (k, _) -> k.settle(letters.scale, letters.corners[i], letters.leftCorners[i]) }
     }
 
     init {

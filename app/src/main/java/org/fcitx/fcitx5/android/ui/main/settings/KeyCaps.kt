@@ -116,9 +116,10 @@ object KeyCaps {
         }
     }
 
-    // [label] with [marks]: under it, and in the right corners over the key, sized as the keyboard's
+    // [label] with [marks]: under it, and in the corners over the key (the symbol top right, the
+    // shortcuts on the left), sized as the keyboard's
     private fun FrameLayout.addMarked(ctx: Context, label: TextView, marks: KeyMarks.Placed<Mark>) {
-        val below = marks.below?.let { markView(ctx, it) }
+        val below = marks.below?.let { markView(ctx, it, end = false) }
         if (below == null) {
             add(label, lParams(matchParent, matchParent))
         } else {
@@ -129,15 +130,20 @@ object KeyCaps {
             }, lParams(wrapContent, wrapContent, Gravity.CENTER))
         }
         val corners = ConstraintLayout(ctx)
-        listOf(marks.topRight, marks.bottomRight).forEachIndexed { corner, mark ->
-            val v = mark?.let { markView(ctx, it) } ?: return@forEachIndexed
+        listOf(marks.topRight to Corner.TopRight, marks.topLeft to Corner.TopLeft, marks.bottomLeft to Corner.BottomLeft).forEach { (mark, corner) ->
+            val v = mark?.let { markView(ctx, it, end = corner == Corner.TopRight) } ?: return@forEach
             val text = mark is Mark.Text
             val icon = ctx.dp(MARK_ICON_DP)
             corners.addView(v, ConstraintLayout.LayoutParams(if (text) 0 else icon, if (text) wrapContent else icon).apply {
                 if (text) matchConstraintPercentWidth = MARK_TEXT_WIDTH
-                endToEnd = ConstraintLayout.LayoutParams.PARENT_ID
-                marginEnd = ctx.dp(4)
-                if (corner == 0) {
+                if (corner == Corner.TopRight) {
+                    endToEnd = ConstraintLayout.LayoutParams.PARENT_ID
+                    marginEnd = ctx.dp(4)
+                } else {
+                    startToStart = ConstraintLayout.LayoutParams.PARENT_ID
+                    marginStart = ctx.dp(4)
+                }
+                if (corner != Corner.BottomLeft) {
                     topToTop = ConstraintLayout.LayoutParams.PARENT_ID
                     topMargin = ctx.dp(2)
                 } else {
@@ -149,14 +155,17 @@ object KeyCaps {
         add(corners, lParams(matchParent, matchParent))
     }
 
-    private fun markView(ctx: Context, mark: Mark): View? {
+    private enum class Corner { TopRight, TopLeft, BottomLeft }
+
+    // [end]: a text from the right edge in, as the symbol it is in the top right corner
+    private fun markView(ctx: Context, mark: Mark, end: Boolean): View? {
         val color = ctx.styledColor(MaterialR.attr.colorOnSurfaceVariant)
         return when (mark) {
             is Mark.Text -> AutoScaleTextView(ctx).apply {
                 text = mark.text
                 textSize = 10f
                 setSingleLine()
-                gravity = Gravity.END
+                gravity = if (end) Gravity.END else Gravity.START
                 scaleMode = AutoScaleTextView.Mode.Horizontal
                 setTextColor(color)
             }
@@ -176,7 +185,7 @@ object KeyCaps {
     // 紧凑, the key too short for two lines else
     private fun hintPosition(ctx: Context): PunctuationPosition {
         val landscape = ctx.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val placed = KeyMarks.place(Unit, null, null, markPosition(), landscape, keyboardCompact())
+        val placed = KeyMarks.place(Unit, null, false, markPosition(), landscape, keyboardCompact())
         return when {
             placed.topRight != null -> PunctuationPosition.TopRight
             placed.below != null -> PunctuationPosition.Bottom

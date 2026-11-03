@@ -150,13 +150,13 @@ internal class KeySwipes(
             val placed = when (val key = swipeKey(view, def)) {
                 is KeySwipe.Key.Char -> {
                     val symbol = KeyView.Mark.Symbol.takeIf { (view as? AltTextKeyView)?.altText?.text?.isNotEmpty() == true }
-                    KeyMarks.place(symbol, markOf(key.shortcut).takeIf { charShortcuts }, layers.wayOf(SwipeLayers.Layer.Shortcut), position, landscape, compact)
+                    KeyMarks.place(symbol, markOf(key.shortcut).takeIf { charShortcuts }, layers.wayOf(SwipeLayers.Layer.Shortcut) != null, position, landscape, compact)
                 }
                 is KeySwipe.Key.Function -> KeyMarks.placeFunction(
-                    markOf(key.up), markOf(key.down), layers.up != SwipeLayers.Layer.Off, layers.down != SwipeLayers.Layer.Off, position, compact,
+                    markOf(key.up), markOf(key.down), layers.up != SwipeLayers.Layer.Off, layers.down != SwipeLayers.Layer.Off, position,
                 )
             }
-            view.showMarks(placed.topRight, placed.bottomRight, placed.below)
+            view.showMarks(placed)
         }
     }
 
