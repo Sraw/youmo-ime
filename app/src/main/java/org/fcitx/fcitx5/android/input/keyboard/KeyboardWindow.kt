@@ -64,6 +64,14 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             HandwritingKeyboard.Name, ZhuyinKeyboard.NameNine, ZhuyinKeyboard.NameFull -> TextKeyboard.Name
             else -> null
         }
+
+        /**
+         * The keyboard to show as quick input ends, the full one having stood in for [was] since the
+         * input method's letters were [lettersThen]: [was] again; but another input method or keyboard
+         * chosen meanwhile (its letters [lettersNow], told before quick input's end) is its letters.
+         */
+        fun afterQuickInput(was: String, lettersThen: String, lettersNow: String): String =
+            if (lettersNow != lettersThen) lettersNow else was
     }
 
     override val key: EssentialWindow.Key
@@ -149,8 +157,10 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         keyboards[currentKeyboardName]?.imTyping = composing && !tempMode
     }
 
-    // the keyboard the full one stands in for while quick input lasts ([quickInputStandIn]), shown again after
+    // the keyboard the full one stands in for while quick input lasts ([quickInputStandIn]), shown again
+    // after, and the input method's letters then
     private var standingInFor: String? = null
+    private var lettersWhenStoodIn = ""
 
     override fun onInputPanelUpdate(data: HostEvent.InputPanel) {
         tempMode = data.auxUp.isNotEmpty()
@@ -158,11 +168,13 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         val standIn = quickInputStandIn(currentKeyboardName)
         if (data.quickPhrase && standIn != null) {
             standingInFor = currentKeyboardName
+            lettersWhenStoodIn = lettersLayout.letters
             showLayout(standIn)
         } else if (!data.quickPhrase) {
-            val back = standingInFor ?: return
+            val was = standingInFor ?: return
             standingInFor = null
-            if (currentKeyboardName == TextKeyboard.Name) showLayout(back)
+            val back = afterQuickInput(was, lettersWhenStoodIn, lettersLayout.letters)
+            if (currentKeyboardName == TextKeyboard.Name && back != TextKeyboard.Name) showLayout(back)
         }
     }
 

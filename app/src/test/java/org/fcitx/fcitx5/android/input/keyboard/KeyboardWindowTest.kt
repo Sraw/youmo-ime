@@ -159,4 +159,15 @@ class KeyboardWindowTest {
             assertEquals(k, null, KeyboardWindow.quickInputStandIn(k))
         }
     }
+
+    // quick input ended: the keyboard it stood in for, unless the input method (or its keyboard) changed
+    // meanwhile, which ends it: then the new one's letters, not 大千 under pinyin's nine keys
+    @Test
+    fun quickInputEndedShowsTheKeyboardStoodInForOrTheNewLetters() {
+        assertEquals(ZhuyinKeyboard.NameFull, KeyboardWindow.afterQuickInput(ZhuyinKeyboard.NameFull, ZhuyinKeyboard.NameFull, ZhuyinKeyboard.NameFull))
+        // the pad shown over another input method's letters stays the pad
+        assertEquals(HandwritingKeyboard.Name, KeyboardWindow.afterQuickInput(HandwritingKeyboard.Name, TextKeyboard.Name, TextKeyboard.Name))
+        assertEquals(T9Keyboard.Name, KeyboardWindow.afterQuickInput(ZhuyinKeyboard.NameFull, ZhuyinKeyboard.NameFull, T9Keyboard.Name))
+        assertEquals(ZhuyinKeyboard.NameFull, KeyboardWindow.afterQuickInput(ZhuyinKeyboard.NameNine, ZhuyinKeyboard.NameNine, ZhuyinKeyboard.NameFull))
+    }
 }
