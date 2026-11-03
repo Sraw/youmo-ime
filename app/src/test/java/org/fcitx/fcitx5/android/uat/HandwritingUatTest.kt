@@ -358,6 +358,7 @@ class HandwritingUatTest {
     }
 
     @Test
+    @Uat("HW-29")
     @Config(qualifiers = "zh-rCN-w851dp-h393dp-land-440dpi")
     fun theCardInLandscapeIsTwoColumns() {
         h.api.charCards["行"] = hang

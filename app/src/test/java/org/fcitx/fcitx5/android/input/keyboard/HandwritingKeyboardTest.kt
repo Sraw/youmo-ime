@@ -12,6 +12,7 @@ import android.view.View
 import android.view.ViewGroup
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.KeySym
@@ -180,8 +181,9 @@ class HandwritingKeyboardTest {
         shadowOf(Looper.getMainLooper()).idle()
     }
 
-    // UAT HW-28: 注 turns 候选词注音 on in the style last used (pinyin, none yet), off where it is on
+    // 注 turns 候选词注音 on in the style last used (pinyin, none yet), off where it is on
     @Test
+    @Uat("HW-28")
     fun theReadingKeyTurnsTheReadingsOnAsLastUsedAndOff() {
         val keyboard = keyboard()
         runAll()

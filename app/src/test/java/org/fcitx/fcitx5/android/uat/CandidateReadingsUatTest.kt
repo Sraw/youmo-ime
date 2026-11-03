@@ -115,6 +115,7 @@ class CandidateReadingsUatTest {
     }
 
     @Test
+    @Uat("HW-27")
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun handwritingLandscape() {
         for (style in listOf(ReadingStyle.PINYIN, ReadingStyle.ZHUYIN)) for (sp in listOf(20, 28)) {
