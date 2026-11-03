@@ -1,4 +1,4 @@
-# lexicon: the words a curator decided on
+# lexicon: the words a curator decided on, and the card's stroke orders
 
 The candidates `lib/ime-dict-tool/engine-data.sh` finds in a crawl are runs of characters that hold
 together; many are no words (作为一, 获得各种, 日皮视频). Packed unread they cost more than they bring
@@ -15,7 +15,7 @@ put before a curator again.
 | `readings.tsv` | `word  reading  date  note`: a word of libime's dictionary it reads wrongly; compiled under the readings listed here (a line each) instead |
 | `misreadings.tsv` | `word  reading  misreadings`: a word often read wrongly (般若, bō rě, read ban'ruo), its reading with tones (a space between syllables) and its misreadings as typed (`,` between them); compiled under both, a tenth as likely under a misreading, so either types it, and typed by a misreading its candidate shows the reading, tones and all |
 | `tones.tsv` | `word  reading  date  note`: a word whose tones the downloaded lists give wrongly (the wrong one of a polyphone's tones), its reading with tones as in `misreadings.tsv`; compiled into pinyin.data's tones after those lists, before `misreadings.tsv`'s readings; never taken from `lib/ime-eval/data/readings/chat.tsv` (the test set). No 轻声 (the user, 2026-11-02): pinyin.data reads a word's neutral tone, a list's or a line's, as its character's usual tone (东西 dōng xī), so a line only for a 轻声 has no use; a character whose usual tone is the neutral one (的, 吗, 们) keeps it |
-| `stroke-order.tsv` | `字  笔顺编号  note`: a character's stroke order as the mainland writes it (《现代汉语通用字笔顺规范》), by the standard's numbers (1 横 2 竖 3 撇 4 点 5 折), for its card; kept by hand, first taken from cnchar (MIT, its notice in the file's head). The build (`ime-dict-tool charinfo`) fails on an order whose strokes are not as many as Unihan's kTotalStrokes, or that is none of rime-stroke's orders of the character, unless its `note` says why (范: Unihan counts Taiwan's 艹, 4 strokes). A wrong order is corrected in place |
+| `stroke-order.tsv` | `字  笔顺编号  note`: a character's stroke order as the mainland writes it (《现代汉语通用字笔顺规范》), by the standard's numbers (1 横 2 竖 3 撇 4 点 5 折), for its card; kept by hand, first taken from cnchar (MIT, its notice in the file's head). The build (`ime-dict-tool charinfo`) fails on an order whose strokes are not as many as Unihan's kTotalStrokes, or that is none of rime-stroke's orders of the character, unless its `note` says why (范: Unihan counts Taiwan's 艹, 4 strokes), and on a note where there is nothing to say why of (a note is not the line's history: git keeps that). A wrong order is corrected in place |
 | `latin.words` | a word pack (`word  R'E'A'D'I'N'G  log10P`, layer `latin`): the Latin words typed inside Chinese, made by `tools/latin.py` from `tools/latin_counts.py`'s counts of FineWeb-2 (ODC-By 1.0) — not by hand; its junk goes in `reject.tsv` |
 
 Tab-separated, `#` starts a comment. A reading is `pin'yin`, a syllable a character, `v` for ü.

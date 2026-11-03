@@ -1081,7 +1081,9 @@ private fun charInfo(options: Options, out: Appendable) {
     }
     File(options.orders!!).useLines { builder.orders(it, options.orders) }
     val output = File(options.output!!)
-    output.outputStream().use { builder.build().writeTo(it) }
+    // built first: a failed check leaves the last file
+    val built = builder.build()
+    output.outputStream().use { built.writeTo(it) }
     val info = CharInfo.load(ByteBuffer.wrap(output.readBytes()))
     out.appendLine("charinfo: ${info.size} characters, ${info.taken} of them taken apart")
     options.cover?.let { cover ->

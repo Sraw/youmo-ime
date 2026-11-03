@@ -23,7 +23,8 @@ import org.fcitx.fcitx5.android.engine.stroke.Strokes
  *   from cnchar (MIT) and kept by this project since: rime-stroke's first order of a character is
  *   Taiwan's as often as not (出 丨乛丨乛丨, not 乛丨丨乛丨; 必 丶乛丶丶丿, not 丶乛丶丿丶), and the user wants the
  *   mainland's standard (2026-11-02). [build] fails on an order whose strokes are not as many as
- *   Unihan counts, or that is none of rime-stroke's orders of the character, unless its line says why:
+ *   Unihan counts, or that is none of rime-stroke's orders of the character, unless its line says why
+ *   (and on a line that says why of neither):
  *   that is how cnchar's slips were found (皙 without 白's 丿, 德's 十 a 一丿). A character with the
  *   mainland's order counts its strokes as that order does (Unihan counts 范 as Taiwan's, 9).
  *
@@ -125,7 +126,7 @@ class CharInfoBuilder {
         ordersSource = source
         lines.forEachIndexed { n, line ->
             if (line.isBlank() || line.startsWith('#')) return@forEachIndexed
-            val f = line.split('\t')
+            val f = line.trimEnd('\r').split('\t')
             val c = f[0]
             if (c.codePointCount(0, c.length) != 1) throw SourceException(source, n + 1, "not one character: $c")
             val order = f.getOrNull(1).orEmpty()
@@ -152,22 +153,30 @@ class CharInfoBuilder {
         return CharInfo.Entry(String(Character.toChars(shown)), strokes, way?.map { String(Character.toChars(it)) }, order)
     }
 
-    /** @throws SourceException naming the stroke orders, not explained, Unihan counts or rime-stroke writes otherwise */
+    /**
+     * @throws SourceException naming the stroke orders Unihan counts or rime-stroke writes otherwise with
+     * no note why, and the notes with nothing to say why of (a note is no place for a line's history)
+     */
     fun build(): DataFile.Writer {
-        val odd = orders.keys.filter { it !in explained }.sortedBy { orderLines.getValue(it) }.mapNotNull { cp ->
+        val odd = orders.keys.sortedBy { orderLines.getValue(it) }.mapNotNull { cp ->
             val order = orders.getValue(cp)
             val c = String(Character.toChars(cp))
             val count = totalStrokes[cp]
-            when {
+            val why = when {
                 count != null && count != order.length -> "$c ${order.length} strokes, Unihan $count"
                 rimeOrders[cp]?.contains(order) == false -> "$c ${Strokes.shown(order)}, rime-stroke ${rimeOrders.getValue(cp).joinToString("/", transform = Strokes::shown)}"
                 else -> null
-            }?.let { cp to it }
+            }
+            when {
+                cp in explained && why == null -> cp to "$c a note, but its order is as Unihan counts and rime-stroke writes"
+                cp !in explained && why != null -> cp to "$why, with no note why"
+                else -> null
+            }
         }
         if (odd.isNotEmpty()) {
             throw SourceException(
                 ordersSource, orderLines.getValue(odd[0].first),
-                "${odd.size} stroke orders unlike Unihan's count or rime-stroke's, with no note why: " + odd.joinToString("; ") { it.second },
+                "${odd.size} stroke orders unlike Unihan's count or rime-stroke's: " + odd.joinToString("; ") { it.second },
             )
         }
         val chars = radicalOf.keys.sorted().mapNotNull { cp -> entry(cp)?.let { cp to it } }

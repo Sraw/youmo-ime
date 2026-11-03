@@ -66,8 +66,11 @@ class CharCardTest {
         assertEquals(6, bare.strokes)
         assertEquals("丶丶一一丨一", bare.strokeOrder)
         assertEquals(CharCard("江", listOf(CharCard.Row("jiāng", "ㄐㄧㄤ", emptyList())), null, null, null, null), card("江", info = CharInfo.EMPTY, strokes = null))
-        // counted as the order shown is, not as Unihan (打 5 there; this table's 打 has 3)
-        val da = card("打", strokes = Strokes(CodeTable.load(ByteBuffer.wrap(Strokes.read("...\n打\thsh\n".reader().buffered(), "stroke").build().toByteArray()))) { 0f })!!
+        // the table's order of Unihan's count (打 5) where it has one, whichever it lists first; else its first,
+        // the strokes counted as that order is
+        fun table(text: String) = Strokes(CodeTable.load(ByteBuffer.wrap(Strokes.read(text.reader().buffered(), "stroke").build().toByteArray()))) { 0f }
+        assertEquals("一丨一丨乛" to 5, card("打", strokes = table("...\n打\thsh\n打\thshsz\n"))!!.let { it.strokeOrder to it.strokes })
+        val da = card("打", strokes = table("...\n打\thsh\n"))!!
         assertEquals("一丨一" to 3, da.strokeOrder to da.strokes)
         assertEquals(5, card("打", strokes = null)!!.strokes)
         // a part with no reading

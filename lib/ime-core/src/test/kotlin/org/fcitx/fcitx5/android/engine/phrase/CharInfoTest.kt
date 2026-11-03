@@ -161,6 +161,17 @@ class CharInfoTest {
             CharInfoBuilder().unihan(sequenceOf("U+8303\tkRSUnicode\t140.5", "U+8303\tkTotalStrokes\t9"), "u.txt")
                 .orders(sequenceOf("范\t12244155"), "o.tsv").build()
         }
+        // a note with nothing to say why of: no place for a line's history
+        val stale = assertThrows(SourceException::class.java) {
+            CharInfoBuilder().unihan(UNIHAN.lineSequence(), "u.txt").orders(sequenceOf("", "江\t441121\tfixed as hanzipi has it"), "o.tsv").build()
+        }
+        assertEquals(2, stale.line)
+        assertTrue(stale.message, "江 a note, but its order is as Unihan counts and rime-stroke writes" in stale.message!!)
+        // a line ended \r\n, a blank one between
+        val crlf = CharInfoBuilder().unihan(UNIHAN.lineSequence(), "u.txt").radicals(RADICALS.lineSequence(), "r.txt")
+            .orders(sequenceOf("江\t441121\r", "", "行\t332112\r"), "o.tsv")
+        crlf.build()
+        assertEquals("ppshhs", crlf.entry('行'.code)!!.order)
     }
 
     @Test

@@ -402,7 +402,10 @@ class MainTest {
     }
 
     // a pinyin.data whose characters' readings are kMandarin's: 你 好 江, not 乾
-    private fun charInfoInputs(orders: String = "# 字  笔顺编号\n好\t531521\n江\t441121\n你\t3235234\n"): Array<String> {
+    private fun charInfoInputs(
+        orders: String = "# 字  笔顺编号\n好\t531521\n江\t441121\n你\t3235234\n",
+        strokes: String = "乾\thhsszhpnhhz\n",
+    ): Array<String> {
         val pinyin = tmp.root.resolve("pinyin.data").path
         val dict = file("dict.txt", "你\tni\t0\n好\thao\t0\n江\tjiang\t0\n")
         val unihan = file("kMandarin.txt", "U+4F60: nǐ  # 你\nU+597D: hǎo  # 好\nU+6C5F: jiāng  # 江\n")
@@ -419,7 +422,7 @@ class MainTest {
             "--unihan", zip.path,
             "--radicals", file("CJKRadicals.txt", "5; 2F04; 4E59\n9; 2F08; 4EBA\n38; 2F25; 5973\n85; 2F54; 6C34\n"),
             "--chaizi", file("chaizi-jt.txt", "你\t人 尔\t亻 尔\n好\t女 子\n江\t水 工\t氵 工\n"),
-            "--strokes", file("stroke.dict.yaml", "---\nname: stroke\n...\n\n乾\thhsszhpnhhz\n"),
+            "--strokes", file("stroke.dict.yaml", "---\nname: stroke\n...\n\n$strokes"),
             "--orders", file("stroke-order.tsv", orders),
             "--pinyin", pinyin,
         )
@@ -454,6 +457,21 @@ class MainTest {
         val (code, _, err) = run("charinfo", "-o", output.path, *charInfoInputs("好\t531521\n你\t323523\n"))
         assertEquals(1, code)
         assertTrue(err, err.contains("stroke-order.tsv:2") && err.contains("你 6 strokes, Unihan 7"))
+    }
+
+    @Test
+    fun anOrderNoneOfRimeStrokesFailsTheBuildAndLeavesTheFileThere() {
+        val output = tmp.root.resolve("charinfo.data").apply { writeText("before") }
+        val (code, _, err) = run("charinfo", "-o", output.path, *charInfoInputs("江\t441121\n", "江\tnnhhsz\n"))
+        assertEquals(1, code)
+        assertTrue(err, err.contains("江 丶丶一一丨一, rime-stroke 丶丶一一丨乛, with no note why"))
+        assertEquals("before", output.readText())
+    }
+
+    @Test
+    fun anOrderWithANoteWhyIsTaken() {
+        val output = tmp.root.resolve("charinfo.data")
+        assertEquals(0, run("charinfo", "-o", output.path, *charInfoInputs("江\t441121\tthe mainland's 竖 a 丨\n", "江\tnnhhsz\n")).first)
     }
 
     @Test

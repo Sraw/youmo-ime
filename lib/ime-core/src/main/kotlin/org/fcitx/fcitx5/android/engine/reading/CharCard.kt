@@ -67,11 +67,17 @@ data class CharCard(
             }
             val entry = info.of(cp)
             val parts = entry?.parts?.map { p -> Part(p, readings.ordered(p.codePointAt(0)).firstOrNull()?.pinyin) }
-            // the mainland's order (charinfo.data's, lexicon/stroke-order.tsv's); rime-stroke's first for a character it lacks
-            val order = entry?.order?.let(Strokes::shown)
-                ?: if (text.length == 1) strokes?.ordersOf(text[0])?.firstOrNull()?.let(Strokes::shown) else null
-            // counted as the order shown is: Unihan's count may be Taiwan's glyph's (廴 3, its order 2)
+            // the mainland's order (charinfo.data's, lexicon/stroke-order.tsv's); for a character it lacks,
+            // the stroke table's of Unihan's count (礻 4, not its 5-stroke 示 form), else its first
+            val order = entry?.order?.let(Strokes::shown) ?: strokes?.let { tableOrder(text, entry?.strokes, it) }
+            // counted as the order shown is: Unihan's count may be Taiwan's glyph's (范 9, the mainland's order 8)
             return CharCard(text, rows, entry?.radical, order?.length ?: entry?.strokes?.takeIf { it > 0 }, parts, order)
+        }
+
+        private fun tableOrder(text: String, count: Int?, strokes: Strokes): String? {
+            if (text.length != 1) return null
+            val all = strokes.ordersOf(text[0])
+            return (all.firstOrNull { it.length == count } ?: all.firstOrNull())?.let(Strokes::shown)
         }
     }
 }

@@ -2,8 +2,9 @@
 # a line a character: `字  笔顺编号  note`, tab-separated. 笔顺编号 is the standard's own code, a digit a
 # stroke: 1 横 (提 too), 2 竖 (竖钩 too), 3 撇, 4 点 (捺 too), 5 折 (every turning stroke). The note says why
 # the character's strokes are not as many as Unihan's kTotalStrokes counts, or why rime-stroke has none
-# of its orders like this one; the build fails on a character either is so of without one
-# (ime-dict-tool charinfo). Kept by hand from here on: a wrong order is corrected in place (git keeps
+# of its orders like this one; the build fails on a character either is so of without one, and on a
+# note with nothing to say why of: a note is no place for a line's history (ime-dict-tool charinfo).
+# Kept by hand from here on: a wrong order is corrected in place (git keeps
 # what it was). The card shows it (CharCard).
 #
 # First taken from cnchar's src/cnchar/plugin/order/dict/stroke-order-jian.json (github.com/theajack/cnchar,
