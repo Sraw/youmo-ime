@@ -76,6 +76,66 @@ test('each part is drawn in the palette field the app draws it in', () => {
   assert.deepEqual([0, 1, 30, 50, 99, 100].map(L.darkenAlpha), c.dim);
 });
 
+test('a colour laid over the picture is turned down to 30 % and given back after', () => {
+  const { theme } = L.readTheme(format, themeText);
+  const P = theme.palette;
+  const K = theme.keys;
+  const alpha = (f) => P[f] >>> 24;
+  const kindOf = (n) => ({ 'qwerty/q': 'letter', '*/enter': 'enter' })[n];
+  // the fixture as the page exports it: its letters show the picture, their colour at 30 %
+  assert.equal(K.letter.fill.type, 'picture');
+  assert.equal(alpha('keyBackgroundColor'), L.SEE_THROUGH_ALPHA);
+  assert.equal(L.SEE_THROUGH_ALPHA, Math.round(0.3 * 255));
+  K.letter.fill = { type: 'color' };
+  K.space.fill = { type: 'color' };
+  P.keyBackgroundColor = 0xff464646 | 0;
+  P.altKeyBackgroundColor = 0x20123456;
+  P.accentKeyBackgroundColor = 0xff0000ff | 0;
+  let kept = L.seeThrough(theme, kindOf, {});
+  assert.deepEqual(kept, {}, 'nothing over the picture: nothing turned down');
+  // the letters through: their colour turned down, its alpha kept
+  K.letter.fill = { type: 'picture', blurDp: 0, brightness: 100 };
+  kept = L.seeThrough(theme, kindOf, kept);
+  assert.deepEqual(kept, { keyBackgroundColor: 0xff });
+  assert.equal(P.keyBackgroundColor, 0x4d464646);
+  // turned up again by hand while through: left as set
+  P.keyBackgroundColor = 0x00464646;
+  kept = L.seeThrough(theme, kindOf, kept);
+  assert.equal(P.keyBackgroundColor, 0x00464646);
+  // a colour already as clear or clearer is left, and has nothing to give back
+  K.function.fill = { type: 'picture', blurDp: 0, brightness: 100 };
+  kept = L.seeThrough(theme, kindOf, kept);
+  assert.equal(P.altKeyBackgroundColor, 0x20123456);
+  assert.equal(kept.altKeyBackgroundColor, null);
+  // a single key through: its kind's colour, as the app lays it (blocks: the space shares the letters')
+  K.overrides['*/enter'] = { fill: { type: 'picture', blurDp: 0, brightness: 100 }, pressed: null, label: 'show' };
+  kept = L.seeThrough(theme, kindOf, kept);
+  assert.equal(P.accentKeyBackgroundColor, 0x4d0000ff);
+  // back from the picture: the alpha given back, and only once nothing else lays that colour over it
+  K.space.fill = { type: 'picture', blurDp: 0, brightness: 100 };
+  K.letter.fill = { type: 'color' };
+  kept = L.seeThrough(theme, kindOf, kept);
+  assert.equal(P.keyBackgroundColor, 0x00464646, 'the space still lays it over the picture');
+  K.space.fill = { type: 'color' };
+  K.function.fill = { type: 'color' };
+  delete K.overrides['*/enter'];
+  kept = L.seeThrough(theme, kindOf, kept);
+  assert.deepEqual(kept, {});
+  assert.equal(P.keyBackgroundColor, 0xff464646 | 0);
+  assert.equal(P.altKeyBackgroundColor, 0x20123456);
+  assert.equal(P.accentKeyBackgroundColor, 0xff0000ff | 0);
+  // flat, the space lays its own colour: switching moves which colour is turned down
+  K.space.fill = { type: 'picture', blurDp: 0, brightness: 100 };
+  P.spaceBarColor = 0xff222222 | 0;
+  kept = L.seeThrough(theme, kindOf, kept);
+  assert.equal(alpha('keyBackgroundColor'), L.SEE_THROUGH_ALPHA);
+  K.blocks = false;
+  kept = L.seeThrough(theme, kindOf, kept);
+  assert.equal(P.keyBackgroundColor, 0xff464646 | 0);
+  assert.equal(alpha('spaceBarColor'), L.SEE_THROUGH_ALPHA);
+  assert.deepEqual(kept, { spaceBarColor: 0xff });
+});
+
 test('a nine-slice image is cut as the app cuts it', () => {
   for (const c of rules.nineSlice) {
     const pieces = L.nineSlice(c.srcWidth, c.srcHeight, c.insets, c.pxPerDp, c.target.map(fr), c.density);

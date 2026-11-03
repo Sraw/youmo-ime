@@ -324,6 +324,8 @@ class ThemeMakerRulesTest {
                     Crop("full-landscape.png", Box(0, 900, 1440, 1500), 90),
                     70, 4,
                 ),
+                // the letters show the picture: their colour, laid over it, at 30 % as the page turns it
+                palette = t.look.palette.run { copy(keyBackgroundColor = keyBackgroundColor and 0xFFFFFF or (0x4D shl 24)) },
                 base = BoardBase.Picture,
                 bar = BarBase.Picture(12, 60),
                 keys = t.look.keys.copy(

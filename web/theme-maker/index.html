@@ -1691,6 +1691,41 @@ dialog::backdrop { background: #0008; }
     return { letter: 'keyBackgroundColor', function: 'altKeyBackgroundColor', enter: 'accentKeyBackgroundColor' }[kind];
   }
 
+  /** The alpha (30 %) a key's colour is turned down to when its face shows the picture: the app lays the colour over it. */
+  const SEE_THROUGH_ALPHA = 0x4d;
+
+  /** The palette fields laid over the picture: of each kind whose face shows it, and of a single key's kind ([kindOf] its name). */
+  function seeThroughFields(theme, kindOf) {
+    const K = theme.keys;
+    const out = new Set();
+    for (const k of ['letter', 'function', 'space', 'enter']) if (K[k].fill.type === 'picture') out.add(faceField(k, K.blocks));
+    for (const [n, o] of Object.entries(K.overrides)) {
+      const kind = o.fill && o.fill.type === 'picture' ? kindOf(n) : undefined;
+      if (kind) out.add(faceField(kind, K.blocks));
+    }
+    return out;
+  }
+
+  /**
+   * A colour newly laid over the picture is turned down to SEE_THROUGH_ALPHA (when more opaque); one no
+   * longer over it gets its alpha back. [kept]: the fields over the picture last time → the alpha each had
+   * (null: none to give back). Changes theme.palette; returns the fields' kept alphas now, for next time.
+   */
+  function seeThrough(theme, kindOf, kept) {
+    const P = theme.palette;
+    const used = seeThroughFields(theme, kindOf);
+    const next = {};
+    for (const f of used) {
+      if (f in kept) next[f] = kept[f];
+      else if ((P[f] >>> 24) > SEE_THROUGH_ALPHA) {
+        next[f] = P[f] >>> 24;
+        P[f] = (P[f] & 0xffffff) | (SEE_THROUGH_ALPHA << 24);
+      } else next[f] = null;
+    }
+    for (const [f, a] of Object.entries(kept)) if (!used.has(f) && a !== null) P[f] = (P[f] & 0xffffff) | (a << 24);
+    return next;
+  }
+
   /** ThemeColors.dim: the black's alpha over the picture at [brightness] percent. */
   function darkenAlpha(brightness) {
     return Math.floor(((100 - brightness) * 255) / 100);
@@ -1724,7 +1759,7 @@ dialog::backdrop { background: #0008; }
     limitBreaches, from21, defaultLook, parseKeyName, isKnownKeyName, checkRanges, ordered, PALETTE_21,
     keyFace, nineSlice, centerCrop, pictureUnder, blurShrink, blur, resolveStyle, imagesOn, budgetBytes, budgetSample,
     argb, channels, toHex, fromHex, css, withAlpha, contrast, over, luminance, deriveSimple, simpleOf, isDarkColor,
-    invertLightness, cropToSource, cropFromSource, resizeInside, darkenAlpha, boardField, barField, panelField, faceField, imageType, fontType, contentId,
+    invertLightness, cropToSource, cropFromSource, resizeInside, darkenAlpha, boardField, barField, panelField, faceField, SEE_THROUGH_ALPHA, seeThroughFields, seeThrough, imageType, fontType, contentId,
   };
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
@@ -1831,6 +1866,7 @@ dialog::backdrop { background: #0008; }
     keyTab: 'all',
     kind: 'letter',
     colorView: 'simple',
+    see: {}, // L.seeThrough's kept alphas: the colours laid over the picture → the alpha to give back
     manual: [], // palette fields set by hand in the full view: not followed from the simple five
     autoDark: true,
     selected: [], // element names (qwerty/q)
@@ -1994,6 +2030,19 @@ dialog::backdrop { background: #0008; }
   }
 
   // ---- the theme ----
+  // a key name's kind, from the measured keys (a role on all boards: the first such key's)
+  const KIND_OF = (() => {
+    const m = {};
+    for (const v of LAYOUT.views) for (const e of v.items) if (e.t === 'key' && e.n) {
+      if (!(e.n in m)) m[e.n] = e.k;
+      const key = e.n.substring(e.n.indexOf('/') + 1);
+      if (ROLES.includes(key) && !(('*/' + key) in m)) m['*/' + key] = e.k;
+    }
+    return m;
+  })();
+  const kindOfName = (n) => KIND_OF[n];
+  // the colours over the picture now, as they are: none to give back
+  const seenNow = () => Object.fromEntries([...L.seeThroughFields(S.theme, kindOfName)].map((f) => [f, null]));
   function presetTheme(p) {
     return L.defaultLook(FORMAT, uuid(), p.isDark, clone(p.palette), null);
   }
@@ -2005,6 +2054,7 @@ dialog::backdrop { background: #0008; }
     S.autoDark = true;
     const sim = L.deriveSimple(L.simpleOf(theme.palette), theme.isDark);
     S.manual = Object.keys(theme.palette).filter((k) => theme.palette[k] !== sim[k]);
+    S.see = seenNow();
     return Promise.all(Object.entries(files || {}).map(([n, b]) => putFile(n, b))).then(() => {
       for (const c of pictureCuts()) if (S.bitmaps[c]) S.avg[c] = averageOf(S.bitmaps[c]);
     });
@@ -2014,6 +2064,7 @@ dialog::backdrop { background: #0008; }
     return p ? [p.portrait.file, p.landscape && p.landscape.file].filter(Boolean) : [];
   }
   function changed(opts) {
+    S.see = L.seeThrough(S.theme, kindOfName, S.see);
     save();
     renderPreview();
     if (opts && opts.settings) renderSettings();
@@ -2023,7 +2074,7 @@ dialog::backdrop { background: #0008; }
       // the colours and options; the files are not kept (too big): a theme with them comes back without
       const t = clone(S.theme);
       if (L.lookFiles(t).length) stripFiles(t);
-      localStorage.setItem(STORE, JSON.stringify({ theme: L.writeTheme(FORMAT, t), view: S.view, manual: S.manual, colorView: S.colorView, tab: S.tab }));
+      localStorage.setItem(STORE, JSON.stringify({ theme: L.writeTheme(FORMAT, t), view: S.view, manual: S.manual, see: S.see, colorView: S.colorView, tab: S.tab }));
     } catch (e) { /* private mode, full, or off: the page works the same */ }
   }
   function stripFiles(t) {
@@ -2053,6 +2104,7 @@ dialog::backdrop { background: #0008; }
       const { theme } = L.readTheme(FORMAT, saved.theme);
       S.theme = theme;
       S.manual = saved.manual || [];
+      S.see = saved.see || seenNow();
       return true;
     } catch (e) {
       return false;
@@ -2067,7 +2119,10 @@ dialog::backdrop { background: #0008; }
     sim[which] = color;
     const all = L.deriveSimple(sim, S.theme.isDark);
     const direct = { bg: 'backgroundColor', key: 'keyBackgroundColor', text: 'keyTextColor', fn: 'altKeyBackgroundColor', accent: 'accentKeyBackgroundColor' };
-    for (const [k, v] of Object.entries(all)) if (!S.manual.includes(k) || k === direct[which]) S.theme.palette[k] = v;
+    for (const [k, v] of Object.entries(all)) if (!S.manual.includes(k) || k === direct[which]) {
+      S.theme.palette[k] = v;
+      delete S.see[k]; // a new colour: turned down again if over the picture
+    }
     S.manual = S.manual.filter((k) => k !== direct[which]);
     if (which === 'bg' && S.autoDark) S.theme.isDark = L.isDarkColor(color);
   }
@@ -2483,6 +2538,7 @@ dialog::backdrop { background: #0008; }
     return ['· 已单独改 ', h('button', { type: 'button', onclick: () => {
       S.manual = S.manual.filter((k) => k !== field);
       S.theme.palette[field] = L.deriveSimple(L.simpleOf(S.theme.palette), S.theme.isDark)[field];
+      delete S.see[field];
       changed({ settings: true });
     } }, '恢复跟随')];
   }
@@ -2816,7 +2872,7 @@ dialog::backdrop { background: #0008; }
     if (fill && fill.type === 'picture') {
       out.push(slider('模糊', fill.blurDp, 0, LIM.blurDp, ' dp', (x) => { fill.blurDp = x; changed(); }));
       out.push(slider('亮度', fill.brightness, 0, 100, ' %', (x) => { fill.brightness = x; changed(); }));
-      out.push(h('p', { class: 'hint' }, '键里透出它下面那块主题图（毛玻璃：调模糊）。'));
+      out.push(h('p', { class: 'hint' }, '键里透出它下面那块主题图（毛玻璃：调模糊），上面再盖一层这类键的底色。选透出时底色自动调到 30% 不透明，在下面的「颜色」里可以再调（0 = 完全透明）；改回别的，恢复原来的不透明度。'));
     }
     if (fill && fill.type === 'image') out.push(imageEditor(fill, set));
     return h('div', {}, out);
@@ -2982,6 +3038,11 @@ dialog::backdrop { background: #0008; }
       };
       out.push(h('h3', {}, '底'), fillEditor(first.fill, true, (f) => write('fill', f), 'single'));
       out.push(h('p', { class: 'hint' }, `「跟随」是${kindName}的样子；只给常态配了图时，按下仍按那一类。`));
+      const seeKind = first.fill && first.fill.type === 'picture' && kindOfName(tg[0]);
+      if (seeKind) {
+        out.push(h('p', { class: 'hint' }, `盖在图上的是${KIND_LABEL[seeKind]}的底色：改它，${KIND_LABEL[seeKind]}都跟着变。`));
+        out.push(colorRow(kindField(seeKind)));
+      }
       out.push(h('h3', {}, '按下'), pressedEditor(first.pressed, true, (p) => write('pressed', p), 'single'));
       out.push(h('h3', {}, '键上的字'), radios('label', [['show', '显示'], ['hide', '隐藏（键角小字也隐藏）']], first.label, (x) => write('label', x)));
     }
@@ -3274,7 +3335,7 @@ dialog::backdrop { background: #0008; }
     if (q.get('select')) S.selected = q.get('select').split(',');
     if (q.get('preset')) {
       const p = PRESETS.find((x) => x.name === q.get('preset'));
-      if (p) S.theme = presetTheme(p);
+      if (p) { S.theme = presetTheme(p); S.see = {}; }
     }
   }
 
