@@ -357,6 +357,91 @@ class UndoChipTest {
         assertTrue("6 s from the second, not 2 s from the first", chip.showing)
     }
 
+    // the edit menu's box where chip() places a notice (its top left), in the window's pixels
+    private val overChip = android.graphics.Rect(0, 0, 500, 100)
+
+    // 051-fix-popup: the edit menu opened where the notices go, under their window
+    @Test
+    fun theEditMenuPutsAwayWhatWasDoneAndHidesAFailureTillItGoes() {
+        val chip = chip()
+        chip.show("已复制")
+        chip.covered(overChip)
+        assertFalse("put away, as typing would", chip.showing)
+        chip.uncovered()
+        assertFalse("not back", chip.showing)
+
+        chip.show("读不出来", steady = true)
+        val said = windows().single().find("读不出来")!!
+        idle(UNDO_MS - 1000)
+        chip.covered(overChip)
+        assertTrue("still up", chip.showing)
+        assertFalse("but hidden under the menu", said.isShown)
+        val flags = (windows().single().layoutParams as WindowManager.LayoutParams).flags
+        assertTrue("taking no touch", (flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE) != 0)
+        // its time stopped while hidden: a long pick does not lose it
+        idle(UNDO_MS)
+        assertTrue(chip.showing)
+        chip.uncovered()
+        assertTrue("back", said.isShown)
+        // shown again for as long as at first
+        idle(UNDO_MS - 1)
+        assertTrue(chip.showing)
+        idle(1)
+        assertFalse(chip.showing)
+    }
+
+    // review M1: one said while the menu is up where it goes is under the menu, not over it, and not lost
+    @Test
+    fun aNoticeSaidUnderTheMenuIsShownAsItGoes() {
+        val chip = chip()
+        chip.covered(overChip)
+        chip.show("已复制")
+        assertTrue("up", chip.showing)
+        val said = windows().single().find("已复制")!!
+        assertFalse("but under the menu", said.isShown)
+        // not timed while hidden
+        idle(SAID_MS * 3)
+        assertTrue(chip.showing)
+        chip.uncovered()
+        assertTrue("shown as the menu goes", said.isShown)
+        idle(SAID_MS - 1)
+        assertTrue("timed from then", chip.showing)
+        idle(1)
+        assertFalse(chip.showing)
+        // the menu gone: the next one said is shown at once
+        chip.show("已剪切")
+        assertTrue(windows().single().find("已剪切")!!.isShown)
+    }
+
+    // review L5: the menu meets only the notices where it is: one over the bar (a word's 撤销) is left as it is
+    @Test
+    fun theMenuLeavesANoticeElsewhereAlone() {
+        val chip = UndoChip(anchor, ThemePreset.PixelDark, { _, _, aboveKeys ->
+            UndoChipPlacement.Place(0, if (aboveKeys) 0 else 400, UndoChipPlacement.Slide.Up)
+        }, { off })
+        chip.show("记住了「你好」", UndoChip.Undo({}), aboveKeys = false)
+        chip.covered(overChip)
+        assertTrue("not put away", chip.showing)
+        assertTrue("nor hidden", windows().single().find("记住了「你好」")!!.isShown)
+        chip.show("又记住了", aboveKeys = false)
+        assertTrue("one said there meanwhile shown", windows().single().find("又记住了")!!.isShown)
+        chip.show("已复制", aboveKeys = true)
+        assertFalse("one said where the menu is hidden", windows().single().find("已复制")!!.isShown)
+        chip.uncovered()
+        assertTrue(windows().single().find("已复制")!!.isShown)
+    }
+
+    @Test
+    fun aNoticeInThePlaceOfOneHiddenIsHiddenTooTillTheMenuGoes() {
+        val chip = chip()
+        chip.show("读不出来", steady = true)
+        chip.covered(overChip)
+        chip.show("又读不出来", steady = true)
+        assertFalse("under the menu as the one it replaced (review M1)", windows().single().find("又读不出来")!!.isShown)
+        chip.uncovered()
+        assertTrue(windows().single().find("又读不出来")!!.isShown)
+    }
+
     @Test
     fun typingPutsAwayWhatWasDoneButNotAFailureSaidAsTheKeyFailed() {
         val chip = chip()

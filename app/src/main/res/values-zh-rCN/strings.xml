@@ -988,7 +988,7 @@
     <string name="shortcut_undo">撤销</string>
     <string name="shortcut_redo">重做</string>
     <string name="shortcut_clear">清除</string>
-    <string name="shortcut_restore">恢复刚清除的</string>
+    <string name="shortcut_restore">恢复刚删除的</string>
     <string name="shortcut_field_start">光标到开头</string>
     <string name="shortcut_field_end">光标到结尾</string>
     <string name="shortcut_edit_menu">编辑菜单</string>

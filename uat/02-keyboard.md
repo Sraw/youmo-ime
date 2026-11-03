@@ -357,8 +357,8 @@
 ### KB-62 [P1] 空格上滑是编辑菜单，退格上滑清除、下滑恢复
 - **前提**：B0，滑动是默认，输入框里有字。
 - **操作**：空格上滑不松手，左挪一格松开；框里写 `one two three`，选中 `two` 退格上滑；光标放在 `one` 后再上滑两次；退格下滑三次；打拼音 `nihao` 时退格上滑，再下滑。
-- **预期**：空格上滑出一排五格（全选、剪切、复制、粘贴、撤销），粘贴在手指上方，左挪一格松开是复制。第一次上滑删掉 `two`，接着删掉光标前的 `one`，再删掉光标后的部分，框空了；每次提示"已清除"带撤销。下滑三次按倒序放回，最后 `two` 又是选中的。打拼音时上滑只清掉拼音串，什么都不上屏；下滑拼音串回来，候选照旧。清除后打了字再下滑，提示"没有可恢复的内容"。
-- **JVM**：`BaseKeyboardTest.theSpaceUpIsTheEditMenuAndTheBackspaceUpAndDownClearAndRestore`（弹出编辑菜单；退格上下滑发出清除、恢复）；清除和恢复对输入框做什么、倒序放回、改动后不放回见 ime-core `EditPlanTest`；拼音串清掉不上屏、放回同样的拼音见 `HostCoreEnginesTest`（`what is typed is cleared without a commit and typed again`）；设备上的冒烟见报告。
+- **预期**：空格上滑出一排五格（全选、剪切、复制、粘贴、撤销），在键盘上方（"已复制"这类提示出现的地方，手指挡不住），粘贴对着空格；和菜单重叠的提示先收起，按键出错的提示（「词库没装上」这类）和菜单开着时新来的提示藏到菜单后、菜单收起后出现；候选栏上的提示不受影响；左挪一格松开是复制。悬浮键盘、横屏时也在键盘上方。第一次上滑删掉 `two`，接着删掉光标前的 `one`，再删掉光标后的部分，框空了；每次提示"已清除"带撤销。下滑三次按倒序放回，最后 `two` 又是选中的。打拼音时上滑只清掉拼音串，什么都不上屏；下滑拼音串回来，候选照旧。清除后打了字再下滑，提示"没有可恢复的内容"。
+- **JVM**：`BaseKeyboardTest.theSpaceUpIsTheEditMenuAndTheBackspaceUpAndDownClearAndRestore`（弹出编辑菜单；退格上下滑发出清除、恢复）；菜单在键盘上方、提示收起、左挪一格松开复制见 `SwipePopupScreenshotTest.theEditMenuIsAboveTheKeyboardAndPicksAsBefore`，出错提示藏起再回来见 `SwipePopupScreenshotTest.aFailureIsHiddenUnderTheEditMenuAndBackAsItGoes`、`UndoChipTest.theEditMenuPutsAwayWhatWasDoneAndHidesAFailureTillItGoes`、ime-core `NoticeStateTest.theEditMenuPutsAwayOrHides`，摆放规则见 ime-core `EditPlanTest.theEditMenuGoesWhereTheNoticesGo`，竖屏、紧凑、悬浮、横屏的样子见 `SwipePopupScreenshotTest` 的 `edit_menu_*` 金样；清除和恢复对输入框做什么、倒序放回、改动后不放回见 ime-core `EditPlanTest`；拼音串清掉不上屏、放回同样的拼音见 `HostCoreEnginesTest`（`what is typed is cleared without a commit and typed again`）；设备上的冒烟见报告。
 
 ### KB-63 [P2] 自己设的文字快捷键
 - **前提**：B0，**按键字符和快捷键** 里把 Q 的快捷键设成文字「你好」。
@@ -366,3 +366,14 @@
 - **预期**：打出「你好」；Q 的右上角是缩小的「你好」。
 - **JVM**：`BaseKeyboardTest.aKeysOwnTextShortcutIsWhatItsSwipeRuns`。
 
+### KB-64 [P1] 连着按退格删掉的一段，下滑整段放回
+- **前提**：B0，滑动是默认。
+- **操作**：框里写 `hello world`，光标在末尾按三下退格，退格下滑；再按住退格删掉 `world` 和前面的空格，下滑；再按两下退格，打一个 `x`（英文键盘，或拼音打 x 后点候选），再按一下退格，下滑两次；最后全选，退格上滑清除，按一下退格（框里没字了，什么也没删），下滑。
+- **预期**：三下退格删掉 `rld`，下滑一次整段放回，光标回到末尾；按住连删后下滑，`world` 连同空格整段回来；打了字以后只放回打字之后删掉的那一下（`x` 回来），再下滑提示"没有可恢复的内容"；最后的下滑放回清除掉的整段，仍是全选。按键字符和快捷键里这个命令叫「恢复刚删除的」。
+- **JVM**：`DeletionRunTest`（ime-core：一段连删整段放回、光标回原处；表情、国旗、组合字符按编辑器删的放回；按住连删到开头；中间打字、挪光标、引擎自己删字就重新计，打了字后不放回；左滑选中删除并入同一段；最近一次是清除就先放回清除；应用自己清空了框、成对符号一起删掉的不放回；光标前超过读的长度时按对齐处判断）；设备上的冒烟见 `dev/design/051-fix-bksp-report.md`。
+
+### KB-65 [P2] 滑出快捷键时键上方小框里的字
+- **前提**：B0，**按键时弹出显示字符** 开着；**按键字符和快捷键** 里把 Q 设成文字「我的邮箱是 someone@example.com」，W 设成 **快速输入**，E 设成 **恢复刚删除的**。
+- **操作**：A、W、E、Q 各上滑过阈值不松手，看键上方的小框；键盘高度换成紧凑、悬浮键盘、横屏各看一次。
+- **预期**：小框里是「全选」「快速输入」「恢复刚删除的」「我的邮箱是 s…」，字比键上的字母小一号，和底排「符」「123」差不多；框最宽约五个字，没有横跨半个键盘、也不盖住工具栏；紧凑、悬浮时字跟着键上的字缩小。
+- **JVM**：`SwipePopupScreenshotTest.theBubbleSaysTheShortcutFitted`（三个键的框里的字）；规则见 ime-core `PreviewLabelTest`；样子见 `SwipePopupScreenshotTest` 的 `select_all_*`、`quick_input_*`、`restore_*`、`text_*`、`trad_simp_en` 金样。

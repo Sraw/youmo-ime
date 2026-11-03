@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.shortcut
 
+import org.fcitx.fcitx5.android.input.UndoChipPlacement
 import org.fcitx.fcitx5.android.input.editing.FakeEditor
 import org.fcitx.fcitx5.android.input.shortcut.EditPlan.Menu
 import org.junit.Assert.assertEquals
@@ -294,5 +295,20 @@ class EditPlanTest {
         assertTrue(EditMenuLayout.disabled(KeyCommand.Copy, password = true))
         assertEquals(false, EditMenuLayout.disabled(KeyCommand.Paste, password = true))
         assertEquals(false, EditMenuLayout.disabled(KeyCommand.Copy, password = false))
+    }
+
+    // the row up where a notice goes: across as rowLeft has it above or below the keyboard, the
+    // notice's own left beside a floating one; over the bar where the notice's place would not show
+    @Test
+    fun theEditMenuGoesWhereTheNoticesGo() {
+        val above = UndoChipPlacement.Place(left = 340, top = 900, slide = UndoChipPlacement.Slide.Up)
+        assertEquals(EditMenuLayout.Spot(150, 900), EditMenuLayout.place(above, 500, 100, 0, 1080, roomTop = 0, barMiddle = 1050))
+        val below = above.copy(top = 1500, slide = UndoChipPlacement.Slide.Down)
+        assertEquals(EditMenuLayout.Spot(0, 1500), EditMenuLayout.place(below, 100, 100, 0, 1080, roomTop = 0, barMiddle = 1050))
+        val beside = UndoChipPlacement.Place(left = 700, top = 1200, slide = UndoChipPlacement.Slide.Right)
+        assertEquals(EditMenuLayout.Spot(700, 1200), EditMenuLayout.place(beside, 300, 100, 0, 1080, roomTop = 0, barMiddle = 1050))
+        assertEquals("no room above", EditMenuLayout.Spot(150, 1000), EditMenuLayout.place(above, 500, 100, 0, 1080, roomTop = 950, barMiddle = 1050))
+        // review L7: a bar's middle less than half a cell below the view's top: not off it
+        assertEquals("over the bar, inside the view", EditMenuLayout.Spot(150, 1000), EditMenuLayout.place(above, 500, 100, 0, 1080, roomTop = 1000, barMiddle = 1020))
     }
 }

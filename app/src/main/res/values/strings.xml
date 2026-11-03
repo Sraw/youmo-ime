@@ -1012,7 +1012,7 @@
     <string name="shortcut_undo">Undo</string>
     <string name="shortcut_redo">Redo</string>
     <string name="shortcut_clear">Clear</string>
-    <string name="shortcut_restore">Restore what was cleared</string>
+    <string name="shortcut_restore">Restore what was deleted</string>
     <string name="shortcut_field_start">To the start</string>
     <string name="shortcut_field_end">To the end</string>
     <string name="shortcut_edit_menu">Edit menu</string>
