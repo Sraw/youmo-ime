@@ -326,4 +326,19 @@ class KeyShortcutsHostTest {
         until("the second put back") { h.field.text.toString() == "ab" }
         assertEquals(1, h.field.selectionStart)
     }
+
+    // review G: a cut and a paste are the editor's (the context menu), changing the field: the run is
+    // over, though the paste leaves it reading as the run did
+    @Test
+    fun aRunIsNotPutBackAfterACutAndAPaste() {
+        start("你好世界")
+        backspaces(1, leaving = "你好世")
+        swipe(h.key("x"), up = true)
+        until("cut") { h.field.text.isEmpty() }
+        swipe(h.key("v"), up = true)
+        until("pasted") { h.field.text.toString() == "你好世" }
+        swipe(backspace, up = false)
+        synced()
+        assertEquals("你好世", h.field.text.toString())
+    }
 }

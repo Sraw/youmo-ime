@@ -417,4 +417,32 @@ class DeletionRunTest {
         assertTrue(same.restore(kept))
         assertEquals("abc", same.text)
     }
+
+    // review C: cut short, a ZWJ and the emoji after it count two characters, the emoji before them
+    // joined, one: the search goes on past the shorter end that counts one more than the press
+    @Test
+    fun aZwjSequenceFarIntoTheFieldIsToldPastAnEndCountingOneMore() {
+        val kept = ClearedText()
+        val text = "👩".repeat(ClearedText.READ_BEFORE) + "\u200D👧"
+        val editor = FakeEditor(text)
+        editor.backspace(kept, units = 5) // 👩‍👧 whole, one character
+        assertTrue(editor.restore(kept))
+        assertEquals(text, editor.text)
+    }
+
+    // review A2: an edit after a run drops the clears before it too, though the field reads as one left it
+    @Test
+    fun anEditAfterARunDropsTheClearsBeforeIt() {
+        val kept = ClearedText()
+        val editor = FakeEditor("abc")
+        val clearing = EditPlan.clear(editor.field(), 3, 3, 10_000, password = false)
+        EditPlan.apply(clearing.steps, editor) {}
+        kept.remember(f, clearing.cleared)
+        editor.commitText("x", 1)
+        editor.backspace(kept)
+        assertEquals("", editor.text)
+        kept.edited()
+        assertFalse(editor.restore(kept))
+        assertEquals("", editor.text)
+    }
 }
