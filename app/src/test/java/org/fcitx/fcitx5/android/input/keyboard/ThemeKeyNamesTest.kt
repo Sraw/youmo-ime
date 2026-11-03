@@ -127,6 +127,7 @@ class ThemeKeyNamesTest {
             "k18" to GroupedKeyboard.layout(NineKeyLetters.G18) { emptyList() },
             "number" to NumberKeyboard.Layout,
             "handwriting" to HandwritingKeyboard.layout(context),
+            "zhuyin" to ZhuyinKeyboard.fullLayout(),
             "symbols" to listOf(PickerLayout.panelKeys(context, symbolPicker().switchKey)),
             "emoji" to listOf(PickerLayout.listKeys(emojiPicker().switchKey, PickerWindow.SearchKey)),
         )
