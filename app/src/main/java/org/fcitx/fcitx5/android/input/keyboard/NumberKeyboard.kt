@@ -11,13 +11,15 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 
 @SuppressLint("ViewConstructor")
 class NumberKeyboard(
     context: Context,
     theme: Theme,
     pad: NumberPad = NumberPad.FULL,
-) : BaseKeyboard(context, theme, layout(pad)) {
+) : BaseKeyboard(context, theme, layout(pad), shortcuts = true) {
 
     companion object {
         const val Name = NumberPad.FULL_LAYOUT
@@ -28,7 +30,7 @@ class NumberKeyboard(
 
         val Layout: List<List<KeyDef>> = layout(NumberPad.FULL)
 
-        private fun digit(d: Int, percentWidth: Float = 0f) = NumPadKey("$d", 0xffb0 + d, 30f, percentWidth)
+        private fun digit(d: Int, percentWidth: Float = 0f) = NumPadKey("$d", 0xffb0 + d, 30f, percentWidth, shortcut = KeyShortcuts.charKey(KeyShortcutPreset.NUMBER, "$d"))
 
         // a key beside the digits: blank where the pad has none there, the digits staying where they are on every pad
         private fun side(label: String, percentWidth: Float, variant: KeyDef.Appearance.Variant = KeyDef.Appearance.Variant.Alternative): KeyDef {
@@ -66,9 +68,13 @@ class NumberKeyboard(
         `return`.showReturnAction(appearance)
     }
 
-    @SuppressLint("MissingSuperCall")
+    // no preview nor long press popup here; the edit menu a swipe opens (the space's) and what picks from it go on
     override fun onPopupAction(action: PopupAction) {
-        // leave empty on purpose to disable popup in NumberKeyboard
+        when (action) {
+            is PopupAction.PreviewAction, is PopupAction.PreviewUpdateAction,
+            is PopupAction.ShowKeyboardAction, is PopupAction.ShowMenuAction -> {}
+            else -> super.onPopupAction(action)
+        }
     }
 
 }

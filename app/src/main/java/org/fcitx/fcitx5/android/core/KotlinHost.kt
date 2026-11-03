@@ -304,6 +304,8 @@ class KotlinHost(
     override suspend fun select(idx: Int, text: String?): Boolean = onHost { select(idx, text) }
     override suspend fun isEmpty(): Boolean = onHost { isEmpty() }
     override suspend fun reset() = onHost { reset() }
+    override suspend fun clearTyped() = onHost { clearTyped() }
+    override suspend fun retype(typing: HostCore.Retyping) = onHost { retype(typing) }
     override suspend fun moveCursor(position: Int) = onHost { moveCursor(position) }
 
     // ---- input methods

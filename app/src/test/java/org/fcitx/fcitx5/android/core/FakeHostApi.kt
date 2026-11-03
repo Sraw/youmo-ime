@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.runtime.ImportLayer
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
+import org.fcitx.fcitx5.android.host.HostCore
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.StatusEntry
 import java.util.concurrent.CopyOnWriteArrayList
@@ -221,6 +222,16 @@ class FakeHostApi : HostApi {
 
     override suspend fun reset() {
         calls += "reset()"
+    }
+
+    override suspend fun clearTyped(): HostCore.Retyping? {
+        calls += "clearTyped()"
+        return null
+    }
+
+    override suspend fun retype(typing: HostCore.Retyping): Boolean {
+        calls += "retype(${typing.im})"
+        return false
     }
 
     override suspend fun moveCursor(position: Int) {

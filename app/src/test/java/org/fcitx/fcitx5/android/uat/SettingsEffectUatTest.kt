@@ -15,7 +15,7 @@ import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
-import org.fcitx.fcitx5.android.input.keyboard.SwipeSymbolDirection
+import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -142,7 +142,7 @@ class SettingsEffectUatTest {
     @Test
     @Uat("ST-15")
     fun swipeUpThenDisabled() {
-        prefs.set(keyboard.swipeSymbolDirection, SwipeSymbolDirection.Up)
+        prefs.set(keyboard.swipeLayers, SwipeLayersChoice.SymbolUpShortcutDown)
         h.start()
         val w = h.key("w")
         h.swipe(w, 0f, -w.height * 0.6f)
@@ -151,7 +151,7 @@ class SettingsEffectUatTest {
         h.swipe(w, 0f, w.height * 0.4f)
         assertTrue(sent().toString(), sent().size == 1 && "key=w," in sent().last())
         fresh()
-        prefs.set(keyboard.swipeSymbolDirection, SwipeSymbolDirection.Disabled)
+        prefs.set(keyboard.swipeLayers, SwipeLayersChoice.Off)
         h.start()
         for (dy in listOf(-1.3f, 1.3f)) {
             h.swipe(h.key("w"), 0f, h.key("w").height * dy)

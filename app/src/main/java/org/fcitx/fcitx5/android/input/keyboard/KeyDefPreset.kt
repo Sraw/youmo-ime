@@ -28,6 +28,7 @@ class SymbolKey(
     variant: Variant = Variant.Normal,
     popup: Array<Popup>? = null,
     viewId: Int = -1,
+    shortcut: String? = null,
 ) : KeyDef(
     Appearance.Text(
         displayText = symbol,
@@ -42,7 +43,8 @@ class SymbolKey(
     popup ?: arrayOf(
         Popup.Preview(symbol),
         Popup.Keyboard.Preset(symbol)
-    )
+    ),
+    shortcut,
 )
 
 /** A key left blank ([NumberPad]'s), so the keys around it stay where they are: no press, nothing for TalkBack. */
@@ -89,7 +91,8 @@ class AlphabetKey(
     popup ?: arrayOf(
         Popup.AltPreview(character, punctuation),
         Popup.Keyboard.Preset(character)
-    )
+    ),
+    "full/${character.lowercase()}",
 )
 
 class CapsKey(percentWidth: Float = 0.15f) : KeyDef(
@@ -105,7 +108,8 @@ class CapsKey(percentWidth: Float = 0.15f) : KeyDef(
         Behavior.Press(KeyAction.CapsAction(false)),
         Behavior.LongPress(KeyAction.CapsAction(true)),
         Behavior.DoubleTap(KeyAction.CapsAction(true))
-    )
+    ),
+    shortcut = "shift",
 )
 
 /**
@@ -143,7 +147,13 @@ class LayoutSwitchKey(
     setOfNotNull(
         Behavior.Press(KeyAction.LayoutSwitchAction(to)),
         longPress?.let { Behavior.LongPress(it) }
-    )
+    ),
+    // the symbols' and the digits' (a page of their own on the keyboard); back to the letters has none
+    shortcut = when (to) {
+        PickerWindow.Key.Symbol.name -> "symbols"
+        NumberKeyboard.Name -> "numbers"
+        else -> null
+    },
 )
 
 class BackspaceKey(
@@ -161,7 +171,8 @@ class BackspaceKey(
     setOf(
         Behavior.Press(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_BackSpace))),
         Behavior.Repeat(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_BackSpace)))
-    )
+    ),
+    shortcut = "backspace",
 )
 
 class LanguageKey : KeyDef(
@@ -174,7 +185,8 @@ class LanguageKey : KeyDef(
     setOf(
         Behavior.Press(KeyAction.LangSwitchAction),
         Behavior.LongPress(KeyAction.ShowInputMethodPickerAction)
-    )
+    ),
+    shortcut = "lang",
 )
 
 class SpaceKey : KeyDef(
@@ -194,7 +206,8 @@ class SpaceKey : KeyDef(
     setOf(
         Behavior.Press(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_space))),
         Behavior.LongPress(KeyAction.SpaceLongPressAction())
-    )
+    ),
+    shortcut = "space",
 )
 
 class ReturnKey(percentWidth: Float = 0.15f) : KeyDef(
@@ -219,6 +232,7 @@ class ReturnKey(percentWidth: Float = 0.15f) : KeyDef(
             )
         )
     ),
+    shortcut = "return",
 )
 
 /**
@@ -248,6 +262,7 @@ class ConfirmKey(percentWidth: Float = 0.15f) : KeyDef(
             )
         )
     ),
+    shortcut = "return",
 )
 
 class ImageLayoutSwitchKey(
@@ -324,7 +339,8 @@ class MiniSpaceKey : KeyDef(
     ),
     setOf(
         Behavior.Press(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_space)))
-    )
+    ),
+    shortcut = "space",
 )
 
 class NumPadKey(
@@ -332,7 +348,8 @@ class NumPadKey(
     val sym: Int,
     textSize: Float = 16f,
     percentWidth: Float = 0.1f,
-    variant: Variant = Variant.Normal
+    variant: Variant = Variant.Normal,
+    shortcut: String? = null,
 ) : KeyDef(
     Appearance.Text(
         displayText,
@@ -342,5 +359,6 @@ class NumPadKey(
     ),
     setOf(
         Behavior.Press(KeyAction.SymAction(KeySym(sym), NumLockState))
-    )
+    ),
+    shortcut = shortcut,
 )

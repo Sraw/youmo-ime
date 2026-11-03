@@ -12,7 +12,13 @@ import org.fcitx.fcitx5.android.data.InputFeedbacks
 open class KeyDef(
     val appearance: Appearance,
     val behaviors: Set<Behavior>,
-    val popup: Array<Popup>? = null
+    val popup: Array<Popup>? = null,
+    /**
+     * What the key's swipe shortcuts are stored under ([org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts]):
+     * a character key's `form/key` (`full/a`), a function key's own name (`space`); null for a key
+     * with none, as on the panels' keyboards.
+     */
+    val shortcut: String? = null,
 ) {
     sealed class Appearance(
         val percentWidth: Float,

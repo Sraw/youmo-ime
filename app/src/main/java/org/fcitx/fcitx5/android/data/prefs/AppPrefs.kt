@@ -28,7 +28,8 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.NineKeySymbols
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
-import org.fcitx.fcitx5.android.input.keyboard.SwipeSymbolDirection
+import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
+import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
@@ -64,6 +65,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          * is also what swiping it types, drawn in its corner.
          */
         val popupOverrides = string("popup_overrides", "")
+
+        /** See [org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts] for the format: the keys' swipe shortcuts the user set. */
+        val keyShortcuts = string("key_shortcuts", "")
 
         /**
          * The bar's buttons, their order and which show (ToolbarConfig.serialize; empty, as
@@ -160,10 +164,11 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         }
         val expandKeypressArea =
             hidden { switch(R.string.expand_keypress_area, "expand_keypress_area", false) }
-        val swipeSymbolDirection = enumList(
-            R.string.swipe_symbol_behavior,
-            "swipe_symbol_behavior",
-            SwipeSymbolDirection.Down
+        /** What a key's swipe up and down reach ([SwipeLayers]); the old 划动输入标点符号及数字 moves over ([dropRetired]). */
+        val swipeLayers = enumList(
+            R.string.swipe_layers,
+            SWIPE_LAYERS,
+            SwipeLayersChoice.ShortcutUpSymbolDown
         )
         val longPressDelay = hidden(setByLevels = true) {
             int(
@@ -700,6 +705,8 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 internal.editorInfoInspector,
                 // the long-press and swipe characters: a password may be typed with them before the first unlock
                 internal.popupOverrides,
+                // a swipe's shortcut too
+                internal.keyShortcuts,
                 // the bar is there before the first unlock too
                 internal.toolbarButtons,
                 advanced.ignoreSystemCursor,
@@ -725,8 +732,23 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
      * at every start, a backup restored being read at the next.
      */
     fun dropRetired() {
-        if (!sharedPreferences.contains(ENGLISH_ON_NINE_KEYS)) return
-        sharedPreferences.edit { remove(ENGLISH_ON_NINE_KEYS) }
+        if (sharedPreferences.contains(ENGLISH_ON_NINE_KEYS)) sharedPreferences.edit { remove(ENGLISH_ON_NINE_KEYS) }
+        migrateSwipe()
+    }
+
+    /**
+     * 0.5's 划动输入标点符号及数字 as 滑动 ([SwipeLayers.fromLegacy]): the symbol the way it was, the
+     * shortcuts the other, off both off. A 滑动 set already is kept, the old one dropped all the same.
+     */
+    private fun migrateSwipe() {
+        if (!sharedPreferences.contains(SWIPE_SYMBOL_BEHAVIOR)) return
+        val legacy = sharedPreferences.getString(SWIPE_SYMBOL_BEHAVIOR, null)
+        sharedPreferences.edit {
+            if (!sharedPreferences.contains(SWIPE_LAYERS)) {
+                putString(SWIPE_LAYERS, SwipeLayersChoice.of(SwipeLayers.fromLegacy(legacy)).name)
+            }
+            remove(SWIPE_SYMBOL_BEHAVIOR)
+        }
     }
 
     /**
@@ -759,6 +781,10 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         // 0.4's: English on the nine keys while 九键's 中/英 had brought it there, gone with the key (I1)
         private const val ENGLISH_ON_NINE_KEYS = "english_on_nine_keys"
+
+        // 0.5's swipe setting, and 0.5.1's that took its place
+        private const val SWIPE_SYMBOL_BEHAVIOR = "swipe_symbol_behavior"
+        const val SWIPE_LAYERS = "swipe_layers"
 
         const val ENGLISH_AUTO_CAPS = "english_auto_caps"
         const val GLIDE_TYPING = "glide_typing"
