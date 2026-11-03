@@ -29,7 +29,6 @@ import androidx.annotation.FloatRange
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.updateLayoutParams
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
@@ -597,7 +596,8 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
         settling.forEachIndexed { i, (v, m) -> v.settle(m.ink, settled.marks.getOrNull(i)) }
     }
 
-    private fun applyTopRightAltTextPosition() {
+    // in a corner, the letter where it is
+    private fun applyCornerAltTextPosition(slot: KeyMarks.Slot) {
         mainText.updateLayoutParams<ConstraintLayout.LayoutParams> {
             // reset
             topMargin = 0
@@ -608,20 +608,20 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
         }
         altText.visibility = View.VISIBLE
         altText.updateLayoutParams<ConstraintLayout.LayoutParams> {
-            // reset
-            bottomToBottom = unset; bottomMargin = 0
-            // set
-            topToTop = parentId; topMargin = vMargin
-            leftToLeft = unset
-            rightToRight = parentId; rightMargin = hMargin + dp(4)
-        }
-    }
-
-    private fun applyBottomRightAltTextPosition() {
-        applyTopRightAltTextPosition()
-        altText.updateLayoutParams<ConstraintLayout.LayoutParams> {
             topToTop = unset; topMargin = 0
-            bottomToBottom = parentId; bottomMargin = vMargin
+            bottomToBottom = unset; bottomMargin = 0
+            leftToLeft = unset; leftMargin = 0
+            rightToRight = unset; rightMargin = 0
+            if (slot.bottom) {
+                bottomToBottom = parentId; bottomMargin = vMargin
+            } else {
+                topToTop = parentId; topMargin = vMargin
+            }
+            if (slot.left) {
+                leftToLeft = parentId; leftMargin = hMargin + dp(4)
+            } else {
+                rightToRight = parentId; rightMargin = hMargin + dp(4)
+            }
         }
     }
 
@@ -637,7 +637,7 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
         altText.updateLayoutParams<ConstraintLayout.LayoutParams> {
             // reset
             topToTop = unset; topMargin = 0
-            rightMargin = 0
+            leftMargin = 0; rightMargin = 0
             // set
             leftToLeft = parentId
             rightToRight = parentId
@@ -657,7 +657,7 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
         altText.visibility = View.GONE
     }
 
-    // where the symbol is drawn as the swipes' marks are placed ([showMarks]); null, as 标点位置 and 滑动 say
+    // where the symbol is drawn as the swipes' marks are placed ([showMarks]); null, as 标点位置 says
     private var marked = false
     private var markedSymbol: KeyMarks.Slot? = null
 
@@ -669,19 +669,18 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
     }
 
     private fun applyLayout(orientation: Int) {
-        // a key no swipe marks: its symbol alone, where 标点位置 and the way 滑动 swipes to it put it
+        // a key no swipe marks: its symbol alone, where 标点位置 puts it
         val slot = if (marked) {
             markedSymbol
         } else {
+            val spots = markSpots()
             KeyMarks.symbolSlot(
-                AppPrefs.getInstance().keyboard.swipeLayers.getValue().layers.wayOf(SwipeLayers.Layer.Symbol), markPosition(),
-                landscape = orientation == Configuration.ORIENTATION_LANDSCAPE, compact = keyboardCompact(),
+                spots.symbol, spots.shortcut, landscape = orientation == Configuration.ORIENTATION_LANDSCAPE, compact = keyboardCompact(),
             )
         }
         symbolLaidOut = slot
         when (slot) {
-            KeyMarks.Slot.TopRight -> applyTopRightAltTextPosition()
-            KeyMarks.Slot.BottomRight -> applyBottomRightAltTextPosition()
+            KeyMarks.Slot.TopRight, KeyMarks.Slot.BottomRight, KeyMarks.Slot.TopLeft, KeyMarks.Slot.BottomLeft -> applyCornerAltTextPosition(slot)
             KeyMarks.Slot.Below -> applyBottomAltTextPosition()
             else -> {
                 symbolLaidOut = null

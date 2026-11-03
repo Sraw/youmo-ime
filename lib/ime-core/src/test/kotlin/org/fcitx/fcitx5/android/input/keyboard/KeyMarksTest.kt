@@ -4,10 +4,10 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarks.At
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks.Placed
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarks.Position
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarks.ShortcutAt
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks.Slot
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarks.Spots
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -16,111 +16,102 @@ import org.junit.Test
 class KeyMarksTest {
 
     private val bools = listOf(false, true)
-    private val ways = listOf(true, false, null)
 
-    private fun place(symbolWay: Boolean?, at: ShortcutAt, position: Position = Position.TopRight, landscape: Boolean = false, compact: Boolean = false) =
-        KeyMarks.place("，", symbolWay, "全选", true, at, position, landscape, compact)
+    private fun place(symbolAt: At, shortcutAt: At, landscape: Boolean = false, compact: Boolean = false) =
+        KeyMarks.place("，", "全选", symbolAt, shortcutAt, landscape, compact)
 
     @Test
-    fun theShortcutWhereChosenTheSymbolByItsWay() {
-        // the default: 滑动 上滑快捷键，下滑符号, 快捷键标记位置 左上
-        assertEquals(Placed.of(Slot.TopLeft to "全选", Slot.BottomRight to "，"), place(false, ShortcutAt.Default))
-        assertEquals(Placed.of(Slot.TopLeft to "全选", Slot.TopRight to "，"), place(true, ShortcutAt.TopLeft))
-        assertEquals("no swipe to it: top right", Placed.of(Slot.BottomLeft to "全选", Slot.TopRight to "，"), place(null, ShortcutAt.BottomLeft))
-        assertEquals(Placed.of(Slot.Bottom to "全选", Slot.BottomRight to "，"), place(false, ShortcutAt.Bottom))
+    fun eachWhereItsSettingSays() {
+        // the defaults: 标点位置 右上, 快捷键图标位置 左上
+        assertEquals(Placed.of(Slot.TopLeft to "全选", Slot.TopRight to "，"), place(At.SymbolDefault, At.ShortcutDefault))
+        assertEquals(Placed.of(Slot.TopRight to "全选", Slot.BottomLeft to "，"), place(At.BottomLeft, At.TopRight))
+        assertEquals(Placed.of(Slot.Bottom to "全选", Slot.TopLeft to "，"), place(At.TopLeft, At.Bottom))
+        assertEquals(Placed.of(Slot.BottomLeft to "全选", Slot.Below to "，"), place(At.Bottom, At.BottomLeft))
+        // 无: that one not drawn, the other where it was
+        assertEquals(Placed.of(Slot.TopLeft to "全选"), place(At.None, At.TopLeft))
+        assertEquals(Placed.of(Slot.TopRight to "，"), place(At.TopRight, At.None))
+        assertEquals(Placed<String>(), place(At.None, At.None))
+        // either alone on a key where it would be
+        assertEquals(Placed.of(Slot.BottomRight to "，"), KeyMarks.place("，", null, At.BottomRight, At.TopLeft, false))
+        assertEquals(Placed.of(Slot.TopLeft to "全选"), KeyMarks.place(null, "全选", At.BottomRight, At.TopLeft, false))
     }
 
     @Test
-    fun aSymbolInTheShortcutsCornerTakesTheOtherRightOne() {
-        // z: 「，」 down, bottom right; the shortcut chosen there, it goes up
-        assertEquals(Placed.of(Slot.BottomRight to "全选", Slot.TopRight to "，"), place(false, ShortcutAt.BottomRight))
-        assertEquals(Placed.of(Slot.TopRight to "全选", Slot.BottomRight to "，"), place(true, ShortcutAt.TopRight))
-        assertEquals(Placed.of(Slot.TopRight to "全选", Slot.BottomRight to "，"), place(null, ShortcutAt.TopRight))
-        // either alone where it would be
-        assertEquals(Placed.of(Slot.BottomRight to "，"), KeyMarks.place("，", false, null, true, ShortcutAt.BottomRight, Position.TopRight, false))
-    }
-
-    @Test
-    fun underTheLetterUnlessTheShortcutIsThere() {
-        assertEquals(Placed.of(Slot.TopLeft to "全选", Slot.Below to "，"), place(false, ShortcutAt.TopLeft, Position.Bottom))
-        assertEquals(Placed.of(Slot.BottomRight to "全选", Slot.Below to "，"), place(false, ShortcutAt.BottomRight, Position.Bottom))
-        // the bottom edge's middle and under the letter one place: the symbol its way's corner
-        assertEquals(Placed.of(Slot.Bottom to "全选", Slot.BottomRight to "，"), place(false, ShortcutAt.Bottom, Position.Bottom))
-        assertEquals(Placed.of(Slot.Bottom to "全选", Slot.TopRight to "，"), place(true, ShortcutAt.Bottom, Position.Bottom))
-        // no room under it: landscape's and 紧凑's keys
-        assertEquals(Placed.of(Slot.TopLeft to "全选", Slot.BottomRight to "，"), place(false, ShortcutAt.TopLeft, Position.Bottom, landscape = true))
-        assertEquals(Placed.of(Slot.TopLeft to "全选", Slot.BottomRight to "，"), place(false, ShortcutAt.TopLeft, Position.Bottom, compact = true))
-    }
-
-    @Test
-    fun noneDrawsNothing() {
-        for (at in ShortcutAt.entries) for (way in ways) {
-            assertEquals(Placed<String>(), place(way, at, Position.None))
-            assertEquals(Placed<String>(), KeyMarks.placeFunction("清除", "恢复", true, true, at, Position.None))
+    fun bottomWithNoRoomUnderTheLetterIsTopRightOrBottomRight() {
+        for (squeezed in listOf(true to false, false to true)) {
+            val (landscape, compact) = squeezed
+            assertEquals(Placed.of(Slot.TopLeft to "全选", Slot.TopRight to "，"), place(At.Bottom, At.TopLeft, landscape, compact))
+            // the shortcuts top right: bottom right
+            assertEquals(Placed.of(Slot.TopRight to "全选", Slot.BottomRight to "，"), place(At.Bottom, At.TopRight, landscape, compact))
+            assertEquals(Slot.BottomRight, KeyMarks.symbolSlot(At.Bottom, At.TopRight, landscape, compact))
         }
+        // the other places as in portrait
+        assertEquals(Placed.of(Slot.TopRight to "全选", Slot.BottomLeft to "，"), place(At.BottomLeft, At.TopRight, compact = true))
+    }
+
+    @Test
+    fun onePlaceInBothTheSymbolYields() {
+        // as an import or a backup can write them; the settings page offers neither
+        assertEquals(Spots(At.BottomRight, At.TopRight), KeyMarks.settled(At.TopRight, At.TopRight))
+        assertEquals(Spots(At.TopRight, At.BottomRight), KeyMarks.settled(At.BottomRight, At.BottomRight))
+        assertEquals(Spots(At.BottomLeft, At.TopLeft), KeyMarks.settled(At.TopLeft, At.TopLeft))
+        assertEquals(Spots(At.TopLeft, At.BottomLeft), KeyMarks.settled(At.BottomLeft, At.BottomLeft))
+        assertEquals(Spots(At.TopRight, At.Bottom), KeyMarks.settled(At.Bottom, At.Bottom))
+        assertEquals("both 无 is allowed", Spots(At.None, At.None), KeyMarks.settled(At.None, At.None))
+        for (a in At.entries) for (b in At.entries) if (a != b) assertEquals(Spots(a, b), KeyMarks.settled(a, b))
+        // placed as read
+        assertEquals(Placed.of(Slot.TopRight to "全选", Slot.BottomRight to "，"), place(At.TopRight, At.TopRight))
+        assertEquals(Placed.of(Slot.Bottom to "全选", Slot.TopRight to "，"), place(At.Bottom, At.Bottom))
     }
 
     private data class Case(
-        val at: ShortcutAt, val symbolWay: Boolean?, val shortcutWay: Boolean?, val position: Position,
-        val landscape: Boolean, val compact: Boolean, val symbol: String?, val shortcut: String?,
-    ) {
-        fun place(shortcutWay: Boolean? = this.shortcutWay) = KeyMarks.place(symbol, symbolWay, shortcut, shortcutWay, at, position, landscape, compact)
-    }
+        val symbolAt: At, val shortcutAt: At, val landscape: Boolean, val compact: Boolean, val symbol: String?, val shortcut: String?,
+    )
 
-    // every combination: the shortcut in its chosen slot, the symbol on the right or under, never the
-    // two in one place, the symbol where it would be alone unless the shortcut is there
+    // every combination, those the settings page does not offer too: the shortcut in its setting's
+    // slot, the symbol in its own, never two in one place or the bottom edge's middle under the letter
     @Test
     fun everyCombinationOneMarkASlot() {
-        val n = 5 * 3 * 3 * 3 * 2 * 2 * 2 * 2
-        val cases = (0 until n).map { i ->
-            val r = intArrayOf(i)
-            Case(
-                ShortcutAt.entries.pick(r), ways.pick(r), ways.pick(r), Position.entries.pick(r),
-                bools.pick(r), bools.pick(r), listOf("，", null).pick(r), listOf("全选", null).pick(r),
-            )
-        }
-        assertEquals(n, cases.toSet().size)
+        val cases = At.entries.flatMap { symbolAt -> At.entries.map { symbolAt to it } }
+            .flatMap { (symbolAt, shortcutAt) -> bools.flatMap { landscape -> bools.map { Case(symbolAt, shortcutAt, landscape, it, null, null) } } }
+            .flatMap { c -> listOf("，", null).flatMap { symbol -> listOf("全选", null).map { c.copy(symbol = symbol, shortcut = it) } } }
         cases.forEach(::check)
+        assertEquals(6 * 6 * 2 * 2 * 2 * 2, cases.distinct().size)
     }
 
-    // the next digit of [r] in this list's base, as its item
-    private fun <T> List<T>.pick(r: IntArray): T = this[r[0] % size].also { r[0] /= size }
-
     private fun check(c: Case) {
-        val placed = c.place()
-        if (c.position == Position.None) return assertEquals("$c", Placed<String>(), placed)
-        val shortcutDrawn = c.shortcut != null && c.shortcutWay != null
-        assertEquals("$c", if (shortcutDrawn) c.at.slot else null, placed.slotOf("全选"))
+        val placed = KeyMarks.place(c.symbol, c.shortcut, c.symbolAt, c.shortcutAt, c.landscape, c.compact)
+        val shortcutSlot = KeyMarks.shortcutSlot(c.shortcutAt)
+        assertEquals("$c", if (c.shortcut != null) shortcutSlot else null, placed.slotOf("全选"))
         val s = placed.slotOf("，")
-        if (c.symbol == null) return assertEquals("$c", null, s)
-        assertTrue("$c", s == Slot.Below || s!!.right)
-        val alone = KeyMarks.symbolSlot(c.symbolWay, c.position, c.landscape, c.compact)
-        val clash = shortcutDrawn && (alone == c.at.slot || (alone == Slot.Below && c.at.slot == Slot.Bottom))
-        if (!clash) assertEquals("$c", alone, s)
-        if (!shortcutDrawn) return
-        assertNotEquals("$c", c.at.slot, s)
-        assertTrue("$c", !(s == Slot.Below && c.at.slot == Slot.Bottom))
-        // the way that swipes to the shortcut moves nothing: 0.5.1's symbols that moved as 滑动 changed
-        assertEquals("$c", placed, c.place(!c.shortcutWay!!))
+        val alone = KeyMarks.symbolSlot(c.symbolAt, c.shortcutAt, c.landscape, c.compact)
+        assertEquals("$c: one place whatever the key has", if (c.symbol != null) alone else null, s)
+        if (alone == null) return assertTrue("$c", c.symbolAt == At.None)
+        assertNotEquals("$c", shortcutSlot, alone)
+        assertTrue("$c", !(alone == Slot.Below && shortcutSlot == Slot.Bottom))
+        assertTrue("$c: under the letter only with room", alone != Slot.Below || (!c.landscape && !c.compact))
+        // the legal ones (apart) where chosen
+        if (c.symbolAt != c.shortcutAt && c.symbolAt != At.Bottom) assertEquals("$c", c.symbolAt.corner, alone)
     }
 
     @Test
     fun aFunctionKeysUpWhereChosenItsDownMirrored() {
         val expected = mapOf(
-            ShortcutAt.TopLeft to (Slot.TopLeft to Slot.BottomLeft),
-            ShortcutAt.BottomLeft to (Slot.BottomLeft to Slot.TopLeft),
-            ShortcutAt.TopRight to (Slot.TopRight to Slot.BottomRight),
-            ShortcutAt.BottomRight to (Slot.BottomRight to Slot.TopRight),
-            ShortcutAt.Bottom to (Slot.Bottom to Slot.Top),
+            At.TopLeft to (Slot.TopLeft to Slot.BottomLeft),
+            At.BottomLeft to (Slot.BottomLeft to Slot.TopLeft),
+            At.TopRight to (Slot.TopRight to Slot.BottomRight),
+            At.BottomRight to (Slot.BottomRight to Slot.TopRight),
+            At.Bottom to (Slot.Bottom to Slot.Top),
         )
-        for (at in ShortcutAt.entries) for (position in listOf(Position.TopRight, Position.Bottom)) {
-            val (up, down) = expected.getValue(at)
-            assertEquals(Placed.of(up to "清除", down to "恢复"), KeyMarks.placeFunction("清除", "恢复", true, true, at, position))
-            assertEquals("the down one alone where chosen", Placed.of(up to "恢复"), KeyMarks.placeFunction("清除", "恢复", false, true, at, position))
-            assertEquals(Placed.of(up to "清除"), KeyMarks.placeFunction("清除", "恢复", true, false, at, position))
-            assertEquals(Placed.of(up to "清除"), KeyMarks.placeFunction("清除", null, true, true, at, position))
-            assertEquals(Placed<String>(), KeyMarks.placeFunction<String>(null, null, true, true, at, position))
+        for ((at, slots) in expected) {
+            val (up, down) = slots
+            assertEquals(Placed.of(up to "清除", down to "恢复"), KeyMarks.placeFunction("清除", "恢复", true, true, at))
+            assertEquals("the down one alone where chosen", Placed.of(up to "恢复"), KeyMarks.placeFunction("清除", "恢复", false, true, at))
+            assertEquals(Placed.of(up to "清除"), KeyMarks.placeFunction("清除", "恢复", true, false, at))
+            assertEquals(Placed.of(up to "清除"), KeyMarks.placeFunction("清除", null, true, true, at))
+            assertEquals(Placed<String>(), KeyMarks.placeFunction<String>(null, null, true, true, at))
         }
+        assertEquals(Placed<String>(), KeyMarks.placeFunction("清除", "恢复", true, true, At.None))
     }
 
     @Test
@@ -131,5 +122,6 @@ class KeyMarksTest {
             if (s != Slot.Below) assertEquals(s, s.mirrored.mirrored)
         }
         assertTrue(Slot.Bottom.centred && Slot.Top.centred && !Slot.TopLeft.centred)
+        for (a in At.entries) if (a != At.None) assertNotEquals(a, a.yielded)
     }
 }

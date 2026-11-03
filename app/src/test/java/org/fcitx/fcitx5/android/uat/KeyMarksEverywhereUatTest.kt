@@ -14,7 +14,7 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePrefs.PunctuationPosition
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
@@ -28,8 +28,6 @@ import org.fcitx.fcitx5.android.input.keyboard.ImageKeyView
 import org.fcitx.fcitx5.android.input.keyboard.ImageTextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
-import org.fcitx.fcitx5.android.input.keyboard.ShortcutMarkPosition
-import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -42,10 +40,11 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The marks on every key of every keyboard (uat/02 KB-67), for each 快捷键标记位置 and as the keys are
- * drawn (standard, 紧凑, floating, one-handed, landscape; 标点位置 底部; 滑动 either way): what each key
- * draws, its label or icon, its symbol and its shortcuts' marks, as drawn (moved, smaller, left out:
- * KeyMarkYield), never two over each other. Their ink: a text's glyphs, an icon's box.
+ * The marks on every key of every keyboard (uat/02 KB-67), for every pair of 标点位置 and 快捷键图标位置
+ * the settings page lets be chosen and as the keys are drawn (standard, 紧凑, floating, one-handed,
+ * landscape): what each key draws, its label or icon, its symbol and its shortcuts' marks, as drawn
+ * (moved, smaller, left out: KeyMarkYield), never two over each other. Their ink: a text's glyphs, an
+ * icon's box. 滑动 is not gone through: it moves no mark.
  *
  * What was left out to keep them apart is counted and printed (the report's numbers), and no symbol
  * ever is.
@@ -123,7 +122,6 @@ class KeyMarksEverywhereUatTest {
         Mode("紧凑") { compact(it) },
         Mode("悬浮") { it.set(ThemeManager.prefs.floatingKeyboard, true) },
         Mode("单手") { it.set(ThemeManager.prefs.oneHanded, OneHanded.Right) },
-        Mode("标点底部") { it.set(ThemeManager.prefs.punctuationPosition, PunctuationPosition.Bottom) },
         Mode("紧凑单手") { p -> compact(p); p.set(ThemeManager.prefs.oneHanded, OneHanded.Right) },
     )
 
@@ -176,6 +174,9 @@ class KeyMarksEverywhereUatTest {
 
     private val dropped = sortedMapOf<String, Int>()
 
+    // the letters made smaller to keep clear (KeyMarkYield.letters: all of a keyboard's alike), by case
+    private val smaller = sortedMapOf<String, Float>()
+
     // what [k] draws, none over another; its symbol never left out
     private fun checkKey(case: String, k: KeyView) {
         val d = drawn(k)
@@ -188,19 +189,41 @@ class KeyMarksEverywhereUatTest {
         if (out.isNotEmpty()) dropped.merge("$case: $name ${out.joinToString()}", 1, Int::plus)
     }
 
+    // every pair the settings page lets be chosen: apart, or 无
+    private val legal = KeyMarkPosition.entries.flatMap { symbol ->
+        KeyMarkPosition.entries.filter { it != symbol || it == KeyMarkPosition.None }.map { symbol to it }
+    }
+
+    // The two settings make the keyboard anew (FcitxInputMethodService.recreateInputViewPrefs). Under
+    // Robolectric each new keyboard keeps about 3 MB till the JVM ends: 62 for each of 90 keyboards ran
+    // a full run out of its 3 GB. Not made anew here: its keys laid out again as a new one lays them
+    // out (check), the swipes' marks by their own listener (KeySwipes)
+    private fun noRebuilds(h: KeyboardHarness) {
+        val field = h.service.javaClass.getDeclaredField("recreateInputViewListener").apply { isAccessible = true }
+        @Suppress("UNCHECKED_CAST")
+        val rebuild = field.get(h.service) as ManagedPreference.OnChangeListener<Any>
+        val keyboard = AppPrefs.getInstance().keyboard
+        @Suppress("UNCHECKED_CAST")
+        listOf(keyboard.punctuationPosition, keyboard.shortcutMarkPosition)
+            .forEach { (it as ManagedPreference<Any>).unregisterOnChangeListener(rebuild) }
+    }
+
     private fun check(board: Board, mode: Mode, h: KeyboardHarness) {
+        noRebuilds(h)
         var keys = 0
-        for (choice in listOf(SwipeLayersChoice.ShortcutUpSymbolDown, SwipeLayersChoice.SymbolUpShortcutDown)) {
-            prefs.set(AppPrefs.getInstance().keyboard.swipeLayers, choice)
-            for (at in ShortcutMarkPosition.entries) {
-                prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, at)
-                h.idle()
-                h.relayout()
-                val case = "${board.name} ${mode.name} ${choice.name} ${at.name}"
-                val shown = KeyboardHarness.all(h.inputView).filterIsInstance<KeyView>().filter { h.shown(it) && it.width > 0 }.toList()
-                for (k in shown) checkKey(case, k)
-                keys += shown.size
-            }
+        for ((symbolAt, shortcutAt) in legal) {
+            prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, symbolAt)
+            prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, shortcutAt)
+            h.idle()
+            val all = KeyboardHarness.all(h.inputView).filterIsInstance<KeyView>().toList()
+            // every key's symbol laid out anew, as the keyboard made anew with these settings has it
+            all.filterIsInstance<AltTextKeyView>().forEach { it.dispatchConfigurationChanged(it.resources.configuration) }
+            h.relayout()
+            val case = "${board.name} ${mode.name} 标点${symbolAt.name} 快捷键${shortcutAt.name}"
+            val shown = all.filter { h.shown(it) && it.width > 0 }
+            for (k in shown) checkKey(case, k)
+            shown.filterIsInstance<AltTextKeyView>().minOfOrNull { it.mainText.scaleX }?.takeIf { it < 1f }?.let { smaller[case] = it }
+            keys += shown.size
         }
         assertTrue("${board.name} ${mode.name}: keys", keys > 0)
     }
@@ -228,6 +251,8 @@ class KeyMarksEverywhereUatTest {
         }
         println("KeyMarksEverywhere left out (${dropped.size}):")
         dropped.keys.forEach { println("  $it") }
+        println("KeyMarksEverywhere letters smaller (${smaller.size}):")
+        smaller.forEach { (case, scale) -> println("  $case: ${"%.3f".format(scale)}") }
     }
 
     @Test

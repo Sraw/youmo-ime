@@ -13,8 +13,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePrefs.PunctuationPosition
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
@@ -27,8 +26,8 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
- * The settings' keys put a key's symbol where the keyboard does: 底部 under the letter, but in its
- * way's corner at 紧凑 (滑动's default swipes down to it: bottom right; up: top right).
+ * The settings' keys put a key's symbol where the keyboard does: where 标点位置 says; 底部 under the
+ * letter, but top right at 紧凑, bottom right if 快捷键图标位置 is top right.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -52,16 +51,34 @@ class KeyCapsTest {
     @Test
     @Uat("ST-51")
     fun atBottomTheSymbolIsUnderTheLetterButInItsCornerWhenCompact() {
-        prefs.set(ThemeManager.prefs.punctuationPosition, PunctuationPosition.Bottom)
+        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.Bottom)
         val standard = key()
         assertTrue(under(standard))
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
-        assertTrue(corner(key(), Gravity.BOTTOM or Gravity.END))
-        prefs.set(AppPrefs.getInstance().keyboard.swipeLayers, SwipeLayersChoice.SymbolUpShortcutDown)
         assertTrue(corner(key(), Gravity.TOP or Gravity.END))
+        prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, KeyMarkPosition.TopRight)
+        assertTrue(corner(key(), Gravity.BOTTOM or Gravity.END))
+        // 滑动 moves nothing
+        prefs.set(AppPrefs.getInstance().keyboard.swipeLayers, SwipeLayersChoice.SymbolUpShortcutDown)
+        assertTrue(corner(key(), Gravity.BOTTOM or Gravity.END))
         // 无 is none whatever the height
-        prefs.set(ThemeManager.prefs.punctuationPosition, PunctuationPosition.None)
+        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.None)
         assertEquals(1, key().childCount)
+    }
+
+    @Test
+    fun theOtherCornersAsChosen() {
+        val at = mapOf(
+            KeyMarkPosition.TopRight to (Gravity.TOP or Gravity.END),
+            KeyMarkPosition.BottomRight to (Gravity.BOTTOM or Gravity.END),
+            KeyMarkPosition.TopLeft to (Gravity.TOP or Gravity.START),
+            KeyMarkPosition.BottomLeft to (Gravity.BOTTOM or Gravity.START),
+        )
+        prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, KeyMarkPosition.Bottom)
+        for ((position, gravity) in at) {
+            prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, position)
+            assertTrue("$position", corner(key(), gravity))
+        }
     }
 }

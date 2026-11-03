@@ -218,7 +218,7 @@ case("KB-64", needs="jvm:DeletionRunTest")(lambda d: None)
 case("KB-65", needs="jvm:SwipePopupScreenshotTest.theBubbleSaysTheShortcutFitted、PreviewLabelTest")(lambda d: None)
 
 
-case("KB-66", needs="jvm:KeyMarksUatTest.theShortcutsWhereChosenTheSymbolsByTheirWay、KeyMarksUatTest.theFirstOpenIsAsAfterAnySettingChanges、KeyMarksScreenshotTest.everyPositionOnTheKeyboards、KeyMarksTest、KeyMarkYieldTest")(lambda d: None)
+case("KB-66", needs="jvm:KeyMarksUatTest.eachWhereItsSettingSays、KeyMarksUatTest.onePlaceStoredInBothTheSymbolYields、KeyMarkPositionSettingsTest.theTwoTogetherTheOthersPlaceGreyedOut、KeyMarksUatTest.theFirstOpenIsAsAfterAnySettingChanges、KeyMarksScreenshotTest.everyPlaceOnTheKeyboards、KeyMarksTest、KeyMarkYieldTest")(lambda d: None)
 
 
 case("KB-67", needs="jvm:KeyMarksEverywhereUatTest.noKeyDrawsTwoThingsOverEachOtherUpright、KeyMarksEverywhereUatTest.noKeyDrawsTwoThingsOverEachOtherTurned、KeyMarkYieldTest")(lambda d: None)

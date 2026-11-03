@@ -14,7 +14,7 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
-import org.fcitx.fcitx5.android.data.theme.ThemePrefs.PunctuationPosition
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
@@ -96,7 +96,7 @@ class CompactKeyboardUatTest {
     @Test
     @Uat("ST-51")
     fun compactTextIsSmallerAndTheSymbolInItsCornerEvenAtBottom() {
-        prefs.set(ThemeManager.prefs.punctuationPosition, PunctuationPosition.Bottom)
+        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.Bottom)
         h.start()
         val size = h.key("q").size()
         val height = h.box(h.key("q")).height()
@@ -175,10 +175,9 @@ class CompactKeyboardUatTest {
         // left), Shift's capitals too
         val lower = lettersStayClearOfTheirSymbols()
         // @ beside a: into the corner and smaller, as far as it goes; the shortcuts' icons into
-        // theirs, 7 dp at least: the letters a little smaller, all of them (the symbols bottom right,
-        // beside the lowercase letters' low ink: a tenth at most)
+        // theirs, top left, 7 dp at least: the letters a hair smaller, all of them
         assertTrue(lower.any { it.altText.scaleX < 1f })
-        assertTrue(lower[0].mainText.scaleX.toString(), lower[0].mainText.scaleX >= 0.9f)
+        assertTrue(lower[0].mainText.scaleX.toString(), lower[0].mainText.scaleX >= 0.98f)
         h.tap(h.described("Shift"))
         h.idle()
         assertEquals("Q", h.key("Q").mainText.text.toString())
@@ -193,21 +192,18 @@ class CompactKeyboardUatTest {
         prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
         compact()
         h.start()
+        // @, +, / and \ nudged into their corners, none smaller, the letters as they were
         val lower = lettersStayClearOfTheirSymbols()
-        // the symbols bottom right (滑动's default swipes down to them), beside the lowercase letters'
-        // low ink: most nudged into their corners, w's, a's and m's smaller, the letters a little
-        assertTrue(lower.count { it.altText.moved() } > lower.size / 2)
-        assertTrue(lower[0].mainText.scaleX.toString(), lower[0].mainText.scaleX >= 0.95f)
+        assertEquals(setOf("a", "d", "h", "m"), lower.filter { it.altText.moved() }.map { it.mainText.text.toString() }.toSet())
+        assertTrue(lower.all { it.altText.scaleX == 1f && it.mainText.scaleX == 1f })
         h.tap(h.described("Shift"))
         h.idle()
         assertTrue(lettersStayClearOfTheirSymbols().any { it.altText.moved() })
-        // the standard height: the letters their size, but for a little beside w's, a's and m's symbols
-        // bottom right
         fresh()
         prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
         h.start()
-        val standard = lettersStayClearOfTheirSymbols()
-        assertTrue(standard[0].mainText.scaleX.toString(), standard[0].mainText.scaleX >= 0.97f)
+        // the standard height: the letters their size too
+        assertTrue(lettersStayClearOfTheirSymbols().all { it.mainText.scaleX == 1f })
     }
 
     private fun View.moved() = scaleX < 1f || translationX != 0f || translationY != 0f

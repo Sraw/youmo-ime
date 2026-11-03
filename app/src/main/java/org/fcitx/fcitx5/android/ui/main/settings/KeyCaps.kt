@@ -18,13 +18,11 @@ import androidx.annotation.DrawableRes
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.ViewCompat
 import com.google.android.material.R as MaterialR
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
-import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
 import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
-import org.fcitx.fcitx5.android.input.keyboard.markPosition
+import org.fcitx.fcitx5.android.input.keyboard.markSpots
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import splitties.views.dsl.core.add
@@ -102,11 +100,13 @@ object KeyCaps {
             setTextColor(ctx.styledColor(MaterialR.attr.colorOnSurfaceVariant))
         }
         when (val slot = hintSlot(ctx)) {
-            KeyMarks.Slot.TopRight, KeyMarks.Slot.BottomRight -> {
+            KeyMarks.Slot.TopRight, KeyMarks.Slot.BottomRight, KeyMarks.Slot.TopLeft, KeyMarks.Slot.BottomLeft -> {
                 add(label, lParams(matchParent, matchParent))
-                val top = slot == KeyMarks.Slot.TopRight
-                add(small, lParams(wrapContent, wrapContent, (if (top) Gravity.TOP else Gravity.BOTTOM) or Gravity.END) {
-                    setMargins(0, if (top) ctx.dp(2) else 0, ctx.dp(4), if (top) 0 else ctx.dp(2))
+                val top = !slot.bottom
+                val side = if (slot.left) Gravity.START else Gravity.END
+                add(small, lParams(wrapContent, wrapContent, (if (top) Gravity.TOP else Gravity.BOTTOM) or side) {
+                    val (start, end) = if (slot.left) ctx.dp(4) to 0 else 0 to ctx.dp(4)
+                    setMargins(start, if (top) ctx.dp(2) else 0, end, if (top) 0 else ctx.dp(2))
                 })
             }
             KeyMarks.Slot.Below -> add(ctx.verticalLayout {
@@ -182,11 +182,11 @@ object KeyCaps {
         }
     }
 
-    // where the keyboard puts a key's symbol alone (KeyMarks.symbolSlot): its way's right corner, under
-    // the letter only in portrait and not 紧凑 (the key too short for two lines else)
+    // where the keyboard puts a key's symbol (KeyMarks.symbolSlot): where 标点位置 says, under the letter
+    // only in portrait and not 紧凑 (the key too short for two lines else)
     private fun hintSlot(ctx: Context): KeyMarks.Slot? {
         val landscape = ctx.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val way = AppPrefs.getInstance().keyboard.swipeLayers.getValue().layers.wayOf(SwipeLayers.Layer.Symbol)
-        return KeyMarks.symbolSlot(way, markPosition(), landscape, keyboardCompact())
+        val spots = markSpots()
+        return KeyMarks.symbolSlot(spots.symbol, spots.shortcut, landscape, keyboardCompact())
     }
 }

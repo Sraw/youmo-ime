@@ -28,7 +28,8 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.NineKeySymbols
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
-import org.fcitx.fcitx5.android.input.keyboard.ShortcutMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
@@ -177,11 +178,33 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             SWIPE_LAYERS,
             SwipeLayersChoice.ShortcutUpSymbolDown
         )
-        /** Where every key draws its shortcut's mark ([ShortcutMarkPosition]), whichever way swipes to it. */
-        val shortcutMarkPosition = enumList(
+        /**
+         * Where every key draws its symbol ([KeyMarkPosition]), whichever way swipes to it; never where
+         * [shortcutMarkPosition] is (greyed out there), but 无. Was the theme's, under the same key.
+         */
+        val punctuationPosition = enumList(
+            R.string.punctuation_position,
+            "punctuation_position",
+            // small in the corner, as Sogou's: under the letter, it crowded the key
+            KeyMarkPosition.TopRight,
+            apart = ManagedPreferenceUi.Apart(
+                taken = { shortcutMarkPosition.getValue().takeIf { it != KeyMarkPosition.None } },
+                note = R.string.mark_at_taken_by_shortcut,
+                read = { KeyMarkPosition.of(KeyMarks.settled(it.at, shortcutMarkPosition.getValue().at).symbol) },
+            )
+        )
+        /** Where every key draws its shortcut's mark ([KeyMarkPosition]), whichever way swipes to it; apart from [punctuationPosition]. */
+        val shortcutMarkPosition: ManagedPreference.PStringLike<KeyMarkPosition> = enumList(
             R.string.shortcut_mark_position,
             "shortcut_mark_position",
-            ShortcutMarkPosition.TopLeft
+            KeyMarkPosition.TopLeft,
+            apart = ManagedPreferenceUi.Apart(
+                taken = {
+                    val symbol = KeyMarks.settled(punctuationPosition.getValue().at, shortcutMarkPosition.getValue().at).symbol
+                    KeyMarkPosition.of(symbol).takeIf { it != KeyMarkPosition.None }
+                },
+                note = R.string.mark_at_taken_by_symbol,
+            )
         )
         val longPressDelay = hidden(setByLevels = true) {
             int(

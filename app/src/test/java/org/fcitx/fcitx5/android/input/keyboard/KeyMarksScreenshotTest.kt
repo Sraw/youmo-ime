@@ -20,9 +20,10 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * 快捷键标记位置's five places (uat/02 KB-66) on the full keyboard, standard and 紧凑, and on 九键,
- * 大千 and handwriting: the goldens under src/test/screenshots/KeyMarksScreenshotTest, looked at one
- * by one for a mark on another or on a letter (KeyMarksEverywhereUatTest measures it everywhere).
+ * 快捷键图标位置's six places and 标点位置's on the full keyboard, standard and 紧凑, and on 九键, 大千
+ * and handwriting (uat/02 KB-66): the goldens under src/test/screenshots/KeyMarksScreenshotTest,
+ * named <board>_<标点位置>_<快捷键图标位置>, looked at one by one for a mark on another or on a letter
+ * (KeyMarksEverywhereUatTest measures it everywhere).
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -39,25 +40,35 @@ class KeyMarksScreenshotTest {
         "handwriting" to (InputMethodEntry(InputMethodCatalog.HANDWRITING, "手写", "", "", "手", "zh_CN", "androidengine", false) to null),
     )
 
-    private fun shoot(name: String, at: ShortcutMarkPosition, board: Pair<InputMethodEntry, ImKeyboards.Chosen?>) {
-        prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, at)
+    // each shortcut place with the symbols top right (bottom right where the shortcuts are), each symbol
+    // place with the shortcuts top left (bottom right where the symbols are): pairs the settings allow
+    private val pairs = KeyMarkPosition.entries.map { (if (it == KeyMarkPosition.TopRight) KeyMarkPosition.BottomRight else KeyMarkPosition.TopRight) to it } +
+        KeyMarkPosition.entries.filter { it != KeyMarkPosition.TopRight }
+            .map { it to (if (it == KeyMarkPosition.TopLeft) KeyMarkPosition.BottomRight else KeyMarkPosition.TopLeft) }
+
+    private fun shoot(name: String, symbolAt: KeyMarkPosition, shortcutAt: KeyMarkPosition, board: Pair<InputMethodEntry, ImKeyboards.Chosen?>) {
+        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, symbolAt)
+        prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, shortcutAt)
         KeyboardHarness(ThemePreset.PixelLight, board.first, keyboards = board.second).use { h ->
             h.start()
-            h.capture("KeyMarksScreenshotTest/${name}_${at.name}")
+            h.capture("KeyMarksScreenshotTest/${name}_${symbolAt.name}_${shortcutAt.name}")
         }
     }
 
     @Test
     @Uat("KB-66")
-    fun everyPositionOnTheKeyboards() {
+    fun everyPlaceOnTheKeyboards() {
         prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
-        for (at in ShortcutMarkPosition.entries) for ((name, board) in boards) shoot(name, at, board)
+        for ((symbolAt, shortcutAt) in pairs.distinct()) for ((name, board) in boards) shoot(name, symbolAt, shortcutAt, board)
     }
 
     @Test
     @Uat("KB-66")
-    fun everyPositionCompact() {
+    fun everyPlaceCompact() {
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
-        for (at in ShortcutMarkPosition.entries) shoot("full_compact", at, boards[0].second)
+        // 底部 has no room there: top right, bottom right where the shortcuts are
+        for ((symbolAt, shortcutAt) in (pairs + (KeyMarkPosition.Bottom to KeyMarkPosition.TopRight)).distinct()) {
+            shoot("full_compact", symbolAt, shortcutAt, boards[0].second)
+        }
     }
 }

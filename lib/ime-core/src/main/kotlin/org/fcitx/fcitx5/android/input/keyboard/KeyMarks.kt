@@ -5,33 +5,70 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 /**
- * Where a key draws what its swipes reach, as slots of its face ([Slot]).
+ * Where a key draws what its swipes reach, as slots of its face ([Slot]), from two settings with one
+ * set of choices ([At]): 标点位置 for its symbol, 快捷键图标位置 for its shortcut's mark (a command's
+ * icon, a text). One place for each on every key, whichever way swipes to it: in 0.5.1's test build
+ * they followed 滑动 instead (the up layer's top right, the down layer's bottom right), and a fresh
+ * install's keyboard looked laid out anew once 滑动 was set the other way.
  *
- * Its shortcut's mark (a command's icon, a text) where 快捷键标记位置 says ([ShortcutAt], top left
- * unless chosen otherwise), whichever way swipes to it: one place on every key, chosen once. In
- * 0.5.1's test build it followed 滑动 instead (the up layer's top right, the down layer's bottom
- * right): a fresh install's symbols pushed to the bottom right by the shortcuts, all of them back
- * and the shortcuts there once 滑动 was set the other way, which read as a keyboard laid out anew.
+ * The settings page keeps the two apart (the other's place greyed out); one place in both, as an
+ * import or a backup can write, is read as [settled] says: the symbol yields. 无 draws nothing, the
+ * swipes still working.
  *
- * Its symbol on the right, by the way that swipes to it: up top right, down bottom right, neither
- * (no swipe reaches it; it is the long press's first all the same) top right; 标点位置 底部 under the
- * letter instead, where there is room (not landscape's or 紧凑's low keys); 无 draws nothing, the
- * swipes still working. A symbol in the shortcut's slot takes the other right corner ([place]).
+ * The symbol's 底部 is under the letter, where there is room: not landscape's or 紧凑's low keys, where
+ * it goes top right, bottom right if the shortcut is there ([symbolSlot]).
  *
- * A function key has no symbol: its up shortcut in the chosen slot, its down one in the slot mirrored
+ * A function key has no symbol: its up shortcut in the chosen slot, its down one in that slot mirrored
  * top for bottom ([placeFunction]); one alone in the chosen slot.
  */
 object KeyMarks {
 
-    /** 标点位置: where a symbol goes, [Position.None] for no marks at all. */
-    enum class Position { TopRight, Bottom, None }
+    /** 标点位置's and 快捷键图标位置's choices, in the settings' order; [Bottom] a shortcut's bottom edge middle, a symbol's under the letter. */
+    enum class At(val corner: Slot?) {
+        TopRight(Slot.TopRight), BottomRight(Slot.BottomRight), TopLeft(Slot.TopLeft), BottomLeft(Slot.BottomLeft), Bottom(null), None(null);
 
-    /** 快捷键标记位置: a shortcut's slot on every key; [TopLeft] the default. */
-    enum class ShortcutAt(val slot: Slot) {
-        TopLeft(Slot.TopLeft), BottomLeft(Slot.BottomLeft), TopRight(Slot.TopRight), BottomRight(Slot.BottomRight), Bottom(Slot.Bottom);
+        /** Its corner's other on its side: top for bottom; [Bottom]'s top right. */
+        val yielded: At
+            get() = when (this) {
+                TopRight -> BottomRight
+                BottomRight -> TopRight
+                TopLeft -> BottomLeft
+                BottomLeft -> TopLeft
+                Bottom -> TopRight
+                None -> None
+            }
 
         companion object {
-            val Default = TopLeft
+            val SymbolDefault = TopRight
+            val ShortcutDefault = TopLeft
+        }
+    }
+
+    /** The two settings as read: never one place but 无. */
+    data class Spots(val symbol: At, val shortcut: At)
+
+    /**
+     * [symbol] and [shortcut] as the settings stored them, apart: one place in both (an import, a
+     * backup) moves the symbol to [At.yielded], the shortcut kept where the user last saw it chosen.
+     */
+    fun settled(symbol: At, shortcut: At): Spots =
+        Spots(if (symbol == shortcut && symbol != At.None) symbol.yielded else symbol, shortcut)
+
+    /** A shortcut's slot at [at]; null for none drawn. */
+    fun shortcutSlot(at: At): Slot? = if (at == At.Bottom) Slot.Bottom else at.corner
+
+    /**
+     * A symbol's slot at [symbolAt], [shortcutAt] where the shortcuts are ([settled] first): 底部 under
+     * the letter, or where there is no room for it (landscape, 紧凑) top right, bottom right if the
+     * shortcuts are top right; null for none drawn.
+     */
+    fun symbolSlot(symbolAt: At, shortcutAt: At, landscape: Boolean, compact: Boolean): Slot? {
+        val s = settled(symbolAt, shortcutAt)
+        return when {
+            s.symbol != At.Bottom -> s.symbol.corner
+            !landscape && !compact -> Slot.Below
+            s.shortcut == At.TopRight -> Slot.BottomRight
+            else -> Slot.TopRight
         }
     }
 
@@ -70,52 +107,29 @@ object KeyMarks {
     }
 
     /**
-     * A character key's [symbol] (null for none), swiped to [symbolWay] (true up, false down, null
-     * neither), and [shortcut] (null for none), drawn only where a way swipes to it ([shortcutWay]),
-     * in [at]'s slot; [position], [landscape], [compact] as the keyboard is.
+     * A character key's [symbol] (null for none) and [shortcut] (null for none, or no way swiping to
+     * it), at [symbolAt] and [shortcutAt] as the settings say; [landscape], [compact] as the keyboard is.
      */
-    fun <T : Any> place(
-        symbol: T?, symbolWay: Boolean?, shortcut: T?, shortcutWay: Boolean?, at: ShortcutAt,
-        position: Position, landscape: Boolean, compact: Boolean = false,
-    ): Placed<T> {
-        if (position == Position.None) return Placed()
-        val shortcutSlot = at.slot.takeIf { shortcut != null && shortcutWay != null }
-        val home = symbol?.let { symbolSlot(symbolWay, position, landscape, compact) }
-        val symbolSlot = when {
-            home == null -> null
-            // the shortcut where it was put, the symbol the other right corner; under the letter, it and
-            // the bottom edge's middle one place: the symbol its way's corner
-            home == Slot.Below -> if (shortcutSlot == Slot.Bottom) wayCorner(symbolWay) else home
-            home != shortcutSlot -> home
-            home == Slot.TopRight -> Slot.BottomRight
-            else -> Slot.TopRight
-        }
+    fun <T : Any> place(symbol: T?, shortcut: T?, symbolAt: At, shortcutAt: At, landscape: Boolean, compact: Boolean = false): Placed<T> {
         val out = linkedMapOf<Slot, T>()
-        if (shortcutSlot != null && shortcut != null) out[shortcutSlot] = shortcut
-        if (symbolSlot != null && symbol != null) out[symbolSlot] = symbol
+        val shortcutSlot = shortcutSlot(shortcutAt)
+        if (shortcut != null && shortcutSlot != null) out[shortcutSlot] = shortcut
+        val symbolSlot = symbolSlot(symbolAt, shortcutAt, landscape, compact)
+        if (symbol != null && symbolSlot != null) out[symbolSlot] = symbol
         return Placed(out)
     }
 
-    /** A symbol's own slot, nothing else on its key: its way's right corner, or under the letter. */
-    fun symbolSlot(way: Boolean?, position: Position, landscape: Boolean, compact: Boolean): Slot? = when {
-        position == Position.None -> null
-        position == Position.Bottom && !landscape && !compact -> Slot.Below
-        else -> wayCorner(way)
-    }
-
-    private fun wayCorner(way: Boolean?): Slot = if (way == false) Slot.BottomRight else Slot.TopRight
-
     /**
-     * A function key's: its [up] shortcut in [at]'s slot, its [down] one in that slot mirrored, each
-     * only where that way is on ([upOn], [downOn]); the down one alone in [at]'s. 标点位置 无 draws neither.
+     * A function key's: its [up] shortcut at [at], its [down] one in that slot mirrored, each only
+     * where that way is on ([upOn], [downOn]); the down one alone at [at]. 无 draws neither.
      */
-    fun <T : Any> placeFunction(up: T?, down: T?, upOn: Boolean, downOn: Boolean, at: ShortcutAt, position: Position): Placed<T> {
-        if (position == Position.None) return Placed()
+    fun <T : Any> placeFunction(up: T?, down: T?, upOn: Boolean, downOn: Boolean, at: At): Placed<T> {
+        val slot = shortcutSlot(at) ?: return Placed()
         val u = up?.takeIf { upOn }
         val d = down?.takeIf { downOn }
         val out = linkedMapOf<Slot, T>()
-        if (u != null) out[at.slot] = u
-        if (d != null) out[if (u != null) at.slot.mirrored else at.slot] = d
+        if (u != null) out[slot] = u
+        if (d != null) out[if (u != null) slot.mirrored else slot] = d
         return Placed(out)
     }
 }
