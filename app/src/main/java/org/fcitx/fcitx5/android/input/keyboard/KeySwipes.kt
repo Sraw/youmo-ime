@@ -11,7 +11,6 @@ import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePrefs.PunctuationPosition
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
 import org.fcitx.fcitx5.android.input.popup.PopupAction
@@ -139,20 +138,17 @@ internal class KeySwipes(
     /** Each swiping key's marks ([KeyMarks]) as the settings are now: its symbol and its shortcut. */
     fun showMarks() {
         val layers = swipeLayers
-        val position = when (ThemeManager.prefs.punctuationPosition.getValue()) {
-            PunctuationPosition.TopRight -> KeyMarks.Position.TopRight
-            PunctuationPosition.Bottom -> KeyMarks.Position.Bottom
-            PunctuationPosition.None -> KeyMarks.Position.None
-        }
+        val position = ThemeManager.prefs.punctuationPosition.getValue().marks
+        val compact = keyboardCompact()
         val landscape = board.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         swipingKeys.forEach { (view, def) ->
             val placed = when (val key = swipeKey(view, def)) {
                 is KeySwipe.Key.Char -> {
                     val symbol = KeyView.Mark.Symbol.takeIf { (view as? AltTextKeyView)?.altText?.text?.isNotEmpty() == true }
-                    KeyMarks.place(symbol, markOf(key.shortcut), layers.wayOf(SwipeLayers.Layer.Shortcut), position, landscape)
+                    KeyMarks.place(symbol, markOf(key.shortcut), layers.wayOf(SwipeLayers.Layer.Shortcut), position, landscape, compact)
                 }
                 is KeySwipe.Key.Function -> KeyMarks.placeFunction(
-                    markOf(key.up), markOf(key.down), layers.up != SwipeLayers.Layer.Off, layers.down != SwipeLayers.Layer.Off, position,
+                    markOf(key.up), markOf(key.down), layers.up != SwipeLayers.Layer.Off, layers.down != SwipeLayers.Layer.Off, position, compact,
                 )
             }
             view.showMarks(placed.topRight, placed.bottomRight, placed.below)

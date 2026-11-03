@@ -39,4 +39,31 @@ class KeyMarksTest {
         assertEquals(Placed(topRight = "清空"), KeyMarks.placeFunction("清空", "恢复", upOn = true, downOn = false, Position.TopRight))
         assertEquals(Placed<String>(), KeyMarks.placeFunction("清空", "恢复", upOn = true, downOn = true, Position.None))
     }
+
+    @Test
+    fun compactDrawsOneMarkTopRightOnly() {
+        // 底部 too: the key is too low for a line under the letter, upright as well
+        for (landscape in listOf(false, true)) {
+            assertEquals(Placed(topRight = "1"), KeyMarks.place("1", null, null, Position.Bottom, landscape, compact = true))
+            assertEquals(Placed(topRight = "1"), KeyMarks.place("1", null, null, Position.TopRight, landscape, compact = true))
+            assertEquals(Placed<String>(), KeyMarks.place("1", null, null, Position.None, landscape, compact = true))
+            assertEquals("the shortcut alone", Placed(topRight = "全选"), KeyMarks.place(null, "全选", false, Position.Bottom, landscape, compact = true))
+        }
+    }
+
+    @Test
+    fun compactKeepsTheSymbolOfTwo() {
+        for (up in listOf(true, false)) {
+            assertEquals(Placed(topRight = "@"), KeyMarks.place("@", "全选", up, Position.TopRight, landscape = false, compact = true))
+            assertEquals(Placed(topRight = "@"), KeyMarks.place("@", "全选", up, Position.Bottom, landscape = false, compact = true))
+        }
+        assertEquals(Placed<String>(), KeyMarks.place("@", "全选", true, Position.None, landscape = true, compact = true))
+    }
+
+    @Test
+    fun compactMarksAFunctionKeysUpWayOnly() {
+        assertEquals(Placed(topRight = "清除"), KeyMarks.placeFunction("清除", "恢复", upOn = true, downOn = true, Position.Bottom, compact = true))
+        assertEquals("its up way off: nothing, the down one not moved up", Placed<String>(), KeyMarks.placeFunction("清除", "恢复", upOn = false, downOn = true, Position.TopRight, compact = true))
+        assertEquals(Placed<String>(), KeyMarks.placeFunction("清除", "恢复", upOn = true, downOn = true, Position.None, compact = true))
+    }
 }

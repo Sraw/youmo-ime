@@ -49,7 +49,7 @@ class ZhuyinKeyboard(
     context: Context,
     theme: Theme,
     private val nine: Boolean,
-) : BaseKeyboard(context, theme, if (nine) nineLayout() else fullLayout(), shortcuts = true) {
+) : BaseKeyboard(context, theme, if (nine) nineLayout() else fullLayout(keyboardCompact()), shortcuts = true) {
 
     companion object {
         const val NameNine = "ZhuyinNine"
@@ -85,12 +85,13 @@ class ZhuyinKeyboard(
             shortcut,
         )
 
-        internal fun fullLayout(): List<List<KeyDef>> = ROWS.mapIndexed { r, row ->
+        /** 大千's rows; [compact] its symbols smaller ([KeyTextScale.dachen]), or they are cut off. */
+        internal fun fullLayout(compact: Boolean = false): List<List<KeyDef>> = ROWS.mapIndexed { r, row ->
             val keys = row.map { q ->
                 val c = ZhuyinKeys.DACHEN_QWERTY.getValue(q)
                 // its shortcut by the QWERTY key it sits on, the swipe's preview naming it
                 key(
-                    c.toString(), 20f, if (r == 0) 1f / 11 else if (r == 3) 0.085f else 0.1f, sym(codeOf(c, nine = false)!!),
+                    c.toString(), 20f * KeyTextScale.dachen(compact), if (r == 0) 1f / 11 else if (r == 3) 0.085f else 0.1f, sym(codeOf(c, nine = false)!!),
                     arrayOf(KeyDef.Popup.AltPreview(c.toString(), c.toString())), ZhuyinShortcutHook.fullKey(q),
                 )
             }

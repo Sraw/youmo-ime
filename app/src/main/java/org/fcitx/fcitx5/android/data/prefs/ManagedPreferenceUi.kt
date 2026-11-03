@@ -11,11 +11,11 @@ import androidx.annotation.StringRes
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
+import org.fcitx.fcitx5.android.input.keyboard.LevelPick
 import org.fcitx.fcitx5.android.ui.main.modified.MySwitchPreference
 import org.fcitx.fcitx5.android.ui.main.settings.DialogSeekBarPreference
 import org.fcitx.fcitx5.android.ui.main.settings.EditTextIntPreference
 import org.fcitx.fcitx5.android.ui.main.settings.TwinSeekBarPreference
-import kotlin.math.abs
 
 abstract class ManagedPreferenceUi<T : Preference>(
     val key: String,
@@ -44,16 +44,9 @@ abstract class ManagedPreferenceUi<T : Preference>(
         /** A level named [label]: [values] for the keys, in their order. */
         class Level(@StringRes val label: Int, vararg val values: Int)
 
-        /** How far apart the levels set each key: one in ms and one of 0..255 then weigh alike. */
-        private val spans = keys.indices.map { k -> levels.maxOf { it.values[k] } - levels.minOf { it.values[k] } }
-
-        /** The level nearest what the keys hold. */
-        fun current(): Int = levels.indices.minBy { i ->
-            keys.indices.sumOf { k ->
-                val held = store.getInt(keys[k].first, keys[k].second)
-                abs(held - levels[i].values[k]).toDouble() / spans[k].coerceAtLeast(1)
-            }
-        }
+        /** The level nearest what the keys hold ([LevelPick]: as the keyboard reads 键盘高度's). */
+        fun current(): Int =
+            LevelPick.nearest(keys.map { (name, default) -> store.getInt(name, default) }, levels.map { it.values.toList() })
 
         /** Sets the keys to level [index], the nearest too if [again]; false if there is none such. */
         fun pick(index: Int, again: Boolean = false): Boolean {

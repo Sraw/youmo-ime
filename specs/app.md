@@ -138,7 +138,11 @@ typed is in, the field's edits as `EditPlan` steps. 清除 (`EditPlan.clear`: wh
 selection, else all before the cursor, else all after) is kept in memory (`ClearedText`), 恢复 putting
 clears back last first while the field reads as each left it; what was typed is dropped and typed
 again by `HostCore.clearTyped`/`retype` (the router's log of the keys since nothing was typed). The
-marks on a key are placed by `KeyMarks`. 注音 keyboards name their keys `zyfull/<QWERTY letter>` and
+marks on a key are placed by `KeyMarks`; at 键盘高度 紧凑 (`KeyboardHeightLevels.isCompact`, read as the keys
+are made by `keyboardCompact()`) one mark a key, top right (a key's symbol over its shortcut, a function
+key's up one), and the keys' text 0.9 (`KeyTextScale`, the smaller of it and floating's; 大千's symbols 0.9 again, `KeyTextScale.dachen`, cut off on a 360 dp phone otherwise). The service
+makes the keys anew only when a height change crosses into or out of 紧凑 (`compactBuilt`, as
+`floatingBuilt`); the theme page's preview does the same in `recalculateSize`. 注音 keyboards name their keys `zyfull/<QWERTY letter>` and
 `zy9/1`…`zy9/11`, the groups by their place (`ZhuyinShortcutHook`; the tones and 注音九键's slot none, as 九键's 1). A long press's keys (`PopupKeyboardUi`, `PopupMenuUi`) are one small size whatever the
 key (`PopupComponent.LONG_PRESS_KEY_*`; as wide as the key pressed, 九键's 7 filled the screen),
 floating above it, the bubble gone; the finger picks by how far it moved since they opened, not
@@ -486,7 +490,11 @@ Rules for settings, all decided:
 - **One concept, one setting.** Do not split what the user sees as one thing into two knobs (the
   long-press character is the swipe character is the corner label).
 - **Levels over numbers.** Sizes, delays, vibration and volume are shown as a few named levels
-  (`levels(...)`, e.g. 矮/标准/高/很高) over the int preferences, which are `hidden(setByLevels = true)`.
+  (`levels(...)`, e.g. 紧凑/矮/标准/高/很高) over the int preferences, which are `hidden(setByLevels = true)`.
+  The level shown is the nearest to what the preferences hold, each key's distance over its levels'
+  span (`LevelPick` in ime-core); the level itself is not stored, so adding one can show an old odd
+  value as a neighbouring level, its numbers unchanged. 键盘高度's levels are `KeyboardHeightLevels`'
+  (ime-core), as the keyboard reads 紧凑 by the same numbers.
 - **`hidden { }`** marks a preference with no UI: it is reset to its default once on upgrade and after
   a restore (`resetHiddenSettings`), so an old value set where the UI used to be cannot linger.
 - **Searchable.** `SettingsIndex` builds the search from the same declarations (managed categories

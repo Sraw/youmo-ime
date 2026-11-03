@@ -102,7 +102,7 @@
     <string name="navbar_bkg_color_only">與鍵盤背景色相符</string>
     <string name="navbar_bkg_full">鍵盤背景圖片</string>
     <string name="punctuation_position">標點符號的位置</string>
-    <string name="punctuation_pos_bottom">底部（僅限直向）</string>
+    <string name="punctuation_pos_bottom">底部（直向；緊湊時在右上）</string>
     <string name="punctuation_pos_top_right">右上</string>
     <string name="punctuation_pos_none">無</string>
     <string name="expand_toolbar_by_default">預設展開工具列</string>

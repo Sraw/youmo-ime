@@ -15,6 +15,9 @@ import androidx.core.view.ViewCompat
 import com.google.android.material.R as MaterialR
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.PunctuationPosition
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
+import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
+import org.fcitx.fcitx5.android.input.keyboard.marks
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import splitties.views.dsl.core.add
@@ -99,11 +102,15 @@ object KeyCaps {
         }
     }
 
-    // under the letter only in portrait: a landscape key is too short for two lines, so the
-    // keyboard puts it in the corner there
+    // where the keyboard puts a key's one mark (KeyMarks): under the letter only in portrait and not
+    // 紧凑, the key too short for two lines else
     private fun hintPosition(ctx: Context): PunctuationPosition {
-        val at = ThemeManager.prefs.punctuationPosition.getValue()
         val landscape = ctx.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        return if (at == PunctuationPosition.Bottom && landscape) PunctuationPosition.TopRight else at
+        val placed = KeyMarks.place(Unit, null, null, ThemeManager.prefs.punctuationPosition.getValue().marks, landscape, keyboardCompact())
+        return when {
+            placed.topRight != null -> PunctuationPosition.TopRight
+            placed.below != null -> PunctuationPosition.Bottom
+            else -> PunctuationPosition.None
+        }
     }
 }

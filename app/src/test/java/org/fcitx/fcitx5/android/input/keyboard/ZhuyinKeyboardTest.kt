@@ -71,6 +71,14 @@ class ZhuyinKeyboardTest {
         assertTrue(GroupedKeyboard.bottomRow().none { it.behaviors.any { b -> b is KeyDef.Behavior.Press && b.action == press(rows[3][3]) } })
     }
 
+    // 紧凑: 大千's symbols as large as 注音九键's groups, or a small phone cuts them off
+    @Test
+    fun compactDachensSymbolsAreSmaller() {
+        fun sizes(rows: List<List<KeyDef>>) = rows.dropLast(1).flatten().mapNotNull { (it.appearance as? KeyDef.Appearance.Text)?.textSize }.toSet()
+        assertEquals(setOf(20f), sizes(ZhuyinKeyboard.fullLayout()))
+        assertEquals(setOf(18f), sizes(ZhuyinKeyboard.fullLayout(compact = true)))
+    }
+
     // their swipes' shortcuts: 大千's by QWERTY place, the groups' by theirs; no tone, no slot
     @Test
     fun theSymbolKeysAreNamedForTheirShortcuts() {

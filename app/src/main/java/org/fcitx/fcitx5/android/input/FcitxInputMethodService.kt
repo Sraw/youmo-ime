@@ -100,6 +100,7 @@ import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import org.fcitx.fcitx5.android.input.hardware.TakenKey
 import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
 import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
+import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
 import org.fcitx.fcitx5.android.input.learning.UndoChip
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.fcitx.fcitx5.android.utils.Locales
@@ -292,7 +293,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         prefs.advanced.disableAnimation,
     )
 
+    private val keyboardHeightPrefs = listOf(prefs.keyboard.keyboardHeightPercent, prefs.keyboard.keyboardHeightPercentLandscape)
+
     private fun replaceInputView(theme: Theme, start: Boolean = false): InputView {
+        compactBuilt = keyboardCompact()
         val newInputView = InputView(this, fcitx, theme)
         setInputView(newInputView)
         inputDeviceMgr.setInputView(newInputView)
@@ -362,6 +366,19 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         replaceInputView(ThemeManager.activeTheme, start = true)
     }
 
+    // 紧凑 as the views were last made: its keys' text and marks are set as they are made (keyboardCompact)
+    private var compactBuilt = keyboardCompact()
+
+    // 键盘高度 into or out of 紧凑 makes the keys anew; another level only resizes them (InputView).
+    // A level sets both of its numbers in one edit, so each call sees both
+    @Keep
+    private val keyboardHeightListener = ManagedPreference.OnChangeListener<Int> { _, _ ->
+        val compact = keyboardCompact()
+        if (compact == compactBuilt) return@OnChangeListener
+        rebuilding(ViewRebuild.SETTING)
+        replaceInputView(ThemeManager.activeTheme, start = true)
+    }
+
     @Keep
     private val recreateCandidatesViewListener = ManagedPreferenceProvider.OnChangeListener {
         rebuilding(ViewRebuild.SETTING)
@@ -409,6 +426,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             it.registerOnChangeListener(recreateInputViewListener)
         }
         prefs.candidates.registerOnChangeListener(recreateCandidatesViewListener)
+        keyboardHeightPrefs.forEach { it.registerOnChangeListener(keyboardHeightListener) }
         ThemeManager.addOnChangedListener(onThemeChangeListener)
         // a fcitx not ready yet syncs them itself once it is, in the app's language as here
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -1486,6 +1504,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             it.unregisterOnChangeListener(recreateInputViewListener)
         }
         prefs.candidates.unregisterOnChangeListener(recreateCandidatesViewListener)
+        keyboardHeightPrefs.forEach { it.unregisterOnChangeListener(keyboardHeightListener) }
         ThemeManager.removeOnChangedListener(onThemeChangeListener)
         // the last field learned from as the service goes (another keyboard picked, the system stopping it): not at a hide or
         // a bar made anew, the same field maybe to come back to. A process killed outright still loses it

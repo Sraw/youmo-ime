@@ -39,19 +39,36 @@ class ThemePrefsTest {
     @Test
     fun aLevelListShowsTheLevelOfWhatItsPreferencesHold() {
         val prefs = ThemePrefs(sp)
-        // untouched: standard height, no padding, standard spacing, rounded keys
+        // untouched: standard height (after 紧凑 and 矮), no padding, standard spacing, rounded keys
         val lists = listOf(
             "keyboard_height_level", "keyboard_side_padding_level", "keyboard_bottom_padding_level",
             "key_spacing_level", "key_radius_level",
         )
         // 贴底 is first, before 无
-        assertEquals(listOf(1, 0, 1, 1, 1), lists.map { prefs.level(it) })
+        assertEquals(listOf(2, 0, 1, 1, 1), lists.map { prefs.level(it) })
         prefs.keyRadius.setValue(10)
         listOf(prefs.keyHorizontalMargin, prefs.keyHorizontalMarginLandscape).forEach { it.setValue(5) }
         prefs.keyVerticalMargin.setValue(9)
         prefs.keyVerticalMarginLandscape.setValue(6)
         assertEquals(2, prefs.level("key_radius_level"))
         assertEquals(2, prefs.level("key_spacing_level"))
+    }
+
+    // 紧凑 the lowest, first, each of its numbers ime-core's: the keyboard reads 紧凑 by those
+    @Test
+    @Config(qualifiers = "zh-rCN")
+    fun theHeightLevelsStartAtCompact() {
+        val list = ThemePrefs(sp).managedPreferencesUi.filterIsInstance<ManagedPreferenceUi.Levels>()
+            .single { it.key == "keyboard_height_level" }
+        val app = RuntimeEnvironment.getApplication()
+        assertEquals(listOf("紧凑", "矮", "标准", "高", "很高"), list.createUi(app).entries.map { it.toString() })
+        // ThemePrefs(sp) keeps them in sp
+        val held = { sp.getInt("keyboard_height_percent", -1) to sp.getInt("keyboard_height_percent_landscape", -1) }
+        list.pick(0)
+        assertEquals(20 to 34, held())
+        assertEquals(0, list.current())
+        list.pick(1)
+        assertEquals(26 to 42, held())
     }
 
     // 贴底 differs from 无 only in the flush key: each is told apart, and picking one sets it

@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightCap
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
 import org.fcitx.fcitx5.android.utils.navbarFrameHeight
 import splitties.dimensions.dp
 import splitties.views.backgroundColor
@@ -160,6 +161,10 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         return w to KeyboardHeightCap.keysHeight(h * hPercent / 100, h, barHeight, keyboardBottomPaddingPx, handle)
     }
 
+    // 紧凑 as the keys were last made (makeKeyboard): its text and marks are set as they are made.
+    // Above init, which sets it
+    private var compactShown = false
+
     init {
         val (w, h) = keyboardWindowAspectRatio()
         keyboardWidth = w
@@ -171,6 +176,8 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         val (w, h) = keyboardWindowAspectRatio()
         keyboardWidth = w
         keyboardHeight = h
+        // a level into or out of 紧凑: the keys made anew, as the keyboard's are
+        if (keyboardCompact() != compactShown) makeKeyboard()
         fakeKawaiiBar.updateLayoutParams<ConstraintLayout.LayoutParams> { height = barHeight }
         fakeKeyboardWindow.updateLayoutParams<ConstraintLayout.LayoutParams> {
             height = keyboardHeight
@@ -219,6 +226,7 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         if (this::fakeKeyboardWindow.isInitialized) {
             fakeInputView.removeView(fakeKeyboardWindow)
         }
+        compactShown = keyboardCompact()
         fakeKeyboardWindow = TextKeyboard(ctx, shownTheme).also {
             it.onAttach()
         }

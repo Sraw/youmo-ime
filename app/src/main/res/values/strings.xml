@@ -102,7 +102,7 @@
     <string name="navbar_bkg_color_only">Follow keyboard color</string>
     <string name="navbar_bkg_full">Keyboard background image</string>
     <string name="punctuation_position">Punctuation position</string>
-    <string name="punctuation_pos_bottom">Bottom (Portrait only)</string>
+    <string name="punctuation_pos_bottom">Bottom (portrait; top right when Compact)</string>
     <string name="punctuation_pos_top_right">Top Right</string>
     <string name="punctuation_pos_none">None</string>
     <string name="expand_toolbar_by_default">Expand toolbar by default</string>

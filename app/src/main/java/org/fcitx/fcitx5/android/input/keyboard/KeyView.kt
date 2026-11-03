@@ -315,13 +315,19 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
 
 /**
  * The keys' text: floating ([FloatingKeyboard]), as much smaller as the keys are shorter, or a letter
- * and the digit under it ran into each other.
+ * and the digit under it ran into each other; 紧凑 ([keyboardCompact]) smaller too, the smaller of
+ * the two where both are ([KeyTextScale]).
  */
 internal fun keyTextScale(context: Context): Float {
-    // a keyboard drawn elsewhere (the theme's preview in the settings) is not the floating one
-    if (!ThemeManager.prefs.floatingKeyboard.getValue() || !context.inInputMethod()) return 1f
-    val screen = context.resources.configuration.screenWidthDp
-    return FloatingKeyboard.textScale(FloatingKeyboard.widthDp(screen), screen)
+    // a keyboard drawn elsewhere (the theme's preview in the settings) is not the floating one, but
+    // is 紧凑 as the real one is, so the preview shows what the level does
+    val floating = if (ThemeManager.prefs.floatingKeyboard.getValue() && context.inInputMethod()) {
+        val screen = context.resources.configuration.screenWidthDp
+        FloatingKeyboard.textScale(FloatingKeyboard.widthDp(screen), screen)
+    } else {
+        null
+    }
+    return KeyTextScale.of(keyboardCompact(), floating)
 }
 
 private fun Context.inInputMethod(): Boolean {
@@ -508,18 +514,21 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
             SYMBOL_BELOW -> return applyBottomAltTextPosition()
             SYMBOL_NONE -> return applyNoAltTextPosition()
         }
-        when (ThemeManager.prefs.punctuationPosition.getValue()) {
-            PunctuationPosition.Bottom -> when (orientation) {
-                Configuration.ORIENTATION_LANDSCAPE -> applyTopRightAltTextPosition()
-                else -> applyBottomAltTextPosition()
-            }
-            PunctuationPosition.TopRight -> applyTopRightAltTextPosition()
-            PunctuationPosition.None -> applyNoAltTextPosition()
+        // a key no swipe marks: its symbol alone, where 标点位置 puts one mark
+        val placed = KeyMarks.place(
+            Unit, null, null, ThemeManager.prefs.punctuationPosition.getValue().marks,
+            landscape = orientation == Configuration.ORIENTATION_LANDSCAPE, compact = keyboardCompact(),
+        )
+        when {
+            placed.topRight != null -> applyTopRightAltTextPosition()
+            placed.below != null -> applyBottomAltTextPosition()
+            else -> applyNoAltTextPosition()
         }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
-        if (symbolAt == null && ThemeManager.prefs.punctuationPosition.getValue() == PunctuationPosition.TopRight) {
+        // top right either way round: nothing to move
+        if (symbolAt == null && (ThemeManager.prefs.punctuationPosition.getValue() == PunctuationPosition.TopRight || keyboardCompact())) {
             return
         }
         applyLayout(newConfig.orientation)

@@ -51,8 +51,11 @@ class ZhuyinShortcutsUatTest {
         settings?.close()
     }
 
-    private fun harness(keyboard: ImKeyboard) =
-        KeyboardHarness(ThemePreset.PixelLight, keyboards = ImKeyboards.Chosen(pinyin = keyboard)).also { made = it }.start()
+    // the 简繁 hint not said, its "told" put back after (KeyboardPickerUatTest reads it)
+    private fun harness(keyboard: ImKeyboard): KeyboardHarness {
+        prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
+        return KeyboardHarness(ThemePreset.PixelLight, keyboards = ImKeyboards.Chosen(pinyin = keyboard)).also { made = it }.start()
+    }
 
     private fun KeyboardHarness.faced(face: String): TextKeyView =
         KeyboardHarness.all(keyboard).filterIsInstance<TextKeyView>().first { it.mainText.text.toString() == face }
