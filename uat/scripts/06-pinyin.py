@@ -283,8 +283,8 @@ case("PY-104", needs="jvm:StrokeFilterUatTest.haoThenADotThenBackspace")(lambda 
 case("PY-105", needs="jvm:ImKeyboardsUatTest.pinyinsEighteenKeysShowTheGroupsAndSendTheirOwnCodes、GroupedKeyboardTest.talkBackReadsAGroupLetterByLetterWithItsCorner")(lambda d: None)
 
 
-@case("PY-106", base="B0-注音全键盘", mutates="learn")
-def py106(d):
+@case("PY-109", base="B0-注音全键盘", mutates="learn")
+def py109(d):
     k = d.keys(refresh=True)
     kb = d.need_keyboard()
     top = sorted((n for n in kb.walk() if n.clickable and n.texts() and n.c[1] < min(m.c[1] for m in kb.walk() if m.clickable) + 20), key=lambda n: n.c[0])

@@ -486,8 +486,8 @@
 - **预期**：三行键：`Q WE RT Y U IO P` / `A SD FG H JK L;` / `分词 Z XC V BN M ⌫`（和双拼 18 键同一套分组，拼音的 L 键只写 L，长按也没有 `;` `:`；角标和别的键一样，打中文时显示中文标点，读屏读出 L 和角标；从 L 起笔滑行照样算在键上），键面大写；编码行 32dp，右边有音节条；候选第一页有「你好」，点了框里是「你好」，没有私用区字符。双拼的键盘不受影响，仍是自己选的那个。
 - **JVM**：`ImKeyboardsUatTest.pinyinsEighteenKeysShowTheGroupsAndSendTheirOwnCodes`（键面是 G18 的分组，BN 发拼音 18 键自己的码不是双拼的，编码行 32dp，双拼仍是全键盘；图）、`GroupedKeyboardTest.talkBackReadsAGroupLetterByLetterWithItsCorner`（L 键也是分组键：角标、读屏、起笔）、`EnginesImKeyboardsTest`（ime-core：拼音 18 键的码进拼音、打出你好）；准确率见 dev/m2/i1-report.md（ime-eval `t9 --keys 18`）；设备上不跑。
 
-### PY-106 [P1] 注音全键盘（大千）：打声调，空格当一声，回车上屏注音
+### PY-109 [P1] 注音全键盘（大千）：打声调，空格当一声，回车上屏注音
 - **前提**：B0-注音全键盘。
 - **操作**：看键盘；点 ㄋ ㄧ ˇ ㄏ ㄠ ˇ，看码行和候选，点「你好」；点 ㄇ ㄚ，按空格，看码行和候选，再按空格；点 ㄉ ㄜ ˙，看候选，按空格；点 ㄅ ˇ，按回车。
 - **预期**：大千排列，第一行是 ㄅ ㄉ ˇ ˋ ㄓ ˊ ˙ ㄚ ㄞ ㄢ ㄦ；码行 `ㄋㄧˇ ㄏㄠˇ`，首选「你好」；ㄇㄚ 后按空格码行是 `ㄇㄚˉ`、首选「妈」，再按空格上屏「妈」；ㄉㄜ˙ 首选「的」；回车上屏 `ㄅˇ`。框里最后是「你好妈的ㄅˇ」。
-- **JVM**：`ZhuyinKeyboardTest.dachenHasEachSymbolAndToneWhereTaiwanPrintsIt`、`PinyinSessionZhuyinTest`（`dachenTypesAWordByItsSymbolsShownInZhuyin`、`dachensSpaceIsTheFirstToneThenThePick`、`enterCommitsTheZhuyinShown`）；设备上照跑。
+- **JVM**：`ZhuyinKeyboardTest.dachenHasEachSymbolAndToneWhereTaiwanPrintsIt`、`PinyinSessionZhuyinTest`（`dachenTypesAWordByItsSymbolsShownInZhuyin`、`dachensSpaceIsTheFirstToneThenThePick`、`enterCommitsTheZhuyinShown`）、`PinyinUatTest.aNeutralToneTypedOrNotPutsTheWordFirst`（真数据：ㄓㄨㄛㄗ、ㄉㄨㄥㄒㄧ 打 ˙、打本调、不打声调，「桌子」「东西」都排第一，大千和注音九键都是）；设备上照跑。
