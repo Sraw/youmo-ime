@@ -289,9 +289,8 @@ class ToolbarUatTest {
         edit.findViewById<View>(R.id.clipboard_edit_ok).performClick()
         h.waitFor("saved") { h.entry("公园门口") != null }
         menu("公园门口", R.string.delete)
-        h.after(500)
-        h.relayout()
-        assertNull(h.entry("公园门口"))
+        // the database's delete, then the list's: as long as the machine takes, not a fixed half second
+        h.waitFor("deleted") { h.relayout(); h.entry("公园门口") == null }
     }
 
     private fun deleteAll(confirm: Boolean = true): String {
