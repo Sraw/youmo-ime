@@ -639,6 +639,30 @@ class ThemeFilesManagerTest {
     }
 
     @Test
+    fun aThemeReplacedDeletesNoFileOfAnothers() {
+        ThemeFilesManager.importTheme(zip("a.json" to json(full("a")), *files("a"))).getOrThrow()
+        // u reads but is not listed (a file of it missing); it names a's key image, and a's json as its font
+        val u = full("u").let { t ->
+            t.copy(look = t.look.mapFiles { if (it == "u-q.png") "a-q.png" else if (it == "u-font.ttf") "a.json" else it })
+        }
+        File(dir, "u.json").writeText(json(u))
+        files("u").filter { it.first !in setOf("u-q.png", "u-font.ttf", "u-fn.png") }.forEach { (name, text) -> File(dir, name).writeText(text) }
+        ThemeManager.refreshThemes()
+        try {
+            assertEquals(listOf("a"), ThemeManager.getAllThemes().filterIsInstance<Theme.Custom>().map { it.name })
+            val a = snapshot().filterKeys { it.startsWith("a") }
+            ThemeFilesManager.importTheme(zip("u.json" to json(ThemePreset.TransparentDark.deriveCustomNoBackground("u")))).getOrThrow()
+            assertEquals(a, snapshot().filterKeys { it.startsWith("a") })
+            assertEquals(setOf("a", "u"), ThemeFilesManager.listThemes().map { it.name }.toSet())
+            // u's own files it no longer names are gone
+            assertEquals(listOf("u.json"), names().filter { it.startsWith("u") })
+        } finally {
+            dir.listFiles()!!.forEach { it.deleteRecursively() }
+            ThemeManager.refreshThemes()
+        }
+    }
+
+    @Test
     fun whatAKillLeftWhereFilesAreWrittenIsClearedAtTheFirstListing() {
         File(dir, ".saving").mkdirs()
         val left = File(dir, ".saving/0c1d").apply { writeText("half a json") }

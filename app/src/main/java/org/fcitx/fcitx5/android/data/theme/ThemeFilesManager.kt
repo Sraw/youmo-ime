@@ -300,8 +300,9 @@ object ThemeFilesManager {
                     val oldFiles = (oldTheme ?: unlisted)?.look?.files().orEmpty().map { File(it).name }.toSet()
                     val newTheme = decoded.copy(look = decoded.look.mapFiles { File(dir, File(it).name).path })
                     place(files, oldFiles, newTheme)
-                    // only once the json names the new files: one not written leaves the theme it replaces whole
-                    (oldFiles - files.keys).forEach { File(dir, it).delete() }
+                    // only once the json names the new files: one not written leaves the theme it replaces whole.
+                    // Never another theme's (a json not listed may name any), nor a json or SAVING (importedFile's rule)
+                    (oldFiles - files.keys - others).mapNotNull(::importedFile).forEach { it.delete() }
                     Triple(newCreated, newTheme, migrated)
                 }
             }

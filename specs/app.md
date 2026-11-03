@@ -534,7 +534,7 @@ renamed into place (a migration's json given its old time first), the dir synced
 system lets a directory be: Linux does); what a kill left there, or a plain file of that name, is
 cleared at the process's first listing. An import writes its files and its json there, then renames
 the files into place and the json last, and only then deletes the files the theme it replaces had and
-it does not name; if any step fails, the files it added are deleted (one of the old theme's renamed
+it does not name (never one another theme names, a json or `.saving`); if any step fails, the files it added are deleted (one of the old theme's renamed
 over by then keeps the new bytes: only a rename in one directory can fail there). A migration saved
 again while listing that fails (a full disk) is logged and drawn migrated all the same, saved at the
 next start; `ThemeManager.saveTheme` tells the user (`theme_not_saved`, no path) and returns false. Export writes each named file once (only files of the theme dir:
