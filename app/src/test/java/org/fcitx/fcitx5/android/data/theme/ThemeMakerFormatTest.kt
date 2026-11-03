@@ -32,7 +32,6 @@ import org.fcitx.fcitx5.android.input.theme.Picture
 import org.fcitx.fcitx5.android.input.theme.Crop
 import org.fcitx.fcitx5.android.input.theme.Text
 import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
-import org.fcitx.fcitx5.android.Uat
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -206,7 +205,6 @@ class ThemeMakerFormatTest {
     private val themeJson get() = Json.decodeFromString(CustomThemeSerializer, ThemeMakerTestdata.file("theme.json").readText())
 
     @Test
-    @Uat("THEME-WEB-01")
     fun whatThePageExportsImportsAsTheThemeItMade() {
         val (_, theme, migrated) = ThemeFilesManager.importTheme(fromWeb.inputStream()).getOrThrow()
         assertFalse(migrated)

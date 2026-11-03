@@ -208,6 +208,20 @@ layouts). Each test compares its file with the repo's and fails on a difference;
 `./gradlew :app:testTextDebugUnitTest --tests '*ThemeMakerRulesTest' --tests '*ThemeKeyNamesTest' -PupdateThemeMaker`
 writes them again, and the page's own test then shows what it must follow.
 
+The page's side: `node --test web/theme-maker/test/format.test.mjs` (Node 24; CI's unit test job and
+the Pages workflow run it) loads the page's `youmo-lib` block as the page runs it and holds it to
+each `rules.json` case (Float maths with `Math.fround`, the blur to the pixel), reads `theme.json`
+and both `from-app` zips, and builds `from-web.zip` from `theme.json` (the app's PNGs of
+`from-app.zip` under its names, and `tiny.ttf`, a 1 KB font of square glyphs made by
+`make-tiny-font.py`), comparing it byte for byte; `UPDATE=1 node --test …` writes it again.
+`ThemeMakerFormatTest` (app JVM) closes the loop: `from-web.zip` imports as `theme.json`, and an app
+export of it imports the same; and the page's generated blocks in `index.html` (`youmo-format`: the
+file's version, every type's fields from `ThemeFileJson`'s descriptors, the limits, the defaults;
+`youmo-presets`: the eleven built-in palettes) are what the app has, through
+`ThemeMakerTestdata.checkBlock`, which `-PupdateThemeMaker` lets write them. `youmo-layout` and
+`youmo-icons` are `ThemeMakerLayoutTest`'s the same way. The test task takes `web/theme-maker` as an
+input, so a change to the page reruns it. Nothing in those blocks is edited by hand.
+
 ## Golden files from upstream fcitx
 
 The host is fcitx ported to Kotlin, and the native sources are not in the tree. What fcitx does is kept

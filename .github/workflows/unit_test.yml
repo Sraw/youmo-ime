@@ -157,6 +157,18 @@ jobs:
         if: success() || failure()
         run: python3 -m unittest discover -s lib/ime-eval/tools
 
+      # the theme maker page against what the app makes (web/theme-maker/test/testdata): the drawing
+      # rules case by case, the theme file both ways, its export byte for byte (specs/testing.md)
+      - name: Setup Node
+        if: success() || failure()
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+
+      - name: Run theme maker tests
+        if: success() || failure()
+        run: node --test web/theme-maker/test/format.test.mjs
+
       # After the tests, so a lint finding does not hide their results. Findings already present
       # are frozen in config/detekt/baseline-*.xml; this fails on new ones only.
       # Syntax rules only: type resolution does not work on this toolchain (see detekt.yml).
