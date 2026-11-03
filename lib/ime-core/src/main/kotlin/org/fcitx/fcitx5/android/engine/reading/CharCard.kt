@@ -70,7 +70,8 @@ data class CharCard(
             // the mainland's order (charinfo.data's, cnchar's); rime-stroke's first for a character it lacks
             val order = entry?.order?.let(Strokes::shown)
                 ?: if (text.length == 1) strokes?.ordersOf(text[0])?.firstOrNull()?.let(Strokes::shown) else null
-            return CharCard(text, rows, entry?.radical, entry?.strokes?.takeIf { it > 0 } ?: order?.length, parts, order)
+            // counted as the order shown is: Unihan's count may be Taiwan's glyph's (廴 3, its order 2)
+            return CharCard(text, rows, entry?.radical, order?.length ?: entry?.strokes?.takeIf { it > 0 }, parts, order)
         }
     }
 }
