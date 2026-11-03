@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.engine.assertRows
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.junit.Assert.assertEquals
@@ -188,5 +189,26 @@ class AppPrefsTest {
         sp.edit { clear(); putInt("swipe_symbol_behavior", 1) }
         AppPrefs(sp).apply { dropRetired() }.let { assertEquals(SwipeLayersChoice.ShortcutUpSymbolDown, it.keyboard.swipeLayers.getValue()) }
         assertFalse(sp.contains("swipe_symbol_behavior"))
+    }
+
+    // an import or a backup with the two in one place: the symbol stored where it reads, at the start after
+    @Test
+    @Uat("KB-66")
+    fun theSymbolStoredInTheShortcutsPlaceStoredWhereItReads() {
+        for ((stored, now) in listOf(
+            KeyMarkPosition.TopLeft to KeyMarkPosition.BottomLeft,
+            KeyMarkPosition.TopRight to KeyMarkPosition.BottomRight,
+            KeyMarkPosition.Bottom to KeyMarkPosition.TopRight,
+            KeyMarkPosition.None to KeyMarkPosition.None,
+        )) {
+            sp.edit { clear(); putString("punctuation_position", stored.name); putString("shortcut_mark_position", stored.name) }
+            val prefs = AppPrefs(sp)
+            prefs.dropRetired()
+            assertEquals(stored.name, now, prefs.keyboard.punctuationPosition.getValue())
+            assertEquals(stored.name, stored, prefs.keyboard.shortcutMarkPosition.getValue())
+        }
+        // apart already: as stored
+        sp.edit { clear(); putString("punctuation_position", "BottomLeft"); putString("shortcut_mark_position", "TopLeft") }
+        AppPrefs(sp).apply { dropRetired() }.let { assertEquals(KeyMarkPosition.BottomLeft, it.keyboard.punctuationPosition.getValue()) }
     }
 }

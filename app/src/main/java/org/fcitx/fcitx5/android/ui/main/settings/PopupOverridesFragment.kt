@@ -32,7 +32,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
 import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
-import org.fcitx.fcitx5.android.input.keyboard.markPosition
+import org.fcitx.fcitx5.android.input.keyboard.markSpots
 import org.fcitx.fcitx5.android.input.popup.PopupPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPages
@@ -144,8 +144,11 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     private val landscape get() = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     // a character key's [symbol] and [name]'s shortcut placed as the keyboard places them (KeySwipes)
-    private fun charMarks(symbol: KeyCaps.Mark?, name: String?) =
-        KeyMarks.place(symbol, name?.let(::markOf), layers.layers.wayOf(SwipeLayers.Layer.Shortcut), markPosition(), landscape, keyboardCompact())
+    private fun charMarks(symbol: KeyCaps.Mark?, name: String?): KeyMarks.Placed<KeyCaps.Mark> {
+        val spots = markSpots()
+        val shortcut = name?.let(::markOf)?.takeIf { layers.layers.wayOf(SwipeLayers.Layer.Shortcut) != null }
+        return KeyMarks.place(symbol, shortcut, spots.symbol, spots.shortcut, landscape, keyboardCompact())
+    }
 
     /** A tab other than the full keyboard's: its keys in their rows, a tap editing the shortcut alone. */
     private fun shortcutPage(ctx: Context, page: KeyShortcutPages.Page) {
@@ -187,7 +190,10 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     private fun functionMarks(names: List<String>): KeyMarks.Placed<KeyCaps.Mark> {
         val (up, down) = names.map(::markOf)
         val l = layers.layers
-        return KeyMarks.placeFunction(up, down, l.up != SwipeLayers.Layer.Off, l.down != SwipeLayers.Layer.Off, markPosition(), keyboardCompact())
+        val spots = markSpots()
+        return KeyMarks.placeFunction(
+            up, down, l.up != SwipeLayers.Layer.Off, l.down != SwipeLayers.Layer.Off, spots.symbol, spots.shortcut, landscape, keyboardCompact(),
+        )
     }
 
     /** [names]' shortcuts (one, or a function key's up and down) edited, under [label]. */

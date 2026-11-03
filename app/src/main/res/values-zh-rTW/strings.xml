@@ -102,9 +102,6 @@
     <string name="navbar_bkg_color_only">與鍵盤背景色相符</string>
     <string name="navbar_bkg_full">鍵盤背景圖片</string>
     <string name="punctuation_position">標點符號的位置</string>
-    <string name="punctuation_pos_bottom">底部（直向；緊湊時在右上）</string>
-    <string name="punctuation_pos_top_right">右上</string>
-    <string name="punctuation_pos_none">無</string>
     <string name="expand_toolbar_by_default">預設展開工具列</string>
     <string name="popup_on_key_press">按鍵時彈出顯示字元</string>
     <string name="disable_animation">停用動畫</string>
@@ -970,6 +967,16 @@
     <string name="swipe_shortcut_up_only">只上滑用快捷鍵</string>
     <string name="swipe_shortcut_down_only">只下滑用快捷鍵</string>
     <string name="swipe_off">關</string>
+    <string name="shortcut_mark_position">快捷鍵圖示位置</string>
+    <string name="mark_at_top_right">右上</string>
+    <string name="mark_at_bottom_right">右下</string>
+    <string name="mark_at_top_left">左上</string>
+    <string name="mark_at_bottom_left">左下</string>
+    <string name="mark_at_bottom">底部</string>
+    <string name="mark_at_none">無</string>
+    <string name="mark_at_taken">%1$s（%2$s）</string>
+    <string name="mark_at_taken_by_symbol">標點符號在這裡</string>
+    <string name="mark_at_taken_by_shortcut">快捷鍵圖示在這裡</string>
     <string name="shortcut_select_all">全選</string>
     <string name="shortcut_copy">複製</string>
     <string name="shortcut_cut">剪下</string>

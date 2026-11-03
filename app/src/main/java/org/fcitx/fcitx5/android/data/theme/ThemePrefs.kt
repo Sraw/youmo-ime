@@ -209,19 +209,6 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     val clipboardEntryRadius =
         hidden { int(R.string.clipboard_entry_radius, "clipboard_entry_radius", 2, 0, 48, "dp") }
 
-    enum class PunctuationPosition(override val stringRes: Int) : ManagedPreferenceEnum {
-        None(R.string.punctuation_pos_none),
-        Bottom(R.string.punctuation_pos_bottom),
-        TopRight(R.string.punctuation_pos_top_right);
-    }
-
-    val punctuationPosition = enumList(
-        R.string.punctuation_position,
-        "punctuation_position",
-        // small in the corner, as Sogou's: under the letter, it crowded the key
-        PunctuationPosition.TopRight
-    )
-
     enum class NavbarBackground(override val stringRes: Int) : ManagedPreferenceEnum {
         None(R.string.navbar_bkg_none),
         ColorOnly(R.string.navbar_bkg_color_only),

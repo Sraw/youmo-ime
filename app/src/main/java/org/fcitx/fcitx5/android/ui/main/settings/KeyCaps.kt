@@ -19,11 +19,10 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.ViewCompat
 import com.google.android.material.R as MaterialR
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePrefs.PunctuationPosition
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
-import org.fcitx.fcitx5.android.input.keyboard.markPosition
+import org.fcitx.fcitx5.android.input.keyboard.markSpots
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import splitties.views.dsl.core.add
@@ -70,8 +69,9 @@ object KeyCaps {
     }
 
     /**
-     * A key with [text] on it and [hint] small where the keyboard puts the first long-press
-     * character (the theme's [PunctuationPosition], as [KeyView][org.fcitx.fcitx5.android.input.keyboard.KeyView]
+     * A key with [text] on it and [hint] small where the keyboard puts its symbol, the first
+     * long-press character (按键's 标点位置, kept from 快捷键图标位置's place, as on the keyboard's
+     * height and orientation: [KeyMarks.symbolSlot], as [KeyView][org.fcitx.fcitx5.android.input.keyboard.KeyView]
      * places it); [dimmed] for a key whose long press is turned off. [state] is what a screen
      * reader says of what the outline and the fading show, which only the caller knows.
      * [marks], placed as the keyboard places them, in the hint's stead; [said], what a screen reader
@@ -100,25 +100,28 @@ object KeyCaps {
             maxLines = 1
             setTextColor(ctx.styledColor(MaterialR.attr.colorOnSurfaceVariant))
         }
-        when (hintPosition(ctx)) {
-            PunctuationPosition.TopRight -> {
+        when (val slot = hintSlot(ctx)) {
+            KeyMarks.Slot.TopRight, KeyMarks.Slot.BottomRight, KeyMarks.Slot.TopLeft, KeyMarks.Slot.BottomLeft -> {
                 add(label, lParams(matchParent, matchParent))
-                add(small, lParams(wrapContent, wrapContent, Gravity.TOP or Gravity.END) {
-                    setMargins(0, ctx.dp(2), ctx.dp(4), 0)
+                val top = !slot.bottom
+                val side = if (slot.left) Gravity.START else Gravity.END
+                add(small, lParams(wrapContent, wrapContent, (if (top) Gravity.TOP else Gravity.BOTTOM) or side) {
+                    val (start, end) = if (slot.left) ctx.dp(4) to 0 else 0 to ctx.dp(4)
+                    setMargins(start, if (top) ctx.dp(2) else 0, end, if (top) 0 else ctx.dp(2))
                 })
             }
-            PunctuationPosition.Bottom -> add(ctx.verticalLayout {
+            KeyMarks.Slot.Below -> add(ctx.verticalLayout {
                 gravity = Gravity.CENTER_HORIZONTAL
                 add(label, lParams(wrapContent, wrapContent))
                 if (hint.isNotEmpty()) add(small, lParams(wrapContent, wrapContent))
             }, lParams(wrapContent, wrapContent, Gravity.CENTER))
-            PunctuationPosition.None -> add(label, lParams(matchParent, matchParent))
+            else -> add(label, lParams(matchParent, matchParent))
         }
     }
 
-    // [label] with [marks]: under it, and in the right corners over the key, sized as the keyboard's
+    // [label] with [marks]: under it, and in the slots over the key, sized as the keyboard's
     private fun FrameLayout.addMarked(ctx: Context, label: TextView, marks: KeyMarks.Placed<Mark>) {
-        val below = marks.below?.let { markView(ctx, it) }
+        val below = marks[KeyMarks.Slot.Below]?.let { markView(ctx, it, KeyMarks.Slot.Below) }
         if (below == null) {
             add(label, lParams(matchParent, matchParent))
         } else {
@@ -129,34 +132,42 @@ object KeyCaps {
             }, lParams(wrapContent, wrapContent, Gravity.CENTER))
         }
         val corners = ConstraintLayout(ctx)
-        listOf(marks.topRight, marks.bottomRight).forEachIndexed { corner, mark ->
-            val v = mark?.let { markView(ctx, it) } ?: return@forEachIndexed
+        marks.at.forEach { (slot, mark) ->
+            if (slot == KeyMarks.Slot.Below) return@forEach
+            val v = markView(ctx, mark, slot) ?: return@forEach
             val text = mark is Mark.Text
             val icon = ctx.dp(MARK_ICON_DP)
             corners.addView(v, ConstraintLayout.LayoutParams(if (text) 0 else icon, if (text) wrapContent else icon).apply {
                 if (text) matchConstraintPercentWidth = MARK_TEXT_WIDTH
-                endToEnd = ConstraintLayout.LayoutParams.PARENT_ID
-                marginEnd = ctx.dp(4)
-                if (corner == 0) {
-                    topToTop = ConstraintLayout.LayoutParams.PARENT_ID
-                    topMargin = ctx.dp(2)
-                } else {
+                if (!slot.right) {
+                    startToStart = ConstraintLayout.LayoutParams.PARENT_ID
+                    if (slot.left) marginStart = ctx.dp(4)
+                }
+                if (!slot.left) {
+                    endToEnd = ConstraintLayout.LayoutParams.PARENT_ID
+                    if (slot.right) marginEnd = ctx.dp(4)
+                }
+                if (slot.bottom) {
                     bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID
                     bottomMargin = ctx.dp(2)
+                } else {
+                    topToTop = ConstraintLayout.LayoutParams.PARENT_ID
+                    topMargin = ctx.dp(2)
                 }
             })
         }
         add(corners, lParams(matchParent, matchParent))
     }
 
-    private fun markView(ctx: Context, mark: Mark): View? {
+    // a text from its slot's edge in: the right one's from the right
+    private fun markView(ctx: Context, mark: Mark, slot: KeyMarks.Slot): View? {
         val color = ctx.styledColor(MaterialR.attr.colorOnSurfaceVariant)
         return when (mark) {
             is Mark.Text -> AutoScaleTextView(ctx).apply {
                 text = mark.text
                 textSize = 10f
                 setSingleLine()
-                gravity = Gravity.END
+                gravity = if (slot.left) Gravity.START else if (slot.right) Gravity.END else Gravity.CENTER_HORIZONTAL
                 scaleMode = AutoScaleTextView.Mode.Horizontal
                 setTextColor(color)
             }
@@ -172,15 +183,11 @@ object KeyCaps {
         }
     }
 
-    // where the keyboard puts a key's one mark (KeyMarks): under the letter only in portrait and not
-    // 紧凑, the key too short for two lines else
-    private fun hintPosition(ctx: Context): PunctuationPosition {
+    // where the keyboard puts a key's symbol (KeyMarks.symbolSlot): where 标点位置 says, under the letter
+    // only in portrait and not 紧凑 (the key too short for two lines else)
+    private fun hintSlot(ctx: Context): KeyMarks.Slot? {
         val landscape = ctx.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val placed = KeyMarks.place(Unit, null, null, markPosition(), landscape, keyboardCompact())
-        return when {
-            placed.topRight != null -> PunctuationPosition.TopRight
-            placed.below != null -> PunctuationPosition.Bottom
-            else -> PunctuationPosition.None
-        }
+        val spots = markSpots()
+        return KeyMarks.symbolSlot(spots.symbol, spots.shortcut, landscape, keyboardCompact())
     }
 }

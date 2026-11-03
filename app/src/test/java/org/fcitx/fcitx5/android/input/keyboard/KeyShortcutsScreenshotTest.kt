@@ -11,8 +11,6 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePrefs.PunctuationPosition
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
@@ -37,7 +35,7 @@ import org.robolectric.annotation.GraphicsMode
 class KeyShortcutsScreenshotTest {
 
     private val prefs = AppPrefs.getInstance()
-    private val position = ThemeManager.prefs.punctuationPosition
+    private val position = AppPrefs.getInstance().keyboard.punctuationPosition
 
     @After
     fun settingsAtTheirDefaults() {
@@ -68,10 +66,10 @@ class KeyShortcutsScreenshotTest {
     }
 
     @Test
-    fun theSymbolUnderTheLetterAndNoMarksAtAll() {
-        position.setValue(PunctuationPosition.Bottom)
+    fun theSymbolUnderTheLetterAndNoSymbols() {
+        position.setValue(KeyMarkPosition.Bottom)
         shot("bottom")
-        position.setValue(PunctuationPosition.None)
+        position.setValue(KeyMarkPosition.None)
         shot("none")
     }
 
@@ -114,7 +112,7 @@ class KeyShortcutsScreenshotTest {
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun landscapeAndTheSymbolUnderTheLetterThere() {
         shot("landscape")
-        position.setValue(PunctuationPosition.Bottom)
+        position.setValue(KeyMarkPosition.Bottom)
         shot("landscape_bottom")
     }
 }

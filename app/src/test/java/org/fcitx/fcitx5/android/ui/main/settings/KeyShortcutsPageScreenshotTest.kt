@@ -14,8 +14,7 @@ import com.github.takahirom.roborazzi.captureScreenRoboImage
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePrefs.PunctuationPosition
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
@@ -90,7 +89,7 @@ class KeyShortcutsPageScreenshotTest {
     @Test
     fun everyTabsKeysWithTheirMarks() {
         open()
-        // a's select all top right and its @ bottom right, as on the keyboard; s's * alone top right
+        // a's select all top left and its @ bottom right (滑动 swipes down to it), as on the keyboard; s's * alone bottom right
         assertEquals(1, icons(key("a")))
         assertEquals(0, icons(key("s")))
         capture("full")
@@ -113,7 +112,7 @@ class KeyShortcutsPageScreenshotTest {
     // the keyboard, under the digit with 标点位置 下方, never into the corner a symbol would have left
     @Test
     fun aNumberKeysShortcutIsPlacedAsTheKeyboardPlacesIt() {
-        prefs.set(ThemeManager.prefs.punctuationPosition, PunctuationPosition.Bottom)
+        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.Bottom)
         open("num/5" to KeyShortcut.Command(KeyCommand.Copy))
         tab(R.string.shortcut_page_number)
         assertEquals(1, icons(key("5")))
@@ -133,13 +132,33 @@ class KeyShortcutsPageScreenshotTest {
         capture("function_landscape")
     }
 
-    // 标点位置 无: no marks on the page, as on the keyboard
+    // 快捷键图标位置 and 标点位置 as the keyboard has them: each shortcut place's full and function keys,
+    // the symbols top right or, the shortcuts there, bottom right; the symbols left (uat/02 KB-66)
     @Test
-    fun noMarksWhereThePunctuationPositionIsNone() {
-        prefs.set(ThemeManager.prefs.punctuationPosition, PunctuationPosition.None)
+    fun theMarksWhereTheirSettingsSay() {
+        for (at in KeyMarkPosition.entries.filter { it != KeyMarkPosition.TopLeft }) {
+            if (at == KeyMarkPosition.TopRight) prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.BottomRight)
+            prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, at)
+            open()
+            assertEquals(if (at == KeyMarkPosition.None) 0 else 1, icons(key("a")))
+            capture("full_${at.name}")
+            tab(R.string.shortcut_page_function)
+            capture("function_${at.name}")
+            prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.TopRight)
+        }
+        prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, KeyMarkPosition.BottomRight)
+        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.TopLeft)
         open()
-        assertEquals(0, icons(key("a")))
-        capture("full_none")
+        capture("full_symbols_TopLeft")
+    }
+
+    // 标点位置 无: no symbols on the page, as on the keyboard; the shortcuts still there
+    @Test
+    fun noSymbolsWhereThePunctuationPositionIsNone() {
+        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.None)
+        open()
+        assertEquals(1, icons(key("a")))
+        capture("full_symbols_None")
     }
 
     @Test

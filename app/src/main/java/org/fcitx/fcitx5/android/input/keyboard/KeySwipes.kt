@@ -10,8 +10,6 @@ import androidx.annotation.Keep
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePrefs.PunctuationPosition
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
 import org.fcitx.fcitx5.android.input.popup.PopupAction
@@ -56,11 +54,15 @@ internal class KeySwipes(
     private val swipeLayersListener = ManagedPreference.OnChangeListener<SwipeLayersChoice> { _, _ -> showMarks() }
     @Keep
     private val keyShortcutsListener = ManagedPreference.OnChangeListener<String> { _, _ -> showMarks() }
+    @Keep
+    private val markPositionListener = ManagedPreference.OnChangeListener<KeyMarkPosition> { _, _ -> showMarks() }
 
     init {
         if (shortcuts) {
             prefs.keyboard.swipeLayers.registerOnChangeListener(swipeLayersListener)
             prefs.internal.keyShortcuts.registerOnChangeListener(keyShortcutsListener)
+            prefs.keyboard.shortcutMarkPosition.registerOnChangeListener(markPositionListener)
+            prefs.keyboard.punctuationPosition.registerOnChangeListener(markPositionListener)
         }
     }
 
@@ -142,21 +144,24 @@ internal class KeySwipes(
     /** Each swiping key's marks ([KeyMarks]) as the settings are now: its symbol and its shortcut. */
     fun showMarks() {
         val layers = swipeLayers
-        val position = markPosition()
+        val spots = markSpots()
         val compact = keyboardCompact()
         val landscape = board.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val charShortcuts = keyboard.charShortcutMarks
+        val shortcutOn = layers.wayOf(SwipeLayers.Layer.Shortcut) != null
         swipingKeys.forEach { (view, def) ->
             val placed = when (val key = swipeKey(view, def)) {
                 is KeySwipe.Key.Char -> {
                     val symbol = KeyView.Mark.Symbol.takeIf { (view as? AltTextKeyView)?.altText?.text?.isNotEmpty() == true }
-                    KeyMarks.place(symbol, markOf(key.shortcut).takeIf { charShortcuts }, layers.wayOf(SwipeLayers.Layer.Shortcut), position, landscape, compact)
+                    val shortcut = markOf(key.shortcut).takeIf { charShortcuts && shortcutOn }
+                    KeyMarks.place(symbol, shortcut, spots.symbol, spots.shortcut, landscape, compact)
                 }
                 is KeySwipe.Key.Function -> KeyMarks.placeFunction(
-                    markOf(key.up), markOf(key.down), layers.up != SwipeLayers.Layer.Off, layers.down != SwipeLayers.Layer.Off, position, compact,
+                    markOf(key.up), markOf(key.down), layers.up != SwipeLayers.Layer.Off, layers.down != SwipeLayers.Layer.Off,
+                    spots.symbol, spots.shortcut, landscape, compact,
                 )
             }
-            view.showMarks(placed.topRight, placed.bottomRight, placed.below)
+            view.showMarks(placed)
         }
     }
 
@@ -195,11 +200,4 @@ internal class KeySwipes(
             }
             KeySwipe.Outcome.None -> false
         }
-}
-
-/** Where the keys' marks go ([KeyMarks]) as 标点位置 says: the keyboard's, and the settings page's drawn like it. */
-internal fun markPosition(): KeyMarks.Position = when (ThemeManager.prefs.punctuationPosition.getValue()) {
-    PunctuationPosition.TopRight -> KeyMarks.Position.TopRight
-    PunctuationPosition.Bottom -> KeyMarks.Position.Bottom
-    PunctuationPosition.None -> KeyMarks.Position.None
 }

@@ -312,6 +312,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         prefs.keyboard.shuangpinKeyboard,
         prefs.keyboard.englishKeyboard,
         prefs.advanced.disableAnimation,
+        // every key's symbol laid out anew, those no swipe marks too (AltTextKeyView); was a theme setting's
+        prefs.keyboard.punctuationPosition,
+        prefs.keyboard.shortcutMarkPosition,
     )
 
     private val keyboardHeightPrefs = listOf(prefs.keyboard.keyboardHeightPercent, prefs.keyboard.keyboardHeightPercentLandscape)
