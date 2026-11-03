@@ -176,6 +176,7 @@ abstract class BaseKeyboard(
 
     private val swipes = KeySwipes(this, shortcuts, inputSwipeThreshold, disabledSwipeThreshold, object : KeySwipes.Keyboard {
         override val inPasswordField get() = this@BaseKeyboard.inPasswordField
+        override val charShortcutMarks get() = this@BaseKeyboard.charShortcutMarks
         override fun swipeText(view: KeyView) = this@BaseKeyboard.swipeText(view)
         override fun onAction(action: KeyAction, source: KeyActionListener.Source) = this@BaseKeyboard.onAction(action, source)
         override fun onPopupAction(action: PopupAction) = this@BaseKeyboard.onPopupAction(action)
@@ -727,6 +728,14 @@ abstract class BaseKeyboard(
     // the marks drawn once the subclass is made: they read its corners and symbols (swipeText)
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        showSwipeMarks()
+    }
+
+    /** Whether the character keys draw their shortcuts' marks: not where their faces have no room ([TextKeyboard]'s roots). */
+    protected open val charShortcutMarks: Boolean get() = true
+
+    /** The keys' swipe marks drawn again, as what [charShortcutMarks] or the corners read changed. */
+    protected fun showSwipeMarks() {
         if (shortcuts) swipes.showMarks()
     }
 

@@ -138,7 +138,8 @@ typed is in, the field's edits as `EditPlan` steps. 清除 (`EditPlan.clear`: wh
 selection, else all before the cursor, else all after) is kept in memory (`ClearedText`), 恢复 putting
 clears back last first while the field reads as each left it; what was typed is dropped and typed
 again by `HostCore.clearTyped`/`retype` (the router's log of the keys since nothing was typed). The
-marks on a key are placed by `KeyMarks`. 注音 keyboards name their keys `zyfull/<QWERTY letter>` and
+marks on a key are placed by `KeyMarks`, on the keyboard and on 按键字符和快捷键's keys (`KeyCaps`) alike;
+五笔's 全部字根 leaves the letters' shortcuts unmarked (`BaseKeyboard.charShortcutMarks`). 注音 keyboards name their keys `zyfull/<QWERTY letter>` and
 `zy9/…` (`ZhuyinShortcutHook`, until their keyboards land). A long press's keys (`PopupKeyboardUi`, `PopupMenuUi`) are one small size whatever the
 key (`PopupComponent.LONG_PRESS_KEY_*`; as wide as the key pressed, 九键's 7 filled the screen),
 floating above it, the bubble gone; the finger picks by how far it moved since they opened, not
