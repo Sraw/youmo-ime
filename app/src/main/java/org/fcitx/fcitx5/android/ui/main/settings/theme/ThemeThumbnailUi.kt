@@ -23,7 +23,6 @@ import splitties.views.dsl.constraintlayout.bottomOfParent
 import splitties.views.dsl.constraintlayout.centerHorizontally
 import splitties.views.dsl.constraintlayout.centerInParent
 import splitties.views.dsl.constraintlayout.constraintLayout
-import splitties.views.dsl.constraintlayout.endOfParent
 import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.constraintlayout.rightOfParent
 import splitties.views.dsl.constraintlayout.startOfParent
@@ -54,12 +53,6 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
         scaleType = ImageView.ScaleType.FIT_CENTER
     }
 
-    val editButton = imageView {
-        setPaddingDp(16, 4, 4, 16)
-        scaleType = ImageView.ScaleType.FIT_CENTER
-        imageResource = R.drawable.ic_baseline_edit_24
-    }
-
     val dynamicIcon = imageView {
         setPaddingDp(5, 5, 5, 5)
         scaleType = ImageView.ScaleType.FIT_CENTER
@@ -74,10 +67,6 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
         add(keys, lParams(matchParent, matchParent))
         add(checkMark, lParams(dp(60), dp(60)) {
             centerInParent()
-        })
-        add(editButton, lParams(dp(44), dp(44)) {
-            topOfParent()
-            endOfParent()
         })
         add(dynamicIcon, lParams(dp(32), dp(32)) {
             topOfParent()
@@ -96,11 +85,6 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
         bar.backgroundColor = ThemeColors.bar(look.palette, look.bar) ?: Color.TRANSPARENT
         keys.background = ThemeThumbnailKeys(look, ctx.resources.displayMetrics.density, ctx.dp(BAR_DP).toFloat())
         val foregroundTint = ColorStateList.valueOf(theme.altKeyTextColor)
-        editButton.apply {
-            visibility = if (theme is Theme.Custom) View.VISIBLE else View.GONE
-            background = rippleDrawable(theme.keyPressHighlightColor)
-            imageTintList = foregroundTint
-        }
         dynamicIcon.apply {
             visibility =
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && theme is Theme.Monet) View.VISIBLE else View.GONE

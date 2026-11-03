@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings.theme
 
-import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import org.fcitx.fcitx5.android.data.theme.Theme
@@ -35,7 +34,6 @@ open class SimpleThemeListAdapter<T : Theme>(private val entries: List<T>) :
         (holder.ui as ThemeThumbnailUi).apply {
             val theme = entries[position]
             setTheme(theme)
-            editButton.visibility = View.GONE
             setChecked(position == selected)
             root.setOnClickListener {
                 onClick(theme)

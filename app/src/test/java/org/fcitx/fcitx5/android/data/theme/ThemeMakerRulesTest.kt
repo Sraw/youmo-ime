@@ -351,7 +351,7 @@ class ThemeMakerRulesTest {
         val files = theme.look.files().map { it to png(if ("landscape" in it) 24 else 16, if ("landscape" in it) 12 else 24, 0x80336699.toInt()) }
         // in the theme dir, as the app keeps them (it exports no other file), and out through its own export
         phoneStorage()
-        val dir = ThemeFilesManager.newCustomBackgroundImages().second.parentFile!!.apply { mkdirs() }
+        val dir = ThemeFilesManager.themeDir.apply { mkdirs() }
         files.forEach { (name, bytes) -> File(dir, name).writeBytes(bytes) }
         val out = ByteArrayOutputStream()
         ThemeFilesManager.exportTheme(theme.copy(look = theme.look.mapFiles { File(dir, it).path }), out).getOrThrow()

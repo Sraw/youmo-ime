@@ -205,7 +205,6 @@ dependencies {
     implementation(libs.material)
     implementation(libs.arrow.core)
     implementation(libs.arrow.functions)
-    implementation(libs.imagecropper)
     implementation(libs.flexbox)
     implementation(libs.dependency)
     implementation(libs.timber)

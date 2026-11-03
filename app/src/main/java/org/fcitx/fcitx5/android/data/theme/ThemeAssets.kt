@@ -80,7 +80,7 @@ object ThemeAssets {
     private val lock = Any()
 
     // the files of the look the caches hold: another look of the same files (a colour, a brightness, a
-    // blur changed on the edit page) decodes nothing again
+    // blur changed: the theme imported again from the web page) decodes nothing again
     private var files: List<String>? = null
 
     private data class PictureKey(val landscape: Boolean, val blurDp: Int)

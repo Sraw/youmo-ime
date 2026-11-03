@@ -73,59 +73,62 @@ case("ST-34", needs="jvm:TablesUatTest.predictionOffHoldsForTablesToo")(lambda d
 case("ST-05", needs="jvm:SettingsUatTest.aDarkThemeTurnsPreviewAndKeyboardDark")(lambda d: None)
 
 
-def push_picture(d):
-    """a picture in the gallery: a striped PNG in Pictures, scanned"""
+THEME_ZIP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "web", "theme-maker", "test", "testdata",
+                         "from-app.zip")
+
+
+def push_theme(d):
+    """a theme zip in 下载 as the web page exports one: the testdata theme (3.0) with a striped picture,
+    drawn sharp and at full brightness so the keyboard shows its orange and blue"""
+    import io
+    import json
+    import zipfile
     from PIL import Image, ImageDraw
-    p = os.path.join(tempfile.gettempdir(), f"uat-theme-{d.port}.png")
-    im = Image.new("RGB", (1080, 900), (250, 120, 30))
-    dr = ImageDraw.Draw(im)
-    for i in range(0, 1080, 120):
-        dr.rectangle((i, 0, i + 60, 900), fill=(30, 90, 220))
-    im.save(p)
-    d.adb("push", p, "/sdcard/Pictures/uat-theme.png")
-    d.sh("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Pictures/uat-theme.png")
+
+    def striped(w, h):
+        im = Image.new("RGB", (w, h), (250, 120, 30))
+        dr = ImageDraw.Draw(im)
+        for i in range(0, w, 120):
+            dr.rectangle((i, 0, i + 60, h), fill=(30, 90, 220))
+        out = io.BytesIO()
+        im.save(out, "PNG")
+        return out.getvalue()
+
+    p = os.path.join(tempfile.gettempdir(), f"uat-theme-{d.port}.zip")
+    with zipfile.ZipFile(THEME_ZIP) as src, zipfile.ZipFile(p, "w") as dst:
+        for name in src.namelist():
+            data = src.read(name)
+            if name.endswith(".json"):
+                t = json.loads(data)
+                t["picture"]["blurDp"], t["picture"]["brightness"] = 0, 100
+                t["bar"] = {"type": "picture", "blurDp": 0, "brightness": 100}
+                t["keys"]["letter"]["fill"] = {"type": "picture", "blurDp": 0, "brightness": 100}
+                data = json.dumps(t).encode()
+            elif name.endswith(("-src.png", "-portrait.png")):
+                data = striped(1440, 1500)
+            elif name.endswith("-landscape.png"):
+                data = striped(1440, 600)
+            dst.writestr(name, data)
+    d.sh("rm -f /sdcard/Download/uat-theme*.zip")
+    d.adb("push", p, "/sdcard/Download/uat-theme.zip")
+    d.sh("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/uat-theme.zip")
     time.sleep(1)
 
 
-def add_image_theme(d):
-    push_picture(d)
+def import_theme(d, name):
+    """新增主题 → 导入文件…, the file [name] in the system's picker (it opens at 下载 or the recent ones)"""
     appearance_tab(d, "主题")
     d.tap_text("新增主题", after=1.2)
-    d.tap_text("选择图片…", contains=True, scroll=False, after=2.5)
-    # the system's picker: the picture by its name, or the only picture
+    d.tap_text("导入文件…", contains=True, scroll=False, after=2.5)
     s = d.screen()
-    for label in ("uat-theme.png", "uat-theme"):
-        n = d.visible(label, s, contains=True)
-        if n:
-            d.tap(n.c, 2.5)
-            break
-    else:
-        imgs = [n for n in s.app() if n.pkg != PKG and n.clickable and n.cls in ("ImageView", "FrameLayout", "View")
-                and n.b[3] - n.b[1] > 150 and n.b[1] > 300]
-        if not imgs:
-            raise Blocked(f"系统选图界面里找不到图片：{d.top_activity()} {s.texts()[:10]}")
-        d.tap(imgs[0].c, 2.5)
-    s = d.screen()
-    # a crop step, if any, then the theme editor
-    for label in ("裁剪", "完成", "确定", "Crop", "Done"):
-        n = s.find(text=label) or s.find(desc=label)
-        if n and n.pkg == PKG and "亮度" not in "".join(s.texts()):
-            d.tap(n.c, 2.0)
-            s = d.screen()
-            break
-    texts = s.texts()
-    if not any("亮度" in t for t in texts):
-        raise Blocked(f"选图后没到主题编辑（无亮度）：{d.top_activity()} {texts[:10]}")
-    bar = next((n for n in s.app() if n.cls == "SeekBar"), None)
-    if bar:
-        d.tap((bar.b[0] + (bar.b[2] - bar.b[0]) * 3 // 4, (bar.b[1] + bar.b[3]) // 2), 0.6)
-    for label in ("保存", "完成", "确定"):
-        n = s.find(text=label) or s.find(desc=label)
-        if n:
-            d.tap(n.c, 2.0)
-            break
-    else:
-        raise Blocked(f"主题编辑里没有保存：{texts[:12]}")
+    n = next((k for k in s.app() if k.text and k.text.startswith(name)), None)
+    if not n and s.find(text="下载"):
+        d.tap(s.find(text="下载").c, 2.0)
+        s = d.screen()
+        n = next((k for k in s.app() if k.text and k.text.startswith(name)), None)
+    if not n:
+        raise Blocked(f"文件选择里没有 {name}：{s.texts()[:8]}")
+    d.tap(n.c, 3.0)
 
 
 def theme_items(d, s=None):
@@ -135,11 +138,24 @@ def theme_items(d, s=None):
 
 
 def custom_item(d, s=None):
-    """a theme of one's own: the item with the edit button (a clickable image in its corner)"""
-    for n in theme_items(d, s):
-        if any(k.cls == "ImageView" and k.clickable for k in n.walk()):
-            return n
-    return None
+    """a theme of one's own: listed first, before the Monet ones, which have the icon in their top-left corner"""
+    items = theme_items(d, s)
+    if not items:
+        return None
+    first = items[0]
+    corner = any(k.cls == "ImageView" and abs(k.b[0] - first.b[0]) < 6 and abs(k.b[1] - first.b[1]) < 6
+                 and k.b[2] - k.b[0] > 0 for k in first.walk())
+    return None if corner else first
+
+
+def theme_action(d, item, label):
+    """long-press one's own theme, pick [label] (导出 / 删除) in its menu"""
+    d.hold(item.c, 1000)
+    time.sleep(1.0)
+    s = d.screen()
+    if not (s.find(text="导出") and s.find(text="删除")):
+        raise Blocked(f"长按自己的主题没出导出、删除：{s.texts()[:8]}")
+    d.tap_text(label, scroll=False, after=2.0)
 
 
 def kb_picture(d, rows=1.0):
@@ -151,16 +167,16 @@ def kb_picture(d, rows=1.0):
 
 
 def export_custom(d):
-    """long-press one's own theme, save it in 下载; returns the new file's name"""
+    """long-press one's own theme, 导出, save it in 下载; returns the new files' names"""
     before = set(d.sh("ls /sdcard/Download/ 2>/dev/null").split())
     appearance_tab(d, "主题")
     item = custom_item(d)
     if not item:
         raise Blocked("列表里没有自己加的主题")
-    d.hold(item.c, 1000)
-    time.sleep(2.0)
+    theme_action(d, item, "导出")
+    time.sleep(1.0)
     if "documentsui" not in d.top_activity():
-        raise Blocked(f"长按后没出保存界面：{d.top_activity()}")
+        raise Blocked(f"导出后没出保存界面：{d.top_activity()}")
     s = d.screen()
     if not s.find(text="下载"):
         raise Blocked(f"保存界面不在下载：{s.texts()[:8]}")
@@ -171,26 +187,24 @@ def export_custom(d):
 
 def delete_custom(d):
     appearance_tab(d, "主题")
-    item = custom_item(d)
-    pen = next(k for k in item.walk() if k.cls == "ImageView" and k.clickable)
-    d.tap(pen.c, 2.0)
-    d.tap_text("删除", scroll=False, after=1.5)
+    theme_action(d, custom_item(d), "删除")
     d.tap_text("确定", scroll=False, after=2.0)
 
 
 @case("ST-09", base="B0-设置", mutates=True)
 def st09(d):
-    d.step("新增")
+    d.step("导入")
     appearance_tab(d, "大小与样式")
     d.switch("跟随系统夜间模式", False)
     # the default to come back to, seen now: with 跟随 off it is the normal-mode theme's default
     # (PixelDark), not the light one (lum > 150) 跟随 on would give
     d.open_page("text")
     lum_default = d.lum(kb_box(d))
-    add_image_theme(d)
+    push_theme(d)
+    import_theme(d, "uat-theme")
     appearance_tab(d, "主题")
     item = custom_item(d)
-    check(item, "主题列表里没有新加的主题")
+    check(item, "导入后主题列表里没有它")
     d.tap(item.c, 1.5)
     d.open_page("text")
     o, b = kb_picture(d)
@@ -208,14 +222,8 @@ def st09(d):
     lum = d.lum(kb_box(d))
     check(o0 < 10 and b0 < 10 and abs(lum - lum_default) < 25,
           f"键盘不是默认主题（图的橙 {o0} 蓝 {b0}，亮度 {lum:.0f}，加主题前 {lum_default:.0f}）")
-    d.step("导入")
-    appearance_tab(d, "新增主题")
-    d.tap_text("导入文件…", contains=True, scroll=False, after=2.5)
-    s = d.screen()
-    n = next((k for k in s.app() if k.text == files[0]), None)
-    if not n:
-        raise Blocked(f"文件选择里没有 {files[0]}：{s.texts()[:8]}")
-    d.tap(n.c, 3.0)
+    d.step("再导入")
+    import_theme(d, files[0])
     appearance_tab(d, "主题")
     item = custom_item(d)
     check(item, "导入后主题列表里没有它")
@@ -223,10 +231,12 @@ def st09(d):
     d.open_page("text")
     o, b = kb_picture(d)
     check(o > 40 and b > 40, f"选用导入的主题后键盘背景不是那张图（橙 {o} 蓝 {b} / 1800）")
-    return f"新增、选用是那张图；导出 {files[0]}；删除后回到默认（亮度 {lum:.0f}）；导入后选用是那张图"
+    return f"导入、选用是那张图；导出 {files[0]}；删除后回到默认（亮度 {lum:.0f}）；导入后选用是那张图"
 
 
-case("ST-35", needs="jvm:SettingsMenuUatTest.aBuiltInThemeCopied")(lambda d: None)
+
+
+case("ST-35", needs="jvm:SettingsMenuUatTest.themesAreMadeOnTheWebAndOnesOwnExportedOrDeletedFromALongPress、MonetKeyStyleTest")(lambda d: None)
 
 
 case("ST-36", needs="jvm:SettingsMenuUatTest.followingTheSystemAThemeTappedAsks")(lambda d: None)
@@ -530,6 +540,9 @@ def region_has(rects, x, y):
 
 
 case("ST-49", needs="jvm:FloatingCodeStripUatTest.theSyllablesAreInTheStripBesideTheCode、FloatingCodeStripUatTest.theKeyboardIsAsHighOnEveryKeyboardAndLowerThanEmbedded")(lambda d: None)
+
+
+case("ST-52", needs="jvm:ThemeLookScreenshotTest")(lambda d: None)
 
 
 case("ST-50", needs="jvm:FloatingCodeStripUatTest.oneHandedTheStripIsAtTheBoardsLeft、FloatingCodeStripUatTest.floatingTheStripIsOutsideTheKeyboardAndUnderItAtTheTop")(lambda d: None)

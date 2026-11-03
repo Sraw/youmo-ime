@@ -615,12 +615,12 @@ held whole), its blurs from that (`BoxBlur`), each once; a board's key images wh
 other files (another picture, a crop, a key image) drops it all; a colour, brightness or blur changed
 keeps what was decoded. `saveTheme` clears it (a file of the same name may have new bytes).
 
-The theme edit page (`CustomThemeActivity`) has the picture's brightness, blur, crop and dark keys,
-the base (picture or colour), and the keys in ime-core's `ThemeEditLevels` steps (the old settings'
-levels: blocks/flat, corners 0/4/10, border 0/1/2, gaps, press); a value of no step (set on the web
-page) shows 自定义 (`ThemeLookChoicesUi`). The rest (colours, key images, fonts) is the web page's
-(`ThemeLookChoicesUi.THEME_MAKER_URL`, also 新增主题 → 在网页上制作…). The preview draws a crop
-not yet saved from a cache file (`cut*.tmp`). Thumbnails (`ThemeThumbnailUi`) draw four rows of the
+The app does not edit themes (user, 2026-11-03): they are made on the web page
+(`ThemeListFragment.THEME_MAKER_URL`, 新增主题 → 在网页上制作…) and imported (导入文件…). The theme list
+applies, imports, and on a long press exports or deletes one of the user's (a Monet theme exports
+`Theme.Monet.toCustom()`: its colours now and the key style it keeps, fixed). The fcitx edit page
+(`CustomThemeActivity`, its cropper) went with the old 选择图片… and 复制内置主题…; themes made by them
+before are listed, used, exported and deleted like any other. Thumbnails (`ThemeThumbnailUi`) draw four rows of the
 theme's keys in little (`ThemeThumbnailKeys`, colours only: no image decoded) over its base.
 
 Import (`ThemeFilesManager.importTheme`) takes the json and every file it names, by file name only

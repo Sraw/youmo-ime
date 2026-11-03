@@ -59,7 +59,6 @@ androidx-viewpager2 = { module = "androidx.viewpager2:viewpager2", version = "1.
 material = { module = "com.google.android.material:material", version = "1.14.0" }
 arrow-core = { module = "io.arrow-kt:arrow-core", version.ref = "arrow" }
 arrow-functions = { module = "io.arrow-kt:arrow-functions", version.ref = "arrow" }
-imagecropper = { module = "com.vanniktech:android-image-cropper", version = "4.7.0" }
 flexbox = { module = "com.google.android.flexbox:flexbox", version = "3.0.0" }
 dependency = { module = "org.mechdancer:dependency", version = "0.1.2" }
 timber = { module = "com.jakewharton.timber:timber", version = "5.0.1" }
