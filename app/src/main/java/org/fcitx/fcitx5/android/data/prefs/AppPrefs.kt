@@ -28,6 +28,8 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.NineKeySymbols
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
@@ -175,6 +177,34 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             R.string.swipe_layers,
             SWIPE_LAYERS,
             SwipeLayersChoice.ShortcutUpSymbolDown
+        )
+        /**
+         * Where every key draws its symbol ([KeyMarkPosition]), whichever way swipes to it; never where
+         * [shortcutMarkPosition] is (greyed out there), but 无. Was the theme's, under the same key.
+         */
+        val punctuationPosition = enumList(
+            R.string.punctuation_position,
+            "punctuation_position",
+            // small in the corner, as Sogou's: under the letter, it crowded the key
+            KeyMarkPosition.TopRight,
+            apart = ManagedPreferenceUi.Apart(
+                taken = { shortcutMarkPosition.getValue().takeIf { it != KeyMarkPosition.None } },
+                note = R.string.mark_at_taken_by_shortcut,
+                read = { KeyMarkPosition.of(KeyMarks.settled(it.at, shortcutMarkPosition.getValue().at).symbol) },
+            )
+        )
+        /** Where every key draws its shortcut's mark ([KeyMarkPosition]), whichever way swipes to it; apart from [punctuationPosition]. */
+        val shortcutMarkPosition: ManagedPreference.PStringLike<KeyMarkPosition> = enumList(
+            R.string.shortcut_mark_position,
+            "shortcut_mark_position",
+            KeyMarkPosition.TopLeft,
+            apart = ManagedPreferenceUi.Apart(
+                taken = {
+                    val symbol = KeyMarks.settled(punctuationPosition.getValue().at, shortcutMarkPosition.getValue().at).symbol
+                    KeyMarkPosition.of(symbol).takeIf { it != KeyMarkPosition.None }
+                },
+                note = R.string.mark_at_taken_by_symbol,
+            )
         )
         val longPressDelay = hidden(setByLevels = true) {
             int(
@@ -734,12 +764,26 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     }
 
     /**
-     * The settings no version reads any more removed, as a 0.4 install or a backup of one has them:
-     * at every start, a backup restored being read at the next.
+     * The settings no version reads any more removed, as a 0.4 install or a backup of one has them,
+     * and 标点位置 stored where 快捷键图标位置 is moved ([settleMarkPositions]): at every start, a
+     * backup restored (an import, after [resetHiddenSettings] again) being read at the next.
      */
     fun dropRetired() {
         if (sharedPreferences.contains(ENGLISH_ON_NINE_KEYS)) sharedPreferences.edit { remove(ENGLISH_ON_NINE_KEYS) }
         migrateSwipe()
+        settleMarkPositions()
+    }
+
+    /**
+     * 标点位置 stored in 快捷键图标位置's place, which the settings page never stores (an import, a
+     * backup), stored as it reads ([KeyMarks.settled]). Read so only ([ManagedPreferenceUi.Apart.read]),
+     * it was not what the page's list held: 快捷键图标位置 moved away, the keyboard drew the symbol where
+     * it was stored and the page's summary said where it had read.
+     */
+    private fun settleMarkPositions() {
+        val symbol = keyboard.punctuationPosition.getValue()
+        val settled = KeyMarkPosition.of(KeyMarks.settled(symbol.at, keyboard.shortcutMarkPosition.getValue().at).symbol)
+        if (settled != symbol) keyboard.punctuationPosition.setValue(settled)
     }
 
     /**

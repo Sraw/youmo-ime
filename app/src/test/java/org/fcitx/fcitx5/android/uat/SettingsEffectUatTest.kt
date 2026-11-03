@@ -11,11 +11,11 @@ import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.input.theme.BarBase
@@ -121,14 +121,14 @@ class SettingsEffectUatTest {
     @Test
     @Uat("ST-13")
     fun punctuationPositionNoneThenBottom() {
-        prefs.set(theme.punctuationPosition, ThemePrefs.PunctuationPosition.None)
+        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.None)
         h.start()
         assertNull(corner("w"))
         // the swipe types it all the same
         h.swipe(h.key("w"), 0f, h.key("w").height * 1.3f)
         assertTrue(sent().toString(), "key=2," in sent().last())
         fresh()
-        prefs.set(theme.punctuationPosition, ThemePrefs.PunctuationPosition.Bottom)
+        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.Bottom)
         h.start()
         val w = h.key("w") as AltTextKeyView
         assertEquals("2", corner("w"))

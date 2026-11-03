@@ -97,11 +97,12 @@ abstract class ManagedPreferenceCategory(
         entryValues: List<T>,
         @StringRes
         entryLabels: List<Int>,
+        apart: ManagedPreferenceUi.Apart<T>? = null,
         enableUiOn: (() -> Boolean)? = null
     ): ManagedPreference.PStringLike<T> {
         val pref = ManagedPreference.PStringLike(sharedPreferences, key, defaultValue, codec)
         val ui = ManagedPreferenceUi.StringList(
-            title, key, defaultValue, codec, entryValues, entryLabels, enableUiOn
+            title, key, defaultValue, codec, entryValues, entryLabels, enableUiOn, apart
         )
         pref.register()
         ui.registerUi()
@@ -114,6 +115,7 @@ abstract class ManagedPreferenceCategory(
         key: String,
         defaultValue: T,
         entryValues: List<T> = enumValues<T>().toList(),
+        apart: ManagedPreferenceUi.Apart<T>? = null,
         noinline enableUiOn: (() -> Boolean)? = null
     ): ManagedPreference.PStringLike<T> where T : Enum<T>, T : ManagedPreferenceEnum {
         val codec = object : ManagedPreference.StringLikeCodec<T> {
@@ -121,7 +123,7 @@ abstract class ManagedPreferenceCategory(
             override fun decode(raw: String): T? = enumValueOf<T>(raw).takeIf { it in entryValues }
         }
         val entryLabels = entryValues.map { it.stringRes }
-        return list(title, key, defaultValue, codec, entryValues, entryLabels, enableUiOn)
+        return list(title, key, defaultValue, codec, entryValues, entryLabels, apart, enableUiOn)
     }
 
     protected fun int(

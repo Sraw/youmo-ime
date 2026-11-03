@@ -90,9 +90,6 @@
     <string name="navbar_bkg_color_only">Follow keyboard color</string>
     <string name="navbar_bkg_full">Keyboard background image</string>
     <string name="punctuation_position">Punctuation position</string>
-    <string name="punctuation_pos_bottom">Bottom (portrait; top right when Compact)</string>
-    <string name="punctuation_pos_top_right">Top Right</string>
-    <string name="punctuation_pos_none">None</string>
     <string name="expand_toolbar_by_default">Expand toolbar by default</string>
     <string name="popup_on_key_press">Popup on key press</string>
     <string name="disable_animation">Disable animation</string>
@@ -971,6 +968,16 @@
     <string name="swipe_shortcut_up_only">Up for shortcuts only</string>
     <string name="swipe_shortcut_down_only">Down for shortcuts only</string>
     <string name="swipe_off">Off</string>
+    <string name="shortcut_mark_position">Shortcut icon position</string>
+    <string name="mark_at_top_right">Top right</string>
+    <string name="mark_at_bottom_right">Bottom right</string>
+    <string name="mark_at_top_left">Top left</string>
+    <string name="mark_at_bottom_left">Bottom left</string>
+    <string name="mark_at_bottom">Bottom</string>
+    <string name="mark_at_none">None</string>
+    <string name="mark_at_taken">%1$s (%2$s)</string>
+    <string name="mark_at_taken_by_symbol">punctuation is here</string>
+    <string name="mark_at_taken_by_shortcut">shortcut icons are here</string>
     <string name="shortcut_select_all">Select all</string>
     <string name="shortcut_copy">Copy</string>
     <string name="shortcut_cut">Cut</string>

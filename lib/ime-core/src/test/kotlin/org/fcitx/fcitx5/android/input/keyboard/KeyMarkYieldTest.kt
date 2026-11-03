@@ -5,149 +5,289 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkYield.Ink
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarkYield.Yield
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkYield.LetterKey
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkYield.Mark
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkYield.Settled
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarks.Slot
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.abs
+import kotlin.random.Random
 
 class KeyMarkYieldTest {
 
-    private val face = Ink(0f, 0f, 40f, 50f)
+    // a 40 by 50 face, the room 2 in from its sides and 1 from its top and bottom
+    private val room = Ink(2f, 1f, 38f, 49f)
 
-    private fun of(label: Ink, mark: Ink, shrinks: Boolean = false) = KeyMarkYield.of(label, mark, face, gap = 1f, markShrinks = shrinks)
+    private fun key(glyph: Ink, vararg marks: Mark) = KeyMarkYield.key(glyph, marks.toList(), room, gap = 1f)
 
-    private fun assertYield(expected: Yield, actual: Yield) {
-        assertEquals("dx", expected.dx, actual.dx, 1e-4f)
-        assertEquals("dy", expected.dy, actual.dy, 1e-4f)
-        assertEquals("label", expected.labelScale, actual.labelScale, 1e-4f)
-        assertEquals("mark", expected.markScale, actual.markScale, 1e-4f)
+    private fun near(a: Ink?, b: Ink?) = a == b ||
+        (a != null && b != null && listOf(a.left - b.left, a.top - b.top, a.right - b.right, a.bottom - b.bottom).all { abs(it) < 0.01f })
+
+    private fun assertInk(message: String, expected: Ink?, actual: Ink?) = assertTrue("$message: $expected, was $actual", near(expected, actual))
+
+    private fun assertSettled(expected: Settled, actual: Settled) {
+        assertInk("glyph", expected.glyph, actual.glyph)
+        assertEquals(expected.marks.size, actual.marks.size)
+        expected.marks.forEachIndexed { i, m -> assertInk("mark $i", m, actual.marks[i]) }
+    }
+
+    // [ink] as [slot] sees what the top right one does: the face mirrored side for side, top for bottom
+    private fun Ink.at(slot: Slot): Ink {
+        var i = this
+        if (slot.left) i = Ink(40f - i.right, i.top, 40f - i.left, i.bottom)
+        if (slot.bottom) i = Ink(i.left, 50f - i.bottom, i.right, 50f - i.top)
+        return i
     }
 
     @Test
     fun apartNothingMoves() {
-        // left of it, below it, or just touching with the gap: as it was (大千's symbols at the standard height)
-        assertYield(Yield.None, of(Ink(10f, 15f, 28f, 35f), Ink(29f, 2f, 38f, 11f)))
-        assertYield(Yield.None, of(Ink(10f, 12f, 35f, 35f), Ink(29f, 2f, 38f, 11f)))
-        assertYield(Yield.None, of(Ink(10f, 15f, 30f, 35f), Ink(31f, 2f, 38f, 20f)))
+        val glyph = Ink(14f, 18f, 26f, 32f)
+        val mark = Mark(Ink(30f, 3f, 36f, 11f), Slot.TopRight)
+        assertSettled(Settled(glyph, listOf(mark.ink)), key(glyph, mark))
     }
 
     @Test
-    fun leftAsFarAsTheyMet() {
-        // 4 over the mark's left, the gap kept, 4 under it: 4 left, the face's edge 9 away
-        assertYield(Yield(-4f, 0f, 1f, 1f), of(Ink(10f, 8f, 32f, 30f), Ink(29f, 2f, 38f, 11f)))
-        // 2 over, 4 under: 2 left
-        assertYield(Yield(-2f, 0f, 1f, 1f), of(Ink(10f, 8f, 30f, 30f), Ink(29f, 2f, 38f, 11f)))
+    fun aMarkMovesTowardsItsCornerTheShorterWayInEverySlot() {
+        val glyph = Ink(14f, 10f, 26f, 32f)
+        for (slot in Slot.entries.filter { !it.centred }) {
+            // up 2 rather than right 3
+            val up = Mark(Ink(24f, 3f, 30f, 11f).at(slot), slot)
+            assertSettled(Settled(glyph.at(slot), listOf(Ink(24f, 1f, 30f, 9f).at(slot))), key(glyph.at(slot), up))
+            // right 1 rather than up 2 (no room up for it)
+            val right = Mark(Ink(26f, 2f, 32f, 11f).at(slot), slot)
+            assertSettled(Settled(glyph.at(slot), listOf(Ink(27f, 2f, 33f, 11f).at(slot))), key(glyph.at(slot), right))
+        }
     }
 
     @Test
-    fun orDownIfThatIsLess() {
-        // under a text mark's bottom by 2, over its left by 20: down 2
-        assertYield(Yield(0f, 2f, 1f, 1f), of(Ink(8f, 10f, 35f, 30f), Ink(16f, 2f, 38f, 11f)))
-        // as far either way: left
-        assertYield(Yield(-4f, 0f, 1f, 1f), of(Ink(10f, 8f, 32f, 30f), Ink(29f, 2f, 38f, 11f)))
-        // left the shorter but no room for it: down
-        assertYield(Yield(0f, 5f, 1f, 1f), of(Ink(1f, 8f, 32f, 30f), Ink(29f, 2f, 38f, 12f)))
+    fun anEdgesMiddleMarkOnlyOutwards() {
+        val glyph = Ink(10f, 10f, 30f, 40f)
+        // the bottom middle: down 3, never sideways
+        val bottom = Mark(Ink(16f, 38f, 24f, 46f), Slot.Bottom)
+        assertSettled(Settled(glyph, listOf(Ink(16f, 41f, 24f, 49f))), key(glyph, bottom))
+        // the top middle, a function key's down shortcut with the bottom chosen: up
+        val top = Mark(Ink(16f, 4f, 24f, 12f), Slot.Top)
+        assertSettled(Settled(glyph, listOf(Ink(16f, 1f, 24f, 9f))), key(glyph, top))
+        // under the letter: down as far as it goes, then the letter up, before the symbol is smaller
+        val below = Mark(Ink(14f, 36f, 26f, 48f), Slot.Below, minScale = 0.5f)
+        assertSettled(Settled(Ink(10f, 6f, 30f, 36f), listOf(Ink(14f, 37f, 26f, 49f))), key(glyph, below))
     }
 
     @Test
-    fun neitherAloneThenOneWayTheLessShrunk() {
-        // 2 to the face's edge (+1 gap) of the 6 over, 5 of the 6 under
-        val y = of(Ink(3f, 7f, 34f, 44f), Ink(29f, 2f, 38f, 12f))
-        // left 2: 32 - 28 = 4 of 31 still over, 13 - 7 = 6 of 37 under, a 4/31 shrink;
-        // down 5: 34 - 28 = 6 of 31, 13 - 12 = 1 of 37, a 1/37 shrink, the less: down, only
-        assertEquals(0f, y.dx, 0f)
-        assertEquals(5f, y.dy, 0f)
-        assertEquals(1f - 1f / 37f, y.labelScale, 1e-4f)
-        // the other way round, a tall label's top far under, little room below: left
-        val l = of(Ink(3f, 4f, 31f, 48f), Ink(29f, 2f, 38f, 14f))
-        // left 2: 29 - 28 = 1 of 28; down 1: 31 - 28 = 3 of 28, 15 - 5 = 10 of 44
-        assertEquals(-2f, l.dx, 0f)
-        assertEquals(0f, l.dy, 0f)
-        assertEquals(1f - 1f / 28f, l.labelScale, 1e-4f)
+    fun neitherAloneTheMarkIntoItsCornerThenTheGlyphMoves() {
+        val glyph = Ink(10f, 6f, 30f, 40f)
+        val mark = Mark(Ink(26f, 2f, 36f, 12f), Slot.TopRight, minScale = 0.5f)
+        // the mark as far as it goes, its size kept; the glyph left 3, clear of it
+        assertSettled(Settled(Ink(7f, 6f, 27f, 40f), listOf(Ink(28f, 1f, 38f, 11f))), key(glyph, mark))
     }
 
     @Test
-    fun thenTheTextMarkSmallerThenTheLabel() {
-        // no room either way: the label fills the face; down 4 of the 10 needed
-        val label = Ink(1f, 4f, 39f, 45f)
-        val mark = Ink(30f, 1f, 39f, 13f)
-        val icon = of(label, mark)
-        assertEquals(0f, icon.dx, 0f)
-        assertEquals(1f, icon.markScale, 0f)
-        // left: 39 - 29 = 10 of 38; down: 13 + 1 - 8 = 6 of 41, the smaller
-        assertEquals(1f - 6f / 41f, icon.labelScale, 1e-4f)
-        // a text mark a quarter smaller first: its bottom at 10, the label's top at 8 still under it
-        val text = of(label, mark, shrinks = true)
-        assertEquals(1f - KeyMarkYield.MAX_MARK_SHRINK, text.markScale, 1e-4f)
-        assertEquals(4f, text.dy, 0f)
-        // left: 39 - (32.75 - 1) = 7.25 of 38; down: 10 + 1 - 8 = 3 of 41, the smaller
-        assertEquals(1f - 3f / 41f, text.labelScale, 1e-4f)
+    fun theMarkSmallerBeforeTheGlyph() {
+        // a glyph as wide as the room: no move clears it, the mark smaller to its least does with the glyph down
+        val glyph = Ink(2f, 4f, 38f, 46f)
+        val mark = Mark(Ink(30f, 2f, 36f, 10f), Slot.TopRight, minScale = 0.6f)
+        val s = key(glyph, mark)
+        val m = s.marks[0]!!
+        assertEquals("the glyph its size", glyph.width, s.glyph.width, 0.01f)
+        assertEquals(0.6f, m.width / mark.ink.width, 0.01f)
+        assertFalse(m.meets(s.glyph, 0f))
     }
 
     @Test
-    fun aTextMarkSmallerOnlyAsNeeded() {
-        // down 2 of the 3 needed: shrunk to clear by its bottom, 11 tall to 10, no more
-        val y = of(Ink(1f, 10f, 39f, 47f), Ink(30f, 1f, 39f, 12f), shrinks = true)
-        assertEquals(2f, y.dy, 0f)
-        assertEquals(10f + 2f - 1f, 1f + 11f * y.markScale, 1e-4f)
-        assertEquals(1f, y.labelScale, 0f)
+    fun theGlyphAFifthSmallerAtMostThenTheMarkLeftOut() {
+        // the room's every inch the glyph's: smaller about its middle as little as clears
+        val glyph = Ink(2f, 1f, 38f, 49f)
+        val icon = Mark(Ink(31f, 2f, 37f, 8f), Slot.TopRight, minScale = 1f)
+        val s = key(glyph, icon)
+        assertTrue(s.glyph.width < glyph.width)
+        assertTrue(s.glyph.width >= glyph.width * (1 - KeyMarkYield.MAX_LABEL_SHRINK) - 0.01f)
+        s.marks[0]?.let { assertFalse(it.meets(s.glyph, 0f)) }
+        // a mark no fifth clears: left out, the glyph a fifth smaller
+        val big = Mark(Ink(14f, 2f, 26f, 24f), Slot.Top)
+        val t = key(glyph, big)
+        assertNull(t.marks[0])
+        assertEquals(glyph.width * 0.8f, t.glyph.width, 0.01f)
     }
 
     @Test
-    fun theLabelAFifthSmallerAtMost() {
-        // a mark over its whole top: nothing clears it
-        val y = of(Ink(1f, 2f, 39f, 49f), Ink(2f, 1f, 39f, 30f))
-        assertEquals(1f - KeyMarkYield.MAX_LABEL_SHRINK, y.labelScale, 1e-4f)
+    fun marksMeetingEachOtherTheMostExpendableLeftOut() {
+        val glyph = Ink(16f, 30f, 24f, 40f)
+        val symbol = Mark(Ink(28f, 2f, 36f, 10f), Slot.TopRight, drop = KeyMarkYield.DROP_SYMBOL)
+        val shortcut = Mark(Ink(30f, 4f, 38f, 12f), Slot.BottomRight, drop = KeyMarkYield.DROP_SHORTCUT)
+        assertSettled(Settled(glyph, listOf(symbol.ink, null)), key(glyph, symbol, shortcut))
+        // a function key's two: its down one left out
+        val up = Mark(Ink(4f, 2f, 12f, 10f), Slot.TopLeft, drop = KeyMarkYield.DROP_SHORTCUT)
+        val down = Mark(Ink(6f, 8f, 14f, 16f), Slot.BottomLeft, drop = KeyMarkYield.DROP_DOWN_SHORTCUT)
+        assertSettled(Settled(glyph, listOf(up.ink, null)), key(glyph, up, down))
     }
 
-    // the keys of a letter keyboard, in a 40 × 50 face: room clear of its edge by 1
-    private val room = Ink(1f, 1f, 39f, 49f)
-
-    private fun key(letter: Ink, symbol: Ink?, dp: Float = 10f) = KeyMarkYield.LetterKey(letter, letter.bottom, symbol, room, dp)
-
+    // a big glyph filling the face but its top: a shortcut with no room in its bottom corner tried in the key's
+    // other free corners, in turn, before it is left out; the glyph then as it was
     @Test
-    fun aLetterApartFromItsSymbolNothingMoves() {
-        val r = KeyMarkYield.letters(listOf(key(Ink(10f, 15f, 28f, 35f), Ink(29f, 2f, 38f, 11f)), key(Ink(10f, 15f, 28f, 35f), null)), gap = 1f)
-        assertEquals(1f, r.scale, 0f)
-        assertEquals(listOf(KeyMarkYield.Corner.None, KeyMarkYield.Corner.None), r.corners)
+    fun aShortcutWithNoRoomTriedElsewhereBeforeLeftOut() {
+        val glyph = Ink(3f, 12f, 37f, 49f)
+        val br = Ink(24f, 20f, 36f, 46f)
+        val tl = Ink(4f, 2f, 12f, 10f)
+        val elsewhere = listOf(Slot.BottomLeft to br.at(Slot.BottomLeft).at(Slot.BottomRight), Slot.TopLeft to tl)
+        val shortcut = Mark(br, Slot.BottomRight, minScale = 0.8f, elsewhere = elsewhere)
+        assertSettled(Settled(glyph, listOf(tl)), key(glyph, shortcut))
+        // none free: left out, as before
+        assertNull(key(glyph, shortcut.copy(elsewhere = elsewhere.take(1))).marks[0])
+        // a function key's two moved together, its down one mirrored: from the edges' middles to the top left and under it
+        val wide = Ink(10f, 4f, 30f, 46f)
+        val corner = Ink(3f, 2f, 8f, 7f)
+        val up = Mark(Ink(16f, 40f, 24f, 48f), Slot.Bottom, elsewhere = listOf(Slot.TopLeft to corner, Slot.TopRight to corner.at(Slot.TopRight)))
+        val down = Mark(Ink(16f, 2f, 24f, 10f), Slot.Top, drop = KeyMarkYield.DROP_DOWN_SHORTCUT,
+            elsewhere = listOf(Slot.BottomLeft to corner.at(Slot.BottomLeft), Slot.BottomRight to corner.at(Slot.BottomRight)))
+        val both = key(wide, up, down)
+        assertNothingMeets("function", listOf(up, down), both, least = false)
+        assertSettled(Settled(wide, listOf(corner, corner.at(Slot.BottomLeft))), both)
+    }
+
+    // a narrow key's two top corners: both smaller about their corners, as much, rather than one left out
+    @Test
+    fun marksMeetingEachOtherSmallerFirst() {
+        val glyph = Ink(6f, 30f, 14f, 40f)
+        val shortcut = Mark(Ink(4f, 2f, 12f, 10f), Slot.TopLeft, minScale = 0.7f)
+        val symbol = Mark(Ink(10f, 2f, 16f, 8f), Slot.TopRight, minScale = 0.5f, drop = KeyMarkYield.DROP_SYMBOL)
+        val s = key(glyph, shortcut, symbol)
+        val (l, r) = s.marks.map { it!! }
+        assertEquals(4f, l.left, 0.001f)
+        assertEquals(2f, l.top, 0.001f)
+        assertEquals(16f, r.right, 0.001f)
+        assertEquals(2f, r.top, 0.001f)
+        assertEquals("as much", l.width / 8f, r.width / 6f, 0.001f)
+        assertTrue("the least that parts them: ${l.width / 8f}", l.width / 8f in 0.84f..0.86f)
+        assertTrue(!l.meets(r, 0f))
+        assertEquals(glyph, s.glyph)
     }
 
     @Test
-    fun theSymbolMovesTheShorterWayTheLetterStays() {
-        // 3 over its left, right 3 of the 4 there; 6 under its bottom: right
-        val right = KeyMarkYield.letters(listOf(key(Ink(10f, 15f, 31f, 35f), Ink(29f, 8f, 35f, 20f))), gap = 1f)
-        assertEquals(1f, right.scale, 0f)
-        assertEquals(KeyMarkYield.Corner(3f, 0f, 1f), right.corners[0])
-        // 6 over with 4 to the right; 1 under with 5 up: up
-        val up = KeyMarkYield.letters(listOf(key(Ink(10f, 12f, 34f, 35f), Ink(29f, 6f, 35f, 12f))), gap = 1f)
-        assertEquals(KeyMarkYield.Corner(0f, -1f, 1f), up.corners[0])
+    fun minScaleOfASize() {
+        assertEquals(0.6f, KeyMarkYield.minScale(KeyMarkYield.MIN_SYMBOL_DP, 10f), 0.001f)
+        assertEquals(1f, KeyMarkYield.minScale(KeyMarkYield.MIN_ICON_DP, 6f), 0.001f)
+        assertEquals(1f, KeyMarkYield.minScale(KeyMarkYield.MIN_ICON_DP, 0f), 0.001f)
+    }
+
+    // ---- letters
+
+    private fun letter(ink: Ink, vararg marks: Mark) = LetterKey(ink, baseline = ink.bottom, marks.toList(), room)
+
+    @Test
+    fun lettersApartNothingMoves() {
+        val a = letter(Ink(10f, 14f, 30f, 40f), Mark(Ink(30f, 2f, 36f, 10f), Slot.TopRight))
+        val l = KeyMarkYield.letters(listOf(a), gap = 1f)
+        assertEquals(1f, l.scale)
+        assertSettled(Settled(a.letter, listOf(a.marks[0].ink)), l.keys[0])
     }
 
     @Test
-    fun neitherIntoTheCornerThenSmaller() {
-        // 4 over with 2 to the right, 5 under with 3 up: into the corner (39, 1 top right), then
-        // smaller about that by its bottom: 11 tall to 11 - 1 - 1 = 9
-        val r = KeyMarkYield.letters(listOf(key(Ink(10f, 11f, 34f, 35f), Ink(31f, 4f, 37f, 15f))), gap = 1f)
-        assertEquals(1f, r.scale, 0f)
-        val c = r.corners[0]
-        assertEquals(2f, c.dx, 0f)
-        assertEquals(-3f, c.dy, 0f)
-        assertEquals(9f / 11f, c.scale, 1e-4f)
+    fun everyLetterAsMuchSmallerAsTheOneThatNeedsItMost() {
+        val ink = Ink(10f, 10f, 30f, 40f)
+        // an icon as small as it goes, as far in: the letter 0.9 of itself clears it, and the other key's too
+        val a = letter(ink, Mark(Ink(28f, 2f, 36f, 14f), Slot.TopRight))
+        val b = letter(ink)
+        val l = KeyMarkYield.letters(listOf(a, b), gap = 1f)
+        assertEquals(0.9f, l.scale, 0.001f)
+        assertSettled(Settled(Ink(11f, 13f, 29f, 40f), listOf(Ink(30f, 2f, 38f, 14f))), l.keys[0])
+        assertSettled(Settled(Ink(11f, 13f, 29f, 40f), emptyList()), l.keys[1])
     }
 
     @Test
-    fun aSymbolSmallerThanItsReadableLeastThenEveryLetterAsMuchSmaller() {
-        // 10 dp, no smaller than 6: into the corner, 10 tall to 6, its bottom at 7, the letter's top at 5
-        val crowded = key(Ink(10f, 5f, 38f, 35f), Ink(30f, 3f, 37f, 13f))
-        val apart = key(Ink(10f, 15f, 20f, 35f), Ink(29f, 2f, 38f, 11f))
-        val r = KeyMarkYield.letters(listOf(crowded, apart), gap = 1f)
-        // the letter about (24, 35) by its top: 35 - (7 + 1) = 27 of 30
-        assertEquals(27f / 30f, r.scale, 1e-4f)
-        // its symbol then only as small as that leaves it: its top at 8, 8 - 1 - 1 = 6 of 10
-        assertEquals(0.6f, r.corners[0].scale, 1e-4f)
-        assertEquals(KeyMarkYield.Corner.None, r.corners[1])
-        // a symbol of 6 dp or less is not shrunk: all the letters are, a quarter at most
-        val small = KeyMarkYield.letters(listOf(key(Ink(10f, 2f, 38f, 35f), Ink(30f, 3f, 37f, 13f), dp = 6f)), gap = 1f)
-        assertEquals(1f - KeyMarkYield.MAX_LETTER_SHRINK, small.scale, 1e-4f)
-        assertEquals(1f, small.corners[0].scale, 0f)
+    fun aMarkNeedingMoreThanAQuarterLeftOutTheLettersKept() {
+        val ink = Ink(4f, 4f, 36f, 46f)
+        val a = letter(ink, Mark(Ink(14f, 2f, 26f, 30f), Slot.Top))
+        val l = KeyMarkYield.letters(listOf(a), gap = 1f)
+        assertEquals(1f, l.scale)
+        assertSettled(Settled(ink, listOf(null)), l.keys[0])
+    }
+
+    // the symbol no room clears: kept, over the glyph at its smallest; a shortcut meeting it left out instead
+    @Test
+    fun aSymbolIsNeverLeftOut() {
+        val glyph = Ink(2f, 1f, 38f, 49f)
+        val symbol = Mark(Ink(14f, 2f, 26f, 24f), Slot.TopRight, drop = KeyMarkYield.DROP_SYMBOL)
+        val shortcut = Mark(Ink(20f, 4f, 30f, 14f), Slot.TopLeft)
+        val s = key(glyph, symbol, shortcut)
+        assertNotNull("the symbol", s.marks[0])
+        assertTrue("over the glyph", s.marks[0]!!.meets(s.glyph, 0f))
+        assertNull(s.marks[1])
+        assertEquals(glyph.width * 0.8f, s.glyph.width, 0.01f)
+        // a letter's: every letter a quarter smaller, none more
+        val ink = Ink(4f, 4f, 36f, 46f)
+        val l = KeyMarkYield.letters(listOf(letter(ink, symbol), letter(ink)), gap = 1f)
+        assertEquals(0.75f, l.scale, 0.001f)
+        assertNotNull("the letter's symbol", l.keys[0].marks[0])
+    }
+
+    // ---- whatever is drawn never meets anything else drawn on its key, but a symbol no room clears
+
+    private fun Random.ink(x0: Float, y0: Float, x1: Float, y1: Float, w: Float, h: Float): Ink {
+        val x = x0 + nextFloat() * (x1 - x0 - w)
+        val y = y0 + nextFloat() * (y1 - y0 - h)
+        return Ink(x, y, x + w, y + h)
+    }
+
+    // a mark of about [w] by [h] near [slot] of the face
+    private fun Random.markAt(slot: Slot, drop: Int): Mark {
+        val w = 4f + nextFloat() * 10f
+        val h = 4f + nextFloat() * 8f
+        val top = Ink(2f + nextFloat() * 4f, 1f + nextFloat() * 6f, 0f, 0f)
+        val x = when {
+            slot.left -> top.left
+            slot.right -> 38f - top.left - w
+            else -> 20f - w / 2 + (nextFloat() - 0.5f) * 2f
+        }
+        val y = if (slot.bottom) 49f - top.top - h else top.top
+        return Mark(Ink(x, y, x + w, y + h), slot, minScale = 0.5f + nextFloat() * 0.5f, drop = drop)
+    }
+
+    // [m] as big in one to three other corners
+    private fun Random.corners(m: Mark): List<Pair<Slot, Ink>> =
+        listOf(Slot.TopLeft, Slot.TopRight, Slot.BottomLeft, Slot.BottomRight).filter { it != m.slot }.shuffled(this).take(1 + nextInt(3))
+            .map { it to markAt(it, m.drop).ink.let { i -> Ink(i.left, i.top, i.left + m.ink.width, i.top + m.ink.height) } }
+
+    // [s] of [marks], [least] whether its glyph is as small as it goes: nothing drawn meets anything else
+    // drawn, but a symbol, never left out, its glyph then at its least
+    private fun assertNothingMeets(case: String, marks: List<Mark>, s: Settled, least: Boolean) {
+        marks.forEachIndexed { i, m -> if (m.drop == KeyMarkYield.DROP_SYMBOL) assertNotNull("$case: the symbol left out", s.marks[i]) }
+        val drawn = listOf(s.glyph) + s.marks.filterNotNull()
+        val symbol = marks.indexOfFirst { it.drop == KeyMarkYield.DROP_SYMBOL }.takeIf { it >= 0 }?.let { s.marks[it] }
+        for (i in drawn.indices) for (j in drawn.indices) {
+            if (i >= j || !drawn[i].meets(drawn[j], 0f)) continue
+            assertTrue("$case: $i ${drawn[i]} meets $j ${drawn[j]}", i == 0 && drawn[j] === symbol && least)
+        }
+    }
+
+    @Test
+    fun noKeyEverDrawsTwoThingsOverEachOther() {
+        val r = Random(51)
+        val slots = Slot.entries
+        repeat(4000) { n ->
+            val glyph = r.ink(4f, 4f, 36f, 46f, 8f + r.nextFloat() * 26f, 10f + r.nextFloat() * 32f)
+            val marks = slots.shuffled(r).take(1 + r.nextInt(3)).mapIndexed { i, slot -> r.markAt(slot, KeyMarkYield.DROP_SYMBOL + i) }
+                .map { m -> if (m.drop == KeyMarkYield.DROP_SYMBOL || r.nextBoolean()) m else m.copy(elsewhere = r.corners(m)) }
+            val s = key(glyph, *marks.toTypedArray())
+            assertNothingMeets("key $n $glyph $marks", marks, s, abs(s.glyph.width - glyph.width * (1 - KeyMarkYield.MAX_LABEL_SHRINK)) < 0.01f)
+            assertTrue("glyph $n", s.glyph.width >= glyph.width * (1 - KeyMarkYield.MAX_LABEL_SHRINK) - 0.01f)
+            marks.forEachIndexed { i, m -> s.marks[i]?.let { assertTrue("mark $n $i", it.width >= m.ink.width * m.minScale - 0.01f) } }
+        }
+        repeat(500) { n ->
+            val keys = List(1 + r.nextInt(6)) {
+                val ink = r.ink(4f, 4f, 36f, 46f, 10f + r.nextFloat() * 20f, 14f + r.nextFloat() * 24f)
+                val marks = slots.shuffled(r).take(r.nextInt(3)).mapIndexed { i, slot -> r.markAt(slot, i + 1) }
+                    .map { m -> if (m.drop == KeyMarkYield.DROP_SYMBOL || r.nextBoolean()) m else m.copy(elsewhere = r.corners(m)) }
+                LetterKey(ink, ink.bottom - r.nextFloat() * 4f, marks, room)
+            }
+            val l = KeyMarkYield.letters(keys, gap = 1f)
+            assertTrue(l.scale >= 1 - KeyMarkYield.MAX_LETTER_SHRINK - 0.001f)
+            val least = abs(l.scale - (1 - KeyMarkYield.MAX_LETTER_SHRINK)) < 0.001f
+            l.keys.forEachIndexed { k, s -> assertNothingMeets("letters $n key $k ${keys[k]}", keys[k].marks, s, least) }
+        }
     }
 }

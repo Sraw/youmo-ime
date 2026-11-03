@@ -141,19 +141,6 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     fun settleLook(slots: List<ThemeLookMigration.Slot>, save: (Theme.Custom) -> Boolean) =
         ThemeLookMigration.settle(sharedPreferences, slots, save)
 
-    enum class PunctuationPosition(override val stringRes: Int) : ManagedPreferenceEnum {
-        None(R.string.punctuation_pos_none),
-        Bottom(R.string.punctuation_pos_bottom),
-        TopRight(R.string.punctuation_pos_top_right);
-    }
-
-    val punctuationPosition = enumList(
-        R.string.punctuation_position,
-        "punctuation_position",
-        // small in the corner, as Sogou's: under the letter, it crowded the key
-        PunctuationPosition.TopRight
-    )
-
     enum class NavbarBackground(override val stringRes: Int) : ManagedPreferenceEnum {
         None(R.string.navbar_bkg_none),
         ColorOnly(R.string.navbar_bkg_color_only),

@@ -129,14 +129,41 @@ abstract class ManagedPreferenceUi<T : Preference>(
         val entryValues: List<T>,
         @StringRes
         val entryLabels: List<Int>,
-        enableUiOn: (() -> Boolean)? = null
+        enableUiOn: (() -> Boolean)? = null,
+        val apart: Apart<T>? = null
     ) : ManagedPreferenceUi<ListPreference>(key, enableUiOn) {
-        override fun createUi(context: Context) = object : ListPreference(context) {
-            // a stored value the list does not offer shows as what it reads as: the default
+        override fun createUi(context: Context): ListPreference = object : ListPreference(context), TakenEntry {
+            // a stored value the list does not offer shows as what it reads as: the default; one apart
+            // from another list's, as it reads ([Apart.read])
             override fun getPersistedString(defaultReturnValue: String?): String? {
                 val stored = super.getPersistedString(defaultReturnValue)
-                if (stored == null || findIndexOfValue(stored) >= 0) return stored
-                return codec.encode(this@StringList.defaultValue)
+                if (stored == null) return null
+                if (findIndexOfValue(stored) < 0) return codec.encode(this@StringList.defaultValue)
+                val read = apart ?: return stored
+                return codec.decode(stored)?.let { codec.encode(read.read(it)) } ?: stored
+            }
+
+            override val takenIndex: Int
+                get() = apart?.taken?.invoke()?.let { findIndexOfValue(codec.encode(it)) } ?: -1
+
+            override val takenNote: Int get() = apart?.note ?: 0
+
+            // the other list changed: this one's pick read again ([Apart.read]), its summary with it, and
+            // stored so; the keyboard reads the two as stored. Held here: the preferences hold it weakly
+            private val otherChanged = SharedPreferences.OnSharedPreferenceChangeListener { _, changed ->
+                if (changed == key) return@OnSharedPreferenceChangeListener
+                val now = getPersistedString(null) ?: return@OnSharedPreferenceChangeListener
+                if (now != value) value = now
+            }
+
+            override fun onAttached() {
+                super.onAttached()
+                if (apart != null) sharedPreferences?.registerOnSharedPreferenceChangeListener(otherChanged)
+            }
+
+            override fun onDetached() {
+                sharedPreferences?.unregisterOnSharedPreferenceChangeListener(otherChanged)
+                super.onDetached()
             }
 
             // the user's pick of that default: setValue sees no change, and persistString would see it stored
@@ -156,6 +183,21 @@ abstract class ManagedPreferenceUi<T : Preference>(
             entries = this@StringList.entryLabels.map { context.getString(it) }.toTypedArray()
             setDialogTitle(this@StringList.title)
         }
+    }
+
+    /**
+     * A list kept apart from another's choice: [taken] the place the other holds (null for none),
+     * offered greyed out with [note]; [read] what a stored value reads as, the two stored in one
+     * place (an import, a backup) till the next start stores it so ([AppPrefs.dropRetired]). The
+     * list's pick is read again as the other changes.
+     */
+    class Apart<T>(val taken: () -> T?, @StringRes val note: Int, val read: (T) -> T = { it })
+
+    /** A list preference whose dialog greys out [takenIndex] (-1 for none), noted [takenNote]. */
+    interface TakenEntry {
+        val takenIndex: Int
+        @get:StringRes
+        val takenNote: Int
     }
 
     class EditTextInt(
