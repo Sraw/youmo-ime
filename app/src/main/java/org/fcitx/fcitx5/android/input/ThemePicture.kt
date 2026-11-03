@@ -14,6 +14,7 @@ import android.graphics.PixelFormat
 import android.graphics.Shader
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
+import android.util.SparseArray
 import android.view.View
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
@@ -31,25 +32,74 @@ import org.fcitx.fcitx5.android.utils.DarkenColorFilter
  */
 class PictureHost(private val look: ThemeLook, val base: View, private val landscape: Boolean) {
 
+    // a blur's picture as laid over the base at its size: asked of ThemeAssets once, not each key a frame
+    private class Placed(val bitmap: Bitmap?, val w: Int, val h: Int, val scale: Float, val dx: Float, val dy: Float)
+
+    private val placed = SparseArray<Placed>(2)
     private val baseAt = IntArray(2)
     private val viewAt = IntArray(2)
     private val matrix = Matrix()
 
     /**
      * [into]'s paint set to the picture blurred [blurDp] at [brightness] percent lying where [view] is
-     * over the base, for drawing in [view]'s coordinates; null with no picture or none that reads.
+     * over the base, for drawing in [view]'s coordinates less ([left], [top]) (a drawable's bounds'
+     * corner, the canvas moved there); null with no picture or none that reads.
      */
-    fun paint(view: View, blurDp: Int, brightness: Int, into: PicturePaint): Paint? {
-        if (base.width == 0 || base.height == 0) return null
-        val dm = base.resources.displayMetrics
-        val bitmap = ThemeAssets.picture(look, landscape, blurDp, base.width, dm.density) ?: return null
-        val p = PictureWindow.centerCrop(bitmap.width, bitmap.height, base.width.toFloat(), base.height.toFloat())
-        base.getLocationInWindow(baseAt)
-        view.getLocationInWindow(viewAt)
-        matrix.setScale(p.scale, p.scale)
-        matrix.postTranslate(p.dx - (viewAt[0] - baseAt[0]), p.dy - (viewAt[1] - baseAt[1]))
+    fun paint(view: View, blurDp: Int, brightness: Int, into: PicturePaint, left: Int = 0, top: Int = 0): Paint? {
+        val w = base.width
+        val h = base.height
+        if (w == 0 || h == 0) return null
+        val at = placed[blurDp]?.takeIf { it.w == w && it.h == h } ?: place(blurDp, w, h)
+        val bitmap = at.bitmap ?: return null
+        matrix.setScale(at.scale, at.scale)
+        if (!offsetOf(view)) {
+            base.getLocationInWindow(baseAt)
+            view.getLocationInWindow(viewAt)
+            offset[0] = (viewAt[0] - baseAt[0]).toFloat()
+            offset[1] = (viewAt[1] - baseAt[1]).toFloat()
+        }
+        matrix.postTranslate(at.dx - offset[0] - left, at.dy - offset[1] - top)
         return into.of(bitmap, matrix, brightness)
     }
+
+    private fun place(blurDp: Int, w: Int, h: Int): Placed {
+        val bitmap = ThemeAssets.picture(look, landscape, blurDp, w, base.resources.displayMetrics.density)
+        val p = bitmap?.let { PictureWindow.centerCrop(it.width, it.height, w.toFloat(), h.toFloat()) }
+        return Placed(bitmap, w, h, p?.scale ?: 1f, p?.dx ?: 0f, p?.dy ?: 0f).also { placed.put(blurDp, it) }
+    }
+
+    private val offset = FloatArray(2)
+    private val baseOffset = FloatArray(2)
+
+    // where [view] is over the base, from where each is in their root view (its parents' places added
+    // up): no window asked twice a key a frame. False under a scaled or turned parent, or for views of
+    // two roots (asked of the window then)
+    private fun offsetOf(view: View): Boolean {
+        val root = inRoot(view, offset) ?: return false
+        if (inRoot(base, baseOffset) !== root) return false
+        offset[0] -= baseOffset[0]
+        offset[1] -= baseOffset[1]
+        return true
+    }
+
+    private fun inRoot(view: View, out: FloatArray): View? {
+        var x = 0f
+        var y = 0f
+        var at = view
+        while (true) {
+            if (!at.plain()) return null
+            val parent = at.parent as? View ?: break
+            x += at.left + at.translationX - parent.scrollX
+            y += at.top + at.translationY - parent.scrollY
+            at = parent
+        }
+        out[0] = x
+        out[1] = y
+        return at
+    }
+
+    // not scaled or turned: its place is its parent's plus its own offset
+    private fun View.plain() = scaleX == 1f && scaleY == 1f && rotation == 0f && rotationX == 0f && rotationY == 0f
 
     companion object {
         /** Puts [host] where the views in [on] find it. */

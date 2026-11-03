@@ -24,7 +24,6 @@ import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
-import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
@@ -142,12 +141,12 @@ class HandwritingKeyboard(
         pause = { AppPrefs.getInstance().keyboard.handwritingPause.getValue().millis },
         onFinish = ::finish,
     ).apply {
-        // a letter key's face, drawn on flat keys too as before 3.0; nothing pressed (it is written on)
+        // a letter key's face (its image among the keyboard's), drawn on flat keys too as before 3.0; nothing pressed (it is written on)
         val keys = theme.look.keys
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val density = resources.displayMetrics.density
         drawAsKey(
-            theme, KeyStyleResolver.resolve(keys, null, null, KeyKind.Letter), KeyKind.Letter, BoardImages.NONE,
+            theme, KeyStyleResolver.resolve(keys, null, null, KeyKind.Letter), KeyKind.Letter, keyImages,
             { w, h -> KeyFaceGeometry.of(w, h, KeyKind.Letter, keys, landscape, density, true, KeyFaceGeometry.Border.On) },
             press = false,
         )

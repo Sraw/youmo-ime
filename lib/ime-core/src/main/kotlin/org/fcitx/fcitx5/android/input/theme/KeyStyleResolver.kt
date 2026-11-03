@@ -28,9 +28,10 @@ object KeyStyleResolver {
 
     /**
      * The images a board with keys [names] draws, each file once: the kinds', its own keys', the
-     * every-board ones of its roles. What a board decodes as it is made.
+     * every-board ones of its roles. What a board decodes as it is made. A keyboard of no board name
+     * (the number row, a search's keys) has no keys of its own: the kinds' and the roles' alone.
      */
-    fun imagesOn(keys: Keys, board: String, names: Collection<String>): Set<NineSlice> {
+    fun imagesOn(keys: Keys, board: String?, names: Collection<String>): Set<NineSlice> {
         val out = LinkedHashSet<NineSlice>()
         fun add(fill: KeyFill?, pressed: KeyPressed?) {
             (fill as? KeyFill.Image)?.let { out += it.slice }
@@ -39,7 +40,7 @@ object KeyStyleResolver {
         keys.kinds().forEach { add(it.fill, it.pressed) }
         names.forEach { key ->
             if (KeyNames.isRole(key)) keys.overrides["${KeyNames.ALL}/$key"]?.let { add(it.fill, it.pressed) }
-            keys.overrides["$board/$key"]?.let { add(it.fill, it.pressed) }
+            if (board != null) keys.overrides["$board/$key"]?.let { add(it.fill, it.pressed) }
         }
         return out
     }

@@ -49,6 +49,20 @@ data class ThemeLook(
         return out.toList()
     }
 
+    /**
+     * The blurs the picture is shown at, dp: under the keyboard, under the bar, in the keys (the kinds' and
+     * single keys'); none without a picture. What is decoded ahead when the theme is picked.
+     */
+    fun pictureBlurs(): Set<Int> {
+        val p = picture ?: return emptySet()
+        val out = LinkedHashSet<Int>()
+        if (base == BoardBase.Picture) out += p.blurDp
+        (bar as? BarBase.Picture)?.let { out += it.blurDp }
+        keys.kinds().forEach { k -> (k.fill as? KeyFill.Picture)?.let { out += it.blurDp } }
+        keys.overrides.values.forEach { o -> (o.fill as? KeyFill.Picture)?.let { out += it.blurDp } }
+        return out
+    }
+
     /** The same look with every file name put through [f]: names to paths as read, paths to names as written. */
     fun mapFiles(f: (String) -> String): ThemeLook = copy(
         picture = picture?.let {

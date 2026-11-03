@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
+import org.fcitx.fcitx5.android.utils.Const
 import org.fcitx.fcitx5.android.utils.applyNavBarInsetsBottomPadding
 import org.fcitx.fcitx5.android.utils.importErrorDialog
 import org.fcitx.fcitx5.android.utils.openUrl
@@ -68,6 +69,8 @@ class ThemeListFragment : Fragment() {
                             val inputStream = cr.openInputStream(uri)!!
                             ThemeFilesManager.importTheme(inputStream).getOrThrow()
                         }
+                        // one imported again under its name: its files new under the old names
+                        ThemeManager.filesChanged()
                         ThemeManager.refreshThemes()
                         if (newCreated) {
                             themeListAdapter.prependTheme(theme)
@@ -149,7 +152,7 @@ class ThemeListFragment : Fragment() {
             .setItems(actions) { _, i ->
                 when (i) {
                     0 -> importLauncher.launch("application/zip")
-                    1 -> ctx.openUrl(THEME_MAKER_URL)
+                    1 -> ctx.openUrl(Const.themeMakerUrl)
                 }
             }
             .show()
@@ -196,9 +199,5 @@ class ThemeListFragment : Fragment() {
     override fun onDestroy() {
         ThemeManager.removeOnChangedListener(onThemeChangeListener)
         super.onDestroy()
-    }
-
-    companion object {
-        const val THEME_MAKER_URL = "https://sraw.github.io/youmo-ime/theme-maker/"
     }
 }

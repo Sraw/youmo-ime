@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import android.content.res.ColorStateList
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.ColorFilter
 import android.graphics.Paint
@@ -98,13 +99,21 @@ class KeyFaceDrawable(
     private val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val picture = PicturePaint()
     private val rect = RectF()
-    private val src = Rect()
     private val clip = Path()
     private var waiting = false
+
+    // an image's nine pieces laid out for the face's size and the bitmap as decoded: made once a size,
+    // not each frame (the face and its pressed one each their own)
+    private class Pieces(val bitmap: Bitmap, val src: Array<Rect>, val dst: Array<RectF>)
+
+    private var fillPieces: Pieces? = null
+    private var pressedPieces: Pieces? = null
 
     override fun onBoundsChange(bounds: Rect) {
         super.onBoundsChange(bounds)
         face = if (bounds.isEmpty) null else geometry(bounds.width().toFloat(), bounds.height().toFloat())
+        fillPieces = null
+        pressedPieces = null
     }
 
     override fun isStateful() = pressed != null
@@ -165,35 +174,44 @@ class KeyFaceDrawable(
                     }
                     return
                 }
-                val density = (callback as? View)?.resources?.displayMetrics?.density ?: 1f
-                // the insets are in the file's pixels; it may have been decoded smaller (KeyImageBudget)
-                val sx = bitmap.width.toFloat() / size[0]
-                val sy = bitmap.height.toFloat() / size[1]
+                val pieces = pieces(fill, bitmap, size, area)
                 canvas.save()
                 clipTo(canvas, area, f)
-                for (piece in NineSliceLayout.of(size[0], size[1], fill.slice, area, density)) {
-                    src.set((piece.src.left * sx).toInt(), (piece.src.top * sy).toInt(), (piece.src.right * sx).toInt(), (piece.src.bottom * sy).toInt())
-                    rect.set(piece.dst.left, piece.dst.top, piece.dst.right, piece.dst.bottom)
-                    canvas.drawBitmap(bitmap, src, rect, imagePaint)
-                }
+                for (i in pieces.src.indices) canvas.drawBitmap(bitmap, pieces.src[i], pieces.dst[i], imagePaint)
                 canvas.restore()
             }
             is FaceFill.Picture -> {
                 val view = callback as? View
-                val p = view?.let { PictureHost.of(it)?.paint(it, fill.blurDp, fill.brightness, picture) }
+                // the picture lies in the view's coordinates; this face is at the bounds' corner in it
+                val p = view?.let { PictureHost.of(it)?.paint(it, fill.blurDp, fill.brightness, picture, bounds.left, bounds.top) }
                 if (p == null) {
                     solid(canvas, area, f, fill.over)
                     return
                 }
-                // the picture lies in the view's coordinates; this face is at the bounds' corner in it
-                canvas.save()
-                canvas.translate(-bounds.left.toFloat(), -bounds.top.toFloat())
-                val a = Area(area.left + bounds.left, area.top + bounds.top, area.right + bounds.left, area.bottom + bounds.top)
-                drawShape(canvas, a, f, p)
-                canvas.restore()
+                drawShape(canvas, area, f, p)
                 if (fill.over ushr 24 != 0) solid(canvas, area, f, fill.over)
             }
         }
+    }
+
+    private fun pieces(fill: FaceFill.Image, bitmap: Bitmap, size: IntArray, area: Area): Pieces {
+        val isPressed = fill === pressed
+        (if (isPressed) pressedPieces else fillPieces)?.takeIf { it.bitmap === bitmap }?.let { return it }
+        val density = (callback as? View)?.resources?.displayMetrics?.density ?: 1f
+        // the insets are in the file's pixels; it may have been decoded smaller (KeyImageBudget)
+        val sx = bitmap.width.toFloat() / size[0]
+        val sy = bitmap.height.toFloat() / size[1]
+        val layout = NineSliceLayout.of(size[0], size[1], fill.slice, area, density)
+        val made = Pieces(
+            bitmap,
+            Array(layout.size) { i ->
+                val p = layout[i].src
+                Rect((p.left * sx).toInt(), (p.top * sy).toInt(), (p.right * sx).toInt(), (p.bottom * sy).toInt())
+            },
+            Array(layout.size) { i -> layout[i].dst.let { RectF(it.left, it.top, it.right, it.bottom) } },
+        )
+        if (isPressed) pressedPieces = made else fillPieces = made
+        return made
     }
 
     private fun solid(canvas: Canvas, area: Area, f: KeyFace, color: Int) {

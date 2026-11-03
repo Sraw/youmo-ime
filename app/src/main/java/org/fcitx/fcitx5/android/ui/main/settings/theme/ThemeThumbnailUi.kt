@@ -14,8 +14,10 @@ import android.widget.ImageView
 import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.input.theme.BoardBase
 import org.fcitx.fcitx5.android.input.theme.ThemeColors
+import org.fcitx.fcitx5.android.utils.DarkenColorFilter
 import org.fcitx.fcitx5.android.utils.rippleDrawable
 import splitties.dimensions.dp
 import splitties.views.backgroundColor
@@ -79,8 +81,20 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
             foreground = rippleDrawable(theme.keyPressHighlightColor)
         }
         val look = theme.look
-        // the picture under the keyboard if it is there, its colour else; the bar's colour if it has one
-        bkg.imageDrawable = if (look.base == BoardBase.Picture) theme.backgroundDrawable() else null
+        // the picture under the keyboard if it is there (decoded small off the main thread, blurred as on
+        // the keyboard: ThemeAssets.thumbnail), its colour else; the bar's colour if it has one
+        bkg.imageDrawable = null
+        bkg.tag = look
+        if (look.base == BoardBase.Picture) {
+            val p = look.picture!!
+            val dm = ctx.resources.displayMetrics
+            ThemeAssets.thumbnail(look, ctx.dp(PICTURE_DP), dm.widthPixels, dm.density) { b ->
+                // bound to another theme since
+                if (b == null || bkg.tag !== look) return@thumbnail
+                bkg.setImageBitmap(b)
+                bkg.colorFilter = if (p.brightness < 100) DarkenColorFilter(100 - p.brightness) else null
+            }
+        }
         bkg.backgroundColor = ThemeColors.board(look.palette, look.keys)
         bar.backgroundColor = ThemeColors.bar(look.palette, look.bar) ?: Color.TRANSPARENT
         keys.background = ThemeThumbnailKeys(look, ctx.resources.displayMetrics.density, ctx.dp(BAR_DP).toFloat())
@@ -110,5 +124,8 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
 
     private companion object {
         const val BAR_DP = 14
+
+        // the picture decoded this wide: the item's 128 dp, cropped to its height from a little wider
+        const val PICTURE_DP = 160
     }
 }

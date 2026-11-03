@@ -86,9 +86,10 @@ abstract class BaseKeyboard(
     // drawn as their kinds till they are in (ThemeAssets)
     protected val keyImages: BoardImages by lazy {
         val look = theme.look
-        val board = themeBoard ?: return@lazy BoardImages.NONE
+        // no board name (the number row, a search's keys): the kinds' and the roles' images still
+        val board = themeBoard
         // its keys' and the places it draws apart from them (the nine keys' column)
-        val names = (keyLayout.flatten().mapNotNull { it.name } + KeyNames.POSITIONS[board].orEmpty()).distinct()
+        val names = (keyLayout.flatten().mapNotNull { it.name } + board?.let { KeyNames.POSITIONS[it] }.orEmpty()).distinct()
         ThemeAssets.boardImages(look, board, KeyStyleResolver.imagesOn(look.keys, board, names))
     }
 

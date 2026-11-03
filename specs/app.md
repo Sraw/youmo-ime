@@ -578,13 +578,15 @@ two to `KeyNames`.
 Reading an older json (`CustomThemeSerializer`, newest first: 3.0 ← 2.1 ← 2.0 ← 1.0): 2.1 → 3.0
 keeps the colours and the picture (one portrait cut, its rect and turn, brightness; no blur), and
 gives the default keys, text and a transparent bar (`LookDefaults.look`). The key style settings
-before 3.0 were global (`ThemePrefs`' border, stroke, ripple, radius, gaps); `ThemeLookMigration`
+before 3.0 were global (`ThemePrefs`' border, radius and gaps as the page's levels set them; the
+stroke, ripple and the two panels' radii were hidden, never set by a user, so read as the defaults
+whatever an old backup has, and removed with the rest); `ThemeLookMigration`
 moves them into the themes by one rule: **a theme read in an older format gets the settings as its
 keys** (`LegacyLook.applyTo`, while they are in the prefs and not the defaults), saved again as 3.0 with
 its mtime kept. A 3.0 theme is never changed by them, so a backup from before restored (the
 settings come back with it) leaves the themes made since as they were. `ThemeLookMigration.settle`
-(copy a built-in or Monet theme in use with them, put the copy in its place, remove the settings,
-tell once) runs at `ThemeManager`'s start (`settleKeyStyle`), not while the themes are not
+(copy a built-in theme in use with them, once a theme however many slots have it, a failed save
+too; put the copy in its place, remove the settings, tell once) runs at `ThemeManager`'s start (`settleKeyStyle`), not while the themes are not
 settled or a migration's write-back failed this start (`ThemeFilesManager.rewriteFailed`): a copy
 not saved leaves its slot and every setting for the next start. A Monet theme in use is not copied
 (its colours follow the wallpaper): the settings are kept, encoded, as hidden `monet_key_style`
@@ -608,20 +610,30 @@ font (`ThemeAssets.typeface`, the weight asked); hints, marks and the bar's icon
 `keyHintColor` and `toolbarIconColor`.
 
 `ThemeAssets` (`data/theme/`) decodes off the main thread and caches for one theme's files at a time:
-the picture once an orientation at the width it is drawn (halved while wider, so a 4096 cut is not
-held whole), its blurs from that (`BoxBlur`), each once; a board's key images when the board is made
-(`boardImages`, the names it can reach: `KeyStyleResolver.imagesOn`), at the sample
-`KeyImageBudget` gives, the boards least recently made dropped past 24 MB; fonts once. A theme of
-other files (another picture, a crop, a key image) drops it all; a colour, brightness or blur changed
-keeps what was decoded. `saveTheme` clears it (a file of the same name may have new bytes).
+the picture once an orientation at the width it is drawn (halved while wider, and till it is at most
+2048² pixels and 4096 high, so a 4096 cut is not held whole), its blurs from that (`BoxBlur`), each
+once, decoded ahead when the theme is picked at every blur it shows (`prefetch`, `ThemeLook.pictureBlurs`;
+decoding and blurring outside the cache's lock, one decode a picture however many ask); a board's key
+images when the board is made (`boardImages`, the names it can reach: `KeyStyleResolver.imagesOn`; a
+keyboard of no board name, the number row or a search's keys, its kinds' and roles'), at the sample
+`KeyImageBudget` gives, the boards least recently made dropped past 24 MB; fonts once. A file that
+does not decode, or runs out of memory, is none (its colour drawn). A theme of other files (another
+picture, a crop, a key image) drops it all, a theme of none too (a plain theme picked lets a picture
+go); a colour, brightness or blur changed keeps what was decoded. A save, a delete and an import clear
+it (`ThemeManager.filesChanged`: a file of the same name may have new bytes). `PictureHost` asks it once
+a blur and base size, then lays the picture by the views' places added up from their parents (the
+window asked only under a scaled view); `KeyFaceDrawable` lays a key image's nine pieces once a size.
+The theme list's thumbnails (`ThemeAssets.thumbnail`) are its portrait cut decoded 160 dp wide on the
+same thread, blurred as on the keyboard, 12 MB of them kept.
 
 The app does not edit themes (user, 2026-11-03): they are made on the web page
-(`ThemeListFragment.THEME_MAKER_URL`, 新增主题 → 在网页上制作…) and imported (导入文件…). The theme list
+(`Const.themeMakerUrl`, 新增主题 → 在网页上制作…) and imported (导入文件…). The theme list
 applies, imports, and on a long press exports or deletes one of the user's (a Monet theme exports
 `Theme.Monet.toCustom()`: its colours now and the key style it keeps, fixed). The fcitx edit page
 (`CustomThemeActivity`, its cropper) went with the old 选择图片… and 复制内置主题…; themes made by them
 before are listed, used, exported and deleted like any other. Thumbnails (`ThemeThumbnailUi`) draw four rows of the
-theme's keys in little (`ThemeThumbnailKeys`, colours only: no image decoded) over its base.
+theme's keys in little (`ThemeThumbnailKeys`, colours only: no key image decoded) over its base
+(its colour, or its picture: `ThemeAssets.thumbnail`).
 
 Import (`ThemeFilesManager.importTheme`) takes the json and every file it names, by file name only
 (never a path, never a `.json`, never `.saving`); it checks all before copying any, so a refusal leaves nothing.

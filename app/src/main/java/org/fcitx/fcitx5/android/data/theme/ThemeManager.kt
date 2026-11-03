@@ -116,7 +116,7 @@ object ThemeManager {
             if (it >= 0) customThemes[it] = theme else customThemes.add(0, theme)
         }
         // its files may be new under the same names (a picture cut again)
-        ThemeAssets.clear()
+        filesChanged()
         if (activeTheme.name == theme.name) {
             activeTheme = theme
         }
@@ -130,10 +130,21 @@ object ThemeManager {
             ThemeFilesManager.deleteThemeFiles(it)
             customThemes.remove(it)
         }
+        // its picture and thumbnail let go; one imported again under its name is decoded anew
+        filesChanged()
         if (activeTheme.name == name) {
             activeTheme = evaluateActiveTheme()
         }
         return true
+    }
+
+    /**
+     * The themes' files written or removed (a save, a delete, an import): what was decoded of them let go
+     * ([ThemeAssets.clear]: a file may be new under its old name), the theme in use decoded ahead again.
+     */
+    fun filesChanged() {
+        ThemeAssets.clear()
+        prefetch()
     }
 
     fun setNormalModeTheme(theme: Theme) {
