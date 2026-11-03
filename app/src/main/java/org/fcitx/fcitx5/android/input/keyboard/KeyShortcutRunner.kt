@@ -72,7 +72,7 @@ class KeyShortcutRunner(
             // the menu opens as the swipe passes its threshold; a lift that got here without it, the panel
             KeyCommand.EditMenu -> windowManager.attachWindow(TextEditingWindow())
             KeyCommand.Clipboard -> windowManager.attachWindow(ClipboardWindow())
-            // as 符's long press and the bar's button open it, on the host's thread
+            // a key's swipe opens it in CommonKeyActionListener, as 符's long press; from here (a menu's) the same
             KeyCommand.QuickInput -> service.postFcitxJob { triggerQuickPhrase() }
             KeyCommand.Emoji -> windowManager.attachWindow(PickerWindow.Key.Emoji)
             KeyCommand.Voice -> VoiceFeature.window()?.let { windowManager.attachWindow(it) }

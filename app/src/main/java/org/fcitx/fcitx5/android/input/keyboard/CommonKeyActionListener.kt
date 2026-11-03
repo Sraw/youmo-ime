@@ -135,6 +135,8 @@ class CommonKeyActionListener :
                         }
                     }
                     KeyCommand.Restore -> shortcutRunner.restore()
+                    // as 符's long press: on the host's thread straight after, no key let in between
+                    KeyCommand.QuickInput -> afterPendingInput { triggerQuickPhrase() }
                     else -> afterPendingInput {
                         ContextCompat.getMainExecutor(context).execute { shortcutRunner.run(action.shortcut) }
                     }
