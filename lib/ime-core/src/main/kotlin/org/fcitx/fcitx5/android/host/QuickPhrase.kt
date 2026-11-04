@@ -86,8 +86,14 @@ class QuickPhrase(
         var key = Key(TempKeys.NONE)
         val buffer = TempInputBuffer(MAX_SIZE)
 
-        // what each character of buffer may be in a key, in step with it
+        // what each character of buffer may be in a key, in step with it: edited through the methods below
         val keys = ArrayList<Set<Int>>()
+
+        fun backspace(): Boolean = buffer.backspace().also { if (it) keys.removeAt(buffer.cursor) }
+
+        fun delete(): Boolean = buffer.del().also { if (it) keys.removeAt(buffer.cursor) }
+
+        fun type(shown: Int, can: Set<Int>): Boolean = buffer.type(String(Character.toChars(shown))).also { if (it) keys.add(buffer.cursor - 1, can) }
         var list: TempCandidateList? = null
 
         // what list shows, the user's or built-in, one for each candidate; null for ＋添加
@@ -105,9 +111,10 @@ class QuickPhrase(
         this.book = book
     }
 
-    /** The list made again from the book as it is now, if the mode is on in [ic]; what is typed stays. */
+    /** The list made again from the book as it is now, if the mode is on in [ic]; what is typed, the page and the lit one stay. */
     fun refresh(ic: InputContext) {
-        if (ic.propertyFor(state).active) updateUI(ic)
+        val s = ic.propertyFor(state)
+        if (s.active) updateUI(ic, kept = s.list)
     }
 
     /** What the candidate at [globalIndex] of the list shown is: null for ＋添加, or none. */
@@ -149,14 +156,16 @@ class QuickPhrase(
         updateUI(ic)
     }
 
+    private fun nothingTypedOrLit(s: State): Boolean = s.buffer.isEmpty() && (s.list?.cursorIndex ?: -1) < 0
+
     /** `keyEvent` (`:96-276`): true when the key was used. */
     @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
     override fun keyEvent(ic: InputContext, e: KeyEvent): Boolean {
         if (e.release) return false
         val s = ic.propertyFor(state)
         val key = e.key
-        // nothing typed, nothing is lit: Space leaves and types itself, never a whole entry by mistake
-        if (key.sym == KeySyms.SPACE && key.states == 0 && s.buffer.isEmpty()) {
+        // nothing typed, nothing lit (the arrows light one): Space leaves and types itself, never a whole entry by mistake
+        if (key.sym == KeySyms.SPACE && key.states == 0 && nothingTypedOrLit(s)) {
             reset(ic)
             host.commit(ic, " ")
             return true
@@ -218,8 +227,7 @@ class QuickPhrase(
             KeySyms.BACKSPACE -> {
                 if (s.buffer.isEmpty()) {
                     reset(ic)
-                } else if (s.buffer.backspace()) {
-                    s.keys.removeAt(s.buffer.cursor)
+                } else if (s.backspace()) {
                     if (s.buffer.isEmpty()) reset(ic) else updateUI(ic)
                 }
                 return true
@@ -227,8 +235,7 @@ class QuickPhrase(
             KeySyms.DELETE -> {
                 if (s.buffer.isEmpty()) {
                     reset(ic)
-                } else if (s.buffer.del()) {
-                    s.keys.removeAt(s.buffer.cursor)
+                } else if (s.delete()) {
                     if (s.buffer.isEmpty()) reset(ic) else updateUI(ic)
                 }
                 return true
@@ -260,7 +267,7 @@ class QuickPhrase(
         } else {
             // a keyboard's own code that is no key's types nothing and leaves the mode untouched (Enter still commits s.alt)
             val typed = QuickPhraseKeys.of(chr, hooks.nineKeys) ?: return true
-            if (s.buffer.type(String(Character.toChars(typed.shown)))) s.keys.add(s.buffer.cursor - 1, typed.can)
+            s.type(typed.shown, typed.can)
         }
         s.typed = true
         updateUI(ic)
@@ -309,8 +316,8 @@ class QuickPhrase(
         return true
     }
 
-    /** `updateUI` (`:345-428`). */
-    private fun updateUI(ic: InputContext) {
+    /** `updateUI` (`:345-428`); [kept], the list it replaces, has its page and lit candidate kept where they still are. */
+    private fun updateUI(ic: InputContext, kept: TempCandidateList? = null) {
         val s = ic.propertyFor(state)
         val book = book()
         val withMine = hooks.withMine
@@ -328,12 +335,19 @@ class QuickPhrase(
             val words = found.map { f -> if (f == null) addCandidate() else candidate(f) }
             TempCandidateList(words, TempKeys.PAGE_SIZE, SELECTION_LABELS, resetCursorAfterPaging = true).also {
                 if (it.totalSize > 0 && !empty) it.setGlobalCursorIndex(0)
+                if (kept != null) keep(it, kept)
             }
         }
         // a trigger's own text (none of the app's) has the line to itself
         val noneYet = withMine && book.mine.isEmpty()
         s.hint = if (empty && noneYet && s.text.isEmpty()) emptyHint else ""
         show(ic)
+    }
+
+    // [list] on [old]'s page, or its last if fewer now, the lit one at the same place if it is still there
+    private fun keep(list: TempCandidateList, old: TempCandidateList) {
+        while (list.currentPage < old.currentPage && list.hasNext) list.next()
+        if (old.globalCursorIndex >= 0) list.setGlobalCursorIndex(minOf(old.globalCursorIndex, list.totalSize - 1))
     }
 
     private fun candidate(f: QuickPhraseBook.Found): TempCandidate {
@@ -343,7 +357,8 @@ class QuickPhrase(
                 reset(c)
             }
         }
-        return TempCandidate(QuickPhraseExcerpt.of(f.content), f.key) { c ->
+        // put in as it is, so shown so too: no traditional of the user's own words
+        return TempCandidate(QuickPhraseExcerpt.of(f.content), { f.key }, asIs = true, select = { c ->
             host.commitAsIs(c, f.content)
             // a password field's use is not kept: nothing typed in one leaves a trace
             if (!c.has(Capability.PASSWORD_OR_SENSITIVE)) {
@@ -352,7 +367,7 @@ class QuickPhrase(
                 hooks.used(f.entry, at)
             }
             reset(c)
-        }
+        })
     }
 
     private fun addCandidate() = TempCandidate(addLabel, "") { c ->

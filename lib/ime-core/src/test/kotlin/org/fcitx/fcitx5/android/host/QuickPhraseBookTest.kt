@@ -76,11 +76,13 @@ class QuickPhraseBookTest {
         val merged = QuickPhraseFiles.merge(
             listOf(gh),
             // GH: gh again, its key's case aside, as typing finds both
-            listOf(gh, gh.copy(key = "GH"), addr, addr, long, longest, QuickPhraseEntry("x".repeat(31), "long"), QuickPhraseEntry("e", "")),
+            listOf(gh, gh.copy(key = "GH"), addr, addr, long, longest, QuickPhraseEntry("x".repeat(31), "long"), QuickPhraseEntry("e", ""), QuickPhraseEntry("y".repeat(31), "")),
         )
         assertEquals(listOf(gh, addr, longest), merged.entries)
         assertEquals(3, merged.duplicates)
         assertEquals(1, merged.tooLong)
+        // the key of 31 counted; an empty content is no line at all, a key of 31 with none too
+        assertEquals(1, merged.badKey)
         // another content under the key is another entry
         assertEquals(2, QuickPhraseFiles.merge(listOf(gh), listOf(gh.copy(content = "x"))).entries.size)
         assertTrue(QuickPhraseFiles.validKey("x".repeat(30)))

@@ -76,8 +76,16 @@ class QuickPhraseBook(
         val lowered = typed.map { set -> set.mapTo(HashSet()) { Character.toLowerCase(it) } }
         val out = ArrayList<Found>()
         if (withMine) mine.filter { starts(it.key, lowered, ignoreCase = true) }.mapTo(out) { Found(it.key, it.content, true) }
-        builtIn.entries().filter { starts(it.first, typed, ignoreCase = false) }.mapTo(out) { Found(it.first, it.second, false) }
+        builtInFound(typed).mapTo(out) { Found(it.first, it.second, false) }
         return out
+    }
+
+    // one character a place (26 keys, a hardware keyboard): the table's own prefix walk; else every entry tried
+    private fun builtInFound(typed: List<Set<Int>>): List<Pair<String, String>> {
+        if (typed.any { it.size != 1 }) return builtIn.entries().filter { starts(it.first, typed, ignoreCase = false) }.toList()
+        val prefix = StringBuilder()
+        typed.forEach { prefix.appendCodePoint(it.single()) }
+        return builtIn.populate(prefix.toString())
     }
 
     /** A match: [mine] one of the user's entries, else a built-in table's. */
@@ -188,8 +196,11 @@ object QuickPhraseFiles {
     fun validKey(key: String): Boolean =
         key.isNotEmpty() && key.none { it.isWhitespace() } && key.codePointCount(0, key.length) <= QuickPhraseBook.MAX_KEY
 
-    /** What [merge] made: [entries] after it, and how many lines it skipped as already there or too long. */
-    data class Merged(val entries: List<QuickPhraseEntry>, val duplicates: Int, val tooLong: Int)
+    /**
+     * What [merge] made: [entries] after it, and how many lines it skipped as already there, too long,
+     * or with a key that cannot be one ([validKey]).
+     */
+    data class Merged(val entries: List<QuickPhraseEntry>, val duplicates: Int, val tooLong: Int, val badKey: Int)
 
     /**
      * [lines] of a `.mb` file ([parseLines]) added after [mine]: the ones whose key is good
@@ -201,15 +212,20 @@ object QuickPhraseFiles {
         val seen = mine.mapTo(HashSet()) { it.identity }
         var duplicates = 0
         var tooLong = 0
+        var badKey = 0
         for (e in lines) {
             when {
-                !validKey(e.key) || e.content.isEmpty() -> {}
+                // a line of no content (only a quoted "" gives one) is no line at all, its key whatever
+                // it is. A picture picked for the file never gets here: parseLines drops its lines (no
+                // value after a space, or not UTF-8), so it is said as not a 快速输入 file
+                e.content.isEmpty() -> {}
+                !validKey(e.key) -> badKey++
                 e.content.length > QuickPhraseBook.MAX_CONTENT -> tooLong++
                 !seen.add(e.identity) -> duplicates++
                 else -> out += e
             }
         }
-        return Merged(out, duplicates, tooLong)
+        return Merged(out, duplicates, tooLong, badKey)
     }
 }
 
@@ -224,7 +240,8 @@ object QuickPhraseExcerpt {
      */
     fun of(content: String, width: Int = 24): String {
         val newline = content.indexOf('\n')
-        val first = if (newline < 0) content else content.substring(0, newline)
+        // a CRLF file's line ends at its \r too
+        val first = (if (newline < 0) content else content.substring(0, newline)).removeSuffix("\r")
         val more = newline >= 0 && content.substring(newline + 1).isNotBlank()
         val out = StringBuilder()
         var used = 0

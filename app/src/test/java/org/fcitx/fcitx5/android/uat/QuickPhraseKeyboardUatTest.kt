@@ -283,17 +283,26 @@ class QuickPhraseKeyboardUatTest {
         h.menuPick(s(R.string.clipboard_save_quick_phrase))
         assertNull(shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity)
         assertEquals(s(R.string.quick_phrase_too_long_to_save, QuickPhraseBook.MAX_CONTENT), ShadowToast.getTextOfLatestToast())
-        // a password (shown as dots): not offered
-        org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.lastClipTimestamp = -1L
-        org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.lastEntry = null
-        val clip = ClipData.newPlainText("", "mima1234").apply {
-            description.extras = PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
+        // a password (shown as dots): not offered. The clipboard's object outlives the test: what it last
+        // stored put back after, passed or failed
+        val cm = org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
+        val stampWas = cm.lastClipTimestamp
+        val entryWas = cm.lastEntry
+        try {
+            cm.lastClipTimestamp = -1L
+            cm.lastEntry = null
+            val clip = ClipData.newPlainText("", "mima1234").apply {
+                description.extras = PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
+            }
+            h.service.getSystemService(ClipboardManager::class.java).setPrimaryClip(clip)
+            h.waitFor("stored") { org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.lastEntry?.text == "mima1234" }
+            h.waitFor("dots listed") { KeyboardHarness.all(h.inputView).any { h.shown(it) && it is TextView && it.text.startsWith("•") } }
+            held("•")
+            assertTrue(menuTitles().toString(), s(R.string.delete) in menuTitles())
+            assertFalse(menuTitles().toString(), s(R.string.clipboard_save_quick_phrase) in menuTitles())
+        } finally {
+            cm.lastClipTimestamp = stampWas
+            cm.lastEntry = entryWas
         }
-        h.service.getSystemService(ClipboardManager::class.java).setPrimaryClip(clip)
-        h.waitFor("stored") { org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.lastEntry?.text == "mima1234" }
-        h.waitFor("dots listed") { KeyboardHarness.all(h.inputView).any { h.shown(it) && it is TextView && it.text.startsWith("•") } }
-        held("•")
-        assertTrue(menuTitles().toString(), s(R.string.delete) in menuTitles())
-        assertFalse(menuTitles().toString(), s(R.string.clipboard_save_quick_phrase) in menuTitles())
     }
 }

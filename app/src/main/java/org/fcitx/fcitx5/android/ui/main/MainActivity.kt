@@ -21,6 +21,8 @@ import androidx.navigation.fragment.NavHostFragment
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.databinding.ActivityMainBinding
+import org.fcitx.fcitx5.android.host.QuickPhraseBook
+import org.fcitx.fcitx5.android.ui.main.settings.QuickPhraseFragment
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.ui.setup.SetupActivity
 import org.fcitx.fcitx5.android.utils.AppUtil
@@ -119,6 +121,13 @@ class MainActivity : AppCompatActivity() {
                 if (!AppUtil.isLaunchRoute(route)) {
                     Timber.w("Settings route not opened from outside: ${route::class.simpleName}")
                     return
+                }
+                if (route is SettingsRoute.QuickPhrase) {
+                    // the keyboard's own refuses a longer one before it sends it; another app's is refused here
+                    if (route.content.length > QuickPhraseBook.MAX_CONTENT) return
+                    // quick input's page up with its editor changed: it asks before that is dropped
+                    val page = supportFragmentManager.findFragmentById(R.id.nav_host_fragment)?.childFragmentManager?.primaryNavigationFragment
+                    if ((page as? QuickPhraseFragment)?.takeRequest(route) == true) return
                 }
                 navController.popBackStack(SettingsRoute.Index, false)
                 navController.navigateWithAnim(route)

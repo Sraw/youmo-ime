@@ -23,6 +23,7 @@ import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.MenuProvider
 import androidx.core.view.ViewCompat
@@ -43,6 +44,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.quickphrase.QuickPhraseManager
 import org.fcitx.fcitx5.android.host.QuickPhraseBook
 import org.fcitx.fcitx5.android.host.QuickPhraseEntry
@@ -51,6 +53,7 @@ import org.fcitx.fcitx5.android.ui.main.MainViewModel.ButtonMode
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.lazyRoute
 import org.fcitx.fcitx5.android.utils.materialTextInput
+import org.fcitx.fcitx5.android.utils.parcelable
 import org.fcitx.fcitx5.android.utils.onPositiveButtonClick
 import org.fcitx.fcitx5.android.utils.str
 import org.fcitx.fcitx5.android.utils.styledColor
@@ -64,6 +67,7 @@ import splitties.views.dsl.core.verticalLayout
 import splitties.views.dsl.core.wrapContent
 import timber.log.Timber
 import java.io.IOException
+import java.util.concurrent.ConcurrentHashMap
 import com.google.android.material.R as MaterialR
 
 /**
@@ -83,6 +87,9 @@ class QuickPhraseFragment : ProgressFragment() {
     // (filter) read this, never a copy made as the page opened
     private val on = HashMap<String, Boolean>()
 
+    // the switches whose writes are still to come, how many each: counted down as each is written
+    private val switching = ConcurrentHashMap<String, Int>()
+
     private lateinit var adapter: Adapter
     private lateinit var list: RecyclerView
     private var undo: Snackbar? = null
@@ -94,6 +101,10 @@ class QuickPhraseFragment : ProgressFragment() {
     private var editor: Editor? = null
     private var editorWas: Bundle? = null
 
+    // the keyboard's ask taken (takeRequest) while the editor restored is not yet shown again: asked once
+    // it is; kept with it over another rotation before that
+    private var pending: SettingsRoute.QuickPhrase? = null
+
     // 放弃修改？ over the editor: gone with the page, the editor shown again without it
     private var discard: AlertDialog? = null
 
@@ -104,6 +115,7 @@ class QuickPhraseFragment : ProgressFragment() {
         super.onCreate(savedInstanceState)
         asked = savedInstanceState?.getBoolean(ASKED) == true
         editorWas = savedInstanceState?.getBundle(EDITOR)
+        pending = savedInstanceState?.parcelable(PENDING)
         importLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { it?.let(::importFile) }
         exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { it?.let(::exportFile) }
     }
@@ -113,6 +125,7 @@ class QuickPhraseFragment : ProgressFragment() {
         outState.putBoolean(ASKED, asked)
         // the editor's, or one restored and not yet shown again (the page still reading its files)
         (editor?.saved() ?: editorWas)?.let { outState.putBundle(EDITOR, it) }
+        pending?.let { outState.putParcelable(PENDING, it) }
     }
 
     private fun builtIns() = QuickPhraseManager.BUILT_IN.associateWith { QuickPhraseManager.builtInOn(it) }
@@ -148,7 +161,10 @@ class QuickPhraseFragment : ProgressFragment() {
         editorWas = null
         val typedWas = was?.entry(TYPED)
         // OK tapped before, and its entry there now
-        val savedWas = typedWas?.takeIf { t -> was.getBoolean(SAVING) && all.any { it.sameAs(t) } }
+        // and the entry it changed gone: one the same added meanwhile (by the keyboard) refused the save
+        val savedWas = typedWas?.takeIf { t ->
+            was.getBoolean(SAVING) && all.any { it.sameAs(t) } && was.entry(OLD).let { old -> old == null || old.sameAs(t) || old !in all }
+        }
         if (savedWas != null) {
             // OK was tapped and the old page's save finished meanwhile: saved, nothing to show again
             asked = true
@@ -160,6 +176,14 @@ class QuickPhraseFragment : ProgressFragment() {
             asked = true
             val entry = QuickPhraseEntry(args.key, args.content)
             edit(entry.takeIf { args.existing && it in all }, entry)
+        }
+        pending?.let { request ->
+            pending = null
+            // the restored editor up now: asked over it as takeRequest does, else (saved meanwhile) opened
+            if (!takeRequest(request) && request.edit) {
+                val entry = QuickPhraseEntry(request.key, request.content)
+                edit(entry.takeIf { request.existing && it in all }, entry)
+            }
         }
         return FrameLayout(ctx).apply {
             setBackgroundColor(ctx.styledColor(android.R.attr.colorBackground))
@@ -209,42 +233,53 @@ class QuickPhraseFragment : ProgressFragment() {
     /**
      * [op] saved, then the entries and the switches read back, failed or not (a row swiped away
      * comes back, a switch turns back), and the keyboard told: the files are the one truth, the
-     * keyboard writing them too. [after] with what [op] gave, [failed] if it threw, while the page is there.
+     * keyboard writing them too. [after] with what [op] gave, [failed] if it threw, while the page is there;
+     * [settled] last on the main thread whatever happened, its read back applied (or the page gone).
      */
-    private fun <T> change(what: String, op: () -> T, failed: () -> Unit = {}, after: (T) -> Unit = {}) {
+    private fun <T> change(what: String, op: () -> T, failed: () -> Unit = {}, settled: () -> Unit = {}, after: (T) -> Unit = {}) {
         // outlives the page: a change made just before leaving it is still saved
         FcitxApplication.getInstance().coroutineScope.launch(Dispatchers.Main.immediate) {
-            // one at a time, in the order made: a switch turned twice quickly is read back as last turned
-            val (done, read) = withContext(changes) {
-                val done = try {
-                    Result.success(op())
-                } catch (e: IOException) {
-                    Result.failure(e)
-                }
-                val read = try {
-                    Read(QuickPhraseManager.load(), builtIns())
-                } catch (e: IOException) {
-                    Timber.w(e, "quick phrases")
-                    null
-                }
-                done to read
+            try {
+                changed(what, op, failed, after)
+            } finally {
+                settled()
             }
-            done.exceptionOrNull()?.let {
-                Timber.w(it, what)
-                appContext.toast(it)
-            }
-            if (done.isSuccess) fcitx.runIfReady { reloadConfig() }
-            if (view == null) return@launch
-            read?.let {
-                all = it.mine
-                on.clear()
-                on.putAll(it.on)
-            }
-            // before the rows are bound again: a switch whose write failed, unread, turns back
-            done.onFailure { failed() }
-            filter()
-            done.onSuccess(after)
         }
+    }
+
+    private suspend fun <T> changed(what: String, op: () -> T, failed: () -> Unit, after: (T) -> Unit) {
+        // one at a time, in the order made: a switch turned twice quickly is read back as last turned
+        val (done, read) = withContext(changes) {
+            val done = try {
+                Result.success(op())
+            } catch (e: IOException) {
+                Result.failure(e)
+            }
+            val read = try {
+                Read(QuickPhraseManager.load(), builtIns())
+            } catch (e: IOException) {
+                Timber.w(e, "quick phrases")
+                null
+            }
+            done to read
+        }
+        done.exceptionOrNull()?.let {
+            Timber.w(it, what)
+            appContext.toast(it)
+        }
+        // not the page's connection: it is gone once the page is, the change made just before leaving it
+        if (done.isSuccess) HostDaemon.runIfRunning { reloadConfig() }
+        if (view == null) return
+        read?.let {
+            all = it.mine
+            // a switch whose write's read back is still to come here (this one's too) keeps what it
+            // was turned to
+            on.putAll(it.on.filterKeys { name -> !switching.containsKey(name) })
+        }
+        // before the rows are bound again: a switch whose write failed, unread, turns back
+        done.onFailure { failed() }
+        filter()
+        done.onSuccess(after)
     }
 
     /** The editor up: what it changes ([entry], null for a new one), what it was filled with. */
@@ -334,7 +369,7 @@ class QuickPhraseFragment : ProgressFragment() {
             ed.key.error = if (key.isEmpty()) {
                 getString(R.string._cannot_be_empty, getString(R.string.quick_phrase_key))
             } else {
-                getString(R.string.quick_phrase_key_invalid)
+                getString(R.string.quick_phrase_key_invalid, QuickPhraseBook.MAX_KEY)
             }
             ed.key.requestFocus()
             return false
@@ -373,19 +408,50 @@ class QuickPhraseFragment : ProgressFragment() {
         return false
     }
 
-    private fun confirmDiscard(editorDialog: AlertDialog) {
+    private fun confirmDiscard(editorDialog: AlertDialog, then: () -> Unit = {}) {
+        discard?.dismiss()
         discard = AlertDialog.Builder(requireContext())
             .setMessage(R.string.quick_phrase_discard_confirm)
             .setNegativeButton(R.string.quick_phrase_keep_editing, null)
-            .setPositiveButton(R.string.quick_phrase_discard) { _, _ -> editorDialog.cancel() }
-            .setOnDismissListener { discard = null }
+            .setPositiveButton(R.string.quick_phrase_discard) { _, _ ->
+                editorDialog.cancel()
+                then()
+            }
+            .setOnDismissListener { if (discard === it) discard = null }
             .show()
     }
 
+    /**
+     * The keyboard asks for this page again ([request]) while it is up: taken here if its editor has
+     * something changed, which is not dropped unasked (放弃修改？, then [request]'s editor; kept
+     * editing, the request is let go). False otherwise: the page is opened anew as usual.
+     */
+    fun takeRequest(request: SettingsRoute.QuickPhrase): Boolean {
+        val ed = editor ?: run {
+            // restored after a rotation or the process's death, the page still reading its files:
+            // what was typed is not dropped by the page opened anew; asked once it is shown again
+            val was = editorWas ?: return false
+            if (was.entry(TYPED) == was.entry(FILLED)) return false
+            pending = request
+            return true
+        }
+        if (ed.typed == ed.filled) return false
+        if (request.edit) {
+            confirmDiscard(ed.dialog) {
+                val entry = QuickPhraseEntry(request.key, request.content)
+                edit(entry.takeIf { request.existing && it in all }, entry)
+            }
+        }
+        return true
+    }
+
     private fun delete(entry: QuickPhraseEntry) {
-        change("quick phrase delete", { QuickPhraseManager.remove(entry) }) {
+        change("quick phrase delete", { QuickPhraseManager.remove(entry) }) { removed ->
+            // gone already (the keyboard deleted it meanwhile): nothing deleted here, nothing to undo
+            if (removed == null) return@change
             undo = Snackbar.make(list, R.string.quick_phrase_deleted, Snackbar.LENGTH_LONG)
-                .setAction(R.string.undo) { change("quick phrase undo", { QuickPhraseManager.put(null, entry, now = 0L) }) }
+                // put back where it was, its time of use too; one the same added meanwhile is kept as it is
+                .setAction(R.string.undo) { change("quick phrase undo", { QuickPhraseManager.restore(removed) }) }
                 .also { it.show() }
         }
     }
@@ -398,7 +464,9 @@ class QuickPhraseFragment : ProgressFragment() {
             override fun onMove(rv: RecyclerView, a: RecyclerView.ViewHolder, b: RecyclerView.ViewHolder) = false
 
             override fun onSwiped(holder: RecyclerView.ViewHolder, direction: Int) {
-                val entry = shown.getOrNull(holder.bindingAdapterPosition - HEAD) ?: return
+                val at = holder.bindingAdapterPosition
+                // gone from the list meanwhile: the row put back, not left swiped away blank
+                val entry = shown.getOrNull(at - HEAD) ?: return run { if (at >= 0) adapter.notifyItemChanged(at) }
                 delete(entry)
             }
         }).attachToRecyclerView(list)
@@ -411,12 +479,9 @@ class QuickPhraseFragment : ProgressFragment() {
                 val bytes = withContext(Dispatchers.IO) { ctx.contentResolver.openInputStreamOrThrow(uri).use { it.readImported() } }
                 change("quick phrases import", {
                     val r = QuickPhraseManager.import(bytes)
-                    val said = if (r.tooLong == 0) {
-                        ctx.getString(R.string.quick_phrase_import_done, r.added, r.duplicates)
-                    } else {
-                        ctx.getString(R.string.quick_phrase_import_done_too_long, r.added, r.duplicates, r.tooLong, QuickPhraseBook.MAX_CONTENT)
-                    }
-                    appContext.mainExecutor.execute { ctx.toast(said) }
+                    val said = quickPhraseImportToast(appContext, r)
+                    // not the page's context: the import outlives it
+                    appContext.mainExecutor.execute { appContext.toast(said) }
                 })
             }
         }
@@ -426,7 +491,8 @@ class QuickPhraseFragment : ProgressFragment() {
         val ctx = requireContext()
         lifecycleScope.launch {
             ctx.showingFileErrors("quick phrases export") {
-                withContext(Dispatchers.IO) {
+                // after the changes still being saved, as they are written
+                withContext(changes) {
                     val text = QuickPhraseManager.export()
                     ctx.contentResolver.openOutputStreamOrThrow(uri).use { it.write(text.toByteArray()) }
                 }
@@ -484,7 +550,15 @@ class QuickPhraseFragment : ProgressFragment() {
                     s.setOnCheckedChangeListener { _, checked ->
                         // before the change's list is bound again (filter): the row keeps what was turned
                         on[name] = checked
-                        change("quick phrase table", { QuickPhraseManager.setBuiltIn(name, checked) }, failed = { on[name] = !checked })
+                        switching.merge(name, 1) { a, b -> a + b }
+                        change(
+                            "quick phrase table", { QuickPhraseManager.setBuiltIn(name, checked) },
+                            failed = { on[name] = !checked },
+                            // counted down on the main thread once this write's read back is applied, not
+                            // as it is written: two turns written before the first's read back reached the
+                            // main thread had it bind the switch to the first turn, then flip to the second
+                            settled = { switching.computeIfPresent(name) { _, n -> (n - 1).takeIf { it > 0 } } },
+                        )
                     }
                 }
             }
@@ -550,6 +624,7 @@ class QuickPhraseFragment : ProgressFragment() {
     companion object {
         private const val ASKED = "asked"
         private const val EDITOR = "editor"
+        private const val PENDING = "pending"
         private const val OLD = "old"
         private const val FILLED = "filled"
         private const val TYPED = "typed"
@@ -560,7 +635,8 @@ class QuickPhraseFragment : ProgressFragment() {
 
         // every page's changes, one after another (they outlive the page)
         @OptIn(ExperimentalCoroutinesApi::class)
-        private val changes = Dispatchers.IO.limitedParallelism(1)
+        @VisibleForTesting
+        internal val changes = Dispatchers.IO.limitedParallelism(1)
 
         private fun Bundle.putEntry(name: String, entry: QuickPhraseEntry?) {
             if (entry != null) putStringArray(name, arrayOf(entry.key, entry.content))
@@ -575,4 +651,20 @@ class QuickPhraseFragment : ProgressFragment() {
         private const val SWITCH = 3
         private const val HEAD = 1
     }
+}
+
+/** What [QuickPhraseFragment]'s import says of [r]: every skipped line counted, those with a bad key too. */
+internal fun quickPhraseImportToast(ctx: Context, r: QuickPhraseManager.Imported): String {
+    if (r.added + r.duplicates + r.tooLong == 0) {
+        // not a .mb file (a picture picked, say): said so, not "0 imported", though a line or
+        // two with a bad key are still said
+        return if (r.badKey == 0) ctx.getString(R.string.quick_phrase_import_none)
+        else ctx.getString(R.string.quick_phrase_import_bad_key, ctx.getString(R.string.quick_phrase_import_done, 0, 0), r.badKey)
+    }
+    val done = if (r.tooLong == 0) {
+        ctx.getString(R.string.quick_phrase_import_done, r.added, r.duplicates)
+    } else {
+        ctx.getString(R.string.quick_phrase_import_done_too_long, r.added, r.duplicates, r.tooLong, QuickPhraseBook.MAX_CONTENT)
+    }
+    return if (r.badKey == 0) done else ctx.getString(R.string.quick_phrase_import_bad_key, done, r.badKey)
 }

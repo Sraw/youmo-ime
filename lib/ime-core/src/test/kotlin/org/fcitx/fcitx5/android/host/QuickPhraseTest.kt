@@ -65,7 +65,6 @@ class QuickPhraseTest {
         rig.press(TempKeys.GRAVE, KeyStates.SUPER)
         assertTrue(asked > 0)
         rig.type("xy")
-        assertTrue(asked > 0)
         assertEquals(listOf("one", "two"), rig.page)
     }
 
@@ -273,5 +272,68 @@ class QuickPhraseTest {
             // reloadConfig hands a book read later, off the host thread
             "a lazy book (the app's path, F4037/F4098)" to { val t = QuickPhraseBook(table()); replaced { it.reload { t } } },
         )
+    }
+
+    // a CRLF line's \r is no character of the first line shown
+    @Test
+    fun anExcerptEndsAtACarriageReturnLineBreak() {
+        assertEquals("a⏎", QuickPhraseExcerpt.of("a\r\nb"))
+    }
+
+    // nothing typed, Space leaves and types itself; an entry the user lit (Tab, the next candidate)
+    // is the one Space then commits, not a space
+    @Test
+    @Uat("QU-22")
+    fun spaceWithNothingTypedCommitsTheEntryLitElseASpace() {
+        val rig = TempModeRig(table, { null }, book = { QuickPhraseBook(table, listOf(QuickPhraseEntry("gh", "mine"))) })
+        rig.press(TempKeys.GRAVE, KeyStates.SUPER)
+        rig.press(KeySyms.SPACE)
+        assertEquals(listOf(" "), rig.commits())
+        assertFalse(rig.quickPhrase.isActive(rig.ic))
+        rig.press(TempKeys.GRAVE, KeyStates.SUPER)
+        rig.press(KeySyms.TAB)
+        assertEquals("mine", rig.panel.candidates!!.run { candidate(cursorIndex).text })
+        rig.press(KeySyms.SPACE)
+        assertEquals(listOf(" ", "mine"), rig.commits())
+    }
+
+    // the book changed while the list is open (an entry deleted from its card): the list made
+    // again stays on the page the user was on
+    @Test
+    @Uat("QU-17")
+    fun aListMadeAgainKeepsItsPage() {
+        trigger()
+        rig.type("ab")
+        rig.press(TempKeys.DOWN)
+        val page = rig.page
+        assertEquals(1, rig.panel.candidates!!.currentPage)
+        rig.quickPhrase.refresh(rig.ic)
+        assertEquals(1, rig.panel.candidates!!.currentPage)
+        assertEquals(page, rig.page)
+    }
+
+    // entries deleted from their cards while the list is open, the lit one on the last page: the list
+    // made again, now shorter, goes to its last page and lights its last entry, not past either
+    @Test
+    @Uat("QU-17")
+    fun aListMadeAgainShorterKeepsTheLastPageAndLitIndexItStillHas() {
+        var mine = (1..7).map { QuickPhraseEntry("m$it", "c$it") }
+        val rig = TempModeRig(QuickPhraseTable.EMPTY, { null }, book = { QuickPhraseBook(QuickPhraseTable.EMPTY, mine) })
+        rig.press(TempKeys.GRAVE, KeyStates.SUPER)
+        rig.type("m")
+        rig.press(TempKeys.DOWN)
+        rig.panel.candidates!!.setGlobalCursorIndex(6)
+        assertEquals(listOf("c6", "c7"), rig.page)
+        // one gone: still two pages, the lit index clamped to the last there is
+        mine = mine.take(6)
+        rig.quickPhrase.refresh(rig.ic)
+        assertEquals(1, rig.panel.candidates!!.currentPage)
+        assertEquals(5, rig.panel.candidates!!.globalCursorIndex)
+        // one page left: on it, not past it, its last lit
+        mine = mine.take(5)
+        rig.quickPhrase.refresh(rig.ic)
+        assertEquals(0, rig.panel.candidates!!.currentPage)
+        assertEquals(4, rig.panel.candidates!!.globalCursorIndex)
+        assertEquals(listOf("c1", "c2", "c3", "c4", "c5"), rig.page)
     }
 }

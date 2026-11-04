@@ -64,6 +64,12 @@ class SettingsHarness(
 
     fun idle() = shadowOf(Looper.getMainLooper()).idle()
 
+    /** [intent] sent to the activity up (onNewIntent), as the keyboard's 存为 does with settings open. */
+    fun newIntent(intent: Intent) {
+        controller.newIntent(intent)
+        idle()
+    }
+
     fun s(id: Int, vararg args: Any): String = activity.getString(id, *args)
 
     private val nav get() = activity.supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment

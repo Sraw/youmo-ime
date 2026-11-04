@@ -54,6 +54,8 @@ object QuickPhraseManager {
      * The user's entries, the last used, added or changed first, as the keyboard lists them.
      * @throws IOException if a file there cannot be read
      */
+    // as the writes are: a write between the two files read would pair the new list with the old times
+    @Synchronized
     fun load(dir: File = dir()): List<QuickPhraseEntry> = QuickPhraseBook(QuickPhraseTable.EMPTY, readMine(dir), readUsed(dir)).mine
 
     /**
@@ -74,13 +76,38 @@ object QuickPhraseManager {
         return Put.Saved
     }
 
-    /** [entry] deleted, if it is there. @throws IOException if the files cannot be read or written */
+    /** What [remove] took away: [entry], where it was in the file, when it was last used (null: never). */
+    class Removed(val entry: QuickPhraseEntry, val index: Int, val usedAt: Long?)
+
+    /**
+     * [entry] deleted, if it is there; what was taken away, for [restore], or null if it was not there.
+     * @throws IOException if the files cannot be read or written
+     */
     @Synchronized
-    fun remove(entry: QuickPhraseEntry, dir: File? = null) {
+    fun remove(entry: QuickPhraseEntry, dir: File? = null): Removed? {
         val target = dir ?: dirToSave()
         val mine = readMine(target)
-        if (entry !in mine) return
-        write(target, mine - entry, readUsed(target))
+        val index = mine.indexOf(entry)
+        if (index < 0) return null
+        val used = readUsed(target)
+        write(target, mine - entry, used)
+        return Removed(entry, index, used[entry])
+    }
+
+    /**
+     * 撤销 of a deletion: [removed] put back where it was in the file, with its time of use, so it is
+     * listed where it was. One the same added meanwhile is kept as it is ([Put.Duplicate]).
+     * @throws IOException as [put]
+     */
+    @Synchronized
+    fun restore(removed: Removed, dir: File? = null): Put {
+        val target = dir ?: dirToSave()
+        val mine = readMine(target)
+        if (mine.any { it.sameAs(removed.entry) }) return Put.Duplicate
+        val out = mine.toMutableList().also { it.add(removed.index.coerceIn(0, it.size), removed.entry) }
+        val used = readUsed(target)
+        write(target, out, removed.usedAt?.let { used + (removed.entry to it) } ?: used)
+        return Put.Saved
     }
 
     /** [entry] used at [at] (the keyboard's): only `mine.used` is written. @throws IOException as [put] */
@@ -92,8 +119,11 @@ object QuickPhraseManager {
         writeUsed(target, readUsed(target) + (entry to at), mine)
     }
 
-    /** What an [import] did: [added] entries, and the lines skipped as already there or too long. */
-    data class Imported(val added: Int, val duplicates: Int, val tooLong: Int)
+    /**
+     * What an [import] did: [added] entries, and the lines skipped as already there, too long, or
+     * with a key that cannot be one ([badKey], [QuickPhraseFiles.validKey]).
+     */
+    data class Imported(val added: Int, val duplicates: Int, val tooLong: Int, val badKey: Int = 0)
 
     /**
      * The entries of a `.mb` file's [bytes] added after the user's ([QuickPhraseFiles.merge]): those
@@ -106,7 +136,7 @@ object QuickPhraseManager {
         val mine = readMine(target)
         val merged = QuickPhraseFiles.merge(mine, QuickPhraseFiles.parseLines(bytes))
         if (merged.entries.size != mine.size) write(target, merged.entries, readUsed(target))
-        return Imported(merged.entries.size - mine.size, merged.duplicates, merged.tooLong)
+        return Imported(merged.entries.size - mine.size, merged.duplicates, merged.tooLong, merged.badKey)
     }
 
     /** The user's entries as a `.mb` file, in the order of use, the one fcitx5 on a computer reads too. */
