@@ -24,6 +24,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardChunks.Chunk
@@ -65,7 +66,7 @@ class ClipboardChunksWindow(private val text: String) : InputWindow.ExtendedInpu
     private val shown = ClipboardChunks.cut(text, MAX_CHARS)
 
     private val ui by lazy {
-        ClipboardChunksUi(context, theme, ThemeColors.entryRadius(theme.look.keys), shown, cut = shown.length < text.length) {
+        ClipboardChunksUi(context, theme, ThemeColors.entryRadius(ThemeManager.shownLook(theme).keys), shown, cut = shown.length < text.length) {
             service.commitOverEngine(it)
             if (returnAfterPaste) windowManager.attachWindow(KeyboardWindow)
         }

@@ -40,7 +40,7 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme) : Ui {
         isSingleLine = true
         gravity = gravityCenter
         setTextColor(theme.candidateTextColor)
-        ThemeAssets.candidateTypeface(theme.look)?.let { typeface = it }
+        ThemeAssets.candidateTypeface(ThemeManager.shownLook(theme))?.let { typeface = it }
     }
 
     override val root = view(::CustomGestureView) {

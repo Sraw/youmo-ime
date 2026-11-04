@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.BooleanKey.ClipboardDbEmpty
@@ -83,7 +84,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(), Inpu
     private val adapter: ClipboardAdapter by lazy {
         object : ClipboardAdapter(
             theme,
-            context.dp(ThemeColors.entryRadius(theme.look.keys)),
+            context.dp(ThemeColors.entryRadius(ThemeManager.shownLook(theme).keys)),
             clipboardMaskSensitive
         ) {
             override fun onPin(id: Int) {

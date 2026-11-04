@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
@@ -141,7 +142,7 @@ class HandwritingKeyboard(
         onFinish = ::finish,
     ).apply {
         // a letter key's face (its image among the keyboard's), drawn on flat keys too as before 3.0; nothing pressed (it is written on)
-        val keys = theme.look.keys
+        val keys = ThemeManager.shownLook(theme).keys
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val density = resources.displayMetrics.density
         drawAsKey(

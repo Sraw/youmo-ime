@@ -215,8 +215,8 @@ directories and gets backups retargeted to its id; the release APK is upgraded w
 The theme maker page draws its preview by the app's rules and reads and writes its theme files, so
 the app makes the files its tests read: `rules.json` (`ThemeMakerRulesTest`: `KeyFaceGeometry`,
 `NineSliceLayout`, `PictureWindow`, `BoxBlur`, `KeyStyleResolver`, `KeyImageBudget` and the 2.1 →
-3.0 migration over fixed cases), `theme.json` (a 3.0 theme with everything), `from-app.zip` and
-`from-app-2.1.zip` (an export of this app's and of one before 3.0), `youmo-layout.json` and
+3.0 migration over fixed cases), `theme.json` (a 3.0 theme with everything), `from-app.theme` and
+`from-app-2.1.theme` (an export of this app's and of one before 3.0), `youmo-layout.json` and
 `youmo-icons.json` (`ThemeMakerLayoutTest`: the real keyboard measured under Robolectric on the
 page's four phones, both orientations, every board, normal / one-handed / floating, and the 26 keys
 typing, long-pressed and showing the clipboard; each key's cell, kind and theme name, each text,
@@ -228,13 +228,22 @@ the repo's and fails on a difference;
 `./gradlew :app:testTextDebugUnitTest --tests '*ThemeMakerRulesTest' --tests '*ThemeMakerLayoutTest' -PupdateThemeMaker`
 writes them again, and the page's own test then shows what it must follow.
 
+The four phones, their short names (`label`, the select's) and the phones named as examples
+(`examples`, a line under the select; long, inside the select they widened the preview on a phone)
+are `ThemeMakerLayoutTest.phones`'s, the user's choice. Every phone has the full set of views: the
+page falls back to none of another phone's, and the node test holds each phone's views to the
+default's. So the page is about 1.5 MB, the layout block most of it (4 phones × 43 views); a fifth
+phone adds about 0.3 MB. The page's layout rule, also the user's: one scroll, the page's (no column
+scrolls in itself, no `overflow`/`max-height` on one), and the preview stays in view only while it
+fits (`fitPreview` in ui.js: the window's height wide, 55% of it narrow).
+
 The page's side: `node --test web/theme-maker/test/format.test.mjs` (Node 24; CI's unit test job and
 the Pages workflow run it) loads the page's `youmo-lib` block as the page runs it and holds it to
 each `rules.json` case (Float maths with `Math.fround`, the blur to the pixel), reads `theme.json`
-and both `from-app` zips, and builds `from-web.zip` from `theme.json` (the app's PNGs of
-`from-app.zip` under its names, and `tiny.ttf`, a 1 KB font of square glyphs made by
+and both `from-app` theme files, and builds `from-web.theme` from `theme.json` (the app's PNGs of
+`from-app.theme` under its names, and `tiny.ttf`, a 1 KB font of square glyphs made by
 `make-tiny-font.py`), comparing it byte for byte; `UPDATE=1 node --test …` writes it again.
-`ThemeMakerFormatTest` (app JVM) closes the loop: `from-web.zip` imports as `theme.json`, and an app
+`ThemeMakerFormatTest` (app JVM) closes the loop: `from-web.theme` imports as `theme.json`, and an app
 export of it imports the same; and the page's generated blocks in `index.html` (`youmo-format`: the
 file's version, every type's fields from `ThemeFileJson`'s descriptors, the limits, the defaults;
 `youmo-presets`: the eleven built-in palettes) are what the app has, through

@@ -14,6 +14,8 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.ThemeManager.activeTheme
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
+import org.fcitx.fcitx5.android.input.theme.KeyStyleChoice
+import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.utils.WeakHashSet
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.isDarkMode
@@ -97,7 +99,31 @@ object ThemeManager {
     private fun prefetch() {
         val dm = appContext.resources.displayMetrics
         val landscape = appContext.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        ThemeAssets.prefetch(_activeTheme.look, landscape, dm.widthPixels, dm.density)
+        ThemeAssets.prefetch(shownLook(_activeTheme), landscape, dm.widthPixels, dm.density)
+    }
+
+    // the last look shown and what it was made of: the same object while neither changes, as what is
+    // decoded of a look (ThemeAssets) is kept by it. A theme's look is compared as the object it is
+    private class Shown(val theme: ThemeLook, val choice: KeyStyleChoice, val look: ThemeLook)
+
+    @Volatile
+    private var shown: Shown? = null
+
+    // the key style settings, held: shownLook is asked a few times a key as a keyboard is made
+    @Volatile
+    private var keyStyle = prefs.keyStyleChoice()
+
+    private val keyStyleKeys = setOf(prefs.keyBorderChoice.key, prefs.keySpacingChoice.key, prefs.keyRadiusChoice.key)
+
+    /**
+     * [theme]'s look as the keyboard draws it: the key style settings (大小与样式) over its keys. All the
+     * keyboard reads it, also where only colours are read (the same as the theme's), so none is missed
+     * and a test can tell. Not for what is the theme's own (its thumbnail, export, editing): [Theme.look].
+     */
+    fun shownLook(theme: Theme): ThemeLook {
+        val choice = keyStyle
+        shown?.let { if (it.theme === theme.look && it.choice == choice) return it.look }
+        return choice.applyTo(theme.look).also { shown = Shown(theme.look, choice, it) }
     }
 
     /** Saves [theme]; whether it was, none while the themes are not settled or it could not be written (the user told). */
@@ -184,6 +210,10 @@ object ThemeManager {
             // where the status area's toggle opens it again; remembered, it changes nothing shown
             prefs.oneHanded.key -> OneHanded.sideToRemember(prefs.oneHanded.getValue())?.let(prefs.oneHandedSide::setValue)
             prefs.splitDock.key, prefs.oneHandedSide.key -> Unit
+            in keyStyleKeys -> {
+                keyStyle = prefs.keyStyleChoice()
+                fireChange()
+            }
             else -> fireChange()
         }
     }

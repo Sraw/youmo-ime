@@ -207,7 +207,7 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
     }
 
     fun setTheme(theme: Theme) {
-        val look = theme.look
+        val look = ThemeManager.shownLook(theme)
         // as the input view draws it: the keys over the picture find it here (PictureHost)
         bkg.background = ThemePictureDrawable.board(look)
         val landscape = ctx.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE

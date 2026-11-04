@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.KeyState
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
@@ -199,7 +200,7 @@ class PickerWindow(
 
     override fun onCreateView() = PickerLayout(context, theme, switchKey, density, panel, if (search) SearchKey else null).apply {
         pickerLayout = this
-        val bordered = followKeyBorder && theme.look.keys.blocks
+        val bordered = followKeyBorder && ThemeManager.shownLook(theme).keys.blocks
         adapter = PickerGridAdapter(grid, keyActionListener, popupActionListener, data(), key.name, bordered, policy)
         grid.adapter = adapter
         side?.apply {

@@ -465,6 +465,8 @@
     return LAYOUT.phones.find((p) => p.id === S.view.phone) || LAYOUT.phones[0];
   }
   const density = () => phone().dpi / 160;
+  /** How the page lists a phone: its short name when the layout gives one, else its size and density. */
+  const phoneLabel = (p) => p.label || `${p.w}×${p.h} · ${p.dpi}`;
   function views(match) {
     return LAYOUT.views.filter((v) => Object.entries(match).every(([k, x]) => v[k] === x));
   }
@@ -473,15 +475,15 @@
     const tries = [
       { phone: v.phone, land: v.land, board: v.board, mode: v.mode, state: v.state },
       { phone: v.phone, land: v.land, board: v.board, mode: v.mode, state: 'idle' },
+      // every phone has every board and mode, but one-handed on its side and the states but the 26 keys'
       { phone: v.phone, land: v.land, board: v.board, mode: 'normal', state: 'idle' },
-      { phone: v.phone, land: v.land, board: 'qwerty', mode: 'normal', state: 'idle' },
-      { phone: v.phone, land: v.land },
     ];
     for (const t of tries) {
       const got = views(t);
       if (got.length) return got[0];
     }
-    return LAYOUT.views[0];
+    // not another phone's: drawn at this one's density it would be wrong without a word (the node test holds every phone whole)
+    return views({ phone: v.phone })[0] || LAYOUT.views[0];
   }
   function cutFor(land) {
     const p = S.theme.picture;
@@ -822,8 +824,11 @@
     box.replaceChildren(
       h('label', { class: 'k', for: 'phone' }, '手机'),
       h('div', {}, h('select', { id: 'phone', onchange: (e) => set('phone', e.target.value) },
-        LAYOUT.phones.map((p) => h('option', { value: p.id, selected: p.id === v.phone }, `${p.w}×${p.h} · ${p.dpi}`))), ' ',
+        // narrow to wide, the default among them
+        [...LAYOUT.phones].sort((a, b) => a.w / a.dpi - b.w / b.dpi).map((p) => h('option', { value: p.id, selected: p.id === v.phone }, phoneLabel(p)))), ' ',
       seg([[false, '竖屏'], [true, '横屏']], v.land, (x) => set('land', x))),
+      // the phones of about its width under the select, not in it: there they widened the preview on a phone
+      ...(phone().examples ? [h('span'), h('div', { class: 'hint' }, phone().examples + '（按常见出厂设置举例，没有逐台核实）')] : []),
       h('label', { class: 'k' }, '键盘'),
       seg(boards.map((b) => [b, BOARD_LABEL[b] || b]), currentView().board, (x) => set('board', x)),
       h('label', { class: 'k' }, '模式'),
@@ -834,7 +839,7 @@
       seg([['light', '浅色'], ['dark', '深色']], v.sys, (x) => set('sys', x)),
     );
     const cv = currentView();
-    summaryBox.textContent = '预览 · ' + [phone().w + '×' + phone().h, v.land ? '横屏' : '竖屏', BOARD_LABEL[cv.board] || cv.board, MODE_LABEL[cv.mode], STATE_LABEL[cv.state]].join(' · ');
+    summaryBox.textContent = '预览 · ' + [phoneLabel(phone()), v.land ? '横屏' : '竖屏', BOARD_LABEL[cv.board] || cv.board, MODE_LABEL[cv.mode], STATE_LABEL[cv.state]].join(' · ');
     if (v.land && currentView().board === 'qwerty' && currentView().mode === 'normal') {
       box.append(h('span'), h('div', { class: 'hint' }, '横屏的 26 键按 App 默认分成左右两半（分体）'));
     }
@@ -1529,7 +1534,7 @@
     if (!L.fontType(bytes)) return toast('字体文件读不了：只收 .ttf / .otf（不收 .ttc 合集）', true);
     S.theme.text[field] = await addFile(field === 'keyFont' ? 'font' : 'candidates', bytes);
     changed({ settings: true });
-    if (bytes.length > FONT_WARN_BYTES) toast(`字体超过 ${mbWords(FONT_WARN_BYTES)}：主题 zip 会很大`);
+    if (bytes.length > FONT_WARN_BYTES) toast(`字体超过 ${mbWords(FONT_WARN_BYTES)}：主题文件会很大`);
   }
 
   function barTab() {
@@ -1567,8 +1572,10 @@
     return migrated;
   }
   async function openZipFile() {
-    const [file] = await pickFile('.zip,application/zip');
+    // no accept: iOS greys out a suffix it has no type for, so the check is after the pick, as the app's
+    const [file] = await pickFile('');
     if (!file) return;
+    if (!/\.theme$/i.test(file.name)) return toast('只能打开 .theme 主题文件；以前导出的 .zip 改名成 .theme 再打开', true);
     try {
       const migrated = await openZipBytes(await readBytes(file));
       toast(migrated ? '这是老版本 App 导出的主题，已按新格式读进来；导出后在 App 里导入会替换原来那个' : '已打开；导出后在 App 里导入会替换原来那个主题');
@@ -1688,13 +1695,13 @@
       const zip = L.exportZip(FORMAT, T, S.files);
       const date = new Date();
       const stamp = date.getFullYear() + String(date.getMonth() + 1).padStart(2, '0') + String(date.getDate()).padStart(2, '0');
-      const a = h('a', { href: URL.createObjectURL(new Blob([zip], { type: 'application/zip' })), download: `youmo-theme-${stamp}.zip` });
+      const a = h('a', { href: URL.createObjectURL(new Blob([zip], { type: 'application/octet-stream' })), download: `youmo-theme-${stamp}.theme` });
       document.body.append(a);
       a.click();
       setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
       changed({ settings: true });
       toast((shrunk ? `按键图片缩小了 ${shrunk} 处（App 只用到这么大）。` : '') + (over.length ? `有键盘的按键图片仍超过 ${mbWords(LIM.boardImageBytes)}，App 会糊一点地画。` : '') +
-        '在手机上：设置 › 外观 › 主题 › 新增主题 › 导入文件…，选这个 zip。');
+        '在手机上：设置 › 外观 › 主题 › 新增主题 › 导入文件…，选这个 .theme 文件。');
     } catch (e) {
       toast(e instanceof L.ThemeError ? themeErrorText(e) : '导出失败：' + e.message, true);
     }
@@ -1720,9 +1727,9 @@
       if (p) await newFrom(p);
     } }, h('option', { value: '' }, '新建 ▾'), PRESETS.map((p) => h('option', { value: p.name }, PRESET_LABEL[p.name] || p.name)));
     const header = h('header', { class: 'top' }, h('h1', {}, '幽默输入法 · 主题制作'), h('div', { class: 'actions' },
-      h('button', { type: 'button', onclick: openZipFile }, '打开主题 zip'), menu,
+      h('button', { type: 'button', onclick: openZipFile }, '打开主题'), menu,
       copyButton = h('button', { type: 'button', onclick: darkCopy }, copyLabel()),
-      h('button', { type: 'button', class: 'primary', onclick: exportTheme }, '导出 zip')));
+      h('button', { type: 'button', class: 'primary', onclick: exportTheme }, '导出主题')));
     controlsBox = h('div', { class: 'controls' });
     summaryBox = h('summary', {});
     // on a phone the view's options fold away, so the keyboard and the settings both fit
@@ -1735,6 +1742,7 @@
       h('div', { class: 'privacy' }, '图片和颜色都只在你的浏览器里处理，不会上传。'),
       h('main', {}, h('section', { class: 'preview-col', 'aria-label': '预览' }, options, preview.stage, preview.note),
         h('section', { class: 'settings-col', 'aria-label': '设置' }, tabsBox, settingsBox)));
+    fitPreview(document.querySelector('.preview-col'), options);
     bindPreview(preview.stage);
     // a long press on the keys selects them: not the system's menu for the picture under them
     preview.stage.addEventListener('contextmenu', (ev) => ev.preventDefault());
@@ -1742,6 +1750,22 @@
     window.addEventListener('pagehide', save);
     let resizeTimer = 0;
     window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(renderPreview, 100); });
+  }
+
+  /**
+   * The preview kept in view as the settings scroll (sticky) only while it fits: the whole screen
+   * wide, about half of it on a phone, where the settings are under it. Taller (its options open, a
+   * landscape view), it goes by with the page: a column scrolling in itself fought the page's scroll.
+   */
+  function fitPreview(col, options) {
+    const fit = () => {
+      const room = window.matchMedia('(max-width: 900px)').matches ? window.innerHeight * 0.55 : window.innerHeight;
+      col.classList.toggle('stuck', col.offsetHeight <= room);
+    };
+    new ResizeObserver(fit).observe(col);
+    window.addEventListener('resize', fit);
+    options.addEventListener('toggle', fit);
+    fit();
   }
 
   // #board=nine&land=1&tab=keys&keys=single…: a view to open at (a link, a screenshot); what a link (#tab=…) or a saved view may set: only these, else a typo leaves the page blank

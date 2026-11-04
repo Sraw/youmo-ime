@@ -24,7 +24,7 @@ button {
 button:hover { border-color: var(--accent); }
 button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 button:disabled { opacity: .5; cursor: default; }
-select { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 5px 8px; min-height: 34px; }
+select { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 5px 8px; min-height: 34px; max-width: 100%; }
 input[type="number"], input[type="text"] {
   border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 4px 6px; min-height: 30px;
 }
@@ -41,12 +41,17 @@ header.top .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .privacy { font-size: 12px; color: var(--muted); padding: 4px 16px; border-bottom: 1px solid var(--line); }
 
 main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 520px); gap: 0; align-items: start; }
-.preview-col { padding: 12px 16px; position: sticky; top: 0; align-self: start; max-height: 100vh; overflow: auto; }
+/* one scroll, the page's: no column scrolls in itself. The preview stays in view (.stuck) only while
+   it fits, decided in ui.js (fitPreview); taller, it goes by with the page */
+.preview-col { padding: 12px 16px; align-self: start; }
+.preview-col.stuck { position: sticky; top: 0; }
 .settings-col { padding: 12px 16px 48px; border-left: 1px solid var(--line); background: var(--panel); min-height: calc(100vh - 100px); }
 
 .view-opts summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-bottom: 8px; }
 .view-opts[open] summary { margin-bottom: 10px; }
 .controls { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; margin-bottom: 10px; }
+/* a grid track's least is its content's width: a long option would widen the column past the page */
+.controls > * { min-width: 0; }
 .controls label.k { color: var(--muted); font-size: 13px; }
 .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .seg button { border: 0; border-radius: 0; min-height: 30px; padding: 4px 10px; border-right: 1px solid var(--line); background: var(--panel); }
@@ -107,7 +112,8 @@ dialog::backdrop { background: #0008; }
 
 @media (max-width: 900px) {
   main { grid-template-columns: minmax(0, 1fr); }
-  .preview-col { position: sticky; top: 0; z-index: 2; background: var(--bg); max-height: 62vh; border-bottom: 1px solid var(--line); }
+  .preview-col { border-bottom: 1px solid var(--line); }
+  .preview-col.stuck { z-index: 2; background: var(--bg); }
   .settings-col { border-left: 0; }
   header.top h1 { font-size: 15px; width: 100%; }
   .controls { grid-template-columns: auto 1fr; }

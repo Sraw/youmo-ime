@@ -98,7 +98,7 @@ class NavigationBarManager {
         if (shouldUpdateNavbarBackground) {
             window.setNavbarBackgroundColor(
                 // the colour under the keys, as the theme has it; under a picture the theme's dark of it
-                if (theme.look.base == BoardBase.Picture) theme.backgroundColor else ThemeColors.board(theme.look.palette, theme.look.keys)
+                if (ThemeManager.shownLook(theme).base == BoardBase.Picture) theme.backgroundColor else ThemeColors.board(ThemeManager.shownLook(theme).palette, ThemeManager.shownLook(theme).keys)
             )
         }
     }

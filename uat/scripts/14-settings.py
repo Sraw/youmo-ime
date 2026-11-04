@@ -74,11 +74,11 @@ case("ST-05", needs="jvm:SettingsUatTest.aDarkThemeTurnsPreviewAndKeyboardDark")
 
 
 THEME_ZIP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "web", "theme-maker", "test", "testdata",
-                         "from-app.zip")
+                         "from-app.theme")
 
 
 def push_theme(d):
-    """a theme zip in 下载 as the web page exports one: the testdata theme (3.0) with a striped picture,
+    """a theme file (.theme, a zip inside) in 下载 as the web page exports one: the testdata theme (3.0) with a striped picture,
     drawn sharp and at full brightness so the keyboard shows its orange and blue"""
     import io
     import json
@@ -94,7 +94,7 @@ def push_theme(d):
         im.save(out, "PNG")
         return out.getvalue()
 
-    p = os.path.join(tempfile.gettempdir(), f"uat-theme-{d.port}.zip")
+    p = os.path.join(tempfile.gettempdir(), f"uat-theme-{d.port}.theme")
     with zipfile.ZipFile(THEME_ZIP) as src, zipfile.ZipFile(p, "w") as dst:
         for name in src.namelist():
             data = src.read(name)
@@ -111,9 +111,9 @@ def push_theme(d):
             elif name.endswith("-landscape.png"):
                 data = striped(1440, 600)
             dst.writestr(name, data)
-    d.sh("rm -f /sdcard/Download/uat-theme*.zip")
-    d.adb("push", p, "/sdcard/Download/uat-theme.zip")
-    d.sh("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/uat-theme.zip")
+    d.sh("rm -f /sdcard/Download/uat-theme*.theme")
+    d.adb("push", p, "/sdcard/Download/uat-theme.theme")
+    d.sh("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/uat-theme.theme")
     time.sleep(1)
 
 
@@ -171,7 +171,7 @@ def kb_picture(d, rows=1.0):
 
 def export_custom(d):
     """long-press one's own theme, 导出, save it in 下载; returns the new files' names"""
-    before = set(d.sh("ls /sdcard/Download/ 2>/dev/null").splitlines())   # names with spaces: from-app (1).zip
+    before = set(d.sh("ls /sdcard/Download/ 2>/dev/null").splitlines())   # names with spaces: from-app (1).theme
     appearance_tab(d, "主题")
     item = custom_item(d)
     if not item:
@@ -196,7 +196,6 @@ def delete_custom(d):
 
 @case("ST-09", base="B0-设置", mutates=True)
 def st09(d):
-    d.step("导入")
     appearance_tab(d, "大小与样式")
     d.switch("跟随系统夜间模式", False)
     # the default to come back to, seen now: with 跟随 off it is the normal-mode theme's default
@@ -204,6 +203,17 @@ def st09(d):
     d.open_page("text")
     lum_default = d.lum(kb_box(d))
     push_theme(d)
+    d.step("拒绝 .zip")
+    # the same file under a zip's name, as an earlier 0.5.1 or the page exported: only .theme is taken
+    d.sh("cp /sdcard/Download/uat-theme.theme /sdcard/Download/uat-zip.zip")
+    d.sh("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/uat-zip.zip")
+    import_theme(d, "uat-zip")
+    check(d.wait_text("只能导入主题文件", timeout=5, where="all", contains=True), "选 .zip 没有提示只认 .theme")
+    d.back(after=1.0)
+    d.sh("rm -f /sdcard/Download/uat-zip.zip")
+    appearance_tab(d, "主题")
+    check(not custom_item(d), "选 .zip 后主题列表里多了主题")
+    d.step("导入")
     import_theme(d, "uat-theme")
     appearance_tab(d, "主题")
     item = custom_item(d)
@@ -215,6 +225,7 @@ def st09(d):
     d.step("导出")
     files = export_custom(d)
     check(files, "导出后下载里没有新文件")
+    check(files and files[0].endswith(".theme"), f"导出的文件名不是 .theme：{files}")
     d.step("删除")
     delete_custom(d)
     appearance_tab(d, "主题")
@@ -234,7 +245,7 @@ def st09(d):
     d.open_page("text")
     o, b = kb_picture(d)
     check(o > 40 and b > 40, f"选用导入的主题后键盘背景不是那张图（橙 {o} 蓝 {b} / 1800）")
-    return f"导入、选用是那张图；导出 {files[0]}；删除后回到默认（亮度 {lum:.0f}）；导入后选用是那张图"
+    return f"选 .zip 被拒；导入、选用是那张图；导出 {files[0]}；删除后回到默认（亮度 {lum:.0f}）；导入后选用是那张图"
 
 
 
@@ -567,5 +578,7 @@ case("ST-54", needs="jvm:ThemeFilesManagerTest.aThemeOfALaterFormatIsSkippedAndL
 case("ST-55", needs="jvm:ThemeFilesManagerTest.aThemeWhosePictureOrFontIsGoneIsNotListedAndTheUserIsToldItIsGone")(lambda d: None)
 
 
-case("ST-56", needs="manual:主题制作网页在电脑浏览器上手工跑（要一个和内置主题同名的主题 zip）")(lambda d: None)
+case("ST-56", needs="manual:主题制作网页在电脑浏览器上手工跑（要一个和内置主题同名的主题文件）")(lambda d: None)
 case("ST-57", needs="manual:分屏下主题页预览和键盘同时要毛玻璃图")(lambda d: None)
+case("ST-58", needs="manual:要一个网页上做的平铺大圆角主题文件，键角、边框、间距、候选栏要人眼看")(lambda d: None)
+case("ST-59", needs="manual:主题制作网页在电脑和手机浏览器上手工跑（滚动、下拉框、打开和下载）")(lambda d: None)

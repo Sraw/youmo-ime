@@ -67,8 +67,8 @@ import kotlin.math.roundToInt
 abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearance) :
     CustomGestureView(ctx) {
 
-    /** How the theme draws its keys ([Theme.look]): blocks or flat, corners, gaps, a press's effect, each kind's face. */
-    protected val keys = theme.look.keys
+    /** How the theme draws its keys ([ThemeManager.shownLook]: the theme's, under the key style settings): blocks or flat, corners, gaps, a press's effect, each kind's face. */
+    protected val keys = ThemeManager.shownLook(theme).keys
 
     /** What a theme styles it as: by the face colour it had before theme file 3.0 ([themeKind]). */
     val kind = def.themeKind
@@ -285,7 +285,7 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
     }
 
     private fun markView(slot: KeyMarks.Slot, mark: Mark): View? {
-        val color = theme.look.palette.keyHintColor
+        val color = ThemeManager.shownLook(theme).palette.keyHintColor
         return when (mark) {
             is Mark.Icon -> ImageView(context).apply {
                 imageTintList = ColorStateList.valueOf(color)
@@ -366,10 +366,10 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
     private fun faces(s: KeyStyle, images: BoardImages) = appearanceView.drawAsKey(theme, s, kind, images, geometry)
 
     /** The theme's key text size, a share of each key's own ([Text.keyScale]). */
-    protected val textScale = theme.look.text.keyScale / 100f
+    protected val textScale = ThemeManager.shownLook(theme).text.keyScale / 100f
 
     /** The theme's key font at its weight, [bold] at 700; null for the system's as it is (no font, the normal weight). */
-    protected fun keyTypeface(bold: Boolean): Typeface? = theme.look.let {
+    protected fun keyTypeface(bold: Boolean): Typeface? = ThemeManager.shownLook(theme).let {
         ThemeAssets.typeface(it, it.text.keyFont, if (bold) BOLD_WEIGHT else it.text.keyWeight)
     }
 
@@ -525,7 +525,7 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
         textDirection = View.TEXT_DIRECTION_FIRST_STRONG_LTR
         setTextColor(
             when (def.variant) {
-                Variant.Normal, Variant.AltForeground, Variant.Alternative -> theme.look.palette.keyHintColor
+                Variant.Normal, Variant.AltForeground, Variant.Alternative -> ThemeManager.shownLook(theme).palette.keyHintColor
                 Variant.Accent -> theme.accentKeyTextColor
             }
         )

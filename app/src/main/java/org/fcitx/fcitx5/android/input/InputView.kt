@@ -132,7 +132,7 @@ class InputView(
     // the bar's base, under the bar and the row above it for the code being typed: one taller bar.
     // None (the keyboard's base seen through), its colour, or the picture's part there
     private val barBackground = view(::View) {
-        background = ThemePictureDrawable.bar(theme.look)
+        background = ThemePictureDrawable.bar(ThemeManager.shownLook(theme))
     }
 
     private val placeholderOnClickListener = OnClickListener { }
@@ -401,7 +401,7 @@ class InputView(
         broadcaster.onImeUpdate(fcitx.runImmediately { inputMethodEntryCached })
 
         // the theme's picture or its colour, under it all; the picture lies where each key showing it finds it
-        customBackground.background = ThemePictureDrawable.board(theme.look)
+        customBackground.background = ThemePictureDrawable.board(ThemeManager.shownLook(theme))
 
         keyboardView = constraintLayout {
             // allow MotionEvent to be delivered to keyboard while pressing on padding views.
@@ -410,8 +410,8 @@ class InputView(
             isMotionEventSplittingEnabled = true
             PictureHost.install(
                 this,
-                theme.look.picture?.let {
-                    PictureHost(theme.look, customBackground, resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
+                ThemeManager.shownLook(theme).picture?.let {
+                    PictureHost(ThemeManager.shownLook(theme), customBackground, resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
                 },
             )
             add(customBackground, lParams {

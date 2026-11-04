@@ -23,6 +23,8 @@ import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SplitDock
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
+import org.fcitx.fcitx5.android.input.theme.Gap
+import org.fcitx.fcitx5.android.input.theme.KeyStyleChoice
 
 class ThemePrefs(sharedPreferences: SharedPreferences) :
     ManagedPreferenceCategory(R.string.theme, sharedPreferences) {
@@ -127,10 +129,42 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         section(R.string.section_key_style)
     }
 
-    // the keys' look is the theme's since theme file 3.0 (blocks or flat, corners, gaps, a press's
-    // effect): made on the web page with the theme; what was set here before went into the theme in use (ThemeLookMigration)
+    // 0.5.0's three, each over the theme's or following it (the user, 2026-11-04); new keys, as
+    // ThemeLookMigration reads 0.5.0's to tell whether to move them into the theme. Following is the
+    // default: what 0.5.0 had set is in the theme in use already, so an upgrade looks as it did
+    val keyBorderChoice = enumList(R.string.key_border, "key_border_choice", KeyBorderChoice.FollowTheme)
+    val keySpacingChoice = enumList(R.string.key_spacing, "key_spacing_choice", KeySpacingChoice.FollowTheme)
+    val keyRadiusChoice = enumList(R.string.key_radius, "key_radius_choice", KeyRadiusChoice.FollowTheme)
+
     init {
-        note(R.string.key_style_in_theme, "key_style_note")
+        note(R.string.key_style_follow_theme, "key_style_note")
+    }
+
+    /** What the three set over a theme's keys ([ThemeManager.shownLook]). */
+    fun keyStyleChoice() = KeyStyleChoice(
+        keyBorderChoice.getValue().blocks,
+        keySpacingChoice.getValue().gap,
+        keyRadiusChoice.getValue().radiusDp,
+    )
+
+    enum class KeyBorderChoice(override val stringRes: Int, val blocks: Boolean?) : ManagedPreferenceEnum {
+        FollowTheme(R.string.follow_theme, null),
+        On(R.string.key_border_on, true),
+        Off(R.string.key_border_off, false),
+    }
+
+    enum class KeySpacingChoice(override val stringRes: Int, val gap: Gap?) : ManagedPreferenceEnum {
+        FollowTheme(R.string.follow_theme, null),
+        Compact(R.string.level_compact, KeyStyleChoice.GAP_COMPACT),
+        Standard(R.string.level_standard, KeyStyleChoice.GAP_STANDARD),
+        Loose(R.string.level_loose, KeyStyleChoice.GAP_LOOSE),
+    }
+
+    enum class KeyRadiusChoice(override val stringRes: Int, val radiusDp: Int?) : ManagedPreferenceEnum {
+        FollowTheme(R.string.follow_theme, null),
+        Square(R.string.level_square, KeyStyleChoice.RADIUS_SQUARE),
+        Rounded(R.string.level_rounded, KeyStyleChoice.RADIUS_ROUNDED),
+        Round(R.string.level_round, KeyStyleChoice.RADIUS_ROUND),
     }
 
     /** The key style settings as they were before theme file 3.0, while they are in the file ([ThemeLookMigration]). */

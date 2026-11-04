@@ -1,8 +1,8 @@
 // The theme maker's own code against what the app makes (testdata/, written by the app's tests):
 // the drawing rules case by case (rules.json), the theme file both ways (theme.json, the zips), and
-// the page's export byte for byte (from-web.zip, which the app's ThemeMakerFormatTest imports).
+// the page's export byte for byte (from-web.theme, which the app's ThemeMakerFormatTest imports).
 // Run: node --test web/theme-maker/test/format.test.mjs   (a file: Node 24 takes no folder here; UPDATE=1
-// writes from-web.zip again). The page is made of src/ by tools/assemble.mjs; index.html must be what it makes.
+// writes from-web.theme again). The page is made of src/ by tools/assemble.mjs; index.html must be what it makes.
 // contract: the page's library against the app's testdata/ (rules.json, theme.json, the zips) and the
 // generated blocks, which mutation of either side cannot see.
 import { test } from 'node:test';
@@ -312,7 +312,7 @@ test('key names are read as KeyNames reads them', () => {
 });
 
 test('what the app exports opens, its own and one before 3.0', async () => {
-  const app = await L.openZip(format, bytes('from-app.zip'));
+  const app = await L.openZip(format, bytes('from-app.theme'));
   assert.equal(app.migrated, false);
   const want = JSON.parse(themeText);
   delete want.version;
@@ -323,7 +323,7 @@ test('what the app exports opens, its own and one before 3.0', async () => {
   assert.deepEqual(app.theme, rename(want));
   for (const [name, b] of Object.entries(app.files)) assert.equal(L.imageType(b), 'png', name);
 
-  const old = await L.openZip(format, bytes('from-app-2.1.zip'));
+  const old = await L.openZip(format, bytes('from-app-2.1.theme'));
   assert.equal(old.migrated, true);
   assert.equal(old.theme.picture.portrait.file, 'old-cropped.png');
   assert.deepEqual(Object.keys(old.files), ['old-src', 'old-cropped.png']);
@@ -388,9 +388,9 @@ function zipOf(entries) {
   for (const p of all) { out.set(p, at); at += p.length; }
   return out;
 }
-/** from-app.zip's entries, unpacked: [{name, data}]. */
+/** from-app.theme's entries, unpacked: [{name, data}]. */
 async function appEntries() {
-  return Promise.all(L.readZip(bytes('from-app.zip')).map(async (e) => ({ name: e.name, data: await e.read() })));
+  return Promise.all(L.readZip(bytes('from-app.theme')).map(async (e) => ({ name: e.name, data: await e.read() })));
 }
 const refusedZip = (zip, code, detail) => assert.rejects(L.openZip(format, zip), (e) => {
   assert.equal(e.code, code, e.message);
@@ -501,7 +501,7 @@ test('a zip\'s names are taken as the app takes them', async () => {
     assert.deepEqual(back.files[odd], png(5, 5), odd);
   }
   // and the export refuses what the app would: a path, a json, SAVING, a name past 255 bytes
-  const { theme: full, files } = await L.openZip(format, bytes('from-app.zip'));
+  const { theme: full, files } = await L.openZip(format, bytes('from-app.theme'));
   for (const bad of ['a/b.png', 'b.json', '.saving', 'é'.repeat(128) + '.png']) {
     const m = L.mapFiles(full, (f) => (f === 'from-app-space.png' ? bad : f));
     const fs = Object.assign(Object.create(null), files, { [bad]: files['from-app-space.png'] });
@@ -657,7 +657,7 @@ test('an image is decoded only within what it may be: the source a photo, a cut 
   assert.ok(!L.decodable([lim.keyImageSide + 1, 1], key));
   assert.ok(!L.decodable(null, cut), 'an unread header is not decoded');
   // each file of a zip by what it is in its theme: a source as big as the app keeps is not decoded
-  const { theme } = await L.openZip(format, bytes('from-app.zip'));
+  const { theme } = await L.openZip(format, bytes('from-app.theme'));
   assert.equal(L.fileRole(theme, theme.picture.src), 'source');
   assert.equal(L.fileRole(theme, theme.picture.portrait.file), 'picture');
   assert.equal(L.fileRole(theme, 'from-app-space.png'), 'key');
@@ -694,7 +694,7 @@ test('the zip is written byte for byte the same, its names UTF-8, CRCs right', a
 
 // the files of theme.json for the page's export: the app's PNGs under theme.json's names, a tiny font
 async function webFiles() {
-  const app = await L.openZip(format, bytes('from-app.zip'));
+  const app = await L.openZip(format, bytes('from-app.theme'));
   const font = bytes('tiny.ttf');
   const files = {};
   for (const [name, b] of Object.entries(app.files)) files[name.replace('from-app-', 'full-')] = b;
@@ -703,11 +703,11 @@ async function webFiles() {
   return files;
 }
 
-test('the page exports theme.json as from-web.zip, byte for byte', async () => {
+test('the page exports theme.json as from-web.theme, byte for byte', async () => {
   const { theme } = L.readTheme(format, themeText);
   const zip = L.exportZip(format, theme, await webFiles());
-  if (process.env.UPDATE) writeFileSync(join(data, 'from-web.zip'), zip);
-  assert.deepEqual(zip, bytes('from-web.zip'), 'from-web.zip is not what the page exports now: UPDATE=1 node --test writes it');
+  if (process.env.UPDATE) writeFileSync(join(data, 'from-web.theme'), zip);
+  assert.deepEqual(zip, bytes('from-web.theme'), 'from-web.theme is not what the page exports now: UPDATE=1 node --test writes it');
   const back = await L.openZip(format, zip);
   assert.deepEqual(back.theme, theme);
   assert.deepEqual(L.readZip(zip).map((e) => e.name), [...L.lookFiles(theme), 'full.json']);
@@ -850,6 +850,15 @@ test('the measured layout and icons have what the preview draws', () => {
   for (const ic of Object.values(icons)) {
     assert.ok(ic.vw > 0 && ic.vh > 0 && ic.paths.length > 0);
     for (const p of ic.paths) assert.equal(typeof p.d, 'string');
+  }
+  // the default first, at 393dp; every phone named, and with every view the default has: the page
+  // falls back to none of another phone's (ui.js currentView)
+  assert.equal(layout.phones[0].id, '1080x2340-440');
+  assert.equal(Math.round(layout.phones[0].px[0] * 160 / layout.phones[0].dpi), 393);
+  const shots = (id) => layout.views.filter((v) => v.phone === id).map((v) => [v.land, v.board, v.mode, v.state].join(' ')).sort();
+  for (const p of layout.phones) {
+    assert.ok(p.label && p.examples, p.id);
+    assert.deepEqual(shots(p.id), shots(layout.phones[0].id), p.id);
   }
   // the default phone's portrait keyboard has every board the page offers, idle
   for (const b of ['qwerty', 'nine', 'k14', 'k18', 'zhuyin', 'zhuyin-nine', 'number', 'symbols']) {

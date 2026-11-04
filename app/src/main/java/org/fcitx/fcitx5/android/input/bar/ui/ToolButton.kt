@@ -11,6 +11,7 @@ import android.widget.ImageView
 import androidx.annotation.ColorInt
 import androidx.annotation.DrawableRes
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
 import org.fcitx.fcitx5.android.utils.circlePressHighlightDrawable
@@ -40,7 +41,7 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         }
 
     constructor(context: Context, @DrawableRes icon: Int, theme: Theme) : this(context) {
-        image.imageTintList = ColorStateList.valueOf(theme.look.palette.toolbarIconColor)
+        image.imageTintList = ColorStateList.valueOf(ThemeManager.shownLook(theme).palette.toolbarIconColor)
         setIcon(icon)
         setPressHighlightColor(theme.keyPressHighlightColor)
         add(image, lParams(wrapContent, wrapContent, gravityCenter))

@@ -11,6 +11,7 @@ import android.view.Gravity
 import androidx.constraintlayout.widget.ConstraintLayout
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.BackspaceKey
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
@@ -99,9 +100,9 @@ class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout
         id = R.id.expanded_candidate_view
 
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val keys = theme.look.keys
+        val keys = ThemeManager.shownLook(theme).keys
         val inset = dp(if (landscape) keys.gap.vLand else keys.gap.v)
-        ThemeColors.panel(theme.look.palette, keys)?.let {
+        ThemeColors.panel(ThemeManager.shownLook(theme).palette, keys)?.let {
             backgroundColor = it
             embeddedKeyboard.background =
                 singleSideBorderDrawable(dp(1), theme.dividerColor, Gravity.LEFT, inset)

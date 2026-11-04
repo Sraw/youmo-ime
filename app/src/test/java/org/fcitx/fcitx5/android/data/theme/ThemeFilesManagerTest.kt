@@ -663,7 +663,7 @@ class ThemeFilesManagerTest {
     @Uat("ST-54")
     fun whatThisAppAndOneBefore30ExportedIsImported() {
         // the zips the theme maker's tests read (ThemeMakerRulesTest writes them): real PNGs
-        val (created, theme, migrated) = ThemeFilesManager.importTheme(ThemeMakerTestdata.file("from-app.zip").inputStream()).getOrThrow()
+        val (created, theme, migrated) = ThemeFilesManager.importTheme(ThemeMakerTestdata.file("from-app.theme").inputStream()).getOrThrow()
         assertTrue(created)
         assertFalse(migrated)
         val names = theme.look.files().map { File(it).name }
@@ -672,7 +672,7 @@ class ThemeFilesManagerTest {
         assertEquals(names.filter { it != File(theme.look.picture!!.src).name }.sorted(), FakeProbe.asked.sorted())
         dir.listFiles()!!.forEach { it.delete() }
         FakeProbe.asked.clear()
-        val (_, old, oldMigrated) = ThemeFilesManager.importTheme(ThemeMakerTestdata.file("from-app-2.1.zip").inputStream()).getOrThrow()
+        val (_, old, oldMigrated) = ThemeFilesManager.importTheme(ThemeMakerTestdata.file("from-app-2.1.theme").inputStream()).getOrThrow()
         assertTrue(oldMigrated)
         assertEquals(setOf("old.json", "old-cropped.png", "old-src"), names().toSet())
         assertEquals(listOf("old-cropped.png"), FakeProbe.asked)

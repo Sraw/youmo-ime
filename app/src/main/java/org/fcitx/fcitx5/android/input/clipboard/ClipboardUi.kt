@@ -11,6 +11,7 @@ import androidx.transition.Fade
 import androidx.transition.TransitionManager
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.motion.Motion
@@ -46,7 +47,7 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
     }
 
     override val root = coordinatorLayout {
-        ThemeColors.panel(theme.look.palette, theme.look.keys)?.let { backgroundColor = it }
+        ThemeColors.panel(ThemeManager.shownLook(theme).palette, ThemeManager.shownLook(theme).keys)?.let { backgroundColor = it }
         add(viewAnimator, defaultLParams(matchParent, matchParent))
     }
 

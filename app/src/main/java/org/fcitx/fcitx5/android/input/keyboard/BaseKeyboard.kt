@@ -34,6 +34,7 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.input.theme.KeyStyleResolver
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
@@ -85,7 +86,7 @@ abstract class BaseKeyboard(
     // the theme's key images this keyboard draws, each file once: decoded off the main thread, the keys
     // drawn as their kinds till they are in (ThemeAssets)
     protected val keyImages: BoardImages by lazy {
-        val look = theme.look
+        val look = ThemeManager.shownLook(theme)
         // no board name (the number row, a search's keys): the kinds' and the roles' images still
         val board = themeBoard
         // its keys' and the places it draws apart from them (the nine keys' column)

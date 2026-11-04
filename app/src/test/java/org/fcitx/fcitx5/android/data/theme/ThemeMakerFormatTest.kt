@@ -50,7 +50,7 @@ import java.util.zip.ZipInputStream
  * contract: the theme file format and the page's generated blocks, which mutation cannot see.
  * The theme maker page and the app read and write the same theme files: the page's generated blocks
  * of web/theme-maker/index.html (`youmo-format`: the file's version, fields and limits; `youmo-presets`:
- * the built-in themes) are what this app has, and what the page exports (testdata/from-web.zip, which
+ * the built-in themes) are what this app has, and what the page exports (testdata/from-web.theme, which
  * its own test holds byte for byte) imports as testdata/theme.json. Changed here, the page's test
  * (`node --test web/theme-maker/test/format.test.mjs`) fails till it follows.
  */
@@ -208,7 +208,7 @@ class ThemeMakerFormatTest {
         generateSequence { z.nextEntry?.let { it.name to z.readBytes() } }.toMap()
     }
 
-    private val fromWeb get() = ThemeMakerTestdata.file("from-web.zip").readBytes()
+    private val fromWeb get() = ThemeMakerTestdata.file("from-web.theme").readBytes()
 
     private val themeJson get() = Json.decodeFromString(CustomThemeSerializer, ThemeMakerTestdata.file("theme.json").readText())
 

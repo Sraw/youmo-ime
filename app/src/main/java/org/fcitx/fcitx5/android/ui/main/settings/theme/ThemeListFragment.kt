@@ -21,6 +21,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.theme.ThemeFileName
 import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
 import org.fcitx.fcitx5.android.utils.Const
 import org.fcitx.fcitx5.android.utils.applyNavBarInsetsBottomPadding
@@ -58,10 +59,11 @@ class ThemeListFragment : Fragment() {
                 val ctx = requireContext()
                 val cr = ctx.contentResolver
                 lifecycleScope.withLoadingDialog(ctx) {
-                    val name = cr.queryFileName(uri) ?: return@withLoadingDialog
-                    val ext = name.substringAfterLast('.')
-                    if (ext != "zip") {
-                        ctx.importErrorDialog(R.string.exception_theme_filename, ext)
+                    // the picker shows every file (.theme has no MIME type of its own): the name decides,
+                    // and one without a name is refused as well
+                    val name = cr.queryFileName(uri)
+                    if (!ThemeFileName.isThemeFile(name)) {
+                        ctx.importErrorDialog(R.string.exception_theme_filename, name ?: ctx.getString(R.string.theme_file_unnamed))
                         return@withLoadingDialog
                     }
                     try {
@@ -88,7 +90,7 @@ class ThemeListFragment : Fragment() {
                 }
             }
         exportLauncher =
-            registerForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+            registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
                 if (uri == null) return@registerForActivityResult
                 val ctx = requireContext()
                 val exported = beingExported ?: return@registerForActivityResult
@@ -138,7 +140,7 @@ class ThemeListFragment : Fragment() {
         themeListAdapter.setSelectedThemes(active, light, dark)
     }
 
-    // themes are made on the web page only (exported there as a zip, imported here); the app picks,
+    // themes are made on the web page only (exported there as a .theme file, a zip inside, imported here); the app picks,
     // exports and deletes them
     private fun addTheme() {
         // the themes not settled: an import would go nowhere the next start reads
@@ -153,7 +155,7 @@ class ThemeListFragment : Fragment() {
             .setNegativeButton(android.R.string.cancel, null)
             .setItems(actions) { _, i ->
                 when (i) {
-                    0 -> importLauncher.launch("application/zip")
+                    0 -> importLauncher.launch("*/*")
                     1 -> ctx.openUrl(Const.themeMakerUrl)
                 }
             }
@@ -183,7 +185,7 @@ class ThemeListFragment : Fragment() {
 
     private fun exportTheme(theme: Theme.Custom) {
         beingExported = theme
-        exportLauncher.launch(theme.name + ".zip")
+        exportLauncher.launch(ThemeFileName.of(theme.name))
     }
 
     private fun deleteTheme(theme: Theme.Custom) {

@@ -20,6 +20,7 @@ import android.view.View
 import androidx.annotation.ColorInt
 import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.PictureHost
 import org.fcitx.fcitx5.android.input.PicturePaint
 import org.fcitx.fcitx5.android.input.theme.Area
@@ -58,7 +59,7 @@ fun View.drawAsKey(
     geometry: (Float, Float) -> KeyFace,
     press: Boolean = true,
 ) {
-    val look = theme.look
+    val look = ThemeManager.shownLook(theme)
     val palette = look.palette
     val color = ThemeColors.face(palette, kind, look.keys.blocks)
     val fill = when (val f = s.fill) {

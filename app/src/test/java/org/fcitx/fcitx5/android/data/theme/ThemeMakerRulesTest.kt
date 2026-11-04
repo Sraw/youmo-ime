@@ -63,7 +63,7 @@ import java.util.zip.ZipOutputStream
  * contract: fixtures the page's node test reads (rules.json, the export zips), which mutation cannot see.
  * The rules the theme maker draws its preview by, computed by ime-core's code for a fixed set of
  * cases (web/theme-maker/test/testdata/rules.json), which the page's own test computes again in
- * JavaScript; and the files it reads (theme.json, a 3.0 theme; from-app.zip and from-app-2.1.zip,
+ * JavaScript; and the files it reads (theme.json, a 3.0 theme; from-app.theme and from-app-2.1.theme,
  * what this app and one before 3.0 export). Changed here, the page's test fails till it follows.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -448,9 +448,9 @@ class ThemeMakerRulesTest {
         // its entries as it wrote them, in its order; only their times fixed (it stamps the time of the export)
         val exported = zip(entries(out.toByteArray()))
         assertEquals(theme.look.files() + "from-app.json", entries(exported).map { it.first })
-        ThemeMakerTestdata.check("from-app.zip", exported)
+        ThemeMakerTestdata.check("from-app.theme", exported)
         // one before 3.0: its two images and its 2.1 json
         val old = zip(listOf("old-cropped.png" to png(16, 24, -0x1000000), "old-src" to png(32, 48, -0x1000000), "old.json" to v21.encodeToByteArray()))
-        ThemeMakerTestdata.check("from-app-2.1.zip", old)
+        ThemeMakerTestdata.check("from-app-2.1.theme", old)
     }
 }

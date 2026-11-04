@@ -594,9 +594,11 @@ settled or a migration's write-back failed this start (`ThemeFilesManager.rewrit
 not saved leaves its slot and every setting for the next start. A Monet theme in use is not copied
 (its colours follow the wallpaper): the settings are kept, encoded, as hidden `monet_key_style`
 (`ThemeLookMigration.MONET_KEY`), and `Theme.Monet`'s look is the defaults with them
-(`ThemeLookMigration.monetLook`). The page's 按键样式 keeps only a line saying where it went (标点位置 moved to 按键).
+(`ThemeLookMigration.monetLook`). The page's 按键样式 has three settings of its own, new keys (`key_border_choice`, `key_spacing_choice`, `key_radius_choice`; not 0.5.0's, which the migration reads): each 跟随主题 (the default) or a value over the theme's `blocks`, `gap`, `radiusDp` (ime-core's `KeyStyleChoice`; a block theme made flat gets a transparent bar's colour, as `LegacyLook.applyTo`); then a line on what following means (标点位置 moved to 按键).
 
 ### Drawing a theme
+
+All the keyboard draws reads `ThemeManager.shownLook(theme)`: the theme's look under the 按键样式 settings (the theme's own when all follow it; one cached look, the same object while the theme's look and the settings stay, as `ThemeAssets` keys on it). Every reader under `input/` and the theme page's preview use it, even those that read colours only, so a guard test (`KeyStyleThemeTest`) can forbid `.look` there. A theme's thumbnail, export, save and the migration read `Theme.look`, the theme's own.
 
 Every key is drawn by `KeyFaceDrawable` (`input/keyboard/`; `View.drawAsKey`): shadow, fill, border, in
 the shape ime-core's `KeyFaceGeometry` gives (blocks or flat, `KeyDef.Appearance.Border` →
@@ -636,7 +638,7 @@ The theme list's thumbnails (`ThemeAssets.thumbnail`) are its portrait cut decod
 same thread, blurred as on the keyboard, 12 MB of them kept; one that does not read is not kept.
 
 The app does not edit themes (user, 2026-11-03): they are made on the web page
-(`Const.themeMakerUrl`, 新增主题 → 在网页上制作…) and imported (导入文件…). The theme list
+(`Const.themeMakerUrl`, 新增主题 → 在网页上制作…) and imported (导入文件…). A theme file is `<name>.theme`, a zip inside (user, 2026-11-04, so it is not taken for any zip): exported under that name as `application/octet-stream` (a provider may add `.zip` for `application/zip`), and the import picker shows every file (`*/*`, `.theme` has no MIME type) and takes only a display name ending `.theme` (ime-core's `ThemeFileName`; `.zip`, an earlier 0.5.1's or the page's, or no name, is refused with `exception_theme_filename`, which says to rename it). The format version is unchanged. The theme list
 applies, imports, and on a long press exports or deletes one of the user's (a Monet theme exports
 `Theme.Monet.toCustom()`: its colours now and the key style it keeps, fixed). The fcitx edit page
 (`CustomThemeActivity`, its cropper) went with the old 选择图片… and 复制内置主题…; themes made by them

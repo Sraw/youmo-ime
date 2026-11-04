@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardWindow
@@ -33,11 +34,11 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
 
     private val hapticOnRepeat by AppPrefs.getInstance().keyboard.hapticOnRepeat
 
-    private val buttonRipple get() = theme.look.keys.press == PressEffect.Ripple
-    private val buttonBorder get() = theme.look.keys.blocks
+    private val buttonRipple get() = ThemeManager.shownLook(theme).keys.press == PressEffect.Ripple
+    private val buttonBorder get() = ThemeManager.shownLook(theme).keys.blocks
 
     // as its own setting had it: its dp a number of pixels (8 beside the keys' 4 dp)
-    private val buttonRadius get() = ThemeColors.buttonRadius(theme.look.keys)
+    private val buttonRadius get() = ThemeColors.buttonRadius(ThemeManager.shownLook(theme).keys)
 
     private var hasSelection = false
     private var userSelection = false

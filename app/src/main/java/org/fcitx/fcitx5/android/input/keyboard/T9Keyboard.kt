@@ -39,6 +39,7 @@ import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
@@ -558,7 +559,7 @@ class T9Keyboard(
         overScrollMode = OVER_SCROLL_NEVER
         // a function key's face as the theme has `nine/side`, drawn on flat keys too as before 3.0;
         // its cells take the press
-        val keys = theme.look.keys
+        val keys = ThemeManager.shownLook(theme).keys
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val h = dp(if (landscape) keys.gap.hLand else keys.gap.h)
         val v = dp(if (landscape) keys.gap.vLand else keys.gap.v)

@@ -94,11 +94,15 @@ class ThemePrefsTest {
         assertEquals(LegacyLook(keyBorder = false, keyRadius = 9), prefs.legacyLook())
     }
 
-    // where they were, a line says where they went; nothing of them is left to set
+    // the three over the theme, shown, then the line on following it; 0.5.0's keys are not set here (the migration's)
     @Test
-    fun theKeyStyleSectionIsThePunctuationAndALine() {
+    fun theKeyStyleSectionIsItsThreeAndALine() {
         val keys = ThemePrefs(sp).managedPreferencesUi.map { it.key }
-        assertTrue("key_style_note" in keys)
+        val note = keys.indexOf("key_style_note")
+        assertTrue(note >= 0)
+        for (shown in listOf("key_border_choice", "key_spacing_choice", "key_radius_choice")) {
+            assertTrue(shown, keys.indexOf(shown) in 0 until note)
+        }
         for (gone in listOf("key_border", "key_spacing_level", "key_radius_level")) assertFalse(gone, gone in keys)
     }
 }

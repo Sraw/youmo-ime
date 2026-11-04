@@ -1,5 +1,5 @@
 # the page's test hashes and compares these as text: LF on every checkout (a CRLF one would fail it)
 * text eol=lf
-*.zip binary
+*.theme binary
 *.ttf binary
 *.png binary

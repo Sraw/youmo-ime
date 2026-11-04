@@ -9,6 +9,7 @@ import android.graphics.Typeface
 import androidx.annotation.DrawableRes
 import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.input.theme.PressEffect
 import org.fcitx.fcitx5.android.utils.alpha
@@ -33,7 +34,7 @@ import splitties.views.imageDrawable
 
 class PickerTabsUi(override val ctx: Context, val theme: Theme) : Ui {
 
-    private val keyRipple = theme.look.keys.press == PressEffect.Ripple
+    private val keyRipple = ThemeManager.shownLook(theme).keys.press == PressEffect.Ripple
 
     inner class TabUi : Ui {
         override val ctx = this@PickerTabsUi.ctx

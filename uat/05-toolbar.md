@@ -192,7 +192,7 @@
 - **JVM**：`ToolbarUatTest.pasteStaysInTheClipboardWhenSoSet`（设了粘贴后留在剪贴板，粘贴后面板还在）；设备上不跑。
 
 ### TB-32 [P2] 主题的按键圆角选"直角"：悬浮键盘四角也是直角
-- **前提**：B0-设置；在主题制作网页（`web/theme-maker/index.html` 用浏览器打开，或 App 里 **主题 → 新增主题 → 在网页上制作…**）上把 **圆角** 拉到 0，点 **导出 zip** 存成 `square.zip`；App 里 **主题 → 新增主题 → 导入文件…** 导入它并用上（App 里不再编辑主题）。
+- **前提**：B0-设置；在主题制作网页（`web/theme-maker/index.html` 用浏览器打开，或 App 里 **主题 → 新增主题 → 在网页上制作…**）上把 **圆角** 拉到 0，点 **导出** 存成 `square.theme`；App 里 **主题 → 新增主题 → 导入文件…** 导入它并用上（App 里不再编辑主题）。
 - **操作**：点「普通文本」框，在工具栏 **⋯** 里点 **悬浮键盘**。
 - **预期**：悬浮键盘的四角是直角（左上角的像素就是横条的颜色）；按键圆角是默认的"圆角"时（TB-22）是圆角。
 - **JVM**：`FloatingUatTest.squareKeysASquareFloatingKeyboard`（默认圆角时悬浮键盘裁成圆角，直角时圆角为 0）；设备上不跑。

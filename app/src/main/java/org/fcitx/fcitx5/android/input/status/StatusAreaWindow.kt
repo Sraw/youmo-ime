@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
@@ -104,7 +105,7 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
 
     val view by lazy {
         context.recyclerView {
-            ThemeColors.panel(theme.look.palette, theme.look.keys)?.let { backgroundColor = it }
+            ThemeColors.panel(ThemeManager.shownLook(theme).palette, ThemeManager.shownLook(theme).keys)?.let { backgroundColor = it }
             layoutManager = gridLayoutManager(4)
             adapter = this@StatusAreaWindow.adapter
         }

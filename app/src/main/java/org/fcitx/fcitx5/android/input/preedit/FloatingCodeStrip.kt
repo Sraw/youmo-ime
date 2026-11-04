@@ -11,6 +11,7 @@ import android.view.View
 import android.widget.FrameLayout
 import androidx.core.graphics.ColorUtils
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.theme.BarBase
 import org.fcitx.fcitx5.android.input.theme.BoardBase
 import org.fcitx.fcitx5.android.input.theme.ThemeColors
@@ -47,7 +48,7 @@ class FloatingCodeStrip(ctx: Context, theme: Theme, content: View) : FrameLayout
     // picture is not carried out to the strip. A see-through bar (the Transparent themes, 15% black)
     // is the keyboard's colour seen through it: made 90% opaque as it is, black text sat on black
     private val shape = GradientDrawable().apply {
-        val look = theme.look
+        val look = ThemeManager.shownLook(theme)
         val picture = look.picture != null && (look.base == BoardBase.Picture || look.bar is BarBase.Picture)
         val bar = ThemeColors.bar(look.palette, look.bar)
         val looks = if (bar == null || picture) theme.backgroundColor else ColorUtils.compositeColors(bar, theme.backgroundColor)

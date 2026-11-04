@@ -76,14 +76,25 @@ class ThemeMakerLayoutTest {
     @get:Rule
     val prefs = PrefsRule()
 
-    /** A phone the page offers: its size and density. */
-    private data class Phone(val id: String, val qualifiers: String, val widthPx: Int, val heightPx: Int, val dpi: Int)
+    /**
+     * A phone the page offers: its size and density, the short name its select lists it by, and the
+     * phones of about its width the page names under the select (kept out of the select: long, they
+     * widened the preview on a phone).
+     */
+    private data class Phone(
+        val id: String, val qualifiers: String, val widthPx: Int, val heightPx: Int, val dpi: Int,
+        val label: String, val examples: String,
+    )
 
+    // by width, as the user picked them (2026-11-04), the examples as given (factory settings, not checked
+    // on each phone); the first the
+    // default (DEFAULT_PHONE: the page's dp sizes are its). dp is px over density rounded, as Robolectric
+    // makes px back from it: 1200 / 2.75 = 436.4, 2670 / 2.75 = 970.9
     private val phones = listOf(
-        Phone("1080x2340-440", DEFAULT_PHONE, 1080, 2340, 440),
-        Phone("1080x2400-420", "w411dp-h914dp-port-420dpi", 1080, 2400, 420),
-        Phone("1440x3200-560", "w411dp-h914dp-port-560dpi", 1440, 3200, 560),
-        Phone("1220x2712-460", "w424dp-h943dp-port-460dpi", 1220, 2712, 460),
+        Phone("1080x2340-440", DEFAULT_PHONE, 1080, 2340, 440, "标准 · 393dp", "1080 宽、440 dpi 的屏"),
+        Phone("1080x2340-480", "w360dp-h780dp-port-480dpi", 1080, 2340, 480, "窄屏 · 360dp", "如三星 Galaxy S24"),
+        Phone("1080x2400-420", "w411dp-h914dp-port-420dpi", 1080, 2400, 420, "较宽 · 411dp", "如 Pixel 9、小米 14 Pro"),
+        Phone("1200x2670-440", "w436dp-h971dp-port-440dpi", 1200, 2670, 440, "宽屏 · 436dp", "如小米 14、Redmi K70"),
     )
 
     // the page's boards: the prefix of their keys' names, and how the keyboard is put up
@@ -104,17 +115,15 @@ class ThemeMakerLayoutTest {
 
     private data class Shot(val phone: Phone, val landscape: Boolean, val board: Board, val mode: Mode, val state: State = State.IDLE)
 
-    // the design's table (051-d3-theme-maker §3.4): the default phone every board and mode both ways
-    // round (landscape normal: the letters split, as the app has them), the 26 keys' four states;
-    // the other phones the 26 and nine keys
+    // every phone every board and mode both ways round (landscape normal: the letters split, as the
+    // app has them; landscape one-handed is not offered), the 26 keys' four states: what the page shows
+    // on one phone it shows on each (the user, 2026-11-04)
     private fun shots(): List<Shot> {
-        val default = phones.first()
         val out = mutableListOf<Shot>()
-        for (board in Board.entries) for (mode in Mode.entries) out += Shot(default, false, board, mode)
-        for (state in State.entries.drop(1)) out += Shot(default, false, Board.QWERTY, Mode.NORMAL, state)
-        for (board in Board.entries) for (mode in listOf(Mode.NORMAL, Mode.FLOATING)) out += Shot(default, true, board, mode)
-        for (phone in phones.drop(1)) for (landscape in listOf(false, true)) for (board in listOf(Board.QWERTY, Board.NINE)) {
-            out += Shot(phone, landscape, board, Mode.NORMAL)
+        for (phone in phones) {
+            for (board in Board.entries) for (mode in Mode.entries) out += Shot(phone, false, board, mode)
+            for (state in State.entries.drop(1)) out += Shot(phone, false, Board.QWERTY, Mode.NORMAL, state)
+            for (board in Board.entries) for (mode in listOf(Mode.NORMAL, Mode.FLOATING)) out += Shot(phone, true, board, mode)
         }
         return out
     }
@@ -158,6 +167,8 @@ class ThemeMakerLayoutTest {
         put("id", p.id)
         put("px", buildJsonArray { add(JsonPrimitive(p.widthPx)); add(JsonPrimitive(p.heightPx)) })
         put("dpi", p.dpi)
+        put("label", p.label)
+        put("examples", p.examples)
     }
 
     // ------------------------------------------------------------------ measuring
