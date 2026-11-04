@@ -8,6 +8,70 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 ---
 
+## 0.5.1（日期待定）
+
+### 主要变化
+
+- **主题在网页上做**：**外观 → 主题 → 新增主题** 里"在网页上制作…"打开主题制作网页，选主题图、颜色、按键的形状和图片、字体，导出 zip 再用"导入文件…"导入；App 里只列出、使用、导入、导出和删除，要改就导出到网页上改再导入（同名的替换）。按键的圆角、边框、间距从 **大小与样式** 移进主题，升级时原来的设置存进正在用的主题（内置主题先复制一份，提示一次）。主题文件是新格式 3.0：更早的版本导入不了这一版导出的主题，更早版本导出的主题这一版照样能导入。
+- **滑动快捷键**：每个键（全键盘、14/18 键、九键、注音键盘、数字键盘、功能键）上滑或下滑可以执行快捷键，默认上滑是快捷键、下滑是符号，标在键上（**按键 → 滑动**、**快捷键图标位置**、**标点位置** 可以改）。**按键 → 按键字符和快捷键** 一页里改每个键的字符和快捷键。
+- **编辑菜单、清除和恢复**：空格上滑弹出全选、剪切、复制、粘贴、撤销，不松手左右挪选一格；退格上滑 **清除**（正在打的、选中的或光标前的全部文字，可撤销）；退格下滑 **恢复** 最近一次清除或连着按退格删掉的一段，放回原处。
+- **快速输入可以存自己的条目**：什么都不打时候选栏列出你存的，最近用过的在前，点一条整段上屏；在 **设置 → 词库与短语 → 快速输入** 里加、改、删、搜索、导入导出 `.mb`，剪贴板里长按一条也能 **存为快速输入**。长按"符"在九键和手写上也能进，工具栏可以放 **快速输入** 按钮，快捷键也能设成它。
+- **候选词注音**（设置里，默认关）：在中文候选的字上标出拼音，或在右边竖排注音符号，各中文输入法、码表、手写都标，每个字标它自己的声调。
+- **注音键盘**：拼音的 **键盘** 多了 **注音九键** 和 **注音全键盘**（大千），用注音符号打拼音的词库，声调可打可不打。
+- **手写的注键和字卡**：手写键盘右边多了 **注** 键，开关候选词注音；手写的单字标出全部读音。长按手写候选里的单字（拆字、笔画查字出的也一样）先显示**字卡**：读音和例词、部首、笔画、拆字、笔顺，下面有 **上屏** 和 **复制**。
+- **联想整段话**：完整上屏过 3 次的整段话，打出它的开头就接着给出剩下的部分，各输入法和手写都有；长按可以不再联想或删除。只由中文数字组成的（电话号码、金额）不学。
+- **键盘高度「紧凑」**：比「矮」更低（竖屏 20%、横屏 34%），键上的字小一号；五笔的全部字根在紧凑时显示成键名。
+- **编码行浮在键盘上方**（默认）：打字时才出现一小条，键盘少一行、按键高度不变，换 14 键、18 键时键盘高度不变；悬浮键盘、单手模式时跟着键盘走。**外观** 里可以改回 **嵌在键盘里**。
+
+### 小改动
+
+- **读音纠正**的读音标在候选的字上方，一字一音，候选栏高度不变；拆字、笔画查字的读音也标在字上方，带声调。
+- 有些框只是少学：网址、邮箱、数字框只学词，不学前后搭配；搜索框不出联想、不学联想。本输入法自己的输入框（加词、自定义短语、设置里的搜索）什么都不学。
+- 从剪贴板面板粘贴的条目挪到最前（置顶的不动），不再先被条数上限删掉。
+- 悬浮键盘的编码行贴在键盘左上角外面，拖到屏幕最上面放不下时换到键盘下边。
+- 双拼的 18 键、九键只在微软双拼时显示 `;`。
+- 按键对话框的「重置」改叫「恢复此键默认」。
+- 0.5.1 以前的备份没有快速输入：恢复它会删掉自己加的快速输入条目，恢复前的确认框里会说。用更早的版本恢复这一版的备份，主题看不到，换回默认主题。
+
+### 修复
+
+- 从最近任务换应用后，键盘留着上一个应用打到一半的拼音和候选：现在跟着清掉。
+- 换应用时新应用的输入框有时没拿到焦点，按键变成原样字母进了框：现在只结束换走的那个应用的输入。
+- 分屏时接着实体键盘按 Ctrl+空格（或别的让屏幕键盘收起的键），输入法会崩溃：现在不再崩溃。
+- 从上游 Fcitx5 for Android 的备份恢复后，输入法列表只剩英文，拼音、双拼和五笔等码表都没了，繁体也关了（0.5.0 起）：现在列表和繁体都恢复。上游的拼音、双拼方案、码表等设置仍不带过来，恢复后到设置里重新选。
+
+### Main changes
+
+- **Themes are made on a web page**: **外观 → 主题 → 新增主题** → "在网页上制作…" opens the theme maker (picture, colours, key shapes and pictures, fonts); export a zip there and bring it in with "导入文件…". The app lists, applies, imports, exports and deletes themes; to change one, export it, edit it on the page and import it again (same name replaces). Key corners, borders and gaps move from **大小与样式** into the theme; on upgrade the old settings are saved into the theme in use (a built-in one is copied first, with one notice). Theme files are format 3.0: earlier versions cannot import this version's themes; this version imports theirs.
+- **Swipe shortcuts**: every key (full, 14/18 keys, nine keys, zhuyin, number pad, function keys) can run a shortcut on a swipe up or down; by default up is the shortcut and down the symbol, both marked on the key (**按键 → 滑动**, **快捷键图标位置**, **标点位置**). **按键 → 按键字符和快捷键** edits each key's characters and shortcuts on one page.
+- **Edit menu, clear and restore**: swipe up on space for select all, cut, copy, paste and undo, picked by sliding sideways; swipe up on backspace to **清除** (what is typed, the selection or all text before the cursor, undoable); swipe down on backspace to **恢复** the last clear or run of backspaces, put back in place.
+- **Quick input keeps your own entries**: with nothing typed the bar lists yours, recent first, a tap types one whole; add, edit, delete, search and import/export `.mb` in **设置 → 词库与短语 → 快速输入**, or long-press a clipboard entry for **存为快速输入**. Long-pressing 符 works on the nine keys and handwriting too; a **快速输入** toolbar button and shortcut are available.
+- **候选词注音** (a setting, off by default): pinyin above each Chinese candidate's characters, or zhuyin beside them, in every Chinese input method, tables and handwriting included, each character in its own tone.
+- **Zhuyin keyboards**: pinyin's **键盘** adds **注音九键** and **注音全键盘** (大千), typing the pinyin dictionary in zhuyin, tones optional.
+- **Handwriting's 注 key and character card**: a **注** key on the handwriting keyboard toggles 候选词注音; handwritten characters show all their readings. Long-pressing a handwritten character (or one from `u` 拆字 or stroke lookup) opens its **card**: readings with example words, radical, stroke count, parts and stroke order, with **上屏** and **复制**.
+- **Whole-phrase prediction**: a phrase committed whole 3 times is offered in full once its start is typed, in every input method and handwriting; its long press turns it off or deletes it. Phrases of Chinese numerals alone (phone numbers, amounts) are not learned.
+- **Keyboard height 紧凑**: lower than 矮 (20% upright, 34% turned), with smaller key text; Wubi's full roots show as key names at 紧凑.
+- **Code row floating over the keyboard** (default): a strip shown only while typing, so the keyboard is a row shorter with keys the same height and keeps its height on 14 and 18 keys; it follows the floating and one-handed keyboards. **外观** can set it back to **嵌在键盘里**.
+
+### Smaller changes
+
+- The **misreading hint**'s reading sits above the candidate's characters, one syllable each, the bar's height unchanged; 拆字 and stroke lookup readings sit above too, with tones.
+- Some fields learn less: URL, email and number fields learn words but not what goes with what; search fields neither predict nor learn predictions. The app's own fields (adding words, custom phrases, settings search) learn nothing.
+- An entry pasted from the clipboard panel moves first (pinned ones stay), no longer the first the limit drops.
+- The floating keyboard's code row sits outside its top left corner, below it when dragged to the top of the screen.
+- Shuangpin's 18 and nine keys show `;` only under 微软.
+- The key dialog's 「重置」 is now 「恢复此键默认」.
+- A backup from before 0.5.1 has no quick input: restoring it deletes your own quick input entries, as the confirmation says. Restoring this version's backup in an earlier version loses its themes and goes back to the default theme.
+
+### Fixes
+
+- After switching apps from recents, the keyboard kept the previous app's half-typed pinyin and candidates: they are now cleared too.
+- Switching apps sometimes left the new app's field unfocused, its keys typed as plain letters: only the app switched away from has its input ended now.
+- In split screen with a hardware keyboard, Ctrl+Space (or another key that hides the on-screen keyboard) crashed the input method: it no longer does.
+- Restoring a backup from upstream Fcitx5 for Android left only English in the input method list, pinyin, shuangpin and the tables (Wubi and the like) gone and 繁體 off (since 0.5.0): the list and 繁體 are restored now. Upstream's pinyin, 双拼 scheme and table settings are still not carried over: choose them again in settings.
+
+---
+
 ## 0.5.0（2026-11-02）
 
 ### 主要变化
