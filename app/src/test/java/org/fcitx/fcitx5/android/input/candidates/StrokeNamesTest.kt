@@ -11,6 +11,7 @@ import org.w3c.dom.Element
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 
+// contract: lexicon/stroke-order.tsv's header and the strings.xml files against StrokeShape's order.
 // TalkBack reads a card's strokes by these names, a shape's its index's (CharCardView): one for each, in
 // StrokeShape's order, in each language. Read from the resource files, as UserWordsClearTextTest does
 class StrokeNamesTest {

@@ -79,11 +79,28 @@ class CandidateReadingsUatTest {
         harness = null
     }
 
+    // PY-110: each word in its characters' own tones (东西 dōng xī), pinyin and zhuyin
     @Test
+    @Uat("PY-110")
     fun portrait() {
         for (style in listOf(ReadingStyle.PINYIN, ReadingStyle.ZHUYIN)) for (sp in listOf(20, 28)) {
             shown(style, sp, "${style.key.lowercase()}_${sp}sp_port")
         }
+    }
+
+    // the keyboard is made anew for each other style, compared with the one it was made with: it was
+    // compared with the style first read, so turned on and back off it stayed made for the one turned on
+    @Test
+    fun theKeyboardIsMadeAnewForEachOtherStyle() {
+        val h = KeyboardHarness().also { harness = it }.start()
+        val off = h.inputView
+        EngineState.candidateReadingState.value = ReadingStyle.ZHUYIN
+        shadowOf(Looper.getMainLooper()).idle()
+        val zhuyin = h.inputView
+        assertTrue("made anew for zhuyin", zhuyin !== off)
+        EngineState.candidateReadingState.value = ReadingStyle.OFF
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue("made anew back off", h.inputView !== zhuyin)
     }
 
     // the style last used kept whichever keyboard is up (review 051-hw-reading M3): pinyin's here, zhuyin set
@@ -124,6 +141,7 @@ class CandidateReadingsUatTest {
     }
 
     @Test
+    @Uat("PY-110")
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun landscape() {
         for (style in listOf(ReadingStyle.PINYIN, ReadingStyle.ZHUYIN)) for (sp in listOf(20, 28)) {

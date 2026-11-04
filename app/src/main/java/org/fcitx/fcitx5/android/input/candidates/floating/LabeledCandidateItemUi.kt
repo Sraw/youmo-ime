@@ -33,7 +33,8 @@ class LabeledCandidateItemUi(
         setupTextView(this)
         ThemeAssets.candidateTypeface(theme.look)?.let { typeface = it }
         // room above every candidate for a hint's reading at its floor (候选词注音 off; ReadingSpan), so the
-        // window keeps one height whichever candidates it shows
+        // window keeps one height whichever candidates it shows. Kept with 候选词注音 on as well, where a pinyin
+        // reading raises the line by itself: the item is made once, not again as the setting changes
         val fm = paint.fontMetrics
         val need = paint.textSize * CandidateBarHeight.HAN_TOP + floor * (fm.descent - fm.ascent) / paint.textSize
         val top = paddingTop + if (includeFontPadding) -fm.top else -fm.ascent

@@ -50,6 +50,9 @@ class ReadingSpan(
     private val columns = (if (more) reading.dropLast(1) else reading).split(SEPARATOR)
     private val small = TextPaint(Paint.ANTI_ALIAS_FLAG)
 
+    // read at every draw: one kept, not two made each time
+    private val faceMetrics = Paint.FontMetrics()
+
     // pinyin's size: several readings smaller to fit over the character
     private fun pinyinSize(paint: Paint, w: Float): Float {
         if (hint) return hintSize
@@ -104,8 +107,9 @@ class ReadingSpan(
         canvas.drawText(text, start, end, x, y.toFloat(), paint)
         // the columns as tall as the character's line, each symbol no larger than half the character, all
         // of one size: that of the longest
-        val faceTop = y + paint.fontMetrics.top
-        val faceHeight = paint.fontMetrics.bottom - paint.fontMetrics.top
+        paint.getFontMetrics(faceMetrics)
+        val faceTop = y + faceMetrics.top
+        val faceHeight = faceMetrics.bottom - faceMetrics.top
         val half = paint.textSize * CandidateBarHeight.READING_SCALE
         val longest = columns.maxOf { c -> c.count { it !in TONES } }
         if (longest == 0) return
