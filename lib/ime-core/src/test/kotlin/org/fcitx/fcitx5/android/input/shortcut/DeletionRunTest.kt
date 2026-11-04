@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.input.editing.FakeEditor
 import org.fcitx.fcitx5.android.input.editing.WatchedEditor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -336,6 +337,21 @@ class DeletionRunTest {
         assertEquals("xyz", alone.text)
     }
 
+    // an edit drops the newest short-read clear and all kept before it, whole clears made after it
+    // staying: neither everything once a short clear is kept, nor the short clear alone
+    @Test
+    fun anEditDropsTheNewestShortReadClearAndAllBeforeItButNotTheWholeClearsAfter() {
+        val left = EditPlan.Field("", "", "")
+        fun clear(text: String, whole: Boolean) = EditPlan.Cleared(left, listOf(EditPlan.Step.Replace(text)), whole = whole)
+        val kept = ClearedText()
+        kept.remember(f, clear("first", whole = true))
+        kept.remember(f, clear("short", whole = false))
+        kept.remember(f, clear("last", whole = true))
+        kept.edited()
+        assertEquals(listOf(EditPlan.Step.Replace("last")), kept.take(f, left, typing = false)?.restore)
+        assertNull("the whole clear before the short one went with it", kept.take(f, left, typing = false))
+    }
+
     // the app changed what is before the cursor, as long as the run left it: nothing put back, not hello's o after help
     @Test
     fun whatIsLeftNotTheStartOfWhatWasReadIsNotTheRunsAndNothingIsPutBack() {
@@ -360,19 +376,21 @@ class DeletionRunTest {
         assertEquals(accented.length - 2, editor.text.length)
     }
 
-    // review L6: the same character a long way, every length meeting the end: a few presses' search
+    // review L6: the same character a long way, every length meeting the end: a few presses' search,
+    // the lengths tried counted (no clock): a search over every length past the presses tries ~700
     @Test
     fun aRunFarIntoALongFieldOfOneCharacterIsToldQuickly() {
         val kept = ClearedText()
         val ha = "哈".repeat(5_000)
         val editor = FakeEditor(ha)
         repeat(300) { editor.backspace(kept) }
-        val start = System.nanoTime()
         assertTrue(editor.restore(kept))
-        val ms = (System.nanoTime() - start) / 1e6
-        println("DeletionRunTest: 300 of 5000 哈 put back in $ms ms")
         assertEquals(ha, editor.text)
-        assertTrue("$ms ms", ms < 500)
+        val read = "哈".repeat(ClearedText.READ_BEFORE)
+        val characters = ClearedText.Companion.Characters()
+        assertEquals(300, ClearedText.cutShort(read, 300, read, characters))
+        // a few past the presses, not the exact stopping rule: any short search passes
+        assertTrue("${characters.counted} lengths tried", characters.counted <= 10)
     }
 
     // review M7: an app giving less than asked of a field longer than that: its start is not the read's

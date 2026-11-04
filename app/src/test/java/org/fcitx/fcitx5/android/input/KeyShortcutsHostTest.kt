@@ -23,10 +23,12 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
+import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.until as waitUntil
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -43,6 +45,9 @@ import java.io.File
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi")
 class KeyShortcutsHostTest {
+
+    @get:Rule
+    val prefs = PrefsRule()
 
     private lateinit var home: File
     private lateinit var fcitx: KotlinHost
@@ -127,7 +132,7 @@ class KeyShortcutsHostTest {
         until("ni cleared") { preedit.isEmpty() }
         type("hao")
         swipe(backspace, up = false)
-        h.idle()
+        synced()
         assertEquals("hao", preedit)
         // nor once hao is cleared in its turn: ni was typed over
         swipe(backspace, up = true)
@@ -137,7 +142,7 @@ class KeyShortcutsHostTest {
         h.tap(h.key("a"))
         until("a typed") { preedit == "haoa" }
         swipe(backspace, up = false)
-        h.idle()
+        synced()
         assertEquals("haoa", preedit)
     }
 
@@ -222,7 +227,7 @@ class KeyShortcutsHostTest {
         until("cleared") { h.field.text.isEmpty() }
         h.start(fieldId = 2)
         swipe(backspace, up = false)
-        h.idle()
+        synced()
         assertEquals("", h.field.text.toString())
     }
 
@@ -241,18 +246,12 @@ class KeyShortcutsHostTest {
     // typed put in first
     @Test
     fun aShortcutOfQuickInputOpensItAfterWhatIsTyped() {
-        val stored = AppPrefs.getInstance().internal.keyShortcuts
-        val was = stored.getValue()
-        stored.setValue(KeyShortcuts.Empty.with("full/q", KeyShortcut.Command(KeyCommand.QuickInput)).serialize())
-        try {
-            start()
-            type("nihao")
-            swipe(h.key("q"), up = true)
-            until("committed, then quick input open") { h.field.text.toString() == "你好" && fcitx.inputPanelCached.quickPhrase }
-            assertEquals("", preedit)
-        } finally {
-            stored.setValue(was)
-        }
+        prefs.set(AppPrefs.getInstance().internal.keyShortcuts, KeyShortcuts.Empty.with("full/q", KeyShortcut.Command(KeyCommand.QuickInput)).serialize())
+        start()
+        type("nihao")
+        swipe(h.key("q"), up = true)
+        until("committed, then quick input open") { h.field.text.toString() == "你好" && fcitx.inputPanelCached.quickPhrase }
+        assertEquals("", preedit)
     }
 
     private fun backspaces(n: Int, leaving: String) {
@@ -285,21 +284,15 @@ class KeyShortcutsHostTest {
     // review L3: a copy changes nothing of the field, the cursor back where it was: the run goes on
     @Test
     fun aCopyBetweenBackspacesEndsNoRun() {
-        val stored = AppPrefs.getInstance().internal.keyShortcuts
-        val was = stored.getValue()
-        stored.setValue(KeyShortcuts.Empty.with("full/c", KeyShortcut.Command(KeyCommand.Copy)).serialize())
-        try {
-            start("你好世界")
-            backspaces(1, leaving = "你好世")
-            swipe(h.key("c"), up = true)
-            until("copied") { appContext.getSystemService(ClipboardManager::class.java).primaryClip?.getItemAt(0)?.text?.toString() == "你好世" }
-            backspaces(1, leaving = "你好")
-            assertEquals(2, h.field.selectionStart)
-            swipe(backspace, up = false)
-            until("both put back") { h.field.text.toString() == "你好世界" }
-        } finally {
-            stored.setValue(was)
-        }
+        prefs.set(AppPrefs.getInstance().internal.keyShortcuts, KeyShortcuts.Empty.with("full/c", KeyShortcut.Command(KeyCommand.Copy)).serialize())
+        start("你好世界")
+        backspaces(1, leaving = "你好世")
+        swipe(h.key("c"), up = true)
+        until("copied") { appContext.getSystemService(ClipboardManager::class.java).primaryClip?.getItemAt(0)?.text?.toString() == "你好世" }
+        backspaces(1, leaving = "你好")
+        assertEquals(2, h.field.selectionStart)
+        swipe(backspace, up = false)
+        until("both put back") { h.field.text.toString() == "你好世界" }
     }
 
     // review L4: the screen turned is the same input, its engine focused again: the run is kept

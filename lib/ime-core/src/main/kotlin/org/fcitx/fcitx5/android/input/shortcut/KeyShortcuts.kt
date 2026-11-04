@@ -121,7 +121,9 @@ class KeyShortcuts private constructor(private val table: Map<String, KeyShortcu
         private fun parseLine(line: String): Pair<String, KeyShortcut>? {
             val name = line.substringBefore('\t', "")
             if (name.isEmpty() || '/' !in name) return null
-            return parseValue(line.substring(name.length + 1))?.let { name to it }
+            // a CRLF backup: its line-ending \r dropped; a text's own \r is stored escaped, never bare
+            val value = line.substring(name.length + 1).removeSuffix("\r")
+            return parseValue(value)?.let { name to it }
         }
     }
 }

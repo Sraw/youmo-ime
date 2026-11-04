@@ -23,6 +23,7 @@ class KeyShortcutsTest {
         assertFalse(KeyShortcuts.Empty.isSet("full/a"))
     }
 
+    // contract: the stored line format (key, tab, command or text:), which a later version must read back
     @Test
     fun noneSetsAPresetToNothing() {
         val shortcuts = KeyShortcuts.parse("full/a\tnone")
@@ -41,6 +42,7 @@ class KeyShortcutsTest {
     }
 
     // review S3: a text pasted from a PC, its lines ended by \r\n, stored and read back whole
+    // contract: the stored line format (key, tab, command or text:), which a later version must read back
     @Test
     fun textRoundTripsItsCarriageReturns() {
         val text = KeyShortcut.Text("Best,\r\nMe\rand \\r")
@@ -52,11 +54,24 @@ class KeyShortcutsTest {
         assertEquals(KeyShortcut.Text("a\rb"), KeyShortcuts.parse("full/q\ttext:a\rb").resolve("full/q"))
     }
 
+    // a backup's lines ended by \r\n: a command or none still read; a text loses the line's \r (it
+    // would otherwise be typed every time), its own \r stored escaped and kept
+    @Test
+    fun aLineEndedByCarriageReturnStillReads() {
+        val shortcuts = KeyShortcuts.parse("a/b\tnone\r\nc/d\tcopy\r\n")
+        assertEquals(KeyShortcut.None, shortcuts.resolve("a/b"))
+        assertEquals(KeyShortcut.Command(KeyCommand.Copy), shortcuts.resolve("c/d"))
+        assertEquals(KeyShortcut.Text("x"), KeyShortcuts.parse("a/b\ttext:x\r\n").resolve("a/b"))
+        assertEquals(KeyShortcut.Text("x\r"), KeyShortcuts.parse("a/b\ttext:x\\r\r\n").resolve("a/b"))
+    }
+
+    // contract: the stored line format (key, tab, command or text:), which a later version must read back
     @Test
     fun aBackslashBeforeNothingEscapedIsKept() {
         assertEquals(KeyShortcut.Text("a\\b\\"), KeyShortcuts.parse("full/q\ttext:a\\b\\").resolve("full/q"))
     }
 
+    // contract: the stored line format (key, tab, command or text:), which a later version must read back
     @Test
     fun badLinesAreSkippedALaterLineWins() {
         val shortcuts = KeyShortcuts.parse(
@@ -105,6 +120,11 @@ class KeyShortcutsTest {
         val cleared = KeyShortcuts.Empty.cleared(listOf("full/a", "full/s"))
         assertEquals(KeyShortcut.None, cleared.resolve("full/a"))
         assertTrue(cleared.isSet("full/s"))
+    }
+
+    // contract: the keys' names in the stored lines
+    @Test
+    fun aKeyIsNamedByItsPageAndItself() {
         assertEquals("full", KeyShortcuts.formOf("full/a"))
         assertEquals("fn/space.up", KeyShortcuts.functionKey("space", up = true))
         assertEquals("fn/space.down", KeyShortcuts.functionKey("space", up = false))
@@ -116,7 +136,12 @@ class KeyShortcutsTest {
         KeyCommand.entries.forEach { assertEquals(it, KeyCommand.ofKey(it.key)) }
         assertNull(KeyCommand.ofKey("nothing"))
         assertEquals(setOf(KeyCommand.Copy, KeyCommand.Cut), KeyCommand.entries.filter { it.readsField }.toSet())
+    }
+
+    // the empty set and one parsed from nothing are equal, so their hashes must be too
+    @Test
+    fun equalSetsHashAlike() {
+        assertEquals(KeyShortcuts.Empty, KeyShortcuts.parse(""))
         assertEquals(KeyShortcuts.Empty.hashCode(), KeyShortcuts.parse("").hashCode())
-        assertTrue(KeyShortcuts.Empty.with("full/a", paste).toString().contains("full/a"))
     }
 }

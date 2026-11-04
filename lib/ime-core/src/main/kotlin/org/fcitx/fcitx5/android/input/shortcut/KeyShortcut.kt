@@ -23,7 +23,8 @@ sealed interface KeyShortcut {
         /** The longest text a shortcut types: a signature or an address, not a document. */
         const val MAX_TEXT = 200
 
-        /** [text]'s first [length] chars, one fewer where the last would be half a surrogate pair (an emoji's). */
+        /** [text]'s first [length] chars, one fewer where the last would be half a surrogate pair. A longer emoji sequence
+         * (ZWJ, flag, skin tone) may still be cut between its code points. */
         fun clip(text: String, length: Int): String =
             if (text.length > length && length > 0 && text[length - 1].isHighSurrogate()) text.take(length - 1) else text.take(length)
     }

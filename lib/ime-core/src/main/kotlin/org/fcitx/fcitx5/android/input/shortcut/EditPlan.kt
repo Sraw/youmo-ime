@@ -33,8 +33,14 @@ object EditPlan {
     /**
      * A clear to put back: [restore] carried out on the field as the clear [left] it. [typed], when it
      * was what is typed that went (the app types it again), the app's token for it; [restore] then empty.
+     * [whole] false where the clear left text before the cursor it never read (an app giving less than
+     * asked, or a reported cursor past the text read): the field then matches by its selection and what
+     * is after the cursor alone, [left]'s before not known.
      */
-    data class Cleared(val left: Field, val restore: List<Step>, val typed: Any? = null)
+    data class Cleared(val left: Field, val restore: List<Step>, val typed: Any? = null, val whole: Boolean = true) {
+        /** The field reads [now] as this clear left it. */
+        fun leaves(now: Field) = if (whole) left == now else left.selected == now.selected && left.after == now.after
+    }
 
     /** What a clear does ([steps]) and what it took, to put back ([cleared]); null when not kept. */
     data class Clearing(val steps: List<Step>, val cleared: Cleared?)
@@ -58,8 +64,10 @@ object EditPlan {
     /**
      * 清除 with nothing typed, the field read as [field], its selection [start]..[end] as the editor
      * reported it: the selection (either a range or text selected says there is one); else all before the cursor; else all after it. A side read whole
-     * goes by its length from the cursor, where the editor has it (the reported cursor may lag); one
-     * cut short at [limit] to the field's edge, nothing kept. A selection whose text the app gave
+     * goes by its length from the cursor, where the editor has it (the reported cursor may lag or run
+     * ahead); never past the text read, so a short read (an app giving less than asked) clears what it
+     * gave and keeps it, put back at the cursor; one cut short at [limit] to the field's edge (as far
+     * back from the editor's cursor as the report says, the start at most), nothing kept. A selection whose text the app gave
      * none of (or too long to) is deleted and not kept: with no text read it is no empty one, the
      * side before it never cleared in its place (review S2). Nothing of a [password] is kept.
      */
@@ -75,10 +83,17 @@ object EditPlan {
                 Cleared(Field(before, "", after), listOf(Step.Select(from, from), Step.Replace(selected), Step.Select(from, from + selected.length)))
                     .takeIf { start != end && selected.isNotEmpty() && selected.length < limit },
             )
-            before.length >= limit -> Clearing(listOf(Step.Select(0, from), Step.Replace("")), null)
+            // read cut short at the limit: all up to the cursor goes, nothing kept. A reported cursor past
+            // the text given is not this: the report may run ahead of the editor (a tap not reported yet),
+            // so only what was read goes, from the editor's own cursor, and stays restorable; an app that
+            // gave less than asked leaves the rest for another 清除 (review S2)
+            // the field's start, from the editor's own cursor: never a Select from a reported cursor that
+            // may run past it, which would take text after the cursor too
+            before.length >= limit -> Clearing(listOf(Step.Delete(maxOf(from, before.length), 0)), null)
+            // put back where it went, at the cursor: text the app did not give stays before it
             before.isNotEmpty() -> Clearing(
                 listOf(Step.Delete(before.length, 0)),
-                Cleared(Field("", "", after), listOf(Step.Select(0, 0), Step.Replace(before))),
+                Cleared(Field("", "", after), listOf(Step.Replace(before)), whole = from == before.length),
             )
             // nothing before the cursor: all the field is after it
             after.length >= limit -> Clearing(listOf(Step.ContextMenu(Menu.SelectAll), Step.Replace("")), null)

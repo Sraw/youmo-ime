@@ -78,7 +78,7 @@ class ClearedText {
      * ([read], each side at most so many chars, null where it cannot be read: nothing kept, those
      * before broken off); the rest of a run are counted alone, what they took told when it is put back.
      * A selection's deletion in a run tells what the run took so far; where that cannot be told, the
-     * run is dropped and a new one starts.
+     * run is dropped, with all kept before it, and a new one starts.
      */
     fun deleting(field: Any, selection: Boolean, read: (before: Int, after: Int) -> Read?) {
         into(field)
@@ -108,10 +108,12 @@ class ClearedText {
      * The field changed otherwise than by a run's deletions (typed in, the cursor moved, what is typed
      * changed): a run's next deletion starts another, and the last run is not put back, nor anything
      * kept before it, all left by a field since changed. A clear since is told by the field alone
-     * ([take]), as ever (the app's own changes are not told here either), so kept (review M1).
+     * ([take]), as ever (the app's own changes are not told here either), so kept (review M1); but not
+     * one that never read all before the cursor ([EditPlan.Cleared.whole] false): its field cannot tell
+     * text typed before the cursor, which it would put the cleared text after, so it goes like a run.
      */
     fun edited() {
-        repeat(kept.indexOfLast { it is Entry.Run } + 1) { kept.removeFirst() }
+        repeat(kept.indexOfLast { it is Entry.Run || it is Entry.Clear && !it.cleared.whole } + 1) { kept.removeFirst() }
     }
 
     /**
@@ -134,7 +136,7 @@ class ClearedText {
             null
         } else {
             when (last) {
-                is Entry.Clear -> last.cleared.takeIf { it.left == now }
+                is Entry.Clear -> last.cleared.takeIf { it.leaves(now) }
                 is Entry.Run -> last.back(now)
             }
         }
@@ -203,9 +205,8 @@ class ClearedText {
         // the read cut short: how much of [b]'s end [units] presses took to leave [before], where only
         // one length can be it. A press's taking all of it leaves no end to meet. Shortest first, and
         // stopped once no longer one can fit: a few presses' search, not the read's every length
-        // squared (review L6; 5000 哈's 1000 read, each a fit)
-        private fun cutShort(b: String, units: Int, before: String): Int? {
-            val characters = Characters()
+        // squared (review L6; 5000 哈's 1000 read, each a fit). [characters] counts the lengths tried
+        internal fun cutShort(b: String, units: Int, before: String, characters: Characters = Characters()): Int? {
             var found: Int? = null
             // each press takes a code point at least: no shorter end is theirs
             var k = minOf(units, b.length)
@@ -236,10 +237,15 @@ class ClearedText {
         }
 
         // characters (grapheme clusters) counted, one BreakIterator for a whole search
-        private class Characters {
+        internal class Characters {
             private val it = BreakIterator.getCharacterInstance()
 
+            /** How many texts [of] has counted: a search's lengths tried. */
+            var counted = 0
+                private set
+
             fun of(text: String): Int {
+                counted++
                 it.setText(text)
                 var count = 0
                 while (it.next() != BreakIterator.DONE) count++

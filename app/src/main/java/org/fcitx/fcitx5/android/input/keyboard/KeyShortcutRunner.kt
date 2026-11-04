@@ -90,13 +90,14 @@ class KeyShortcutRunner(
      */
     fun clear(typing: HostCore.Retyping?, field: Any? = service.startedField) {
         if (field == null || field !== service.startedField) return
-        // a field kept from learning is kept from this too (review2): nothing of it remembered
-        val sensitive = service.inSensitiveField
         val kept = if (typing != null) {
-            // a field not read is said cleared, those before it broken off as for one not kept (review2)
+            // a field not read is said cleared, those before it broken off as for one not kept (review2).
+            // A sensitive field's keys the host kept back itself (HostCore.clearTyped): nothing of it here
             typing.keys?.let { read()?.let { now -> EditPlan.Cleared(now, emptyList(), typing) } }
         } else {
             val now = read() ?: return
+            // a field kept from learning is kept from this too (review2): nothing of it remembered
+            val sensitive = service.inSensitiveField
             val range = service.currentInputSelection
             val clearing = EditPlan.clear(now, range.start, range.end, READ_LIMIT, sensitive)
             if (clearing.steps.isEmpty()) return

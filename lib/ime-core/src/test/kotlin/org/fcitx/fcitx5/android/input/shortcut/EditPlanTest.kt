@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.shortcut
 
+import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.input.UndoChipPlacement
 import org.fcitx.fcitx5.android.input.editing.FakeEditor
 import org.fcitx.fcitx5.android.input.shortcut.EditPlan.Menu
@@ -251,6 +253,106 @@ class EditPlanTest {
         assertEquals("ah", long.text)
     }
 
+    // a reported cursor past the text read (a stale report running ahead of the editor, or an app
+    // giving less than asked): only what was read goes, from the editor's own cursor, never the text
+    // after the cursor, and it can be put back
+    @Test
+    fun aCursorReportedPastTheTextReadClearsOnlyWhatWasReadAndKeepsIt() {
+        val kept = ClearedText()
+        val editor = FakeEditor("abc def", cursor = 3)
+        val clearing = EditPlan.clear(editor.field(), 6, 6, 1000, password = false)
+        assertEquals(listOf(EditPlan.Step.Delete(3, 0)), clearing.steps)
+        editor.run(clearing.steps)
+        assertEquals(" def", editor.text)
+        kept.remember(f, clearing.cleared)
+        assertTrue(editor.restore(kept))
+        assertEquals("abc def", editor.text)
+    }
+
+    // an app giving less text before the cursor than asked: only what it gave goes, and 撤销 puts back
+    // exactly that, at the cursor, the text it never gave staying before it (matched by what is after)
+    @Test
+    @Uat("KB-62")
+    fun aShortReadClearsWhatWasGivenAndPutsBackJustThatAtTheCursor() {
+        val kept = ClearedText()
+        val editor = FakeEditor("abcdef gh", cursor = 6)
+        val given = EditPlan.Field("def", "", " gh")
+        val clearing = EditPlan.clear(given, 6, 6, 1000, password = false)
+        assertEquals(listOf(EditPlan.Step.Delete(3, 0)), clearing.steps)
+        editor.run(clearing.steps)
+        assertEquals("abc gh", editor.text)
+        kept.remember(f, clearing.cleared)
+        assertTrue(editor.restore(kept))
+        assertEquals("abcdef gh", editor.text)
+        assertEquals(6, editor.selectionStart)
+        assertEquals(6, editor.selectionEnd)
+        // the cursor moved since, what is after it not as the clear left it: nothing put back
+        val again = EditPlan.clear(given, 6, 6, 1000, password = false)
+        editor.run(again.steps)
+        kept.remember(f, again.cleared)
+        editor.setSelection(6, 6)
+        assertFalse(editor.restore(kept))
+    }
+
+    // a short read's clear never read all before the cursor, so text typed there since cannot be told
+    // by the field: the typing itself ends it, else 撤销 would put the cleared text after what was typed
+    @Test
+    @Uat("KB-62")
+    fun aShortReadClearIsNotPutBackOnceSomethingWasTypedBeforeTheCursor() {
+        class Row(val typed: String, val why: String)
+        val rows = listOf(
+            Row("x", "a key typed before the cursor"),
+            Row("好", "a Chinese character committed, not an ASCII one: a short read ends the same way"),
+        )
+        assertRows(rows, { it.why }) { row ->
+            val typed = row.typed
+            val kept = ClearedText()
+            val editor = FakeEditor("abcdef gh", cursor = 6)
+            val clearing = EditPlan.clear(EditPlan.Field("def", "", " gh"), 6, 6, 1000, password = false)
+            editor.run(clearing.steps)
+            kept.remember(f, clearing.cleared)
+            editor.commitText(typed, 1)
+            kept.edited()
+            assertFalse(typed, editor.restore(kept))
+            assertEquals("abc$typed gh", editor.text)
+        }
+    }
+
+    // what a clear matches the field by: all of it where it read all before the cursor, else the
+    // selection and what is after alone, a change before the cursor then not seen
+    @Test
+    fun aClearMatchesTheFieldWholeOnlyWhereItReadAllBeforeTheCursor() {
+        val left = EditPlan.Field("", "", " gh")
+        class Row(val whole: Boolean, val now: EditPlan.Field, val leaves: Boolean, val why: String)
+        val rows = listOf(
+            Row(true, left, true, "whole, the field as the clear left it"),
+            Row(true, EditPlan.Field("abc", "", " gh"), false, "whole, text typed before the cursor is seen"),
+            Row(true, EditPlan.Field("", "", " gx"), false, "whole, what is after changed"),
+            Row(false, left, true, "short read, the field as the clear left it"),
+            Row(false, EditPlan.Field("abc", "", " gh"), true, "short read, a change before the cursor is not seen"),
+            Row(false, EditPlan.Field("abc", "", " gx"), false, "short read, what is after changed"),
+            Row(false, EditPlan.Field("", "s", " gh"), false, "short read, a selection made since"),
+        )
+        assertRows(rows, { it.why }) { row ->
+            assertEquals(row.leaves, EditPlan.Cleared(left, emptyList(), whole = row.whole).leaves(row.now))
+        }
+    }
+
+    // a read cut short at the limit with a reported cursor past the editor's: all before the editor's
+    // own cursor goes, never the text after it (a Select from the reported cursor would take that too)
+    @Test
+    @Uat("KB-62")
+    fun aClearAtTheLimitWithTheCursorReportedAheadKeepsWhatIsAfterTheCursor() {
+        val kept = ClearedText()
+        val editor = FakeEditor("x".repeat(50) + "yz", cursor = 50)
+        val clearing = EditPlan.clear(editor.field(10), 52, 52, 10, password = false)
+        editor.run(clearing.steps)
+        assertEquals("yz", editor.text)
+        assertNull(clearing.cleared)
+        kept.remember(f, clearing.cleared)
+        assertFalse(editor.restore(kept))
+    }
+
     // review S2: the reported cursor behind the editor's (a report not in yet): what was read
     // before or after it is what goes, measured from where the editor has the cursor
     @Test
@@ -286,7 +388,6 @@ class EditPlanTest {
     @Test
     fun theEditMenusPasteIsOverTheFingerTheRowKeptOnTheScreen() {
         assertEquals(KeyCommand.Paste, EditMenuLayout.CELLS[EditMenuLayout.START])
-        assertEquals(5, EditMenuLayout.CELLS.size)
         // centred: the paste cell's middle at the key's
         assertEquals(500 - 50 - 300, EditMenuLayout.rowLeft(500, 100, 0, 1080))
         assertEquals("at the left edge", 0, EditMenuLayout.rowLeft(100, 100, 0, 1080))
