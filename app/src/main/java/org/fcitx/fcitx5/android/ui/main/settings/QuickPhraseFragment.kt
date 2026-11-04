@@ -590,7 +590,10 @@ class QuickPhraseFragment : ProgressFragment() {
                 setPadding(dp(16), dp(10), dp(16), dp(10))
                 isClickable = true
                 isFocusable = true
-                ctx.theme.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground)).use { background = it.getDrawable(0) }
+                // Not `.use {}`: TypedArray is AutoCloseable only from API 31; on 29/30 that cast crashes.
+                background = ctx.theme.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground)).run {
+                    getDrawable(0).also { recycle() }
+                }
                 add(key, lParams(matchParent))
                 add(content, lParams(matchParent))
             }

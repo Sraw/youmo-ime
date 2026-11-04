@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input
 
+import android.annotation.SuppressLint
 import android.os.Build
 import android.view.inputmethod.InputConnection
 import org.fcitx.fcitx5.android.input.shortcut.ClearedText
@@ -15,6 +16,8 @@ import org.fcitx.fcitx5.android.input.shortcut.EditPlan
  * text's offset, or [tracked] (the selection the service follows) where the editor gives none; else a
  * read of each side and the selection. Null where the editor gives neither.
  */
+// the API 31 calls are behind `sdk >= S`; lint cannot see through the parameter (tests pass the level)
+@SuppressLint("NewApi")
 internal fun readAround(
     ic: InputConnection,
     tracked: Int,

@@ -26,6 +26,9 @@ open class AndroidBaseConventionPlugin : Plugin<Project> {
             }
             lint.apply {
                 disable += setOf("UseKtx")
+                // Android 10 (minSdk 29) must keep working: a call or cast above it fails the release
+                // build (lintVital) instead of crashing on the phone (0.5.1: TypedArray.use, an API 33 Paint overload)
+                fatal += setOf("NewApi")
             }
         }
 

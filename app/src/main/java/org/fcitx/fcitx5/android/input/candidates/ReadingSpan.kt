@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.candidates
 
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.os.Build
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.TextPaint
@@ -71,7 +72,12 @@ class ReadingSpan(
         if (fm != null) {
             // the text's own fonts (a Han character's fallback is taller than the paint's): a line of it plain
             // and one of it read are then the same height
-            paint.getFontMetricsInt(text, start, end - start, start, end - start, false, fm)
+            // (that overload is API 33; below it, NoSuchMethodError: the paint's own metrics instead)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                paint.getFontMetricsInt(text, start, end - start, start, end - start, false, fm)
+            } else {
+                paint.getFontMetricsInt(fm)
+            }
             // room above for the pinyin where the view lays out by lines (the floating window's)
             if (!zhuyin && !hint) {
                 val line = ceil(paint.textSize * CandidateBarHeight.READING_LINE).toInt()
