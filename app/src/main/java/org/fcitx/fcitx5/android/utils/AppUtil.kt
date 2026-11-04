@@ -33,6 +33,8 @@ object AppUtil {
     /**
      * Whether [route] is one [launchMainToDest] sends, the only ones MainActivity opens from an
      * intent: it is exported, and a route such as the pinyin dictionaries' names any file it likes.
+     * Quick input's editor may so be opened filled in by another app: nothing is saved or deleted till
+     * the user taps it, and a content over the limit is refused (MainActivity).
      */
     fun isLaunchRoute(route: SettingsRoute) = when (route) {
         SettingsRoute.Keys, SettingsRoute.InputMethodList, SettingsRoute.Theme,

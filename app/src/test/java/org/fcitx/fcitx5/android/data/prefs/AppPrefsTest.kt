@@ -5,17 +5,20 @@
 package org.fcitx.fcitx5.android.data.prefs
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.core.content.edit
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows as assertNamedRows
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
+import org.fcitx.fcitx5.android.input.keyboard.OneHanded
+import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.junit.Assert.assertEquals
-import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -169,27 +172,40 @@ class AppPrefsTest {
         }
     }
 
+    // each pair of ways a SwipeLayers can be made is a choice of the setting's own: SwipeLayersChoice.of
+    // falls back to the default only for one no choice lists, which would then be lost unsaid
+    @Test
+    fun everySwipeLayersThatCanBeMadeIsAChoice() {
+        for (up in SwipeLayers.Layer.entries) for (down in SwipeLayers.Layer.entries) {
+            val layers = runCatching { SwipeLayers(up, down) }.getOrNull() ?: continue
+            assertEquals("$up/$down", layers, SwipeLayersChoice.of(layers).layers)
+        }
+    }
+
     // 0.5's 划动输入标点符号及数字 becomes 滑动: the symbol the way it was, shortcuts the other way, off all off
     @Test
     fun theOldSwipeSettingBecomesTheTwoWays() {
-        for ((old, now) in listOf(
-            "Down" to SwipeLayersChoice.ShortcutUpSymbolDown,
-            "Up" to SwipeLayersChoice.SymbolUpShortcutDown,
-            "Disabled" to SwipeLayersChoice.Off,
-        )) {
-            sp.edit { clear(); putString("swipe_symbol_behavior", old) }
-            val prefs = AppPrefs(sp)
-            prefs.dropRetired()
-            assertEquals(old, now, prefs.keyboard.swipeLayers.getValue())
-            assertFalse(old, sp.contains("swipe_symbol_behavior"))
-        }
-        // one set already is kept
-        sp.edit { clear(); putString("swipe_symbol_behavior", "Up"); putString("swipe_layers", SwipeLayersChoice.Off.name) }
-        AppPrefs(sp).apply { dropRetired() }.let { assertEquals(SwipeLayersChoice.Off, it.keyboard.swipeLayers.getValue()) }
-        // stored as another type (a bad backup): the default, and no crash at every start
-        sp.edit { clear(); putInt("swipe_symbol_behavior", 1) }
-        AppPrefs(sp).apply { dropRetired() }.let { assertEquals(SwipeLayersChoice.ShortcutUpSymbolDown, it.keyboard.swipeLayers.getValue()) }
-        assertFalse(sp.contains("swipe_symbol_behavior"))
+        // each row from an emptied store of its own: nothing one leaves is read by the next
+        fun row(why: String, stored: SharedPreferences.Editor.() -> Unit, now: SwipeLayersChoice) =
+            why to {
+                sp.edit { clear(); stored() }
+                val prefs = AppPrefs(sp).apply { dropRetired() }
+                assertEquals(now, prefs.keyboard.swipeLayers.getValue())
+                assertFalse("the old setting dropped", sp.contains("swipe_symbol_behavior"))
+            }
+        assertNamedRows(
+            row("Down: the symbol down, shortcuts up", { putString("swipe_symbol_behavior", "Down") }, SwipeLayersChoice.ShortcutUpSymbolDown),
+            row("Up: the symbol up, shortcuts down", { putString("swipe_symbol_behavior", "Up") }, SwipeLayersChoice.SymbolUpShortcutDown),
+            row("Disabled: all off", { putString("swipe_symbol_behavior", "Disabled") }, SwipeLayersChoice.Off),
+            row(
+                "one set already is kept",
+                { putString("swipe_symbol_behavior", "Up"); putString("swipe_layers", SwipeLayersChoice.Off.name) },
+                SwipeLayersChoice.Off,
+            ),
+            // the bug: the old key read as a String whatever it held, so a bad backup storing it as an
+            // Int threw a ClassCastException in dropRetired at every start; now the default, no crash
+            row("stored as another type (a bad backup): the default, no crash at every start", { putInt("swipe_symbol_behavior", 1) }, SwipeLayersChoice.ShortcutUpSymbolDown),
+        )
     }
 
     // an import or a backup with the two in one place: the symbol stored where it reads, at the start after

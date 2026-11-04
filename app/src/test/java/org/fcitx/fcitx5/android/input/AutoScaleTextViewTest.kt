@@ -13,6 +13,7 @@ import android.text.Spanned
 import android.text.style.RelativeSizeSpan
 import android.view.Gravity
 import android.view.View.MeasureSpec
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -67,7 +68,15 @@ class AutoScaleTextViewTest {
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun theInkIsWhereTheGlyphsAreDrawn() {
-        for ((text, width) in listOf("g" to 200, "Wg@" to 200, "WWWWWW" to 120)) {
+        val rows = listOf(
+            // a descender: the ink below the baseline, not the line's box
+            Triple("g a descender, at its size", "g", 200),
+            // wide and tall glyphs mixed with a descender: the box spans them all
+            Triple("Wg@ glyphs of every height, at its size", "Wg@", 200),
+            // too wide for the view: squeezed sideways, the ink squeezed with it
+            Triple("WWWWWW squeezed sideways into a narrow view", "WWWWWW", 120),
+        )
+        assertRows(rows, { it.first }) { (_, text, width) ->
             val view = AutoScaleTextView(RuntimeEnvironment.getApplication()).apply {
                 textSize = 60f
                 setTextColor(Color.BLACK)

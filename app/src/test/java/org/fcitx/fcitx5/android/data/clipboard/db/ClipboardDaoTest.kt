@@ -8,6 +8,7 @@ import androidx.paging.PagingSource
 import androidx.room.Room
 import kotlinx.coroutines.test.runTest
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.data.clipboard.lastKept
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -110,8 +111,11 @@ class ClipboardDaoTest {
         assertEquals(listOf("p1", "p2", "b", "a", "c"), order())
         dao.updateTimeIfUnpinned(p2, 6000L)
         assertEquals(listOf("p1", "p2", "b", "a", "c"), order())
-        // the limit drops the least recently used: c, not b
-        dao.deleteUnpinnedEarlierThan(2000L)
+        // a limit of two keeps the two used last, as ClipboardManager.removeOutdated finds them: b and a;
+        // it drops the least recently used, c, not b
+        val last = lastKept(2, 0L) { dao.unpinnedTimestampAt(it) }
+        assertEquals(3000L, last)
+        dao.deleteUnpinnedEarlierThan(last!!)
         assertEquals(listOf("p1", "p2", "b", "a"), order())
     }
 }

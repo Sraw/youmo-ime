@@ -52,7 +52,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.BuildConfig
@@ -107,7 +106,6 @@ import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
 import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
 import org.fcitx.fcitx5.android.input.learning.UndoChip
 import org.fcitx.fcitx5.android.input.shortcut.ClearedText
-import org.fcitx.fcitx5.android.input.shortcut.EditPlan
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.fcitx.fcitx5.android.utils.Locales
 import org.fcitx.fcitx5.android.utils.alpha
@@ -321,6 +319,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private fun replaceInputView(theme: Theme, start: Boolean = false): InputView {
         compactBuilt = keyboardCompact()
+        readingBuilt = EngineState.candidateReading.value
         val newInputView = InputView(this, fcitx, theme)
         setInputView(newInputView)
         inputDeviceMgr.setInputView(newInputView)
@@ -393,6 +392,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     // 紧凑 as the views were last made: its keys' text and marks are set as they are made (keyboardCompact)
     private var compactBuilt = keyboardCompact()
 
+    // 候选词注音 as the input view was made with it: made anew only for another
+    private var readingBuilt = EngineState.candidateReading.value
+
     // 键盘高度 into or out of 紧凑 makes the keys anew; another level only resizes them (InputView).
     // A level sets both of its numbers in one edit, so each call sees both
     @Keep
@@ -446,8 +448,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         // 候选词注音 is the host's config, set on the fcitx thread: the bar's height goes by it (KawaiiBarComponent.heightDp).
         // What is typed stays (the handwriting pad's 注 sets it mid-sentence): the engine shows it annotated anew
+        // Against the style the view was made with, not the flow's first value: the engine's first configure
+        // after a start sets the style kept, which the view made since already has
         lifecycleScope.launch {
-            EngineState.candidateReading.drop(1).collect {
+            EngineState.candidateReading.collect {
+                if (inputView == null || it == readingBuilt) return@collect
                 rebuilding(ViewRebuild.READING)
                 replaceInputView(ThemeManager.activeTheme, start = true)
             }
@@ -596,32 +601,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         clearedText.deleting(field, selection) { before, after -> readAround(before, after, selected = selection) }
     }
 
-    /**
-     * The field around the cursor as a run reads it, on the main thread before the deletion: one
-     * round trip where the editor gives its text around the selection at once (API 31), else a read
-     * of each side and the selection (review M2). Null where the editor gives neither.
-     */
+    // the field around the cursor as a run reads it, on the main thread before the deletion ([readAround])
     private fun readAround(before: Int, after: Int, selected: Boolean): ClearedText.Read? {
         val ic = currentInputConnection ?: return null
-        val tracked = selection.latest.let { minOf(it.start, it.end) }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val around = ic.getSurroundingText(before, after, 0)
-            val start = around?.let { minOf(it.selectionStart, it.selectionEnd) } ?: -1
-            val end = around?.let { maxOf(it.selectionStart, it.selectionEnd) } ?: -1
-            if (around != null && start >= 0 && end <= around.text.length) {
-                val text = around.text.toString()
-                val at = if (around.offset >= 0) around.offset + start else tracked
-                return ClearedText.Read(EditPlan.Field(text.substring(0, start), text.substring(start, end), text.substring(end)), at)
-            }
-        }
-        return ClearedText.Read(
-            EditPlan.Field(
-                ic.getTextBeforeCursor(before, 0)?.toString() ?: return null,
-                if (selected) ic.getSelectedText(0)?.toString().orEmpty() else "",
-                ic.getTextAfterCursor(after, 0)?.toString() ?: return null,
-            ),
-            tracked,
-        )
+        return readAround(ic, selection.latest.let { minOf(it.start, it.end) }, before, after, selected)
     }
 
     /** An empty pair put in goes whole: its closing one here, the opening one as ever. */

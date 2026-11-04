@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.keyboard.LayoutSwitchKey
 import org.fcitx.fcitx5.android.input.keyboard.ReturnKey
+import org.fcitx.fcitx5.android.input.keyboard.SYMBOL_NAMES
 import org.fcitx.fcitx5.android.input.keyboard.SpaceKey
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.showReturnAction
@@ -56,7 +57,7 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
             setOf(
                 Behavior.Press(KeyAction.HostKeyAction(symbol))
             ),
-            name = if (symbol == ",") "comma" else "period",
+            name = SYMBOL_NAMES[symbol],
         )
 
         val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }

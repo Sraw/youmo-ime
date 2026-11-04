@@ -17,7 +17,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.data.InputFeedbacks
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.UndoChipPlacement
 import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
 import org.fcitx.fcitx5.android.input.dependency.context
@@ -315,7 +314,9 @@ class PopupComponent :
             bounds,
             { dismissPopup(viewId) },
             cells.map {
-                KeyDef.Popup.Menu.Item(it.key, KeyShortcutLooks.of(it).icon, KeyAction.ShortcutAction(KeyShortcut.Command(it)))
+                // its name as the settings and the swipe's preview say it: what TalkBack reads of the cell
+                val looks = KeyShortcutLooks.of(it)
+                KeyDef.Popup.Menu.Item(context.getString(looks.label), looks.icon, KeyAction.ShortcutAction(KeyShortcut.Command(it)))
             }.toTypedArray(),
             onFocusMoved = { InputFeedbacks.hapticFeedback(it) },
             fixed = PopupMenuUi.Fixed(

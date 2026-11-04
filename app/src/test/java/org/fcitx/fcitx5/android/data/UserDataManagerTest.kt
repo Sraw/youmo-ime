@@ -4,8 +4,6 @@
  */
 package org.fcitx.fcitx5.android.data
 
-import org.fcitx.fcitx5.android.data.quickphrase.QuickPhraseManager
-import org.fcitx.fcitx5.android.host.QuickPhraseEntry
 import androidx.room.Room
 import kotlinx.coroutines.test.runTest
 import org.fcitx.fcitx5.android.BuildConfig
@@ -18,12 +16,14 @@ import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardDatabase
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.clipboard.importedClipboardMarker
+import org.fcitx.fcitx5.android.data.quickphrase.QuickPhraseManager
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.learn.backup.Backups
 import org.fcitx.fcitx5.android.engine.learn.backup.RestoreStash
 import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.user.WordLists
 import org.fcitx.fcitx5.android.host.ConfigHome
+import org.fcitx.fcitx5.android.host.QuickPhraseEntry
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -624,5 +624,27 @@ class UserDataManagerTest {
         const val FIRST_WITH_THE_RECORD = 2130L
         // upstream's, which the builds before the renaming carried
         const val UPSTREAM = 114L
+    }
+
+    // a backup restored unpacked till the disk was full (a zip bomb, or a phone nearly full): stopped
+    // once what is unpacked would pass the room there, told so, before the disk fills
+    // (import unpacks into a temporary folder before it copies anything in, so a restore stopped here changes nothing)
+    @Test
+    @Uat("PR-50")
+    fun aBackupBiggerThanTheRoomLeftStopsAsItIsUnpacked() {
+        val zip = java.io.ByteArrayOutputStream().also { out ->
+            java.util.zip.ZipOutputStream(out).use { z ->
+                z.putNextEntry(java.util.zip.ZipEntry("big"))
+                z.write(ByteArray(1 shl 20))
+                z.closeEntry()
+            }
+        }.toByteArray()
+        val dir = folder.newFolder("unpacked")
+        val e = runCatching { UserDataManager.extractWithinRoom(zip.inputStream(), dir, room = 4096) }.exceptionOrNull()
+        assertEquals(appContext.getString(R.string.exception_user_data_no_room), e?.message)
+        assertTrue("stopped near the room, not unpacked whole", dir.walk().filter { it.isFile }.sumOf { it.length() } <= 4096)
+        // the same with room enough: unpacked
+        val roomy = folder.newFolder("roomy")
+        assertEquals(listOf("big"), UserDataManager.extractWithinRoom(zip.inputStream(), roomy, room = 2L shl 20).map { it.name })
     }
 }

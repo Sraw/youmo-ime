@@ -14,7 +14,6 @@ import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.KeyState
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
@@ -60,7 +59,6 @@ class PickerWindow(
     private val commonKeyActionListener: CommonKeyActionListener by manager.must()
     private val popup: PopupComponent by manager.must()
     private val returnKeyDrawable: ReturnKeyDrawableComponent by manager.must()
-
 
     private var locked by AppPrefs.getInstance().internal.symbolPanelLocked
 

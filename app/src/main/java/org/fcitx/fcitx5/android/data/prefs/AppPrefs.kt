@@ -24,12 +24,12 @@ import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.NineKeySymbols
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
@@ -190,7 +190,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             apart = ManagedPreferenceUi.Apart(
                 taken = { shortcutMarkPosition.getValue().takeIf { it != KeyMarkPosition.None } },
                 note = R.string.mark_at_taken_by_shortcut,
-                read = { KeyMarkPosition.of(KeyMarks.settled(it.at, shortcutMarkPosition.getValue().at).symbol) },
+                read = { settledSymbol(it, shortcutMarkPosition.getValue()) },
             )
         )
         /** Where every key draws its shortcut's mark ([KeyMarkPosition]), whichever way swipes to it; apart from [punctuationPosition]. */
@@ -199,10 +199,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             "shortcut_mark_position",
             KeyMarkPosition.TopLeft,
             apart = ManagedPreferenceUi.Apart(
-                taken = {
-                    val symbol = KeyMarks.settled(punctuationPosition.getValue().at, shortcutMarkPosition.getValue().at).symbol
-                    KeyMarkPosition.of(symbol).takeIf { it != KeyMarkPosition.None }
-                },
+                taken = { settledSymbol(punctuationPosition.getValue(), shortcutMarkPosition.getValue()).takeIf { it != KeyMarkPosition.None } },
                 note = R.string.mark_at_taken_by_symbol,
             )
         )
@@ -782,7 +779,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
      */
     private fun settleMarkPositions() {
         val symbol = keyboard.punctuationPosition.getValue()
-        val settled = KeyMarkPosition.of(KeyMarks.settled(symbol.at, keyboard.shortcutMarkPosition.getValue().at).symbol)
+        val settled = settledSymbol(symbol, keyboard.shortcutMarkPosition.getValue())
         if (settled != symbol) keyboard.punctuationPosition.setValue(settled)
     }
 
@@ -905,3 +902,7 @@ enum class EnglishKeyboard(override val stringRes: Int, val keyboard: ImKeyboard
         fun of(keyboard: ImKeyboard) = entries.first { it.keyboard == keyboard }
     }
 }
+
+// where the symbol's mark is drawn with the shortcut's at [shortcut]: moved off it if it is there (KeyMarks.settled)
+private fun settledSymbol(symbol: KeyMarkPosition, shortcut: KeyMarkPosition) =
+    KeyMarkPosition.of(KeyMarks.settled(symbol.at, shortcut.at).symbol)

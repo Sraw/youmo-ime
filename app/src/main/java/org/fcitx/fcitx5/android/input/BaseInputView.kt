@@ -6,16 +6,7 @@
 package org.fcitx.fcitx5.android.input
 
 import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.res.Configuration
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.fcitx.fcitx5.android.data.quickphrase.QuickPhraseManager
-import org.fcitx.fcitx5.android.host.QuickPhraseBook
-import org.fcitx.fcitx5.android.utils.AppUtil
-import org.fcitx.fcitx5.android.utils.clipboardManager
-import org.fcitx.fcitx5.android.utils.toast
-import java.io.IOException
 import android.graphics.Rect
 import android.os.SystemClock
 import android.util.SparseArray
@@ -39,14 +30,20 @@ import androidx.core.text.color
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.doOnPreDraw
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineBridge
 import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.InputFeedbacks
+import org.fcitx.fcitx5.android.data.quickphrase.QuickPhraseManager
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
@@ -54,13 +51,17 @@ import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.reading.CharCard
 import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.host.QuickPhraseBook
 import org.fcitx.fcitx5.android.input.candidates.CharCardView
 import org.fcitx.fcitx5.android.input.learning.CandidateLearningMenu
 import org.fcitx.fcitx5.android.input.learning.UndoChip
 import org.fcitx.fcitx5.android.input.popup.CharCardLayout
+import org.fcitx.fcitx5.android.utils.AppUtil
+import org.fcitx.fcitx5.android.utils.clipboardManager
 import org.fcitx.fcitx5.android.utils.navbarFrameHeight
 import org.fcitx.fcitx5.android.utils.popIn
 import org.fcitx.fcitx5.android.utils.styledColorOrDefault
+import org.fcitx.fcitx5.android.utils.toast
 import splitties.dimensions.dp
 import splitties.resources.styledDrawable
 import splitties.views.dsl.core.withTheme
@@ -267,7 +268,8 @@ abstract class BaseInputView(
 
     /**
      * The long press's lines for the candidate [text] at [idx], and its character card: quick input's
-     * own lines for one of its entries (numbered over the whole list, not a page's); else the engine's
+     * own lines for one of its entries (numbered over the whole list, not a page's: a paged list's, the
+     * floating and physical keyboards', has none of them, as the host has no page offset for it); else the engine's
      * menu, worded by the app (U-82), with a handwritten character's card, or one looked up's (the
      * engine's alone), in the same trip; else, for an input method not the engine's, what the addon
      * offers, as it words it: not the addon's words where the engine's list changed under the press
@@ -309,14 +311,17 @@ abstract class BaseInputView(
                 }
             }
             // as wide as PopupMenu lets its menus grow
-            val widest = CharCardLayout.width(resources.displayMetrics.widthPixels, dp(320), twoColumns())
+            // (a card's two columns let it grow wider in landscape; a title's menu keeps PopupMenu's own limit)
+            val widest = CharCardLayout.width(resources.displayMetrics.widthPixels, dp(320), card != null && twoColumns())
             // the card (上屏 and 复制 in it), then the lines; else the title, then the lines
             val head = listOfNotNull(cardRow(card, accent, { candidateActionMenu?.dismiss() }) { fcitx.launchOnReady { it.select(idx, text) } })
             // a line picked may show others in its place (a block's confirmation, the reason): the same popup
             var shown = lines
+            // the first line's row: after the card, else after the title
+            val firstLine = head.size.coerceAtLeast(1)
             val adapter = object : ArrayAdapter<CharSequence>(themedContext, android.R.layout.simple_list_item_1, ArrayList()) {
                 override fun areAllItemsEnabled() = false
-                override fun isEnabled(position: Int) = position >= head.size.coerceAtLeast(1) && shown[position - head.size.coerceAtLeast(1)].enabled
+                override fun isEnabled(position: Int) = position >= firstLine && shown[position - firstLine].enabled
                 override fun getViewTypeCount() = 1 + head.size
                 override fun getItemViewType(position: Int) = if (position < head.size) position + 1 else 0
                 override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
@@ -337,7 +342,7 @@ abstract class BaseInputView(
                 setAdapter(adapter)
                 setContentWidth(width())
                 setOnItemClickListener { _, _, position, _ ->
-                    val next = shown[position - head.size.coerceAtLeast(1)].pick()
+                    val next = shown[position - firstLine].pick()
                     if (next == null) {
                         dismiss()
                         return@setOnItemClickListener
@@ -369,7 +374,7 @@ abstract class BaseInputView(
             null
         }
         val copy = CandidateLearningMenu.Line(context.getString(R.string.quick_phrase_copy)) {
-            context.clipboardManager.setPrimaryClip(ClipData.newPlainText(null, found.content))
+            copy(found.content)
             null
         }
         if (!found.mine) return listOf(commit, copy)
@@ -378,11 +383,14 @@ abstract class BaseInputView(
             null
         }
         val delete = CandidateLearningMenu.Line(context.getString(R.string.delete)) {
-            quickPhraseChange { QuickPhraseManager.remove(entry) }
+            // where it was and when last used, for 撤销 to put it back as it was
+            var removed: QuickPhraseManager.Removed? = null
+            quickPhraseChange { removed = QuickPhraseManager.remove(entry) }
             listOf(
                 CandidateLearningMenu.Line(context.getString(R.string.quick_phrase_deleted), enabled = false),
                 CandidateLearningMenu.Line(context.getString(R.string.undo)) {
-                    quickPhraseChange { QuickPhraseManager.put(null, entry, now = 0L) }
+                    // after the deletion (one at a time, in order): an entry the same added meanwhile is kept as it is
+                    quickPhraseChange { removed?.let { QuickPhraseManager.restore(it) } }
                     null
                 },
             )
@@ -390,14 +398,22 @@ abstract class BaseInputView(
         return listOf(commit, copy, edit, delete)
     }
 
-    // saved off the main thread, then quick input reads its files again
+    // the menu's changes to quick input, one at a time in the order made: an undo never runs before its deletion
+    private val quickPhraseChanges = Mutex()
+
+    /**
+     * [op] saved off the main thread, then quick input reads its files again. Failed (a file that cannot be
+     * written or read), it says why and closes the menu: no 已删除 shown for an entry still there.
+     */
     private fun quickPhraseChange(op: () -> Unit) {
         service.lifecycleScope.launch {
             try {
-                withContext(Dispatchers.IO) { op() }
-            } catch (e: IOException) {
+                quickPhraseChanges.withLock { withContext(Dispatchers.IO) { op() } }
+            } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                if (e is CancellationException) throw e
                 Timber.w(e, "quick phrase")
                 context.toast(e)
+                candidateActionMenu?.dismiss()
                 return@launch
             }
             fcitx.runIfReady { reloadConfig() }
@@ -478,15 +494,15 @@ abstract class BaseInputView(
                     close()
                 }
             }
-            addView(button(R.string.clipboard_split_commit, commit), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            addView(button(R.string.a11y_copy) { copy(card.text) }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(button(R.string.quick_phrase_commit, commit), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(button(R.string.quick_phrase_copy) { copy(card.text) }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         }
         return CharCardView(themedContext, card, textSize, twoColumns(), accent, buttons)
     }
 
-    // the character alone to the clipboard: nothing committed, what is typed stays
+    // [text] alone to the clipboard (a card's character, a quick input entry's content): nothing committed, what is typed stays
     private fun copy(text: String) {
-        context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(text, text))
+        context.clipboardManager.setPrimaryClip(ClipData.newPlainText(null, text))
     }
 
     // the menu's window [decor] grown from the middle of the candidate [pressed], wherever it opened

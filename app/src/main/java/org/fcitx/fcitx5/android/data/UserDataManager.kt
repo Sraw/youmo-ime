@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.data
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteException
+import androidx.annotation.VisibleForTesting
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -268,11 +269,19 @@ object UserDataManager {
 
     fun import(src: InputStream) = import(src, appDirs)
 
+    // stopped as it is unpacked once it would fill the disk (a zip bomb), not after
+    @VisibleForTesting
+    internal fun extractWithinRoom(src: InputStream, tempDir: File, room: Long = tempDir.usableSpace): List<File> {
+        return ZipInputStream(src).use {
+            it.extract(tempDir) { _, size, total -> if (total + size > room) errorRuntime(R.string.exception_user_data_no_room) }
+        }
+    }
+
     internal fun import(src: InputStream, dirs: Dirs) = runCatching {
         if (!dirs.settled) errorRuntime(R.string.user_data_not_settled)
         withTempDir { tempDir ->
             // closed before anything is copied: nothing may fail the import once the engine's is in
-            val extracted = ZipInputStream(src).use { it.extract(tempDir) }
+            val extracted = extractWithinRoom(src, tempDir)
             val metadataFile = extracted.find { it.name == "metadata.json" }
                 ?: errorRuntime(R.string.exception_user_data_metadata)
             val metadata = json.decodeFromString<Metadata>(metadataFile.readText())
