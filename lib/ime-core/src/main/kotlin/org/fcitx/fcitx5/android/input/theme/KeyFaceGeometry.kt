@@ -14,6 +14,13 @@ data class Area(val left: Float, val top: Float, val right: Float, val bottom: F
 }
 
 /**
+ * [radius] as a rounded rect [width]×[height] can take: half its shorter side at most, 0 for a rect
+ * with no size (a key squeezed to nothing in split screen, its gap and border wider than it).
+ */
+fun cornerRadius(radius: Float, width: Float, height: Float): Float =
+    radius.coerceIn(0f, maxOf(0f, min(width, height) / 2))
+
+/**
  * Where a key's layers go in its cell: the face, the shadow under it, the border's width, the
  * pressed layer. [face] null: no face (flat keys but the space and Return); [oval] the face and the
  * pressed layer are circles (flat Return). [radius] for the face, the shadow and the pressed layer.

@@ -32,7 +32,7 @@ import org.fcitx.fcitx5.android.input.theme.NineSlice
 import org.fcitx.fcitx5.android.input.theme.NineSliceLayout
 import org.fcitx.fcitx5.android.input.theme.PressEffect
 import org.fcitx.fcitx5.android.input.theme.ThemeColors
-import kotlin.math.min
+import org.fcitx.fcitx5.android.input.theme.cornerRadius
 
 /**
  * What a key's face is filled with: a colour, a nine-slice image of its keyboard's ([BoardImages];
@@ -130,7 +130,8 @@ class KeyFaceDrawable(
         val b = bounds
         canvas.save()
         canvas.translate(b.left.toFloat(), b.top.toFloat())
-        val area = f.face
+        // a key squeezed to nothing (split screen, its gap wider than it, ST-57): no face, not an inverted sliver
+        val area = f.face?.takeIf { it.hasSize }
         if (area != null) {
             f.shadow?.let {
                 paint.style = Paint.Style.FILL
@@ -143,7 +144,8 @@ class KeyFaceDrawable(
                 paint.strokeWidth = f.border
                 paint.color = borderColor
                 val half = f.border / 2
-                drawShape(canvas, Area(area.left + half, area.top + half, area.right - half, area.bottom - half), f, paint, f.radius - half)
+                val inner = Area(area.left + half, area.top + half, area.right - half, area.bottom - half)
+                if (inner.hasSize) drawShape(canvas, inner, f, paint, f.radius - half)
                 paint.style = Paint.Style.FILL
             }
         }
@@ -155,7 +157,7 @@ class KeyFaceDrawable(
         if (f.oval) {
             canvas.drawOval(rect, p)
         } else {
-            val r = radius.coerceIn(0f, min(rect.width(), rect.height()) / 2)
+            val r = cornerRadius(radius, rect.width(), rect.height())
             canvas.drawRoundRect(rect, r, r, p)
         }
     }
@@ -227,7 +229,7 @@ class KeyFaceDrawable(
         if (f.oval) {
             clip.addOval(rect, Path.Direction.CW)
         } else {
-            val r = f.radius.coerceIn(0f, min(rect.width(), rect.height()) / 2)
+            val r = cornerRadius(f.radius, rect.width(), rect.height())
             clip.addRoundRect(rect, r, r, Path.Direction.CW)
         }
         canvas.clipPath(clip)
@@ -268,12 +270,12 @@ class KeyFaceDrawable(
 
         override fun draw(canvas: Canvas) {
             val f = face ?: return
-            val a = f.pressed
+            val a = f.pressed.takeIf { it.hasSize } ?: return
             rect.set(a.left + bounds.left, a.top + bounds.top, a.right + bounds.left, a.bottom + bounds.top)
             if (f.oval) {
                 canvas.drawOval(rect, paint)
             } else {
-                val r = f.radius.coerceIn(0f, min(rect.width(), rect.height()) / 2)
+                val r = cornerRadius(f.radius, rect.width(), rect.height())
                 canvas.drawRoundRect(rect, r, r, paint)
             }
         }

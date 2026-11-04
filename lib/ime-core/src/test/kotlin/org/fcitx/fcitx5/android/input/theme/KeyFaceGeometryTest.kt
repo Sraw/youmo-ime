@@ -172,4 +172,21 @@ class KeyFaceGeometryTest {
         // a picture smaller than a block: one pixel of what there is
         assertArrayEquals(intArrayOf(2), BoxBlur.shrink(intArrayOf(1, 3), 2, 1, 4))
     }
+
+    @Test
+    fun aCornerIsHalfTheShorterSideAtMostAndNoneOnAKeySqueezedToNothing() {
+        assertEquals(6f, cornerRadius(6f, 40f, 30f))
+        assertEquals(15f, cornerRadius(20f, 40f, 30f))
+        assertEquals(0f, cornerRadius(-2f, 40f, 30f))
+        // split screen (ST-57): the border's inset wider than the key, a negative height threw an empty range
+        assertEquals(0f, cornerRadius(6f, 40f, -12.5f))
+        assertEquals(0f, cornerRadius(6f, -1f, -1f))
+    }
+
+    @Test
+    fun aKeySqueezedUnderItsGapHasAFaceOfNoSize() {
+        // split screen (ST-57): a 4×4 px cell inside a 3 dp gap at 2 px a dp; KeyFaceDrawable draws no face then
+        val face = KeyFaceGeometry.of(4f, 4f, KeyKind.Letter, keys, landscape = false, density = 2f)
+        assertTrue(face.face?.hasSize != true)
+    }
 }

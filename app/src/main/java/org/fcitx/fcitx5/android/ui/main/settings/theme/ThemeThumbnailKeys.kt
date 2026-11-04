@@ -15,7 +15,7 @@ import org.fcitx.fcitx5.android.input.theme.KeyFaceGeometry
 import org.fcitx.fcitx5.android.input.theme.KeyKind
 import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
-import kotlin.math.min
+import org.fcitx.fcitx5.android.input.theme.cornerRadius
 
 /**
  * A theme's keys in little, over its thumbnail's base: four rows as the 26 keys have them, each
@@ -81,7 +81,7 @@ class ThemeThumbnailKeys(private val look: ThemeLook, private val density: Float
         if (f.oval) {
             canvas.drawOval(rect, paint)
         } else {
-            val radius = f.radius.coerceIn(0f, min(rect.width(), rect.height()) / 2)
+            val radius = cornerRadius(f.radius, rect.width(), rect.height())
             canvas.drawRoundRect(rect, radius, radius, paint)
         }
     }
