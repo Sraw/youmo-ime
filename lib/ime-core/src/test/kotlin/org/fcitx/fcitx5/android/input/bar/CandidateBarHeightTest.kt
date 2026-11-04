@@ -12,16 +12,12 @@ import org.junit.Test
 class CandidateBarHeightTest {
 
     @Test
-    fun theBarFollowsTheTextAndTheDefaultKeepsTodaysBar() {
-        assertEquals(listOf(28, 40, 56), listOf(14, 20, 28).map { CandidateBarHeight.dp(it) })
-    }
-
-    @Test
     fun pinyinAddsALineAboveAndZhuyinNoHeight() {
-        // text sp, style, bar dp
+        // text sp, style, bar dp; off, the bar follows the text and the default keeps the old bar
         val table = listOf(
             Triple(14, ReadingStyle.OFF, 28),
             Triple(20, ReadingStyle.OFF, 40),
+            Triple(28, ReadingStyle.OFF, 56),
             Triple(14, ReadingStyle.PINYIN, 36),
             Triple(20, ReadingStyle.PINYIN, 52),
             Triple(28, ReadingStyle.PINYIN, 73),

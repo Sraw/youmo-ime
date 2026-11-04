@@ -15,8 +15,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.popup.PopupComponent
-import org.fcitx.fcitx5.android.input.InputView
+import org.fcitx.fcitx5.android.input.shortcut.EditMenuLayout
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
@@ -222,6 +221,28 @@ class SwipePopupScreenshotTest {
         }
     }
 
+    // TalkBack on the edit menu: each cell is read by its name as the settings and the swipe's preview
+    // say it (全选, 剪切 ...), never the command's enum name
+    @Test
+    @Uat("KB-62")
+    fun theEditMenusCellsAreReadByTheirLabels() {
+        KeyboardHarness(ThemePreset.PixelLight).use { h ->
+            h.start(prefill = { it.setText("hello") })
+            fun icons() = KeyboardHarness.all(h.inputView).filter { v ->
+                v is ImageView && h.shown(v) && generateSequence(v.parent as? View) { it.parent as? View }.none { it is KeyView }
+            }.toSet()
+            val before = icons()
+            val space = h.inputView.findViewById<View>(R.id.button_space)
+            val finger = h.finger(space, h.at(space))
+            for (i in 1..6) finger.move(h.at(space, dy = -10f * i, ms = 16))
+            val read = (icons() - before).sortedBy { h.box(it).left }.map { it.contentDescription?.toString() }
+            assertEquals(EditMenuLayout.CELLS.map { h.service.getString(KeyShortcutLooks.of(it).label) }, read)
+            finger.move(h.at(space, dy = 200f, ms = 16))
+            finger.up(h.at(space, dy = 200f))
+            h.idle()
+        }
+    }
+
     // review L1: the menu taken down with everything (another window, the keyboard's onDetached): the
     // failure back then, and the finger lifted after does not bring it back a second time
     @Test
@@ -231,7 +252,7 @@ class SwipePopupScreenshotTest {
             h.service.say("读不出来", steady = true)
             h.after(500)
             val said = h.notice()!!.contentView
-            val popup = InputView::class.java.getDeclaredField("popup").apply { isAccessible = true }.get(h.inputView) as PopupComponent
+            val popup = h.inputView.popup
             val gone = popup.onMenuGone
             var goes = 0
             popup.onMenuGone = { goes++; gone() }

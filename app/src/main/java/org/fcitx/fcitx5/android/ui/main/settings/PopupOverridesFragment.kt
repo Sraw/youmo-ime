@@ -155,13 +155,14 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         val stored = shortcuts
         val function = page.form == KeyShortcuts.FUNCTION
         val symbols = symbolsOf(page).iterator()
-        page.rows.forEachIndexed { i, row ->
+        page.rows.forEach { row ->
             val keys = if (function) row.take(1) else row
             with(content) { add(ctx.horizontalLayout {
                 gravity = if (page.leftAligned) Gravity.START else Gravity.CENTER_HORIZONTAL
                 keys.forEach { key ->
                     val names = if (function) row.map { it.name } else listOf(key.name)
-                    val label = if (function) getString(FunctionLabels.getValue(key.label)) else key.label
+                    // a function key of ime-core's not named here yet shows as it is called there, not a crash
+                    val label = if (function) FunctionLabels[key.label]?.let(::getString) ?: key.label else key.label
                     val said = names.map { said(it) ?: "–" }.joinToString(" / ").takeIf { names.any { said(it) != null } }
                     val marks = if (function) functionMarks(names) else charMarks(symbols.next(), key.name)
                     add(KeyCaps.key(ctx, label, "", marked = names.any(stored::isSet), dimmed = false, marks = marks, said = said).apply {
@@ -212,7 +213,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             .setPositiveButton(android.R.string.ok, null)
             .setNegativeButton(android.R.string.cancel, null)
         if (names.any(current::isSet)) {
-            builder.setNeutralButton(R.string.reset) { _, _ ->
+            builder.setNeutralButton(R.string.reset_this_key) { _, _ ->
                 shortcuts = names.fold(current) { s, n -> s.without(n) }
                 rebuild()
             }
@@ -400,7 +401,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             .setNegativeButton(android.R.string.cancel, null)
         val stored = shortcuts
         if (current[label] != null || name?.let(stored::isSet) == true) {
-            builder.setNeutralButton(R.string.reset) { _, _ ->
+            builder.setNeutralButton(R.string.reset_this_key) { _, _ ->
                 overrides = current.without(label)
                 name?.let { shortcuts = stored.without(it) }
                 rebuild()
@@ -483,7 +484,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         private const val KeyHeight = 52
         private const val OtherKeyWidth = 44
 
-        private fun pageTitle(page: KeyShortcutPages.Page) = when (page.form) {
+        internal fun pageTitle(page: KeyShortcutPages.Page) = when (page.form) {
             KeyShortcutPreset.FULL -> R.string.shortcut_page_full
             KeyShortcutPreset.NINE -> R.string.shortcut_page_nine
             KeyShortcutPreset.GROUPED14 -> R.string.shortcut_page_g14
@@ -491,11 +492,12 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             KeyShortcutPreset.ZHUYIN_NINE -> R.string.shortcut_page_zy9
             KeyShortcutPreset.ZHUYIN_FULL -> R.string.shortcut_page_zyfull
             KeyShortcutPreset.NUMBER -> R.string.shortcut_page_number
-            else -> R.string.shortcut_page_function
+            KeyShortcuts.FUNCTION -> R.string.shortcut_page_function
+            else -> error("no title for the shortcut page ${page.form}")
         }
 
         // the function keys' names on the page ([KeyShortcutPages.FUNCTION_KEYS])
-        private val FunctionLabels = mapOf(
+        internal val FunctionLabels = mapOf(
             "space" to R.string.fn_key_space, "backspace" to R.string.fn_key_backspace, "return" to R.string.fn_key_return,
             "shift" to R.string.fn_key_shift, "comma" to R.string.fn_key_comma, "period" to R.string.fn_key_period,
             "symbols" to R.string.fn_key_symbols, "numbers" to R.string.fn_key_numbers, "lang" to R.string.fn_key_lang,

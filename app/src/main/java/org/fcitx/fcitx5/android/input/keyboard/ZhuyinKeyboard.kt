@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.view.View
 import androidx.annotation.Keep
 import androidx.annotation.VisibleForTesting
 import androidx.core.view.isVisible
@@ -42,7 +41,7 @@ import org.fcitx.fcitx5.android.input.theme.KeyNames
  * three a row, and on the left the tones ˉ ˊ ˇ ˋ a key each (˙ on ˉ's long press), as Taiwan's
  * 元書 has them: each ends the syllable and filters by its tone. The key after the last group is
  * 分词 while typing, punctuation else (pinyin's nine keys' 1). A group's long press each of its symbols. The bottom row is the grouped keyboards'.
- * A symbol key's swipe reaches its shortcut ([ZhuyinShortcutHook]: 大千's by QWERTY place, the groups' by
+ * A symbol key's swipe reaches its shortcut ([ZhuyinShortcutNames]: 大千's by QWERTY place, the groups' by
  * their place); the tones (ˉ swipes to ˙) and the slot have none, as the nine keys' 1.
  */
 @SuppressLint("ViewConstructor")
@@ -54,7 +53,7 @@ class ZhuyinKeyboard(
     context,
     theme,
     if (nine) nineLayout() else fullLayout(keyboardCompact()),
-    // 注音九键's keys are not named yet: the format's grid for it is not the keyboard's (tones on the left)
+    // 注音九键's keys are named by their place in its own 4×5 grid (the tones in the first column), ⌫ by its role
     themeBoard = if (nine) KeyNames.ZHUYIN_NINE else KeyNames.ZHUYIN,
     shortcuts = true,
 ) {
@@ -102,7 +101,7 @@ class ZhuyinKeyboard(
                 // its shortcut and its theme name (KeyNames.ZHUYIN) by the QWERTY key it sits on, the swipe's preview naming it
                 key(
                     c.toString(), 20f * KeyTextScale.dachen(compact), if (r == 0) 1f / 11 else if (r == 3) 0.085f else 0.1f, sym(codeOf(c, nine = false)!!),
-                    arrayOf(KeyDef.Popup.AltPreview(c.toString(), c.toString())), ZhuyinShortcutHook.fullKey(q), name = q.toString(),
+                    arrayOf(KeyDef.Popup.AltPreview(c.toString(), c.toString())), ZhuyinShortcutNames.fullKey(q), name = q.toString(),
                 )
             }
             if (r == 3) keys + BackspaceKey(0.15f) else keys
@@ -145,7 +144,7 @@ class ZhuyinKeyboard(
                 key(
                     symbols, 18f, GROUP, sym(Keyboard.zhuyinNineKey(g)),
                     arrayOf(KeyDef.Popup.AltPreview(symbols, symbols), KeyDef.Popup.Keyboard.Explicit(symbols.map { it.toString() }.toTypedArray())),
-                    ZhuyinShortcutHook.nineKey("${g + 1}"),
+                    ZhuyinShortcutNames.nineKey("${g + 1}"),
                     name = "r${g / 3 + 1}c${g % 3 + 2}",
                 )
             }
@@ -190,15 +189,6 @@ class ZhuyinKeyboard(
             field = value
             showAddressKeys()
         }
-
-    private fun showAddressKeys() {
-        findViewById<View>(R.id.button_comma).isVisible = address == AddressKeys.NONE
-        findViewById<View>(R.id.button_period).isVisible = address == AddressKeys.NONE
-        findViewById<View>(R.id.button_dot).isVisible = address != AddressKeys.NONE
-        findViewById<View>(R.id.button_slash).isVisible = address == AddressKeys.URL
-        findViewById<View>(R.id.button_at).isVisible = address == AddressKeys.EMAIL
-        findViewById<View>(R.id.button_domain).isVisible = address != AddressKeys.NONE
-    }
 
     private val showLangSwitchKey = AppPrefs.getInstance().keyboard.showLangSwitchKey
 

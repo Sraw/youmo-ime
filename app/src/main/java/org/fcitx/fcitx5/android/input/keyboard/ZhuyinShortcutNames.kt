@@ -12,7 +12,7 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
  * key's [fullKey] of the QWERTY key it sits on (051-zhuyin §1.3), 注音九键's group [nineKey] of its
  * place in the grid, 1 to 11 ([org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPages.ZhuyinNine]).
  */
-object ZhuyinShortcutHook {
+object ZhuyinShortcutNames {
     fun fullKey(qwerty: Char): String = KeyShortcuts.charKey(KeyShortcutPreset.ZHUYIN_FULL, qwerty.lowercase())
 
     fun nineKey(key: String): String = KeyShortcuts.charKey(KeyShortcutPreset.ZHUYIN_NINE, key)

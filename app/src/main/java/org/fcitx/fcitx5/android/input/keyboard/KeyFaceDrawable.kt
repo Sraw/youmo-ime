@@ -233,6 +233,7 @@ class KeyFaceDrawable(
         canvas.clipPath(clip)
     }
 
+    // not taken: the face is drawn in the theme's colours as they are; fade the view (View.alpha) instead
     override fun setAlpha(alpha: Int) = Unit
 
     override fun setColorFilter(colorFilter: ColorFilter?) = Unit

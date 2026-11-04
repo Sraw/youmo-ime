@@ -115,7 +115,8 @@ object KeyCaps {
                 add(label, lParams(wrapContent, wrapContent))
                 if (hint.isNotEmpty()) add(small, lParams(wrapContent, wrapContent))
             }, lParams(wrapContent, wrapContent, Gravity.CENTER))
-            else -> add(label, lParams(matchParent, matchParent))
+            // no hint drawn there (a slot over the key's middle, or none): the label alone
+            KeyMarks.Slot.Top, KeyMarks.Slot.Bottom, null -> add(label, lParams(matchParent, matchParent))
         }
     }
 

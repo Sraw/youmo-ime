@@ -39,7 +39,6 @@ import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
@@ -409,7 +408,7 @@ class T9Keyboard(
 
         private fun layoutOf(on: (Char) -> String, symbols: NineKeySymbols, english: Boolean): List<List<KeyDef>> = listOf(
             listOf(
-                spacer("side"),
+                spacer(SIDE_KEY),
                 KeyDef(
                     KeyDef.Appearance.AltText(displayText = if (english) ENGLISH_ONE_LABEL else ONE, altText = "1", textSize = 16f, percentWidth = DIGIT),
                     setOf(
@@ -566,7 +565,7 @@ class T9Keyboard(
         val density = resources.displayMetrics.density
         drawAsKey(
             theme, KeyStyleResolver.resolve(keys, KeyNames.NINE, SIDE_KEY, KeyKind.Function), KeyKind.Function, keyImages,
-            { w, hh -> KeyFaceGeometry.of(w, hh, KeyKind.Function, keys, landscape, density, true, KeyFaceGeometry.Border.On) },
+            { width, height -> KeyFaceGeometry.of(width, height, KeyKind.Function, keys, landscape, density, true, KeyFaceGeometry.Border.On) },
             press = false,
         )
         setPadding(h, v, h, v)

@@ -70,11 +70,11 @@ object KeySwipe {
         cancelled: Boolean,
         password: Boolean,
     ): Outcome {
-        if (consumed || cancelled) return Outcome.None
+        // 关 is 0.5.0's 禁用: no swipe on any key, a function key's tap kept as a character key's is
+        if (consumed || cancelled || layers.allOff) return Outcome.None
         if (!swiped && totalY == 0) return Outcome.None
         return when (key) {
             is Key.Char -> when {
-                layers.allOff -> Outcome.None
                 totalY == 0 -> Outcome.Cancel
                 else -> when (layers.layerOf(totalY)) {
                     Layer.Off -> Outcome.Tap

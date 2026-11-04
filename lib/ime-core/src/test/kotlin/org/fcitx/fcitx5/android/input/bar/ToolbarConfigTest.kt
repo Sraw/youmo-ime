@@ -110,9 +110,9 @@ class ToolbarConfigTest {
         val arranged = ToolbarConfig.parse("undo,redo,cursor_move,clipboard,|,emoji,voice,hide")
         assertEquals(Item.Button(ToolbarButton.QuickPhrase, false), quick(arranged))
         // ticked, it is on the toolbar where it stands in the list
-        val ticked = ToolbarConfig.parse("undo,redo,cursor_move,clipboard,quick_phrase,|,emoji,voice,hide")
+        val ticked = ToolbarConfig.parse("undo,redo,cursor_move,clipboard,quick_input,|,emoji,voice,hide")
         assertEquals(listOf(Undo, Redo, CursorMove, Clipboard, ToolbarButton.QuickPhrase, More), ticked.layout(everything).toolbar)
-        assertEquals(ToolbarButton.QuickPhrase, ToolbarButton.ofKey("quick_phrase"))
+        assertEquals(ToolbarButton.QuickPhrase, ToolbarButton.ofKey("quick_input"))
     }
 
     @Test

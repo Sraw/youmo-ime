@@ -23,7 +23,7 @@ import org.fcitx.fcitx5.android.input.picker.PickerWindow
 val NumLockState = KeyStates(KeyState.NumLock, KeyState.Virtual)
 
 // a theme's names of keys by what they type (KeyNames' roles): the same key on every keyboard
-private val SYMBOL_NAMES = mapOf(";" to "semicolon", "*" to "star", "," to "comma", "." to "period")
+internal val SYMBOL_NAMES = mapOf(";" to "semicolon", "*" to "star", "," to "comma", "." to "period")
 
 // an address's own keys, beside the comma and period they are shown in place of
 private val ADDRESS_NAMES = mapOf("/" to "slash", "@" to "at", "." to "dot")
@@ -202,7 +202,9 @@ class BackspaceKey(
     ),
     name = "backspace",
     shortcut = "backspace",
-)
+) {
+    override val swipesBothWays get() = true
+}
 
 class LanguageKey : KeyDef(
     Appearance.Image(
@@ -239,7 +241,9 @@ class SpaceKey : KeyDef(
     ),
     name = "space",
     shortcut = "space",
-)
+) {
+    override val swipesBothWays get() = true
+}
 
 class ReturnKey(percentWidth: Float = 0.15f) : KeyDef(
     Appearance.Image(
@@ -381,7 +385,9 @@ class MiniSpaceKey : KeyDef(
     ),
     name = "space",
     shortcut = "space",
-)
+) {
+    override val swipesBothWays get() = true
+}
 
 class NumPadKey(
     displayText: String,

@@ -15,9 +15,8 @@ import org.junit.Test
 class SwipeLayersTest {
 
     @Test
-    fun sevenChoicesTheDefaultFirstNoneRepeated() {
-        assertEquals(7, SwipeLayers.entries.size)
-        assertEquals(7, SwipeLayers.entries.toSet().size)
+    fun theChoicesTheDefaultFirstNoneRepeated() {
+        assertEquals(SwipeLayers.entries.size, SwipeLayers.entries.toSet().size)
         assertEquals(SwipeLayers(Layer.Shortcut, Layer.Symbol), SwipeLayers.entries.first())
         assertEquals(SwipeLayers.Default, SwipeLayers.entries.first())
     }

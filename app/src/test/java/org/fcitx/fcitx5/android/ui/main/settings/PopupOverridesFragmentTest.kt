@@ -18,7 +18,9 @@ import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPages
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.uat.SettingsHarness
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
@@ -26,6 +28,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -105,6 +108,9 @@ class PopupOverridesFragmentTest {
 
         private val st = SettingsHarness()
 
+        @get:Rule
+        val prefs = PrefsRule()
+
         @After
         fun close() = st.close()
 
@@ -134,6 +140,8 @@ class PopupOverridesFragmentTest {
         @Test
         fun aLettersShortcutIsSetInItsDialog() {
             val pref = AppPrefs.getInstance().internal.keyShortcuts
+            // put back after, passed or failed: a later swipe test expects the presets (full/a = 全选)
+            prefs.set(pref, pref.getValue())
             st.activity
             st.open(SettingsRoute.PopupOverrides)
             KeyboardHarness.all(st.activity.window.decorView)
@@ -148,13 +156,14 @@ class PopupOverridesFragmentTest {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             st.idle()
             assertEquals(KeyShortcut.Text("你好"), KeyShortcuts.parse(pref.getValue()).resolve("full/q"))
-            pref.setValue("")
         }
-    
+
         // a whole page's shortcuts cleared only once the user says so: cancelled, nothing changed
         @Test
         fun aPageIsClearedOfItsShortcutsOnlyOnceConfirmed() {
             val pref = AppPrefs.getInstance().internal.keyShortcuts
+            // put back after, passed or failed: a later swipe test expects the presets (full/a = 全选)
+            prefs.set(pref, pref.getValue())
             st.activity
             st.open(SettingsRoute.PopupOverrides)
             fun clearPage(): AlertDialog {
@@ -169,7 +178,14 @@ class PopupOverridesFragmentTest {
             clearPage().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             st.idle()
             assertEquals(KeyShortcut.None, KeyShortcuts.parse(pref.getValue()).resolve("full/a"))
-            pref.setValue("")
         }
-}
+    }
+
+    // a page or function key ime-core adds with no title or name here: the page's title would throw
+    // (an unknown page has no fallback) and the key show its bare name; caught here, not on a phone
+    @Test
+    fun everyShortcutPageHasATitleAndEveryFunctionKeyAName() {
+        KeyShortcutPages.all.forEach { PopupOverridesFragment.pageTitle(it) }
+        assertEquals(emptyList<String>(), KeyShortcutPages.FUNCTION_KEYS.filter { it !in PopupOverridesFragment.FunctionLabels })
+    }
 }

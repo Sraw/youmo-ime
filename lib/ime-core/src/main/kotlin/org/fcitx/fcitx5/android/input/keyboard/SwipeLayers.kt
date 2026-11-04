@@ -29,6 +29,7 @@ data class SwipeLayers(val up: Layer, val down: Layer) {
 
     /** Which way swipes to [layer]: true up, false down, null neither. */
     fun wayOf(layer: Layer): Boolean? = when (layer) {
+        Layer.Off -> null
         up -> true
         down -> false
         else -> null

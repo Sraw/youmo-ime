@@ -17,6 +17,11 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 
+/** Whether a key's long press showed a popup in this touch: set by its popup's listener, read by its swipe. */
+internal class LongPopup {
+    var shown = false
+}
+
 /**
  * A keyboard's keys' vertical swipes ([KeySwipe]): to their symbol (a [KeyDef.Behavior.Swipe]) and
  * their shortcut ([KeyDef.shortcut]), and the marks that show both. Apart from [BaseKeyboard], which
@@ -98,10 +103,10 @@ internal class KeySwipes(
      * menu opened there and picked from as the finger moves on; none after its long press showed a
      * popup ([longPopup]).
      */
-    fun attach(view: KeyView, def: KeyDef, longPopup: BooleanArray) {
+    fun attach(view: KeyView, def: KeyDef, longPopup: LongPopup) {
         val builtIn = def.behaviors.firstNotNullOfOrNull { (it as? KeyDef.Behavior.Swipe)?.action }
         if (builtIn == null && (def.shortcut == null || !shortcuts)) return
-        val both = def is SpaceKey || def is MiniSpaceKey || def is BackspaceKey
+        val both = def.swipesBothWays
         if (shortcuts) swipingKeys.add(view to def)
         view.swipeEnabled = true
         view.swipeThresholdY = threshold
@@ -114,7 +119,7 @@ internal class KeySwipes(
             when (event.type) {
                 GestureType.Down -> {
                     menu = false
-                    longPopup[0] = false
+                    longPopup.shown = false
                     false
                 }
                 GestureType.Move -> when {
@@ -123,7 +128,7 @@ internal class KeySwipes(
                         keyboard.onPopupChangeFocus(v.id, event.x, event.y)
                         true
                     }
-                    longPopup[0] || event.countY == 0 || event.totalY - event.countY != 0 -> false
+                    longPopup.shown || event.countY == 0 || event.totalY - event.countY != 0 -> false
                     else -> {
                         menu = swipeReached(v, def, event.totalY)
                         menu
@@ -135,13 +140,17 @@ internal class KeySwipes(
                     if (!keyboard.onPopupTrigger(v.id, event.cancelled)) keyboard.onPopupAction(PopupAction.DismissAction(v.id))
                     true
                 } else {
-                    lifted(v, def, event, builtIn, longPopup[0])
+                    lifted(v, def, event, builtIn, longPopup.shown)
                 }
             } || old.onGesture(v, event)
         }
     }
 
-    /** Each swiping key's marks ([KeyMarks]) as the settings are now: its symbol and its shortcut. */
+    /**
+     * Each swiping key's marks ([KeyMarks]) as the settings are now: its symbol and its shortcut. The
+     * orientation is read once here: turning the screen makes the input view anew (onConfigurationChanged),
+     * whose keyboard places them again as it attaches.
+     */
     fun showMarks() {
         val layers = swipeLayers
         val spots = markSpots()

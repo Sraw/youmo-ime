@@ -27,9 +27,15 @@ class KeyboardHeightLevelsTest {
     @Test
     fun aValueBetweenIsAtTheNearest() {
         // set by an older version's sliders: no migration, shown (and drawn) as the nearest level
-        assertTrue(KeyboardHeightLevels.isCompact(23, 38))
+        assertTrue(KeyboardHeightLevels.isCompact(22, 37))
         assertEquals(1, KeyboardHeightLevels.nearest(24, 40))
         assertEquals(KeyboardHeightLevels.COMPACT, KeyboardHeightLevels.nearest(10, 10))
         assertEquals(4, KeyboardHeightLevels.nearest(90, 90))
+    }
+
+    @Test
+    fun exactlyHalfwayIsTheLowerLevel() {
+        // the old 23% / 38%, as far from 紧凑's 20 / 34 as from the next's 26 / 42: 紧凑
+        assertTrue(KeyboardHeightLevels.isCompact(23, 38))
     }
 }

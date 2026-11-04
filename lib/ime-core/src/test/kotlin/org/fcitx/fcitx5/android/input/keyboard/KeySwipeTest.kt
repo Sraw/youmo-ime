@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.input.keyboard.KeySwipe.Key
 import org.fcitx.fcitx5.android.input.keyboard.KeySwipe.Outcome
 import org.fcitx.fcitx5.android.input.keyboard.KeySwipe.Preview
@@ -54,9 +55,13 @@ class KeySwipeTest {
     }
 
     @Test
+    @Uat("ST-15")
     fun bothOffLeavesTheKeyAsItWas() {
         assertEquals(Outcome.None, up(a, -1, off))
         assertEquals(Outcome.None, up(a, 0, off, swiped = true))
+        // 关 is 0.5.0's 禁用: a function key swiped out and back still taps
+        assertEquals(Outcome.None, up(space, 0, off, swiped = true))
+        assertEquals(Outcome.None, up(space, 2, off))
     }
 
     @Test
@@ -90,8 +95,10 @@ class KeySwipeTest {
         assertEquals(Outcome.None, up(both, -1, off))
     }
 
+    // the key's own preview where the lift does nothing as well: swiped back, or a password's copy
+    // (lifted it cancels, as swiped and back does; the preview shows no shortcut that would not run)
     @Test
-    fun thePreviewIsWhatTheLiftWouldDo() {
+    fun thePreviewIsWhatTheLiftWouldDoTheKeysOwnWhereItDoesNothing() {
         assertEquals(Preview.Shortcut(selectAll), KeySwipe.preview(a, SwipeLayers.Default, -1, password = false))
         assertEquals(Preview.Symbol, KeySwipe.preview(a, SwipeLayers.Default, 1, password = false))
         assertEquals(Preview.Own, KeySwipe.preview(s, SwipeLayers.Default, -1, password = false))

@@ -103,7 +103,7 @@ class NineKeySymbolsFragment : KeyCapsPageFragment() {
             }
             .setNegativeButton(android.R.string.cancel, null)
         if (!current.isDefault(digit)) {
-            builder.setNeutralButton(R.string.reset) { _, _ ->
+            builder.setNeutralButton(R.string.reset_this_key) { _, _ ->
                 save(current.with(digit, default))
                 rebuild()
             }

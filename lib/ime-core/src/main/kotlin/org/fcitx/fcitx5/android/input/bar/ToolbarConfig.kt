@@ -39,7 +39,7 @@ enum class ToolbarButton(val key: String) {
     Keyboard("keyboard"),
 
     /** 快速输入, as a long press on 符 opens it */
-    QuickPhrase("quick_phrase");
+    QuickPhrase("quick_input");
 
     companion object {
         fun ofKey(key: String) = entries.firstOrNull { it.key == key }

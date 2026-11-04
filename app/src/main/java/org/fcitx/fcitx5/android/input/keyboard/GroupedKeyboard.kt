@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.view.View
 import androidx.annotation.Keep
 import androidx.core.view.children
 import androidx.core.view.isVisible
@@ -67,7 +66,7 @@ class GroupedKeyboard(
     private val semicolon: Boolean = true,
 ) : BaseKeyboard(
     context, theme, layout(letters, wire, semicolon, ::symbolsOf),
-    themeBoard = if (letters == NineKeyLetters.G18) KeyNames.K18 else KeyNames.K14,
+    themeBoard = shapeOf(letters).board,
     shortcuts = true,
 ) {
 
@@ -95,13 +94,16 @@ class GroupedKeyboard(
 
         private const val SIDE = 0.15f
 
-        /** How [letters]' groups lie: the groups in each of the three rows, a row's key widths, and their corners. */
-        private class Shape(val rows: List<Int>, val widths: List<Float>, val corners: List<String>)
+        /**
+         * How [letters]' groups lie: the groups in each of the three rows, a row's key widths, and their corners;
+         * the keyboard's name in a theme ([board]) and its keys' shortcuts' ([preset]).
+         */
+        private class Shape(val rows: List<Int>, val widths: List<Float>, val corners: List<String>, val board: String, val preset: String)
 
         private fun shapeOf(letters: NineKeyLetters) = when (letters) {
-            NineKeyLetters.G14 -> Shape(listOf(5, 5, 4), listOf(0.2f, 0.2f, 0.175f), CORNERS)
+            NineKeyLetters.G14 -> Shape(listOf(5, 5, 4), listOf(0.2f, 0.2f, 0.175f), CORNERS, KeyNames.K14, KeyShortcutPreset.GROUPED14)
             // seven on top as wide as each other, six under them, five between the separator and backspace
-            NineKeyLetters.G18 -> Shape(listOf(7, 6, 5), listOf(1f / 7, 1f / 6, 0.14f), CORNERS18)
+            NineKeyLetters.G18 -> Shape(listOf(7, 6, 5), listOf(1f / 7, 1f / 6, 0.14f), CORNERS18, KeyNames.K18, KeyShortcutPreset.GROUPED18)
             else -> error("no grouped keyboard of ${letters.tag()}")
         }
 
@@ -188,7 +190,7 @@ class GroupedKeyboard(
             val first = shape.rows.runningFold(0, Int::plus)
             fun row(r: Int) = (first[r] until first[r + 1]).map {
                 groupKey(
-                    if (letters == NineKeyLetters.G14) KeyShortcutPreset.GROUPED14 else KeyShortcutPreset.GROUPED18,
+                    shape.preset,
                     groups[it], letters.codes[it], shape.corners[it], shape.widths[r], symbolsOf, wire, "r${r + 1}c${it - first[r] + 1}",
                 )
             }
@@ -250,15 +252,6 @@ class GroupedKeyboard(
             field = value
             showAddressKeys()
         }
-
-    private fun showAddressKeys() {
-        findViewById<View>(R.id.button_comma).isVisible = address == AddressKeys.NONE
-        findViewById<View>(R.id.button_period).isVisible = address == AddressKeys.NONE
-        findViewById<View>(R.id.button_dot).isVisible = address != AddressKeys.NONE
-        findViewById<View>(R.id.button_slash).isVisible = address == AddressKeys.URL
-        findViewById<View>(R.id.button_at).isVisible = address == AddressKeys.EMAIL
-        findViewById<View>(R.id.button_domain).isVisible = address != AddressKeys.NONE
-    }
 
     private val showLangSwitchKey = AppPrefs.getInstance().keyboard.showLangSwitchKey
 

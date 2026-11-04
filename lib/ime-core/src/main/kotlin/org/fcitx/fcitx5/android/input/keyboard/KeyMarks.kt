@@ -77,13 +77,18 @@ object KeyMarks {
      * Where a key's shortcut marks, in [slots] (a function key's up one, then its down one mirrored; or
      * one alone), are tried in turn when they have no room there, before one is left out: each a slot
      * for each, the first in a corner of [LowOrder]'s order, a function key's down one in that corner
-     * mirrored; none in [taken] (its symbol's slot) or where they are now.
+     * mirrored, the up one on the side (top or bottom) it is on now; none in [taken] (its symbol's
+     * slot) or where they are now.
      */
     fun elsewhere(slots: List<Slot>, taken: Collection<Slot>): List<List<Slot>> {
         if (slots.isEmpty() || slots.size > 2) return emptyList()
         return LowOrder.mapNotNull { it.corner }
             .map { if (slots.size == 1) listOf(it) else listOf(it, it.mirrored) }
             .filter { alt -> alt.none { it in taken || it in slots } }
+            // of the same two corners, the pair keeping the up mark on the side (top or bottom) it is
+            // drawn on now, as the user's setting put it; never both orders, and the corners' order kept
+            .groupBy { it.toSet() }.values
+            .map { same -> same.firstOrNull { it[0].bottom == slots[0].bottom } ?: same[0] }
     }
 
     /** A shortcut's slot at [at] as [onKeys] gave it; null for none drawn. */

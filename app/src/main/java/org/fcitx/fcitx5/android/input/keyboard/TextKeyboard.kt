@@ -214,15 +214,6 @@ class TextKeyboard private constructor(
             showAddressKeys()
         }
 
-    private fun showAddressKeys() {
-        findViewById<View>(R.id.button_comma).isVisible = address == AddressKeys.NONE
-        findViewById<View>(R.id.button_period).isVisible = address == AddressKeys.NONE
-        findViewById<View>(R.id.button_dot).isVisible = address != AddressKeys.NONE
-        findViewById<View>(R.id.button_slash).isVisible = address == AddressKeys.URL
-        findViewById<View>(R.id.button_at).isVisible = address == AddressKeys.EMAIL
-        findViewById<View>(R.id.button_domain).isVisible = address != AddressKeys.NONE
-    }
-
     private val showLangSwitchKey = AppPrefs.getInstance().keyboard.showLangSwitchKey
 
     @Keep
@@ -587,13 +578,17 @@ class TextKeyboard private constructor(
     }
 
     private fun updatePunctuationKeys() {
+        // a corner emptied or filled (a long press turned off, Shift's list): the marks placed for it move
+        var cornersChanged = false
         textKeys.forEach {
             if (it is AltTextKeyView) {
                 it.def as KeyDef.Appearance.AltText
                 val letter = it.def.displayText.singleOrNull()?.takeIf { c -> c.isLetter() }
+                val had = it.altText.text.isNotEmpty()
                 // a table's roots over the letter: the letter in the corner, its swipe as it was
                 it.altText.text = if (letter != null && table?.labelled == true) letter.lowercase()
                 else transformPunctuation(swipeOverride(it.def) ?: it.def.altText)
+                if (had != it.altText.text.isNotEmpty()) cornersChanged = true
             } else {
                 it.def as KeyDef.Appearance.Text
                 // an address's keys commit as they are, and say so: . not 。
@@ -605,6 +600,7 @@ class TextKeyboard private constructor(
                 }
             }
         }
+        if (cornersChanged && isAttachedToWindow) showSwipeMarks()
     }
 
 

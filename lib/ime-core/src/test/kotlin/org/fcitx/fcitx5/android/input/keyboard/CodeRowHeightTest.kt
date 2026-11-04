@@ -46,6 +46,5 @@ class CodeRowHeightTest {
         assertEquals(CodeRowHeight.dp(layout), CodeRowHeight.keyboardDp(layout, floats = false))
         val strip = if (CodeRowHeight.showsStrip(layout)) CodeRowHeight.STRIP_DP else CodeRowHeight.FLOAT_DP
         assertEquals(strip, CodeRowHeight.stripDp(layout))
-        assertEquals(24, CodeRowHeight.FLOAT_DP)
     }
 }

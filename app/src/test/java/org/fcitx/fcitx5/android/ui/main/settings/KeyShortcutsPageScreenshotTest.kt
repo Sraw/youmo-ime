@@ -89,7 +89,7 @@ class KeyShortcutsPageScreenshotTest {
     @Test
     fun everyTabsKeysWithTheirMarks() {
         open()
-        // a's select all top left and its @ bottom right (滑动 swipes down to it), as on the keyboard; s's * alone bottom right
+        // a's select all top left and its @ top right (标点位置's default), as on the keyboard; s's * alone top right
         assertEquals(1, icons(key("a")))
         assertEquals(0, icons(key("s")))
         capture("full")

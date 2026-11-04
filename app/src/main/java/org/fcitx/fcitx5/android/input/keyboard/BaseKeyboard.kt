@@ -127,6 +127,19 @@ abstract class BaseKeyboard(
     /** Set per field ([KeyboardWindow]): an address's has no glide typing, as no word is typed there. */
     open var address: AddressKeys = AddressKeys.NONE
 
+    /**
+     * The bottom row's address keys as [address] says, for a keyboard that has them (the letters', the
+     * grouped and 注音's): the comma and period in an ordinary field, the dot, slash or @ and domain in an address.
+     */
+    protected fun showAddressKeys() {
+        findViewById<View>(R.id.button_comma).isVisible = address == AddressKeys.NONE
+        findViewById<View>(R.id.button_period).isVisible = address == AddressKeys.NONE
+        findViewById<View>(R.id.button_dot).isVisible = address != AddressKeys.NONE
+        findViewById<View>(R.id.button_slash).isVisible = address == AddressKeys.URL
+        findViewById<View>(R.id.button_at).isVisible = address == AddressKeys.EMAIL
+        findViewById<View>(R.id.button_domain).isVisible = address != AddressKeys.NONE
+    }
+
     private val glideTyping = prefs.keyboard.glideTyping
     private val strokeFilter = prefs.keyboard.strokeFilter
 
@@ -475,7 +488,7 @@ abstract class BaseKeyboard(
                 }
             }
             // set as its long press shows a popup, which then has the touch: no swipe of the key's after that
-            val longPopup = booleanArrayOf(false)
+            val longPopup = LongPopup()
             swipes.attach(this, def, longPopup)
             def.popup?.forEach { popup ->
                 when (popup) {
@@ -483,7 +496,7 @@ abstract class BaseKeyboard(
                     is KeyDef.Popup.Menu -> {
                         setOnLongClickListener { view ->
                             view as KeyView
-                            longPopup[0] = true
+                            longPopup.shown = true
                             onPopupAction(PopupAction.ShowMenuAction(view.id, popup, view.bounds))
                             // do not consume this LongClick gesture
                             false
@@ -506,7 +519,7 @@ abstract class BaseKeyboard(
                     is KeyDef.Popup.Keyboard -> {
                         setOnLongClickListener { view ->
                             view as KeyView
-                            longPopup[0] = true
+                            longPopup.shown = true
                             onPopupAction(PopupAction.ShowKeyboardAction(view.id, popup, view.bounds))
                             // do not consume this LongClick gesture
                             false

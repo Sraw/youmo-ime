@@ -213,7 +213,7 @@ class HandwritingKeyboardTest {
     fun itsLongPressSetsEachStyle() {
         val keyboard = keyboard()
         runAll()
-        val menu = HandwritingKeyboard.layout(keyboard.context)[3][1].popup!!.single() as KeyDef.Popup.Menu
+        val menu = HandwritingKeyboard.layout(keyboard.context).flatten().first { it.appearance.viewId == R.id.button_reading }.popup!!.single() as KeyDef.Popup.Menu
         val c = keyboard.context
         assertEquals(
             listOf(R.string.im_candidate_reading_off, R.string.im_candidate_reading_pinyin, R.string.im_candidate_reading_zhuyin).map(c::getString),

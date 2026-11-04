@@ -230,9 +230,12 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         return KeyMarkYield.Ink(x, y, x + ink.width, y + ink.height)
     }
 
+    // 紧凑 as the keyboard was made: read once, not at each layout (the keyboard is made anew as it changes)
+    private val compact = keyboardCompact()
+
     // a mark's room from the face's top or bottom, and its side: 紧凑's closer in
-    private fun markInset() = dp(if (keyboardCompact()) 1 else 2)
-    private fun markInsetSide() = dp(if (keyboardCompact()) 2 else 3)
+    private fun markInset() = dp(if (compact) 1 else 2)
+    private fun markInsetSide() = dp(if (compact) 2 else 3)
 
     /** This view, whose ink is [from], drawn as [to] (as wide to tall, from its own top left), or not at all (null). */
     protected fun View.settle(from: KeyMarkYield.Ink, to: KeyMarkYield.Ink?) {
@@ -306,7 +309,7 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
     // [slot]'s place on the face; 紧凑: smaller and into the corner, or on 大千's narrow low keys the
     // icon sat on the symbol
     private fun markParams(slot: KeyMarks.Slot, text: Boolean): ConstraintLayout.LayoutParams {
-        val size = dp(if (keyboardCompact()) MARK_ICON_COMPACT_DP else MARK_ICON_DP)
+        val size = dp(if (compact) MARK_ICON_COMPACT_DP else MARK_ICON_DP)
         val inset = markInset()
         val insetSide = markInsetSide()
         return ConstraintLayout.LayoutParams(if (text) 0 else size, if (text) wrapContent else size).apply {

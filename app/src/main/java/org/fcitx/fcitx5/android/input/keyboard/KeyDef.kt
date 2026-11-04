@@ -25,6 +25,9 @@ open class KeyDef(
      */
     val shortcut: String? = null,
 ) {
+    /** Whether the key's swipes go both ways (the cursor sideways, the shortcuts up and down), each locked to its axis. */
+    open val swipesBothWays: Boolean get() = false
+
     sealed class Appearance(
         val percentWidth: Float,
         val variant: Variant,

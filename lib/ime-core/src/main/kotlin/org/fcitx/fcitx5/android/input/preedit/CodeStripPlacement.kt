@@ -11,7 +11,7 @@ import org.fcitx.fcitx5.android.input.UndoChipPlacement.Box
  * board's top-left corner, left-aligned with the board as drawn (docked, one-handed at a side,
  * floating anywhere), so it goes with the board. Where there is no room above it (a floating
  * keyboard dragged to the top), outside its bottom instead; room on neither side, over the board's
- * top within the room. Never wider than the board.
+ * top within the room. Never wider than the board: the caller sizes [place]'s width to it.
  */
 object CodeStripPlacement {
 

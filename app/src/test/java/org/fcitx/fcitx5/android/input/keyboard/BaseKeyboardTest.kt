@@ -26,11 +26,13 @@ import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -53,6 +55,9 @@ import org.robolectric.annotation.Config
  */
 @RunWith(RobolectricTestRunner::class)
 class BaseKeyboardTest {
+
+    @get:Rule
+    val prefs = PrefsRule()
 
     /** The input view's lifecycle, which the keys' long-press timers run in. */
     private class Owner : LifecycleOwner {
@@ -327,20 +332,14 @@ class BaseKeyboardTest {
     @Uat("KB-63")
     @Config(application = FcitxApplication::class)
     fun aKeysOwnTextShortcutIsWhatItsSwipeRuns() {
-        val stored = AppPrefs.getInstance().internal.keyShortcuts
-        val was = stored.getValue()
-        stored.setValue(KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好")).serialize())
-        try {
-            val actions = mutableListOf<KeyAction>()
-            val keyboard = keyboard(actions).apply {
-                measure(exactly(1080), exactly(800))
-                layout(0, 0, 1080, 800)
-            }
-            drag(letter(keyboard, "Q"), -400f)
-            assertEquals(listOf(KeyAction.ShortcutAction(KeyShortcut.Text("你好"))), actions.filterIsInstance<KeyAction.ShortcutAction>())
-        } finally {
-            stored.setValue(was)
+        prefs.set(AppPrefs.getInstance().internal.keyShortcuts, KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好")).serialize())
+        val actions = mutableListOf<KeyAction>()
+        val keyboard = keyboard(actions).apply {
+            measure(exactly(1080), exactly(800))
+            layout(0, 0, 1080, 800)
         }
+        drag(letter(keyboard, "Q"), -400f)
+        assertEquals(listOf(KeyAction.ShortcutAction(KeyShortcut.Text("你好"))), actions.filterIsInstance<KeyAction.ShortcutAction>())
     }
 
     // ST-15: a swipe the other way (up, the symbol being down) types the letter once, on the key or off it

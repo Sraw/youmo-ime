@@ -19,7 +19,11 @@ enum class SwipeLayersChoice(override val stringRes: Int, val layers: SwipeLayer
     Off(R.string.swipe_off, SwipeLayers(Layer.Off, Layer.Off));
 
     companion object {
-        /** The choice of [layers]: every one of the seven has one. */
-        fun of(layers: SwipeLayers): SwipeLayersChoice = entries.first { it.layers == layers }
+        /**
+         * The choice of [layers]: every one of the seven has one. Anything else (never made today) reads as
+         * the default: the migration that calls this runs at every start and must never crash there.
+         */
+        fun of(layers: SwipeLayers): SwipeLayersChoice =
+            entries.firstOrNull { it.layers == layers } ?: entries.first { it.layers == SwipeLayers.Default }
     }
 }

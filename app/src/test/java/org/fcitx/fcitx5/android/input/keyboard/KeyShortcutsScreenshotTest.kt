@@ -25,8 +25,9 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The keys' swipe marks ([KeyMarks]): a shortcut's icon in its way's corner, the symbol moved to the
- * other, a text shortcut's whole shrunk, the function keys' up and down; against the goldens under
+ * The keys' swipe marks ([KeyMarks]): each in the corner its own setting gives it (KeyMarks.settled:
+ * 快捷键标记位置, by default top left; 标点位置, by default top right), a text shortcut's whole shrunk,
+ * the function keys' up and down; against the goldens under
  * src/test/screenshots, recorded again with `-Proborazzi.test.record=true` when the look changes on purpose.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -56,7 +57,7 @@ class KeyShortcutsScreenshotTest {
         prefs.internal.keyShortcuts.setValue(KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好")).serialize())
         KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN).use { h ->
             h.start()
-            // a's select all in its top right corner, its @ moved to the bottom right
+            // a's select all top left, its @ top right: the two settings' defaults
             val a = h.key("a") as AltTextKeyView
             assertEquals(View.VISIBLE, a.altText.visibility)
             assertTrue(h.texts().contains("你好"))
@@ -107,7 +108,8 @@ class KeyShortcutsScreenshotTest {
         }
     }
 
-    // landscape's keys are low: one mark in the top right, two in their corners, the symbol never under the letter
+    // landscape's keys are low: each mark in its setting's corner, a 底部 one moved to a free corner
+    // (KeyMarks.onKeys), the symbol never under the letter
     @Test
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun landscapeAndTheSymbolUnderTheLetterThere() {

@@ -105,8 +105,11 @@ class KeyMarkYieldTest {
         val icon = Mark(Ink(31f, 2f, 37f, 8f), Slot.TopRight, minScale = 1f)
         val s = key(glyph, icon)
         assertTrue(s.glyph.width < glyph.width)
-        assertTrue(s.glyph.width >= glyph.width * (1 - KeyMarkYield.MAX_LABEL_SHRINK) - 0.01f)
-        s.marks[0]?.let { assertFalse(it.meets(s.glyph, 0f)) }
+        // the icon kept, the glyph above the fifth smaller a mark left out would leave it
+        assertTrue("${s.glyph}", s.glyph.width > glyph.width * (1 - KeyMarkYield.MAX_LABEL_SHRINK) + 0.01f)
+        val kept = s.marks[0]
+        assertNotNull(kept)
+        assertFalse(kept!!.meets(s.glyph, 0f))
         // a mark no fifth clears: left out, the glyph a fifth smaller
         val big = Mark(Ink(14f, 2f, 26f, 24f), Slot.Top)
         val t = key(glyph, big)

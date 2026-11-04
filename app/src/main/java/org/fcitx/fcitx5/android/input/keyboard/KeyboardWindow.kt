@@ -266,9 +266,13 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         if (told.getValue()) return
         val traditional = EngineState.traditionalIms ?: return
         if (InputMethodCatalog.PINYIN in traditional) return
-        told.setValue(true)
-        // posted: picked from ⋯, the panel closing as the layout shows would take a notice said now with it
-        keyboardView.post { service.say(R.string.zhuyin_traditional_hint) }
+        // posted: picked from ⋯, the panel closing as the layout shows would take a notice said now with it.
+        // Told only once said (on the keyboard, else as a toast): a post that never runs, the view gone first, tells it next time
+        keyboardView.post {
+            if (told.getValue()) return@post
+            told.setValue(true)
+            service.say(R.string.zhuyin_traditional_hint)
+        }
     }
 
     private fun showLayout(target: String) {
