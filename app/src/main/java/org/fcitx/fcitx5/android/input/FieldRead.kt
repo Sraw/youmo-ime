@@ -13,7 +13,7 @@ import org.fcitx.fcitx5.android.input.shortcut.EditPlan
  * The field around the cursor as a run of deletions reads it ([ClearedText.deleting]): one round trip
  * where the editor gives its text around the selection at once ([sdk] 31 and up), its place from the
  * text's offset, or [tracked] (the selection the service follows) where the editor gives none; else a
- * read of each side and the selection (review M2). Null where the editor gives neither.
+ * read of each side and the selection. Null where the editor gives neither.
  */
 internal fun readAround(
     ic: InputConnection,

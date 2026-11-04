@@ -69,7 +69,7 @@ object EditPlan {
      * gave and keeps it, put back at the cursor; one cut short at [limit] to the field's edge (as far
      * back from the editor's cursor as the report says, the start at most), nothing kept. A selection whose text the app gave
      * none of (or too long to) is deleted and not kept: with no text read it is no empty one, the
-     * side before it never cleared in its place (review S2). Nothing of a [password] is kept.
+     * side before it never cleared in its place. Nothing of a [password] is kept.
      */
     fun clear(field: Field, start: Int, end: Int, limit: Int, password: Boolean): Clearing {
         val (before, selected, after) = field
@@ -86,7 +86,7 @@ object EditPlan {
             // read cut short at the limit: all up to the cursor goes, nothing kept. A reported cursor past
             // the text given is not this: the report may run ahead of the editor (a tap not reported yet),
             // so only what was read goes, from the editor's own cursor, and stays restorable; an app that
-            // gave less than asked leaves the rest for another 清除 (review S2)
+            // gave less than asked leaves the rest for another 清除
             // the field's start, from the editor's own cursor: never a Select from a reported cursor that
             // may run past it, which would take text after the cursor too
             before.length >= limit -> Clearing(listOf(Step.Delete(maxOf(from, before.length), 0)), null)

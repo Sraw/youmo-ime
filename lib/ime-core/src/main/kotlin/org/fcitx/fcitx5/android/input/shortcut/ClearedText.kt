@@ -12,7 +12,7 @@ import java.text.BreakIterator
  * deletion, one after another with nothing else between), last first ([take]) while the field reads
  * as each left it and nothing is typed: once anything else changed it, nothing is put back.
  * Forgotten ([forget]) as input starts in another field or finishes, so nothing is put back in
- * another field that reads the same, nor kept once its field is left (review M1); at most [MAX] kept.
+ * another field that reads the same, nor kept once its field is left; at most [MAX] kept.
  */
 class ClearedText {
 
@@ -108,7 +108,7 @@ class ClearedText {
      * The field changed otherwise than by a run's deletions (typed in, the cursor moved, what is typed
      * changed): a run's next deletion starts another, and the last run is not put back, nor anything
      * kept before it, all left by a field since changed. A clear since is told by the field alone
-     * ([take]), as ever (the app's own changes are not told here either), so kept (review M1); but not
+     * ([take]), as ever (the app's own changes are not told here either), so kept; but not
      * one that never read all before the cursor ([EditPlan.Cleared.whole] false): its field cannot tell
      * text typed before the cursor, which it would put the cleared text after, so it goes like a run.
      */
@@ -205,7 +205,7 @@ class ClearedText {
         // the read cut short: how much of [b]'s end [units] presses took to leave [before], where only
         // one length can be it. A press's taking all of it leaves no end to meet. Shortest first, and
         // stopped once no longer one can fit: a few presses' search, not the read's every length
-        // squared (review L6; 5000 哈's 1000 read, each a fit). [characters] counts the lengths tried
+        // squared (5000 哈's 1000 read, each a fit). [characters] counts the lengths tried
         internal fun cutShort(b: String, units: Int, before: String, characters: Characters = Characters()): Int? {
             var found: Int? = null
             // each press takes a code point at least: no shorter end is theirs

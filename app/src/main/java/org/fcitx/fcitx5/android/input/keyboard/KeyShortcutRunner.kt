@@ -91,12 +91,12 @@ class KeyShortcutRunner(
     fun clear(typing: HostCore.Retyping?, field: Any? = service.startedField) {
         if (field == null || field !== service.startedField) return
         val kept = if (typing != null) {
-            // a field not read is said cleared, those before it broken off as for one not kept (review2).
+            // a field not read is said cleared, those before it broken off as for one not kept.
             // A sensitive field's keys the host kept back itself (HostCore.clearTyped): nothing of it here
             typing.keys?.let { read()?.let { now -> EditPlan.Cleared(now, emptyList(), typing) } }
         } else {
             val now = read() ?: return
-            // a field kept from learning is kept from this too (review2): nothing of it remembered
+            // a field kept from learning is kept from this too: nothing of it remembered
             val sensitive = service.inSensitiveField
             val range = service.currentInputSelection
             val clearing = EditPlan.clear(now, range.start, range.end, READ_LIMIT, sensitive)
@@ -117,7 +117,7 @@ class KeyShortcutRunner(
         val back = field?.let { read()?.let { now -> cleared.take(field, now, typing()) } } ?: return service.say(R.string.nothing_to_restore)
         val typed = back.typed as? HostCore.Retyping
         if (typed == null) return apply(back.restore)
-        // the input method changed since, its keyboard (review2), or the field: said, the clear gone all
+        // the input method changed since, its keyboard, or the field: said, the clear gone all
         // the same (review S4)
         val keyboard = keyboardOf(typed.im)
         service.postFcitxJob {
