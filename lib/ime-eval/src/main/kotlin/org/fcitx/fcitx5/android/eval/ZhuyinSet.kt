@@ -19,7 +19,7 @@ import java.io.File
  */
 object ZhuyinSet {
 
-    /** The keyboards, `zhuyin --keys`, by the scheme a set typed on them is read with (`pinyin --scheme`). */
+    /** `zhuyin --keys`: the keyboard a set is typed on, by its name (nine or full). */
     val KEYS = mapOf("nine" to ZhuyinKeys.NINE, "full" to ZhuyinKeys.DACHEN)
 
     /** `pinyin --scheme` for a set typed on [KEYS]' keyboard of the same name. */
@@ -41,8 +41,8 @@ object ZhuyinSet {
     /**
      * Each character's tones read as a syllable, and each word's, from a local copy of the lists the
      * reading table is made of (mozillazg's pinyin-data `pinyin.txt` lines `U+4F60: nǐ  # 你`, its
-     * phrase-pinyin-data `pinyin.txt` lines `你好: nǐ hǎo`). For measuring only: the app's own
-     * table is compiled into its pinyin data.
+     * phrase-pinyin-data `pinyin.txt` lines `你好: nǐ hǎo`). For typing a set's tones only: the
+     * decoder reads them with the app's own table, compiled into its pinyin data.
      */
     class Tones(chars: File, phrases: File?) {
         // a character's syllable's tones, the most common first: code point, syllable → tones
@@ -65,7 +65,7 @@ object ZhuyinSet {
             phrases?.forEachLine { line ->
                 if (line.startsWith('#') || ':' !in line) return@forEachLine
                 val text = line.substringBefore(':').trim()
-                val readings = line.substringAfter(':').substringBefore('#').trim().split(' ').map { ToneMark.parse(it) ?: return@forEachLine }
+                val readings = line.substringAfter(':').substringBefore('#').trim().split(SPACES).map { ToneMark.parse(it) ?: return@forEachLine }
                 byPhrase[text] = readings.map { (s, t) -> (Syllables.id(s).takeIf { it >= 0 } ?: return@forEachLine) to t }
             }
         }
@@ -78,18 +78,12 @@ object ZhuyinSet {
             return IntArray(cps.size) { byChar[key(cps[it], syllables[it])]?.first() ?: 0 }
         }
 
-        /** Whether [codePoint] read as [syllable] may have [tone]: true for one not known. */
-        fun allows(codePoint: Int, syllable: Int, tone: Int): Boolean {
-            val known = byChar[key(codePoint, syllable)] ?: return true
-            // 轻声 is the reading's own tone too
-            return tone in known || tone == ToneMark.NEUTRAL
-        }
-
         private fun key(cp: Int, syllable: Int) = (cp.toLong() shl SYLLABLE_BITS) or syllable.toLong()
 
         companion object {
             private const val HEX = 16
             private const val SYLLABLE_BITS = 16
+            private val SPACES = Regex("\\s+")
 
             /** `--tones <chars.txt>[,<phrases.txt>]`. */
             fun of(option: String): Tones = option.split(',').let { Tones(File(it[0]), it.getOrNull(1)?.let(::File)) }

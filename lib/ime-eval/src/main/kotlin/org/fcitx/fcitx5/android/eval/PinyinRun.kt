@@ -88,6 +88,8 @@ class PinyinRun(
         coarse = coarse,
         // text kept as typed reaches the rerankers as the session's does: on keys of letter groups, as letters
         asTyped = { (segmenter as? KeyedSegmenter)?.asTyped(it) ?: it },
+        // a tone typed on zhuyin's keys weighed against the data's tones as the session weighs it
+        toneAllows = (segmenter as? KeyedSegmenter)?.toneAllows,
     )
     private val textWords = TextWords(data.model, data.wordIndex)
     // where the session lists the candidates with one, by the same code

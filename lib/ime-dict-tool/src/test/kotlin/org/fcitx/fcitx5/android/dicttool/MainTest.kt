@@ -445,11 +445,22 @@ class MainTest {
     }
 
     @Test
-    fun tooFewCharactersWithTheMainlandsStrokeOrderFailTheBuild() {
-        val output = tmp.root.resolve("charinfo.data")
+    fun tooFewCharactersWithTheMainlandsStrokeOrderFailTheBuildAndLeaveTheFileThere() {
+        // the cover checked before the file is written: it was written first
+        val output = tmp.root.resolve("charinfo.data").apply { writeText("before") }
         val (code, _, err) = run("charinfo", "-o", output.path, *charInfoInputs("你\tP S P HG SG P D\n"), "--cover", file("chars.txt", "你好江"))
         assertEquals(1, code)
         assertTrue(err, err.contains("2 characters without the mainland's stroke order") && err.contains("好江"))
+        assertEquals("before", output.readText())
+    }
+
+    @Test
+    fun aCoverWithNoCharactersFailsTheBuild() {
+        // every share 0/0, NaN, passed every floor
+        val output = tmp.root.resolve("charinfo.data")
+        val (code, _, err) = run("charinfo", "-o", output.path, *charInfoInputs(), "--cover", file("chars.txt", "a，b"))
+        assertEquals(1, code)
+        assertTrue(err, err.contains("no Han characters to check"))
     }
 
     @Test

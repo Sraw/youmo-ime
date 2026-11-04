@@ -4,12 +4,12 @@
  */
 package org.fcitx.fcitx5.android.eval
 
+import org.fcitx.fcitx5.android.engine.assertRows
+import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
-import org.fcitx.fcitx5.android.engine.reading.ToneMark
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -48,18 +48,55 @@ class ZhuyinSetTest {
     fun aPhraseReadsItsOwnTones() {
         val ai = Syllables.id("ai")
         val hao = Syllables.id("hao")
-        assertArrayEquals(intArrayOf(4, 4), tones.of("爱好", intArrayOf(ai, hao)))
-        // a character alone its first reading's; one not listed none
-        assertArrayEquals(intArrayOf(0, 3), tones.of("碍好", intArrayOf(ai, hao)))
+        val spacedTwice by lazy {
+            val chars = tmp.newFile("c.txt").apply { writeText("U+597D: hǎo  # 好\n") }
+            val phrases = tmp.newFile("p.txt").apply { writeText("爱好: ài  hào\n") }
+            ZhuyinSet.Tones(chars, phrases)
+        }
+        class Row(val tones: () -> ZhuyinSet.Tones, val text: String, val expected: IntArray, val why: String)
+        assertRows(
+            listOf(
+                Row({ tones }, "爱好", intArrayOf(4, 4), "a phrase's own line, not its characters' first readings"),
+                Row({ tones }, "碍好", intArrayOf(0, 3), "a character alone its first reading's; one not listed none"),
+                Row({ spacedTwice }, "爱好", intArrayOf(4, 4), "a line with two spaces between its readings was dropped whole"),
+            ),
+            { it.why },
+        ) { assertArrayEquals(it.expected, it.tones().of(it.text, intArrayOf(ai, hao))) }
     }
 
     @Test
-    fun allowsTheListedTonesAndTheNeutral() {
-        val hao = Syllables.id("hao")
-        val t = tones
-        assertTrue(t.allows('好'.code, hao, 4))
-        assertTrue(t.allows('好'.code, hao, ToneMark.NEUTRAL))
-        assertFalse(t.allows('好'.code, hao, 1))
-        assertTrue(t.allows('爱'.code, Syllables.id("ai"), 1))
+    fun theCommandsTypeASetAndReadIt() {
+        val set = tmp.newFile("set.tsv").apply { writeText("nihao\t你好\tdaily\n") }
+        val bytes = PinyinDataBuilder().unigram("<unk>", -7f, 0f)
+            .unigram("你好", -2f, 0f).entry("你好", intArrayOf(Syllables.id("ni"), Syllables.id("hao")))
+            // read the same, less likely, any tone allowed (号 has none in the data): first only when 你好's tone is refused
+            .unigram("你号", -3f, 0f).entry("你号", intArrayOf(Syllables.id("ni"), Syllables.id("hao")))
+            .charTone('好'.code, Syllables.id("hao"), 3)
+            .build().toByteArray()
+        val data = tmp.newFile("pinyin.data").apply { writeBytes(bytes) }
+        // typed with the tones a chars file gives, read with the data's own tones, as the app reads zhuyin
+        fun candidates(chars: String): List<String> {
+            val charsFile = tmp.newFile().apply { writeText(chars) }
+            val typed = tmp.newFile()
+            val out = StringBuilder()
+            assertEquals(0, runCli(arrayOf("zhuyin", set.path, typed.path, "--keys", "nine", "--tones", charsFile.path), out, StringBuilder()))
+            assertTrue(out.toString(), out.startsWith("1 of 1 samples typed in zhuyin"))
+            val result = tmp.newFile()
+            assertEquals(0, runCli(arrayOf("pinyin", data.path, typed.path, result.path, "--scheme", "zy9"), StringBuilder(), StringBuilder()))
+            return result.useLines { RunResultFormat.parse(it) }.single().candidates
+        }
+        class Row(val chars: String, val first: String, val why: String)
+        assertRows(
+            listOf(
+                Row("U+4F60: nǐ  # 你\nU+597D: hǎo  # 好\n", "你好", "好 typed with the tone the data has for it"),
+                Row("U+4F60: nǐ  # 你\nU+597D: hào  # 好\n", "你号", "好 typed with a tone the data does not allow it: the data's tones read the keys, 你号 first"),
+            ),
+            { it.why },
+        ) {
+            val candidates = candidates(it.chars)
+            assertEquals(it.why, it.first, candidates.firstOrNull())
+            // the tone's penalty is soft: 你好 put after, never out
+            assertTrue("$candidates", "你好" in candidates)
+        }
     }
 }

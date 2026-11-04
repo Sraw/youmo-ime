@@ -605,11 +605,12 @@ class PinyinUatTest {
         }
         for ((style, want) in listOf(ReadingStyle.PINYIN to listOf("zhuō zǐ", "dōng xī", "wǒ men"), ReadingStyle.ZHUYIN to listOf("ㄓㄨㄛ ㄗˇ", "ㄉㄨㄥ ㄒㄧ", "ㄨㄛˇ ˙ㄇㄣ"))) {
             with(EngineReplay(settings(EngineSettings(candidateReading = style)))) {
-                for ((typed, word) in listOf("zhuozi" to "桌子", "dongxi" to "东西", "women" to "我们").zip(want)) {
-                    type(typed.first)
-                    expectAmong(typed.second)
-                    assertEquals("$style ${typed.second}", word, readingOf(typed.second))
-                    backspace(typed.first.length)
+                for ((case, reading) in listOf("zhuozi" to "桌子", "dongxi" to "东西", "women" to "我们").zip(want)) {
+                    val (keys, word) = case
+                    type(keys)
+                    expectAmong(word)
+                    assertEquals("$style $word", reading, readingOf(word))
+                    backspace(keys.length)
                 }
             }
         }
@@ -643,7 +644,7 @@ class PinyinUatTest {
     private fun dachenCode(c: Char) = ZhuyinKeys.MARKS.indexOf(c).let { if (it >= 0) Keyboard.zhuyinTone(it + 1) else Keyboard.zhuyinKey(c) }
 
     private fun nineCode(c: Char) = ZhuyinKeys.MARKS.indexOf(c).let {
-        if (it >= 0) Keyboard.zhuyinNineTone(it + 1) else Keyboard.zhuyinNineKey(ZhuyinKeys.GROUP_SYMBOLS.indexOfFirst { g -> c in g })
+        if (it >= 0) Keyboard.zhuyinNineTone(it + 1) else Keyboard.zhuyinNineKey(ZhuyinKeys.GROUP_SYMBOLS.indexOfFirst { g -> c in g }.also { g -> require(g >= 0) { "$c is on no key" } })
     }
 
     @Test

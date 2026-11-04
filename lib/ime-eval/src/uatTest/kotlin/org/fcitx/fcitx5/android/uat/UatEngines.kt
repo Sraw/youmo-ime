@@ -77,7 +77,7 @@ object UatEngines {
     }
 
     /** The app's pinyin data, as the engines map it: what a case reads off it directly (a character's tones). */
-    val pinyinData: PinyinData by lazy { PinyinData.load(load(InputMethodCatalog.PINYIN_DATA)) }
+    val pinyinData: PinyinData by lazy { PinyinData.load(data(InputMethodCatalog.PINYIN_DATA)) }
 
     /** A file of uat/fixtures, as a device's case pushes it. */
     fun fixture(name: String): File =

@@ -21,9 +21,11 @@ import org.fcitx.fcitx5.android.engine.user.Continuations
  * is learned, after it was typed once and after three times (a user's own phrases, typed again:
  * a pair counts from its third time, U-71), the [Halves.HELD_OUT] half after that (text not typed
  * before, which learning must not make worse), each with the user's pairs at [weight]; the whole
- * phrases typed three times going on after their start ([continuations], U-73) or not.
+ * phrases typed three times going on after their start ([withPhrases], U-73) or not. After a word
+ * the model does not know, the session offers the phrases going on after what was put in last; here
+ * that is the context's last word, as a set typed a word at a time puts it in.
  */
-class PredictLearning(private val data: PinyinData, private val weight: Float, private val continuations: Boolean = true) {
+class PredictLearning(private val data: PinyinData, private val weight: Float, private val withPhrases: Boolean = true) {
     private val textWords = TextWords(data.model, data.wordIndex)
 
     fun measure(samples: List<Sample>): List<Pair<String, PredictRun.Score>> {
@@ -49,8 +51,8 @@ class PredictLearning(private val data: PinyinData, private val weight: Float, p
         val offers = continuations.map { c ->
             val words = textWords.lastTwo(c.context)
             val (prev2, prev) = TextWords.previous(words)
-            // the word before as Predictions.wordBefore has it (the user's too)
-            val last = if (prev == NO_WORD) "" else predictor.textOf(prev)
+            // the word before as Predictions.wordBefore has it (the user's too), else what was put in last
+            val last = if (prev == NO_WORD) lastWord(c.context) else predictor.textOf(prev)
             order.offer(user.habits, prev2, prev, continued = phrases(c.context, last, user), last = last).candidates.map { it.text }.distinct()
         }
         return PredictRun.score(continuations, offers)
@@ -58,10 +60,13 @@ class PredictLearning(private val data: PinyinData, private val weight: Float, p
 
     // the whole phrases [context] ends a start of, after its last word [last], as Predictions.continued finds them
     private fun phrases(context: String, last: String, user: EvalUser): List<Continuations.Found> {
-        if (!continuations || last.isEmpty()) return emptyList()
+        if (!withPhrases || last.isEmpty()) return emptyList()
         val tail = Continuations.tail(context)
         return user.model.continuationsAfter(tail, textWords.boundaries(tail), last)
     }
+
+    // the last of [context]'s words, as typed a word at a time
+    private fun lastWord(context: String): String = textWords.boundaries(context).let { b -> if (b.size < 2) "" else context.substring(b[b.size - 2]) }
 
     /** After each word of each sample's text but the last, the text to it and what follows. */
     fun continuations(samples: List<Sample>): List<Continuation> = samples.flatMap { sample ->

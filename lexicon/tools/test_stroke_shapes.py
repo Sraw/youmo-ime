@@ -78,6 +78,15 @@ class StrokeShapesTest(unittest.TestCase):
         # chaizi with a cycle: each its whole walk, whichever is asked first
         self.assertEqual(({'乙', '丙'}, {'丙', '甲'}), (parts('甲'), parts('乙')))
 
+    def test_each_stroke_a_gf_rule_changed_is_said(self):
+        lines, notes = converted(['牙\t1523\n'])
+        self.assertEqual(['牙\tH SZ SG P'], lines)
+        self.assertEqual(['牙: stroke 2 PZ made SZ, by GF 2001 (牙)'], notes)
+
+    def test_a_line_without_a_tab_is_named(self):
+        with self.assertRaisesRegex(ValueError, '^口: no tab'):
+            converted(['口\n'])
+
     def test_a_line_corrected_by_hand_and_the_kinds_checked(self):
         tsv = ['# head\n', '\n', '行\t332112\n', '皙\t1234331232511\n', '承\t52111534\n', '匹\t1355\n', '江\t441121\tsome note\n']
         lines, notes = converted(tsv)

@@ -10,7 +10,8 @@
 # was read with (<name>.options) and report.txt to <out dir>. The gate: with BASE, no gate set may
 # lose significantly more samples than it wins (McNemar, p < 0.05 shared among the gate sets,
 # Bonferroni: six sets each at 0.05 would fail a release that changed nothing one time in seven);
-# and learning must bring back what was typed (95% first) and not cost the rest. It exits 1 when
+# learning must bring back what was typed (95% first) and not cost the rest; and the candidates'
+# readings (`readings --gate` on data/readings/chat.tsv) must be right at the release gate. It exits 1 when
 # the gate fails, 2 when a run fails or its output cannot be read (a gate that cannot read its
 # numbers does not pass), and 2, before any set is run and naming every such set, when BASE has no
 # results for a gate set read with the options this run reads it with: a BASE made before the
@@ -157,5 +158,19 @@ if awk "BEGIN { exit !(${twice%\%} < 95 || ${learned%\%} < ${nothing%\%} - 1) }"
   failed=1
 fi
 echo "learn: typed a third time $twice first; held-out $nothing learning nothing, $learned after the rest was learned$verdict" >> "$REPORT"
+
+# the readings 候选词注音 shows (specs/engine.md, Tones): DATA's tone tables must read the chat
+# set's words right at ReadingsRun.GATE; `readings --gate` exits 1 below it
+"$EVAL" readings "$DATA" "$SETS/readings/chat.tsv" --misses "$OUT/readings-misses.tsv" --gate > "$OUT/readings.txt" 2> "$OUT/readings.err"
+status=$?
+# a JVM that throws exits 1 too: a gate miss is one that printed its numbers
+line1=$(head -n 1 "$OUT/readings.txt")
+[[ $status -le 1 && $line1 == words:* ]] || fail "readings: the run failed (see readings.err)"
+verdict=""
+if [ $status = 1 ]; then
+  verdict=" FAIL"
+  failed=1
+fi
+echo "readings: $line1$verdict" >> "$REPORT"
 cat "$REPORT"
 [ $failed = 0 ] || exit 1

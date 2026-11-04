@@ -84,10 +84,12 @@ class MainTest {
      * Stands in for the ime-eval launcher, noting each call in `eval.calls` beside it: `t9` and
      * `pinyin` write empty files, `score` and `learn` print [scores] and [learning].
      */
-    private fun launcher(scores: String, learning: String): File {
+    private fun launcher(scores: String, learning: String, readings: String = "words: 2, read right: 2 (100.00%), gate 98%\n", readingsExit: Int = 0): File {
         val dir = tmp.newFolder()
         File(dir, "score").writeText(scores)
         File(dir, "learn").writeText(learning)
+        File(dir, "readings").writeText(readings)
+        File(dir, "readings.exit").writeText("$readingsExit")
         return File(dir, "eval").apply {
             writeText(
                 listOf(
@@ -98,6 +100,7 @@ class MainTest {
                     "  shuangpin) : > \"\$4\" ;;",
                     "  pinyin) : > \"\$4\" ;;",
                     "  score | learn) cat \"\$(dirname \"\$0\")/\$1\" ;;",
+                    "  readings) cat \"\$(dirname \"\$0\")/readings\"; exit \"\$(cat \"\$(dirname \"\$0\")/readings.exit\")\" ;;",
                     "  *) exit 3 ;;",
                     "esac",
                 ).joinToString("\n", postfix = "\n"),
@@ -158,6 +161,10 @@ class MainTest {
             arrayOf("predict-learn", "d", "s", "--user-weight", "-1"),
             arrayOf("predict-learn", "d", "s", "--user-weight", "NaN"),
             arrayOf("predict-learn", "d", "s", "--user-weight", "Infinity"),
+            arrayOf("predict-learn", "d", "s", "--continuations", "maybe"),
+            // the decoder reads zhuyin's tones with the data's own table: no --tones of pinyin's
+            arrayOf("pinyin", "d", "s", "r", "--scheme", "zy", "--tones", "t.txt"),
+            arrayOf("zhuyin", "s", "o", "--keys", "14"), // nine or full
             arrayOf("lm", "m", "c"), // nothing to score
             arrayOf("score", "s", "r", "--scheme", "xiaohe"), // not score's
             arrayOf("shuangpin", "xiaohe", "s", "o", "--half", "tune"),
@@ -310,6 +317,16 @@ class MainTest {
         val (unread, said) = releaseReport(launcher(scores.toString(), learning(emptyList())))
         assertEquals(said, 2, unread)
         assertTrue(said, "learn typed a third time: no number in its output" in said)
+
+        // the candidates' readings: below the gate fails the release; a run that printed nothing is no pass either
+        assertTrue(printed, "readings: words: 2, read right: 2 (100.00%), gate 98%" in printed)
+        assertTrue(made.joinToString("\n"), made.any { it.startsWith("readings pinyin.data ") && "/readings/chat.tsv " in it && it.endsWith(" --gate") })
+        val (missed, toldMissed) = releaseReport(launcher(scores.toString(), learning(typed), "words: 2, read right: 1 (50.00%), gate 98%\n", 1))
+        assertEquals(toldMissed, 1, missed)
+        assertTrue(toldMissed, "readings: words: 2, read right: 1 (50.00%), gate 98% FAIL" in toldMissed)
+        val (crashed, toldCrashed) = releaseReport(launcher(scores.toString(), learning(typed), "", 1))
+        assertEquals(toldCrashed, 2, crashed)
+        assertTrue(toldCrashed, "readings: the run failed" in toldCrashed)
     }
 
     // a dictionary's text compiled as the app compiles one: its words typed as the app offers them

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.eval
 
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
@@ -22,7 +23,8 @@ class PredictLearningTest {
 
     private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
 
-    // the model has 好 after 你, and nothing after 我: 们 comes after it only once 我们 is typed
+    // the model has 好 after 你, and nothing after 我: 们 comes after it only once 我们 is typed;
+    // 他 is in the dictionary alone, no word of the model's
     private val bytes = PinyinDataBuilder()
         .unigram("<unk>", -7f, 0f)
         .unigram("我", -2f, 0f)
@@ -36,6 +38,7 @@ class PredictLearningTest {
         .entry("你", syl("ni"))
         .entry("好", syl("hao"))
         .entry("中国", syl("zhong", "guo"))
+        .entry("他", syl("ta"))
         .build().toByteArray()
 
     private val data = PinyinData.load(ByteBuffer.wrap(bytes))
@@ -75,6 +78,39 @@ class PredictLearningTest {
     }
 
     @Test
+    fun aWholePhraseTypedThreeTimesGoesOnOnlyWithPhrases() {
+        class Row(val sample: Sample, val why: String)
+        assertRows(
+            listOf(
+                Row(Sample("womennihao", "我们你好", "daily"), "我们你好 typed whole three times: after 我 the rest of it, not 们 alone"),
+                Row(
+                    Sample("tanihao", "他你好", "daily"),
+                    "a phrase goes on after a word the model has not: after 他 the model finds no word before: the phrase went on only from the text's last word " +
+                        "as typed, else nothing was looked up after it and on scored as off",
+                ),
+            ),
+            { it.why },
+        ) {
+            val phrase = listOf(it.sample)
+            assertEquals(listOf(Halves.TUNE), phrase.map { s -> Halves.of(s) })
+            fun saved(withPhrases: Boolean) = PredictLearning(data, Predictor.USER_WEIGHT, withPhrases).measure(phrase).toMap().getValue("tune, typed three times")
+            val on = saved(true)
+            val off = saved(false)
+            assertTrue("$on / $off", on.saved > off.saved)
+        }
+    }
+
+    // nothing learned yet, nothing to go on with either way
+    @Test
+    fun nothingLearnedGoesOnTheSameWithPhrasesOrNot() {
+        val phrase = listOf(Sample("womennihao", "我们你好", "daily"))
+        assertEquals(
+            PredictLearning(data, Predictor.USER_WEIGHT, withPhrases = false).measure(phrase).toMap().getValue("tune, nothing learned"),
+            PredictLearning(data, Predictor.USER_WEIGHT).measure(phrase).toMap().getValue("tune, nothing learned"),
+        )
+    }
+
+    @Test
     fun theCommandsMakeASetAndMeasureIt() {
         val dataFile = tmp.newFile("pinyin.data").apply { writeBytes(bytes) }
         val set = tmp.newFile("set.tsv").apply { writeText(samples.joinToString("") { "${it.input}\t${it.expected}\t${it.tag}\n" }) }
@@ -87,6 +123,7 @@ class PredictLearningTest {
         assertEquals(0, runCli(arrayOf("predict-learn", dataFile.path, set.path, "--user-weight", "0"), out, StringBuilder()))
         assertTrue(out.lines()[3], "top1 0.0%" in out.lines()[3])
         assertEquals(2, runCli(arrayOf("predict-learn", dataFile.path, set.path, "--user-weight", "much"), StringBuilder(), StringBuilder()))
+        assertEquals(0, runCli(arrayOf("predict-learn", dataFile.path, set.path, "--continuations", "off"), StringBuilder(), StringBuilder()))
 
         // after each word of the set's sentences, what follows; `predict` measures it with nothing learned
         val predictSet = tmp.newFile("predict.tsv")

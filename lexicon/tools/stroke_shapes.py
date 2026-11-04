@@ -130,7 +130,7 @@ def e_shape(v, i):
     return None
 
 
-def shapes(c, v, parts):
+def shapes(c, v, parts, changed=None):
     """The shapes of character c's strokes, cnchar's letters v; None for a stroke no rule settles."""
     out = []
     for i, x in enumerate(v):
@@ -156,6 +156,10 @@ def shapes(c, v, parts):
     for of, letters, at, shape in GF:
         if ({c} | parts(c)) & set(of):
             for m in re.finditer('(?=' + re.escape(letters) + ')', v):
+                # said, a line each: the rule matches its letters anywhere in the character, so a
+                # run's diff is checked character by character
+                if changed is not None and out[m.start() + at] != shape:
+                    changed.append(f'{c}: stroke {m.start() + at + 1} {out[m.start() + at]} made {shape}, by GF 2001 ({of})')
                 out[m.start() + at] = shape
     return out
 
@@ -170,16 +174,19 @@ def convert(orders, chaizi, tsv):
             lines.append(line)
             continue
         f = line.split('\t')
+        if len(f) < 2:
+            raise ValueError(f'{f[0]}: no tab before its strokes')
         c, strokes = f[0], f[1]
         written = strokes.split()
         have = strokes if len(written) == 1 and strokes.isdigit() else kinds(written)
         if c not in orders:   # added by hand (冖), cnchar has not the character
             lines.append(line)
             continue
+        changed = []
         if c in FIXED or c in OVERRIDE:
             made = (FIXED.get(c) or OVERRIDE[c]).split()
         else:
-            made = shapes(c, orders[c], parts)
+            made = shapes(c, orders[c], parts, changed)
             if None in made:
                 notes.append(f'{c} {orders[c]}: stroke {made.index(None) + 1} settled by no rule')
                 lines.append(line)
@@ -190,6 +197,7 @@ def convert(orders, chaizi, tsv):
                 lines.append(line)
                 continue
             raise ValueError(f'{c}: the shapes made, {kinds(made)}, are not the line\'s {have}')
+        notes += changed
         lines.append('\t'.join([c, ' '.join(made)] + f[2:]))
     return lines, notes
 
@@ -197,7 +205,8 @@ def convert(orders, chaizi, tsv):
 def main():
     if len(sys.argv) != 4:
         sys.exit(__doc__)
-    orders = json.load(open(sys.argv[1], encoding='utf-8'))
+    with open(sys.argv[1], encoding='utf-8') as f:
+        orders = json.load(f)
     with open(sys.argv[2], encoding='utf-8') as chaizi, open(sys.argv[3], encoding='utf-8') as tsv:
         lines, notes = convert(orders, list(chaizi), list(tsv))
     print('\n'.join(lines))

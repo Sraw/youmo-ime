@@ -157,4 +157,29 @@ class PrivacyUatTest {
             assertFalse("是" in typed("shi"))
         }
     }
+
+    @Test
+    @Uat("PR-49")
+    fun aBackupTakesAWholeSentenceUsedTwiceNotOnce() {
+        // used once: left out of the backup, so two more on the new phone are not the three 联想 waits for
+        val once = with(EngineReplay()) {
+            typedWhole()
+            backups(BackupOp.Copy).bytes!!
+        }
+        with(EngineReplay()) {
+            assertTrue(backups(BackupOp.Restore(once)).ok)
+            val whole = (1..2).map { typedWhole() }.last()
+            assertTrue("$page", whole.substring(1) !in afterNi())
+        }
+        // used twice: in the backup, one more on the new phone is the third
+        val twice = with(EngineReplay()) {
+            repeat(2) { typedWhole() }
+            backups(BackupOp.Copy).bytes!!
+        }
+        with(EngineReplay()) {
+            assertTrue(backups(BackupOp.Restore(twice)).ok)
+            val whole = typedWhole()
+            assertEquals(whole.substring(1), afterNi().first())
+        }
+    }
 }

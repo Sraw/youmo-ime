@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.uat
 
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
-import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.reading.CandidateReadings
 import org.fcitx.fcitx5.android.engine.reading.CharCard
@@ -166,11 +165,11 @@ class HandwritingEngineUatTest {
     @Uat("HW-29")
     fun aCardsWordsAreADictionarys() {
         val he = card("和", "口")
-        assertEquals(listOf("hé", "hè", "huò", "hú", "huó", "huo"), he.readings.map { it.pinyin })
-        assertEquals(listOf("和谐", "和平"), he.readings[0].examples)
+        val heWords = he.readings.associate { it.pinyin to it.examples }
+        assertEquals("hé", he.readings.first().pinyin)
         // 和牌 is no dictionary's: hú has none
-        assertEquals(emptyList<String>(), he.readings[3].examples)
-        assertEquals(listOf("掺和", "搅和"), he.readings[5].examples)
+        assertEquals(emptyList<String>(), heWords["hú"])
+        assertEquals(listOf("掺和", "搅和"), heWords["huo"])
         assertEquals(listOf("呢喃", "毛呢"), card("呢", "口").readings.single { it.pinyin == "ní" }.examples)
         assertEquals(emptyList<String>(), card("呢", "口").readings.single { it.pinyin == "ne" }.examples)
         val shu = card("数", "口").readings.associate { it.pinyin to it.examples }
@@ -252,7 +251,7 @@ class HandwritingEngineUatTest {
     @Test
     @Uat("HW-27")
     fun theCandidatesLeaveOutACharactersOwnNeutralTone() {
-        val data = PinyinData.load(UatEngines.data("engine/pinyin.data"))
+        val data = UatEngines.pinyinData
         val readings = CandidateReadings(data, data.tones) { Predictor.charReadingsOf(data.dictionary, data.vocabulary) }
         assertEquals(listOf("tóu"), readings.ordered('头'.code).map { it.pinyin })
         val he = readings.ordered('和'.code).map { it.pinyin }

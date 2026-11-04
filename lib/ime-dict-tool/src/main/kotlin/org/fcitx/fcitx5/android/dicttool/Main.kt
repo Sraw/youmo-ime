@@ -12,8 +12,8 @@ import org.fcitx.fcitx5.android.engine.data.Misreadings
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.data.ReadingSource
-import org.fcitx.fcitx5.android.engine.data.ToneSources
 import org.fcitx.fcitx5.android.engine.data.SourceException
+import org.fcitx.fcitx5.android.engine.data.ToneSources
 import org.fcitx.fcitx5.android.engine.data.WordIndex
 import org.fcitx.fcitx5.android.engine.data.WordLayers
 import org.fcitx.fcitx5.android.engine.data.forEachNumberedLine
@@ -31,6 +31,7 @@ import org.fcitx.fcitx5.android.engine.user.WordPack
 import org.fcitx.fcitx5.android.host.ChineseConverter
 import org.fcitx.fcitx5.android.host.OpenCCData
 import org.fcitx.fcitx5.android.input.voice.HotwordSpelling
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -61,7 +62,7 @@ private class Command(val synopsis: String, about: String, val inputs: IntRange 
 
 private val COMMANDS = listOf(
     Command(
-        "pinyin -o <out> --lm <lm.arpa> [--remove <remove.tsv>] [--readings <readings.tsv>] [--misreadings <misreadings.tsv>] [--char-tones <kX.txt,...>] [--phrase-tones <pinyin.txt>] [--tones <tones.tsv>] <dict>...",
+        "pinyin -o <out> --lm <lm.arpa> [--remove <remove.tsv>] [--readings <readings.tsv>] [--misreadings <misreadings.tsv>] [--char-tones <kX.txt>[:<kY.txt>...]] [--phrase-tones <pinyin.txt>] [--tones <tones.tsv>] <dict>...",
         """
             compile a pinyin dictionary and model, from
             libime's text and word packs (.words), each
@@ -941,7 +942,8 @@ private fun pinyin(options: Options, out: Appendable) {
     }
     if (misread.isNotEmpty()) out.appendLine("misread: ${misread.size} words, typed by their misreadings too")
     // from the least trusted: a later source's reading of a word replaces an earlier one's
-    options.charTones?.split(',')?.forEach { charTones(it, builder) }
+    // File.pathSeparator between them: a path may hold a comma
+    options.charTones?.split(File.pathSeparator)?.forEach { charTones(it, builder) }
     options.phraseTones?.let { path -> File(path).useLines { ToneSources.phrases(it, path, builder::wordTones) } }
     val curated = { w: String, s: IntArray, t: ByteArray -> builder.wordTones(w, s, t, curated = true); Unit }
     options.tones?.let { path -> File(path).useLines { ToneSources.curated(it, path, curated) } }
@@ -1083,41 +1085,46 @@ private fun charInfo(options: Options, out: Appendable) {
     }
     File(options.orders!!).useLines { builder.orders(it, options.orders) }
     val output = File(options.output!!)
-    // built first: a failed check leaves the last file
-    val built = builder.build()
-    output.outputStream().use { built.writeTo(it) }
-    val info = CharInfo.load(ByteBuffer.wrap(output.readBytes()))
+    // built and checked first, written last: a failed check leaves the last file
+    val bytes = ByteArrayOutputStream().also { builder.build().writeTo(it) }.toByteArray()
+    val info = CharInfo.load(ByteBuffer.wrap(bytes))
     out.appendLine("charinfo: ${info.size} characters, ${info.taken} of them taken apart")
-    options.cover?.let { cover ->
-        val readings = PinyinData.load(map(options.pinyin!!)).charReadings
-        val chars = File(cover).readText().codePoints().filter { Character.UnicodeScript.of(it) == Character.UnicodeScript.HAN }.distinct().toArray()
-        val has = listOf<Pair<String, (Int) -> Boolean>>(
-            "readings" to { cp -> readings.of(cp).isNotEmpty() },
-            "radical" to { cp -> info.of(cp) != null },
-            "strokes" to { cp -> (info.of(cp)?.strokes ?: 0) > 0 },
-            PARTS to { cp -> info.of(cp)?.parts != null },
-            MAINLAND_ORDER to { cp -> info.of(cp)?.order != null },
-        )
-        for ((what, test) in has) {
-            val missing = chars.filterNot(test)
-            val share = 1 - missing.size.toDouble() / chars.size
-            out.appendLine("  of ${File(cover).name}'s ${chars.size}: $what ${chars.size - missing.size} (${"%.1f".format(Locale.ROOT, share * 100)}%)")
-            val floor = FLOORS[what] ?: 1.0
-            if (share < floor) {
-                val some = missing.take(MISSING_SHOWN).joinToString("") { String(Character.toChars(it)) }
-                throw SourceException(cover, 0, "${missing.size} characters without $what, below ${floor * 100}%: $some")
-            }
+    options.cover?.let { checkCover(it, options, info, out) }
+    output.writeBytes(bytes)
+    out.appendLine("wrote $output: ${output.length()} bytes")
+}
+
+// of the characters in [cover], the shares that have each part of the record: below its floor fails
+private fun checkCover(cover: String, options: Options, info: CharInfo, out: Appendable) {
+    val readings = PinyinData.load(map(options.pinyin!!)).charReadings
+    val chars = File(cover).readText().codePoints().filter { Character.UnicodeScript.of(it) == Character.UnicodeScript.HAN }.distinct().toArray()
+    // no characters to cover: every share would be 0/0, NaN, and pass
+    if (chars.isEmpty()) throw SourceException(cover, 0, "no Han characters to check")
+    val has = listOf<Pair<String, (Int) -> Boolean>>(
+        "readings" to { cp -> readings.of(cp).isNotEmpty() },
+        "radical" to { cp -> info.of(cp) != null },
+        "strokes" to { cp -> (info.of(cp)?.strokes ?: 0) > 0 },
+        PARTS to { cp -> info.of(cp)?.parts != null },
+        MAINLAND_ORDER to { cp -> info.of(cp)?.order != null },
+    )
+    for ((what, test) in has) {
+        val missing = chars.filterNot(test)
+        val share = 1 - missing.size.toDouble() / chars.size
+        out.appendLine("  of ${File(cover).name}'s ${chars.size}: $what ${chars.size - missing.size} (${"%.1f".format(Locale.ROOT, share * 100)}%)")
+        val floor = FLOORS[what] ?: 1.0
+        if (share < floor) {
+            val some = missing.take(MISSING_SHOWN).joinToString("") { String(Character.toChars(it)) }
+            throw SourceException(cover, 0, "${missing.size} characters without $what, below ${floor * 100}%: $some")
         }
     }
-    out.appendLine("wrote $output: ${output.length()} bytes")
 }
 
 // Unihan.zip's file of kRSUnicode and kTotalStrokes
 private const val UNIHAN_RS = "Unihan_IRGSources.txt"
 
-// of the characters handwriting knows, at least this share must be taken apart (97.8% are), and have
-// the mainland's stroke order (95.1% have: lexicon/stroke-order.tsv's are 6,940 simplified ones; a traditional one has
-// rime-stroke's); the rest all
+// of the characters handwriting knows, at least this share must be taken apart (about 98% are), and have
+// the mainland's stroke order (about 95% have: lexicon/stroke-order.tsv's are the simplified ones; a traditional one
+// has rime-stroke's); the rest all. The run prints each share
 private const val PARTS = "parts"
 private const val MAINLAND_ORDER = "the mainland's stroke order"
 private val FLOORS = mapOf(PARTS to 0.97, MAINLAND_ORDER to 0.94)

@@ -64,8 +64,8 @@ internal val COMMANDS = listOf(
     },
     Command(
         "pinyin",
-        "<pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--merged <dictionary.txt> [--stale]] [--threads <n>] [--taps <hand>:<α>[:<seed>]] [--tones <chars.txt>[,<phrases.txt>], zhuyin's]",
-        3..3, "scheme", "fuzzy", "half", "neighbours", "rerank", "refine", "weight", "limit", "beam", "sentences", "layers", "pack", "merged", "stale", "threads", "taps", "tones",
+        "<pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--merged <dictionary.txt> [--stale]] [--threads <n>] [--taps <hand>:<α>[:<seed>]]",
+        3..3, "scheme", "fuzzy", "half", "neighbours", "rerank", "refine", "weight", "limit", "beam", "sentences", "layers", "pack", "merged", "stale", "threads", "taps",
     ) { args, _, _ ->
         val (dataPath, setPath, resultPath) = args.operands
         runPinyin(dataPath, setPath, resultPath, RunOptions(args.options), Models(args.options))
@@ -164,8 +164,8 @@ internal val COMMANDS = listOf(
     Command("predict-learn", "<pinyin.data> <set.tsv> [--user-weight <w>] [--continuations on|off]", 2..2, "user-weight", "continuations") { args, out, _ ->
         val (dataPath, setPath) = args.operands
         val userWeight = args.options["user-weight"]?.toFloat() ?: Predictor.USER_WEIGHT
+        // checked already: see optionsValid
         val continuations = args.options["continuations"] ?: "on"
-        require(continuations in ON_OFF) { "--continuations: on or off" }
         val rows = PredictLearning(loadData(dataPath), userWeight, continuations == "on").measure(readSet(setPath))
         rows.forEach { (label, score) -> out.appendLine("%-28s %s".format(label, score)) }
         0
@@ -216,9 +216,12 @@ internal val COMMANDS = listOf(
             null
         } else writeT9Set(setPath, outPath, presses, keys, out, args.options["same"])
     },
-    Command("zhuyin", "<set.tsv> <zhuyin-set.tsv> [--keys nine|full] [--tones <chars.txt>[,<phrases.txt>]]", 2..2, "keys", "tones") { args, out, _ ->
+    Command("zhuyin", "<set.tsv> <zhuyin-set.tsv> [--keys nine|full] [--tones <chars.txt>[,<phrases.txt>]]", 2..2, "keys", "tones") { args, out, err ->
         val (setPath, outPath) = args.operands
-        val keys = ZhuyinSet.KEYS[args.options["keys"] ?: "full"] ?: return@Command null
+        val keys = ZhuyinSet.KEYS[args.options["keys"] ?: "full"] ?: run {
+            err.appendLine("zhuyin: --keys nine or full")
+            return@Command null
+        }
         val samples = readSet(setPath)
         val converted = ZhuyinSet.convert(samples, keys, args.options["tones"]?.let(ZhuyinSet.Tones::of))
         val toned = if ("tones" in args.options) ", tones typed" else ""
@@ -269,7 +272,7 @@ internal val COMMANDS = listOf(
     Command("readings", "<pinyin.data> <readings.tsv> [--typed] [--misses <out.tsv>] [--gate]", 2..2, "typed", "misses", "gate") { args, out, _ ->
         val (dataPath, setPath) = args.operands
         val r = ReadingsRun(loadData(dataPath), typed = "typed" in args.options).measure(File(setPath).useLines { ReadingsRun.parse(it) })
-        out.appendLine("words: ${r.words}, read right: ${r.right} (${"%.2f".format(r.accuracy)}%), gate ${ReadingsRun.GATE}%")
+        out.appendLine("words: ${r.words}, read right: ${r.right} (${"%.2f".format(Locale.ROOT, r.accuracy)}%), gate ${ReadingsRun.GATE}%")
         args.options["misses"]?.let { path -> File(path).printWriter().use { w -> r.misses.forEach(w::println) } }
         if ("gate" in args.options && r.accuracy < ReadingsRun.GATE) 1 else 0
     },
@@ -413,6 +416,7 @@ private fun optionsValid(options: Map<String, String>): Boolean {
         valid("keys") { it in T9Set.KEYS || it in ShuangpinSet.KEYS || it in ZhuyinSet.KEYS },
         valid("user-counts") { it in setOf("full", "none", "multi") },
         valid("short-guard") { it in ON_OFF },
+        valid("continuations") { it in ON_OFF },
         // the taps type the 14 keys: a 14-key scheme
         valid("taps") { runCatching { Taps.parse(it) }.isSuccess && scheme != null && scheme in T9Set.SCHEMES && T9Set.lettersOf(scheme) == NineKeyLetters.G14 },
         valid("seed") { (it.toIntOrNull() ?: -1) >= 0 },
@@ -476,8 +480,6 @@ private class RunOptions(options: Map<String, String>) {
     private val scheme = options["scheme"]
     private val fuzzy = options["fuzzy"]?.let(::fuzzyPairs).orEmpty()
     private val neighbours = options["neighbours"] == "on"
-    // zhuyin's tones checked against the characters' readings
-    private val tones = options["tones"]?.let(ZhuyinSet.Tones::of)
     val half = options["half"]
     val beam = options["beam"]?.toInt() ?: PinyinDecoder.DEFAULT_BEAM
     /** How many whole-input readings the decoder gives the rerankers. */
@@ -504,7 +506,7 @@ private class RunOptions(options: Map<String, String>) {
     fun segmenter(data: PinyinData): Segmenter = when (scheme) {
         null -> PinyinSegmenter(fuzzy, neighbours = neighbours, latin = LatinWords.of(data.dictionary))
         NO_LATIN -> PinyinSegmenter(fuzzy, neighbours = neighbours)
-        in ZhuyinSet.SCHEMES -> T9Segmenter(fuzzy, abbreviations = false, letters = ZhuyinSet.SCHEMES.getValue(scheme), toneAllows = tones?.let { it::allows })
+        in ZhuyinSet.SCHEMES -> T9Segmenter(fuzzy, abbreviations = false, letters = ZhuyinSet.SCHEMES.getValue(scheme), toneAllows = data.tones::allows)
         in T9Set.SCHEMES -> T9Segmenter(fuzzy, abbreviations = T9Set.abbreviates(scheme), letters = T9Set.lettersOf(scheme))
         in ShuangpinSet.GROUPED -> ShuangpinSet.GROUPED.getValue(scheme).let { (s, letters) -> GroupedShuangpinSegmenter(s, letters, fuzzy) }
         else -> ShuangpinSegmenter(ShuangpinSet.SCHEMES.getValue(scheme), fuzzy)
