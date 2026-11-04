@@ -434,12 +434,12 @@ def set_comma(d, mark):
     def comma(s):
         return next((n for n in s.app() if n.text == ","), None)
     try:
-        n = d.wait(comma, 5)
+        n = d.wait(comma, 10)   # 5 s ran out with four emulators busy at once
     except Blocked:   # seen in PR-10: left on 通用输入 after the tap on 中文标点; once more
         home(d, "通用输入", "中文标点")
         n = None
     try:
-        n = n or d.wait(comma, 5)
+        n = n or d.wait(comma, 10)
     except Blocked:
         raise Blocked(f"中文标点里没有 ,：{d.top_activity()} {d.screen().texts()[:12]}")
     d.tap(n.row().c, 1.2)

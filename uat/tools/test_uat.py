@@ -151,6 +151,26 @@ def case(cid, needs=None, heavy=False):
                     needs=needs, heavy=heavy)
 
 
+class DevicesTest(unittest.TestCase):
+    def test_ports_are_even_and_skip_taken_pairs(self):
+        self.assertEqual(uat.free_ports(set(), 3), ["5554", "5556", "5558"])
+        self.assertEqual(uat.free_ports({5558}, 3), ["5554", "5556", "5560"])
+        self.assertEqual(uat.free_ports({5555}, 1), ["5556"])   # adb's half of 5554 taken
+        self.assertEqual(len(uat.free_ports(set(), 99)), 16)    # 5554-5584
+
+    def test_each_port_has_its_own_page_server(self):
+        got = [uat.http_port(p) for p in uat.free_ports(set(), 16)]
+        self.assertEqual(got, list(range(8800, 8816)))
+
+    def test_count_from_memory(self):
+        G = uat.GB
+        self.assertEqual(uat.device_count(20 * G, 0, budget=3 * G), 6)      # (20-2)/3
+        self.assertEqual(uat.device_count(20 * G, 1, budget=3 * G), 3)      # (20-2-7)/3
+        self.assertEqual(uat.device_count(20 * G, 0, budget=3 * G, cap=3), 3)
+        self.assertEqual(uat.device_count(4 * G, 2, budget=3 * G), 1)       # never under 1
+        self.assertEqual(uat.device_count(99 * G, 0, budget=3 * G, ports=2), 2)
+
+
 class HeavyTest(unittest.TestCase):
     def case(self, cid, heavy=False):
         return case(cid, heavy=heavy)

@@ -213,7 +213,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 还等不到就报阻塞，并写明当前输入法、进程在不在、前台是哪个界面。
 怀疑失败是时机问题时，加 `UAT_SLOW=1` 用原来的长停顿再跑一次对比。
 要在这份用例下跑另一个检出构建的包（红色基线，如 VO-23 在 R15 上先红），加 `UAT_APK_REPO=<那个检出的路径>`：装包时取它的 `app/build/outputs` 里最新的 APK，用例和脚本仍用这一份。
-测试页的本地网页服务按第一台设备取端口（5554 → 8800，5556 → 8801，到 8815）；端口被占时运行器直接退出，
+测试页的本地网页服务按第一台设备取端口（5554 → 8800，5556 → 8801，……，5584 → 8815，每台各一个）；端口被占时运行器直接退出，
 停掉占用的服务或用 `UAT_HTTP_PORT=<端口>` 换一个。
 
 ```sh
@@ -221,15 +221,17 @@ BUILD_ABI=arm64-v8a ./gradlew :app:assembleTextDebug   # 没有 debug 包时（�
 uat/tools/uat.py up --port 5554             # 第一台 emulator-5554；不带 --port 是第二台 5556
 uat/tools/uat.py up
 uat/tools/uat.py run [--areas 14,06] [--ids PY-01,ST-02] [--devices 5554,5556]
+uat/tools/uat.py run --devices auto [--ids …]   # 按内存开尽量多台、分着跑、跑完关掉
+uat/tools/uat.py up --count auto|N            # 只开机，在空着的偶数端口上
 uat/tools/uat.py mark <run> <编号> 通过|失败 [看到了什么]     # 看过拼图后
 uat/tools/uat.py down; uat/tools/uat.py down --port 5554   # 用完关掉
 ```
 
 设备是 AVD `youmo`（android-36 google_apis arm64-v8a，1080×2340，440 dpi，三键导航，简体中文，3 GB 内存）
 的模拟器，`uat/tools/avd.sh` 建它并存一个快照 `clean`（要先 `sdkmanager "system-images;android-36;google_apis;arm64-v8a" emulator`）。`up` 从这个快照只读启动（`-read-only -no-snapshot-save`，
-约 5 秒），所以每次 `up` 都是干净设备，同一个 AVD 能同时开两台；`adb root` 后 adbd 是 root。
-无界面（`-no-window`），GPU 用宿主（`-gpu host`；`EMU_GPU=swiftshader_indirect` 换软件渲染，但快照是 host 存的，
-换了要冷启动）。两台一起跑时不分核（macOS 上没法给进程定核）；标了 `heavy=True` 的用例照旧排在最后、
+约 5 秒），所以每次 `up` 都是干净设备，同一个 AVD 能同时开多台；`adb root` 后 adbd 是 root。
+无界面（`-no-window`），GPU 用宿主（`-gpu host`，这台 Mac 没接显示器，GPU 算「离线」渲染器，运行器给模拟器加载 `uat/tools/offline-gl.m` 编出的垫片才拿得到它；`EMU_GPU=swiftshader_indirect` 换软件渲染，但快照是 host 存的，
+换了要冷启动）。台数不限：`--devices auto` 按启动时的空闲内存算——（vm_stat 空闲+非活跃+推测页 − 2 GB 余量 − 正在跑的 heavy.sh 任务数 × 7 GB）÷ 每台 5 GB，至少 1 台，`UAT_MAX_DEVICES` 封顶，`UAT_EMU_GB` 改每台预算（2026-11-03 在 Mac mini 上实测：空闲约 23 GB 时 4 台 `-gpu host` 一起跑用例，压缩约 1.5 GB，没用 swap；单台 qemu 的 phys_footprint 约 6 GB，其中一部分被压缩）；端口从 5554 起取偶数，adb 已列出的或有人在听的（别的工作区、别的项目的模拟器）跳过。10 条用例：软件渲染 1 台 466 秒、2 台 334 秒；GPU 4 台 324 秒，大半耗在最长的一条（PR-10 185 秒）上，用例多时才看得出台数的好处。几台一起跑时不分核（macOS 上没法给进程定核）；标了 `heavy=True` 的用例照旧排在最后、
 一次只跑一条，别的设备都闲着。别的工作区要自己的设备就开在别的偶数端口（`up --port 5558`，到 5584），
 `run --devices 5558`。adb 37 的 mDNS 在这台机器的局域网上会让 adb 服务几秒就崩（`ADB_MDNS=0` 关掉；运行器和
 `uat/tools/avd.sh` 自己设，别的地方先起的 adb 服务要带上它）。

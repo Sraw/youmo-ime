@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""UAT runner for the Android emulator: groups of cases per baseline, machine checks, contact sheets, two devices.
+"""UAT runner for the Android emulator: groups of cases per baseline, machine checks, contact sheets, any number of devices.
 
   uat.py up | down [--port P]      an emulator (emulator-P, default the second: 5556) of the AVD youmo
                                    from its snapshot "clean", read-only: every up a clean device
   uat.py emu-up | emu-down         the same on 5554 (the first)
-  uat.py run [--areas 14,06] [--ids ST-01,PY-02] [--devices 5554,5556] [--flavor text|voice]
+  uat.py up --count N|auto          N emulators (auto: as many as memory allows) on free even ports
+  uat.py run [--areas 14,06] [--ids ST-01,PY-02] [--devices 5554,5556|auto] [--flavor text|voice]
+                                   auto: start as many as memory allows, split the run, bring them down
   uat.py mark <run> <id> 通过|失败 [note]
   uat.py list [--areas …]          the registered cases, their group and kind
 
@@ -57,8 +59,7 @@ os.environ.setdefault("ADB_MDNS", "0")
 # are the two of a run; a worktree may start its own on another even port up to 5584 (uat.py up --port)
 AVD = os.environ.get("UAT_AVD", "youmo")
 SNAPSHOT = "clean"   # the AVD's state after uat/tools/avd.sh: zh-CN, three-button nav, the WebView shell
-# two by design: on the 32 GB Mac one emulator is 3-4.5 GB resident beside two heavy Gradle jobs
-# (~7 GB each); a third wants the builds serialized (YOUMO_HEAVY_SLOTS=1, dev/README.md)
+# the default pair; any number runs (--devices 5554,5556,5558,… or auto: device_count from free memory)
 PORTS = ("5554", "5556")
 
 
@@ -111,6 +112,98 @@ def http_port(port):
     so runs and gates on different devices never share a server (5554 → 8800, 5556 → 8801). 8800-8815:
     clear of the ports forwarded to this Mac (8780 is one)"""
     return 8800 + (int(port) - 5554) // 2
+
+
+# how many emulators a run may start (uat.py up --count auto, run --devices auto): the memory free now,
+# less some headroom (what runs now is already out of it) and ~7 GB per heavy Gradle job running
+# (heavy.sh's slots taken), over one emulator's budget, measured on the Mac mini: four -gpu host
+# emulators running cases took the ~23 GB free, ~1.5 GB of it compressed, nothing swapped
+# (see uat/README.md「设备」). UAT_MAX_DEVICES caps it; never under 1
+GB = 1 << 30
+RESERVE = 2 * GB
+HEAVY_JOB = 7 * GB
+EMU_BUDGET = int(float(os.environ.get("UAT_EMU_GB", "5")) * GB)
+HEAVY_SLOTS = "/private/tmp/claude-501/youmo-heavy"
+
+
+def device_count(free, heavy_jobs, budget=EMU_BUDGET, cap=None, ports=16):
+    """emulators to start for [free] bytes available and [heavy_jobs] heavy jobs running: at least 1,
+    at most [cap] and the [ports] free"""
+    n = (free - RESERVE - heavy_jobs * HEAVY_JOB) // budget
+    if cap is not None:
+        n = min(n, cap)
+    return max(1, min(int(n), ports))
+
+
+def free_memory():
+    """bytes the system can hand out now: vm_stat's free, inactive and speculative pages"""
+    out = subprocess.run(["vm_stat"], capture_output=True, text=True).stdout
+    page = int(re.search(r"page size of (\d+)", out).group(1))
+    pages = {k: int(v) for k, v in re.findall(r"Pages (free|inactive|speculative):\s+(\d+)", out)}
+    return sum(pages.values()) * page
+
+
+def heavy_jobs():
+    """heavy.sh slots held now (each a lockf lock on a slot file)"""
+    import fcntl
+    n = 0
+    for f in (os.listdir(HEAVY_SLOTS) if os.path.isdir(HEAVY_SLOTS) else []):
+        try:
+            fd = os.open(os.path.join(HEAVY_SLOTS, f), os.O_RDONLY)
+        except OSError:
+            continue
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        except OSError:
+            n += 1
+        finally:
+            os.close(fd)
+    return n
+
+
+def free_ports(taken, n):
+    """the first [n] console ports, 5554, 5556, … up to 5584, with neither port of the pair in [taken]
+    (ports adb lists or something listens on: another worktree's or project's emulator is skipped)"""
+    out = []
+    for p in range(5554, 5586, 2):
+        if p not in taken and p + 1 not in taken:
+            out.append(str(p))
+        if len(out) == n:
+            break
+    return out
+
+
+def taken_ports():
+    """console/adb ports in use: emulators adb lists, and anything listening on 127.0.0.1 there"""
+    import socket
+    taken = {int(m) for m in re.findall(r"emulator-(\d+)",
+                                        subprocess.run(["adb", "devices"], capture_output=True, text=True).stdout)}
+    for p in range(5554, 5586):
+        s = socket.socket()
+        s.settimeout(0.2)
+        if s.connect_ex(("127.0.0.1", p)) == 0:
+            taken.add(p - p % 2)
+        s.close()
+    return taken
+
+
+def auto_ports(count="auto"):
+    """console ports for [count] new emulators ("auto": as many as memory allows), printing the sum"""
+    taken = taken_ports()
+    room = len(free_ports(taken, 16))
+    if count == "auto":
+        cap = int(os.environ["UAT_MAX_DEVICES"]) if os.environ.get("UAT_MAX_DEVICES") else None
+        free, jobs = free_memory(), heavy_jobs()
+        n = device_count(free, jobs, cap=cap, ports=room)
+        print(f"{n} emulators: {free / GB:.1f} GB free - {RESERVE // GB} reserve - {jobs} heavy jobs x "
+              f"{HEAVY_JOB // GB} GB, / {EMU_BUDGET / GB:.1f} GB each" + (f", cap {cap}" if cap else ""))
+    else:
+        n = int(count)
+    ports = free_ports(taken, n)
+    if len(ports) < n:
+        sys.exit(f"only {len(ports)} console ports free of {n}")
+    return ports
 CLIPS = os.path.join(OUT, "voice-clips")
 # host side of `adb reverse tcp:8000`: one per first device, so two runs at once (on 5554 and on 5556,
 # from two checkouts) each serve their own fixtures rather than the other's
@@ -2281,6 +2374,29 @@ def flakes(names):
 
 # ---------------------------------------------------------------- devices and the page server
 
+SHIM_LOCK = threading.Lock()
+
+
+def emulator_env(gpu):
+    """The emulator's environment: for -gpu host on a Mac, the offline-renderer shim (offline-gl.m) loaded
+    into it, built once into ~/.cache/youmo (again when the source is newer)."""
+    env = dict(os.environ)
+    if gpu != "host" or sys.platform != "darwin":
+        return env
+    src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "offline-gl.m")
+    lib = os.path.expanduser("~/.cache/youmo/liboffline-gl.dylib")
+    with SHIM_LOCK:   # devices start on threads: one builds it, the others wait
+        if not os.path.exists(lib) or os.path.getmtime(lib) < os.path.getmtime(src):
+            os.makedirs(os.path.dirname(lib), exist_ok=True)
+            tmp = lib + f".{os.getpid()}"   # another uat.py building it too: each its own, the last one kept
+            subprocess.run(["clang", "-dynamiclib", "-arch", "arm64", "-o", tmp, src,
+                            "-framework", "AppKit", "-framework", "OpenGL"], check=True)
+            subprocess.run(["codesign", "-s", "-", "-f", tmp], check=True, capture_output=True)
+            os.replace(tmp, lib)
+    env["DYLD_INSERT_LIBRARIES"] = lib
+    return env
+
+
 def emulator_bin():
     sdk = (os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT")
            or os.path.expanduser("~/Library/Android/sdk"))
@@ -2288,6 +2404,16 @@ def emulator_bin():
     if not os.path.exists(p):
         sys.exit(f"no emulator at {p}: set ANDROID_HOME to the SDK")
     return p
+
+
+def wait_for(ok, timeout):
+    """ok() polled each second until it holds (True) or [timeout] s went by (False)"""
+    end = time.time() + timeout
+    while not ok():
+        if time.time() > end:
+            return False
+        time.sleep(1)
+    return True
 
 
 def tail(path, n=3):
@@ -2339,14 +2465,16 @@ def up(port="5556"):
         log = os.path.join(OUT, "emu", f"emulator-{port}.log")
         if not name:
             os.makedirs(os.path.join(OUT, "emu"), exist_ok=True)
-            # -gpu host: the Mac's GPU (its OpenGL; EMU_GPU=swiftshader_indirect for software, which the
-            # snapshot was not saved with: a cold boot). -no-audio: no microphone yet (Device.say)
+            # -gpu host: the Mac's GPU (its OpenGL, through emulator_env's shim with no display attached;
+            # EMU_GPU=swiftshader_indirect for software, which the snapshot was not saved with: a cold boot).
+            # -no-audio: no microphone yet (Device.say)
+            gpu = os.environ.get("EMU_GPU", "host")
             with open(log, "w") as f:   # the emulator holds its own copy of the file
                 emu = subprocess.Popen([emulator_bin(), "-avd", AVD, "-port", port, "-snapshot", SNAPSHOT,
                                         "-no-snapshot-save", "-read-only", "-no-window", "-no-audio", "-no-boot-anim",
-                                        "-gpu", os.environ.get("EMU_GPU", "host")],
+                                        "-gpu", gpu],
                                        stdout=f, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                                       start_new_session=True)
+                                       env=emulator_env(gpu), start_new_session=True)
         for _ in range(180):
             time.sleep(1)
             if d.sh("getprop sys.boot_completed").strip() == "1":
@@ -2358,6 +2486,13 @@ def up(port="5556"):
                 emu.kill()
             sys.exit(f"{d.serial} did not boot in 3 min ({log})")
         ours(d)   # the port taken by another emulator between the look and the start: that one booted
+        # the log polled: from the snapshot, boot_completed can come before the emulator's output is written
+        if emu is not None and gpu == "host" and not wait_for(
+                lambda: "OpenGL ES Translator (Apple" in tail(log, 400), 15):
+            # booted from the snapshot without the GPU: no surfaceflinger, every screencap would time out
+            emu.kill()
+            sys.exit(f"{d.serial}: the emulator found no GPU ({log}); the shim not loaded (an emulator update "
+                     "without allow-dyld-environment-variables?): EMU_GPU=swiftshader_indirect for software")
     need_root(d)
     if d.sh("getprop persist.sys.locale").strip() != "zh-CN":   # a snapshot made without it
         d.sh("setprop persist.sys.locale zh-CN; setprop sys.boot_completed 0; stop; start")
@@ -2449,7 +2584,46 @@ def cmd_run(a):
              and (not areas or c.area in areas)]
     if not cases:
         sys.exit("no cases")
-    ports = [emu_port(p) for p in a.devices.split(",")]
+    if a.devices == "auto":   # as many as memory allows, started here and brought down after
+        ports = auto_ports()
+        try:   # a Ctrl-C while they boot too: each in its own session, the signal does not reach them
+            return run_on(a, cases, up_many(ports))
+        finally:
+            down_all(ports)
+    return run_on(a, cases, [emu_port(p) for p in a.devices.split(",")])
+
+
+def up_many(ports):
+    """emulators on [ports] booted together; if any did not boot, all are brought down and the run exits"""
+    fails = {}
+    def one(p):
+        try:
+            up(p)
+        except SystemExit as e:
+            fails[p] = e.code
+        except Exception as e:   # the shim's build, adb timing out: not taken for a device that is up
+            fails[p] = f"{type(e).__name__}: {e}"
+    threads = [threading.Thread(target=one, args=(p,), daemon=True) for p in ports]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    if fails:
+        down_all(ports)   # those booted, and those that failed after booting (root, the page's browser)
+        sys.exit("; ".join(f"{p}: {m}" for p, m in fails.items()))
+    return ports
+
+
+def down_all(ports):
+    """down() each of [ports]; one that will not go down does not keep the others up"""
+    for p in ports:
+        try:
+            down(p)
+        except (SystemExit, Exception) as e:
+            print(f"emulator-{p}: not brought down ({e})")
+
+
+def run_on(a, cases, ports):
     global HTTP_PORT
     HTTP_PORT = HTTP_PORT or http_port(ports[0])
     for p in ports:
@@ -2728,6 +2902,7 @@ def main():
     l.add_argument("--areas")
     for n in ("up", "down"):
         sub.add_parser(n).add_argument("--port", default=PORTS[1])
+    sub.choices["up"].add_argument("--count", help="N or auto: that many on free ports (auto: as many as memory allows)")
     sub.add_parser("emu-up")
     sub.add_parser("emu-down")
     m = sub.add_parser("mark")
@@ -2750,6 +2925,8 @@ def main():
         for c in sorted(CASES.values(), key=lambda c: (c.group, c.order(), c.id)):
             print(c.group, c.id, {0: "read", 1: "learn-clean", 2: "learn", 3: "mutate"}[c.order()],
                   "visual" if c.visual else "", c.needs or "")
+    elif a.cmd == "up" and a.count:
+        print("up: " + ",".join(up_many(auto_ports(a.count))))
     elif a.cmd == "up":
         up(a.port)
     elif a.cmd == "down":
