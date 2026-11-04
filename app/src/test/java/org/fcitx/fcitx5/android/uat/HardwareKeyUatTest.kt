@@ -9,6 +9,7 @@ import android.view.InputDevice
 import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
@@ -40,6 +41,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -157,6 +160,28 @@ class HardwareKeyUatTest {
     }
 
     private inline fun <reified T : View> KeyboardHarness.showing(): Boolean = KeyboardHarness.all(inputView).any { it is T && shown(it) }
+
+    @Test
+    @Uat("HK-30")
+    fun aCursorReportWithTheWindowGoneShowsNoTouchWindow() {
+        val h = harness().start()
+        h.type("a")
+        val cv = h.candidatesView
+        // the IME window not up (split screen, the other app's window focused): the view detached,
+        // its window token null. A touch window shown over it is the BadTokenException of HK-30
+        val parent = cv.parent as ViewGroup
+        parent.removeView(cv)
+        assertFalse(cv.isAttachedToWindow)
+        cv.updateCursorAnchor(floatArrayOf(10f, 900f, 10f, 860f), floatArrayOf(1000f, 2000f))
+        cv.updateCursorAnchor(floatArrayOf(1000f, 2000f))
+        h.advance(500)
+        val popups = shadowOf(RuntimeEnvironment.getApplication())
+        assertFalse(popups.latestPopupWindow?.isShowing == true)
+        // the window back: the position put off is placed at its first draw, the touch window with it
+        parent.addView(cv)
+        h.advance(500)
+        assertTrue("touch window after the window came back", popups.latestPopupWindow?.isShowing == true)
+    }
 
     @Test
     @Uat("HK-02")

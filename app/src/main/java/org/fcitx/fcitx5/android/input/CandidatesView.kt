@@ -128,6 +128,8 @@ class CandidatesView(
     private val receiverPlace = intArrayOf(0, 0, 0, 0)
     private var receiverShown = false
     private val placeReceiver = Runnable {
+        // no window to put it over (the IME window not up, HK-30): BadTokenException. Placed at the next draw
+        if (!isAttachedToWindow) return@Runnable
         receiverShown = true
         touchEventReceiverWindow.showAt(receiverPlace[0], receiverPlace[1], receiverPlace[2], receiverPlace[3])
     }
@@ -209,6 +211,11 @@ class CandidatesView(
     private fun updatePosition() {
         if (visibility != VISIBLE || dragging) {
             // skip unnecessary updates; a drag places it itself
+            return
+        }
+        if (!isAttachedToWindow) {
+            // a hardware key with the IME window not up (split screen, HK-30): placed at its first draw
+            shouldUpdatePosition = true
             return
         }
         val (parentWidth, parentHeight) = parentSize
