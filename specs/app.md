@@ -159,14 +159,16 @@ put back, from what is left (`ClearedText.settled`: all of it read, by its lengt
 place its end meets, each press a code point at least and a character, `BreakIterator`'s, at most;
 what follows the cursor unchanged); a selection's deletion in a run reads again and settles it so
 far. Whatever else changes the field ends a run and drops the last run and all kept before it, a
-clear since kept (`edited`): the service's editor is a `WatchedEditor` (commits, compositions,
+clear since kept (`edited`) unless it read short (`Cleared.whole` false: it cannot tell text typed before the cursor, so it goes like a run): the service's editor is a `WatchedEditor` (commits, compositions,
 selections, deletions, but a Backspace's or the swipe's own and the 复制 shortcut's, made `quietly`),
 and Enter, the arrows, key events sent, the context menu (`changing`), a hardware key, another input
 method (not the same one focused again as the screen turns), a preedit shown on the bar tell it too.
 A tap on the field the editor tells (`onViewClicked`, not a WebView's or Compose's) closes the run
 (`moved`): the next deletion starts another, the last still put back where the field reads as it
 left it. An empty pair Backspace takes whole changes what follows the cursor: that run is never put back. 恢复 putting the last clear or run
-back first while the field reads as each left it and nothing is typed (a run's text before the
+back first while the field reads as each left it and nothing is typed (a clear that read short
+(an app giving less before the cursor than asked) matched by the selection and what is after the
+cursor alone, and put back at the cursor, not the field's start; a run's text before the
 cursor, where it was; pinyin never reaching the field, a clear of what is typed drops those before it;
 a Backspace after one put back starts a run of its own); what was typed is dropped and typed
 again by `HostCore.clearTyped`/`retype` (the router's log of the keys since nothing was typed: plain
@@ -183,7 +185,7 @@ two settings with one list of places (`KeyMarkPosition`, `KeyMarks.At`: 右上 �
 are made by `keyboardCompact()`) the symbol never under the letter, the shortcuts drawn as anywhere, smaller, and the keys' text 0.9 (`KeyTextScale`, the smaller of it and floating's; 大千's symbols 0.9 again, `KeyTextScale.dachen`, cut off on a 360 dp phone otherwise). The service
 makes the keys anew only when a height change crosses into or out of 紧凑 (`compactBuilt`, as
 `floatingBuilt`); the theme page's preview does the same in `recalculateSize`. A key's glyph (label, icon) and its marks (shortcut icons and texts, a letter's symbol) keep apart only where their ink meets (`KeyMarkYield`, by `AutoScaleTextView.inkBounds`; an icon's box), every slot worked out as the top right one mirrored. `KeyView.settleMarks` after the face's layout (`KeyView.glyphs`: a `TextKeyView`'s label, an `ImageKeyView`'s icon, an `ImageTextKeyView`'s two as one; `KeyMarkYield.key`): marks meeting each other first smaller about their corners, as much, the least that parts them (`keptApart`), else left out (no move parts them), then the marks into their corners (a corner's sideways or out, the less; an edge's middle only out), then the glyph moves (any way, the least, in the face), then the marks smaller (a symbol or text to 6 dp, an icon to 7, `MIN_SYMBOL_DP`, `MIN_ICON_DP`), then the glyph smaller about its middle, a fifth at most, then a shortcut still meeting tried in the key's other free corners (`Mark.elsewhere`), then left out, the most expendable first (`Mark.drop`: a function key's down shortcut, a shortcut); a symbol is never left out (`DROP_SYMBOL`: kept, the glyph at its smallest; drawn over it were that not enough, which the walk finds nowhere). An `AltTextKeyView` (letters; `KeyMarkYield.letters`, run by `BaseKeyboard.onLayout` over all its letter keys once they are laid out): the letter stays, its marks into their corners and smaller; what still meets, every letter of the keyboard the same smaller about its baseline, a quarter at most (a shortcut that would need more is tried elsewhere, then left out; a symbol that would, the letters a quarter smaller). The views are moved by `KeyView.settle`: scaled from their own top left, translated to the ink `KeyMarkYield` gives; a mark left out is drawn at alpha 0. `KeyMarksEverywhereUatTest` measures every key of every keyboard (standard, 紧凑, floating, one-handed, landscape; every pair of places the settings allow) for nothing drawn over anything else and no symbol left out, (the system's font size changes none of it: the keys are sized in dp), and prints what was left out (nothing) and moved. The icon 8 dp at 紧凑. `KeyCaps`' keys don't yield. 注音 keyboards name their keys `zyfull/<QWERTY letter>` and
-`zy9/1`…`zy9/11`, the groups by their place (`ZhuyinShortcutHook`; the tones and 注音九键's slot none, as 九键's 1). A long press's keys (`PopupKeyboardUi`, `PopupMenuUi`) are one small size whatever the
+`zy9/1`…`zy9/11`, the groups by their place (`ZhuyinShortcutNames`; the tones and 注音九键's slot none, as 九键's 1). A long press's keys (`PopupKeyboardUi`, `PopupMenuUi`) are one small size whatever the
 key (`PopupComponent.LONG_PRESS_KEY_*`; as wide as the key pressed, 九键's 7 filled the screen),
 floating above it, the bubble gone; the finger picks by how far it moved since they opened, not
 where it is (`PopupFocus` in ime-core: 0.6 of a key a step, held past a row's ends, an empty slot's
@@ -592,7 +594,7 @@ settled or a migration's write-back failed this start (`ThemeFilesManager.rewrit
 not saved leaves its slot and every setting for the next start. A Monet theme in use is not copied
 (its colours follow the wallpaper): the settings are kept, encoded, as hidden `monet_key_style`
 (`ThemeLookMigration.MONET_KEY`), and `Theme.Monet`'s look is the defaults with them
-(`ThemeLookMigration.monetLook`). The page's 按键样式 keeps only 标点位置 and a line saying where the rest went.
+(`ThemeLookMigration.monetLook`). The page's 按键样式 keeps only a line saying where it went (标点位置 moved to 按键).
 
 ### Drawing a theme
 
@@ -613,7 +615,7 @@ font (`ThemeAssets.typeface`, the weight asked); hints, marks and the bar's icon
 `ThemeAssets` (`data/theme/`) decodes off the main thread and caches for one theme's files at a time:
 the picture once an orientation at the width it is drawn (halved while wider, and till it is at most
 2048² pixels and 4096 high, so a 4096 cut is not held whole), its blurs from that (`BoxBlur`), each
-once a width it is drawn at within a tenth (a floating keyboard's blurred as much as the docked one),
+once a width it is drawn at within a tenth (the last three widths a blur is drawn at kept, never one still being made or waited for; a floating keyboard's blurred as much as the docked one),
 decoded ahead when the theme is picked and when the screen turns at every blur it shows (`prefetch`,
 `ThemeLook.pictureBlurs`; decoding and blurring outside the cache's lock, one decode a picture however
 many ask; a prefetch run after another theme was picked decodes nothing and keeps nothing). A view
@@ -716,11 +718,6 @@ remembering text goes through it. One exception: in an email's or a URL's field 
 (`AddressStrip`) reads at most 256 units either side of the cursor of a sensitive field too, to offer
 an address's end there, and keeps nothing of it (not even to compare: `AddressLearning` holds no text
 of a field not learned from).
-
-Where a field learns nothing or less than others, the bar says so: `NotLearned.of` (ime-core) turns
-the field's traits (password, sensitive, own app, `FieldPolicy.learnFlags`) and 「不用我的输入习惯」
-into reasons, and `KawaiiBarComponent` shows them on `NotLearnedMark`, leftmost on `IdleUi` (before
-the password's number row, which narrows for it) and on `CandidateUi`; held, a bubble says why.
 
 ## The two flavors
 

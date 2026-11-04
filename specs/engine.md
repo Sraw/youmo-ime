@@ -542,7 +542,7 @@ setting either: it reads the codes.
 - **Learning.** Kinds `zy:nine`, `zy:dachen` (`Kinds.isZhuyin`), grouped, no spellings linked (U-20 is
   pinyin's). Custom phrases match each symbol's pinyin fragments (`ZhuyinKeys.PINYIN_WAYS`).
 - **Top-1** (decoder alone, pinyin.tsv / pinyin-chat.tsv, `ime-eval zhuyin`): 全拼 93.9 / 70.0%, 注音全键盘
-  93.2 / 69.4%, with tones 93.9 / 69.8%; 九键拼音 87.6 / 51.5%, 注音九键 86.0 / 48.7%, with tones 89.0 / 53.0%.
+  93.2 / 69.4%, with tones 97.4 / 83.4%; 九键拼音 87.6 / 51.5%, 注音九键 86.0 / 48.7%, with tones 95.8 / 70.6% (tones as the app allows them: `PinyinData.tones`; the eval passed none before 0.5.1, so earlier "with tones" numbers were without).
 
 ## Tables
 

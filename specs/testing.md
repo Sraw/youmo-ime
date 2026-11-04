@@ -122,7 +122,8 @@ temp directory (the base split from the eval's own data) and reads it as the app
 Report top-1 (and the change in samples won and lost) on at least the main, web, chat and new sets,
 with the default reading (neighbouring keys on, both models). `release-report.sh` runs the full gate
 used for a data release: against a baseline, no gate set may lose significantly more samples than it
-wins (McNemar, Bonferroni-corrected), and learning must bring back what was typed.
+wins (McNemar, Bonferroni-corrected), learning must bring back what was typed, and the candidate readings (候选词注音) must read
+`data/readings/chat.tsv` right at `ReadingsRun.GATE` (98%; `readings --gate`).
 
 `run-on-device.sh` runs a set through the APK's own engine on a device, for checking that the app
 decodes as the tool does.
@@ -131,6 +132,8 @@ Roborazzi goldens (`app/src/test/screenshots/`) are compared in the text flavor 
 build's bar adds a microphone. `app/build.gradle.kts` turns record, compare and verify off for every
 `testVoice*` task, which makes `captureRoboImage` a no-op there; every other assertion still runs. A
 voice case that is about how the microphone looks would need its own golden in a voice-only directory.
+
+Every app JVM test runs with 编码行 = 嵌入 (`OneDefaultPreferencesShadow`), not the floating strip a new install gets: this keeps 0.5.0's goldens and geometry. A test of the floating strip sets it itself and puts it back.
 
 `ThemeLookScreenshotTest` draws five sample themes (colours, a frosted picture, the picture cut out
 by the keys, nine-slice images with fonts, an image per key), light and dark, on eight boards in
@@ -154,7 +157,7 @@ a settings page, rotation, a field type, an upgrade) is tried on a device before
   the same device as the rest; a uinput keyboard is still made nowhere but an emulator. Install,
   `ime enable` / `ime set` the service, drive it with `adb shell input tap/swipe` at measured key
   coordinates, read the field back, screenshot the bar. Scripted, that is `uat/tools/uat.py`
-  (below); `dev/emu/` is only an uncommitted workbench (it makes the AVD). Root via `adb root`.
+  (below); `uat/tools/avd.sh` makes the AVD and its snapshot `clean`. Root via `adb root`.
   Voice (UAT 12) needs the microphone fed with clips made by `uat/tools/voice-clips.py`: not wired
   up yet (the emulators start `-no-audio`; on Linux it was a host PulseAudio virtual source), so the
   cases that speak are blocked.
@@ -193,6 +196,10 @@ per `uat/tools/sheet-review.md`. The debug build's `TypingHostActivity` is the n
 WebView test page cannot set (an IME_ACTION_NEXT field, no personalized learning, a sensitive clip).
 The composing row is read by its ids (`Device.code_row`, `preedit` and `syllables`: `code_row_text`, and
 `code_row_syllables` for the 14 keys' syllable strip), not by its class: the strip scrolls too.
+The two emulators share the Mac's cores unpinned (redroid's per-device `cpusets()` once took the
+steady cases from 30/45 to 39/45, 2026-10-23); how flaky the timing-bound cases are on the emulators
+is not measured yet: before taking a case that fails then passes for an app bug, compare
+`uat.py flakes` over a few two-emulator runs (and `UAT_SLOW=1`), and record the counts here.
 Details in `uat/README.md`.
 
 Release gates 2, 3 and 5 of the host replacement (0.4.0) (in-place upgrade from the `uat/fixtures/upgrade`
