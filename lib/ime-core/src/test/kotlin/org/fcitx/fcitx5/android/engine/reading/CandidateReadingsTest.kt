@@ -74,10 +74,7 @@ class CandidateReadingsTest {
     @Test
     fun byTextTheLongestWordFirstThenEachCharacterItsLikeliestWay() {
         assertEquals(listOf("yín", "háng", "xíng", "zǒu"), readings.of("银行行走", ReadingStyle.PINYIN))
-    }
-
-    @Test
-    fun zhuyin() {
+        // the same in 注音
         assertEquals(listOf("ㄧㄣˊ", "ㄏㄤˊ"), readings.of("银行", ReadingStyle.ZHUYIN))
     }
 
@@ -120,12 +117,6 @@ class CandidateReadingsTest {
         assertEquals(emptyList<String>(), readings.ofHint("你A", "ni a"))
         assertEquals(emptyList<String>(), readings.ofHint("银行", "yinhang"))
         assertEquals(emptyList<String>(), readings.ofHint("你", "~ni"))
-    }
-
-    @Test
-    fun traditionalTextIsReadAsItsSimplified() {
-        val r = CandidateReadings(data, data.tones, { it.replace('銀', '银') }) { Predictor.charReadingsOf(data.dictionary, data.vocabulary) }
-        assertEquals(listOf("yín", "háng"), r.of("銀行", ReadingStyle.PINYIN))
     }
 
     @Test

@@ -4,9 +4,11 @@
  */
 package org.fcitx.fcitx5.android.engine.stroke
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.learn.control.Why
+import org.fcitx.fcitx5.android.engine.reading.WordReading
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
@@ -407,5 +409,22 @@ class StrokeFilterTest {
         val s = filter.apply(Action.Key('，'))
         assertEquals("养", s.commit)
         assertEquals(2, s.deleteBefore)
+    }
+
+    // the character card and 候选词注音 ask of a place in the list shown: a kept candidate's is
+    // the session's of its own place, not of the place it now has
+    @Test
+    @Uat("PY-113")
+    fun readingsAndLookupsOfAKeptCandidateAreOfItsOwnPlace() {
+        val inner = object : Session by pinyin {
+            override fun readingOf(index: Int) = listOf(WordReading(yang[index], 0, IntArray(0)))
+            override fun lookedUp(index: Int) = yang[index]
+        }
+        val filter = StrokeFilter(inner, { strokes }, pageSize = 3)
+        "yang".forEach { filter.apply(Action.Key(it)) }
+        val s = filter.apply(Action.Stroke('n'))
+        assertEquals(listOf("养", "羊", "🐑"), s.candidates)
+        assertEquals(s.candidates, s.candidates.indices.map { filter.lookedUp(it) })
+        assertEquals(s.candidates, s.candidates.indices.map { filter.readingOf(it)?.single()?.text })
     }
 }

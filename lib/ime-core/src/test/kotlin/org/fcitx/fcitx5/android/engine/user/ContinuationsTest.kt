@@ -79,10 +79,6 @@ class ContinuationsTest {
         assertEquals(3, found.single().count)
     }
 
-    private companion object {
-        const val LEAST = 3
-    }
-
     // two phrases left with the same rest are one candidate: the one used most (review of 051-predict)
     @Test
     fun oneRestOnceTheMostUsedPhrase() {
@@ -95,13 +91,21 @@ class ContinuationsTest {
         assertEquals("你好呀亲爱的", c.find("你好呀", intArrayOf(0, 1, 2), "呀", 2) { true }.single().whole)
     }
 
+    // the tail was measured in UTF-16 units against a limit in code points: a character outside the
+    // BMP counted twice, or cut in half
     @Test
     fun theTailIsAPhrasesLengthNoCharacterCut() {
         assertEquals("你好", Continuations.tail("你好"))
         val long = "一".repeat(20)
         assertEquals(12, Continuations.tail(long).length)
-        // 𠀀 (two chars) cut in two at the start: dropped whole
-        val cut = "𠀀" + "好".repeat(11)
-        assertEquals("好".repeat(11), Continuations.tail(cut))
+        // 𠀀 (two chars) one code point as Phrases counts: twelve in all, kept whole
+        val ext = "𠀀" + "好".repeat(11)
+        assertEquals(ext, Continuations.tail(ext))
+        // thirteen: the first goes whole, never half of it
+        assertEquals("好".repeat(12), Continuations.tail("𠀀" + "好".repeat(12)))
+    }
+
+    private companion object {
+        const val LEAST = 3
     }
 }

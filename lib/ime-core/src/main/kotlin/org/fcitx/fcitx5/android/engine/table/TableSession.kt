@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.engine.learn.KeyedRows
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.learn.Word
 import org.fcitx.fcitx5.android.engine.learn.control.Why
+import org.fcitx.fcitx5.android.engine.reading.WordReading
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
@@ -324,6 +325,9 @@ class TableSession(
         offering() -> predictions.why(index - selfEmoji.size)
         else -> ranking[index]?.takeIf { it.phrase == null }?.let { TableHabitOrder.why(habits, keyed(input.toString()), it.text, ranked[it.text]) }
     }
+
+    // a pinyin lookup's words read as typed; a code's by their text
+    override fun readingOf(index: Int): List<WordReading>? = if (lookingUp) lookUp!!.readingOf(index) else null
 
     // what was learned read as it is now (an undo, a prediction turned off), the record's read live
     override fun reread(): Snapshot? = when {

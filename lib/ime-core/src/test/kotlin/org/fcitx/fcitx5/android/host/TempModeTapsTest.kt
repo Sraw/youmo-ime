@@ -47,7 +47,7 @@ class TempModeTapsTest {
 
     @Test
     fun aRejectedCodeLeavesQuickInputUntouched() {
-        // code review N5: a 九键 digit typed nothing, yet Return no longer committed alt
+        // code review N5: a key quick input does not take (a syllable tapped in the strip) typed nothing, yet Return no longer committed alt
         rig.quickPhrase.trigger(rig.ic, str = "S", alt = "ALT", key = Key('k'.code))
         send(Keyboard.SYLLABLES.first.code)
         rig.press(KeySyms.RETURN)

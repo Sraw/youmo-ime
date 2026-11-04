@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.engine.pinyin
 
 import org.fcitx.fcitx5.android.engine.pinyin.SpellingIndex.Companion.keepBest
 import org.fcitx.fcitx5.android.engine.pinyin.SpellingIndex.Companion.toMatches
-import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Companion.SEPARATOR
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 import java.util.TreeMap
 
@@ -175,8 +174,7 @@ class T9Segmenter(
 
     // the letters of a syllable taken are the session's to put in, not typed
     // zhuyin's symbols typed as themselves and tones are keys sent as codes ([ZhuyinKeys]), read as the groups are
-    override fun reads(c: Char) = letters.isCode(c) && letters.letters(c).isNotEmpty() ||
-        spelling == KeySpelling.Bopomofo && (spelling.isFixed(c) || spelling.separates(c) && c != SEPARATOR)
+    override fun reads(c: Char) = letters.isCode(c) && letters.letters(c).isNotEmpty() || spelling.readsOwn(c)
 
     override fun segment(input: String): SyllableGraph = segment(input, null)
 
@@ -315,32 +313,22 @@ class T9Segmenter(
     /** Whether [c] is a key typed: one of the keys' codes (the nine keys' digits) or a letter typed as itself. */
     override fun isKey(c: Char): Boolean = letters.isCode(c) || spelling.isFixed(c)
 
-    override fun initialsOf(code: Char): List<String> = when (spelling) {
-        KeySpelling.Pinyin -> initialsOf(letters, code)
-        // the key's initial symbols as pinyin's initials, what the bar puts in
-        KeySpelling.Bopomofo -> (ZhuyinKeys.symbolOf(code)?.toString() ?: letters.letters(code)).mapNotNull { KeySpelling.Bopomofo.initialOf[it] }
-    }
+    override fun initialsOf(code: Char): List<String> = spelling.initialsOf(letters, code)
 
     // digits say nothing: of a syllable still being typed as many letters as were typed
     override fun started(syllable: Int, keys: Int): String = spelling.of(syllable).take(keys)
 
     override fun spelt(syllable: Int): String = spelling.of(syllable)
 
-    // an initial first: the bar offers m, n and r (ㄇ ㄋ ㄖ) as initials only, never as 呣 嗯 儿's syllables
+    // an initial first, where the spelling shows one so
     override fun shownOffered(offered: String): String =
-        (if (spelling == KeySpelling.Bopomofo) spelling.initial(offered) else null)
-            ?: Syllables.id(offered).takeIf { it >= 0 }?.let(spelling::of) ?: offered
+        spelling.offeredInitial(offered) ?: Syllables.id(offered).takeIf { it >= 0 }?.let(spelling::of) ?: offered
 
-    override fun keyOf(offered: String): Char? =
-        if (spelling == KeySpelling.Bopomofo) spelling.initial(offered)?.singleOrNull()?.let(ZhuyinKeys::symbolCode) else null
+    override fun keyOf(offered: String): Char? = spelling.keyOf(offered)
 
     override fun separates(c: Char): Boolean = spelling.separates(c)
 
-    override fun phraseWays(c: Char): List<String>? = when {
-        spelling != KeySpelling.Bopomofo -> null
-        ZhuyinKeys.toneOf(c) > 0 -> emptyList()
-        else -> (ZhuyinKeys.symbolOf(c)?.toString() ?: letters.letters(c).takeIf { letters.isCode(c) })?.flatMap { ZhuyinKeys.PINYIN_WAYS.getValue(it) }?.distinct()
-    }
+    override fun phraseWays(c: Char): List<String>? = spelling.phraseWays(letters, c)
 
     override val spaceTone: Char? = if (letters == ZhuyinKeys.DACHEN) ZhuyinKeys.toneCode(1) else null
 

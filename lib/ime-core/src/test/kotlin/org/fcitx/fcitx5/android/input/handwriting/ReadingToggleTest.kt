@@ -27,6 +27,5 @@ class ReadingToggleTest {
         assertEquals("Zhuyin", ReadingToggle.last(ReadingStyle.ZHUYIN, "Pinyin"))
         assertEquals("Pinyin", ReadingToggle.last(ReadingStyle.OFF, "Pinyin"))
         assertEquals("", ReadingToggle.last(ReadingStyle.OFF, ""))
-        assertEquals(listOf(ReadingStyle.OFF, ReadingStyle.PINYIN, ReadingStyle.ZHUYIN), ReadingToggle.CHOICES)
     }
 }

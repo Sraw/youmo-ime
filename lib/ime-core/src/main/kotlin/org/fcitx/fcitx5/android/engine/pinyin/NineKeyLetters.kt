@@ -144,7 +144,7 @@ class NineKeyLetters private constructor(
          * after a switch the keyboard shown has not caught up with). Private use:
          * no text a user types (braille is: blind users'), no case, no digit, dropped wherever
          * the app keeps such characters from the field; in the BMP, as every code is a Char, past
-         * the syllables' (Keyboard.SYLLABLES ends at U+F8BF). As on [G14], a code less its
+         * the syllables' (Keyboard.SYLLABLES ends at U+F87F, ZhuyinKeys' block U+F880–F8B4). As on [G14], a code less its
          * block's first is its key's first letter.
          */
         val G18 = grouped(FIRST_PRIVATE_CODE, "q", "we", "rt", "y", "u", "io", "p", "a", "sd", "fg", "h", "jk", "l;", "z", "xc", "v", "bn", "m")

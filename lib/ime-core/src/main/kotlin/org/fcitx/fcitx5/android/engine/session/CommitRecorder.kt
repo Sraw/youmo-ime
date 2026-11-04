@@ -45,7 +45,7 @@ internal class CommitRecorder(
 ) {
     val habits = to.habits
     private val layout = letters?.tag()
-    // a grouped keyboard's keys apart from the nine keys' (qk:, not t9:): it has no 连按 either
+    // a grouped keyboard's keys apart from the nine keys' (qk:, not t9:); 注音九键's 连按 is under its own kind (zy:), never t9m:
     private val grouped = layout != null && (NineKeyLetters.grouped(layout) != null || Kinds.isZhuyin(to.kind))
     // grouped 双拼 (to.kind sp:<scheme>) spk:<scheme>:<tag>, the 14 keys qk:<tag>, zhuyin's its own
     private val kind = when {
@@ -199,6 +199,7 @@ internal class CommitRecorder(
 
     /** A prediction (联想) of [text] picked [after] the word it follows, [first] the one shown first, the rest of [continued] if a whole phrase's: see [PredictionOrder]. */
     fun prediction(text: String, after: String, first: String, continued: String = "") = safely {
+        // after nothing, no whole phrase either: PredictionOrder offers a phrase's rest only after the word it follows
         if (after.isEmpty()) return@safely
         val row = PredictionOrder.row(text, after, first)
         // in the journal as a commit is: deleted whole at once, the pick is taken back (U-03); the rest

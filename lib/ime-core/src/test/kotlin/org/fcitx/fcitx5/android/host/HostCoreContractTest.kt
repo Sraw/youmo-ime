@@ -670,6 +670,8 @@ class HostCoreContractTest {
 
     @Test
     fun `an unbind arriving after the next app's bind leaves that app focused, its keys typed`() {
+        // the bug: the old app's late unbind ended the context that was current, the new app's, so
+        // its keys went to the app raw instead of being typed (InputContexts.deactivate)
         val core = core()
         core.open()
         core.activate(2)

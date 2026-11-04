@@ -71,11 +71,18 @@ class Continuations {
     companion object {
         /**
          * The end of the text before the cursor [text] a phrase's start may be in: no longer than a
-         * phrase, a character not cut in two. What [find] is given, by the sessions and the evaluation alike.
+         * phrase, in code points as [Phrases] counts them (an Ext-B character one), a character not cut
+         * in two. What [find] is given, by the sessions and the evaluation alike.
          */
         fun tail(text: String): String {
-            val tail = text.takeLast(Phrases.MAX)
-            return if (tail.isNotEmpty() && Character.isLowSurrogate(tail[0])) tail.substring(1) else tail
+            var start = text.length
+            var taken = 0
+            while (start > 0 && taken < Phrases.MAX) {
+                val pair = start >= 2 && Character.isLowSurrogate(text[start - 1]) && Character.isHighSurrogate(text[start - 2])
+                start -= if (pair) 2 else 1
+                taken++
+            }
+            return text.substring(start)
         }
 
         /** What is left of a phrase to offer it: one character is a word's 联想's (U-71). */

@@ -29,6 +29,8 @@ class CharReadingsTest {
         // a character only 频率词典 has: its readings
         assertEquals(listOf("gōng"), of('工'))
         assertEquals(listOf("hái", "huán"), of('还'))
+        // 一 in its own tone alone, not the yí yì it is said in before others
+        assertEquals(listOf("yī"), of('一'))
     }
 
     @Test
@@ -53,11 +55,6 @@ class CharReadingsTest {
         // its words by the card's place
         assertEquals(emptyList<String>(), readings.examples('和'.code, 5))
         assertEquals(listOf("和平"), readings.examples('和'.code, 0))
-    }
-
-    @Test
-    fun yiInItsOwnToneAlone() {
-        assertEquals(listOf("yī"), of('一'))
     }
 
     @Test

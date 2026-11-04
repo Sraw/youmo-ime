@@ -8,6 +8,7 @@ import android.content.Context
 import android.os.Build
 import androidx.annotation.Keep
 import androidx.annotation.VisibleForTesting
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.withContext
@@ -20,10 +21,12 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMaps
+import org.fcitx.fcitx5.android.data.quickphrase.QuickPhraseManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.session.Action
@@ -52,13 +55,10 @@ import org.fcitx.fcitx5.android.host.PunctuationConfig
 import org.fcitx.fcitx5.android.host.PunctuationEntry
 import org.fcitx.fcitx5.android.host.PunctuationProfile
 import org.fcitx.fcitx5.android.host.QuickPhraseBook
-import androidx.core.content.ContextCompat
-import org.fcitx.fcitx5.android.data.quickphrase.QuickPhraseManager
-import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
-import org.fcitx.fcitx5.android.utils.AppUtil
 import org.fcitx.fcitx5.android.host.QuickPhraseEntry
 import org.fcitx.fcitx5.android.host.QuickPhraseHooks
 import org.fcitx.fcitx5.android.host.StatusEntry
+import org.fcitx.fcitx5.android.utils.AppUtil
 import timber.log.Timber
 import java.io.File
 import java.io.IOException
@@ -642,8 +642,15 @@ class KotlinHost(
 
     // quick input's ties to the app: the nine keys' letters, the habits (借手机), the use kept, ＋添加
     private val quickPhraseHooks = object : QuickPhraseHooks {
+        // read at every key quick input sees: parsed again only when the setting's text changed
+        private var nineKeysRead: Pair<String, NineKeyLetters>? = null
+
         override val nineKeys: NineKeyLetters
-            get() = NineKeyLetters.parse(AppPrefs.getInstance().keyboard.t9Letters.getValue())
+            get() {
+                val raw = AppPrefs.getInstance().keyboard.t9Letters.getValue()
+                nineKeysRead?.let { (seen, letters) -> if (seen == raw) return letters }
+                return NineKeyLetters.parse(raw).also { nineKeysRead = raw to it }
+            }
 
         override val withMine: Boolean get() = AppPrefs.getInstance().internal.useHabits.getValue()
 
@@ -652,7 +659,8 @@ class KotlinHost(
             configThread.execute {
                 try {
                     QuickPhraseManager.markUsed(entry, at)
-                } catch (e: IOException) {
+                } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                    // a file this cannot write or parse costs the use kept, never the input method's process
                     Timber.w(e, "quick phrase use")
                 }
             }

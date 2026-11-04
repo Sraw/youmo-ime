@@ -102,7 +102,11 @@ class SyllableGraph internal constructor(
     companion object {
         const val SEPARATOR = '\''
 
-        /** Whether [c] ends a syllable: [SEPARATOR], or a tone of the zhuyin keyboards, which no other input has. */
+        /**
+         * Whether [c] ends a syllable: [SEPARATOR], or a tone of the zhuyin keyboards ([KeySpelling.Bopomofo]'s
+         * separators, the one place they are said). The graph reads every input so, its spelling not
+         * known here: a tone's code is in [ZhuyinKeys.BLOCK], which only the zhuyin keyboards send.
+         */
         fun isSeparator(c: Char): Boolean = c == SEPARATOR || ZhuyinKeys.toneOf(c) > 0
     }
 }

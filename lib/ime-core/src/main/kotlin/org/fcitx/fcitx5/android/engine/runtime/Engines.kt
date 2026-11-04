@@ -381,31 +381,31 @@ class Engines(
     private fun annotatedSession(im: String): Session? =
         if (settings.candidateReading == ReadingStyle.OFF) null else sessions[pairs.shownSession(im)]?.takeIf { it !is EnglishSession }
 
-    /**
-     * [s] with 候选词注音's readings, while it is on. Pinyin's and 双拼's hints then go: each a reading
-     * (a misreading's, a character by its parts', a stroke lookup's), which the readings show now;
-     * a table's (what is left of its code) stay.
-     */
+    /** [s] with each candidate's reading and hint as [readingAndHint] has them; as it is where there are none to show. */
     private fun annotated(im: String, s: Snapshot): Snapshot {
-        if (settings.candidateReading == ReadingStyle.OFF) return hintsAbove(im, s)
-        val session = annotatedSession(im) ?: return s
+        val off = settings.candidateReading == ReadingStyle.OFF
+        if (off && (im !in pairs || s.hints.none { it.isNotEmpty() })) return s
+        val session = if (off) null else annotatedSession(im) ?: return s
         if (s.candidates.isEmpty()) return s
-        val style = settings.candidateReading
-        val readings = s.candidates.mapIndexed { i, text ->
-            // a hint is the true reading (角色 typed jiaose: jué sè, not as typed)
-            hintAbove(text, if (im in pairs) s.hints.getOrElse(i) { "" } else "", style).ifEmpty { read(im, session, s.first + i, text, style) }
-        }
-        return s.copy(readings = readings, hints = if (im in pairs) emptyList() else s.hints)
+        val both = s.candidates.mapIndexed { i, text -> readingAndHint(im, session, s.first + i, text, s.hints.getOrElse(i) { "" }) }
+        val hints = s.hints.mapIndexed { i, h -> both.getOrNull(i)?.second ?: h }
+        // on, with every hint drawn above: no hints at all
+        return s.copy(readings = both.map { it.first }, hints = if (!off && hints.all { it.isEmpty() }) emptyList() else hints)
     }
 
     /**
-     * [s] with pinyin's and 双拼's hints, readings, as readings while 候选词注音 is off: drawn above the
-     * candidate as the setting's pinyin is, in the bar's height (the user, 2026-11-02); others' stay hints.
+     * The reading drawn above the candidate [text] at [index] of [session]'s, and the hint left beside
+     * it; the one place the snapshot and the candidates read ([candidates]) work them out. A pinyin's or
+     * 双拼's [hint] that is a reading (a misreading's true one, 角色 typed jiaose: jué sè; a character by
+     * its parts', a stroke lookup's) is drawn above, 候选词注音 on or off (off: as its pinyin, in the bar's
+     * height, the user, 2026-11-02), and leaves no hint; any other hint stays. While 候选词注音 is on
+     * ([session] not null) a candidate with no such hint is read as the session typed it.
      */
-    private fun hintsAbove(im: String, s: Snapshot): Snapshot {
-        if (im !in pairs || s.hints.none { it.isNotEmpty() }) return s
-        val readings = s.candidates.mapIndexed { i, text -> hintAbove(text, s.hints.getOrElse(i) { "" }) }
-        return s.copy(readings = readings, hints = s.hints.mapIndexed { i, h -> if (readings.getOrNull(i).isNullOrEmpty()) h else "" })
+    private fun readingAndHint(im: String, session: Session?, index: Int, text: String, hint: String): Pair<List<String>, String> {
+        val style = settings.candidateReading
+        val above = if (im in pairs) hintAbove(text, hint, if (style == ReadingStyle.OFF) ReadingStyle.PINYIN else style) else emptyList()
+        if (above.isNotEmpty()) return above to ""
+        return (if (session == null) emptyList() else read(im, session, index, text, style)) to hint
     }
 
     // the candidate at [index] of [session]'s as 候选词注音 writes it: handwriting's last character with all its readings
@@ -557,14 +557,12 @@ class Engines(
     /** Candidates of [im]'s input, from the [from]th, at most [count]; none if it has no session yet. */
     fun candidates(im: String, from: Int, count: Int): List<Choice> = checked {
         val choices = sessions[pairs.shownSession(im)]?.candidates(from, count).orEmpty()
-        if (settings.candidateReading == ReadingStyle.OFF && im in pairs) {
-            return@checked choices.map { c -> hintAbove(c.text, c.hint).let { r -> if (r.isEmpty()) c else Choice(c.text, "", r) } }
-        }
-        val session = annotatedSession(im) ?: return@checked choices
-        val style = settings.candidateReading
+        val off = settings.candidateReading == ReadingStyle.OFF
+        if (off && im !in pairs) return@checked choices
+        val session = if (off) null else annotatedSession(im) ?: return@checked choices
         choices.mapIndexed { i, c ->
-            val hint = if (im in pairs) c.hint else ""
-            Choice(c.text, c.hint.takeIf { im !in pairs }.orEmpty(), hintAbove(c.text, hint, style).ifEmpty { read(im, session, from + i, c.text, style) })
+            val (readings, hint) = readingAndHint(im, session, from + i, c.text, c.hint)
+            if (readings.isEmpty() && hint == c.hint) c else Choice(c.text, hint, readings)
         }
     }
 

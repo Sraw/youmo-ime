@@ -90,6 +90,8 @@ class StrokeFilter(
 
     override fun why(index: Int): Why? = if (!filtering) session.why(index) else keptAt(index)?.let { session.why(it.index) }
 
+    override fun lookedUp(index: Int): String? = if (!filtering) session.lookedUp(index) else keptAt(index)?.let { session.lookedUp(it.index) }
+
     override fun reread(): Snapshot? {
         val s = session.reread() ?: return null
         return if (filtering) after(s) else shown(s)

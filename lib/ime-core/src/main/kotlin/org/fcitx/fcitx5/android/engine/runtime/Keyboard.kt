@@ -210,7 +210,8 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
         val c = if (codePoint in 0..Char.MAX_VALUE.code) codePoint.toChar() else REPLACEMENT
         if (c in SYLLABLES && nineKeys) {
             val n = c - SYLLABLES.first
-            return session.apply(Action.Syllable(n % Action.Syllable.MAX, n / Action.Syllable.MAX))
+            // a pick of the bar as it was shown: sent again its list's id is gone, so never a key to type again
+            return session.apply(Action.Syllable(n % Action.Syllable.MAX, n / Action.Syllable.MAX)).copy(picked = true)
         }
         if (session.reads(c) || english) return session.apply(Action.Key(c))
         // on the nine keys a digit is a key: one not read (0) ends the input, as punctuation does

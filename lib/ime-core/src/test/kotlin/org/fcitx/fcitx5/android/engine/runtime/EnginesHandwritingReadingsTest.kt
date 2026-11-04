@@ -58,6 +58,7 @@ class EnginesHandwritingReadingsTest : EnginesFixture() {
         val next = e.onEvent(HANDWRITING, EngineEvent.PICK, 0)
         assertEquals("行", next.commit)
         // offered after it, nothing written: one reading each
+        assertTrue(next.toString(), next.candidates.isNotEmpty())
         assertTrue(next.toString(), next.readings.all { it.size <= 1 && it.none { r -> '/' in r } })
         val typed = engines(ReadingStyle.PINYIN).type(PINYIN, "xing")
         assertEquals(listOf("xíng"), typed.readings[typed.candidates.indexOf("行")])
@@ -101,7 +102,8 @@ class EnginesHandwritingReadingsTest : EnginesFixture() {
         assertNull(e.charCard(HANDWRITING, 5, "行"))
         // what may follow: no card
         e.onEvent(HANDWRITING, EngineEvent.PICK, 0)
-        assertNull(e.charCard(HANDWRITING, 0, e.candidates(HANDWRITING, 0, 1).firstOrNull()?.text ?: "行"))
+        val followed = e.candidates(HANDWRITING, 0, 1).single().text
+        assertNull(e.charCard(HANDWRITING, 0, followed))
         // pinyin's: by its parts or strokes, not as typed
         val p = engines(ReadingStyle.OFF)
         val parts = p.type(PINYIN, "ushuigong")

@@ -50,9 +50,10 @@ class TempPanel(
 
 /**
  * A candidate: [select] is what `PanelCandidate::select` does, null for a display-only one; [comment]
- * worked out the first time it is read (Unicode's names, for the page sent only).
+ * worked out the first time it is read (Unicode's names, for the page sent only); [asIs] shown as
+ * it is put in ([PanelCandidate.asIs]).
  */
-class TempCandidate(val text: String, comment: () -> String, internal val select: ((InputContext) -> Unit)?) {
+class TempCandidate(val text: String, comment: () -> String, internal val select: ((InputContext) -> Unit)?, val asIs: Boolean = false) {
     constructor(text: String, comment: String, select: ((InputContext) -> Unit)?) : this(text, { comment }, select)
 
     val comment: String by lazy(LazyThreadSafetyMode.NONE, comment)

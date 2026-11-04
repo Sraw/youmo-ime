@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.stroke
 
 import org.fcitx.fcitx5.android.engine.learn.control.Why
+import org.fcitx.fcitx5.android.engine.reading.WordReading
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
@@ -108,6 +109,9 @@ class StrokeLookup(
     override fun offers(index: Int): Set<Offer> = if (looking) emptySet() else pinyin.offers(index)
 
     override fun why(index: Int): Why? = if (looking) null else pinyin.why(index)
+
+    // the reading typed, while pinyin has the keys; a character found by its strokes is read by its text
+    override fun readingOf(index: Int): List<WordReading>? = if (looking) null else pinyin.readingOf(index)
 
     // a character found by its strokes, nothing typed before it (the lookup starts only then)
     override fun lookedUp(index: Int): String? = if (looking) found[index]?.let { "" } else pinyin.lookedUp(index)

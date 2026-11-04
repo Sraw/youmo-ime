@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.glide
 
 import org.fcitx.fcitx5.android.engine.learn.control.Why
+import org.fcitx.fcitx5.android.engine.reading.WordReading
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
@@ -191,6 +192,11 @@ class GlideSession(
 
     // the others are no candidates [session] ranked; its own a place on for each (review-int-runtime S2)
     override fun why(index: Int): Why? = if (others(index) != null) null else session.why(inner(index))
+
+    // the others are read by their text: their keys are not what [session] read
+    override fun readingOf(index: Int): List<WordReading>? = if (others(index) != null) null else session.readingOf(inner(index))
+
+    override fun lookedUp(index: Int): String? = if (others(index) != null) null else session.lookedUp(inner(index))
 
     override fun reread(): Snapshot? = session.reread()?.let { shown(settled(it)) }
 

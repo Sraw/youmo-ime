@@ -179,7 +179,7 @@ class HostCoreEnginesTest : EnginesFixture() {
         assertEquals("ni", log.filterIsInstance<HostEvent.InputPanel>().last().preedit.toString())
         assertEquals(listOf("nǐ"), log.filterIsInstance<HostEvent.Candidates>().last().candidates.first().readings)
         assertTrue(log.drop(before).none { it is HostEvent.Commit })
-        // the same again, or another setting: nothing read again
+        // the same setting again: nothing read again
         val after = log.size
         core.configure(EngineOptions().apply { load("CandidateReading=Pinyin\n") })
         assertEquals(after, log.size)
@@ -231,9 +231,10 @@ class HostCoreEnginesTest : EnginesFixture() {
     }
 
     // review M5: through the core and its chttrans, the user's own entry goes out as it is
-    // (HostCore.commitAsIs, past the commit filters) and the built-in one converted; neither reaches
+    // (HostCore.commitAsIs, past the commit filters) and the built-in one converted, both shown as they go out; neither reaches
     // the engine, so nothing is learnt of them and nothing is predicted after them
     @Test
+    @Uat("QU-23")
     fun `quick input's own entry goes out as it is under traditional, a built-in one converted, neither learnt nor predicted from`() {
         val engines = engines()
         val sent = mutableListOf<Int>()
@@ -276,6 +277,8 @@ class HostCoreEnginesTest : EnginesFixture() {
             "tf".forEach { core.sendKey(Key(it.code), virtual = true) }
             val shown = log.filterIsInstance<HostEvent.Candidates>().last().candidates.map { it.text }
             assertEquals(shown.toString(), 2, shown.size)
+            assertEquals("the user's own shown as it goes out", "头发", shown[0])
+            assertEquals("頭髮", shown[1])
             log.clear()
             sent.clear()
             assertTrue(core.select(index, shown[index]))
@@ -343,5 +346,28 @@ class HostCoreEnginesTest : EnginesFixture() {
         core.sendKey(Key(KeySyms.ESCAPE))
         write(1, "好")
         assertEquals("你好", log.filterIsInstance<HostEvent.InputPanel>().last().preedit.toString())
+    }
+
+    // a syllable taken off the nine keys' bar is a pick: the list it was taken from is one the
+    // session has moved past, so what is typed is never typed again from there
+    @Test
+    @Uat("KB-62")
+    fun `what is typed after a syllable taken off the nine keys' bar is never typed again`() {
+        val real = EnginesHost(engines())
+        var last: Snapshot? = null
+        val host = object : EngineHost by real {
+            override fun event(im: String, event: Int, arg: Int, learning: Boolean, payload: Action?): Snapshot? =
+                real.event(im, event, arg, learning, payload).also { last = it }
+        }
+        val core = HostCore(host, clock, Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "Default"), firstRun = true)
+        core.activate(1)
+        core.setCapabilities(Capability.PREEDIT or Capability.CLIENT_UNFOCUS_COMMIT)
+        core.focus(true)
+        "64".forEach { core.sendKey(Key(KeySyms.fromUnicode(Keyboard.pinyinNineKey(it))), virtual = true) }
+        val typed = last!!
+        assertTrue(typed.toString(), typed.syllables.isNotEmpty())
+        core.sendKey(Key(KeySyms.fromUnicode(Keyboard.syllableKey(0, typed.syllablesId).code)), virtual = true)
+        assertFalse("something still typed", core.isEmpty())
+        assertNull("a syllable pick is not typed again", core.clearTyped()!!.keys)
     }
 }

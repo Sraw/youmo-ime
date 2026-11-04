@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.table
 
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.learn.control.Why
+import org.fcitx.fcitx5.android.engine.reading.WordReading
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.HandedBack
@@ -200,6 +201,8 @@ internal class PinyinLookUp(
     override fun offers(index: Int): Set<Offer> = pinyin.offers(index).intersect(setOf(Offer.FORGET))
 
     override fun why(index: Int): Why? = pinyin.why(index)
+
+    override fun readingOf(index: Int): List<WordReading>? = pinyin.readingOf(index)
 
     override fun reread(): Snapshot? = pinyin.reread()
 

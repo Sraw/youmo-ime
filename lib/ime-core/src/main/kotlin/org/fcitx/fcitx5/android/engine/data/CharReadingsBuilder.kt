@@ -102,7 +102,7 @@ internal class CharReadingsBuilder {
     }
 
     // a neutral tone the candidates leave out: its syllable in a full tone too, and not kMandarin's reading
-    private fun cardOnly(r: Int, all: List<Int>, mandarin: List<Int>) =
+    private fun isCardOnly(r: Int, all: List<Int>, mandarin: List<Int>) =
         r % TONES == ToneMark.NEUTRAL && r !in mandarin && all.any { it / TONES == r / TONES && it % TONES != ToneMark.NEUTRAL }
 
     /** [codePoint]'s readings the candidates show, in order, each a syllable times 8 plus its tone. */
@@ -110,7 +110,7 @@ internal class CharReadingsBuilder {
         val lists = listed[codePoint] ?: return emptyList()
         val all = listedOf(codePoint, lists)
         val mandarin = of(lists, ReadingSource.MANDARIN)
-        val kept = all.filter { !cardOnly(it, all, mandarin) }
+        val kept = all.filter { !isCardOnly(it, all, mandarin) }
         if (of(lists, ReadingSource.TGHZ).isEmpty() && of(lists, ReadingSource.XHC).isEmpty() && of(lists, ReadingSource.PINLU).isEmpty()) return kept
         return byUse(codePoint, lists, kept)
     }
@@ -120,7 +120,7 @@ internal class CharReadingsBuilder {
         val lists = listed[codePoint] ?: return emptyList()
         val all = listedOf(codePoint, lists)
         val mandarin = of(lists, ReadingSource.MANDARIN)
-        return all.filter { cardOnly(it, all, mandarin) }
+        return all.filter { isCardOnly(it, all, mandarin) }
     }
 
     private fun byUse(codePoint: Int, lists: Array<IntList?>, kept: List<Int>): List<Int> {

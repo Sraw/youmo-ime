@@ -177,6 +177,9 @@ class PinyinDecoder(
     }
 
     private fun buildLattice(graph: SyllableGraph) {
+        // collect's enter and leave pair up; a decode thrown out of half way leaves no path behind
+        pathLength = 0
+        pathToned = 0
         val n = graph.end
         arcs.clear(n)
         for (at in 0..n) {
@@ -314,17 +317,32 @@ class PinyinDecoder(
     }
 
     // [Penalties.tone] where a tone typed on the path to [word] is one a character of it does not have
+    // a dictionary word read in place, no String made: this is on every arc while a tone is typed
     private fun toneCost(word: Int): Float {
+        if (toneAllows == null || pathToned == 0) return 0f
+        if (word < vocabulary.size) return toneCost(vocabulary.length(word)) { vocabulary.char(word, it) }
+        val text = user?.text(word) ?: return 0f
+        return toneCost(text.length) { text[it] }
+    }
+
+    // the word of [length] chars, [charAt] each
+    private inline fun toneCost(length: Int, charAt: (Int) -> Char): Float {
         val allows = toneAllows ?: return 0f
-        if (pathToned == 0) return 0f
-        val text = if (word < vocabulary.size) vocabulary.word(word) else user?.text(word) ?: return 0f
         // one code point a syllable, or no telling which character a tone is of
-        if (text.codePointCount(0, text.length) != pathLength) return 0f
+        var count = 0
         var at = 0
+        while (at < length) {
+            at += if (charAt(at).isHighSurrogate() && at + 1 < length && charAt(at + 1).isLowSurrogate()) 2 else 1
+            count++
+        }
+        if (count != pathLength) return 0f
+        at = 0
         for (k in 0 until pathLength) {
-            val cp = text.codePointAt(at)
+            val c = charAt(at)
+            val pair = c.isHighSurrogate() && at + 1 < length && charAt(at + 1).isLowSurrogate()
+            val cp = if (pair) Character.toCodePoint(c, charAt(at + 1)) else c.code
             if (pathTones[k] > 0 && !allows(cp, pathSyllables[k], pathTones[k])) return penalties.tone
-            at += Character.charCount(cp)
+            at += if (pair) 2 else 1
         }
         return 0f
     }

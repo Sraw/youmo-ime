@@ -166,13 +166,24 @@ class PinyinDataBuilder {
      * Each word's likeliest reading (its highest weight) is handed to [read] with its tones.
      */
     private fun writeTones(out: DataFile.Writer, read: (Entry, ByteArray) -> Unit) {
+        val chars = charToneBits()
+        val keys = chars.keys.sorted()
+        out.add(Section.TONE_CHAR_KEYS, BitPacked.encode(keys.size) { keys[it] })
+        out.add(Section.TONE_CHAR, ByteArray(keys.size) { chars.getValue(keys[it]).toByte() })
+        writeToneWords(out, chars, read)
+    }
+
+    // the usual tones of [cps] read [reading], as [chars] has them; 0 for a character with none
+    private fun usual(chars: Map<Int, Int>, cps: IntArray, reading: List<Int>) =
+        ByteArray(cps.size) { i -> ((chars[cps[i] * ToneTable.KEY_SPAN + reading[i]] ?: 0) and ToneTable.USUAL_MASK).toByte() }
+
+    // each character and syllable's byte of [ToneTable]: its usual tone and the tones it is typed with
+    private fun charToneBits(): HashMap<Int, Int> {
         val chars = HashMap(charTones)
-        fun usual(cps: IntArray, reading: List<Int>) =
-            ByteArray(cps.size) { i -> ((chars[cps[i] * ToneTable.KEY_SPAN + reading[i]] ?: 0) and ToneTable.USUAL_MASK).toByte() }
         for ((word, readings) in wordTones.entries.sortedWith(compareBy({ it.key.codePointCount(0, it.key.length) > 1 }, { it.key }))) {
             val cps = word.codePoints().toArray()
             for ((reading, listed) in readings) {
-                val tones = if (cps.size == 1) listed else ToneRules.full(listed, usual(cps, reading))
+                val tones = if (cps.size == 1) listed else ToneRules.full(listed, usual(chars, cps, reading))
                 cps.indices.forEach { i ->
                     val key = cps[i] * ToneTable.KEY_SPAN + reading[i]
                     // a character listed alone (谁 shéi) is its usual tone, whatever Unihan listed first
@@ -182,9 +193,11 @@ class PinyinDataBuilder {
                 }
             }
         }
-        val keys = chars.keys.sorted()
-        out.add(Section.TONE_CHAR_KEYS, BitPacked.encode(keys.size) { keys[it] })
-        out.add(Section.TONE_CHAR, ByteArray(keys.size) { chars.getValue(keys[it]).toByte() })
+        return chars
+    }
+
+    // the words whose tones are not their characters' usual ones, each likeliest reading handed to [read]
+    private fun writeToneWords(out: DataFile.Writer, chars: Map<Int, Int>, read: (Entry, ByteArray) -> Unit) {
         // only a reading in the dictionary, whose tones its characters' usual ones would not give
         val exceptions = sortedMapOf<Int, MutableList<Pair<List<Int>, ByteArray>>>()
         val likeliest = likeliest()
@@ -194,7 +207,7 @@ class PinyinDataBuilder {
             val cps = e.word.codePoints().toArray()
             // a Latin word's letters (iPhone) are no syllable each
             if (cps.size != reading.size) return@forEach
-            val usual = usual(cps, reading)
+            val usual = usual(chars, cps, reading)
             if (own == null && usual.any { it.toInt() == 0 }) return@forEach
             val ruled = if (own != null && (e.word to reading) in curated) own else ToneRules.tones(e.word, cps, reading, own, usual) { w, r -> wordTones[w]?.get(r) }
             val tones = ToneRules.full(ruled, usual)

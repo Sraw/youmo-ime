@@ -49,6 +49,9 @@ class PhrasesTest {
         for (t in listOf("你好", "一二三四五六七八九十一二三", "我在3楼", "好的，谢谢", "好的 谢谢", "好的😀呀")) whole(t)
         assertTrue(log.state.phrases.isEmpty())
         assertFalse(Phrases.learnable(""))
+        // the length alone: 13 letters too long, 12 not
+        assertFalse(Phrases.learnable("你好呀亲爱的你好呀亲爱的呀"))
+        assertTrue(Phrases.learnable("你好呀亲爱的你好呀亲爱的"))
     }
 
     // U-91: where no pairs are learned, no phrase either

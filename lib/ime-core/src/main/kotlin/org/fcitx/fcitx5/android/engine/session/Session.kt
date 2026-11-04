@@ -205,8 +205,9 @@ sealed class Action {
             const val ANY = -1
 
             /**
-             * Ids of the syllables offered run from 0 to this, less one, then again: 99 so the
-             * private use area's last 64 are left over (Keyboard.SYLLABLES), the grouped keyboards' codes there.
+             * Ids of the syllables offered run from 0 to this, less one, then again: 98 so that
+             * Keyboard.SYLLABLES ends at U+F87F, the private use area after it left to the grouped
+             * keyboards' codes (ZhuyinKeys from U+F880).
              */
             const val IDS = 98
 
@@ -387,6 +388,6 @@ data class Snapshot(
     val cursor: Int = -1,
     val lookingUp: Boolean = false,
     val readings: List<List<String>> = emptyList(),
-    /** A key chose a candidate (a digit, space: Keyboard's [Action.Select]); what it took hangs on the list shown. */
+    /** A key chose from a list shown (a digit, space: Keyboard's [Action.Select]; the nine keys' syllable bar); what it took hangs on that list. */
     val picked: Boolean = false,
 )

@@ -22,8 +22,8 @@ interface Habits {
 
     fun record(rows: List<Row>, takes: List<Take> = emptyList(), flags: Int = 0): Commit?
 
-    /** A 联想 picked ([rows]) that went on with the whole phrase [continued] (U-73): a use of it whole. */
-    fun recordContinued(rows: List<Row>, flags: Int, continued: String): Commit? = record(rows, flags = flags)
+    /** A 联想 picked ([rows]) that went on with the whole phrase [continued] (U-73): a use of it whole. Each its own, none dropped by default. */
+    fun recordContinued(rows: List<Row>, flags: Int, continued: String): Commit?
     fun pin(code: Code, text: String, reading: String, on: Boolean)
     fun forget(text: String)
 
@@ -118,6 +118,7 @@ interface Habits {
         override val learns get() = false
         override val today get() = 0
         override fun record(rows: List<Row>, takes: List<Take>, flags: Int): Commit? = null
+        override fun recordContinued(rows: List<Row>, flags: Int, continued: String): Commit? = null
         override fun pin(code: Code, text: String, reading: String, on: Boolean) = Unit
         override fun forget(text: String) = Unit
         override fun forgetPhrase(text: String) = Unit

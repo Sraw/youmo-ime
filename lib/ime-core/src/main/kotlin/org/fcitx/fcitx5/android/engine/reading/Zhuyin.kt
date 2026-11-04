@@ -11,7 +11,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
  * Written in code rather than shipped as data: the mapping is a fixed rule of the two scripts, not
  * a reading anyone could disagree with.
  *
- * Three pairs of syllables share a spelling, so [syllable] reads it back as the first of each:
+ * Two pairs of syllables share a spelling, so [syllable] reads it back as the first of each:
  * `er` and the rhotic `r` are both ㄦ (`er`), `weng` and the rare `wong` are both ㄨㄥ (`weng`).
  * The spelt-out Latin letters (A股) have no zhuyin.
  */
@@ -74,6 +74,10 @@ object Zhuyin {
     /** @return the id of the syllable spelt [zhuyin] (no tone mark), or -1 */
     fun syllable(zhuyin: String): Int = byZhuyin[zhuyin] ?: -1
 
-    /** Every zhuyin symbol a syllable may use, initials first: what a zhuyin keyboard needs keys for. */
+    /**
+     * Every zhuyin symbol a syllable may use, initials first, then the medials and finals: what a zhuyin
+     * keyboard needs keys for. ZhuyinKeys.SYMBOLS is the same set in Unicode's order, which its codes
+     * follow; ZhuyinKeysTest holds the two to one set.
+     */
     const val symbols: String = "ㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㄓㄔㄕㄖㄗㄘㄙㄧㄨㄩㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦ"
 }

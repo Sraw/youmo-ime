@@ -7,7 +7,7 @@ package org.fcitx.fcitx5.android.engine.pinyin
 /**
  * The two zhuyin keyboards' keys as their sessions' input has them: 注音九键's eleven groups
  * ([NINE]) and 大千's one symbol a key ([DACHEN]), each a [NineKeyLetters] of zhuyin symbols the
- * [T9Segmenter] reads syllables off through [Spelling.ZHUYIN]. The input's characters are private
+ * [T9Segmenter] reads syllables off through [KeySpelling.Bopomofo]. The input's characters are private
  * use, U+F880 on, the syllables' last block (Keyboard.SYLLABLES ends at U+F87F): a symbol's code
  * ([symbolCode], 大千's key and 九键's symbol typed as itself alike), a group's ([groupCode]) and a
  * tone's ([toneCode]); a symbol from the symbols page is text, never one of them. Only on a key's
@@ -31,7 +31,7 @@ object ZhuyinKeys {
 
     val GROUPS = GROUP_SYMBOLS.size
 
-    private const val FIRST = ''
+    private const val FIRST = '\uF880'
     private val FIRST_GROUP = FIRST + SYMBOLS.length
     private val FIRST_TONE = FIRST_GROUP + GROUPS
 

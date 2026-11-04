@@ -613,14 +613,17 @@ class HostCore(
     // 候选词注音's readings go with the text as shown, kept while it has a code point for each (traditional
     // output converts character for character; a phrase it rewrites otherwise is shown none)
     private fun entry(ic: InputContext, label: String, word: PanelCandidate): CandidateEntry {
-        val text = filterOutput(ic, word.text)
+        val text = shown(ic, word)
         val readings = word.readings.takeIf { it.size == text.codePointCount(0, text.length) }.orEmpty()
         return CandidateEntry(if (label.isEmpty()) "" else filterOutput(ic, label), text, filterOutput(ic, word.comment), readings = readings)
     }
 
     // `shows` (`androidfrontend.cpp:303-307`): the word the user tapped, by the text sent for it,
     // filtered (traditional, say); an empty text (a key's pick) is not checked
-    private fun shows(ic: InputContext, word: PanelCandidate, text: String) = text.isEmpty() || filterOutput(ic, word.text) == text
+    private fun shows(ic: InputContext, word: PanelCandidate, text: String) = text.isEmpty() || shown(ic, word) == text
+
+    // the text sent for [word]: filtered, one put in as it is ([PanelCandidate.asIs]) as it is
+    private fun shown(ic: InputContext, word: PanelCandidate) = if (word.asIs) word.text else filterOutput(ic, word.text)
 
     /**
      * A temp mode's [TempCandidateList] as the panel's list (fcitx's `CommonCandidateList`: bulk,
@@ -630,6 +633,7 @@ class HostCore(
         private inner class Word(val candidate: TempCandidate) : PanelCandidate {
             override val text get() = candidate.text
             override val comment get() = candidate.comment
+            override val asIs get() = candidate.asIs
             override fun select(ic: InputContext) {
                 candidate.select?.invoke(ic)
             }

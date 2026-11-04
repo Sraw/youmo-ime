@@ -4,12 +4,14 @@
  */
 package org.fcitx.fcitx5.android.engine.glide
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.reading.WordReading
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
@@ -298,5 +300,22 @@ class GlideSessionTest {
         assertEquals(listOf("好", "你", "妤", "姓"), s.candidates)
         assertEquals(listOf(0, null, 1, 2), s.candidates.indices.map { session.why(it)?.uses })
         assertEquals(s.candidates, session.reread()!!.candidates)
+    }
+
+    // 候选词注音 and the character card ask of a place in the list shown: the others' places read
+    // nothing (their keys are not what the session read), the session's own its reading, shifted past them
+    @Test
+    @Uat("PY-50")
+    fun readingsAndLookupsAreTheSessionsShiftedPastTheOthers() {
+        val inner = object : Session by tableSession {
+            override fun readingOf(index: Int) = listOf(WordReading("r$index", 0, IntArray(0)))
+            override fun lookedUp(index: Int) = "l$index"
+        }
+        tableReadings = listOf(GlideReading("vbg", "好", 0f), GlideReading("wqiy", "你", -1f))
+        session = GlideSession(inner, Action.Pick(0)) { _, _ -> tableReadings }
+        val s = session.apply(session.read(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY)))
+        assertEquals(listOf("好", "你", "妤", "姓"), s.candidates)
+        assertEquals(listOf("r0", null, "r1", "r2"), s.candidates.indices.map { session.readingOf(it)?.single()?.text })
+        assertEquals(listOf("l0", null, "l1", "l2"), s.candidates.indices.map { session.lookedUp(it) })
     }
 }

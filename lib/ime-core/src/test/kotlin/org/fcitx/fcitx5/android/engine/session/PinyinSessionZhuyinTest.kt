@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.engine.session
 
+import org.fcitx.fcitx5.android.engine.assertRows
+import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.SpelledForm
 import org.fcitx.fcitx5.android.engine.learn.LearnTo
@@ -108,19 +110,40 @@ class PinyinSessionZhuyinTest {
         assertTrue(out.commit.none { it in ZhuyinKeys.BLOCK })
     }
 
-    // design 051 Q4 A: a tone the reading has not puts the word after, never out
+    // design 051 Q4 A: a tone the reading has not puts the word after, never out. The Ext-B rows: a
+    // character outside the BMP (two chars, one syllable), alone and in a word with one inside it,
+    // its tone read as one code point a syllable, not passed over as a length that does not match
     @Test
     fun aToneTheReadingHasNotPutsTheWordAfter() {
         val ni = Syllables.id("ni")
         // 你 is ni3 alone here; 拟 any
-        val allows = { cp: Int, syllable: Int, tone: Int -> !(cp == '你'.code && syllable == ni && tone != 3) }
-        val plain = session(toneAllows = allows).let { s -> dachen("ㄋㄧ").map { s.apply(Key(Keyboard.keyedChar(it)!!)) }.last() }
-        assertEquals("你", plain.candidates[0])
-        val third = session(toneAllows = allows).let { s -> dachen("ㄋㄧˇ").map { s.apply(Key(Keyboard.keyedChar(it)!!)) }.last() }
-        assertEquals("你", third.candidates[0])
-        val second = session(toneAllows = allows).let { s -> dachen("ㄋㄧˊ").map { s.apply(Key(Keyboard.keyedChar(it)!!)) }.last() }
-        assertEquals("拟", second.candidates[0])
-        assertTrue(second.candidates.toString(), "你" in second.candidates)
+        val niThird = { cp: Int, syllable: Int, tone: Int -> !(cp == '你'.code && syllable == ni && tone != 3) }
+        val extB = "\uD840\uDC00" // U+20000
+        val extBData = pinyinDataOf(
+            Triple(extB, "ni", -1f), Triple("你", "ni", -2f),
+            Triple(extB + "好", "ni hao", -1f), Triple("你好", "ni hao", -2f), Triple("好", "hao", -2.5f),
+        )
+        val extBThird = { cp: Int, _: Int, tone: Int -> !(cp == 0x20000 && tone != 3) }
+        class Row(val data: PinyinData, val allows: (Int, Int, Int) -> Boolean, val typed: String, val first: String, val after: String?, val why: String)
+        assertRows(
+            listOf(
+                Row(data, niThird, "ㄋㄧ", "你", null, "no tone typed: nothing put after"),
+                Row(data, niThird, "ㄋㄧˇ", "你", null, "the tone the reading has"),
+                Row(data, niThird, "ㄋㄧˊ", "拟", "你", "a tone it has not: after, still there"),
+                Row(extBData, extBThird, "ㄋㄧˇ", extB, null, "Ext-B alone, its tone"),
+                Row(extBData, extBThird, "ㄋㄧˊ", "你", extB, "Ext-B alone, a tone it has not: one code point read as one syllable"),
+                Row(extBData, extBThird, "ㄋㄧˇㄏㄠˇ", extB + "好", null, "Ext-B in a word, its tone"),
+                Row(extBData, extBThird, "ㄋㄧˊㄏㄠˇ", "你好", extB + "好", "a tone the reading has not puts a word of an Ext-B character after: in a word, a tone it has not, not passed over as a length that does not match"),
+            ),
+            { it.why },
+        ) {
+            val candidates = PinyinSession(
+                it.data, T9Segmenter(abbreviations = false, letters = ZhuyinKeys.DACHEN, toneAllows = it.allows), spell = true, prediction = false,
+                learnTo = LearnTo(RecordingHabits(), Kinds.ZHUYIN_DACHEN),
+            ).let { s -> dachen(it.typed).map { k -> s.apply(Key(Keyboard.keyedChar(k)!!)) }.last().candidates }
+            assertEquals(it.first, candidates[0])
+            it.after?.let { a -> assertTrue(candidates.toString(), a in candidates) }
+        }
     }
 
     @Test

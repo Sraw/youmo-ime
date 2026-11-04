@@ -62,14 +62,8 @@ internal class EngineAssets(
     // English's words and model; none if the app has not got them or cannot read them (a stale
     // VERSION, say), English then suggesting nothing, and [onError] told why
     val englishData: EnglishData? by lazy(LazyThreadSafetyMode.NONE) {
-        try {
+        readOr(null, "cannot read $ENGLISH_DATA: $NO_ENGLISH") {
             EnglishData.load(blobs.load(ENGLISH_DATA), verify = false) { onError(IOException("$ENGLISH_DATA: $NO_ENGLISH", it)) }
-        } catch (e: IOException) {
-            onError(IOException("cannot read $ENGLISH_DATA: $NO_ENGLISH", e))
-            null
-        } catch (e: DataFormatException) {
-            onError(IOException("cannot read $ENGLISH_DATA: $NO_ENGLISH", e))
-            null
         }
     }
 
@@ -288,15 +282,20 @@ internal class EngineAssets(
 
     /** Each character's radical, strokes and parts, for its card; none known if the app has not got them. */
     val charInfo: CharInfo by lazy {
-        try {
+        readOr(CharInfo.EMPTY, "cannot read $CHAR_INFO_DATA: no radicals or strokes on a character's card") {
             CharInfo.load(blobs.load(CHAR_INFO_DATA), verify = false)
-        } catch (e: IOException) {
-            onError(IOException("cannot read $CHAR_INFO_DATA: no radicals or strokes on a character's card", e))
-            CharInfo.EMPTY
-        } catch (e: DataFormatException) {
-            onError(IOException("cannot read $CHAR_INFO_DATA: no radicals or strokes on a character's card", e))
-            CharInfo.EMPTY
         }
+    }
+
+    // what [read] reads, or [fallback] with [onError] told [message] when the file cannot be opened or read
+    private inline fun <T> readOr(fallback: T, message: String, read: () -> T): T = try {
+        read()
+    } catch (e: IOException) {
+        onError(IOException(message, e))
+        fallback
+    } catch (e: DataFormatException) {
+        onError(IOException(message, e))
+        fallback
     }
 
     // asked of each character by its parts once found: a rare one may be past the phone's font

@@ -197,10 +197,10 @@ class UnicodeInput(
                 val words = chars.map { chr ->
                     val text = if (chr == 0) "" else String(Character.toChars(chr))
                     // the name looked up only for the candidates sent: a prefix matches thousands
-                    TempCandidate(text, { d.name(chr) }) { c ->
+                    TempCandidate(text, comment = { d.name(chr) }, select = { c ->
                         host.commit(c, text)
                         reset(c)
-                    }
+                    }, asIs = false)
                 }
                 s.list = list(words, SEARCH_LABELS)
             } else if (trigger) {

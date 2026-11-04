@@ -34,6 +34,21 @@ internal sealed class KeySpelling {
     /** Whether [c] of the input ends a syllable as the separator does. */
     open fun separates(c: Char): Boolean = c == SyllableGraph.SEPARATOR
 
+    /** Whether [c], no code of the keys', is read all the same: a letter typed as itself or a tone sent as a code. */
+    open fun readsOwn(c: Char): Boolean = false
+
+    /** The initials, pinyin's, the key [code] of [letters] may start a syllable with. */
+    open fun initialsOf(letters: NineKeyLetters, code: Char): List<String> = T9Segmenter.initialsOf(letters, code)
+
+    /** [offered], a pinyin initial the bar offers, in the keys' letters; null to show it as a syllable. */
+    open fun offeredInitial(offered: String): String? = null
+
+    /** The key an initial the bar offers is taken as ([KeyedSegmenter.keyOf]); null for its letters. */
+    open fun keyOf(offered: String): Char? = null
+
+    /** The pinyin letters [c] of [letters]' input may be in a custom phrase's key ([KeyedSegmenter.phraseWays]). */
+    open fun phraseWays(letters: NineKeyLetters, c: Char): List<String>? = null
+
     data object Pinyin : KeySpelling() {
         override fun of(pinyin: String): String = pinyin
         override fun initial(pinyin: String): String = pinyin
@@ -53,7 +68,24 @@ internal sealed class KeySpelling {
         override fun letterOf(c: Char) = ZhuyinKeys.symbolOf(c) ?: c
         override fun shown(c: Char): String? =
             ZhuyinKeys.symbolOf(c)?.toString() ?: ZhuyinKeys.toneOf(c).takeIf { it > 0 }?.let { ZhuyinKeys.MARKS[it - 1].toString() }
-        override fun separates(c: Char) = c == SyllableGraph.SEPARATOR || ZhuyinKeys.toneOf(c) > 0
+        override fun separates(c: Char) = SyllableGraph.isSeparator(c)
+
+        // the separator is the keys' code: a symbol typed as itself and a tone are not
+        override fun readsOwn(c: Char) = isFixed(c) || separates(c) && c != SyllableGraph.SEPARATOR
+
+        // the key's initial symbols as pinyin's initials, what the bar puts in
+        override fun initialsOf(letters: NineKeyLetters, code: Char): List<String> =
+            (ZhuyinKeys.symbolOf(code)?.toString() ?: letters.letters(code)).mapNotNull { initialOf[it] }
+
+        // m, n and r (ㄇ ㄋ ㄖ) as initials only, never as 呣 嗯 儿's syllables
+        override fun offeredInitial(offered: String): String? = initial(offered)
+
+        override fun keyOf(offered: String): Char? = initial(offered)?.singleOrNull()?.let(ZhuyinKeys::symbolCode)
+
+        override fun phraseWays(letters: NineKeyLetters, c: Char): List<String>? = when {
+            ZhuyinKeys.toneOf(c) > 0 -> emptyList()
+            else -> (ZhuyinKeys.symbolOf(c)?.toString() ?: letters.letters(c).takeIf { letters.isCode(c) })?.flatMap { ZhuyinKeys.PINYIN_WAYS.getValue(it) }?.distinct()
+        }
 
         private val INITIALS = setOf("b", "p", "m", "f", "d", "t", "n", "l", "g", "k", "h", "j", "q", "x", "zh", "ch", "sh", "r", "z", "c", "s")
 

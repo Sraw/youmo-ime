@@ -403,6 +403,7 @@ internal class SessionFactory(
         override fun offers(index: Int) = made?.offers(index).orEmpty()
         override fun why(index: Int) = made?.why(index)
         override fun lookedUp(index: Int) = made?.lookedUp(index)
+        override fun readingOf(index: Int) = made?.readingOf(index)
         override fun reread() = made?.reread()
         override fun passedOn() = made?.passedOn() ?: Unit
         override fun typed(text: String) = made?.typed(text) ?: Unit

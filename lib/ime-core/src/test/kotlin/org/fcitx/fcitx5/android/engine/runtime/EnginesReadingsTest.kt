@@ -5,10 +5,13 @@
 package org.fcitx.fcitx5.android.engine.runtime
 
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.ENGLISH
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.WUBI
+import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.phrase.Chaizi
+import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.junit.Assert.assertEquals
@@ -59,22 +62,17 @@ class EnginesReadingsTest : EnginesFixture() {
     }
 
     @Test
-    fun offATablesHintsStay() {
-        val off = engines(ReadingStyle.OFF, wubiShown).type(WUBI, "vbg")
-        assertTrue(off.readings.all { it.isEmpty() })
-    }
+    @Uat("PY-113")
+    fun eachCandidateIsReadAsTyped() = assertRows(
+        "pinyin: the typed syllable, its tone" to { readAsTyped(ReadingStyle.PINYIN, "nǐ") },
+        "zhuyin: the same syllable in 注音" to { readAsTyped(ReadingStyle.ZHUYIN, "ㄋㄧˇ") },
+    )
 
-    @Test
-    fun pinyinOnEachCandidateAsTyped() {
-        val e = engines(ReadingStyle.PINYIN)
+    private fun readAsTyped(style: ReadingStyle, want: String) {
+        val e = engines(style)
         val s = e.type(PINYIN, "ni")
-        assertEquals(s.candidates.map { listOf("nǐ") }, s.readings)
-        assertEquals(listOf("nǐ"), e.candidates(PINYIN, 0, 1).single().readings)
-    }
-
-    @Test
-    fun zhuyin() {
-        assertEquals(listOf("ㄏㄠˇ"), engines(ReadingStyle.ZHUYIN).type(PINYIN, "hao").readings.first())
+        assertEquals(s.candidates.map { listOf(want) }, s.readings)
+        assertEquals(listOf(want), e.candidates(PINYIN, 0, 1).single().readings)
     }
 
     @Test
@@ -83,6 +81,9 @@ class EnginesReadingsTest : EnginesFixture() {
         assertTrue(engines(ReadingStyle.PINYIN).type(PINYIN, "upsnp").hints.isEmpty())
         val off = engines(ReadingStyle.OFF, wubiShown).type(WUBI, "vbg")
         val on = e.type(WUBI, "vbg")
+        // readings off: none read, the table's hints shown all the same
+        assertTrue(off.readings.all { it.isEmpty() })
+        assertTrue("$off", off.hints.any { it.isNotEmpty() })
         assertEquals(off.hints, on.hints)
         // a table's candidate read by its text
         assertEquals(listOf("hǎo"), on.readings[on.candidates.indexOf("好")])
@@ -91,5 +92,59 @@ class EnginesReadingsTest : EnginesFixture() {
     @Test
     fun englishShowsNone() {
         assertEquals(emptyList<List<String>>(), engines(ReadingStyle.PINYIN).type(ENGLISH, "th").readings)
+    }
+
+    // full pinyin's chain (stroke filter, glide, table forgetting, stroke lookup) hands on the reading typed:
+    // 行 typed hang reads háng, not its text's likelier xíng
+    @Test
+    @Uat("PY-113")
+    fun aCharacterOfTwoReadingsIsReadAsTypedThroughFullPinyinsWrappers() {
+        pinyin = PinyinDataBuilder()
+            .unigram("<unk>", -7f, 0f).unigram("行", -3f, 0f)
+            .entry("行", syl("xing")).entry("行", syl("hang"), weight = -1f)
+            .charTone('行'.code, Syllables.id("xing"), 2).charTone('行'.code, Syllables.id("hang"), 2)
+            .build().toByteArray()
+        val e = engines(ReadingStyle.PINYIN)
+        val s = e.type(PINYIN, "hang")
+        assertEquals(s.toString(), listOf("háng"), s.readings[s.candidates.indexOf("行")])
+        assertEquals(listOf("háng"), e.candidates(PINYIN, 0, 10).single { it.text == "行" }.readings)
+    }
+
+    // a table's pinyin lookup (五笔's z) hands on the reading typed as full pinyin does: 行 looked up
+    // by hang reads háng, not its text's likelier xíng; the table's own candidates stay read by their text
+    @Test
+    fun aTablesPinyinLookupIsReadAsTyped() {
+        pinyin = PinyinDataBuilder()
+            .unigram("<unk>", -7f, 0f).unigram("行", -3f, 0f).unigram("好", -2.5f, 0f)
+            .entry("行", syl("xing")).entry("行", syl("hang"), weight = -1f).entry("好", syl("hao"))
+            .charTone('行'.code, Syllables.id("xing"), 2).charTone('行'.code, Syllables.id("hang"), 2)
+            .charTone('好'.code, Syllables.id("hao"), 3)
+            .build().toByteArray()
+        val e = engines(ReadingStyle.PINYIN, wubiShown)
+        val s = e.type(WUBI, "zhang")
+        val at = s.candidates.indexOf("行")
+        assertTrue(s.toString(), at >= 0)
+        assertEquals(s.toString(), listOf("háng"), s.readings[at])
+        assertEquals(listOf("háng"), e.candidates(WUBI, 0, 10).single { it.text == "行" }.readings)
+        val coded = engines(ReadingStyle.PINYIN, wubiShown).type(WUBI, "vbg")
+        assertEquals(listOf("hǎo"), coded.readings[coded.candidates.indexOf("好")])
+    }
+
+    // a hint that is no reading (a character by its parts with two readings: "xing/hang") is no
+    // reading to draw above: it stays beside the candidate with 候选词注音 on, as with it off
+    @Test
+    @Uat("PY-111")
+    fun aHintThatIsNoReadingStaysWithTheReadingsOn() {
+        pinyin = PinyinDataBuilder()
+            .unigram("<unk>", -7f, 0f).unigram("行", -3f, 0f)
+            .entry("行", syl("xing")).entry("行", syl("hang"), weight = -1f)
+            .build().toByteArray()
+        chaizi = Chaizi.format(mapOf("ercun" to listOf("行"))).toByteArray()
+        val e = engines(ReadingStyle.PINYIN)
+        val s = e.type(PINYIN, "uercun")
+        val at = s.candidates.indexOf("行")
+        assertTrue(s.toString(), at >= 0)
+        assertTrue(s.toString(), "/" in s.hints[at])
+        assertEquals(s.hints[at], e.candidates(PINYIN, 0, 10).single { it.text == "行" }.hint)
     }
 }

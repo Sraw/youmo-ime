@@ -117,11 +117,11 @@ object LearnRecords {
     const val BATCH_ROW: Byte = 46
     const val IMPORTED_ROW: Byte = 47
     const val WORD_USE_ROW: Byte = 48
-    const val DATE_ROW: Byte = 80
     /** A whole phrase's count (U-73, [PhraseRow]). */
     const val PHRASE_ROW: Byte = 49
     /** Step 2's (tables): a table word the user blocked, put in and taken out by TableBlock (15) as they block it and let it show again, and kept by a snapshot. */
     const val TABLE_BLOCK_ROW: Byte = 65
+    const val DATE_ROW: Byte = 80
 
     /** [record] as one record of the log; an event, or a row that names no kind (see [SnapshotWriter]). */
     fun encode(record: LearnRecord): ByteArray = encode(record) { error("a snapshot row needs its kinds: $record") }

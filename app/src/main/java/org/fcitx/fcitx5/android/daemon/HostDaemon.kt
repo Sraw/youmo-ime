@@ -118,6 +118,18 @@ object HostDaemon {
     }
 
     /**
+     * [block] on fcitx if it runs for some client now, without a connection of the caller's: work that
+     * outlives its page (its connection gone) still tells the keyboard. Not running, nothing to tell:
+     * fcitx reads its files as it starts.
+     */
+    fun runIfRunning(block: suspend HostApi.() -> Unit): Unit = lock.withLock {
+        // a test's fake engine stands for fcitx as connect gives it
+        testConnection?.let { return@withLock it("runIfRunning").runIfReady(block) }
+        if (clients.isNotEmpty() && realFcitx.isReady)
+            realFcitx.lifeCycleScope.launch { block(fcitxImpl) }
+    }
+
+    /**
      * Restart fcitx instance while keep the clients connected
      */
     fun restartFcitx() = lock.withLock {

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.data.CodeTable
@@ -675,5 +676,17 @@ class EnginesTest : EnginesFixture() {
     private companion object {
         const val MAX_PICKS = 10
         const val MAX_SLICES = 10_000
+    }
+
+    // a syllable taken off the nine keys' bar is a pick of the list shown: the host's 清除 log ends there,
+    // as a list id sent again would be one the session has moved past
+    @Test
+    @Uat("KB-62")
+    fun aSyllableTakenOffTheBarIsAPick() {
+        val engines = Engines(::load, null, warmUps = inPlace)
+        val typed = "64".map { engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, Keyboard.pinyinNineKey(it)) }.last()
+        assertTrue(typed.toString(), typed.syllables.isNotEmpty())
+        assertFalse(typed.picked)
+        assertTrue(engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, Keyboard.syllableKey(0, typed.syllablesId).code).picked)
     }
 }
