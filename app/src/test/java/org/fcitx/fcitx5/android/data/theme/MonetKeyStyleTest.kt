@@ -112,4 +112,16 @@ class MonetKeyStyleTest {
         assertEquals(monet.look.palette, imported.look.palette)
         ThemeManager.deleteTheme(imported.name)
     }
+
+    // the Monet themes' key style is no managed preference, so it was not copied to the device-protected
+    // store: before the first unlock a Monet theme was drawn without it; and one cleared stays cleared there
+    @Test
+    fun theKeyStyleIsCopiedToTheStoreReadBeforeTheFirstUnlock() {
+        val locked = PreferenceManager.getDefaultSharedPreferences(appContext.createDeviceProtectedStorageContext())
+        ThemeManager.syncToDeviceEncryptedStorage()
+        assertEquals(old, ThemeLookMigration.monet(locked))
+        sp.edit(commit = true) { remove(ThemeLookMigration.MONET_KEY) }
+        ThemeManager.syncToDeviceEncryptedStorage()
+        assertEquals(null, ThemeLookMigration.monet(locked))
+    }
 }

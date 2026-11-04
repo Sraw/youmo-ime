@@ -123,6 +123,7 @@ class ThemeLookTest {
         assertEquals(BoardBase.Color, plain.base)
     }
 
+    // contract: the old versions' default key settings, so a user who never changed them sees the keys as before
     @Test
     fun theDefaultsAreTheOldDefaultSettings() {
         val k = LookDefaults.KEYS
@@ -135,6 +136,5 @@ class ThemeLookTest {
         assertEquals(k.space, k.kind(KeyKind.Space))
         assertEquals(k.enter, k.kind(KeyKind.Enter))
         assertFalse(k.showsPicture())
-        assertEquals("Color/Darken/Transparent/Color/Picture", listOf(KeyFill.Color, KeyPressed.Darken, BarBase.Transparent, BarBase.Color, BoardBase.Picture).joinToString("/"))
     }
 }

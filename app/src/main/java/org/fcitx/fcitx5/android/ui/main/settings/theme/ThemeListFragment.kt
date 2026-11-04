@@ -65,9 +65,11 @@ class ThemeListFragment : Fragment() {
                         return@withLoadingDialog
                     }
                     try {
+                        // the list read here, where it is changed, not on the thread that imports
+                        val themes = ThemeManager.getAllThemes()
                         val (newCreated, theme, migrated) = withContext(Dispatchers.IO) {
                             val inputStream = cr.openInputStream(uri)!!
-                            ThemeFilesManager.importTheme(inputStream).getOrThrow()
+                            ThemeFilesManager.importTheme(inputStream, themes).getOrThrow()
                         }
                         // one imported again under its name: its files new under the old names, the
                         // keyboard drawn anew if it is the one in use

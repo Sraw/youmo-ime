@@ -59,6 +59,7 @@ import java.io.File
 import kotlin.math.roundToInt
 
 /**
+ * contract: data files the theme maker page reads (youmo-layout.json, youmo-icons.json and its blocks).
  * What the theme maker's preview draws, measured on the real keyboard (`youmo-layout`), and the
  * icons it draws with (`youmo-icons`): each phone, orientation, board, mode and state the page
  * offers, every key's cell (its whole cell, the gap not taken off: the page takes the theme's off),
@@ -254,10 +255,7 @@ class ThemeMakerLayoutTest {
         private val column: View? = KeyboardHarness.find<T9Keyboard>(h.inputView)?.let { t9 ->
             T9Keyboard::class.java.getDeclaredField("column").apply { isAccessible = true }.get(t9) as View
         }
-        private val popup: View? = runCatching {
-            val f = InputView::class.java.getDeclaredField("popup").apply { isAccessible = true }
-            f.get(input).let { c -> c.javaClass.getMethod("getRoot").invoke(c) as View }
-        }.getOrNull()
+        private val popup: View = input.popup.root
 
         private fun drawn(v: View) = h.shown(v) && v.width > 0 && v.height > 0 && v.alpha > 0f
 

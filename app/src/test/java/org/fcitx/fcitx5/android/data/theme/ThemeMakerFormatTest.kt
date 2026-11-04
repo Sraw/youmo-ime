@@ -47,6 +47,7 @@ import java.nio.ByteBuffer
 import java.util.zip.ZipInputStream
 
 /**
+ * contract: the theme file format and the page's generated blocks, which mutation cannot see.
  * The theme maker page and the app read and write the same theme files: the page's generated blocks
  * of web/theme-maker/index.html (`youmo-format`: the file's version, fields and limits; `youmo-presets`:
  * the built-in themes) are what this app has, and what the page exports (testdata/from-web.zip, which
@@ -103,8 +104,19 @@ class ThemeMakerFormatTest {
     private fun fields(d: SerialDescriptor, ref: (SerialDescriptor) -> String) =
         JsonObject(d.elementNames.zip(d.elementDescriptors).associate { (n, e) -> n to JsonPrimitive(ref(e)) })
 
-    // the largest value [make] takes: a limit ime-core keeps to itself (its require is the rule)
-    private fun largest(make: (Int) -> Unit) = (0..1000).last { runCatching { make(it) }.isSuccess }
+    // the largest value [make] takes: a limit ime-core keeps to itself (its require is the rule). Only
+    // its require's IllegalArgumentException means "too large"; anything else fails the test, and so
+    // does a limit past the scan's end
+    private fun largest(make: (Int) -> Unit): Int {
+        fun takes(v: Int) = try {
+            make(v)
+            true
+        } catch (_: IllegalArgumentException) {
+            false
+        }
+        assertFalse("the limit is past the scan's end", takes(SCAN_END + 1))
+        return (0..SCAN_END).last(::takes)
+    }
 
     private fun limits() = buildJsonObject {
         put("radiusDp", Keys.MAX_RADIUS_DP)
@@ -147,11 +159,7 @@ class ThemeMakerFormatTest {
     @Test
     fun thePagesBuiltInThemesAreTheApps() {
         // as the app lists them (ThemeManager.BuiltinThemes), then the two a picture's theme starts from
-        val themes = listOf(
-            ThemePreset.MaterialLight, ThemePreset.MaterialDark, ThemePreset.PixelLight, ThemePreset.PixelDark,
-            ThemePreset.NordLight, ThemePreset.NordDark, ThemePreset.DeepBlue, ThemePreset.Monokai,
-            ThemePreset.AMOLEDBlack, ThemePreset.TransparentDark, ThemePreset.TransparentLight,
-        )
+        val themes = ThemeManager.BuiltinThemes + listOf(ThemePreset.TransparentDark, ThemePreset.TransparentLight)
         val presets = buildJsonArray {
             for (t in themes) add(buildJsonObject {
                 put("name", t.name)
@@ -231,3 +239,6 @@ class ThemeMakerFormatTest {
         assertEquals(entries(fromWeb).mapValues { it.value.toList() }, entries(exported).mapValues { it.value.toList() })
     }
 }
+
+// how far [ThemeMakerFormatTest] looks for a limit ime-core keeps to itself
+private const val SCAN_END = 1000

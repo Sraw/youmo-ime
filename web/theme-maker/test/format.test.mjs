@@ -3,24 +3,27 @@
 // the page's export byte for byte (from-web.zip, which the app's ThemeMakerFormatTest imports).
 // Run: node --test web/theme-maker/test/format.test.mjs   (a file: Node 24 takes no folder here; UPDATE=1
 // writes from-web.zip again). The page is made of src/ by tools/assemble.mjs; index.html must be what it makes.
+// contract: the page's library against the app's testdata/ (rules.json, theme.json, the zips) and the
+// generated blocks, which mutation of either side cannot see.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, copyFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { createHash } from 'node:crypto';
 import { deflateRawSync } from 'node:zlib';
-import { assemble } from '../tools/assemble.mjs';
+import { assemble, blockOf } from '../tools/assemble.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const data = join(here, 'testdata');
 const html = readFileSync(join(here, '..', 'index.html'), 'utf8');
 
 function block(id) {
-  const m = new RegExp('<script(?: type="application/json")? id="' + id + '">\\n?([\\s\\S]*?)\\n?</script>').exec(html);
-  assert.ok(m, 'no block ' + id + ' in index.html');
-  return m[1];
+  const text = blockOf(html, id);
+  assert.ok(text != null, 'no block ' + id + ' in index.html');
+  return text;
 }
 
 // the page's library as the page runs it, in this realm (so its objects compare as ours)
@@ -74,10 +77,13 @@ test('each part is drawn in the palette field the app draws it in', () => {
     const want = c[blocks ? 'blocks' : 'flat'];
     assert.equal(L.boardField({ blocks }), want.board);
     assert.equal(L.panelField({ blocks }), want.panel);
-    for (const kind of ['letter', 'function', 'space', 'enter']) assert.equal(L.faceField(kind, blocks), want.faces[kind], kind);
+    for (const kind of L.KINDS) assert.equal(L.faceField(kind, blocks), want.faces[kind], kind);
   }
   for (const [type, want] of Object.entries(c.bar)) assert.equal(L.barField({ type }), want, type);
   assert.deepEqual([0, 1, 30, 50, 99, 100].map(L.darkenAlpha), c.dim);
+  // the default brightness (70) and none dimmed
+  assert.equal(L.darkenAlpha(70), 76);
+  assert.equal(L.darkenAlpha(100), 0);
 });
 
 test('a colour laid over the picture is turned down to 30 % and given back after', () => {
@@ -102,7 +108,11 @@ test('a colour laid over the picture is turned down to 30 % and given back after
   kept = L.seeThrough(theme, kindOf, kept);
   assert.deepEqual(kept, { keyBackgroundColor: 0xff });
   assert.equal(P.keyBackgroundColor, 0x4d464646);
-  // turned up again by hand while through: left as set
+  // turned up again by hand while through: left as set, not pressed back to 30 %
+  P.keyBackgroundColor = 0xc0464646 | 0;
+  kept = L.seeThrough(theme, kindOf, kept);
+  assert.equal(P.keyBackgroundColor, 0xc0464646 | 0);
+  // and down to clear by hand: left as set too
   P.keyBackgroundColor = 0x00464646;
   kept = L.seeThrough(theme, kindOf, kept);
   assert.equal(P.keyBackgroundColor, 0x00464646);
@@ -130,7 +140,7 @@ test('a colour laid over the picture is turned down to 30 % and given back after
   assert.equal(P.accentKeyBackgroundColor, 0xff0000ff | 0);
   // a role on all boards is of each kind its keys are: every one of their colours turned down
   K.blocks = true;
-  for (const k of ['letter', 'function', 'space', 'enter']) K[k].fill = { type: 'color' };
+  for (const k of L.KINDS) K[k].fill = { type: 'color' };
   K.overrides = { '*/space': { fill: { type: 'picture', blurDp: 0, brightness: 100 }, pressed: null, label: 'show' } };
   P.keyBackgroundColor = 0xff464646 | 0;
   P.altKeyBackgroundColor = 0xff101010 | 0;
@@ -391,11 +401,14 @@ const refusedZip = (zip, code, detail) => assert.rejects(L.openZip(format, zip),
 test('a zip is unpacked no further than the app would: a bomb, a lie, a count, a total, an entry outside', async () => {
   const lim = format.limits;
   const good = await appEntries();
-  // 50 MB of zeros in 50 KB, said to be 10 bytes: refused at the first chunk past what it says
-  const bomb = new Uint8Array(50 * 1024 * 1024);
+  // 50 MB of zeros in 50 KB, said to be 10 bytes: refused at the first chunk past what it says. The
+  // zip is made first and the 50 MB let go, so what is measured is the unpacking alone: whole, it
+  // would be 50 MB more; chunk by chunk, well under 8
+  const bombZip = zipOf([{ name: 'x.json', data: new Uint8Array(50 * 1024 * 1024), deflate: true, size: 10 }]);
+  if (globalThis.gc) globalThis.gc();
   const before = process.memoryUsage().arrayBuffers;
-  await refusedZip(zipOf([{ name: 'x.json', data: bomb, deflate: true, size: 10 }]), 'not-theme', 'more than');
-  assert.ok(process.memoryUsage().arrayBuffers - before < 60 * 1024 * 1024, 'the bomb was not unpacked whole');
+  await refusedZip(bombZip, 'not-theme', 'more than');
+  assert.ok(process.memoryUsage().arrayBuffers - before < 8 * 1024 * 1024, 'the bomb was not unpacked whole');
   // said past a file's limit, or the zip's: refused before anything is unpacked
   await refusedZip(zipOf([...good, { name: 'big.bin', data: new Uint8Array(1), size: lim.fileBytes + 1 }]), 'limit', 'fileBytes');
   const third = Math.floor(lim.totalBytes / 3);
@@ -599,10 +612,33 @@ test('contrast is Contrast.ratio, a colour reads dark as the page guesses, a cut
   assert.deepEqual(L.resizeInside(3000, 4000, 1440, 800), [600, 800]);
   assert.deepEqual(L.resizeInside(3000, 1000, 1440, 800), [1440, 480]);
   assert.deepEqual(L.resizeInside(10000, 1, 100, 100), [100, 1]);
+  assert.deepEqual(L.resizeInside(2000, 1000, 1080, 830), [1080, 540]);
+  assert.deepEqual(L.resizeInside(500, 400, 1080, 830), [500, 400]);
 });
 
 test('index.html is what tools/assemble.mjs makes of src/ (src/ changed, the page not made again: fails)', () => {
   assert.ok(assemble() === html, 'index.html is not src/ assembled: node web/theme-maker/tools/assemble.mjs');
+});
+
+test('assemble.mjs refuses a page it cannot make, and puts in text that looks like a slot as it is', () => {
+  const src = join(here, '..', 'src');
+  const dir = mkdtempSync(join(tmpdir(), 'youmo-assemble-'));
+  try {
+    for (const f of ['style.css', 'lib.js', 'ui.js']) copyFileSync(join(src, f), join(dir, f));
+    const page = readFileSync(join(src, 'page.html'), 'utf8');
+    const made = (p, old = html) => { writeFileSync(join(dir, 'page.html'), p); return assemble(dir, old); };
+    assert.throws(() => made(page.replace('{{ui}}', '')), /no \{\{ui\}\}/, 'a slot missing');
+    assert.throws(() => made(page.replace('{{css}}', '{{css}}{{css}}')), /2 \{\{css\}\}/, 'a slot twice');
+    assert.throws(() => made(page, html.replace('id="youmo-icons"', 'id="youmo-other"')), /no youmo-icons block/, 'a generated block missing');
+    assert.throws(() => made(page.replace(/<script id="youmo-ui">/, '<script>')), /not two scripts/, 'a script not hashed');
+    // a slot's name inside what is put in is text, not a slot
+    writeFileSync(join(dir, 'style.css'), '/* {{lib}} $& */');
+    const out = made(page);
+    assert.ok(out.includes('/* {{lib}} $& */'));
+    assert.equal(out.split(readFileSync(join(src, 'lib.js'), 'utf8').replace(/\n+$/, '')).length, 2, 'lib.js put in once');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('an image is decoded only within what it may be: the source a photo, a cut 4096, a key image 1024', async () => {
@@ -632,7 +668,9 @@ test('an image is decoded only within what it may be: the source a photo, a cut 
 });
 
 test('the page runs only its own two scripts, by their hashes', () => {
-  const csp = /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(html)[1];
+  const m = /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(html);
+  assert.ok(m, 'no CSP meta in index.html');
+  const csp = m[1];
   const dirs = Object.fromEntries(csp.split(';').map((d) => d.trim().split(/\s+/)).map(([k, ...v]) => [k, v]));
   assert.deepEqual(dirs['default-src'], ["'none'"]);
   assert.deepEqual(dirs['base-uri'], ["'none'"]);
@@ -688,10 +726,6 @@ test('a crop on the turned picture is the source\'s box and back, each quarter t
   // a quarter turn clockwise: the turned picture's top-left corner is the source's bottom-left
   assert.deepEqual(L.cropToSource([0, 0, 10, 10], W, H, 90), [0, H - 10, 10, H]);
   assert.deepEqual(L.cropToSource([0, 0, 10, 10], W, H, 270), [W - 10, 0, W, 10]);
-  assert.deepEqual(L.resizeInside(2000, 1000, 1080, 830), [1080, 540]);
-  assert.deepEqual(L.resizeInside(500, 400, 1080, 830), [500, 400]);
-  assert.equal(L.darkenAlpha(70), 76);
-  assert.equal(L.darkenAlpha(100), 0);
 });
 
 test('the simple view\'s five colours make the 24', () => {
@@ -713,6 +747,60 @@ test('the simple view\'s five colours make the 24', () => {
   assert.equal(L.toHex(L.invertLightness(L.fromHex('#80FFFFFF'))), '#80000000');
   assert.equal(L.fromHex('12'), null);
   assert.equal(L.fromHex('#123456'), L.fromHex('#FF123456'));
+});
+
+test('a simple-view edit follows the rule for the isDark it sets, and keeps what was set by hand', () => {
+  const light = { bg: L.fromHex('#FFEEEEEE'), key: -1, text: L.fromHex('#212121'), fn: L.fromHex('#FFE1E1E1'), accent: L.fromHex('#FF4285F4') };
+  const p = L.deriveSimple(light, false);
+  // a dark background on a light theme: isDark turned first, so the press, shadow and border are dark's
+  const e = L.simpleEdit(p, ['dividerColor'], 'bg', L.fromHex('#FF202124'), false, true);
+  assert.equal(e.isDark, true);
+  const want = L.deriveSimple({ ...light, bg: L.fromHex('#FF202124') }, true);
+  for (const k of ['keyPressHighlightColor', 'keyShadowColor', 'keyBorderColor', 'backgroundColor']) assert.equal(e.palette[k], want[k], k);
+  assert.equal(e.palette.dividerColor, p.dividerColor, 'set by hand: kept');
+  assert.ok(!e.set.includes('dividerColor'));
+  // isDark ticked by hand (not auto): a background leaves it
+  assert.equal(L.simpleEdit(p, [], 'bg', L.fromHex('#FF202124'), false, false).isDark, false);
+  // the field of the five set is its own again, though set by hand before
+  const own = L.simpleEdit(p, ['keyTextColor', 'dividerColor'], 'text', -1, false, true);
+  assert.equal(own.palette.keyTextColor, -1);
+  assert.deepEqual(own.manual, ['dividerColor']);
+  assert.notEqual(p.keyTextColor, -1, 'the palette given is not changed');
+  // the dark box ticked: what follows worked out for dark, what was set by hand left
+  const q = { ...p, keyBorderColor: 0x11223344 };
+  const set = L.followDark(q, ['keyBorderColor'], true);
+  assert.deepEqual(set.sort(), ['keyPressHighlightColor', 'keyShadowColor']);
+  assert.equal(q.keyShadowColor, L.deriveSimple(light, true).keyShadowColor);
+  assert.equal(q.keyBorderColor, 0x11223344);
+});
+
+test('a dark copy is dark or light by its new background, its shadow and border still black', () => {
+  const light = L.deriveSimple({ bg: L.fromHex('#FFEEEEEE'), key: -1, text: L.fromHex('#212121'), fn: L.fromHex('#FFE1E1E1'), accent: L.fromHex('#FF4285F4') }, false);
+  const d = L.darkPalette(light, []);
+  assert.equal(d.isDark, true);
+  assert.equal(d.palette.keyTextColor, L.invertLightness(light.keyTextColor));
+  assert.equal(L.toHex(d.palette.keyShadowColor), '#66000000', 'black at dark\'s 40 %, not white');
+  assert.equal(L.toHex(d.palette.keyBorderColor), '#66000000');
+  // a dark theme's copy is a light one
+  const back = L.darkPalette(d.palette, []);
+  assert.equal(back.isDark, false);
+  assert.equal(L.toHex(back.palette.keyShadowColor), '#33000000');
+  // a shadow set by hand is kept as it was
+  assert.equal(L.darkPalette(light, ['keyShadowColor']).palette.keyShadowColor, light.keyShadowColor);
+});
+
+test('the blur radius is ThemeAssets.blurRadius: the dp in the bitmap\'s pixels as drawn, on the quarter copy', () => {
+  // [blurDp, widthPx, bitmapWidth, density, radius, why], as the app's ThemeAssets.blurRadius gives them
+  assert.ok(rules.blurRadius.length >= 5);
+  for (const [blurDp, widthPx, bitmapWidth, density, want, why] of rules.blurRadius) assert.equal(L.blurRadius(blurDp, widthPx, bitmapWidth, density), want, why);
+});
+
+test('a file the page adds is named by its CRC and its length: two of one CRC are two names', () => {
+  // the length is in the name: contents of one CRC-32 but of different lengths get different names
+  const a = new Uint8Array([1, 2, 3]);
+  const b = new Uint8Array([1, 2, 3, 0]);
+  assert.match(L.contentId(a), /^[0-9a-f]{8}-3$/);
+  assert.notEqual(L.contentId(a), L.contentId(b));
 });
 
 test('the built-in themes are the app\'s eleven', () => {
@@ -748,7 +836,7 @@ test('the measured layout and icons have what the preview draws', () => {
     for (const e of v.items) {
       if (e.t === 'key') {
         box(e.r);
-        assert.ok(['letter', 'function', 'space', 'enter'].includes(e.k), e.k);
+        assert.ok(L.KINDS.includes(e.k), e.k);
         assert.ok(['default', 'on', 'off', 'special'].includes(e.b), e.b);
         if (e.n) assert.ok(L.isKnownKeyName(layout.names, e.n), e.n);
         for (const x of e.l || []) text(x);

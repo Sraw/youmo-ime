@@ -146,24 +146,16 @@ data class Picture(
 
 /** Under the whole keyboard, the bar and the keys: the palette's colour, or the picture. */
 sealed interface BoardBase {
-    object Color : BoardBase {
-        override fun toString() = "Color"
-    }
+    data object Color : BoardBase
 
-    object Picture : BoardBase {
-        override fun toString() = "Picture"
-    }
+    data object Picture : BoardBase
 }
 
 /** Under the candidates and the toolbar: the keyboard's base seen through, the palette's bar colour, or the picture's part there. */
 sealed interface BarBase {
-    object Transparent : BarBase {
-        override fun toString() = "Transparent"
-    }
+    data object Transparent : BarBase
 
-    object Color : BarBase {
-        override fun toString() = "Color"
-    }
+    data object Color : BarBase
 
     data class Picture(val blurDp: Int, val brightness: Int) : BarBase {
         init {
@@ -199,9 +191,7 @@ data class Insets(val left: Int, val top: Int, val right: Int, val bottom: Int) 
 
 /** A key's face: its kind's colour from the palette, an image, or the picture's part where the key is. */
 sealed interface KeyFill {
-    object Color : KeyFill {
-        override fun toString() = "Color"
-    }
+    data object Color : KeyFill
 
     data class Image(val slice: NineSlice) : KeyFill
 
@@ -215,9 +205,7 @@ sealed interface KeyFill {
 
 /** A key's face while pressed: its own face darkened (the palette's press highlight over it), a colour, an image. */
 sealed interface KeyPressed {
-    object Darken : KeyPressed {
-        override fun toString() = "Darken"
-    }
+    data object Darken : KeyPressed
 
     data class Color(val argb: Int) : KeyPressed
 

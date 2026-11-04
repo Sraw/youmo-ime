@@ -56,6 +56,8 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
             defaults(keyboard.keyboardHeightPercent, keyboard.keyboardHeightPercentLandscape),
             // ime-core's, which the keyboard reads 紧凑 by
             listOf(R.string.level_compact, R.string.level_low, R.string.level_standard, R.string.level_tall, R.string.level_taller)
+                // a level added or taken away in ime-core is a label to add or take away here, not one cut off
+                .also { require(it.size == KeyboardHeightLevels.ALL.size) { "a label for each keyboard height level" } }
                 .zip(KeyboardHeightLevels.ALL) { label, l -> Level(label, l.portrait, l.landscape) }
         )
         levels(

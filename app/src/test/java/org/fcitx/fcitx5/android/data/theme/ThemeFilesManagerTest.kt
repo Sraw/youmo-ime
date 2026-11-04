@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.data.theme
 
 import android.os.Environment
+import android.os.Looper
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
@@ -14,6 +15,7 @@ import kotlinx.serialization.json.putJsonObject
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.core.EngineNotices
 import org.fcitx.fcitx5.android.core.HostConfigDir
 import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.host.ConfigHome
@@ -37,6 +39,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowEnvironment
 import org.robolectric.shadows.ShadowToast
@@ -44,8 +47,58 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.nio.ByteBuffer
+import java.util.Collections
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+
+// an image is a file of "<w>x<h>" or a real PNG (its header's), a font one of "font": what an import
+// reads of them, off Android; the images it was asked about, by name
+private object FakeProbe : ThemeFilesManager.AssetProbe {
+    val asked = mutableListOf<String>()
+
+    // what was beside each image as it was read: the import's unpacked zip
+    val beside = mutableSetOf<String>()
+
+    private val png = byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
+
+    override fun imageSize(file: File): Pair<Int, Int>? {
+        asked += file.name
+        beside += file.parentFile!!.list()!!
+        val bytes = file.readBytes()
+        if (bytes.size >= 24 && bytes.copyOf(8).contentEquals(png)) {
+            return ByteBuffer.wrap(bytes).let { it.getInt(16) to it.getInt(20) }
+        }
+        return bytes.decodeToString().split('x').takeIf { it.size == 2 }
+            ?.let { (w, h) -> w.toIntOrNull()?.let { a -> h.toIntOrNull()?.let { b -> a to b } } }
+    }
+
+    override fun fontReads(file: File) = file.readText() == "font"
+}
+
+// the colours 3.0 added, from others, which 2.1 did not have
+private val DERIVED = setOf("keyBorderColor", "keyHintColor", "toolbarIconColor")
+
+// the 2.1 json of [json]'s theme (its colours and picture, the keys the settings'), as the app
+// before the look wrote it: which listing saves again as the current one
+private fun older(json: String): String {
+    val theme = Json.decodeFromString(CustomThemeSerializer, json)
+    val colours = Json.parseToJsonElement(Json.encodeToString(CustomThemeSerializer, theme)).jsonObject
+        .getValue("palette").jsonObject
+    return buildJsonObject {
+        put("version", "2.1")
+        put("name", theme.name)
+        put("isDark", theme.isDark)
+        val bg = theme.backgroundImage
+        if (bg == null) put("backgroundImage", JsonNull) else putJsonObject("backgroundImage") {
+            put("croppedFilePath", bg.croppedFilePath)
+            put("srcFilePath", bg.srcFilePath)
+            put("brightness", bg.brightness)
+            put("cropRect", JsonNull)
+            put("cropRotation", bg.cropRotation)
+        }
+        colours.forEach { (k, v) -> if (k !in DERIVED) put(k, v) }
+    }.toString()
+}
 
 /**
  * An imported theme's json names its files; a crafted one must not lead out of the theme dir,
@@ -77,56 +130,10 @@ class ThemeFilesManagerTest {
         ThemeFilesManager.probe = real
     }
 
-    // an image is a file of "<w>x<h>" or a real PNG (its header's), a font one of "font": what an import
-    // reads of them, off Android; the images it was asked about, by name
-    private object FakeProbe : ThemeFilesManager.AssetProbe {
-        val asked = mutableListOf<String>()
-
-        // what was beside each image as it was read: the import's unpacked zip
-        val beside = mutableSetOf<String>()
-
-        private val png = byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
-
-        override fun imageSize(file: File): Pair<Int, Int>? {
-            asked += file.name
-            beside += file.parentFile!!.list()!!
-            val bytes = file.readBytes()
-            if (bytes.size >= 24 && bytes.copyOf(8).contentEquals(png)) {
-                return ByteBuffer.wrap(bytes).let { it.getInt(16) to it.getInt(20) }
-            }
-            return bytes.decodeToString().split('x').takeIf { it.size == 2 }
-                ?.let { (w, h) -> w.toIntOrNull()?.let { a -> h.toIntOrNull()?.let { b -> a to b } } }
-        }
-
-        override fun fontReads(file: File) = file.readText() == "font"
-    }
-
     private val real = ThemeFilesManager.probe
 
     private fun theme(name: String, cropped: String, src: String) =
         Json.encodeToString(CustomThemeSerializer, ThemePreset.TransparentDark.deriveCustomBackground(name, cropped, src))
-
-    // the 2.1 json of [json]'s theme (its colours and picture, the keys the settings'), as the app
-    // before the look wrote it: which listing saves again as the current one
-    private fun older(json: String): String {
-        val theme = Json.decodeFromString(CustomThemeSerializer, json)
-        val colours = Json.parseToJsonElement(Json.encodeToString(CustomThemeSerializer, theme)).jsonObject
-            .getValue("palette").jsonObject
-        return buildJsonObject {
-            put("version", "2.1")
-            put("name", theme.name)
-            put("isDark", theme.isDark)
-            val bg = theme.backgroundImage
-            if (bg == null) put("backgroundImage", JsonNull) else putJsonObject("backgroundImage") {
-                put("croppedFilePath", bg.croppedFilePath)
-                put("srcFilePath", bg.srcFilePath)
-                put("brightness", bg.brightness)
-                put("cropRect", JsonNull)
-                put("cropRotation", bg.cropRotation)
-            }
-            colours.forEach { (k, v) -> if (k !in DERIVED) put(k, v) }
-        }.toString()
-    }
 
     private fun zip(vararg entries: Pair<String, String>) = ByteArrayOutputStream().also { bytes ->
         ZipOutputStream(bytes).use { zip ->
@@ -148,7 +155,7 @@ class ThemeFilesManagerTest {
     fun anImageIsKeptByItsFileNameInTheThemeDir() {
         val imported = ThemeFilesManager.importTheme(
             zip("t.json" to theme("t", "../../t-cropped.png", "../../t-src"), "t-cropped.png" to "1080x720", "t-src" to "s")
-        ).getOrThrow().second.backgroundImage!!
+        ).getOrThrow().theme.backgroundImage!!
         assertEquals(File(dir, "t-cropped.png").path, imported.croppedFilePath)
         assertEquals(File(dir, "t-src").path, imported.srcFilePath)
         assertEquals("s", File(dir, "t-src").readText())
@@ -309,10 +316,23 @@ class ThemeFilesManagerTest {
 
     private fun json(theme: Theme.Custom) = Json.encodeToString(CustomThemeSerializer, theme)
 
+    // deleting a theme once deleted a file another theme names too (a theme of a later build, say,
+    // that this one cannot read): that one then lost its picture or font
+    @Test
+    fun aThemeDeletedLeavesTheFilesAnotherNames() {
+        val imported = ThemeFilesManager.importTheme(zip("f.json" to json(full("f")), *files("f"))).getOrThrow().theme
+        // a later build's theme, not listed here, naming f's font
+        File(dir, "g.json").writeText("""{"version":"9.0","look":{"font":"f-font.ttf"}}""")
+        ThemeFilesManager.deleteThemeFiles(imported)
+        assertEquals(setOf("g.json", "f-font.ttf"), names().toSet())
+        File(dir, "g.json").delete()
+        File(dir, "f-font.ttf").delete()
+    }
+
     @Test
     fun aThemeOfManyFilesIsImportedExportedAndDeletedWhole() {
         val theme = full("f")
-        val imported = ThemeFilesManager.importTheme(zip("f.json" to json(theme), *files("f"))).getOrThrow().second
+        val imported = ThemeFilesManager.importTheme(zip("f.json" to json(theme), *files("f"))).getOrThrow().theme
         assertEquals(setOf("f.json") + files("f").map { it.first }, names().toSet())
         assertEquals(theme.look.mapFiles { File(dir, it).path }, imported.look)
         assertEquals(theme.look.keys.overrides.keys, imported.look.keys.overrides.keys)
@@ -329,6 +349,7 @@ class ThemeFilesManagerTest {
     }
 
     @Test
+    @Uat("ST-54")
     fun aThemeWithAFileMissingIsRefusedAndNotListed() {
         val theme = full("m")
         val crafted = zip("m.json" to json(theme), *files("m").filter { it.first != "m-fn.png" }.toTypedArray())
@@ -343,6 +364,27 @@ class ThemeFilesManagerTest {
 
     private fun refusal(theme: Theme.Custom, vararg entries: Pair<String, String>) =
         ThemeFilesManager.importTheme(zip("t.json" to json(theme), *entries)).exceptionOrNull()?.message
+
+    @Test
+    @Uat("ST-55")
+    fun aThemeWhosePictureOrFontIsGoneIsNotListedAndTheUserIsToldItIsGone() {
+        val said = Collections.synchronizedList(ArrayList<String>())
+        val before = EngineNotices.sayer
+        EngineNotices.forgetToldOnce()
+        EngineNotices.sayer = EngineNotices.Sayer { message, _ -> said += message; true }
+        try {
+            ThemeFilesManager.importTheme(zip("g.json" to json(full("g")), *files("g"))).getOrThrow()
+            File(dir, "g-font.ttf").delete()
+            assertTrue(ThemeFilesManager.listThemes().none { it.name == "g" })
+            shadowOf(Looper.getMainLooper()).idle()
+            // told the file is gone, not the restart-the-phone advice for a file that does not read
+            assertEquals(listOf(appContext.getString(R.string.theme_file_missing)), said)
+        } finally {
+            EngineNotices.sayer = before
+            EngineNotices.forgetToldOnce()
+            dir.listFiles()!!.forEach { it.deleteRecursively() }
+        }
+    }
 
     @Test
     fun filesPastTheLimitsAreRefused() {
@@ -379,7 +421,7 @@ class ThemeFilesManagerTest {
         ThemeManager.refreshThemes()
         try {
             val plain = ThemePreset.TransparentDark.deriveCustomNoBackground("r")
-            assertFalse(ThemeFilesManager.importTheme(zip("r.json" to json(plain))).getOrThrow().first)
+            assertFalse(ThemeFilesManager.importTheme(zip("r.json" to json(plain))).getOrThrow().created)
             assertEquals(listOf("r.json"), names())
         } finally {
             dir.listFiles()!!.forEach { it.delete() }
@@ -486,7 +528,9 @@ class ThemeFilesManagerTest {
             assertEquals(10, monet.look.keys.radiusDp)
             assertFalse(monet.look.keys.blocks)
         } finally {
-            sp.edit().remove(ThemeLookMigration.MONET_KEY).commit()
+            // the old key style's settings too: left by a failure before they are settled, the next
+            // test's ThemeManager.init would settle a key style it never asked for
+            sp.edit().remove(ThemeLookMigration.MONET_KEY).also { e -> ThemeLookMigration.KEYS.forEach { e.remove(it) } }.commit()
             ThemeLookMigration.monetLook = null
             ThemeManager.onSystemPlatteChange(appContext.resources.configuration)
             prefs.darkModeTheme.setValue(prefs.darkModeTheme.defaultValue)
@@ -513,6 +557,7 @@ class ThemeFilesManagerTest {
     }
 
     @Test
+    @Uat("ST-54")
     fun aThemeOfALaterFormatIsSkippedAndLeftAsItIs() {
         val later = json(ThemePreset.TransparentDark.deriveCustomNoBackground("l")).replace("\"version\":\"3.0\"", "\"version\":\"3.1\"")
         File(dir, "l.json").writeText(later)
@@ -581,7 +626,7 @@ class ThemeFilesManagerTest {
         val t = full("p").let { t ->
             t.copy(look = t.look.mapFiles { if (it == "p-q.png" || it == "p-font.ttf") "../../$it" else it })
         }
-        val imported = ThemeFilesManager.importTheme(zip("p.json" to json(t), *files("p"))).getOrThrow().second
+        val imported = ThemeFilesManager.importTheme(zip("p.json" to json(t), *files("p"))).getOrThrow().theme
         assertEquals(setOf("p.json") + files("p").map { it.first }, names().toSet())
         assertEquals(File(dir, "p-font.ttf").path, imported.look.text.keyFont)
         assertFalse(File(dir, "../../p-q.png").exists())
@@ -615,6 +660,7 @@ class ThemeFilesManagerTest {
     }
 
     @Test
+    @Uat("ST-54")
     fun whatThisAppAndOneBefore30ExportedIsImported() {
         // the zips the theme maker's tests read (ThemeMakerRulesTest writes them): real PNGs
         val (created, theme, migrated) = ThemeFilesManager.importTheme(ThemeMakerTestdata.file("from-app.zip").inputStream()).getOrThrow()
@@ -692,7 +738,7 @@ class ThemeFilesManagerTest {
             assertEquals(later, File(dir, "l.json").readText())
             // a broken one is replaced
             File(dir, "l.json").writeText("{\"version\":")
-            assertTrue(ThemeFilesManager.importTheme(zip("l.json" to json(plain))).getOrThrow().first)
+            assertTrue(ThemeFilesManager.importTheme(zip("l.json" to json(plain))).getOrThrow().created)
             assertEquals(plain, ThemeFilesManager.listThemes().single { it.name == "l" })
             // one that reads, not listed for a file it lost: replaced, the files it had and the new one does not name gone
             ThemeFilesManager.importTheme(zip("u.json" to json(full("u")), *files("u"))).getOrThrow()
@@ -748,10 +794,5 @@ class ThemeFilesManagerTest {
         ThemeFilesManager.listThemes()
         ThemeFilesManager.saveThemeFiles(ThemePreset.TransparentDark.deriveCustomNoBackground("s"))
         assertTrue(File(dir, "s.json").exists())
-    }
-
-    companion object {
-        // the colours 3.0 added, from others, which 2.1 did not have
-        private val DERIVED = setOf("keyBorderColor", "keyHintColor", "toolbarIconColor")
     }
 }

@@ -58,7 +58,9 @@ object KeyFaceGeometry {
         val inner = Area(h, v, width - h, height - v)
         if (keys.blocks) {
             val radius = keys.radiusDp * density
-            val shadow = if (keys.shadowDp > 0) inner.copy(bottom = inner.bottom + keys.shadowDp * density) else null
+            // kept within the cell: never drawn on the row below
+            val shadowBottom = (inner.bottom + keys.shadowDp * density).coerceAtMost(height)
+            val shadow = if (keys.shadowDp > 0) inner.copy(bottom = shadowBottom) else null
             return KeyFace(inner, shadow, keys.borderDp * density, inner, radius, oval = false)
         }
         return when (kind) {
@@ -104,8 +106,11 @@ object NineSliceLayout {
         val scale = density / slice.pxPerDp
         val (dl, dr) = fit(i.left * scale, i.right * scale, target.width)
         val (dt, db) = fit(i.top * scale, i.bottom * scale, target.height)
-        val sx = listOf(0f, i.left.toFloat(), (srcWidth - i.right).toFloat(), srcWidth.toFloat())
-        val sy = listOf(0f, i.top.toFloat(), (srcHeight - i.bottom).toFloat(), srcHeight.toFloat())
+        // insets wider than the picture (an imported theme's): the corners' source kept within it
+        val (sl, sr) = fit(i.left.toFloat(), i.right.toFloat(), srcWidth.toFloat())
+        val (st, sb) = fit(i.top.toFloat(), i.bottom.toFloat(), srcHeight.toFloat())
+        val sx = listOf(0f, sl, srcWidth - sr, srcWidth.toFloat())
+        val sy = listOf(0f, st, srcHeight - sb, srcHeight.toFloat())
         val dx = listOf(target.left, target.left + dl, target.right - dr, target.right)
         val dy = listOf(target.top, target.top + dt, target.bottom - db, target.bottom)
         val out = ArrayList<Piece>(9)

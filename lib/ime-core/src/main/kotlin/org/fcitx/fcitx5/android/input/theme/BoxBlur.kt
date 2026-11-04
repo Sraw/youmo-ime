@@ -22,8 +22,9 @@ object BoxBlur {
         val fy = minOf(factor, height)
         val n = fx * fy
         val out = IntArray(w * h)
+        val sums = LongArray(4)
         for (y in 0 until h) for (x in 0 until w) {
-            val sums = LongArray(4)
+            sums.fill(0)
             for (yy in 0 until fy) for (xx in 0 until fx) add(sums, pixels[(y * fy + yy) * width + x * fx + xx])
             out[y * w + x] = pack(sums, n)
         }
@@ -48,30 +49,24 @@ object BoxBlur {
         val lines = if (horizontal) height else width
         val len = if (horizontal) width else height
         val n = 2 * r + 1
+        val sums = LongArray(4)
         for (line in 0 until lines) {
             fun at(i: Int) = src[if (horizontal) line * width + i.coerceIn(0, len - 1) else i.coerceIn(0, len - 1) * width + line]
-            val sums = LongArray(4)
+            sums.fill(0)
             for (i in -r..r) add(sums, at(i))
             for (i in 0 until len) {
                 dst[if (horizontal) line * width + i else i * width + line] = pack(sums, n)
-                sub(sums, at(i - r))
+                add(sums, at(i - r), -1)
                 add(sums, at(i + r + 1))
             }
         }
     }
 
-    private fun add(s: LongArray, c: Int) {
-        s[0] += (c ushr 24 and 0xff).toLong()
-        s[1] += (c ushr 16 and 0xff).toLong()
-        s[2] += (c ushr 8 and 0xff).toLong()
-        s[3] += (c and 0xff).toLong()
-    }
-
-    private fun sub(s: LongArray, c: Int) {
-        s[0] -= (c ushr 24 and 0xff).toLong()
-        s[1] -= (c ushr 16 and 0xff).toLong()
-        s[2] -= (c ushr 8 and 0xff).toLong()
-        s[3] -= (c and 0xff).toLong()
+    private fun add(s: LongArray, c: Int, sign: Int = 1) {
+        s[0] += sign * (c ushr 24 and 0xff).toLong()
+        s[1] += sign * (c ushr 16 and 0xff).toLong()
+        s[2] += sign * (c ushr 8 and 0xff).toLong()
+        s[3] += sign * (c and 0xff).toLong()
     }
 
     private fun pack(s: LongArray, n: Int): Int {

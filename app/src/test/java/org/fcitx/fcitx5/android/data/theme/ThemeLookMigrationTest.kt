@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.data.theme
 import android.content.Context
 import androidx.core.content.edit
 import org.fcitx.fcitx5.android.input.theme.LegacyLook
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -22,6 +23,12 @@ class ThemeLookMigrationTest {
 
     private val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("t", Context.MODE_PRIVATE)
         .apply { edit(commit = true) { clear() } }
+
+    // global: a failed test leaves no Monet look to the next
+    @After
+    fun noMonetLook() {
+        ThemeLookMigration.monetLook = null
+    }
 
     @Test
     fun noSettingsNoLegacy() {
@@ -148,7 +155,6 @@ class ThemeLookMigrationTest {
         assertFalse(drawn.keys.blocks)
         assertEquals(monet.look.palette, drawn.palette)
         assertTrue(ThemeLookMigration.KEYS.none(prefs::contains))
-        ThemeLookMigration.monetLook = null
     }
 
     @Test
@@ -157,5 +163,19 @@ class ThemeLookMigrationTest {
         assertEquals(l, ThemeLookMigration.decode(ThemeLookMigration.encode(l)))
         assertNull(ThemeLookMigration.decode("true,1"))
         assertNull(ThemeLookMigration.decode("x,false,false,1,1,1,1,1"))
+    }
+
+    // the bug: the old key style settings were read bare, so one stored as another type (a bad
+    // backup) threw a ClassCastException at every start; now each is its default
+    @Test
+    fun aSettingOfTheWrongTypeIsItsDefaultNotACrashAtEveryStart() {
+        prefs.edit(commit = true) {
+            putString("key_radius", "10")
+            putInt("key_border", 1)
+            putInt("key_vertical_margin", 2)
+            putInt(ThemeLookMigration.MONET_KEY, 3)
+        }
+        assertEquals(LegacyLook(vMargin = 2), ThemeLookMigration.legacy(prefs))
+        assertNull(ThemeLookMigration.monet(prefs))
     }
 }

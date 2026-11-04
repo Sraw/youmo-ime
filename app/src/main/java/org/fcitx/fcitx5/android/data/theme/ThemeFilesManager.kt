@@ -26,11 +26,11 @@ import timber.log.Timber
 import java.io.File
 import java.io.FileFilter
 import java.io.FileOutputStream
-import java.nio.channels.FileChannel
-import java.nio.file.StandardOpenOption
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.nio.channels.FileChannel
+import java.nio.file.StandardOpenOption
 import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
@@ -166,14 +166,11 @@ object ThemeFilesManager {
     fun deleteThemeFiles(theme: Theme.Custom) {
         if (!writable) notSettled()
         themeFile(theme).delete()
-        theme.look.files().map(::File).filter { it.isThemeAsset() }.forEach { it.delete() }
+        // not a file another theme names too, as an import leaves another's be
+        val others = othersFiles(theme.name, ThemeManager.getAllThemes())
+        theme.look.files().map(::File).filter { it.isThemeAsset() && it.name !in others }.forEach { it.delete() }
     }
 
-    /**
-     * The themes in the directory, newest first; one of an older format saved again as 3.0, with
-     * [legacy] (the key style settings before 3.0, while they are there) as its keys: drawn as it was.
-     * A theme of 3.0 already is never changed by them, so an old backup restored leaves the new ones be.
-     */
     /**
      * Whether the last [listThemes] could not save a theme of an older format again as 3.0: the old
      * key style settings it was drawn with are kept till it is ([ThemeLookMigration.settle]).
@@ -182,6 +179,11 @@ object ThemeFilesManager {
     var rewriteFailed = false
         private set
 
+    /**
+     * The themes in the directory, newest first; one of an older format saved again as 3.0, with
+     * [legacy] (the key style settings before 3.0, while they are there) as its keys: drawn as it was.
+     * A theme of 3.0 already is never changed by them, so an old backup restored leaves the new ones be.
+     */
     fun listThemes(legacy: LegacyLook? = null): MutableList<Theme.Custom> {
         rewriteFailed = false
         if (writable && !swept) {
@@ -209,6 +211,10 @@ object ThemeFilesManager {
                     return@decode null
                 }
                 val here = theme.foundIn(dir) { f -> f.isThemeAsset() } ?: run {
+                    // a picture or font gone (a backup restored in part, a file deleted by hand): not
+                    // listed, as one that does not read; the user told it is gone (a restart finds
+                    // no file again) and that importing it again brings it back
+                    EngineNotices.failedOnce(R.string.theme_file_missing)
                     Timber.w("Cannot find a file of theme ${theme.name}")
                     return@decode null
                 }
@@ -259,10 +265,14 @@ object ThemeFilesManager {
             }
         }
 
+    /** A theme imported: [created] new (not one of its name replaced), [migrated] from an older format. */
+    data class Imported(val created: Boolean, val theme: Theme.Custom, val migrated: Boolean)
+
     /**
-     * @return (newCreated, theme, migrated)
+     * Imports the theme zip [src]. [themes] are the themes there are, taken where they are changed (the
+     * main thread) before this runs on another: it reads them, not the list being changed.
      */
-    fun importTheme(src: InputStream): Result<Triple<Boolean, Theme.Custom, Boolean>> =
+    fun importTheme(src: InputStream, themes: List<Theme> = ThemeManager.getAllThemes()): Result<Imported> =
         runCatching {
             if (!writable) notSettled()
             ZipInputStream(src).use { zipStream ->
@@ -284,7 +294,7 @@ object ThemeFilesManager {
                     if (!isPlainFileName(decoded.name)) errorRuntime(R.string.invalid_value)
                     if (ThemeManager.BuiltinThemes.find { it.name == decoded.name } != null)
                         errorRuntime(R.string.exception_theme_name_clash)
-                    val oldTheme = ThemeManager.getTheme(decoded.name) as? Theme.Custom
+                    val oldTheme = themes.find { it.name == decoded.name } as? Theme.Custom
                     val newCreated = oldTheme == null
                     // a json of that name not listed: a later build's is kept (this one cannot read it, nor
                     // know its files); one that reads (a file of it missing) is replaced, its files with it; a
@@ -294,15 +304,10 @@ object ThemeFilesManager {
                             if (it is CustomThemeSerializer.UnknownVersion) errorRuntime(R.string.exception_theme_newer_kept)
                         }.getOrNull()
                     } else null
-                    // every file found and checked before any is copied: one refused would leave the others in dir
-                    val files = decoded.look.files().associate { name ->
-                        val target = importedFile(name) ?: errorRuntime(R.string.exception_theme_file, name)
-                        target.name to (extracted.find { it.isFile && it.name == target.name } ?: errorRuntime(R.string.exception_theme_file, name))
-                    }
-                    check(decoded.look, files)
+                    val files = foundFiles(decoded.look, extracted)
                     // another theme's file is a clash; one no theme names (left by a backup from before 3.0 put
                     // back over a 3.0 theme's json, say) is taken over, else its name could never be imported
-                    val others = othersFiles(decoded.name)
+                    val others = othersFiles(decoded.name, themes)
                     files.keys.firstOrNull { it in others }?.let { errorRuntime(R.string.exception_theme_file_clash, it) }
                     val oldFiles = (oldTheme ?: unlisted)?.look?.files().orEmpty().map { File(it).name }.toSet()
                     val newTheme = decoded.copy(look = decoded.look.mapFiles { File(dir, File(it).name).path })
@@ -310,18 +315,29 @@ object ThemeFilesManager {
                     // only once the json names the new files: one not written leaves the theme it replaces whole.
                     // Never another theme's (a json not listed may name any), nor a json or SAVING (importedFile's rule)
                     (oldFiles - files.keys - others).mapNotNull(::importedFile).forEach { it.delete() }
-                    Triple(newCreated, newTheme, migrated)
+                    Imported(newCreated, newTheme, migrated)
                 }
             }
         }
+
+    // every file of [look] found among [extracted] (by name in dir) and checked before any is copied:
+    // one refused would leave the others in dir
+    private fun foundFiles(look: ThemeLook, extracted: List<File>): Map<String, File> {
+        val files = look.files().associate { name ->
+            val target = importedFile(name) ?: errorRuntime(R.string.exception_theme_file, name)
+            target.name to (extracted.find { it.isFile && it.name == target.name } ?: errorRuntime(R.string.exception_theme_file, name))
+        }
+        check(look, files)
+        return files
+    }
 
     /**
      * The files of every theme but [name], by name: the listed ones', and of each json not listed (a later
      * build's, a broken one) every string that is the name of a file here, read loosely: its files are
      * not known, and taken over they would be lost to it when it is read again.
      */
-    private fun othersFiles(name: String): Set<String> {
-        val listed = ThemeManager.getAllThemes().filterIsInstance<Theme.Custom>()
+    private fun othersFiles(name: String, themes: List<Theme>): Set<String> {
+        val listed = themes.filterIsInstance<Theme.Custom>()
         val here = dir.list()?.toSet().orEmpty()
         val unlisted = dir.listFiles(FileFilter { it.extension == "json" }).orEmpty()
             .filter { f -> f.nameWithoutExtension != name && listed.none { f.nameWithoutExtension == it.name } }
@@ -389,15 +405,14 @@ object ThemeFilesManager {
 
     // the limit in the message is the one checked, not a number written into the strings
     private fun refused(breach: ThemeAssetLimits.Breach): Nothing {
-        val l = ThemeAssetLimits
         val (message, limit) = when (breach) {
-            ThemeAssetLimits.Breach.Entries -> R.string.exception_theme_entries to l.MAX_ENTRIES.toLong()
-            ThemeAssetLimits.Breach.FileSize -> R.string.exception_theme_file_size to l.MAX_FILE_BYTES / MB
-            ThemeAssetLimits.Breach.TotalSize -> R.string.exception_theme_total_size to l.MAX_TOTAL_BYTES / MB
-            ThemeAssetLimits.Breach.PictureSide -> R.string.exception_theme_picture_side to l.MAX_PICTURE_SIDE.toLong()
-            ThemeAssetLimits.Breach.KeyImageSide -> R.string.exception_theme_key_image_side to l.MAX_KEY_IMAGE_SIDE.toLong()
-            ThemeAssetLimits.Breach.KeyImageSize -> R.string.exception_theme_key_image_size to l.MAX_KEY_IMAGE_BYTES / MB
-            ThemeAssetLimits.Breach.Overrides -> R.string.exception_theme_overrides to l.MAX_OVERRIDES.toLong()
+            ThemeAssetLimits.Breach.Entries -> R.string.exception_theme_entries to ThemeAssetLimits.MAX_ENTRIES.toLong()
+            ThemeAssetLimits.Breach.FileSize -> R.string.exception_theme_file_size to ThemeAssetLimits.MAX_FILE_BYTES / MB
+            ThemeAssetLimits.Breach.TotalSize -> R.string.exception_theme_total_size to ThemeAssetLimits.MAX_TOTAL_BYTES / MB
+            ThemeAssetLimits.Breach.PictureSide -> R.string.exception_theme_picture_side to ThemeAssetLimits.MAX_PICTURE_SIDE.toLong()
+            ThemeAssetLimits.Breach.KeyImageSide -> R.string.exception_theme_key_image_side to ThemeAssetLimits.MAX_KEY_IMAGE_SIDE.toLong()
+            ThemeAssetLimits.Breach.KeyImageSize -> R.string.exception_theme_key_image_size to ThemeAssetLimits.MAX_KEY_IMAGE_BYTES / MB
+            ThemeAssetLimits.Breach.Overrides -> R.string.exception_theme_overrides to ThemeAssetLimits.MAX_OVERRIDES.toLong()
         }
         errorRuntime(message, limit.toString())
     }

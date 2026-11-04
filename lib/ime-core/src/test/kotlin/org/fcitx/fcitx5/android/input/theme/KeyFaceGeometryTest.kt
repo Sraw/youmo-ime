@@ -33,6 +33,14 @@ class KeyFaceGeometryTest {
         assertEquals(Area(0f, 0f, 100f, 160f), KeyFaceGeometry.of(100f, 160f, KeyKind.Letter, keys, false, 2f, margin = false).face)
     }
 
+    // a key's shadow deeper than the gap below it was drawn past its cell, over the row below
+    @Test
+    fun aShadowDeeperThanTheGapEndsAtTheCellsBottom() {
+        val face = KeyFaceGeometry.of(100f, 160f, KeyKind.Letter, keys.copy(shadowDp = 3, gap = keys.gap.copy(v = 1)), landscape = false, density = 2f)
+        // a 1 dp gap under a 3 dp shadow: 158 + 6 px would reach into the row below
+        assertEquals(160f, face.shadow!!.bottom)
+    }
+
     @Test
     fun aRadiusOverHalfTheKeyIsKeptAsSet() {
         // the drawing clamps it, as a round rect does; the geometry says what was asked
@@ -101,6 +109,16 @@ class KeyFaceGeometryTest {
         // the middle column has no room: two pieces
         assertEquals(listOf(Area(0f, 0f, 10f, 10f), Area(10f, 0f, 40f, 10f)), pieces.map { it.dst })
         assertEquals(listOf(Area(0f, 0f, 20f, 10f), Area(40f, 0f, 100f, 10f)), pieces.map { it.src })
+    }
+
+    // a theme's nine-slice insets larger than its image were read past the image's edges
+    @Test
+    fun insetsLargerThanTheImageTakeNoSourceOutsideIt() {
+        val pieces = NineSliceLayout.of(10, 10, NineSlice("f", Insets(8, 8, 8, 8), 1), Area(0f, 0f, 100f, 100f), 1f)
+        assertTrue(pieces.isNotEmpty())
+        pieces.forEach { p ->
+            assertTrue("$p", p.src.left >= 0f && p.src.top >= 0f && p.src.right <= 10f && p.src.bottom <= 10f)
+        }
     }
 
     @Test

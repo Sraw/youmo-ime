@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.data.theme.backgroundImage
 import org.fcitx.fcitx5.android.data.theme.deriveCustomBackground
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.input.theme.KeyLabel
 import org.fcitx.fcitx5.android.input.theme.KeyOverride
 import org.fcitx.fcitx5.android.input.theme.KeyPressed
@@ -24,6 +25,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
+// contract: the theme file format (every version this app reads, and 3.0 as it writes it)
 class ThemeSerializationTest {
 
     private fun Theme.Custom.toJson() = Json.encodeToString(CustomThemeSerializer, this)
@@ -257,7 +259,7 @@ class ThemeSerializationTest {
             "a fill of no known type" to written.at("keys", "letter", "fill") { JsonObject(it + ("type" to JsonPrimitive("gradient"))) },
             "a base of no known type" to written.at("base") { JsonObject(it + ("type" to JsonPrimitive("video"))) },
         )
-        for ((case, json) in refused) {
+        assertRows(refused.entries, { it.key }) { (case, json) ->
             Assert.assertThrows(case, SerializationException::class.java) { json.toString().toCustomTheme() }
         }
     }
@@ -289,7 +291,7 @@ class ThemeSerializationTest {
     @Test
     fun serializingStampsCurrentVersion() {
         val theme = Fixtures.v21.toCustomTheme().first
-        Assert.assertTrue("Serialized form carries a version", theme.toJson().startsWith("{\"version\":\"3.0\""))
+        Assert.assertTrue("Serialized form carries a version", theme.toJson().startsWith("{\"version\":\"${CustomThemeSerializer.CURRENT_VERSION}\""))
     }
 
     /**

@@ -186,7 +186,8 @@ class InputView(
 
     private val scope = DynamicScope()
     private val broadcaster = InputBroadcaster()
-    private val popup = PopupComponent()
+    @VisibleForTesting
+    internal val popup = PopupComponent()
     private val punctuation = PunctuationComponent()
     private val returnKeyDrawable = ReturnKeyDrawableComponent()
     private val preeditEmptyState = PreeditEmptyStateComponent()
@@ -660,7 +661,8 @@ class InputView(
     }
 
     private val stripAt = IntArray(2)
-    private val boardAt = IntArray(2)
+    private val barAt = IntArray(2)
+    private val keyboardAt = IntArray(2)
     private val viewAt = IntArray(2)
 
     // each frame, the strip outside the board's top-left as it is drawn now: docked, at a side
@@ -678,12 +680,12 @@ class InputView(
         strip.visibility = if (moving) INVISIBLE else VISIBLE
         if (moving) return
         val bar = kawaiiBar.view
-        bar.getLocationInWindow(boardAt)
-        val left = boardAt[0] + bar.paddingLeft
-        val right = boardAt[0] + bar.width - bar.paddingRight
-        keyboardView.getLocationInWindow(boardAt)
+        bar.getLocationInWindow(barAt)
+        val left = barAt[0] + bar.paddingLeft
+        val right = barAt[0] + bar.width - bar.paddingRight
+        keyboardView.getLocationInWindow(keyboardAt)
         getLocationInWindow(viewAt)
-        val board = UndoChipPlacement.Box(left, boardAt[1], right, boardAt[1] + keyboardView.height)
+        val board = UndoChipPlacement.Box(left, keyboardAt[1], right, keyboardAt[1] + keyboardView.height)
         val room = UndoChipPlacement.Box(viewAt[0], viewAt[1] + (floatingPlacer?.topInset ?: 0), viewAt[0] + width, viewAt[1] + height)
         strip.maxWidth = right - left
         val place = CodeStripPlacement.place(board, room, strip.width, strip.height)

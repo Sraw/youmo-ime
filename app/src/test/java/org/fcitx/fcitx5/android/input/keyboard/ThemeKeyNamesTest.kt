@@ -24,6 +24,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
+ * contract: the 3.0 theme format's key names, shared with the web page; a rename breaks theme files.
  * Every key a theme can style by itself has the name the theme format gives it ([KeyNames]); the
  * web theme maker's list of keys is that format's, so a key named here but not there (or twice on a
  * board) is a key a theme cannot reach.

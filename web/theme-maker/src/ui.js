@@ -22,11 +22,9 @@
   }
   const NAMES = LAYOUT.names;
   const ROLES = NAMES.roles;
-  const LIM = FORMAT.limits;
-  const KINDS = ['letter', 'function', 'space', 'enter'];
+  const KINDS = L.KINDS;
   const SVGNS = 'http://www.w3.org/2000/svg';
   const STORE = 'youmo-theme-maker';
-  const MB = 1024 * 1024;
 
   // ---- words the page uses ----
   const PRESET_LABEL = {
@@ -81,10 +79,23 @@
     limit: '主题超出 App 的上限',
     image: '主题里有图片读不出大小（只认 PNG、JPEG、WebP、GIF），App 也可能不收',
   };
+  const LIM = FORMAT.limits;
+  const MB = 1024 * 1024;
+  // a size in the words: 32 MB, 1.5 MB
+  const mbWords = (n) => +(n / MB).toFixed(1) + ' MB';
+  // the limits' words made of the limits, so the number told is the number checked
   const LIMIT_WORDS = {
-    entries: '文件太多', fileBytes: '单个文件超过 32 MB', totalBytes: '文件合计超过 64 MB', overrides: '单独设置的键超过 400 个',
-    pictureSide: '主题图边长超过 4096', keyImageSide: '按键图片边长超过 1024', keyImageBytes: '按键图片超过 2 MB',
+    entries: '文件太多', fileBytes: `单个文件超过 ${mbWords(LIM.fileBytes)}`, totalBytes: `文件合计超过 ${mbWords(LIM.totalBytes)}`,
+    overrides: `单独设置的键超过 ${LIM.overrides} 个`, pictureSide: `主题图边长超过 ${LIM.pictureSide}`,
+    keyImageSide: `按键图片边长超过 ${LIM.keyImageSide}`, keyImageBytes: `按键图片超过 ${mbWords(LIM.keyImageBytes)}`,
   };
+  /** What a ThemeError says to the user: its code's words, and for a limit which, for a file what is wrong with which. */
+  function themeErrorText(e) {
+    if (e.code === 'limit') return ERR.limit + '：' + (LIMIT_WORDS[e.detail] || e.detail);
+    return ERR[e.code] + (e.code === 'bad' || e.code === 'missing' || e.code === 'image' ? '：' + e.detail : '');
+  }
+  // a font past this is taken, with a word that the zip will be big
+  const FONT_WARN_BYTES = 10 * MB;
 
   // ---- state ----
   const S = {
@@ -160,6 +171,8 @@
     return new Promise((resolve) => {
       const i = h('input', { type: 'file', accept, multiple: !!multiple, style: 'display:none' });
       i.addEventListener('change', () => { resolve([...i.files]); i.remove(); });
+      // the dialog closed without a file: settled with none, so a radio set to 「图片」 goes back
+      i.addEventListener('cancel', () => { resolve([]); i.remove(); });
       document.body.append(i);
       i.click();
     });
@@ -290,10 +303,13 @@
   }
   /**
    * The picture blurred as the app blurs it (BoxBlur): shrunk to a quarter, three box passes of
-   * blurDp × density / 4 px, drawn back at full size. Made once per picture and radius.
+   * ThemeAssets.blurRadius (the dp in the bitmap's pixels, [widthPx] the keyboard's width as ThemePicture
+   * passes it, not the cropped picture's), drawn back at
+   * full size. Made once per picture and radius.
    */
-  function blurredPicture(file, blurDp, density) {
-    const radius = Math.max(1, Math.round((blurDp * density) / 4));
+  function blurredPicture(file, blurDp, density, widthPx) {
+    const bitmap = S.bitmaps[file];
+    const radius = L.blurRadius(blurDp, widthPx, bitmap ? bitmap.width : widthPx, density);
     const key = file + '|' + radius;
     S.blurUsed.add(key);
     const got = S.blurred[key];
@@ -302,6 +318,8 @@
       S.blurred[key] = 'pending';
       setTimeout(async () => {
         const bm = S.bitmaps[file];
+        // a radius the preview has moved past (a slider dragged), or a picture let go meanwhile: not made
+        if (!bm || !S.blurUsed.has(key)) { delete S.blurred[key]; return; }
         const c = canvasOf(bm.width, bm.height);
         const g = c.getContext('2d');
         g.drawImage(bm, 0, 0);
@@ -319,7 +337,7 @@
         }
         sg.putImageData(id, 0, 0);
         const blob = await new Promise((r) => sc.toBlob(r, 'image/png'));
-        if (!S.bitmaps[file] || !blob) { delete S.blurred[key]; return; } // let go meanwhile, or not drawable
+        if (!S.bitmaps[file] || !blob || !S.blurUsed.has(key)) { delete S.blurred[key]; return; } // let go meanwhile, or not drawable
         S.blurred[key] = { url: URL.createObjectURL(blob) };
         renderPreview();
       }, 0);
@@ -346,15 +364,18 @@
   function presetTheme(p) {
     return L.defaultLook(FORMAT, uuid(), p.isDark, clone(p.palette), null);
   }
-  function setTheme(theme, files) {
-    dropFiles();
+  /** [theme] as the page's, what follows the five worked out for it: the fields unlike the rule kept as they are. */
+  function resetFollowing(theme) {
     S.theme = theme;
-    S.selected = [];
-    S.manual = [];
     S.autoDark = true;
     const sim = L.deriveSimple(L.simpleOf(theme.palette), theme.isDark);
     S.manual = Object.keys(theme.palette).filter((k) => theme.palette[k] !== sim[k]);
     S.see = seenNow();
+  }
+  function setTheme(theme, files) {
+    dropFiles();
+    S.selected = [];
+    resetFollowing(theme);
     return Promise.all(Object.entries(files || {}).map(([n, b]) => putFile(n, b, L.decodeCaps(FORMAT, L.fileRole(theme, n))))).then(() => {
       for (const c of pictureCuts()) if (S.bitmaps[c]) S.avg[c] = averageOf(S.bitmaps[c]);
     });
@@ -368,16 +389,27 @@
   function changed(opts) {
     S.see = L.seeThrough(S.theme, kindOfName, S.see);
     dropUnused();
-    save();
-    renderPreview();
+    saveSoon();
+    previewSoon();
     if (opts && opts.settings) renderSettings();
   }
+  // a slider or a colour drag sends an input event per step: the preview drawn once a frame, the save once it rests
+  let previewFrame = 0;
+  function previewSoon() {
+    if (!previewFrame) previewFrame = requestAnimationFrame(() => { previewFrame = 0; renderPreview(); });
+  }
+  let saveTimer = 0;
+  function saveSoon() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(save, 300);
+  }
   function save() {
+    clearTimeout(saveTimer);
     try {
       // the colours and options; the files are not kept (too big): a theme with them comes back without
       const t = clone(S.theme);
       if (L.lookFiles(t).length) stripFiles(t);
-      localStorage.setItem(STORE, JSON.stringify({ theme: L.writeTheme(FORMAT, t), view: S.view, manual: S.manual, see: S.see, colorView: S.colorView, tab: S.tab }));
+      localStorage.setItem(STORE, JSON.stringify({ theme: L.writeTheme(FORMAT, t), view: S.view, manual: S.manual, autoDark: S.autoDark, see: S.see, colorView: S.colorView, tab: S.tab }));
     } catch (e) { /* private mode, full, or off: the page works the same */ }
   }
   function stripFiles(t) {
@@ -407,6 +439,8 @@
       const { theme } = L.readTheme(FORMAT, saved.theme);
       S.theme = theme;
       S.manual = saved.manual || [];
+      // a dark box ticked by hand stays so: a new background no longer sets it
+      if (typeof saved.autoDark === 'boolean') S.autoDark = saved.autoDark;
       // saved without its files, what showed the picture shows a colour now: the alphas turned down for it go back
       S.see = L.seeThrough(S.theme, kindOfName, saved.see || {});
       return true;
@@ -419,16 +453,11 @@
     if (!S.manual.includes(field)) S.manual.push(field);
   }
   function setSimple(which, color) {
-    const sim = L.simpleOf(S.theme.palette);
-    sim[which] = color;
-    const all = L.deriveSimple(sim, S.theme.isDark);
-    const direct = { bg: 'backgroundColor', key: 'keyBackgroundColor', text: 'keyTextColor', fn: 'altKeyBackgroundColor', accent: 'accentKeyBackgroundColor' };
-    for (const [k, v] of Object.entries(all)) if (!S.manual.includes(k) || k === direct[which]) {
-      S.theme.palette[k] = v;
-      delete S.see[k]; // a new colour: turned down again if over the picture
-    }
-    S.manual = S.manual.filter((k) => k !== direct[which]);
-    if (which === 'bg' && S.autoDark) S.theme.isDark = L.isDarkColor(color);
+    const e = L.simpleEdit(S.theme.palette, S.manual, which, color, S.theme.isDark, S.autoDark);
+    S.theme.palette = e.palette;
+    S.theme.isDark = e.isDark;
+    S.manual = e.manual;
+    for (const k of e.set) delete S.see[k]; // a new colour: turned down again if over the picture
   }
 
   // ---- the view the preview draws ----
@@ -475,7 +504,6 @@
    * text size) grows it about its middle, or, a corner label ([corner]: the key's cell), about the
    * corner it keeps to.
    */
-  const alignOf = (e) => e.al;
   function drawText(e, font, weight, scale, family, corner) {
     const [l, t, r, b] = e.cell || boxOf(e.r);
     let fx = (l + r) / 2;
@@ -484,7 +512,7 @@
       fx = (l + r) / 2 > (corner[0] + corner[2]) / 2 ? r : l;
       fy = (t + b) / 2 > (corner[1] + corner[3]) / 2 ? b : t;
     }
-    const al = alignOf(e);
+    const al = e.al;
     const anchor = { l: 'start', c: 'middle', r: 'end' }[al] || 'middle';
     const x0 = al ? e.x : (l + r) / 2;
     return s('text', {
@@ -510,6 +538,7 @@
 
   // ---- the preview ----
   const preview = { svg: null, box: null, note: null };
+  const NARROW = window.matchMedia('(max-width: 600px)');
   let ids = 0;
   function renderPreview() {
     S.blurUsed = new Set();
@@ -529,7 +558,7 @@
     let top = 0;
     let maxY = v.keyboard[3];
     for (const e of v.els) { top = Math.min(top, e.cell[1]); maxY = Math.max(maxY, e.cell[3]); }
-    const narrow = window.matchMedia('(max-width: 600px)').matches;
+    const narrow = NARROW.matches;
     const appH = narrow ? 50 : 110; // on a phone only the text field: the keyboard has the room
     const dark = S.view.sys === 'dark';
     const defs = s('defs');
@@ -562,7 +591,7 @@
     })() : null;
     const pictureIn = (g, blurDp, brightness, clipPath) => {
       if (!window_) return;
-      const href = blurDp > 0 ? blurredPicture(cut, blurDp, d) : S.urls[cut];
+      const href = blurDp > 0 ? blurredPicture(cut, blurDp, d, frW * d) : S.urls[cut];
       const grp = s('g', { 'clip-path': clipPath });
       grp.append(s('image', { href, x: window_.x, y: window_.y, width: window_.w, height: window_.h, preserveAspectRatio: 'none' }));
       const a = L.darkenAlpha(brightness);
@@ -592,7 +621,7 @@
         const el = drawText(e, cand ? candFont : keyFont, e.w || (cand ? T.text.candidateWeight : T.text.keyWeight), 1, family);
         // a line in a wider view over the keys (a clipboard entry) is cut at the view's edge; a title in
         // the bar is not, its view as wide as the line was in the app's font
-        if (alignOf(e) && e.p === 'keyboard') el.setAttribute('clip-path', clip(s('rect', { x: e.r[0], y: e.r[1], width: e.r[2], height: e.r[3] })));
+        if (e.al && e.p === 'keyboard') el.setAttribute('clip-path', clip(s('rect', { x: e.r[0], y: e.r[1], width: e.r[2], height: e.r[3] })));
         svg.append(el);
       }
     });
@@ -710,10 +739,15 @@
         S.pressed = +k.dataset.i;
         renderPreview();
         if (start.touch && selecting()) {
+          // this press's own: a second finger within the time makes a start of its own
+          const press = start;
+          const name = preview.view.els[press.i].name;
+          clearTimeout(longTimer);
           longTimer = setTimeout(() => {
+            press.i = -2;
+            if (!name) return toast('这个键没有名字（比如符号面板的格子），只能按它那一类设置');
             S.multi = true;
-            toggle(preview.view.els[start.i].name, true);
-            start.i = -2;
+            toggle(name, true);
             if (navigator.vibrate) navigator.vibrate(20);
           }, 500);
         }
@@ -730,7 +764,7 @@
         clearTimeout(longTimer);
         S.pressed = -1;
         S.box = [start.x, start.y, p.x, p.y];
-        renderPreview();
+        previewSoon();
       }
     });
     const end = () => {
@@ -917,7 +951,7 @@
   async function choosePicture() {
     const [file] = await pickFile('image/*');
     if (!file) return;
-    if (file.size > LIM.fileBytes) return toast('图片太大（超过 32 MB）', true);
+    if (file.size > LIM.fileBytes) return toast(`图片太大（超过 ${mbWords(LIM.fileBytes)}）`, true);
     const bytes = await readBytes(file);
     const size = L.imageSize(bytes);
     const caps = L.decodeCaps(FORMAT, 'source');
@@ -1108,8 +1142,12 @@
           dlg.close();
           await cutPicture(land, box.map(Math.round), rotation);
         } }, '用这一块'),
-        h('button', { type: 'button', onclick: () => { dlg.close(); if (land && !T.picture.landscape) renderSettings(); } }, '取消')));
-    dlg.addEventListener('close', () => dlg.remove());
+        h('button', { type: 'button', onclick: () => dlg.close() }, '取消')));
+    dlg.addEventListener('close', () => {
+      dlg.remove();
+      // closed without a landscape cut (取消, Esc): the 横屏单独裁 box unticked again
+      if (land && T.picture && !T.picture.landscape) renderSettings();
+    });
     document.body.append(dlg);
     dlg.showModal();
     clamp();
@@ -1119,7 +1157,13 @@
   function colorsTab() {
     const T = S.theme;
     const out = [h('div', { class: 'row' },
-      h('label', {}, h('input', { type: 'checkbox', checked: T.isDark, onchange: (e) => { T.isDark = e.target.checked; S.autoDark = false; changed(); } }), '深色主题'),
+      h('label', {}, h('input', { type: 'checkbox', checked: T.isDark, onchange: (e) => {
+        T.isDark = e.target.checked;
+        S.autoDark = false;
+        // the press, shadow and border that follow are dark's or light's
+        for (const k of L.followDark(T.palette, S.manual, T.isDark)) delete S.see[k];
+        changed({ settings: true });
+      } }), '深色主题'),
       h('span', { class: 'hint' }, '只管系统导航栏图标的深浅和行内建议的底色；按底色亮度自动勾，手动改过就不再自动')),
     seg([['simple', '简单 5 色'], ['all', '全部 24 色']], S.colorView, (x) => { S.colorView = x; save(); renderSettings(); })];
     if (S.colorView === 'simple') {
@@ -1134,8 +1178,8 @@
         out.push(h('div', { class: 'color-row' }, h('div', { class: 'name' }, label), pick, h('span'), text));
       }
       const warn = h('div', {}, contrastWarnings());
-      out.push(warn, h('p', { class: 'hint' }, '其余的颜色按 App 动态取色主题的规则从这 5 个算出来；「全部」里单独改过的不跟着变。'));
-      if (S.manual.length) out.push(h('p', { class: 'hint' }, `有 ${S.manual.length} 个颜色单独改过，在「全部」里看。`));
+      out.push(warn, h('p', { class: 'hint' }, '其余的颜色按 App 动态取色主题的规则从这 5 个算出来；「全部」里与规则不同的不跟着变。'));
+      if (S.manual.length) out.push(h('p', { class: 'hint' }, `有 ${S.manual.length} 个颜色与规则不同，在「全部」里看。`));
     } else {
       for (const [group, rows] of COLOR_GROUPS) {
         out.push(h('h3', {}, group));
@@ -1234,11 +1278,11 @@
     if (pressed && pressed.type === 'image') out.push(imageEditor(pressed, set));
     return h('div', {}, out);
   }
-  /** A key image: within the app's limits (side 1024, 2 MB), shrunk here if over. */
+  /** A key image: within the app's limits (LIM.keyImageSide, LIM.keyImageBytes), shrunk here if over. */
   async function chooseKeyImage() {
     const [file] = await pickFile('image/png,image/jpeg,image/webp');
     if (!file) return null;
-    if (file.size > LIM.fileBytes) { toast('图片太大（超过 32 MB）', true); return null; }
+    if (file.size > LIM.fileBytes) { toast(`图片太大（超过 ${mbWords(LIM.fileBytes)}）`, true); return null; }
     let bytes = await readBytes(file);
     const size = L.imageSize(bytes);
     // bigger than a key image may be is made smaller; bigger than a source picture may be, refused
@@ -1265,7 +1309,7 @@
     } finally {
       bm.close();
     }
-    if (shrunk) toast('图片超过 App 的上限（边长 1024、2 MB），已缩小');
+    if (shrunk) toast(`图片超过 App 的上限（边长 ${LIM.keyImageSide}、${mbWords(LIM.keyImageBytes)}），已缩小`);
     const name = await addFile('key', bytes, L.decodeCaps(FORMAT, 'key'));
     const [w, hh] = S.sizes[name] || drawnSize;
     return { type: 'image', file: name, insets: [0, 0, 0, 0], pxPerDp: Math.min(LIM.pxPerDp, Math.max(1, Math.round(Math.max(w, hh) / 48))) };
@@ -1318,7 +1362,14 @@
     });
     ed.addEventListener('pointerup', () => { if (drag >= 0) { drag = -1; save(); } });
     const nums = ['左', '上', '右', '下'].map((label, i) => h('input', { type: 'number', min: 0, max: i % 2 ? hh : w, value: img.insets[i], 'aria-label': '九宫格 ' + label,
-      onchange: (e) => { const ins = img.insets.slice(); ins[i] = Math.max(0, Math.min(+e.target.value | 0, i % 2 ? hh : w)); img.insets = ins; draw(); changed(); } }));
+      onchange: (e) => {
+        // as a drag keeps it: no further than the opposite line, so the middle never goes
+        const ins = img.insets.slice();
+        ins[i] = Math.max(0, Math.min(+e.target.value | 0, (i % 2 ? hh : w) - ins[(i + 2) % 4]));
+        img.insets = ins;
+        draw();
+        changed();
+      } }));
     const demo = h('div', { class: 'ninebox' });
     box.append(
       h('div', { class: 'row' }, h('button', { type: 'button', onclick: async () => { const n = await chooseKeyImage(); if (n) set(n); } }, '换一张…'),
@@ -1375,7 +1426,7 @@
       const first = K.overrides[tg[0]] || { fill: null, pressed: null, label: 'show' };
       const kindName = KIND_LABEL[(preview.view.els.find((e) => e.name === S.selected[0]) || {}).kind] || '它那一类';
       const write = (field, value) => {
-        if (Object.keys(K.overrides).length + tg.filter((t) => !K.overrides[t]).length > LIM.overrides) return toast('单独设置的键最多 400 个', true);
+        if (Object.keys(K.overrides).length + tg.filter((t) => !K.overrides[t]).length > LIM.overrides) return toast(`单独设置的键最多 ${LIM.overrides} 个`, true);
         for (const t of tg) {
           const o = K.overrides[t] || { fill: null, pressed: null, label: 'show' };
           o[field] = value && typeof value === 'object' ? clone(value) : value;
@@ -1473,12 +1524,12 @@
   async function chooseFont(field) {
     const [file] = await pickFile('.ttf,.otf,font/ttf,font/otf');
     if (!file) return;
-    if (file.size > LIM.fileBytes) return toast('字体文件超过 32 MB，App 不收', true);
+    if (file.size > LIM.fileBytes) return toast(`字体文件超过 ${mbWords(LIM.fileBytes)}，App 不收`, true);
     const bytes = await readBytes(file);
     if (!L.fontType(bytes)) return toast('字体文件读不了：只收 .ttf / .otf（不收 .ttc 合集）', true);
     S.theme.text[field] = await addFile(field === 'keyFont' ? 'font' : 'candidates', bytes);
     changed({ settings: true });
-    if (bytes.length > 10 * MB) toast('字体超过 10 MB：主题 zip 会很大');
+    if (bytes.length > FONT_WARN_BYTES) toast(`字体超过 ${mbWords(FONT_WARN_BYTES)}：主题 zip 会很大`);
   }
 
   function barTab() {
@@ -1508,16 +1559,21 @@
   }
 
   // ---- open, new, dark copy, export ----
-  async function openZip() {
+  /** A theme zip's bytes opened as the page's theme: whether it was migrated. */
+  async function openZipBytes(bytes) {
+    const { theme, migrated, files } = await L.openZip(FORMAT, bytes);
+    await setTheme(theme, files);
+    renderAll();
+    return migrated;
+  }
+  async function openZipFile() {
     const [file] = await pickFile('.zip,application/zip');
     if (!file) return;
     try {
-      const { theme, migrated, files } = await L.openZip(FORMAT, await readBytes(file));
-      await setTheme(theme, files);
-      renderAll();
+      const migrated = await openZipBytes(await readBytes(file));
       toast(migrated ? '这是老版本 App 导出的主题，已按新格式读进来；导出后在 App 里导入会替换原来那个' : '已打开；导出后在 App 里导入会替换原来那个主题');
     } catch (e) {
-      if (e instanceof L.ThemeError) toast(ERR[e.code] + (e.code === 'limit' ? '：' + (LIMIT_WORDS[e.detail] || e.detail) : e.code === 'bad' || e.code === 'missing' || e.code === 'image' ? '：' + e.detail : ''), true);
+      if (e instanceof L.ThemeError) toast(themeErrorText(e), true);
       else toast(ERR['not-theme'], true);
     }
   }
@@ -1539,16 +1595,17 @@
     }
     const mapped = L.mapFiles(T, (f) => names.get(f) || f);
     mapped.name = name;
-    mapped.isDark = true;
-    for (const k of Object.keys(mapped.palette)) mapped.palette[k] = L.invertLightness(mapped.palette[k]);
-    const manual = S.manual.slice();
+    // isDark by the new background: a dark theme's copy is a light one; the shadow and border stay black
+    const dark = L.darkPalette(mapped.palette, S.manual);
+    mapped.palette = dark.palette;
+    mapped.isDark = dark.isDark;
     const see = { ...S.see }; // the alphas to give back: invertLightness keeps an alpha as it is
+    // what follows is worked out again for the turned colours (setTheme): the source's list counted its own
     await setTheme(mapped, files);
-    S.manual = manual;
     S.see = see;
     S.autoDark = false;
     renderAll();
-    toast('已复制成深色版（新主题，颜色明暗翻过来）：导出后在 App 里是另一个主题');
+    toast(`已复制成${mapped.isDark ? '深' : '浅'}色版（新主题，颜色明暗翻过来）：导出后在 App 里是另一个主题`);
   }
   /**
    * Key images as the app wants them before a zip is written: at most 3 × the largest key's dp
@@ -1621,6 +1678,8 @@
     try {
       const shrunk = await fitKeyImages();
       L.readTheme(FORMAT, L.writeTheme(FORMAT, T)); // what the app would refuse, refused here first
+      // the app refuses a theme named as a built-in one (a zip opened here may be)
+      if (PRESETS.some((p) => p.name === T.name)) return toast('这个主题和内置主题同名，App 不收：先「' + copyLabel() + '」或新建一个再导出', true);
       const missing = L.lookFiles(T).filter((f) => !S.files[f]);
       if (missing.length) return toast('主题里用到的文件不在这里（从浏览器存的进度恢复时不带图片和字体）：重新选 ' + missing.length + ' 个文件', true);
       const breaches = L.limitBreaches(FORMAT, T, S.files, S.sizes);
@@ -1634,17 +1693,21 @@
       a.click();
       setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
       changed({ settings: true });
-      toast((shrunk ? `按键图片缩小了 ${shrunk} 处（App 只用到这么大）。` : '') + (over.length ? '有键盘的按键图片仍超过 12 MB，App 会糊一点地画。' : '') +
+      toast((shrunk ? `按键图片缩小了 ${shrunk} 处（App 只用到这么大）。` : '') + (over.length ? `有键盘的按键图片仍超过 ${mbWords(LIM.boardImageBytes)}，App 会糊一点地画。` : '') +
         '在手机上：设置 › 外观 › 主题 › 新增主题 › 导入文件…，选这个 zip。');
     } catch (e) {
-      toast(e instanceof L.ThemeError ? ERR[e.code] + '：' + e.detail : '导出失败：' + e.message, true);
+      toast(e instanceof L.ThemeError ? themeErrorText(e) : '导出失败：' + e.message, true);
     }
   }
 
   // ---- the page ----
   let controlsBox = null;
+  let copyButton = null;
+  // a dark theme's copy is a light one
+  const copyLabel = () => `复制成${S.theme.isDark ? '浅' : '深'}色版`;
   let summaryBox = null;
   function renderAll() {
+    if (copyButton) copyButton.textContent = copyLabel();
     renderControls(controlsBox);
     renderPreview();
     renderSettings();
@@ -1657,8 +1720,8 @@
       if (p) await newFrom(p);
     } }, h('option', { value: '' }, '新建 ▾'), PRESETS.map((p) => h('option', { value: p.name }, PRESET_LABEL[p.name] || p.name)));
     const header = h('header', { class: 'top' }, h('h1', {}, '幽默输入法 · 主题制作'), h('div', { class: 'actions' },
-      h('button', { type: 'button', onclick: openZip }, '打开主题 zip'), menu,
-      h('button', { type: 'button', onclick: darkCopy }, '复制成深色版'),
+      h('button', { type: 'button', onclick: openZipFile }, '打开主题 zip'), menu,
+      copyButton = h('button', { type: 'button', onclick: darkCopy }, copyLabel()),
       h('button', { type: 'button', class: 'primary', onclick: exportTheme }, '导出 zip')));
     controlsBox = h('div', { class: 'controls' });
     summaryBox = h('summary', {});
@@ -1675,12 +1738,13 @@
     bindPreview(preview.stage);
     // a long press on the keys selects them: not the system's menu for the picture under them
     preview.stage.addEventListener('contextmenu', (ev) => ev.preventDefault());
+    // the save waits for a pause: the page closed first, it is made now
+    window.addEventListener('pagehide', save);
     let resizeTimer = 0;
     window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(renderPreview, 100); });
   }
 
-  // #board=nine&land=1&tab=keys&key=single…: a view to open at (a link, a screenshot)
-  // what a link (#tab=…) or a saved view may set: only these, else a typo leaves the page blank
+  // #board=nine&land=1&tab=keys&keys=single…: a view to open at (a link, a screenshot); what a link (#tab=…) or a saved view may set: only these, else a typo leaves the page blank
   const CHOICES = {
     phone: LAYOUT.phones.map((p) => p.id),
     board: [...new Set(LAYOUT.views.map((v) => v.board))],
@@ -1697,7 +1761,7 @@
     for (const k of ['phone', 'board', 'mode', 'state', 'sys']) if (view && chosen(k, view[k])) S.view[k] = view[k];
     if (view && typeof view.land === 'boolean') S.view.land = view.land;
   }
-  function fromHash() {
+  function fromHash(restored) {
     const q = new URLSearchParams(location.hash.slice(1));
     setView(Object.fromEntries(['phone', 'board', 'mode', 'state', 'sys'].map((k) => [k, q.get(k)])));
     if (q.get('land')) S.view.land = q.get('land') === '1';
@@ -1705,29 +1769,26 @@
     if (chosen('keys', q.get('keys'))) S.keyTab = q.get('keys');
     if (chosen('kind', q.get('kind'))) S.kind = q.get('kind');
     if (chosen('colors', q.get('colors'))) S.colorView = q.get('colors');
-    if (q.get('select')) S.selected = q.get('select').split(',');
-    if (q.get('preset')) {
-      const p = PRESETS.find((x) => x.name === q.get('preset'));
-      if (p) { S.theme = presetTheme(p); S.see = {}; }
-    }
+    // only names the layout has (one keys may be selected by): another would leave the settings blank
+    const known = (n) => { try { return !n.startsWith('*/') && L.isKnownKeyName(NAMES, n); } catch (e) { return false; } };
+    if (q.get('select')) S.selected = q.get('select').split(',').filter(known);
+    const p = q.get('preset') && PRESETS.find((x) => x.name === q.get('preset'));
+    // over work brought back from the browser: only if the user says so
+    if (p && (!restored || confirm('链接要打开内置主题「' + (PRESET_LABEL[p.name] || p.name) + '」，浏览器里存的进度会被替换。打开吗？'))) resetFollowing(presetTheme(p));
   }
 
   async function start() {
-    if (!restore()) {
+    const restored = restore();
+    if (!restored) {
       const p = PRESETS.find((x) => x.name === 'PixelLight') || PRESETS[0];
       S.theme = p ? presetTheme(p) : L.defaultLook(FORMAT, uuid(), false, L.deriveSimple({ bg: -1118482, key: -1, text: -14606047, fn: -2039584, accent: -12417548 }, false), null);
     }
-    fromHash();
+    fromHash(restored);
     if (S.view.sys) document.documentElement.dataset.theme = S.view.sys;
     build();
     renderAll();
   }
   // for the page's own checks (screenshots, a console): the state and the actions
-  window.YoumoUI = { S, setTheme, renderAll, exportTheme, fitKeyImages, openZipBytes: async (bytes) => {
-    const r = await L.openZip(FORMAT, bytes);
-    await setTheme(r.theme, r.files);
-    renderAll();
-    return r.migrated;
-  } };
+  window.YoumoUI = { S, setTheme, renderAll, exportTheme, fitKeyImages, openZipBytes };
   start();
 })();

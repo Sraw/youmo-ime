@@ -289,6 +289,10 @@
     return !!pos && (pos.includes(key) || names.roles.includes(key));
   }
 
+  // the four kinds a key is drawn as, in the theme file's order; every walk over the kinds' styles goes through these
+  const KINDS = ['letter', 'function', 'space', 'enter'];
+  const kindStyles = (keys) => KINDS.map((k) => keys[k]);
+
   function inRange(v, lo, hi, what) {
     if (v < lo || v > hi) throw new ThemeError('bad', what + ' ' + v + ' out of ' + lo + '..' + hi);
   }
@@ -299,7 +303,7 @@
     const pic = theme.picture;
     const shows = (f) => f && f.type === 'picture';
     const k = theme.keys;
-    const kinds = [k.letter, k.function, k.space, k.enter];
+    const kinds = kindStyles(k);
     const showsPicture = theme.base.type === 'picture' || theme.bar.type === 'picture' ||
       kinds.some((s) => shows(s.fill)) || Object.values(k.overrides).some((o) => shows(o.fill));
     if (!pic && showsPicture) throw new ThemeError('bad', 'the picture is shown but there is none');
@@ -338,7 +342,7 @@
     inRange(k.borderDp, 0, L.borderDp, 'borderDp');
     inRange(k.shadowDp, 0, L.shadowDp, 'shadowDp');
     for (const g of ['h', 'v', 'hLand', 'vLand']) inRange(k.gap[g], 0, L.gapDp, 'gap.' + g);
-    for (const kind of ['letter', 'function', 'space', 'enter']) {
+    for (const kind of KINDS) {
       fill(k[kind].fill, kind);
       pressed(k[kind].pressed, kind);
     }
@@ -367,7 +371,7 @@
       if (p.landscape) add(p.landscape.file);
     }
     const k = theme.keys;
-    for (const s of [k.letter, k.function, k.space, k.enter]) {
+    for (const s of kindStyles(k)) {
       add(img(s.fill));
       add(img(s.pressed));
     }
@@ -518,7 +522,7 @@
       if (x && x.type === 'image') x.file = fn(x.file);
     };
     const k = t.keys;
-    for (const s of [k.letter, k.function, k.space, k.enter, ...Object.values(k.overrides)]) {
+    for (const s of [...kindStyles(k), ...Object.values(k.overrides)]) {
       img(s.fill);
       img(s.pressed);
     }
@@ -591,6 +595,7 @@
       if (parts.length === 1 && !e.name.endsWith('/')) top.set(parts[0], e);
     }
     const jsons = [...top.keys()].filter((n) => n.endsWith('.json') && !n.startsWith('._'));
+    // stricter than the app (it takes the first json): a zip of two is not one the app exported
     if (jsons.length !== 1) throw new ThemeError('not-theme', jsons.length + ' json files');
     const read = readTheme(format, new TextDecoder().decode(await top.get(jsons[0]).read()));
     if (Object.keys(read.theme.keys.overrides).length > lim.overrides) throw new ThemeError('limit', 'overrides');
@@ -686,13 +691,9 @@
     const out = new Set();
     const img = (x) => x && x.type === 'image' && out.add(x.file);
     const k = theme.keys;
-    for (const s of [k.letter, k.function, k.space, k.enter]) {
+    for (const s of [...kindStyles(k), ...Object.values(k.overrides)]) {
       img(s.fill);
       img(s.pressed);
-    }
-    for (const o of Object.values(k.overrides)) {
-      img(o.fill);
-      img(o.pressed);
     }
     return [...out];
   }
@@ -721,7 +722,7 @@
     const inner = area(h, v, f(width - h), f(height - v));
     if (keys.blocks) {
       const radius = f(keys.radiusDp * density);
-      const shadow = keys.shadowDp > 0 ? [inner[0], inner[1], inner[2], f(inner[3] + f(keys.shadowDp * density))] : null;
+      const shadow = keys.shadowDp > 0 ? [inner[0], inner[1], inner[2], Math.min(f(inner[3] + f(keys.shadowDp * density)), height)] : null; // kept within the cell, as the app's
       return { face: inner, shadow, border: f(keys.borderDp * density), pressed: inner, radius, oval: false };
     }
     if (kind === 'space') {
@@ -760,12 +761,12 @@
     const dx = [f(target[0]), f(target[0] + dl), f(target[2] - dr), f(target[2])];
     const dy = [f(target[1]), f(target[1] + dt), f(target[3] - db), f(target[3])];
     const out = [];
-    const has = (a) => f(a[2] - a[0]) > 0 && f(a[3] - a[1]) > 0;
+    const nonEmpty = (a) => f(a[2] - a[0]) > 0 && f(a[3] - a[1]) > 0;
     for (let r = 0; r < 3; r++) {
       for (let c = 0; c < 3; c++) {
         const src = [sx[c], sy[r], sx[c + 1], sy[r + 1]];
         const dst = [dx[c], dy[r], dx[c + 1], dy[r + 1]];
-        if (has(src) && has(dst)) out.push({ src, dst });
+        if (nonEmpty(src) && nonEmpty(dst)) out.push({ src, dst });
       }
     }
     return out;
@@ -788,16 +789,10 @@
   }
 
   // BoxBlur: 0xAARRGGBB ints (signed, as Kotlin's), three box passes across then down
-  function pack(s, n) {
+  // the sums a, r, g, b of n pixels as their rounded mean, packed (scalars: the loops run per pixel and allocate nothing)
+  function pack(a, r, g, b, n) {
     const ch = (v) => Math.floor((v * 2 + n) / (2 * n));
-    return (ch(s[0]) << 24) | (ch(s[1]) << 16) | (ch(s[2]) << 8) | ch(s[3]);
-  }
-
-  function addPx(s, c, sign) {
-    s[0] += sign * ((c >>> 24) & 0xff);
-    s[1] += sign * ((c >>> 16) & 0xff);
-    s[2] += sign * ((c >>> 8) & 0xff);
-    s[3] += sign * (c & 0xff);
+    return (ch(a) << 24) | (ch(r) << 16) | (ch(g) << 8) | ch(b);
   }
 
   function blurShrink(pixels, width, height, factor) {
@@ -809,9 +804,14 @@
     const out = new Int32Array(w * h);
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        const s = [0, 0, 0, 0];
-        for (let yy = 0; yy < fy; yy++) for (let xx = 0; xx < fx; xx++) addPx(s, pixels[(y * fy + yy) * width + x * fx + xx], 1);
-        out[y * w + x] = pack(s, n);
+        let a = 0, r = 0, g = 0, b = 0;
+        for (let yy = 0; yy < fy; yy++) {
+          for (let xx = 0; xx < fx; xx++) {
+            const c = pixels[(y * fy + yy) * width + x * fx + xx];
+            a += (c >>> 24) & 0xff; r += (c >>> 16) & 0xff; g += (c >>> 8) & 0xff; b += c & 0xff;
+          }
+        }
+        out[y * w + x] = pack(a, r, g, b, n);
       }
     }
     return out;
@@ -821,18 +821,38 @@
     const lines = horizontal ? height : width;
     const len = horizontal ? width : height;
     const n = 2 * r + 1;
-    const clamp = (i) => (i < 0 ? 0 : i > len - 1 ? len - 1 : i);
+    // a pixel of the line: along a row 1 apart, down a column width apart; past an end, the end's
+    const step = horizontal ? 1 : width;
+    const last = len - 1;
     for (let line = 0; line < lines; line++) {
-      const at = horizontal ? (i) => src[line * width + clamp(i)] : (i) => src[clamp(i) * width + line];
-      const s = [0, 0, 0, 0];
-      for (let i = -r; i <= r; i++) addPx(s, at(i), 1);
+      const base = horizontal ? line * width : line;
+      let sa = 0, sr = 0, sg = 0, sb = 0;
+      for (let i = -r; i <= r; i++) {
+        const c = src[base + (i < 0 ? 0 : i > last ? last : i) * step];
+        sa += (c >>> 24) & 0xff; sr += (c >>> 16) & 0xff; sg += (c >>> 8) & 0xff; sb += c & 0xff;
+      }
       for (let i = 0; i < len; i++) {
-        dst[horizontal ? line * width + i : i * width + line] = pack(s, n);
-        addPx(s, at(i - r), -1);
-        addPx(s, at(i + r + 1), 1);
+        dst[base + i * step] = pack(sa, sr, sg, sb, n);
+        const o = i - r, p = i + r + 1;
+        const out = src[base + (o < 0 ? 0 : o > last ? last : o) * step];
+        const inn = src[base + (p < 0 ? 0 : p > last ? last : p) * step];
+        sa += ((inn >>> 24) & 0xff) - ((out >>> 24) & 0xff);
+        sr += ((inn >>> 16) & 0xff) - ((out >>> 16) & 0xff);
+        sg += ((inn >>> 8) & 0xff) - ((out >>> 8) & 0xff);
+        sb += (inn & 0xff) - (out & 0xff);
       }
     }
   }
+
+  /**
+   * ThemeAssets.blurRadius: the box radius in the bitmap's pixels for [blurDp] drawn [widthPx] wide
+   * (the bitmap [bitmapWidth] wide; widthPx 0: as wide), on its quarter-size copy.
+   */
+  function blurRadius(blurDp, widthPx, bitmapWidth, density) {
+    const pxPerBitmapPx = widthPx > 0 ? f(f(widthPx) / bitmapWidth) : 1;
+    return Math.max(1, Math.round(f(f(f(blurDp * f(density)) / pxPerBitmapPx) / BLUR_SHRINK)));
+  }
+  const BLUR_SHRINK = 4;
 
   function blur(pixels, width, height, radius) {
     const cur = Int32Array.from(pixels);
@@ -864,7 +884,7 @@
     const add = (fill, pressed) => {
       for (const x of [fill, pressed]) if (x && x.type === 'image' && !out.includes(x.file)) out.push(x.file);
     };
-    for (const s of [keys.letter, keys.function, keys.space, keys.enter]) add(s.fill, s.pressed);
+    for (const s of kindStyles(keys)) add(s.fill, s.pressed);
     for (const key of names) {
       if (roles.includes(key)) {
         const o = keys.overrides['*/' + key];
@@ -999,6 +1019,57 @@
     return { bg: p.backgroundColor, key: p.keyBackgroundColor, text: p.keyTextColor, fn: p.altKeyBackgroundColor, accent: p.accentKeyBackgroundColor };
   }
 
+  // the field each of the five sets as it is (the rest are worked out of them)
+  const SIMPLE_FIELD = { bg: 'backgroundColor', key: 'keyBackgroundColor', text: 'keyTextColor', fn: 'altKeyBackgroundColor', accent: 'accentKeyBackgroundColor' };
+
+  /**
+   * The simple view's [which] of the five set to [color]: {palette, manual, isDark, set: the fields given a
+   * new colour}. isDark follows the background when [autoDark], and is worked out before the rest (the
+   * press, shadow and border are dark's or light's); a field in [manual] keeps its colour, but for the one set.
+   */
+  function simpleEdit(palette, manual, which, color, isDark, autoDark) {
+    const dark = which === 'bg' && autoDark ? isDarkColor(color) : isDark;
+    const sim = simpleOf(palette);
+    sim[which] = color;
+    const all = deriveSimple(sim, dark);
+    const out = { ...palette };
+    const set = [];
+    for (const [k, v] of Object.entries(all)) {
+      if (!manual.includes(k) || k === SIMPLE_FIELD[which]) {
+        out[k] = v;
+        set.push(k);
+      }
+    }
+    return { palette: out, manual: manual.filter((k) => k !== SIMPLE_FIELD[which]), isDark: dark, set };
+  }
+
+  /** The fields not in [manual] worked out again for [isDark] (the dark box ticked or not): the fields changed. */
+  function followDark(palette, manual, isDark) {
+    const all = deriveSimple(simpleOf(palette), isDark);
+    const set = [];
+    for (const [k, v] of Object.entries(all)) {
+      if (!manual.includes(k) && palette[k] !== v) {
+        palette[k] = v;
+        set.push(k);
+      }
+    }
+    return set;
+  }
+
+  /**
+   * A palette's copy with its lightness turned over: {palette, isDark}, isDark by its new background (a
+   * dark theme's copy is a light one). The shadow and border stay black, as deriveSimple has them for
+   * the new isDark, unless set by hand ([manual]).
+   */
+  function darkPalette(palette, manual) {
+    const out = {};
+    for (const [k, v] of Object.entries(palette)) out[k] = invertLightness(v);
+    const isDark = isDarkColor(out.backgroundColor);
+    const derived = deriveSimple(simpleOf(out), isDark);
+    for (const k of ['keyShadowColor', 'keyBorderColor']) out[k] = manual.includes(k) ? palette[k] : derived[k];
+    return { palette: out, isDark };
+  }
+
   /** Whether a colour reads as dark (the theme's isDark guessed from its background). */
   function isDarkColor(c) {
     return luminance(c) < 0.18;
@@ -1088,7 +1159,6 @@
     return { scale, pxPerDp, insets: img.insets.map((x) => Math.floor(x * scale)) };
   }
 
-  /** DarkenColorFilter(100 − brightness): black at this alpha (0..255) over the picture. */
   /** ThemeColors: the palette field under the keyboard, under the bar (null: none), under a panel, a key's face. */
   const boardField = (keys) => (keys.blocks ? 'backgroundColor' : 'keyboardColor');
   const barField = (bar) => (bar.type === 'color' ? 'barColor' : null);
@@ -1136,7 +1206,7 @@
   function seeThroughFields(theme, kindOf) {
     const K = theme.keys;
     const out = new Set();
-    for (const k of ['letter', 'function', 'space', 'enter']) if (K[k].fill.type === 'picture') out.add(faceField(k, K.blocks));
+    for (const k of KINDS) if (K[k].fill.type === 'picture') out.add(faceField(k, K.blocks));
     for (const [n, o] of Object.entries(K.overrides)) {
       const kinds = o.fill && o.fill.type === 'picture' ? kindOf(n) : undefined;
       for (const kind of kinds ? [].concat(kinds) : []) out.add(faceField(kind, K.blocks));
@@ -1153,18 +1223,18 @@
     const P = theme.palette;
     const used = seeThroughFields(theme, kindOf);
     const next = {};
-    for (const f of used) {
-      if (f in kept) next[f] = kept[f];
-      else if ((P[f] >>> 24) > SEE_THROUGH_ALPHA) {
-        next[f] = P[f] >>> 24;
-        P[f] = (P[f] & 0xffffff) | (SEE_THROUGH_ALPHA << 24);
-      } else next[f] = null;
+    for (const field of used) {
+      if (field in kept) next[field] = kept[field];
+      else if ((P[field] >>> 24) > SEE_THROUGH_ALPHA) {
+        next[field] = P[field] >>> 24;
+        P[field] = (P[field] & 0xffffff) | (SEE_THROUGH_ALPHA << 24);
+      } else next[field] = null;
     }
-    for (const [f, a] of Object.entries(kept)) if (!used.has(f) && a !== null) P[f] = (P[f] & 0xffffff) | (a << 24);
+    for (const [field, a] of Object.entries(kept)) if (!used.has(field) && a !== null) P[field] = (P[field] & 0xffffff) | (a << 24);
     return next;
   }
 
-  /** ThemeColors.dim: the black's alpha over the picture at [brightness] percent. */
+  /** ThemeColors.dim (DarkenColorFilter(100 − brightness)): the black's alpha (0..255) over the picture at [brightness] percent. */
   function darkenAlpha(brightness) {
     return Math.floor(((100 - brightness) * 255) / 100);
   }
@@ -1189,12 +1259,14 @@
 
   /** A short hex of a file's content: names a file the page adds, so new content is a new name. */
   function contentId(bytes) {
-    return crc32(bytes).toString(16).padStart(8, '0');
+    // with the length: two files of one CRC (rare, but then the second would be taken for the first) differ in it as well
+    return crc32(bytes).toString(16).padStart(8, '0') + '-' + bytes.length.toString(16);
   }
 
   root.YoumoLib = {
     ThemeError, crc32, writeZip, readZip, readTheme, writeTheme, openZip, exportZip, lookFiles, keyImageFiles,
     limitBreaches, entryBreach, imageSize, decodeCaps, fileRole, decodable, mapFiles, isThemeFileName, isPlainFileName, baseName, entryPath, fitKeyImage, from21, defaultLook, parseKeyName, isKnownKeyName, checkRanges, ordered, PALETTE_21,
+    KINDS, kindStyles, blurRadius, simpleEdit, followDark, darkPalette,
     keyFace, nineSlice, centerCrop, pictureUnder, blurShrink, blur, resolveStyle, imagesOn, budgetBytes, budgetSample,
     argb, channels, toHex, fromHex, css, withAlpha, contrast, over, luminance, deriveSimple, simpleOf, isDarkColor,
     invertLightness, cropToSource, cropFromSource, resizeInside, darkenAlpha, boardField, barField, panelField, faceField, SEE_THROUGH_ALPHA, seeThroughFields, seeThrough, imageType, fontType, contentId,

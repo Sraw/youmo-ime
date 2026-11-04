@@ -110,12 +110,17 @@ object ThemeAssets {
         var done = false
         var bitmap: Bitmap? = null
         val waiting = ArrayList<() -> Unit>()
+
+        // under the lock: a fill for the waiting views is on the runner already; another draw before
+        // it is in queues none more
+        var queued = false
     }
 
     /** A picture as [pictureOrLater] gives it: [bitmap] null for none. */
     class Got internal constructor(val bitmap: Bitmap?)
 
-    private val pictures = HashMap<PictureKey, PictureSlot>()
+    // in the order last asked for (access order): the blurs of the widths least lately drawn go first
+    private val pictures = LinkedHashMap<PictureKey, PictureSlot>(16, 0.75f, true)
     private val boards = LinkedHashMap<String, BoardImages>(8, 0.75f, true)
     private val fonts = HashMap<Pair<String?, Int>, Typeface?>()
 
@@ -172,7 +177,7 @@ object ThemeAssets {
     }
 
     /**
-     * [picture] for a view drawing now: null while another thread decodes it (ahead, [prefetch]), [then]
+     * [picture] for a view drawing now: null till the decode thread has it (ahead, [prefetch], or now), [then]
      * told on the main thread when it is in; a view does not wait a frame on a picture of 4096.
      */
     fun pictureOrLater(look: ThemeLook, landscape: Boolean, blurDp: Int, widthPx: Int, density: Float, then: () -> Unit): Got? {
@@ -183,7 +188,7 @@ object ThemeAssets {
     /**
      * [look]'s picture if it is the theme drawn now, without making it so: a prefetch run late, a theme
      * picked since, keeps no slot and decodes nothing (it would let the theme now drawn's go). Null when
-     * [then] is given and another thread decodes it (or the sharp one the blur is made from), [then]
+     * [then] is given and it is not in yet (or the sharp one the blur is made from): the decode thread makes it, [then]
      * told when it is in; else waits for it.
      */
     private fun pictureOf(look: ThemeLook, landscape: Boolean, blurDp: Int, widthPx: Int, density: Float, then: (() -> Unit)?): Got? {
@@ -195,21 +200,60 @@ object ThemeAssets {
             if (look.picture == null || !current(look)) return Got(null)
             val key = PictureKey(landscape, blurDp, if (blurDp == 0) 0 else widthBucket(widthPx))
             pictures[key] ?: PictureSlot().also {
-                // turned, the other orientation's are let go
-                pictures.keys.removeAll { k -> k.landscape != landscape }
+                // turned, the other orientation's are let go; a blur made for another width (a floating
+                // keyboard resized) too, but only past the last few widths drawn and never one still
+                // being made or waited for: two views drawing it at two widths at once (the theme
+                // page's preview and the keyboard, split screen) would else let each other's go and
+                // blur again and again, neither ever getting one
+                letGoBeforeAdding(landscape, blurDp)
                 pictures[key] = it
             }
         }
         if (slot.done) return Got(slot.bitmap)
-        if (then == null) {
-            slot.decoding.lock()
-        } else if (!slot.decoding.tryLock()) {
-            synchronized(lock) {
-                if (slot.done) return Got(slot.bitmap)
-                slot.waiting += then
-            }
-            return null
+        if (then == null) return fill(slot, look, landscape, blurDp, widthPx, density)
+        return queueFill(slot, look, landscape, blurDp, widthPx, density, then)
+    }
+
+    // pictureOf's slot not in yet and a view waiting: Got if it came in meanwhile, else null and [then] told later
+    @Suppress("LongParameterList")
+    private fun queueFill(
+        slot: PictureSlot, look: ThemeLook, landscape: Boolean, blurDp: Int, widthPx: Int, density: Float,
+        then: () -> Unit,
+    ): Got? {
+        // a view drawing never decodes nor blurs on its own thread: the decode thread does it, [then]
+        // told when it is in (a width no prefetch made, a floating keyboard's, too)
+        val free = slot.decoding.tryLock()
+        val post = synchronized(lock) {
+            if (slot.done) return Got(slot.bitmap).also { if (free) slot.decoding.unlock() }
+            slot.waiting += then
+            // a fill already queued tells this view too: each frame drawn before it is in queues none
+            (free && !slot.queued).also { if (it) slot.queued = true }
         }
+        if (free) slot.decoding.unlock()
+        if (post) {
+            // this slot, though let go meanwhile: its waiting views are told from it
+            runner {
+                // skipped, another theme drawn since: use() already let this slot go, a draw of the theme again queuing its own
+                if (synchronized(lock) { current(look) }) fill(slot, look, landscape, blurDp, widthPx, density)
+            }
+        }
+        return null
+    }
+
+    // under the lock, before a slot of [landscape] and [blurDp] is added: see pictureOf
+    private fun letGoBeforeAdding(landscape: Boolean, blurDp: Int) {
+        pictures.keys.removeAll { k -> k.landscape != landscape }
+        if (blurDp == 0) return
+        // a slot waited for is never done (fill sets done and empties waiting under the lock): kept as said
+        val others = pictures.entries.filter { (k, v) -> k.blurDp == blurDp && v.done && v.waiting.isEmpty() }
+        val over = pictures.keys.count { k -> k.blurDp == blurDp } + 1 - BLUR_WIDTHS_KEPT
+        // oldest asked for first: the map's access order
+        others.take(maxOf(0, over)).forEach { e -> pictures.remove(e.key) }
+    }
+
+    // [slot] decoded, or waited for if another thread decodes it; its waiting views told
+    private fun fill(slot: PictureSlot, look: ThemeLook, landscape: Boolean, blurDp: Int, widthPx: Int, density: Float): Got {
+        slot.decoding.lock()
         val told = try {
             if (slot.done) return Got(slot.bitmap)
             val b = decodeSafely("picture") { decodePicture(look, landscape, blurDp, widthPx, density) }
@@ -331,14 +375,18 @@ object ThemeAssets {
     }
 
     // the keyboards drawn longest ago dropped till the rest are in the limit; the one just decoded kept
-    private fun trim(keep: BoardImages) {
-        var total = boards.values.sumOf { it.bytes }
-        val it = boards.entries.iterator()
-        while (total > BOARDS_LIMIT && it.hasNext()) {
-            val e = it.next()
-            if (e.value === keep) continue
-            total -= e.value.bytes
-            it.remove()
+    private fun trim(keep: BoardImages) = trimToLimit(boards, BOARDS_LIMIT, keep, { it.bytes })
+
+    // under the lock: [cache]'s entries used longest ago (it is in access order) dropped till the rest
+    // take no more than [limit] bytes; [keep] (the one just decoded) and those [inUse] stay
+    private fun <V> trimToLimit(cache: LinkedHashMap<String, V>, limit: Long, keep: V, bytes: (V) -> Long, inUse: (V) -> Boolean = { false }) {
+        var total = cache.values.sumOf(bytes)
+        val entries = cache.entries.iterator()
+        while (total > limit && entries.hasNext()) {
+            val entry = entries.next().value
+            if (entry === keep || inUse(entry)) continue
+            total -= bytes(entry)
+            entries.remove()
         }
     }
 
@@ -438,16 +486,8 @@ object ThemeAssets {
         return if (blurDp > 0) blurred(small, blurDp, screenPx, density) else small
     }
 
-    private fun trimThumbnails(keep: Thumbnail) {
-        var total = thumbnails.values.sumOf { it.bytes }
-        val it = thumbnails.entries.iterator()
-        while (total > THUMBNAILS_LIMIT && it.hasNext()) {
-            val e = it.next()
-            if (e.value === keep || !e.value.done) continue
-            total -= e.value.bytes
-            it.remove()
-        }
-    }
+    // a thumbnail still being decoded stays: its waiting views are told from it
+    private fun trimThumbnails(keep: Thumbnail) = trimToLimit(thumbnails, THUMBNAILS_LIMIT, keep, { it.bytes }, inUse = { !it.done })
 
     /** What the thumbnails kept take now, bytes. */
     @VisibleForTesting
@@ -455,6 +495,9 @@ object ThemeAssets {
 
     private const val BLUR_SHRINK = 4
     private const val WIDTH_STEP = 1.1
+
+    // the widths a blur is kept for at once (per blur): two views drawing it at two widths, and one more
+    private const val BLUR_WIDTHS_KEPT = 3
     private const val NORMAL_WEIGHT = 400
 
     /** The most pixels a picture is decoded to: 2048² (16 MB). */

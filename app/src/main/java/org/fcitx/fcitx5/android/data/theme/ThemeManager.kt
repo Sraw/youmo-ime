@@ -233,6 +233,10 @@ object ThemeManager {
             prefs.managedPreferences.forEach {
                 it.value.putValueTo(this@edit)
             }
+            // what the Monet themes' keys are drawn with is no managed preference: before the first unlock too
+            val monet = prefs.monetLook()
+            if (monet != null) putString(ThemeLookMigration.MONET_KEY, ThemeLookMigration.encode(monet))
+            else remove(ThemeLookMigration.MONET_KEY)
         }
     }
 

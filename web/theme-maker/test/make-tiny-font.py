@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
-"""A tiny valid TrueType font: .notdef and one square glyph for A-Z a-z 0-9. Test fixture only."""
-import struct, sys
+"""A tiny valid TrueType font: .notdef and one square glyph for A-Z a-z 0-9. Test fixture only.
+
+Usage: make-tiny-font.py <out.ttf>
+"""
+import math
+import struct
+import sys
+
+if len(sys.argv) != 2:
+    sys.exit('usage: make-tiny-font.py <out.ttf>')
 
 UPM = 1000
 def checksum(b):
@@ -31,7 +39,6 @@ hhea = struct.pack('>IhhhHhhhhhhhhhhhH', 0x00010000, 800, -200, 0, 700, 0, 0, 60
 maxp = struct.pack('>IHHHHHHHHHHHHHH', 0x00010000, 2, 4, 1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0)
 hmtx = struct.pack('>HhHh', 500, 0, 700, 100)
 
-chars = list(range(0x30, 0x3A)) + list(range(0x41, 0x5B)) + list(range(0x61, 0x7B))
 # cmap format 4: a segment per character (each to glyph 1: a run's delta would number them on), plus 0xFFFF
 runs = [(c, c) for a, b in [(0x30, 0x39), (0x41, 0x5A), (0x61, 0x7A)] for c in range(a, b + 1)] + [(0xFFFF, 0xFFFF)]
 seg = len(runs)
@@ -39,7 +46,6 @@ ends = b''.join(struct.pack('>H', e) for s, e in runs)
 starts = b''.join(struct.pack('>H', s) for s, e in runs)
 deltas = b''.join(struct.pack('>H', ((1 - s) % 0x10000) if s != 0xFFFF else 1) for s, e in runs)
 ranges = b'\0\0' * seg
-import math
 sr = 2 * (2 ** int(math.log2(seg)))
 f4body = struct.pack('>HHHH', seg * 2, sr, int(math.log2(sr // 2)), seg * 2 - sr) + ends + b'\0\0' + starts + deltas + ranges
 f4 = struct.pack('>HHH', 4, 6 + len(f4body), 0) + f4body
@@ -81,5 +87,6 @@ hoff = 12 + 16 * tags.index(b'head')
 head_at = struct.unpack('>I', font[hoff + 8:hoff + 12])[0]
 adj = (0xB1B0AFBA - checksum(bytes(font))) & 0xffffffff
 font[head_at + 8:head_at + 12] = struct.pack('>I', adj)
-open(sys.argv[1], 'wb').write(bytes(font))
+with open(sys.argv[1], 'wb') as out_file:
+    out_file.write(bytes(font))
 print(len(font))

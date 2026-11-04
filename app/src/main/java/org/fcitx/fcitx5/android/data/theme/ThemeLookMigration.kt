@@ -39,13 +39,17 @@ object ThemeLookMigration {
     fun legacy(prefs: SharedPreferences): LegacyLook? {
         if (KEYS.none(prefs::contains)) return null
         val d = LegacyLook()
+        // no longer managed preferences: a value of the wrong type (a bad backup, a hand edit) is the
+        // default, not a crash at every start
+        fun bool(key: String, default: Boolean) = runCatching { prefs.getBoolean(key, default) }.getOrDefault(default)
+        fun int(key: String, default: Int) = runCatching { prefs.getInt(key, default) }.getOrDefault(default)
         return LegacyLook(
-            keyBorder = prefs.getBoolean("key_border", d.keyBorder),
-            keyRadius = prefs.getInt("key_radius", d.keyRadius),
-            hMargin = prefs.getInt("key_horizontal_margin", d.hMargin),
-            hMarginLandscape = prefs.getInt("key_horizontal_margin_landscape", d.hMarginLandscape),
-            vMargin = prefs.getInt("key_vertical_margin", d.vMargin),
-            vMarginLandscape = prefs.getInt("key_vertical_margin_landscape", d.vMarginLandscape),
+            keyBorder = bool("key_border", d.keyBorder),
+            keyRadius = int("key_radius", d.keyRadius),
+            hMargin = int("key_horizontal_margin", d.hMargin),
+            hMarginLandscape = int("key_horizontal_margin_landscape", d.hMarginLandscape),
+            vMargin = int("key_vertical_margin", d.vMargin),
+            vMarginLandscape = int("key_vertical_margin_landscape", d.vMarginLandscape),
         )
     }
 
@@ -53,7 +57,8 @@ object ThemeLookMigration {
     const val MONET_KEY = "monet_key_style"
 
     /** The old settings the Monet themes are drawn with, [settle]d into [prefs]; null for none (the defaults). */
-    fun monet(prefs: SharedPreferences): LegacyLook? = prefs.getString(MONET_KEY, null)?.let(::decode)
+    fun monet(prefs: SharedPreferences): LegacyLook? =
+        runCatching { prefs.getString(MONET_KEY, null) }.getOrNull()?.let(::decode)
 
     /**
      * What the Monet themes' keys are drawn with, read as the themes are ([ThemeManager]): their look is
@@ -73,7 +78,10 @@ object ThemeLookMigration {
         if (v.size != 8) return null
         val b = v.take(3).map { it.toBooleanStrictOrNull() ?: return null }
         val n = v.drop(3).map { it.toIntOrNull() ?: return null }
-        return LegacyLook(b[0], b[1], b[2], n[0], n[1], n[2], n[3], n[4])
+        return LegacyLook(
+            keyBorder = b[0], keyBorderStroke = b[1], keyRippleEffect = b[2], keyRadius = n[0],
+            hMargin = n[1], hMarginLandscape = n[2], vMargin = n[3], vMarginLandscape = n[4],
+        )
     }
 
     /** A theme in use: light, dark or the one chosen, read and set. */

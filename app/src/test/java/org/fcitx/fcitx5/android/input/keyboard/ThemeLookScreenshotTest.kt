@@ -235,6 +235,10 @@ class ThemeLookScreenshotTest {
                 h.idle()
             }
             val name = "${theme.name}_${board.name}_$mode"
+            // a picture not made ahead (a floating keyboard's blur) is asked for at the first draw and comes in
+            // from the decode thread, the view told after: drawn once, then shot as the next frame shows it
+            h.inputView.draw(android.graphics.Canvas(android.graphics.Bitmap.createBitmap(maxOf(1, h.inputView.width), maxOf(1, h.inputView.height), android.graphics.Bitmap.Config.ARGB_8888)))
+            h.idle()
             if (golden) h.capture("ThemeLookScreenshotTest/$name", h.inputView)
             shots?.let { save(h, h.inputView, File(it, "$name.png")) }
             // ⌫ held: its own pressed colour, not its face darkened

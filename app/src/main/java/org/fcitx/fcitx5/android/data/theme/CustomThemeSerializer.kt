@@ -119,13 +119,27 @@ object CustomThemeSerializer : JsonTransformingSerializer<Theme.Custom>(ThemeFil
     private fun from21(obj: JsonObject): JsonObject {
         fun color(key: String) = obj.getValue(key).jsonPrimitive.int
         val palette = Palette(
-            color("backgroundColor"), color("barColor"), color("keyboardColor"), color("keyBackgroundColor"),
-            color("keyTextColor"), color("candidateTextColor"), color("candidateLabelColor"),
-            color("candidateCommentColor"), color("altKeyBackgroundColor"), color("altKeyTextColor"),
-            color("accentKeyBackgroundColor"), color("accentKeyTextColor"), color("keyPressHighlightColor"),
-            color("keyShadowColor"), color("popupBackgroundColor"), color("popupTextColor"),
-            color("spaceBarColor"), color("dividerColor"), color("clipboardEntryColor"),
-            color("genericActiveBackgroundColor"), color("genericActiveForegroundColor"),
+            backgroundColor = color("backgroundColor"),
+            barColor = color("barColor"),
+            keyboardColor = color("keyboardColor"),
+            keyBackgroundColor = color("keyBackgroundColor"),
+            keyTextColor = color("keyTextColor"),
+            candidateTextColor = color("candidateTextColor"),
+            candidateLabelColor = color("candidateLabelColor"),
+            candidateCommentColor = color("candidateCommentColor"),
+            altKeyBackgroundColor = color("altKeyBackgroundColor"),
+            altKeyTextColor = color("altKeyTextColor"),
+            accentKeyBackgroundColor = color("accentKeyBackgroundColor"),
+            accentKeyTextColor = color("accentKeyTextColor"),
+            keyPressHighlightColor = color("keyPressHighlightColor"),
+            keyShadowColor = color("keyShadowColor"),
+            popupBackgroundColor = color("popupBackgroundColor"),
+            popupTextColor = color("popupTextColor"),
+            spaceBarColor = color("spaceBarColor"),
+            dividerColor = color("dividerColor"),
+            clipboardEntryColor = color("clipboardEntryColor"),
+            genericActiveBackgroundColor = color("genericActiveBackgroundColor"),
+            genericActiveForegroundColor = color("genericActiveForegroundColor"),
         )
         val picture = (obj["backgroundImage"] as? JsonObject)?.let { image ->
             val rect = (image["cropRect"] as? JsonObject)?.let { r ->

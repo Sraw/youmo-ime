@@ -102,7 +102,8 @@ dialog::backdrop { background: #0008; }
 
 .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg);
   padding: 10px 16px; border-radius: 10px; max-width: min(92vw, 560px); z-index: 10; font-size: 13px; }
-.toast.err { background: var(--err); color: #fff; }
+/* light: white on the dark red; dark: the dark ink on the light red (white on it is 1.9:1) */
+.toast.err { background: var(--err); color: var(--accent-ink); }
 
 @media (max-width: 900px) {
   main { grid-template-columns: minmax(0, 1fr); }

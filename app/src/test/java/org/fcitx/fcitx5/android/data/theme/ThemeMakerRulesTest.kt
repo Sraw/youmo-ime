@@ -10,6 +10,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
@@ -59,6 +60,7 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 /**
+ * contract: fixtures the page's node test reads (rules.json, the export zips), which mutation cannot see.
  * The rules the theme maker draws its preview by, computed by ime-core's code for a fixed set of
  * cases (web/theme-maker/test/testdata/rules.json), which the page's own test computes again in
  * JavaScript; and the files it reads (theme.json, a 3.0 theme; from-app.zip and from-app-2.1.zip,
@@ -187,6 +189,19 @@ class ThemeMakerRulesTest {
             })
         }
     }
+
+    private fun blurRadius() = buildJsonArray {
+        // [blurDp, widthPx, bitmapWidth, density, ThemeAssets.blurRadius, why]: the page's test checks each
+        for (r in listOf(
+            Row(10, 1080, 1080, 2.75f, "drawn at its own size: 10 dp × 2.75 / 4"),
+            Row(10, 540, 1080, 2.75f, "drawn at half its width: twice the bitmap pixels"),
+            Row(10, 2160, 1080, 2.75f, "drawn at twice its width: half"),
+            Row(10, 0, 1080, 2.75f, "no width: as wide as the bitmap"),
+            Row(1, 1080, 1080, 1f, "never under 1"),
+        )) add(buildJsonArray { add(r.dp); add(r.w); add(r.bw); add(r.density); add(ThemeAssets.blurRadius(r.dp, r.w, r.bw, r.density)); add(r.why) })
+    }
+
+    private data class Row(val dp: Int, val w: Int, val bw: Int, val density: Float, val why: String)
 
     private fun blur() = buildJsonArray {
         // a fixed pseudo-random picture: the same numbers in the page's test
@@ -326,6 +341,7 @@ class ThemeMakerRulesTest {
             put("nineSlice", nineSlice())
             put("pictures", pictures())
             put("blur", blur())
+            put("blurRadius", blurRadius())
             put("styles", styles())
             put("budget", budget())
             put("migration", migration())

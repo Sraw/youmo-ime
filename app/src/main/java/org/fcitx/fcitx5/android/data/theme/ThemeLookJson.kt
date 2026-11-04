@@ -73,7 +73,7 @@ internal object ThemeFileSerializer : KSerializer<Theme.Custom> {
         decoder.decodeSerializableValue(ThemeFileJson.serializer()).toTheme()
 }
 
-/** A [ThemeLook] in a Parcel: its json, as a theme file has it (an Intent carries a theme to its editing page). */
+/** A [ThemeLook] in a Parcel: its json, as a theme file has it (a [Theme.Custom] parcelled carries its look so). */
 internal object ThemeLookParceler : Parceler<ThemeLook> {
     override fun create(parcel: Parcel): ThemeLook =
         Json.decodeFromString(ThemeFileSerializer, parcel.readString()!!).look
@@ -109,21 +109,60 @@ internal data class PaletteJson(
     val keyHintColor: Int,
     val toolbarIconColor: Int,
 ) {
+    // by name: a reordered Palette must not swap two colours unseen
     fun toPalette() = Palette(
-        backgroundColor, barColor, keyboardColor, keyBackgroundColor, keyTextColor, candidateTextColor,
-        candidateLabelColor, candidateCommentColor, altKeyBackgroundColor, altKeyTextColor,
-        accentKeyBackgroundColor, accentKeyTextColor, keyPressHighlightColor, keyShadowColor,
-        popupBackgroundColor, popupTextColor, spaceBarColor, dividerColor, clipboardEntryColor,
-        genericActiveBackgroundColor, genericActiveForegroundColor, keyBorderColor, keyHintColor, toolbarIconColor,
+        backgroundColor = backgroundColor,
+        barColor = barColor,
+        keyboardColor = keyboardColor,
+        keyBackgroundColor = keyBackgroundColor,
+        keyTextColor = keyTextColor,
+        candidateTextColor = candidateTextColor,
+        candidateLabelColor = candidateLabelColor,
+        candidateCommentColor = candidateCommentColor,
+        altKeyBackgroundColor = altKeyBackgroundColor,
+        altKeyTextColor = altKeyTextColor,
+        accentKeyBackgroundColor = accentKeyBackgroundColor,
+        accentKeyTextColor = accentKeyTextColor,
+        keyPressHighlightColor = keyPressHighlightColor,
+        keyShadowColor = keyShadowColor,
+        popupBackgroundColor = popupBackgroundColor,
+        popupTextColor = popupTextColor,
+        spaceBarColor = spaceBarColor,
+        dividerColor = dividerColor,
+        clipboardEntryColor = clipboardEntryColor,
+        genericActiveBackgroundColor = genericActiveBackgroundColor,
+        genericActiveForegroundColor = genericActiveForegroundColor,
+        keyBorderColor = keyBorderColor,
+        keyHintColor = keyHintColor,
+        toolbarIconColor = toolbarIconColor,
     )
 
     companion object {
         fun of(p: Palette) = PaletteJson(
-            p.backgroundColor, p.barColor, p.keyboardColor, p.keyBackgroundColor, p.keyTextColor, p.candidateTextColor,
-            p.candidateLabelColor, p.candidateCommentColor, p.altKeyBackgroundColor, p.altKeyTextColor,
-            p.accentKeyBackgroundColor, p.accentKeyTextColor, p.keyPressHighlightColor, p.keyShadowColor,
-            p.popupBackgroundColor, p.popupTextColor, p.spaceBarColor, p.dividerColor, p.clipboardEntryColor,
-            p.genericActiveBackgroundColor, p.genericActiveForegroundColor, p.keyBorderColor, p.keyHintColor, p.toolbarIconColor,
+            backgroundColor = p.backgroundColor,
+            barColor = p.barColor,
+            keyboardColor = p.keyboardColor,
+            keyBackgroundColor = p.keyBackgroundColor,
+            keyTextColor = p.keyTextColor,
+            candidateTextColor = p.candidateTextColor,
+            candidateLabelColor = p.candidateLabelColor,
+            candidateCommentColor = p.candidateCommentColor,
+            altKeyBackgroundColor = p.altKeyBackgroundColor,
+            altKeyTextColor = p.altKeyTextColor,
+            accentKeyBackgroundColor = p.accentKeyBackgroundColor,
+            accentKeyTextColor = p.accentKeyTextColor,
+            keyPressHighlightColor = p.keyPressHighlightColor,
+            keyShadowColor = p.keyShadowColor,
+            popupBackgroundColor = p.popupBackgroundColor,
+            popupTextColor = p.popupTextColor,
+            spaceBarColor = p.spaceBarColor,
+            dividerColor = p.dividerColor,
+            clipboardEntryColor = p.clipboardEntryColor,
+            genericActiveBackgroundColor = p.genericActiveBackgroundColor,
+            genericActiveForegroundColor = p.genericActiveForegroundColor,
+            keyBorderColor = p.keyBorderColor,
+            keyHintColor = p.keyHintColor,
+            toolbarIconColor = p.toolbarIconColor,
         )
     }
 }
