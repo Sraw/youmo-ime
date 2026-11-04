@@ -136,7 +136,7 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 
 ### WD-14i [P1] 导入大词库时取消：什么都不变
 - **前提**：B0-设置，已按 WD-14e 把 `rime-words.dict.yaml` 并入基础词库；`frost_dict_for_fcitx5.txt` 放在下载目录。
-- **操作**：**词库与短语 → 导入词库** 选 frost，看读文件时的对话框；选「基础词库」点 **导入词库**，对话框显示「正在整理词条… N%」时点 **取消**；再导入一次，点 **导入词库** 后等「正在导入」对话框出现马上点它的 **取消**（还在保存词库时，记下这时对话框写的什么）；看词库页、词库目录和应用的缓存目录（`docker exec <容器> ls -a /data/data/<包名>/cache`，模拟器上先 `adb root` 再 `adb shell ls -a …`；列不出来就记为阻塞）；打 k e m i a o x i n g g a n g。
+- **操作**：**词库与短语 → 导入词库** 选 frost，看读文件时的对话框；选「基础词库」点 **导入词库**，对话框显示「正在整理词条… N%」时点 **取消**；再导入一次，点 **导入词库** 后等「正在导入」对话框出现马上点它的 **取消**（还在保存词库时，记下这时对话框写的什么）；看词库页、词库目录和应用的缓存目录（先 `adb root` 再 `adb shell ls -a /data/data/<包名>/cache`；列不出来就记为阻塞）；打 k e m i a o x i n g g a n g。
 - **预期**：读文件和导入时都有进度条和百分比（正在分析格式，再到正在整理词条），一路往前走；取消后对话框关掉，不报错；词库页和词库目录跟导入前一样（没有 frost，没有 `.tmp` 或 `.build` 文件），缓存目录里没有 `import*` 文件；候选里仍有「氪喵星港」。
 - **JVM**：`DictionaryUatTest.aCancelledImportChangesNothing`（导入时取消：目录、词库页、缓存都和之前一样，仍有氪喵星港。用 big-words.txt 代替 frost）；设备上不跑。
 
@@ -223,7 +223,7 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **预期**：空闲栏和词库页都不出现「正在升级词库格式」，也不提示「词库格式已升级」；词库页 frost 已开启、写着词数；目录里没有 `frost.txt`、`.merged.left`，`frost.txt.gz` 还在；abazhou 的候选里有「阿坝州」，kemiaoxinggang 第一页没有「氪喵星港」（留下的文本没被当成新的再转换）。
 - **JVM**：`DictionaryUatTest.aTextLeftAfterAnUpgradeIsDeletedNotConvertedAgain`（留下的旧文本和 .merged.left：页面重试删掉它们；关了再开也不升级、不转换，有阿坝州、没有氪喵星港）；设备上不跑。
 
-升级时删不掉已转换文本的那一下（F3660：`.txt` 已转成 `.gz` 但删除被拒）没有用例：redroid 上 adb 改不了应用目录的权限让删除被拒而旁边的改名照常，用 root 去改又不像真手机，单元测试也造不出。它留下的状态（`.merged.left` 记着的文本）之后的合成怎么处理，由 WD-14t2 用 adb 直接造出来测。
+升级时删不掉已转换文本的那一下（F3660：`.txt` 已转成 `.gz` 但删除被拒）没有用例：当初在 redroid 上 adb 改不了应用目录的权限让删除被拒而旁边的改名照常，用 root 去改又不像真手机，单元测试也造不出。它留下的状态（`.merged.left` 记着的文本）之后的合成怎么处理，由 WD-14t2 用 adb 直接造出来测。
 
 ### WD-14v [P1] 装回 0.3.2 再升级：导入的基础词库藏起来，回来时又有了
 - **前提**：WD-14r 做完的手机（这一版正式版，frost 已开启、dict-words 已关闭，目录里是 `frost_dict_for_fcitx5.txt.gz`、`dict-words.txt.gz.disable`）。
@@ -249,7 +249,7 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **JVM**：`DictionaryUatTest.aFileDamagedHalfwayGivesWhatWasReadBefore`（截到三分之二：列为文件损坏、并入的词数在 1 到 1000 之间，有鲸喵屿、没有橘星屿）；设备上不跑。
 
 ### WD-14y [P1] 升级时词库没能转换（手机空间不够）：原文本留着、行上写明，腾出空间再开词库页就转换
-- **前提**：B0-设置；强行停止应用，在词库目录放一个 0.3.1 的词库 `small.txt`（一行「氪喵星港 ke'miao'xing'gang 0.0」）。redroid 上没法安全地把空间占满：在压缩文件要写的位置放一个非空目录顶替（`adb shell 'mkdir -p <目录>/small.txt.gz.convert.tmp/full && touch <目录>/small.txt.gz.convert.tmp/full/x'`），写入同样失败。真手机上可以改成真的占满空间（拷大文件把剩余空间占到几 MB 以内），腾出空间就是删掉这些大文件。
+- **前提**：B0-设置；强行停止应用，在词库目录放一个 0.3.1 的词库 `small.txt`（一行「氪喵星港 ke'miao'xing'gang 0.0」）。模拟器上没法安全地把空间占满（当初 redroid 上也一样）：在压缩文件要写的位置放一个非空目录顶替（`adb shell 'mkdir -p <目录>/small.txt.gz.convert.tmp/full && touch <目录>/small.txt.gz.convert.tmp/full/x'`），写入同样失败。真手机上可以改成真的占满空间（拷大文件把剩余空间占到几 MB 以内），腾出空间就是删掉这些大文件。
 - **操作**：回测试页弹出键盘，等词库目录里出现 `.merged.unwritten`（`ls -a`，最多两分钟）；打 k e m i a o x i n g g a n g；打开词库页（最多等一分钟，行上的字在这次打开的重试做完后更新）；看词库目录；删掉那个目录（`adb shell rm -r <目录>/small.txt.gz.convert.tmp`，即腾出空间）；离开词库页再打开，等目录里出现 `small.txt.gz`（最多两分钟）；看词库页；打 k e m i a o x i n g g a n g。
 - **预期**：腾出空间前：候选里没有「氪喵星港」，词库页 small 的行上写着「没转换成（手机空间不够？）：腾出空间后重新打开这一页」，不是「读不了」，目录里 `small.txt` 还在。腾出空间再开词库页后：目录里是 `small.txt.gz`，没有 `small.txt`；small 的行写着词数；候选里有「氪喵星港」。
 - **JVM**：`DictionaryUatTest.aTextNotConvertedForSpaceIsKeptTillThereIsRoom`（写不出时列为没转换成（不是读不了），small.txt 留着、没有氪喵星港；腾出后重开页面转换成 small.txt.gz、有氪喵星港）；设备上不跑。

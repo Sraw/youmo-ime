@@ -7,7 +7,7 @@ import re
 import subprocess
 import time
 
-from uat import CLIPS, OUT, PKG, Blocked, Fail, case, check, script
+from uat import CLIPS, OUT, PKG, Blocked, Fail, case, check, need_mic, script
 
 LISTEN, HEARD_NOTHING, PREPARING, SILENT = "正在听…", "没有听清", "准备中…", "麦克风没有声音"
 EV = "voice:语音只在语音版跑（--flavor voice）"
@@ -190,6 +190,7 @@ def host_calm(timeout=30):
     host saturated (other checkouts' Gradle) the emulator's vCPUs starve, the guest's audio HAL logs
     "pcm_readi was late delivering frames, inserting … silence" for every 16 ms and the app hears
     digital silence (envPeak -120 dBFS, no segment) though the clip played into uat-mic"""
+    need_mic()   # nothing to wait for till a clip can be said
     end = time.time() + timeout
     while time.time() < end and os.getloadavg()[0] >= os.cpu_count():
         time.sleep(5)
@@ -617,6 +618,7 @@ def vo26_try(d):
     """one hold: 准备中… till the clip's first sound, then 正在听…, and the text; None if the
     emulator's sound card failed. The emulator's microphone reads exact zeroes while nothing plays
     (a phone's never does), so there 正在听 must wait for the clip"""
+    need_mic()
     quiet(d)
     d.sh("logcat -c")
     try:

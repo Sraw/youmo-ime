@@ -206,7 +206,7 @@ case("KB-60", needs="jvm:HostCoreContractTest.an app unbound clears the panel it
 case("KB-61", needs="jvm:BaseKeyboardTest.aLettersSwipeUpIsItsShortcutAndDownItsSymbol")(lambda d: None)
 
 
-case("KB-62", needs="jvm:BaseKeyboardTest.theSpaceUpIsTheEditMenuAndTheBackspaceUpAndDownClearAndRestore、EditPlanTest、HostCoreEnginesTest.what is typed is cleared without a commit and typed again")(lambda d: None)
+case("KB-62", needs="jvm:BaseKeyboardTest.theSpaceUpIsTheEditMenuAndTheBackspaceUpAndDownClearAndRestore、EditPlanTest、EditPlanTest.aShortReadClearsWhatWasGivenAndPutsBackJustThatAtTheCursor、EditPlanTest.aClearAtTheLimitWithTheCursorReportedAheadKeepsWhatIsAfterTheCursor、EditPlanTest.aShortReadClearIsNotPutBackOnceSomethingWasTypedBeforeTheCursor、HostCoreEnginesTest.what is typed is cleared without a commit and typed again、HostCoreEnginesTest.what is typed after a syllable taken off the nine keys' bar is never typed again、EnginesTest.aSyllableTakenOffTheBarIsAPick、SwipePopupScreenshotTest.theEditMenusCellsAreReadByTheirLabels")(lambda d: None)
 
 
 case("KB-63", needs="jvm:BaseKeyboardTest.aKeysOwnTextShortcutIsWhatItsSwipeRuns")(lambda d: None)
@@ -218,7 +218,7 @@ case("KB-64", needs="jvm:DeletionRunTest")(lambda d: None)
 case("KB-65", needs="jvm:SwipePopupScreenshotTest.theBubbleSaysTheShortcutFitted、PreviewLabelTest")(lambda d: None)
 
 
-case("KB-66", needs="jvm:KeyMarksUatTest.eachWhereItsSettingSays、KeyMarksUatTest.onePlaceStoredInBothTheSymbolYields、KeyMarkPositionSettingsTest.theTwoTogetherTheOthersPlaceGreyedOut、KeyMarksUatTest.theFirstOpenIsAsAfterAnySettingChanges、KeyMarksScreenshotTest.everyPlaceOnTheKeyboards、KeyMarksTest、KeyMarkYieldTest")(lambda d: None)
+case("KB-66", needs="jvm:KeyMarksUatTest.eachWhereItsSettingSays、KeyMarksUatTest.onePlaceStoredInBothTheSymbolYields、KeyMarkPositionSettingsTest.theTwoTogetherTheOthersPlaceGreyedOut、KeyMarksUatTest.theFirstOpenIsAsAfterAnySettingChanges、KeyMarksUatTest.aLongPressTurnedOffPlacesTheMarksAsAKeyboardMadeWithIt、KeyMarksScreenshotTest.everyPlaceOnTheKeyboards、KeyMarksTest、KeyMarkYieldTest")(lambda d: None)
 
 
 case("KB-67", needs="jvm:KeyMarksEverywhereUatTest.noKeyDrawsTwoThingsOverEachOtherUpright、KeyMarksEverywhereUatTest.noKeyDrawsTwoThingsOverEachOtherTurned、KeyMarkYieldTest")(lambda d: None)

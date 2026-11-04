@@ -63,16 +63,29 @@ case("QU-13", needs="jvm:QuickPhraseMineTest.inAPasswordFieldMineCommitsButItsUs
 case("QU-14", needs="jvm:QuickPhraseMineTest.habitsOffShowNoneOfMine")(lambda d: None)
 
 
-case("QU-15", needs="jvm:QuickPhraseManagerTest")(lambda d: None)
+case("QU-15", needs="jvm:QuickPhraseManagerTest、QuickPhraseSettingsUatTest.anEntryAddedChangedFoundAndDeleted、QuickPhraseSettingsUatTest.aBuiltInTableTurnedOffStaysOffAndTurnsOnAgain、QuickPhraseSettingsUatTest.theImportToastCountsEveryLineSkipped、QuickPhraseSettingsUatTest.aSwitchTurnedTwiceWhileTheFilesAreBusyNeverShowsTheFirstTurn")(lambda d: None)
 
 
 case("QU-16", needs="jvm:UserDataManagerTest.quickInputsEntriesOrderAndSwitchesRoundTripThroughABackup")(lambda d: None)
 
 
-case("QU-17", needs="jvm:QuickPhraseKeyboardUatTest.aCandidatesCardCommitsCopiesEditsDeletesAndUndoes、QuickPhraseMineTest.refreshedAfterAReloadTheListIsTheNewBooks")(lambda d: None)
+case("QU-17", needs="jvm:QuickPhraseKeyboardUatTest.aCandidatesCardCommitsCopiesEditsDeletesAndUndoes、QuickPhraseMineTest.refreshedAfterAReloadTheListIsTheNewBooks、QuickPhraseTest.aListMadeAgainKeepsItsPage、QuickPhraseTest.aListMadeAgainShorterKeepsTheLastPageAndLitIndexItStillHas、QuickPhraseManagerTest.aDeletionUndoneIsPutBackWhereItWasWithItsTimeOfUse")(lambda d: None)
 
 
 case("QU-18", needs="jvm:QuickPhraseKeyboardUatTest.theClipboardSavesAnEntryAsQuickInputButNotAPasswordNorOneTooLong")(lambda d: None)
 
 
-case("QU-19", needs="jvm:QuickPhraseSettingsUatTest.theEditorAndWhatWasTypedOutliveTheActivityMadeAnew、QuickPhraseSettingsUatTest.aContentTooLongIsToldAtOkAndNeverCut")(lambda d: None)
+case("QU-19", needs="jvm:QuickPhraseSettingsUatTest.theEditorAndWhatWasTypedOutliveTheActivityMadeAnew、QuickPhraseSettingsUatTest.aContentTooLongIsToldAtOkAndNeverCut、QuickPhraseSettingsUatTest.theKeyboardAskingAgainOverAChangedEditorAsksFirst")(lambda d: None)
+
+
+case("QU-20", needs="release:要一份 v0.5.0 正式版做的「备份全部」")(lambda d: None)
+
+
+case("QU-21", needs="jvm:QuickPhraseSettingsUatTest.theKeyboardAskingAgainOverAChangedEditorAsksFirst、QuickPhraseSettingsUatTest.theKeyboardAskingBeforeARestoredEditorIsShownAsksOverItOnceItIs")(lambda d: None)
+
+
+case("QU-24", needs="manual:要切到别的输入法后在后台杀掉应用进程再让系统恢复编辑框")(lambda d: None)
+case("QU-22", needs="jvm:QuickPhraseTest.spaceWithNothingTypedCommitsTheEntryLitElseASpace")(lambda d: None)
+
+
+case("QU-23", needs="jvm:HostCoreEnginesTest.quick input's own entry goes out as it is under traditional, a built-in one converted, neither learnt nor predicted from")(lambda d: None)

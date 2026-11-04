@@ -1,5 +1,6 @@
 """uat.py's record keeping, without a device: python3 -m unittest test_uat (in uat/tools)"""
 import contextlib
+import importlib.util
 import io
 import json
 import os
@@ -114,6 +115,36 @@ class ScreenTest(unittest.TestCase):
             s = uat.Screen(x)
             self.assertEqual([n.text for n in s.ime() if n.text], ["键"], t)
 
+    def test_the_input_methods_touchable_region_is_read_from_dumpsys_input(self):
+        # InputDispatcher's window line as redroid 14 printed it; the strip's band and the keyboard's
+        # joined by |, an empty one as <empty>, the list ended by a comma
+        d = uat.Device("5556")
+        for dump, want in (
+                ("  3: name='Window{1 u0 InputMethod}', frame=[0,1203][1080,2340], touchableRegion="
+                 "[0,1370][100,1436]|[0,1436][1080,2340], ownerPid=1, ownerUid=2\n",
+                 [(0, 1370, 100, 1436), (0, 1436, 1080, 2340)]),
+                ("  3: name='Window{1 u0 InputMethod}', touchableRegion=<empty>, ownerPid=1\n", []),
+                # InputMethodManager's own lines never count, nor a window without the input method
+                ("  InputMethodManager touchableRegion=[0,0][1,1]\n  1: name='Window{2 u0 com.app}', "
+                 "touchableRegion=[0,0][1080,2340], ownerPid=3\n", [])):
+            d.sh = lambda cmd, dump=dump: dump
+            self.assertEqual(want, d.ime_touchable_region(), dump)
+
+    def test_the_usb_keyboard_is_asked_of_the_device_once_then_known_from_plugging_it(self):
+        d = uat.Device("5556")
+        asked = []
+        d.sh = lambda cmd: asked.append(cmd) or ""
+        with mock.patch.object(uat.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0, stdout="")):
+            self.assertFalse(d.kb_plugged())
+            self.assertFalse(d.kb_plugged())
+            d.kb("up")
+            self.assertTrue(d.kb_plugged())
+            d.kb("type", "a")
+            self.assertTrue(d.kb_plugged())
+            d.kb("down")
+            self.assertFalse(d.kb_plugged())
+        self.assertEqual(1, len(asked), asked)
+
 
 def case(cid, needs=None, heavy=False):
     return uat.Case(fn=None, id=cid, base="B0", page="text", mutates=False, clean=False, visual=False,
@@ -181,6 +212,19 @@ class JvmTest(unittest.TestCase):
         found = uat.uat_tests([os.path.join(self.tmp.name, "src")])
         self.assertEqual({"KB-22": [("org.x.KeysTest", "address")], "TB-01": [("org.x.KeysTest", "bar")],
                           "KB-01": [("org.x.KeysTest", "bar")]}, found)
+
+    def test_a_backtick_name_with_a_quote_a_comma_or_a_paren_is_read_whole(self):
+        # such names were read as no test at all, and their cases dropped without a word
+        self.write("src/c/HostTest.kt", 'package org.x\n\nclass HostTest {\n'
+                   "    @Uat(\"PY-01\")\n    fun `the nine keys' bar shows it`() {}\n\n"
+                   '    @Uat("PY-02")\n    fun `as it is under traditional, a built-in one converted`() {}\n\n'
+                   '    @Uat("PY-03")\n    fun `a b`() {}\n\n'
+                   '    @Uat("PY-04")\n    fun `a key (held) types it`() {}\n}\n')
+        found = uat.uat_tests([os.path.join(self.tmp.name, "src")])
+        self.assertEqual({"PY-01": [("org.x.HostTest", "the nine keys' bar shows it")],
+                          "PY-02": [("org.x.HostTest", "as it is under traditional, a built-in one converted")],
+                          "PY-03": [("org.x.HostTest", "a b")],
+                          "PY-04": [("org.x.HostTest", "a key (held) types it")]}, found)
 
     def test_a_nested_class_is_outer_dollar_inner_and_the_outer_resumes_after_it(self):
         self.write("src/b/PopupTest.kt", 'package org.x\n\nclass PopupTest {\n'
@@ -253,7 +297,8 @@ class JvmTest(unittest.TestCase):
         for bad in ("5555", "5557", "5552", "5586", "127.0.0.1:5556", ""):
             with self.assertRaises(SystemExit, msg=bad):
                 uat.emu_port(bad)
-        self.assertEqual([8765, 8766, 8780], [uat.http_port(p) for p in ("5554", "5556", "5584")])
+        # 8800-8815: past 8780, a port forwarded to this Mac
+        self.assertEqual([8800, 8801, 8815], [uat.http_port(p) for p in ("5554", "5556", "5584")])
 
     def test_a_jvm_case_runs_elsewhere_on_a_device(self):
         c = case("KB-22", "jvm:KeyboardUatTest")
@@ -310,7 +355,8 @@ class JvmTest(unittest.TestCase):
 
 
 # adb for UpTest: answers emu avd name from $FAKE_DIR/avd (an error when empty, a hang with
-# $FAKE_DIR/hang), sys.boot_completed 1 after $FAKE_DIR/boot_after asks, nothing to the rest; logs each call
+# $FAKE_DIR/hang), sys.boot_completed 1 after $FAKE_DIR/boot_after asks, whoami from $FAKE_DIR/whoami
+# (root without it), nothing to the rest; logs each call
 FAKE_ADB = r"""#!/bin/sh
 D=$FAKE_DIR
 [ "$1" = -s ] && shift 2
@@ -320,6 +366,8 @@ case "$*" in
     [ -f "$D/hang" ] && exec sleep 30
     A=$(cat "$D/avd" 2>/dev/null)
     if [ -n "$A" ]; then printf '%s\r\nOK\r\n' "$A"; else echo "error: no emulator detected" >&2; exit 1; fi ;;
+  "shell whoami")
+    cat "$D/whoami" 2>/dev/null || echo root ;;
   "shell getprop sys.boot_completed")
     n=$(($(cat "$D/boots" 2>/dev/null || echo 0) + 1)); echo $n > "$D/boots"
     if [ $n -gt "$(cat "$D/boot_after" 2>/dev/null || echo 0)" ]; then echo 1; else echo; fi ;;
@@ -394,7 +442,74 @@ class UpTest(unittest.TestCase):
         self.put("boot_after", "3")
         self.assertIn("webview_shell", self.up())   # the fake has no packages: past the checks
         self.popen.assert_not_called()
+        self.assertIn("shell whoami", self.calls())
+
+    def test_adb_root_that_leaves_the_shell_not_root_stops_before_the_cases_run_as_shell(self):
+        self.put("avd", "youmo")
+        self.put("whoami", "shell")
+        self.assertIn("did not make the shell root", self.up())
         self.assertIn("root", self.calls())
+        self.assertFalse([c for c in self.calls() if "setprop" in c or "pm path" in c], self.calls())
+
+    def test_an_emulator_that_exits_before_booting_fails_at_once_with_its_log(self):
+        self.put("boot_after", "1000")
+        self.popen.return_value = mock.MagicMock(**{"poll.return_value": 1, "returncode": 1})
+        self.assertIn("exited (1)", self.up())
+        self.assertLess(self.calls().count("shell getprop sys.boot_completed"), 5)
+
+    def test_an_emulator_this_started_that_never_boots_is_killed(self):
+        self.put("boot_after", "1000")
+        emu = mock.MagicMock(**{"poll.return_value": None})
+        self.popen.return_value = emu
+        self.assertIn("did not boot", self.up())
+        emu.kill.assert_called_once()
+
+    def test_down_leaves_another_avds_emulator_and_kills_its_own(self):
+        os.makedirs(os.path.join(self.dir, "tools"))
+        self.put("tools/emu-keyboard.sh", "#!/bin/sh\n")
+        os.chmod(os.path.join(self.dir, "tools", "emu-keyboard.sh"), 0o755)
+        with mock.patch.object(uat, "UAT", self.dir), contextlib.redirect_stdout(io.StringIO()):
+            self.put("avd", "dsapp")
+            with self.assertRaises(SystemExit) as e:
+                uat.down("5556")
+            self.assertIn("AVD dsapp", str(e.exception.code))
+            self.assertNotIn("emu kill", self.calls())
+            self.put("avd", "youmo")
+            uat.down("5556")
+            self.assertIn("emu kill", self.calls())
+
+    def test_run_refuses_another_avds_emulator_before_installing(self):
+        self.put("avd", "dsapp")
+        a = SimpleNamespace(areas=None, ids="ST-48", devices="5556", flavor="text")
+        with mock.patch.object(uat, "install", mock.MagicMock()) as install, \
+                self.assertRaises(SystemExit) as e:
+            uat.cmd_run(a)
+        self.assertIn("AVD dsapp", str(e.exception.code))
+        install.assert_not_called()
+        self.assertFalse([c for c in self.calls() if c in ("root", "shell whoami") or c.startswith("reverse")])
+
+
+class ResultsFileTest(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        os.makedirs(os.path.join(self.dir, "runs"))
+        for p in (mock.patch.object(uat, "OUT", self.dir), mock.patch.object(uat, "UAT", self.dir)):
+            p.start()
+            self.addCleanup(p.stop)
+
+    def test_the_device_line_closes_its_bracket_then_goes_on(self):
+        # dropping a clause left "{ABI}，）1080×2340": a comma before the bracket, none after it
+        p = uat.write_results(uat.Run("r", []), {}, "v", ["5554"], 1, [])
+        with open(p, encoding="utf-8") as f:
+            dev = f.read().splitlines()[2]
+        self.assertIn(f"google_apis {uat.ABI}），1080×2340，", dev)
+        self.assertNotIn("，）", dev)
+
+    @unittest.skipUnless(importlib.util.find_spec("PIL"), "needs Pillow")
+    def test_sheets_are_made_with_neither_font_on_the_host(self):
+        # a host without the fonts crashed here and the whole run's results were lost
+        with mock.patch.object(uat, "FONT", None), mock.patch.object(uat, "FONT_LATIN", None):
+            self.assertEqual([], uat.build_sheets(uat.Run("r", []), {}))
 
 
 if __name__ == "__main__":

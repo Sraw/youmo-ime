@@ -104,7 +104,9 @@ def push_theme(d):
                 t["bar"] = {"type": "picture", "blurDp": 0, "brightness": 100}
                 t["keys"]["letter"]["fill"] = {"type": "picture", "blurDp": 0, "brightness": 100}
                 data = json.dumps(t).encode()
-            elif name.endswith(("-src.png", "-portrait.png")):
+            elif name.endswith("-src.png"):   # as tall as the json's crops reach (portrait's to 1800)
+                data = striped(1440, 1800)
+            elif name.endswith("-portrait.png"):   # its cropRect's size
                 data = striped(1440, 1500)
             elif name.endswith("-landscape.png"):
                 data = striped(1440, 600)
@@ -290,7 +292,7 @@ case("ST-13", needs="jvm:SettingsEffectUatTest.punctuationPositionNoneThenBottom
 case("ST-14", needs="jvm:SettingsEffectUatTest.noPopupOnKeyPress")(lambda d: None)
 
 
-case("ST-15", needs="jvm:SettingsEffectUatTest.swipeUpThenDisabled")(lambda d: None)
+case("ST-15", needs="jvm:SettingsEffectUatTest.swipeUpThenDisabled、KeySwipeTest.bothOffLeavesTheKeyAsItWas")(lambda d: None)
 
 
 case("ST-16", needs="jvm:SettingsEffectUatTest.aLongerLongPressDelay")(lambda d: None)
@@ -429,10 +431,17 @@ def set_comma(d, mark):
     """中文标点 → , set to mark, typed by its corner swipe (、 is m's corner character)"""
     corner = {"、": "m"}[mark]
     home(d, "通用输入", "中文标点")
-    s = d.screen()
-    n = next((n for n in s.app() if n.text == ","), None)
-    if not n:
-        raise Blocked("中文标点里没有 ,")
+    def comma(s):
+        return next((n for n in s.app() if n.text == ","), None)
+    try:
+        n = d.wait(comma, 5)
+    except Blocked:   # seen in PR-10: left on 通用输入 after the tap on 中文标点; once more
+        home(d, "通用输入", "中文标点")
+        n = None
+    try:
+        n = n or d.wait(comma, 5)
+    except Blocked:
+        raise Blocked(f"中文标点里没有 ,：{d.top_activity()} {d.screen().texts()[:12]}")
     d.tap(n.row().c, 1.2)
     s = d.screen()
     eds = [n for n in s.app() if "Edit" in n.cls]
@@ -550,3 +559,13 @@ case("ST-50", needs="jvm:FloatingCodeStripUatTest.oneHandedTheStripIsAtTheBoards
 
 
 case("ST-51", needs="jvm:CompactKeyboardUatTest、ZhuyinShortcutsUatTest、AutoScaleTextViewTest、KeyMarkYield、KeyCapsTest、CompactKeyboardScreenshotTest")(lambda d: None)
+
+
+case("ST-54", needs="jvm:ThemeFilesManagerTest.aThemeOfALaterFormatIsSkippedAndLeftAsItIs、ThemeFilesManagerTest.aThemeWithAFileMissingIsRefusedAndNotListed、ThemeFilesManagerTest.whatThisAppAndOneBefore30ExportedIsImported")(lambda d: None)
+
+
+case("ST-55", needs="jvm:ThemeFilesManagerTest.aThemeWhosePictureOrFontIsGoneIsNotListedAndTheUserIsToldItIsGone")(lambda d: None)
+
+
+case("ST-56", needs="manual:主题制作网页在电脑浏览器上手工跑")(lambda d: None)
+case("ST-57", needs="manual:分屏下主题页预览和键盘同时要毛玻璃图")(lambda d: None)

@@ -12,7 +12,7 @@ Cases live in uat/scripts/<file stem>.py (one per uat/*.md); the .md stays the s
 a script follows its case's 前提/操作/预期, and the caption under a screenshot is the case's 预期.
 Python 3 stdlib + PIL. `adb shell input tap/swipe/motionevent/keyevent/text`, uiautomator,
 am/pm/ime/settings drive the device. The devices are emulators (AVD youmo, android-36 google_apis
-arm64-v8a: the release ABI, native on Apple silicon; dev/emu/avd.sh makes it), VMs with their own
+arm64-v8a: the release ABI, native on Apple silicon; uat/tools/avd.sh makes it), VMs with their own
 kernel: root over `adb root`, and 17 实体键盘's USB keyboard a uinput one (uat/tools/emu-keyboard.sh),
 which is never made anywhere else. Nothing feeds the voice cases' microphone yet (`Device.say`: the
 emulators start -no-audio), so those cases are blocked.
@@ -56,7 +56,7 @@ os.environ.setdefault("ADB_MDNS", "0")
 # the devices: emulators of one AVD, each on its console port (serial emulator-<port>). 5554 and 5556
 # are the two of a run; a worktree may start its own on another even port up to 5584 (uat.py up --port)
 AVD = os.environ.get("UAT_AVD", "youmo")
-SNAPSHOT = "clean"   # the AVD's state after dev/emu/avd.sh: zh-CN, three-button nav, the WebView shell
+SNAPSHOT = "clean"   # the AVD's state after uat/tools/avd.sh: zh-CN, three-button nav, the WebView shell
 # two by design: on the 32 GB Mac one emulator is 3-4.5 GB resident beside two heavy Gradle jobs
 # (~7 GB each); a third wants the builds serialized (YOUMO_HEAVY_SLOTS=1, dev/README.md)
 PORTS = ("5554", "5556")
@@ -108,8 +108,9 @@ def version_key(name):
 
 def http_port(port):
     """host side of `adb reverse tcp:8000` for the first device on this serial port: one per port,
-    so runs and gates on different devices never share a server (5554 → 8765, 5556 → 8766)"""
-    return 8765 + (int(port) - 5554) // 2
+    so runs and gates on different devices never share a server (5554 → 8800, 5556 → 8801). 8800-8815:
+    clear of the ports forwarded to this Mac (8780 is one)"""
+    return 8800 + (int(port) - 5554) // 2
 CLIPS = os.path.join(OUT, "voice-clips")
 # host side of `adb reverse tcp:8000`: one per first device, so two runs at once (on 5554 and on 5556,
 # from two checkouts) each serve their own fixtures rather than the other's
@@ -197,8 +198,8 @@ class Case:
             return Elsewhere, f"{ELSEWHERE[k]}：{why}"
         return None
 
-    def heavy_here(self, ports):
-        """whether this run on [ports] may run the case at all, before a device is picked: a heavy case
+    def heavy_here(self):
+        """whether this run may run the case at all, before a device is picked: a heavy case
         that runs elsewhere goes with its group instead of waiting for every device to go idle only to be
         listed as 在别处跑. The release,scripted ones as RUNS_HERE has them: BUILD=release; any other
         ELSEWHERE kind counts as elsewhere (it would then run with its group, not alone)"""
@@ -437,6 +438,7 @@ class Device:
         self.run = run
         self.case = None
         self._keys = None
+        self._plugged = None   # the USB keyboard plugged in, as kb up/down left it; None: not known yet
         # unique page URLs across runs: WebView caches a URL it loaded before (heuristic freshness)
         self.reload_n = int(time.time() * 1000) * 10 + int(port) % 10
         self.page = None
@@ -491,16 +493,21 @@ class Device:
         if r.returncode:
             raise Blocked(f"emu-keyboard.sh {' '.join(args)}: {(r.stderr or r.stdout).strip()[:200]}")
         self._keys = None
+        if args[0] in ("up", "down"):
+            self._plugged = args[0] == "up"
         return r.stdout
 
     def kb_plugged(self):
-        return "Test USB Keyboard" in self.sh("dumpsys input | grep -m1 'Test USB Keyboard'")
+        """asked of the device once, then known from kb up/down (every field's focus asks)"""
+        if self._plugged is None:
+            self._plugged = "Test USB Keyboard" in self.sh("dumpsys input | grep -m1 'Test USB Keyboard'")
+        return self._plugged
 
     def say(self, clip, wait=True):
         """play dev/uat-out/voice-clips/<clip>.wav into the emulator's microphone: not wired up yet
         (up() starts the emulators -no-audio; the redroid-era runner played clips into a PulseAudio
         source the emulator recorded, Linux only)"""
-        raise Blocked("模拟器的麦克风还没接上语音片段（uat/README.md「实体键盘和语音」）")
+        need_mic()
 
     # --- reading the screen
     # the dump server (Dumper.java): one UiAutomation connection kept open, ~0.1 s a dump
@@ -1968,13 +1975,13 @@ class Scheduler:
     def __init__(self, cases, run, ports, flavor="text"):
         groups = {}
         for c in cases:
-            if not c.heavy or not c.heavy_here(ports):
+            if not c.heavy or not c.heavy_here():
                 groups.setdefault(c.group, []).append(c)
         for g in groups.values():
             g.sort(key=lambda c: (c.order(), c.id))
         # biggest groups first, so the stealing at the end has small pieces
         self.pending = sorted(groups.values(), key=lambda g: -sum(3 if c.mutates else 1 for c in g))
-        self.heavy = [[c] for c in sorted((c for c in cases if c.heavy and c.heavy_here(ports)), key=lambda c: c.id)]
+        self.heavy = [[c] for c in sorted((c for c in cases if c.heavy and c.heavy_here()), key=lambda c: c.id)]
         self.active = []
         self.busy = set()   # the ports running a group now
         self.lock = threading.Condition()
@@ -2071,8 +2078,9 @@ class Scheduler:
 
 def build_sheets(run, cases):
     from PIL import Image, ImageDraw, ImageFont
-    font = Fonts(ImageFont.truetype(FONT, 15), ImageFont.truetype(FONT_LATIN, 14)
-                 if os.path.exists(FONT_LATIN) else None)
+    # neither font on this host: PIL's own (Latin only), the sheets still made and the results written
+    font = Fonts(ImageFont.truetype(FONT, 15) if FONT else ImageFont.load_default(),
+                 ImageFont.truetype(FONT_LATIN, 14) if FONT_LATIN else None)
     from PIL import Image as _I
     groups = {}
     for cid, group, f, note in run.shots:
@@ -2205,7 +2213,7 @@ def table(results):
 
 def write_results(run, cases, version, ports, wall, sheets, flavor="text"):
     p = os.path.join(UAT, "runs", f"{run.name}.md")
-    dev = (f"- 设备：Android 模拟器（AVD {AVD}，android-36 google_apis {ABI}，快照 {SNAPSHOT} 只读启动），1080×2340，"
+    dev = (f"- 设备：Android 模拟器（AVD {AVD}，android-36 google_apis {ABI}），1080×2340，"
            f"440 dpi，简体中文；{len(ports)} 台（{', '.join('emulator-' + p for p in ports)}）；"
            f"实体键盘是 uat/tools/emu-keyboard.sh 的 uinput USB 键盘")
     lines = [f"# {run.name}", "", dev,
@@ -2274,8 +2282,43 @@ def flakes(names):
 # ---------------------------------------------------------------- devices and the page server
 
 def emulator_bin():
-    sdk = os.environ.get("ANDROID_HOME") or os.path.expanduser("~/Library/Android/sdk")
-    return os.path.join(sdk, "emulator", "emulator")
+    sdk = (os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT")
+           or os.path.expanduser("~/Library/Android/sdk"))
+    p = os.path.join(sdk, "emulator", "emulator")
+    if not os.path.exists(p):
+        sys.exit(f"no emulator at {p}: set ANDROID_HOME to the SDK")
+    return p
+
+
+def tail(path, n=3):
+    """a log's last [n] lines, on one line"""
+    try:
+        with open(path, errors="replace") as f:
+            return " / ".join(l.strip() for l in f.read().splitlines()[-n:])
+    except OSError:
+        return path
+
+
+def need_mic():
+    """blocked until clips reach the emulator's microphone (Device.say): a case that speaks calls it
+    first, before its waits (host_calm, the hold) cost anything"""
+    raise Blocked("模拟器的麦克风还没接上语音片段（uat/README.md「实体键盘和语音」）")
+
+
+def need_root(d):
+    """adb root, then exit unless the shell is root: open_host, the keyboard and the cases' root
+    calls run through it and would fail quietly as shell (an AVD whose adbd cannot be root)"""
+    if d.sh("whoami").strip() == "root":
+        return
+    subprocess.run(["adb", "-s", d.serial, "root"], capture_output=True)
+    subprocess.run(["adb", "-s", d.serial, "wait-for-device"], capture_output=True)
+    if d.sh("whoami").strip() != "root":
+        sys.exit(f"{d.serial}: adb root did not make the shell root (an AVD of a google_apis image, "
+                 "not google_play, does)")
+    for _ in range(30):   # adbd restarted: the package manager answers again before installing
+        if "package:" in d.sh("pm path android"):
+            break
+        time.sleep(1)
 
 
 def up(port="5556"):
@@ -2292,28 +2335,30 @@ def up(port="5556"):
         name = avd_name(d)
         if name not in ("", AVD):
             not_ours(d, name)
+        emu = None
+        log = os.path.join(OUT, "emu", f"emulator-{port}.log")
         if not name:
             os.makedirs(os.path.join(OUT, "emu"), exist_ok=True)
-            log = open(os.path.join(OUT, "emu", f"emulator-{port}.log"), "w")
             # -gpu host: the Mac's GPU (its OpenGL; EMU_GPU=swiftshader_indirect for software, which the
             # snapshot was not saved with: a cold boot). -no-audio: no microphone yet (Device.say)
-            subprocess.Popen([emulator_bin(), "-avd", AVD, "-port", port, "-snapshot", SNAPSHOT,
-                              "-no-snapshot-save", "-read-only", "-no-window", "-no-audio", "-no-boot-anim",
-                              "-gpu", os.environ.get("EMU_GPU", "host")],
-                             stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
+            with open(log, "w") as f:   # the emulator holds its own copy of the file
+                emu = subprocess.Popen([emulator_bin(), "-avd", AVD, "-port", port, "-snapshot", SNAPSHOT,
+                                        "-no-snapshot-save", "-read-only", "-no-window", "-no-audio", "-no-boot-anim",
+                                        "-gpu", os.environ.get("EMU_GPU", "host")],
+                                       stdout=f, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                                       start_new_session=True)
         for _ in range(180):
             time.sleep(1)
             if d.sh("getprop sys.boot_completed").strip() == "1":
                 break
+            if emu is not None and emu.poll() is not None:   # no AVD or snapshot, a bad EMU_GPU, the port taken
+                sys.exit(f"the emulator exited ({emu.returncode}) before booting: {tail(log)}")
         else:
-            sys.exit(f"{d.serial} did not boot in 3 min (dev/uat-out/emu/emulator-{port}.log)")
+            if emu is not None:   # ours, hung: not left running (3-4.5 GB each)
+                emu.kill()
+            sys.exit(f"{d.serial} did not boot in 3 min ({log})")
         ours(d)   # the port taken by another emulator between the look and the start: that one booted
-    subprocess.run(["adb", "-s", d.serial, "root"], capture_output=True)
-    subprocess.run(["adb", "-s", d.serial, "wait-for-device"], capture_output=True)
-    for _ in range(30):
-        if "package:" in d.sh("pm path android"):
-            break
-        time.sleep(1)
+    need_root(d)
     if d.sh("getprop persist.sys.locale").strip() != "zh-CN":   # a snapshot made without it
         d.sh("setprop persist.sys.locale zh-CN; setprop sys.boot_completed 0; stop; start")
         time.sleep(5)
@@ -2324,7 +2369,7 @@ def up(port="5556"):
         time.sleep(3)
     if "package:" not in d.sh("pm path org.chromium.webview_shell"):
         sys.exit(f"{d.serial}: no org.chromium.webview_shell (the test page's browser): the snapshot is "
-                 "not dev/emu/avd.sh's")
+                 "not uat/tools/avd.sh's")
     print(f"{d.serial} up")
 
 
@@ -2412,13 +2457,7 @@ def cmd_run(a):
         if d.sh("getprop sys.boot_completed").strip() != "1":
             sys.exit(f"{d.serial} is not up (uat.py up --port {p})")
         ours(d)
-        if d.sh("whoami").strip() != "root":   # started by hand: open_host and the keyboard need root
-            subprocess.run(["adb", "-s", d.serial, "root"], capture_output=True)
-            subprocess.run(["adb", "-s", d.serial, "wait-for-device"], capture_output=True)
-            for _ in range(30):   # adbd restarted: the package manager answers again before installing
-                if "package:" in d.sh("pm path android"):
-                    break
-                time.sleep(1)
+        need_root(d)   # one started by hand
         install(d, a.flavor)
         d.adb("reverse", "tcp:8000", f"tcp:{HTTP_PORT}", check=True)
     ver = version(Device(ports[0]))
@@ -2458,7 +2497,7 @@ def cmd_run(a):
 
 # ---------------------------------------------------------------- the cases asserted on the JVM
 
-UAT_RE = re.compile(r'@Uat\(([^)]*)\)\s*(?:@\w+(?:\([^)]*\))?\s*)*fun\s+`?([\w ]+?)`?\s*\(')
+UAT_RE = re.compile(r'@Uat\(([^)]*)\)\s*(?:@\w+(?:\([^)]*\))?\s*)*fun\s+(?:`([^`\n]+)`|(\w+))\s*\(')
 
 
 CLASS_RE = re.compile(r"^([ \t]*)(?:(?:internal|private|open|abstract|data|inner)\s+)*class\s+(\w+)", re.M)
@@ -2503,7 +2542,7 @@ def uat_tests(roots):
                         continue
                     fqcn = (pkg.group(1) + "." if pkg else "") + cls
                     for cid in re.findall(r'"([^"]+)"', m.group(1)):
-                        found.setdefault(cid, []).append((fqcn, m.group(2)))
+                        found.setdefault(cid, []).append((fqcn, m.group(2) or m.group(3)))
     return found
 
 

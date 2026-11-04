@@ -217,4 +217,4 @@
 - **前提**：B0-五笔，**按键显示** 选 **全部字根**。
 - **操作**：**键盘 → 键盘高度** 选 **紧凑**，回测试页看键盘（截图），长按 G（王），A 上滑；再选 **标准**，看键盘。
 - **预期**：紧凑时键上是键名（G 王、F 土……），和选「键名」时一样：字母在右上角，快捷键标记也照键名的规则画；长按 G 弹出的是平常的字符，不是字根大图；A 上滑照样全选。改回标准后又是全部字根，设置里一直是「全部字根」。设置里「全部字根」这一项写着紧凑时显示键名。
-- **JVM**：`TablesKeysUatTest.wubisAllRootsAreItsNamesAtCompact`（紧凑时和键名一样、长按不是字根、回到标准是全部字根，Roborazzi 金图）+ ime-core `TableRootsTest.atCompactAllTheRootsAreShownAsTheirNames`；设备上照跑。
+- **JVM**：`TablesKeysUatTest.wubisAllRootsAreItsNamesAtCompact`（紧凑时和键名一样、长按不是字根、回到标准是全部字根，Roborazzi 金图）+ ime-core `TableRootsTest.atCompactAllTheRootsAreShownAsTheirNames`；设备上不跑。

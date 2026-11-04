@@ -168,12 +168,12 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 |---|---|
 | 只能在设备上（17） | KB-31、LC-01、LC-02、LC-03、LC-08、LC-10、LC-11、LC-13、PR-34、PY-96、SET-01、SET-09、ST-09、ST-26、ST-39、TB-22、TB-41 |
 | 冒烟（13） | KB-01、PY-01、T9-02、EN-02、HW-03、TBL-01、TB-08、PR-03、PR-10、LS-03、QU-01、WD-03、ST-29 |
-| JVM 断言了一部分、设备上照跑（3） | EN-19、TB-23、WD-37 |
+| JVM 断言了一部分、设备上照跑（6） | EN-19、TB-23、WD-37、T9-60、PY-109、ST-48 |
 | 实体键盘（17） | HK-01、HK-03、HK-03c、HK-03d、HK-17、HK-24、HK-29、HK-35、HK-36、HK-37、HK-39、HK-40、HK-41、HK-42、HK-43、HK-44、HK-45 |
 
 新用例先想能不能在 JVM 上断言；只有落在"只能在设备上"那几类的才写设备脚本。一条既有引擎半又有界面半时两半各写一个测试，
 不因为"界面那半 JVM 没断言"把整条留在设备上。
-EN-19、TB-23、WD-37 三条 JVM 上有测试，剩下的那半还在设备上：EN-19 的打字结果（「hello 」「abc hello 」、退格、逗号）JVM 上断言，设备上只看候选栏不出联想词；TB-23 的 Robolectric 转屏不重排已显示的悬浮键盘，JVM 上是转屏后新起的键盘读回位置。WD-37 的读完前不能导入导出 JVM 上断言，设备上走系统的文件选择器、真的导入导出文件。原先还没搬的 EN-11、PY-87、T9-31 已于 2026-10-31 整条搬到 JVM。ST-26（动画）和 LC-10（引擎重启）要在 main 代码里加口子（IdleUi/InputWindowManager 的动画、HostDaemon 的引擎工厂）才能上 JVM，先算在"只能在设备上"。
+这六条 JVM 上有测试，剩下的那半还在设备上：EN-19 的打字结果（「hello 」「abc hello 」、退格、逗号）JVM 上断言，设备上只看候选栏不出联想词；TB-23 的 Robolectric 转屏不重排已显示的悬浮键盘，JVM 上是转屏后新起的键盘读回位置。WD-37 的读完前不能导入导出 JVM 上断言，设备上走系统的文件选择器、真的导入导出文件。T9-60（注音九键）、PY-109（大千）的键盘排列和引擎 JVM 上断言，设备上看真引擎、真数据打出的码行和候选；ST-48（浮条）的出现、位置和触摸区 JVM 上断言，设备上看真窗口里应用的输入框排到哪里、浮条能不能点。原先还没搬的 EN-11、PY-87、T9-31 已于 2026-10-31 整条搬到 JVM。ST-26（动画）和 LC-10（引擎重启）要在 main 代码里加口子（IdleUi/InputWindowManager 的动画、HostDaemon 的引擎工厂）才能上 JVM，先算在"只能在设备上"。
 
 平时模拟器跑这些；发版时（`UAT_BUILD=release`）再加上面 `release,scripted:` 的三条大词库用例，`jvm` 的 run 文件也要绿。
 
@@ -190,14 +190,14 @@ EN-19、TB-23、WD-37 三条 JVM 上有测试，剩下的那半还在设备上�
 | `needs=` | 在哪跑 | 例子 |
 |---|---|---|
 | `voice:…` | 语音版（`--flavor voice`） | 12 语音 |
-| `release:…` | 发版时手动（要上一版正式包或两个版本的包） | PR-13、PR-14、PR-30、PR-35、PR-36、PR-37、PR-38、PR-41、PR-43、TBL-12d、TBL-33、TBL-43、WD-14r、WD-14v |
+| `release:…` | 发版时手动（要上一版正式包或两个版本的包） | PR-13、PR-14、PR-30、PR-35、PR-36、PR-37、PR-38、PR-41、PR-43、TBL-12d、TBL-33、TBL-43、WD-14r、WD-14v、QU-20 |
 | `release,scripted:…` | 发版时用发布包脚本跑（`UAT_BUILD=release` 时脚本照跑，平时不跑；要雾凇拼音，一条三四分钟） | WD-14d、WD-14h、TBL-12c |
-| `manual:…` | 真机或手工 | HK-03a、HK-03b、HK-30、HK-33、MN-13、SET-11 |
+| `manual:…` | 真机或手工 | HK-03a、HK-03b、HK-30、HK-33、MN-13、SET-11、ST-56、ST-57、QU-24 |
 | `jvm:<测试>` | JVM 上的测试（`:app:testTextDebugUnitTest` 的 Robolectric，`:lib:ime-eval:uatTest` 的引擎回放，语音的 `:app:testVoiceDebugUnitTest`，`:lib:ime-core:test`），`uat.py jvm` 记录 | T9-01、PAN-09、ST-01、MN-20 |
 
 `skip:…`／`block:…` 只留给别的原因，记"跳过"／"阻塞"。
 
-现在共 638 条（P0 116、P1 496、P2 26）：模拟器上跑 53 条（其中 24 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 585 条（JVM 552、发版时 17、真机或手工 6、语音版 10）。
+现在共 651 条（P0 117、P1 500、P2 34）：模拟器上跑 53 条（其中 24 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 598 条（JVM 561、发版时 18、真机或手工 9、语音版 10）。
 
 （2026-11 从 redroid 搬到模拟器时 `needs=` 改了两处：原来的 `emu:` 去掉，实体键盘用例不再单独跑；`release,redroid:` 改名 `release,scripted:`，意思不变：发版时脚本跑。）
 
@@ -213,7 +213,7 @@ EN-19、TB-23、WD-37 三条 JVM 上有测试，剩下的那半还在设备上�
 还等不到就报阻塞，并写明当前输入法、进程在不在、前台是哪个界面。
 怀疑失败是时机问题时，加 `UAT_SLOW=1` 用原来的长停顿再跑一次对比。
 要在这份用例下跑另一个检出构建的包（红色基线，如 VO-23 在 R15 上先红），加 `UAT_APK_REPO=<那个检出的路径>`：装包时取它的 `app/build/outputs` 里最新的 APK，用例和脚本仍用这一份。
-测试页的本地网页服务按第一台设备取端口（5554 → 8765，5556 → 8766）；端口被占时运行器直接退出，
+测试页的本地网页服务按第一台设备取端口（5554 → 8800，5556 → 8801，到 8815）；端口被占时运行器直接退出，
 停掉占用的服务或用 `UAT_HTTP_PORT=<端口>` 换一个。
 
 ```sh
@@ -226,13 +226,13 @@ uat/tools/uat.py down; uat/tools/uat.py down --port 5554   # 用完关掉
 ```
 
 设备是 AVD `youmo`（android-36 google_apis arm64-v8a，1080×2340，440 dpi，三键导航，简体中文，3 GB 内存）
-的模拟器，`dev/emu/avd.sh` 建它并存一个快照 `clean`。`up` 从这个快照只读启动（`-read-only -no-snapshot-save`，
+的模拟器，`uat/tools/avd.sh` 建它并存一个快照 `clean`（要先 `sdkmanager "system-images;android-36;google_apis;arm64-v8a" emulator`）。`up` 从这个快照只读启动（`-read-only -no-snapshot-save`，
 约 5 秒），所以每次 `up` 都是干净设备，同一个 AVD 能同时开两台；`adb root` 后 adbd 是 root。
 无界面（`-no-window`），GPU 用宿主（`-gpu host`；`EMU_GPU=swiftshader_indirect` 换软件渲染，但快照是 host 存的，
 换了要冷启动）。两台一起跑时不分核（macOS 上没法给进程定核）；标了 `heavy=True` 的用例照旧排在最后、
 一次只跑一条，别的设备都闲着。别的工作区要自己的设备就开在别的偶数端口（`up --port 5558`，到 5584），
 `run --devices 5558`。adb 37 的 mDNS 在这台机器的局域网上会让 adb 服务几秒就崩（`ADB_MDNS=0` 关掉；运行器和
-`dev/emu/up.sh` 自己设，别的地方先起的 adb 服务要带上它）。
+`uat/tools/avd.sh` 自己设，别的地方先起的 adb 服务要带上它）。
 
 测发布包（正式版发版前）：先 `BUILD_ABI=arm64-v8a ./gradlew :app:assembleTextRelease`（要签名密钥，没有就只出
 `-unsigned.apk`，装不上），再在命令前加 `UAT_BUILD=release`：装 `io.github.sraw.youmo`，设备上的 debug 包先卸掉

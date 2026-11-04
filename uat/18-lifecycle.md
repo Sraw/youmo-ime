@@ -79,7 +79,7 @@
 - **前提**：B0，点 n i（还没上屏）。
 - **操作**：键盘还在时换主题（系统深色模式跟着切也一样会重建键盘）；点 h a o。
 - **预期**：同 LC-14：拼音清掉、不上屏，新主题的键盘上拼音栏和候选栏都空着；之后打的照常出候选。
-- **JVM**：`StuckBarUatTest.aThemeChangedMidPinyinDropsIt`；设备上不跑（redroid 上切深色模式时测试宿主自己会重建，输入框重新开始，走的是换框的路）。
+- **JVM**：`StuckBarUatTest.aThemeChangedMidPinyinDropsIt`；设备上不跑（当初在 redroid 上看到：切深色模式时测试宿主自己会重建，输入框重新开始，走的是换框的路）。
 
 ### LC-16 [P1] 系统重建键盘视图时拼音还在
 - **前提**：B0，点 n i（还没上屏）。

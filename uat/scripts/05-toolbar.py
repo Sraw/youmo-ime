@@ -67,7 +67,11 @@ def copy_word(d, word):
 
 def clip_items(d):
     s = d.screen()
-    return [n for n in s.ime() if n.text and n.c[1] > BAR_BOTTOM and n.text not in ("试着复制些东西",)]
+    # below the panel's title bar (bottom 1506 on the emulator): the first row's centre, 1556, is above
+    # BAR_BOTTOM, so a cut there lost it
+    title = next((n for n in s.ime() if n.text == "剪贴板"), None)
+    top = title.b[3] if title else BAR_BOTTOM
+    return [n for n in s.ime() if n.text and n.b[1] >= top and n.text not in ("试着复制些东西",)]
 
 
 def clip_item(d, text):

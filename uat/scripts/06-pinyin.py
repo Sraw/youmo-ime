@@ -162,7 +162,7 @@ case("PY-19", needs="jvm:PinyinUatTest.eachSwitchTurnedOffTakesItsCandidates")(l
 case("PY-20", needs="jvm:PinyinUatTest.fuzzyZZh")(lambda d: None)
 
 
-case("PY-50", needs="jvm:PinyinUatTest.pinyinGlide、GlideUatTest.pinyinsGlideIsDrawnAsTheFingerGoes")(lambda d: None)
+case("PY-50", needs="jvm:PinyinUatTest.pinyinGlide、GlideUatTest.pinyinsGlideIsDrawnAsTheFingerGoes、GlideSessionTest.readingsAndLookupsAreTheSessionsShiftedPastTheOthers")(lambda d: None)
 
 
 case("PY-52", needs="jvm:PinyinUatTest.theBuiltInDatesTurnedOff")(lambda d: None)
@@ -323,7 +323,10 @@ def py109(d):
 case("PY-110", needs="jvm:PinyinUatTest.aReadingIsInItsCharactersOwnTones、ToneTableTest.aWordsNeutralToneIsItsCharactersOwn")(lambda d: None)
 
 
-case("PY-111", needs="jvm:CandidateHintsUatTest、EnginesReadingsTest.offShowsNoneButTheHintsAboveTheCandidates、CandidateReadingsTest.aHintIsOneReadingACharacterWithItsTones、CandidateBarHeightTest.aHintsReadingFillsTheRoomBetweenItsBounds")(lambda d: None)
+case("PY-111", needs="jvm:CandidateHintsUatTest、EnginesReadingsTest.offShowsNoneButTheHintsAboveTheCandidates、CandidateReadingsTest.aHintIsOneReadingACharacterWithItsTones、CandidateBarHeightTest.aHintsReadingFillsTheRoomBetweenItsBounds、EnginesReadingsTest.aHintThatIsNoReadingStaysWithTheReadingsOn、GridReadingWidthTest.aWordWithReadingsIsMeasuredAsItIsDrawnInEachStyle")(lambda d: None)
 
 
 case("PY-112", needs="jvm:ZhuyinShortcutsUatTest.dachensKeysTakeTheFullKeyboardsShortcutsByPlace、ZhuyinKeyboardTest.theSymbolKeysAreNamedForTheirShortcuts")(lambda d: None)
+
+
+case("PY-113", needs="jvm:EnginesReadingsTest.eachCandidateIsReadAsTyped、EnginesReadingsTest.aCharacterOfTwoReadingsIsReadAsTypedThroughFullPinyinsWrappers、StrokeFilterTest.readingsAndLookupsOfAKeptCandidateAreOfItsOwnPlace")(lambda d: None)

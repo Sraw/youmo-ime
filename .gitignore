@@ -15,6 +15,7 @@
 # Android.gitignore
 # Built application files
 *.apk
+!uat/tools/webview_shell.apk
 *.aar
 *.ap_
 *.aab

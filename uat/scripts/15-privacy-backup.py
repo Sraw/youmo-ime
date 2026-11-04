@@ -386,4 +386,7 @@ case("PR-46", needs="jvm:BackupUatTest.aSettingsBackupsAddressesMergeWithThePhon
 case("PR-47", needs="jvm:KotlinHostTest.aZeroFourBackupRestoredMergesItsNineKeysPinyinAgain")(lambda d: None)
 
 
-case("PR-48", needs="jvm:NotLearnedMarkUatTest、NotLearnedTest")(lambda d: None)
+case("PR-49", needs="jvm:PrivacyUatTest.aBackupTakesAWholeSentenceUsedTwiceNotOnce")(lambda d: None)
+
+
+case("PR-50", needs="jvm:UserDataManagerTest.aBackupBiggerThanTheRoomLeftStopsAsItIsUnpacked")(lambda d: None)
