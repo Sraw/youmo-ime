@@ -140,9 +140,12 @@ def dictate(d, clip):
     p = d.say(clip, wait=False)
     shown = []   # what the screen showed while it was said and just after
     end = time.time() + 30
-    while time.time() < end and p.poll() is None:
-        shown += [n.text for n in d.screen().nodes if n.text and n.pkg == PKG and n.text not in shown]
-        time.sleep(0.2)
+    try:
+        while time.time() < end and p.poll() is None:
+            shown += [n.text for n in d.screen().nodes if n.text and n.pkg == PKG and n.text not in shown]
+            time.sleep(0.2)
+    finally:
+        p.kill()   # done or not, nothing left streaming into the next case
     # the last stretch's silence (1.2 s: the VAD closes it), then up to 4 s for its text to show: on
     # a loaded host the recognizer takes longer than the silence, and VO-02 then saw only 正在听…
     heard = len(shown)
@@ -458,15 +461,21 @@ def lift_early(d, clip, before_s):
         wait = max(0.0, end - start - LIFT_CUE_LAG - 0.45)
         cmd = f"logcat -m 1 -e 'voice speech started' >/dev/null; sleep {wait:.3f}; {raw_up(d)}"
     else:
+        # R15: timed from before say(), which first waits for the app's AudioRecord (~0.5 s): the lift
+        # comes that much earlier than before_s asks. Timed from the stream's start instead, VO-23 lost
+        # the whole utterance one time in three on the emulator; this way it passes
         cmd = f"sleep {max(0.0, end - before_s):.3f}; {raw_up(d)}"
     up = subprocess.Popen(["adb", "-s", d.serial, "shell", cmd])
     p = d.say(clip, wait=False)
     try:
-        up.wait(end + 5)
-    except subprocess.TimeoutExpired:   # no cue: nothing was heard; the finger lifted all the same
-        up.kill()
-        d.sh(raw_up(d))
-    p.wait(30)
+        try:
+            up.wait(end + 5)
+        except subprocess.TimeoutExpired:   # no cue: nothing was heard; the finger lifted all the same
+            up.kill()
+            d.sh(raw_up(d))
+        p.wait(30)
+    finally:
+        p.kill()
     cued = cued or bool(d.sh("logcat -d | grep -c 'voice speech started'").strip() not in ("", "0"))
     t = settle(d)
     log = capture_log(d)
@@ -631,11 +640,14 @@ def vo26_try(d):
     before = d.field_text() or ""
     early = d.sh("logcat -d | grep -c 'voice ready'").strip() not in ("", "0")
     p = d.say("nihao", wait=False)
-    seen, end = False, time.time() + 10
-    while time.time() < end and not seen:
-        seen = bool(anywhere(d.screen(), LISTEN))
-        time.sleep(0.1)
-    p.wait(30)
+    try:
+        seen, end = False, time.time() + 10
+        while time.time() < end and not seen:
+            seen = bool(anywhere(d.screen(), LISTEN))
+            time.sleep(0.1)
+        p.wait(30)
+    finally:
+        p.kill()
     time.sleep(1.2)
     d.sh(raw_up(d))
     t = settle(d)

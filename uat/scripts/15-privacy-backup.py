@@ -346,13 +346,13 @@ case("PR-32", needs="jvm:PrivacyUatTest.aBlockInTheBackupWinsOverThePhonesPin")(
 case("PR-25", needs="jvm:PrivacyUatTest.aRestoreMergesAndIsTakenBack")(lambda d: None)
 
 
-case("PR-35", needs="release:gate 3（gates.py backups）恢复 fixtures/upgrade/v0.3.0 的备份")(lambda d: None)
+case("PR-35", needs="release:gate 3（gates.py backups，只支持 redroid；模拟器上手工做）恢复 fixtures/upgrade/v0.3.0 的备份")(lambda d: None)
 
 
-case("PR-36", needs="release:gate 3（gates.py backups）恢复 fixtures/upgrade/v0.3.1 的备份")(lambda d: None)
+case("PR-36", needs="release:gate 3（gates.py backups，只支持 redroid；模拟器上手工做）恢复 fixtures/upgrade/v0.3.1 的备份")(lambda d: None)
 
 
-case("PR-37", needs="release:gate 3（gates.py backups）恢复 fixtures/upgrade/v0.3.2 的备份")(lambda d: None)
+case("PR-37", needs="release:gate 3（gates.py backups，只支持 redroid；模拟器上手工做）恢复 fixtures/upgrade/v0.3.2 的备份")(lambda d: None)
 
 
 case("PR-38", needs="release:这一版正式版的备份装回 v0.3.2 正式版恢复")(lambda d: None)

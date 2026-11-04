@@ -532,5 +532,75 @@ class ResultsFileTest(unittest.TestCase):
             self.assertEqual([], uat.build_sheets(uat.Run("r", []), {}))
 
 
+class MicTest(unittest.TestCase):
+    def test_each_emulator_has_its_own_grpc_port(self):
+        self.assertEqual((8554, 8558, 8560), tuple(uat.grpc_port(p) for p in ("5554", "5558", "5560")))
+
+    def test_an_audio_packet_is_encoded_as_the_proto_says(self):
+        # AudioFormat{samplingRate=16000, channels=Mono, format=S16, mode=REAL_TIME}: 0x08 varint 16000 ...
+        fmt = uat._pb_field(1, 16000) + uat._pb_field(2, 0) + uat._pb_field(3, 1) + uat._pb_field(4, 1)
+        self.assertEqual(bytes.fromhex("08807d1000180120 01"), fmt)
+        self.assertEqual(b"\x1a\x02ab", uat._pb_field(3, b"ab"))
+
+    DUMP = ["11-04 10:00:05.500000000", "RecordActivityMonitor dump time: 11-04 10:00:05",
+            "  riid 7; active? true", "  riid 9; active? true",
+            "Events log: recording activity",
+            "11-04 10:00:01:000 rec start riid:7 uid:10050 session:1 src:MIC pack:com.other.app",
+            "11-04 10:00:04:000 rec start riid:9 uid:10150 session:2 src:MIC pack:%s" % uat.PKG]
+
+    def test_recording_counts_only_the_apps_audiorecord(self):
+        self.assertAlmostEqual(1.5, uat.record_age(self.DUMP))
+        self.assertIsNone(uat.record_age(self.DUMP[:3] + self.DUMP[4:6]))
+
+    def test_recording_without_package_names_takes_the_active_one(self):
+        out = [self.DUMP[0], "  riid 3; active? true", "11-04 10:00:05:000 rec start riid:3 uid:1 session:1"]
+        self.assertAlmostEqual(0.5, uat.record_age(out))
+        self.assertEqual(0.0, uat.record_age(out[:2]))
+        self.assertIsNone(uat.record_age([self.DUMP[0], "  riid 3; active? false"]))
+
+    def test_a_mic_wait_that_times_out_stops_the_stream(self):
+        m = uat.Mic.__new__(uat.Mic)
+        m.stop, m.error = threading.Event(), None
+        m.thread = threading.Thread(target=m.stop.wait, daemon=True)
+        m.thread.start()
+        with self.assertRaises(uat.subprocess.TimeoutExpired):
+            m.wait(0.05)
+        self.assertTrue(m.stop.is_set())
+
+
+class PlugTest(unittest.TestCase):
+    def device(self, plugged, nav_on):
+        d = mock.Mock()
+        d.kb_plugged.return_value = plugged
+        d.sh.side_effect = lambda c: (f"[x] com.android.internal.systemui.navbar.{nav_on}\n"
+                                      if c.startswith("cmd overlay list") else "")
+        return d
+
+    def enabled(self, d):
+        return [a.args[0] for a in d.sh.call_args_list if "enable-exclusive" in a.args[0]]
+
+    def test_a_keyboard_already_plugged_still_gets_gesture_nav(self):
+        d = self.device(True, "threebutton")
+        with mock.patch.object(uat.time, "sleep"):
+            uat.plug(d, "B0-实体")
+        d.kb.assert_not_called()
+        self.assertEqual(1, len(self.enabled(d)))
+        self.assertIn("gestural", self.enabled(d)[0])
+
+    def test_the_nav_is_set_even_when_the_keyboard_fails(self):
+        d = self.device(True, "gestural")
+        d.kb.side_effect = uat.Blocked("no")
+        with mock.patch.object(uat.time, "sleep"), self.assertRaises(uat.Blocked):
+            uat.plug(d, "B0")
+        self.assertIn("threebutton", self.enabled(d)[0])
+
+    def test_nothing_to_change_changes_nothing(self):
+        d = self.device(False, "threebutton")
+        with mock.patch.object(uat.time, "sleep") as sleep:
+            uat.plug(d, "B0")
+        self.assertEqual([], self.enabled(d))
+        sleep.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -274,7 +274,7 @@ case("HK-11", needs="jvm:HardwareKeyUatTest.shiftHeldTypesCapitalsAndSwitchesNot
 case("HK-12", needs="jvm:HardwareKeyUatTest.ctrlSpaceSwitchesAndTypesNoSpace")(lambda d: None)
 
 
-@case("HK-30", base="B0-实体", needs="manual:要分屏（上面测试页、下面设置）再点回上面的窗口；模拟器上 adb 摆不出分屏，手动做")
+@case("HK-30", base="B0-实体", needs="manual:要分屏（上面测试页、下面设置）再点回上面的窗口；模拟器上手动摆（最近任务里点应用图标→分屏）")
 def hk30(d):
     pass
 

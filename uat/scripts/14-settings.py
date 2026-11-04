@@ -331,7 +331,7 @@ def record_change(d, y0, y1, act):
     act()
     rec.wait(timeout=20)
     d.adb("pull", "/sdcard/uat-rec.mp4", os.path.join(tmp, "r.mp4"))
-    subprocess.run(["ffmpeg", "-loglevel", "quiet", "-i", os.path.join(tmp, "r.mp4"), "-vsync", "0",
+    subprocess.run(["ffmpeg", "-loglevel", "quiet", "-i", os.path.join(tmp, "r.mp4"), "-fps_mode", "passthrough",
                     "-vf", f"crop=1080:{y1 - y0}:0:{y0},scale=216:-1", os.path.join(tmp, "f%04d.png")])
     from PIL import Image, ImageChops
     frames = [Image.open(os.path.join(tmp, f)).convert("L") for f in sorted(os.listdir(tmp)) if f.endswith(".png")]
@@ -567,5 +567,5 @@ case("ST-54", needs="jvm:ThemeFilesManagerTest.aThemeOfALaterFormatIsSkippedAndL
 case("ST-55", needs="jvm:ThemeFilesManagerTest.aThemeWhosePictureOrFontIsGoneIsNotListedAndTheUserIsToldItIsGone")(lambda d: None)
 
 
-case("ST-56", needs="manual:主题制作网页在电脑浏览器上手工跑")(lambda d: None)
+case("ST-56", needs="manual:主题制作网页在电脑浏览器上手工跑（要一个和内置主题同名的主题 zip）")(lambda d: None)
 case("ST-57", needs="manual:分屏下主题页预览和键盘同时要毛玻璃图")(lambda d: None)

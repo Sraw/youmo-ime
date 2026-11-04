@@ -117,7 +117,7 @@ uat/tools/emu-keyboard.sh combo CTRL SPACE   # 按住前面的，按最后一个
 - **JVM**：`HardwareKeyUatTest.ctrlSpaceSwitchesAndTypesNoSpace`（Ctrl+空格 来回切，不多发空格）；设备上不跑。
 
 ### HK-30 [P1] 分屏里在设置中加了英文，回来首按 Ctrl+空格 就切换
-- **前提**：B0-实体，设置里只留拼音（删掉英文）；分屏，上面是有「普通文本」框的应用，下面是幽默输入法的设置。
+- **前提**：B0-实体，设置里只留拼音（删掉英文）；分屏，上面是有「普通文本」框的应用，下面是幽默输入法的设置。模拟器上能摆：先打开测试页，进最近任务（`adb shell input keyevent KEYCODE_APP_SWITCH`），点它卡片上的应用图标选 **分屏**，再在下半屏点幽默输入法的设置。
 - **操作**：点「普通文本」框；在下面的设置里加回英文；不再点框，直接点回上面的应用窗口，按 Ctrl+空格，按 o k。
 - **预期**：第一次 Ctrl+空格 就到英文，ok 原样上屏。
 

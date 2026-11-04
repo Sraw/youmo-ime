@@ -16,8 +16,8 @@ Python 3 stdlib + PIL. `adb shell input tap/swipe/motionevent/keyevent/text`, ui
 am/pm/ime/settings drive the device. The devices are emulators (AVD youmo, android-36 google_apis
 arm64-v8a: the release ABI, native on Apple silicon; uat/tools/avd.sh makes it), VMs with their own
 kernel: root over `adb root`, and 17 实体键盘's USB keyboard a uinput one (uat/tools/emu-keyboard.sh),
-which is never made anywhere else. Nothing feeds the voice cases' microphone yet (`Device.say`: the
-emulators start -no-audio), so those cases are blocked.
+which is never made anywhere else. The voice cases' microphone is the emulator's gRPC injectAudio
+(`Device.say`, `-grpc` from up(); grpcio needed, else those cases are blocked).
 Output is kept short on purpose (counts and paths): an agent reading it re-reads its context.
 """
 import argparse
@@ -597,10 +597,34 @@ class Device:
         return self._plugged
 
     def say(self, clip, wait=True):
-        """play dev/uat-out/voice-clips/<clip>.wav into the emulator's microphone: not wired up yet
-        (up() starts the emulators -no-audio; the redroid-era runner played clips into a PulseAudio
-        source the emulator recorded, Linux only)"""
+        """play dev/uat-out/voice-clips/<clip>.wav into the emulator's microphone (the emulator's gRPC
+        injectAudio, Mic below); wait=False: in the background (returns the player: poll/wait/kill)"""
+        f = os.path.join(CLIPS, f"{clip}.wav")
+        if not os.path.exists(f):
+            raise Blocked(f"没有 {f}：先跑 uat/tools/voice-clips.py")
         need_mic()
+        # the emulator (37.2) segfaults (audio_forwarder_enable) on an injectAudio stream that starts
+        # with nothing recording in the guest, or as the recording is only just opened (VO-28: said at
+        # the press); so the stream waits till the app's AudioRecord is MIC_SETTLE_S old
+        for _ in range(50):
+            age = self.recording()
+            if age is not None:
+                break
+            time.sleep(0.1)
+        else:
+            raise Blocked("设备上没有在录音（AudioRecord）：没把片段放进麦克风（空放会让模拟器崩溃）")
+        time.sleep(max(0.0, MIC_SETTLE_S - age))
+        p = Mic(grpc_port(self.port), f)
+        if wait:
+            p.wait(30)
+        return p
+
+    def recording(self):
+        """seconds the active AudioRecord has been recording (dumpsys audio: the monitor's active riid,
+        its first event against the device's clock), None if none is"""
+        return record_age(self.sh("date +'%m-%d %H:%M:%S.%N'; dumpsys audio | sed -n "
+                                  "'/^RecordActivityMonitor dump time/,/^Events log: recording activity/p;"
+                                  "/^Events log: recording activity/,/^$/p'").splitlines())
 
     # --- reading the screen
     # the dump server (Dumper.java): one UiAutomation connection kept open, ~0.1 s a dump
@@ -1660,9 +1684,22 @@ def reset(d, base, page):
 def plug(d, base):
     """B0-实体: the emulator's USB keyboard plugged in; any other baseline: unplugged"""
     want = base == "B0-实体"
+    # gesture nav while it is plugged: with no touch keyboard the input method's window takes touches
+    # only over the navigation bar (onComputeInsets), and under three-button nav's bar that region is
+    # covered, so accessibility (Dumper, uiautomator) leaves the whole window out: the floating
+    # candidates and the 显示屏幕键盘 button read as nothing. The other baselines keep avd.sh's three-button.
+    # Set every time (enable-exclusive is idempotent), before the keyboard, so a keyboard plugged by
+    # hand or left from an earlier run, or kb() raising, still leaves the nav the baseline wants
+    nav = "gestural" if want else "threebutton"
+    overlay = f"com.android.internal.systemui.navbar.{nav}"
+    changed = f"[x] {overlay}" not in d.sh(f"cmd overlay list android | grep -F '{overlay}'")
+    if changed:
+        d.sh(f"cmd overlay enable-exclusive --category {overlay}")
     if d.kb_plugged() != want:
         d.kb("up" if want else "down")
-        time.sleep(1)
+        changed = True
+    if changed:
+        time.sleep(3)
 
 
 PREFILLED = ("long",)   # the test page's fields that come with text
@@ -2425,10 +2462,119 @@ def tail(path, n=3):
         return path
 
 
+def record_age(out, pkg=None):
+    """Device.recording's parse: out is the device's date, then dumpsys audio's recording monitor and
+    events; an active riid whose lines name a package (pack:) counts only if one is pkg (the app's)"""
+    pkg = pkg or PKG
+    if not out:
+        return None
+    for riid in (m.group(1) for l in out if (m := re.match(r"\s*riid (\d+); active\? true", l))):
+        mine = [l for l in out if re.search(rf"\briid:{riid}\b", l)]
+        packs = [l for l in mine if "pack:" in l]
+        if packs and not any(f"pack:{pkg} " in l + " " for l in packs):
+            continue
+        now = datetime.datetime.strptime("2000-" + out[0][:21], "%Y-%m-%d %H:%M:%S.%f")
+        for l in mine:
+            if re.match(r"\d\d-\d\d \d", l):
+                then = datetime.datetime.strptime("2000-" + l[:18], "%Y-%m-%d %H:%M:%S:%f")
+                return max(0.0, (now - then).total_seconds())
+        return 0.0   # active, its start not logged yet: just opened
+    return None
+
+
+def grpc_port(port):
+    """the emulator's gRPC port, from its console port (8554 for 5554: one each, two can run at once)"""
+    return 8554 + int(port) - 5554
+
+
 def need_mic():
-    """blocked until clips reach the emulator's microphone (Device.say): a case that speaks calls it
-    first, before its waits (host_calm, the hold) cost anything"""
-    raise Blocked("模拟器的麦克风还没接上语音片段（uat/README.md「实体键盘和语音」）")
+    """grpcio, which Device.say plays clips through: a case that speaks calls it first, before its waits
+    (host_calm, the hold) cost anything"""
+    try:
+        import grpc  # noqa: F401
+    except ImportError:
+        raise Blocked("没有 grpcio：Device.say 经模拟器的 gRPC 把语音片段放进麦克风（pip install grpcio）")
+
+
+def _pb_varint(n):
+    out = b""
+    while True:
+        b, n = n & 0x7F, n >> 7
+        out += bytes([b | (0x80 if n else 0)])
+        if not n:
+            return out
+
+
+def _pb_field(num, v):
+    """one protobuf field: int as a varint, bytes length-delimited (enough for AudioPacket)"""
+    if isinstance(v, int):
+        return _pb_varint(num << 3) + _pb_varint(v)
+    return _pb_varint(num << 3 | 2) + _pb_varint(len(v)) + v
+
+
+MIC_SETTLE_S = 0.5   # Device.say: a recording this old takes a stream (0.6 s held through VO-28; none crashed it)
+
+
+class Mic:
+    """a WAV (16-bit PCM) streamed to EmulatorController.injectAudio (emulator_controller.proto in the
+    SDK's emulator/lib) in real time, on a thread; Popen's poll/wait/kill so a case holds it like the old
+    pw-play. The messages are encoded by hand (no generated stubs, so only grpcio is needed)."""
+    CHUNK_S = 0.02
+
+    def __init__(self, port, wav):
+        need_mic()
+        import grpc
+        import threading
+        import wave
+        with wave.open(wav) as w:
+            if w.getsampwidth() != 2:
+                raise Blocked(f"{wav}：不是 16 位 PCM")
+            self.rate, ch, self.pcm = w.getframerate(), w.getnchannels(), w.readframes(w.getnframes())
+        self.fmt = _pb_field(1, self.rate) + _pb_field(2, 0 if ch == 1 else 1) + _pb_field(3, 1) + _pb_field(4, 1)
+        self.step = int(self.rate * self.CHUNK_S) * 2 * ch
+        self.chan = grpc.insecure_channel(f"127.0.0.1:{port}")
+        self.call = self.chan.stream_unary("/android.emulation.control.EmulatorController/injectAudio",
+                                           request_serializer=lambda b: b, response_deserializer=lambda b: b)
+        self.stop, self.error = threading.Event(), None
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread.start()
+
+    def _packets(self):
+        t0 = time.time()
+        for i, off in enumerate(range(0, len(self.pcm), self.step)):
+            if self.stop.is_set():
+                return
+            lag = t0 + i * self.CHUNK_S - time.time()
+            if lag > 0:
+                time.sleep(lag)
+            yield (_pb_field(1, self.fmt) + _pb_field(2, int(time.time() * 1e6))
+                   + _pb_field(3, self.pcm[off:off + self.step]))
+
+    def _run(self):
+        try:
+            self.call(self._packets(), timeout=120)
+        except Exception as e:   # the emulator not started with -grpc, or gone
+            self.error = e
+        finally:
+            self.chan.close()
+
+    def poll(self):
+        if self.thread.is_alive():
+            return None
+        if self.error:
+            raise Blocked(f"模拟器 gRPC injectAudio 失败：{self.error}")
+        return 0
+
+    def wait(self, timeout=None):
+        self.thread.join(timeout)
+        if self.thread.is_alive():
+            self.kill()   # else its thread streams the rest of the clip into the next case
+            raise subprocess.TimeoutExpired("injectAudio", timeout)
+        return self.poll()
+
+    def kill(self):
+        self.stop.set()
+        self.thread.join(5)
 
 
 def need_root(d):
@@ -2467,12 +2613,13 @@ def up(port="5556"):
             os.makedirs(os.path.join(OUT, "emu"), exist_ok=True)
             # -gpu host: the Mac's GPU (its OpenGL, through emulator_env's shim with no display attached;
             # EMU_GPU=swiftshader_indirect for software, which the snapshot was not saved with: a cold boot).
-            # -no-audio: no microphone yet (Device.say)
+            # -grpc: its controller, whose injectAudio is the microphone Device.say plays clips into
+            # (audio stays on: -no-audio would drop the microphone)
             gpu = os.environ.get("EMU_GPU", "host")
             with open(log, "w") as f:   # the emulator holds its own copy of the file
                 emu = subprocess.Popen([emulator_bin(), "-avd", AVD, "-port", port, "-snapshot", SNAPSHOT,
-                                        "-no-snapshot-save", "-read-only", "-no-window", "-no-audio", "-no-boot-anim",
-                                        "-gpu", gpu],
+                                        "-no-snapshot-save", "-read-only", "-no-window", "-no-boot-anim",
+                                        "-grpc", str(grpc_port(port)), "-audio", "none", "-gpu", gpu],
                                        stdout=f, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                                        env=emulator_env(gpu), start_new_session=True)
         for _ in range(180):
