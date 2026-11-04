@@ -33,6 +33,11 @@ class ModuleConfigsTest {
     }
 
     @Test
+    fun `chttrans' list from upstream Fcitx5 names the engine's input methods`() {
+        assertEquals(setOf("engine-pinyin", "engine-shuangpin"), ModuleConfigs.chttrans("[EnabledIM]\n0=pinyin\n1=shuangpin\n2=engine-pinyin\n"))
+    }
+
+    @Test
     fun `chttrans' list read till the first gap, written in place, the engine kept`() {
         val old = "Engine=OpenCC\n\n[EnabledIM]\n0=engine-pinyin\n1=engine-t9\n3=engine-wubi\n"
         assertEquals(setOf("engine-pinyin", "engine-t9"), ModuleConfigs.chttrans(old))

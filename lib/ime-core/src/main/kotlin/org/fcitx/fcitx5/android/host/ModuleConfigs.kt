@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.host
 
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+
 /**
  * The two module files whose state the host keeps, read and written with fcitx's INI rules
  * ([IniFile]): `conf/punctuation.conf` (`ca/punctuation/punctuation.h:36-46`) and
@@ -43,11 +45,14 @@ object ModuleConfigs {
         return IniFile.write(tree)
     }
 
-    /** chttrans.conf's `EnabledIM` (`EnabledIM/0`, `/1`, … till the first missing, `marshallfunction.h:70-88`). */
+    /**
+     * chttrans.conf's `EnabledIM` (`EnabledIM/0`, `/1`, … till the first missing, `marshallfunction.h:70-88`),
+     * upstream Fcitx5's names as this engine's ([InputMethodCatalog.fromUpstream]).
+     */
     fun chttrans(text: String?): Set<String> {
         val list = IniFile.read(text.orEmpty()).find(ENABLED_IM) ?: return emptySet()
         return generateSequence(0) { it + 1 }.map { list.find(it.toString()) }.takeWhile { it != null }
-            .mapNotNull { it?.value }.toCollection(LinkedHashSet())
+            .mapNotNull { it?.value?.let(InputMethodCatalog::fromUpstream) }.toCollection(LinkedHashSet())
     }
 
     /** [old] (null: no file) with `EnabledIM` set to [enabled], the rest of the file kept. */

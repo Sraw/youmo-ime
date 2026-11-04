@@ -183,6 +183,17 @@ object InputMethodCatalog {
     )
 
     /**
+     * Upstream Fcitx5's names (libime's pinyin and tables) for the input methods this engine
+     * replaces: a backup from upstream Fcitx5 for Android names them so in its profile and
+     * chttrans.conf (SET-11), and an unknown name is dropped.
+     */
+    private val UPSTREAM: Map<String, String> =
+        mapOf("pinyin" to PINYIN, "shuangpin" to SHUANGPIN) + TABLES.entries.associate { (im, method) -> method.libime to im }
+
+    /** [name] as this engine names it: upstream's ([UPSTREAM]) renamed, any other as it is. */
+    fun fromUpstream(name: String): String = UPSTREAM[name] ?: name
+
+    /**
      * The input methods the host lists, in this order (`androidengine.cpp:337-358`, which the
      * native addon had): what the input method page and the picker show of each, its icon,
      * its language.

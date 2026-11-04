@@ -56,6 +56,17 @@ class ProfileTest {
     }
 
     @Test
+    fun `upstream Fcitx5's names read as the engine's, each listed once`() {
+        // a backup from upstream Fcitx5 for Android (SET-11): libime's pinyin, shuangpin and wbx
+        val upstream = "[Groups/0]\nName=默认\nDefault Layout=us\nDefaultIM=shuangpin\n" +
+            "[Groups/0/Items/0]\nName=keyboard-us\n[Groups/0/Items/1]\nName=pinyin\n[Groups/0/Items/2]\nName=shuangpin\n" +
+            "[Groups/0/Items/3]\nName=engine-pinyin\n[Groups/0/Items/4]\nName=wbx\n"
+        val g = Profile.load(upstream, available + "engine-shuangpin", "Default").currentGroup()
+        assertEquals(listOf("keyboard-us", "engine-pinyin", "engine-shuangpin", "engine-wubi"), g.inputMethods)
+        assertEquals("engine-shuangpin", g.defaultInputMethod)
+    }
+
+    @Test
     fun `what it writes reads back the same`() {
         val p = Profile.load(fcitxWritten, available, "Default").with(ImGroup.of("默认", listOf("engine-wubi", "engine-pinyin", "keyboard-us"), "engine-pinyin"))
         val again = Profile.load(p.text(), available, "Default")

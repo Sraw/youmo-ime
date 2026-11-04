@@ -129,18 +129,25 @@ class Profile private constructor(val groups: List<Group>, val order: List<Strin
                 val name = values["$path/$NAME"].orEmpty()
                 val layout = values["$path/$DEFAULT_LAYOUT"].orEmpty()
                 if (name.isEmpty() || layout.isEmpty()) continue
-                val items = indexes(values, "$path/$ITEMS").map { i ->
-                    Item(values["$path/$ITEMS/$i/$NAME"].orEmpty(), values["$path/$ITEMS/$i/$LAYOUT"].orEmpty())
-                }.filter { it.name in available }
+                val read = indexes(values, "$path/$ITEMS").map { i ->
+                    val im = values["$path/$ITEMS/$i/$NAME"].orEmpty()
+                    val ours = InputMethodCatalog.fromUpstream(im)
+                    Item(ours, values["$path/$ITEMS/$i/$LAYOUT"].orEmpty()) to (ours != im)
+                }
                 // a second group of the name is the first's: `groups_.emplace` keeps the first, the
                 // second's items appended to its list, its layout and default set over the first's
                 val existing = groups[name]
-                val merged = (existing?.items.orEmpty()) + items
+                val merged = ArrayList(existing?.items.orEmpty())
+                // upstream's name beside the engine's own (a list half moved over), either first: listed once
+                val renamed = read.filter { it.second }.mapTo(HashSet()) { it.first.name }
+                for ((item, _) in read) {
+                    if (item.name in available && !(item.name in renamed && merged.any { it.name == item.name })) merged += item
+                }
                 if (merged.isEmpty()) {
                     groups.remove(name)
                     continue
                 }
-                val default = ImGroup.of(name, merged.map(Item::name), values["$path/$DEFAULT_IM"].orEmpty()).defaultInputMethod
+                val default = ImGroup.of(name, merged.map(Item::name), InputMethodCatalog.fromUpstream(values["$path/$DEFAULT_IM"].orEmpty())).defaultInputMethod
                 groups[name] = Group(name, layout, default, merged)
             }
             if (groups.isEmpty()) return default(defaultName)
