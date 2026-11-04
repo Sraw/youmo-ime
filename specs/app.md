@@ -637,8 +637,9 @@ window asked only under a scaled view); `KeyFaceDrawable` lays a key image's nin
 The theme list's thumbnails (`ThemeAssets.thumbnail`) are its portrait cut decoded 160 dp wide on the
 same thread, blurred as on the keyboard, 12 MB of them kept; one that does not read is not kept.
 
-The app does not edit themes (user, 2026-11-03): they are made on the web page
-(`Const.themeMakerUrl`, 新增主题 → 在网页上制作…) and imported (导入文件…). A theme file is `<name>.theme`, a zip inside (user, 2026-11-04, so it is not taken for any zip): exported under that name as `application/octet-stream` (a provider may add `.zip` for `application/zip`), and the import picker shows every file (`*/*`, `.theme` has no MIME type) and takes only a display name ending `.theme` (ime-core's `ThemeFileName`; `.zip`, an earlier 0.5.1's or the page's, or no name, is refused with `exception_theme_filename`, which says to rename it). The format version is unchanged. The theme list
+The app does not edit themes (user, 2026-11-03) and in 0.5.1 does not link the web theme maker
+(user, 2026-11-04: making themes moves to 0.5.2): 新增主题 opens the import picker directly, no menu; the page
+(`web/theme-maker`) stays on GitHub Pages for 0.5.2, unlinked from the app and the user docs. A theme file is `<name>.theme`, a zip inside (user, 2026-11-04, so it is not taken for any zip): exported under that name as `application/octet-stream` (a provider may add `.zip` for `application/zip`), and the import picker shows every file (`*/*`, `.theme` has no MIME type) and takes only a display name ending `.theme` (ime-core's `ThemeFileName`; `.zip`, an earlier 0.5.1's or the page's, or no name, is refused with `exception_theme_filename`, which says to rename it). The format version is unchanged. The theme list
 applies, imports, and on a long press exports or deletes one of the user's (a Monet theme exports
 `Theme.Monet.toCustom()`: its colours now and the key style it keeps, fixed). The fcitx edit page
 (`CustomThemeActivity`, its cropper) went with the old 选择图片… and 复制内置主题…; themes made by them

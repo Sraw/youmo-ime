@@ -92,7 +92,7 @@ object ThemeAssets {
     private val lock = Any()
 
     // the look the caches are of, and its files: another look of the same files (a colour, a
-    // brightness, a blur changed: the theme imported again from the web page) decodes nothing again
+    // brightness, a blur changed: the theme imported again) decodes nothing again
     private var look: ThemeLook? = null
     private var files: List<String>? = null
 

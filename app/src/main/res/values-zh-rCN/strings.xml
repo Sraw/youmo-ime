@@ -93,7 +93,6 @@
     <string name="expand_toolbar_by_default">默认展开工具栏</string>
     <string name="popup_on_key_press">按键时弹出显示字符</string>
     <string name="disable_animation">禁用动画</string>
-    <string name="import_from_file">导入文件…</string>
     <string name="exception_logcat_created">Logcat 进程已创建</string>
     <string name="exception_theme_filename">只能导入主题文件（.theme）：%1$s 不是。以前导出的 .zip 主题改名成 .theme 就能导入。</string>
     <string name="theme_file_unnamed">这个文件</string>
@@ -863,9 +862,8 @@
     <string name="level_square">直角</string>
     <string name="level_rounded">圆角</string>
     <string name="level_round">大圆角</string>
-    <string name="key_style_follow_theme">跟随主题：用主题里的样式（主题在网页上制作）；选别的会盖过主题里的。</string>
+    <string name="key_style_follow_theme">跟随主题：用主题里的样式；选别的会盖过主题里的。</string>
     <string name="key_style_moved">按键的圆角、边框、间距现在跟着主题走，已经存进你的主题里。</string>
-    <string name="make_theme_on_web">在网页上制作…</string>
     <string name="section_phrases">短语</string>
     <string name="punctuation_map_summary">中文输入时每个标点打成什么，比如 , 打成 ，</string>
     <string name="custom_phrases_summary">打拼音时打一个缩写出一段话，比如 dz 出你的地址；长的、多行的、偶尔用的，存到「快速输入」</string>

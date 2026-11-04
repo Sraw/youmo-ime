@@ -93,7 +93,6 @@
     <string name="expand_toolbar_by_default">預設展開工具列</string>
     <string name="popup_on_key_press">按鍵時彈出顯示字元</string>
     <string name="disable_animation">停用動畫</string>
-    <string name="import_from_file">從檔案匯入…</string>
     <string name="exception_logcat_created">Logcat 程序已經建立</string>
     <string name="exception_theme_filename">只能匯入主題檔案（.theme）：%1$s 不是。以前匯出的 .zip 主題改名成 .theme 就能匯入。</string>
     <string name="theme_file_unnamed">這個檔案</string>
@@ -863,9 +862,8 @@
     <string name="level_square">直角</string>
     <string name="level_rounded">圓角</string>
     <string name="level_round">大圓角</string>
-    <string name="key_style_follow_theme">跟隨主題：用主題裡的樣式（主題在網頁上製作）；選別的會蓋過主題裡的。</string>
+    <string name="key_style_follow_theme">跟隨主題：用主題裡的樣式；選別的會蓋過主題裡的。</string>
     <string name="key_style_moved">按鍵的圓角、邊框、間距現在跟著主題走，已經存進你的主題裡。</string>
-    <string name="make_theme_on_web">在網頁上製作…</string>
     <string name="section_phrases">短語</string>
     <string name="punctuation_map_summary">中文輸入時每個標點打成什麼，例如 , 打成 ，</string>
     <string name="custom_phrases_summary">打拼音時打一個縮寫出一段話，例如 dz 出你的地址；長的、多行的、偶爾用的，存到「快速輸入」</string>

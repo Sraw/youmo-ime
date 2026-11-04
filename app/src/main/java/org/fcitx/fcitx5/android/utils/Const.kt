@@ -17,8 +17,6 @@ object Const {
     // the user's manual, in the repository so it changes with the app: a release's as it shipped
     val helpUrl = manualUrl(githubRepo, BuildConfig.VERSION_NAME, BuildConfig.FLAVOR)
     const val releasesUrl = "$githubRepo/releases"
-    // the theme maker, a web page of this repository's (web/theme-maker) on its GitHub Pages
-    const val themeMakerUrl = "https://sraw.github.io/youmo-ime/theme-maker/"
 }
 
 /**

@@ -12,12 +12,12 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 ### 主要变化
 
-- **主题在网页上做**：**外观 → 主题 → 新增主题** 里"在网页上制作…"打开主题制作网页，选主题图、颜色、按键的形状和图片、字体，导出 `.theme` 主题文件再用"导入文件…"导入（只认 `.theme`，里面仍是 zip）；App 里只列出、使用、导入、导出和删除，要改就导出到网页上改再导入（同名的替换）。按键的圆角、边框、间距默认跟随主题，在 **大小与样式** 里也可以自己设（盖过主题）；升级时原来的设置存进正在用的主题（内置主题先复制一份，提示一次）。主题文件是新格式 3.0：更早的版本导入不了这一版导出的主题，0.5.0 及更早版本、0.5.1 测试版和网页早先导出的 `.zip` 主题，改名成 `.theme` 再导入，改名后都能读。
 - **滑动快捷键**：每个键（全键盘、14/18 键、九键、注音键盘、数字键盘、功能键）上滑或下滑可以执行快捷键，默认上滑是快捷键、下滑是符号，标在键上（**按键 → 滑动**、**快捷键图标位置**、**标点位置** 可以改）。**按键 → 按键字符和快捷键** 一页里改每个键的字符和快捷键。
 - **编辑菜单、清除和恢复**：空格上滑弹出全选、剪切、复制、粘贴、撤销，不松手左右挪选一格；退格上滑 **清除**（正在打的、选中的或光标前的全部文字，可撤销）；退格下滑 **恢复** 最近一次清除或连着按退格删掉的一段，放回原处。
 - **快速输入可以存自己的条目**：什么都不打时候选栏列出你存的，最近用过的在前，点一条整段上屏；在 **设置 → 词库与短语 → 快速输入** 里加、改、删、搜索、导入导出 `.mb`，剪贴板里长按一条也能 **存为快速输入**。长按"符"在九键和手写上也能进，工具栏可以放 **快速输入** 按钮，快捷键也能设成它。
 - **候选词注音**（设置里，默认关）：在中文候选的字上标出拼音，或在右边竖排注音符号，各中文输入法、码表、手写都标，每个字标它自己的声调。
 - **注音键盘**：拼音的 **键盘** 多了 **注音九键** 和 **注音全键盘**（大千），用注音符号打拼音的词库，声调可打可不打。
+- **主题文件改成新格式 3.0**：主题导出、导入都是 `.theme` 文件（里面仍是 zip，只认 `.theme`）；0.5.0 及更早版本导出的 `.zip` 主题改名成 `.theme` 再导入；更早的版本导入不了 0.5.1 导出的主题。按键的圆角、边框、间距存在主题里，**大小与样式** 里也可以自己设，盖过主题（默认 **跟随主题**）；升级时原来的设置存进正在用的主题（内置主题先复制一份，提示一次）。App 里不再做主题、改主题：0.5.0 的"选择图片…""复制内置主题…"和主题上的编辑按钮没有了，只列出、使用、导入、导出和删除；做主题以后的版本再提供。已有的自己的主题都保留，照常能用。
 - **手写的注键和字卡**：手写键盘右边多了 **注** 键，开关候选词注音；手写的单字标出全部读音。长按手写候选里的单字（拆字、笔画查字出的也一样）先显示**字卡**：读音和例词、部首、笔画、拆字、笔顺，下面有 **上屏** 和 **复制**。
 - **联想整段话**：完整上屏过 3 次的整段话，打出它的开头就接着给出剩下的部分，各输入法和手写都有；长按可以不再联想或删除。只由中文数字组成的（电话号码、金额）不学。
 - **键盘高度「紧凑」**：比「矮」更低（竖屏 20%、横屏 34%），键上的字小一号；五笔的全部字根在紧凑时显示成键名。
@@ -42,12 +42,12 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 ### Main changes
 
-- **Themes are made on a web page**: **外观 → 主题 → 新增主题** → "在网页上制作…" opens the theme maker (picture, colours, key shapes and pictures, fonts); export a `.theme` theme file there (a zip inside) and bring it in with "导入文件…" (only `.theme` is imported). The app lists, applies, imports, exports and deletes themes; to change one, export it, edit it on the page and import it again (same name replaces). Key corners, borders and gaps follow the theme by default, and you can set them yourself in **大小与样式** (over the theme's); on upgrade the old settings are saved into the theme in use (a built-in one is copied first, with one notice). Theme files are format 3.0: earlier versions cannot import this version's themes. Themes exported as `.zip` by 0.5.0 and earlier, by the 0.5.1 test builds or by the page before, are refused as they are: rename them to `.theme` and they import fine.
 - **Swipe shortcuts**: every key (full, 14/18 keys, nine keys, zhuyin, number pad, function keys) can run a shortcut on a swipe up or down; by default up is the shortcut and down the symbol, both marked on the key (**按键 → 滑动**, **快捷键图标位置**, **标点位置**). **按键 → 按键字符和快捷键** edits each key's characters and shortcuts on one page.
 - **Edit menu, clear and restore**: swipe up on space for select all, cut, copy, paste and undo, picked by sliding sideways; swipe up on backspace to **清除** (what is typed, the selection or all text before the cursor, undoable); swipe down on backspace to **恢复** the last clear or run of backspaces, put back in place.
 - **Quick input keeps your own entries**: with nothing typed the bar lists yours, recent first, a tap types one whole; add, edit, delete, search and import/export `.mb` in **设置 → 词库与短语 → 快速输入**, or long-press a clipboard entry for **存为快速输入**. Long-pressing 符 works on the nine keys and handwriting too; a **快速输入** toolbar button and shortcut are available.
 - **候选词注音** (a setting, off by default): pinyin above each Chinese candidate's characters, or zhuyin beside them, in every Chinese input method, tables and handwriting included, each character in its own tone.
 - **Zhuyin keyboards**: pinyin's **键盘** adds **注音九键** and **注音全键盘** (大千), typing the pinyin dictionary in zhuyin, tones optional.
+- **Theme files are a new format, 3.0**: themes are exported and imported as `.theme` files (a zip inside; only `.theme` is imported). Rename a `.zip` theme from 0.5.0 or earlier to `.theme`, then import it. Earlier versions cannot import 0.5.1's themes. Key corners, borders and gaps are stored in the theme, and **大小与样式** can override them (default **跟随主题**); on upgrade the old settings are saved into the theme in use (a built-in one is copied first, with one notice). The app no longer makes or edits themes: 0.5.0's "选择图片…", "复制内置主题…" and the edit button are gone; it lists, applies, imports, exports and deletes them, and making themes returns in a later version. Your existing custom themes are kept and keep working.
 - **Handwriting's 注 key and character card**: a **注** key on the handwriting keyboard toggles 候选词注音; handwritten characters show all their readings. Long-pressing a handwritten character (or one from `u` 拆字 or stroke lookup) opens its **card**: readings with example words, radical, stroke count, parts and stroke order, with **上屏** and **复制**.
 - **Whole-phrase prediction**: a phrase committed whole 3 times is offered in full once its start is typed, in every input method and handwriting; its long press turns it off or deletes it. Phrases of Chinese numerals alone (phone numbers, amounts) are not learned.
 - **Keyboard height 紧凑**: lower than 矮 (20% upright, 34% turned), with smaller key text; Wubi's full roots show as key names at 紧凑.

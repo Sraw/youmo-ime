@@ -192,7 +192,7 @@
 - **JVM**：`ToolbarUatTest.pasteStaysInTheClipboardWhenSoSet`（设了粘贴后留在剪贴板，粘贴后面板还在）；设备上不跑。
 
 ### TB-32 [P2] 主题的按键圆角选"直角"：悬浮键盘四角也是直角
-- **前提**：B0-设置；在主题制作网页（`web/theme-maker/index.html` 用浏览器打开，或 App 里 **主题 → 新增主题 → 在网页上制作…**）上把 **圆角** 拉到 0，点 **导出** 存成 `square.theme`；App 里 **主题 → 新增主题 → 导入文件…** 导入它并用上（App 里不再编辑主题）。
+- **前提**：B0-设置；"下载"里有 `square.theme`，从仓库的测试主题做：解开 `web/theme-maker/test/testdata/from-app.theme`，把 `from-app.json` 里的 `name` 和所有文件名里的 `from-app` 都换成新名字（json 里对文件的引用一起换；两个主题有同名文件时后导入的被拒），json 也改成 `<新名字>.json`，按下面改字段，再把这些文件放在 zip 顶层打包成 `<新名字>.theme`（例如 `python3 -c` 里用 `zipfile` 读改写，和 `uat/scripts/14-settings.py` 的 `push_theme` 一样）；`keys.radiusDp` 改成 0。App 里 **主题 → 新增主题** 导入它并用上（App 里不做、不编辑主题）。
 - **操作**：点「普通文本」框，在工具栏 **⋯** 里点 **悬浮键盘**。
 - **预期**：悬浮键盘的四角是直角（左上角的像素就是横条的颜色）；按键圆角是默认的"圆角"时（TB-22）是圆角。
 - **JVM**：`FloatingUatTest.squareKeysASquareFloatingKeyboard`（默认圆角时悬浮键盘裁成圆角，直角时圆角为 0）；设备上不跑。

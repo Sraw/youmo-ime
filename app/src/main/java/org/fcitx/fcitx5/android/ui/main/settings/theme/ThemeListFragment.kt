@@ -23,10 +23,8 @@ import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.theme.ThemeFileName
 import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
-import org.fcitx.fcitx5.android.utils.Const
 import org.fcitx.fcitx5.android.utils.applyNavBarInsetsBottomPadding
 import org.fcitx.fcitx5.android.utils.importErrorDialog
-import org.fcitx.fcitx5.android.utils.openUrl
 import org.fcitx.fcitx5.android.utils.queryFileName
 import org.fcitx.fcitx5.android.utils.toast
 import splitties.resources.styledDrawable
@@ -140,26 +138,11 @@ class ThemeListFragment : Fragment() {
         themeListAdapter.setSelectedThemes(active, light, dark)
     }
 
-    // themes are made on the web page only (exported there as a .theme file, a zip inside, imported here); the app picks,
-    // exports and deletes them
+    // the app lists, picks, imports, exports and deletes themes; it makes none, so 新增主题 is the import's file picker
     private fun addTheme() {
         // the themes not settled: an import would go nowhere the next start reads
         if (ThemeManager.refuseIfNotSettled()) return
-        val ctx = requireContext()
-        val actions = arrayOf(
-            getString(R.string.import_from_file),
-            getString(R.string.make_theme_on_web),
-        )
-        AlertDialog.Builder(ctx)
-            .setTitle(R.string.new_theme)
-            .setNegativeButton(android.R.string.cancel, null)
-            .setItems(actions) { _, i ->
-                when (i) {
-                    0 -> importLauncher.launch("*/*")
-                    1 -> ctx.openUrl(Const.themeMakerUrl)
-                }
-            }
-            .show()
+        importLauncher.launch("*/*")
     }
 
     private fun selectTheme(theme: Theme) {

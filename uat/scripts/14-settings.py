@@ -78,7 +78,7 @@ THEME_ZIP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
 
 
 def push_theme(d):
-    """a theme file (.theme, a zip inside) in 下载 as the web page exports one: the testdata theme (3.0) with a striped picture,
+    """a theme file (.theme, a zip inside) in 下载: the testdata theme (3.0) with a striped picture,
     drawn sharp and at full brightness so the keyboard shows its orange and blue"""
     import io
     import json
@@ -118,10 +118,9 @@ def push_theme(d):
 
 
 def import_theme(d, name):
-    """新增主题 → 导入文件…, the file [name] in the system's picker (it opens at 下载 or the recent ones)"""
+    """新增主题, which opens the system's picker straight away: the file [name] there (it opens at 下载 or the recent ones)"""
     appearance_tab(d, "主题")
-    d.tap_text("新增主题", after=1.2)
-    d.tap_text("导入文件…", contains=True, scroll=False, after=2.5)
+    d.tap_text("新增主题", after=3.0)
     s = d.screen()
     n = next((k for k in s.app() if k.text and k.text.startswith(name)), None)
     if not n and s.find(text="下载"):
@@ -250,7 +249,7 @@ def st09(d):
 
 
 
-case("ST-35", needs="jvm:SettingsMenuUatTest.themesAreMadeOnTheWebAndOnesOwnExportedOrDeletedFromALongPress、MonetKeyStyleTest")(lambda d: None)
+case("ST-35", needs="jvm:SettingsMenuUatTest.themesAreImportedAndOnesOwnExportedOrDeletedFromALongPress、MonetKeyStyleTest")(lambda d: None)
 
 
 case("ST-36", needs="jvm:SettingsMenuUatTest.followingTheSystemAThemeTappedAsks")(lambda d: None)
@@ -578,7 +577,6 @@ case("ST-54", needs="jvm:ThemeFilesManagerTest.aThemeOfALaterFormatIsSkippedAndL
 case("ST-55", needs="jvm:ThemeFilesManagerTest.aThemeWhosePictureOrFontIsGoneIsNotListedAndTheUserIsToldItIsGone")(lambda d: None)
 
 
-case("ST-56", needs="manual:主题制作网页在电脑浏览器上手工跑（要一个和内置主题同名的主题文件）")(lambda d: None)
+case("ST-56", needs="manual:主题制作网页 0.5.2 起提供；在电脑浏览器上手工跑（要一个和内置主题同名的主题文件）")(lambda d: None)
 case("ST-57", needs="manual:分屏下主题页预览和键盘同时要毛玻璃图")(lambda d: None)
-case("ST-58", needs="manual:要一个网页上做的平铺大圆角主题文件，键角、边框、间距、候选栏要人眼看")(lambda d: None)
-case("ST-59", needs="manual:主题制作网页在电脑和手机浏览器上手工跑（滚动、下拉框、打开和下载）")(lambda d: None)
+case("ST-58", needs="manual:要一个平铺大圆角主题文件（从 from-app.theme 改出来，见用例），键角、边框、间距、候选栏要人眼看")(lambda d: None)

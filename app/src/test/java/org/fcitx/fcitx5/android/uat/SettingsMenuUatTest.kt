@@ -227,20 +227,17 @@ class SettingsMenuUatTest {
 
     @Test
     @Uat("ST-35")
-    fun themesAreMadeOnTheWebAndOnesOwnExportedOrDeletedFromALongPress() {
+    fun themesAreImportedAndOnesOwnExportedOrDeletedFromALongPress() {
         val follow = ThemeManager.prefs.followSystemDayNightTheme
         follow.setValue(false)
         val mine = ThemePreset.PixelDark.deriveCustomNoBackground("mine")
         assertTrue(ThemeManager.saveTheme(mine))
         try {
             st.open(SettingsRoute.Theme)
-            // 新增主题: an import and the web page, nothing made here
+            // 新增主题: straight to the import's file picker, no menu, nothing made here
             themeList().findViewHolderForAdapterPosition(0)!!.itemView.performClick()
             st.idle()
-            val adds = dialog().listView.adapter.let { a -> (0 until a.count).map { a.getItem(it).toString() } }
-            assertEquals(listOf("导入文件…", "在网页上制作…"), adds)
-            dialog().dismiss()
-            st.idle()
+            assertEquals(Intent.ACTION_GET_CONTENT, shadowOf(st.activity).nextStartedActivity?.action)
             // one's own theme: no edit button, its long press 导出 or 删除
             pick("mine")
             assertEquals("mine", ThemeManager.activeTheme.name)
