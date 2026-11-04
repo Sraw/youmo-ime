@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -57,7 +58,7 @@ class KeyMarksUatTest {
         made?.close()
     }
 
-    // [v]'s place on [key]: T(op), M(iddle) or B(ottom); L(eft), C(entre) or R(ight); - for none drawn
+    // [v]'s place on [key]: T(op) or B(ottom); L(eft), C(entre) or R(ight); - for none drawn
     private fun corner(key: View, v: View?): String {
         if (v == null || !h.shown(v) || v.alpha == 0f) return "-"
         val k = h.box(key)
@@ -187,6 +188,22 @@ class KeyMarksUatTest {
         assertEquals(first, marks())
         fresh().start()
         assertEquals(first, marks())
+    }
+
+    // a letter's long press turned off with the keyboard up: its corner emptied, its shortcut's mark
+    // once stayed where it was placed beside the symbol, not where a keyboard made with the setting puts it
+    @Test
+    @Uat("KB-66")
+    fun aLongPressTurnedOffPlacesTheMarksAsAKeyboardMadeWithIt() {
+        prefs.set(AppPrefs.getInstance().internal.keyShortcuts, KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好")).serialize())
+        h.start()
+        val before = marksOf("q")
+        prefs.set(AppPrefs.getInstance().internal.popupOverrides, "q")
+        h.idle()
+        val changed = marksOf("q")
+        assertTrue(before, before != changed)
+        fresh().start()
+        assertEquals(marksOf("q"), changed)
     }
 
     // either remakes the keyboard (FcitxInputMethodService.recreateInputViewPrefs): KeySwipes places

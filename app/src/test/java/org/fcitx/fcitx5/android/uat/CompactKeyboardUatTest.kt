@@ -41,8 +41,9 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * 键盘高度 紧凑 (uat/14 ST-51, 051-compact): the keys' text 0.9 of the size, one mark a key in its top
- * right corner, the keys made anew only as the level goes into or out of it.
+ * 键盘高度 紧凑 (uat/14 ST-51, 051-compact): the keys' text 0.9 of the size, every mark drawn (symbols
+ * and shortcuts; one too low for the bottom edge moved to the first free corner, KeyMarks.onKeys), the
+ * keys made anew only as the level goes into or out of it.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)

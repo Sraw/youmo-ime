@@ -48,6 +48,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -65,6 +66,9 @@ import splitties.dimensions.dp
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class HandwritingUatTest {
+
+    @get:Rule
+    val prefs = PrefsRule()
 
     private val handwriting = InputMethodEntry(InputMethodCatalog.HANDWRITING, "手写", "", "", "写", "zh_CN", "androidengine", false)
 
@@ -321,7 +325,7 @@ class HandwritingUatTest {
             card.contentDescription,
         )
         // 上屏 and 复制 last in it, then the learning menu's lines; the card no line to pick
-        assertEquals(listOf(s.getString(R.string.clipboard_split_commit), s.getString(R.string.a11y_copy)), texts.takeLast(2))
+        assertEquals(listOf(s.getString(R.string.quick_phrase_commit), s.getString(R.string.quick_phrase_copy)), texts.takeLast(2))
         val menuLines = (1 until menu.listView!!.adapter.count).map { menu.listView!!.adapter.getItem(it).toString() }
         assertTrue(menuLines.toString(), h.service.getString(R.string.learning_block) in menuLines)
         assertFalse(menu.listView!!.adapter.isEnabled(0))
@@ -343,7 +347,7 @@ class HandwritingUatTest {
         written("银行")
         var menu = held("行")
         h.api.calls.clear()
-        val copy = KeyboardHarness.all(menu.row(0)).filterIsInstance<TextView>().single { it.text == h.service.getString(R.string.a11y_copy) }
+        val copy = KeyboardHarness.all(menu.row(0)).filterIsInstance<TextView>().single { it.text == h.service.getString(R.string.quick_phrase_copy) }
         assertTrue(copy.performClick())
         h.idle()
         val clip = h.service.getSystemService(ClipboardManager::class.java).primaryClip!!
@@ -353,7 +357,7 @@ class HandwritingUatTest {
         assertEquals(null, h.inputView.candidateActionMenu)
         // 上屏: as the candidate tapped
         menu = held("行")
-        KeyboardHarness.all(menu.row(0)).filterIsInstance<TextView>().single { it.text == h.service.getString(R.string.clipboard_split_commit) }.performClick()
+        KeyboardHarness.all(menu.row(0)).filterIsInstance<TextView>().single { it.text == h.service.getString(R.string.quick_phrase_commit) }.performClick()
         h.idle()
         assertTrue(h.api.calls.toString(), "select(0, 行)" in h.api.calls)
         assertEquals(null, h.inputView.candidateActionMenu)
@@ -373,7 +377,7 @@ class HandwritingUatTest {
         assertTrue("${card.readingsScroll.measuredHeight}", card.readingsScroll.measuredHeight < card.readingsScroll.getChildAt(0).measuredHeight)
         h.relayout()
         // 上屏 and 复制 in the right column, under the radical and the rest
-        val copy = KeyboardHarness.all(card).filterIsInstance<TextView>().single { it.text == h.service.getString(R.string.a11y_copy) }
+        val copy = KeyboardHarness.all(card).filterIsInstance<TextView>().single { it.text == h.service.getString(R.string.quick_phrase_copy) }
         val at = Rect().also(copy::getDrawingRect).also { card.offsetDescendantRectToMyCoords(copy, it) }
         val readings = Rect().also(card.readingsScroll::getDrawingRect).also { card.offsetDescendantRectToMyCoords(card.readingsScroll, it) }
         assertTrue("$at right of $readings", at.left >= readings.right)
@@ -385,18 +389,14 @@ class HandwritingUatTest {
     @Uat("HW-29")
     @Config(qualifiers = "zh-rCN-w851dp-h393dp-land-440dpi")
     fun theCardOnTheFloatingKeyboardIsOneColumn() {
-        ThemeManager.prefs.floatingKeyboard.setValue(true)
-        try {
-            h.api.charCards["行"] = hang
-            h.start()
-            written("银行")
-            val menu = held("行")
-            assertEquals(LinearLayout.VERTICAL, (menu.row(0) as CharCardView).orientation)
-            h.relayout()
-            h.capture("HandwritingUatTest/char_card_floating", menu.listView!!.rootView)
-        } finally {
-            ThemeManager.prefs.floatingKeyboard.setValue(false)
-        }
+        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        h.api.charCards["行"] = hang
+        h.start()
+        written("银行")
+        val menu = held("行")
+        assertEquals(LinearLayout.VERTICAL, (menu.row(0) as CharCardView).orientation)
+        h.relayout()
+        h.capture("HandwritingUatTest/char_card_floating", menu.listView!!.rootView)
     }
 
     // 乾 not taken apart and no stroke order: those lines left out; 和's six readings scrolled past four

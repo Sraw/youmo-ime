@@ -130,7 +130,7 @@ class ZhuyinShortcutsUatTest {
         st.open(SettingsRoute.PopupOverrides)
         val chips = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<Chip>().map { it.text.toString() }.toList()
         val nine = chips.indexOf(st.s(R.string.shortcut_page_zy9))
-        assertTrue(chips.toString(), nine >= 0 && chips[nine + 1] == st.s(R.string.shortcut_page_zyfull))
+        assertTrue(chips.toString(), nine >= 0 && chips.getOrNull(nine + 1) == st.s(R.string.shortcut_page_zyfull))
         KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<Chip>().first { it.text.toString() == chips[nine] }.performClick()
         st.idle()
         val texts = st.texts()

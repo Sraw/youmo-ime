@@ -114,11 +114,11 @@ class KeyboardPickerUatTest {
         prefs.set(keyboard.englishKeyboard, EnglishKeyboard.Full)
         start()
         // pinyin: the six (two of them zhuyin's), 全键盘 ticked; the nine keys picked, the keyboard is them
-        val four = listOf(R.string.pinyin_keyboard_full, R.string.keyboard_18, R.string.pinyin_keyboard_14, R.string.keyboard_nine, R.string.keyboard_zhuyin_nine, R.string.keyboard_zhuyin_full).map(::s)
-        assertEquals(four to s(R.string.pinyin_keyboard_full), picked(R.string.keyboard_nine))
+        val pinyinKeyboards = listOf(R.string.pinyin_keyboard_full, R.string.keyboard_18, R.string.pinyin_keyboard_14, R.string.keyboard_nine, R.string.keyboard_zhuyin_nine, R.string.keyboard_zhuyin_full).map(::s)
+        assertEquals(pinyinKeyboards to s(R.string.pinyin_keyboard_full), picked(R.string.keyboard_nine))
         assertEquals(PinyinKeyboard.NineKeys, keyboard.pinyinKeyboard.getValue())
         assertTrue(h.texts().toString(), "重输" in h.texts())
-        assertEquals(four to s(R.string.keyboard_nine), picked())
+        assertEquals(pinyinKeyboards to s(R.string.keyboard_nine), picked())
         h.start()
         // 注音九键 picked while pinyin is already traditional: nothing to tell, nor marked told
         EngineState.traditionalIms = setOf(InputMethodCatalog.PINYIN)
@@ -136,7 +136,7 @@ class KeyboardPickerUatTest {
         EngineState.traditionalIms = emptySet()
         h.start()
         // 大千 picked on 简体: said once that 繁体 is in ⋯
-        assertEquals(four to s(R.string.keyboard_zhuyin_nine), picked(R.string.keyboard_zhuyin_full))
+        assertEquals(pinyinKeyboards to s(R.string.keyboard_zhuyin_nine), picked(R.string.keyboard_zhuyin_full))
         assertEquals(PinyinKeyboard.ZhuyinFull, keyboard.pinyinKeyboard.getValue())
         assertTrue(AppPrefs.getInstance().internal.zhuyinTraditionalTold.getValue())
         assertTrue(h.texts().toString(), "ㄅ" in h.texts())
@@ -177,8 +177,8 @@ class KeyboardPickerUatTest {
         h.tap(h.described(s(R.string.status_keyboard)))
         val menu = ShadowPopupMenu.getLatestPopupMenu().menu
         val items = (0 until menu.size()).map { menu.getItem(it) }
-        val four = listOf(R.string.pinyin_keyboard_full, R.string.keyboard_18, R.string.pinyin_keyboard_14, R.string.keyboard_nine, R.string.keyboard_zhuyin_nine, R.string.keyboard_zhuyin_full).map(::s)
-        assertEquals(four, items.map { it.title.toString() })
+        val pinyinKeyboards = listOf(R.string.pinyin_keyboard_full, R.string.keyboard_18, R.string.pinyin_keyboard_14, R.string.keyboard_nine, R.string.keyboard_zhuyin_nine, R.string.keyboard_zhuyin_full).map(::s)
+        assertEquals(pinyinKeyboards, items.map { it.title.toString() })
         assertEquals(s(R.string.pinyin_keyboard_full), items.single { it.isChecked }.title.toString())
         shadowOf(ShadowPopupMenu.getLatestPopupMenu()).onMenuItemClickListener.onMenuItemClick(items.first { it.title.toString() == s(R.string.keyboard_nine) })
         h.idle()

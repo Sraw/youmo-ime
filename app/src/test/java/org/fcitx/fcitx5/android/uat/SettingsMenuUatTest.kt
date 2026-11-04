@@ -245,7 +245,10 @@ class SettingsMenuUatTest {
             pick("mine")
             assertEquals("mine", ThemeManager.activeTheme.name)
             val at = (themeList().adapter as ThemeListAdapter).entries.indexOfFirst { it.name == "mine" } + 1
-            themeList().findViewHolderForAdapterPosition(at)!!.itemView.performLongClick()
+            val row = themeList().findViewHolderForAdapterPosition(at)!!.itemView
+            // no edit button: nothing in the row takes a tap but the row itself (which picks the theme)
+            assertEquals(0, KeyboardHarness.all(row).count { it !== row && it.hasOnClickListeners() })
+            row.performLongClick()
             st.idle()
             val actions = dialog().listView.adapter.let { a -> (0 until a.count).map { a.getItem(it).toString() } }
             assertEquals(listOf("导出", "删除"), actions)

@@ -218,7 +218,9 @@ class KeyMarksEverywhereUatTest {
     // runs and lets go (a heap dump's only path; the clock moved, none was left). Moving the clock
     // after each would do too, with the symbol page and a table's keys set again after each rebuild: not
     // made anew here, its keys laid out again as a new one lays them out (check), the swipes' marks by
-    // their own listener (KeySwipes)
+    // their own listener (KeySwipes). Not registered again: [check] runs once on a harness closed right
+    // after it, whose service unregisters it on destroy anyway. The field read by name: renamed, this
+    // fails loudly (NoSuchFieldException), never silently
     private fun noRebuilds(h: KeyboardHarness) {
         val field = h.service.javaClass.getDeclaredField("recreateInputViewListener").apply { isAccessible = true }
         @Suppress("UNCHECKED_CAST")

@@ -155,6 +155,7 @@ class SettingsUatTest {
         ThemeManager.prefs.followSystemDayNightTheme.setValue(false)
         ThemeManager.setNormalModeTheme(ThemePreset.PixelLight)
         // the preview as shipped, the tests' baseline embedded (OneDefaultPreferencesShadow)
+        val codeRowWas = ThemeManager.prefs.codeRow.getValue()
         ThemeManager.prefs.codeRow.setValue(CodeRowStyle.Floating)
         try {
             activity
@@ -180,7 +181,7 @@ class SettingsUatTest {
         } finally {
             ThemeManager.setNormalModeTheme(ThemePreset.PixelLight)
             ThemeManager.prefs.followSystemDayNightTheme.setValue(ThemeManager.prefs.followSystemDayNightTheme.defaultValue)
-            ThemeManager.prefs.codeRow.setValue(CodeRowStyle.Embedded)
+            ThemeManager.prefs.codeRow.setValue(codeRowWas)
         }
     }
 
@@ -270,7 +271,7 @@ class SettingsUatTest {
         st.pref(R.string.im_fuzzy).performClick()
         idle()
         val fuzzy = KeyboardHarness.all(ShadowDialog.getLatestDialog().window!!.decorView).filterIsInstance<TextView>().map { it.text.toString() }.toList()
-        assertTrue(fuzzy.toString(), fuzzy.any { notFor(c.T9, c.SHUANGPIN_NINE, c.ZHUYIN_NINE, c.ZHUYIN) in it })
+        assertTrue(fuzzy.toString(), fuzzy.any { notFor(c.T9, c.SHUANGPIN_NINE) in it })
         ShadowDialog.getLatestDialog().dismiss()
         idle()
         val shared = listOf(R.string.im_page_size, R.string.im_prediction, R.string.im_model_level, R.string.im_typos, R.string.im_fuzzy).map(::s)

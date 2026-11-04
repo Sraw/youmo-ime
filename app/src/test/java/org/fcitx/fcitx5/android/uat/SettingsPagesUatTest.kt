@@ -163,6 +163,8 @@ class SettingsPagesUatTest {
         idle()
         val d = dialog()
         if (typed != null) KeyboardHarness.all(d.window!!.decorView).filterIsInstance<EditText>().single().setText(typed)
+        // every per-key dialog names its reset 恢复此键默认, as uat T9-29 tells the tester to find it
+        if (button == AlertDialog.BUTTON_NEUTRAL) assertEquals(activity.getString(R.string.reset_this_key), d.getButton(button).text.toString())
         d.getButton(button).performClick()
         idle()
     }
