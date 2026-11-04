@@ -176,6 +176,7 @@
     <string name="import_user_data">Restore a backup</string>
     <string name="exception_user_data_filename">The filename extension of %1$s does not indicate a Youmo IME backup</string>
     <string name="exception_user_data_metadata">Unable to find metadata of user data</string>
+    <string name="exception_user_data_no_room">The backup does not fit in the phone\'s free storage</string>
     <string name="exception_user_data_package_name_mismatch">User data does not match current application</string>
     <string name="exception_user_data_too_old">This backup is from 0.3.0 or earlier, whose learning this version no longer reads. Restore it in 0.4.x, type a few characters and pause, back up again, then restore that here</string>
     <string name="user_data_imported">User data on %1$s has been imported, restarting…</string>
@@ -281,6 +282,7 @@
     <string name="toolbar_reset">Reset to default</string>
     <string name="toolbar_trad_simp">Simplified / Traditional</string>
     <string name="long_press_of">Long press on “%1$s”</string>
+    <string name="reset_this_key">Restore this key\'s default</string>
     <string name="long_press_editor_hint">The outlined one is what you get by holding the key and letting go, and by swiping it, and the small character on the key. Tap a character to select it, then use the buttons below.</string>
     <string name="letters">Letters</string>
     <string name="other_keys">Other keys</string>
@@ -324,14 +326,6 @@
     <string name="learning_done_delete_phrase">Deleted “%1$s” from custom phrases</string>
     <string name="learning_done_no_predict">“%1$s” no longer suggested here</string>
     <string name="learning_undo_gone">Too late to undo</string>
-    <string name="not_learned_glyph">学</string>
-    <string name="not_learned_mark">Not learning here</string>
-    <string name="not_learned_password">A password field: nothing typed here is learned</string>
-    <string name="not_learned_app_asks">The app asks for nothing to be kept here (incognito, say): nothing is learned</string>
-    <string name="not_learned_own_app">A field of this keyboard\'s own: nothing is learned</string>
-    <string name="not_learned_habits_off">“Don\'t use my habits” is on: nothing is learned; restore it in ⋯</string>
-    <string name="not_learned_no_pairs">An address, email or number field: words are learned, not which follow which</string>
-    <string name="not_learned_no_predict">A search field: no suggestions after a word, none learned</string>
     <string name="learning_habits_off">Don\'t use my habits</string>
     <string name="learning_habits_on">Use my habits again</string>
     <string name="learning_clear_recent">Clear recent</string>
@@ -838,6 +832,7 @@
     <string name="engine_unloadable">Input method data could not be loaded. Reinstall the app; for an imported table, import it again.</string>
     <string name="config_unreadable">Some of your input settings could not be read. They are left as they were: typing uses their defaults for now, and changes to them are not saved until the phone is restarted.</string>
     <string name="config_not_settled">Your input settings could not be put in place. Typing may use their defaults this time, and changes are not saved until the phone is restarted.</string>
+    <string name="theme_file_missing">A picture or font of one of your themes is gone (deleted, or not in a backup restored): that theme is not listed. Import it again to use it.</string>
     <string name="user_data_unreadable">Some of what you added (custom phrases, quick input, your punctuation table, themes) could not be read or put in place. It is left as it was and not saved over: for now it is missing or the built-in one is used. Restart the phone to try again.</string>
     <string name="user_data_not_settled">What you added and your settings could not be put in place this time, so they cannot be changed, backed up or restored now. Restart the phone to try again.</string>
     <string name="split_keyboard">Split keyboard</string>
@@ -1003,7 +998,7 @@
     <string name="shortcut_change">Change</string>
     <string name="shortcut_section_up">Shortcut (swipe up)</string>
     <string name="shortcut_section_down">Shortcut (swipe down)</string>
-    <string name="shortcut_section_off"> (off now: turn it on in Swipe)</string>
+    <string name="shortcut_section_off">" (off now: turn it on in Swipe)"</string>
     <string name="shortcut_apply_presets">Apply edit shortcuts</string>
     <string name="shortcut_clear_page">Clear this page\'s shortcuts</string>
     <string name="shortcut_apply_presets_message">Set this page\'s shortcuts back to the edit presets? What you changed here is replaced.</string>
@@ -1041,7 +1036,7 @@
     <string name="host_quick_phrase_hint">type a key, or tap + Add for your own</string>
     <string name="quick_phrase_key">Key</string>
     <string name="quick_phrase_content">Content</string>
-    <string name="quick_phrase_key_invalid">A key has no spaces and at most 30 characters</string>
+    <string name="quick_phrase_key_invalid">A key has no spaces and at most %1$d characters</string>
     <string name="quick_phrase_content_too_long">At most %d characters</string>
     <string name="quick_phrase_duplicate">The same key and content are there already</string>
     <string name="quick_phrase_search">Search keys or content</string>
@@ -1050,10 +1045,12 @@
     <string name="quick_phrase_built_in_emoji_eac">Emoji codes (such as :smile:)</string>
     <string name="quick_phrase_built_in_latex">LaTeX symbols (such as \\alpha)</string>
     <string name="quick_phrase_import_done">%1$d imported, %2$d duplicates skipped</string>
+    <string name="quick_phrase_import_none">No quick input in this file: each line is a key, a space, then the text</string>
     <string name="quick_phrase_deleted">Deleted</string>
     <string name="quick_phrase_too_long_to_save">Over %d characters: too long for quick input</string>
     <string name="quick_phrase_saved">Saved</string>
     <string name="quick_phrase_import_done_too_long">%1$d imported, %2$d duplicates and %3$d over %4$d characters skipped</string>
+    <string name="quick_phrase_import_bad_key">%1$s; %2$d lines with a key that cannot be one (empty, spaces, too long) skipped</string>
     <string name="quick_phrase_discard_confirm">Discard your changes?</string>
     <string name="quick_phrase_discard">Discard</string>
     <string name="quick_phrase_keep_editing">Keep editing</string>

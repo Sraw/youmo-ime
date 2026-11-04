@@ -176,6 +176,7 @@
     <string name="import_user_data">從備份還原</string>
     <string name="exception_user_data_filename">%1$s 的副檔名並不是幽默輸入法備份</string>
     <string name="exception_user_data_metadata">無法找到使用者資料的中繼資料</string>
+    <string name="exception_user_data_no_room">備份放不下：手機剩餘空間不夠</string>
     <string name="exception_user_data_package_name_mismatch">使用者資料與目前應用程式不符合</string>
     <string name="exception_user_data_too_old">這個備份來自 0.3.0 或更早的版本，這一版不再讀取那時學到的內容。請先在 0.4.x 裡還原它、打幾個字、停一下、重新備份，再在這裡還原新的備份</string>
     <string name="user_data_imported">已匯入來自 %1$s 的使用者資料，正在重新啟動</string>
@@ -277,6 +278,7 @@
     <string name="toolbar_reset">恢復預設</string>
     <string name="toolbar_trad_simp">簡繁切換</string>
     <string name="long_press_of">長按「%1$s」</string>
+    <string name="reset_this_key">恢復此鍵預設</string>
     <string name="long_press_editor_hint">帶框的第一個是長按後直接放開得到的字元，也是滑動這個鍵輸入的字元，也就是鍵上的小字。點一個字元選取它，再用下面的按鈕調整。</string>
     <string name="letters">字母</string>
     <string name="other_keys">其他按鍵</string>
@@ -320,14 +322,6 @@
     <string name="learning_done_delete_phrase">已從自訂詞組中刪除「%1$s」</string>
     <string name="learning_done_no_predict">不再聯想「%1$s」</string>
     <string name="learning_undo_gone">已經復原不了了</string>
-    <string name="not_learned_glyph">學</string>
-    <string name="not_learned_mark">這裡不學</string>
-    <string name="not_learned_password">密碼框：這裡打的什麼都不學</string>
-    <string name="not_learned_app_asks">應用程式要求不記錄（例如無痕模式）：什麼都不學</string>
-    <string name="not_learned_own_app">本輸入法自己的輸入框：什麼都不學</string>
-    <string name="not_learned_habits_off">開著「不用我的輸入習慣」：什麼都不學，在 ⋯ 裡恢復</string>
-    <string name="not_learned_no_pairs">網址、郵箱、數字框：只學詞，不學詞和詞的前後搭配</string>
-    <string name="not_learned_no_predict">搜尋框：不出聯想，也不學聯想</string>
     <string name="learning_habits_off">不用我的輸入習慣</string>
     <string name="learning_habits_on">恢復我的輸入習慣</string>
     <string name="learning_clear_recent">清掉最近</string>
@@ -817,6 +811,7 @@
     <string name="engine_unloadable">輸入法資料無法載入，請重新安裝應用程式；如果是匯入的碼表，請重新匯入。</string>
     <string name="config_unreadable">部分輸入設定讀取失敗。這些設定原樣保留：這次先按預設值打字，變更在重新啟動手機前不會儲存。</string>
     <string name="config_not_settled">輸入設定暫時無法就位。這次打字可能用的是預設設定，變更在重新啟動手機前不會儲存。</string>
+    <string name="theme_file_missing">你的某個主題缺了圖片或字型檔案（被刪掉，或還原的備份裡沒有），這個主題不再列出。重新匯入它就能再用。</string>
     <string name="user_data_unreadable">部分你新增的內容（自訂短語、快速輸入、標點表、主題）讀取失敗或無法就位。它們原樣保留、不會被覆蓋：這次暫時缺少或改用內建的。重新啟動手機後再試。</string>
     <string name="user_data_not_settled">你新增的內容和設定這次無法就位，暫時不能修改、備份或還原。重新啟動手機後再試。</string>
     <string name="split_keyboard">分體鍵盤</string>
@@ -1017,7 +1012,7 @@
     <string name="host_quick_phrase_hint">打關鍵詞，或點＋新增自己的</string>
     <string name="quick_phrase_key">關鍵詞</string>
     <string name="quick_phrase_content">內容</string>
-    <string name="quick_phrase_key_invalid">關鍵詞不能有空格，最多 30 個字</string>
+    <string name="quick_phrase_key_invalid">關鍵詞不能有空格，最多 %1$d 個字</string>
     <string name="quick_phrase_content_too_long">內容最多 %d 字</string>
     <string name="quick_phrase_duplicate">已經有一條關鍵詞和內容都一樣的</string>
     <string name="quick_phrase_search">搜尋關鍵詞或內容</string>
@@ -1026,10 +1021,12 @@
     <string name="quick_phrase_built_in_emoji_eac">表情代碼（:smile: 這樣）</string>
     <string name="quick_phrase_built_in_latex">LaTeX 符號（\\alpha 這樣）</string>
     <string name="quick_phrase_import_done">匯入 %1$d 條，略過 %2$d 條重複</string>
+    <string name="quick_phrase_import_none">這個檔案裡沒有快速輸入：每行是關鍵詞、空格、內容</string>
     <string name="quick_phrase_deleted">已刪除</string>
     <string name="quick_phrase_too_long_to_save">超過 %d 字，存不成快速輸入</string>
     <string name="quick_phrase_saved">已儲存</string>
     <string name="quick_phrase_import_done_too_long">匯入 %1$d 條，略過 %2$d 條重複、%3$d 條超過 %4$d 字</string>
+    <string name="quick_phrase_import_bad_key">%1$s；另略過 %2$d 條關鍵詞無效（空的、有空格或太長）</string>
     <string name="quick_phrase_discard_confirm">放棄這次的修改？</string>
     <string name="quick_phrase_discard">放棄</string>
     <string name="quick_phrase_keep_editing">繼續編輯</string>

@@ -176,6 +176,7 @@
     <string name="import_user_data">从备份恢复</string>
     <string name="exception_user_data_filename">文件 %1$s 的拓展名不是幽默输入法备份</string>
     <string name="exception_user_data_metadata">找不到用户数据的元数据</string>
+    <string name="exception_user_data_no_room">备份放不下：手机剩余空间不够</string>
     <string name="exception_user_data_package_name_mismatch">用户数据与当前应用不匹配</string>
     <string name="exception_user_data_too_old">这个备份来自 0.3.0 或更早的版本，这一版不再读取那时学到的内容。请先在 0.4.x 里恢复它、打几个字、停一下、重新备份，再在这里恢复新的备份</string>
     <string name="user_data_imported">已导入来自 %1$s 的用户数据，正在重启…</string>
@@ -277,6 +278,7 @@
     <string name="toolbar_reset">恢复默认</string>
     <string name="toolbar_trad_simp">简繁切换</string>
     <string name="long_press_of">长按“%1$s”</string>
+    <string name="reset_this_key">恢复此键默认</string>
     <string name="long_press_editor_hint">带框的第一个是长按后直接松手得到的字符，也是滑动这个键输入的字符，也就是键上的小字。点一个字符选中它，再用下面的按钮调整。</string>
     <string name="letters">字母</string>
     <string name="other_keys">其他按键</string>
@@ -320,14 +322,6 @@
     <string name="learning_done_delete_phrase">已从自定义词组中删除「%1$s」</string>
     <string name="learning_done_no_predict">不再联想「%1$s」</string>
     <string name="learning_undo_gone">已经撤销不了了</string>
-    <string name="not_learned_glyph">学</string>
-    <string name="not_learned_mark">这里不学</string>
-    <string name="not_learned_password">密码框：这里打的什么都不学</string>
-    <string name="not_learned_app_asks">应用要求不记录（例如无痕模式）：什么都不学</string>
-    <string name="not_learned_own_app">本输入法自己的输入框：什么都不学</string>
-    <string name="not_learned_habits_off">开着「不用我的输入习惯」：什么都不学，在 ⋯ 里恢复</string>
-    <string name="not_learned_no_pairs">网址、邮箱、数字框：只学词，不学词和词的前后搭配</string>
-    <string name="not_learned_no_predict">搜索框：不出联想，也不学联想</string>
     <string name="learning_habits_off">不用我的输入习惯</string>
     <string name="learning_habits_on">恢复我的输入习惯</string>
     <string name="learning_clear_recent">清掉最近</string>
@@ -817,6 +811,7 @@
     <string name="engine_unloadable">输入法数据无法加载，请重新安装应用；如果是导入的码表，请重新导入。</string>
     <string name="config_unreadable">部分输入设置读取失败。这些设置原样保留：这次先按默认值打字，改动在重启手机前不会保存。</string>
     <string name="config_not_settled">输入设置暂时无法就位。这次打字可能用的是默认设置，改动在重启手机前不会保存。</string>
+    <string name="theme_file_missing">你的某个主题缺了图片或字体文件（被删掉，或恢复的备份里没有），这个主题不再列出。重新导入它就能再用。</string>
     <string name="user_data_unreadable">部分你添加的内容（自定义短语、快速输入、标点表、主题）读取失败或无法就位。它们原样保留、不会被覆盖：这次暂时缺失或改用内置的。重启手机后再试。</string>
     <string name="user_data_not_settled">你添加的内容和设置这次无法就位，暂时不能修改、备份或恢复。重启手机后再试。</string>
     <string name="split_keyboard">分体键盘</string>
@@ -1017,7 +1012,7 @@
     <string name="host_quick_phrase_hint">打关键词，或点＋添加自己的</string>
     <string name="quick_phrase_key">关键词</string>
     <string name="quick_phrase_content">内容</string>
-    <string name="quick_phrase_key_invalid">关键词不能有空格，最多 30 个字</string>
+    <string name="quick_phrase_key_invalid">关键词不能有空格，最多 %1$d 个字</string>
     <string name="quick_phrase_content_too_long">内容最多 %d 字</string>
     <string name="quick_phrase_duplicate">已经有一条关键词和内容都一样的</string>
     <string name="quick_phrase_search">搜索关键词或内容</string>
@@ -1026,10 +1021,12 @@
     <string name="quick_phrase_built_in_emoji_eac">表情代码（:smile: 这样）</string>
     <string name="quick_phrase_built_in_latex">LaTeX 符号（\\alpha 这样）</string>
     <string name="quick_phrase_import_done">导入 %1$d 条，跳过 %2$d 条重复</string>
+    <string name="quick_phrase_import_none">这个文件里没有快速输入：每行是关键词、空格、内容</string>
     <string name="quick_phrase_deleted">已删除</string>
     <string name="quick_phrase_too_long_to_save">超过 %d 字，存不成快速输入</string>
     <string name="quick_phrase_saved">已保存</string>
     <string name="quick_phrase_import_done_too_long">导入 %1$d 条，跳过 %2$d 条重复、%3$d 条超过 %4$d 字</string>
+    <string name="quick_phrase_import_bad_key">%1$s；另跳过 %2$d 条关键词无效（空的、有空格或太长）</string>
     <string name="quick_phrase_discard_confirm">放弃这次的修改？</string>
     <string name="quick_phrase_discard">放弃</string>
     <string name="quick_phrase_keep_editing">继续编辑</string>
