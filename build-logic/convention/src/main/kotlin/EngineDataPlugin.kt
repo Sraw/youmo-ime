@@ -25,8 +25,8 @@ import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
-import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
@@ -481,7 +481,7 @@ class EngineDataPlugin : Plugin<Project> {
                         "pinyin", "-o", output().path, "--lm", lm.get().asFile.path,
                         "--remove", remove.get().asFile.path, "--readings", readings.get().asFile.path,
                         "--misreadings", misreadings.get().asFile.path,
-                        "--char-tones", charTones.files.joinToString(",") { it.path },
+                        "--char-tones", charTones.files.joinToString(File.pathSeparator) { it.path },
                         "--phrase-tones", phraseTones.get().asFile.path, "--tones", tones.get().asFile.path,
                     ) + dictionaries.files.map { it.path }
                 )

@@ -72,9 +72,12 @@ val Project.buildTimestamp
 val Project.buildAbiOverride: String?
     get() = epn("BUILD_ABI", "buildABI")
 
-// A test build's <profileable shell="true">, for simpleperf on an unrooted phone; never a release's
+// A test build's <profileable shell="true">, for simpleperf on an unrooted phone; never a release's:
+// said aloud, so a BUILD_PROFILEABLE left in the environment is seen before a release is built with it
 val Project.buildProfileable: Boolean
-    get() = epn("BUILD_PROFILEABLE", "buildProfileable") == "true"
+    get() = (epn("BUILD_PROFILEABLE", "buildProfileable") == "true").also {
+        if (it) logger.warn("buildProfileable: this build is profileable from the shell (a test build's; never a release's)")
+    }
 
 val Project.signKeyBase64: String?
     get() = epn("SIGN_KEY_BASE64", "signKeyBase64")

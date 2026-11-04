@@ -119,11 +119,21 @@ android {
                 // mockk's agent attached from inside the test JVM: by default ByteBuddy starts a second
                 // process to attach it, which under a full run's load at times fails and takes every
                 // mockk test of that JVM with it (JvmMockKGateway); the attach's own wait, 10 s, ran
-                // out under that load too (the JVM's attach listener slow to answer), given a minute
+                // out under that load too (the JVM's attach listener slow to answer), and so did a minute:
+                // the agent loaded when the JVM starts instead, so nothing is attached (ByteBuddyAgent
+                // finds it already installed); the attach settings stay for an IDE's run without it
                 it.jvmArgs(
                     "-Djdk.attach.allowAttachSelf=true", "-XX:+EnableDynamicAgentLoading",
                     "-Dsun.tools.attach.attachTimeout=60000",
                 )
+                val test = it
+                // the byte-buddy-agent on the test's own classpath: the version mockk resolved to
+                it.jvmArgumentProviders.add(CommandLineArgumentProvider {
+                    val agents = test.classpath.files.filter { f -> f.name.startsWith("byte-buddy-agent-") }
+                    val agent = agents.singleOrNull()
+                        ?: error("${test.name}: one byte-buddy-agent expected on the classpath, found ${agents.map { f -> f.name }} (mockk's dependency changed?)")
+                    listOf("-javaagent:${agent.path}")
+                })
                 // fixtures found from any working directory (an IDE's run too): core/Fixtures.kt
                 it.systemProperty("uat.fixtures", rootProject.file("uat/fixtures").path)
                 // the theme maker's shared cases (ThemeMakerRulesTest): compared, or with -PupdateThemeMaker written
