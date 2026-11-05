@@ -186,6 +186,8 @@ class MainTest {
             arrayOf("handwriting", "d", "r", "--model-weights", "1"),
             // the models read the sentences at one ink weight
             arrayOf("handwriting", "d", "r", "--rerank", "m", "--weights", "1,2"),
+            arrayOf("voice-post", "s", "--source", "best"),
+            arrayOf("voice-post", "s", "--without", "tidy,punct"),
             arrayOf(),
         )
         for (args in usageErrors) assertEquals(args.joinToString(" "), 2, exit(*args))

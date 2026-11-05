@@ -17,11 +17,12 @@ object VoiceDisfluency {
 
     private const val MARKS = "，。？！、；：,.?!;:"
     private const val STRONG = "？?。.！!"
-    private const val GAP = "$MARKS\\s"
+    // spaces, not a new line (a command's): what is on two lines is not one run
+    private const val GAP = "$MARKS \\t"
 
     // 呃 is no word's; 嗯 none's either, but 嗯嗯 is a yes. 额 and 唔 are words' (金额, 唔该): alone only, between
     // marks, ends or other fillers
-    private const val FILLER = "(?<!嗯)嗯(?!嗯)|呃+|(?<=^|[${GAP}呃嗯])[额唔]+(?=$|[$GAP])"
+    private const val FILLER = "(?<!嗯)嗯(?!嗯)|呃+|(?<=^|[${GAP}呃嗯\\n])[额唔]+(?=$|[$GAP\\n])"
 
     // the fillers of a run, with the marks and spaces about them; from the first of those only (a long run of
     // marks is not tried from each)

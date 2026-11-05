@@ -44,7 +44,7 @@ any change to behaviour or settings.
 | English typing measured: committed as meant, wrongly corrected, slips fixed, words offered before a key | `ime-eval english <english.data> lib/ime-eval/data/english.txt [--misses <out.tsv>]` |
 | English glide typing measured on simulated paths: first, first three, time a word | `ime-eval english-glide <english.data> lib/ime-eval/data/english.txt [--wobble 0.3] [--misses <out.tsv>]` |
 | Pinyin glide typing measured the same way, a dictionary word at a time (`--word nihao`: one clean path's readings; 双拼, the nine keys, a table's codes instead) | `ime-eval pinyin-glide <pinyin.data> lib/ime-eval/data/pinyin-chat.tsv [--shuangpin Ziranma \| --keys nine \| --table <wbx.data>] [--misses <out.tsv>]` |
-| Voice post-processing measured on recorded stretches (voice-eval's `seg_app.py <set>`: the app's VAD, recognizer and rerank, each stretch's n-best and time; no recognizer runs here): CER, written CER, marks P/R/F1, ends | `ime-eval voice-post <seg-<set>.jsonl>... [--source app\|top] [--without tidy] [--misses <out.tsv>]` |
+| Voice post-processing measured on recorded stretches (voice-eval's `seg_app.py <set>`: the app's VAD, recognizer and rerank, each stretch's n-best and time; no recognizer runs here): CER, written CER, marks P/R/F1, ends | `ime-eval voice-post <seg-<set>.jsonl>... [--source app\|top] [--without tidy,commands] [--misses <out.tsv>]` |
 
 Unit tests need no NDK or CMake (the repo has no submodules). Instrumented tests (`HostTest`, `SoftKeyboardTest`)
 need an APK build and an emulator; CI runs them weekly / on PRs labelled `emulator`.
