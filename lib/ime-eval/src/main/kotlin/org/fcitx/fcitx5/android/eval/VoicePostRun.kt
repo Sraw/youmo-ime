@@ -191,13 +191,13 @@ internal object VoicePostRun {
     private fun JsonObject.seconds(key: String) = getValue(key).jsonPrimitive.content.toDouble()
 
     /** Scores each file of [paths] and all together; [misses], a TSV of the clips whose written text is not the reference's. */
-    fun run(paths: List<String>, source: String, misses: String?, out: Appendable): Int {
+    fun run(paths: List<String>, source: String, misses: String?, out: Appendable, layers: VoicePost.Layers = VoicePost.Layers()): Int {
         val missed = misses?.let { File(it).bufferedWriter() }
-        missed.use { run(paths, source, it, out) }
+        missed.use { run(paths, source, it, out, layers) }
         return 0
     }
 
-    private fun run(paths: List<String>, source: String, missed: Appendable?, out: Appendable) {
+    private fun run(paths: List<String>, source: String, missed: Appendable?, out: Appendable, layers: VoicePost.Layers) {
         val all = Score()
         missed?.appendLine("set\twav\tref\thyp")
         out.appendLine(HEADER)
@@ -210,7 +210,7 @@ internal object VoicePostRun {
             val scored = if (clips.any { it.written }) clips.filter { it.written } else clips
             score.unwritten = clips.size - scored.size
             for (clip in scored) {
-                val hyp = VoicePost.text(clip.stretches)
+                val hyp = VoicePost.text(clip.stretches, layers)
                 score.stretches += clip.stretches.size
                 val before = score.writtenErrors
                 score(clip.ref, hyp, score)
