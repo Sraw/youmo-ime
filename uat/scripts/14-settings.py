@@ -577,6 +577,6 @@ case("ST-54", needs="jvm:ThemeFilesManagerTest.aThemeOfALaterFormatIsSkippedAndL
 case("ST-55", needs="jvm:ThemeFilesManagerTest.aThemeWhosePictureOrFontIsGoneIsNotListedAndTheUserIsToldItIsGone")(lambda d: None)
 
 
-case("ST-56", needs="manual:主题制作网页 0.5.2 起提供；在电脑浏览器上手工跑（要一个和内置主题同名的主题文件）")(lambda d: None)
+case("ST-56", needs="manual:主题制作网页 0.6.0 起提供；在电脑浏览器上手工跑（要一个和内置主题同名的主题文件）")(lambda d: None)
 case("ST-57", needs="manual:分屏下主题页预览和键盘同时要毛玻璃图")(lambda d: None)
 case("ST-58", needs="manual:要一个平铺大圆角主题文件（从 from-app.theme 改出来，见用例），键角、边框、间距、候选栏要人眼看")(lambda d: None)

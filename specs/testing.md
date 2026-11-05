@@ -230,8 +230,8 @@ directories and gets backups retargeted to its id; the release APK is upgraded w
 
 ## The theme maker's shared files (`web/theme-maker/test/testdata/`)
 
-In 0.5.1 the app and the user docs do not link the page (user, 2026-11-04: its entry, 新增主题 → 在网页上制作…,
-is removed; the page stays on GitHub Pages for 0.5.2). Its tests below still run: the app reads the same format.
+In 0.5.x the app and the user docs do not link the page (user, 2026-11-04: its entry, 新增主题 → 在网页上制作…,
+is removed; the page stays on GitHub Pages for 0.6.0). Its tests below still run: the app reads the same format.
 UAT cases that need a theme file take `from-app.theme` from this directory and rewrite it in python (as `push_theme` does), as each says.
 
 The theme maker page draws its preview by the app's rules and reads and writes its theme files, so

@@ -8,7 +8,11 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 ---
 
-## 0.5.1（2026-11-04）
+## 0.5.2（2026-11-04）
+
+0.5.1 同一天发出，替换成了 0.5.2：0.5.1 在 Android 10–12 上会崩溃（打出带读音的候选时输入法崩溃，例如读音纠正的 jiaose → 角色 jué sè；存过快速输入条目后打开 **快速输入** 管理页时应用崩溃）。装过 0.5.1 的直接覆盖安装 0.5.2。下面是相对 0.5.0 的变化。
+
+0.5.1 went out the same day and was replaced by 0.5.2: on Android 10–12 it crashed (the keyboard on a candidate with a reading, such as a misreading's hint; the app opening the 快速输入 page once it had an entry). Install 0.5.2 over 0.5.1. Below: the changes since 0.5.0.
 
 ### 主要变化
 
