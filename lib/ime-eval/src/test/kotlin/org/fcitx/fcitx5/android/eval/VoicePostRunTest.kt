@@ -84,6 +84,10 @@ class VoicePostRunTest {
         // the first hypotheses: 你好。世界 — the words right, a period where the comma was and no end mark: 2 of 6
         assertEquals(listOf("0.00%", "33.33%"), top.lines()[1].split('\t').subList(3, 5))
         assertEquals(listOf("set\twav\tref\thyp", "x\t1.wav\t你好，世界。\t你好。世界"), misses.readLines())
+        // every clip typed, a miss or not
+        val texts = tmp.newFile("texts.tsv")
+        VoicePostRun.run(listOf(file.path), "app", null, StringBuilder(), texts = texts.path)
+        assertEquals(listOf("set\twav\tref\thyp", "x\t1.wav\t你好，世界。\t你好，世界。"), texts.readLines())
     }
 
     @Test

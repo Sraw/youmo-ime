@@ -190,16 +190,28 @@ internal object VoicePostRun {
 
     private fun JsonObject.seconds(key: String) = getValue(key).jsonPrimitive.content.toDouble()
 
-    /** Scores each file of [paths] and all together; [misses], a TSV of the clips whose written text is not the reference's. */
-    fun run(paths: List<String>, source: String, misses: String?, out: Appendable, layers: VoicePost.Layers = VoicePost.Layers()): Int {
-        val missed = misses?.let { File(it).bufferedWriter() }
-        missed.use { run(paths, source, it, out, layers) }
+    /**
+     * Scores each file of [paths] and all together; [misses], a TSV of the clips whose written text is not the reference's;
+     * [texts], one of every clip scored (what a layer after these, voice-eval's, starts from).
+     */
+    fun run(
+        paths: List<String>,
+        source: String,
+        misses: String?,
+        out: Appendable,
+        layers: VoicePost.Layers = VoicePost.Layers(),
+        texts: String? = null,
+    ): Int {
+        misses?.let { File(it).bufferedWriter() }.use { m ->
+            texts?.let { File(it).bufferedWriter() }.use { t -> run(paths, source, m, t, out, layers) }
+        }
         return 0
     }
 
-    private fun run(paths: List<String>, source: String, missed: Appendable?, out: Appendable, layers: VoicePost.Layers) {
+    private fun run(paths: List<String>, source: String, missed: Appendable?, texts: Appendable?, out: Appendable, layers: VoicePost.Layers) {
         val all = Score()
         missed?.appendLine("set\twav\tref\thyp")
+        texts?.appendLine("set\twav\tref\thyp")
         out.appendLine(HEADER)
         for (path in paths) {
             val name = File(path).name.removePrefix("seg-").removeSuffix(".jsonl")
@@ -214,7 +226,9 @@ internal object VoicePostRun {
                 score.stretches += clip.stretches.size
                 val before = score.writtenErrors
                 score(clip.ref, hyp, score)
-                if (score.writtenErrors > before) missed?.appendLine(listOf(name, clip.wav, clip.ref, hyp).joinToString("\t") { it.replace(WHITE, " ") })
+                val line = listOf(name, clip.wav, clip.ref, hyp).joinToString("\t") { it.replace(WHITE, " ") }
+                if (score.writtenErrors > before) missed?.appendLine(line)
+                texts?.appendLine(line)
             }
             out.appendLine(row(name, score))
             all.add(score)
