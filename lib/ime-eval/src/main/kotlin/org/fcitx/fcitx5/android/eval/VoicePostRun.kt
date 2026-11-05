@@ -81,11 +81,14 @@ internal object VoicePostRun {
         var endsSame = 0
         var doubled = 0
 
+        /** clips of a set with written references that have none (written_refs.py could not make one): left out */
+        var unwritten = 0
+
         fun add(o: Score) {
             clips += o.clips; stretches += o.stretches; refWords += o.refWords; wordErrors += o.wordErrors
             refWritten += o.refWritten; writtenErrors += o.writtenErrors
             for (k in tp.indices) { tp[k] += o.tp[k]; fp[k] += o.fp[k]; fn[k] += o.fn[k] }
-            refEnds += o.refEnds; hypEnds += o.hypEnds; endsSame += o.endsSame; doubled += o.doubled
+            refEnds += o.refEnds; hypEnds += o.hypEnds; endsSame += o.endsSame; doubled += o.doubled; unwritten += o.unwritten
         }
     }
 
@@ -163,15 +166,16 @@ internal object VoicePostRun {
     /**
      * A clip of a `seg_app.py` file: its reference and stretches, the [source] text of each (`app`, the rerank's; `top`, the
      * recognizer's first). The reference is the written one where written_refs.py made it (marks in, fillers and stammers out:
-     * what should be typed), else the set's own.
+     * what should be typed), else the set's own ([written] false).
      */
-    class Clip(val wav: String, val ref: String, val stretches: List<VoicePost.Stretch>)
+    class Clip(val wav: String, val ref: String, val written: Boolean, val stretches: List<VoicePost.Stretch>)
 
     fun read(file: File, source: String): List<Clip> = file.readLines().filter { it.isNotBlank() }.map { line ->
         val o = Json.parseToJsonElement(line).jsonObject
         Clip(
             o.getValue("wav").jsonPrimitive.content,
             (o["written"] ?: o.getValue("ref")).jsonPrimitive.content,
+            "written" in o,
             o.getValue("stretches").jsonArray.map { s ->
                 val st = s.jsonObject
                 VoicePost.Stretch(text(st, source), (st.seconds("start") * 1000).toLong(), (st.seconds("end") * 1000).toLong())
@@ -200,7 +204,12 @@ internal object VoicePostRun {
         for (path in paths) {
             val name = File(path).name.removePrefix("seg-").removeSuffix(".jsonl")
             val score = Score()
-            for (clip in read(File(path), source)) {
+            val clips = read(File(path), source)
+            // a set with written references: a clip without one would be scored against no marks at all;
+            // left out of every column, the CER too (not to be set beside a run before written references)
+            val scored = if (clips.any { it.written }) clips.filter { it.written } else clips
+            score.unwritten = clips.size - scored.size
+            for (clip in scored) {
                 val hyp = VoicePost.text(clip.stretches)
                 score.stretches += clip.stretches.size
                 val before = score.writtenErrors
@@ -215,7 +224,7 @@ internal object VoicePostRun {
 
     private val WHITE = Regex("[\t\r\n]")
 
-    private val HEADER = listOf("set", "clips", "stretches", "CER", "written", "，P/R/F1", "。P/R/F1", "？P/R/F1", "marks F1", "ends ref/hyp/same", "doubled")
+    private val HEADER = listOf("set", "clips", "stretches", "CER", "written", "，P/R/F1", "。P/R/F1", "？P/R/F1", "marks F1", "ends ref/hyp/same", "doubled", "unwritten")
         .joinToString("\t")
 
     fun row(name: String, s: Score): String {
@@ -231,6 +240,6 @@ internal object VoicePostRun {
         val marks = Mark.entries.map { prf(s.tp[it.ordinal], s.fp[it.ordinal], s.fn[it.ordinal]) }
         val f1 = if (s.tp.sum() + s.fn.sum() == 0) "-" else prf(s.tp.sum(), s.fp.sum(), s.fn.sum()).substringAfterLast('/')
         return (listOf(name, "${s.clips}", "${s.stretches}", pct(s.wordErrors, s.refWords), pct(s.writtenErrors, s.refWritten)) + marks +
-            listOf(f1, "${pct(s.refEnds, s.clips)}/${pct(s.hypEnds, s.clips)}/${pct(s.endsSame, s.clips)}", "${s.doubled}")).joinToString("\t")
+            listOf(f1, "${pct(s.refEnds, s.clips)}/${pct(s.hypEnds, s.clips)}/${pct(s.endsSame, s.clips)}", "${s.doubled}", "${s.unwritten}")).joinToString("\t")
     }
 }

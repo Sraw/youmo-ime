@@ -46,6 +46,12 @@ data class EditorTraits(
     val customActionId: Int? = null,
     /** The action from `imeOptions`, or null when it is `UNSPECIFIED` or `NONE`. */
     val imeAction: Int? = null,
+    /** Its action is `SEND`, in `imeOptions` or as its own labelled one: a message is written there. */
+    val sends: Boolean = false,
+    /** A text field that takes more than one line (`TYPE_TEXT_FLAG_MULTI_LINE` or `_IME_MULTI_LINE`). */
+    val isMultiLine: Boolean = false,
+    /** `TYPE_TEXT_VARIATION_SHORT_MESSAGE`: an SMS or a chat's message. */
+    val isShortMessage: Boolean = false,
 )
 
 /** What a number, phone or date field declares it takes, out of its class, variation and flags. */
