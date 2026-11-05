@@ -13,5 +13,5 @@ work=$here/build/host-eval
 cmake -G Ninja -S "$here/src/main/cpp" -B "$work" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \
   -DSHERPA_ONNX_USE_PRE_INSTALLED_ONNXRUNTIME_IF_AVAILABLE=OFF \
   -DSHERPA_ONNX_ENABLE_BINARY=ON -DSHERPA_ONNX_ENABLE_CHECK=OFF -DSHERPA_ONNX_ENABLE_JNI=OFF >/dev/null
-cpus=$(nproc)
+cpus=$(getconf _NPROCESSORS_ONLN)  # nproc is GNU only, not on macOS
 cmake --build "$work" --target sherpa-onnx-offline -j"$(( cpus > 1 ? cpus / 2 : 1 ))"

@@ -192,6 +192,15 @@ internal val COMMANDS = listOf(
         val (dataPath, setPath, outPath) = args.operands
         sentences(dataPath, setPath, outPath, RunOptions(args.options))
     },
+    // the voice post-processing on voice-eval's recorded stretches (seg_app.py), no recognizer: dev/design/060-voice-post.md §5
+    Command("voice-post", "<seg-set.jsonl>... [--source app|top] [--misses <out.tsv>]", 1..Int.MAX_VALUE, "source", "misses") { args, out, err ->
+        val source = args.options["source"] ?: "app"
+        if (source !in setOf("app", "top")) {
+            err.appendLine("voice-post: --source app or top, not $source")
+            return@Command null
+        }
+        VoicePostRun.run(args.operands, source, args.options["misses"], out)
+    },
     Command("lm", "<model.safetensors> <context> <text>...", 3..Int.MAX_VALUE) { args, out, _ ->
         val (modelPath, context) = args.operands
         lm(modelPath, context, args.operands.drop(2), out)

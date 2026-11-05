@@ -50,13 +50,7 @@ class VoiceHold(private val cancelDistance: Float, private val around: Boolean =
         return zone == Zone.Talk
     }
 
-    /** What was said so far, as typed: the stretches one after another. */
+    /** What was said so far, as typed: the stretches one after another ([VoicePost.join]). */
     val text: String
-        get() = pieces.fold("") { acc, piece -> if (wordsMeet(acc, piece)) "$acc $piece" else acc + piece }
-
-    // two stretches of English (or numbers) side by side keep a space between them
-    private fun wordsMeet(before: String, after: String) =
-        before.isNotEmpty() && before.last().isAsciiWord() && after.first().isAsciiWord()
-
-    private fun Char.isAsciiWord() = this < '\u0080' && isLetterOrDigit()
+        get() = VoicePost.join(pieces)
 }
