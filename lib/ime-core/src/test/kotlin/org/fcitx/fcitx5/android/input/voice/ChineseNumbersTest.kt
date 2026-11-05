@@ -91,7 +91,8 @@ class ChineseNumbersTest {
         // the hour kept as its minutes are, whatever its shape
         check("十点五十", "十点五十")
         check("十二点五十", "十二点五十")
-        check("早上九点五十", "早上九点五十")
+        // but after a time of day a time
+        check("早上9点50", "早上九点五十")
         // not an hour alone: any whole number before a bare 点 and a number
         check("一百点五十", "一百点五十")
         // minutes said digit by digit, with no 分: as 十点三五, whatever the hour's length
@@ -109,6 +110,40 @@ class ChineseNumbersTest {
         check("上十个人", "上十个人")
     }
 
+    // WeTextProcessing's inverse normalization tests (itn/chinese/test/data), written as one types them
+    @Test
+    fun theWeTextProcessingCases() {
+        check("100072300人", "一亿七万两千三百人")
+        check("100002300人", "一亿零两千三百人")
+        check("2002年1月", "二零零二年一月")
+        check("2008年8月", "二零零八年八月")
+        check("3380元5角8分", "三千三百八十元五角八分")
+        check("25元3毛", "二十五元三毛")
+        check("12块5毛", "十二块五毛")
+        check("5块3毛", "五块三毛")
+        check("12块5", "十二块五")
+        check("911是报警电话", "九幺幺是报警电话")
+        check("可以打我手机13501234567", "可以打我手机幺三五零幺二三四五六七")
+        check("我的身份证号是34020319370101051X", "我的身份证号是三四零二零三一九三七零幺零幺零五幺X")
+        check("早上1点02", "早上一点零二")
+        check("下午3点40,或者上午10点半", "下午三点四十,或者上午十点半")
+        check("13点10分36秒", "十三点十分三十六秒")
+        check("30%到41%", "百分之三十到四十一")
+        check("30%到41%的人", "百分之三十到四十一的人")
+        check("每小时10千米", "每小时十千米")
+        check("每小时30到311千米", "每小时三十到三百一十一千米")
+        check("重达25千克", "重达二十五千克")
+        check("3.1415926", "三点一四一五九二六")
+        check("2.5平方电线", "二点五平方电线")
+        check("5块3毛钱", "五块三毛钱")
+        check("考了90分之后", "考了九十分之后")
+        check("重点3.5倍", "重点三点五倍")
+        check("下午3点05", "下午三点零五")
+        check("5块3毛5", "五块三毛五")
+        // a hundred years and a month
+        check("100年一月", "一百年一月")
+    }
+
     @Test
     fun wordsThatOnlyLookLikeNumbers() {
         for (word in listOf(
@@ -120,6 +155,10 @@ class ChineseNumbersTest {
             "二十亿万元", "八点五百分之一",
             // a point made, not an hour
             "这一点十分重要", "这三点十分关键", "第三点", "这一点整体来看",
+            // fractions as said, an address's numbers, 幺 alone, 一块 together, a time with no time of day
+            "十六分之三", "三分之二十", "一百分之二十", "幺二七点零点零点幺", "幺妹", "幺幺", "我们一块五点走", "一块一块的",
+            "八点三十", "三年一月", "一块三角形", "三块五角星", "天到了晚上一点一点暗下来", "下午三点零几分", "下午三点零",
+            "晚上八点一刻", "早上九点五十个人", "晚上七点五十块", "下午两点三十号",
             // sayings
             "十字路口", "十有八九", "三十而立", "十万火急", "十万八千里", "三三两两", "七七八八",
             "百分之三十几", "差一点整天", "一千零零五", "一千零", "他有一点十分奇怪", "还有两点十分重要",
