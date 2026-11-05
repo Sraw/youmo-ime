@@ -180,7 +180,8 @@ trap in [pitfalls.md](pitfalls.md#kotlin-ic-and-interface-delegation) before bui
 
 | Workflow | When | Runs |
 |---|---|---|
-| `unit_test.yml` | push, PR | `:lib:ime-core:check`, dict-tool and eval tests, build-logic tests, `:app:testTextDebugUnitTest`, the same at SDK 29 (a job of its own), voice test compile, sherpa-onnx's host tests, Python tool tests (`lexicon/tools`, `lib/ime-eval/tools`), detekt, Kover reports, test failures annotated |
+| `unit_test.yml` | push, PR | four jobs side by side (setup in `.github/actions/setup-build`): `:lib:ime-core:check`, dict-tool and eval tests, build-logic tests, `:app:testTextDebugUnitTest` and the same at SDK 29 (a job each, `-PskipExhaustive`, two test JVMs at once), the voice flavour (a job), sherpa-onnx's host tests, Python tool tests (`lexicon/tools`, `lib/ime-eval/tools`), detekt, Kover reports, test failures annotated |
+| `key_marks.yml` | push, PR changing the keys' marks or drawing (its `paths`); Tue 03:37; on demand | `KeyMarksEverywhereUatTest` alone at SDK 35 and 29, which the app jobs above leave out (half their time) |
 | `pull_request.yml` | PR | `assembleTextRelease` and `assembleVoiceRelease` on Ubuntu (unsigned) |
 | `engine_downloads.yml` | push to main changing `EngineDataPlugin.kt`, `HandwritingDataPlugin.kt`, `lib/handwriting/build.gradle.kts` or the workflow; Mon/Thu 04:41; on demand | the engine data's download tasks alone (the handwriting models and onnxruntime too, a cache of their own), saving the `engine-downloads-*` cache a new pull request's build reads |
 | `emulator_test.yml` | weekly, and PRs labelled `emulator` | instrumented tests (`HostTest`, `SoftKeyboardTest` …) for Text and Voice on API 35 and API 29 (minSdk) emulators |

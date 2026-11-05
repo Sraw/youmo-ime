@@ -3,13 +3,18 @@ name: Unit Tests
 # JVM unit tests, the lexicon tools' Python tests, and the C++ tests of our sherpa-onnx changes,
 # built with the host's compiler (lib/sherpa-onnx/host-test.sh).
 # Deliberately separate from the build workflow:
-#   - no NDK, no CMake (the task graph for `:app:testTextDebugUnitTest` contains no native tasks)
+#   - no NDK (the task graph for `:app:testTextDebugUnitTest` contains no native tasks)
 #   - single OS
-# so it takes a few minutes rather than the build jobs' half hour, and can gate every push.
+# so it gates every push.
+# Four jobs side by side, each on a runner of its own (one in a row took 30 minutes): the plain JVM
+# modules and the tools, the app's tests at SDK 35, the same at 29, the voice flavour. The app's
+# KeyMarksEverywhereUatTest (half an app run's time) is left out of the app jobs (-PskipExhaustive)
+# and run by key_marks.yml, when the keys' code changes and weekly.
 #
-# JDK 21, like the jobs that build APKs here (pull_request, emulator_test) and the one the
-# screenshot goldens are recorded on. The Android modules target 21 (Versions.java in
-# build-logic/convention/src/main/kotlin/Versions.kt); lib/ime-core stays on the Java 11 API.
+# JDK 21 (.github/actions/setup-build), like the jobs that build APKs here (pull_request,
+# emulator_test) and the one the screenshot goldens are recorded on. The Android modules target 21
+# (Versions.java in build-logic/convention/src/main/kotlin/Versions.kt); lib/ime-core stays on the
+# Java 11 API.
 
 on:
   pull_request:
@@ -37,11 +42,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  unit_test:
-    name: JVM unit tests
+  core:
+    name: Core, tools and static analysis
     runs-on: ubuntu-24.04
-    # was 20 before the voice flavour's compile (a second one of the app) and the host tests
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - name: Fetch source code
         uses: actions/checkout@v7
@@ -50,42 +54,14 @@ jobs:
           fetch-depth: 0
           submodules: false
 
-      - name: Setup Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: "temurin"
-          java-version: "21"
-
-      - name: Setup Android environment
-        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
-
-      # CMake at the build's own version (Versions.defaultCMake): the app tests read the engine's
-      # data, whose archives are unpacked with it
-      - name: Install build dependencies
-        run: |
-          cmake=$(sed -n 's/.*defaultCMake = "\([^"]*\)".*/\1/p' build-logic/convention/src/main/kotlin/Versions.kt)
-          sdkmanager --install "cmake;${cmake:?no defaultCMake in Versions.kt}"
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
-
-      # Robolectric fetches its android-all jars (hundreds of MB, one per SDK the tests run at)
-      # into the Maven local repository, which the Gradle cache does not cover
-      - name: Cache Robolectric runtimes
-        uses: actions/cache@v6
-        with:
-          path: ~/.m2/repository/org/robolectric
-          # a key a job: each fetches its own SDKs' jars (35 here, 29 in unit_test_29)
-          key: robolectric-35-${{ hashFiles('gradle/libs.versions.toml', 'app/src/test/resources/robolectric.properties') }}
-          restore-keys: robolectric-35-
+      - name: Set up the build
+        uses: ./.github/actions/setup-build
 
       # :lib:ime-core is a plain JVM module: no Android SDK, no resource merging, seconds to
-      # run. Kept as a separate step so a failure there is obviously a logic failure rather
-      # than an Android build problem. `check` = tests, the Android API level guard
-      # (animal-sniffer, which Android lint cannot provide for a JVM module) and the coverage
-      # floors (Kover). :lib:ime-dict-tool, the host tool that builds the engine's data, is
-      # plain JVM too; its tests are what covers the mix and the crawl, whose output builds download.
-      # Its coverage is reported, with no floor.
+      # run. `check` = tests, the Android API level guard (animal-sniffer, which Android lint cannot
+      # provide for a JVM module) and the coverage floors (Kover). :lib:ime-dict-tool, the host tool
+      # that builds the engine's data, is plain JVM too; its tests are what covers the mix and the
+      # crawl, whose output builds download. Its coverage is reported, with no floor.
       # :lib:ime-eval, the evaluation harness, is a third: its tests drive ime-core's engine API and
       # fail while the sets made from data/pinyin.tsv have not been remade after it changed. Its uatTest
       # source set (the UAT cases replayed on the JVM) is only compiled: running it needs the app's data.
@@ -94,34 +70,6 @@ jobs:
       # --continue: the coverage report is wanted most when a check has failed
       - name: Run core logic, dict tool and evaluation tests, API level check and coverage floors
         run: ./gradlew --build-cache --continue :lib:ime-core:check :lib:ime-core:koverHtmlReport :lib:ime-dict-tool:test :lib:ime-dict-tool:koverHtmlReport :lib:ime-eval:test :lib:ime-eval:compileUatTestKotlin :build-logic:convention:test
-
-      # text debug only: the voice flavour's own code is tested by the voice tests in ime-core.
-      # The screenshot tests compare against app/src/test/screenshots (roborazzi.test.verify in
-      # gradle.properties); goldens are recorded on JDK 21 locally, the JDK set up above.
-      # One ABI: a build of all four links resources once per split, and the unit tests need one.
-      - name: Run app unit tests
-        if: success() || failure()
-        env:
-          BUILD_ABI: x86_64
-        run: ./gradlew --build-cache :app:testTextDebugUnitTest :app:koverLogTextDebug
-
-      # what a changed look drew: <name>_actual.png and _compare.png beside the golden
-      - name: Upload screenshot differences
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: roborazzi-differences
-          path: app/build/outputs/roborazzi/
-          if-no-files-found: ignore
-
-      # no other job sees the voice flavour on a push: its own code (src/voice), whose VoiceFeature
-      # the text stub has to match, the unit tests' sources against it, and the voice-only tests
-      # (VoiceKeyboardUatTest, VoiceHoldUatTest); the shared tests already ran on the text flavour
-      - name: Compile the voice flavour and run its own tests
-        if: success() || failure()
-        env:
-          BUILD_ABI: x86_64
-        run: ./gradlew --build-cache :app:testVoiceDebugUnitTest --tests '*Voice*'
 
       # the C++ tests of our sherpa-onnx changes (context graph, hotword and blocked-phrase encoding):
       # the runner's g++, with googletest and simple-sentencepiece downloaded SHA-256 checked; no NDK,
@@ -170,43 +118,22 @@ jobs:
         if: success() || failure()
         run: node --test web/theme-maker/test/format.test.mjs
 
-      # After the tests, so a lint finding does not hide their results. Findings already present
-      # are frozen in config/detekt/baseline-*.xml; this fails on new ones only.
-      # Syntax rules only: type resolution does not work on this toolchain (see detekt.yml).
+      # Findings already present are frozen in config/detekt/baseline-*.xml; this fails on new ones
+      # only. Syntax rules only: type resolution does not work on this toolchain (see detekt.yml).
       - name: Static analysis (detekt)
         if: success() || failure()
         run: ./gradlew --build-cache detekt
 
-      # a failed test shows up on the run page and the checks tab, not only inside the report
-      # (without a file and line GitHub cannot place it in the diff; it shows the first 10)
       - name: Annotate test failures
         if: failure()
-        run: |
-          python3 - <<'PY'
-          import glob, xml.etree.ElementTree as ET
-          def escape(s, prop=False):
-              s = s.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-              return s.replace(":", "%3A").replace(",", "%2C") if prop else s
-          for path in glob.glob("**/build/test-results/**/TEST-*.xml", recursive=True):
-              try:
-                  root = ET.parse(path).getroot()
-              except ET.ParseError:  # e.g. a test JVM killed mid-write
-                  print(f"::warning title=Unreadable test result::{escape(path)}")
-                  continue
-              for case in root.iter("testcase"):
-                  for bad in list(case.findall("failure")) + list(case.findall("error")):
-                      title = escape(f"{case.get('classname')}.{case.get('name')}", prop=True)
-                      lines = (bad.get("message") or "").splitlines()
-                      text = escape(lines[0] if lines else bad.get("type", "failed"))
-                      print(f"::error title={title}::{text}")
-          PY
+        run: python3 .github/scripts/annotate_test_failures.py
 
       - name: Upload test report
         # the report is most useful precisely when the tests failed
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: unit-test-report
+          name: unit-test-report-core
           # detekt checks every Kotlin module (DetektConventionPlugin), so its reports are globbed
           path: |
             lib/ime-core/build/reports/tests/
@@ -220,83 +147,88 @@ jobs:
             lib/ime-eval/build/test-results/
             build-logic/convention/build/reports/tests/
             build-logic/convention/build/test-results/
-            app/build/reports/tests/
-            app/build/test-results/
             **/build/reports/detekt/
           retention-days: 14
 
-  # Android 10 (minSdk 29) must keep working: every app Robolectric test again at SDK 29, a task of
-  # its own (robolectric.properties, app/build.gradle.kts); 0.5.1 shipped two crashes only it shows.
-  # A job of its own beside the one above, which takes most of its 30 minutes already.
-  unit_test_29:
-    name: JVM unit tests at SDK 29
+  app:
+    name: App JVM tests
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Fetch source code
         uses: actions/checkout@v7
         with:
-          # full history like pull_request.yml: build-logic runs `git describe` at configuration
           fetch-depth: 0
           submodules: false
 
-      - name: Setup Java
-        uses: actions/setup-java@v5
+      # CMake: the app tests read the engine's data, whose archives are unpacked with it.
+      # A Robolectric cache key a job: each fetches its own SDKs' jars (35 here, 29 in app_29)
+      - name: Set up the build
+        uses: ./.github/actions/setup-build
         with:
-          distribution: "temurin"
-          java-version: "21"
+          cmake: "true"
+          robolectric: robolectric-35
 
-      - name: Setup Android environment
-        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+      # text debug only: the voice flavour's own code is tested by the voice job and the voice tests
+      # in ime-core. The screenshot tests compare against app/src/test/screenshots
+      # (roborazzi.test.verify in gradle.properties); goldens are recorded on JDK 21 locally.
+      # One ABI: a build of all four links resources once per split, and the unit tests need one.
+      - name: Run app unit tests
+        env:
+          BUILD_ABI: x86_64
+        run: ./gradlew --build-cache -PskipExhaustive :app:testTextDebugUnitTest :app:koverLogTextDebug
 
-      # CMake at the build's own version (Versions.defaultCMake): the app tests read the engine's
-      # data, whose archives are unpacked with it
-      - name: Install build dependencies
-        run: |
-          cmake=$(sed -n 's/.*defaultCMake = "\([^"]*\)".*/\1/p' build-logic/convention/src/main/kotlin/Versions.kt)
-          sdkmanager --install "cmake;${cmake:?no defaultCMake in Versions.kt}"
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
-
-      # Robolectric fetches its android-all jars (hundreds of MB, one per SDK the tests run at)
-      # into the Maven local repository, which the Gradle cache does not cover
-      - name: Cache Robolectric runtimes
-        uses: actions/cache@v6
+      # what a changed look drew: <name>_actual.png and _compare.png beside the golden
+      - name: Upload screenshot differences
+        if: failure()
+        uses: actions/upload-artifact@v7
         with:
-          path: ~/.m2/repository/org/robolectric
-          key: robolectric-29-${{ hashFiles('gradle/libs.versions.toml', 'app/src/test/resources/robolectric.properties') }}
-          restore-keys: robolectric-29-
+          name: roborazzi-differences
+          path: app/build/outputs/roborazzi/
+          if-no-files-found: ignore
+
+      - name: Annotate test failures
+        if: failure()
+        run: python3 .github/scripts/annotate_test_failures.py
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-report-app
+          path: |
+            app/build/reports/tests/testTextDebugUnitTest/
+            app/build/test-results/testTextDebugUnitTest/
+          retention-days: 14
+
+  # Android 10 (minSdk 29) must keep working: every app Robolectric test again at SDK 29, a task of
+  # its own (robolectric.properties, app/build.gradle.kts); 0.5.1 shipped two crashes only it shows.
+  app_29:
+    name: App JVM tests at SDK 29
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Fetch source code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: false
+
+      - name: Set up the build
+        uses: ./.github/actions/setup-build
+        with:
+          cmake: "true"
+          robolectric: robolectric-29
 
       # text debug, as above; one ABI
       - name: Run app unit tests at SDK 29
         env:
           BUILD_ABI: x86_64
-        run: ./gradlew --build-cache :app:testTextDebugUnitTestAt29
+        run: ./gradlew --build-cache -PskipExhaustive :app:testTextDebugUnitTestAt29
 
-      # a failed test shows up on the run page and the checks tab, not only inside the report
-      # (without a file and line GitHub cannot place it in the diff; it shows the first 10)
       - name: Annotate test failures
         if: failure()
-        run: |
-          python3 - <<'PY'
-          import glob, xml.etree.ElementTree as ET
-          def escape(s, prop=False):
-              s = s.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-              return s.replace(":", "%3A").replace(",", "%2C") if prop else s
-          for path in glob.glob("**/build/test-results/**/TEST-*.xml", recursive=True):
-              try:
-                  root = ET.parse(path).getroot()
-              except ET.ParseError:  # e.g. a test JVM killed mid-write
-                  print(f"::warning title=Unreadable test result::{escape(path)}")
-                  continue
-              for case in root.iter("testcase"):
-                  for bad in list(case.findall("failure")) + list(case.findall("error")):
-                      title = escape(f"{case.get('classname')}.{case.get('name')}", prop=True)
-                      lines = (bad.get("message") or "").splitlines()
-                      text = escape(lines[0] if lines else bad.get("type", "failed"))
-                      print(f"::error title={title}::{text}")
-          PY
+        run: python3 .github/scripts/annotate_test_failures.py
 
       - name: Upload test report
         if: always()
@@ -306,4 +238,43 @@ jobs:
           path: |
             app/build/reports/tests/testTextDebugUnitTestAt29/
             app/build/test-results/testTextDebugUnitTestAt29/
+          retention-days: 14
+
+  # no other job sees the voice flavour on a push: its own code (src/voice), whose VoiceFeature the
+  # text stub has to match, the unit tests' sources against it, and the voice-only tests
+  # (VoiceKeyboardUatTest, VoiceHoldUatTest); the shared tests already ran on the text flavour
+  voice:
+    name: Voice flavour
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Fetch source code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: false
+
+      - name: Set up the build
+        uses: ./.github/actions/setup-build
+        with:
+          cmake: "true"
+          robolectric: robolectric-35-voice
+
+      - name: Compile the voice flavour and run its own tests
+        env:
+          BUILD_ABI: x86_64
+        run: ./gradlew --build-cache :app:testVoiceDebugUnitTest --tests '*Voice*'
+
+      - name: Annotate test failures
+        if: failure()
+        run: python3 .github/scripts/annotate_test_failures.py
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-report-voice
+          path: |
+            app/build/reports/tests/testVoiceDebugUnitTest/
+            app/build/test-results/testVoiceDebugUnitTest/
           retention-days: 14

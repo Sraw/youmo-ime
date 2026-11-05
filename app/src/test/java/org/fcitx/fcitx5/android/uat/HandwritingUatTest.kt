@@ -390,6 +390,11 @@ class HandwritingUatTest {
     @Config(qualifiers = "zh-rCN-w851dp-h393dp-land-440dpi")
     fun theCardOnTheFloatingKeyboardIsOneColumn() {
         prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        // at its default place whatever an earlier test left: higher up, the card has more room
+        AppPrefs.getInstance().internal.run {
+            prefs.set(floatingKeyboardX, floatingKeyboardX.defaultValue)
+            prefs.set(floatingKeyboardY, floatingKeyboardY.defaultValue)
+        }
         h.api.charCards["行"] = hang
         h.start()
         written("银行")

@@ -1,0 +1,60 @@
+name: Set up the build
+description: >-
+  JDK 21, the Android SDK, Gradle, and optionally CMake and the Robolectric runtimes: what every job
+  of unit_test.yml and key_marks.yml runs Gradle with (after actions/checkout, with fetch-depth 0:
+  build-logic runs `git describe` at configuration).
+
+inputs:
+  cmake:
+    description: "Install CMake at Versions.defaultCMake (the app tests read the engine's data, unpacked with it)"
+    default: "false"
+  robolectric:
+    description: "A cache key prefix for Robolectric's android-all jars (one per job: each fetches its own SDKs'); empty: none"
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    # JDK 21, like the jobs that build APKs (pull_request, emulator_test) and the one the screenshot
+    # goldens are recorded on
+    - name: Setup Java
+      uses: actions/setup-java@v5
+      with:
+        distribution: "temurin"
+        java-version: "21"
+
+    - name: Setup Android environment
+      uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+
+    - name: Install CMake
+      if: inputs.cmake == 'true'
+      shell: bash
+      run: |
+        cmake=$(sed -n 's/.*defaultCMake = "\([^"]*\)".*/\1/p' build-logic/convention/src/main/kotlin/Versions.kt)
+        sdkmanager --install "cmake;${cmake:?no defaultCMake in Versions.kt}"
+
+    # the engine data's downloads (libime's sources, the models, some 500 MB), read only: saved on
+    # main by engine_downloads.yml, keyed and pathed as pull_request.yml's
+    - name: Restore engine data downloads
+      if: inputs.cmake == 'true'
+      uses: actions/cache/restore@v6
+      with:
+        path: |
+          .gradle/engine-downloads
+          !.gradle/engine-downloads/voice
+          !.gradle/engine-downloads/handwriting
+          !.gradle/engine-downloads/onnxruntime-android-*.zip
+        key: engine-downloads-${{ hashFiles('build-logic/convention/src/main/kotlin/EngineDataPlugin.kt') }}
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+
+    # Robolectric fetches its android-all jars (hundreds of MB, one per SDK the tests run at)
+    # into the Maven local repository, which the Gradle cache does not cover
+    - name: Cache Robolectric runtimes
+      if: inputs.robolectric != ''
+      uses: actions/cache@v6
+      with:
+        path: ~/.m2/repository/org/robolectric
+        key: ${{ inputs.robolectric }}-${{ hashFiles('gradle/libs.versions.toml', 'app/src/test/resources/robolectric.properties') }}
+        restore-keys: ${{ inputs.robolectric }}-

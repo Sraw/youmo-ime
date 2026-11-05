@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.InputMethodEntry
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
@@ -65,6 +66,11 @@ class FloatingCodeStripUatTest {
     fun close() {
         harness?.close()
         EngineState.syllablesState.value = EngineState.SyllableState()
+        // where a test dragged the keyboard: not the next test's (AppPrefs outlives it)
+        AppPrefs.getInstance().internal.run {
+            floatingKeyboardX.setValue(floatingKeyboardX.defaultValue)
+            floatingKeyboardY.setValue(floatingKeyboardY.defaultValue)
+        }
     }
 
     private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)

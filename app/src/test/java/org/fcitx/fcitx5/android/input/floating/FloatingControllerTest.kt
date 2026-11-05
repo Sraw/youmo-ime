@@ -59,6 +59,9 @@ class FloatingControllerTest {
     fun tearDown() {
         noAnimation.setValue(false)
         floatingPref.setValue(false)
+        // where a test put the keyboard: not the next test's (FloatingUatTest and MotionNoticeUatTest do the same)
+        internal.floatingKeyboardX.setValue(internal.floatingKeyboardX.defaultValue)
+        internal.floatingKeyboardY.setValue(internal.floatingKeyboardY.defaultValue)
     }
 
     @Test

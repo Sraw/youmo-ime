@@ -17,6 +17,15 @@ plugins {
 fun Test.unitTestSettings() {
     maxHeapSize = "3g"
     forkEvery = 40
+    // two test JVMs at once (-PtestForks=<n>): CI's runner has 4 cores and 16 GB, each JVM up to 3 GB
+    // beside Gradle's 2; a run one at a time took 14 min there
+    maxParallelForks = project.findProperty("testForks")?.toString()?.let {
+        it.toIntOrNull()?.takeIf { n -> n >= 1 } ?: error("-PtestForks=<n>: a whole number, 1 or more, not '$it'")
+    } ?: 2
+    // -PskipExhaustive: KeyMarksEverywhereUatTest (every key of every keyboard, every pair of mark places)
+    // left out, half a run's time; CI runs it in key_marks.yml (at 35 and 29), when the keys' code changes and weekly.
+    // Not with --tests naming it: the exclusion wins, "No tests found"
+    if (project.hasProperty("skipExhaustive")) filter.excludeTestsMatching("org.fcitx.fcitx5.android.uat.KeyMarksEverywhereUatTest")
     // mockk's agent attached from inside the test JVM: by default ByteBuddy starts a second
     // process to attach it, which under a full run's load at times fails and takes every
     // mockk test of that JVM with it (JvmMockKGateway); the attach's own wait, 10 s, ran

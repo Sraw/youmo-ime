@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.floating
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -23,6 +24,13 @@ class FloatingPlacerTest {
 
     private val prefs = AppPrefs.getInstance().internal
     private val zone = mutableListOf<Boolean>()
+
+    // where a test put the keyboard: not the next test's (AppPrefs outlives it)
+    @After
+    fun tearDown() {
+        prefs.floatingKeyboardX.setValue(prefs.floatingKeyboardX.defaultValue)
+        prefs.floatingKeyboardY.setValue(prefs.floatingKeyboardY.defaultValue)
+    }
 
     private fun placer(): FloatingPlacer {
         val context = RuntimeEnvironment.getApplication()

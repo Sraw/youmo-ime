@@ -1,0 +1,105 @@
+name: Key Marks Everywhere
+
+# KeyMarksEverywhereUatTest alone, at SDK 35 and 29: every key of every keyboard (standard, 紧凑, floating,
+# one-handed, landscape), every pair of mark places the settings allow, nothing drawn over anything
+# else (specs/app.md). Half the app tests' time, so unit_test.yml leaves it out (-PskipExhaustive)
+# and it runs here: when what places a key's marks or draws its keys changes, and weekly for
+# whatever else moved them (a theme, a font, a dependency).
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+    paths:
+      - "app/src/main/java/org/fcitx/fcitx5/android/input/**"
+      - "app/src/main/java/org/fcitx/fcitx5/android/data/theme/**"
+      - "app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt"
+      - "app/src/main/res/**"
+      - "lib/ime-core/src/main/kotlin/org/fcitx/fcitx5/android/input/**"
+      - "lib/ime-core/src/main/kotlin/org/fcitx/fcitx5/android/engine/table/**"
+      - "lib/ime-core/src/main/kotlin/org/fcitx/fcitx5/android/engine/InputMethodCatalog.kt"
+      - "app/src/test/java/org/fcitx/fcitx5/android/uat/KeyMarksEverywhereUatTest.kt"
+      - "app/src/test/java/org/fcitx/fcitx5/android/input/KeyboardHarness.kt"
+      - "app/src/test/resources/robolectric.properties"
+      - "app/build.gradle.kts"
+      - "gradle/libs.versions.toml"
+      - ".github/actions/setup-build/**"
+      - ".github/workflows/key_marks.yml"
+  push:
+    branches:
+      - main
+    # the same as pull_request's
+    paths:
+      - "app/src/main/java/org/fcitx/fcitx5/android/input/**"
+      - "app/src/main/java/org/fcitx/fcitx5/android/data/theme/**"
+      - "app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt"
+      - "app/src/main/res/**"
+      - "lib/ime-core/src/main/kotlin/org/fcitx/fcitx5/android/input/**"
+      - "lib/ime-core/src/main/kotlin/org/fcitx/fcitx5/android/engine/table/**"
+      - "lib/ime-core/src/main/kotlin/org/fcitx/fcitx5/android/engine/InputMethodCatalog.kt"
+      - "app/src/test/java/org/fcitx/fcitx5/android/uat/KeyMarksEverywhereUatTest.kt"
+      - "app/src/test/java/org/fcitx/fcitx5/android/input/KeyboardHarness.kt"
+      - "app/src/test/resources/robolectric.properties"
+      - "app/build.gradle.kts"
+      - "gradle/libs.versions.toml"
+      - ".github/actions/setup-build/**"
+      - ".github/workflows/key_marks.yml"
+  schedule:
+    - cron: "37 3 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: key-marks-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  key_marks:
+    name: Key marks on every keyboard (SDK ${{ matrix.sdk }})
+    runs-on: ubuntu-24.04
+    # Android 10 (minSdk 29) as well, like unit_test.yml's app_29: a runner each
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sdk: 35
+            task: testTextDebugUnitTest
+          - sdk: 29
+            task: testTextDebugUnitTestAt29
+    timeout-minutes: 30
+    steps:
+      - name: Fetch source code
+        uses: actions/checkout@v7
+        with:
+          # full history: build-logic runs `git describe` at configuration
+          fetch-depth: 0
+          submodules: false
+
+      - name: Set up the build
+        uses: ./.github/actions/setup-build
+        with:
+          cmake: "true"
+          robolectric: robolectric-${{ matrix.sdk }}-keymarks
+
+      - name: Run KeyMarksEverywhereUatTest
+        env:
+          BUILD_ABI: x86_64
+        run: ./gradlew --build-cache :app:${{ matrix.task }} --tests '*.KeyMarksEverywhereUatTest'
+
+      - name: Annotate test failures
+        if: failure()
+        run: python3 .github/scripts/annotate_test_failures.py
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: key-marks-report-${{ matrix.sdk }}
+          path: |
+            app/build/reports/tests/${{ matrix.task }}/
+            app/build/test-results/${{ matrix.task }}/
+          retention-days: 14

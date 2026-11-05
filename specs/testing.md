@@ -23,6 +23,17 @@ compiled is not done.
 Minimum before a commit: `./gradlew :lib:ime-core:check :app:testTextDebugUnitTest :app:testTextDebugUnitTestAt29 detekt`, plus
 the tool or build-logic tests if those changed. Unit tests need no NDK or CMake.
 
+The app's test tasks run two test JVMs at once (`maxParallelForks`, `-PtestForks=<n>` for another
+count; `1` to rule out one test's state reaching another), each a fresh one every 40 classes. A test
+that leaves a preference, a file or a static set where the next test in its JVM reads it fails only
+in some orders: `KeyboardHarness.close` puts back what a harness test may change, and a test
+that moves the floating keyboard puts its place back in its own teardown (`FloatingUatTest`, `FloatingCodeStripUatTest`, `FloatingPlacerTest`,
+`FloatingControllerTest`; `KeyboardHarness.close` cannot, `FloatingUatTest` reads the place a closed
+harness left), and a screenshot of the floating keyboard pins the place it is drawn at. `-PskipExhaustive` leaves out `KeyMarksEverywhereUatTest` (every key
+of every keyboard, every pair of mark places; half an app run's time): CI's app jobs do, and
+`key_marks.yml` runs it alone, at 35 and 29, when the keys' code changes and weekly. Run it locally after a
+change to how keys are laid out or marked (not with `-PskipExhaustive`: the exclusion wins over `--tests`).
+
 ## Writing tests
 
 - New logic gets a test in the same change, in ime-core where the logic is.
