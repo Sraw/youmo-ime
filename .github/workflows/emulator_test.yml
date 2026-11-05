@@ -21,16 +21,16 @@ permissions:
 
 jobs:
   emulator_test:
-    name: Instrumented tests (API 35, ${{ matrix.flavor }})
+    name: Instrumented tests (API ${{ matrix.api }}, ${{ matrix.flavor }})
     # on a labelled PR: its pushes, and the `emulator` label itself being added (not other labels)
     if: >-
       github.event_name != 'pull_request' ||
       (contains(github.event.pull_request.labels.*.name, 'emulator') &&
       (github.event.action != 'labeled' || github.event.label.name == 'emulator'))
     # on the job, not the workflow: a run for some other label joins no group, so it cannot
-    # cancel one in progress. A group per flavour, or the two would cancel each other
+    # cancel one in progress. A group per flavour and API level, or they would cancel each other
     concurrency:
-      group: emulator-test-${{ matrix.flavor }}-${{ github.ref }}
+      group: emulator-test-${{ matrix.flavor }}-${{ matrix.api }}-${{ github.ref }}
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     strategy:
       fail-fast: false
@@ -38,6 +38,10 @@ jobs:
         flavor:
           - Text
           - Voice
+        # 29: minSdk, Android 10, which must keep working (0.5.1 crashed there)
+        api:
+          - 35
+          - 29
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -106,7 +110,7 @@ jobs:
       - name: Run instrumented tests
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
-          api-level: 35
+          api-level: ${{ matrix.api }}
           arch: x86_64
           target: google_apis
           disable-animations: true
@@ -117,7 +121,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: emulator-test-report-${{ matrix.flavor }}
+          name: emulator-test-report-${{ matrix.flavor }}-${{ matrix.api }}
           path: |
             app/build/reports/androidTests/
             app/build/outputs/androidTest-results/

@@ -170,7 +170,7 @@ trap in [pitfalls.md](pitfalls.md#kotlin-ic-and-interface-delegation) before bui
 - A release: bump versions → commit → `git tag -a vX.Y.Z` → build both release APKs for arm64-v8a
   signed with the release key (kept outside the repo; `signKeyFile`/`signKeyAlias`/`signKeyPwd` in
   `~/.gradle/gradle.properties` or `SIGN_KEY_*` env; unsigned if absent) → install over the last
-  release and type on it → GitHub release with both APKs and `SHA256SUMS.txt`, notes in Chinese
+  release and type on it, on Android 10 too (the AVD `youmo29`, testing.md: a misreading's hint, the 快速输入 page with an entry) → GitHub release with both APKs and `SHA256SUMS.txt`, notes in Chinese
   and English.
 - Test builds between releases go up as **draft** releases (the repository is public) and are
   deleted once a release supersedes them. Data releases are public and stay.
@@ -180,7 +180,7 @@ trap in [pitfalls.md](pitfalls.md#kotlin-ic-and-interface-delegation) before bui
 
 | Workflow | When | Runs |
 |---|---|---|
-| `unit_test.yml` | push, PR | `:lib:ime-core:check`, dict-tool and eval tests, build-logic tests, `:app:testTextDebugUnitTest`, voice test compile, sherpa-onnx's host tests, Python tool tests (`lexicon/tools`, `lib/ime-eval/tools`), detekt, Kover reports, test failures annotated |
+| `unit_test.yml` | push, PR | `:lib:ime-core:check`, dict-tool and eval tests, build-logic tests, `:app:testTextDebugUnitTest`, the same at SDK 29 (a job of its own), voice test compile, sherpa-onnx's host tests, Python tool tests (`lexicon/tools`, `lib/ime-eval/tools`), detekt, Kover reports, test failures annotated |
 | `pull_request.yml` | PR | `assembleTextRelease` and `assembleVoiceRelease` on Ubuntu (unsigned) |
 | `engine_downloads.yml` | push to main changing `EngineDataPlugin.kt`, `HandwritingDataPlugin.kt`, `lib/handwriting/build.gradle.kts` or the workflow; Mon/Thu 04:41; on demand | the engine data's download tasks alone (the handwriting models and onnxruntime too, a cache of their own), saving the `engine-downloads-*` cache a new pull request's build reads |
-| `emulator_test.yml` | weekly, and PRs labelled `emulator` | instrumented tests (`HostTest`, `SoftKeyboardTest` …) for Text and Voice on an API 35 emulator |
+| `emulator_test.yml` | weekly, and PRs labelled `emulator` | instrumented tests (`HostTest`, `SoftKeyboardTest` …) for Text and Voice on API 35 and API 29 (minSdk) emulators |

@@ -376,7 +376,7 @@ class JvmTest(unittest.TestCase):
 
 # adb for UpTest: answers emu avd name from $FAKE_DIR/avd (an error when empty, a hang with
 # $FAKE_DIR/hang), sys.boot_completed 1 after $FAKE_DIR/boot_after asks, whoami from $FAKE_DIR/whoami
-# (root without it), nothing to the rest; logs each call
+# (root without it), the SDK from $FAKE_DIR/sdk (36 without it), nothing to the rest; logs each call
 FAKE_ADB = r"""#!/bin/sh
 D=$FAKE_DIR
 [ "$1" = -s ] && shift 2
@@ -388,6 +388,8 @@ case "$*" in
     if [ -n "$A" ]; then printf '%s\r\nOK\r\n' "$A"; else echo "error: no emulator detected" >&2; exit 1; fi ;;
   "shell whoami")
     cat "$D/whoami" 2>/dev/null || echo root ;;
+  "shell getprop ro.build.version.sdk")
+    cat "$D/sdk" 2>/dev/null || echo 36 ;;
   "shell getprop sys.boot_completed")
     n=$(($(cat "$D/boots" 2>/dev/null || echo 0) + 1)); echo $n > "$D/boots"
     if [ $n -gt "$(cat "$D/boot_after" 2>/dev/null || echo 0)" ]; then echo 1; else echo; fi ;;
@@ -463,6 +465,15 @@ class UpTest(unittest.TestCase):
         self.assertIn("webview_shell", self.up())   # the fake has no packages: past the checks
         self.popen.assert_not_called()
         self.assertIn("shell whoami", self.calls())
+
+    def test_below_api_34_no_test_page_browser_is_said_not_an_exit(self):
+        self.put("avd", "youmo29")
+        self.put("sdk", "29")
+        out = io.StringIO()
+        with mock.patch.object(uat, "AVD", "youmo29"), contextlib.redirect_stdout(out):
+            uat.up("5556")   # the shell's minSdk is 34: youmo29 comes up without it
+        self.assertIn("below API 34", out.getvalue())
+        self.assertIn("emulator-5556 up", out.getvalue())
 
     def test_adb_root_that_leaves_the_shell_not_root_stops_before_the_cases_run_as_shell(self):
         self.put("avd", "youmo")

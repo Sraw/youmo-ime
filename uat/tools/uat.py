@@ -14,7 +14,8 @@ Cases live in uat/scripts/<file stem>.py (one per uat/*.md); the .md stays the s
 a script follows its case's 前提/操作/预期, and the caption under a screenshot is the case's 预期.
 Python 3 stdlib + PIL. `adb shell input tap/swipe/motionevent/keyevent/text`, uiautomator,
 am/pm/ime/settings drive the device. The devices are emulators (AVD youmo, android-36 google_apis
-arm64-v8a: the release ABI, native on Apple silicon; uat/tools/avd.sh makes it), VMs with their own
+arm64-v8a: the release ABI, native on Apple silicon; uat/tools/avd.sh makes it; UAT_AVD=youmo29 an
+Android 10 one, minSdk, without the test page's browser), VMs with their own
 kernel: root over `adb root`, and 17 实体键盘's USB keyboard a uinput one (uat/tools/emu-keyboard.sh),
 which is never made anywhere else. The voice cases' microphone is the emulator's gRPC injectAudio
 (`Device.say`, `-grpc` from up(); grpcio needed, else those cases are blocked).
@@ -1265,6 +1266,8 @@ class Device:
     # --- pages
     def open_page(self, page="text"):
         """the test page showing one field, tapped: the keyboard is up"""
+        if "package:" not in self.sh("pm path org.chromium.webview_shell"):
+            raise Blocked("这台没有测试页的浏览器（webview_shell 要 API 34+）")
         self.reload_n += 1
         url = f"http://127.0.0.1:8000/fields.html?r={self.reload_n}#{page}"
         self.sh(f"am start -a android.intent.action.VIEW -d '{url}' -n {BROWSER}")
@@ -2650,8 +2653,12 @@ def up(port="5556"):
             time.sleep(1)
         time.sleep(3)
     if "package:" not in d.sh("pm path org.chromium.webview_shell"):
-        sys.exit(f"{d.serial}: no org.chromium.webview_shell (the test page's browser): the snapshot is "
-                 "not uat/tools/avd.sh's")
+        # the shell's minSdk is 34: an older AVD (UAT_AVD=youmo29, Android 10) has none, its page cases blocked
+        sdk = d.sh("getprop ro.build.version.sdk").strip()
+        if not sdk.isdigit() or int(sdk) >= 34:   # an answer not a number: the check kept
+            sys.exit(f"{d.serial}: no org.chromium.webview_shell (the test page's browser): the snapshot is "
+                     "not uat/tools/avd.sh's")
+        print(f"{d.serial}: below API 34, no test page browser: the cases on fields.html are blocked here")
     print(f"{d.serial} up")
 
 
