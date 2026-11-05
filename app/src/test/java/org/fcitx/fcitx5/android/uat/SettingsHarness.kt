@@ -5,6 +5,8 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.os.Looper
 import android.view.View
 import android.widget.TextView
@@ -22,6 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.comparesScreenshots
 import org.fcitx.fcitx5.android.core.FakeHostApi
 import org.fcitx.fcitx5.android.core.FakeHostConnection
 import org.fcitx.fcitx5.android.core.HostApi
@@ -119,7 +122,13 @@ class SettingsHarness(
 
     fun capture(path: String) {
         idle()
-        activity.window.decorView.captureRoboImage(
+        val root = activity.window.decorView
+        if (!comparesScreenshots) {
+            // drawn all the same (see SCREENSHOT_SDK)
+            root.draw(Canvas(Bitmap.createBitmap(root.width.coerceAtLeast(1), root.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)))
+            return
+        }
+        root.captureRoboImage(
             "src/test/screenshots/$path.png",
             RoborazziOptions(recordOptions = RoborazziOptions.RecordOptions(resizeScale = 0.5)),
         )

@@ -31,6 +31,7 @@ any change to behaviour or settings.
 |---|---|
 | Core logic tests + API-level check + coverage floors | `./gradlew :lib:ime-core:check` |
 | App JVM tests (Robolectric where needed) | `./gradlew :app:testTextDebugUnitTest` |
+| The same at SDK 29 (Android 10, minSdk: must keep working; specs/testing.md) | `./gradlew :app:testTextDebugUnitTestAt29` |
 | Engine UAT replay (uat/ cases through Engines with the app's data; not in check, minutes the first time) | `./gradlew :lib:ime-eval:uatTest` |
 | Static analysis (syntax rules only; type resolution doesn't work here) | `./gradlew detekt` |
 | Accept current findings after a deliberate batch (run alone, not with `detekt`; `:<module>:detektBaseline` for one module, bare `detektBaseline` rewrites every module) | `./gradlew :<module>:detektBaseline` |

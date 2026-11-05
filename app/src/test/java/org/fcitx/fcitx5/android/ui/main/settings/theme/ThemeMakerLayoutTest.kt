@@ -21,6 +21,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.SCREENSHOT_SDK
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemeMakerTestdata
@@ -70,7 +71,8 @@ import kotlin.math.roundToInt
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(application = FcitxApplication::class, qualifiers = DEFAULT_PHONE)
+// the page's testdata is measured at the goldens' SDK, as a screenshot is
+@Config(sdk = [SCREENSHOT_SDK], application = FcitxApplication::class, qualifiers = DEFAULT_PHONE)
 class ThemeMakerLayoutTest {
 
     @get:Rule

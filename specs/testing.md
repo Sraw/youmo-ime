@@ -10,6 +10,7 @@ compiled is not done.
 |---|---|---|---|
 | ime-core unit tests | `lib/ime-core/src/test` | `./gradlew :lib:ime-core:check` (tests + animal-sniffer + Kover floors) | every decision and the whole engine; milliseconds each |
 | App JVM tests | `app/src/test` | `./gradlew :app:testTextDebugUnitTest` | glue that needs Android types: Robolectric where the framework is reached |
+| App JVM tests at minSdk | `app/src/test` | `./gradlew :app:testTextDebugUnitTestAt29` | the same tests at SDK 29, Android 10, which must keep working (below) |
 | Engine UAT replay | `lib/ime-eval/src/uatTest` | `./gradlew :lib:ime-eval:uatTest` (not in `check`) | the uat/ cases whose 预期 is what the engine types, through `Engines` with the app's own data: needs `:app`'s data tasks (minutes the first time), and a 2 GB heap; no network (its named keys are held to the host's `KeySyms`, which `KeySymsGoldenTest` holds to fcitx) |
 | Tools | `lib/ime-dict-tool/src/test`, `lib/ime-eval/src/test`, `build-logic/convention/src/test` | `:lib:ime-dict-tool:test`, `:lib:ime-eval:test`, `./gradlew -p build-logic test` | data compilation, the evaluation, build tasks |
 | Python tools | `lexicon/tools`, `lib/ime-eval/tools` | `python3 -m unittest discover -s lexicon/tools` (and `-s lib/ime-eval/tools`) | the lexicon and evaluation scripts |
@@ -19,7 +20,7 @@ compiled is not done.
 | Evaluation | `lib/ime-eval` | see below | ranking: whether the first candidate is the sentence meant |
 | On a device | the Android emulator (arm64) or a phone | by hand / scripts | what a user sees: layout, gestures, rotation, upgrade |
 
-Minimum before a commit: `./gradlew :lib:ime-core:check :app:testTextDebugUnitTest detekt`, plus
+Minimum before a commit: `./gradlew :lib:ime-core:check :app:testTextDebugUnitTest :app:testTextDebugUnitTestAt29 detekt`, plus
 the tool or build-logic tests if those changed. Unit tests need no NDK or CMake.
 
 ## Writing tests
@@ -36,6 +37,23 @@ the tool or build-logic tests if those changed. Unit tests need no NDK or CMake.
   byte golden, the upgrade tests, `RecordStore`, `CodedIndex`, `DictionaryFile`.
 - `unitTests.isReturnDefaultValues = false` on purpose: a JVM test that reaches an android.jar stub
   fails loudly. Anything needing the framework runs under Robolectric.
+- Android 10 (API 29, minSdk) must keep working. Every text debug Robolectric test runs at SDK 29 and 35
+  (`robolectric.properties`), one SDK a task and a JVM (`robolectric.enabledSdks`): the 35s in
+  `testTextDebugUnitTest`, the 29s in `testTextDebugUnitTestAt29`, every test drawing natively there
+  (one sandbox a JVM: Robolectric's native runtime goes into the first sandbox's class loader only).
+  The normal tasks enable 30 to 36 alone, so a pin outside 29..36 runs nowhere, unreported. The voice
+  flavour's JVM tests run at 35 only; it is at 29 on the emulator (below). `RobolectricSdks` fails
+  if 29 leaves `robolectric.properties` (the At29 task would pass with nothing left in it).
+  Screenshots and the theme maker's testdata are compared at 35 alone (`SCREENSHOT_SDK`); at 29 a
+  capture still lays out and draws. A test of behaviour that only exists from some level on pins
+  `@Config(sdk = [35])`, as does a check that is itself above 29 (`View.hasOnLongClickListeners`).
+  Two layers, each catching what the other cannot: lint's `NewApi` is fatal (a release build's
+  lintVital fails on a call above minSdk), but lint does not see an implicit cast to an interface a
+  class implements only later (`TypedArray.use {}`: AutoCloseable from 31), which only running the
+  code at 29 shows. 0.5.1 shipped both kinds (`e1e5c7489`). On a device: the AVD `youmo29`
+  (`UAT_AVD=youmo29 UAT_API=29 uat/tools/avd.sh`, then `UAT_AVD=youmo29 uat.py up`), no test page
+  browser there (the WebView shell needs 34), the debug build's `TypingHostActivity` as the field;
+  CI's instrumented tests run at API 29 and 35.
 - A class reading `AppPrefs` in its initialiser needs `AppPrefs.init(sharedPreferences)` in the test
   (a relaxed mock is enough); the error message says so.
 - Test the behaviour a user would notice, named so ("a coarse word the user typed is not lowered"),

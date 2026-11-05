@@ -77,11 +77,17 @@ class FieldReadTest {
                     EditPlan.Field("ab", "", "ef"), tracked,
                 ),
                 Row(
+                    "Android 10: the sides and the selection read apart, never the text around",
+                    Editor(null, "ab", "cd", "ef"), true, Build.VERSION_CODES.Q,
+                    EditPlan.Field("ab", "cd", "ef"), tracked,
+                ),
+                Row(
                     "a side the editor will not give: nothing read, nothing kept",
                     Editor(null, null, "", "ef"), false, Build.VERSION_CODES.S,
                     null, tracked,
                 ),
-            ),
+            // at SDK 29 too (robolectric.properties): a row for a later level needs calls 29 lacks, its own row runs there
+            ).filter { it.sdk <= Build.VERSION.SDK_INT },
             { it.why },
         ) { row ->
             val read = readAround(row.editor, tracked, 64, 64, row.selected, row.sdk)

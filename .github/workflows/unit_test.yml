@@ -75,8 +75,9 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.m2/repository/org/robolectric
-          key: robolectric-${{ hashFiles('gradle/libs.versions.toml', 'app/src/test/resources/robolectric.properties') }}
-          restore-keys: robolectric-
+          # a key a job: each fetches its own SDKs' jars (35 here, 29 in unit_test_29)
+          key: robolectric-35-${{ hashFiles('gradle/libs.versions.toml', 'app/src/test/resources/robolectric.properties') }}
+          restore-keys: robolectric-35-
 
       # :lib:ime-core is a plain JVM module: no Android SDK, no resource merging, seconds to
       # run. Kept as a separate step so a failure there is obviously a logic failure rather
@@ -222,4 +223,87 @@ jobs:
             app/build/reports/tests/
             app/build/test-results/
             **/build/reports/detekt/
+          retention-days: 14
+
+  # Android 10 (minSdk 29) must keep working: every app Robolectric test again at SDK 29, a task of
+  # its own (robolectric.properties, app/build.gradle.kts); 0.5.1 shipped two crashes only it shows.
+  # A job of its own beside the one above, which takes most of its 30 minutes already.
+  unit_test_29:
+    name: JVM unit tests at SDK 29
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Fetch source code
+        uses: actions/checkout@v7
+        with:
+          # full history like pull_request.yml: build-logic runs `git describe` at configuration
+          fetch-depth: 0
+          submodules: false
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - name: Setup Android environment
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+
+      # CMake at the build's own version (Versions.defaultCMake): the app tests read the engine's
+      # data, whose archives are unpacked with it
+      - name: Install build dependencies
+        run: |
+          cmake=$(sed -n 's/.*defaultCMake = "\([^"]*\)".*/\1/p' build-logic/convention/src/main/kotlin/Versions.kt)
+          sdkmanager --install "cmake;${cmake:?no defaultCMake in Versions.kt}"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+
+      # Robolectric fetches its android-all jars (hundreds of MB, one per SDK the tests run at)
+      # into the Maven local repository, which the Gradle cache does not cover
+      - name: Cache Robolectric runtimes
+        uses: actions/cache@v6
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-29-${{ hashFiles('gradle/libs.versions.toml', 'app/src/test/resources/robolectric.properties') }}
+          restore-keys: robolectric-29-
+
+      # text debug, as above; one ABI
+      - name: Run app unit tests at SDK 29
+        env:
+          BUILD_ABI: x86_64
+        run: ./gradlew --build-cache :app:testTextDebugUnitTestAt29
+
+      # a failed test shows up on the run page and the checks tab, not only inside the report
+      # (without a file and line GitHub cannot place it in the diff; it shows the first 10)
+      - name: Annotate test failures
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          def escape(s, prop=False):
+              s = s.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              return s.replace(":", "%3A").replace(",", "%2C") if prop else s
+          for path in glob.glob("**/build/test-results/**/TEST-*.xml", recursive=True):
+              try:
+                  root = ET.parse(path).getroot()
+              except ET.ParseError:  # e.g. a test JVM killed mid-write
+                  print(f"::warning title=Unreadable test result::{escape(path)}")
+                  continue
+              for case in root.iter("testcase"):
+                  for bad in list(case.findall("failure")) + list(case.findall("error")):
+                      title = escape(f"{case.get('classname')}.{case.get('name')}", prop=True)
+                      lines = (bad.get("message") or "").splitlines()
+                      text = escape(lines[0] if lines else bad.get("type", "failed"))
+                      print(f"::error title={title}::{text}")
+          PY
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-report-29
+          path: |
+            app/build/reports/tests/testTextDebugUnitTestAt29/
+            app/build/test-results/testTextDebugUnitTestAt29/
           retention-days: 14

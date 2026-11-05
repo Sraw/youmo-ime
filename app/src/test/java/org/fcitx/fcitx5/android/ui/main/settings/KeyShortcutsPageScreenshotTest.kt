@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
@@ -11,6 +13,7 @@ import androidx.appcompat.app.AlertDialog
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureScreenRoboImage
+import org.fcitx.fcitx5.android.comparesScreenshots
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -80,6 +83,13 @@ class KeyShortcutsPageScreenshotTest {
     @OptIn(ExperimentalRoborazziApi::class)
     private fun captureScreen(name: String) {
         st.idle()
+        if (!comparesScreenshots) {
+            // drawn all the same (see SCREENSHOT_SDK): the page, and the dialog over it
+            st.capture("KeyShortcutsPageScreenshotTest/$name")
+            val dialog = ShadowDialog.getLatestDialog().window!!.decorView
+            dialog.draw(Canvas(Bitmap.createBitmap(dialog.width.coerceAtLeast(1), dialog.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)))
+            return
+        }
         captureScreenRoboImage(
             "src/test/screenshots/KeyShortcutsPageScreenshotTest/$name.png",
             RoborazziOptions(recordOptions = RoborazziOptions.RecordOptions(resizeScale = 0.5)),

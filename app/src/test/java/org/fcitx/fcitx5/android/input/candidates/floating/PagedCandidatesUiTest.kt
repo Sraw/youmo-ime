@@ -19,6 +19,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
 /** A candidate of the floating bar, once recycled, keeps nothing of the candidate it showed. */
 @RunWith(RobolectricTestRunner::class)
@@ -40,6 +41,7 @@ class PagedCandidatesUiTest {
     }
 
     @Test
+    @Config(sdk = [35]) // View.hasOnLongClickListeners is API 30: the check, not the code under test
     fun aRecycledCandidateHoldsNeitherItsTapNorItsLongPress() {
         val ui = PagedCandidatesUi(
             PlainRecyclerViews(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark, {},

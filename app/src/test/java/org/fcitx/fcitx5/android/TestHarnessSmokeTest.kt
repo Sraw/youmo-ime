@@ -91,16 +91,31 @@ class TestHarnessSmokeTest {
     /**
      * Robolectric: a real Context and real framework behaviour on the JVM.
      *
-     * `robolectric.properties` sets SDK 35 for every Robolectric test that pins no other; see there
-     * for why.
+     * `robolectric.properties` runs every Robolectric test that pins no other at SDK 29 (minSdk) and
+     * 35; see there for why.
      */
+    /**
+     * Plain JUnit, so it runs in both tasks whatever the SDKs: with 29 gone from `robolectric.properties`,
+     * testTextDebugUnitTestAt29 would filter every Robolectric test out and still pass.
+     */
+    class RobolectricSdks {
+        @Test
+        fun theTestsRunAtMinSdkAndTheScreenshotsOne() {
+            val properties = java.util.Properties().apply {
+                RobolectricSdks::class.java.getResourceAsStream("/robolectric.properties")!!.use(::load)
+            }
+            val sdks = properties.getProperty("sdk").split(",").map { it.trim().toInt() }.toSet()
+            Assert.assertEquals(setOf(29, SCREENSHOT_SDK), sdks)
+        }
+    }
+
     @RunWith(RobolectricTestRunner::class)
     class RobolectricSmoke {
         @Test
         fun providesRealContextAtPinnedSdk() {
             val ctx = RuntimeEnvironment.getApplication()
             Assert.assertNotNull("Robolectric supplies an Application context", ctx)
-            Assert.assertEquals("running at the SDK robolectric.properties pins", 35, Build.VERSION.SDK_INT)
+            Assert.assertTrue("running at an SDK robolectric.properties lists", Build.VERSION.SDK_INT in setOf(29, 35))
         }
 
         /**

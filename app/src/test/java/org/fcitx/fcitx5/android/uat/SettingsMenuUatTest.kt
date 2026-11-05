@@ -146,6 +146,9 @@ class SettingsMenuUatTest {
 
     @Test
     @Uat("ST-25")
+    // not at 29: Robolectric there dies in appcompat's recreate below Android 13 (a sync barrier token
+    // "not posted"); picking English on Android 10 itself (AVD youmo29) switches the app as it should
+    @Config(sdk = [35])
     fun theLanguagesOfferedAreFour() {
         st.pref(R.string.app_language).performClick()
         st.idle()

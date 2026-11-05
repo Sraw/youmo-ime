@@ -86,6 +86,14 @@ in a password field and an address field, not only a plain one.
 The host holds the config and the engine holds its logs open; replacing them under a running process
 leaves it writing to the old files. A restore stops the host, replaces, then restarts the process.
 
+### Android 10 lacks what lint does not see
+
+minSdk is 29 and the tests ran at 35 alone till 0.5.1, which crashed on Android 10-12 twice: Kotlin's
+`.use {}` on a `TypedArray` casts it to `AutoCloseable`, an interface it has only from 31
+(`ClassCastException`, no lint warning), and `Paint.getFontMetricsInt(CharSequence, ...)` is 33
+(`NoSuchMethodError`; lint's `NewApi`, now fatal). Never `.use {}` a framework type unless it is
+`Closeable` at 29; recycle a `TypedArray` by hand. The tests at SDK 29 (testing.md) catch both.
+
 ### Direct boot
 
 Before the first unlock there is no credential-protected storage: `EngineBridge.userDir()` is null,

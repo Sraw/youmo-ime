@@ -107,8 +107,9 @@ class LocalesTest {
         assertEquals(of(phone.toLanguageTag()).joinToString(":"), Locales.fcitxLocale)
     }
 
-    // Android 13 on, as the pinned SDK: the configuration has a pick only once the system sends it
+    // Android 13 on (pinned: every test also runs at 29): the configuration has a pick only once the system sends it
     @Test
+    @Config(sdk = [35])
     fun aLanguageJustPickedComesFirstThoughTheConfigurationGetsItLater() {
         val app = RuntimeEnvironment.getApplication()
         app.getSystemService(LocaleManager::class.java).applicationLocales = LocaleList.forLanguageTags("zh-TW")
@@ -117,6 +118,7 @@ class LocalesTest {
     }
 
     @Test
+    @Config(sdk = [35])
     fun thePhonesLanguagePickedAgainIsReadFromTheSystemNotFromTheConfigurationNotYetSent() {
         val app = RuntimeEnvironment.getApplication()
         // the configuration of the language picked before
@@ -161,7 +163,7 @@ class LocalesTest {
     }
 
     @Test
-    @Config(application = FcitxApplication::class)
+    @Config(sdk = [35], application = FcitxApplication::class)
     fun fromAndroid13ThePickIsTheSystemsAndTheAppsCopyIsNotRead() {
         val copy = AppPrefs.getInstance().internal.appLanguage
         val system = appContext.getSystemService(LocaleManager::class.java)

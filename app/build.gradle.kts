@@ -13,6 +13,40 @@ plugins {
     alias(libs.plugins.roborazzi)
 }
 
+// What every app unit test task runs with, AGP's (testOptions.unitTests.all) and testTextDebugUnitTestAt29
+fun Test.unitTestSettings() {
+    maxHeapSize = "3g"
+    forkEvery = 40
+    // mockk's agent attached from inside the test JVM: by default ByteBuddy starts a second
+    // process to attach it, which under a full run's load at times fails and takes every
+    // mockk test of that JVM with it (JvmMockKGateway); the attach's own wait, 10 s, ran
+    // out under that load too (the JVM's attach listener slow to answer), and so did a minute:
+    // the agent loaded when the JVM starts instead, so nothing is attached (ByteBuddyAgent
+    // finds it already installed); the attach settings stay for an IDE's run without it
+    jvmArgs(
+        "-Djdk.attach.allowAttachSelf=true", "-XX:+EnableDynamicAgentLoading",
+        "-Dsun.tools.attach.attachTimeout=60000",
+    )
+    val test = this
+    // the byte-buddy-agent on the test's own classpath: the version mockk resolved to
+    jvmArgumentProviders.add(CommandLineArgumentProvider {
+        val agents = test.classpath.files.filter { f -> f.name.startsWith("byte-buddy-agent-") }
+        val agent = agents.singleOrNull()
+            ?: error("${test.name}: one byte-buddy-agent expected on the classpath, found ${agents.map { f -> f.name }} (mockk's dependency changed?)")
+        listOf("-javaagent:${agent.path}")
+    })
+    // fixtures found from any working directory (an IDE's run too): core/Fixtures.kt
+    systemProperty("uat.fixtures", rootProject.file("uat/fixtures").path)
+    // the theme maker's shared cases (ThemeMakerRulesTest): compared, or with -PupdateThemeMaker written
+    systemProperty("themeMaker.testdata", rootProject.file("web/theme-maker/test/testdata").path)
+    systemProperty("themeMaker.update", project.hasProperty("updateThemeMaker").toString())
+    // compared with the page and its files: a change there is a reason to run again, not an up-to-date skip
+    inputs.dir(rootProject.file("web/theme-maker")).withPropertyName("themeMaker")
+        .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    // ThemeLookScreenshotTest's whole set of themes × keyboards × modes, for the eye: -PthemeShots=<dir>
+    systemProperty("themeShots.dir", project.findProperty("themeShots")?.toString().orEmpty())
+}
+
 android {
     namespace = "org.fcitx.fcitx5.android"
 
@@ -113,38 +147,8 @@ android {
             // with the themes' (ThemeMakerLayoutTest's 55 measured views) 4 GB ran out too, ThemeMakerLayoutTest
             // thrashing 8 minutes first: a new JVM every 40 classes, what is kept dropped with it (80 ran
             // out again once feat/051's popups were merged; the test alone takes 8 s and little heap)
-            all {
-                it.maxHeapSize = "3g"
-                it.forkEvery = 40
-                // mockk's agent attached from inside the test JVM: by default ByteBuddy starts a second
-                // process to attach it, which under a full run's load at times fails and takes every
-                // mockk test of that JVM with it (JvmMockKGateway); the attach's own wait, 10 s, ran
-                // out under that load too (the JVM's attach listener slow to answer), and so did a minute:
-                // the agent loaded when the JVM starts instead, so nothing is attached (ByteBuddyAgent
-                // finds it already installed); the attach settings stay for an IDE's run without it
-                it.jvmArgs(
-                    "-Djdk.attach.allowAttachSelf=true", "-XX:+EnableDynamicAgentLoading",
-                    "-Dsun.tools.attach.attachTimeout=60000",
-                )
-                val test = it
-                // the byte-buddy-agent on the test's own classpath: the version mockk resolved to
-                it.jvmArgumentProviders.add(CommandLineArgumentProvider {
-                    val agents = test.classpath.files.filter { f -> f.name.startsWith("byte-buddy-agent-") }
-                    val agent = agents.singleOrNull()
-                        ?: error("${test.name}: one byte-buddy-agent expected on the classpath, found ${agents.map { f -> f.name }} (mockk's dependency changed?)")
-                    listOf("-javaagent:${agent.path}")
-                })
-                // fixtures found from any working directory (an IDE's run too): core/Fixtures.kt
-                it.systemProperty("uat.fixtures", rootProject.file("uat/fixtures").path)
-                // the theme maker's shared cases (ThemeMakerRulesTest): compared, or with -PupdateThemeMaker written
-                it.systemProperty("themeMaker.testdata", rootProject.file("web/theme-maker/test/testdata").path)
-                it.systemProperty("themeMaker.update", project.hasProperty("updateThemeMaker").toString())
-                // compared with the page and its files: a change there is a reason to run again, not an up-to-date skip
-                it.inputs.dir(rootProject.file("web/theme-maker")).withPropertyName("themeMaker")
-                    .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
-                // ThemeLookScreenshotTest's whole set of themes × keyboards × modes, for the eye: -PthemeShots=<dir>
-                it.systemProperty("themeShots.dir", project.findProperty("themeShots")?.toString().orEmpty())
-            }
+            // unitTestSettings (top of this file): testTextDebugUnitTestAt29 gets the same
+            all { it.unitTestSettings() }
         }
     }
     // fcitx's built-in data the Kotlin host reads (host-assets.md)
@@ -169,9 +173,33 @@ tasks.withType<Test>().matching { it.name.startsWith("testVoice") }.configureEac
 // TablesSettingsUatTest runs the real engine on build/generated's pinyin and table blobs. Nothing
 // else of a unit test run builds them, so a fresh checkout (CI) had none and the test's lookups
 // failed quietly; as inputs they are built first and key the test task's cache entry.
-tasks.withType<Test>().matching { it.name.endsWith("UnitTest") }.configureEach {
+tasks.withType<Test>().matching { it.name.endsWith("UnitTest") || it.name.endsWith("UnitTestAt29") }.configureEach {
     inputs.files(tasks.named("compileEngineData"), tasks.named("compileEngineTables"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
+// Android 10 (minSdk 29) must keep working, so every Robolectric test runs at 29 as well as 35
+// (robolectric.properties lists both): 0.5.1 shipped a cast and a call Android 10-12 lack, which
+// the tests at 35 alone ran past. One SDK a JVM: robolectric.enabledSdks puts 29 in a task of its
+// own, :app:testTextDebugUnitTestAt29, the same classes and settings (both SDKs in one JVM ran out
+// of its 3 GB, and broke the native SQLite and android-all's zip filesystem across the sandboxes).
+// (a pin outside 29..36 then runs in neither, unreported)
+tasks.withType<Test>().matching { it.name.endsWith("UnitTest") }.configureEach {
+    systemProperty("robolectric.enabledSdks", "30,31,32,33,34,35,36")
+}
+tasks.register<Test>("testTextDebugUnitTestAt29") {
+    group = "verification"
+    description = "The text debug unit tests at SDK 29 (minSdk) alone"
+    val base = tasks.named<Test>("testTextDebugUnitTest").get()
+    testClassesDirs = base.testClassesDirs
+    classpath = base.classpath
+    unitTestSettings()
+    systemProperty("robolectric.enabledSdks", "29")
+    // one sandbox a JVM: a test of the other graphics mode in the same JVM found Robolectric's native
+    // runtime loaded into the first one's class loader (UnsatisfiedLinkError: TypefaceNatives, SQLite's).
+    // Nothing is compared at 29, so every test there draws natively.
+    systemProperty("robolectric.graphicsMode", "NATIVE")
+    useJUnit()
 }
 
 androidComponents {

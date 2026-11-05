@@ -34,6 +34,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.comparesScreenshots
 import org.fcitx.fcitx5.android.core.FakeHostApi
 import org.fcitx.fcitx5.android.core.FakeHostConnection
 import org.fcitx.fcitx5.android.core.HostApi
@@ -603,6 +604,7 @@ class KeyboardHarness(
         settled()
         val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
         view.draw(Canvas(bitmap))
+        if (!comparesScreenshots) return
         bitmap.captureRoboImage(
             "src/test/screenshots/$path.png",
             RoborazziOptions(recordOptions = RoborazziOptions.RecordOptions(resizeScale = 0.5)),
