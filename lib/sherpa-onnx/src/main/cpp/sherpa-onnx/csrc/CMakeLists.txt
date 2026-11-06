@@ -1,13 +1,15 @@
 include_directories(${PROJECT_SOURCE_DIR})
 
 
-# youmo: the offline transducer, its beam search and hotwords, silero VAD, features
-# and what they need; upstream's other model families are removed (README.md)
+# youmo: the offline and the streaming zipformer transducers, their beam search and
+# hotwords, silero VAD, features and what they need; upstream's other model families are removed (README.md)
 set(sources
   base64-decode.cc
   bbpe.cc
+  cat.cc
   circular-buffer.cc
   context-graph.cc
+  endpoint.cc
   features.cc
   file-utils.cc
   fst-utils.cc
@@ -27,14 +29,23 @@ set(sources
   offline-transducer-model-config.cc
   offline-transducer-model.cc
   offline-transducer-modified-beam-search-decoder.cc
+  online-ctc-fst-decoder-config.cc
   online-lm-config.cc
   online-model-config.cc
   online-nemo-ctc-model-config.cc
   online-paraformer-model-config.cc
+  online-recognizer-impl.cc
+  online-recognizer.cc
+  online-stream.cc
   online-t-one-ctc-model-config.cc
+  online-transducer-decoder.cc
+  online-transducer-greedy-search-decoder.cc
   online-transducer-model-config.cc
+  online-transducer-model.cc
+  online-transducer-modified-beam-search-decoder.cc
   online-wenet-ctc-model-config.cc
   online-zipformer2-ctc-model-config.cc
+  online-zipformer2-transducer-model.cc
   onnx-utils.cc
   packed-sequence.cc
   pad-sequence.cc
@@ -50,6 +61,7 @@ set(sources
   symbol-table.cc
   text-utils.cc
   transpose.cc
+  unbind.cc
   utils.cc
   vad-model-config.cc
   vad-model.cc
@@ -153,11 +165,13 @@ if(NOT WIN32 AND CMAKE_SYSTEM_NAME STREQUAL Linux)
 endif()
 
 if(SHERPA_ONNX_ENABLE_BINARY)
-  # youmo: only the offline recognizer, for lib/sherpa-onnx/host-eval.sh; the other programs'
-  # sources were removed with the rest of what our builds never compile (see README.md)
+  # youmo: only the recognizers, offline and streaming, for lib/sherpa-onnx/host-eval.sh; the
+  # other programs' sources were removed with the rest of what our builds never compile (see README.md)
+  add_executable(sherpa-onnx sherpa-onnx.cc)
   add_executable(sherpa-onnx-offline sherpa-onnx-offline.cc)
 
   set(main_exes
+    sherpa-onnx
     sherpa-onnx-offline
   )
 

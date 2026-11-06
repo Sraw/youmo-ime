@@ -19,14 +19,24 @@ upstream's AAR, so that it is ours to change.
 
 ## What we changed
 
-- **Blocked phrases:** `OfflineRecognizer::CreateStream(hotwords, blocked)` (Kotlin
-  `createStream(hotwords, blocked)`): a transducer's modified beam search does not let a hypothesis
-  complete any of them (`ContextGraph::CompletingTokens`), so the next best is written instead.
-- **N-best:** `OfflineRecognizerResult.nbest` and `nbestScores`, the beam's hypotheses best first
-  (in `AsJsonString` too). The app ranks them again with its pinyin model (`VoiceRerank`).
+Each change is made to both recognizers, the offline (`OfflineRecognizer`) and the streaming one
+(`OnlineRecognizer`, 0.6.0's), unless it says otherwise.
+
+- **Blocked phrases:** `CreateStream(hotwords, blocked)` (Kotlin `createStream(hotwords, blocked)`):
+  a transducer's modified beam search does not let a hypothesis complete any of them
+  (`ContextGraph::CompletingTokens`), so the next best is written instead. Streaming, a phrase is
+  matched within a segment: an endpoint's `Reset` puts every hypothesis back at the graph's root.
+- **N-best:** the results' `nbest` and `nbestScores`, the beam's hypotheses best first (in
+  `AsJsonString` too). The app ranks them again with its pinyin model (`VoiceRerank`). Streaming,
+  `GetResult` gives the n-best so far, at any time, each text once (after an endpoint, hypotheses
+  that differed only before it can write the next segment alike), none before anything is heard.
+  At an endpoint each carried hypothesis's log prob is taken less the best's, so a segment's
+  scores and its best (ranked by log prob over length) are its own; upstream's divided the earlier
+  segments' sum by the new one's length, which favoured longer hypotheses.
 - **Hotwords graph:** `CreateStream(hotwords)` keeps the graph of the last hotwords it was given and
   returns it again for the same ones, rather than building the pack's hotwords into a new graph for
-  each stream.
+  each stream. The user's words are not written to the log, where upstream's streaming recognizer
+  wrote them on an encoding error.
 - **Models mapped in place:** a transducer model in onnxruntime's ORT format (`.ort`) loaded from
   the Android assets is not copied: its asset stays open, mapped from the APK (stored uncompressed),
   and onnxruntime reads its weights where they lie (`session.use_ort_model_bytes_directly`,
@@ -36,12 +46,13 @@ upstream's AAR, so that it is ours to change.
   tests ran in 15 s rather than 20. The ORT files are the release `voice-models-*`
   (`VoiceDataPlugin`); converted for x86 they give the evaluation sets' error rates exactly, and on
   arm64 (onnxruntime 1.28 under qemu, as Neoverse N1 and N2) the ARM files' outputs equal the ONNX
-  models', prepacked or not.
+  models', prepacked or not. Streaming (`online-zipformer2-transducer-model.cc`), each of the
+  three models has its own options, so each mapped one gets a copy of its own.
 
 Each change is marked `youmo` in the source, except the deletions under "What we removed". Their C++ unit tests run on this machine with
 `lib/sherpa-onnx/host-test.sh`; the app's `VoiceEngineTest` covers them through the JNI.
-`lib/sherpa-onnx/host-eval.sh` builds `sherpa-onnx-offline` for this machine, to evaluate the
-recognizer on the app's code without a phone, on the app's onnxruntime version
+`lib/sherpa-onnx/host-eval.sh` builds `sherpa-onnx-offline` and `sherpa-onnx` (streaming, with
+`--blocked`) for this machine, to evaluate the recognizers on the app's code without a phone, on the app's onnxruntime version
 (`cmake/onnxruntime-linux-x86_64.cmake`, kept with the Android files).
 
 ## What we removed
@@ -49,12 +60,16 @@ recognizer on the app's code without a phone, on the app's onnxruntime version
 What our builds never use is deleted, so that it is neither read nor compiled: every file listed in
 `upstream-removed.txt` (relative to `src/main/cpp`), and the `CMakeLists.txt` entries naming them.
 Layer A is what no build of ours compiled at all (speech synthesis, speaker diarization, the NPU
-backends, the tests and programs other than `sherpa-onnx-offline`, the Kotlin API of the rest).
+backends, the tests and programs other than `sherpa-onnx-offline` and `sherpa-onnx`, the Kotlin API
+of the rest).
 Layer B is what was compiled but never ran: every recognizer but the offline transducer (with its
-greedy and modified beam search, hotwords' context graph and LM rescoring), ten-vad, and the JNI
-of the rest. So `OfflineRecognizerImpl::Create` makes a transducer recognizer or stops,
-`OfflineModelConfig` (C++ and Kotlin) holds only the transducer's fields, and `VadModelConfig` only
-silero's; the JNI reads no more than those, except the transducer's QNN fields (`QnnConfig`,
+greedy and modified beam search, hotwords' context graph and LM rescoring) and the streaming
+zipformer2 transducer (greedy and modified beam search, hotwords, endpoints; no LM, no whisper
+features), ten-vad, and the JNI of the rest. So `OfflineRecognizerImpl::Create` makes a transducer
+recognizer or stops, `OnlineRecognizerImpl::Create` a zipformer2 transducer (an online LM or
+another model family stops it), `OfflineModelConfig` and the Kotlin `OnlineModelConfig` hold only
+the transducer's fields (the C++ `OnlineModelConfig` keeps upstream's others, unread), and
+`VadModelConfig` only silero's; the JNI reads no more than those, except the transducer's QNN fields (`QnnConfig`,
 `csrc/qnn-config.cc`, the JNI's three QNN strings and `prependAdspLibraryPath`): they are part of
 upstream's transducer config, so they stay to keep its diff small, and are inert since `Validate`
 refuses the `qnn` provider. An empty `model_type` is taken as a transducer without reading the
@@ -63,7 +78,7 @@ encoder's metadata, as upstream did to choose among families: a non-transducer m
 Layer C is the build options that would now configure a broken build: speech synthesis, speaker
 diarization, the NPUs, WASM, Python, the C API, websocket, PortAudio, ALSA and the tests are gone
 from the `CMakeLists.txt` files, with the leftover NPU headers and the `cmake/` files that fetched
-their dependencies. What stays: `BINARY` (for `sherpa-onnx-offline`), `JNI`, `CHECK`, the
+their dependencies. What stays: `BINARY` (for `sherpa-onnx-offline` and `sherpa-onnx`), `JNI`, `CHECK`, the
 onnxruntime choices (`GPU`, `DIRECTML`, `SPACEMIT`, static or shared) and the sanitizer. Branches on the
 removed options left in dependency `.cmake` files and `csrc/macros.h` are kept on purpose: they are dead,
 and leaving them keeps the next upstream diff small.
@@ -78,7 +93,7 @@ list there), then bring our commits forward onto it (`git log` above lists them;
 `csrc/CMakeLists.txt` lists its sources itself (`set(sources …)`), so upstream's edits to its list never
 reach us. To sort the new release's files:
 
-1. The roots are the `.cc` files in `jni/CMakeLists.txt`, `csrc/sherpa-onnx-offline.cc` and the
+1. The roots are the `.cc` files in `jni/CMakeLists.txt`, `csrc/sherpa-onnx-offline.cc`, `csrc/sherpa-onnx.cc` and the
    sources `host-test.sh` compiles. What they `#include`, followed transitively, is the kept header set;
    a kept header's `.cc` is a kept source.
 2. A `.cc` with no header of its own (`log.cc` was one) is not found that way: check each new one by hand

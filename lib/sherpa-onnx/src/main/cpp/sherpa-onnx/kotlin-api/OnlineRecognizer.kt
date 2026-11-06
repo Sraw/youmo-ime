@@ -1,0 +1,136 @@
+package com.k2fsa.sherpa.onnx
+
+import android.content.res.AssetManager
+
+data class EndpointRule(
+    var mustContainNonSilence: Boolean,
+    var minTrailingSilence: Float,
+    var minUtteranceLength: Float,
+)
+
+data class EndpointConfig(
+    var rule1: EndpointRule = EndpointRule(false, 2.4f, 0.0f),
+    var rule2: EndpointRule = EndpointRule(true, 1.4f, 0.0f),
+    var rule3: EndpointRule = EndpointRule(false, 0.0f, 20.0f)
+)
+
+data class OnlineTransducerModelConfig(
+    var encoder: String = "",
+    var decoder: String = "",
+    var joiner: String = "",
+    var qnnConfig: QnnConfig = QnnConfig(),
+)
+
+data class OnlineModelConfig(
+    var transducer: OnlineTransducerModelConfig = OnlineTransducerModelConfig(),
+    var tokens: String = "",
+    var numThreads: Int = 1,
+    var debug: Boolean = false,
+    var provider: String = "cpu",
+    var modelType: String = "",
+    var modelingUnit: String = "",
+    var bpeVocab: String = "",
+)
+
+data class OnlineRecognizerConfig(
+    var featConfig: FeatureConfig = FeatureConfig(),
+    var modelConfig: OnlineModelConfig = OnlineModelConfig(),
+    var hr: HomophoneReplacerConfig = HomophoneReplacerConfig(),
+    var endpointConfig: EndpointConfig = EndpointConfig(),
+    var enableEndpoint: Boolean = true,
+    var decodingMethod: String = "greedy_search",
+    var maxActivePaths: Int = 4,
+    var hotwordsFile: String = "",
+    var hotwordsScore: Float = 1.5f,
+    var ruleFsts: String = "",
+    var ruleFars: String = "",
+    var blankPenalty: Float = 0.0f,
+)
+
+data class OnlineRecognizerResult(
+    val text: String,
+    val tokens: Array<String>,
+    val timestamps: FloatArray,
+    val ysProbs: FloatArray,
+
+    // youmo: the beam's hypotheses, best first (text the first), and the score
+    // each was ranked by: modified_beam_search only, else empty
+    val nbest: Array<String> = emptyArray(),
+    val nbestScores: FloatArray = FloatArray(0),
+)
+
+class OnlineRecognizer(
+    assetManager: AssetManager? = null,
+    val config: OnlineRecognizerConfig,
+) {
+    private var ptr: Long
+
+    init {
+        ptr = if (assetManager != null) {
+            newFromAsset(assetManager, config)
+        } else {
+            newFromFile(config)
+        }
+        require(ptr != 0L) {
+            "Invalid OnlineRecognizerConfig: failed to create native OnlineRecognizer"
+        }
+    }
+
+    protected fun finalize() {
+        if (ptr != 0L) {
+            delete(ptr)
+            ptr = 0
+        }
+    }
+
+    fun release() = finalize()
+
+    fun createStream(hotwords: String = ""): OnlineStream {
+        val p = createStream(ptr, hotwords)
+        return OnlineStream(p)
+    }
+
+    // youmo: and phrases, "/"-separated as the hotwords, its result never contains
+    // (within a segment: an endpoint's reset starts the matching over)
+    fun createStream(hotwords: String, blocked: String): OnlineStream {
+        val p = createStreamWithBlocked(ptr, hotwords, blocked)
+        return OnlineStream(p)
+    }
+
+    fun reset(stream: OnlineStream) = reset(ptr, stream.ptr)
+    fun decode(stream: OnlineStream) = decode(ptr, stream.ptr)
+    fun isEndpoint(stream: OnlineStream) = isEndpoint(ptr, stream.ptr)
+    fun isReady(stream: OnlineStream) = isReady(ptr, stream.ptr)
+    fun getResult(stream: OnlineStream): OnlineRecognizerResult {
+        return getResult(ptr, stream.ptr)
+    }
+
+    private external fun delete(ptr: Long)
+
+    private external fun newFromAsset(
+        assetManager: AssetManager,
+        config: OnlineRecognizerConfig,
+    ): Long
+
+    private external fun newFromFile(
+        config: OnlineRecognizerConfig,
+    ): Long
+
+    private external fun createStream(ptr: Long, hotwords: String): Long
+    private external fun createStreamWithBlocked(ptr: Long, hotwords: String, blocked: String): Long
+    private external fun reset(ptr: Long, streamPtr: Long)
+    private external fun decode(ptr: Long, streamPtr: Long)
+    private external fun isEndpoint(ptr: Long, streamPtr: Long): Boolean
+    private external fun isReady(ptr: Long, streamPtr: Long): Boolean
+    private external fun getResult(ptr: Long, streamPtr: Long): OnlineRecognizerResult
+
+    companion object {
+        init {
+            System.loadLibrary("sherpa-onnx-jni")
+        }
+
+        @JvmStatic
+        external fun prependAdspLibraryPath(newPath: String) // for qnn
+    }
+}
+
