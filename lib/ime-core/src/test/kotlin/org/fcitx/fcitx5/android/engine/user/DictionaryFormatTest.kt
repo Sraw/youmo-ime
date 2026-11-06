@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.engine.user.DictionaryFormat.Weight
 import org.fcitx.fcitx5.android.engine.user.imports.WordText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.random.Random
@@ -259,5 +260,130 @@ class DictionaryFormatTest {
         assertEquals(1, list.words)
         assertEquals(2, list.textOnly)
         assertEquals(0, list.unread)
+    }
+
+    // a dictionary that reads 你好 and 幽默 alone, as the app's does more
+    private val guess: (List<String>) -> Map<String, String?> = { texts ->
+        texts.associateWith { mapOf("你好" to "ni hao", "幽默" to "you mo")[it] }
+    }
+
+    private fun guessed(bytes: ByteArray, out: MutableList<String> = ArrayList()) =
+        DictionaryFormat.analyse({ bytes.inputStream() }, write = { out += it }, guess = guess) as Detected
+
+    @Test
+    fun aListOfWordsAloneIsGivenTheReadingsGuessedTheRestSkipped() {
+        val out = ArrayList<String>()
+        val d = guessed(text(listOf("你好", "幽默", "蓝鲸")), out)
+        assertEquals(2, d.words)
+        assertEquals(2, d.guessed)
+        assertEquals(1, d.textOnly)
+        assertEquals(1, d.unguessed)
+        // the one skipped is said, not held against the base
+        assertNull(d.refusedForBase)
+        assertEquals(listOf("你好 ni'hao 0.0", "幽默 you'mo 0.0"), out)
+        // none read: nothing for the base
+        assertEquals(Reason.NO_PINYIN, guessed(text(listOf("蓝鲸", "花园"))).refusedForBase)
+    }
+
+    @Test
+    fun aGuessFillsInAmongWordsWithPinyinAndLeavesTheBlockedAlone() {
+        val out = ArrayList<String>()
+        val d = guessed(text((1..100).map { "测试 ce'shi" } + "你好" + "你好" + "!幽默"), out)
+        assertEquals(102, d.words)
+        assertEquals(2, d.guessed)
+        // the blocked one: the user dictionary's alone, never guessed
+        assertEquals(1, d.textOnly)
+        assertEquals(0, d.unguessed)
+        assertEquals(2, out.count { it == "你好 ni'hao 0.0" })
+        assertTrue(out.none { it.startsWith("幽默") })
+        // a list's numbers kept on a word alone
+        val counted = ArrayList<String>()
+        guessed(text(listOf("你好 12", "幽默 3")), counted)
+        assertEquals(listOf("你好 ni'hao 12.0", "幽默 you'mo 3.0"), counted)
+    }
+
+    @Test
+    fun aFileAllWithPinyinNeverAsksTheGuess() {
+        var asked = 0
+        val d = DictionaryFormat.analyse({ text(words.map { "${it.first} ${it.second}" }).inputStream() }, guess = { asked++; guess(it) })
+        assertTrue(d is Detected)
+        assertEquals(0, asked)
+    }
+
+    @Test
+    fun aGuessChangesNoOtherRefusal() {
+        // blocked lines past 2%: the user dictionary's alone, guess or not
+        assertEquals(Reason.NO_PINYIN, guessed(text(List(10) { "测试 ce'shi" } + List(5) { "!幽默" })).refusedForBase)
+        // lines of no word past 2%
+        val unreadable = text(List(50) { "你好" } + List(10) { "你好 世界 再见" })
+        assertEquals(Reason.UNREADABLE, (DictionaryFormat.analyse({ unreadable.inputStream() }, guess = guess) as Refused).reason)
+        // more words than the compiler takes, the guessed counted too
+        val many = "你好\n".toByteArray()
+        val n = DictionaryCompiler.MAX_WORDS + 1
+        val tooMany = DictionaryFormat.analyse(
+            { generateSequence { many }.take(n).fold(java.io.ByteArrayOutputStream(many.size * n)) { out, b -> out.apply { write(b) } }.toByteArray().inputStream() },
+            guess = guess,
+        )
+        assertEquals(Reason.TOO_MANY, (tooMany as Refused).reason)
+    }
+
+    @Test
+    fun aGuessThatThrowsSkipsItsBatchAndACancelStopsAll() {
+        val d = DictionaryFormat.analyse({ text(listOf("测试 ce'shi", "你好", "幽默")).inputStream() }, guess = { error("the engine is gone") }) as Detected
+        assertEquals(1, d.words)
+        assertEquals(2, d.unguessed)
+        // skipped, not held to the 2%: the word with pinyin goes in
+        assertNull(d.refusedForBase)
+        // thrown, the batch skipped, never a mismatch: a GBK list's words not judged by a guess that failed
+        val gbk = text(listOf("你好", "幽默")).let { String(it).toByteArray(WordLists.GB18030) }
+        assertTrue(DictionaryFormat.analyse({ gbk.inputStream() }, guess = { error("gone") }) is Detected)
+        assertThrows(java.util.concurrent.CancellationException::class.java) {
+            DictionaryFormat.analyse({ text(listOf("你好")).inputStream() }, guess = { throw java.util.concurrent.CancellationException("cancelled") })
+        }
+    }
+
+    @Test
+    fun differentWordsPastABatchAreAllWrittenAndCounted() {
+        val n = DictionaryFormat.GUESS_BATCH + 10
+        val texts = List(n) { String(Character.toChars(0x4E00 + it)) }
+        val out = ArrayList<String>()
+        val d = DictionaryFormat.analyse({ text(texts).inputStream() }, write = { out += it }, guess = { it.associateWith { "a" } }) as Detected
+        assertEquals(n, d.words)
+        assertEquals(n, d.guessed)
+        assertEquals(0, d.unguessed)
+        assertEquals(texts.map { "$it a 0.0" }, out)
+    }
+
+    // Q3: a list of words alone in Big5 reads as GBK, every character another: the guess reads few of them
+    @Test
+    fun aBig5ListOfWordsAloneIsRefusedByItsReadings() {
+        val traditional = listOf("輸入法" to "shu ru fa", "詞庫" to "ci ku", "電腦" to "dian nao", "資訊" to "zi xun", "網際網路" to "wang ji wang lu")
+        val readings = traditional.toMap()
+        val reads: (List<String>) -> Map<String, String?> = { texts -> texts.associateWith { readings[it] } }
+        val big5 = traditional.joinToString("\n") { it.first }.toByteArray(charset("Big5"))
+        // some of its pairs no Han as GBK reads them (lines of no word), the rest characters the guess does not read
+        assertTrue(DictionaryFormat.analyse({ big5.inputStream() }, guess = reads) is Refused)
+        // Han all through as GBK reads it, but not words the dictionary reads: a mismatch
+        val gbk = traditional.joinToString("\n") { it.first }.toByteArray(WordLists.GB18030)
+        val readsNone: (List<String>) -> Map<String, String?> = { texts -> texts.associateWith { null } }
+        assertEquals(Reason.MISMATCH, (DictionaryFormat.analyse({ gbk.inputStream() }, guess = readsNone) as Refused).reason)
+        // the dictionary reading them, it is what it says
+        assertEquals(5, (DictionaryFormat.analyse({ gbk.inputStream() }, guess = reads) as Detected).guessed)
+        // the same in UTF-8 reads
+        val utf8 = traditional.joinToString("\n") { it.first }.toByteArray()
+        assertEquals(5, (DictionaryFormat.analyse({ utf8.inputStream() }, guess = reads) as Detected).guessed)
+    }
+
+    @Test
+    fun aListLongerThanABatchIsGuessedAPieceAtATime() {
+        val asked = ArrayList<Int>()
+        val n = DictionaryFormat.GUESS_BATCH + 10
+        val d = DictionaryFormat.analyse(
+            { text(List(n) { "你好" }).inputStream() },
+            guess = { texts -> asked += texts.size; guess(texts) },
+        ) as Detected
+        assertEquals(n, d.words)
+        assertEquals(2, asked.size)
+        assertTrue(asked.all { it == 1 })
     }
 }

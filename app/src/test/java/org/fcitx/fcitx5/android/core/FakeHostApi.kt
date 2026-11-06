@@ -90,6 +90,8 @@ class FakeHostApi : HostApi {
 
     override suspend fun pinyinOf(text: String): String? = readings[text]
 
+    override suspend fun pinyinsOf(texts: List<String>): Map<String, String?> = texts.associateWith { readings[it] }
+
     /** What [charCard] answers, by the candidate's text: no data to make one of, so none unless set here. */
     val charCards = mutableMapOf<String, CharCard>()
 

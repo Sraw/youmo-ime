@@ -37,9 +37,12 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
@@ -364,7 +367,8 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
                 if (userOnly && !askUserOnly(ctx, incoming.name)) return@launch
                 // the whole file read through before anything is imported (D6): what it is shows
                 // in the dialog, and one not surely read is refused here, for either dictionary
-                val prepared = analyse(ctx, uri, incoming)
+                // words alone given a reading only for a file that may go into the base: the user dictionary reads its own
+                val prepared = analyse(ctx, uri, incoming, guess = offersBase(incoming) && !userOnly)
                 val analysis = prepared.analysis
                 // refused for either dictionary only when its text is not read at all; else the
                 // user dictionary takes it line by line as before, the base refusing it then (review OQ1)
@@ -399,14 +403,15 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
     }
 
     // the whole file read through, its progress shown; the page gone or Cancel stops it, its files cleared
-    private suspend fun analyse(ctx: Context, uri: Uri, incoming: Incoming): PinyinDictManager.Prepared =
+    private suspend fun analyse(ctx: Context, uri: Uri, incoming: Incoming, guess: Boolean): PinyinDictManager.Prepared =
         withProgress(ctx, R.string.dict_analysing_title) { said, cancelled ->
             // not cancellable itself (its token is): what it made is closed here if the page went meanwhile
             withContext(NonCancellable + Dispatchers.IO) {
                 val size = ctx.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use {
                     if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else 0L
                 } ?: 0L
-                PinyinDictManager.prepare(ctx.contentResolver.openInputStreamOrThrow(uri), incoming.fileName, size) { share ->
+                val guessing = if (guess) guessing(cancelled) else null
+                PinyinDictManager.prepare(ctx.contentResolver.openInputStreamOrThrow(uri), incoming.fileName, size, guessing) { share ->
                     if (cancelled.get()) throw CancellationException("cancelled")
                     said.value = ctx.getString(R.string.dict_progress_analysing, (share * 100).toInt()) to (share * 100).toInt()
                 }.also { made ->
@@ -505,7 +510,10 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
         )
         // the words the base takes; those without pinyin only the user dictionary does, said apart (review NIT)
         parts += resources.getQuantityString(R.plurals.word_count, detected.words, detected.words)
-        if (detected.textOnly > 0) parts += resources.getQuantityString(R.plurals.dict_detected_text_only, detected.textOnly, detected.textOnly)
+        if (detected.guessed > 0) parts += resources.getQuantityString(R.plurals.dict_detected_guessed, detected.guessed, detected.guessed)
+        val textOnly = detected.textOnly - detected.unguessed
+        if (textOnly > 0) parts += resources.getQuantityString(R.plurals.dict_detected_text_only, textOnly, textOnly)
+        if (detected.unguessed > 0) parts += resources.getQuantityString(R.plurals.dict_detected_unguessed, detected.unguessed, detected.unguessed)
         if (detected.unread > 0) parts += resources.getQuantityString(R.plurals.dict_detected_unread, detected.unread, detected.unread)
         return parts.joinToString(" · ")
     }
@@ -583,6 +591,37 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
      * (text to percent); its cancel sets the flag [block] checks and calls [cancel]. A cancel
      * ends it as a CancellationException, as one that is not imported is not an error to show.
      */
+    /**
+     * Words alone read as the dictionary reads them, a batch at a time on the analysing IO thread (the
+     * host's own thread doing it). Cancel and the page going ([cancelled]) stop the wait; a host not
+     * ready in [GUESS_WAIT_MS] gives up, this batch and all after it unread (thrown: DictionaryFormat
+     * skips them), never a dialog stuck on it.
+     */
+    private fun guessing(cancelled: AtomicBoolean): (List<String>) -> Map<String, String?> {
+        var gaveUp = false
+        return { texts ->
+            check(!gaveUp) { "the engine did not get ready" }
+            runBlocking {
+                val asked = async { viewModel.fcitx.runOnReady { pinyinsOf(texts) } }
+                val waited = withTimeoutOrNull(GUESS_WAIT_MS) {
+                    while (!asked.isCompleted) {
+                        if (cancelled.get()) {
+                            asked.cancel()
+                            throw CancellationException("cancelled")
+                        }
+                        withTimeoutOrNull(CANCEL_POLL_MS) { asked.join() }
+                    }
+                }
+                if (waited == null) {
+                    gaveUp = true
+                    asked.cancel()
+                }
+                check(!gaveUp) { "the engine did not get ready" }
+                asked.await()
+            }
+        }
+    }
+
     private suspend fun <T> withProgress(
         ctx: Context,
         @StringRes title: Int,
@@ -699,6 +738,10 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
 
         // the spinner of an import into the user dictionary, once it takes this long (ms)
         private const val LOADING_AFTER = 200L
+
+        // how long one batch of words alone waits for the engine, and how often Cancel is looked at meanwhile
+        private const val GUESS_WAIT_MS = 15_000L
+        private const val CANCEL_POLL_MS = 100L
 
         // the process's: a page made anew reads again only the dictionaries that changed
         private val wordCounts = WordCounts { PinyinDictManager.wordCount(it) }

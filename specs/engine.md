@@ -222,6 +222,13 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   mostly not having their pinyin as the base dictionary reads them (`MISMATCH`, GB18030-decoded files only: Big5 decoded as GBK,
   or no Mandarin readings), more words than `DictionaryCompiler.MAX_WORDS` (`TOO_MANY`). `analyse`'s
   `write` callback gets every word read with its pinyin, in the one form the sources keep (`text pin'yin weight`);
+  with `guess` (the app's: `HostApi.pinyinsOf`, i.e. `EngineAssets.pinyinsOf` with a stray first, as the user
+  dictionary's import reads words alone) a line that is a word alone gets the reading guessed for it,
+  `GUESS_BATCH` words a call, and one it has none for is skipped (`Detected.unguessed`, said in the dialog, not
+  held to the 2%; a batch whose guess throws, but for a cancel, is skipped so too). A GB18030 file whose words
+  alone the guess reads fewer than `AGREE` of is `MISMATCH`, and with a guess too many lines of no word are
+  `UNREADABLE`, not `NO_PINYIN`. The app guesses only for a file that may go into the base, its wait on the
+  host stopped by Cancel or the page going and given up after 15 s (`PinyinDictionaryFragment.guessing`);
   the app writes them to the file `PinyinDictManager.Prepared.lines`, which the import reads. The app (`PinyinDictManager.prepare`/
   `importPrepared`) keeps the texts in `dictionaries/` gzip-compressed (`<name>.txt.gz`, off
   `<name>.txt.gz.disable`; rime-frost 84.5 MiB of text to 23.6) as sources only and compiles those on into

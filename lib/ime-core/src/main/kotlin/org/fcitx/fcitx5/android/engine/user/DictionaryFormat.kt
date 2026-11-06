@@ -88,7 +88,9 @@ object DictionaryFormat {
     /**
      * A file read as [charset], laid out so. [words] lines read as a word with its pinyin,
      * [textOnly] as a word alone or a blocked one (`!`; only the user dictionary takes those),
-     * [unread] as neither.
+     * [unread] as neither. With a guess (see [analyse]): [guessed] of [words] were words alone given
+     * the reading guessed for them, [unguessed] of [textOnly] words alone it had none for, skipped
+     * by the base.
      */
     class Detected internal constructor(
         val charset: Charset,
@@ -99,15 +101,19 @@ object DictionaryFormat {
         val words: Int,
         val textOnly: Int,
         val unread: Int,
+        val guessed: Int = 0,
+        val unguessed: Int = 0,
     ) : Analysis() {
         /**
          * Why the base dictionary does not take it, which has nothing to guess a reading from;
-         * null if it does. Lines without pinyin are unread there, held to the same 2%.
+         * null if it does. Lines without pinyin are unread there, held to the same 2%; words alone
+         * a guess had no reading for are skipped, said in the dialog, not held to it.
          */
         val refusedForBase: Reason?
             get() = when {
                 words == 0 -> if (textOnly > 0) Reason.NO_PINYIN else Reason.NO_WORDS
-                tooMany(textOnly + unread, words + textOnly + unread) -> if (textOnly > unread) Reason.NO_PINYIN else Reason.UNREADABLE
+                tooMany(textOnly - unguessed + unread, words + textOnly - unguessed + unread) ->
+                    if (textOnly - unguessed > unread) Reason.NO_PINYIN else Reason.UNREADABLE
                 else -> null
             }
     }
@@ -117,7 +123,12 @@ object DictionaryFormat {
      * none holding more than a line and the sample) is, or why it is refused. Its words go to [write] as the
      * sources keep them (`text pin'yin weight`), in the second pass: the caller drops what it
      * wrote if it is refused then. [progress] hears the share of [size] read, both passes over 0..1;
-     * a throw from it (a CancellationException, the user cancelled) stops it.
+     * a throw from it (a CancellationException, the user cancelled) stops it. [guess], how the
+     * dictionary reads words (`ni hao`, null for none it reads), gives a word alone on its line (a
+     * list of words only, or such lines among others) its reading, asked [GUESS_BATCH] at a time; one
+     * it reads is written as any word, one it does not skipped ([Detected.unguessed]), a batch whose
+     * guess throws (but for a cancel) too. A file read as GB18030 whose words alone it reads fewer
+     * than [AGREE] of is refused ([Reason.MISMATCH]): Big5 decoded as GBK, characters it never meant.
      *
      * @throws IOException if it cannot be read
      */
@@ -127,6 +138,7 @@ object DictionaryFormat {
         size: Long = 0,
         write: ((String) -> Unit)? = null,
         knows: ((String, IntArray) -> Boolean)? = null,
+        guess: ((List<String>) -> Map<String, String?>)? = null,
         progress: (Float) -> Unit = {},
     ): Analysis {
         // pass 1: the charset, decoded strictly through, with the lines and a sample spread over them;
@@ -138,7 +150,7 @@ object DictionaryFormat {
         for (line in scan.sample) classify(line)?.let { sample.merge(it.layout(), 1, Int::plus) }
         val sampled = sample.values.sum()
         if (sampled == 0) return Refused(Reason.NO_WORDS)
-        val layout = when (val decided = decide(sample, sampled)) {
+        val layout = when (val decided = decide(sample, sampled, guessing = guess != null)) {
             is Refusal -> return Refused(decided.reason)
             is Layout -> decided
         }
@@ -149,6 +161,7 @@ object DictionaryFormat {
         var lines = 0
         var words = 0
         var textOnly = 0
+        val alone = Alone(guess, write, gbk = scan.charset == WordLists.GB18030)
         counted(open, size, { progress(0.5f + it / 2) }) { input ->
             read(input, scan.charset) { seq ->
                 for (read in seq.withHeaders {}.mapNotNull(::classify)) {
@@ -156,7 +169,10 @@ object DictionaryFormat {
                     val entry = read.entry
                     when {
                         !layout.takes(read) -> {}
-                        entry == null -> textOnly++
+                        entry == null -> {
+                            textOnly++
+                            alone.add(read.alone, layout.weigh(read))
+                        }
                         else -> {
                             words++
                             write?.invoke("${escapeValue(entry.text)} ${entry.apostrophed()} ${layout.weigh(read)}")
@@ -165,10 +181,68 @@ object DictionaryFormat {
                 }
             }
         }
+        alone.flush()
+        if (!alone.agrees()) return Refused(Reason.MISMATCH)
+        words += alone.guessed
+        textOnly -= alone.guessed
         val unread = lines - words - textOnly
         if (tooMany(unread, lines)) return Refused(Reason.UNREADABLE)
         if (words > DictionaryCompiler.MAX_WORDS) return Refused(Reason.TOO_MANY)
-        return Detected(scan.charset, scan.source, layout.order, layout.reading ?: Reading.NONE, layout.weight, words, textOnly, unread)
+        return Detected(scan.charset, scan.source, layout.order, layout.reading ?: Reading.NONE, layout.weight, words, textOnly, unread, alone.guessed, alone.unguessed)
+    }
+
+    // words alone and their weights, waiting for [guess] (none: kept for no one); written as the sources keep them once read, a batch at a time
+    // [gbk]: read as GB18030, held to [AGREE] ([agrees])
+    private class Alone(
+        private val guess: ((List<String>) -> Map<String, String?>)?,
+        private val write: ((String) -> Unit)?,
+        private val gbk: Boolean,
+    ) {
+        var guessed = 0
+        var unguessed = 0
+
+        // of those the guess was asked for and answered, not one that threw
+        private var failed = 0
+
+        fun agrees(): Boolean {
+            val asked = guessed + unguessed - failed
+            return !gbk || asked == 0 || guessed >= asked * AGREE
+        }
+
+        private val waiting = ArrayList<Pair<String, Double>>()
+
+        fun add(text: String?, weight: Double) {
+            if (guess == null || text == null) return
+            waiting += text to weight
+            if (waiting.size >= GUESS_BATCH) flush()
+        }
+
+        // a guess that failed (the engine gone, a bug): the batch unread, skipped, not the whole file refused;
+        // a cancel goes on up, the import stopped
+        @Suppress("TooGenericExceptionCaught")
+        private fun readings(guess: (List<String>) -> Map<String, String?>): Map<String, String?> = try {
+            guess(waiting.mapTo(LinkedHashSet()) { it.first }.toList())
+        } catch (e: java.util.concurrent.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            failed += waiting.size
+            emptyMap()
+        }
+
+        fun flush() {
+            if (guess == null || waiting.isEmpty()) return
+            val readings = readings(guess)
+            for ((text, weight) in waiting) {
+                val entry = readings[text]?.let { WordLists.entry(text, it) }
+                if (entry == null) {
+                    unguessed++
+                } else {
+                    guessed++
+                    write?.invoke("${escapeValue(entry.text)} ${entry.apostrophed()} $weight")
+                }
+            }
+            waiting.clear()
+        }
     }
 
     // whether the sample's characters have their readings, as [knows] (the base dictionary) has
@@ -262,13 +336,17 @@ object DictionaryFormat {
 
     private const val SEED = 20261022L
 
+    /** How many words alone one guess is asked for: a list of a million read without holding it. */
+    const val GUESS_BATCH = 4096
+
     // what [decide] makes of the sample: a layout, or why there is none
     private sealed interface Decision
 
     private class Refusal(val reason: Reason) : Decision
 
     // the layout most of the sample has, or why there is none
-    private fun decide(sample: Map<Layout, Int>, sampled: Int): Decision {
+    // [guessing]: words alone are given a reading, so lines of no word are what is wrong, not the pinyin missing
+    private fun decide(sample: Map<Layout, Int>, sampled: Int, guessing: Boolean): Decision {
         val read = sample.filterKeys { it.reads }
         val order = read.entries.filter { it.key.order != null }.groupBy({ it.key.order }, { it.value })
             .maxByOrNull { it.value.sum() }?.key
@@ -285,7 +363,7 @@ object DictionaryFormat {
             return when {
                 initials >= otherLayout && tooMany(initials, sampled) -> Reason.INITIALS
                 tooMany(otherLayout, sampled) -> Reason.MIXED
-                fitting > 0 && fits.keys.all { it.reading == Reading.NONE } -> Reason.NO_PINYIN
+                !guessing && fitting > 0 && fits.keys.all { it.reading == Reading.NONE } -> Reason.NO_PINYIN
                 else -> Reason.UNREADABLE
             }.let(::Refusal)
         }
@@ -334,7 +412,8 @@ object DictionaryFormat {
         }
     }
 
-    private class Read(val order: Order?, val line: LineReading, val weight: Weight, val value: Double, val entry: Entry?) {
+    // [alone]: the word of a line that is a word alone (not a blocked one), for a guess of its reading
+    private class Read(val order: Order?, val line: LineReading, val weight: Weight, val value: Double, val entry: Entry?, val alone: String? = null) {
         fun layout(): Layout {
             val reading = when (line) {
                 LineReading.APOSTROPHES -> Reading.APOSTROPHES
@@ -414,7 +493,7 @@ object DictionaryFormat {
         if (t.pinyin.isEmpty()) {
             // a word alone: Han only, or it is no word (Baidu's `词(ci)`, a sentence of punctuation)
             val han = isHan(t.text)
-            return Read(null, if (han) LineReading.NONE else LineReading.BAD, weight, w, null)
+            return Read(null, if (han) LineReading.NONE else LineReading.BAD, weight, w, null, t.text.takeIf { han })
         }
         val order = if (t.pinyinFirst) Order.PINYIN_FIRST else Order.TEXT_FIRST
         val spelt = t.pinyin.joinToString(" ")

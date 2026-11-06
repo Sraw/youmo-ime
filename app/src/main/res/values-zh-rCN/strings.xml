@@ -768,6 +768,12 @@
     <plurals name="dict_detected_unread">
         <item quantity="other">%1$d 行读不懂</item>
     </plurals>
+    <plurals name="dict_detected_guessed">
+        <item quantity="other">其中 %1$d 个词的拼音按词库推出</item>
+    </plurals>
+    <plurals name="dict_detected_unguessed">
+        <item quantity="other">%1$d 个词推不出拼音（并入基础词库时跳过）</item>
+    </plurals>
     <plurals name="dict_detected_text_only">
         <item quantity="other">%1$d 个词没有拼音（只能并入用户词库）</item>
     </plurals>

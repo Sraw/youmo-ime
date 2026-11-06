@@ -221,6 +221,19 @@ class PinyinDictManagerTest {
         }
     }
 
+    // 0.6.0 #5: a list of words alone goes into the base with the readings the guess gives, the rest skipped
+    @Test
+    fun aListOfWordsAloneIsPreparedWithTheReadingsGuessed() {
+        val readings = mapOf("幽默" to "you mo", "搭子" to "da zi")
+        PinyinDictManager.prepare("幽默\n搭子\n蓝鲸\n".byteInputStream(), "words.txt", guess = { it.associateWith(readings::get) }).use { prepared ->
+            val detected = prepared.analysis as DictionaryFormat.Detected
+            assertEquals(2, detected.words)
+            assertEquals(1, detected.unguessed)
+            assertEquals(null, detected.refusedForBase)
+            assertEquals(listOf("幽默 you'mo 0.0", "搭子 da'zi 0.0"), prepared.lines!!.readLines())
+        }
+    }
+
     // one of its name that comes as it is written (another import's, a restore) is told 词库已存在,
     // not the commit's raw IOException, and is left as it is (F3603, F3654)
     @Test

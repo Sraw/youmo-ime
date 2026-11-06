@@ -788,6 +788,14 @@
         <item quantity="one">%1$d line unread</item>
         <item quantity="other">%1$d lines unread</item>
     </plurals>
+    <plurals name="dict_detected_guessed">
+        <item quantity="one">pinyin of %1$d of them from the dictionary</item>
+        <item quantity="other">pinyin of %1$d of them from the dictionary</item>
+    </plurals>
+    <plurals name="dict_detected_unguessed">
+        <item quantity="one">%1$d word without pinyin the dictionary cannot read (skipped for the base)</item>
+        <item quantity="other">%1$d words without pinyin the dictionary cannot read (skipped for the base)</item>
+    </plurals>
     <plurals name="dict_detected_text_only">
         <item quantity="one">%1$d word without pinyin (user dictionary only)</item>
         <item quantity="other">%1$d words without pinyin (user dictionary only)</item>

@@ -220,6 +220,9 @@ interface LexiconApi {
     /** How the dictionary reads [text], for the user to check: see [Engines.pinyinOf]. */
     suspend fun pinyinOf(text: String): String?
 
+    /** How the dictionary reads each of [texts], for a list of words alone imported: see [Engines.pinyinsOf]. */
+    suspend fun pinyinsOf(texts: List<String>): Map<String, String?>
+
     /**
      * The card of candidate [index] (of the page shown if [paged]) of the input method shown, if it still shows [text]: a handwritten
      * character's or one looked up (see [Engines.charCard]); null for any other.

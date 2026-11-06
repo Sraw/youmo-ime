@@ -111,9 +111,16 @@ object PinyinDictManager {
      * [stream], a file called [name] of any [PinyinDictionary.Type] (or of none, a word list for
      * the user dictionary), copied into the cache, a binary dictionary converted to text, and
      * analysed through; [stream] is closed. Before anything is imported: the confirm dialog
-     * shows what it is, or that it is refused.
+     * shows what it is, or that it is refused. [guess] reads words alone (no pinyin) for the base
+     * ([DictionaryFormat.analyse]); none, and those are the user dictionary's alone.
      */
-    fun prepare(stream: InputStream, name: String, size: Long = 0, progress: (Float) -> Unit = {}): Prepared {
+    fun prepare(
+        stream: InputStream,
+        name: String,
+        size: Long = 0,
+        guess: ((List<String>) -> Map<String, String?>)? = null,
+        progress: (Float) -> Unit = {},
+    ): Prepared {
         // the name a provider gives is no path to trust: only its extension, which tells the type
         val type = PinyinDictionary.Type.fromFileName(withLowercaseExtension(File(name).name))
         val raw = File.createTempFile("import", ".${type?.ext ?: PinyinDictionary.Type.Text.ext}", appContext.cacheDir)
@@ -139,7 +146,7 @@ object PinyinDictManager {
                 // the words written as the base keeps them while it is analysed: no pass more to import it (frost's 85 MB took 29 s in three)
                 val out = File.createTempFile("import", ".lines", appContext.cacheDir).also { lines = it }
                 val analysis = out.bufferedWriter().use { w ->
-                    DictionaryFormat.analyse({ text.inputStream() }, text.length(), { w.write(it); w.write('\n'.code) }, knows()) { progress(COPY_SHARE + (1 - COPY_SHARE) * it) }
+                    DictionaryFormat.analyse({ text.inputStream() }, text.length(), { w.write(it); w.write('\n'.code) }, knows(), guess) { progress(COPY_SHARE + (1 - COPY_SHARE) * it) }
                 }
                 Prepared(text, analysis, out)
             }
