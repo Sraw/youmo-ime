@@ -105,6 +105,9 @@ class ThemeTest {
         assertEquals(Radius(List(4) { 4.0 }), Values.radius("4dp"))
         assertEquals(true, Values.radius("50%")?.half)
         assertEquals(0.0, Values.radius("0")?.corners?.first())
+        // on both targets alike (Kotlin/JS refused a name that only began with "system")
+        assertEquals(Value.Word("systemui"), Values.read("font", "systemui"))
+        assertEquals(Value.Word("system"), Values.read("font", "system"))
         assertEquals(1.0, Values.shadow("0 1dp 0 @keyShadow")?.dy)
         assertEquals(0.0, Values.shadow("none")?.dy)
         assertNotNull(Values.fill("linear(90deg, @a 0%, @b 100%)") as? Fill.Linear)
@@ -153,6 +156,44 @@ class ThemeTest {
         assertTrue(!s("key:on:pressed").matches(target.copy(states = setOf("pressed")), emptySet()))
         val list = assertNotNull(Selector.parseList("*/enter, */lang"))
         assertTrue(list.any { it.matches(target.copy(role = "lang"), emptySet()) })
+    }
+
+    @Test
+    fun keyNamesEscapeAsInCss() {
+        fun s(t: String) = assertNotNull(Selector.parse(t), t)
+        // `\` makes the next character the name's: the comma key, not two selectors
+        val comma = assertNotNull(Selector.parseList("zhuyin/\\,, key.enter"))
+        assertEquals(2, comma.size)
+        assertEquals(",", comma[0].key)
+        assertEquals(",", s("zhuyin/\\,:pressed").key)
+        assertEquals(setOf("pressed"), s("zhuyin/\\,:pressed").states)
+        // the star key against every key of the board
+        val star = s("number/\\*")
+        assertEquals("*", star.key)
+        val every = s("number/*")
+        assertNull(every.key)
+        val starKey = Selector.Target("key", "number", "*", null, setOf("function"))
+        val plusKey = starKey.copy(key = "+")
+        assertTrue(star.matches(starKey, emptySet()))
+        assertTrue(!star.matches(plusKey, emptySet()))
+        assertTrue(every.matches(plusKey, emptySet()))
+        assertEquals("\\", s("number/\\\\").key)
+        assertEquals("a.b", s("x/a\\.b").key, "an escaped dot is no class")
+        assertEquals("/", s("zhuyin//").key)
+        assertEquals(":", s("number/:").key, "a name's first character is its own, escaped or not")
+        // a lone `\` at the end, an escape outside a key's name
+        assertNull(Selector.parseList("number/\\"))
+        assertNull(Selector.parse("ke\\y"))
+        assertNull(Selector.parse("number/a.b\\c"))
+        assertNull(Selector.parse("\\*/enter"))
+    }
+
+    @Test
+    fun aSlotIsNoneOfItsBoardsEveryKey() {
+        val pad = Selector.Target("key", "handwriting", "pad", null, setOf("letter"), slot = true)
+        assertTrue(!assertNotNull(Selector.parse("handwriting/*")).matches(pad, emptySet()))
+        assertTrue(assertNotNull(Selector.parse("handwriting/pad")).matches(pad, emptySet()))
+        assertTrue(assertNotNull(Selector.parse("key.letter")).matches(pad, emptySet()))
     }
 
     @Test

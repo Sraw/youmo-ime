@@ -56,7 +56,9 @@ object Values {
     private val DP = Regex("(-?[0-9]+(\\.[0-9]+)?)dp|0")
     private val SP = Regex("([0-9]+(\\.[0-9])?)sp")
     private val PCT = Regex("([0-9]+(\\.[0-9]+)?)%")
-    private val FONT = Regex("system|[a-zA-Z][a-zA-Z0-9_-]{0,31}")
+    // "system" a name like any other: Kotlin/JS takes the first alternative that starts a match and
+    // wants it whole, so "system|…" refused "systemui" there
+    private val FONT = Regex("[a-zA-Z][a-zA-Z0-9_-]{0,31}")
     private val IMAGE = Regex("image\\(([^,()]+), ?([0-9]{1,4}) ([0-9]{1,4}) ([0-9]{1,4}) ([0-9]{1,4})(?:, ?([1-8])x)?\\)")
     private val PICTURE = Regex("picture(?:\\(([0-9]{1,2})dp, ?([0-9]{1,3})%\\))?")
     private val LINEAR = Regex("linear\\((-?[0-9]{1,3})deg, ?(.+)\\)")
