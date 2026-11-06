@@ -31,26 +31,11 @@ kotlin {
     }
 }
 
-// The tests read src/commonTest/data (the example layout and theme; the snapshots, which they also write)
-// on both targets; a node test has no project directory, so where it is is compiled in
-val testData = layout.projectDirectory.dir("src/commonTest/data")
-val testDataSource = layout.buildDirectory.dir("generated/testData/kotlin")
-val writeTestDataDir = tasks.register("writeTestDataDir") {
-    val out = testDataSource
-    val dir = testData.asFile.absolutePath
-    inputs.property("dir", dir)
-    outputs.dir(out)
-    doLast {
-        val file = out.get().file("org/fcitx/fcitx5/android/scene/TestData.kt").asFile
-        file.parentFile.mkdirs()
-        file.writeText(
-            "package org.fcitx.fcitx5.android.scene\n\n" +
-                "internal const val TEST_DATA = \"" + dir.replace("\\", "\\\\").replace("\"", "\\\"") + "\"\n",
-        )
-    }
-}
-kotlin.sourceSets.commonTest {
-    kotlin.srcDir(writeTestDataDir.map { testDataSource.get() })
+
+// The JS test runner's npm packages are pinned by kotlin-js-store/package-lock.json: a lock that does not
+// match fails the build (the default), and so does a run that would write one where none is committed
+rootProject.extensions.configure<org.jetbrains.kotlin.gradle.targets.js.npm.NpmExtension> {
+    reportNewPackageLock.set(true)
 }
 
 dependencies {
@@ -58,10 +43,19 @@ dependencies {
     signature(variantOf(libs.gummyBears.api29) { artifactType("signature") })
 }
 
+// The tests read src/commonTest/data (the example layouts and themes; the snapshots, which they also
+// write) on both targets: told where by a system property (JVM) or the environment (node), so no
+// absolute path of this machine is compiled into anything
+val testData: String = layout.projectDirectory.dir("src/commonTest/data").asFile.absolutePath
+tasks.withType<org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest>().configureEach {
+    environment("SCENE_TEST_DATA", testData)
+}
+
 tasks.withType<Test>().configureEach {
     // -Psnapshots.record=true writes the scene snapshots anew instead of comparing (JVM only: the JS
     // run then compares with what the JVM wrote, so the two agree or fail)
     systemProperty("snapshots.record", providers.gradleProperty("snapshots.record").getOrElse("false"))
+    systemProperty("scene.testData", testData)
     testLogging {
         events("failed")
     }

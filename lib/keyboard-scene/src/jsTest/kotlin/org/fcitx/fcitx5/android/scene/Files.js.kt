@@ -15,3 +15,8 @@ internal actual fun writeText(path: String, text: String) {
 }
 
 internal actual fun recording(): Boolean = false
+
+private val env: dynamic = js("process.env")
+
+internal actual fun testDataDir(): String =
+    (env.SCENE_TEST_DATA as String?) ?: error("no SCENE_TEST_DATA: run the tests through Gradle")
