@@ -206,6 +206,17 @@ class KeyboardHarness(
         relayout()
     }
 
+    /**
+     * The keyboard put away (back, the app hiding it), the field kept: as hideWindow, the input view
+     * finished and not started any more, so leaving the field next finishes the input only.
+     */
+    fun hide() {
+        service.onFinishInputView(false)
+        InputMethodService::class.java.getDeclaredField("mInputViewStarted").apply { isAccessible = true }.setBoolean(service, false)
+        idle()
+        relayout()
+    }
+
     /** The screen turned: input restarted in the same field with the same EditorInfo (resetStateForNewConfiguration). */
     fun turn() {
         doStartInput(connection, info, restarting = true)

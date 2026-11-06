@@ -89,8 +89,9 @@ class VoiceListener(
     // the models once in, the user's words with them; cancelled if they never come
     private val ready = CompletableDeferred<Pair<VoiceEngine.Models, VoiceHotwords.Words>>()
 
-    // what was said (VoiceLive.finished, before the clean-up), once the microphone is closed and all of it decoded
-    private val said = CompletableDeferred<String?>()
+    // what was said (VoiceLive.finished, before the clean-up), once the microphone is closed and all
+    // of it decoded; true: the raw text, the polish having failed
+    private val said = CompletableDeferred<Pair<String, Boolean>?>()
 
     private var acquired = false
     private var decoding: Job? = null
@@ -190,11 +191,11 @@ class VoiceListener(
      * the finger lifted from holding to talk, or the talk tapped to a stop. The tail keeps the last
      * word's sound still on its way in, said as it stopped. Not if closed meanwhile.
      */
-    override fun finish(stoppedAt: Long, done: (String?) -> Unit) {
+    override fun finish(stoppedAt: Long, done: (said: String?, raw: Boolean) -> Unit) {
         liftAt = stoppedAt
         scope.launch {
             val text = runCatching { said.await() }.getOrNull()
-            main.post { if (!closed) done(text) }
+            main.post { if (!closed) done(text?.first, text?.second == true) }
         }
     }
 
@@ -257,7 +258,9 @@ class VoiceListener(
             segment.close()
             // numbers only, nothing said: the UAT's measure of the lift against the speech's end (uat/12 VO-23/24)
             if (BuildConfig.DEBUG) Timber.d("voice segments: speechStart=%s segments=%d", segment.speechStart, segment.kept)
-            said.complete(orFallback("voice polish", live.raw) { live.finished() })
+            // the polish failing: the raw text, told as such (what was typed as it was said is polished)
+            val polished = orFallback<String?>("voice polish", null) { live.finished() }
+            said.complete(if (polished != null) polished to false else live.raw to true)
         } catch (e: CancellationException) {
             throw e
         } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {

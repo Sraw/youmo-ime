@@ -102,6 +102,23 @@ class VoiceTalkTest {
         // the raw text instead, the 嗯 the polish took out back in: nothing more typed as it goes
         val step = talk.heard(VoiceLive.Heard("嗯今天天气不错，我们出去。走吧", 0, fallback = true))
         assertEquals("", step.type)
+        // what composes is what follows the part typed, found in the raw text
+        assertEquals("我们出去。走吧", step.composing)
         assertEquals("", talk.step("今天天气不错，我们出去。走吧", 14).first)
+    }
+
+    @Test
+    fun thePolishFailingAtTheEndTheRawTextAfterWhatWasTypedIsTyped() {
+        val talk = VoiceTalk(asItGoes = true)
+        assertEquals("我到了。" to "马上", talk.step("我到了。马上", 4))
+        // polished 「我到了。」 typed; the end's polish failed: the raw text, its 嗯 back, no marks
+        assertEquals("马上走", talk.rest("嗯我到了马上走", raw = true))
+        // as heard last, the talk cut short
+        talk.heard(VoiceLive.Heard("嗯我到了马上走", 0, fallback = true))
+        assertEquals("马上走", talk.restNow())
+        // not raw: the polished text, after what was typed as it is
+        assertEquals("马上走。", talk.rest("我到了。马上走。"))
+        // what was typed not all in it (it should be): what differs is typed, not dropped
+        assertEquals("你好", talk.rest("你好", raw = true))
     }
 }

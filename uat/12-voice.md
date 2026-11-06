@@ -25,8 +25,8 @@
 ### VO-04 [P1] 点工具栏麦克风说话
 - **前提**：B0-语音。
 - **操作**：点工具栏上的麦克风，看键盘；说"我们走吧"，再点一下麦克风。再点麦克风说"你好"，点盖在键盘上的那一层（不点按钮）。
-- **预期**：点了以后键盘上盖一层（工具栏还在上面，麦克风也在），显示声音条和「准备中…」→「正在听…」，没有另开语音面板；第一次框里是「我们走吧」，第二次接着是「你好」；结束后那一层淡出，键盘照常能打。
-- **JVM**：`VoiceTapUatTest.tappingTheMicrophoneTalksTillItIsTappedAgain`（点麦克风开始、盖层在键盘上、没有面板，再点结束上屏，可以再来一次）、`VoiceTapUatTest.tappingTheMaskStopsIt`、`VoiceTapUatTest.theMicrophoneTappedInTheTailEndsIt`（结束后的续录中再点：`cut()` 一次，不开新的）、`VoiceTapUatTest.gettingReadyShowsTillTheMicrophoneIsOn`、`VoiceTapUatTest.aSilentMicrophoneIsSaid`、`VoiceTapUatTest.floatingTheMaskGoesWithTheKeyboard`（悬浮键盘拖动、缩小后，盖层是键盘自己的子 View，在工具栏下面、盖住按键）、`VoiceTapUatTest.startedFromAShortcutTheMicrophoneStillStopsItOnce`（从按键快捷键开始的，点麦克风只结束一次，不截掉续录）、`VoiceHoldUatTest.floatingTheCardGoesWithTheKeyboard`（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testVoiceDebugUnitTest`）；设备上看：盖层的位置（悬浮键盘拖动和缩放后、单手模式、横屏）。
+- **预期**：点了以后键盘上盖一层（工具栏还在上面，麦克风也在），显示声音条和「准备中…」→「正在听…」，没有另开语音面板；第一次框里是「我们走吧」，第二次接着是「你好」；结束后那一层淡出，键盘照常能打。悬浮键盘说着时拖它的把手移动，不结束。
+- **JVM**：`VoiceTapUatTest.tappingTheMicrophoneTalksTillItIsTappedAgain`（点麦克风开始、盖层在键盘上、没有面板，再点结束上屏，可以再来一次）、`VoiceTapUatTest.tappingTheMaskStopsIt`、`VoiceTapUatTest.theMicrophoneTappedInTheTailEndsIt`（结束后的续录中再点：`cut()` 一次，不开新的）、`VoiceTapUatTest.gettingReadyShowsTillTheMicrophoneIsOn`、`VoiceTapUatTest.aSilentMicrophoneIsSaid`、`VoiceTapUatTest.floatingTheMaskGoesWithTheKeyboard`（悬浮键盘拖动、缩小后，盖层是键盘自己的子 View，在工具栏下面、盖住按键）、`VoiceTapUatTest.floatingDraggingItsHandleTalksOn`（拖把手不算点到盖层外）、`VoiceTapUatTest.startedFromAShortcutTheMicrophoneStillStopsItOnce`（从按键快捷键开始的，点麦克风只结束一次，不截掉续录）、`VoiceHoldUatTest.floatingTheCardGoesWithTheKeyboard`（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testVoiceDebugUnitTest`）；设备上看：盖层的位置（悬浮键盘拖动和缩放后、单手模式、横屏），说着时拖悬浮键盘的把手不结束。
 
 ### VO-05 [P1] 点麦克风说话时点 × 取消
 - **前提**：B0-语音，多行的「普通文本」框。
@@ -190,18 +190,18 @@
 ### VO-29 [P1] 点麦克风说话，定下来的边说边上屏
 - **前提**：B0-语音，多行的「普通文本」框，语音整理开着。
 - **操作**：点工具栏上的麦克风，连着说几句（中间正常停顿），比如"今天天气很好 我们出去走走 晚上回来吃饭"，说的时候看框里，最后点麦克风结束。
-- **预期**：说着的时候，前面已经定下来的句子变成普通文字（没有下划线），只有最后还在变的一段带下划线；结束后整段是说的话，没有重复、没有漏字，句末按输入框加不加句号（只在结束时加）。说着的时候点框里别的位置：带下划线的那段撤掉，接着说的从新位置开始，结束后不重复。在聊天框里说着时应用把框清空（发出去了）：已经说过的不会再上屏一遍。
-- **JVM**：`VoiceTapUatTest.whatIsSettledIsTypedAsItIsSaid`（一段话在下一段开始前整段待定，下一段一来前一段连标点上屏，最后只补剩下的、句号只在结束时加）、`VoiceTapUatTest.polishedTheFrozenPartIsTypedAsItIsSaid`（开语音整理：冻结的部分边说边上屏）、`VoiceTapUatTest.underEnglishWhatIsSaidIsTypedOnce`（英文输入法：结束时不把待定文字原地定成文字再上屏一遍）、`VoiceTapUatTest.theCursorMovedWhileTalkingTheTailComposesWhereItWent`、`VoiceTapUatTest.whatTheAppSentIsNotTypedAgain`（说着时框被清空，结束后框还是空的）、`VoiceTapUatTest.whatTheAppRewroteIsNotTypedAgainTheTalkGoesOn`、`VoiceLiveTest`、`VoiceTalkTest`（ime-core：只算关了的段、整理已冻结的部分、停在标点后；改写过的只补公共前缀以后的；应用拿走的不再打；整理失败后不再边说边上屏）、`EditingSessionTest.aProvisionalCompositionTheAppTookIsNotTakenAgain`（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testVoiceDebugUnitTest`）；真机上照"操作"跑一遍（整理冻结的时机看真的模型；微信里发送后框清空）。
+- **预期**：说着的时候，前面已经定下来的句子变成普通文字（没有下划线），只有最后还在变的一段带下划线；结束后整段是说的话，没有重复、没有漏字，句末按输入框加不加句号（只在结束时加）。说着的时候点框里别的位置：带下划线的那段撤掉，接着说的从新位置开始，结束后不重复。在聊天框里说着时应用把框清空（发出去了）：已经说过的不会再上屏一遍。结束时整理失败（退回原文）也只补后面的，不重复。
+- **JVM**：`VoiceTapUatTest.whatIsSettledIsTypedAsItIsSaid`（一段话在下一段开始前整段待定，下一段一来前一段连标点上屏，最后只补剩下的、句号只在结束时加）、`VoiceTapUatTest.polishedTheFrozenPartIsTypedAsItIsSaid`（开语音整理：冻结的部分边说边上屏）、`VoiceTapUatTest.polishedThenThePolishFailingAtTheEndOnlyWhatFollowsIsTyped`（已上屏「我到了。」，结束时原文「嗯我到了马上走」，只补「马上走」）、`VoiceTapUatTest.underEnglishWhatIsSaidIsTypedOnce`（英文输入法：结束时不把待定文字原地定成文字再上屏一遍）、`VoiceTapUatTest.theCursorMovedWhileTalkingTheTailComposesWhereItWent`、`VoiceTapUatTest.whatTheAppSentIsNotTypedAgain`（说着时框被清空，结束后框还是空的）、`VoiceTapUatTest.whatTheAppRewroteIsNotTypedAgainTheTalkGoesOn`、`VoiceLiveTest`、`VoiceTalkTest`（ime-core：只算关了的段、整理已冻结的部分、停在标点后；改写过的只补公共前缀以后的；原文按子序列对齐，只补后面的；应用拿走的不再打；整理失败后不再边说边上屏）、`EditingSessionTest.aProvisionalCompositionTheAppTookIsNotTakenAgain`（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testVoiceDebugUnitTest`）；真机上照"操作"跑一遍（整理冻结的时机看真的模型；微信里发送后框清空）。
 
 ### VO-30 [P1] 点麦克风说话时换输入框、收起键盘
 - **前提**：B0-语音。
 - **操作**：打开测试页的全部输入框（地址不带 `#`），在「普通文本」框点工具栏的麦克风说"你好"，说完马上点下面的「句子」框。再回「普通文本」框点麦克风说"再见 明天见"，说完马上按系统的返回收起键盘。
-- **预期**：「你好」上屏到「普通文本」框，「句子」框里没有；「再见，明天见」也完整上屏到「普通文本」框（收起时还没识别完的部分识别完再上屏，不丢）；两次那一层都没了。（换框那一刻还没识别完的最后几个字可能丢。）网页里同一个框重新开始输入（浏览器有时会这样）时不结束，接着说。
-- **JVM**：`VoiceTapUatTest.anotherFieldGetsNothingTheFirstGetsWhatWasSaid`、`VoiceTapUatTest.theKeyboardHiddenStopsItAndTypesTheRestOnceRecognized`（收起：待定的撤掉，续录、识别完后剩下的直接上屏，只一次）、`VoiceTapUatTest.inputRestartedInTheSameFieldTalksOn`（同一个框 restartInput：按包名和 fieldId 认作同一个框，接着说）、`VoiceTapTest`、`VoiceCommitTest.theSameFieldIsTheSameAppAndViewIdAcrossARestart`、`EditingSessionTest.inputRestartedOverAProvisionalComposition`（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testVoiceDebugUnitTest`）；真机上照"操作"跑一遍（微信、浏览器里的输入框）。
+- **预期**：「你好」上屏到「普通文本」框，「句子」框里没有；「再见，明天见」也完整上屏到「普通文本」框（收起时还没识别完的部分识别完再上屏，不丢）；两次那一层都没了。（换框那一刻还没识别完的最后几个字可能丢。）收起键盘后、还没识别完就点别的框：已经听到的上屏到原来的框。网页里同一个框重新开始输入（浏览器有时会这样）时不结束，接着说；网页里换到另一个框（类型、名字或提示不同）算换框。
+- **JVM**：`VoiceTapFieldUatTest.anotherFieldGetsNothingTheFirstGetsWhatWasSaid`、`VoiceTapFieldUatTest.theKeyboardHiddenStopsItAndTypesTheRestOnceRecognized`（收起：待定的撤掉，续录、识别完后剩下的直接上屏，只一次）、`VoiceTapFieldUatTest.theKeyboardHiddenThenAnotherFieldTheFirstKeepsWhatWasHeard`（收起后、识别完前换框：听到的进原来的框，新框没有）、`VoiceTapFieldUatTest.theKeyboardHiddenAfterTheStopTheRestStillComesIn`（结束后识别中收起：不再结束一次，剩下的照常上屏）、`VoiceTapFieldUatTest.theMaskThrownAwayWithTheKeysWhatWasHeardIsTyped`（键盘的 View 被换掉：听到的立刻上屏）、`VoiceTapFieldUatTest.inputRestartedInTheSameFieldTalksOn`（同一个框 restartInput：按包名、fieldId、输入类型、字段名和提示认作同一个框，接着说）、`VoiceTapTest`、`VoiceCommitTest.theSameFieldIsTheSameAppAndViewIdAcrossARestart`、`VoiceCommitTest.aWebViewsInputsAreToldApartByWhatTheySayOfThemselves`、`EditingSessionTest.inputRestartedOverAProvisionalComposition`（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testVoiceDebugUnitTest`）；真机上照"操作"跑一遍（微信、浏览器里的输入框）。
 
 ### VO-31 [P2] 点麦克风说话后一分钟没说话自动结束
 - **前提**：B0-语音。
 - **操作**：点工具栏上的麦克风，说"你好"，然后不说话，等 1 分钟多一点。
-- **预期**：最后一次听到说话后约 60 秒自动结束，「你好」上屏，那一层没了。（停止后 15 秒还没识别完就放弃：已经边说边上屏过的，把最后听到的也上屏，提示「最后几个字可能没识别完」；什么都没上屏的提示「没有听清」。）
-- **JVM**：`VoiceTapUatTest.aMinuteWithNothingSaidStopsIt`、`VoiceTapUatTest.givenUpWhatWasHeardIsTypedAfterWhatWent`、`VoiceTapUatTest.givenUpWithNothingTypedSaysNothingWasHeard`（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testVoiceDebugUnitTest`）；设备上不跑。
+- **预期**：最后一次听到说话后约 60 秒自动结束，「你好」上屏，那一层没了。（停止后 15 秒还没识别完就放弃：把最后听到的上屏，有东西上屏过（边说边上屏的或这次补的）就提示「最后几个字可能没识别完」；什么都没听到的提示「没有听清」。）
+- **JVM**：`VoiceTapFieldUatTest.aMinuteWithNothingSaidStopsIt`、`VoiceTapFieldUatTest.givenUpWhatWasHeardIsTypedAfterWhatWent`、`VoiceTapFieldUatTest.givenUpWithNothingTypedSaysNothingWasHeard`、`VoiceTapFieldUatTest.givenUpWithOnlyTheTailHeardItIsTypedAndSaidCutShort`（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testVoiceDebugUnitTest`）；设备上不跑。
 

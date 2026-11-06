@@ -777,9 +777,11 @@ in CI keeps the voice source set compiling.
   the field, an app's edit) takes it away, the cursor where it went, and the next text heard composes there; gone
   from the field with no span reported (the app sent or cleared the text: the text around the cursor no longer it,
   `EditingSession.provisionalTaken(consumed = true)`), it is not taken away nor typed again (`VoiceTalk.consumed`:
-  all heard so far counts as typed) and the talk goes on; input restarted in the same field (`provisionalRestarted`;
-  the same field: `VoiceCommit.sameField`, the same package and view id, not the same `EditorInfo`) takes it away
-  (or finds it taken), another field's restart leaves it as text; input finishing in the field, or the keyboard
+  all heard so far counts as typed; the editor's composing region over the app's text let go) and the talk goes on;
+  input restarted in the same field (`provisionalRestarted`; the same field: `VoiceCommit.sameField`, the same
+  package, view id, input type, field name and hint, as `ContextMemory.field` names it, so a WebView's inputs are
+  told apart; not the same `EditorInfo`) takes it away, the cursor's place predicted (or finds it taken), another
+  field's restart leaves it as text; input finishing in the field, or the keyboard
   hidden, takes it away (not finished in place) before its connection goes; a drop, a give-up or nothing to type
   takes it away, in the same field only. A preedit of fcitx's in the field meanwhile (another finger) stops typing as
   it is said till it is gone (`voiceOwnsComposing`): the engine's text is never finished in place by voice.
@@ -789,12 +791,15 @@ in CI keeps the voice source set compiling.
   `VoiceTapOverlay` adds the tap's: what each press does is `VoiceTap` (ime-core): the microphone, the mask or a
   press off it (the bar's other buttons, the candidates) stop it, × drops it, a press after the stop cuts the tail,
   another field (`inputEnded(LEFT)`, the overlay detached; `STARTED` in another field) types now, the keyboard
-  hidden (`HIDDEN`) stops it as a tap does, the tail taken away now and what is left typed straight into the field
-  once recognized (`VoiceSession.hidden`, `commitVoice`, the connection still there), input started again in the
+  hidden (`HIDDEN`, stopped or not) stops it as a tap does, the tail taken away now and what is left typed straight
+  into the field once recognized (`VoiceSession.hidden`, `commitVoice`, the connection still there); another field
+  before that (no view to finish then: `onFinishInput` tells `LEFT` first, its connection and `EditorInfo` still the
+  first field's) types what was heard into the first at once; input started again in the
   same field (`STARTED`: a restart, the keyboard shown again) talks on, 60 s with nothing heard
   (`VoiceTap.QUIET_MS`, counted from the last thing heard) stops it. A press off the mask is told by where the bar's
   microphone is now (`InputView.voiceButton`), so a talk started from a key's shortcut is not stopped by the
-  microphone's own touch before its tap. No Enter on the mask (the user's decision 2026-11-06: it would not follow
+  microphone's own touch before its tap; the floating keyboard's handle (`InputView.handleShown`) is not off it:
+  dragging the keyboard talks on. No Enter on the mask (the user's decision 2026-11-06: it would not follow
   the theme): to send, stop it, then the keyboard's Enter.
 - Tapped, what is settled is typed as it is said (060-voice-tap-to-talk.md, the user's decision): `VoiceLive.Heard`
   carries `settled`, the end of the part that cannot change: of the closed segments only (`VoiceChoice` may still
@@ -802,12 +807,16 @@ in CI keeps the voice source set compiling.
   just after a pause or end mark followed by something said (`VoiceLive.settledEnd`), so neither the tagger's
   marks nor `VoiceText.clean`'s joins straddle the cut. `VoiceTalk` (ime-core) types what newly settled (cleaned on
   its own) and composes the rest; were what was typed rewritten after all, only the part after the common prefix is
-  typed at the end. Mid-talk parts go straight in (`FcitxInputMethodService.voiceHeard`: `commitVoice`, synchronous,
+  typed at the end. The raw text instead (the polish failed: mid-talk, `Heard.fallback`, or at the end,
+  `Listening.finish`'s `raw`), what was typed is found in it as a subsequence, its marks skipped and a character of
+  raw's it lacks (the 「嗯」 the polish took out) passed over (`VoiceTalk.rest(raw = true)`): 「我到了。」 typed, raw
+  「嗯我到了马上走」, only 「马上走」 is left. `VoiceLive.settled` types nothing where what shows does not start with
+  the frozen part (out of step: it should not be). Mid-talk parts go straight in (`FcitxInputMethodService.voiceHeard`: `commitVoice`, synchronous,
   then the tail composed, in one batch edit); the last part goes through fcitx as the hold's does. × takes only
   the composing tail. Another field mid-talk types what was heard so far into the first at once (`typeNow`,
   `commitVoice`: its connection is about to go); what the recognizer had not decoded yet is lost. Given up (15 s)
-  or failed after something was typed as it was said, what was heard last is typed too, the message
-  `voice_tap_cut_short`. The polish failing (`VoiceLive.Heard.fallback`: the raw text, not in step with the
+  or failed, tapped, what was heard last is typed too (what was said stays, the user's rule), and the message is
+  `voice_tap_cut_short` if anything went in (as it was said or now), `voice_hold_nothing` only if nothing did. The polish failing (`VoiceLive.Heard.fallback`: the raw text, not in step with the
   polished part typed) stops typing as it is said for the rest of the talk. Each part is cleaned on its own, so a
   sound alone between two marks (「嗯，」「哦。」) can go where the whole cleaned at once keeps it: accepted. Held,
   nothing is typed before the lift (`asItGoes = false`).

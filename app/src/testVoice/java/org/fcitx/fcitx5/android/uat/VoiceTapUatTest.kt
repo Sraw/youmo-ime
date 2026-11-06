@@ -4,12 +4,7 @@
  */
 package org.fcitx.fcitx5.android.uat
 
-import android.Manifest
 import android.graphics.Rect
-import android.text.InputType
-import android.view.View
-import android.view.inputmethod.BaseInputConnection
-import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -18,14 +13,10 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
+import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.input.voice.VoicePolishStream
 import org.fcitx.fcitx5.android.input.voice.VoicePolishTags
-import org.fcitx.fcitx5.android.input.voice.VoiceSession
-import org.fcitx.fcitx5.android.input.voice.VoiceStyle
-import org.fcitx.fcitx5.android.input.voice.VoiceTap
-import org.fcitx.fcitx5.android.input.voice.VoiceTapOverlay
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -34,84 +25,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
-import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
  * UAT cases of tapping the bar's microphone to talk (uat/12), everything after the recognizer, as
  * [VoiceHoldUatTest]'s: the mask over the keys, the stop by the microphone or the mask, ×, what is
- * settled typed as it is said, the field left or restarted, the keyboard hidden or floating, the
- * app taking the text, the quiet stop. After each, the microphone closed once ([FakeRecognizer.closes]).
+ * settled typed as it is said, the keyboard floating, the app taking the text (the field left or
+ * restarted, the keyboard hidden, the quiet stop: [VoiceTapFieldUatTest]). After each, the
+ * microphone closed once ([FakeRecognizer.closes]).
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
-class VoiceTapUatTest {
-
-    private val voice = FakeRecognizer()
-    private val restore = mutableListOf<() -> Unit>()
-
-    private val h = KeyboardHarness().also {
-        VoiceSession.listening = { events -> voice.also { v -> v.events = events } }
-        val was = VoiceStyle.haptics
-        VoiceStyle.haptics = { _, _ -> }
-        restore += { VoiceStyle.haptics = was }
-    }
-
-    @After
-    fun close() {
-        h.close()
-        VoiceSession.listening = null
-        restore.asReversed().forEach { it() }
-    }
-
-    private fun allowMicrophone() = shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.RECORD_AUDIO)
-
-    private fun string(id: Int) = h.service.getString(id)
-
-    private fun described(description: CharSequence, within: View = h.inputView): View? =
-        KeyboardHarness.all(within).firstOrNull { h.shown(it) && it.contentDescription == description }
-
-    // the bar's own microphone
-    private fun mic(): View = described(string(R.string.voice_input)) ?: error("no microphone on the bar")
-
-    private fun tapMic() {
-        h.tap(mic())
-        h.advance(100)
-    }
-
-    // the mask: what its hint sits on (hidden once it is stopped), taken by a click
-    private fun mask(): View? {
-        val hint = KeyboardHarness.all(h.inputView)
-            .firstOrNull { it is TextView && it.text.toString() == string(R.string.voice_tap_hint) } ?: return null
-        var at = hint.parent as? View
-        while (at != null && !at.hasOnClickListeners()) at = at.parent as? View
-        return at?.takeIf { h.shown(it) }
-    }
-
-    private fun cancel(): View = described(string(R.string.voice_tap_cancel), mask()!!) ?: error("no × on the mask")
-
-    // the keyboard's own Enter, named as the field's action
-    private fun enter(): View =
-        described(ReturnKeyDrawableComponent.appearanceFromEditorInfo(h.info).label(h.service), h.keyboard) ?: error("no Enter on the keyboard")
-
-    private fun shown(): List<String> = KeyboardHarness.all(h.inputView)
-        .filterIsInstance<TextView>().filter { h.shown(it) }.map { it.text.toString() }.toList()
-
-    private fun text() = h.field.text.toString()
-
-    private fun composing() = h.field.text.let { BaseInputConnection.getComposingSpanStart(it) to BaseInputConnection.getComposingSpanEnd(it) }
-
-    private fun enters() = h.api.calls.count { it.startsWith("sendKey(sym=$RETURN,") }
-
-    private val talking get() = h.inputView.hold is VoiceTapOverlay
-
-    private companion object {
-        const val MULTI_LINE = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
-        const val RETURN = 0xff0d
-    }
+class VoiceTapUatTest : VoiceTapUat() {
 
     @Test
     @Uat("VO-04")
@@ -249,56 +176,6 @@ class VoiceTapUatTest {
     }
 
     @Test
-    @Uat("VO-30")
-    fun anotherFieldGetsNothingTheFirstGetsWhatWasSaid() {
-        allowMicrophone()
-        h.start()
-        val first = h.field
-        tapMic()
-        voice.heard("你好")
-        h.advance(100)
-        // another field tapped while it talks
-        h.start()
-        h.advance(500)
-        assertEquals("你好", first.text.toString())
-        assertEquals("", text())
-        assertFalse(talking)
-        assertNull(mask())
-        // what was still to be heard does not come late into the new field
-        voice.release()
-        h.advance(500)
-        assertEquals("", text())
-        assertEquals(1, voice.closes)
-    }
-
-    @Test
-    @Uat("VO-30")
-    fun theKeyboardHiddenStopsItAndTypesTheRestOnceRecognized() {
-        allowMicrophone()
-        h.start(MULTI_LINE)
-        tapMic()
-        voice.heard("今天天气")
-        voice.heard("很好")
-        h.advance(100)
-        assertEquals("今天天气，很好", text())
-        voice.held = true
-        voice.said += "我们走吧"
-        h.service.onFinishInputView(false)
-        h.advance(100)
-        // stopped as by a tap: what composed taken away, not left as text; the tail still recorded
-        assertEquals("今天天气，", text())
-        assertEquals(-1 to -1, composing())
-        assertEquals(1, voice.finishes)
-        assertEquals(0, voice.closes)
-        // recognized: what is left typed straight into the field, once
-        voice.release()
-        h.advance(100)
-        assertEquals("今天天气，很好，我们走吧", text())
-        assertFalse(talking)
-        assertEquals(1, voice.closes)
-    }
-
-    @Test
     @Uat("VO-28")
     fun theMaskHasNoEnterStoppedTheKeyboardsSendsIt() {
         allowMicrophone()
@@ -390,31 +267,6 @@ class VoiceTapUatTest {
     }
 
     @Test
-    @Uat("VO-30")
-    fun inputRestartedInTheSameFieldTalksOn() {
-        allowMicrophone()
-        h.start(MULTI_LINE, fieldId = 7)
-        tapMic()
-        voice.heard("今天天气")
-        voice.heard("很好")
-        h.advance(100)
-        assertEquals("今天天气，很好", text())
-        // the app restarts input in it (a WebView's field, an app's restartInput): a new EditorInfo
-        h.restart()
-        h.advance(100)
-        assertTrue(talking)
-        assertEquals("今天天气，", text())
-        voice.hearing("我们")
-        h.advance(100)
-        assertEquals("今天天气，很好，我们", text())
-        voice.said += "我们走吧"
-        tapMic()
-        assertEquals("今天天气，很好，我们走吧", text())
-        assertEquals(1, voice.opened)
-        assertEquals(1, voice.closes)
-    }
-
-    @Test
     @Uat("VO-29")
     fun polishedTheFrozenPartIsTypedAsItIsSaid() {
         allowMicrophone()
@@ -432,6 +284,29 @@ class VoiceTapUatTest {
         // the tagger's frozen text of the closed segment, to its mark, typed; the rest composing
         assertEquals("我到了。马上走", text())
         assertEquals(4 to 7, composing())
+        tapMic()
+        assertEquals("我到了。马上走", text())
+        assertEquals(-1 to -1, composing())
+        assertEquals(1, voice.closes)
+    }
+
+    @Test
+    @Uat("VO-29")
+    fun polishedThenThePolishFailingAtTheEndOnlyWhatFollowsIsTyped() {
+        allowMicrophone()
+        val tags = VoicePolishTags(listOf("keep", "del"), listOf("", "，", "。"))
+        val tagger = VoicePolishStream.Tagger { w ->
+            IntArray(w.size) { if (w[it] == '嗯'.code) VoicePolishTags.DEL else VoicePolishTags.KEEP } to
+                IntArray(w.size) { if (w[it] == '了'.code) 2 else 0 }
+        }
+        voice.polish = { VoicePolishStream(tags, tagger, freezeAfter = 2, window = 8) }
+        h.start(MULTI_LINE)
+        tapMic()
+        voice.heard("嗯我到了马上走")
+        h.advance(100)
+        assertEquals("我到了。马上走", text())
+        // the end's polish failed: the raw text, its 嗯 back and no mark; what was typed found in it
+        voice.finishRaw = true
         tapMic()
         assertEquals("我到了。马上走", text())
         assertEquals(-1 to -1, composing())
@@ -493,6 +368,28 @@ class VoiceTapUatTest {
 
     @Test
     @Uat("VO-04")
+    fun floatingDraggingItsHandleTalksOn() {
+        allowMicrophone()
+        ThemeManager.prefs.floatingKeyboard.setValue(true)
+        restore += { ThemeManager.prefs.floatingKeyboard.setValue(false) }
+        h.start()
+        tapMic()
+        val handle = KeyboardHarness.find<FloatingHandle>(h.inputView)!!
+        assertTrue(h.shown(handle))
+        val at = h.box(handle)
+        h.drag(handle, at.exactCenterX() + 30f, at.exactCenterY() - 150f)
+        h.advance(100)
+        // moved, not stopped
+        assertTrue(talking)
+        assertEquals(0, voice.finishes)
+        voice.said += "你好"
+        tapMic()
+        assertEquals("你好", text())
+        assertEquals(1, voice.closes)
+    }
+
+    @Test
+    @Uat("VO-04")
     fun startedFromAShortcutTheMicrophoneStillStopsItOnce() {
         allowMicrophone()
         h.start()
@@ -515,65 +412,6 @@ class VoiceTapUatTest {
     }
 
     @Test
-    @Uat("VO-31")
-    fun givenUpWhatWasHeardIsTypedAfterWhatWent() {
-        allowMicrophone()
-        h.start(MULTI_LINE)
-        tapMic()
-        voice.heard("今天天气")
-        voice.heard("很好")
-        h.advance(100)
-        voice.held = true
-        voice.stuck = true
-        tapMic()
-        // the recognizer never back, the tail cut no matter: 15 s and given up
-        tapMic()
-        h.advance(15_100)
-        assertEquals("今天天气，很好", text())
-        assertEquals(-1 to -1, composing())
-        assertTrue(shown().toString(), string(R.string.voice_tap_cut_short) in shown())
-        assertFalse(talking)
-        assertEquals(1, voice.closes)
-    }
-
-    @Test
-    @Uat("VO-31")
-    fun givenUpWithNothingTypedSaysNothingWasHeard() {
-        allowMicrophone()
-        h.start()
-        tapMic()
-        voice.held = true
-        voice.stuck = true
-        voice.said += "我们走吧"
-        tapMic()
-        tapMic()
-        h.advance(15_100)
-        assertTrue(shown().toString(), string(R.string.voice_hold_nothing) in shown())
-        assertEquals("", text())
-        assertFalse(talking)
-        assertEquals(1, voice.closes)
-    }
-
-    @Test
-    @Uat("VO-31")
-    fun aMinuteWithNothingSaidStopsIt() {
-        allowMicrophone()
-        h.start()
-        tapMic()
-        h.advance(VoiceTap.QUIET_MS / 2)
-        voice.hearing("你好")
-        // counted from the last thing heard
-        h.advance(VoiceTap.QUIET_MS - 1000)
-        assertTrue(talking)
-        assertEquals(0, voice.finishes)
-        h.advance(2000)
-        assertEquals(1, voice.finishes)
-        assertEquals("你好", text())
-        assertFalse(talking)
-        assertEquals(1, voice.closes)
-    }
-
-    @Test
     @Uat("VO-26")
     fun gettingReadyShowsTillTheMicrophoneIsOn() {
         allowMicrophone()
@@ -585,6 +423,9 @@ class VoiceTapUatTest {
         voice.on()
         h.advance(100)
         assertTrue(shown().toString(), string(R.string.voice_hold_listening) in shown())
+        tapMic()
+        assertFalse(talking)
+        assertEquals(1, voice.closes)
     }
 
     @Test
@@ -603,5 +444,7 @@ class VoiceTapUatTest {
         voice.said += "你好"
         tapMic()
         assertEquals("你好", text())
+        assertFalse(talking)
+        assertEquals(1, voice.closes)
     }
 }

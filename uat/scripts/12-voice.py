@@ -420,10 +420,10 @@ case("VO-22", needs="jvm:VoiceUatTest.habitsOffListensForNoneOfTheirs")(lambda d
 case("VO-29", needs="jvm:VoiceTapUatTest.whatIsSettledIsTypedAsItIsSaid、VoiceTapUatTest.theCursorMovedWhileTalkingTheTailComposesWhereItWent、VoiceTapUatTest.whatTheAppSentIsNotTypedAgain")(lambda d: None)
 
 
-case("VO-30", needs="jvm:VoiceTapUatTest.anotherFieldGetsNothingTheFirstGetsWhatWasSaid、VoiceTapUatTest.theKeyboardHiddenStopsItAndTypesTheRestOnceRecognized、VoiceTapUatTest.inputRestartedInTheSameFieldTalksOn")(lambda d: None)
+case("VO-30", needs="jvm:VoiceTapFieldUatTest.anotherFieldGetsNothingTheFirstGetsWhatWasSaid、VoiceTapFieldUatTest.theKeyboardHiddenStopsItAndTypesTheRestOnceRecognized、VoiceTapFieldUatTest.inputRestartedInTheSameFieldTalksOn")(lambda d: None)
 
 
-case("VO-31", needs="jvm:VoiceTapUatTest.aMinuteWithNothingSaidStopsIt")(lambda d: None)
+case("VO-31", needs="jvm:VoiceTapFieldUatTest.aMinuteWithNothingSaidStopsIt")(lambda d: None)
 
 
 case("VO-27", needs="jvm:VoiceHoldUatTest.aSilentMicrophoneIsSaidAndListeningComesWithTheFirstSound、VoiceOnsetTest.twoSecondsOfZeroesIsASilentMicrophoneToldOnce、VoiceTapUatTest.aSilentMicrophoneIsSaid")(lambda d: None)

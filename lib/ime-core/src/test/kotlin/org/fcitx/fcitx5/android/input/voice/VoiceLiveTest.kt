@@ -152,4 +152,12 @@ class VoiceLiveTest {
         assertEquals(0, VoiceLive.settledEnd("如下：一"))
         assertEquals(0, VoiceLive.settledEnd("3.5"))
     }
+
+    @Test
+    fun nothingSettledWhereWhatShowsDoesNotStartWithWhatStays() {
+        assertEquals(3, VoiceLive.settled("你好，我们", "你好，我"))
+        // the frozen text and what shows out of step: nothing typed, rather than the wrong thing
+        assertEquals(0, VoiceLive.settled("您好，我们", "你好，我"))
+        assertEquals(0, VoiceLive.settled("你好", "你好，我"))
+    }
 }

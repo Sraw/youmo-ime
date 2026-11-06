@@ -70,7 +70,7 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
         val shown = polish?.update(text)
         val whole = shown?.let { it.polished + it.rest } ?: text
         val fixed = polish?.frozenPrefix(VoicePolishTags.norm(stable).size) ?: stable
-        return Heard(whole, settledEnd(fixed))
+        return Heard(whole, settled(whole, fixed))
     }
 
     companion object {
@@ -94,6 +94,16 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
                 if (fixed[i - 1] in ENDS) return i
             }
             return 0
+        }
+
+        /**
+         * How much of [whole] may be typed now, [fixed] what stays of it ([settledEnd]); 0 if [whole]
+         * does not start with that much of [fixed] (the polish's frozen text and what it shows out of
+         * step: it should not be), as nothing typed is better than the wrong thing.
+         */
+        fun settled(whole: String, fixed: String): Int {
+            val end = settledEnd(fixed)
+            return if (whole.regionMatches(0, fixed, 0, end)) end else 0
         }
 
         /** [after] following [before], as the tagger's input had segments one after another. */

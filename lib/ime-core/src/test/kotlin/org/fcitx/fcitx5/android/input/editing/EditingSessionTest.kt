@@ -794,8 +794,8 @@ class EditingSessionTest {
             assertEquals(listOf(true), told)
             assertFalse(s.provisional)
             assertTrue(s.composing.isEmpty())
-            // nothing left to take away: the field read, not edited
-            assertEquals(listOf("textAfterCursor(4)"), e.calls)
+            // nothing left to take away: the field read, not edited, its composing region let go
+            assertEquals(listOf("textAfterCursor(4)", "finishComposingText()"), e.calls)
         },
         "all of it composing, the field cleared: the cursor at its start" to {
             val (s, e) = session("", cursor = 0)
@@ -854,6 +854,20 @@ class EditingSessionTest {
             assertEquals(2, e.selectionStart)
             assertEquals(listOf(false), told)
             assertFalse(s.provisional)
+            // the cursor's report that brings is the prediction, not the user's move
+            assertTrue(s.selection.latest.rangeEquals(2))
+            assertEquals(EditingSession.CursorUpdate.None, s.report(2))
+            assertTrue(s.selection.current.rangeEquals(2))
+        },
+        "the same field, text after it, the cursor past it: kept after that text" to {
+            val (s, e) = session("abc", cursor = 2)
+            s.updateComposingText(formatted("你好"), provisional = true)
+            assertEquals("ab你好c", e.text)
+            e.setSelection(5, 5)
+            s.provisionalRestarted(sameField = true, 5, 5)
+            assertEquals("abc", e.text)
+            assertEquals(3, e.selectionStart)
+            assertTrue(s.selection.latest.rangeEquals(3))
         },
         "the same field, the app took it: not touched" to {
             val (s, e) = session("ab", cursor = 2)
@@ -866,6 +880,8 @@ class EditingSessionTest {
             assertEquals("", e.text)
             assertEquals(listOf(true), told)
             assertTrue(e.calls.none { it.startsWith("set") || it.startsWith("commit") })
+            // the editor's composing region, if it kept one over the app's text, let go
+            assertTrue("finishComposingText()" in e.calls)
         },
         "another field: left as text" to {
             val (s, e) = session("ab", cursor = 2)

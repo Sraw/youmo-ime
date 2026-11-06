@@ -39,7 +39,10 @@ class FakeRecognizer : VoiceSession.Listening {
 
     /** a recognizer that never comes back, even cut: the session's 15 s give-up ends it */
     var stuck = false
-    private var waiting: ((String?) -> Unit)? = null
+    private var waiting: ((String?, Boolean) -> Unit)? = null
+
+    /** the polish failing at the end: what was said comes back as the raw text, as VoiceListener's then */
+    var finishRaw = false
 
     /** the microphone's first sample not zero comes as it opens; false: only when [on] says so */
     var warm = true
@@ -65,7 +68,7 @@ class FakeRecognizer : VoiceSession.Listening {
     /** the segment being said, so far */
     fun hearing(raw: String) = events.heard(live.heard(raw))
 
-    override fun finish(stoppedAt: Long, done: (String?) -> Unit) {
+    override fun finish(stoppedAt: Long, done: (said: String?, raw: Boolean) -> Unit) {
         finishes++
         this.stoppedAt = stoppedAt
         waiting = done
@@ -78,7 +81,7 @@ class FakeRecognizer : VoiceSession.Listening {
         said.clear()
         val done = waiting
         waiting = null
-        if (!closed) done?.invoke(live.finished())
+        if (!closed) done?.invoke(if (finishRaw) live.raw else live.finished(), finishRaw)
     }
 
     // as VoiceListener's: the capture ends, and what was heard comes back from another thread

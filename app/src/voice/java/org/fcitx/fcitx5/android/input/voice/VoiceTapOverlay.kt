@@ -183,6 +183,8 @@ class VoiceTapOverlay(
         // the microphone where it is now: the talk may have started from a key's shortcut, the
         // toolbar shown since
         if (card.contains(x, y) || inputView.voiceButton()?.contains(x, y) == true) return
+        // the keyboard moved by its handle: not a press off the mask, the talk goes on
+        if (inputView.handleShown()?.contains(x, y) == true) return
         press(Press.OUTSIDE)
     }
 

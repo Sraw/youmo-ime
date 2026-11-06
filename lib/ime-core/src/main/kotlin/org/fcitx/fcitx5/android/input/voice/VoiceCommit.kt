@@ -14,13 +14,23 @@ object VoiceCommit {
     fun typed(text: String, sameField: Boolean, passwordField: Boolean): String? =
         text.takeIf { it.isNotEmpty() && sameField && !passwordField }
 
-    /** A field told by its app ([packageName]) and its view's id ([fieldId], EditorInfo's). */
-    data class Field(val packageName: String?, val fieldId: Int)
+    /**
+     * A field told by its app ([packageName]), its view's id ([fieldId]) and what it says of itself
+     * ([inputType], [fieldName], [hintText]), all EditorInfo's: as ContextMemory.field names it, so
+     * the inputs one view holds (a WebView's, a Compose screen's) are told apart where they differ.
+     */
+    data class Field(
+        val packageName: String?,
+        val fieldId: Int,
+        val inputType: Int = 0,
+        val fieldName: String? = null,
+        val hintText: String? = null,
+    )
 
     /**
-     * Whether [now] is still the field [said] was, told by app and view id rather than by the
-     * EditorInfo object: the app restarting input in it (a WebView, an app's restartInput) gives a
-     * new one for the same field. An id not set (0, or View.NO_ID: -1) tells nothing, so two such
+     * Whether [now] is still the field [said] was, told by app, view id and what it says of itself
+     * rather than by the EditorInfo object: the app restarting input in it (a WebView, an app's
+     * restartInput) gives a new one for the same field. An id not set (0, or View.NO_ID: -1) tells nothing, so two such
      * fields are not taken as one; the same EditorInfo always is ([identical]).
      */
     fun sameField(said: Field?, now: Field?, identical: Boolean): Boolean = identical ||

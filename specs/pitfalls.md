@@ -81,6 +81,12 @@ Password, URL, email, search, no-suggestions and no-personalized-learning flags 
 keyboard does (`EditorTraits`, `FieldPolicy`, `AddressKeys`, the Return key's action). Test a change
 in a password field and an address field, not only a plain one.
 
+"The same field" is not one rule across the app. A posted commit (`PostedCommit.lands`) goes in
+only under the very `EditorInfo` it was asked under: a restart that brings a new one drops it.
+Voice (`VoiceCommit.sameField`) takes a restart with the same app, view id, input type, field name
+and hint as the same field, as `ContextMemory.field` names it, and goes on typing there. Left as
+it is (a paste lost on a restart is rare and harmless); mind it when one of them changes.
+
 ### Restoring user data needs a new process
 
 The host holds the config and the engine holds its logs open; replacing them under a running process

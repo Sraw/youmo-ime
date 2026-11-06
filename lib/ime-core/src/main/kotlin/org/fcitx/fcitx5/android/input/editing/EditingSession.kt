@@ -158,9 +158,11 @@ class EditingSession(
         selection.resetTo(selStart, selEnd)
         if (provisional && composingStart !in 0..<composingEnd && !provisionalStillThere(selStart, selEnd)) {
             // the app took it (a chat's text sent, the field cleared): nothing left to take away, and
-            // its owner must not put it in again
+            // its owner must not put it in again. The editor's composing region, if it kept one over
+            // what the app put there, is let go: not ours to replace
             CoreLog.d { "a provisional composition gone from the field: taken by the app" }
             resetComposingState()
+            editor.finishComposingText()
             provisionalTaken?.invoke(true)
             return CursorUpdate.None
         }
@@ -206,7 +208,8 @@ class EditingSession(
      * text. [sameField]: taken away if still there as composed ([selStart]..[selEnd]: the restarted
      * field's selection), for its owner to compose anew; if not there, the app took it. Another
      * field (a WebView's inputs share one view): left in place as text, its owner's to forget.
-     * [provisionalTaken] told either way; nothing done if not provisional.
+     * Either way not it, the editor's composing region is let go. [provisionalTaken] told either
+     * way; nothing done if not provisional.
      */
     fun provisionalRestarted(sameField: Boolean, selStart: Int, selEnd: Int) {
         checkThread()
@@ -216,12 +219,21 @@ class EditingSession(
         val there = sameField && selStart >= 0 && provisionalStillThere(selStart, selEnd)
         resetComposingState()
         if (there) {
+            // the cursor kept where it is, the composition's characters gone from before it; predicted,
+            // so the report it brings is not taken as the user's move (as the cursor leaving it)
+            val p = when {
+                selStart >= end -> selStart - (end - start)
+                selStart > start -> start
+                else -> selStart
+            }
             CoreLog.d { "input restarted over a provisional composition: taken away" }
+            selection.predict(p)
             editor.batchEdit {
                 editor.setComposingRegion(start, end)
                 editor.setComposingText("", 1)
+                editor.setSelection(p, p)
             }
-        } else if (!sameField) {
+        } else {
             editor.finishComposingText()
         }
         provisionalTaken?.invoke(!there)

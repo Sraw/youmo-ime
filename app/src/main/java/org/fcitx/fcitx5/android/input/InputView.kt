@@ -226,6 +226,9 @@ class InputView(
     /** The bar's microphone, where the user sees it now; null where not. */
     fun voiceButton(): View? = kawaiiBar.shownButton(ToolbarButton.Voice)
 
+    /** The floating keyboard's handle (or the docked one's, 始终显示悬浮条), where the user sees it now; null where not. */
+    fun handleShown(): View? = floatingHandle?.takeIf { it.isShown }
+
     // over the candidates' bar: this view is as high as the window, its top the screen's (setInputView)
     override val undoAnchor: View get() = kawaiiBar.view
 

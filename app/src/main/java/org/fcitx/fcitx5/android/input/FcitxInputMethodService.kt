@@ -1492,10 +1492,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     /**
      * Whether [now] is the field [said] was, though input restarted in it (a new EditorInfo): the
-     * same app and view id ([VoiceCommit.sameField]).
+     * same app, view id and what it says of itself ([VoiceCommit.sameField]).
      */
     fun sameVoiceField(said: EditorInfo?, now: EditorInfo? = currentInputEditorInfo): Boolean = said != null && now != null &&
-        VoiceCommit.sameField(VoiceCommit.Field(said.packageName, said.fieldId), VoiceCommit.Field(now.packageName, now.fieldId), said === now)
+        VoiceCommit.sameField(said.voiceField(), now.voiceField(), said === now)
+
+    private fun EditorInfo.voiceField() =
+        VoiceCommit.Field(packageName, fieldId, inputType, fieldName, hintText?.toString())
 
     /**
      * Voice's composing text taken from the field by anything but voice ([EditingSession.provisionalTaken]):
@@ -1631,6 +1634,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onFinishInput() {
         Timber.d("onFinishInput")
+        // a talk going on with the keyboard hidden (onFinishInputView came before, no field left then):
+        // what was heard typed into its field now, the connection and EditorInfo still that field's
+        inputView?.hold?.inputEnded(BaseInputView.Hold.InputEnd.LEFT)
         // voice's text still to come is taken from the field it was in, before its connection goes
         // (the framework would finish it there, kept as text)
         if (editingSession.provisional) editingSession.updateComposingText(FormattedText.Empty)

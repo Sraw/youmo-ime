@@ -37,4 +37,14 @@ class VoiceCommitTest {
         assertFalse(VoiceCommit.sameField(VoiceCommit.Field("a", -1), VoiceCommit.Field("a", -1), identical = false))
         assertTrue(VoiceCommit.sameField(VoiceCommit.Field("a", 0), VoiceCommit.Field("a", 0), identical = true))
     }
+
+    @Test
+    fun aWebViewsInputsAreToldApartByWhatTheySayOfThemselves() {
+        // one view (one id) holds them all: its type, name and hint tell them apart, as ContextMemory.field does
+        val search = VoiceCommit.Field("org.example.browser", 9, inputType = 1, fieldName = "q", hintText = "Search")
+        assertTrue(VoiceCommit.sameField(search, search.copy(), identical = false))
+        assertFalse(VoiceCommit.sameField(search, search.copy(hintText = "Message"), identical = false))
+        assertFalse(VoiceCommit.sameField(search, search.copy(fieldName = "body"), identical = false))
+        assertFalse(VoiceCommit.sameField(search, search.copy(inputType = 0x21), identical = false))
+    }
 }

@@ -24,8 +24,9 @@ class VoiceTalk(private val asItGoes: Boolean) {
     // the start of the heard text (before the clean-up) typed, or taken by the app, so far
     private var typed = ""
 
-    // the heard text last told
+    // the heard text last told, and whether it was the raw text ([VoiceLive.Heard.fallback])
     private var last = ""
+    private var lastRaw = false
 
     // the polish failed once: its raw text is not in step with the polished part typed, so nothing
     // more is typed as it is said (it would type what was typed again)
@@ -41,9 +42,12 @@ class VoiceTalk(private val asItGoes: Boolean) {
      */
     fun heard(heard: VoiceLive.Heard, typing: Boolean = true): Step {
         last = heard.whole
+        lastRaw = heard.fallback
         if (heard.fallback) halted = true
         val types = asItGoes && !halted && typing
-        if (!types || !newlySettled(heard)) return Step("", if (typed.isEmpty()) heard.text else rest(heard.whole).orEmpty())
+        if (!types || !newlySettled(heard)) {
+            return Step("", if (typed.isEmpty()) heard.text else rest(heard.whole, heard.fallback).orEmpty())
+        }
         val part = heard.whole.substring(typed.length, heard.settled)
         typed = heard.whole.substring(0, heard.settled)
         // a sound alone between two marks (「嗯，」) types nothing, as it would alone
@@ -64,16 +68,47 @@ class VoiceTalk(private val asItGoes: Boolean) {
         if (last.isNotEmpty()) typedAny = true
     }
 
-    /** What is left to type of [whole], what was said all told (null: nothing came back); null if nothing. */
-    fun rest(whole: String?): String? {
+    /**
+     * What is left to type of [whole], what was said all told (null: nothing came back); null if
+     * nothing. [raw]: [whole] is the recognizer's text, the polish having failed, not in step with
+     * the polished part typed (its marks, the 「嗯」 it took out): what was typed found in it as a
+     * subsequence, marks aside.
+     */
+    fun rest(whole: String?, raw: Boolean = false): String? {
         if (whole == null) return null
-        // the settled part changed after all (it should not): what differs is typed, not dropped
+        val from = (if (raw) afterTypedIn(whole) else null) ?: samePrefix(whole)
+        return VoiceText.clean(whole.substring(from))
+    }
+
+    // the settled part changed after all (it should not): what differs is typed, not dropped
+    private fun samePrefix(whole: String): Int {
         var same = 0
         val most = minOf(typed.length, whole.length)
         while (same < most && typed[same] == whole[same]) same++
-        return VoiceText.clean(whole.substring(same))
+        return same
+    }
+
+    // where what was typed ends in [raw]: its characters found there in order, its marks skipped (the
+    // polish added them), a character of raw's not matched skipped (one the polish took out); null if
+    // not all of it is there. The marks raw has after it go with it
+    private fun afterTypedIn(raw: String): Int? {
+        var i = 0
+        var j = 0
+        while (j < typed.length) {
+            when {
+                !typed[j].isLetterOrDigit() -> j++
+                i == raw.length -> return null
+                typed[j] == raw[i] -> {
+                    i++
+                    j++
+                }
+                else -> i++
+            }
+        }
+        while (i < raw.length && !raw[i].isLetterOrDigit()) i++
+        return i
     }
 
     /** What is left to type of what was heard last: the talk ended before the recognizer was done. */
-    fun restNow(): String? = rest(last)
+    fun restNow(): String? = rest(last, lastRaw)
 }

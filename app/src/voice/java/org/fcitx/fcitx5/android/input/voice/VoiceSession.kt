@@ -149,8 +149,8 @@ class VoiceSession(
         ui.recognizing()
         // the models not coming in, or a stretch not coming back: not waiting for good
         main.postDelayed({ endTypingWhatWasHeard(R.string.voice_hold_nothing) }, FINISH_MS)
-        listener?.finish(at) { said ->
-            val text = typed(talk.rest(said))
+        listener?.finish(at) { said, raw ->
+            val text = typed(talk.rest(said, raw))
             if (text != null) {
                 // it replaces what composes in the field: not taken away first, no flicker
                 put(text)
@@ -197,15 +197,14 @@ class VoiceSession(
     }
 
     // given up (15 s with nothing back) or failed: typed as it was said, what was heard last is
-    // typed too, not dropped after what went in before it, and the message says it may be cut short
+    // typed too (what was said stays, the user's rule), and "nothing heard" said only if nothing
+    // went in: else that the end may be cut short
     private fun endTypingWhatWasHeard(@StringRes message: Int) {
         if (over) return
-        if (!asItGoes || !talk.typedAny) {
-            end(message)
-            return
-        }
-        typed(talk.restNow())?.let(::put)
-        end(if (message == R.string.voice_hold_nothing) R.string.voice_tap_cut_short else message)
+        val rest = if (asItGoes) typed(talk.restNow()) else null
+        rest?.let(::put)
+        val some = talk.typedAny || rest != null
+        end(if (some && message == R.string.voice_hold_nothing) R.string.voice_tap_cut_short else message)
     }
 
     // [text] into the field: as its own commit (through fcitx: the bar's suggestions after it), or
@@ -249,9 +248,10 @@ class VoiceSession(
 
         /**
          * the microphone closed a tail after [stoppedAt] (uptime, ms), all of it recognized, then
-         * [done] with what was said ([VoiceLive.finished], before the clean-up; null: nothing came back)
+         * [done] with what was said ([VoiceLive.finished], before the clean-up; null: nothing came
+         * back), raw: the recognizer's text, the polish having failed
          */
-        fun finish(stoppedAt: Long, done: (String?) -> Unit)
+        fun finish(stoppedAt: Long, done: (said: String?, raw: Boolean) -> Unit)
 
         /** the microphone closed now, what was heard still recognized */
         fun cut()
