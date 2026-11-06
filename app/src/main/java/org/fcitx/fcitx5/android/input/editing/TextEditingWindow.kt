@@ -41,6 +41,11 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
     private val buttonRadius get() = ThemeColors.buttonRadius(ThemeManager.shownLook(theme).keys)
 
     private var hasSelection = false
+
+    // the report may lag a select-all just made: its text asked for too, only when it says none
+    private fun nothingSelected(start: Int, end: Int) =
+        start == end && service.currentInputConnection?.getSelectedText(0).isNullOrEmpty()
+
     private var userSelection = false
 
     private fun sendDirectionKey(keyEventCode: Int) {
@@ -89,15 +94,21 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
                 service.performContextMenuAction(android.R.id.selectAll)
             }
             cutButton.setOnClickListener {
+                val range = service.currentInputSelection
+                // the panel's cut and copy take the selection alone: with none, the clipboard kept,
+                // 选择 left as it was (it shows the state; nothing done changes it)
+                if (nothingSelected(range.start, range.end)) return@setOnClickListener service.say(R.string.nothing_to_cut)
                 // deactivate select button after operation
                 userSelection = false
-                val range = service.currentInputSelection
                 service.performContextMenuAction(android.R.id.cut)
                 if (range.start != range.end && copyIsSaid(service.currentInputEditorInfo)) service.say(R.string.text_cut)
             }
             copyButton.setOnClickListener {
-                userSelection = false
                 val ic = service.currentInputConnection ?: return@setOnClickListener
+                service.currentInputSelection.let {
+                    if (nothingSelected(it.start, it.end)) return@setOnClickListener service.say(R.string.nothing_to_copy)
+                }
+                userSelection = false
                 ic.performContextMenuAction(android.R.id.copy)
                 // 选择 off after a copy: the selection gone, >| moves the cursor and 粘贴 inserts at it
                 // only a selection is collapsed: a cursor alone stays where the editor has it, the

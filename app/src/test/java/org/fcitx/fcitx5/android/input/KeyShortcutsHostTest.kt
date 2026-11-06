@@ -295,6 +295,22 @@ class KeyShortcutsHostTest {
         until("both put back") { h.field.text.toString() == "你好世界" }
     }
 
+    // 0.6.0 #4: a copy or cut with nothing selected in an empty field leaves the clipboard as it was
+    @Test
+    fun aCopyOrCutOfAnEmptyFieldKeepsTheClipboard() {
+        prefs.set(
+            AppPrefs.getInstance().internal.keyShortcuts,
+            KeyShortcuts.Empty.with("full/c", KeyShortcut.Command(KeyCommand.Copy)).with("full/x", KeyShortcut.Command(KeyCommand.Cut)).serialize(),
+        )
+        val clipboard = appContext.getSystemService(ClipboardManager::class.java)
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText(null, "旧的"))
+        start("")
+        swipe(h.key("c"), up = true)
+        swipe(h.key("x"), up = true)
+        synced()
+        assertEquals("旧的", clipboard.primaryClip?.getItemAt(0)?.text?.toString())
+    }
+
     // review L4: the screen turned is the same input, its engine focused again: the run is kept
     @Test
     fun aRunOutlastsTheScreenTurning() {

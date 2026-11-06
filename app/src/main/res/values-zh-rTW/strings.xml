@@ -983,6 +983,8 @@
     <string name="shortcut_hide_keyboard">收起鍵盤</string>
     <string name="field_cleared">已清除</string>
     <string name="nothing_to_restore">沒有可恢復的內容</string>
+    <string name="nothing_to_copy">沒有內容可以複製</string>
+    <string name="nothing_to_cut">沒有內容可以剪下</string>
     <string name="shortcut_none">不設</string>
     <string name="shortcut_command">命令</string>
     <string name="shortcut_text">文字</string>

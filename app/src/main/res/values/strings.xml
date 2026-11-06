@@ -1007,6 +1007,8 @@
     <string name="shortcut_hide_keyboard">Hide keyboard</string>
     <string name="field_cleared">Cleared</string>
     <string name="nothing_to_restore">Nothing to restore</string>
+    <string name="nothing_to_copy">Nothing to copy</string>
+    <string name="nothing_to_cut">Nothing to cut</string>
     <string name="shortcut_none">None</string>
     <string name="shortcut_command">Command</string>
     <string name="shortcut_text">Text</string>

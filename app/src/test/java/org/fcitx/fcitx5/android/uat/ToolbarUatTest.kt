@@ -426,16 +426,20 @@ class ToolbarUatTest {
         typed("今天天气很好")
         editing()
         h.tap(h.described(s(R.string.move_cursor_to_start)))
-        h.tap(button(s(R.string.select)))
+        val select = button(s(R.string.select))
+        h.tap(select)
         h.tap(button(h.service.getString(android.R.string.copy)))
         assertEquals(0 to 0, h.field.selectionStart to h.field.selectionEnd)
+        // nothing copied, nothing done: 选择 stays on as it shows, → selects (review M1)
+        assertTrue(h.noticeTexts().toString(), s(R.string.nothing_to_copy) in h.noticeTexts())
+        assertTrue(select.isActivated)
         h.tap(h.described(s(R.string.move_cursor_right)))
-        assertEquals(1 to 1, h.field.selectionStart to h.field.selectionEnd)
+        assertEquals(0 to 1, h.field.selectionStart to h.field.selectionEnd)
     }
 
     @Test
     @Uat("TB-30")
-    fun copyAndCutSaidNothingCopiedNotSaid() {
+    fun copyAndCutSaidNothingToCopySaid() {
         h.start()
         typed("今天天气很好")
         editing()
@@ -448,7 +452,7 @@ class ToolbarUatTest {
         h.after(3000)
         assertNull(h.notice())
         h.tap(button(h.service.getString(android.R.string.copy)))
-        assertNull(h.notice())
+        assertTrue(h.noticeTexts().toString(), s(R.string.nothing_to_copy) in h.noticeTexts())
     }
 
     @Test

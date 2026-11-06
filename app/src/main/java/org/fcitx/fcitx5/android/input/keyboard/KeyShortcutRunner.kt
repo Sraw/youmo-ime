@@ -56,12 +56,19 @@ class KeyShortcutRunner(
         val range = service.currentInputSelection
         when (command) {
             KeyCommand.SelectAll -> menu(EditPlan.Menu.SelectAll)
-            KeyCommand.Copy -> {
+            // nothing selected in a field read empty: the clipboard kept, that said (one not read is taken whole)
+            KeyCommand.Copy -> if (nothingToTake(range.start, range.end)) {
+                service.say(R.string.nothing_to_copy)
+            } else {
                 // the field as it was, the cursor back: a run of Backspaces goes on after it, as after the panel's copy (review L3)
                 service.quietly { apply(EditPlan.copy(range.start, range.end)) }
                 if (copyIsSaid(service.currentInputEditorInfo)) service.say(R.string.text_copied)
             }
-            KeyCommand.Cut -> apply(EditPlan.cut(range.start, range.end))
+            KeyCommand.Cut -> if (nothingToTake(range.start, range.end)) {
+                service.say(R.string.nothing_to_cut)
+            } else {
+                apply(EditPlan.cut(range.start, range.end))
+            }
             KeyCommand.Paste -> service.performContextMenuAction(android.R.id.paste)
             KeyCommand.Undo -> service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true)
             KeyCommand.Redo -> service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true, shift = true)
@@ -127,14 +134,18 @@ class KeyShortcutRunner(
 
     // the field around its selection as a clear reads it; null without one, or where the app gives
     // neither side (no text read is no empty field: review S2)
-    private fun read(): EditPlan.Field? {
+    private fun read(limit: Int = READ_LIMIT): EditPlan.Field? {
         val ic = service.currentInputConnection ?: return null
         return EditPlan.Field(
-            ic.getTextBeforeCursor(READ_LIMIT, 0)?.toString() ?: return null,
+            ic.getTextBeforeCursor(limit, 0)?.toString() ?: return null,
             ic.getSelectedText(0)?.toString() ?: "",
-            ic.getTextAfterCursor(READ_LIMIT, 0)?.toString() ?: return null,
+            ic.getTextAfterCursor(limit, 0)?.toString() ?: return null,
         )
     }
+
+    // a character each side tells an empty field: the field read only with nothing selected
+    private fun nothingToTake(start: Int, end: Int) =
+        start == end && EditPlan.nothingToTake(start, end, read(1), service.currentInputEditorInfo?.toEditorTraits()?.isRawKeyInput == true)
 
     private fun fieldEdge(keyCode: Int) = service.sendCombinationKeyEvents(
         keyCode,

@@ -46,6 +46,16 @@ object EditPlan {
     data class Clearing(val steps: List<Step>, val cleared: Cleared?)
 
     /**
+     * Whether 复制 or 剪切 has nothing to take, the selection at [start]..[end] and the field read as
+     * [field]: nothing selected, and the field read empty. Then the clipboard is left alone and that
+     * said, never an empty copy over what it held. A field not read ([field] null) is no empty one
+     * (some apps give none of what they hold): the whole field taken as before; nor is one of raw
+     * keys ([rawKeys], a terminal), whatever it gives, its text not the editor's own.
+     */
+    fun nothingToTake(start: Int, end: Int, field: Field?, rawKeys: Boolean = false): Boolean =
+        !rawKeys && start == end && field != null && field.before.isEmpty() && field.selected.isEmpty() && field.after.isEmpty()
+
+    /**
      * A copy with the selection at [start]..[end]: of it, the cursor then at its end, as the 文本编辑
      * panel leaves it; of the whole field with nothing selected, the cursor back where it was.
      */

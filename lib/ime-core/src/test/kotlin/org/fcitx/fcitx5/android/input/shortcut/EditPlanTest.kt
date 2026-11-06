@@ -42,6 +42,22 @@ class EditPlanTest {
     )
 
     @Test
+    fun aCopyOrCutHasNothingToTakeOnlyWithNothingSelectedInAFieldReadEmpty() {
+        assertTrue(EditPlan.nothingToTake(0, 0, EditPlan.Field("", "", "")))
+        // not read is not empty: the whole field taken as before
+        assertFalse(EditPlan.nothingToTake(3, 3, null))
+        assertFalse(EditPlan.nothingToTake(0, 0, null))
+        // a field of raw keys (a terminal) read empty is not known empty either
+        assertFalse(EditPlan.nothingToTake(0, 0, EditPlan.Field("", "", ""), rawKeys = true))
+        assertFalse(EditPlan.nothingToTake(0, 2, null))
+        assertFalse(EditPlan.nothingToTake(0, 2, EditPlan.Field("", "", "")))
+        assertFalse(EditPlan.nothingToTake(1, 1, EditPlan.Field("a", "", "")))
+        assertFalse(EditPlan.nothingToTake(0, 0, EditPlan.Field("", "", "b")))
+        // a selection the report has not caught up with
+        assertFalse(EditPlan.nothingToTake(0, 0, EditPlan.Field("", "ab", "")))
+    }
+
+    @Test
     fun aCopyOfNothingSelectedIsTheWholeFieldTheCursorStaying() {
         val editor = FakeEditor("hello world", cursor = 5)
         editor.run(EditPlan.copy(5, 5))
