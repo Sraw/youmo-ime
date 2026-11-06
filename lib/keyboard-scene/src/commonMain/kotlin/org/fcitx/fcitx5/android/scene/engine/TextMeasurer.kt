@@ -22,3 +22,18 @@ fun interface TextMeasurer {
  * top and bottom), the same for any text of that font and size.
  */
 data class TextMetrics(val advance: Double, val ink: Box, val top: Double, val bottom: Double)
+
+/**
+ * An icon's own size, dp across and down: its drawable's, which an icon key draws it at (rules B §5,
+ * ImageKeyView's wrap_content). Only the platform has the drawables; a theme's icon is its file's.
+ */
+fun interface IconSizes {
+    fun dp(name: String): Pair<Double, Double>
+
+    companion object {
+        private const val MATERIAL_DP = 24.0
+
+        /** The app's keyboard icons: every one a Material icon's 24 dp (ic_baseline_*_24, ic_capslock_*, ic_number_pad). */
+        val MATERIAL = IconSizes { MATERIAL_DP to MATERIAL_DP }
+    }
+}

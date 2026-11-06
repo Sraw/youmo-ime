@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.scene
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Input
+import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
 import kotlin.math.abs
@@ -76,8 +77,10 @@ class PlaceTest {
         // between two faces (the theme's inset) is still a key's
         assertEquals("q", s.keyAt(107.0, 5.0)?.id)
         assertEquals("w", s.keyAt(108.0, 5.0)?.id)
-        assertNull(s.keyAt(-1.0, 5.0))
-        assertNull(s.keyAt(5.0, 720.0))
+        // a finger's centre reported a pixel out counts as on the edge (L4)
+        assertEquals("q", s.keyAt(-1.0, 5.0)?.id)
+        assertEquals(s.keys.last { it.bounds.left == 0.0 }.id, s.keyAt(5.0, env.height + 1)?.id)
+        assertEquals("p", s.keyAt(env.width, 5.0)?.id)
     }
 
     @Test
@@ -156,11 +159,70 @@ class PlaceTest {
     }
 
     @Test
-    fun aBoardThatDoesNotSplitIsLaidOutWhole() {
+    fun aBoardThatDoesNotSplitGoesToASide() {
         val l = LayoutReader.layout(
             "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"10\">" +
                 "<row><key id=\"a\" label=\"a\" width=\"10\"/></row></keyboard>",
         ).ok()
-        assertEquals(Fixtures.landscape.width, Fixtures.scene(Fixtures.landscape, l).key("a").bounds.width)
+        val e = Fixtures.landscape
+        val s = Fixtures.scene(e, l)
+        // rules D §2: docked right, 42% of 914 dp
+        val w = SplitKeyboard.dockWidth(914) * e.density
+        near(w, s.key("a").bounds.width)
+        near(e.width, s.key("a").bounds.right)
+        val side = s.slots.single { it.kind == SceneBuilder.SIDE_BUTTONS }
+        near(e.width - w, side.bounds.right)
+        // touches left of it are not a key's
+        assertNull(s.keyAt(5.0, 5.0))
+        val whole = Fixtures.scene(e.copy(split = false), l)
+        near(e.width, whole.key("a").bounds.width)
+    }
+
+    @Test
+    fun oneHandedBoardsGoToTheirSide() {
+        val left = Fixtures.scene(env.copy(oneHanded = SplitKeyboard.Dock.LEFT))
+        val w = (env.widthDp * SplitKeyboard.ONE_HANDED_SHARE).toInt() * env.density
+        near(w, left.board.right)
+        near(0.0, left.key("q").bounds.left)
+        near(w, left.keys.maxOf { it.bounds.right })
+        val right = Fixtures.scene(env.copy(oneHanded = SplitKeyboard.Dock.RIGHT))
+        near(env.width - w, right.board.left)
+        near(env.width - w, right.keys.minOf { it.bounds.left })
+        assertEquals(1, right.slots.count { it.kind == SceneBuilder.SIDE_BUTTONS })
+    }
+
+    @Test
+    fun aHalvesRowOfOtherThanNineOrTenKeysIsScaled() {
+        val l = LayoutReader.layout(
+            "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"8\" on-split=\"split\">" +
+                "<row split=\"halves\">" + (1..8).joinToString("") { "<key id=\"k$it\" label=\"$it\"/>" } + "</row></keyboard>",
+        ).ok()
+        val e = Fixtures.landscape
+        val s = Fixtures.scene(e, l)
+        assertTrue(s.warnings.single().message.contains("not 9 or 10"), "${s.warnings}")
+        val letter = e.width * SplitKeyboard.Sizes(914).letter
+        // each a split letter wide, the row centred: no room between halves
+        s.keys.forEach { near(letter, it.bounds.width, it.id) }
+        near(e.width / 2, (s.key("k4").bounds.right + s.key("k5").bounds.left) / 2)
+    }
+
+    @Test
+    fun anItemAcrossRowsKeepsItsSideOfTheRowsBelow() {
+        val l = LayoutReader.layout(
+            "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"10\">" +
+                "<row><slot id=\"side\" kind=\"nine-side\" width=\"2\" rows=\"2\"/><key id=\"a\" label=\"a\" width=\"fill\"/></row>" +
+                "<row><key id=\"b\" label=\"b\" width=\"4\"/><key id=\"c\" label=\"c\" width=\"4\"/></row>" +
+                "<row><key id=\"d\" label=\"d\" width=\"10\"/></row></keyboard>",
+        ).ok()
+        val s = Fixtures.scene(env, l)
+        val unit = env.width / 10
+        val side = s.slots.single { it.id == "side" }.bounds
+        near(0.0, side.left)
+        near(2 * unit, side.right)
+        near(s.key("b").bounds.bottom, side.bottom, "two rows tall")
+        near(2 * unit, s.key("b").bounds.left, "the row below starts at its edge")
+        near(2 * unit, s.key("b").hit.let { (it as Shape.Rect).box.left }, "and its hit too")
+        near(0.0, s.key("d").bounds.left, "the row under both is whole")
+        assertNull(s.keyAt(5.0, side.centerY))
     }
 }

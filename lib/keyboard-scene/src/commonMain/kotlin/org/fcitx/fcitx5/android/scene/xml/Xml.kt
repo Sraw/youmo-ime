@@ -152,7 +152,17 @@ private class Reader(private val s: String) {
                 at("<!") -> fail("a declaration is not allowed here")
                 at("<?") -> skipPast("?>", "a processing instruction")
                 at("<") -> children += element(depth + 1)
-                else -> text.append(chars('<'))
+                else -> {
+                    val textLine = line
+                    val t = chars('<')
+                    // no element here holds text: a word between them is a mistake (a quote not closed, a > too many)
+                    val first = t.indexOfFirst { !it.isXmlSpace() }
+                    if (first >= 0) {
+                        // the line the word is on, not the one the whitespace before it started
+                        throw XmlException(textLine + t.take(first).count { it == '\n' }, "text in <$qName>: \"${t.trim().take(TEXT_SHOWN)}\"")
+                    }
+                    text.append(t)
+                }
             }
         }
     }
@@ -202,8 +212,8 @@ private class Reader(private val s: String) {
         if (end < 0 || end - i > MAX_REFERENCE) fail("'&' not starting a reference")
         val body = s.substring(i + 1, end)
         val text = when {
-            body.startsWith("#x") -> codePoint(body.substring(2).toIntOrNull(HEX))
-            body.startsWith("#") -> codePoint(body.substring(1).toIntOrNull())
+            body.startsWith("#x") -> codePoint(body.substring(2).takeIf(HEX_DIGITS::matches)?.toIntOrNull(HEX))
+            body.startsWith("#") -> codePoint(body.substring(1).takeIf(DIGITS::matches)?.toIntOrNull())
             else -> PREDEFINED[body] ?: fail("the entity &$body; is not one of XML's five")
         }
         advance(end + 1 - i)
@@ -222,6 +232,9 @@ private class Reader(private val s: String) {
     private companion object {
         val PREDEFINED = mapOf("lt" to "<", "gt" to ">", "amp" to "&", "quot" to "\"", "apos" to "'")
         const val MAX_REFERENCE = 12
+        const val TEXT_SHOWN = 20
+        val HEX_DIGITS = Regex("[0-9A-Fa-f]{1,6}")
+        val DIGITS = Regex("[0-9]{1,7}")
         const val HEX = 16
         const val MAX_CODE_POINT = 0x10FFFF
         val SURROGATES = 0xD800..0xDFFF
@@ -235,6 +248,8 @@ private class Reader(private val s: String) {
 
 private fun Char.isXmlSpace(): Boolean = this == ' ' || this == '\n' || this == '\t' || this == '\r'
 
-private fun Char.isNameStart(): Boolean = isLetter() || this == '_' || this == ':'
+// names are ASCII: what Unicode calls a letter the JVM's and JS's tables may not agree on, and no name here needs one.
+// `:` for a namespace's prefix (xmlns:xsi), which is dropped
+private fun Char.isNameStart(): Boolean = this in 'a'..'z' || this in 'A'..'Z' || this == '_' || this == ':'
 
-private fun Char.isNameChar(): Boolean = isNameStart() || isDigit() || this == '-' || this == '.'
+private fun Char.isNameChar(): Boolean = isNameStart() || this in '0'..'9' || this == '-' || this == '.'

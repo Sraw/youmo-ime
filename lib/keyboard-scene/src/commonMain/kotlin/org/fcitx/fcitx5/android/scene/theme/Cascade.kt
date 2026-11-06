@@ -13,24 +13,35 @@ package org.fcitx.fcitx5.android.scene.theme
  * A key's parts (label, mark…) inherit what text is drawn in from the key ([INHERITED]) where no style
  * of the part sets it: `key.enter { color }` colours its label, not its mark, which `key mark` sets.
  */
-class Cascade(private val theme: Theme, private val scene: Set<String>) {
+class Cascade(theme: Theme, private val scene: Set<String>) {
+    private data class Bucket(val widget: String, val part: String?, val key: String?)
 
-    /** The properties set for [target]: a widget, a key, or a key's part (inheriting from the key). */
-    fun of(target: Selector.Target): Map<String, Value> {
+    // the selectors that can hold here (their scenes this one's), by what a target must be to be selected:
+    // a key is tried against its widget's and part's, and those naming it, not a theme's every style
+    private val index: Map<Bucket, List<Pair<Selector, Style>>> = theme.styles
+        .flatMap { style -> style.selectors.filter { scene.containsAll(it.scenes) }.map { it to style } }
+        .groupBy { (sel, _) -> Bucket(sel.widget, sel.part, sel.key) }
+
+    /**
+     * The properties set for [target]: a widget, a key, or a key's part, which inherits from the key:
+     * [key] its key's own, where the caller has them already (a key's every part in a state).
+     */
+    fun of(target: Selector.Target, key: Map<String, Value>? = null): Map<String, Value> {
         val own = own(target)
         if (target.part == null) return own
-        val key = own(target.copy(part = null))
-        return key.filterKeys { it in INHERITED } + own
+        val under = key ?: own(target.copy(part = null))
+        return under.filterKeys { it in INHERITED } + own
     }
 
     private fun own(target: Selector.Target): Map<String, Value> {
-        val matched = ArrayList<Pair<Int, Style>>()
-        for (style in theme.styles) {
-            val best = style.selectors.filter { it.matches(target, scene) }.maxOfOrNull { it.specificity } ?: continue
-            matched += best to style
+        val best = HashMap<Style, Int>()
+        fun from(bucket: Bucket) = index[bucket]?.forEach { (sel, style) ->
+            if (sel.matches(target, scene) && sel.specificity > (best[style] ?: -1)) best[style] = sel.specificity
         }
+        from(Bucket(target.widget, target.part, null))
+        if (target.key != null) from(Bucket(target.widget, target.part, target.key))
         val out = LinkedHashMap<String, Value>()
-        matched.sortedWith(compareBy({ it.first }, { it.second.order })).forEach { out.putAll(it.second.values) }
+        best.entries.sortedWith(compareBy({ it.value }, { it.key.order })).forEach { out.putAll(it.key.values) }
         return out
     }
 

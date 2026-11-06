@@ -12,8 +12,11 @@ import org.fcitx.fcitx5.android.scene.rules.KeyTextScale
 import org.fcitx.fcitx5.android.scene.theme.TextLook
 import kotlin.math.ceil
 
-/** A mark as placed before any yields ([KeyMarkYield.Mark] of it), and where it would be elsewhere. */
-class MarkDrawn(val drawn: Drawn, val slot: Slot, val minScale: Double, val drop: Int, val elsewhere: List<Pair<Slot, Drawn>>)
+/**
+ * A mark as placed before any yields ([KeyMarkYield.Mark] of it), and where it would be elsewhere;
+ * [top] its box's (a text's by the font's extent, as its TextView stood: the label under it centres to it).
+ */
+class MarkDrawn(val drawn: Drawn, val slot: Slot, val minScale: Double, val drop: Int, val elsewhere: List<Pair<Slot, Drawn>>, val top: Double)
 
 /** A key's [glyph] (label, icon, badge; null: none) and [marks], before they yield to each other. */
 class KeyContent(val glyph: Drawn?, val marks: List<MarkDrawn>, val room: Box, val letter: Boolean, val baseline: Double)
@@ -24,14 +27,18 @@ class Looks(val label: TextLook, val icon: TextLook, val badge: TextLook, val ma
 /**
  * Step 5 of §6: a key's label, icon and marks where theme 3.0's KeyView put them (rules B §5), from
  * the platform's [measurer]: a single character centred by its ink, longer text by its advance, both
- * upright by the font's extent (AutoScaleTextView); an icon 24 dp in the middle; a badge 15 dp before
- * the label, 3 dp apart, the two centred; the symbol 10.67 dp bold in its corner, 4 dp in from the
- * face's side, or under the label ([Slot.Below], 2 dp up, the label centred above it); a shortcut's
- * icon 11 dp (8 compact), its text 9 dp squeezed to 45% of the key, 3 dp from the side and 2 dp from
- * the top or bottom (2 and 1 compact). Text scales by the compact or floating scale (rules B §6),
- * label and symbol by the theme's too, a shortcut's not.
+ * upright by the font's extent (AutoScaleTextView); an icon alone at its own size ([icons]: the
+ * drawable's, ImageKeyView's wrap_content) in the middle; a badge 15 dp before the label, 3 dp apart,
+ * the two centred; the symbol 10.67 dp bold in its corner, 4 dp in from the face's side, or under the
+ * label ([Slot.Below], 2 dp up, the label centred between the face's top and the symbol's, the
+ * symbol's by its extent as its TextView's was); a shortcut's icon 11 dp (8 compact), its text 9 dp
+ * squeezed to 45% of the key, 3 dp from the side and 2 dp from the top or bottom (2 and 1 compact).
+ * Text scales by the compact or floating scale (rules B §6), label and symbol by the theme's too, a
+ * shortcut's not. A theme's `hidden` label hides the label, the icon and the symbol, never the badge
+ * or the shortcuts (rules B §5); the badge keeps its place beside the label hidden, or beside no
+ * label where there is none (an input method with no name: the label's 3 dp still after it).
  */
-class Content(private val env: Env, private val measurer: TextMeasurer) {
+class Content(private val env: Env, private val measurer: TextMeasurer, private val icons: IconSizes = IconSizes.MATERIAL) {
     private val d = env.density
     private val textScale = KeyTextScale.of(env.compact, env.floating)
 
@@ -40,23 +47,17 @@ class Content(private val env: Env, private val measurer: TextMeasurer) {
         val hidden = looks.label.hidden
         val marks = marks(key, cell, content, looks, hidden)
         val below = marks.firstOrNull { it.slot == Slot.Below }
-        val label = key.label?.takeIf { it.isNotEmpty() && !hidden }?.let { text ->
+        val measured = key.label?.takeIf { it.isNotEmpty() }?.let { text ->
             val size = (key.attrs.textSize ?: DEFAULT_TEXT_DP) * d * textScale * compactScale * looks.label.scale
             val weight = if (key.attrs.bold == true) BOLD else looks.label.weight
             Measured(text, measurer.measure(text, looks.label.font, weight, size), size, looks.label.font, weight)
         }
+        val label = measured?.takeIf { !hidden }
         val icon = key.icon?.takeIf { !hidden }
         val badge = key.badge
-        val cy = if (below != null) (content.top + below.drawn.ink.top) / 2 else content.centerY
+        val cy = if (below != null) (content.top + below.top) / 2 else content.centerY
         val glyph = when {
-            label != null && badge != null -> {
-                val iconSize = BADGE_DP * d
-                val total = iconSize + BADGE_GAP_DP * d + label.box.width
-                val left = content.centerX - total / 2
-                val b = PlacedIcon(badge, Box(left, cy - iconSize / 2, left + iconSize, cy + iconSize / 2), Part.Badge)
-                val t = label.at(left + iconSize + BADGE_GAP_DP * d + label.box.width / 2, cy, Part.Label)
-                Drawn(t.texts, listOf(b), t.ink.union(b.box))
-            }
+            badge != null -> badged(badge, measured, label, content.centerX, cy)
             label != null && icon != null -> {
                 val iconSize = ICON_WITH_LABEL_DP * d
                 val (labelPad, iconPad) = if (env.landscape) LANDSCAPE_PADS else PORTRAIT_PADS
@@ -67,8 +68,8 @@ class Content(private val env: Env, private val measurer: TextMeasurer) {
             }
             label != null -> label.at(content.centerX, cy, Part.Label)
             icon != null -> {
-                val s = ICON_DP * d
-                Drawn.of(PlacedIcon(icon, Box(content.centerX - s / 2, cy - s / 2, content.centerX + s / 2, cy + s / 2), Part.Icon))
+                val (w, h) = icons.dp(icon).let { (w, h) -> w * d to h * d }
+                Drawn.of(PlacedIcon(icon, Box(content.centerX - w / 2, cy - h / 2, content.centerX + w / 2, cy + h / 2), Part.Icon))
             }
             else -> null
         }
@@ -77,15 +78,26 @@ class Content(private val env: Env, private val measurer: TextMeasurer) {
         return KeyContent(glyph, marks, room, letter, glyph?.texts?.firstOrNull()?.baseline ?: 0.0)
     }
 
+    // the badge 15 dp, 3 dp, the label ([measured]'s room kept where it is hidden: [label] null), the two centred at [cx]
+    private fun badged(badge: String, measured: Measured?, label: Measured?, cx: Double, cy: Double): Drawn {
+        val iconSize = BADGE_DP * d
+        val labelWidth = measured?.box?.width ?: 0.0
+        val left = cx - (iconSize + BADGE_GAP_DP * d + labelWidth) / 2
+        val b = PlacedIcon(badge, Box(left, cy - iconSize / 2, left + iconSize, cy + iconSize / 2), Part.Badge)
+        val t = label?.at(left + iconSize + BADGE_GAP_DP * d + labelWidth / 2, cy, Part.Label)
+        return if (t == null) Drawn.of(b) else Drawn(t.texts, listOf(b), t.ink.union(b.box))
+    }
+
     private fun marks(key: ExpandedKey, cell: Box, content: Box, looks: Looks, hidden: Boolean): List<MarkDrawn> {
         val m = env.marks
         val name = key.attrs.shortcut
         if (name == null || '/' in name) {
             val symbol = key.alt?.takeIf { m.symbols && key.attrs.mark != false && !hidden }
             val shortcut = name?.let { m.shortcuts[it] }?.takeIf { m.charShortcuts }
-            val placed = KeyMarks.place(symbol, shortcut, m.symbolAt, m.shortcutAt, env.landscape, env.compact)
-            val symbolSlot = symbol?.let { placed.slotOf(it) }
-            val shortcutSlot = shortcut?.let { placed.at.entries.firstOrNull { e -> e.value === it }?.key }
+            // KeyMarks.place's slots, by what each is: a symbol in the shortcut's slot takes it
+            val symbolSlot = symbol?.let { KeyMarks.symbolSlot(m.symbolAt, m.shortcutAt, env.landscape, env.compact) }
+            val shortcutSlot = shortcut?.let { KeyMarks.shortcutSlot(KeyMarks.onKeys(m.symbolAt, m.shortcutAt, env.landscape, env.compact).shortcut) }
+                ?.takeIf { it != symbolSlot }
             return listOfNotNull(
                 shortcutSlot?.let { shortcutMark(shortcut, it, listOfNotNull(symbolSlot), KeyMarkYield.DROP_SHORTCUT, 0, listOf(it), cell, content, looks) },
                 symbolSlot?.let { symbolMark(symbol, it, content, looks) },
@@ -95,8 +107,9 @@ class Content(private val env: Env, private val measurer: TextMeasurer) {
         val down = m.shortcuts["$name:down"]
         val placed = KeyMarks.placeFunction(up, down, m.upOn, m.downOn, m.symbolAt, m.shortcutAt, env.landscape, env.compact)
         val slots = placed.at.keys.toList()
+        // up's first, down's second where both are (placeFunction's order)
         return placed.at.entries.mapIndexed { i, (slot, mark) ->
-            val drop = if (mark === down && placed.at.size == 2) KeyMarkYield.DROP_DOWN_SHORTCUT else KeyMarkYield.DROP_SHORTCUT
+            val drop = if (i == 1) KeyMarkYield.DROP_DOWN_SHORTCUT else KeyMarkYield.DROP_SHORTCUT
             shortcutMark(mark, slot, emptyList(), drop, i, slots, cell, content, looks)
         }
     }
@@ -106,8 +119,9 @@ class Content(private val env: Env, private val measurer: TextMeasurer) {
         val size = sizeDp * d
         val measured = Measured(text, measurer.measure(text, looks.mark.font, BOLD, size), size, looks.mark.font, BOLD)
         val vPad = if (slot == Slot.Below) BELOW_DP * d else 0.0
-        val drawn = measured.inBox(slotBox(slot, measured.box.width, measured.box.height, content, SYMBOL_SIDE_DP * d, vPad), Part.Mark)
-        return MarkDrawn(drawn, slot, KeyMarkYield.minScale(KeyMarkYield.MIN_SYMBOL_DP, sizeDp), KeyMarkYield.DROP_SYMBOL, emptyList())
+        val box = slotBox(slot, measured.box.width, measured.box.height, content, SYMBOL_SIDE_DP * d, vPad)
+        val drawn = measured.inBox(box, Part.Mark)
+        return MarkDrawn(drawn, slot, KeyMarkYield.minScale(KeyMarkYield.MIN_SYMBOL_DP, sizeDp), KeyMarkYield.DROP_SYMBOL, emptyList(), box.top)
     }
 
     // a shortcut's mark, the [index]th of its key's [slots] (KeyMarks.elsewhere tries them together)
@@ -132,7 +146,9 @@ class Content(private val env: Env, private val measurer: TextMeasurer) {
             }
         }
         val elsewhere = KeyMarks.elsewhere(slots, taken).map { alt -> alt[index] to drawnAt(alt[index]) }
-        return MarkDrawn(drawnAt(slot), slot, minScale, drop, elsewhere)
+        val drawn = drawnAt(slot)
+        // a shortcut is never under the label (KeyMarks.Slot.Below): its top centres nothing
+        return MarkDrawn(drawn, slot, minScale, drop, elsewhere, drawn.ink.top)
     }
 
     /** A box [w]×[h] in [slot] of [content]: [hPad] in from a side, [vPad] from the top or bottom; centred ones in the middle. */
@@ -172,7 +188,6 @@ class Content(private val env: Env, private val measurer: TextMeasurer) {
     companion object {
         const val DEFAULT_TEXT_DP = 23.0
         const val BOLD = 700
-        const val ICON_DP = 24.0
         const val ICON_WITH_LABEL_DP = 13.0
         const val BADGE_DP = 15.0
         const val BADGE_GAP_DP = 3.0

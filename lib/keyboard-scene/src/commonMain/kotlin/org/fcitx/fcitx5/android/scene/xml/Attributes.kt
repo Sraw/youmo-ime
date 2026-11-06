@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.scene.xml
 
 import org.fcitx.fcitx5.android.scene.Problems
+import org.fcitx.fcitx5.android.scene.SceneText
 
 /**
  * An element's attributes read one by one, each problem noted with the element's line; what was never
@@ -44,13 +45,15 @@ class Attributes(private val element: XmlElement, private val problems: Problems
 
     /** A decimal in ([min], [max]] or [[min], [max]] where [minIncluded]. */
     fun decimal(name: String, min: Double, max: Double, minIncluded: Boolean): Double? {
-        val range = if (minIncluded) "[$min, $max]" else "($min, $max]"
+        val range = if (minIncluded) "[${SceneText.n(min)}, ${SceneText.n(max)}]" else "(${SceneText.n(min)}, ${SceneText.n(max)}]"
         return value(name, "a number in $range") { raw ->
-            raw.takeIf(DECIMAL::matches)?.toDoubleOrNull()?.takeIf { (if (minIncluded) it >= min else it > min) && it <= max }
+            decimal(raw)?.takeIf { (if (minIncluded) it >= min else it > min) && it <= max }
         }
     }
 
-    fun positiveInt(name: String): Int? = value(name, "a positive whole number") { raw -> raw.toIntOrNull()?.takeIf { it > 0 } }
+    fun positiveInt(name: String): Int? = value(name, "a positive whole number") { raw ->
+        raw.takeIf(WHOLE::matches)?.toIntOrNull()?.takeIf { it > 0 }
+    }
 
     /** Notes every attribute not asked for, but namespace declarations. */
     fun done() {
@@ -58,7 +61,14 @@ class Attributes(private val element: XmlElement, private val problems: Problems
             .forEach { problem("unknown attribute $it=") }
     }
 
-    private companion object {
-        val DECIMAL = Regex("[+-]?([0-9]+(\\.[0-9]*)?|\\.[0-9]+)")
+    companion object {
+        private val DECIMAL = Regex("[+-]?([0-9]{1,9}(\\.[0-9]{0,9})?|\\.[0-9]{1,9})")
+        private val WHOLE = Regex("[0-9]{1,6}")
+
+        /**
+         * [raw] as a decimal where it is one as XSD writes them (no exponent, no `Infinity`, no hex):
+         * the JVM's and JS's own number parsing differ past that, and a file must read the same on both.
+         */
+        fun decimal(raw: String): Double? = raw.takeIf(DECIMAL::matches)?.toDoubleOrNull()
     }
 }

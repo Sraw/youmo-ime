@@ -27,7 +27,12 @@ internal class Paint(private val theme: Theme, private val density: Double) {
         is Fill.Picture -> Op.Picture(shape, fill.blurDp, fill.brightness)
     }
 
-    /** A key's face in one state: its shadow, fill, pressed layer ([pressed]: the state is), border. */
+    /**
+     * A key's face in one state: its shadow, fill, pressed layer ([pressed]: the state is), border.
+     * The pressed layer is the look's `overlay` over the pressed box, a ripple's from the touch, but
+     * none for `press="face"`: the pressed look's own fill is the pressed face (rules B §3: a key with
+     * a pressed face of its own is not tinted too), nor where the box has no size (a face of nothing).
+     */
     fun face(g: FaceGeometry, look: KeyLook, pressed: Boolean): List<Op> = buildList {
         val face = g.face
         val shadow = look.shadow
@@ -36,8 +41,8 @@ internal class Paint(private val theme: Theme, private val density: Double) {
             if (!c.transparent) add(Op.Shadow(g.shadow, shadow.blur * density, c))
         }
         if (face != null) fill(face, look.fill)?.let(::add)
-        val overlay = look.overlay
-        if (pressed && overlay != null && !overlay.transparent) {
+        val overlay = look.overlay?.takeIf { !it.transparent && look.press != "face" }
+        if (pressed && overlay != null && g.pressed.box.hasSize) {
             add(if (look.press == "ripple") Op.Ripple(g.pressed, overlay) else Op.Fill(g.pressed, overlay))
         }
         val border = look.border

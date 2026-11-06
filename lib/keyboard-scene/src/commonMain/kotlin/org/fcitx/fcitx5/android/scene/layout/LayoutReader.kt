@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.scene.layout
 
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Problems
+import org.fcitx.fcitx5.android.scene.SceneText
 import org.fcitx.fcitx5.android.scene.rules.KeyNames
 import org.fcitx.fcitx5.android.scene.xml.Attributes
 import org.fcitx.fcitx5.android.scene.xml.Xml
@@ -30,7 +31,22 @@ object LayoutReader {
         is Parsed.Ok -> fragment(xml.value)
     }
 
-    fun layout(root: XmlElement): Parsed<Layout> {
+    /** [root] read; whatever goes wrong reading it is a problem of the file (as [org.fcitx.fcitx5.android.scene.theme.ThemeReader.theme]). */
+    @Suppress("TooGenericExceptionCaught")
+    fun layout(root: XmlElement): Parsed<Layout> = try {
+        readLayout(root)
+    } catch (e: Throwable) {
+        Parsed.Failed(root.line, "the layout could not be read: ${e::class.simpleName}")
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    fun fragment(root: XmlElement): Parsed<Fragment> = try {
+        readFragment(root)
+    } catch (e: Throwable) {
+        Parsed.Failed(root.line, "the fragment could not be read: ${e::class.simpleName}")
+    }
+
+    private fun readLayout(root: XmlElement): Parsed<Layout> {
         val p = Problems()
         if (root.name != "keyboard") return Parsed.Failed(root.line, "the root is <${root.name}>, not <keyboard>")
         val a = Attributes(root, p)
@@ -45,6 +61,8 @@ object LayoutReader {
             "none" -> OnSplit.None
             else -> OnSplit.Side
         }
+        val preview = a.oneOf("preview", ON_OFF) != "off"
+        val popups = a.oneOf("popups", ON_OFF) != "off"
         a.done()
         val defaults = defaults(root, p)
         val parts = root.children.filter { it.name != "defaults" }.mapNotNull { child ->
@@ -61,10 +79,10 @@ object LayoutReader {
             KeyNames.LETTERS.filter { it !in ids }.takeIf { it.isNotEmpty() }
                 ?.let { p.add(root.line, "a letters board lacks the keys ${it.joinToString(" ")}") }
         }
-        return p.result { Layout(id.orEmpty(), name.orEmpty(), family.orEmpty(), columns, onSplit, defaults, parts) }
+        return p.result { Layout(id.orEmpty(), name.orEmpty(), family.orEmpty(), columns, onSplit, defaults, parts, preview, popups) }
     }
 
-    fun fragment(root: XmlElement): Parsed<Fragment> {
+    private fun readFragment(root: XmlElement): Parsed<Fragment> {
         val p = Problems()
         if (root.name != "fragment") return Parsed.Failed(root.line, "the root is <${root.name}>, not <fragment>")
         val a = Attributes(root, p)
@@ -84,12 +102,11 @@ object LayoutReader {
         if (a.string("xmlns") != NAMESPACE) a.problem("xmlns= must be $NAMESPACE")
     }
 
-    // ids unique within the file (keys of exclusive conditions have their own: lookup, lookup-on)
+    // ids unique within the file, but where each has a when= (the number pad's `-`, at a place a pad):
+    // the engine checks those shown are (Expand)
     private fun checkKeys(rows: List<Row>, p: Problems) {
-        val seen = HashSet<String>()
-        for (cell in rows.flatMap { it.cells }) {
-            val id = cell.id ?: continue
-            if (!seen.add(id)) p.add(cell.line, "the id \"$id\" is used twice")
+        rows.flatMap { it.cells }.filter { it.id != null }.groupBy { it.id }.forEach { (id, cells) ->
+            if (cells.size > 1 && cells.any { it.condition == null }) p.add(cells[1].line, "the id \"$id\" is used twice")
         }
     }
 
@@ -136,8 +153,12 @@ object LayoutReader {
 
     private fun gap(el: XmlElement, p: Problems): Gap {
         val a = Attributes(el, p)
-        val gap = Gap(a.matching("id", IDENT, "a name"), width(a) ?: Width.Units(1.0), condition(a), el.line)
+        val gap = Gap(
+            a.matching("id", IDENT, "a name"), width(a) ?: Width.Units(1.0), a.oneOf("look", KINDS), classes(a).orEmpty(),
+            condition(a), el.line,
+        )
         a.done()
+        noChildren(el, p)
         return gap
     }
 
@@ -146,11 +167,16 @@ object LayoutReader {
         val kind = a.oneOf("kind", SLOT_KINDS) ?: a.required("kind")
         val slot = Slot(
             a.matching("id", IDENT, "a name"), kind.orEmpty(), width(a) ?: Width.Units(1.0), a.positiveInt("rows") ?: 1,
-            face(a) ?: Face.Default, condition(a), el.line,
+            face(a) ?: Face.Default, a.oneOf("look", KINDS), classes(a).orEmpty(), condition(a), el.line,
         )
         a.done()
+        noChildren(el, p)
         return slot
     }
+
+    private fun noChildren(el: XmlElement, p: Problems) = el.children.forEach { p.add(it.line, "<${it.name}> is not allowed in <${el.name}>") }
+
+    private fun classes(a: Attributes): List<String>? = a.matching("class", CLASSES, "class names")?.split(' ')
 
     private fun key(el: XmlElement, p: Problems): Key {
         val a = Attributes(el, p)
@@ -158,26 +184,38 @@ object LayoutReader {
         val condition = condition(a)
         val attrs = look(a).copy(width = width(a), rows = a.positiveInt("rows"))
         a.done()
-        if (attrs.rows != null && attrs.rows > 1) a.problem("rows=\"${attrs.rows}\": keys across rows are not laid out yet (P2)")
         if (attrs.icon != null && attrs.label == null && attrs.a11y == null) a.problem("an icon key needs a11y= (what a screen reader says)")
         var popup: Popup? = null
         var menu = emptyList<MenuItem>()
+        val variants = ArrayList<Variant>()
         for (child in el.children) {
             when (child.name) {
                 "popup" -> popup = popup(child, p)
                 "menu" -> menu = menu(child, p)
+                "variant" -> variant(child, p)?.let(variants::add)
                 else -> p.add(child.line, "<${child.name}> is not allowed in <key>")
             }
         }
-        return Key(id.orEmpty(), condition, attrs, popup, menu, el.line)
+        return Key(id.orEmpty(), condition, attrs, popup, menu, el.line, variants)
+    }
+
+    // a <variant>: a when= and what it changes (no id, no width: the key stays where it is)
+    private fun variant(el: XmlElement, p: Problems): Variant? {
+        val a = Attributes(el, p)
+        val condition = condition(a) ?: null.also { a.required("when") }
+        val attrs = look(a)
+        a.done()
+        noChildren(el, p)
+        return condition?.let { Variant(it, attrs, el.line) }
     }
 
     private fun popup(el: XmlElement, p: Problems): Popup {
         val a = Attributes(el, p)
-        val from = a.oneOf("from", listOf("preset", "list", "none")) ?: "preset"
-        val preset = a.string("preset")
-        val options = POPUP_OPTIONS.mapNotNull { name -> a.string(name)?.let { name to it } }.toMap()
+        val from = a.oneOf("from", POPUP_FROM) ?: "preset"
+        val preset = a.matching("preset", KEY_ID, "a key's preset (a key id)")
+        val options = POPUP_OPTIONS.mapNotNull { (name, pattern) -> a.matching(name, pattern, "a value of $name")?.let { name to it } }.toMap()
         a.done()
+        if (preset != null && from != "preset") a.problem("preset= is only for from=\"preset\"")
         val items = el.children.mapNotNull { item ->
             if (item.name != "item") return@mapNotNull null.also { p.add(item.line, "<${item.name}> is not allowed in <popup>") }
             val ia = Attributes(item, p)
@@ -186,6 +224,8 @@ object LayoutReader {
             ia.done()
             text?.let { it to send }
         }
+        if (from == "list" && items.isEmpty()) a.problem("from=\"list\" with no items")
+        if (from != "list" && items.isNotEmpty()) a.problem("items are only for from=\"list\"")
         return Popup(from, preset, items, options)
     }
 
@@ -212,8 +252,8 @@ object LayoutReader {
         }
     }
 
-    private fun width(a: Attributes): Width? = a.value("width", "a width (0–$MAX_UNITS or fill)") { raw ->
-        if (raw == "fill") Width.Fill else raw.toDoubleOrNull()?.takeIf { it in 0.0..MAX_UNITS }?.let { Width.Units(it) }
+    private fun width(a: Attributes): Width? = a.value("width", "a width (0–${SceneText.n(MAX_UNITS)} or fill)") { raw ->
+        if (raw == "fill") Width.Fill else Attributes.decimal(raw)?.takeIf { it in 0.0..MAX_UNITS }?.let { Width.Units(it) }
     }
 
     private fun face(a: Attributes): Face? = a.value("face", "default|keep|none|special") { raw -> Face.entries.firstOrNull { it.xml == raw } }
@@ -225,13 +265,13 @@ object LayoutReader {
         icon = a.value("icon", "an icon name or binding", ::icon),
         kind = a.oneOf("kind", KINDS),
         role = a.oneOf("role", KeyNames.ROLES),
-        classes = a.matching("class", CLASSES, "class names")?.split(' '),
+        classes = classes(a),
         textSize = a.decimal("text-size", 0.0, MAX_TEXT_DP, minIncluded = false),
         compactTextScale = a.decimal("compact-text-scale", 0.0, MAX_RATIO, minIncluded = false),
         bold = a.oneOf("text-style", listOf("normal", "bold"))?.let { it == "bold" },
         face = face(a),
         margin = a.boolean("margin"),
-        a11y = a.string("a11y")?.let { raw -> binding(raw) ?: Text.Literal(raw) },
+        a11y = a.value("a11y", "text or one binding", ::text),
         sound = a.oneOf("sound", listOf("standard", "space", "delete", "return")),
         badge = a.value("badge", "an icon name or binding", ::icon),
         actions = ACTIONS.mapNotNull { name -> a.value(name, "an action", ::action)?.let { name to it } }.toMap() +
@@ -256,6 +296,7 @@ object LayoutReader {
         val arg = m.groupValues[2].takeIf { it.isNotEmpty() }
         val ok = when {
             arg == null -> name in Text.PLAIN || name in Text.ICONS
+            name == Text.PUNCT -> PUNCT_ARG.matches(arg)
             name in Text.WITH_LETTER -> LETTER_ARG.matches(arg)
             name in Text.WITH_NUMBER -> NUMBER_ARG.matches(arg)
             else -> false
@@ -271,7 +312,8 @@ object LayoutReader {
     /** [raw] where it is a word of the action vocabulary (layout-1.xsd's `action`). */
     fun action(raw: String): String? = raw.takeIf { a -> ACTION_PATTERNS.any { it.matches(a) } }
 
-    private const val MAX_UNITS = 20.0
+    // a board may be 100 columns: the boards but the letters give widths in hundredths of the row (rules C)
+    private const val MAX_UNITS = 100.0
     private const val MAX_RATIO = 4.0
     private const val MAX_TEXT_DP = 64.0
     private const val DEFAULT_COLUMNS = 10.0
@@ -281,14 +323,22 @@ object LayoutReader {
     private val SHORTCUT = Regex("([a-z0-9-]+/)?[^\\s/]+")
     private val BINDING = Regex("\\{([a-z-]+)(?::([^{}]*))?\\}")
     private val LETTER_ARG = Regex("[a-z;,./'?!~-]")
+    private val PUNCT_ARG = Regex("[^\\s{}]")
+    private val ON_OFF = listOf("on", "off")
+    private val POPUP_FROM = listOf("preset", "list", "none", "nine", "group")
     private val NUMBER_ARG = Regex("[0-9]{1,2}")
     private val FAMILIES = listOf("letters", "zhuyin", "nine", "zhuyin-nine", "grouped", "number", "symbols", "handwriting")
     private val KINDS = listOf("letter", "function", "space", "enter")
     private val SLOT_KINDS = listOf("handwriting-pad", "nine-side", "handwriting-candidates")
     private val ACTIONS = listOf("send", "long-press", "swipe-up", "swipe-down", "double-tap")
-    private val POPUP_OPTIONS = listOf("transform-punctuation", "symbols-from", "as-is", "in-row", "preview", "preview-alt")
+    private val BOOLEAN = Regex("true|false|1|0")
+    private val COUNT = Regex("[0-9]{1,3}")
+    private val POPUP_OPTIONS = listOf(
+        "transform-punctuation" to BOOLEAN, "symbols-from" to COUNT, "as-is" to BOOLEAN, "in-row" to COUNT,
+        "preview" to Regex(".{1,16}"), "preview-alt" to Regex(".{1,16}"),
+    )
     private val ACTION_PATTERNS = listOf(
-        Regex("[^\\s:]|[A-Za-z0-9]"),
+        Regex("[^\\s:]"),
         Regex("(sym|layout|picker|shortcut|reading|emoji-search|action):[A-Za-z0-9_.-]*"),
         Regex("commit:.+"),
         Regex("code:U\\+[0-9A-F]{4,6}"),

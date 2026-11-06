@@ -16,6 +16,9 @@ class Layout(
     val onSplit: OnSplit,
     val defaults: KeyAttrs,
     val parts: List<Part>,
+    /** Its keys pop up a preview as they are pressed, and their long press's keyboard or menu (the number pad's do not: rules C §7). */
+    val preview: Boolean = true,
+    val popups: Boolean = true,
 )
 
 /** A row of a keyboard, or the rows of a fragment it includes. */
@@ -67,21 +70,42 @@ class Key(
     val popup: Popup?,
     val menu: List<MenuItem>,
     override val line: Int,
+    /** The first that holds is laid over [attrs]. */
+    val variants: List<Variant> = emptyList(),
 ) : Cell
 
-/** Room taking no touch (the old GapKey). */
-class Gap(override val id: String?, val width: Width, override val condition: Condition?, override val line: Int) : Cell
+/**
+ * Room taking no touch (the old GapKey); with a [look], a key's face of that kind drawn there all the
+ * same, a key that does nothing (the number pad's blank places: rules C §7, the old BlankKey).
+ */
+class Gap(
+    override val id: String?,
+    val width: Width,
+    val look: String?,
+    val classes: List<String>,
+    override val condition: Condition?,
+    override val line: Int,
+) : Cell
 
-/** A native widget's place (the handwriting pad, the nine keys' side column): laid out, not drawn. */
+/**
+ * A native widget's place (the handwriting pad, the nine keys' side column), [rows] tall: laid out,
+ * the widget drawn by the app; with a [look], a key's face of that kind under it (the column a
+ * function key's, the pad a letter's: rules C §2, §8), never pressed.
+ */
 class Slot(
     override val id: String?,
     val kind: String,
     val width: Width,
     val rows: Int,
     val face: Face,
+    val look: String?,
+    val classes: List<String>,
     override val condition: Condition?,
     override val line: Int,
 ) : Cell
+
+/** A key's look and actions where [condition] holds (`<variant>`): the nine keys' 1 while typing (rules C §2). */
+class Variant(val condition: Condition, val attrs: KeyAttrs, val line: Int)
 
 enum class Face(val xml: String) { Default("default"), Keep("keep"), None("none"), Special("special") }
 
@@ -121,7 +145,11 @@ data class KeyAttrs(
     )
 }
 
-/** A long press's popup as written (`<popup>`); the app fills a preset's from PopupPreset. */
+/**
+ * A long press's popup as written (`<popup>`): [from] `preset` (PopupPreset's, [preset] or the key's
+ * own), `list` ([items]), `none`, or made of the key itself by the app, `nine` (a nine key's letters,
+ * its digit and t9_symbols) or `group` (a group's letters, its corner and their 26 keys' symbols).
+ */
 data class Popup(val from: String, val preset: String?, val items: List<Pair<String, String?>>, val options: Map<String, String>)
 
 data class MenuItem(val label: String, val icon: String?, val action: String)
@@ -138,11 +166,14 @@ sealed interface Text {
 
     companion object {
         /** Bindings with an argument, and the characters it may be. */
-        val WITH_LETTER = setOf("case", "root", "sp-hint", "alt", "punct")
+        val WITH_LETTER = setOf("case", "root", "sp-hint", "alt")
         val WITH_NUMBER = setOf("zhuyin-group", "nine-letters")
+
+        /** `{punct:x}`: any one character but a space or a brace (`(`, `@`, `:` among the 18 keys' corners). */
+        const val PUNCT = "punct"
         val PLAIN = setOf("ime-name", "return", "table-extra", "comma", "period")
 
         /** Icon bindings (`icon=`, `badge=`). */
-        val ICONS = setOf("shift-icon", "return-icon", "hold-badge")
+        val ICONS = setOf("shift-icon", "return-icon", "hold-badge", "lock-icon")
     }
 }

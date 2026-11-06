@@ -33,7 +33,7 @@ data class Condition(val anyOf: List<List<Term>>) {
 
     companion object {
         /** Names with values (`ime=pinyin`); a bare one asks whether there is any. */
-        val VALUED = setOf("ime", "scheme", "scheme-types", "table", "table-extra", "field", "action", "split-side")
+        val VALUED = setOf("ime", "scheme", "scheme-types", "table", "table-extra", "field", "action", "split-side", "pad")
 
         /** Flags: set or not. */
         val FLAGS = setOf(

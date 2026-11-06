@@ -12,13 +12,14 @@ import org.fcitx.fcitx5.android.scene.xml.XmlElement
 
 /**
  * A theme file read and checked: theme-4.xsd's words, and what an import checks beyond them (the 24
- * colours of 3.0 all there, every `@name` naming a colour and none itself, at most 1000 styles and 4
- * fonts, a selector's grammar exactly).
+ * colours of 3.0 all there, every `@name` naming a colour and none itself, at most 1000 styles, 4
+ * fonts and 200 icons, a selector's grammar exactly).
  */
 object ThemeReader {
     const val NAMESPACE = "https://youmo-ime/theme/4"
     private const val MAX_STYLES = 1000
     private const val MAX_FONTS = 4
+    private const val MAX_ICONS = 200
     private const val MAX_COLORS = 200
     private const val PERCENT = 100.0
     private val VERSION = Regex("4\\.[0-9]+")
@@ -39,7 +40,18 @@ object ThemeReader {
         is Parsed.Ok -> theme(xml.value)
     }
 
-    fun theme(root: XmlElement): Parsed<Theme> {
+    /**
+     * [root] read. A theme comes from anywhere: whatever goes wrong reading it (a bug of ours it
+     * finds, a stack it overflows) is a problem of the file, never a crash of the keyboard.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    fun theme(root: XmlElement): Parsed<Theme> = try {
+        read(root)
+    } catch (e: Throwable) {
+        Parsed.Failed(root.line, "the theme could not be read: ${e::class.simpleName}")
+    }
+
+    private fun read(root: XmlElement): Parsed<Theme> {
         if (root.name != "theme") return Parsed.Failed(root.line, "the root is <${root.name}>, not <theme>")
         val p = Problems()
         val a = Attributes(root, p)
@@ -60,10 +72,13 @@ object ThemeReader {
         val picture = pictures.firstOrNull()?.let { picture(it, p) }
         val fonts = root.all("font").also { if (it.size > MAX_FONTS) p.add(it[MAX_FONTS].line, "over $MAX_FONTS fonts") }
             .mapNotNull { named(it, p, "src") }.toMap()
-        val icons = root.all("icon").mapNotNull { named(it, p, "src") }.toMap()
+        val iconEls = root.all("icon")
+        if (iconEls.size > MAX_ICONS) p.add(iconEls[MAX_ICONS].line, "over $MAX_ICONS icons")
+        val icons = iconEls.take(MAX_ICONS).mapNotNull { named(it, p, "src") }.toMap()
         val styleEls = root.all("style")
         if (styleEls.size > MAX_STYLES) p.add(styleEls[MAX_STYLES].line, "over $MAX_STYLES styles")
-        val styles = styleEls.mapIndexedNotNull { i, el -> style(el, i, p, colors.keys, fonts.keys) }
+        // the rest not read: the file is refused already, and a million styles would each be a problem
+        val styles = styleEls.take(MAX_STYLES).mapIndexedNotNull { i, el -> style(el, i, p, colors.keys, fonts.keys) }
         return p.result { Theme(name.orEmpty(), dark, version.orEmpty(), colors, styles, fonts, icons, picture) }
     }
 

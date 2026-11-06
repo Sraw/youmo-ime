@@ -8,30 +8,74 @@ import kotlin.math.abs
 import kotlin.math.roundToLong
 
 /**
- * A [Scene] as text, for snapshots (060-render-v2 §9): one line an op, keys in layout order, numbers
- * in px to a hundredth, written by this code and not the platform's (a Double prints differently on
- * the JVM and in JS; these lines are the same on both, which the snapshot test holds them to).
+ * A [Scene] as text, for snapshots (060-render-v2 §9): one line an op, slots then keys in layout
+ * order, numbers in px to a hundredth, written by this code and not the platform's (a Double prints
+ * differently on the JVM and in JS; these lines are the same on both, which the snapshot test holds
+ * them to). A key's pressed drawing is written as what it changes of its unpressed one: `+i op` put
+ * in at i, `-i op` taken out from i (a shortest such list; most keys only gain a layer).
  */
 object SceneText {
 
     fun of(scene: Scene): String = buildString {
-        appendLine("scene ${n(scene.width)}x${n(scene.height)}")
+        val whole = Box(0.0, 0.0, scene.width, scene.height)
+        append("scene ${n(scene.width)}x${n(scene.height)}")
+        if (scene.board != whole) append(" board ${box(scene.board)}")
+        if (!scene.preview) append(" no-preview")
+        if (!scene.popups) append(" no-popups")
+        appendLine()
+        scene.warnings.forEach { appendLine("warning line ${it.line}: ${it.message}") }
         if (scene.base.isNotEmpty()) appendLine("base")
         scene.base.forEach { appendLine("  ${op(it)}") }
-        for (k in scene.keys) {
-            val copy = if (k.copy == 0) "" else "#${k.copy}"
-            appendLine("key ${k.id}$copy kind=${k.kind}${k.role?.let { " role=$it" }.orEmpty()} a11y=${q(k.a11y)}")
-            appendLine("  bounds ${box(k.bounds)}")
-            appendLine("  shape ${shape(k.shape)}")
-            appendLine("  hit ${shape(k.hit)}")
-            appendLine("  anchor ${n(k.anchor.x)},${n(k.anchor.y)} up ${n(k.up.x)},${n(k.up.y)}")
-            if (k.actions.isNotEmpty()) appendLine("  actions ${k.actions.entries.sortedBy { it.key }.joinToString(" ") { "${it.key}=${q(it.value)}" }}")
-            for ((state, ops) in k.faces) {
-                appendLine("  ${state.name.lowercase()}")
-                ops.forEach { appendLine("    ${op(it)}") }
+        for (s in scene.slots) {
+            appendLine("slot ${s.kind}${s.id?.let { " $it" }.orEmpty()} ${box(s.bounds)}")
+            s.ops.forEach { appendLine("  ${op(it)}") }
+        }
+        for (k in scene.keys) key(k)
+    }
+
+    private fun StringBuilder.key(k: KeyNode) {
+        val copy = if (k.copy == 0) "" else "#${k.copy}"
+        val states = if (k.states.isEmpty()) "" else " states=" + k.states.sorted().joinToString(",") { it.xml }
+        appendLine("key ${k.id}$copy kind=${k.kind}${k.role?.let { " role=$it" }.orEmpty()}$states a11y=${q(k.a11y)}")
+        appendLine("  bounds ${box(k.bounds)}")
+        appendLine("  shape ${shape(k.shape)}")
+        appendLine("  hit ${shape(k.hit)}")
+        appendLine("  anchor ${n(k.anchor.x)},${n(k.anchor.y)} up ${n(k.up.x)},${n(k.up.y)}")
+        if (k.actions.isNotEmpty()) appendLine("  actions ${k.actions.entries.sortedBy { it.key }.joinToString(" ") { "${it.key}=${q(it.value)}" }}")
+        val normal = k.ops(pressed = false)
+        appendLine("  normal")
+        normal.forEach { appendLine("    ${op(it)}") }
+        val pressed = k.ops(pressed = true)
+        if (pressed == normal) {
+            appendLine("  pressed the same")
+        } else {
+            appendLine("  pressed")
+            diff(normal.map(::op), pressed.map(::op)).forEach { appendLine("    $it") }
+        }
+    }
+
+    /** [b] as [a] changed: `-i` lines of [a] taken out, `+i` lines of [b] put in (by a longest common run). */
+    fun diff(a: List<String>, b: List<String>): List<String> {
+        val lcs = Array(a.size + 1) { IntArray(b.size + 1) }
+        for (i in a.indices.reversed()) {
+            for (j in b.indices.reversed()) {
+                lcs[i][j] = if (a[i] == b[j]) lcs[i + 1][j + 1] + 1 else maxOf(lcs[i + 1][j], lcs[i][j + 1])
             }
         }
-        for (s in scene.slots) appendLine("slot ${s.kind}${s.id?.let { " $it" }.orEmpty()} ${box(s.bounds)}")
+        val out = ArrayList<String>()
+        var i = 0
+        var j = 0
+        while (i < a.size || j < b.size) {
+            when {
+                i < a.size && j < b.size && a[i] == b[j] -> {
+                    i++
+                    j++
+                }
+                j < b.size && (i == a.size || lcs[i][j + 1] >= lcs[i + 1][j]) -> out += "+$j ${b[j++]}"
+                else -> out += "-$i ${a[i++]}"
+            }
+        }
+        return out
     }
 
     fun op(o: Op): String = when (o) {

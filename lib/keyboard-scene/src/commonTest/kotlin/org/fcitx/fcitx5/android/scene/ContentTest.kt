@@ -7,9 +7,11 @@ package org.fcitx.fcitx5.android.scene
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.engine.Content
 import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.IconSizes
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.MarkContent
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
+import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
@@ -25,7 +27,7 @@ class ContentTest {
 
     private fun near(e: Double, a: Double, what: String = "") = assertTrue(abs(e - a) < 0.01, "$what: expected $e, was $a")
 
-    private fun ops(s: Scene, id: String, state: KeyState = KeyState.Normal) = s.keys.first { it.id == id }.faces.getValue(state)
+    private fun ops(s: Scene, id: String, pressed: Boolean = false) = s.keys.first { it.id == id }.ops(pressed)
 
     private fun texts(s: Scene, id: String) = ops(s, id).filterIsInstance<Op.Text>()
 
@@ -125,6 +127,50 @@ class ContentTest {
     }
 
     @Test
+    fun theLabelAboveASymbolBelowCentresToTheSymbolsExtent() {
+        // M2: the symbol's TextView stood by the font's extent (1.05 of its size above the baseline), not its ink
+        val s = Fixtures.scene(env.copy(marks = MarkSettings(symbolAt = KeyMarks.At.Bottom)))
+        val f = face(s, "q")
+        val one = texts(s, "q").first { it.text == "1" }
+        val symbolTop = one.baseline - 1.05 * one.size
+        val q = texts(s, "q").first { it.text == "q" }
+        val cy = (f.top + symbolTop) / 2
+        near(cy - 1.35 * q.size / 2 + 1.05 * q.size, q.baseline, "the label's extent centred between the face's top and the symbol's")
+    }
+
+    @Test
+    fun aBadgeStaysWhereTheLabelIsHiddenOrThereIsNone() {
+        // M6: a theme hiding the label keeps the badge and the shortcuts (rules B §5), the badge where it was
+        val voice = env.copy(input = Input(holdVoice = true))
+        val shown = icons(Fixtures.scene(voice), "space").first { it.name == "voice" }
+        val t = ThemeReader.theme(testData("material-light.xml").replace("</theme>", "<style select=\"*/space label\" hidden=\"true\"/>\n</theme>")).ok()
+        val hidden = Fixtures.scene(voice, theme = t)
+        assertTrue(texts(hidden, "space").isEmpty())
+        assertEquals(shown.box, icons(hidden, "space").first { it.name == "voice" }.box)
+        assertEquals("cursor-move", icons(hidden, "space").last().name, "the shortcut still drawn")
+        // an input method with no name: the badge alone, its 3 dp after it still counted
+        val nameless = Fixtures.scene(voice.copy(texts = voice.texts.copy(imeName = "")))
+        val badge = icons(nameless, "space").first { it.name == "voice" }
+        near(face(nameless, "space").centerX - 1.5 * d, badge.box.centerX, "15 dp and 3 dp centred")
+    }
+
+    @Test
+    fun anIconAloneIsDrawnAtItsOwnSize() {
+        // L2: ImageKeyView's wrap_content, the drawable's size
+        val l = LayoutReader.layout(
+            "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"10\">" +
+                "<row><key id=\"a\" icon=\"wide\" a11y=\"a\" width=\"5\"/><key id=\"b\" icon=\"lock\" a11y=\"b\" width=\"5\"/></row></keyboard>",
+        ).ok()
+        val sizes = IconSizes { name -> if (name == "wide") 32.0 to 20.0 else 24.0 to 24.0 }
+        val s = SceneBuilder(Fixtures.materialLight, env, FakeMeasurer, sizes).build(l).ok()
+        val wide = icons(s, "a").single()
+        near(32 * d, wide.box.width)
+        near(20 * d, wide.box.height)
+        near(face(s, "a").centerX, wide.box.centerX)
+        near(24 * d, icons(s, "b").single().box.width)
+    }
+
+    @Test
     fun anIconWithALabelAboveIt() {
         val l = LayoutReader.layout(
             "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"10\">" +
@@ -150,7 +196,7 @@ class ContentTest {
         val e: Env = env.copy(width = 540.0, height = 240.0)
         val s = Fixtures.scene(e)
         val sizes = s.keys.filter { it.kind == "letter" && it.role == null }.map { k ->
-            k.faces.getValue(KeyState.Normal).filterIsInstance<Op.Text>().first { it.text == k.id }.size
+            k.ops(false).filterIsInstance<Op.Text>().first { it.text == k.id }.size
         }.toSet()
         assertEquals(1, sizes.size, "$sizes")
         assertTrue(sizes.single() < 23 * d, "${sizes.single()}")

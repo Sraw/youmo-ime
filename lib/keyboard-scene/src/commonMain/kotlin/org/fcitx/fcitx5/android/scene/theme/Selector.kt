@@ -8,6 +8,8 @@ package org.fcitx.fcitx5.android.scene.theme
  * One selector of a `<style select>` (theme-4.xsd's grammar): `[@scene…] widget[qualifiers] [part]`.
  * A key is selected as `key`, by name (`qwerty/q`), by its role on every board (`*`/enter), or every
  * key of a board (`qwerty/` then a star); then `.class` (its kind is one), `[role=…]`, `:state`.
+ * As in CSS, a selector's qualifiers all hold (`.function[role=enter]:pressed`: each of them) and a
+ * `select=` list's selectors any (`key.enter, key.space`).
  *
  * How specific it is, as CSS weighs it ([specificity]): a key's own name like an id; a class, a role,
  * a state, a scene each like a class, a board's every key one too, `*`/role two (so it outranks a kind,
@@ -40,7 +42,7 @@ data class Selector(
         widget == target.widget && part == target.part && scene.containsAll(scenes) &&
             (board == null || board == target.board) && (key == null || key == target.key) &&
             (starRole == null || starRole == target.role) && target.classes.containsAll(classes) &&
-            (roles.isEmpty() || target.role in roles) && target.states.containsAll(states)
+            roles.all { it == target.role } && target.states.containsAll(states)
 
     /** What a style may select: a widget, or a key's [part], with its names, classes and states. */
     data class Target(

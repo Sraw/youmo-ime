@@ -4,8 +4,10 @@
  */
 package org.fcitx.fcitx5.android.scene.engine
 
+import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.layout.Condition
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
+import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
 
 /**
  * Everything outside the layout and the theme a scene depends on: the keyboard's size, the scene's
@@ -14,7 +16,10 @@ import org.fcitx.fcitx5.android.scene.rules.KeyMarks
  * of these; the engine reads nothing else (CLAUDE.md: values in, a decision out).
  */
 data class Env(
-    /** The keyboard's keys' area, px: the app's side padding and bottom padding already taken off. */
+    /**
+     * The keyboard's keys' area, px: the app's side padding and bottom padding already taken off; a
+     * board one-handed or at a side ([oneHanded], [dock]) is placed in it by the engine (rules D §2).
+     */
     val width: Double,
     val height: Double,
     /** px a dp. */
@@ -23,9 +28,12 @@ data class Env(
     val compact: Boolean = false,
     /** Floating: the keys' text scale there (FloatingKeyboard.textScale); null docked, or a settings preview. */
     val floating: Double? = null,
-    /** The letters split (SplitKeyboard.splits, never floating). */
+    /** The letters split (SplitKeyboard.splits, never floating); the other boards then go to [dock]'s side. */
     val split: Boolean = false,
-    val oneHanded: Boolean = false,
+    /** 单手: the side the board goes to ([SplitKeyboard.Dock.FULL]: off). */
+    val oneHanded: SplitKeyboard.Dock = SplitKeyboard.Dock.FULL,
+    /** 分体时其它键盘靠哪边 (split_dock). */
+    val dock: SplitKeyboard.Dock = SplitKeyboard.Dock.RIGHT,
     val dark: Boolean = false,
     /** 按键样式 made the keys flat (key_border_choice), the theme's `@flat` styles then apply. */
     val flat: Boolean = false,
@@ -33,7 +41,19 @@ data class Env(
     val shift: Shift = Shift.None,
     val texts: Texts = Texts(),
     val marks: MarkSettings = MarkSettings(),
+    /**
+     * The states keys are in, but pressed and Shift's (from [shift]), by a key's id or its role:
+     * `reading` [KeyState.On] (手写的注 on), `lock` [KeyState.Locked] (a panel's lock).
+     */
+    val states: Map<String, Set<KeyState>> = emptyMap(),
 ) {
+    /** The keyboard's width in dp as Android's configuration has it (a whole number, rounded down). */
+    val widthDp: Int get() = (width / density + DP_EPSILON).toInt()
+
+    /** Whether a board one-handed goes to a side here ([oneHanded] on, not split, room beside it: rules D §2). */
+    val isOneHanded: Boolean
+        get() = !split && SplitKeyboard.placement(oneHanded, dock, false, true, widthDp) != null
+
     /** The theme's scene prefixes this environment is in. */
     val scenes: Set<String>
         get() = buildSet {
@@ -41,7 +61,7 @@ data class Env(
             if (landscape) add("landscape")
             if (floating != null) add("floating")
             if (split) add("split")
-            if (oneHanded) add("one-handed")
+            if (isOneHanded) add("one-handed")
             if (dark) add("dark")
             if (flat) add("flat")
         }
@@ -58,6 +78,7 @@ data class Env(
                 "field" -> input.field.isIn(values)
                 "action" -> input.action.isIn(values)
                 "split-side" -> false
+                "pad" -> input.pad.isIn(values)
                 else -> flag(name)
             }
         }
@@ -70,7 +91,7 @@ data class Env(
         "landscape" -> landscape
         "split" -> split
         "floating" -> floating != null
-        "one-handed" -> oneHanded
+        "one-handed" -> isOneHanded
         "voice" -> input.voice
         "hold-voice" -> input.holdVoice
         "lang-key" -> input.langKey
@@ -79,6 +100,11 @@ data class Env(
         "shifted" -> shift != Shift.None
         "caps-lock" -> shift == Shift.Lock
         else -> false
+    }
+
+    private companion object {
+        // 1080 px at 2.625 is 411.43 dp: Android says 411; a width of exactly 600 dp computed as 599.9999 must say 600
+        const val DP_EPSILON = 1e-6
     }
 }
 
@@ -103,6 +129,8 @@ data class Input(
     val langKey: Boolean = true,
     val composing: Boolean = false,
     val lookingUp: Boolean = false,
+    /** A number field's pad (NumberPad: full, digits, signed, decimal, signed-decimal, phone, datetime). */
+    val pad: String? = null,
 )
 
 /**
@@ -120,8 +148,17 @@ data class Texts(
     val keepUppercase: Boolean = false,
     val alts: Map<String, String>? = null,
     val punctuation: Map<String, String> = emptyMap(),
+    /** The nine keys' letters, by digit (t9_letters, or 双拼's NINE_SP): lower case, the binding cases them. */
+    val nineLetters: Map<String, String> = NINE_LETTERS,
     val other: Map<String, String> = emptyMap(),
-)
+) {
+    companion object {
+        /** NineKeyLetters' default: the phone's. */
+        val NINE_LETTERS = mapOf(
+            "2" to "abc", "3" to "def", "4" to "ghi", "5" to "jkl", "6" to "mno", "7" to "pqrs", "8" to "tuv", "9" to "wxyz",
+        )
+    }
+}
 
 /** What a mark shows: a command's icon or a text (KeyShortcutLooks). */
 sealed interface MarkContent {

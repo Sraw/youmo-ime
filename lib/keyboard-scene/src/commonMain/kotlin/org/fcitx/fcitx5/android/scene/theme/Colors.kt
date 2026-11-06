@@ -38,8 +38,8 @@ data class Argb(val value: Int) {
 
 /**
  * A colour as theme-4.xsd writes it, before its variables are known: `#rrggbb`, `#aarrggbb`,
- * `@name`, `transparent`, or a function of colours (nested at will, though the XSD's pattern shows
- * one level):
+ * `@name`, `transparent`, or a function of colours (nested up to [MAX_DEPTH] deep, though the XSD's
+ * pattern shows one level):
  * - `darker(c, n%)`: each of r, g, b n% nearer black; `lighter(c, n%)`: nearer white;
  * - `alpha(c, n%)`: c with its alpha set to n% (not multiplied: what the maker's slider shows);
  * - `mix(a, b, n%)`: n% of the way from a to b, alpha too (the floating handle's 10% of the text).
@@ -72,26 +72,33 @@ sealed interface ColorExpr {
         private val PERCENT_ARG = Regex("([0-9]|[1-9][0-9]|100)%")
         private val ARITY = mapOf("darker" to 1, "lighter" to 1, "alpha" to 1, "mix" to 2)
 
-        /** [text] read, or null where it is no colour. */
-        fun parse(text: String): ColorExpr? {
+        /** Functions nested this deep at most, a colour [MAX_LENGTH] characters: a theme comes from anywhere. */
+        const val MAX_DEPTH = 8
+        const val MAX_LENGTH = 256
+
+        /** [text] read, or null where it is no colour (or nested over [MAX_DEPTH], or over [MAX_LENGTH] long). */
+        fun parse(text: String): ColorExpr? = if (text.length > MAX_LENGTH) null else parse(text, 0)
+
+        private fun parse(text: String, depth: Int): ColorExpr? {
             val t = text.trim()
             return when {
                 t == "transparent" -> Literal(Argb.TRANSPARENT)
                 HEX6.matches(t) -> Literal(Argb(t.substring(1).toLong(16).toInt() or (FULL shl 24)))
                 HEX8.matches(t) -> Literal(Argb(t.substring(1).toLong(16).toInt()))
                 VAR.matches(t) -> Ref(t.substring(1))
-                else -> function(t)
+                depth >= MAX_DEPTH -> null
+                else -> function(t, depth + 1)
             }
         }
 
-        private fun function(t: String): ColorExpr? {
+        private fun function(t: String, depth: Int): ColorExpr? {
             val name = t.substringBefore('(')
             val arity = ARITY[name] ?: return null
             if (!t.endsWith(")")) return null
             val args = splitTop(t.substring(name.length + 1, t.length - 1)) ?: return null
             if (args.size != arity + 1) return null
             val percent = args.last().trim().takeIf(PERCENT_ARG::matches)?.dropLast(1)?.toDouble() ?: return null
-            val colors = args.dropLast(1).map { parse(it) ?: return null }
+            val colors = args.dropLast(1).map { parse(it, depth) ?: return null }
             return Fn(name, colors, percent)
         }
 

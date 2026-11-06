@@ -7,11 +7,13 @@ package org.fcitx.fcitx5.android.scene
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.layout.Condition
 import org.fcitx.fcitx5.android.scene.layout.Face
+import org.fcitx.fcitx5.android.scene.layout.Gap
 import org.fcitx.fcitx5.android.scene.layout.Key
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.layout.OnSplit
 import org.fcitx.fcitx5.android.scene.layout.Row
 import org.fcitx.fcitx5.android.scene.layout.RowSplit
+import org.fcitx.fcitx5.android.scene.layout.Slot
 import org.fcitx.fcitx5.android.scene.layout.Text
 import org.fcitx.fcitx5.android.scene.layout.Width
 import kotlin.test.Test
@@ -70,9 +72,9 @@ class LayoutReaderTest {
     }
 
     @Test
-    fun keysAcrossRowsWaitForP2() {
+    fun keysAcrossRowsAreRead() {
         val p = problems(board("<row><key id=\"a\" label=\"a\" rows=\"2\"/></row>"))
-        assertTrue(p.single().contains("(P2)"), "$p")
+        assertTrue(p.none { "rows" in it }, "$p")
     }
 
     @Test
@@ -127,5 +129,61 @@ class LayoutReaderTest {
         val semicolon = Fixtures.qwerty.parts.filterIsInstance<Row>()[1].cells.first { it.id == "semicolon" }
         val c: Condition? = semicolon.condition
         assertEquals(2, c?.anyOf?.size)
+    }
+
+    @Test
+    fun anIdTwiceIsFineWhereEachHasACondition() {
+        // the number pad's `-`: at one place or another as the pad is; the engine checks those shown (Expand)
+        val ok = board("<row><key id=\"a\" label=\"a\" when=\"pad=signed\"/></row>\n<row><key id=\"a\" label=\"b\" when=\"pad=phone\"/></row>")
+        assertEquals(emptyList(), problems(ok))
+        val half = board("<row><key id=\"a\" label=\"a\" when=\"pad=signed\"/></row>\n<row><key id=\"a\" label=\"b\"/></row>")
+        assertTrue(problems(half).single().contains("used twice"))
+    }
+
+    @Test
+    fun variantsGapsWithALookAndBoardSwitches() {
+        val l = LayoutReader.layout(
+            board(
+                "<row><key id=\"a\" label=\"a\"><variant when=\"composing\" label=\"分词\" text-size=\"16\"/></key>" +
+                    "<gap width=\"1\" look=\"function\" class=\"blank\"/><slot id=\"s\" kind=\"nine-side\" width=\"2\" look=\"function\" face=\"keep\"/></row>",
+                " preview=\"off\" popups=\"off\"",
+            ),
+        ).ok()
+        assertEquals(false, l.preview)
+        assertEquals(false, l.popups)
+        val cells = l.parts.filterIsInstance<Row>().single().cells
+        val a = assertIs<Key>(cells[0])
+        assertEquals(Text.Literal("分词"), a.variants.single().attrs.label)
+        assertEquals(16.0, a.variants.single().attrs.textSize)
+        assertEquals("function", assertIs<Gap>(cells[1]).look)
+        assertEquals(listOf("blank"), assertIs<Gap>(cells[1]).classes)
+        assertEquals("function", assertIs<Slot>(cells[2]).look)
+        assertTrue(problems(board("<row><key id=\"a\" label=\"a\"><variant label=\"b\"/></key></row>")).single().contains("when"))
+        assertTrue(problems(board("<row><gap width=\"1\"><key id=\"a\" label=\"a\"/></gap><key id=\"b\" label=\"b\"/></row>")).isNotEmpty())
+    }
+
+    @Test
+    fun popupsAreChecked() {
+        assertEquals(emptyList(), problems(board("<row><key id=\"a\" label=\"a\"><popup from=\"nine\"/></key></row>")))
+        assertEquals(emptyList(), problems(board("<row><key id=\"a\" label=\"a\"><popup preset=\"q\" symbols-from=\"2\"/></key></row>")))
+        // a preset names a key; options are of their kind; items only for a list
+        assertTrue(problems(board("<row><key id=\"a\" label=\"a\"><popup preset=\"a b\"/></key></row>")).isNotEmpty())
+        assertTrue(problems(board("<row><key id=\"a\" label=\"a\"><popup from=\"none\" preset=\"q\"/></key></row>")).isNotEmpty())
+        assertTrue(problems(board("<row><key id=\"a\" label=\"a\"><popup symbols-from=\"many\"/></key></row>")).isNotEmpty())
+        assertTrue(problems(board("<row><key id=\"a\" label=\"a\"><popup from=\"list\"/></key></row>")).isNotEmpty())
+        assertTrue(problems(board("<row><key id=\"a\" label=\"a\"><popup from=\"nine\"><item text=\"x\"/></popup></key></row>")).isNotEmpty())
+    }
+
+    @Test
+    fun badBindingsAndNumbersAreProblems() {
+        assertTrue(problems(board("<row><key id=\"a\" icon=\"x\" a11y=\"{nonsense}\"/></row>")).isNotEmpty())
+        // a number the JVM and JS would read differently is not one (M3)
+        assertTrue(problems(board("<row><key id=\"a\" label=\"a\" width=\"1e1\"/></row>")).isNotEmpty())
+        assertTrue(problems(board("<row><key id=\"a\" label=\"a\" width=\"0x10\"/></row>")).isNotEmpty())
+        assertTrue(problems(board("<row><key id=\"a\" label=\"a\" width=\" 2\"/></row>")).isNotEmpty())
+        assertEquals(emptyList(), problems(board("<row><key id=\"a\" label=\"a\" width=\".5\"/></row>")))
+        assertTrue(problems(board("<row><key id=\"a\" label=\"a\" rows=\"+2\"/></row>")).isNotEmpty())
+        assertEquals(Text.Binding("punct", "，"), LayoutReader.text("{punct:，}"))
+        assertNull(LayoutReader.text("{punct: }"))
     }
 }

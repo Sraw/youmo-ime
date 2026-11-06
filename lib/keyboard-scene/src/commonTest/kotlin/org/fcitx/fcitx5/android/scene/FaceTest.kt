@@ -98,17 +98,17 @@ class FaceTest {
         ).ok()
         val s = SceneBuilder(t, Fixtures.portrait, FakeMeasurer).build(Fixtures.qwerty).ok()
         val q = s.keys.first { it.id == "q" }
-        val pressed = q.faces.getValue(KeyState.Pressed)
+        val pressed = q.ops(true)
         assertEquals(listOf("Shadow", "Fill", "Fill", "Stroke", "Text", "Text"), pressed.map { it::class.simpleName })
         val stroke = assertIs<Op.Stroke>(pressed[3])
         assertEquals(2.625, stroke.width)
         val face = (q.shape as Shape.Rect)
         assertEquals(face.box.left + 2.625 / 2, (stroke.shape as Shape.Rect).box.left, "inside the face")
         assertEquals(face.radii[0] - 2.625 / 2, (stroke.shape as Shape.Rect).radii[0])
-        assertTrue(s.keys.first { it.id == "space" }.faces.getValue(KeyState.Pressed).any { it is Op.Ripple })
-        assertTrue(s.keys.first { it.id == "comma" }.faces.getValue(KeyState.Normal).any { it is Op.Gradient })
-        assertTrue(s.keys.first { it.id == "enter" }.faces.getValue(KeyState.Normal).any { it is Op.NineSlice })
-        assertTrue(s.keys.first { it.id == "lang" }.faces.getValue(KeyState.Normal).any { it is Op.Picture })
+        assertTrue(s.keys.first { it.id == "space" }.ops(true).any { it is Op.Ripple })
+        assertTrue(s.keys.first { it.id == "comma" }.ops(false).any { it is Op.Gradient })
+        assertTrue(s.keys.first { it.id == "enter" }.ops(false).any { it is Op.NineSlice })
+        assertTrue(s.keys.first { it.id == "lang" }.ops(false).any { it is Op.Picture })
     }
 
     @Test
@@ -116,15 +116,15 @@ class FaceTest {
         val table = Fixtures.portrait.copy(flat = true, input = Input(ime = "table", table = "wubi", lookingUp = true, composing = true))
         val s = Fixtures.scene(table)
         val q = s.keys.first { it.id == "q" }
-        val normal = q.faces.getValue(KeyState.Normal)
+        val normal = q.ops(false)
         assertTrue(normal.none { it is Op.Fill || it is Op.Shadow }, "flat: no face, no shadow ($normal)")
-        val overlay = q.faces.getValue(KeyState.Pressed).filterIsInstance<Op.Fill>().single()
+        val overlay = q.ops(true).filterIsInstance<Op.Fill>().single()
         assertEquals(Argb(0x1F000000), overlay.color)
         assertEquals(List(4) { 0.0 }, (overlay.shape as Shape.Rect).radii, "@flat key radius=0: a square pressed area")
         val space = s.keys.first { it.id == "space" }.shape as Shape.Rect
         assertEquals(10 * 2.625, space.box.left - s.keys.first { it.id == "space" }.bounds.left, 1e-9)
         // face="keep": the block face 3.0 drew whatever 按键样式 said
-        val keep = s.keys.first { it.id == "lookup-on" }.faces.getValue(KeyState.Normal)
+        val keep = s.keys.first { it.id == "lookup-on" }.ops(false)
         assertTrue(keep.any { it is Op.Shadow }, "$keep")
         assertEquals(Argb(0xFF5CB5AB.toInt()), keep.filterIsInstance<Op.Fill>().single().color)
         val confirm = s.keys.first { it.id == "confirm" }.shape as Shape.Rect
@@ -142,13 +142,47 @@ class FaceTest {
     }
 
     @Test
+    fun pressFaceIsThePressedFillAloneAndANothingBoxHasNoPress() {
+        val t = ThemeReader.theme(
+            testData("material-light.xml").replace(
+                "</theme>",
+                "<style select=\"*/space\" press=\"face\"/>\n<style select=\"*/space:pressed\" fill=\"#ff0000\"/>\n</theme>",
+            ),
+        ).ok()
+        val space = Fixtures.scene(Fixtures.portrait, theme = t).keys.first { it.id == "space" }
+        val fills = space.ops(true).filterIsInstance<Op.Fill>()
+        assertEquals(listOf(Argb(0xFFFF0000.toInt())), fills.map { it.color }, "the pressed face, no overlay on it")
+        // L5: a key too narrow for its inset has a face of nothing, and nothing pressed
+        val l = LayoutReader.layout(
+            "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"10\">" +
+                "<row><key id=\"a\" label=\"a\" width=\"0.01\"/><key id=\"b\" label=\"b\" width=\"fill\"/></row></keyboard>",
+        ).ok()
+        val a = Fixtures.scene(Fixtures.portrait, l).keys.first { it.id == "a" }
+        assertTrue(a.ops(true).none { it is Op.Fill && it.color == Argb(0x1F000000) }, "${a.ops(true)}")
+    }
+
+    @Test
+    fun keyStatesAreASet() {
+        val e = Fixtures.portrait.copy(states = mapOf("lang" to setOf(KeyState.On, KeyState.Disabled)))
+        val t = ThemeReader.theme(
+            testData("material-light.xml").replace("</theme>", "<style select=\"*/lang:on:disabled\" fill=\"#00ff00\"/>\n</theme>"),
+        ).ok()
+        val lang = Fixtures.scene(e, theme = t).keys.first { it.id == "lang" }
+        assertEquals(setOf(KeyState.On, KeyState.Disabled), lang.states)
+        assertTrue(lang.ops(false).any { it is Op.Fill && it.color == Argb(0xFF00FF00.toInt()) })
+        assertTrue(lang.ops(true).any { it is Op.Fill && it.color == Argb(0xFF00FF00.toInt()) }, "pressed keeps the others")
+        val shift = Fixtures.scene(Fixtures.portrait.copy(shift = org.fcitx.fcitx5.android.scene.engine.Shift.Lock)).keys.first { it.id == "shift" }
+        assertEquals(setOf(KeyState.Locked), shift.states)
+    }
+
+    @Test
     fun aKeyWithFaceNoneStillShowsItsPress() {
         val l = LayoutReader.layout(
             "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"10\">" +
                 "<row><key id=\"a\" label=\"a\" width=\"10\" face=\"none\"/></row></keyboard>",
         ).ok()
         val a = Fixtures.scene(Fixtures.portrait, l).keys.single()
-        assertTrue(a.faces.getValue(KeyState.Normal).none { it is Op.Fill || it is Op.Shadow })
-        assertEquals(1, a.faces.getValue(KeyState.Pressed).count { it is Op.Fill })
+        assertTrue(a.ops(false).none { it is Op.Fill || it is Op.Shadow })
+        assertEquals(1, a.ops(true).count { it is Op.Fill })
     }
 }

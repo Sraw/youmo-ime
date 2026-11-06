@@ -61,6 +61,24 @@ class ThemeTest {
     }
 
     @Test
+    fun colourExpressionsAreBounded() {
+        // H1: eight functions deep at most, 256 characters at most: a theme cannot make the reader recurse away
+        fun nested(n: Int) = "mix(".repeat(n) + "#000000" + ", #ffffff, 50%)".repeat(n)
+        assertNotNull(ColorExpr.parse(nested(ColorExpr.MAX_DEPTH)))
+        assertNull(ColorExpr.parse(nested(ColorExpr.MAX_DEPTH + 1)))
+        assertNull(ColorExpr.parse("#000000" + " ".repeat(ColorExpr.MAX_LENGTH)))
+        assertTrue(problems(withStyle("<style select=\"key\" fill=\"${nested(40)}\"/>")).isNotEmpty())
+        val deep = "<colors>" + "<x>".repeat(500)
+        assertTrue(ThemeReader.theme(source.replace("<colors>", deep)).problems().isNotEmpty())
+    }
+
+    @Test
+    fun tooManyIconsOrStylesAreProblems() {
+        val icons = (1..201).joinToString("") { "<icon name=\"i$it\" src=\"i$it.png\"/>" }
+        assertTrue(problems(source.replace("</theme>", "$icons</theme>")).any { it.contains("over 200 icons") })
+    }
+
+    @Test
     fun colourFunctions() {
         val black = Argb.of(255, 0, 0, 0)
         val white = Argb.of(255, 255, 255, 255)
@@ -126,6 +144,15 @@ class ThemeTest {
         assertTrue(!s("@flat key").matches(target, emptySet()))
         assertTrue(!byRole.matches(target, emptySet()))
         assertTrue(s("*/enter").matches(target.copy(role = "enter"), emptySet()))
+        // L3, as CSS: a selector's qualifiers all hold (AND), a list's selectors any (OR)
+        val both = s("key[role=enter][role=lang]")
+        assertTrue(!both.matches(target.copy(role = "enter"), emptySet()), "one key is not two roles")
+        assertTrue(s("key.function.alt-text").matches(target.copy(classes = setOf("function", "alt-text")), emptySet()))
+        assertTrue(!s("key.function.alt-text").matches(target.copy(classes = setOf("function")), emptySet()))
+        assertTrue(s("key:on:pressed").matches(target.copy(states = setOf("on", "pressed")), emptySet()))
+        assertTrue(!s("key:on:pressed").matches(target.copy(states = setOf("pressed")), emptySet()))
+        val list = assertNotNull(Selector.parseList("*/enter, */lang"))
+        assertTrue(list.any { it.matches(target.copy(role = "lang"), emptySet()) })
     }
 
     @Test

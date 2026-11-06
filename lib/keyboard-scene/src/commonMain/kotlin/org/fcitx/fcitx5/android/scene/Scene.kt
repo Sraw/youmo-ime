@@ -9,7 +9,12 @@ import org.fcitx.fcitx5.android.scene.theme.Argb
 /**
  * What the engine makes of a layout, a theme and an environment (060-render-v2 §3): every key's
  * shape, touch area and drawing, in px; plain data, the same on the JVM and in JS ([SceneText]).
- * [base] is drawn first (the keyboard's own fill), then each key's face for its state.
+ * [base] is drawn first (the keyboard's own fill), then the slots' faces, then each key's face for
+ * its states. [board] is where the keys are: the whole of it, or one-handed or split at a side
+ * (rules D §2), the rest a `side-buttons` slot. [preview] and [popups]: whether its keys pop up a
+ * preview, a long press's keyboard or menu (the layout's; the number pad's do not). [warnings]: what
+ * the layout asked that this environment could not give and was done another way (a split row of
+ * other than nine or ten keys, scaled).
  */
 class Scene(
     val width: Double,
@@ -17,13 +22,39 @@ class Scene(
     val base: List<Op>,
     val keys: List<KeyNode>,
     val slots: List<SlotNode>,
+    val board: Box = Box(0.0, 0.0, width, height),
+    val preview: Boolean = true,
+    val popups: Boolean = true,
+    val warnings: List<Problem> = emptyList(),
 ) {
-    /** The key a finger at ([x], [y]) presses: the one whose [KeyNode.hit] holds it; none in a gap. */
-    fun keyAt(x: Double, y: Double): KeyNode? = keys.firstOrNull { it.hit.contains(x, y) }
+    /**
+     * The key a finger at ([x], [y]) presses: the one whose [KeyNode.hit] holds it; none in a gap.
+     * A touch on the scene's right or bottom edge, or past it (a finger's centre the system reports a
+     * pixel out), counts as just inside: the edge keys' hits stop short of their right and bottom.
+     */
+    fun keyAt(x: Double, y: Double): KeyNode? {
+        val cx = x.coerceIn(0.0, maxOf(0.0, width - EDGE))
+        val cy = y.coerceIn(0.0, maxOf(0.0, height - EDGE))
+        return keys.firstOrNull { it.hit.contains(cx, cy) }
+    }
+
+    private companion object {
+        const val EDGE = 1e-6
+    }
 }
 
-/** The states a key is drawn in; others (`:locked`, `:shifted`) come with the environment for now. */
-enum class KeyState { Normal, Pressed }
+/**
+ * The states a key is drawn in (theme-4.xsd's `:pressed` and the rest). A key is in a set of them:
+ * [Pressed] while a finger is on it, the others as the input is ([KeyNode.states]: Shift on or
+ * locked, the handwriting's 注 on, a panel's lock locked, a key not usable, a popup's focused cell).
+ */
+enum class KeyState(val xml: String) {
+    Pressed("pressed"), Shifted("shifted"), Locked("locked"), On("on"), Disabled("disabled"), Selected("selected");
+
+    companion object {
+        fun of(xml: String): KeyState? = entries.firstOrNull { it.xml == xml }
+    }
+}
 
 /**
  * A key (§3, §3.1): [id] is the name themes, overrides, UAT and accessibility know it by
@@ -42,13 +73,23 @@ class KeyNode(
     val hit: Shape,
     val anchor: Point,
     val up: Point,
-    val faces: Map<KeyState, List<Op>>,
+    /** The states it is in now, but [KeyState.Pressed]: a change of these is a new scene for the key (§3). */
+    val states: Set<KeyState>,
+    /** Its drawing in [states], and pressed ([states] and [KeyState.Pressed]). */
+    val faces: Map<Set<KeyState>, List<Op>>,
     val a11y: String,
     val actions: Map<String, String>,
-)
+) {
+    /** What a backend draws for it: [faces] in its [states], pressed or not. */
+    fun ops(pressed: Boolean): List<Op> = faces.getValue(if (pressed) states + KeyState.Pressed else states)
+}
 
-/** A native widget's place (the handwriting pad): the app puts its view there. */
-class SlotNode(val kind: String, val id: String?, val bounds: Box)
+/**
+ * A native widget's place (the handwriting pad, the nine keys' column, a one-handed board's side
+ * buttons): the app puts its view there, over [ops], a key's face drawn under it where the layout
+ * gives it a look (never pressed).
+ */
+class SlotNode(val kind: String, val id: String?, val bounds: Box, val ops: List<Op> = emptyList())
 
 /**
  * One drawing step, px, the engine's arithmetic done (§3, its geometry by [Shape] as §3.1 has it).

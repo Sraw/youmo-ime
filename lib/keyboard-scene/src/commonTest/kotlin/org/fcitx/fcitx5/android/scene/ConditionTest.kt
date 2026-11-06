@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.Shift
+import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
 import org.fcitx.fcitx5.android.scene.layout.Condition
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -49,11 +50,12 @@ class ConditionTest {
     @Test
     fun flags() {
         val all = env.copy(
-            compact = true, landscape = true, split = true, floating = 0.85, oneHanded = true, shift = Shift.Lock,
+            compact = true, landscape = true, split = true, floating = 0.85, oneHanded = SplitKeyboard.Dock.LEFT, shift = Shift.Lock,
             input = Input(roots = true, voice = true, holdVoice = true, langKey = true, composing = true, lookingUp = true),
         )
         for (flag in Condition.FLAGS) {
-            assertTrue(holds(flag, all), flag)
+            // one thumb's keyboard is only while the letters do not split (SplitKeyboard.placement)
+            assertTrue(holds(flag, if (flag == "one-handed") all.copy(split = false) else all), flag)
             assertFalse(holds(flag, env.copy(input = Input(langKey = false))), flag)
         }
         assertTrue(holds("shifted", env.copy(shift = Shift.Once)))

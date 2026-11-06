@@ -22,7 +22,7 @@ class XmlTest {
             <!-- a comment -->
             <a x="1" y='two'>
               <b/>
-              <c z="&lt;&amp;&gt;&quot;&apos;&#65;&#x1F600;">text</c>
+              <c z="&lt;&amp;&gt;&quot;&apos;&#65;&#x1F600;"> </c>
             </a>
             """.trimIndent(),
         ).ok()
@@ -33,8 +33,18 @@ class XmlTest {
         assertEquals(listOf("b", "c"), root.children.map { it.name })
         val c = root.all("c").single()
         assertEquals("<&>\"'A😀", c["z"])
-        assertEquals("text", c.text.trim())
         assertEquals(5, c.line)
+    }
+
+    @Test
+    fun strayTextAndNonAsciiNamesAreProblems() {
+        // nothing the formats read is text: a stray word is a slip (L7)
+        val p = assertIs<Parsed.Failed>(Xml.parse("<a>\n<b/>\n  oops\n</a>"))
+        assertEquals(3, p.problems.single().line)
+        assertTrue(p.problems.single().message.contains("oops"), "${p.problems}")
+        assertIs<Parsed.Failed>(Xml.parse("<键/>"))
+        assertIs<Parsed.Failed>(Xml.parse("<a 名=\"1\"/>"))
+        assertIs<Parsed.Failed>(Xml.parse("<a>&#99999999;</a>"))
     }
 
     @Test

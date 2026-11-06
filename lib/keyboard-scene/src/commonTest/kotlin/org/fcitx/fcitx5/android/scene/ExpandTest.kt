@@ -44,7 +44,7 @@ class ExpandTest {
     @Test
     fun bindings() {
         val texts = Texts(imeName = "拼音", comma = "，", period = "。", returnLabel = "发送", keepUppercase = false,
-            alts = mapOf("q" to "!"), punctuation = mapOf("?" to "？"), other = mapOf("nine-letters:2" to "abc", "zhuyin-group:1" to "ㄅ"))
+            alts = mapOf("q" to "!"), punctuation = mapOf("?" to "？"), other = mapOf("zhuyin-group:1" to "ㄅ"))
         val e = env.copy(texts = texts)
         assertEquals("q", Expand.text(Text.Binding("case", "q"), e))
         assertEquals("Q", Expand.text(Text.Binding("case", "q"), e.copy(shift = Shift.Once)))
@@ -57,9 +57,41 @@ class ExpandTest {
         assertEquals("。", Expand.text(Text.Binding("period", null), e))
         assertEquals("拼音", Expand.text(Text.Binding("ime-name", null), e))
         assertEquals("发送", Expand.text(Text.Binding("return", null), e))
-        assertEquals("abc", Expand.text(Text.Binding("nine-letters", "2"), e))
+        // rules C §2: pinyin's in capitals, English's as Shift has them
+        assertEquals("ABC", Expand.text(Text.Binding("nine-letters", "2"), e))
+        assertEquals("wxyz", Expand.text(Text.Binding("nine-letters", "9"), e.copy(input = Input(ime = "english"))))
+        assertEquals("WXYZ", Expand.text(Text.Binding("nine-letters", "9"), e.copy(input = Input(ime = "english"), shift = Shift.Once)))
+        assertEquals("JKL;", Expand.text(Text.Binding("nine-letters", "5"), e.copy(texts = texts.copy(nineLetters = mapOf("5" to "jkl;")))))
         assertEquals("ㄅ", Expand.text(Text.Binding("zhuyin-group", "1"), e))
-        assertEquals("", Expand.text(Text.Binding("nine-letters", "9"), e))
+        assertEquals("", Expand.text(Text.Binding("nine-letters", "1"), e))
+    }
+
+    @Test
+    fun theFirstVariantThatHoldsIsLaidOver() {
+        val l = LayoutReader.layout(
+            "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"10\">" +
+                "<row><key id=\"one\" label=\"，。？！\" text-size=\"16\" alt=\"1\">" +
+                "<variant when=\"composing ime=english\" label=\"'\"/><variant when=\"composing\" label=\"分词\"/>" +
+                "<variant when=\"ime=english\" label=\".,?!\"/></key></row></keyboard>",
+        ).ok()
+        fun one(e: Env) = Expand.rows(l, emptyMap(), e).ok().single().items.single() as ExpandedKey
+        assertEquals("，。？！", one(env).label)
+        assertEquals("分词", one(env.copy(input = Input(composing = true))).label)
+        assertEquals(16.0, one(env.copy(input = Input(composing = true))).attrs.textSize, "the rest the key's")
+        assertEquals("1", one(env.copy(input = Input(composing = true))).alt)
+        assertEquals(".,?!", one(env.copy(input = Input(ime = "english"))).label)
+        assertEquals("'", one(env.copy(input = Input(ime = "english", composing = true))).label, "the first that holds")
+    }
+
+    @Test
+    fun twoKeysOfOneIdShownIsAProblem() {
+        val l = LayoutReader.layout(
+            "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"10\">" +
+                "<row><key id=\"minus\" label=\"-\" when=\"pad=signed|signed-decimal\"/>" +
+                "<key id=\"minus\" label=\"-\" when=\"pad=signed|phone\"/></row></keyboard>",
+        ).ok()
+        assertEquals(1, Expand.rows(l, emptyMap(), env.copy(input = Input(pad = "phone"))).ok().single().items.size)
+        assertTrue(Expand.rows(l, emptyMap(), env.copy(input = Input(pad = "signed"))).problems().single().message.contains("two keys"))
     }
 
     @Test
@@ -68,6 +100,8 @@ class ExpandTest {
         assertEquals("shift-once", Expand.icon(Text.Binding("shift-icon", null), env.copy(shift = Shift.Once)))
         assertEquals("shift-locked", Expand.icon(Text.Binding("shift-icon", null), env.copy(shift = Shift.Lock)))
         assertEquals("enter", Expand.icon(Text.Binding("return-icon", null), env))
+        assertEquals("lock-open", Expand.icon(Text.Binding("lock-icon", null), env))
+        assertEquals("lock", Expand.icon(Text.Binding("lock-icon", null), env.copy(states = mapOf("lock" to setOf(KeyState.Locked)))))
         assertNull(Expand.icon(Text.Binding("hold-badge", null), env))
         assertEquals("voice", Expand.icon(Text.Binding("hold-badge", null), env.copy(input = Input(holdVoice = true))))
         assertNull(Expand.icon(Text.Binding("other", null), env))

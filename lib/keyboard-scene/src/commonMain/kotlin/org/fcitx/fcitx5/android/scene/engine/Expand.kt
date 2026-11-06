@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.scene.engine
 
+import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Problems
 import org.fcitx.fcitx5.android.scene.layout.Fragment
@@ -28,12 +29,13 @@ class ExpandedRow(
     val line: Int,
 )
 
-/** What a row holds once expanded. */
+/** What a row holds once expanded: [rows] tall (one, or the rows below it too: rules C §2, §8). */
 sealed interface Item {
     val width: Width
+    val rows: Int get() = 1
 }
 
-/** A key shown, its attributes laid over its row's and file's defaults, its bindings read. */
+/** A key shown, its attributes laid over its row's and file's defaults (and the variant that holds), its bindings read. */
 class ExpandedKey(
     val key: Key,
     val attrs: KeyAttrs,
@@ -44,6 +46,7 @@ class ExpandedKey(
     val a11y: String,
 ) : Item {
     override val width: Width get() = attrs.width ?: Width.Units(1.0)
+    override val rows: Int get() = attrs.rows ?: 1
     val kind: String get() = attrs.kind ?: "letter"
 }
 
@@ -53,11 +56,14 @@ class ExpandedGap(val gap: Gap) : Item {
 
 class ExpandedSlot(val slot: Slot) : Item {
     override val width: Width get() = slot.width
+    override val rows: Int get() = slot.rows
 }
 
 /**
- * Step 2 of §6: includes put in, `when=` weighed, bindings read. [fragments] are the files includes
- * name, by id; one not there is a problem, as is a row with nothing shown.
+ * Step 2 of §6: includes put in, `when=` weighed, a key's first `<variant>` that holds laid over it,
+ * bindings read. [fragments] are the files includes name, by id; one not there is a problem, as is a
+ * row with nothing shown, and two keys shown of one id (a file may write an id twice where each has
+ * a `when=`: the number pad's `-`, at one place or another as the pad is).
  */
 object Expand {
 
@@ -80,6 +86,10 @@ object Expand {
             }
         }
         if (out.isEmpty() && p.isEmpty()) p.add(0, "no row shows here")
+        val seen = HashSet<String>()
+        out.flatMap { it.items }.filterIsInstance<ExpandedKey>().forEach { k ->
+            if (!seen.add(k.key.id)) p.add(k.key.line, "two keys \"${k.key.id}\" shown here")
+        }
         return p.result { out }
     }
 
@@ -88,7 +98,10 @@ object Expand {
         val facts = env.facts
         val items = row.cells.filter { it.condition?.holds(facts) != false }.map { cell ->
             when (cell) {
-                is Key -> key(cell, cell.attrs.over(defaults), env)
+                is Key -> {
+                    val attrs = cell.attrs.over(defaults)
+                    key(cell, cell.variants.firstOrNull { it.condition.holds(facts) }?.attrs?.over(attrs) ?: attrs, env)
+                }
                 is Gap -> ExpandedGap(cell)
                 is Slot -> ExpandedSlot(cell)
             }
@@ -127,9 +140,14 @@ object Expand {
             "period" -> texts.period
             "ime-name" -> texts.imeName
             "return" -> texts.returnLabel
+            "nine-letters" -> nineLetters(texts.nineLetters[arg].orEmpty(), env)
             else -> texts.other[if (arg.isEmpty()) name else "$name:$arg"].orEmpty()
         }
     }
+
+    // rules C §2: pinyin's and 双拼's in capitals; English's as Shift has them, small without
+    private fun nineLetters(letters: String, env: Env): String =
+        if (env.input.ime == "english" && env.shift == Shift.None) letters.lowercase() else letters.uppercase()
 
     /** An icon's name: as written, or a binding's (null: none drawn). */
     fun icon(t: Text, env: Env): String? = when (t) {
@@ -142,6 +160,8 @@ object Expand {
             }
             "return-icon" -> env.texts.returnIcon
             "hold-badge" -> "voice".takeIf { env.input.holdVoice }
+            // the symbols panel's lock (PickerLayout): open, or shut while the panel stays
+            "lock-icon" -> if (env.states["lock"].orEmpty().contains(KeyState.Locked)) "lock" else "lock-open"
             else -> null
         }
     }
