@@ -10,13 +10,16 @@
     <item name="chain_3" type="id" />
     <item name="chat_clear" type="id" />
     <item name="chat_hide" type="id" />
+    <item name="chat_naive" type="id" />
     <item name="chat_restart" type="id" />
+    <item name="chat_settext" type="id" />
     <item name="date" type="id" />
     <item name="datetime" type="id" />
     <item name="decimal" type="id" />
     <item name="dialog_field" type="id" />
     <item name="email" type="id" />
     <item name="finish_composing" type="id" />
+    <item name="finish_composing_async" type="id" />
     <item name="ime_done" type="id" />
     <item name="ime_go" type="id" />
     <item name="ime_next" type="id" />

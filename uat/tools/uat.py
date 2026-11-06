@@ -1275,12 +1275,18 @@ class Device:
 
     def testbed_state(self):
         """the testbed's native fields on screen: {name: {text, selStart, selEnd, compStart, compEnd,
-        focused, hint, desc}} (its debug build's StateProvider; compStart -1: nothing composing)"""
-        out = self.sh(f"content query --uri content://{TESTBED}.state")
-        i = out.find("json=")
-        if i < 0:
-            raise Blocked(f"输入测试台的状态读不到：{out.strip()[:200]}")
-        return {f["name"]: f for f in json.loads(out[i + 5:].strip())}
+        focused, batch, connections, hint, desc}} (its debug build's StateProvider; compStart -1: nothing
+        composing). Read again while a field is inside the IME's batch edit (batch > 0): half an edit"""
+        for _ in range(10):
+            out = self.sh(f"content query --uri content://{TESTBED}.state")
+            i = out.find("json=")
+            if i < 0:
+                raise Blocked(f"输入测试台的状态读不到：{out.strip()[:200]}")
+            fields = {f["name"]: f for f in json.loads(out[i + 5:].strip())}
+            if not any(f.get("batch", 0) > 0 for f in fields.values()):
+                return fields
+            time.sleep(0.1)
+        raise Blocked("输入测试台：输入法的批量编辑 1 秒还没结束")
 
     def open_page(self, page="text"):
         """the test page showing one field, tapped: the keyboard is up"""

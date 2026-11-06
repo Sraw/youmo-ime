@@ -28,13 +28,13 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        show(intent.getStringExtra(EXTRA_PAGE))
+        show(pageOf(intent))
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        show(intent.getStringExtra(EXTRA_PAGE))
+        show(pageOf(intent))
     }
 
     // singleTask: `am start --es page` reaches the running instance (onNewIntent); a page opened
@@ -46,10 +46,27 @@ class MainActivity : Activity() {
 
     @Deprecated("the list on back, for every API level from 29")
     override fun onBackPressed() {
-        if (intent.getStringExtra(EXTRA_PAGE) != null) open(null) else super.onBackPressed()
+        if (pageOf(intent) != null) open(null) else super.onBackPressed()
     }
 
+    private var leaving: List<() -> Unit> = emptyList()
+
+    /** the page's timers and dialogs gone, before another page and with the activity */
+    private fun leave() {
+        leaving.forEach { it() }
+        leaving = emptyList()
+    }
+
+    override fun onDestroy() {
+        leave()
+        super.onDestroy()
+    }
+
+    // an extra of another type (am start --ei page 1) or one that does not unparcel: the list
+    private fun pageOf(i: Intent?): String? = runCatching { i?.getStringExtra(EXTRA_PAGE) }.getOrNull()
+
     private fun show(name: String?) {
+        leave()
         Fields.live.clear()
         val page = Pages.ALL.find { it.name == name }
         if (page == null) {
@@ -59,7 +76,9 @@ class MainActivity : Activity() {
         val heading = "${page.name} · ${page.title}"
         val log = EventLog(page.name)
         val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(12), dp(8), dp(12), dp(8)) }
-        page.build(PageBuilder(this, column, log))
+        val builder = PageBuilder(this, column, log)
+        leaving = builder.onLeave
+        page.build(builder)
         setPage(heading, withLog(column, log))
     }
 
@@ -77,7 +96,7 @@ class MainActivity : Activity() {
         root.addView(content, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
         if (Build.VERSION.SDK_INT >= EDGE_TO_EDGE_API) {
             root.setOnApplyWindowInsetsListener { v, insets ->
-                val i = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.ime())
+                val i = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.ime() or WindowInsets.Type.displayCutout())
                 v.setPadding(i.left, i.top, i.right, i.bottom)
                 WindowInsets.CONSUMED
             }

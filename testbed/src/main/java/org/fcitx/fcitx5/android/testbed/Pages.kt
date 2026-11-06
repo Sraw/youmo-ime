@@ -73,6 +73,19 @@ class PageBuilder(val activity: Activity, private val column: LinearLayout, val 
     }.also { add(it) }
 
     fun hideKeyboard(v: View) = imm.hideSoftInputFromWindow(v.windowToken, 0)
+
+    /** Run when the page goes (another page, the activity destroyed): its timers stopped */
+    val onLeave = mutableListOf<() -> Unit>()
+
+    /** A main-thread handler whose callbacks die with the page */
+    fun handler(): Handler = Handler(Looper.getMainLooper()).also { h -> onLeave += { h.removeCallbacksAndMessages(null) } }
+
+    /** [d] shown; its field out of the state (Fields) once dismissed */
+    fun show(d: Dialog, field: Stateful) {
+        d.setOnDismissListener { Fields.remove(field) }
+        onLeave += { d.dismiss() }
+        d.show()
+    }
 }
 
 object Pages {
@@ -146,19 +159,30 @@ object Pages {
 
     @SuppressLint("SetTextI18n")
     private fun PageBuilder.behavior() {
-        label("聊天框：点发送或回车就清空")
-        field("chat_clear", "聊天：发送后只 setText(\"\")", ime = EditorInfo.IME_ACTION_SEND) {
+        label("聊天框：点发送或回车就清空（事件记录里 connection 是一次新的 InputConnection，即重启输入）")
+        field("chat_clear", "聊天：发送后 text.clear()，不重启输入", ime = EditorInfo.IME_ACTION_SEND) {
+            onAction = { text.clear(); true }
+        }
+        // API 30+: setText itself restarts the input (Editor.scheduleRestartInputForSetText)
+        field("chat_settext", "聊天：发送后 setText(\"\")（框架自带一次 restartInput）", ime = EditorInfo.IME_ACTION_SEND) {
             onAction = { setText(""); true }
         }
         field("chat_restart", "聊天：发送后 setText(\"\") 再 restartInput", ime = EditorInfo.IME_ACTION_SEND) {
             onAction = { setText(""); imm.restartInput(this); true }
         }
+        field("chat_naive", "粗糙的聊天：回车的按下和抬起各处理一次（清两次）", ime = EditorInfo.IME_ACTION_SEND) {
+            naive = true
+            onAction = { setText(""); true }
+        }
         field("chat_hide", "聊天：发送后清空并收起键盘", ime = EditorInfo.IME_ACTION_SEND) {
-            onAction = { setText(""); hideKeyboard(this); clearFocus(); true }
+            onAction = { text.clear(); hideKeyboard(this); clearFocus(); true }
         }
         label("应用在 composing 时自己提交 / 改写")
-        field("finish_composing", "搜索框：每次变化应用就去掉 composing（finishComposingText）") {
-            addTextChangedListener(afterChange { BaseInputConnection.removeComposingSpans(it) })
+        field("finish_composing", "搜索框：每次变化应用就 clearComposingText()") {
+            addTextChangedListener(afterChange { clearComposingText() })
+        }
+        field("finish_composing_async", "搜索框：每次变化应用 post{} 异步去掉 composing") {
+            addTextChangedListener(afterChange { post { clearComposingText() } })
         }
         field("phone_format", "手机号：应用自动加空格（3-4-4）", InputType.TYPE_CLASS_PHONE) {
             addTextChangedListener(afterChange { s ->
@@ -170,8 +194,9 @@ object Pages {
         }
         field("upper", "输入时应用自动转大写") {
             addTextChangedListener(afterChange { s ->
-                val i = s.indexOfFirst { it.isLowerCase() }
-                if (i >= 0) s.replace(i, i + 1, s[i].uppercase())
+                for (i in s.indices) {
+                    if (s[i].isLowerCase()) s.replace(i, i + 1, s[i].uppercaseChar().toString())
+                }
             })
         }
         timedChanges()
@@ -186,29 +211,31 @@ object Pages {
         label("应用每隔 N 秒改文字或光标")
         val interval = field("interval", "间隔秒数", NUMBER) { setText("$DEFAULT_INTERVAL_S") }
         val timed = field("timed", "应用定时改它：setText 加 # 或 setSelection(0)")
-        val handler = Handler(Looper.getMainLooper())
-        var mode = 0
-        val tick = object : Runnable {
+        fun every() = (interval.text.toString().toLongOrNull() ?: DEFAULT_INTERVAL_S.toLong()).coerceAtLeast(1) * MS
+        timer("定时 setText", every = ::every) {
+            timed.setText("${timed.text}#"); timed.setSelection(timed.length())
+            log.event("timed", "app", JSONObject().put("detail", "setText"))
+        }
+        timer("定时 setSelection(0)", every = ::every) {
+            timed.setSelection(0)
+            log.event("timed", "app", JSONObject().put("detail", "setSelection(0)"))
+        }
+    }
+
+    /** A start/stop button of its own, its own handler */
+    private fun PageBuilder.timer(label: String, every: () -> Long, tick: () -> Unit) {
+        val h = handler()
+        var on = false
+        val r = object : Runnable {
             override fun run() {
-                if (mode == 1) {
-                    timed.setText("${timed.text}#"); timed.setSelection(timed.length())
-                } else {
-                    timed.setSelection(0)
-                }
-                log.event("timed", "app", JSONObject().put("detail", if (mode == 1) "setText" else "setSelection(0)"))
-                handler.postDelayed(this, (interval.text.toString().toLongOrNull() ?: DEFAULT_INTERVAL_S.toLong()) * MS)
+                tick()
+                h.postDelayed(this, every())
             }
         }
-        button("定时 setText：开始") { b ->
-            handler.removeCallbacks(tick)
-            mode = if (mode == 1) 0 else 1
-            b.text = if (mode == 1) "定时 setText：停止" else "定时 setText：开始"
-            if (mode == 1) handler.post(tick)
-        }
-        button("定时 setSelection(0)：开始/停止") {
-            handler.removeCallbacks(tick)
-            mode = if (mode == 2) 0 else 2
-            if (mode == 2) handler.post(tick)
+        button("$label：开始") { b ->
+            on = !on
+            b.text = if (on) "$label：停止" else "$label：开始"
+            if (on) h.post(r) else h.removeCallbacks(r)
         }
     }
 
@@ -220,8 +247,9 @@ object Pages {
             })
         }
         field("null_extracted", "getExtractedText 返回 null") { nullExtracted = true }
-        field("null_before", "getTextBeforeCursor 返回 null") { nullBeforeCursor = true }
-        field("terminal", "TYPE_NULL 原始按键（像终端）", InputType.TYPE_NULL)
+        field("null_before", "光标前读不到：getTextBeforeCursor/getSurroundingText 返回 null，没有初始周围文字") { nullBeforeCursor = true }
+        label("TYPE_NULL 原始按键（像终端，点一下弹键盘）")
+        add(TbTerminal(activity, "terminal", log).apply { id = idOf("terminal"); minimumHeight = activity.dp(TERMINAL_DP) })
         label("两个框共用一个 View id（shared）")
         field("shared_a", "共用 id 的第一个", idName = "shared")
         field("shared_b", "共用 id 的第二个", idName = "shared")
@@ -230,7 +258,7 @@ object Pages {
     private fun PageBuilder.containers() {
         button("打开对话框里的输入框") {
             val e = edit("dialog_field", "对话框里的输入框")
-            AlertDialog.Builder(activity).setTitle("对话框").setView(e).setPositiveButton("关闭", null).show()
+            show(AlertDialog.Builder(activity).setTitle("对话框").setView(e).setPositiveButton("关闭", null).create(), e)
         }
         button("打开底部弹出层里的输入框") {
             val d = Dialog(activity)
@@ -240,7 +268,7 @@ object Pages {
                 setGravity(Gravity.BOTTOM)
                 setLayout(MATCH_PARENT, WRAP_CONTENT)
             }
-            d.show()
+            show(d, e)
         }
         field("landscape_extract", "横屏全屏提取：先把屏幕转横再点（不带 noExtractUi）")
         label("最后一个框在内容最底部，弹出键盘时会被挡住或要页面跟着滚")
@@ -250,6 +278,7 @@ object Pages {
 
     private const val MS = 1000L
     private const val SPACER_DP = 600
+    private const val TERMINAL_DP = 56
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun PageBuilder.webview() {
@@ -271,7 +300,7 @@ object Pages {
     private fun PageBuilder.switching() {
         val a = field("switch_a", "框 A")
         val b = field("switch_b", "框 B")
-        val h = Handler(Looper.getMainLooper())
+        val h = handler()
         button("2 秒后把焦点切到另一个框") {
             h.postDelayed({
                 val to = if (a.isFocused) b else a

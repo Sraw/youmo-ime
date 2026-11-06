@@ -36,7 +36,7 @@
     console.log(JSON.stringify(o));
   }
   document.querySelectorAll('input, textarea, [contenteditable]').forEach(function (el) {
-    ['input', 'focus', 'blur', 'compositionstart', 'compositionend'].forEach(function (e) {
+    ['input', 'focus', 'blur', 'compositionstart', 'compositionend', 'selectionchange', 'select'].forEach(function (e) {
       el.addEventListener(e, function () { log(el, e); });
     });
   });
