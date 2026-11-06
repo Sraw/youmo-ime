@@ -201,7 +201,7 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
     icon restore 933.75,474,962.63,502.88 #ff7a858a
   pressed
     +2 fill rect(925.88,369.38,1072.13,508.13 r=10.5,10.5,10.5,10.5) #1f000000
-key back kind=function role=back a11y="A B C"
+key back kind=function role=back a11y="ABC"
   bounds 0,526.5,162,702
   shape rect(7.88,544.88,154.13,683.63 r=10.5,10.5,10.5,10.5)
   hit rect(0,526.5,162,702)

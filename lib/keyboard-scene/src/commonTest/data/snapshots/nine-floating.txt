@@ -4,7 +4,7 @@ base
 slot nine-side side 0,0,126,447
   shadow rect(7.88,18.38,118.13,431.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
   fill rect(7.88,18.38,118.13,428.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-key 1 kind=letter a11y="，。？！, 1"
+key 1 kind=letter a11y="，。？！，1"
   bounds 126,0,299.25,149
   shape rect(133.88,18.38,291.38,130.63 r=10.5,10.5,10.5,10.5)
   hit rect(126,0,299.25,149)
@@ -20,7 +20,7 @@ key 1 kind=letter a11y="，。？！, 1"
     text "1" 267.07,43.37 system 700 23.8 #ff7a858a
   pressed
     +2 fill rect(133.88,18.38,291.38,130.63 r=10.5,10.5,10.5,10.5) #1f000000
-key 2 kind=letter a11y="A B C, 2"
+key 2 kind=letter a11y="ABC，2"
   bounds 299.25,0,472.5,149
   shape rect(307.13,18.38,464.63,130.63 r=10.5,10.5,10.5,10.5)
   hit rect(299.25,0,472.5,149)
@@ -36,7 +36,7 @@ key 2 kind=letter a11y="A B C, 2"
     text "2" 440.32,43.37 system 700 23.8 #ff7a858a
   pressed
     +2 fill rect(307.13,18.38,464.63,130.63 r=10.5,10.5,10.5,10.5) #1f000000
-key 3 kind=letter a11y="D E F, 3"
+key 3 kind=letter a11y="DEF，3"
   bounds 472.5,0,645.75,149
   shape rect(480.38,18.38,637.88,130.63 r=10.5,10.5,10.5,10.5)
   hit rect(472.5,0,645.75,149)
@@ -67,7 +67,7 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
     icon restore 658.88,99.13,687.75,128 #ff7a858a
   pressed
     +2 fill rect(653.63,18.38,779.63,130.63 r=10.5,10.5,10.5,10.5) #1f000000
-key 4 kind=letter a11y="G H I, 4"
+key 4 kind=letter a11y="GHI，4"
   bounds 126,149,299.25,298
   shape rect(133.88,167.38,291.38,279.63 r=10.5,10.5,10.5,10.5)
   hit rect(126,149,299.25,298)
@@ -83,7 +83,7 @@ key 4 kind=letter a11y="G H I, 4"
     text "4" 267.07,192.37 system 700 23.8 #ff7a858a
   pressed
     +2 fill rect(133.88,167.38,291.38,279.63 r=10.5,10.5,10.5,10.5) #1f000000
-key 5 kind=letter a11y="J K L, 5"
+key 5 kind=letter a11y="JKL，5"
   bounds 299.25,149,472.5,298
   shape rect(307.13,167.38,464.63,279.63 r=10.5,10.5,10.5,10.5)
   hit rect(299.25,149,472.5,298)
@@ -99,7 +99,7 @@ key 5 kind=letter a11y="J K L, 5"
     text "5" 440.32,192.37 system 700 23.8 #ff7a858a
   pressed
     +2 fill rect(307.13,167.38,464.63,279.63 r=10.5,10.5,10.5,10.5) #1f000000
-key 6 kind=letter a11y="M N O, 6"
+key 6 kind=letter a11y="MNO，6"
   bounds 472.5,149,645.75,298
   shape rect(480.38,167.38,637.88,279.63 r=10.5,10.5,10.5,10.5)
   hit rect(472.5,149,645.75,298)
@@ -129,7 +129,7 @@ key reset kind=function role=reset a11y="重输"
     text "重输" 680.63,236.89 system 400 35.7 #ff7a858a
   pressed
     +2 fill rect(653.63,167.38,779.63,279.63 r=10.5,10.5,10.5,10.5) #1f000000
-key 7 kind=letter a11y="P Q R S, 7"
+key 7 kind=letter a11y="PQRS，7"
   bounds 126,298,299.25,447
   shape rect(133.88,316.38,291.38,428.63 r=10.5,10.5,10.5,10.5)
   hit rect(126,298,299.25,447)
@@ -145,7 +145,7 @@ key 7 kind=letter a11y="P Q R S, 7"
     text "7" 267.07,341.37 system 700 23.8 #ff7a858a
   pressed
     +2 fill rect(133.88,316.38,291.38,428.63 r=10.5,10.5,10.5,10.5) #1f000000
-key 8 kind=letter a11y="T U V, 8"
+key 8 kind=letter a11y="TUV，8"
   bounds 299.25,298,472.5,447
   shape rect(307.13,316.38,464.63,428.63 r=10.5,10.5,10.5,10.5)
   hit rect(299.25,298,472.5,447)
@@ -161,7 +161,7 @@ key 8 kind=letter a11y="T U V, 8"
     text "8" 440.32,341.37 system 700 23.8 #ff7a858a
   pressed
     +2 fill rect(307.13,316.38,464.63,428.63 r=10.5,10.5,10.5,10.5) #1f000000
-key 9 kind=letter a11y="W X Y Z, 9"
+key 9 kind=letter a11y="WXYZ，9"
   bounds 472.5,298,645.75,447
   shape rect(480.38,316.38,637.88,428.63 r=10.5,10.5,10.5,10.5)
   hit rect(472.5,298,645.75,447)
@@ -219,7 +219,7 @@ key numbers kind=function role=numbers a11y="123"
     text "123" 147.13,534.89 system 700 35.7 #ff7a858a
   pressed
     +2 fill rect(133.88,465.38,228.38,577.63 r=10.5,10.5,10.5,10.5) #1f000000
-key space kind=space role=space a11y="拼音"
+key space kind=space role=space a11y="空格，拼音"
   bounds 236.25,447,567,596
   shape rect(244.13,465.38,559.13,577.63 r=10.5,10.5,10.5,10.5)
   hit rect(236.25,447,567,596)

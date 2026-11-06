@@ -5,8 +5,10 @@
 package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
+import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
+import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
 import kotlin.test.Test
@@ -46,7 +48,7 @@ class SceneBuilderTest {
             "<row><key id=\"l\" label=\"l\" send=\"commit:l\" when=\"split-side=left\"/>" +
                 "<key id=\"r\" label=\"r\" send=\"commit:r\" when=\"split-side=right\"/><key id=\"x\" label=\"x\" send=\"commit:x\"/></row>",
         )
-        fun ids(env: org.fcitx.fcitx5.android.scene.engine.Env) = Fixtures.scene(env, sided).keys.map { it.id }
+        fun ids(env: Env) = Fixtures.scene(env, sided).keys.map { it.id }
         assertEquals(listOf("r", "x"), ids(Fixtures.landscape))
         assertEquals(listOf("l", "x"), ids(Fixtures.landscape.copy(dock = SplitKeyboard.Dock.LEFT)))
         assertEquals(listOf("x"), ids(Fixtures.portrait))
@@ -62,23 +64,51 @@ class SceneBuilderTest {
         assertTrue(built.problems.single().message.contains("IllegalStateException"), "${built.problems}")
     }
 
+    // round 3: read as theme 3.0 read them, the space with the input method's name, a label spelt only on a group key
+    @Test
+    fun keysAreReadAsTheyWere() {
+        fun keys(board: String, env: Env = Forms.env(board, Forms.block)) = Forms.scene(board, env).keys.associateBy { it.id }
+        val rime = Forms.block.copy(texts = Forms.texts.copy(imeName = "Rime"))
+        for (board in listOf("qwerty", "nine", "k14", "zhuyin", "handwriting")) {
+            assertEquals("空格，${Forms.env(board, Forms.block).texts.imeName}", keys(board).getValue("space").a11y, board)
+            val named = Forms.env(board, rime).let { it.copy(texts = it.texts.copy(imeName = "Rime")) }
+            assertEquals("空格，Rime", keys(board, named).getValue("space").a11y, "$board: a Latin name is not spelt")
+        }
+        assertEquals("ABC，2", keys("nine").getValue("2").a11y)
+        assertEquals("ABC", keys("number").getValue("back").a11y)
+        assertEquals("a，@", keys("qwerty").getValue("a").a11y)
+        // the app's strings as given: the default ones English's
+        val english = Forms.block.copy(texts = Texts(imeName = "English"))
+        assertEquals("Space, English", keys("qwerty", english).getValue("space").a11y)
+        assertEquals("Q W, 1", keys("k14", english).getValue("r1c1").a11y)
+        // what is no group key reads as written, letters or not
+        val plain = board(
+            "symbols",
+            "<row><key id=\"fn\" label=\"Fn\" send=\"commit:x\"/><key id=\"tab\" label=\"Tab\" alt=\"⇥\" send=\"sym:Tab\"/>" +
+                "<key id=\"g\" label=\"go\" send=\"action:group\"/></row>",
+        )
+        val read = Fixtures.scene(Fixtures.portrait, plain).keys.associate { it.id to it.a11y }
+        assertEquals(mapOf("fn" to "Fn", "tab" to "Tab, ⇥", "g" to "G O"), read)
+    }
+
     // review L-5, M-4: the reading made where none is written, and what the app works a key by
     @Test
     fun aKeyCarriesItsReadingAndWhatItDoes() {
         val k14 = Forms.scene("k14", Forms.env("k14", Forms.block)).keys.associateBy { it.id }
         val qw = k14.getValue("r1c1")
-        assertEquals("Q W, 1", qw.a11y)
+        assertEquals("Q W，1", qw.a11y, "GroupedKeyboard's a11y_key_grouped, in Chinese")
         assertEquals("QW", qw.label)
         assertEquals("1", qw.alt)
         assertEquals("group", qw.popup?.from)
         assertEquals("g14/qw", qw.shortcut)
         val zx = k14.getValue("r3c1")
-        assertEquals("Z X, ～", zx.a11y, "the corner as shown, Chinese punctuation's")
+        assertEquals("Z X，～", zx.a11y, "the corner as shown, Chinese punctuation's")
         assertEquals("～", zx.alt)
         assertEquals("{punct:~}", zx.altRaw)
         val semicolon = Forms.env("k18", Forms.block).let { it.copy(input = it.input.copy(ime = "shuangpin", schemeTypes = setOf("semicolon"))) }
-        assertEquals("L ;, -", Forms.scene("k18", semicolon).keys.single { it.label == "L;" }.a11y)
+        assertEquals("L ;，-", Forms.scene("k18", semicolon).keys.single { it.label == "L;" }.a11y)
         val space = Forms.scene("symbols", Forms.env("symbols", Forms.block)).keys.single { it.role == "space" }
+        assertEquals("a11y_key_space", space.a11y, "the panel's, as written")
         assertEquals("space-long-press", space.actions["long-press"])
         assertEquals("space", space.sound)
         assertNull(space.label?.takeIf { it.isNotBlank() }, "no input method's name on the panel's space")

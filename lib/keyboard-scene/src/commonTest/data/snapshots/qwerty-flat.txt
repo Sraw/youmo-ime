@@ -1,7 +1,7 @@
 scene 1080x702
 base
   fill rect(0,0,1080,702) #ffeceff1
-key q kind=letter a11y="q, 1"
+key q kind=letter a11y="q，1"
   bounds 0,0,108,175.5
   shape rect(7.88,18.38,100.13,157.13)
   hit rect(0,0,108,175.5)
@@ -14,7 +14,7 @@ key q kind=letter a11y="q, 1"
     text "1" 73.38,47.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(7.88,18.38,100.13,157.13) #1f000000
-key w kind=letter a11y="w, 2"
+key w kind=letter a11y="w，2"
   bounds 108,0,216,175.5
   shape rect(115.88,18.38,208.13,157.13)
   hit rect(108,0,216,175.5)
@@ -27,7 +27,7 @@ key w kind=letter a11y="w, 2"
     text "2" 181.38,47.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(115.88,18.38,208.13,157.13) #1f000000
-key e kind=letter a11y="e, 3"
+key e kind=letter a11y="e，3"
   bounds 216,0,324,175.5
   shape rect(223.88,18.38,316.13,157.13)
   hit rect(216,0,324,175.5)
@@ -40,7 +40,7 @@ key e kind=letter a11y="e, 3"
     text "3" 289.38,47.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(223.88,18.38,316.13,157.13) #1f000000
-key r kind=letter a11y="r, 4"
+key r kind=letter a11y="r，4"
   bounds 324,0,432,175.5
   shape rect(331.88,18.38,424.13,157.13)
   hit rect(324,0,432,175.5)
@@ -53,7 +53,7 @@ key r kind=letter a11y="r, 4"
     text "4" 397.38,47.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(331.88,18.38,424.13,157.13) #1f000000
-key t kind=letter a11y="t, 5"
+key t kind=letter a11y="t，5"
   bounds 432,0,540,175.5
   shape rect(439.88,18.38,532.13,157.13)
   hit rect(432,0,540,175.5)
@@ -66,7 +66,7 @@ key t kind=letter a11y="t, 5"
     text "5" 505.38,47.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(439.88,18.38,532.13,157.13) #1f000000
-key y kind=letter a11y="y, 6"
+key y kind=letter a11y="y，6"
   bounds 540,0,648,175.5
   shape rect(547.88,18.38,640.13,157.13)
   hit rect(540,0,648,175.5)
@@ -80,7 +80,7 @@ key y kind=letter a11y="y, 6"
     text "6" 613.38,47.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(547.88,18.38,640.13,157.13) #1f000000
-key u kind=letter a11y="u, 7"
+key u kind=letter a11y="u，7"
   bounds 648,0,756,175.5
   shape rect(655.88,18.38,748.13,157.13)
   hit rect(648,0,756,175.5)
@@ -93,7 +93,7 @@ key u kind=letter a11y="u, 7"
     text "7" 721.38,47.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(655.88,18.38,748.13,157.13) #1f000000
-key i kind=letter a11y="i, 8"
+key i kind=letter a11y="i，8"
   bounds 756,0,864,175.5
   shape rect(763.88,18.38,856.13,157.13)
   hit rect(756,0,864,175.5)
@@ -106,7 +106,7 @@ key i kind=letter a11y="i, 8"
     text "8" 829.38,47.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(763.88,18.38,856.13,157.13) #1f000000
-key o kind=letter a11y="o, 9"
+key o kind=letter a11y="o，9"
   bounds 864,0,972,175.5
   shape rect(871.88,18.38,964.13,157.13)
   hit rect(864,0,972,175.5)
@@ -119,7 +119,7 @@ key o kind=letter a11y="o, 9"
     text "9" 937.38,47.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(871.88,18.38,964.13,157.13) #1f000000
-key p kind=letter a11y="p, 0"
+key p kind=letter a11y="p，0"
   bounds 972,0,1080,175.5
   shape rect(979.88,18.38,1072.13,157.13)
   hit rect(972,0,1080,175.5)
@@ -132,7 +132,7 @@ key p kind=letter a11y="p, 0"
     text "0" 1045.38,47.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(979.88,18.38,1072.13,157.13) #1f000000
-key a kind=letter a11y="a, @"
+key a kind=letter a11y="a，@"
   bounds 54,175.5,162,351
   shape rect(61.88,193.88,154.13,332.63)
   hit rect(0,175.5,162,351)
@@ -146,7 +146,7 @@ key a kind=letter a11y="a, @"
     text "@" 127.38,223.28 system 700 28 #ff7a858a
   pressed
     +0 fill rect(61.88,193.88,154.13,332.63) #1f000000
-key s kind=letter a11y="s, *"
+key s kind=letter a11y="s，*"
   bounds 162,175.5,270,351
   shape rect(169.88,193.88,262.13,332.63)
   hit rect(162,175.5,270,351)
@@ -159,7 +159,7 @@ key s kind=letter a11y="s, *"
     text "*" 235.38,223.28 system 700 28 #ff7a858a
   pressed
     +0 fill rect(169.88,193.88,262.13,332.63) #1f000000
-key d kind=letter a11y="d, +"
+key d kind=letter a11y="d，+"
   bounds 270,175.5,378,351
   shape rect(277.88,193.88,370.13,332.63)
   hit rect(270,175.5,378,351)
@@ -172,7 +172,7 @@ key d kind=letter a11y="d, +"
     text "+" 343.38,223.28 system 700 28 #ff7a858a
   pressed
     +0 fill rect(277.88,193.88,370.13,332.63) #1f000000
-key f kind=letter a11y="f, -"
+key f kind=letter a11y="f，-"
   bounds 378,175.5,486,351
   shape rect(385.88,193.88,478.13,332.63)
   hit rect(378,175.5,486,351)
@@ -185,7 +185,7 @@ key f kind=letter a11y="f, -"
     text "-" 451.38,223.28 system 700 28 #ff7a858a
   pressed
     +0 fill rect(385.88,193.88,478.13,332.63) #1f000000
-key g kind=letter a11y="g, ="
+key g kind=letter a11y="g，="
   bounds 486,175.5,594,351
   shape rect(493.88,193.88,586.13,332.63)
   hit rect(486,175.5,594,351)
@@ -198,7 +198,7 @@ key g kind=letter a11y="g, ="
     text "=" 559.38,223.28 system 700 28 #ff7a858a
   pressed
     +0 fill rect(493.88,193.88,586.13,332.63) #1f000000
-key h kind=letter a11y="h, /"
+key h kind=letter a11y="h，/"
   bounds 594,175.5,702,351
   shape rect(601.88,193.88,694.13,332.63)
   hit rect(594,175.5,702,351)
@@ -211,7 +211,7 @@ key h kind=letter a11y="h, /"
     text "/" 667.38,223.28 system 700 28 #ff7a858a
   pressed
     +0 fill rect(601.88,193.88,694.13,332.63) #1f000000
-key j kind=letter a11y="j, #"
+key j kind=letter a11y="j，#"
   bounds 702,175.5,810,351
   shape rect(709.88,193.88,802.13,332.63)
   hit rect(702,175.5,810,351)
@@ -224,7 +224,7 @@ key j kind=letter a11y="j, #"
     text "#" 775.38,223.28 system 700 28 #ff7a858a
   pressed
     +0 fill rect(709.88,193.88,802.13,332.63) #1f000000
-key k kind=letter a11y="k, ("
+key k kind=letter a11y="k，("
   bounds 810,175.5,918,351
   shape rect(817.88,193.88,910.13,332.63)
   hit rect(810,175.5,918,351)
@@ -237,7 +237,7 @@ key k kind=letter a11y="k, ("
     text "(" 883.38,223.28 system 700 28 #ff7a858a
   pressed
     +0 fill rect(817.88,193.88,910.13,332.63) #1f000000
-key l kind=letter a11y="l, )"
+key l kind=letter a11y="l，)"
   bounds 918,175.5,1026,351
   shape rect(925.88,193.88,1018.13,332.63)
   hit rect(918,175.5,1080,351)
@@ -261,7 +261,7 @@ key shift kind=function role=shift a11y="a11y_key_shift"
     icon shift 49.5,407.25,112.5,470.25 #ff7a858a
   pressed
     +0 fill rect(7.88,369.38,154.13,508.13) #1f000000
-key z kind=letter a11y="z, '"
+key z kind=letter a11y="z，'"
   bounds 162,351,270,526.5
   shape rect(169.88,369.38,262.13,508.13)
   hit rect(162,351,270,526.5)
@@ -275,7 +275,7 @@ key z kind=letter a11y="z, '"
     text "'" 235.38,398.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(169.88,369.38,262.13,508.13) #1f000000
-key x kind=letter a11y="x, :"
+key x kind=letter a11y="x，:"
   bounds 270,351,378,526.5
   shape rect(277.88,369.38,370.13,508.13)
   hit rect(270,351,378,526.5)
@@ -289,7 +289,7 @@ key x kind=letter a11y="x, :"
     text ":" 343.38,398.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(277.88,369.38,370.13,508.13) #1f000000
-key c kind=letter a11y="c, \""
+key c kind=letter a11y="c，\""
   bounds 378,351,486,526.5
   shape rect(385.88,369.38,478.13,508.13)
   hit rect(378,351,486,526.5)
@@ -303,7 +303,7 @@ key c kind=letter a11y="c, \""
     text "\"" 451.38,398.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(385.88,369.38,478.13,508.13) #1f000000
-key v kind=letter a11y="v, ?"
+key v kind=letter a11y="v，?"
   bounds 486,351,594,526.5
   shape rect(493.88,369.38,586.13,508.13)
   hit rect(486,351,594,526.5)
@@ -317,7 +317,7 @@ key v kind=letter a11y="v, ?"
     text "?" 559.38,398.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(493.88,369.38,586.13,508.13) #1f000000
-key b kind=letter a11y="b, !"
+key b kind=letter a11y="b，!"
   bounds 594,351,702,526.5
   shape rect(601.88,369.38,694.13,508.13)
   hit rect(594,351,702,526.5)
@@ -330,7 +330,7 @@ key b kind=letter a11y="b, !"
     text "!" 667.38,398.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(601.88,369.38,694.13,508.13) #1f000000
-key n kind=letter a11y="n, ~"
+key n kind=letter a11y="n，~"
   bounds 702,351,810,526.5
   shape rect(709.88,369.38,802.13,508.13)
   hit rect(702,351,810,526.5)
@@ -343,7 +343,7 @@ key n kind=letter a11y="n, ~"
     text "~" 775.38,398.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(709.88,369.38,802.13,508.13) #1f000000
-key m kind=letter a11y="m, \\"
+key m kind=letter a11y="m，\\"
   bounds 810,351,918,526.5
   shape rect(817.88,369.38,910.13,508.13)
   hit rect(810,351,918,526.5)
@@ -405,7 +405,7 @@ key comma kind=function role=comma a11y="，"
     text "，" 283.01,636.89 system 400 60.38 #ff7a858a
   pressed
     +0 fill rect(267.08,544.88,359.33,683.63) #1f000000
-key space kind=space role=space a11y="拼音"
+key space kind=space role=space a11y="空格，拼音"
   bounds 367.2,526.5,702,702
   shape rect(393.45,568.5,675.75,660 r=7.88,7.88,7.88,7.88)
   hit rect(367.2,526.5,702,702)

@@ -336,7 +336,7 @@ key comma kind=function role=comma a11y="，"
     text "，" 286.03,441.58 system 400 54.34 #ff7a858a
   pressed
     +2 fill rect(267.08,392.78,359.33,449.63 r=10.5,10.5,10.5,10.5) #1f000000
-key space kind=space role=space a11y="注音"
+key space kind=space role=space a11y="空格，注音"
   bounds 367.2,374.4,702,468
   shape rect(375.08,392.78,694.13,449.63 r=10.5,10.5,10.5,10.5)
   hit rect(367.2,374.4,702,468)

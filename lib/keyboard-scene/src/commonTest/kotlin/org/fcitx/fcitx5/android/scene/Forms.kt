@@ -43,12 +43,15 @@ object Forms {
 
     private val portraitHeight = (SCREEN_LONG * UPRIGHT).toInt().toDouble()
 
-    /** The texts the app gives a pinyin keyboard: Chinese punctuation, its name on the space. */
+    /** The texts the app gives a pinyin keyboard in Chinese: Chinese punctuation, its name on the space, the screen reader's. */
     val texts = Texts(
         imeName = "拼音", comma = "，", period = "。", returnLabel = "换行", returnIcon = "enter",
         punctuation = mapOf(
             "," to "，", "." to "。", "?" to "？", "!" to "！", "~" to "～", ":" to "：", "(" to "（", ")" to "）",
         ),
+        // values-zh-rCN's a11y_key_grouped and a11y_key_space_with_ime
+        a11yGrouped = "%1\$s，%2\$s",
+        a11ySpace = "空格，%1\$s",
     )
 
     private val base = Env(SCREEN_SHORT, portraitHeight, DENSITY, input = Input(langKey = true), texts = texts)

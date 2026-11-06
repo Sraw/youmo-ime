@@ -129,27 +129,33 @@ object Expand {
             key, attrs, label, alt,
             attrs.icon?.let { icon(it, env) },
             attrs.badge?.let { icon(it, env) },
-            attrs.a11y?.let { text(it, env) } ?: spoken(label, alt),
+            attrs.a11y?.let { text(it, env) } ?: spoken(attrs, label, alt, env.texts),
             attrs.alt?.let(::written),
         )
     }
 
     /**
-     * What a screen reader says of a key the layout gives no a11y: its label, spelt out where it is
-     * letters (a group's `QW` as "Q W", `L;` as "L ;", as TalkBack read the old group keys), then its
-     * alt as shown ("Q W, 1").
+     * What a screen reader says of a key the layout gives no a11y, as theme 3.0's keys said it: the
+     * space with the input method's name ([Texts.a11ySpace], BaseKeyboard's a11y_key_space_with_ime:
+     * TalkBack reads the description, not the name drawn); a group key's letters one by one in
+     * capitals, a `;` kept (GroupedKeyboard's "Q W", "L ;": TalkBack read the face "QW" as a word),
+     * any other label as it is (Rime, Fn, ABC); then the alt as shown ([Texts.a11yGrouped]'s
+     * a11y_key_grouped: "Q W, 1", "ABC, 2", in Chinese with a full-width comma).
      */
-    fun spoken(label: String?, alt: String?): String {
-        val said = label?.let { if (SPELT.matches(it)) it.uppercase().toList().joinToString(" ") else it }.orEmpty()
+    fun spoken(attrs: KeyAttrs, label: String?, alt: String?, texts: Texts): String {
+        if (attrs.role == SPACE && !label.isNullOrEmpty()) return texts.a11ySpace.replace(ARG1, label)
+        val said = label?.let { if (attrs.actions["send"] == GROUP) it.uppercase().toList().joinToString(" ") else it }.orEmpty()
         return when {
             alt == null -> said
             said.isEmpty() -> alt
-            else -> "$said, $alt"
+            else -> texts.a11yGrouped.replace(ARG1, said).replace(ARG2, alt)
         }
     }
 
-    // two letters or more, maybe a sign among them (L;), from a letter: not .com, not 123
-    private val SPELT = Regex("[A-Za-z][A-Za-z;',./]+")
+    private const val SPACE = "space"
+    private const val GROUP = "action:group"
+    private const val ARG1 = "%1\$s"
+    private const val ARG2 = "%2\$s"
 
     private fun written(t: Text): String = when (t) {
         is Text.Literal -> t.text

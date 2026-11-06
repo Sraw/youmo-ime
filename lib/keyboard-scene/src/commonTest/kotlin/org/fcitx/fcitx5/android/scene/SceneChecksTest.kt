@@ -24,18 +24,19 @@ class SceneChecksTest {
 
     @Test
     fun theTextsOfAKeyKeepApart() = expectNone { shot, k ->
-        val boxes = contents(k)
+        val boxes = contents(shot, k)
         boxes.indices.flatMap { i -> (i + 1 until boxes.size).map { i to it } }
-            .filter { (i, j) -> overlap(boxes[i].second, boxes[j].second) > AREA }
-            .map { (i, j) -> "${shot.name} ${k.id}: ${boxes[i].first} and ${boxes[j].first} meet" }
+            .filter { (i, j) -> overlap(boxes[i].box, boxes[j].box) > AREA }
+            .map { (i, j) -> "${shot.name} ${k.id}: ${boxes[i].what} and ${boxes[j].what} meet" }
     }
 
     // within the face, or for the known exceptions ([leeway]) within the key's cell
     @Test
     fun theTextsOfAKeyKeepToItsFace() = expectNone { shot, k ->
-        contents(k).mapNotNull { (what, b) ->
-            val within = if (leeway(shot, k, b) != null) k.bounds else k.shape.bounds
-            "${shot.name} ${k.id}: $what ${SceneText.box(b)} out of ${SceneText.box(within)}".takeUnless { inside(b, within) }
+        val all = contents(shot, k)
+        all.mapNotNull { c ->
+            val within = if (leeway(shot, k, c, all) != null) k.bounds else k.shape.bounds
+            "${shot.name} ${k.id}: ${c.what} ${SceneText.box(c.box)} out of ${SceneText.box(within)}".takeUnless { inside(c.box, within) }
         }
     }
 
@@ -43,22 +44,27 @@ class SceneChecksTest {
     @Test
     fun theFaceExceptionsAreStillMet() {
         val met = Shots.all.flatMap { shot ->
-            shot.scene.keys.flatMap { k -> contents(k).filter { (_, b) -> !inside(b, k.shape.bounds) }.mapNotNull { (_, b) -> leeway(shot, k, b) } }
+            shot.scene.keys.flatMap { k ->
+                val all = contents(shot, k)
+                all.filter { !inside(it.box, k.shape.bounds) }.mapNotNull { leeway(shot, k, it, all) }
+            }
         }.toSet()
         assertEquals(setOf(FLAT_SPACE, ICON_ON_COMPACT), met)
     }
 
     /**
-     * Why [box] may leave [k]'s face, kept to its cell instead, or null:
+     * Why [c] may leave [k]'s face, kept to its cell instead, or null:
      * - [FLAT_SPACE]: flat, the space's face is a pill inset in the key (theme 3.0's InsetDrawable),
      *   its marks placed in the whole key as KeyView's appearance has them, so the edit menu's mark
-     *   sits across the pill's corner;
-     * - [ICON_ON_COMPACT]: an icon alone is drawn at its own 24 dp (ImageKeyView's wrap_content), taller
-     *   than a compact key's face (⌫, 🌐, ↵ on the boards whose rows are four to the height).
+     *   sits across the pill's corner; its marks only, never its label;
+     * - [ICON_ON_COMPACT]: a key's icon, on a key with no text ([all]; marks of icons beside it), at its own 24 dp
+     *   (ImageKeyView's wrap_content), taller than a compact key's face (⌫, 🌐, ↵ on the boards whose
+     *   rows are four to the height).
      */
-    private fun leeway(shot: Shot, k: KeyNode, box: Box): String? = when {
-        shot.env.flat && k.kind == "space" -> FLAT_SPACE
-        shot.env.compact && kotlin.math.abs(box.height - ICON_DP * shot.env.density) < EDGE -> ICON_ON_COMPACT
+    private fun leeway(shot: Shot, k: KeyNode, c: Drawn, all: List<Drawn>): String? = when {
+        shot.env.flat && k.kind == "space" && c.part == Part.MARK -> FLAT_SPACE
+        shot.env.compact && c.part == Part.ICON && all.none { it.text } &&
+            kotlin.math.abs(c.box.height - ICON_DP * shot.env.density) < EDGE -> ICON_ON_COMPACT
         else -> null
     }
 
@@ -111,14 +117,24 @@ class SceneChecksTest {
         assertTrue(found.isEmpty(), found.joinToString("\n"))
     }
 
-    // what a key's drawing puts on it, each text's ink as the measurer has it and each icon's box
-    private fun contents(k: KeyNode): List<Pair<String, Box>> = k.ops(pressed = false).mapNotNull { op ->
+    private enum class Part { LABEL, MARK, ICON }
+
+    private class Drawn(val what: String, val box: Box, val part: Part, val text: Boolean = false)
+
+    // what a key's drawing puts on it, each text's ink as the measurer has it and each icon's box: the
+    // label, a mark (any other text; an icon at a shortcut's 11 dp, 8 compact) or an icon (glyph, badge)
+    private fun contents(shot: Shot, k: KeyNode): List<Drawn> = k.ops(pressed = false).mapNotNull { op ->
         when (op) {
             is Op.Text -> {
                 val ink = FakeMeasurer.measure(op.text, op.font, op.weight, op.size).ink
-                "\"${op.text}\"" to Box(op.x + ink.left * op.scaleX, op.baseline + ink.top, op.x + ink.right * op.scaleX, op.baseline + ink.bottom)
+                val box = Box(op.x + ink.left * op.scaleX, op.baseline + ink.top, op.x + ink.right * op.scaleX, op.baseline + ink.bottom)
+                Drawn("\"${op.text}\"", box, if (op.text == k.label) Part.LABEL else Part.MARK, text = true)
             }
-            is Op.Icon -> "icon ${op.name}" to op.box
+            is Op.Icon -> {
+                val dp = if (shot.env.compact) SHORTCUT_ICON_COMPACT_DP else SHORTCUT_ICON_DP
+                val mark = kotlin.math.abs(op.box.height - dp * shot.env.density) < EDGE
+                Drawn("icon ${op.name}", op.box, if (mark) Part.MARK else Part.ICON)
+            }
             else -> null
         }
     }
@@ -130,6 +146,8 @@ class SceneChecksTest {
         const val AREA = 1e-4
         const val EDGE = 0.01
         const val ICON_DP = 24.0
+        const val SHORTCUT_ICON_DP = 11.0
+        const val SHORTCUT_ICON_COMPACT_DP = 8.0
         const val FLAT_SPACE = "flat space: marks by the key, not its inset pill"
         const val ICON_ON_COMPACT = "an icon alone at its own 24 dp on a compact key"
     }

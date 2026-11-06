@@ -2,7 +2,7 @@ scene 2340x529 board 1358.25,0,2340,529
 base
   fill rect(0,0,2340,529) #ffeceff1
 slot side-buttons 0,0,1358.25,529
-key r1c1 kind=letter a11y="Q, 1"
+key r1c1 kind=letter a11y="Q，1"
   bounds 1358.25,0,1498.5,132.25
   shape rect(1366.13,10.5,1490.63,121.75 r=10.5,10.5,10.5,10.5)
   hit rect(1358.25,0,1498.5,132.25)
@@ -18,7 +18,7 @@ key r1c1 kind=letter a11y="Q, 1"
     text "1" 1463.88,39.9 system 700 28 #ff7a858a
   pressed
     +2 fill rect(1366.13,10.5,1490.63,121.75 r=10.5,10.5,10.5,10.5) #1f000000
-key r1c2 kind=letter a11y="W E, 2"
+key r1c2 kind=letter a11y="W E，2"
   bounds 1498.5,0,1638.75,132.25
   shape rect(1506.38,10.5,1630.88,121.75 r=10.5,10.5,10.5,10.5)
   hit rect(1498.5,0,1638.75,132.25)
@@ -34,7 +34,7 @@ key r1c2 kind=letter a11y="W E, 2"
     text "2" 1604.13,39.9 system 700 28 #ff7a858a
   pressed
     +2 fill rect(1506.38,10.5,1630.88,121.75 r=10.5,10.5,10.5,10.5) #1f000000
-key r1c3 kind=letter a11y="R T, 3"
+key r1c3 kind=letter a11y="R T，3"
   bounds 1638.75,0,1779,132.25
   shape rect(1646.63,10.5,1771.13,121.75 r=10.5,10.5,10.5,10.5)
   hit rect(1638.75,0,1779,132.25)
@@ -50,7 +50,7 @@ key r1c3 kind=letter a11y="R T, 3"
     text "3" 1744.38,39.9 system 700 28 #ff7a858a
   pressed
     +2 fill rect(1646.63,10.5,1771.13,121.75 r=10.5,10.5,10.5,10.5) #1f000000
-key r1c4 kind=letter a11y="Y, 4"
+key r1c4 kind=letter a11y="Y，4"
   bounds 1779,0,1919.25,132.25
   shape rect(1786.88,10.5,1911.38,121.75 r=10.5,10.5,10.5,10.5)
   hit rect(1779,0,1919.25,132.25)
@@ -66,7 +66,7 @@ key r1c4 kind=letter a11y="Y, 4"
     text "4" 1884.63,39.9 system 700 28 #ff7a858a
   pressed
     +2 fill rect(1786.88,10.5,1911.38,121.75 r=10.5,10.5,10.5,10.5) #1f000000
-key r1c5 kind=letter a11y="U, 5"
+key r1c5 kind=letter a11y="U，5"
   bounds 1919.25,0,2059.5,132.25
   shape rect(1927.13,10.5,2051.63,121.75 r=10.5,10.5,10.5,10.5)
   hit rect(1919.25,0,2059.5,132.25)
@@ -82,7 +82,7 @@ key r1c5 kind=letter a11y="U, 5"
     text "5" 2024.88,39.9 system 700 28 #ff7a858a
   pressed
     +2 fill rect(1927.13,10.5,2051.63,121.75 r=10.5,10.5,10.5,10.5) #1f000000
-key r1c6 kind=letter a11y="I O, 6"
+key r1c6 kind=letter a11y="I O，6"
   bounds 2059.5,0,2199.75,132.25
   shape rect(2067.38,10.5,2191.88,121.75 r=10.5,10.5,10.5,10.5)
   hit rect(2059.5,0,2199.75,132.25)
@@ -98,7 +98,7 @@ key r1c6 kind=letter a11y="I O, 6"
     text "6" 2165.13,39.9 system 700 28 #ff7a858a
   pressed
     +2 fill rect(2067.38,10.5,2191.88,121.75 r=10.5,10.5,10.5,10.5) #1f000000
-key r1c7 kind=letter a11y="P, 7"
+key r1c7 kind=letter a11y="P，7"
   bounds 2199.75,0,2340,132.25
   shape rect(2207.63,10.5,2332.13,121.75 r=10.5,10.5,10.5,10.5)
   hit rect(2199.75,0,2340,132.25)
@@ -114,7 +114,7 @@ key r1c7 kind=letter a11y="P, 7"
     text "7" 2305.38,39.9 system 700 28 #ff7a858a
   pressed
     +2 fill rect(2207.63,10.5,2332.13,121.75 r=10.5,10.5,10.5,10.5) #1f000000
-key r2c1 kind=letter a11y="A, 8"
+key r2c1 kind=letter a11y="A，8"
   bounds 1358.25,132.25,1521.88,264.5
   shape rect(1366.13,142.75,1514,254 r=10.5,10.5,10.5,10.5)
   hit rect(1358.25,132.25,1521.88,264.5)
@@ -130,7 +130,7 @@ key r2c1 kind=letter a11y="A, 8"
     text "8" 1487.26,172.15 system 700 28 #ff7a858a
   pressed
     +2 fill rect(1366.13,142.75,1514,254 r=10.5,10.5,10.5,10.5) #1f000000
-key r2c2 kind=letter a11y="S D, 9"
+key r2c2 kind=letter a11y="S D，9"
   bounds 1521.88,132.25,1685.5,264.5
   shape rect(1529.75,142.75,1677.63,254 r=10.5,10.5,10.5,10.5)
   hit rect(1521.88,132.25,1685.5,264.5)
@@ -146,7 +146,7 @@ key r2c2 kind=letter a11y="S D, 9"
     text "9" 1650.88,172.15 system 700 28 #ff7a858a
   pressed
     +2 fill rect(1529.75,142.75,1677.63,254 r=10.5,10.5,10.5,10.5) #1f000000
-key r2c3 kind=letter a11y="F G, 0"
+key r2c3 kind=letter a11y="F G，0"
   bounds 1685.5,132.25,1849.13,264.5
   shape rect(1693.38,142.75,1841.25,254 r=10.5,10.5,10.5,10.5)
   hit rect(1685.5,132.25,1849.13,264.5)
@@ -162,7 +162,7 @@ key r2c3 kind=letter a11y="F G, 0"
     text "0" 1814.51,172.15 system 700 28 #ff7a858a
   pressed
     +2 fill rect(1693.38,142.75,1841.25,254 r=10.5,10.5,10.5,10.5) #1f000000
-key r2c4 kind=letter a11y="H, （"
+key r2c4 kind=letter a11y="H，（"
   bounds 1849.13,132.25,2012.75,264.5
   shape rect(1857,142.75,2004.88,254 r=10.5,10.5,10.5,10.5)
   hit rect(1849.13,132.25,2012.75,264.5)
@@ -178,7 +178,7 @@ key r2c4 kind=letter a11y="H, （"
     text "（" 1966.37,172.15 system 700 28 #ff7a858a
   pressed
     +2 fill rect(1857,142.75,2004.88,254 r=10.5,10.5,10.5,10.5) #1f000000
-key r2c5 kind=letter a11y="J K, ）"
+key r2c5 kind=letter a11y="J K，）"
   bounds 2012.75,132.25,2176.38,264.5
   shape rect(2020.63,142.75,2168.5,254 r=10.5,10.5,10.5,10.5)
   hit rect(2012.75,132.25,2176.38,264.5)
@@ -194,7 +194,7 @@ key r2c5 kind=letter a11y="J K, ）"
     text "）" 2130,172.15 system 700 28 #ff7a858a
   pressed
     +2 fill rect(2020.63,142.75,2168.5,254 r=10.5,10.5,10.5,10.5) #1f000000
-key r2c6 kind=letter a11y="L, -"
+key r2c6 kind=letter a11y="L，-"
   bounds 2176.38,132.25,2340,264.5
   shape rect(2184.25,142.75,2332.13,254 r=10.5,10.5,10.5,10.5)
   hit rect(2176.38,132.25,2340,264.5)
@@ -224,7 +224,7 @@ key apostrophe kind=function role=apostrophe a11y="分词"
     text "分词" 1389.88,346.38 system 400 42 #ff7a858a
   pressed
     +2 fill rect(1366.13,275,1497.64,386.25 r=10.5,10.5,10.5,10.5) #1f000000
-key r3c1 kind=letter a11y="Z, ～"
+key r3c1 kind=letter a11y="Z，～"
   bounds 1505.51,264.5,1642.96,396.75
   shape rect(1513.39,275,1635.08,386.25 r=10.5,10.5,10.5,10.5)
   hit rect(1505.51,264.5,1642.96,396.75)
@@ -240,7 +240,7 @@ key r3c1 kind=letter a11y="Z, ～"
     text "～" 1596.58,304.4 system 700 28 #ff7a858a
   pressed
     +2 fill rect(1513.39,275,1635.08,386.25 r=10.5,10.5,10.5,10.5) #1f000000
-key r3c2 kind=letter a11y="X C, ！"
+key r3c2 kind=letter a11y="X C，！"
   bounds 1642.96,264.5,1780.4,396.75
   shape rect(1650.83,275,1772.53,386.25 r=10.5,10.5,10.5,10.5)
   hit rect(1642.96,264.5,1780.4,396.75)
@@ -256,7 +256,7 @@ key r3c2 kind=letter a11y="X C, ！"
     text "！" 1734.03,304.4 system 700 28 #ff7a858a
   pressed
     +2 fill rect(1650.83,275,1772.53,386.25 r=10.5,10.5,10.5,10.5) #1f000000
-key r3c3 kind=letter a11y="V, @"
+key r3c3 kind=letter a11y="V，@"
   bounds 1780.4,264.5,1917.85,396.75
   shape rect(1788.28,275,1909.97,386.25 r=10.5,10.5,10.5,10.5)
   hit rect(1780.4,264.5,1917.85,396.75)
@@ -272,7 +272,7 @@ key r3c3 kind=letter a11y="V, @"
     text "@" 1883.23,304.4 system 700 28 #ff7a858a
   pressed
     +2 fill rect(1788.28,275,1909.97,386.25 r=10.5,10.5,10.5,10.5) #1f000000
-key r3c4 kind=letter a11y="B N, ？"
+key r3c4 kind=letter a11y="B N，？"
   bounds 1917.85,264.5,2055.29,396.75
   shape rect(1925.72,275,2047.42,386.25 r=10.5,10.5,10.5,10.5)
   hit rect(1917.85,264.5,2055.29,396.75)
@@ -288,7 +288,7 @@ key r3c4 kind=letter a11y="B N, ？"
     text "？" 2008.92,304.4 system 700 28 #ff7a858a
   pressed
     +2 fill rect(1925.72,275,2047.42,386.25 r=10.5,10.5,10.5,10.5) #1f000000
-key r3c5 kind=letter a11y="M, ："
+key r3c5 kind=letter a11y="M，："
   bounds 2055.29,264.5,2192.74,396.75
   shape rect(2063.17,275,2184.86,386.25 r=10.5,10.5,10.5,10.5)
   hit rect(2055.29,264.5,2192.74,396.75)
@@ -361,7 +361,7 @@ key comma kind=function role=comma a11y="，"
     text "，" 1612.77,485.52 system 400 60.38 #ff7a858a
   pressed
     +2 fill rect(1601.75,407.25,1684.17,518.5 r=10.5,10.5,10.5,10.5) #1f000000
-key space kind=space role=space a11y="拼音"
+key space kind=space role=space a11y="空格，拼音"
   bounds 1692.04,396.75,1996.39,529
   shape rect(1699.92,407.25,1988.51,518.5 r=10.5,10.5,10.5,10.5)
   hit rect(1692.04,396.75,1996.39,529)

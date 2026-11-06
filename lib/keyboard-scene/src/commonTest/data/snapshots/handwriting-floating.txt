@@ -99,7 +99,7 @@ key numbers kind=function role=numbers a11y="123"
     text "123" 139.25,549.79 system 700 35.7 #ff7a858a
   pressed
     +2 fill rect(126,495.18,220.5,577.63 r=10.5,10.5,10.5,10.5) #1f000000
-key space kind=space role=space a11y="拼音"
+key space kind=space role=space a11y="空格，拼音"
   bounds 228.38,476.8,590.63,596
   shape rect(236.25,495.18,582.75,577.63 r=10.5,10.5,10.5,10.5)
   hit rect(228.38,476.8,590.63,596)

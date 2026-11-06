@@ -151,6 +151,10 @@ data class Texts(
     /** The nine keys' letters, by digit (t9_letters, or 双拼's NINE_SP): lower case, the binding cases them. */
     val nineLetters: Map<String, String> = NINE_LETTERS,
     val other: Map<String, String> = emptyMap(),
+    /** A key's label and its alt read together, `%1$s` and `%2$s` (a11y_key_grouped; "%1$s，%2$s" in Chinese). */
+    val a11yGrouped: String = "%1\$s, %2\$s",
+    /** The space read with the input method's name, `%1$s` (a11y_key_space_with_ime; "空格，%1$s" in Chinese). */
+    val a11ySpace: String = "Space, %1\$s",
 ) {
     companion object {
         /** NineKeyLetters' default: the phone's. */
