@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebView 输入框</title>
+<style>
+  body { font: 16px sans-serif; margin: 8px; }
+  label { display: block; margin-top: 10px; color: #444; }
+  input, textarea, [contenteditable] { width: 100%; box-sizing: border-box; font-size: 18px; padding: 6px; }
+  [contenteditable] { border: 1px solid #888; min-height: 2em; }
+</style>
+</head>
+<body>
+<!-- every field logs its input/selection/focus events to the console as JSON: the page's event log -->
+<label>input text<input id="w_text" type="text" placeholder="w_text：普通文本"></label>
+<label>input search<input id="w_search" type="search" placeholder="w_search：搜索"></label>
+<label>input email<input id="w_email" type="email" placeholder="w_email：邮箱"></label>
+<label>input number<input id="w_number" type="number" placeholder="w_number：数字"></label>
+<label>input tel<input id="w_tel" type="tel" placeholder="w_tel：电话"></label>
+<label>input url<input id="w_url" type="url" placeholder="w_url：网址"></label>
+<label>input password<input id="w_password" type="password" placeholder="w_password：密码"></label>
+<label>textarea<textarea id="w_textarea" rows="3" placeholder="w_textarea：多行"></textarea></label>
+<label>contenteditable<div id="w_editable" contenteditable="true" aria-label="w_editable：contenteditable"></div></label>
+<form id="w_form">
+  <label>表单：回车提交后清空<input id="w_form_input" type="text" placeholder="w_form_input：提交后清空"></label>
+</form>
+<label>JS 在 input 事件里改写 value（转大写）<input id="w_rewrite" type="text" placeholder="w_rewrite：JS 改写"></label>
+<label>autocomplete=off<input id="w_noauto" type="text" autocomplete="off" placeholder="w_noauto：autocomplete=off"></label>
+<label>输入时 JS 把光标移到开头<input id="w_moveselect" type="text" placeholder="w_moveselect：JS 改选区"></label>
+<script>
+  function value(el) { return el.isContentEditable ? el.textContent : el.value; }
+  function log(el, event) {
+    var o = { field: el.id, event: event, value: value(el) };
+    if (!el.isContentEditable && el.selectionStart != null) { o.selStart = el.selectionStart; o.selEnd = el.selectionEnd; }
+    console.log(JSON.stringify(o));
+  }
+  document.querySelectorAll('input, textarea, [contenteditable]').forEach(function (el) {
+    ['input', 'focus', 'blur', 'compositionstart', 'compositionend'].forEach(function (e) {
+      el.addEventListener(e, function () { log(el, e); });
+    });
+  });
+  document.addEventListener('selectionchange', function () {
+    var el = document.activeElement;
+    if (el && el.id) log(el, 'selection');
+  });
+  document.getElementById('w_form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var f = document.getElementById('w_form_input');
+    log(f, 'submit');
+    f.value = '';
+  });
+  document.getElementById('w_rewrite').addEventListener('input', function () {
+    var up = this.value.toUpperCase();
+    if (up !== this.value) this.value = up;
+  });
+  document.getElementById('w_moveselect').addEventListener('input', function () {
+    this.setSelectionRange(0, 0);
+  });
+</script>
+</body>
+</html>

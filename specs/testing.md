@@ -239,6 +239,20 @@ saying so; parity.py's other commands need no device); results in `uat/runs/`
 (`uat/gates/README.md`). A `.debug` build is upgraded by putting the fixture's files into its own
 directories and gets backups retargeted to its id; the release APK is upgraded with `install -r`.
 
+## The testbed app (`:testbed`)
+
+`testbed/` is a separate app, `org.fcitx.fcitx5.android.testbed` (输入测试台), with every kind of
+native field (input types, imeOptions, focus chains), app behaviours an IME meets (clearing on send with
+and without `restartInput`, rewriting TextWatchers, timed `setText`/`setSelection`, an InputConnection
+that answers null, TYPE_NULL, dialogs, a shared view id) and a local WebView page, one page each,
+opened by `--es page <name>`. It is a tool, not shipped and not depended on; framework Views only, so
+it adds nothing to verification-metadata, and minSdk 29 like the app (the WebView test page's shell
+needs 34). Each page logs its fields' events to a folding panel and to logcat (tag `Testbed`, JSON);
+its debug build's `StateProvider` hands the fields' text, selection and composing span to `adb shell
+content query` and to no app (it answers the shell and root uids only). `uat.py`'s `Device.testbed(page)`
+and `testbed_state()`; pages and fields in `uat/TESTBED.md`. Compose fields are not there yet (no
+Compose dependency in the repository).
+
 ## The theme maker's shared files (`web/theme-maker/test/testdata/`)
 
 In 0.5.x the app and the user docs do not link the page (user, 2026-11-04: its entry, 新增主题 → 在网页上制作…,

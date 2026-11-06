@@ -35,6 +35,7 @@ any change to behaviour or settings.
 | Engine UAT replay (uat/ cases through Engines with the app's data; not in check, minutes the first time) | `./gradlew :lib:ime-eval:uatTest` |
 | Static analysis (syntax rules only; type resolution doesn't work here) | `./gradlew detekt` |
 | Accept current findings after a deliberate batch (run alone, not with `detekt`; `:<module>:detektBaseline` for one module, bare `detektBaseline` rewrites every module) | `./gradlew :<module>:detektBaseline` |
+| The testbed app (every kind of field and app behaviour, for emulator and phone tests; uat/TESTBED.md) | `./gradlew :testbed:installDebug` |
 | App coverage (report only, no floor) | `./gradlew :app:koverLogTextDebug` |
 | Engine data into app assets (part of every app build; downloads libime's sources, the mixed model of this fork's release `engine-data-*` and the curated new-word pack of `words-*`, SHA-256 checked, once) | `./gradlew :app:compileEngineData` |
 | A new `engine-data` release's files (CommonCrawl crawl, cleaning, mix, new words, evaluation; ~100 GB down, an hour on a rented 16-core box via `dev/training/jobs/engine-data.json`) | `TOOL=… EVAL=… SETS=… lib/ime-dict-tool/engine-data.sh <work dir>` |
