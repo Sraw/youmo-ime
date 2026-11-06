@@ -35,6 +35,8 @@ object Forms {
     private const val UPRIGHT = 0.30
     private const val UPRIGHT_COMPACT = 0.20
     private const val SIDEWAYS = 0.49
+    private const val SIDEWAYS_COMPACT = 0.34
+    private const val FLOATING_MAX_DP = 420.0
     private const val FLOATING_WIDTH_DP = 300.0
     private const val FLOATING_HEIGHT = 0.85
     private const val FLOATING_TEXT = 0.85
@@ -74,10 +76,24 @@ object Forms {
 
     val oneHandedRight = base.copy(oneHanded = SplitKeyboard.Dock.RIGHT)
 
+    /** On its side and compact: the setting's lowest level there, 34%. */
+    val landscapeCompact = landscape.copy(height = (SCREEN_SHORT * SIDEWAYS_COMPACT).toInt().toDouble(), compact = true)
+
+    /** Floating on its side: 70% of 891 dp kept to 420; 85% of the docked height (the width's share, 47%, is under it). */
+    val floatingLandscape = landscape.copy(
+        width = FLOATING_MAX_DP * DENSITY,
+        height = (landscape.height * FLOATING_HEIGHT).toInt().toDouble(),
+        floating = FLOATING_TEXT,
+    )
+
+    /** One-handed on its side, not split: 80% of 891 dp is 712, kept to 420 (SplitKeyboard.DOCK_MAX_DP). */
+    val oneHandedLandscape = landscape.copy(oneHanded = SplitKeyboard.Dock.LEFT)
+
     /** Every form, by the name its snapshot carries. */
     val all: Map<String, Env> = linkedMapOf(
         "block" to block, "flat" to flat, "compact" to compact, "landscape" to landscape, "split" to split,
         "floating" to floating, "one-handed-left" to oneHandedLeft, "one-handed-right" to oneHandedRight,
+        "landscape-compact" to landscapeCompact, "floating-landscape" to floatingLandscape, "one-handed-landscape" to oneHandedLandscape,
     )
 
     /** Every board of rules C, by its id (KeyNames.BOARDS less emoji, which is no layout). */

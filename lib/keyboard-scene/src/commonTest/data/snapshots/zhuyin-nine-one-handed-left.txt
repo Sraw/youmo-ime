@@ -7,7 +7,10 @@ key r1c1 kind=function a11y="ˉ"
   shape rect(7.88,18.38,112.67,122.03 r=10.5,10.5,10.5,10.5)
   hit rect(0,0,120.54,140.4)
   anchor 60.27,70.2 up 0,-1
-  actions long-press="commit:˙" send="action:tone" swipe-up="commit:˙"
+  actions send="action:tone-1" swipe-up="action:tone-5"
+  text label="ˉ"
+  popup from=list
+    item "˙" send="action:tone-5"
   normal
     shadow rect(7.88,18.38,112.67,124.65 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(7.88,18.38,112.67,122.03 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -20,6 +23,9 @@ key r1c2 kind=letter a11y="ㄅㄉㄚ"
   hit rect(120.54,0,327.18,140.4)
   anchor 223.86,70.2 up 0,-1
   actions send="action:zhuyin"
+  text label="ㄅㄉㄚ"
+  shortcut="zy9/1"
+  popup from=group
   normal
     shadow rect(128.42,18.38,319.3,124.65 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(128.42,18.38,319.3,122.03 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -32,6 +38,9 @@ key r1c3 kind=letter a11y="ㄍㄐㄞ"
   hit rect(327.18,0,533.82,140.4)
   anchor 430.5,70.2 up 0,-1
   actions send="action:zhuyin"
+  text label="ㄍㄐㄞ"
+  shortcut="zy9/2"
+  popup from=group
   normal
     shadow rect(335.05,18.38,525.94,124.65 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(335.05,18.38,525.94,122.03 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -44,6 +53,9 @@ key r1c4 kind=letter a11y="ㄓㄗㄢㄦ"
   hit rect(533.82,0,740.46,140.4)
   anchor 637.14,70.2 up 0,-1
   actions send="action:zhuyin"
+  text label="ㄓㄗㄢㄦ"
+  shortcut="zy9/3"
+  popup from=group
   normal
     shadow rect(541.69,18.38,732.58,124.65 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(541.69,18.38,732.58,122.03 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -56,6 +68,7 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
   hit rect(740.46,0,861,140.4)
   anchor 800.73,70.2 up 0,-1
   actions repeat="true" send="sym:BackSpace" swipe-axis="both"
+  sound=delete shortcut="backspace"
   normal
     shadow rect(748.33,18.38,853.12,124.65 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(748.33,18.38,853.12,122.03 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -69,7 +82,8 @@ key r2c1 kind=function a11y="ˊ"
   shape rect(7.88,158.78,112.67,262.43 r=10.5,10.5,10.5,10.5)
   hit rect(0,140.4,120.54,280.8)
   anchor 60.27,210.6 up 0,-1
-  actions send="action:tone"
+  actions send="action:tone-2"
+  text label="ˊ"
   normal
     shadow rect(7.88,158.78,112.67,265.05 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(7.88,158.78,112.67,262.43 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -82,6 +96,9 @@ key r2c2 kind=letter a11y="ㄆㄊㄛ"
   hit rect(120.54,140.4,327.18,280.8)
   anchor 223.86,210.6 up 0,-1
   actions send="action:zhuyin"
+  text label="ㄆㄊㄛ"
+  shortcut="zy9/4"
+  popup from=group
   normal
     shadow rect(128.42,158.78,319.3,265.05 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(128.42,158.78,319.3,262.43 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -94,6 +111,9 @@ key r2c3 kind=letter a11y="ㄎㄑㄟ"
   hit rect(327.18,140.4,533.82,280.8)
   anchor 430.5,210.6 up 0,-1
   actions send="action:zhuyin"
+  text label="ㄎㄑㄟ"
+  shortcut="zy9/5"
+  popup from=group
   normal
     shadow rect(335.05,158.78,525.94,265.05 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(335.05,158.78,525.94,262.43 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -106,6 +126,9 @@ key r2c4 kind=letter a11y="ㄔㄘㄣㄧ"
   hit rect(533.82,140.4,740.46,280.8)
   anchor 637.14,210.6 up 0,-1
   actions send="action:zhuyin"
+  text label="ㄔㄘㄣㄧ"
+  shortcut="zy9/6"
+  popup from=group
   normal
     shadow rect(541.69,158.78,732.58,265.05 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(541.69,158.78,732.58,262.43 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -118,6 +141,7 @@ key r2c5 kind=function a11y="?"
   hit rect(740.46,140.4,861,280.8)
   anchor 800.73,210.6 up 0,-1
   actions send="?"
+  text label="?"
   normal
     shadow rect(748.33,158.78,853.12,265.05 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(748.33,158.78,853.12,262.43 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -129,7 +153,8 @@ key r3c1 kind=function a11y="ˇ"
   shape rect(7.88,299.18,112.67,402.83 r=10.5,10.5,10.5,10.5)
   hit rect(0,280.8,120.54,421.2)
   anchor 60.27,351 up 0,-1
-  actions send="action:tone"
+  actions send="action:tone-3"
+  text label="ˇ"
   normal
     shadow rect(7.88,299.18,112.67,405.45 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(7.88,299.18,112.67,402.83 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -142,6 +167,9 @@ key r3c2 kind=letter a11y="ㄇㄋㄜ"
   hit rect(120.54,280.8,327.18,421.2)
   anchor 223.86,351 up 0,-1
   actions send="action:zhuyin"
+  text label="ㄇㄋㄜ"
+  shortcut="zy9/7"
+  popup from=group
   normal
     shadow rect(128.42,299.18,319.3,405.45 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(128.42,299.18,319.3,402.83 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -154,6 +182,9 @@ key r3c3 kind=letter a11y="ㄏㄒㄠㄡ"
   hit rect(327.18,280.8,533.82,421.2)
   anchor 430.5,351 up 0,-1
   actions send="action:zhuyin"
+  text label="ㄏㄒㄠㄡ"
+  shortcut="zy9/8"
+  popup from=group
   normal
     shadow rect(335.05,299.18,525.94,405.45 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(335.05,299.18,525.94,402.83 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -166,6 +197,9 @@ key r3c4 kind=letter a11y="ㄕㄙㄤㄨ"
   hit rect(533.82,280.8,740.46,421.2)
   anchor 637.14,351 up 0,-1
   actions send="action:zhuyin"
+  text label="ㄕㄙㄤㄨ"
+  shortcut="zy9/9"
+  popup from=group
   normal
     shadow rect(541.69,299.18,732.58,405.45 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(541.69,299.18,732.58,402.83 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -178,6 +212,7 @@ key r3c5 kind=function a11y="!"
   hit rect(740.46,280.8,861,421.2)
   anchor 800.73,351 up 0,-1
   actions send="!"
+  text label="!"
   normal
     shadow rect(748.33,299.18,853.12,405.45 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(748.33,299.18,853.12,402.83 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -189,7 +224,8 @@ key r4c1 kind=function a11y="ˋ"
   shape rect(7.88,439.58,112.67,543.23 r=10.5,10.5,10.5,10.5)
   hit rect(0,421.2,120.54,561.6)
   anchor 60.27,491.4 up 0,-1
-  actions send="action:tone"
+  actions send="action:tone-4"
+  text label="ˋ"
   normal
     shadow rect(7.88,439.58,112.67,545.85 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(7.88,439.58,112.67,543.23 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -202,6 +238,9 @@ key r4c2 kind=letter a11y="ㄈㄌㄝ"
   hit rect(120.54,421.2,327.18,561.6)
   anchor 223.86,491.4 up 0,-1
   actions send="action:zhuyin"
+  text label="ㄈㄌㄝ"
+  shortcut="zy9/10"
+  popup from=group
   normal
     shadow rect(128.42,439.58,319.3,545.85 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(128.42,439.58,319.3,543.23 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -214,6 +253,9 @@ key r4c3 kind=letter a11y="ㄖㄥㄩ"
   hit rect(327.18,421.2,533.82,561.6)
   anchor 430.5,491.4 up 0,-1
   actions send="action:zhuyin"
+  text label="ㄖㄥㄩ"
+  shortcut="zy9/11"
+  popup from=group
   normal
     shadow rect(335.05,439.58,525.94,545.85 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(335.05,439.58,525.94,543.23 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -226,6 +268,14 @@ key r4c4 kind=letter a11y="，"
   hit rect(533.82,421.2,740.46,561.6)
   anchor 637.14,491.4 up 0,-1
   actions send="action:zhuyin-slot"
+  text label="，"
+  popup from=list as-is="true"
+    item "。"
+    item "？"
+    item "！"
+    item "、"
+    item "："
+    item "；"
   normal
     shadow rect(541.69,439.58,732.58,545.85 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(541.69,439.58,732.58,543.23 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -238,6 +288,7 @@ key r4c5 kind=function a11y="~"
   hit rect(740.46,421.2,861,561.6)
   anchor 800.73,491.4 up 0,-1
   actions send="~"
+  text label="~"
   normal
     shadow rect(748.33,439.58,853.12,545.85 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(748.33,439.58,853.12,543.23 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -250,6 +301,8 @@ key symbols kind=function role=symbols a11y="符"
   hit rect(0,561.6,103.32,702)
   anchor 51.66,631.8 up 0,-1
   actions long-press="quickphrase" send="layout:Symbol"
+  text label="符"
+  shortcut="symbols"
   normal
     shadow rect(7.88,579.98,95.45,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(7.88,579.98,95.45,683.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -262,6 +315,8 @@ key numbers kind=function role=numbers a11y="123"
   hit rect(103.32,561.6,206.64,702)
   anchor 154.98,631.8 up 0,-1
   actions long-press="unicode" send="layout:Number"
+  text label="123"
+  shortcut="numbers"
   normal
     shadow rect(111.2,579.98,198.77,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(111.2,579.98,198.77,683.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -274,6 +329,8 @@ key comma kind=function role=comma a11y="，"
   hit rect(206.64,561.6,292.74,702)
   anchor 249.69,631.8 up 0,-1
   actions send=","
+  text label="，"
+  shortcut="comma"
   normal
     shadow rect(214.52,579.98,284.87,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(214.52,579.98,284.87,683.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -286,6 +343,8 @@ key space kind=space role=space a11y="注音"
   hit rect(292.74,561.6,559.65,702)
   anchor 426.2,631.8 up 0,-1
   actions long-press="space-long-press" send="sym:space" swipe-axis="both"
+  text label="注音"
+  sound=space shortcut="space"
   normal
     shadow rect(300.62,579.98,551.78,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(300.62,579.98,551.78,683.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -299,6 +358,8 @@ key period kind=function role=period a11y="。"
   hit rect(559.65,561.6,645.75,702)
   anchor 602.7,631.8 up 0,-1
   actions send="."
+  text label="。"
+  shortcut="period"
   normal
     shadow rect(567.53,579.98,637.88,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(567.53,579.98,637.88,683.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -311,6 +372,7 @@ key lang kind=letter role=lang a11y="a11y_key_switch_language"
   hit rect(645.75,561.6,731.85,702)
   anchor 688.8,631.8 up 0,-1
   actions long-press="ime-picker" send="lang"
+  shortcut="lang"
   normal
     shadow rect(653.63,579.98,723.98,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(653.63,579.98,723.98,683.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -323,6 +385,8 @@ key enter kind=enter role=enter a11y="换行"
   hit rect(731.85,561.6,861,702)
   anchor 796.43,631.8 up 0,-1
   actions send="sym:Return"
+  sound=return shortcut="return"
+  menu "emoji" icon=emoji do="picker:Emoji"
   normal
     shadow rect(739.73,579.98,853.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(739.73,579.98,853.13,683.63 r=10.5,10.5,10.5,10.5) #ff5cb5ab

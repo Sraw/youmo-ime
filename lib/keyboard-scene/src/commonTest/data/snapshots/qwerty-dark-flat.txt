@@ -1,212 +1,250 @@
 scene 1080x702
 base
   fill rect(0,0,1080,702) #ff263238
-key q kind=letter a11y="q"
+key q kind=letter a11y="q, 1"
   bounds 0,0,108,175.5
   shape rect(7.88,18.38,100.13,157.13)
   hit rect(0,0,108,175.5)
   anchor 54,87.75 up 0,-1
   actions send="q"
+  text label="q" alt="1"
+  shortcut="full/q"
   normal
     text "q" 35.89,110.39 system 400 60.38 #ffd9dbdc
     text "1" 73.38,47.78 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(7.88,18.38,100.13,157.13) #33ffffff
-key w kind=letter a11y="w"
+key w kind=letter a11y="w, 2"
   bounds 108,0,216,175.5
   shape rect(115.88,18.38,208.13,157.13)
   hit rect(108,0,216,175.5)
   anchor 162,87.75 up 0,-1
   actions send="w"
+  text label="w" alt="2"
+  shortcut="full/w"
   normal
     text "w" 143.89,110.39 system 400 60.38 #ffd9dbdc
     text "2" 181.38,47.78 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(115.88,18.38,208.13,157.13) #33ffffff
-key e kind=letter a11y="e"
+key e kind=letter a11y="e, 3"
   bounds 216,0,324,175.5
   shape rect(223.88,18.38,316.13,157.13)
   hit rect(216,0,324,175.5)
   anchor 270,87.75 up 0,-1
   actions send="e"
+  text label="e" alt="3"
+  shortcut="full/e"
   normal
     text "e" 251.89,110.39 system 400 60.38 #ffd9dbdc
     text "3" 289.38,47.78 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(223.88,18.38,316.13,157.13) #33ffffff
-key r kind=letter a11y="r"
+key r kind=letter a11y="r, 4"
   bounds 324,0,432,175.5
   shape rect(331.88,18.38,424.13,157.13)
   hit rect(324,0,432,175.5)
   anchor 378,87.75 up 0,-1
   actions send="r"
+  text label="r" alt="4"
+  shortcut="full/r"
   normal
     text "r" 359.89,110.39 system 400 60.38 #ffd9dbdc
     text "4" 397.38,47.78 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(331.88,18.38,424.13,157.13) #33ffffff
-key t kind=letter a11y="t"
+key t kind=letter a11y="t, 5"
   bounds 432,0,540,175.5
   shape rect(439.88,18.38,532.13,157.13)
   hit rect(432,0,540,175.5)
   anchor 486,87.75 up 0,-1
   actions send="t"
+  text label="t" alt="5"
+  shortcut="full/t"
   normal
     text "t" 467.89,110.39 system 400 60.38 #ffd9dbdc
     text "5" 505.38,47.78 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(439.88,18.38,532.13,157.13) #33ffffff
-key y kind=letter a11y="y"
+key y kind=letter a11y="y, 6"
   bounds 540,0,648,175.5
   shape rect(547.88,18.38,640.13,157.13)
   hit rect(540,0,648,175.5)
   anchor 594,87.75 up 0,-1
   actions send="y"
+  text label="y" alt="6"
+  shortcut="full/y"
   normal
     text "y" 575.89,110.39 system 400 60.38 #ffd9dbdc
     icon redo 555.75,23.63,584.63,52.5 #ffadb1b3
     text "6" 613.38,47.78 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(547.88,18.38,640.13,157.13) #33ffffff
-key u kind=letter a11y="u"
+key u kind=letter a11y="u, 7"
   bounds 648,0,756,175.5
   shape rect(655.88,18.38,748.13,157.13)
   hit rect(648,0,756,175.5)
   anchor 702,87.75 up 0,-1
   actions send="u"
+  text label="u" alt="7"
+  shortcut="full/u"
   normal
     text "u" 683.89,110.39 system 400 60.38 #ffd9dbdc
     text "7" 721.38,47.78 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(655.88,18.38,748.13,157.13) #33ffffff
-key i kind=letter a11y="i"
+key i kind=letter a11y="i, 8"
   bounds 756,0,864,175.5
   shape rect(763.88,18.38,856.13,157.13)
   hit rect(756,0,864,175.5)
   anchor 810,87.75 up 0,-1
   actions send="i"
+  text label="i" alt="8"
+  shortcut="full/i"
   normal
     text "i" 791.89,110.39 system 400 60.38 #ffd9dbdc
     text "8" 829.38,47.78 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(763.88,18.38,856.13,157.13) #33ffffff
-key o kind=letter a11y="o"
+key o kind=letter a11y="o, 9"
   bounds 864,0,972,175.5
   shape rect(871.88,18.38,964.13,157.13)
   hit rect(864,0,972,175.5)
   anchor 918,87.75 up 0,-1
   actions send="o"
+  text label="o" alt="9"
+  shortcut="full/o"
   normal
     text "o" 899.89,110.39 system 400 60.38 #ffd9dbdc
     text "9" 937.38,47.78 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(871.88,18.38,964.13,157.13) #33ffffff
-key p kind=letter a11y="p"
+key p kind=letter a11y="p, 0"
   bounds 972,0,1080,175.5
   shape rect(979.88,18.38,1072.13,157.13)
   hit rect(972,0,1080,175.5)
   anchor 1026,87.75 up 0,-1
   actions send="p"
+  text label="p" alt="0"
+  shortcut="full/p"
   normal
     text "p" 1007.89,110.39 system 400 60.38 #ffd9dbdc
     text "0" 1045.38,47.78 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(979.88,18.38,1072.13,157.13) #33ffffff
-key a kind=letter a11y="a"
+key a kind=letter a11y="a, @"
   bounds 54,175.5,162,351
   shape rect(61.88,193.88,154.13,332.63)
   hit rect(0,175.5,162,351)
   anchor 108,263.25 up 0,-1
   actions send="a"
+  text label="a" alt="@"
+  shortcut="full/a"
   normal
     text "a" 89.89,285.89 system 400 60.38 #ffd9dbdc
     icon select-all 69.75,199.13,98.63,228 #ffadb1b3
     text "@" 127.38,223.28 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(61.88,193.88,154.13,332.63) #33ffffff
-key s kind=letter a11y="s"
+key s kind=letter a11y="s, *"
   bounds 162,175.5,270,351
   shape rect(169.88,193.88,262.13,332.63)
   hit rect(162,175.5,270,351)
   anchor 216,263.25 up 0,-1
   actions send="s"
+  text label="s" alt="*"
+  shortcut="full/s"
   normal
     text "s" 197.89,285.89 system 400 60.38 #ffd9dbdc
     text "*" 235.38,223.28 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(169.88,193.88,262.13,332.63) #33ffffff
-key d kind=letter a11y="d"
+key d kind=letter a11y="d, +"
   bounds 270,175.5,378,351
   shape rect(277.88,193.88,370.13,332.63)
   hit rect(270,175.5,378,351)
   anchor 324,263.25 up 0,-1
   actions send="d"
+  text label="d" alt="+"
+  shortcut="full/d"
   normal
     text "d" 305.89,285.89 system 400 60.38 #ffd9dbdc
     text "+" 343.38,223.28 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(277.88,193.88,370.13,332.63) #33ffffff
-key f kind=letter a11y="f"
+key f kind=letter a11y="f, -"
   bounds 378,175.5,486,351
   shape rect(385.88,193.88,478.13,332.63)
   hit rect(378,175.5,486,351)
   anchor 432,263.25 up 0,-1
   actions send="f"
+  text label="f" alt="-"
+  shortcut="full/f"
   normal
     text "f" 413.89,285.89 system 400 60.38 #ffd9dbdc
     text "-" 451.38,223.28 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(385.88,193.88,478.13,332.63) #33ffffff
-key g kind=letter a11y="g"
+key g kind=letter a11y="g, ="
   bounds 486,175.5,594,351
   shape rect(493.88,193.88,586.13,332.63)
   hit rect(486,175.5,594,351)
   anchor 540,263.25 up 0,-1
   actions send="g"
+  text label="g" alt="="
+  shortcut="full/g"
   normal
     text "g" 521.89,285.89 system 400 60.38 #ffd9dbdc
     text "=" 559.38,223.28 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(493.88,193.88,586.13,332.63) #33ffffff
-key h kind=letter a11y="h"
+key h kind=letter a11y="h, /"
   bounds 594,175.5,702,351
   shape rect(601.88,193.88,694.13,332.63)
   hit rect(594,175.5,702,351)
   anchor 648,263.25 up 0,-1
   actions send="h"
+  text label="h" alt="/"
+  shortcut="full/h"
   normal
     text "h" 629.89,285.89 system 400 60.38 #ffd9dbdc
     text "/" 667.38,223.28 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(601.88,193.88,694.13,332.63) #33ffffff
-key j kind=letter a11y="j"
+key j kind=letter a11y="j, #"
   bounds 702,175.5,810,351
   shape rect(709.88,193.88,802.13,332.63)
   hit rect(702,175.5,810,351)
   anchor 756,263.25 up 0,-1
   actions send="j"
+  text label="j" alt="#"
+  shortcut="full/j"
   normal
     text "j" 737.89,285.89 system 400 60.38 #ffd9dbdc
     text "#" 775.38,223.28 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(709.88,193.88,802.13,332.63) #33ffffff
-key k kind=letter a11y="k"
+key k kind=letter a11y="k, ("
   bounds 810,175.5,918,351
   shape rect(817.88,193.88,910.13,332.63)
   hit rect(810,175.5,918,351)
   anchor 864,263.25 up 0,-1
   actions send="k"
+  text label="k" alt="("
+  shortcut="full/k"
   normal
     text "k" 845.89,285.89 system 400 60.38 #ffd9dbdc
     text "(" 883.38,223.28 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(817.88,193.88,910.13,332.63) #33ffffff
-key l kind=letter a11y="l"
+key l kind=letter a11y="l, )"
   bounds 918,175.5,1026,351
   shape rect(925.88,193.88,1018.13,332.63)
   hit rect(918,175.5,1080,351)
   anchor 972,263.25 up 0,-1
   actions send="l"
+  text label="l" alt=")"
+  shortcut="full/l"
   normal
     text "l" 953.89,285.89 system 400 60.38 #ffd9dbdc
     text ")" 991.38,223.28 system 700 28 #ffadb1b3
@@ -218,86 +256,101 @@ key shift kind=function role=shift a11y="a11y_key_shift"
   hit rect(0,351,162,526.5)
   anchor 81,438.75 up 0,-1
   actions double-tap="caps:lock" long-press="caps:lock" send="caps"
+  shortcut="shift"
   normal
     icon shift 49.5,407.25,112.5,470.25 #ffadb1b3
   pressed
     +0 fill rect(7.88,369.38,154.13,508.13) #33ffffff
-key z kind=letter a11y="z"
+key z kind=letter a11y="z, '"
   bounds 162,351,270,526.5
   shape rect(169.88,369.38,262.13,508.13)
   hit rect(162,351,270,526.5)
   anchor 216,438.75 up 0,-1
   actions send="z"
+  text label="z" alt="'"
+  shortcut="full/z"
   normal
     text "z" 197.89,461.39 system 400 60.38 #ffd9dbdc
     icon undo 177.75,374.63,206.63,403.5 #ffadb1b3
     text "'" 235.38,398.78 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(169.88,369.38,262.13,508.13) #33ffffff
-key x kind=letter a11y="x"
+key x kind=letter a11y="x, :"
   bounds 270,351,378,526.5
   shape rect(277.88,369.38,370.13,508.13)
   hit rect(270,351,378,526.5)
   anchor 324,438.75 up 0,-1
   actions send="x"
+  text label="x" alt=":"
+  shortcut="full/x"
   normal
     text "x" 305.89,461.39 system 400 60.38 #ffd9dbdc
     icon content-cut 285.75,374.63,314.63,403.5 #ffadb1b3
     text ":" 343.38,398.78 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(277.88,369.38,370.13,508.13) #33ffffff
-key c kind=letter a11y="c"
+key c kind=letter a11y="c, \""
   bounds 378,351,486,526.5
   shape rect(385.88,369.38,478.13,508.13)
   hit rect(378,351,486,526.5)
   anchor 432,438.75 up 0,-1
   actions send="c"
+  text label="c" alt="\""
+  shortcut="full/c"
   normal
     text "c" 413.89,461.39 system 400 60.38 #ffd9dbdc
     icon content-copy 393.75,374.63,422.63,403.5 #ffadb1b3
     text "\"" 451.38,398.78 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(385.88,369.38,478.13,508.13) #33ffffff
-key v kind=letter a11y="v"
+key v kind=letter a11y="v, ?"
   bounds 486,351,594,526.5
   shape rect(493.88,369.38,586.13,508.13)
   hit rect(486,351,594,526.5)
   anchor 540,438.75 up 0,-1
   actions send="v"
+  text label="v" alt="?"
+  shortcut="full/v"
   normal
     text "v" 521.89,461.39 system 400 60.38 #ffd9dbdc
     icon content-paste 501.75,374.63,530.63,403.5 #ffadb1b3
     text "?" 559.38,398.78 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(493.88,369.38,586.13,508.13) #33ffffff
-key b kind=letter a11y="b"
+key b kind=letter a11y="b, !"
   bounds 594,351,702,526.5
   shape rect(601.88,369.38,694.13,508.13)
   hit rect(594,351,702,526.5)
   anchor 648,438.75 up 0,-1
   actions send="b"
+  text label="b" alt="!"
+  shortcut="full/b"
   normal
     text "b" 629.89,461.39 system 400 60.38 #ffd9dbdc
     text "!" 667.38,398.78 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(601.88,369.38,694.13,508.13) #33ffffff
-key n kind=letter a11y="n"
+key n kind=letter a11y="n, ~"
   bounds 702,351,810,526.5
   shape rect(709.88,369.38,802.13,508.13)
   hit rect(702,351,810,526.5)
   anchor 756,438.75 up 0,-1
   actions send="n"
+  text label="n" alt="~"
+  shortcut="full/n"
   normal
     text "n" 737.89,461.39 system 400 60.38 #ffd9dbdc
     text "~" 775.38,398.78 system 700 28 #ffadb1b3
   pressed
     +0 fill rect(709.88,369.38,802.13,508.13) #33ffffff
-key m kind=letter a11y="m"
+key m kind=letter a11y="m, \\"
   bounds 810,351,918,526.5
   shape rect(817.88,369.38,910.13,508.13)
   hit rect(810,351,918,526.5)
   anchor 864,438.75 up 0,-1
   actions send="m"
+  text label="m" alt="\\"
+  shortcut="full/m"
   normal
     text "m" 845.89,461.39 system 400 60.38 #ffd9dbdc
     text "\\" 883.38,398.78 system 700 28 #ffadb1b3
@@ -309,6 +362,7 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
   hit rect(918,351,1080,526.5)
   anchor 999,438.75 up 0,-1
   actions repeat="true" send="sym:BackSpace" swipe-axis="both"
+  sound=delete shortcut="backspace"
   normal
     icon backspace 967.5,407.25,1030.5,470.25 #ffadb1b3
     icon delete-sweep 933.75,374.63,962.63,403.5 #ffadb1b3
@@ -321,6 +375,8 @@ key symbols kind=function role=symbols a11y="符"
   hit rect(0,526.5,129.6,702)
   anchor 64.8,614.25 up 0,-1
   actions long-press="quickphrase" send="layout:Symbol"
+  text label="符"
+  shortcut="symbols"
   normal
     text "符" 42.75,630 system 700 42 #ffadb1b3
   pressed
@@ -331,6 +387,8 @@ key numbers kind=function role=numbers a11y="123"
   hit rect(129.6,526.5,259.2,702)
   anchor 194.4,614.25 up 0,-1
   actions long-press="unicode" send="layout:Number"
+  text label="123"
+  shortcut="numbers"
   normal
     text "123" 154.4,630 system 700 42 #ffadb1b3
   pressed
@@ -341,6 +399,8 @@ key comma kind=function role=comma a11y="，"
   hit rect(259.2,526.5,367.2,702)
   anchor 313.2,614.25 up 0,-1
   actions send=","
+  text label="，"
+  shortcut="comma"
   normal
     text "，" 283.01,636.89 system 400 60.38 #ffadb1b3
   pressed
@@ -351,6 +411,8 @@ key space kind=space role=space a11y="拼音"
   hit rect(367.2,526.5,702,702)
   anchor 534.6,614.25 up 0,-1
   actions long-press="space-long-press" send="sym:space" swipe-axis="both"
+  text label="拼音"
+  sound=space shortcut="space"
   normal
     fill rect(393.45,568.5,675.75,660 r=7.88,7.88,7.88,7.88) #ff3b464c
     text "拼音" 500.1,627.05 system 400 34.13 #ffd9dbdc
@@ -363,6 +425,8 @@ key period kind=function role=period a11y="。"
   hit rect(702,526.5,810,702)
   anchor 756,614.25 up 0,-1
   actions send="."
+  text label="。"
+  shortcut="period"
   normal
     text "。" 725.81,636.89 system 400 60.38 #ffadb1b3
   pressed
@@ -373,6 +437,7 @@ key lang kind=letter role=lang a11y="a11y_key_switch_language"
   hit rect(810,526.5,918,702)
   anchor 864,614.25 up 0,-1
   actions long-press="ime-picker" send="lang"
+  shortcut="lang"
   normal
     icon language 832.5,582.75,895.5,645.75 #ffadb1b3
   pressed
@@ -383,6 +448,8 @@ key enter kind=enter role=enter a11y="换行"
   hit rect(918,526.5,1080,702)
   anchor 999,614.25 up 0,-1
   actions send="sym:Return"
+  sound=return shortcut="return"
+  menu "emoji" icon=emoji do="picker:Emoji"
   normal
     fill rect(953.06,568.31,1044.94,660.19 r=45.94,45.94,45.94,45.94) #ff6eaca8
     icon enter 967.5,582.75,1030.5,645.75 #ffffffff

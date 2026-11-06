@@ -1,0 +1,418 @@
+scene 1102.5x449
+base
+  fill rect(0,0,1102.5,449 r=18.38,18.38,18.38,18.38) #ffeceff1
+key r1c1 kind=letter a11y="Q, 1"
+  bounds 0,0,157.5,112.25
+  shape rect(7.88,10.5,149.63,101.75 r=10.5,10.5,10.5,10.5)
+  hit rect(0,0,157.5,112.25)
+  anchor 78.75,56.13 up 0,-1
+  actions send="action:group" swipe-up="keypad:1"
+  text label="Q" alt="1"
+  shortcut="g18/q"
+  popup from=group
+  normal
+    shadow rect(7.88,10.5,149.63,104.38 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(7.88,10.5,149.63,101.75 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "Q" 65.36,72.86 system 400 44.63 #ff37474f
+    text "1" 125.32,35.49 system 700 23.8 #ff7a858a
+  pressed
+    +2 fill rect(7.88,10.5,149.63,101.75 r=10.5,10.5,10.5,10.5) #1f000000
+key r1c2 kind=letter a11y="W E, 2"
+  bounds 157.5,0,315,112.25
+  shape rect(165.38,10.5,307.13,101.75 r=10.5,10.5,10.5,10.5)
+  hit rect(157.5,0,315,112.25)
+  anchor 236.25,56.13 up 0,-1
+  actions send="action:group" swipe-up="keypad:2"
+  text label="WE" alt="2"
+  shortcut="g18/we"
+  popup from=group
+  normal
+    shadow rect(165.38,10.5,307.13,104.38 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(165.38,10.5,307.13,101.75 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "WE" 209.25,72.86 system 400 44.63 #ff37474f
+    text "2" 282.82,35.49 system 700 23.8 #ff7a858a
+  pressed
+    +2 fill rect(165.38,10.5,307.13,101.75 r=10.5,10.5,10.5,10.5) #1f000000
+key r1c3 kind=letter a11y="R T, 3"
+  bounds 315,0,472.5,112.25
+  shape rect(322.88,10.5,464.63,101.75 r=10.5,10.5,10.5,10.5)
+  hit rect(315,0,472.5,112.25)
+  anchor 393.75,56.13 up 0,-1
+  actions send="action:group" swipe-up="keypad:3"
+  text label="RT" alt="3"
+  shortcut="g18/rt"
+  popup from=group
+  normal
+    shadow rect(322.88,10.5,464.63,104.38 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(322.88,10.5,464.63,101.75 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "RT" 366.75,72.86 system 400 44.63 #ff37474f
+    text "3" 440.32,35.49 system 700 23.8 #ff7a858a
+  pressed
+    +2 fill rect(322.88,10.5,464.63,101.75 r=10.5,10.5,10.5,10.5) #1f000000
+key r1c4 kind=letter a11y="Y, 4"
+  bounds 472.5,0,630,112.25
+  shape rect(480.38,10.5,622.13,101.75 r=10.5,10.5,10.5,10.5)
+  hit rect(472.5,0,630,112.25)
+  anchor 551.25,56.13 up 0,-1
+  actions send="action:group" swipe-up="keypad:4"
+  text label="Y" alt="4"
+  shortcut="g18/y"
+  popup from=group
+  normal
+    shadow rect(480.38,10.5,622.13,104.38 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(480.38,10.5,622.13,101.75 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "Y" 537.86,72.86 system 400 44.63 #ff37474f
+    text "4" 597.82,35.49 system 700 23.8 #ff7a858a
+  pressed
+    +2 fill rect(480.38,10.5,622.13,101.75 r=10.5,10.5,10.5,10.5) #1f000000
+key r1c5 kind=letter a11y="U, 5"
+  bounds 630,0,787.5,112.25
+  shape rect(637.88,10.5,779.63,101.75 r=10.5,10.5,10.5,10.5)
+  hit rect(630,0,787.5,112.25)
+  anchor 708.75,56.13 up 0,-1
+  actions send="action:group" swipe-up="keypad:5"
+  text label="U" alt="5"
+  shortcut="g18/u"
+  popup from=group
+  normal
+    shadow rect(637.88,10.5,779.63,104.38 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(637.88,10.5,779.63,101.75 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "U" 695.36,72.86 system 400 44.63 #ff37474f
+    text "5" 755.32,35.49 system 700 23.8 #ff7a858a
+  pressed
+    +2 fill rect(637.88,10.5,779.63,101.75 r=10.5,10.5,10.5,10.5) #1f000000
+key r1c6 kind=letter a11y="I O, 6"
+  bounds 787.5,0,945,112.25
+  shape rect(795.38,10.5,937.13,101.75 r=10.5,10.5,10.5,10.5)
+  hit rect(787.5,0,945,112.25)
+  anchor 866.25,56.13 up 0,-1
+  actions send="action:group" swipe-up="keypad:6"
+  text label="IO" alt="6"
+  shortcut="g18/io"
+  popup from=group
+  normal
+    shadow rect(795.38,10.5,937.13,104.38 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(795.38,10.5,937.13,101.75 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "IO" 839.25,72.86 system 400 44.63 #ff37474f
+    text "6" 912.82,35.49 system 700 23.8 #ff7a858a
+  pressed
+    +2 fill rect(795.38,10.5,937.13,101.75 r=10.5,10.5,10.5,10.5) #1f000000
+key r1c7 kind=letter a11y="P, 7"
+  bounds 945,0,1102.5,112.25
+  shape rect(952.88,10.5,1094.63,101.75 r=10.5,10.5,10.5,10.5)
+  hit rect(945,0,1102.5,112.25)
+  anchor 1023.75,56.13 up 0,-1
+  actions send="action:group" swipe-up="keypad:7"
+  text label="P" alt="7"
+  shortcut="g18/p"
+  popup from=group
+  normal
+    shadow rect(952.88,10.5,1094.63,104.38 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(952.88,10.5,1094.63,101.75 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "P" 1010.36,72.86 system 400 44.63 #ff37474f
+    text "7" 1070.32,35.49 system 700 23.8 #ff7a858a
+  pressed
+    +2 fill rect(952.88,10.5,1094.63,101.75 r=10.5,10.5,10.5,10.5) #1f000000
+key r2c1 kind=letter a11y="A, 8"
+  bounds 0,112.25,183.75,224.5
+  shape rect(7.88,122.75,175.88,214 r=10.5,10.5,10.5,10.5)
+  hit rect(0,112.25,183.75,224.5)
+  anchor 91.88,168.38 up 0,-1
+  actions send="action:group" swipe-up="keypad:8"
+  text label="A" alt="8"
+  shortcut="g18/a"
+  popup from=group
+  normal
+    shadow rect(7.88,122.75,175.88,216.63 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(7.88,122.75,175.88,214 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "A" 78.49,185.11 system 400 44.63 #ff37474f
+    text "8" 151.57,147.74 system 700 23.8 #ff7a858a
+  pressed
+    +2 fill rect(7.88,122.75,175.88,214 r=10.5,10.5,10.5,10.5) #1f000000
+key r2c2 kind=letter a11y="S D, 9"
+  bounds 183.75,112.25,367.5,224.5
+  shape rect(191.63,122.75,359.63,214 r=10.5,10.5,10.5,10.5)
+  hit rect(183.75,112.25,367.5,224.5)
+  anchor 275.63,168.38 up 0,-1
+  actions send="action:group" swipe-up="keypad:9"
+  text label="SD" alt="9"
+  shortcut="g18/sd"
+  popup from=group
+  normal
+    shadow rect(191.63,122.75,359.63,216.63 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(191.63,122.75,359.63,214 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "SD" 248.63,185.11 system 400 44.63 #ff37474f
+    text "9" 335.32,147.74 system 700 23.8 #ff7a858a
+  pressed
+    +2 fill rect(191.63,122.75,359.63,214 r=10.5,10.5,10.5,10.5) #1f000000
+key r2c3 kind=letter a11y="F G, 0"
+  bounds 367.5,112.25,551.25,224.5
+  shape rect(375.38,122.75,543.38,214 r=10.5,10.5,10.5,10.5)
+  hit rect(367.5,112.25,551.25,224.5)
+  anchor 459.38,168.38 up 0,-1
+  actions send="action:group" swipe-up="keypad:0"
+  text label="FG" alt="0"
+  shortcut="g18/fg"
+  popup from=group
+  normal
+    shadow rect(375.38,122.75,543.38,216.63 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(375.38,122.75,543.38,214 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "FG" 432.38,185.11 system 400 44.63 #ff37474f
+    text "0" 519.07,147.74 system 700 23.8 #ff7a858a
+  pressed
+    +2 fill rect(375.38,122.75,543.38,214 r=10.5,10.5,10.5,10.5) #1f000000
+key r2c4 kind=letter a11y="H, （"
+  bounds 551.25,112.25,735,224.5
+  shape rect(559.13,122.75,727.13,214 r=10.5,10.5,10.5,10.5)
+  hit rect(551.25,112.25,735,224.5)
+  anchor 643.13,168.38 up 0,-1
+  actions send="action:group" swipe-up="("
+  text label="H" alt="（" alt-raw="{punct:(}"
+  shortcut="g18/h"
+  popup from=group
+  normal
+    shadow rect(559.13,122.75,727.13,216.63 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(559.13,122.75,727.13,214 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "H" 629.74,185.11 system 400 44.63 #ff37474f
+    text "（" 692.82,147.74 system 700 23.8 #ff7a858a
+  pressed
+    +2 fill rect(559.13,122.75,727.13,214 r=10.5,10.5,10.5,10.5) #1f000000
+key r2c5 kind=letter a11y="J K, ）"
+  bounds 735,112.25,918.75,224.5
+  shape rect(742.88,122.75,910.88,214 r=10.5,10.5,10.5,10.5)
+  hit rect(735,112.25,918.75,224.5)
+  anchor 826.88,168.38 up 0,-1
+  actions send="action:group" swipe-up=")"
+  text label="JK" alt="）" alt-raw="{punct:)}"
+  shortcut="g18/jk"
+  popup from=group
+  normal
+    shadow rect(742.88,122.75,910.88,216.63 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(742.88,122.75,910.88,214 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "JK" 799.88,185.11 system 400 44.63 #ff37474f
+    text "）" 876.57,147.74 system 700 23.8 #ff7a858a
+  pressed
+    +2 fill rect(742.88,122.75,910.88,214 r=10.5,10.5,10.5,10.5) #1f000000
+key r2c6 kind=letter a11y="L, -"
+  bounds 918.75,112.25,1102.5,224.5
+  shape rect(926.63,122.75,1094.63,214 r=10.5,10.5,10.5,10.5)
+  hit rect(918.75,112.25,1102.5,224.5)
+  anchor 1010.63,168.38 up 0,-1
+  actions send="action:group" swipe-up="-"
+  text label="L" alt="-" alt-raw="{punct:-}"
+  shortcut="g18/l"
+  popup from=group
+  normal
+    shadow rect(926.63,122.75,1094.63,216.63 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(926.63,122.75,1094.63,214 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "L" 997.24,185.11 system 400 44.63 #ff37474f
+    text "-" 1070.32,147.74 system 700 23.8 #ff7a858a
+  pressed
+    +2 fill rect(926.63,122.75,1094.63,214 r=10.5,10.5,10.5,10.5) #1f000000
+key apostrophe kind=function role=apostrophe a11y="分词"
+  bounds 0,224.5,165.38,336.75
+  shape rect(7.88,235,157.5,326.25 r=10.5,10.5,10.5,10.5)
+  hit rect(0,224.5,165.38,336.75)
+  anchor 82.69,280.63 up 0,-1
+  actions send="'"
+  text label="分词"
+  shortcut="separator"
+  normal
+    shadow rect(7.88,235,157.5,328.88 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(7.88,235,157.5,326.25 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    text "分词" 46.69,294.01 system 400 35.7 #ff7a858a
+  pressed
+    +2 fill rect(7.88,235,157.5,326.25 r=10.5,10.5,10.5,10.5) #1f000000
+key r3c1 kind=letter a11y="Z, ～"
+  bounds 165.38,224.5,319.73,336.75
+  shape rect(173.25,235,311.85,326.25 r=10.5,10.5,10.5,10.5)
+  hit rect(165.38,224.5,319.73,336.75)
+  anchor 242.55,280.63 up 0,-1
+  actions send="action:group" swipe-up="~"
+  text label="Z" alt="～" alt-raw="{punct:~}"
+  shortcut="g18/z"
+  popup from=group
+  normal
+    shadow rect(173.25,235,311.85,328.88 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(173.25,235,311.85,326.25 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "Z" 229.16,297.36 system 400 44.63 #ff37474f
+    text "～" 277.55,259.99 system 700 23.8 #ff7a858a
+  pressed
+    +2 fill rect(173.25,235,311.85,326.25 r=10.5,10.5,10.5,10.5) #1f000000
+key r3c2 kind=letter a11y="X C, ！"
+  bounds 319.73,224.5,474.08,336.75
+  shape rect(327.6,235,466.2,326.25 r=10.5,10.5,10.5,10.5)
+  hit rect(319.73,224.5,474.08,336.75)
+  anchor 396.9,280.63 up 0,-1
+  actions send="action:group" swipe-up="!"
+  text label="XC" alt="！" alt-raw="{punct:!}"
+  shortcut="g18/xc"
+  popup from=group
+  normal
+    shadow rect(327.6,235,466.2,328.88 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(327.6,235,466.2,326.25 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "XC" 369.9,297.36 system 400 44.63 #ff37474f
+    text "！" 431.9,259.99 system 700 23.8 #ff7a858a
+  pressed
+    +2 fill rect(327.6,235,466.2,326.25 r=10.5,10.5,10.5,10.5) #1f000000
+key r3c3 kind=letter a11y="V, @"
+  bounds 474.08,224.5,628.43,336.75
+  shape rect(481.95,235,620.55,326.25 r=10.5,10.5,10.5,10.5)
+  hit rect(474.08,224.5,628.43,336.75)
+  anchor 551.25,280.63 up 0,-1
+  actions send="action:group" swipe-up="@"
+  text label="V" alt="@" alt-raw="{punct:@}"
+  shortcut="g18/v"
+  popup from=group
+  normal
+    shadow rect(481.95,235,620.55,328.88 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(481.95,235,620.55,326.25 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "V" 537.86,297.36 system 400 44.63 #ff37474f
+    text "@" 596.25,259.99 system 700 23.8 #ff7a858a
+  pressed
+    +2 fill rect(481.95,235,620.55,326.25 r=10.5,10.5,10.5,10.5) #1f000000
+key r3c4 kind=letter a11y="B N, ？"
+  bounds 628.43,224.5,782.78,336.75
+  shape rect(636.3,235,774.9,326.25 r=10.5,10.5,10.5,10.5)
+  hit rect(628.43,224.5,782.78,336.75)
+  anchor 705.6,280.63 up 0,-1
+  actions send="action:group" swipe-up="?"
+  text label="BN" alt="？" alt-raw="{punct:?}"
+  shortcut="g18/bn"
+  popup from=group
+  normal
+    shadow rect(636.3,235,774.9,328.88 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(636.3,235,774.9,326.25 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "BN" 678.6,297.36 system 400 44.63 #ff37474f
+    text "？" 740.6,259.99 system 700 23.8 #ff7a858a
+  pressed
+    +2 fill rect(636.3,235,774.9,326.25 r=10.5,10.5,10.5,10.5) #1f000000
+key r3c5 kind=letter a11y="M, ："
+  bounds 782.78,224.5,937.13,336.75
+  shape rect(790.65,235,929.25,326.25 r=10.5,10.5,10.5,10.5)
+  hit rect(782.78,224.5,937.13,336.75)
+  anchor 859.95,280.63 up 0,-1
+  actions send="action:group" swipe-up=":"
+  text label="M" alt="：" alt-raw="{punct::}"
+  shortcut="g18/m"
+  popup from=group
+  normal
+    shadow rect(790.65,235,929.25,328.88 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(790.65,235,929.25,326.25 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "M" 846.56,297.36 system 400 44.63 #ff37474f
+    text "：" 894.95,259.99 system 700 23.8 #ff7a858a
+  pressed
+    +2 fill rect(790.65,235,929.25,326.25 r=10.5,10.5,10.5,10.5) #1f000000
+key backspace kind=function role=backspace a11y="a11y_key_backspace"
+  bounds 937.13,224.5,1102.5,336.75
+  shape rect(945,235,1094.63,326.25 r=10.5,10.5,10.5,10.5)
+  hit rect(937.13,224.5,1102.5,336.75)
+  anchor 1019.81,280.63 up 0,-1
+  actions repeat="true" send="sym:BackSpace" swipe-axis="both"
+  sound=delete shortcut="backspace"
+  normal
+    shadow rect(945,235,1094.63,328.88 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(945,235,1094.63,326.25 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    icon backspace 988.31,249.13,1051.31,312.13 #ff7a858a
+    icon delete-sweep 952.88,240.25,981.75,269.13 #ff7a858a
+    icon restore 952.88,292.13,981.75,321 #ff7a858a
+  pressed
+    +2 fill rect(945,235,1094.63,326.25 r=10.5,10.5,10.5,10.5) #1f000000
+key symbols kind=function role=symbols a11y="符"
+  bounds 0,336.75,132.3,449
+  shape rect(7.88,347.25,124.43,438.5 r=10.5,10.5,10.5,10.5)
+  hit rect(0,336.75,132.3,449)
+  anchor 66.15,392.88 up 0,-1
+  actions long-press="quickphrase" send="layout:Symbol"
+  text label="符"
+  shortcut="symbols"
+  normal
+    shadow rect(7.88,347.25,124.43,441.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(7.88,347.25,124.43,438.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    text "符" 47.41,406.26 system 700 35.7 #ff7a858a
+  pressed
+    +2 fill rect(7.88,347.25,124.43,438.5 r=10.5,10.5,10.5,10.5) #1f000000
+key numbers kind=function role=numbers a11y="123"
+  bounds 132.3,336.75,264.6,449
+  shape rect(140.18,347.25,256.73,438.5 r=10.5,10.5,10.5,10.5)
+  hit rect(132.3,336.75,264.6,449)
+  anchor 198.45,392.88 up 0,-1
+  actions long-press="unicode" send="layout:Number"
+  text label="123"
+  shortcut="numbers"
+  normal
+    shadow rect(140.18,347.25,256.73,441.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(140.18,347.25,256.73,438.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    text "123" 164.45,406.26 system 700 35.7 #ff7a858a
+  pressed
+    +2 fill rect(140.18,347.25,256.73,438.5 r=10.5,10.5,10.5,10.5) #1f000000
+key comma kind=function role=comma a11y="，"
+  bounds 264.6,336.75,374.85,449
+  shape rect(272.48,347.25,366.98,438.5 r=10.5,10.5,10.5,10.5)
+  hit rect(264.6,336.75,374.85,449)
+  anchor 319.73,392.88 up 0,-1
+  actions send=","
+  text label="，"
+  shortcut="comma"
+  normal
+    shadow rect(272.48,347.25,366.98,441.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(272.48,347.25,366.98,438.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    text "，" 294.07,412.12 system 400 51.32 #ff7a858a
+  pressed
+    +2 fill rect(272.48,347.25,366.98,438.5 r=10.5,10.5,10.5,10.5) #1f000000
+key space kind=space role=space a11y="拼音"
+  bounds 374.85,336.75,716.63,449
+  shape rect(382.73,347.25,708.75,438.5 r=10.5,10.5,10.5,10.5)
+  hit rect(374.85,336.75,716.63,449)
+  anchor 545.74,392.88 up 0,-1
+  actions long-press="space-long-press" send="sym:space" swipe-axis="both"
+  text label="拼音"
+  sound=space shortcut="space"
+  normal
+    shadow rect(382.73,347.25,708.75,441.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(382.73,347.25,708.75,438.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "拼音" 516.24,403.75 system 400 29.01 #ff37474f
+    icon cursor-move 390.6,352.5,419.48,381.38 #ff7a858a
+  pressed
+    +2 fill rect(382.73,347.25,708.75,438.5 r=10.5,10.5,10.5,10.5) #1f000000
+key period kind=function role=period a11y="。"
+  bounds 716.63,336.75,826.88,449
+  shape rect(724.5,347.25,819,438.5 r=10.5,10.5,10.5,10.5)
+  hit rect(716.63,336.75,826.88,449)
+  anchor 771.75,392.88 up 0,-1
+  actions send="."
+  text label="。"
+  shortcut="period"
+  normal
+    shadow rect(724.5,347.25,819,441.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(724.5,347.25,819,438.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    text "。" 746.09,412.12 system 400 51.32 #ff7a858a
+  pressed
+    +2 fill rect(724.5,347.25,819,438.5 r=10.5,10.5,10.5,10.5) #1f000000
+key lang kind=letter role=lang a11y="a11y_key_switch_language"
+  bounds 826.88,336.75,937.13,449
+  shape rect(834.75,347.25,929.25,438.5 r=10.5,10.5,10.5,10.5)
+  hit rect(826.88,336.75,937.13,449)
+  anchor 882,392.88 up 0,-1
+  actions long-press="ime-picker" send="lang"
+  shortcut="lang"
+  normal
+    shadow rect(834.75,347.25,929.25,441.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(834.75,347.25,929.25,438.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    icon language 850.5,361.38,913.5,424.38 #ff7a858a
+  pressed
+    +2 fill rect(834.75,347.25,929.25,438.5 r=10.5,10.5,10.5,10.5) #1f000000
+key enter kind=enter role=enter a11y="换行"
+  bounds 937.13,336.75,1102.5,449
+  shape rect(945,347.25,1094.63,438.5 r=10.5,10.5,10.5,10.5)
+  hit rect(937.13,336.75,1102.5,449)
+  anchor 1019.81,392.88 up 0,-1
+  actions send="sym:Return"
+  sound=return shortcut="return"
+  menu "emoji" icon=emoji do="picker:Emoji"
+  normal
+    shadow rect(945,347.25,1094.63,441.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(945,347.25,1094.63,438.5 r=10.5,10.5,10.5,10.5) #ff5cb5ab
+    icon enter 988.31,361.38,1051.31,424.38 #ffffffff
+  pressed
+    +2 fill rect(945,347.25,1094.63,438.5 r=10.5,10.5,10.5,10.5) #1f000000

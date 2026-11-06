@@ -51,6 +51,16 @@ tasks.withType<org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest>().co
     environment("SCENE_TEST_DATA", testData)
 }
 
+// the data is read by path, not off the classpath, so Gradle is told: a changed layout or snapshot
+// reruns the tests (both targets) rather than finding them up to date; recording always runs
+val recording = providers.gradleProperty("snapshots.record").getOrElse("false") == "true"
+tasks.withType<AbstractTestTask>().configureEach {
+    inputs.dir(layout.projectDirectory.dir("src/commonTest/data"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+        .withPropertyName("sceneTestData")
+    if (recording) outputs.upToDateWhen { false }
+}
+
 tasks.withType<Test>().configureEach {
     // -Psnapshots.record=true writes the scene snapshots anew instead of comparing (JVM only: the JS
     // run then compares with what the JVM wrote, so the two agree or fail)

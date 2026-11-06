@@ -2,7 +2,8 @@
 <!--
   数字键盘（NumberKeyboard：Number 及字段的 6 种 pad，rules C §7），板 number，一个文件七种 pad，按 pad= 条件（NumberPad.of）。
   宽度为行宽的百分之几：左列 15、数字平分、右列 15；第 4 行 ABC 15、底0 10、!?# 13.333、0 23.334、底1 13.333、底2 10、回车 15。
-  pad 没有键的位置是空白键：画功能键面、不收触摸、读屏跳过（<gap look="function">），数字在各 pad 的位置不变。
+  pad 没有键的位置是空白键：画键面、不收触摸、读屏跳过（<gap look="function">），数字在各 pad 的位置不变。
+  底行中间那格（FULL 的 =、SIGNED 的 -、PHONE 的 )）现在是 AltForeground，归字母键（kind="letter" class="alt-text"），空着时也一样。
   同一个符号在不同 pad 里在不同位置（- 在 FULL 是左列、PHONE 是角、SIGNED 是底中），id 可以重复，只要每处都有 when=，引擎查
   显示出来的不重复。+ - * / , = . 发小键盘键（输入法不改成全角），# ( ) : 原样提交。不弹预览、长按键盘和长按菜单（popups="off"，
   回车的 Emoji 菜单也没有，rules C 疑问 8）。
@@ -48,10 +49,10 @@
     <gap width="10" look="function" when="pad=digits|signed|decimal|signed-decimal|datetime"/>
     <key id="symbols" role="symbols" kind="letter" class="alt-text" width="13.333" label="!?#" text-size="16" text-style="bold" send="layout:Symbol"/>
     <key id="0" width="23.334" label="0" text-size="30" send="keypad:0" shortcut="num/0"/>
-    <key id="=" kind="function" class="alt-text" width="13.333" label="=" text-size="23" send="sym:KP_Equal" when="pad=full"/>
-    <key id="-" kind="function" class="alt-text" width="13.333" label="-" text-size="23" send="sym:KP_Subtract" when="pad=signed|signed-decimal"/>
-    <key id=")" kind="function" class="alt-text" width="13.333" label=")" text-size="23" send="commit:)" when="pad=phone"/>
-    <gap width="13.333" look="function" class="alt-text" when="pad=digits|decimal|datetime"/>
+    <key id="=" kind="letter" class="alt-text" width="13.333" label="=" text-size="23" send="sym:KP_Equal" when="pad=full"/>
+    <key id="-" kind="letter" class="alt-text" width="13.333" label="-" text-size="23" send="sym:KP_Subtract" when="pad=signed|signed-decimal"/>
+    <key id=")" kind="letter" class="alt-text" width="13.333" label=")" text-size="23" send="commit:)" when="pad=phone"/>
+    <gap width="13.333" look="letter" class="alt-text" when="pad=digits|decimal|datetime"/>
     <key id="." kind="function" width="10" label="." text-size="23" send="sym:KP_Decimal" when="pad=full|decimal|signed-decimal|datetime"/>
     <key id="," kind="function" width="10" label="," text-size="23" send="sym:KP_Separator" when="pad=phone"/>
     <gap width="10" look="function" when="pad=digits|signed"/>

@@ -2,87 +2,88 @@
 <!--
   18 键（GroupedKeyboard：GroupedPinyin18、Grouped18、Grouped18Plain，rules C §3），板 k18（拼音 18 和双拼 18 共用）。
   第 1 行 7 组、第 2 行 6 组各占满（fill 平分），第 3 行 分词 15 + 五组各 14 + ⌫ 15。角标 1–0 ( ) - ~ ! @ ? :。
-  第 2 行最后一组在双拼方案打 ; 时是 L;（Grouped18），否则 L（拼音 18、Grouped18Plain），用 variant 写。其余同 14 键。
+  第 2 行最后一组在双拼方案打 ; 时是 L;（Grouped18），否则 L（拼音 18、Grouped18Plain），用 variant 写（读「L ;, -」）。
+  M 的角标 : 上滑发 :（过输入法，同现在的 HostKeyAction(":")）。其余同 14 键。
 -->
 <keyboard xmlns="https://youmo-ime/layout/1" id="k18" name="18 键" family="grouped" columns="100">
   <defaults kind="letter" text-size="20" width="fill"/>
   <row>
-    <key id="r1c1" label="Q" alt="1" a11y="Q, 1" send="action:group" swipe-up="keypad:1"
+    <key id="r1c1" label="Q" alt="1" send="action:group" swipe-up="keypad:1"
          shortcut="g18/q">
       <popup from="group"/>
     </key>
-    <key id="r1c2" label="WE" alt="2" a11y="W E, 2" send="action:group" swipe-up="keypad:2"
+    <key id="r1c2" label="WE" alt="2" send="action:group" swipe-up="keypad:2"
          shortcut="g18/we">
       <popup from="group"/>
     </key>
-    <key id="r1c3" label="RT" alt="3" a11y="R T, 3" send="action:group" swipe-up="keypad:3"
+    <key id="r1c3" label="RT" alt="3" send="action:group" swipe-up="keypad:3"
          shortcut="g18/rt">
       <popup from="group"/>
     </key>
-    <key id="r1c4" label="Y" alt="4" a11y="Y, 4" send="action:group" swipe-up="keypad:4"
+    <key id="r1c4" label="Y" alt="4" send="action:group" swipe-up="keypad:4"
          shortcut="g18/y">
       <popup from="group"/>
     </key>
-    <key id="r1c5" label="U" alt="5" a11y="U, 5" send="action:group" swipe-up="keypad:5"
+    <key id="r1c5" label="U" alt="5" send="action:group" swipe-up="keypad:5"
          shortcut="g18/u">
       <popup from="group"/>
     </key>
-    <key id="r1c6" label="IO" alt="6" a11y="I O, 6" send="action:group" swipe-up="keypad:6"
+    <key id="r1c6" label="IO" alt="6" send="action:group" swipe-up="keypad:6"
          shortcut="g18/io">
       <popup from="group"/>
     </key>
-    <key id="r1c7" label="P" alt="7" a11y="P, 7" send="action:group" swipe-up="keypad:7"
+    <key id="r1c7" label="P" alt="7" send="action:group" swipe-up="keypad:7"
          shortcut="g18/p">
       <popup from="group"/>
     </key>
   </row>
   <row>
-    <key id="r2c1" width="fill" label="A" alt="8" a11y="A, 8" send="action:group" swipe-up="keypad:8"
+    <key id="r2c1" width="fill" label="A" alt="8" send="action:group" swipe-up="keypad:8"
          shortcut="g18/a">
       <popup from="group"/>
     </key>
-    <key id="r2c2" width="fill" label="SD" alt="9" a11y="S D, 9" send="action:group" swipe-up="keypad:9"
+    <key id="r2c2" width="fill" label="SD" alt="9" send="action:group" swipe-up="keypad:9"
          shortcut="g18/sd">
       <popup from="group"/>
     </key>
-    <key id="r2c3" width="fill" label="FG" alt="0" a11y="F G, 0" send="action:group" swipe-up="keypad:0"
+    <key id="r2c3" width="fill" label="FG" alt="0" send="action:group" swipe-up="keypad:0"
          shortcut="g18/fg">
       <popup from="group"/>
     </key>
-    <key id="r2c4" width="fill" label="H" alt="{punct:(}" a11y="H, (" send="action:group" swipe-up="("
+    <key id="r2c4" width="fill" label="H" alt="{punct:(}" send="action:group" swipe-up="("
          shortcut="g18/h">
       <popup from="group"/>
     </key>
-    <key id="r2c5" width="fill" label="JK" alt="{punct:)}" a11y="J K, )" send="action:group" swipe-up=")"
+    <key id="r2c5" width="fill" label="JK" alt="{punct:)}" send="action:group" swipe-up=")"
          shortcut="g18/jk">
       <popup from="group"/>
     </key>
-    <key id="r2c6" width="fill" label="L" alt="{punct:-}" a11y="L, -" send="action:group" swipe-up="-"
+    <key id="r2c6" width="fill" label="L" alt="{punct:-}" send="action:group" swipe-up="-"
          shortcut="g18/l">
-      <variant when="ime=shuangpin scheme-types=semicolon" label="L;" a11y="L, -"/>
+      <variant when="ime=shuangpin scheme-types=semicolon" label="L;"/>
       <popup from="group"/>
     </key>
   </row>
   <row>
     <key id="apostrophe" role="apostrophe" kind="function" width="15" label="分词" text-size="16" a11y="分词"
          send="'" shortcut="separator"/>
-    <key id="r3c1" width="14" label="Z" alt="{punct:~}" a11y="Z, ~" send="action:group" swipe-up="~"
+    <key id="r3c1" width="14" label="Z" alt="{punct:~}" send="action:group" swipe-up="~"
          shortcut="g18/z">
       <popup from="group"/>
     </key>
-    <key id="r3c2" width="14" label="XC" alt="{punct:!}" a11y="X C, !" send="action:group" swipe-up="!"
+    <key id="r3c2" width="14" label="XC" alt="{punct:!}" send="action:group" swipe-up="!"
          shortcut="g18/xc">
       <popup from="group"/>
     </key>
-    <key id="r3c3" width="14" label="V" alt="{punct:@}" a11y="V, @" send="action:group" swipe-up="@"
+    <key id="r3c3" width="14" label="V" alt="{punct:@}" send="action:group" swipe-up="@"
          shortcut="g18/v">
       <popup from="group"/>
     </key>
-    <key id="r3c4" width="14" label="BN" alt="{punct:?}" a11y="B N, ?" send="action:group" swipe-up="?"
+    <key id="r3c4" width="14" label="BN" alt="{punct:?}" send="action:group" swipe-up="?"
          shortcut="g18/bn">
       <popup from="group"/>
     </key>
-    <key id="r3c5" width="14" label="M" alt="{punct::}" a11y="M, :" send="action:group" swipe-up="commit::"
+    <key id="r3c5" width="14" label="M" alt="{punct::}" send="action:group" swipe-up=":"
          shortcut="g18/m">
       <popup from="group"/>
     </key>

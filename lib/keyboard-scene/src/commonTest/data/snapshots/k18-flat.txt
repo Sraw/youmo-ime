@@ -7,6 +7,9 @@ key r1c1 kind=letter a11y="Q, 1"
   hit rect(0,0,154.29,175.5)
   anchor 77.14,87.75 up 0,-1
   actions send="action:group" swipe-up="keypad:1"
+  text label="Q" alt="1"
+  shortcut="g18/q"
+  popup from=group
   normal
     text "Q" 61.39,107.44 system 400 52.5 #ff37474f
     text "1" 119.67,47.78 system 700 28 #ff7a858a
@@ -18,6 +21,9 @@ key r1c2 kind=letter a11y="W E, 2"
   hit rect(154.29,0,308.57,175.5)
   anchor 231.43,87.75 up 0,-1
   actions send="action:group" swipe-up="keypad:2"
+  text label="WE" alt="2"
+  shortcut="g18/we"
+  popup from=group
   normal
     text "WE" 199.93,107.44 system 400 52.5 #ff37474f
     text "2" 273.96,47.78 system 700 28 #ff7a858a
@@ -29,6 +35,9 @@ key r1c3 kind=letter a11y="R T, 3"
   hit rect(308.57,0,462.86,175.5)
   anchor 385.71,87.75 up 0,-1
   actions send="action:group" swipe-up="keypad:3"
+  text label="RT" alt="3"
+  shortcut="g18/rt"
+  popup from=group
   normal
     text "RT" 354.21,107.44 system 400 52.5 #ff37474f
     text "3" 428.24,47.78 system 700 28 #ff7a858a
@@ -40,6 +49,9 @@ key r1c4 kind=letter a11y="Y, 4"
   hit rect(462.86,0,617.14,175.5)
   anchor 540,87.75 up 0,-1
   actions send="action:group" swipe-up="keypad:4"
+  text label="Y" alt="4"
+  shortcut="g18/y"
+  popup from=group
   normal
     text "Y" 524.25,107.44 system 400 52.5 #ff37474f
     text "4" 582.53,47.78 system 700 28 #ff7a858a
@@ -51,6 +63,9 @@ key r1c5 kind=letter a11y="U, 5"
   hit rect(617.14,0,771.43,175.5)
   anchor 694.29,87.75 up 0,-1
   actions send="action:group" swipe-up="keypad:5"
+  text label="U" alt="5"
+  shortcut="g18/u"
+  popup from=group
   normal
     text "U" 678.54,107.44 system 400 52.5 #ff37474f
     text "5" 736.81,47.78 system 700 28 #ff7a858a
@@ -62,6 +77,9 @@ key r1c6 kind=letter a11y="I O, 6"
   hit rect(771.43,0,925.71,175.5)
   anchor 848.57,87.75 up 0,-1
   actions send="action:group" swipe-up="keypad:6"
+  text label="IO" alt="6"
+  shortcut="g18/io"
+  popup from=group
   normal
     text "IO" 817.07,107.44 system 400 52.5 #ff37474f
     text "6" 891.1,47.78 system 700 28 #ff7a858a
@@ -73,6 +91,9 @@ key r1c7 kind=letter a11y="P, 7"
   hit rect(925.71,0,1080,175.5)
   anchor 1002.86,87.75 up 0,-1
   actions send="action:group" swipe-up="keypad:7"
+  text label="P" alt="7"
+  shortcut="g18/p"
+  popup from=group
   normal
     text "P" 987.11,107.44 system 400 52.5 #ff37474f
     text "7" 1045.38,47.78 system 700 28 #ff7a858a
@@ -84,6 +105,9 @@ key r2c1 kind=letter a11y="A, 8"
   hit rect(0,175.5,180,351)
   anchor 90,263.25 up 0,-1
   actions send="action:group" swipe-up="keypad:8"
+  text label="A" alt="8"
+  shortcut="g18/a"
+  popup from=group
   normal
     text "A" 74.25,282.94 system 400 52.5 #ff37474f
     text "8" 145.38,223.28 system 700 28 #ff7a858a
@@ -95,6 +119,9 @@ key r2c2 kind=letter a11y="S D, 9"
   hit rect(180,175.5,360,351)
   anchor 270,263.25 up 0,-1
   actions send="action:group" swipe-up="keypad:9"
+  text label="SD" alt="9"
+  shortcut="g18/sd"
+  popup from=group
   normal
     text "SD" 238.5,282.94 system 400 52.5 #ff37474f
     text "9" 325.38,223.28 system 700 28 #ff7a858a
@@ -106,28 +133,37 @@ key r2c3 kind=letter a11y="F G, 0"
   hit rect(360,175.5,540,351)
   anchor 450,263.25 up 0,-1
   actions send="action:group" swipe-up="keypad:0"
+  text label="FG" alt="0"
+  shortcut="g18/fg"
+  popup from=group
   normal
     text "FG" 418.5,282.94 system 400 52.5 #ff37474f
     text "0" 505.38,223.28 system 700 28 #ff7a858a
   pressed
     +0 fill rect(367.88,193.88,532.13,332.63) #1f000000
-key r2c4 kind=letter a11y="H, ("
+key r2c4 kind=letter a11y="H, （"
   bounds 540,175.5,720,351
   shape rect(547.88,193.88,712.13,332.63)
   hit rect(540,175.5,720,351)
   anchor 630,263.25 up 0,-1
   actions send="action:group" swipe-up="("
+  text label="H" alt="（" alt-raw="{punct:(}"
+  shortcut="g18/h"
+  popup from=group
   normal
     text "H" 614.25,282.94 system 400 52.5 #ff37474f
     text "（" 673.62,223.28 system 700 28 #ff7a858a
   pressed
     +0 fill rect(547.88,193.88,712.13,332.63) #1f000000
-key r2c5 kind=letter a11y="J K, )"
+key r2c5 kind=letter a11y="J K, ）"
   bounds 720,175.5,900,351
   shape rect(727.88,193.88,892.13,332.63)
   hit rect(720,175.5,900,351)
   anchor 810,263.25 up 0,-1
   actions send="action:group" swipe-up=")"
+  text label="JK" alt="）" alt-raw="{punct:)}"
+  shortcut="g18/jk"
+  popup from=group
   normal
     text "JK" 778.5,282.94 system 400 52.5 #ff37474f
     text "）" 853.62,223.28 system 700 28 #ff7a858a
@@ -139,6 +175,9 @@ key r2c6 kind=letter a11y="L, -"
   hit rect(900,175.5,1080,351)
   anchor 990,263.25 up 0,-1
   actions send="action:group" swipe-up="-"
+  text label="L" alt="-" alt-raw="{punct:-}"
+  shortcut="g18/l"
+  popup from=group
   normal
     text "L" 974.25,282.94 system 400 52.5 #ff37474f
     text "-" 1045.38,223.28 system 700 28 #ff7a858a
@@ -150,27 +189,35 @@ key apostrophe kind=function role=apostrophe a11y="分词"
   hit rect(0,351,162,526.5)
   anchor 81,438.75 up 0,-1
   actions send="'"
+  text label="分词"
+  shortcut="separator"
   normal
     text "分词" 39,454.5 system 400 42 #ff7a858a
   pressed
     +0 fill rect(7.88,369.38,154.13,508.13) #1f000000
-key r3c1 kind=letter a11y="Z, ~"
+key r3c1 kind=letter a11y="Z, ～"
   bounds 162,351,313.2,526.5
   shape rect(169.88,369.38,305.33,508.13)
   hit rect(162,351,313.2,526.5)
   anchor 237.6,438.75 up 0,-1
   actions send="action:group" swipe-up="~"
+  text label="Z" alt="～" alt-raw="{punct:~}"
+  shortcut="g18/z"
+  popup from=group
   normal
     text "Z" 221.85,458.44 system 400 52.5 #ff37474f
     text "～" 266.82,398.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(169.88,369.38,305.33,508.13) #1f000000
-key r3c2 kind=letter a11y="X C, !"
+key r3c2 kind=letter a11y="X C, ！"
   bounds 313.2,351,464.4,526.5
   shape rect(321.08,369.38,456.53,508.13)
   hit rect(313.2,351,464.4,526.5)
   anchor 388.8,438.75 up 0,-1
   actions send="action:group" swipe-up="!"
+  text label="XC" alt="！" alt-raw="{punct:!}"
+  shortcut="g18/xc"
+  popup from=group
   normal
     text "XC" 357.3,458.44 system 400 52.5 #ff37474f
     text "！" 418.02,398.78 system 700 28 #ff7a858a
@@ -182,28 +229,37 @@ key r3c3 kind=letter a11y="V, @"
   hit rect(464.4,351,615.6,526.5)
   anchor 540,438.75 up 0,-1
   actions send="action:group" swipe-up="@"
+  text label="V" alt="@" alt-raw="{punct:@}"
+  shortcut="g18/v"
+  popup from=group
   normal
     text "V" 524.25,458.44 system 400 52.5 #ff37474f
     text "@" 580.98,398.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(472.28,369.38,607.73,508.13) #1f000000
-key r3c4 kind=letter a11y="B N, ?"
+key r3c4 kind=letter a11y="B N, ？"
   bounds 615.6,351,766.8,526.5
   shape rect(623.48,369.38,758.93,508.13)
   hit rect(615.6,351,766.8,526.5)
   anchor 691.2,438.75 up 0,-1
   actions send="action:group" swipe-up="?"
+  text label="BN" alt="？" alt-raw="{punct:?}"
+  shortcut="g18/bn"
+  popup from=group
   normal
     text "BN" 659.7,458.44 system 400 52.5 #ff37474f
     text "？" 720.42,398.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(623.48,369.38,758.93,508.13) #1f000000
-key r3c5 kind=letter a11y="M, :"
+key r3c5 kind=letter a11y="M, ："
   bounds 766.8,351,918,526.5
   shape rect(774.68,369.38,910.13,508.13)
   hit rect(766.8,351,918,526.5)
   anchor 842.4,438.75 up 0,-1
-  actions send="action:group" swipe-up="commit::"
+  actions send="action:group" swipe-up=":"
+  text label="M" alt="：" alt-raw="{punct::}"
+  shortcut="g18/m"
+  popup from=group
   normal
     text "M" 826.65,458.44 system 400 52.5 #ff37474f
     text "：" 871.62,398.78 system 700 28 #ff7a858a
@@ -215,6 +271,7 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
   hit rect(918,351,1080,526.5)
   anchor 999,438.75 up 0,-1
   actions repeat="true" send="sym:BackSpace" swipe-axis="both"
+  sound=delete shortcut="backspace"
   normal
     icon backspace 967.5,407.25,1030.5,470.25 #ff7a858a
     icon delete-sweep 933.75,374.63,962.63,403.5 #ff7a858a
@@ -227,6 +284,8 @@ key symbols kind=function role=symbols a11y="符"
   hit rect(0,526.5,129.6,702)
   anchor 64.8,614.25 up 0,-1
   actions long-press="quickphrase" send="layout:Symbol"
+  text label="符"
+  shortcut="symbols"
   normal
     text "符" 42.75,630 system 700 42 #ff7a858a
   pressed
@@ -237,6 +296,8 @@ key numbers kind=function role=numbers a11y="123"
   hit rect(129.6,526.5,259.2,702)
   anchor 194.4,614.25 up 0,-1
   actions long-press="unicode" send="layout:Number"
+  text label="123"
+  shortcut="numbers"
   normal
     text "123" 154.4,630 system 700 42 #ff7a858a
   pressed
@@ -247,6 +308,8 @@ key comma kind=function role=comma a11y="，"
   hit rect(259.2,526.5,367.2,702)
   anchor 313.2,614.25 up 0,-1
   actions send=","
+  text label="，"
+  shortcut="comma"
   normal
     text "，" 283.01,636.89 system 400 60.38 #ff7a858a
   pressed
@@ -257,6 +320,8 @@ key space kind=space role=space a11y="拼音"
   hit rect(367.2,526.5,702,702)
   anchor 534.6,614.25 up 0,-1
   actions long-press="space-long-press" send="sym:space" swipe-axis="both"
+  text label="拼音"
+  sound=space shortcut="space"
   normal
     fill rect(393.45,568.5,675.75,660 r=7.88,7.88,7.88,7.88) #ffc9ced1
     text "拼音" 500.1,627.05 system 400 34.13 #ff37474f
@@ -269,6 +334,8 @@ key period kind=function role=period a11y="。"
   hit rect(702,526.5,810,702)
   anchor 756,614.25 up 0,-1
   actions send="."
+  text label="。"
+  shortcut="period"
   normal
     text "。" 725.81,636.89 system 400 60.38 #ff7a858a
   pressed
@@ -279,6 +346,7 @@ key lang kind=letter role=lang a11y="a11y_key_switch_language"
   hit rect(810,526.5,918,702)
   anchor 864,614.25 up 0,-1
   actions long-press="ime-picker" send="lang"
+  shortcut="lang"
   normal
     icon language 832.5,582.75,895.5,645.75 #ff7a858a
   pressed
@@ -289,6 +357,8 @@ key enter kind=enter role=enter a11y="换行"
   hit rect(918,526.5,1080,702)
   anchor 999,614.25 up 0,-1
   actions send="sym:Return"
+  sound=return shortcut="return"
+  menu "emoji" icon=emoji do="picker:Emoji"
   normal
     fill rect(953.06,568.31,1044.94,660.19 r=45.94,45.94,45.94,45.94) #ff5cb5ab
     icon enter 967.5,582.75,1030.5,645.75 #ffffffff

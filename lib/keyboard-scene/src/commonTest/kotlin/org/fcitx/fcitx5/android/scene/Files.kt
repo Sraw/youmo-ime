@@ -18,3 +18,6 @@ internal expect fun testDataDir(): String
 internal val TEST_DATA: String by lazy { testDataDir() }
 
 internal fun testData(name: String): String = readText("$TEST_DATA/$name") ?: error("no $TEST_DATA/$name")
+
+/** The names of the files in [dir], sorted. */
+internal expect fun listNames(dir: String): List<String>

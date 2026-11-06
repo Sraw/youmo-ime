@@ -20,3 +20,5 @@ private val env: dynamic = js("process.env")
 
 internal actual fun testDataDir(): String =
     (env.SCENE_TEST_DATA as String?) ?: error("no SCENE_TEST_DATA: run the tests through Gradle")
+
+internal actual fun listNames(dir: String): List<String> = (fs.readdirSync(dir) as Array<String>).toList().sorted()

@@ -3,6 +3,7 @@
   符号面板（PickerLayout panel=true，rules C §9）的排法，板 symbols。上 3/4（行高 3 比 1）：分类栏（左 18）和网格（右 82）两个原生 slot，
   不画键面（栏和网格的颜色从主题变量取）；下 1/4 一行键：返回 15、锁 12、数字 12、空格、⌫ 15、回车 15。
   锁的图标随锁定换（{lock-icon}：开着 lock-open，锁上 lock，App 把锁的状态给引擎 :locked）。
+  空格是 SpaceKey：长按同字母板，但不写输入法名（PickerLayout 不调 onInputMethodUpdate，键上是空的）。
 -->
 <keyboard xmlns="https://youmo-ime/layout/1" id="symbols" name="符号" family="symbols" columns="100">
   <row height="3">
@@ -11,10 +12,10 @@
   </row>
   <row height="1">
     <key id="back" role="back" kind="function" width="15" label="返回" text-size="16" text-style="bold" send="panel-back"/>
-    <key id="lock" role="lock" kind="function" width="12" icon="{lock-icon}" a11y="a11y_key_lock" send="panel-lock"/>
+    <key id="lock" role="lock" kind="function" width="12" icon="{lock-icon}" a11y="picker_lock" send="panel-lock"/>
     <key id="numbers" role="numbers" kind="letter" class="alt-text" width="12" icon="number-pad" a11y="a11y_key_numbers" send="layout:Number"/>
     <key id="space" role="space" kind="space" face="special" width="fill" text-size="13" a11y="a11y_key_space" sound="space" send="sym:space"
-         swipe-axis="both" shortcut="space"/>
+         long-press="space-long-press" swipe-axis="both" shortcut="space"/>
     <key id="backspace" role="backspace" kind="function" width="15" icon="backspace" a11y="a11y_key_backspace"
          sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both" shortcut="backspace"/>
     <key id="enter" role="enter" kind="enter" face="special" width="15" icon="{return-icon}" a11y="{return}"

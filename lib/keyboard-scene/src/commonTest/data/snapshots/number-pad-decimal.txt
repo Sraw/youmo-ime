@@ -12,13 +12,15 @@ base
   shadow rect(169.88,544.88,262.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
   fill rect(169.88,544.88,262.13,683.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
   shadow rect(673.88,544.88,802.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-  fill rect(673.88,544.88,802.13,683.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+  fill rect(673.88,544.88,802.13,683.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
 key 1 kind=letter a11y="1"
   bounds 162,0,414,175.5
   shape rect(169.88,18.38,406.13,157.13 r=10.5,10.5,10.5,10.5)
   hit rect(162,0,414,175.5)
   anchor 288,87.75 up 0,-1
   actions send="keypad:1"
+  text label="1"
+  shortcut="num/1"
   normal
     shadow rect(169.88,18.38,406.13,159.75 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(169.88,18.38,406.13,157.13 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -31,6 +33,8 @@ key 2 kind=letter a11y="2"
   hit rect(414,0,666,175.5)
   anchor 540,87.75 up 0,-1
   actions send="keypad:2"
+  text label="2"
+  shortcut="num/2"
   normal
     shadow rect(421.88,18.38,658.13,159.75 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(421.88,18.38,658.13,157.13 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -43,6 +47,8 @@ key 3 kind=letter a11y="3"
   hit rect(666,0,918,175.5)
   anchor 792,87.75 up 0,-1
   actions send="keypad:3"
+  text label="3"
+  shortcut="num/3"
   normal
     shadow rect(673.88,18.38,910.13,159.75 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(673.88,18.38,910.13,157.13 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -55,6 +61,8 @@ key 4 kind=letter a11y="4"
   hit rect(162,175.5,414,351)
   anchor 288,263.25 up 0,-1
   actions send="keypad:4"
+  text label="4"
+  shortcut="num/4"
   normal
     shadow rect(169.88,193.88,406.13,335.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(169.88,193.88,406.13,332.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -67,6 +75,8 @@ key 5 kind=letter a11y="5"
   hit rect(414,175.5,666,351)
   anchor 540,263.25 up 0,-1
   actions send="keypad:5"
+  text label="5"
+  shortcut="num/5"
   normal
     shadow rect(421.88,193.88,658.13,335.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(421.88,193.88,658.13,332.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -79,6 +89,8 @@ key 6 kind=letter a11y="6"
   hit rect(666,175.5,918,351)
   anchor 792,263.25 up 0,-1
   actions send="keypad:6"
+  text label="6"
+  shortcut="num/6"
   normal
     shadow rect(673.88,193.88,910.13,335.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(673.88,193.88,910.13,332.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -91,6 +103,7 @@ key space kind=function role=space a11y="a11y_key_space"
   hit rect(918,175.5,1080,351)
   anchor 999,263.25 up 0,-1
   actions send="sym:space" swipe-axis="both"
+  shortcut="space"
   normal
     shadow rect(925.88,193.88,1072.13,335.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(925.88,193.88,1072.13,332.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -104,6 +117,8 @@ key 7 kind=letter a11y="7"
   hit rect(162,351,414,526.5)
   anchor 288,438.75 up 0,-1
   actions send="keypad:7"
+  text label="7"
+  shortcut="num/7"
   normal
     shadow rect(169.88,369.38,406.13,510.75 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(169.88,369.38,406.13,508.13 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -116,6 +131,8 @@ key 8 kind=letter a11y="8"
   hit rect(414,351,666,526.5)
   anchor 540,438.75 up 0,-1
   actions send="keypad:8"
+  text label="8"
+  shortcut="num/8"
   normal
     shadow rect(421.88,369.38,658.13,510.75 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(421.88,369.38,658.13,508.13 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -128,6 +145,8 @@ key 9 kind=letter a11y="9"
   hit rect(666,351,918,526.5)
   anchor 792,438.75 up 0,-1
   actions send="keypad:9"
+  text label="9"
+  shortcut="num/9"
   normal
     shadow rect(673.88,369.38,910.13,510.75 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(673.88,369.38,910.13,508.13 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -140,6 +159,7 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
   hit rect(918,351,1080,526.5)
   anchor 999,438.75 up 0,-1
   actions repeat="true" send="sym:BackSpace" swipe-axis="both"
+  sound=delete shortcut="backspace"
   normal
     shadow rect(925.88,369.38,1072.13,510.75 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(925.88,369.38,1072.13,508.13 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -148,12 +168,13 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
     icon restore 933.75,474,962.63,502.88 #ff7a858a
   pressed
     +2 fill rect(925.88,369.38,1072.13,508.13 r=10.5,10.5,10.5,10.5) #1f000000
-key back kind=function role=back a11y="ABC"
+key back kind=function role=back a11y="A B C"
   bounds 0,526.5,162,702
   shape rect(7.88,544.88,154.13,683.63 r=10.5,10.5,10.5,10.5)
   hit rect(0,526.5,162,702)
   anchor 81,614.25 up 0,-1
   actions send="layout:Text"
+  text label="ABC"
   normal
     shadow rect(7.88,544.88,154.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(7.88,544.88,154.13,683.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -166,6 +187,7 @@ key symbols kind=letter role=symbols a11y="!?#"
   hit rect(270,526.5,414,702)
   anchor 342,614.25 up 0,-1
   actions send="layout:Symbol"
+  text label="!?#"
   normal
     shadow rect(277.88,544.88,406.12,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(277.88,544.88,406.12,683.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -178,6 +200,8 @@ key 0 kind=letter a11y="0"
   hit rect(414,526.5,666,702)
   anchor 540,614.25 up 0,-1
   actions send="keypad:0"
+  text label="0"
+  shortcut="num/0"
   normal
     shadow rect(421.87,544.88,658.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(421.87,544.88,658.13,683.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -190,6 +214,7 @@ key . kind=function a11y="."
   hit rect(810,526.5,918,702)
   anchor 864,614.25 up 0,-1
   actions send="sym:KP_Decimal"
+  text label="."
   normal
     shadow rect(817.88,544.88,910.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(817.88,544.88,910.13,683.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -202,6 +227,7 @@ key enter kind=enter role=enter a11y="换行"
   hit rect(918,526.5,1080,702)
   anchor 999,614.25 up 0,-1
   actions send="sym:Return"
+  sound=return shortcut="return"
   normal
     shadow rect(925.88,544.88,1072.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(925.88,544.88,1072.13,683.63 r=10.5,10.5,10.5,10.5) #ff5cb5ab

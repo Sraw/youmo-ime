@@ -15,3 +15,5 @@ internal actual fun writeText(path: String, text: String) {
 internal actual fun recording(): Boolean = System.getProperty("snapshots.record") == "true"
 
 internal actual fun testDataDir(): String = System.getProperty("scene.testData") ?: error("no scene.testData: run the tests through Gradle")
+
+internal actual fun listNames(dir: String): List<String> = File(dir).list().orEmpty().sorted()
