@@ -163,8 +163,9 @@ object Pages {
         field("chat_clear", "聊天：发送后 text.clear()，不重启输入", ime = EditorInfo.IME_ACTION_SEND) {
             onAction = { text.clear(); true }
         }
-        // API 30+: setText itself restarts the input (Editor.scheduleRestartInputForSetText)
-        field("chat_settext", "聊天：发送后 setText(\"\")（框架自带一次 restartInput）", ime = EditorInfo.IME_ACTION_SEND) {
+        // setText makes the framework restart the input itself: at once up to Android 10, deferred from
+        // API 30 (Editor.scheduleRestartInputForSetText), through invalidateInput from API 34 (no new connection)
+        field("chat_settext", "聊天：发送后 setText(\"\")（框架自己让输入法重来：10 直接重启，30 起延后，34 起 invalidateInput）", ime = EditorInfo.IME_ACTION_SEND) {
             onAction = { setText(""); true }
         }
         field("chat_restart", "聊天：发送后 setText(\"\") 再 restartInput", ime = EditorInfo.IME_ACTION_SEND) {
@@ -195,7 +196,9 @@ object Pages {
         field("upper", "输入时应用自动转大写") {
             addTextChangedListener(afterChange { s ->
                 for (i in s.indices) {
-                    if (s[i].isLowerCase()) s.replace(i, i + 1, s[i].uppercaseChar().toString())
+                    val u = s[i].uppercaseChar()
+                    // a letter whose upper case is itself (ß, some others) left alone: no endless rewrite
+                    if (u != s[i]) s.replace(i, i + 1, u.toString())
                 }
             })
         }

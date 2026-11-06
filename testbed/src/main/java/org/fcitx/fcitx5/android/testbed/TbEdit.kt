@@ -189,9 +189,27 @@ class TbEdit(context: Context, val name: String, private val log: EventLog) : Ed
         to.extras = from.extras
         to.hintLocales = from.hintLocales
         to.contentMimeTypes = from.contentMimeTypes
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            to.supportedHandwritingGestures = from.supportedHandwritingGestures
+            to.supportedHandwritingGesturePreviews = from.supportedHandwritingGesturePreviews
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            to.isStylusHandwritingEnabled = from.isStylusHandwritingEnabled
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+            to.isWritingToolsEnabled = from.isWritingToolsEnabled
+        }
     }
 
+    // @TargetApi, not @RequiresApi: android.annotation.RequiresApi is hidden from the SDK's
+    // android.jar and this module has no androidx
     private inner class Wrapper(ic: InputConnection) : InputConnectionWrapper(ic, false) {
+        // the field left mid batch edit: no batch to wait for any more
+        override fun closeConnection() {
+            batch = 0
+            super.closeConnection()
+        }
+
         override fun beginBatchEdit(): Boolean {
             batch++
             return super.beginBatchEdit()
@@ -256,11 +274,16 @@ class TbTerminal(context: Context, val name: String, private val log: EventLog) 
         return true
     }
 
+    // BACK, volume and other system keys to the framework: back still leaves the page
+    private fun ours(keyCode: Int, event: KeyEvent) = !event.isSystem &&
+        (keyCode == KeyEvent.KEYCODE_DEL || keyCode == KeyEvent.KEYCODE_ENTER || event.unicodeChar > 0)
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (!ours(keyCode, event)) return super.onKeyDown(keyCode, event)
         when {
             keyCode == KeyEvent.KEYCODE_DEL -> if (buffer.isNotEmpty()) buffer.setLength(buffer.length - 1)
             keyCode == KeyEvent.KEYCODE_ENTER -> buffer.append('\n')
-            event.unicodeChar != 0 -> buffer.appendCodePoint(event.unicodeChar)
+            event.unicodeChar > 0 -> buffer.appendCodePoint(event.unicodeChar)
         }
         log.event(name, "key", JSONObject().put("keyCode", keyCode).put("down", true).put("detail", KeyEvent.keyCodeToString(keyCode)))
         invalidate()
@@ -278,6 +301,7 @@ class TbTerminal(context: Context, val name: String, private val log: EventLog) 
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (!ours(keyCode, event)) return super.onKeyUp(keyCode, event)
         log.event(name, "key", JSONObject().put("keyCode", keyCode).put("down", false).put("detail", "↑" + KeyEvent.keyCodeToString(keyCode)))
         return true
     }

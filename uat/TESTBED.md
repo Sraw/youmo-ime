@@ -44,7 +44,8 @@ adb shell am start -n org.fcitx.fcitx5.android.testbed/.MainActivity --es page b
   ```
 
   脚本里 `d.testbed_state()` 返回 `{名字: {...}}`，当前页（和开着的对话框）的原生框都在里面；有框在批量编辑中途
-  （`batch` > 0）时它隔 0.1 秒重读，最多 1 秒。判断重复上屏、丢字
+  （`batch` > 0）时它最多读 10 次、每次之间等 0.1 秒（加上每次 adb 往返，一般共 1.5–3 秒），还不行就报 Blocked。
+  批量编辑中途换框时，旧连接关闭会把 `batch` 清零。判断重复上屏、丢字
   就比它的 `text` 和 composing 区间。这个 ContentProvider 是导出的（`content` 命令以 shell 身份调用），但只回答
   shell（uid 除以 100000 的余数是 2000，任何用户）和 root，别的 App 调用一律 SecurityException，所以不会给其他 App 开读取输入的口子；release 包里没有它。
 - WebView 页的框不在状态里：它们的事件经 `console.log` 进事件记录和 logcat（`web_input` `web_selection` 等，
@@ -86,7 +87,7 @@ adb shell am start -n org.fcitx.fcitx5.android.testbed/.MainActivity --es page b
 |---|---|
 | `chat_clear` | 发送/回车后 `text.clear()`：清空，不重启输入 |
 | `chat_settext` | 发送后 `setText("")`：框架自己会让输入法重新开始。实测 Android 10 建一个新的 InputConnection（记录里有一次 `connection`）；Android 16 走 `invalidateInput`，不建新的，记录里看不到 `connection` |
-| `chat_restart` | 发送后 `setText("")` 再显式 `restartInput` |
+| `chat_restart` | 发送后 `setText("")` 再显式 `restartInput`（Android 10 上记录里有两次 `connection`：setText 一次，restartInput 一次） |
 | `chat_naive` | 粗糙的应用：回车的按下和抬起都当一次发送（清两次）。别的聊天框只在输入法的动作或按下时处理一次，抬起吞掉 |
 | `chat_hide` | 发送后清空并收起键盘 |
 | `finish_composing` | 搜索框：每次文本变化应用就 `clearComposingText()`（同步） |

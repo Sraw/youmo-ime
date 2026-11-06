@@ -146,6 +146,41 @@ class ScreenTest(unittest.TestCase):
         self.assertEqual(1, len(asked), asked)
 
 
+class TestbedStateTest(unittest.TestCase):
+    @staticmethod
+    def row(batch):
+        return "Row: 0 json=" + json.dumps([{"name": "a", "text": "你好", "batch": batch}]) + "\n"
+
+    def adb(self, outputs):
+        """a stand-in adb answering the queries with outputs in turn: (stdout, stderr)"""
+        calls = []
+
+        def run(cmd, **kw):
+            calls.append(cmd)
+            out, err = outputs[min(len(calls), len(outputs)) - 1]
+            return SimpleNamespace(returncode=0, stdout=out, stderr=err)
+        return calls, mock.patch.object(uat.subprocess, "run", run)
+
+    def test_read_again_while_a_field_is_mid_batch_edit(self):
+        calls, patch = self.adb([(self.row(1), ""), (self.row(2), ""), (self.row(0), "")])
+        with patch, mock.patch.object(uat.time, "sleep", lambda s: None):
+            state = uat.Device("5556").testbed_state()
+        self.assertEqual(3, len(calls))
+        self.assertEqual("你好", state["a"]["text"])
+
+    def test_blocked_when_the_batch_never_ends(self):
+        calls, patch = self.adb([(self.row(1), "")])
+        with patch, mock.patch.object(uat.time, "sleep", lambda s: None), self.assertRaises(uat.Blocked):
+            uat.Device("5556").testbed_state()
+        self.assertEqual(uat.TESTBED_READS, len(calls))
+
+    def test_blocked_names_adbs_error(self):
+        _, patch = self.adb([("", "Error: no provider org.fcitx.fcitx5.android.testbed.state")])
+        with patch, self.assertRaises(uat.Blocked) as e:
+            uat.Device("5556").testbed_state()
+        self.assertIn("no provider", str(e.exception))
+
+
 def case(cid, needs=None, heavy=False):
     return uat.Case(fn=None, id=cid, base="B0", page="text", mutates=False, clean=False, visual=False,
                     needs=needs, heavy=heavy)

@@ -53,6 +53,7 @@ MAIN = f"{PKG}/org.fcitx.fcitx5.android.ui.main.MainActivity"
 BROWSER = "org.chromium.webview_shell/.WebViewBrowserActivity"
 # the testbed app (uat/TESTBED.md): every kind of field and app behaviour, Android 10 too
 TESTBED = "org.fcitx.fcitx5.android.testbed"
+TESTBED_READS = 10   # testbed_state's reads while a field is mid batch edit, 0.1 s apart
 # the ABI of the APKs installed: the emulator's, which is the release's
 ABI = "arm64-v8a"
 # adb 37's mDNS bridge aborts on a service name seen on this LAN (the server dies every few seconds):
@@ -1277,16 +1278,18 @@ class Device:
         """the testbed's native fields on screen: {name: {text, selStart, selEnd, compStart, compEnd,
         focused, batch, connections, hint, desc}} (its debug build's StateProvider; compStart -1: nothing
         composing). Read again while a field is inside the IME's batch edit (batch > 0): half an edit"""
-        for _ in range(10):
-            out = self.sh(f"content query --uri content://{TESTBED}.state")
+        for _ in range(TESTBED_READS):
+            r = subprocess.run(["adb", "-s", self.serial, "shell", f"content query --uri content://{TESTBED}.state"],
+                               capture_output=True, text=True, timeout=60)
+            out = r.stdout
             i = out.find("json=")
             if i < 0:
-                raise Blocked(f"输入测试台的状态读不到：{out.strip()[:200]}")
+                raise Blocked(f"输入测试台的状态读不到：{(out.strip() + ' ' + r.stderr.strip())[:300]}")
             fields = {f["name"]: f for f in json.loads(out[i + 5:].strip())}
             if not any(f.get("batch", 0) > 0 for f in fields.values()):
                 return fields
             time.sleep(0.1)
-        raise Blocked("输入测试台：输入法的批量编辑 1 秒还没结束")
+        raise Blocked(f"输入测试台：读了 {TESTBED_READS} 次，输入法的批量编辑还没结束")
 
     def open_page(self, page="text"):
         """the test page showing one field, tapped: the keyboard is up"""
