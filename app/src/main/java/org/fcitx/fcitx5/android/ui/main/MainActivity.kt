@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.ui.main
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Bundle
 import android.view.ViewGroup
@@ -152,6 +153,9 @@ class MainActivity : AppCompatActivity() {
  * Takes out of this intent the deep links Navigation opens on the first graph: MainActivity is
  * exported, and the app sends none, so they could only be another app's way to any page.
  */
+// the keys are Navigation's own (restricted to its library group), and the only way to take its
+// deep links out before the NavController reads them
+@SuppressLint("RestrictedApi")
 internal fun Intent.dropDeepLinks() {
     try {
         removeExtra(NavController.KEY_DEEP_LINK_IDS)

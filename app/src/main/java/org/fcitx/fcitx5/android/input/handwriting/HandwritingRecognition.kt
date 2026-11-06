@@ -35,7 +35,7 @@ class HandwritingRecognition internal constructor(
     private val main: Executor,
     private val ended: () -> Int,
     // a JVM test's reader of fixed readings in place of the native model
-    @VisibleForTesting internal var reader: Reader,
+    @get:VisibleForTesting internal var reader: Reader,
 ) {
 
     /** What reads the strokes, on the worker. */

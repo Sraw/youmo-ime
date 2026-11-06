@@ -131,6 +131,8 @@ class SyllableStrip(context: Context, private val theme: Theme) : HorizontalScro
         scrollTo(0, 0)
     }
 
+    // a plain TextView: the keyboard's views are not under an AppCompat theme, its tinting would add nothing
+    @SuppressLint("AppCompatCustomView")
     private fun item(i: Int) = object : TextView(context) {
         // a button to TalkBack, as it acts as one
         override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {

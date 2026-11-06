@@ -223,7 +223,10 @@ class HandwritingKeyboard(
         return super.onInterceptTouchEvent(ev)
     }
 
-    // public for its tests: a long press's pick (注's styles) comes here as a tap does
+    // public for its tests: a long press's pick (注's styles) comes here as a tap does. super's is
+    // called, by act: later, once a stroke being read is in, or never (the pad's own keys, an undo,
+    // input restarted meanwhile), which lint cannot see
+    @SuppressLint("MissingSuperCall")
     @VisibleForTesting(otherwise = VisibleForTesting.PROTECTED)
     public override fun onAction(action: KeyAction, source: KeyActionListener.Source) {
         // pressed while a stroke is read: in after its reading, as written before it; dropped if
