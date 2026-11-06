@@ -394,16 +394,21 @@ class VoiceListener(
         val buffer = FloatArray(VoiceEngine.WINDOW)
         val shorts = if (record.audioFormat == AudioFormat.ENCODING_PCM_16BIT) ShortArray(VoiceEngine.WINDOW) else null
         val timestamp = AudioTimestamp()
+        // the device UAT's clips in place of what the microphone hears (VoiceClipMic); none in a release
+        val clips = if (BuildConfig.DEBUG) VoiceClipMic.feed() else null
         var windows = 0
         while (currentCoroutineContext().isActive) {
-            val n = read(record, buffer, shorts)
+            val n = clips?.read(buffer) ?: read(record, buffer, shorts)
             if (n < 0) {
                 // lifted already, in the tail: what was said is in, typed as at the tail's end; the
                 // microphone failing is told only while it was still being spoken into
                 if (liftAt == null) tell { failed(Failure.NoMicrophone) }
                 return
             }
-            val over = opening.end.window(n, SystemClock.uptimeMillis(), liftAt) { stamp(record, timestamp, it) }
+            val over = opening.end.window(n, SystemClock.uptimeMillis(), liftAt) {
+                // the clips' frames are not the record's: counted from what is read
+                if (clips == null) stamp(record, timestamp, it) else null
+            }
             if (n == 0) {
                 if (over) return
                 continue

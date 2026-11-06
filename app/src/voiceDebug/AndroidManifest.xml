@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!--
+            The device UAT's clip microphone (uat.py Device.say): exported for the shell's `content
+            call` and `content write`; the provider itself takes only the shell's and root's uid.
+            The voice debug build only.
+        -->
+        <provider
+            android:name="org.fcitx.fcitx5.android.debug.VoiceClipProvider"
+            android:authorities="${applicationId}.voiceclip"
+            android:exported="true" />
+    </application>
+
+</manifest>

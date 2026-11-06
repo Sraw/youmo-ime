@@ -188,9 +188,17 @@ a settings page, rotation, a field type, an upgrade) is tried on a device before
   `ime enable` / `ime set` the service, drive it with `adb shell input tap/swipe` at measured key
   coordinates, read the field back, screenshot the bar. Scripted, that is `uat/tools/uat.py`
   (below); `uat/tools/avd.sh` makes the AVD and its snapshot `clean`. Root via `adb root`.
-  Voice (UAT 12) needs the microphone fed with clips made by `uat/tools/voice-clips.py`: not wired
-  up yet (the emulators start `-no-audio`; on Linux it was a host PulseAudio virtual source), so the
-  cases that speak are blocked.
+  Voice (UAT 12) is said with clips made by `uat/tools/voice-clips.py` (Kokoro, offline, into
+  `dev/uat-out/voice-clips/`, not in git), played by the voice debug build's clip microphone:
+  `VoiceClipMic` stands in for what `VoiceListener` reads from the AudioRecord (still opened,
+  started and released; the permission still checked), a window at a time at the microphone's
+  pace, the queued clips and pauses in order, then a faint noise (never exact zero) till the talk
+  ends, so the endpoint, the live text and the level run as on a phone. The shell drives it
+  through `VoiceClipProvider` (voiceDebug source set only, shell or root uid only): `content write`
+  a clip into the app's files, `content call --method queue --arg a.wav,800,b.wav` (on, clear,
+  state too); `Device.say` does both. It is reached only under `BuildConfig.DEBUG`, so R8 drops it
+  from a release. What it cannot test, left to a phone and a person: a real microphone and its
+  HAL (AudioRecord's failures, its timestamps, the zeroes before it opens), noise and distance, accents.
 - A real phone (arm64) for performance, voice latency and a real microphone.
 
 Worth checking by hand for keyboard changes: portrait and landscape; a password field (nothing

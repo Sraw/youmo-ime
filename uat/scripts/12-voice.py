@@ -1,6 +1,6 @@
 """uat/12-voice.md (语音输入, the voice build): `uat.py run --flavor voice`. What is "said" is a clip of
-uat/tools/voice-clips.py played into the emulator's microphone (Device.say: not wired up yet, so the
-cases that speak are blocked). The .md is the source of truth."""
+uat/tools/voice-clips.py read by the voice debug build in place of the microphone (Device.say, the
+clip microphone: VoiceClipMic). The .md is the source of truth."""
 import json
 import os
 import re
@@ -93,6 +93,7 @@ def hold_space(d, timeout=60, wait_quiet=True, raw=False):
     reset loads the models); returns the space key's centre. raw: through sendevent, to be lifted with raw_up"""
     if wait_quiet:
         quiet(d)
+    d.clip_mic()
     x, y = d.keys(refresh=True)["space"]
     if raw:
         d.sh(raw_down(d, x, y))
@@ -311,7 +312,54 @@ def vo02(d):
 case("VO-03", needs="jvm:VoiceHoldUatTest.slidingUpDropsIt")(lambda d: None)
 
 
-case("VO-04", needs="jvm:VoiceTapUatTest.tappingTheMicrophoneTalksTillItIsTappedAgain、VoiceTapUatTest.tappingTheMaskStopsIt、VoiceTapUatTest.theMicrophoneTappedInTheTailEndsIt")(lambda d: None)
+def tap_mic(d):
+    """the toolbar's microphone tapped: the mask over the keys; returns its hint (the mask has no
+    button: tapping it, or the microphone, ends the talk)"""
+    quiet(d)
+    d.clip_mic()
+    voice = d.screen().find(desc="语音输入", where="ime")
+    if not voice:
+        raise Blocked("工具栏上没有「语音输入」（工具栏收起了？）")
+    d.tap(voice.c, 0.8)
+    hint = d.screen().find(text="点这里或麦克风 结束", where="ime")
+    check(hint, "点麦克风后没有盖层（没找到它的提示）")
+    return hint
+
+
+def mask_gone(d, timeout=15):
+    """the field once the mask is gone (what was heard recognized and typed)"""
+    try:
+        d.wait(lambda s: not s.find(text="点这里或麦克风 结束", where="ime"), timeout, step=0.3, what="盖层收起")
+    except Blocked:
+        raise Fail(f"结束后 {timeout} s 盖层还在")
+    time.sleep(0.5)
+    return d.field_text() or ""
+
+
+# also on the JVM (VoiceTapUatTest); on the device the real recognizer and InputConnection: stopped by
+# the microphone, then by the mask (its hint: the mask has no button)
+@case("VO-04", base="B0-语音", mutates="learn", needs=EV)
+def vo04(d):
+    tap_mic(d)
+    s = d.screen()
+    check(not anywhere(s, "松开"), "点麦克风后出现了长按的语音卡片")
+    d.say("zouba")
+    time.sleep(1.0)
+    voice = d.screen().find(desc="语音输入", where="ime")
+    check(voice, "说着时工具栏上没有麦克风（盖层盖住了工具栏？）")
+    d.tap(voice.c, 0.1)
+    t1 = mask_gone(d)
+    check(plain(t1) == "我们走吧", f"点麦克风说「我们走吧」再点麦克风，框里「{t1}」")
+    hint = tap_mic(d)
+    d.say("nihao")
+    time.sleep(1.0)
+    d.tap(hint.c, 0.1)
+    t2 = mask_gone(d)
+    check(t2.startswith(t1) and plain(t2[len(t1):]).lstrip("，,。. ") == "你好", f"再点麦克风说「你好」点盖层，框里「{t2}」")
+    d.type("a")
+    t3 = d.field_text() or ""
+    check(len(t3) > len(t2) or d.screen().ime(), f"结束后键盘不能打：「{t3}」")
+    return f"点麦克风结束「{t1}」；点盖层结束「{t2}」"
 
 
 case("VO-05", needs="jvm:VoiceGlassTest、VoiceTapUatTest.theMaskHasNoEnterStoppedTheKeyboardsSendsIt；真机截图看毛玻璃")(lambda d: None)
@@ -698,6 +746,7 @@ def vo28_try(d):
     quiet(d)
     d.sh("logcat -c")
     s = d.screen()
+    d.clip_mic()
     voice = s.find(desc="语音输入", where="ime")
     if not voice:
         raise Blocked("工具栏上没有「语音输入」（工具栏收起了？）")

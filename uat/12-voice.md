@@ -2,7 +2,7 @@
 
 区域代号 `VO`。本文件的测试都用**语音版**，在有麦克风的真机上跑，周围安静。前提里的 **B0-语音**：B0（装的是语音版），并且已经给过麦克风权限（没给过的见 VO-01）。
 
-自动跑（`uat/tools/uat.py run --devices 5554 --flavor voice --areas 12`）：**现在没接上**，要说话的用例记阻塞（2026-11 搬到 Mac 后，模拟器以 `-no-audio` 启动，还没有把语音片段放进它麦克风的办法，要一个虚拟声卡或模拟器的 gRPC 音频注入）。搬家前在 Linux 上是这样跑的：模拟器的麦克风是宿主机 PulseAudio 的一个虚拟音源，"说"的话是 `uat/tools/voice-clips.py` 离线合成的语音片段（Kokoro），每段先用同一个 X-ASR 模型确认听得出。合成的声音干净、没有口音，真机上用真人说话再跑一遍。模拟器的麦克风在宿主机忙时会丢帧（系统日志 `late delivering frames, inserting … silence`），一句没听全时脚本重说，最多三次，结果里写第几次。
+自动跑（`uat/tools/uat.py run --devices 5554 --flavor voice --areas 12`，装 arm64 语音版 **debug** 包）：要说话的用例由 debug 包的「片段麦克风」听：`Device.say` 把 `uat/tools/voice-clips.py` 离线合成的语音片段（Kokoro，每段先用同一个 X-ASR 模型确认听得出；放在 `dev/uat-out/voice-clips/`，不进 git，没有时先跑这个脚本）写进 App、排进队列，App 照常打开 AudioRecord，但改读这些片段，按实时速度送，放完送很轻的底噪直到说完（详见 uat/README.md「实体键盘和语音」）。片段麦克风测不到的留给真机真人：真实麦克风和它的硬件（AudioRecord 出错、时间戳、开麦前的全零，所以 VO-26 在模拟器上通常一按就是「正在听…」）、环境噪声和距离、口音；合成的声音干净、没有口音。下文「模拟器声卡出错」「丢帧」是搬家前经宿主声卡放音时的情况，片段麦克风不经声卡，不再发生，脚本里的重试保留。
 
 ### VO-01 [P0] 第一次用时请求麦克风权限
 - **前提**：B0，语音版刚重置，没给过麦克风权限。
@@ -27,6 +27,7 @@
 - **操作**：点工具栏上的麦克风，看键盘；说"我们走吧"，再点一下麦克风。再点麦克风说"你好"，点盖在键盘上的那一层（不点按钮）。
 - **预期**：点了以后键盘上盖一层（工具栏还在上面，麦克风也在），显示声音条和「准备中…」→「正在听…」，没有另开语音面板；第一次框里是「我们走吧」，第二次接着是「你好」；结束后那一层淡出，键盘照常能打。悬浮键盘说着时拖它的把手移动，不结束。
 - **JVM**：`VoiceTapUatTest.tappingTheMicrophoneTalksTillItIsTappedAgain`（点麦克风开始、盖层在键盘上、没有面板，再点结束上屏，可以再来一次）、`VoiceTapUatTest.tappingTheMaskStopsIt`、`VoiceTapUatTest.theMicrophoneTappedInTheTailEndsIt`（结束后的续录中再点：`cut()` 一次，不开新的）、`VoiceTapUatTest.gettingReadyShowsTillTheMicrophoneIsOn`、`VoiceTapUatTest.aSilentMicrophoneIsSaid`、`VoiceTapUatTest.floatingTheMaskGoesWithTheKeyboard`（悬浮键盘拖动、缩小后，盖层是键盘自己的子 View，在工具栏下面、盖住按键）、`VoiceTapUatTest.floatingDraggingItsHandleTalksOn`（拖把手不算点到盖层外）、`VoiceTapUatTest.startedFromAShortcutTheMicrophoneStillStopsItOnce`（从按键快捷键开始的，点麦克风只结束一次，不截掉续录）、`VoiceHoldUatTest.floatingTheCardGoesWithTheKeyboard`（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testVoiceDebugUnitTest`）；设备上看：盖层的位置（悬浮键盘拖动和缩放后、单手模式、横屏），说着时拖悬浮键盘的把手不结束。
+- **模拟器**：点麦克风，播 `zouba`，再点麦克风，等盖层收起，框里「我们走吧」；再点麦克风，播 `nihao`，点盖层的提示文字，框里接着是「你好」；结束后还能打字。悬浮键盘、横屏、单手模式不在模拟器上跑。
 
 ### VO-05 [P1] 说话时的那一层是毛玻璃，没有 ×
 - **前提**：B0-语音；再换一个图片背景的主题、悬浮键盘、横屏各做一遍。

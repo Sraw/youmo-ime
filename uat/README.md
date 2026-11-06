@@ -147,7 +147,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 | 大部分 | 真机或 Android 模拟器（arm64-v8a 镜像，装的就是发布用的 arm64 包；Apple 芯片上原生跑）。发版前至少在一台真机上跑一遍 P0 |
 | 实体键盘（17） | 真机接蓝牙或 USB 键盘；或者模拟器加一个 uinput 键盘（见 [17-hardware-keyboard.md](17-hardware-keyboard.md) 开头）。模拟器有自己的内核，和别的用例同一台设备上跑；**只在模拟器里造虚拟键盘**（容器类设备如 redroid 和宿主机共用内核，造出来的键盘宿主机也会收到） |
 | 横屏与分体（16） | 屏幕横过来宽度不少于 600 dp 的手机或平板，模拟器也行 |
-| 语音（12） | 真机，有麦克风，装语音版；arm64 语音版也能在模拟器上跑（片段经 gRPC 放进麦克风，见「实体键盘和语音」） |
+| 语音（12） | 真机，有麦克风，装语音版；arm64 语音版 debug 包也能在模拟器上跑（片段麦克风，见「实体键盘和语音」） |
 
 模拟器快照里装了浏览器"WebView Browser Tester"（`org.chromium.webview_shell`），测试页在它里面打开（`am start -a android.intent.action.VIEW -d <地址> -n org.chromium.webview_shell/.WebViewBrowserActivity`）。
 
@@ -197,7 +197,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 
 `skip:…`／`block:…` 只留给别的原因，记"跳过"／"阻塞"。
 
-现在共 652 条（P0 117、P1 501、P2 34）：模拟器上跑 53 条（其中 24 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 599 条（JVM 561、发版时 18、真机或手工 10、语音版 10）。
+现在共 655 条（P0 117、P1 503、P2 35）：模拟器上跑 53 条（其中 24 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 602 条（JVM 562、发版时 18、真机或手工 10、语音版 12）。
 
 （2026-11 从 redroid 搬到模拟器时 `needs=` 改了两处：原来的 `emu:` 去掉，实体键盘用例不再单独跑；`release,redroid:` 改名 `release,scripted:`，意思不变：发版时脚本跑。）
 
@@ -266,11 +266,11 @@ uat/tools/uat.py jvm                             # 读 JUnit 结果，按编号�
 
 实体键盘（17）的用例和别的用例一起跑：基线 `B0-实体` 用 `uat/tools/emu-keyboard.sh` 插上一个 uinput USB 键盘，
 别的基线拔掉。语音（12）要语音版：`--flavor` 要和装的包一致，运行器把它传给用例，文字版上语音用例单列为"在别处跑"。
-语音片段（`uat/tools/voice-clips.py` 合成，在 `dev/uat-out/voice-clips/`）经模拟器的 gRPC `injectAudio` 放进麦克风
-（`Device.say`）：`up()` 以 `-grpc <8554+端口-5554>`（5558→8558，几台各用各的）和 `-audio none` 启动（不能 `-no-audio`，
-那样没有麦克风；Mac 无界面时 coreaudio 拿不到输入设备，会崩）。要 `pip install grpcio`，没有时说话的用例记"阻塞"。
-模拟器 37.2 在客户机没在录音、或录音刚打开时收到音频流会段错误（`audio_forwarder_enable`），所以 `say` 等应用的
-AudioRecord 开了 0.5 s 再放。搬到 Mac 前是经 Linux 宿主的 PulseAudio 虚拟音源放进去的。`emu-up`/`emu-down` 还在，等于 `up/down --port 5554`。
+语音片段（`uat/tools/voice-clips.py` 合成，在 `dev/uat-out/voice-clips/`，不进 git）由语音版 debug 包的「片段麦克风」
+（`VoiceClipMic`）当作麦克风读到的声音（`Device.say`）：先 `content write` 写进 App 的 files，再
+`content call --uri content://<包名>.voiceclip --method queue --arg a.wav,800,b.wav` 排队（数字是停顿毫秒；`on` 打开但不排、
+`clear` 清空并关掉、`state` 查询），只认 shell 或 root 的 uid。按实时速度送，放完送很轻的底噪直到这次说话结束。
+模拟器照常 `-no-audio`。release 包里没有这段代码。`emu-up`/`emu-down` 还在，等于 `up/down --port 5554`。
 
 ```sh
 BUILD_ABI=arm64-v8a ./gradlew :app:assembleVoiceDebug   # 语音版

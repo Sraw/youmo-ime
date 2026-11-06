@@ -17,8 +17,8 @@ am/pm/ime/settings drive the device. The devices are emulators (AVD youmo, andro
 arm64-v8a: the release ABI, native on Apple silicon; uat/tools/avd.sh makes it; UAT_AVD=youmo29 an
 Android 10 one, minSdk, without the test page's browser), VMs with their own
 kernel: root over `adb root`, and 17 实体键盘's USB keyboard a uinput one (uat/tools/emu-keyboard.sh),
-which is never made anywhere else. The voice cases' microphone is the emulator's gRPC injectAudio
-(`Device.say`, `-grpc` from up(); grpcio needed, else those cases are blocked).
+which is never made anywhere else. The voice cases' microphone is the voice debug build's clip microphone
+(`Device.say`: VoiceClipProvider plays dev/uat-out/voice-clips/ in place of the AudioRecord's samples).
 Output is kept short on purpose (counts and paths): an agent reading it re-reads its context.
 """
 import argparse
@@ -35,6 +35,7 @@ import threading
 import time
 import traceback
 import unicodedata
+import wave
 import warnings
 import xml.etree.ElementTree as ET
 
@@ -532,6 +533,7 @@ class Device:
         self.port = str(port)
         self.flavor = flavor   # the build under test (--flavor): voice-only cases, SET-01's reinstall
         self.serial = f"emulator-{self.port}"
+        self._clips_in = set()   # the clips Device.say has written into the app's files
         self.run = run
         self.case = None
         self._keys = None
@@ -601,27 +603,49 @@ class Device:
         return self._plugged
 
     def say(self, clip, wait=True):
-        """play dev/uat-out/voice-clips/<clip>.wav into the emulator's microphone (the emulator's gRPC
-        injectAudio, Mic below); wait=False: in the background (returns the player: poll/wait/kill)"""
-        f = os.path.join(CLIPS, f"{clip}.wav")
-        if not os.path.exists(f):
-            raise Blocked(f"没有 {f}：先跑 uat/tools/voice-clips.py")
-        need_mic()
-        # the emulator (37.2) segfaults (audio_forwarder_enable) on an injectAudio stream that starts
-        # with nothing recording in the guest, or as the recording is only just opened (VO-28: said at
-        # the press); so the stream waits till the app's AudioRecord is MIC_SETTLE_S old
-        for _ in range(50):
-            age = self.recording()
-            if age is not None:
-                break
-            time.sleep(0.1)
-        else:
-            raise Blocked("设备上没有在录音（AudioRecord）：没把片段放进麦克风（空放会让模拟器崩溃）")
-        time.sleep(max(0.0, MIC_SETTLE_S - age))
-        p = Mic(grpc_port(self.port), f)
+        """dev/uat-out/voice-clips/<clip>.wav as what the microphone hears: the voice debug build's clip
+        microphone (VoiceClipProvider), the file written into the app's files once, then queued; the
+        talk open now (clip_mic() before it) or the next one reads it at the microphone's pace. clip:
+        a name, or a list of names and pauses in ms ("a", 800, "b"). wait=False: returns at once
+        (poll/wait/kill, as a player would: done once the clips' time has passed)"""
+        parts = [clip] if isinstance(clip, str) else list(clip)
+        secs = 0.0
+        for c in parts:
+            if isinstance(c, (int, float)):
+                secs += c / 1000
+                continue
+            f = os.path.join(CLIPS, f"{c}.wav")
+            if not os.path.exists(f):
+                raise Blocked(f"没有 {f}：先跑 uat/tools/voice-clips.py")
+            with wave.open(f) as w:
+                secs += w.getnframes() / w.getframerate()
+            if c not in self._clips_in:
+                with open(f, "rb") as src:
+                    r = subprocess.run(["adb", "-s", self.serial, "shell", f"content write --uri {CLIP_URI}/{c}.wav"],
+                                       stdin=src, capture_output=True, text=True, timeout=60)
+                if r.returncode or "Exception" in r.stdout + r.stderr:
+                    raise Blocked(f"片段麦克风写不进 {c}.wav（语音版 debug 包？）：{(r.stdout + r.stderr).strip()[:120]}")
+                self._clips_in.add(c)
+        arg = ",".join(str(int(c)) if isinstance(c, (int, float)) else f"{c}.wav" for c in parts)
+        self.clip_call("queue", arg)
+        p = ClipPlay(self, secs)
         if wait:
             p.wait(30)
         return p
+
+    def clip_call(self, method, arg=None):
+        """VoiceClipProvider's method (queue, on, clear, state): its state line"""
+        out = self.sh(f"content call --uri {CLIP_URI} --method {method}" + (f" --arg '{arg}'" if arg is not None else ""))
+        m = re.search(r"state=(.*?)}", out)
+        if not m:
+            raise Blocked(f"片段麦克风不应答（语音版 debug 包？）：{out.strip()[:120]}")
+        return m.group(1)
+
+    def clip_mic(self):
+        """every talk from here hears the clips Device.say queues, not the microphone (the app's
+        process restarted, pm clear: off again, and the files gone)"""
+        self._clips_in = set() if "on=false" in self.clip_call("state") else self._clips_in
+        self.clip_call("on")
 
     def recording(self):
         """seconds the active AudioRecord has been recording (dumpsys audio: the monitor's active riid,
@@ -1686,6 +1710,8 @@ def reset(d, base, page):
     # the voice build: the microphone allowed (pm clear took it back), on every baseline (B0-语音 is
     # B0 there; VO-01 revokes it itself). The text build has no such permission: refused, no harm
     d.sh(f"pm grant {PKG} android.permission.RECORD_AUDIO 2>/dev/null")
+    if d.flavor == "voice":
+        d.clip_mic()   # what the talks hear: Device.say's clips (the emulator runs with no audio)
     d.open_page("text")   # the engine's first load is waited for on the letters
     ime_ready(d)
     if base != "B0-设置" and page != "text":
@@ -2518,93 +2544,37 @@ def grpc_port(port):
 
 
 def need_mic():
-    """grpcio, which Device.say plays clips through: a case that speaks calls it first, before its waits
-    (host_calm, the hold) cost anything"""
-    try:
-        import grpc  # noqa: F401
-    except ImportError:
-        raise Blocked("没有 grpcio：Device.say 经模拟器的 gRPC 把语音片段放进麦克风（pip install grpcio）")
+    """kept for the scripts: Device.say needs nothing on the host (the clip microphone is the app's)"""
 
 
-def _pb_varint(n):
-    out = b""
-    while True:
-        b, n = n & 0x7F, n >> 7
-        out += bytes([b | (0x80 if n else 0)])
-        if not n:
-            return out
+CLIP_URI = f"content://{PKG}.voiceclip"
 
 
-def _pb_field(num, v):
-    """one protobuf field: int as a varint, bytes length-delimited (enough for AudioPacket)"""
-    if isinstance(v, int):
-        return _pb_varint(num << 3) + _pb_varint(v)
-    return _pb_varint(num << 3 | 2) + _pb_varint(len(v)) + v
+class ClipPlay:
+    """Device.say's queue as a player: done once its clips' time has passed and the app says none is
+    left; kill() drops what is left (the clip microphone stays on)"""
 
-
-MIC_SETTLE_S = 0.5   # Device.say: a recording this old takes a stream (0.6 s held through VO-28; none crashed it)
-
-
-class Mic:
-    """a WAV (16-bit PCM) streamed to EmulatorController.injectAudio (emulator_controller.proto in the
-    SDK's emulator/lib) in real time, on a thread; Popen's poll/wait/kill so a case holds it like the old
-    pw-play. The messages are encoded by hand (no generated stubs, so only grpcio is needed)."""
-    CHUNK_S = 0.02
-
-    def __init__(self, port, wav):
-        need_mic()
-        import grpc
-        import threading
-        import wave
-        with wave.open(wav) as w:
-            if w.getsampwidth() != 2:
-                raise Blocked(f"{wav}：不是 16 位 PCM")
-            self.rate, ch, self.pcm = w.getframerate(), w.getnchannels(), w.readframes(w.getnframes())
-        self.fmt = _pb_field(1, self.rate) + _pb_field(2, 0 if ch == 1 else 1) + _pb_field(3, 1) + _pb_field(4, 1)
-        self.step = int(self.rate * self.CHUNK_S) * 2 * ch
-        self.chan = grpc.insecure_channel(f"127.0.0.1:{port}")
-        self.call = self.chan.stream_unary("/android.emulation.control.EmulatorController/injectAudio",
-                                           request_serializer=lambda b: b, response_deserializer=lambda b: b)
-        self.stop, self.error = threading.Event(), None
-        self.thread = threading.Thread(target=self._run, daemon=True)
-        self.thread.start()
-
-    def _packets(self):
-        t0 = time.time()
-        for i, off in enumerate(range(0, len(self.pcm), self.step)):
-            if self.stop.is_set():
-                return
-            lag = t0 + i * self.CHUNK_S - time.time()
-            if lag > 0:
-                time.sleep(lag)
-            yield (_pb_field(1, self.fmt) + _pb_field(2, int(time.time() * 1e6))
-                   + _pb_field(3, self.pcm[off:off + self.step]))
-
-    def _run(self):
-        try:
-            self.call(self._packets(), timeout=120)
-        except Exception as e:   # the emulator not started with -grpc, or gone
-            self.error = e
-        finally:
-            self.chan.close()
+    def __init__(self, d, secs):
+        self.d, self.end = d, time.time() + secs + 0.2
 
     def poll(self):
-        if self.thread.is_alive():
+        if time.time() < self.end:
             return None
-        if self.error:
-            raise Blocked(f"模拟器 gRPC injectAudio 失败：{self.error}")
-        return 0
+        st = self.d.clip_call("state")
+        return 0 if "playing=false" in st and st.endswith("queued=") else None
 
     def wait(self, timeout=None):
-        self.thread.join(timeout)
-        if self.thread.is_alive():
-            self.kill()   # else its thread streams the rest of the clip into the next case
-            raise subprocess.TimeoutExpired("injectAudio", timeout)
-        return self.poll()
+        until = time.time() + (timeout or 600)
+        while self.poll() is None:
+            if time.time() > until:
+                self.kill()
+                raise subprocess.TimeoutExpired("clip microphone", timeout)
+            time.sleep(0.1)
+        return 0
 
     def kill(self):
-        self.stop.set()
-        self.thread.join(5)
+        self.d.clip_call("clear")
+        self.d.clip_call("on")
 
 
 def need_root(d):
@@ -2643,8 +2613,6 @@ def up(port="5556"):
             os.makedirs(os.path.join(OUT, "emu"), exist_ok=True)
             # -gpu host: the Mac's GPU (its OpenGL, through emulator_env's shim with no display attached;
             # EMU_GPU=swiftshader_indirect for software, which the snapshot was not saved with: a cold boot).
-            # -grpc: its controller, whose injectAudio is the microphone Device.say plays clips into
-            # (audio stays on: -no-audio would drop the microphone)
             gpu = os.environ.get("EMU_GPU", "host")
             with open(log, "w") as f:   # the emulator holds its own copy of the file
                 emu = subprocess.Popen([emulator_bin(), "-avd", AVD, "-port", port, "-snapshot", SNAPSHOT,
