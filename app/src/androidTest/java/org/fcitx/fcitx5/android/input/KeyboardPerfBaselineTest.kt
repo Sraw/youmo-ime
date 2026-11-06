@@ -1,0 +1,544 @@
+/*
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+ */
+package org.fcitx.fcitx5.android.input
+
+import android.content.ComponentName
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.LinearGradient
+import android.graphics.Paint
+import android.graphics.PointF
+import android.graphics.Shader
+import android.os.Process
+import android.os.SystemClock
+import android.util.Log
+import android.view.InputDevice
+import android.view.MotionEvent
+import android.view.View
+import android.view.ViewGroup
+import androidx.test.core.app.ActivityScenario
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.By
+import androidx.test.uiautomator.BySelector
+import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.Until
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.HostApi
+import org.fcitx.fcitx5.android.daemon.HostDaemon
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
+import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.input.theme.BoardBase
+import org.fcitx.fcitx5.android.input.theme.Crop
+import org.fcitx.fcitx5.android.input.theme.Picture
+import org.fcitx.fcitx5.android.utils.inputMethodManager
+import org.junit.After
+import org.junit.Assume.assumeTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.rules.Timeout
+import java.io.File
+import java.util.Locale
+
+/**
+ * How fast the keyboard is drawn now, measured on a device so that its redraw (design 060: one View a
+ * keyboard, a RenderNode a key) can be held to no worse: each keyboard made and first drawn, a theme
+ * changed, a key's press shown, the process's memory with the keyboard up. Results go to logcat,
+ * tag [TAG], a line a number; how to read them and the numbers so far: dev/design/060-render-perf.md.
+ *
+ * Measured through what a user does, so that the same test runs on the new drawing unchanged: a
+ * keyboard picked in ⋯ (the setting, which makes the input view anew), keys tapped as the system
+ * delivers touches, a theme picked as its list does. What it reads of the views is the window
+ * ([KeyboardFrames]), the keyboard's frame (`keyboard_view`) and, in [shows], which keyboard is in
+ * it: the one place to change when the keyboards are drawn by other classes.
+ *
+ * Not a check run with the rest: it takes minutes and asserts nothing about speed. Run alone, with
+ * `-Pandroid.testInstrumentationRunnerArguments.class=…KeyboardPerfBaselineTest` (perfRuns sets the
+ * samples, 20 by default). Puts back what it changes: the device's keyboard, the input methods, the
+ * settings and themes; not the screen it wakes, nor perfScreenshot's file.
+ */
+class KeyboardPerfBaselineTest {
+
+    @get:Rule
+    val timeout: Timeout = Timeout.seconds(1_800)
+
+    private lateinit var scenario: ActivityScenario<TypingHostActivity>
+    private lateinit var service: FcitxInputMethodService
+    private lateinit var frames: KeyboardFrames
+
+    private val runs = InstrumentationRegistry.getArguments().getString("perfRuns")?.toInt() ?: 20
+    private val warmUp = 3
+
+    // perfScreenshot=true: the picture theme's keyboard captured once, to see the picture is drawn
+    private val screenshots = InstrumentationRegistry.getArguments().getString("perfScreenshot") == "true"
+
+    // put back after the test, each once changed
+    private var deviceIme: String? = null
+    private var deviceImeEnabled = false
+    private var spellChecker: String? = null
+    private var imsWere: Array<String>? = null
+    private var imWas: String? = null
+    private var pinyinKeyboardWas: PinyinKeyboard? = null
+    private var followSystemWas: Boolean? = null
+    private var themeWas: Theme? = null
+    private val themesMade = mutableListOf<String>()
+
+    @Test
+    fun keyboardDrawingBaseline() {
+        val sdk = android.os.Build.VERSION.SDK_INT
+        log("device ${android.os.Build.MODEL} sdk $sdk runs $runs warm-up $warmUp")
+        selectThisInputMethod()
+        memory("no keyboard shown yet")
+        launch()
+        memory("26 keys shown, first time")
+        hideKeyboard()
+        memory("26 keys made, hidden")
+        showKeyboard()
+        memory("26 keys shown again")
+        buildEachKeyboard()
+        switchThemes()
+        pressFeedback()
+        hideKeyboard()
+        memory("after the runs (handwriting's models loaded), hidden")
+        showKeyboard()
+        memory("after the runs (handwriting's models loaded), shown")
+    }
+
+    // ---- the device
+
+    private fun selectThisInputMethod() {
+        deviceIme = shell("settings get secure default_input_method").takeIf { it.isNotEmpty() && it != "null" }
+        val self = ComponentName.unflattenFromString(imeId)
+        deviceImeEnabled = shell("settings get secure enabled_input_methods").split(':')
+            .any { ComponentName.unflattenFromString(it.substringBefore(';')) == self }
+        // the system's spell checker would underline what the runs type, a frame of its own in the field
+        spellChecker = shell("settings get secure spell_checker_enabled")
+        shell("settings put secure spell_checker_enabled 0")
+        shell("ime enable $imeId")
+        shell("ime set $imeId")
+    }
+
+    private fun launch() {
+        // a phone left locked: the field over the lock screen (this activity only), the keyboard with it
+        shell("input keyevent KEYCODE_WAKEUP")
+        scenario = ActivityScenario.launch(Intent(context, TypingHostActivity::class.java))
+        scenario.onActivity {
+            it.setShowWhenLocked(true)
+            it.setTurnScreenOn(true)
+        }
+        showKeyboard()
+        // pinyin on the 26 keys first; handwriting enabled for its pad
+        AppPrefs.getInstance().keyboard.pinyinKeyboard.let { pref ->
+            pinyinKeyboardWas = pref.getValue()
+            if (pref.getValue() != PinyinKeyboard.Full) onMain { pref.setValue(PinyinKeyboard.Full) }
+        }
+        host {
+            imsWere = enabledIme().map { it.uniqueName }.toTypedArray()
+            imWas = currentIme().uniqueName
+            val wanted = listOf(PINYIN, HANDWRITING).filter { im -> enabledIme().none { it.uniqueName == im } }
+            if (wanted.isNotEmpty()) setEnabledIme(imsWere!! + wanted)
+            activateIme(PINYIN)
+        }
+        find(onKeyboard().text("123"))
+        onMain {
+            service = checkNotNull(findInputMethodService()) { "the input method's window is not in this process" }
+            frames = KeyboardFrames(service.window.window!!)
+        }
+        settle()
+    }
+
+    @After
+    fun putBack() {
+        runCatching { if (::frames.isInitialized) onMain { frames.close() } }
+        runCatching { putThemesBack() }
+        pinyinKeyboardWas?.let { onMain { AppPrefs.getInstance().keyboard.pinyinKeyboard.setValue(it) } }
+        runCatching {
+            host {
+                imsWere?.let { setEnabledIme(it) }
+                imWas?.let { activateIme(it) }
+            }
+        }
+        if (::scenario.isInitialized) scenario.close()
+        deviceIme.let { if (it == null) shell("ime reset") else shell("ime set $it") }
+        if (!deviceImeEnabled) shell("ime disable $imeId")
+        spellChecker.let {
+            if (it.isNullOrEmpty() || it == "null") shell("settings delete secure spell_checker_enabled")
+            else shell("settings put secure spell_checker_enabled $it")
+        }
+    }
+
+    // ---- 1. each keyboard made and first drawn
+
+    private enum class Board(val label: String, val pinyin: PinyinKeyboard?) {
+        FULL("26 keys (pinyin)", PinyinKeyboard.Full),
+        NINE("9 keys", PinyinKeyboard.NineKeys),
+        KEYS14("14 keys", PinyinKeyboard.Keys14),
+        KEYS18("18 keys", PinyinKeyboard.Keys18),
+        ZHUYIN("zhuyin (大千)", PinyinKeyboard.ZhuyinFull),
+        ZHUYIN_NINE("zhuyin 9 keys", PinyinKeyboard.ZhuyinNine),
+        NUMBER("number", null),
+        SYMBOLS("symbols", null),
+        HANDWRITING("handwriting", null),
+    }
+
+    private val built = linkedMapOf<Board, MutableList<KeyboardFrames.Sample>>()
+    private val viewsIn = linkedMapOf<Board, Pair<Int, Int>>()
+
+    /**
+     * A keyboard picked in ⋯ is a setting, and the input view is made anew with it (as on a theme
+     * change): counted from the setting to its first frame. The number and symbol keyboards and the
+     * handwriting pad are made the first time a fresh input view shows them: the 26 keys made anew
+     * (via 14 keys, a setting each), then counted from the tap's lift, or from handwriting asked for.
+     */
+    private fun buildEachKeyboard() {
+        val picked = Board.entries.filter { it.pinyin != null && it != Board.FULL }
+        repeat(warmUp + runs) {
+            // from the 26 keys and back: the 26 keys' samples are the way back from each
+            for (board in picked) {
+                record(board, pick(board))
+                record(Board.FULL, pick(Board.FULL))
+            }
+        }
+        val number = keyAt(onKeyboard().text("123"))
+        val symbols = keyAt(onKeyboard().text("符"))
+        val handwriting = host { availableIme().any { it.uniqueName == HANDWRITING } }
+        repeat(warmUp + runs) {
+            fresh()
+            record(Board.NUMBER, tapTo(number, Board.NUMBER))
+            fresh()
+            record(Board.SYMBOLS, tapTo(symbols, Board.SYMBOLS))
+            if (handwriting) {
+                fresh()
+                record(Board.HANDWRITING, switchTo(HANDWRITING, Board.HANDWRITING))
+                switchTo(PINYIN, Board.FULL)
+            }
+        }
+        if (!handwriting) log("handwriting\tnot in this build's input methods")
+        fresh()
+        for ((board, samples) in built) {
+            val kept = samples.drop(warmUp)
+            val (area, window) = viewsIn[board] ?: (-1 to -1)
+            row("build", board.label, kept, "views area $area window $window")
+        }
+    }
+
+    private fun record(board: Board, sample: KeyboardFrames.Sample) {
+        built.getOrPut(board) { mutableListOf() } += sample
+        if (board !in viewsIn) viewsIn[board] = onMain { viewCount(keyboardArea()) to viewCount(service.window.window!!.decorView) }
+    }
+
+    // a fresh input view on the 26 keys: none of the others made yet
+    private fun fresh() {
+        pick(Board.KEYS14)
+        pick(Board.FULL)
+    }
+
+    private fun pick(board: Board): KeyboardFrames.Sample {
+        val before = onMain { keyboardFrame() }
+        return measure({ keyboardFrame().let { it !== before && shows(it, board) } }) {
+            AppPrefs.getInstance().keyboard.pinyinKeyboard.setValue(board.pinyin!!)
+        }
+    }
+
+    private fun tapTo(key: PointF, board: Board): KeyboardFrames.Sample {
+        // the area as it is before the tap: the symbols take the keyboard's frame away
+        onMain { keyboardArea() }
+        val mark = onMain { frames.mark(0) { shows(keyboardFrame(), board) } }
+        val down = SystemClock.uptimeMillis()
+        inject(MotionEvent.ACTION_DOWN, key, down, down)
+        SystemClock.sleep(HOLD_MS)
+        val up = SystemClock.uptimeMillis()
+        mark.from = up * DownMarks.NS_PER_MS
+        inject(MotionEvent.ACTION_UP, key, down, up)
+        return frames.await(mark).also { settle() }
+    }
+
+    private fun switchTo(im: String, board: Board): KeyboardFrames.Sample {
+        val mark = onMain { frames.mark(0) { shows(keyboardFrame(), board) } }
+        mark.from = System.nanoTime()
+        host { activateIme(im) }
+        return frames.await(mark).also { settle() }
+    }
+
+    /**
+     * Whether [frame] shows [board]: the keyboard in it by its class; the symbols, a window of their own,
+     * as the keyboard's frame gone. The one part to change for the new drawing, if its keyboards are
+     * other classes.
+     */
+    private fun shows(frame: ViewGroup?, board: Board): Boolean {
+        if (board == Board.SYMBOLS) return frame == null || !frame.isShown
+        if (frame == null || !frame.isShown || frame.childCount == 0) return false
+        val shown = frame.getChildAt(0).javaClass.simpleName
+        return shown == when (board) {
+            Board.FULL -> "TextKeyboard"
+            Board.NINE -> "T9Keyboard"
+            Board.KEYS14, Board.KEYS18 -> "GroupedKeyboard"
+            Board.ZHUYIN, Board.ZHUYIN_NINE -> "ZhuyinKeyboard"
+            Board.NUMBER -> "NumberKeyboard"
+            Board.HANDWRITING -> "HandwritingKeyboard"
+            Board.SYMBOLS -> error("above")
+        }
+    }
+
+    private fun keyboardFrame(): ViewGroup? = service.window.window!!.decorView.findViewById(R.id.keyboard_view)
+
+    // what holds the keyboard's frame and the pickers (InputWindowManager's view): the keyboard area
+    private var area: View? = null
+    private fun keyboardArea(): View {
+        keyboardFrame()?.parent?.let { area = it as View }
+        return area!!
+    }
+
+    // ---- 2. a theme picked
+
+    /**
+     * Themes picked as the theme list picks them (followed by no day and night setting), each made anew
+     * with the input view: a block theme (a built-in's look) and a flat one, and a flat one over a
+     * picture. No built-in has a picture, so the two flat ones are made here and deleted after. The
+     * first frame of the new view is counted; a picture is decoded off the main thread
+     * (ThemeAssets.prefetch) and may come a frame or more later.
+     */
+    private fun switchThemes() {
+        val prefs = ThemeManager.prefs
+        followSystemWas = prefs.followSystemDayNightTheme.getValue()
+        themeWas = prefs.normalModeTheme.getValue()
+        log("theme\tkey border setting ${prefs.keyBorderChoice.getValue()} (FollowTheme: each theme's own)")
+        val block = ThemePreset.PixelLight
+        val flat = Theme.Custom(FLAT, isDark = false, look = block.look.copy(keys = block.look.keys.copy(blocks = false)))
+        val pictured = Theme.Custom(PICTURED, isDark = false, look = flat.look.copy(picture = picture(), base = BoardBase.Picture))
+        val saved = onMain {
+            prefs.followSystemDayNightTheme.setValue(false)
+            listOf(flat, pictured).all { ThemeManager.saveTheme(it).also { ok -> if (ok) themesMade += it.name } }
+        }
+        assumeTrue("themes could not be saved", saved)
+        if (ThemeManager.activeTheme.name != block.name) theme(block)
+        log("theme\tblocks: ${block.name} ${ThemeManager.shownLook(block).keys.blocks}, $FLAT ${ThemeManager.shownLook(flat).keys.blocks}")
+        if (screenshots) {
+            theme(pictured)
+            SystemClock.sleep(SCREENSHOT_WAIT_MS)
+            shell("screencap -p $SCREENSHOT")
+            log("theme\tthe picture theme on screen: $SCREENSHOT")
+            theme(block)
+        }
+        val samples = linkedMapOf<String, MutableList<KeyboardFrames.Sample>>()
+        repeat(warmUp + runs) {
+            for ((label, to) in listOf("block → flat" to flat, "flat → block" to block, "block → flat+picture" to pictured, "flat+picture → block" to block)) {
+                samples.getOrPut(label) { mutableListOf() } += theme(to)
+            }
+        }
+        samples.forEach { (label, s) -> row("theme", label, s.drop(warmUp)) }
+    }
+
+    private fun theme(to: Theme): KeyboardFrames.Sample {
+        val before = onMain { keyboardFrame() }
+        return measure({ keyboardFrame().let { it != null && it !== before && it.isShown } }) { ThemeManager.setNormalModeTheme(to) }
+    }
+
+    // a picture as wide as a phone's keyboard, as a theme's cut is: a gradient and some shapes
+    private fun picture(): Picture {
+        val file = File(ThemeFilesManager.themeDir, "$PICTURED.png")
+        val bitmap = Bitmap.createBitmap(PICTURE_W, PICTURE_H, Bitmap.Config.ARGB_8888)
+        Canvas(bitmap).apply {
+            drawPaint(Paint().apply { shader = LinearGradient(0f, 0f, PICTURE_W.toFloat(), PICTURE_H.toFloat(), 0xff3a6ea5.toInt(), 0xfff2c14e.toInt(), Shader.TileMode.CLAMP) })
+            val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x55ffffff }
+            for (i in 0 until 40) drawCircle((i * 97 % PICTURE_W).toFloat(), (i * 61 % PICTURE_H).toFloat(), 20f + i % 7 * 9, dot)
+        }
+        file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        bitmap.recycle()
+        return Picture(file.path, Crop(file.path, null, 0), null, brightness = 100, blurDp = 0)
+    }
+
+    private fun putThemesBack() {
+        onMain {
+            themeWas?.let { ThemeManager.prefs.normalModeTheme.setValue(it) }
+            followSystemWas?.let { ThemeManager.prefs.followSystemDayNightTheme.setValue(it) }
+            themesMade.forEach { ThemeManager.deleteTheme(it) }
+        }
+    }
+
+    // ---- 3. a key's press shown
+
+    /**
+     * Keys pressed on the 26 keys as the system delivers touches: a single key (a letter, lifted after
+     * 80 ms, then Space and the field emptied), and ten letters in a row at 80 ms a key. Each down is
+     * counted from its event's time to the window's next frame done ([DownMarks]).
+     */
+    private fun pressFeedback() {
+        fresh()
+        val letters = "nihaoshiji"
+        val at = (letters.toSet() + 'a').associateWith { keyAt(onKeyboard().text("$it")) }
+        val space = keyAt(onKeyboard().res(imePkg, "button_space"))
+        val marks = onMain { DownMarks(service.window.window!!.callback, frames).also { service.window.window!!.callback = it } }
+        try {
+            val single = mutableListOf<KeyboardFrames.Sample>()
+            val run = mutableListOf<KeyboardFrames.Sample>()
+            val runWorst = mutableListOf<Double>()
+            repeat(warmUp + runs) { i ->
+                val one = presses(marks, listOf(at.getValue('a')), gapMs = HOLD_MS * 2)
+                endTyping(space)
+                val ten = presses(marks, letters.map(at::getValue), gapMs = FAST_GAP_MS)
+                endTyping(space)
+                if (i >= warmUp) {
+                    single += one
+                    run += ten
+                    ten.maxOfOrNull { it.latency }?.let { runWorst += it }
+                }
+            }
+            row("press", "single key", single)
+            row("press", "10-key run, every key", run)
+            log("press\t10-key run, slowest key of a run\t${Stats(runWorst)}")
+        } finally {
+            onMain { service.window.window!!.callback = marks.original }
+        }
+    }
+
+    private fun presses(marks: DownMarks, keys: List<PointF>, gapMs: Long): List<KeyboardFrames.Sample> {
+        marks.marks.clear()
+        marks.recording = true
+        for (key in keys) {
+            val down = SystemClock.uptimeMillis()
+            inject(MotionEvent.ACTION_DOWN, key, down, down)
+            SystemClock.sleep(gapMs / 2)
+            inject(MotionEvent.ACTION_UP, key, down, SystemClock.uptimeMillis())
+            SystemClock.sleep(gapMs / 2)
+        }
+        marks.recording = false
+        // a down with no frame after it (nothing drawn for the press) is told, not counted
+        val drawn = marks.marks.mapNotNull { runCatching { frames.await(it) }.getOrNull() }
+        if (drawn.size != keys.size) log("press\t${keys.size - drawn.size} of ${keys.size} downs had no frame")
+        return drawn
+    }
+
+    // what was typed committed and the field emptied, for the next run to start alike
+    private fun endTyping(space: PointF) {
+        val down = SystemClock.uptimeMillis()
+        inject(MotionEvent.ACTION_DOWN, space, down, down)
+        inject(MotionEvent.ACTION_UP, space, down, SystemClock.uptimeMillis())
+        settle()
+        scenario.onActivity { it.field.setText("") }
+        settle()
+    }
+
+    // ---- 4. memory
+
+    private fun memory(label: String) {
+        repeat(2) {
+            Runtime.getRuntime().gc()
+            SystemClock.sleep(GC_WAIT_MS)
+        }
+        val samples = (1..MEMORY_SAMPLES).map {
+            SystemClock.sleep(GC_WAIT_MS)
+            Memory.parse(shell("dumpsys meminfo ${Process.myPid()}"))
+        }
+        fun median(of: (Memory) -> Int) = Stats(samples.map { of(it).toDouble() }).median.toInt()
+        log("memory\t$label\tjava ${median { it.javaHeap }} kB\tnative ${median { it.nativeHeap }} kB\tgraphics ${median { it.graphics }} kB\ttotal pss ${median { it.totalPss }} kB")
+    }
+
+    private fun hideKeyboard() {
+        scenario.onActivity { context.inputMethodManager.hideSoftInputFromWindow(it.field.windowToken, 0) }
+        device.wait(Until.gone(By.pkg(imePkg).res(imePkg, "keyboard_view")), 5_000)
+        settle()
+    }
+
+    private fun showKeyboard() {
+        scenario.onActivity {
+            it.field.requestFocus()
+            context.inputMethodManager.showSoftInput(it.field, 0)
+        }
+        find(By.pkg(imePkg).res(imePkg, "keyboard_view"))
+        settle()
+    }
+
+    // ---- the parts
+
+    /** Counts [action] (main thread) to the first frame where [ready] holds. */
+    private fun measure(ready: () -> Boolean, action: () -> Unit): KeyboardFrames.Sample {
+        val mark = onMain {
+            val from = System.nanoTime()
+            frames.mark(from, ready).also { action() }
+        }
+        return frames.await(mark).also { settle() }
+    }
+
+    private fun inject(action: Int, at: PointF, down: Long, time: Long) {
+        val event = MotionEvent.obtain(down, time, action, at.x, at.y, 0)
+        event.source = InputDevice.SOURCE_TOUCHSCREEN
+        check(instrumentation.uiAutomation.injectInputEvent(event, true)) { "not injected" }
+        event.recycle()
+    }
+
+    // the main thread idle, and a little more for what is posted after a frame (the bar, a11y)
+    private fun settle() {
+        instrumentation.waitForIdleSync()
+        SystemClock.sleep(SETTLE_MS)
+    }
+
+    private fun onKeyboard() = By.pkg(imePkg).hasAncestor(By.res(imePkg, "keyboard_view"))
+
+    private fun find(selector: BySelector) = device.wait(Until.findObject(selector), 10_000) ?: error("not on screen: $selector")
+
+    // a key's centre on the screen, found as TalkBack and the UAT find it
+    private fun keyAt(selector: BySelector) = find(selector).visibleBounds.let { PointF(it.exactCenterX(), it.exactCenterY()) }
+
+    private fun row(what: String, label: String, samples: List<KeyboardFrames.Sample>, extra: String = "") {
+        fun stats(of: (KeyboardFrames.Sample) -> Double?) = Stats(samples.mapNotNull(of))
+        val withMetrics = samples.count { it.toDone != null }
+        // a press's event to the window, and from there: the system's part and the app's
+        val dispatch = if (samples.any { it.dispatch != null }) "\tdispatch ${stats { it.dispatch }}\tdispatch to done ${stats { it.fromDispatch }}" else ""
+        log(
+            "$what\t$label\tn ${samples.size} (metrics $withMetrics)\tto frame done ${stats { it.latency }}" +
+                "\tto commit ${stats { it.toCommit }}\tmain before draw ${stats { it.toPreDraw }}$dispatch" +
+                "\tframe total ${stats { it.frameTotal }}\tlayout ${stats { it.layoutMeasure }}\tdraw ${stats { it.draw }}\t$extra",
+        )
+    }
+
+    private fun log(line: String) {
+        Log.i(TAG, line)
+    }
+
+    private fun <T> onMain(block: () -> T): T {
+        var result: Result<T>? = null
+        instrumentation.runOnMainSync { result = runCatching(block) }
+        return result!!.getOrThrow()
+    }
+
+    private companion object {
+        const val TAG = "KeyboardPerf"
+        const val PINYIN = InputMethodCatalog.PINYIN
+        const val HANDWRITING = InputMethodCatalog.HANDWRITING
+        const val FLAT = "perf-baseline-flat"
+        const val PICTURED = "perf-baseline-picture"
+        const val PICTURE_W = 1080
+        const val PICTURE_H = 900
+        const val HOLD_MS = 80L
+        const val FAST_GAP_MS = 80L
+        const val SETTLE_MS = 150L
+        const val GC_WAIT_MS = 500L
+        const val MEMORY_SAMPLES = 3
+        const val SCREENSHOT_WAIT_MS = 1_000L
+        const val SCREENSHOT = "/data/local/tmp/keyboard-perf-picture.png"
+
+        val instrumentation = InstrumentationRegistry.getInstrumentation()!!
+        val context = instrumentation.targetContext!!
+        val device: UiDevice = UiDevice.getInstance(instrumentation)
+        val imePkg: String = context.packageName
+        val imeId = "$imePkg/${FcitxInputMethodService::class.java.name}"
+
+        fun shell(command: String): String = device.executeShellCommand(command).trim()
+
+        fun <T> host(block: suspend HostApi.() -> T): T = try {
+            runBlocking { withTimeout(30_000) { HostDaemon.connect(TAG).runOnReady(block) } }
+        } finally {
+            HostDaemon.disconnect(TAG)
+        }
+    }
+}
