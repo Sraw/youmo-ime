@@ -1,0 +1,148 @@
+/*
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+ */
+package org.fcitx.fcitx5.android.scene.engine
+
+import org.fcitx.fcitx5.android.scene.Parsed
+import org.fcitx.fcitx5.android.scene.Problems
+import org.fcitx.fcitx5.android.scene.layout.Fragment
+import org.fcitx.fcitx5.android.scene.layout.Gap
+import org.fcitx.fcitx5.android.scene.layout.Include
+import org.fcitx.fcitx5.android.scene.layout.Key
+import org.fcitx.fcitx5.android.scene.layout.KeyAttrs
+import org.fcitx.fcitx5.android.scene.layout.Layout
+import org.fcitx.fcitx5.android.scene.layout.Row
+import org.fcitx.fcitx5.android.scene.layout.RowSplit
+import org.fcitx.fcitx5.android.scene.layout.Slot
+import org.fcitx.fcitx5.android.scene.layout.Text
+import org.fcitx.fcitx5.android.scene.layout.Width
+
+/** A row as the environment has it: what shows, each key's text read (060-render-v2 §6 step 2). */
+class ExpandedRow(
+    val height: Double,
+    val indent: Double,
+    val endIndent: Double,
+    val split: RowSplit,
+    val items: List<Item>,
+    val line: Int,
+)
+
+/** What a row holds once expanded. */
+sealed interface Item {
+    val width: Width
+}
+
+/** A key shown, its attributes laid over its row's and file's defaults, its bindings read. */
+class ExpandedKey(
+    val key: Key,
+    val attrs: KeyAttrs,
+    val label: String?,
+    val alt: String?,
+    val icon: String?,
+    val badge: String?,
+    val a11y: String,
+) : Item {
+    override val width: Width get() = attrs.width ?: Width.Units(1.0)
+    val kind: String get() = attrs.kind ?: "letter"
+}
+
+class ExpandedGap(val gap: Gap) : Item {
+    override val width: Width get() = gap.width
+}
+
+class ExpandedSlot(val slot: Slot) : Item {
+    override val width: Width get() = slot.width
+}
+
+/**
+ * Step 2 of §6: includes put in, `when=` weighed, bindings read. [fragments] are the files includes
+ * name, by id; one not there is a problem, as is a row with nothing shown.
+ */
+object Expand {
+
+    fun rows(layout: Layout, fragments: Map<String, Fragment>, env: Env): Parsed<List<ExpandedRow>> {
+        val p = Problems()
+        val facts = env.facts
+        val out = ArrayList<ExpandedRow>()
+        for (part in layout.parts) {
+            when (part) {
+                is Row -> if (part.condition?.holds(facts) != false) row(part, layout.defaults, env, p)?.let(out::add)
+                is Include -> if (part.condition?.holds(facts) != false) {
+                    val fragment = fragments[part.src]
+                    if (fragment == null) {
+                        p.add(part.line, "<include src=\"${part.src}\">: no such fragment")
+                    } else {
+                        val defaults = fragment.defaults.over(layout.defaults)
+                        fragment.rows.filter { it.condition?.holds(facts) != false }.mapNotNullTo(out) { row(it, defaults, env, p) }
+                    }
+                }
+            }
+        }
+        if (out.isEmpty() && p.isEmpty()) p.add(0, "no row shows here")
+        return p.result { out }
+    }
+
+    private fun row(row: Row, fileDefaults: KeyAttrs, env: Env, p: Problems): ExpandedRow? {
+        val defaults = row.defaults.over(fileDefaults)
+        val facts = env.facts
+        val items = row.cells.filter { it.condition?.holds(facts) != false }.map { cell ->
+            when (cell) {
+                is Key -> key(cell, cell.attrs.over(defaults), env)
+                is Gap -> ExpandedGap(cell)
+                is Slot -> ExpandedSlot(cell)
+            }
+        }
+        if (items.isEmpty()) {
+            p.add(row.line, "a row with nothing shown here")
+            return null
+        }
+        return ExpandedRow(row.height, row.indent, row.endIndent, row.split, items, row.line)
+    }
+
+    private fun key(key: Key, attrs: KeyAttrs, env: Env): ExpandedKey {
+        val label = attrs.label?.let { text(it, env) }
+        return ExpandedKey(
+            key, attrs, label,
+            attrs.alt?.let { text(it, env) }?.takeIf { it.isNotEmpty() },
+            attrs.icon?.let { icon(it, env) },
+            attrs.badge?.let { icon(it, env) },
+            attrs.a11y?.let { text(it, env) } ?: label.orEmpty(),
+        )
+    }
+
+    /** [t] as [env] reads it: a literal as written, a binding's value (empty where the environment has none). */
+    fun text(t: Text, env: Env): String = when (t) {
+        is Text.Literal -> t.text
+        is Text.Binding -> binding(t.name, t.arg.orEmpty(), env)
+    }
+
+    private fun binding(name: String, arg: String, env: Env): String {
+        val texts = env.texts
+        return when (name) {
+            "case" -> if (env.shift != Shift.None || texts.keepUppercase) arg.uppercase() else arg
+            "alt" -> texts.alts?.get(arg).orEmpty()
+            "punct" -> texts.punctuation[arg] ?: arg
+            "comma" -> texts.comma
+            "period" -> texts.period
+            "ime-name" -> texts.imeName
+            "return" -> texts.returnLabel
+            else -> texts.other[if (arg.isEmpty()) name else "$name:$arg"].orEmpty()
+        }
+    }
+
+    /** An icon's name: as written, or a binding's (null: none drawn). */
+    fun icon(t: Text, env: Env): String? = when (t) {
+        is Text.Literal -> t.text
+        is Text.Binding -> when (t.name) {
+            "shift-icon" -> when (env.shift) {
+                Shift.None -> "shift"
+                Shift.Once -> "shift-once"
+                Shift.Lock -> "shift-locked"
+            }
+            "return-icon" -> env.texts.returnIcon
+            "hold-badge" -> "voice".takeIf { env.input.holdVoice }
+            else -> null
+        }
+    }
+}

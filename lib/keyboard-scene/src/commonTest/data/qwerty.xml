@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  26 键（qwerty）照现在的 TextKeyboard.Layout（TextKeyboard.kt:82-144）、KeyDefPreset 和 show*Key 的条件转写。
+  拼音、双拼、英文、5 个码表共用这一块，差别都在 when= 里。宽度：字母键 = 1（原 percentWidth 0.1）。
+  不写的：每个字母的长按/上下滑字符（PopupPreset + 用户 PopupOverrides，按 label 自动取）、快捷键的内容（KeyShortcuts）。
+  分体：行上 split="halves" 两半各五键（A §8，引擎按 SplitKeyboard 算宽），; 和 * 写 split="after" 接在右半后面。角标 alt 写的是内置值；用户改过长按首字时角标跟着变，那是 {alt:x}，这里为了可读写成固定字。
+-->
+<keyboard xmlns="https://youmo-ime/layout/1" id="qwerty" name="26 键" family="letters" columns="10" arrange="rows" on-split="split">
+  <defaults kind="letter" text-size="23"/>
+  <row split="halves">
+    <key id="q" label="{case:q}" alt="1" send="q" shortcut="full/q"/>
+    <key id="w" label="{case:w}" alt="2" send="w" shortcut="full/w"/>
+    <key id="e" label="{case:e}" alt="3" send="e" shortcut="full/e"/>
+    <key id="r" label="{case:r}" alt="4" send="r" shortcut="full/r"/>
+    <key id="t" label="{case:t}" alt="5" send="t" shortcut="full/t"/>
+    <key id="y" label="{case:y}" alt="6" send="y" shortcut="full/y"/>
+    <key id="u" label="{case:u}" alt="7" send="u" shortcut="full/u"/>
+    <key id="i" label="{case:i}" alt="8" send="i" shortcut="full/i"/>
+    <key id="o" label="{case:o}" alt="9" send="o" shortcut="full/o"/>
+    <key id="p" label="{case:p}" alt="0" send="p" shortcut="full/p"/>
+  </row>
+  <row split="halves">
+    <key id="a" label="{case:a}" alt="@" send="a" shortcut="full/a"/>
+    <key id="s" label="{case:s}" alt="*" send="s" shortcut="full/s"/>
+    <key id="d" label="{case:d}" alt="+" send="d" shortcut="full/d"/>
+    <key id="f" label="{case:f}" alt="-" send="f" shortcut="full/f"/>
+    <key id="g" label="{case:g}" alt="=" send="g" shortcut="full/g"/>
+    <key id="h" label="{case:h}" alt="/" send="h" shortcut="full/h"/>
+    <key id="j" label="{case:j}" alt="#" send="j" shortcut="full/j"/>
+    <key id="k" label="{case:k}" alt="(" send="k" shortcut="full/k"/>
+    <key id="l" label="{case:l}" alt=")" send="l" shortcut="full/l"/>
+    <!-- 双拼方案会打 ; 且不分体（SemicolonKey.kt），或码表的额外码键在 ; 位（TableKeyboard.extraKey）：TextKeyboard.kt:324-329 -->
+    <key id="semicolon" role="semicolon" label=";" send=";" mark="false" split="after"
+         when="ime=shuangpin scheme-types=semicolon !split, table-extra=semicolon"/>
+    <key id="star" role="star" label="*" send="*" mark="false" split="after" when="table-extra=star"/>
+  </row>
+  <row split="halves">
+    <!-- 码表时 ⇧ 让给「拼」键，开/关两态二选一（TextKeyboard.kt:300-306） -->
+    <key id="shift" role="shift" kind="function" width="1.5" icon="{shift-icon}" a11y="a11y_key_shift" shortcut="shift"
+         send="caps" long-press="caps:lock" double-tap="caps:lock" when="!table"/>
+    <key id="lookup" role="lookup" kind="function" width="1.5" label="拼" text-size="18" text-style="bold"
+         send="code:U+F0104" when="table !looking-up"/>
+    <key id="lookup-on" role="lookup-on" kind="enter" face="keep" width="1.5" label="拼" text-size="18" text-style="bold"
+         send="code:U+F0104" when="table looking-up"/>
+    <key id="z" label="{case:z}" alt="'" send="z" shortcut="full/z"/>
+    <key id="x" label="{case:x}" alt=":" send="x" shortcut="full/x"/>
+    <key id="c" label="{case:c}" alt="&quot;" send="c" shortcut="full/c"/>
+    <key id="v" label="{case:v}" alt="?" send="v" shortcut="full/v"/>
+    <key id="b" label="{case:b}" alt="!" send="b" shortcut="full/b"/>
+    <key id="n" label="{case:n}" alt="~" send="n" shortcut="full/n"/>
+    <key id="m" label="{case:m}" alt="\" send="m" shortcut="full/m"/>
+    <key id="backspace" role="backspace" kind="function" width="1.5" icon="backspace" a11y="a11y_key_backspace"
+         sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both" shortcut="backspace"/>
+  </row>
+  <row>
+    <key id="symbols" role="symbols" kind="function" width="1.2" label="符" text-size="16" text-style="bold"
+         send="layout:Symbol" long-press="quickphrase" shortcut="symbols"/>
+    <key id="numbers" role="numbers" kind="function" width="1.2" label="123" text-size="16" text-style="bold"
+         send="layout:Number" long-press="unicode" shortcut="numbers"/>
+    <!-- 地址框（AddressKeys.URL/EMAIL）里 , . 让给 / @ . .com（BaseKeyboard.kt:135-142） -->
+    <key id="comma" role="comma" kind="function" label="{comma}" send="," shortcut="comma" when="!field=url|email"/>
+    <key id="slash" role="slash" kind="function" label="/" send="commit:/" mark="false" when="field=url">
+      <popup from="none"/>
+    </key>
+    <key id="at" role="at" kind="function" label="@" send="commit:@" mark="false" when="field=email">
+      <popup from="none"/>
+    </key>
+    <!-- 占满剩下的宽：🌐 隐藏、地址键替换时空格自动变宽 -->
+    <key id="space" role="space" kind="space" face="special" width="fill" label="{ime-name}" text-size="13"
+         badge="{hold-badge}" sound="space" send="sym:space" long-press="space-long-press" swipe-axis="both" shortcut="space"/>
+    <key id="period" role="period" kind="function" label="{period}" send="." shortcut="period" when="!field=url|email"/>
+    <!-- 原样上屏：经引擎 . 会变成 。 -->
+    <key id="dot" role="dot" kind="function" label="." send="commit:." mark="false" when="field=url|email">
+      <popup from="none"/>
+    </key>
+    <key id="domain" role="domain" kind="function" width="1.4" label=".com" text-size="16" send="commit:.com" mark="false"
+         when="field=url|email">
+      <popup from="list" as-is="true">
+        <item text=".com"/><item text=".cn"/><item text=".net"/><item text=".org"/>
+      </popup>
+    </key>
+    <!-- 字母键的底、功能键的字色（Variant.AltForeground） -->
+    <key id="lang" role="lang" kind="letter" class="alt-text" icon="language" a11y="a11y_key_switch_language" shortcut="lang"
+         send="lang" long-press="ime-picker" when="lang-key"/>
+    <!-- 码表输入中 确定 替 ⏎（TextKeyboard.kt:309-313）；两者共用快捷键名 return -->
+    <key id="enter" role="enter" kind="enter" face="special" width="1.5" icon="{return-icon}" a11y="{return}"
+         sound="return" send="sym:Return" shortcut="return" when="!composing, !table">
+      <menu>
+        <item label="emoji" icon="emoji" do="picker:Emoji"/>
+      </menu>
+    </key>
+    <key id="confirm" role="confirm" kind="enter" face="keep" width="1.5" label="确定" text-size="16" text-style="bold"
+         sound="return" send="sym:Return" shortcut="return" when="composing table"/>
+  </row>
+</keyboard>
