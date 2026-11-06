@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  分组键盘（14、18 键）和注音（大千、注音九键）共用的底行（GroupedKeyboard.bottomRow，rules C §4），宽度为行宽的百分之几。
+  , . 按标点映射显示（{punct:,}，中文下 ，。），地址框里让给 / @ . .com（BaseKeyboard.kt:135-141）；空格填满，地址框剩 17。
+  没有中/英键；123 长按 Unicode（九键、手写的 123 没有长按，rules C 疑问 3）。
+-->
+<fragment xmlns="https://youmo-ime/layout/1" id="grouped-bottom">
+  <row>
+    <key id="symbols" role="symbols" kind="function" width="12" label="符" text-size="16" text-style="bold"
+         send="layout:Symbol" long-press="quickphrase" shortcut="symbols"/>
+    <key id="numbers" role="numbers" kind="function" width="12" label="123" text-size="16" text-style="bold"
+         send="layout:Number" long-press="unicode" shortcut="numbers"/>
+    <key id="comma" role="comma" kind="function" width="10" label="{punct:,}" text-size="23" send="," shortcut="comma" when="!field=url|email"/>
+    <key id="slash" role="slash" kind="function" width="10" label="/" send="commit:/" mark="false" when="field=url">
+      <popup from="none"/>
+    </key>
+    <key id="at" role="at" kind="function" width="10" label="@" send="commit:@" mark="false" when="field=email">
+      <popup from="none"/>
+    </key>
+    <key id="space" role="space" kind="space" face="special" width="fill" label="{ime-name}" text-size="13"
+         badge="{hold-badge}" sound="space" send="sym:space" long-press="space-long-press" swipe-axis="both" shortcut="space"/>
+    <key id="period" role="period" kind="function" width="10" label="{punct:.}" text-size="23" send="." shortcut="period" when="!field=url|email"/>
+    <key id="dot" role="dot" kind="function" width="10" label="." send="commit:." mark="false" when="field=url|email">
+      <popup from="none"/>
+    </key>
+    <key id="domain" role="domain" kind="function" width="14" label=".com" text-size="16" send="commit:.com" mark="false"
+         when="field=url|email">
+      <popup from="list" as-is="true">
+        <item text=".com"/><item text=".cn"/><item text=".net"/><item text=".org"/>
+      </popup>
+    </key>
+    <key id="lang" role="lang" kind="letter" class="alt-text" width="10" icon="language" a11y="a11y_key_switch_language"
+         shortcut="lang" send="lang" long-press="ime-picker" when="lang-key"/>
+    <key id="enter" role="enter" kind="enter" face="special" width="15" icon="{return-icon}" a11y="{return}"
+         sound="return" send="sym:Return" shortcut="return">
+      <menu>
+        <item label="emoji" icon="emoji" do="picker:Emoji"/>
+      </menu>
+    </key>
+  </row>
+</fragment>

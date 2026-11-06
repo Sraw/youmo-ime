@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  注音大千（ZhuyinKeyboard nine=false，ZhuyinFull，rules C §5），板 zhuyin，键名是大千键盘的 QWERTY 位置（与 ZhuyinKeys.DACHEN_QWERTY 核对过）。
+  宽度为行宽的百分之几：第 1 行 11 键平分，第 2、3 行各 10，第 4 行十键各 8.5 + ⌫ 15；第 5 行是分组底行。
+  符号 20 号，紧凑档再乘 0.9（compact-text-scale，KeyTextScale.dachen，乘在引擎的紧凑缩放之上）。点按发注音私有码（App 行为，
+  send="action:zhuyin" 只是占位）；预览就是符号本身。
+-->
+<keyboard xmlns="https://youmo-ime/layout/1" id="zhuyin" name="注音大千" family="zhuyin" columns="100">
+  <defaults kind="letter" text-size="20" compact-text-scale="0.9" mark="false"/>
+  <row>
+    <key id="1" width="fill" label="ㄅ" send="action:zhuyin" shortcut="zyfull/1"/>
+    <key id="2" width="fill" label="ㄉ" send="action:zhuyin" shortcut="zyfull/2"/>
+    <key id="3" width="fill" label="ˇ" send="action:zhuyin" shortcut="zyfull/3"/>
+    <key id="4" width="fill" label="ˋ" send="action:zhuyin" shortcut="zyfull/4"/>
+    <key id="5" width="fill" label="ㄓ" send="action:zhuyin" shortcut="zyfull/5"/>
+    <key id="6" width="fill" label="ˊ" send="action:zhuyin" shortcut="zyfull/6"/>
+    <key id="7" width="fill" label="˙" send="action:zhuyin" shortcut="zyfull/7"/>
+    <key id="8" width="fill" label="ㄚ" send="action:zhuyin" shortcut="zyfull/8"/>
+    <key id="9" width="fill" label="ㄞ" send="action:zhuyin" shortcut="zyfull/9"/>
+    <key id="0" width="fill" label="ㄢ" send="action:zhuyin" shortcut="zyfull/0"/>
+    <key id="-" width="fill" label="ㄦ" send="action:zhuyin" shortcut="zyfull/-"/>
+  </row>
+  <row>
+    <key id="q" width="10" label="ㄆ" send="action:zhuyin" shortcut="zyfull/q"/>
+    <key id="w" width="10" label="ㄊ" send="action:zhuyin" shortcut="zyfull/w"/>
+    <key id="e" width="10" label="ㄍ" send="action:zhuyin" shortcut="zyfull/e"/>
+    <key id="r" width="10" label="ㄐ" send="action:zhuyin" shortcut="zyfull/r"/>
+    <key id="t" width="10" label="ㄔ" send="action:zhuyin" shortcut="zyfull/t"/>
+    <key id="y" width="10" label="ㄗ" send="action:zhuyin" shortcut="zyfull/y"/>
+    <key id="u" width="10" label="ㄧ" send="action:zhuyin" shortcut="zyfull/u"/>
+    <key id="i" width="10" label="ㄛ" send="action:zhuyin" shortcut="zyfull/i"/>
+    <key id="o" width="10" label="ㄟ" send="action:zhuyin" shortcut="zyfull/o"/>
+    <key id="p" width="10" label="ㄣ" send="action:zhuyin" shortcut="zyfull/p"/>
+  </row>
+  <row>
+    <key id="a" width="10" label="ㄇ" send="action:zhuyin" shortcut="zyfull/a"/>
+    <key id="s" width="10" label="ㄋ" send="action:zhuyin" shortcut="zyfull/s"/>
+    <key id="d" width="10" label="ㄎ" send="action:zhuyin" shortcut="zyfull/d"/>
+    <key id="f" width="10" label="ㄑ" send="action:zhuyin" shortcut="zyfull/f"/>
+    <key id="g" width="10" label="ㄕ" send="action:zhuyin" shortcut="zyfull/g"/>
+    <key id="h" width="10" label="ㄘ" send="action:zhuyin" shortcut="zyfull/h"/>
+    <key id="j" width="10" label="ㄨ" send="action:zhuyin" shortcut="zyfull/j"/>
+    <key id="k" width="10" label="ㄜ" send="action:zhuyin" shortcut="zyfull/k"/>
+    <key id="l" width="10" label="ㄠ" send="action:zhuyin" shortcut="zyfull/l"/>
+    <key id=";" width="10" label="ㄤ" send="action:zhuyin" shortcut="zyfull/;"/>
+  </row>
+  <row>
+    <key id="z" width="8.5" label="ㄈ" send="action:zhuyin" shortcut="zyfull/z"/>
+    <key id="x" width="8.5" label="ㄌ" send="action:zhuyin" shortcut="zyfull/x"/>
+    <key id="c" width="8.5" label="ㄏ" send="action:zhuyin" shortcut="zyfull/c"/>
+    <key id="v" width="8.5" label="ㄒ" send="action:zhuyin" shortcut="zyfull/v"/>
+    <key id="b" width="8.5" label="ㄖ" send="action:zhuyin" shortcut="zyfull/b"/>
+    <key id="n" width="8.5" label="ㄙ" send="action:zhuyin" shortcut="zyfull/n"/>
+    <key id="m" width="8.5" label="ㄩ" send="action:zhuyin" shortcut="zyfull/m"/>
+    <key id="," width="8.5" label="ㄝ" send="action:zhuyin" shortcut="zyfull/,"/>
+    <key id="." width="8.5" label="ㄡ" send="action:zhuyin" shortcut="zyfull/."/>
+    <key id="/" width="8.5" label="ㄥ" send="action:zhuyin" shortcut="zyfull//"/>
+    <key id="backspace" role="backspace" kind="function" width="15" icon="backspace" a11y="a11y_key_backspace"
+         sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both" shortcut="backspace"/>
+  </row>
+  <include src="grouped-bottom"/>
+</keyboard>

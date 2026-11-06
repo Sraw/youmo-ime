@@ -318,9 +318,10 @@ object LayoutReader {
     private const val MAX_TEXT_DP = 64.0
     private const val DEFAULT_COLUMNS = 10.0
     private val IDENT = Regex("[a-z0-9]+(-[a-z0-9]+)*")
-    private val KEY_ID = Regex("[^\\s/]+")
+    // KeyNames': 大千's `/` and the number pad's are keys too (a theme's `zhuyin//` is its own: Selector)
+    private val KEY_ID = Regex("\\S{1,32}")
     private val CLASSES = Regex("[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*")
-    private val SHORTCUT = Regex("([a-z0-9-]+/)?[^\\s/]+")
+    private val SHORTCUT = Regex("([a-z0-9-]+/)?\\S{1,32}")
     private val BINDING = Regex("\\{([a-z-]+)(?::([^{}]*))?\\}")
     private val LETTER_ARG = Regex("[a-z;,./'?!~-]")
     private val PUNCT_ARG = Regex("[^\\s{}]")
@@ -329,7 +330,7 @@ object LayoutReader {
     private val NUMBER_ARG = Regex("[0-9]{1,2}")
     private val FAMILIES = listOf("letters", "zhuyin", "nine", "zhuyin-nine", "grouped", "number", "symbols", "handwriting")
     private val KINDS = listOf("letter", "function", "space", "enter")
-    private val SLOT_KINDS = listOf("handwriting-pad", "nine-side", "handwriting-candidates")
+    private val SLOT_KINDS = listOf("handwriting-pad", "nine-side", "handwriting-candidates", "symbol-categories", "symbol-grid")
     private val ACTIONS = listOf("send", "long-press", "swipe-up", "swipe-down", "double-tap")
     private val BOOLEAN = Regex("true|false|1|0")
     private val COUNT = Regex("[0-9]{1,3}")

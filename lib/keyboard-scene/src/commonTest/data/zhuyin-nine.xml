@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  注音九键（ZhuyinKeyboard nine=true，ZhuyinNine，rules C §6），板 zhuyin-nine，键名为 4×5 格的位置（⌫ 按角色，没有 r1c5）。
+  每行：声调列 14、三组各 24、右列 14（宽度为行宽的百分之几）；第 5 行是分组底行。组键 18 号、声调 20 号、? ! ~ 23 号。
+  第 4 行第 4 格（r4c4）未输入时显示逗号（按标点映射），输入中显示「分词」；它的动作随输入中变是 App 行为。
+  ? ! ~ 显示半角（rules C 疑问 5），照现在写。
+-->
+<keyboard xmlns="https://youmo-ime/layout/1" id="zhuyin-nine" name="注音九键" family="zhuyin-nine" columns="100">
+  <defaults kind="letter" text-size="20" width="24" mark="false"/>
+  <row>
+    <key id="r1c1" kind="function" width="14" label="ˉ" send="action:tone" long-press="commit:˙" swipe-up="commit:˙"/>
+    <key id="r1c2" label="ㄅㄉㄚ" text-size="18" send="action:zhuyin" shortcut="zy9/1">
+      <popup from="group"/>
+    </key>
+    <key id="r1c3" label="ㄍㄐㄞ" text-size="18" send="action:zhuyin" shortcut="zy9/2">
+      <popup from="group"/>
+    </key>
+    <key id="r1c4" label="ㄓㄗㄢㄦ" text-size="18" send="action:zhuyin" shortcut="zy9/3">
+      <popup from="group"/>
+    </key>
+    <key id="backspace" role="backspace" kind="function" width="14" icon="backspace" a11y="a11y_key_backspace"
+         sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both" shortcut="backspace"/>
+  </row>
+  <row>
+    <key id="r2c1" kind="function" width="14" label="ˊ" send="action:tone"/>
+    <key id="r2c2" label="ㄆㄊㄛ" text-size="18" send="action:zhuyin" shortcut="zy9/4">
+      <popup from="group"/>
+    </key>
+    <key id="r2c3" label="ㄎㄑㄟ" text-size="18" send="action:zhuyin" shortcut="zy9/5">
+      <popup from="group"/>
+    </key>
+    <key id="r2c4" label="ㄔㄘㄣㄧ" text-size="18" send="action:zhuyin" shortcut="zy9/6">
+      <popup from="group"/>
+    </key>
+    <key id="r2c5" kind="function" width="14" label="?" text-size="23" send="?"/>
+  </row>
+  <row>
+    <key id="r3c1" kind="function" width="14" label="ˇ" send="action:tone"/>
+    <key id="r3c2" label="ㄇㄋㄜ" text-size="18" send="action:zhuyin" shortcut="zy9/7">
+      <popup from="group"/>
+    </key>
+    <key id="r3c3" label="ㄏㄒㄠㄡ" text-size="18" send="action:zhuyin" shortcut="zy9/8">
+      <popup from="group"/>
+    </key>
+    <key id="r3c4" label="ㄕㄙㄤㄨ" text-size="18" send="action:zhuyin" shortcut="zy9/9">
+      <popup from="group"/>
+    </key>
+    <key id="r3c5" kind="function" width="14" label="!" text-size="23" send="!"/>
+  </row>
+  <row>
+    <key id="r4c1" kind="function" width="14" label="ˋ" send="action:tone"/>
+    <key id="r4c2" label="ㄈㄌㄝ" text-size="18" send="action:zhuyin" shortcut="zy9/10">
+      <popup from="group"/>
+    </key>
+    <key id="r4c3" label="ㄖㄥㄩ" text-size="18" send="action:zhuyin" shortcut="zy9/11">
+      <popup from="group"/>
+    </key>
+    <key id="r4c4" label="{punct:,}" text-size="18" send="action:zhuyin-slot">
+      <variant when="composing" label="分词"/>
+      <popup from="list" as-is="true">
+        <item text="。"/><item text="？"/><item text="！"/><item text="、"/><item text="："/><item text="；"/>
+      </popup>
+    </key>
+    <key id="r4c5" kind="function" width="14" label="~" text-size="23" send="~"/>
+  </row>
+  <include src="grouped-bottom"/>
+</keyboard>

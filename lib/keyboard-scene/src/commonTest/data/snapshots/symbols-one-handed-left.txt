@@ -1,0 +1,80 @@
+scene 1080x702 board 0,0,861,702
+base
+  fill rect(0,0,1080,702) #ffeceff1
+slot symbol-categories categories 0,0,154.98,526.5
+slot symbol-grid grid 154.98,0,861,526.5
+slot side-buttons 861,0,1080,702
+key back kind=function role=back a11y="返回"
+  bounds 0,526.5,129.15,702
+  shape rect(7.88,544.88,121.27,683.63 r=10.5,10.5,10.5,10.5)
+  hit rect(0,526.5,129.15,702)
+  anchor 64.57,614.25 up 0,-1
+  actions send="panel-back"
+  normal
+    shadow rect(7.88,544.88,121.27,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(7.88,544.88,121.27,683.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    text "返回" 20.07,630 system 700 42 #ff7a858a
+  pressed
+    +2 fill rect(7.88,544.88,121.27,683.63 r=10.5,10.5,10.5,10.5) #1f000000
+key lock kind=function role=lock a11y="a11y_key_lock"
+  bounds 129.15,526.5,232.47,702
+  shape rect(137.02,544.88,224.59,683.63 r=10.5,10.5,10.5,10.5)
+  hit rect(129.15,526.5,232.47,702)
+  anchor 180.81,614.25 up 0,-1
+  actions send="panel-lock"
+  normal
+    shadow rect(137.02,544.88,224.59,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(137.02,544.88,224.59,683.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    icon lock-open 149.31,582.75,212.31,645.75 #ff7a858a
+  pressed
+    +2 fill rect(137.02,544.88,224.59,683.63 r=10.5,10.5,10.5,10.5) #1f000000
+key numbers kind=letter role=numbers a11y="a11y_key_numbers"
+  bounds 232.47,526.5,335.79,702
+  shape rect(240.34,544.88,327.92,683.63 r=10.5,10.5,10.5,10.5)
+  hit rect(232.47,526.5,335.79,702)
+  anchor 284.13,614.25 up 0,-1
+  actions send="layout:Number"
+  normal
+    shadow rect(240.34,544.88,327.92,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(240.34,544.88,327.92,683.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    icon number-pad 252.63,582.75,315.63,645.75 #ff7a858a
+  pressed
+    +2 fill rect(240.34,544.88,327.92,683.63 r=10.5,10.5,10.5,10.5) #1f000000
+key space kind=space role=space a11y="a11y_key_space"
+  bounds 335.79,526.5,602.7,702
+  shape rect(343.67,544.88,594.82,683.63 r=10.5,10.5,10.5,10.5)
+  hit rect(335.79,526.5,602.7,702)
+  anchor 469.24,614.25 up 0,-1
+  actions send="sym:space" swipe-axis="both"
+  normal
+    shadow rect(343.67,544.88,594.82,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(343.67,544.88,594.82,683.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    icon cursor-move 351.54,550.13,380.42,579 #ff7a858a
+  pressed
+    +2 fill rect(343.67,544.88,594.82,683.63 r=10.5,10.5,10.5,10.5) #1f000000
+key backspace kind=function role=backspace a11y="a11y_key_backspace"
+  bounds 602.7,526.5,731.85,702
+  shape rect(610.57,544.88,723.97,683.63 r=10.5,10.5,10.5,10.5)
+  hit rect(602.7,526.5,731.85,702)
+  anchor 667.27,614.25 up 0,-1
+  actions repeat="true" send="sym:BackSpace" swipe-axis="both"
+  normal
+    shadow rect(610.57,544.88,723.97,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(610.57,544.88,723.97,683.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    icon backspace 635.77,582.75,698.77,645.75 #ff7a858a
+    icon delete-sweep 618.45,550.13,647.32,579 #ff7a858a
+    icon restore 618.45,649.5,647.32,678.38 #ff7a858a
+  pressed
+    +2 fill rect(610.57,544.88,723.97,683.63 r=10.5,10.5,10.5,10.5) #1f000000
+key enter kind=enter role=enter a11y="换行"
+  bounds 731.85,526.5,861,702
+  shape rect(739.72,544.88,853.12,683.63 r=10.5,10.5,10.5,10.5)
+  hit rect(731.85,526.5,861,702)
+  anchor 796.43,614.25 up 0,-1
+  actions send="sym:Return"
+  normal
+    shadow rect(739.72,544.88,853.12,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(739.72,544.88,853.12,683.63 r=10.5,10.5,10.5,10.5) #ff5cb5ab
+    icon enter 764.93,582.75,827.93,645.75 #ffffffff
+  pressed
+    +2 fill rect(739.72,544.88,853.12,683.63 r=10.5,10.5,10.5,10.5) #1f000000

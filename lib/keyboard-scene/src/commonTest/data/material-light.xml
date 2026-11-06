@@ -55,6 +55,8 @@
   <style select="key mark, key shortcut" color="@keyHint" icon-color="@keyHint"/>
   <style select="key.enter mark" color="@accentKeyText"/>
   <style select="key badge" icon-color="@altKeyText"/>
+  <!-- 手写的 注 键开着（:on）：字是强调色（HandwritingKeyboard 的 reading 键） -->
+  <style select="*/reading:on" color="@accentKey" icon-color="@accentKey"/>
 
   <!-- 平铺（KeyFaceGeometry 的 flat 分支）：普通键无面；空格是横条、回车是圆（尺寸是引擎规则，见规则清单「疑问」1） -->
   <style select="@flat key" fill="transparent" shadow="none" radius="0"/>

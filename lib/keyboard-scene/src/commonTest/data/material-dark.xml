@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  内置主题 MaterialDark（ThemePreset.kt:36-61）转成 4.0：颜色换成暗色那组，style 与 material-light.xml 一字不差
+  （3.0 的内置主题只给颜色，外观全是 LookDefaults）。keyBorder、keyHint、toolbarIcon 同样取 Palette 的默认。
+-->
+<theme xmlns="https://youmo-ime/theme/4" name="MaterialDark" dark="true" version="4.0">
+  <colors>
+    <color name="background" value="#263238"/>
+    <color name="bar" value="#21272b"/>
+    <color name="keyboard" value="#263238"/>
+    <color name="key" value="#404a50"/>
+    <color name="keyText" value="#d9dbdc"/>
+    <color name="candidateText" value="#d9dbdc"/>
+    <color name="candidateLabel" value="#d9dbdc"/>
+    <color name="candidateComment" value="#adb1b3"/>
+    <color name="altKey" value="#313c42"/>
+    <color name="altKeyText" value="#adb1b3"/>
+    <color name="accentKey" value="#6eaca8"/>
+    <color name="accentKeyText" value="#ffffff"/>
+    <color name="keyPressHighlight" value="#33ffffff"/>
+    <color name="keyShadow" value="#1f292e"/>
+    <color name="popupBackground" value="#3c474c"/>
+    <color name="popupText" value="#ffffff"/>
+    <color name="spaceBar" value="#3b464c"/>
+    <color name="divider" value="#1fffffff"/>
+    <color name="clipboardEntry" value="#404a50"/>
+    <color name="genericActiveBackground" value="#4db6ac"/>
+    <color name="genericActiveForeground" value="#ffffff"/>
+    <color name="keyBorder" value="@keyShadow"/>
+    <color name="keyHint" value="@altKeyText"/>
+    <color name="toolbarIcon" value="@altKeyText"/>
+  </colors>
+
+  <!-- 板：块状时底 = background，平铺时 = keyboard（ThemeColors.board）；bar 透明（BarBase.Transparent） -->
+  <style select="keyboard" fill="@background"/>
+  <style select="@flat keyboard" fill="@keyboard"/>
+  <style select="bar" fill="transparent"/>
+  <!-- 原生面板：块状时透出板底，平铺时用 bar 色（ThemeColors.panel） -->
+  <style select="panel" fill="transparent"/>
+  <style select="@flat panel" fill="@bar"/>
+
+  <!-- 键：四类（letter、function、space、enter）当类名用 -->
+  <style select="key" fill="@key" radius="4dp" border="none" shadow="0 1dp 0 @keyShadow" inset="7dp 3dp"
+         color="@keyText" icon-color="@keyText" font="system" weight="400" scale="100%" press="tint"/>
+  <style select="@landscape key" inset="4dp 3dp"/>
+  <style select="key:pressed" overlay="@keyPressHighlight"/>
+  <style select="key.function" fill="@altKey" color="@altKeyText" icon-color="@altKeyText"/>
+  <style select="key.enter" fill="@accentKey" color="@accentKeyText" icon-color="@accentKeyText"/>
+  <style select="key.space" fill="@key"/>
+  <!-- AltForeground：字母键的底、功能键的字色（🌐） -->
+  <style select="key.alt-text" color="@altKeyText" icon-color="@altKeyText"/>
+  <style select="key mark, key shortcut" color="@keyHint" icon-color="@keyHint"/>
+  <style select="key.enter mark" color="@accentKeyText"/>
+  <style select="key badge" icon-color="@altKeyText"/>
+  <!-- 手写的 注 键开着（:on）：字是强调色（HandwritingKeyboard 的 reading 键） -->
+  <style select="*/reading:on" color="@accentKey" icon-color="@accentKey"/>
+
+  <!-- 平铺（KeyFaceGeometry 的 flat 分支）：普通键无面；空格是横条、回车是圆（尺寸是引擎规则，见规则清单「疑问」1） -->
+  <style select="@flat key" fill="transparent" shadow="none" radius="0"/>
+  <style select="@flat key.space" fill="@spaceBar" shape="bar" radius="3dp"/>
+  <style select="@flat key.enter" fill="@accentKey" shape="circle"/>
+  <!-- face=keep 的键（确定、拼 开、九键左列、手写板）平铺也画块：由布局的 face 说，引擎在 @flat 下照块状算 -->
+
+  <!-- 弹出层：圆角跟键（PopupComponent.kt:88-89） -->
+  <style select="preview, popup" fill="@popupBackground" color="@popupText" radius="4dp" shadow="0 2dp 2dp #33000000"/>
+  <style select="popup:selected" fill="@genericActiveBackground" color="@genericActiveForeground"/>
+  <style select="menu" fill="@accentKey" color="@accentKeyText" icon-color="@accentKeyText" radius="50%"/>
+
+  <!-- 悬浮：圆角 = 键圆角 + min(横缝, 竖缝) = 4 + 3（FloatingKeyboard.cornerDp）；把手 = 板底混 10% 字色 -->
+  <style select="@floating keyboard" radius="7dp"/>
+  <style select="handle" fill="mix(@background, @keyText, 10%)"/>
+</theme>
