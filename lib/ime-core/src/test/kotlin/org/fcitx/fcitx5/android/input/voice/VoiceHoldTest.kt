@@ -20,35 +20,24 @@ class VoiceHoldTest {
 
     @Test
     fun slidUpFarEnoughDrops() {
-        assertFalse(hold.moved(0f, -50f))
+        assertFalse(hold.moved(-50f))
         assertEquals(VoiceHold.Zone.Talk, hold.zone)
-        assertTrue(hold.moved(0f, -100f))
+        assertTrue(hold.moved(-100f))
         assertEquals(VoiceHold.Zone.Cancel, hold.zone)
         assertFalse(hold.release())
     }
 
     @Test
     fun slidBackDownTypesAgain() {
-        hold.moved(0f, -150f)
-        assertTrue(hold.moved(0f, -20f))
+        hold.moved(-150f)
+        assertTrue(hold.moved(-20f))
         assertTrue(hold.release())
     }
 
     @Test
     fun aMoveOnceLiftedChangesNothing() {
         hold.release()
-        assertFalse(hold.moved(0f, -500f))
+        assertFalse(hold.moved(-500f))
         assertEquals(VoiceHold.Zone.Talk, hold.zone)
-    }
-
-    @Test
-    fun onARoundButtonOutOfItWhicheverWayCancels() {
-        val round = VoiceHold(cancelDistance = 50f, around = true)
-        assertFalse(round.moved(30f, -30f))
-        assertTrue(round.moved(60f, 0f))
-        assertEquals(VoiceHold.Zone.Cancel, round.zone)
-        assertTrue(round.moved(0f, 40f))
-        assertTrue(round.moved(0f, -51f))
-        assertFalse(round.release())
     }
 }

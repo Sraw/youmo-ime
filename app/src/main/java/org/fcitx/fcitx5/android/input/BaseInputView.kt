@@ -421,15 +421,31 @@ abstract class BaseInputView(
     }
 
     /**
-     * Voice's hold to talk, while one goes on: it follows the finger that long-pressed space,
-     * which the key itself no longer reports once its long press has fired, and ends with the
-     * field or the keyboard (InputView's startInput and finishInput).
+     * Voice's talk, while one goes on (the space held, the bar's microphone tapped): it sees every
+     * touch first (the finger that long-pressed space, which the key itself no longer reports once
+     * its long press has fired), and hears of the field or the keyboard going (InputView's
+     * startInput and finishInput).
      */
     interface Hold {
+        /** How input ended under it. */
+        enum class InputEnd {
+            /** another field (or none) */
+            LEFT,
+
+            /** the keyboard hidden, the field kept and its connection still good */
+            HIDDEN,
+
+            /**
+             * input started again, the new field current: maybe the same one (a WebView's or an
+             * app's restartInput, the keyboard shown again, the screen turned), maybe not
+             */
+            STARTED,
+        }
+
         /** each touch event, before the keys see it */
         fun touched(ev: MotionEvent)
 
-        fun inputEnded()
+        fun inputEnded(how: InputEnd)
     }
 
     var hold: Hold? = null

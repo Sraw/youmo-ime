@@ -64,7 +64,7 @@ class VoiceWaveView(context: Context) : View(context) {
             rect.set(x, mid - maxOf(h, bar) / 2f, x + bar, mid + maxOf(h, bar) / 2f)
             canvas.drawRoundRect(rect, bar / 2f, bar / 2f, paint)
         }
-        // at rest, nothing moves: no frame drawn for nothing while the panel sits paused
+        // at rest, nothing moves: no frame drawn for nothing while it sits paused
         if (isShown && (active || shown > SETTLED)) postInvalidateOnAnimation()
     }
 

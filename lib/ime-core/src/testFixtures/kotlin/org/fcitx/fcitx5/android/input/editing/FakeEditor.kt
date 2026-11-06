@@ -77,6 +77,19 @@ class FakeEditor(
     }
 
     /**
+     * The app's own edit, not the keyboard's: the whole text set to [text] (a chat's box emptied
+     * as it sends), the cursor at its end, no composing span left (as `TextView.setText`). Not
+     * recorded in [calls].
+     */
+    fun appSetsText(text: String) {
+        buffer.setLength(0)
+        buffer.append(text)
+        selectionStart = text.length
+        selectionEnd = text.length
+        clearComposing()
+    }
+
+    /**
      * Where a cursor at [p] ends up after [from, to) is replaced by [length] characters. This is
      * how the selection spans of an `Editable` move: before the range they stay, after it they
      * shift, and inside it they land at the end of the new text.

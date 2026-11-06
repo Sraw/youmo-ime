@@ -11,8 +11,8 @@ import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 
 /**
- * What the two views held to talk in (VoiceWindow, VoiceHoldOverlay) show alike: in one place,
- * so that they stay alike.
+ * What the two views talked in (VoiceHoldOverlay, held; VoiceTapOverlay, tapped) show alike: in
+ * one place, so that they stay alike.
  */
 object VoiceStyle {
 

@@ -23,7 +23,6 @@ import org.fcitx.fcitx5.android.input.shortcut.ClearedText
 import org.fcitx.fcitx5.android.input.shortcut.EditPlan
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
-import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 
 /**
@@ -36,6 +35,8 @@ class KeyShortcutRunner(
     private val windowManager: InputWindowManager,
     private val tradSimp: () -> Unit,
     private val chooseKeyboard: () -> Unit,
+    /** tap to talk started, or stopped, as by the bar's microphone */
+    private val voice: () -> Unit = {},
     /** Whether something is typed (the engine's preedit shown): no clear is put back over it. */
     private val typing: () -> Boolean,
 ) {
@@ -83,7 +84,7 @@ class KeyShortcutRunner(
             // a key's swipe opens it in CommonKeyActionListener, as 符's long press; from here (a menu's) the same
             KeyCommand.QuickInput -> service.postFcitxJob { triggerQuickPhrase() }
             KeyCommand.Emoji -> windowManager.attachWindow(PickerWindow.Key.Emoji)
-            KeyCommand.Voice -> VoiceFeature.window()?.let { windowManager.attachWindow(it) }
+            KeyCommand.Voice -> voice()
             KeyCommand.TradSimp -> tradSimp()
             KeyCommand.ChooseKeyboard -> chooseKeyboard()
             KeyCommand.HideKeyboard -> service.requestHideSelf(0)

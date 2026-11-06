@@ -64,7 +64,7 @@ class CommonKeyActionListener :
     private val bar: KawaiiBarComponent by manager.must()
 
     private val shortcutRunner by lazy {
-        KeyShortcutRunner(service, windowManager, bar::tradSimp, bar::chooseKeyboard) { !preeditState.isEmpty }
+        KeyShortcutRunner(service, windowManager, bar::tradSimp, bar::chooseKeyboard, { voiceTap() }) { !preeditState.isEmpty }
     }
 
     private var lastPickerType by AppPrefs.getInstance().internal.lastPickerType
@@ -94,6 +94,12 @@ class CommonKeyActionListener :
     // [asIs] is asked on fcitx's side too: whether the field is an address's is read before, as the key is pressed
     private fun typeOrSend(asIs: (im: () -> String, composing: () -> Boolean, tableKeys: () -> Set<Char>) -> String?, sent: suspend HostApi.() -> Unit) =
         typeAsIsOrSend(asIs, { service.postFcitxJob(it) }, { service.commitOverEngine(it) }, sent)
+
+    /**
+     * Tap to talk, started or stopped: the bar's microphone or a key's shortcut. What is said goes
+     * in as the emoji's does (a pinyin being typed committed first, not overwritten).
+     */
+    fun voiceTap() = VoiceFeature.tap(inputView) { listener.onKeyAction(CommitAction(it), KeyActionListener.Source.Keyboard) }
 
     private fun showInputMethodPicker() {
         fcitx.launchOnReady {
@@ -212,7 +218,7 @@ class CommonKeyActionListener :
                         SpaceLongPressBehavior.ShowPicker -> showInputMethodPicker()
                         // hold to talk: the keyboard stays, the key's finger followed till it lifts
                         SpaceLongPressBehavior.Voice -> if (behavior.talks(VoiceFeature.AVAILABLE, service.inPasswordField)) {
-                            VoiceFeature.hold(inputView, popup.root, action.pointer) { text ->
+                            VoiceFeature.hold(inputView, action.pointer) { text ->
                                 listener.onKeyAction(KeyAction.CommitAction(text), KeyActionListener.Source.Keyboard)
                             }
                         }

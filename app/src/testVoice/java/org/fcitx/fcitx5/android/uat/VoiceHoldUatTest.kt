@@ -5,8 +5,7 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.Manifest
-import android.os.Handler
-import android.os.Looper
+import android.graphics.Rect
 import android.os.SystemClock
 import android.text.InputType
 import android.view.View
@@ -17,14 +16,13 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.InputMethodEntry
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
-import org.fcitx.fcitx5.android.input.voice.VoiceHoldSession
-import org.fcitx.fcitx5.android.input.voice.VoiceListener
-import org.fcitx.fcitx5.android.input.voice.VoiceLive
+import org.fcitx.fcitx5.android.input.voice.VoiceSession
 import org.fcitx.fcitx5.android.input.voice.VoicePermissionActivity
 import org.fcitx.fcitx5.android.input.voice.VoiceStyle
 import org.junit.After
@@ -44,7 +42,7 @@ import org.robolectric.shadows.ShadowDialog
 
 /**
  * UAT cases of holding to talk (uat/12), everything after the recognizer: what it hears told
- * straight to the session ([VoiceHoldSession.listening]) as segments closed, the rest the app's own
+ * straight to the session ([VoiceSession.listening]) as segments closed, the rest the app's own
  * (the finger, VoiceHold, VoiceLive's joining with VoiceText's clean-up and numbers, the polish
  * tagger aside, VoiceEnd, VoiceCommit, the commit into the field). Whether the
  * model hears it right is the voice-eval benchmark's; the microphone end to end is VO-02's device smoke.
@@ -54,79 +52,14 @@ import org.robolectric.shadows.ShadowDialog
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class VoiceHoldUatTest {
 
-    /**
-     * The recognizer: what [said] holds is heard as the finger lifts, each a segment closed, [heard]
-     * one before; [opened] times the microphone opened. [held]: the tail after the lift still being
-     * recorded, until [release] or a [cut].
-     */
-    private class Recognizer : VoiceHoldSession.Listening {
-        lateinit var events: VoiceListener.Events
-        val said = mutableListOf<String>()
-        // as VoiceListener's, without the tagger (语音整理 is a device's: the model is); one a hold, as a listener is
-        private var live = VoiceLive()
-        var opened = 0
-        var held = false
-        var cuts = 0
-        var finishes = 0
-        var liftedAt: Long? = null
-
-        /** a recognizer that never comes back, even cut: the session's 15 s give-up ends it */
-        var stuck = false
-        private var waiting: ((String?) -> Unit)? = null
-
-        /** the microphone's first sample not zero comes as it opens; false: only when [on] says so */
-        var warm = true
-
-        override fun load() = Unit
-        override fun start() {
-            opened++
-            live = VoiceLive()
-            // from the capture thread, as VoiceListener's
-            if (warm) Handler(Looper.getMainLooper()).post { on() }
-        }
-
-        /** the microphone really on */
-        fun on() = events.ready()
-
-        /** 2 s of zeroes */
-        fun silent() = events.silent()
-
-        /** a segment closed at an endpoint, the finger still down */
-        fun heard(raw: String) = events.heard(live.closed(raw))
-
-        override fun finish(liftedAt: Long, done: (String?) -> Unit) {
-            finishes++
-            this.liftedAt = liftedAt
-            waiting = done
-            if (!held) release()
-        }
-
-        /** the tail recorded: what was said heard, then the session's done */
-        fun release() {
-            said.forEach(::heard)
-            said.clear()
-            val done = waiting
-            waiting = null
-            done?.invoke(live.finish())
-        }
-
-        // as VoiceListener's: the capture ends, and what was heard comes back from another thread
-        override fun cut() {
-            cuts++
-            if (waiting != null && !stuck) Handler(Looper.getMainLooper()).post { release() }
-        }
-
-        override fun close() = Unit
-    }
-
-    private val voice = Recognizer()
+    private val voice = FakeRecognizer()
     private val restore = mutableListOf<() -> Unit>()
 
     // the 正在听 cues (VoiceStyle.haptics's cue = true)
     private var cues = 0
 
     private val h = KeyboardHarness().also {
-        VoiceHoldSession.listening = { events -> voice.also { v -> v.events = events } }
+        VoiceSession.listening = { events -> voice.also { v -> v.events = events } }
         val was = VoiceStyle.haptics
         VoiceStyle.haptics = { _, cue -> if (cue) cues++ }
         restore += { VoiceStyle.haptics = was }
@@ -135,7 +68,7 @@ class VoiceHoldUatTest {
     @After
     fun close() {
         h.close()
-        VoiceHoldSession.listening = null
+        VoiceSession.listening = null
         restore.asReversed().forEach { it() }
     }
 
@@ -160,7 +93,7 @@ class VoiceHoldUatTest {
         f.lift()
     }
 
-    // every text shown in the keyboard's window, the hold's card and the panel included
+    // every text shown in the keyboard's window, the hold's card included
     private fun shown(): List<String> = KeyboardHarness.all(h.service.window.window!!.decorView)
         .filterIsInstance<TextView>().filter { h.shown(it) }.map { it.text.toString() }.toList()
 
@@ -171,16 +104,8 @@ class VoiceHoldUatTest {
 
     private fun string(id: Int) = h.service.getString(id)
 
-    private fun panel(): View {
-        h.tap(KeyboardHarness.all(h.inputView).first { h.shown(it) && it.contentDescription == string(R.string.voice_input) })
-        h.advance(500)
-        return KeyboardHarness.all(h.inputView).first { h.shown(it) && it.contentDescription == string(R.string.voice_press_to_talk) }
-    }
-
     private companion object {
         const val MULTI_LINE = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
-        const val RETURN = 0xff0d
-        const val BACKSPACE = 0xff08
     }
 
     @Test
@@ -239,6 +164,34 @@ class VoiceHoldUatTest {
 
     @Test
     @Uat("VO-02")
+    fun floatingTheCardGoesWithTheKeyboard() {
+        allowMicrophone()
+        ThemeManager.prefs.floatingKeyboard.setValue(true)
+        restore += { ThemeManager.prefs.floatingKeyboard.setValue(false) }
+        h.start()
+        // dragged and made smaller
+        h.keyboard.translationX = 40f
+        h.keyboard.translationY = -120f
+        h.keyboard.scaleX = 0.8f
+        h.keyboard.scaleY = 0.8f
+        h.relayout()
+        val f = holdSpace()
+        val listening = KeyboardHarness.all(h.keyboard).filterIsInstance<TextView>()
+            .first { h.shown(it) && it.text.toString() == string(R.string.voice_hold_listening) }
+        var card: View = listening
+        while (card.parent !== h.keyboard) card = card.parent as View
+        // over the whole keyboard where it is now, not where it would be docked
+        val board = Rect().also { h.keyboard.getGlobalVisibleRect(it) }
+        val seen = Rect().also { card.getGlobalVisibleRect(it) }
+        assertEquals(board, seen)
+        voice.said += "你好"
+        f.lift()
+        assertEquals("你好", text())
+        assertEquals(1, voice.closes)
+    }
+
+    @Test
+    @Uat("VO-02")
     fun whatIsSaidShowsThenIsTyped() {
         allowMicrophone()
         // a note's field, many lines: what is said ends as said (VoiceEnd)
@@ -272,19 +225,6 @@ class VoiceHoldUatTest {
         assertEquals("", text())
         // dropped at once: no tail recorded after the lift
         assertEquals(0, voice.finishes)
-    }
-
-    @Test
-    @Uat("VO-04")
-    fun thePanelsMicrophoneTypesWhatIsSaid() {
-        allowMicrophone()
-        h.start()
-        val mic = panel()
-        val f = h.finger(mic, h.at(mic))
-        voice.said += "我们走吧"
-        f.up(h.at(mic))
-        h.advance(300)
-        assertEquals("我们走吧", text())
     }
 
     @Test
@@ -327,24 +267,6 @@ class VoiceHoldUatTest {
         voice.said += "你好"
         f.lift()
         assertEquals("你好", text())
-    }
-
-    @Test
-    @Uat("VO-27")
-    fun thePanelSaysASilentMicrophoneToo() {
-        allowMicrophone()
-        h.start()
-        voice.warm = false
-        val mic = panel()
-        val f = h.finger(mic, h.at(mic))
-        voice.silent()
-        h.advance(100)
-        assertTrue(shown().toString(), string(R.string.voice_hold_silent) in shown())
-        voice.on()
-        h.advance(100)
-        assertTrue(shown().toString(), string(R.string.voice_hold_listening) in shown())
-        f.up(h.at(mic))
-        h.advance(300)
     }
 
     @Test
@@ -436,85 +358,6 @@ class VoiceHoldUatTest {
         assertTrue(shown().toString(), string(R.string.voice_hold_listening) in shown())
         assertEquals(1, cues)
         f.lift()
-    }
-
-    @Test
-    @Uat("VO-26")
-    fun thePanelSaysGettingReadyTillTheMicrophoneIsOn() {
-        allowMicrophone()
-        h.start()
-        voice.warm = false
-        val mic = panel()
-        val f = h.finger(mic, h.at(mic))
-        h.advance(100)
-        assertTrue(shown().toString(), string(R.string.voice_hold_preparing) in shown())
-        voice.on()
-        h.advance(100)
-        assertTrue(shown().toString(), string(R.string.voice_hold_listening) in shown())
-        voice.said += "我们走吧"
-        f.up(h.at(mic))
-        h.advance(300)
-        assertEquals("我们走吧", text())
-    }
-
-    @Test
-    @Uat("VO-26")
-    fun thePanelPutsOffItsCueTillBackFromTheCancelZone() {
-        allowMicrophone()
-        h.start()
-        voice.warm = false
-        val mic = panel()
-        val f = h.finger(mic, h.at(mic))
-        f.move(h.at(mic, dx = 120f))
-        h.advance(100)
-        // the panel keeps its own cue state: the microphone come on in the cancel zone gives none there
-        voice.on()
-        h.advance(100)
-        assertEquals(0, cues)
-        f.move(h.at(mic))
-        h.advance(100)
-        assertEquals(1, cues)
-        f.move(h.at(mic, dx = 120f))
-        f.move(h.at(mic))
-        h.advance(100)
-        assertEquals(1, cues)
-        f.up(h.at(mic))
-        h.advance(300)
-    }
-
-    @Test
-    @Uat("VO-26")
-    fun aHoldDroppedInTheCancelZoneLeavesTheNextOnesCue() {
-        allowMicrophone()
-        h.start()
-        voice.warm = false
-        val mic = panel()
-        val f = h.finger(mic, h.at(mic))
-        f.move(h.at(mic, dx = 120f))
-        f.up(h.at(mic, dx = 120f))
-        h.advance(300)
-        // the panel outlives the hold: lifting in the cancel zone must not leave it cancelling
-        val g = h.finger(mic, h.at(mic))
-        h.advance(100)
-        voice.on()
-        h.advance(100)
-        assertEquals(1, cues)
-        g.up(h.at(mic))
-        h.advance(300)
-    }
-
-    @Test
-    @Uat("VO-05")
-    fun slidingOffThePanelsMicrophoneDropsIt() {
-        allowMicrophone()
-        h.start()
-        val mic = panel()
-        val f = h.finger(mic, h.at(mic))
-        voice.said += "你好"
-        f.move(h.at(mic, dx = 120f))
-        f.up(h.at(mic, dx = 120f))
-        h.advance(300)
-        assertEquals("", text())
     }
 
     @Test
@@ -621,7 +464,7 @@ class VoiceHoldUatTest {
         val upAt = SystemClock.uptimeMillis() - 40
         f.up(h.at(space), eventTime = upAt)
         // the tail counted from this ACTION_UP's own time, "recognizing" shown at once
-        assertEquals(upAt, voice.liftedAt)
+        assertEquals(upAt, voice.stoppedAt)
         h.advance(100)
         assertTrue(shown().toString(), string(R.string.voice_hold_recognizing) in shown())
         // the tail still being recorded: nothing typed yet
@@ -660,124 +503,6 @@ class VoiceHoldUatTest {
         voice.said += "再见"
         next.lift()
         assertEquals("你好再见", text())
-    }
-
-    @Test
-    @Uat("VO-25")
-    fun pressingThePanelsMicrophoneAgainEndsTheTail() {
-        allowMicrophone()
-        h.start()
-        val mic = panel()
-        voice.held = true
-        val f = h.finger(mic, h.at(mic))
-        voice.said += "我们走吧"
-        // held a moment: the lift's own time, 40 ms before it is handled, still after the press
-        h.advance(100)
-        val upAt = SystemClock.uptimeMillis() - 40
-        f.up(h.at(mic), eventTime = upAt)
-        assertEquals(upAt, voice.liftedAt)
-        h.advance(100)
-        val again = h.finger(mic, h.at(mic))
-        h.advance(100)
-        assertEquals(1, voice.cuts)
-        again.up(h.at(mic))
-        h.advance(300)
-        assertEquals(1, voice.opened)
-        assertEquals("我们走吧", text())
-    }
-
-    // the panel's own keys beside the microphone
-    private fun panelKey(description: Int): View =
-        KeyboardHarness.all(h.inputView).first { h.shown(it) && it.contentDescription == string(description) }
-
-    private fun enters() = h.api.calls.count { it.startsWith("sendKey(sym=$RETURN,") }
-
-    // the panel's microphone held with [said], lifted, its tail still being recorded
-    private fun liftInTheTail(mic: View, said: String) {
-        voice.held = true
-        val f = h.finger(mic, h.at(mic))
-        voice.said += said
-        h.advance(100)
-        f.up(h.at(mic))
-        h.advance(50)
-    }
-
-    @Test
-    @Uat("VO-28")
-    fun enterInTheTailEndsItAndActsAfterTheText() {
-        allowMicrophone()
-        h.start()
-        val mic = panel()
-        // whether the Enter had reached fcitx when the text went into the field
-        var enterBeforeText: Boolean? = null
-        h.field.addTextChangedListener(object : android.text.TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
-            override fun afterTextChanged(s: android.text.Editable?) {
-                if (enterBeforeText == null) enterBeforeText = enters() > 0
-            }
-        })
-        liftInTheTail(mic, "我们走吧")
-        // the cut's recognition still out: the Enter waits for it
-        voice.stuck = true
-        val enter = panelKey(R.string.a11y_key_enter)
-        h.tap(enter)
-        assertEquals(1, voice.cuts)
-        assertEquals(0, enters())
-        // pressed again while waiting: still one Enter
-        h.tap(enter)
-        voice.release()
-        h.advance(300)
-        assertEquals(1, voice.cuts)
-        assertEquals("我们走吧", text())
-        assertEquals(false, enterBeforeText)
-        assertEquals(h.api.calls.toString(), 1, enters())
-    }
-
-    @Test
-    @Uat("VO-28")
-    fun backspaceInTheTailActsAtOnce() {
-        allowMicrophone()
-        h.start()
-        val mic = panel()
-        liftInTheTail(mic, "我们走吧")
-        h.tap(panelKey(R.string.backspace))
-        h.advance(50)
-        assertEquals(0, voice.cuts)
-        assertEquals(1, h.api.calls.count { it.startsWith("sendKey(sym=$BACKSPACE,") })
-        voice.release()
-        h.advance(100)
-        assertEquals(h.api.calls.toString(), 0, enters())
-    }
-
-    @Test
-    @Uat("VO-28")
-    fun aWaitingEnterGoesWithTheField() {
-        allowMicrophone()
-        h.start()
-        val mic = panel()
-        liftInTheTail(mic, "我们走吧")
-        voice.stuck = true
-        h.tap(panelKey(R.string.a11y_key_enter))
-        // another field before the text comes back: the session dropped, the Enter with it
-        h.start()
-        voice.release()
-        h.advance(500)
-        assertEquals(h.api.calls.toString(), 0, enters())
-    }
-
-    @Test
-    @Uat("VO-28")
-    fun aWaitingEnterIsDroppedByTheGiveUp() {
-        allowMicrophone()
-        h.start()
-        val mic = panel()
-        voice.stuck = true
-        liftInTheTail(mic, "我们走吧")
-        h.tap(panelKey(R.string.a11y_key_enter))
-        h.advance(16_000)
-        assertTrue(shown().toString(), string(R.string.voice_hold_nothing) in shown())
-        assertEquals(h.api.calls.toString(), 0, enters())
     }
 
     @Test

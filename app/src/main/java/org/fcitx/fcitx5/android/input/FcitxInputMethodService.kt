@@ -106,6 +106,7 @@ import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
 import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
 import org.fcitx.fcitx5.android.input.learning.UndoChip
 import org.fcitx.fcitx5.android.input.shortcut.ClearedText
+import org.fcitx.fcitx5.android.input.voice.VoiceCommit
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.fcitx.fcitx5.android.utils.Locales
 import org.fcitx.fcitx5.android.utils.alpha
@@ -1189,8 +1190,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         val sensitive = flags.hasAny(CapabilityFlag.PasswordOrSensitive)
         // input restarting (the screen turned, resetStateForNewConfiguration, or the app's own
         // restartInput) has no onFinishInputView, and the focus out below drops the engine's input: the
-        // editor's preedit (English's word, handwriting's characters, the text itself) is text from now on
-        if (restarting) currentInputConnection?.finishComposingText()
+        // editor's preedit (English's word, handwriting's characters, the text itself) is text from now on.
+        // Voice's text still to come, in the same field, is taken away instead: its talk goes on, and
+        // composes it anew (or, the app having taken it, does not type it again)
+        if (restarting) {
+            if (editingSession.provisional) {
+                editingSession.provisionalRestarted(sameVoiceField(startedWith, attribute), attribute.initialSelStart, attribute.initialSelEnd)
+            } else {
+                currentInputConnection?.finishComposingText()
+            }
+        }
         // restarted, the same field: what it had of the floating window stays its
         if (restarting && cursorField === startedWith) cursorField = attribute
         startedWith = attribute
@@ -1478,6 +1487,33 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     val voiceComposes get() = editingSession.composingText.isEmpty() && !inPasswordField &&
         currentInputEditorInfo?.isTypeNull() == false
 
+    /** What composes in the field is voice's, or nothing does: not the engine's (another finger typing meanwhile). */
+    val voiceOwnsComposing get() = editingSession.composingText.isEmpty() || editingSession.provisional
+
+    /**
+     * Whether [now] is the field [said] was, though input restarted in it (a new EditorInfo): the
+     * same app and view id ([VoiceCommit.sameField]).
+     */
+    fun sameVoiceField(said: EditorInfo?, now: EditorInfo? = currentInputEditorInfo): Boolean = said != null && now != null &&
+        VoiceCommit.sameField(VoiceCommit.Field(said.packageName, said.fieldId), VoiceCommit.Field(now.packageName, now.fieldId), said === now)
+
+    /**
+     * Voice's composing text taken from the field by anything but voice ([EditingSession.provisionalTaken]):
+     * [taken] told whether the app took it (true) or it was taken away here. One talk at a time; null when it ends.
+     */
+    fun watchVoice(taken: ((consumed: Boolean) -> Unit)?) {
+        editingSession.provisionalTaken = taken
+    }
+
+    /**
+     * Tap to talk's step as it is said: [type] typed ([commitVoice], if any), then [composing] composes
+     * after it ([composeVoice]); one batch, so the app sees one change, not the tail gone a moment.
+     */
+    fun voiceHeard(type: String, composing: String) = fieldEditor.batchEdit {
+        if (type.isNotEmpty()) commitVoice(type)
+        composeVoice(composing)
+    }
+
     /**
      * What voice has heard so far as the field's composing text, replaced as it grows, empty to
      * take it away; the text itself, as English's word is (specs/pitfalls.md). Its commit, through
@@ -1490,6 +1526,18 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             if (text.isEmpty()) FormattedText.Empty else FormattedText(arrayOf(text), intArrayOf(0), -1),
             provisional = true,
         )
+    }
+
+    /**
+     * Voice's [text] typed at once, in place of what voice composes, not through fcitx (tap to
+     * talk: the settled part as it is said; what was heard as the field is left). Posted, it would
+     * land after the tail composed next, or after the field's connection went. An engine's preedit
+     * (the talk started over one, so voice composed nothing) is finished in place first, as leaving
+     * the field would.
+     */
+    fun commitVoice(text: String) {
+        if (editingSession.composing.isNotEmpty() && !editingSession.provisional) finishComposing()
+        commitText(text)
     }
 
     /**
@@ -1567,9 +1615,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         decorLocationUpdated = false
         inputViewStarted = false
         inputDeviceMgr.onFinishInputView()
-        inputView?.finishInput()
+        inputView?.finishInput(finishingInput)
         currentInputConnection?.apply {
-            finishComposingText()
+            // voice's text still to come is taken away, not left as text: its talk types it (as
+            // the keyboard hides, once recognized), or drops it
+            if (editingSession.provisional) editingSession.updateComposingText(FormattedText.Empty) else finishComposingText()
             monitorCursorAnchor(false)
         }
         resetComposingState()

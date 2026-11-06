@@ -5,9 +5,7 @@
 package org.fcitx.fcitx5.android.input.voice
 
 import android.content.Context
-import android.widget.FrameLayout
 import org.fcitx.fcitx5.android.input.InputView
-import org.fcitx.fcitx5.android.input.wm.InputWindow
 
 /** A text build's: no voice input, no microphone (the voice flavor's has them). */
 object VoiceFeature {
@@ -16,12 +14,12 @@ object VoiceFeature {
     const val AVAILABLE = false
 
     // the voice flavor's signatures, which this one has to match
-    @Suppress("FunctionOnlyReturningConstant")
-    fun window(): InputWindow? = null
-
     @Suppress("UnusedParameter")
     fun credits(context: Context): List<Credit> = emptyList()
 
     @Suppress("UnusedParameter")
-    fun hold(inputView: InputView, overlay: FrameLayout, pointer: Int, commit: (String) -> Unit) = Unit
+    fun hold(inputView: InputView, pointer: Int, commit: (String) -> Unit) = Unit
+
+    @Suppress("UnusedParameter")
+    fun tap(inputView: InputView, commit: (String) -> Unit) = Unit
 }

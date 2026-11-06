@@ -311,10 +311,10 @@ def vo02(d):
 case("VO-03", needs="jvm:VoiceHoldUatTest.slidingUpDropsIt")(lambda d: None)
 
 
-case("VO-04", needs="jvm:VoiceHoldUatTest.thePanelsMicrophoneTypesWhatIsSaid")(lambda d: None)
+case("VO-04", needs="jvm:VoiceTapUatTest.tappingTheMicrophoneTalksTillItIsTappedAgain、VoiceTapUatTest.tappingTheMaskStopsIt、VoiceTapUatTest.theMicrophoneTappedInTheTailEndsIt")(lambda d: None)
 
 
-case("VO-05", needs="jvm:VoiceHoldUatTest.slidingOffThePanelsMicrophoneDropsIt")(lambda d: None)
+case("VO-05", needs="jvm:VoiceTapUatTest.cancelTakesOnlyTheUnsettledTail、VoiceTapUatTest.cancelBeforeAnythingSettledLeavesTheFieldAsItWas")(lambda d: None)
 
 
 case("VO-06", needs="jvm:VoiceHoldUatTest.numbersAreWrittenInDigits")(lambda d: None)
@@ -417,7 +417,16 @@ case("VO-21", needs="jvm:VoiceUatTest.aWordDeletedOrBlockedIsNotListenedFor")(la
 case("VO-22", needs="jvm:VoiceUatTest.habitsOffListensForNoneOfTheirs")(lambda d: None)
 
 
-case("VO-27", needs="jvm:VoiceHoldUatTest.aSilentMicrophoneIsSaidAndListeningComesWithTheFirstSound、VoiceOnsetTest.twoSecondsOfZeroesIsASilentMicrophoneToldOnce、VoiceHoldUatTest.thePanelSaysASilentMicrophoneToo")(lambda d: None)
+case("VO-29", needs="jvm:VoiceTapUatTest.whatIsSettledIsTypedAsItIsSaid、VoiceTapUatTest.theCursorMovedWhileTalkingTheTailComposesWhereItWent、VoiceTapUatTest.whatTheAppSentIsNotTypedAgain")(lambda d: None)
+
+
+case("VO-30", needs="jvm:VoiceTapUatTest.anotherFieldGetsNothingTheFirstGetsWhatWasSaid、VoiceTapUatTest.theKeyboardHiddenStopsItAndTypesTheRestOnceRecognized、VoiceTapUatTest.inputRestartedInTheSameFieldTalksOn")(lambda d: None)
+
+
+case("VO-31", needs="jvm:VoiceTapUatTest.aMinuteWithNothingSaidStopsIt")(lambda d: None)
+
+
+case("VO-27", needs="jvm:VoiceHoldUatTest.aSilentMicrophoneIsSaidAndListeningComesWithTheFirstSound、VoiceOnsetTest.twoSecondsOfZeroesIsASilentMicrophoneToldOnce、VoiceTapUatTest.aSilentMicrophoneIsSaid")(lambda d: None)
 
 
 def input_lag(d):
@@ -668,8 +677,8 @@ def vo26_try(d):
     return f"{how}（{ready.split(': ')[1]}，从开麦算）；框里「{got}」"
 
 
-# the rule on the JVM (VoiceTailEnterTest, VoiceHoldUatTest); on the device a smoke as VO-25's: in
-# the chat box, the panel's ↵ right after the lift sends the sentence, not an empty box before it
+# the rule on the JVM (VoiceTapUatTest); on the device a smoke: in the chat box, the mask (no Enter of
+# its own) tapped to stop after the clip, then the keyboard's Enter once it has gone sends the sentence
 @case("VO-28", base="B0-语音", mutates="learn", needs=EV, page="chat")
 def vo28(d):
     lost = []
@@ -683,8 +692,14 @@ def vo28(d):
     raise Blocked("3 次都是模拟器声卡出错（pcm_readi failed）")
 
 
+def ex_mid(s):
+    """the middle of the keyboard's width, where the mask is"""
+    xs = [n.c[0] for n in s.ime()]
+    return (min(xs) + max(xs)) // 2 if xs else 540
+
+
 def vo28_try(d):
-    """one sentence said and ↵ right after the lift; None if the emulator's sound card failed"""
+    """one sentence said, stopped on the mask, then the keyboard's Enter; None if the emulator's sound card failed"""
     host_calm()
     quiet(d)
     d.sh("logcat -c")
@@ -692,18 +707,24 @@ def vo28_try(d):
     voice = s.find(desc="语音输入", where="ime")
     if not voice:
         raise Blocked("工具栏上没有「语音输入」（工具栏收起了？）")
+    # tapped, not held: the mask over the keys, only its × on it
     d.tap(voice.c, 0.8)
     s = d.screen()
-    mic, enter = s.find(desc="按住 说话", where="ime"), s.find(desc="回车", where="ime")
-    check(mic and enter, "语音面板上没找到话筒或 ↵")
-    x, y = mic.c
-    d.touch(("down", x, y))
+    cancel = s.find(desc="取消", where="ime")
+    check(cancel, "点麦克风后没有盖层（没找到 ×）")
+    # the keyboard's Enter under it is named as the field's (the chat's: 发送); none on the mask itself
+    enters = [n for n in s.ime() if n.desc in ("发送", "回车")]
+    check(len(enters) == 1, f"点麦克风后有 {len(enters)} 个回车（盖层上不该有）")
+    enter = enters[0]
     d.say("zouba")
     time.sleep(0.3)
-    ex, ey = enter.c
-    # lifted, and ↵ at once: inside the 300 ms tail
-    d.touch(("up", x, y), ("sleep", 0.05), ("down", ex, ey), ("sleep", 0.05), ("up", ex, ey))
+    # stopped on the mask (its middle, off the ×), then the tail and the rest recognized, the mask gone
+    cx, cy = cancel.c
+    d.tap((ex_mid(s), cy + 200), 0.1)
     time.sleep(3)
+    ex, ey = enter.c
+    d.touch(("down", ex, ey), ("sleep", 0.05), ("up", ex, ey))
+    time.sleep(2)
     s = d.screen()
     box = d.field_text(s) or ""
     # the page's log skips an empty send, so an empty ↵ before the sentence shows as the sentence

@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.input.voice
 
 /**
- * What one hold shows and types as streaming recognition goes (060-voice-tagger.md §4.2, §5.1):
+ * What one talk shows and types as streaming recognition goes (060-voice-tagger.md §4.2, §5.1):
  * the segments the recognizer's endpoints closed, each its chosen text ([VoiceChoice]), then the
  * one being said, joined as the tagger was measured on (voice-eval `fusion_exp.py`'s `joined`: a
  * segment ending in no mark of its own gets a 「，」, except between two English words, which keep
@@ -24,8 +24,19 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
     val raw: String
         get() = join(said, hearing)
 
+    /**
+     * What one step of the talk shows: [whole], the text so far before [VoiceText.clean] (the
+     * frozen part polished, the rest as heard); [text], it cleaned, as it shows; and [settled], how
+     * many characters of [whole] stay as they are whatever is said next, so they can be typed as
+     * the talk goes on (tap to talk, [VoiceTalk]). [fallback]: the polish failed on this step and
+     * [whole] is the raw text instead, not in step with what was polished before.
+     */
+    class Heard(val whole: String, val settled: Int, val fallback: Boolean = false) {
+        val text: String = VoiceText.clean(whole).orEmpty()
+    }
+
     /** The segment being said is [raw] so far; what to show. */
-    fun heard(raw: String): String {
+    fun heard(raw: String): Heard {
         hearing = raw.trim()
         return shown()
     }
@@ -35,26 +46,55 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
      * of a sound only ([VoiceText.clean]'s 「嗯。」, 「咳咳。」) is left out: the recognizer writes one
      * for a noise as often as for a word.
      */
-    fun closed(raw: String): String {
+    fun closed(raw: String): Heard {
         hearing = ""
         if (VoiceText.clean(raw) != null) said = join(said, raw.trim())
         return shown()
     }
 
-    /** What was said, polished and cleaned, the segment being said taken as it is; null if nothing worth typing. */
-    fun finish(): String? {
+    /** What was said, polished, the segment being said taken as it is; before [VoiceText.clean]. */
+    fun finished(): String {
         val text = raw
-        return VoiceText.clean(polish?.finish(text) ?: text)
+        return polish?.finish(text) ?: text
     }
 
-    private fun shown(): String {
+    /** What was said, polished and cleaned, the segment being said taken as it is; null if nothing worth typing. */
+    fun finish(): String? = VoiceText.clean(finished())
+
+    private fun shown(): Heard {
         val text = raw
-        val shown = polish?.update(text)?.let { it.polished + it.rest } ?: text
-        return VoiceText.clean(shown).orEmpty()
+        // what no later segment changes: the closed ones, but for their end marks (the next may
+        // bring its own, join). The one being said may yet change anywhere, as may its text once it
+        // closes, chosen among the n-best (VoiceChoice); and the tagger's labels only once frozen
+        val stable = said.trimEnd { it in MARKS || it.isWhitespace() }
+        val shown = polish?.update(text)
+        val whole = shown?.let { it.polished + it.rest } ?: text
+        val fixed = polish?.frozenPrefix(VoicePolishTags.norm(stable).size) ?: stable
+        return Heard(whole, settledEnd(fixed))
     }
 
     companion object {
         private const val MARKS = "，。？！、；：,.?!;:…"
+
+        // the marks a talk is typed up to as it goes: not 「.」 (3.5, e.g.), 「：」 (what follows
+        // belongs to it) nor 「…」
+        private const val ENDS = "。？！；，、?!;,"
+
+        /**
+         * How much of [fixed] (text that stays) may be typed now: up to its last mark with a
+         * character after it, not a mark nor a space, in [fixed] too, so that what follows it now
+         * follows it in the end. Not up to a mark at its end: one coming next may change it
+         * ([VoicePolishTags.apply] drops 「，」 before 「。」), and the clean-up may join what is on
+         * either side of a cut with no mark ([VoiceText.clean]: numbers, spelled letters). 0 if none.
+         */
+        fun settledEnd(fixed: String): Int {
+            for (i in fixed.length - 1 downTo 1) {
+                val c = fixed[i]
+                if (c in MARKS || c.isWhitespace()) continue
+                if (fixed[i - 1] in ENDS) return i
+            }
+            return 0
+        }
 
         /** [after] following [before], as the tagger's input had segments one after another. */
         fun join(before: String, after: String): String = when {

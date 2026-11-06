@@ -25,6 +25,7 @@ import android.widget.ImageView
 import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
 import androidx.annotation.VisibleForTesting
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
@@ -49,6 +50,7 @@ import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.bar.Calculation
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarStateMachine
+import org.fcitx.fcitx5.android.input.bar.ToolbarButton
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcaster
 import org.fcitx.fcitx5.android.input.broadcast.PreeditEmptyStateComponent
@@ -200,6 +202,29 @@ class InputView(
     private val windowManager = InputWindowManager()
     @VisibleForTesting
     internal val kawaiiBar = KawaiiBarComponent()
+
+    /**
+     * Voice's [card] over the keys, a child of [keyboardView] so that it goes and scales with it
+     * (floating, dragged, one-handed): [underBar], from under the bar to the keys' bottom (tap to
+     * talk: the bar and its microphone left above it); else over the whole keyboard (the space held).
+     */
+    fun overKeys(card: View, underBar: Boolean) {
+        val board = keyboardView as ConstraintLayout
+        board.addView(card, board.lParams(0, 0) {
+            leftToLeft = ConstraintLayout.LayoutParams.PARENT_ID
+            rightToRight = ConstraintLayout.LayoutParams.PARENT_ID
+            if (underBar) {
+                below(kawaiiBar.view)
+                bottomToBottomOf(windowManager.view)
+            } else {
+                topOfParent()
+                bottomOfParent()
+            }
+        })
+    }
+
+    /** The bar's microphone, where the user sees it now; null where not. */
+    fun voiceButton(): View? = kawaiiBar.shownButton(ToolbarButton.Voice)
 
     // over the candidates' bar: this view is as high as the window, its top the screen's (setInputView)
     override val undoAnchor: View get() = kawaiiBar.view
@@ -706,7 +731,7 @@ class InputView(
      * called when [InputView] is about to show, or restart
      */
     fun startInput(info: EditorInfo, capFlags: CapabilityFlags, restarting: Boolean = false) {
-        hold?.inputEnded()
+        hold?.inputEnded(Hold.InputEnd.STARTED)
         broadcaster.onStartInput(info, capFlags)
         returnKeyDrawable.updateDrawableOnEditorInfo(info)
         if (focusChangeResetKeyboard || !restarting) {
@@ -714,9 +739,9 @@ class InputView(
         }
     }
 
-    /** called when [InputView] is hidden, or its field left */
-    fun finishInput() {
-        hold?.inputEnded()
+    /** called when [InputView] is hidden ([finishingInput] false), or its field left */
+    fun finishInput(finishingInput: Boolean) {
+        hold?.inputEnded(if (finishingInput) Hold.InputEnd.LEFT else Hold.InputEnd.HIDDEN)
         floatingController.inputEnded()
         broadcaster.onFinishInput()
     }

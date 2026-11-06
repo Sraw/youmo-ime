@@ -6,12 +6,14 @@ package org.fcitx.fcitx5.android.input.voice
 
 import android.animation.ArgbEvaluator
 import android.animation.ValueAnimator
+import android.graphics.Matrix
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -30,7 +32,6 @@ import splitties.dimensions.dp
  */
 class VoiceHoldOverlay(
     private val inputView: InputView,
-    private val overlay: FrameLayout,
     // the finger the long press was for
     private val pointer: Int,
     commit: (String) -> Unit,
@@ -106,7 +107,7 @@ class VoiceHoldOverlay(
         addView(hint, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(2) })
         // under the finger: nothing there, it would not be seen. The keyboard's view runs under
         // the navigation bar too: from where the finger went down to the bottom, and its tip above
-        val under = (keyboard.bottom - downY + ctx.dp(FINGER)).toInt().coerceIn(0, keyboard.height / 2)
+        val under = (keyboard.height - downInKeyboard() + ctx.dp(FINGER)).toInt().coerceIn(0, keyboard.height / 2)
         addView(View(ctx), LinearLayout.LayoutParams(-1, under))
         // a touch on it is the held finger's, not the keys' under it
         isClickable = true
@@ -118,12 +119,18 @@ class VoiceHoldOverlay(
         })
     }
 
+    // where the finger went down, in the keyboard's own coordinates, where the card is: the keyboard
+    // may be moved and scaled in the input view (floating)
+    private fun downInKeyboard(): Float {
+        val at = floatArrayOf(0f, downY - keyboard.top)
+        Matrix().also { keyboard.matrix.invert(it) }.mapPoints(at)
+        return at[1]
+    }
+
     /** The long press has fired: the microphone opens now, the models load meanwhile. */
     fun begin() {
-        overlay.addView(card, FrameLayout.LayoutParams(keyboard.width, keyboard.height).apply {
-            leftMargin = keyboard.left
-            topMargin = keyboard.top
-        })
+        // the keyboard's own child: it moves and scales with it (floating, one-handed)
+        inputView.overKeys(card, underBar = false)
         card.alpha = 0f
         pill.scaleX = APPEAR_SCALE
         pill.scaleY = APPEAR_SCALE
@@ -145,7 +152,7 @@ class VoiceHoldOverlay(
         when (ev.actionMasked) {
             MotionEvent.ACTION_MOVE -> {
                 val i = ev.findPointerIndex(pointer)
-                if (i >= 0) session.moved(0f, ev.getY(i) - downY)
+                if (i >= 0) session.moved(ev.getY(i) - downY)
             }
             MotionEvent.ACTION_UP -> session.lift(ev.eventTime)
             MotionEvent.ACTION_POINTER_UP -> if (ev.getPointerId(ev.actionIndex) == pointer) session.lift(ev.eventTime)
@@ -153,8 +160,8 @@ class VoiceHoldOverlay(
         }
     }
 
-    /** another field, or the keyboard hidden: nothing typed, the microphone closed */
-    override fun inputEnded() = session.drop()
+    /** another field, the keyboard hidden, input restarted: nothing typed, the microphone closed */
+    override fun inputEnded(how: BaseInputView.Hold.InputEnd) = session.drop()
 
     override fun ready() {
         ready = true
@@ -221,8 +228,8 @@ class VoiceHoldOverlay(
         card.isClickable = false
         message?.let { status.setText(it) }
         main.postDelayed({
-            card.animate().alpha(0f).setDuration(VoiceStyle.ANIMATE_MS).withEndAction { overlay.removeView(card) }.start()
-        }, if (message != null) VoiceHoldSession.MESSAGE_MS else 0L)
+            card.animate().alpha(0f).setDuration(VoiceStyle.ANIMATE_MS).withEndAction { (card.parent as? ViewGroup)?.removeView(card) }.start()
+        }, if (message != null) VoiceSession.MESSAGE_MS else 0L)
     }
 
     companion object {

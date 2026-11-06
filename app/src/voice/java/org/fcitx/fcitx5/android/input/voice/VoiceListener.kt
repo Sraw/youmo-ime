@@ -35,7 +35,7 @@ import kotlin.math.log10
 import kotlin.math.sqrt
 
 /**
- * The microphone and the streaming recognizer, for one hold: reads the microphone while open and
+ * The microphone and the streaming recognizer, for one talk: reads the microphone while open and
  * hands what it reads to the recognizer on a thread of its own, which decodes it a chunk at a time,
  * closes a segment where its endpoint rules say ([VoiceEngine.choose] picking its text) and polishes
  * the text as it streams ([VoiceLive]). Tells [events] of it all on the main thread, until [close]d.
@@ -50,7 +50,7 @@ class VoiceListener(
     private val language: VoiceChoice.Language,
     /** 语音整理: the polish tagger on the text as it streams */
     private val polish: Boolean = true,
-) : VoiceHoldSession.Listening {
+) : VoiceSession.Listening {
 
     enum class Failure { NoModel, NoMicrophone }
 
@@ -64,13 +64,13 @@ class VoiceListener(
         fun silent()
 
         /** what was said so far, as it shows ([VoiceLive]): the segments closed, polished, and the one being said */
-        fun heard(text: String)
+        fun heard(heard: VoiceLive.Heard)
 
         /** how loud, 0 to 1, a few times a second */
         fun level(level: Float)
     }
 
-    // a native error is the panel's to show, not the keyboard's to crash on
+    // a native error is the session's to show, not the keyboard's to crash on
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, e ->
         Timber.w(e, "voice")
         tell { failed(Failure.NoMicrophone) }
@@ -89,7 +89,7 @@ class VoiceListener(
     // the models once in, the user's words with them; cancelled if they never come
     private val ready = CompletableDeferred<Pair<VoiceEngine.Models, VoiceHotwords.Words>>()
 
-    // what was said, as typed, once the microphone is closed and all of it decoded; null if nothing worth typing
+    // what was said (VoiceLive.finished, before the clean-up), once the microphone is closed and all of it decoded
     private val said = CompletableDeferred<String?>()
 
     private var acquired = false
@@ -109,7 +109,7 @@ class VoiceListener(
         main.post { if (!closed) events.event() }
     }
 
-    // a failure logged and [fallback] in its place: one part lost, not the panel
+    // a failure logged and [fallback] in its place: one part lost, not the talk
     private inline fun <T> orFallback(tag: String, fallback: T, block: () -> T): T = try {
         block()
     } catch (e: CancellationException) {
@@ -185,13 +185,13 @@ class VoiceListener(
     }
 
     /**
-     * Closes the microphone a tail after [liftedAt] (the lift's uptime, ms) and, once what was
-     * heard is all recognized, [done] with what to type (null: nothing worth typing): the finger
-     * lifted from holding to talk. The tail keeps the last word's sound still on its way in, said
-     * as the finger lifted. Not if closed meanwhile.
+     * Closes the microphone a tail after [stoppedAt] (the lift's or the tap's uptime, ms) and,
+     * once what was heard is all recognized, [done] with what was said (null: nothing came back):
+     * the finger lifted from holding to talk, or the talk tapped to a stop. The tail keeps the last
+     * word's sound still on its way in, said as it stopped. Not if closed meanwhile.
      */
-    override fun finish(liftedAt: Long, done: (String?) -> Unit) {
-        liftAt = liftedAt
+    override fun finish(stoppedAt: Long, done: (String?) -> Unit) {
+        liftAt = stoppedAt
         scope.launch {
             val text = runCatching { said.await() }.getOrNull()
             main.post { if (!closed) done(text) }
@@ -257,7 +257,7 @@ class VoiceListener(
             segment.close()
             // numbers only, nothing said: the UAT's measure of the lift against the speech's end (uat/12 VO-23/24)
             if (BuildConfig.DEBUG) Timber.d("voice segments: speechStart=%s segments=%d", segment.speechStart, segment.kept)
-            said.complete(orFallback("voice polish", live.raw.let(VoiceText::clean)) { live.finish() })
+            said.complete(orFallback("voice polish", live.raw) { live.finished() })
         } catch (e: CancellationException) {
             throw e
         } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
@@ -297,7 +297,7 @@ class VoiceListener(
                     val text = recognizer.getResult(stream).text
                     if (text != last) {
                         last = text
-                        show(orFallback("voice polish", live.raw) { live.heard(text) })
+                        show(orFallback("voice polish", VoiceLive.Heard(live.raw, 0, fallback = true)) { live.heard(text) })
                     }
                 }
             }
@@ -311,10 +311,10 @@ class VoiceListener(
             // the first segment's timestamps count from the stream's start, the microphone's opening
             if (kept++ == 0) speechStart = result.timestamps.firstOrNull()?.let { (it * VoiceEngine.SAMPLE_RATE).toInt() }
             val text = orFallback("voice choice", result.text) { VoiceEngine.choose(result, words, safeLanguage) }
-            show(orFallback("voice polish", live.raw) { live.closed(text) })
+            show(orFallback("voice polish", VoiceLive.Heard(live.raw, 0, fallback = true)) { live.closed(text) })
         }
 
-        private fun show(text: String) = tell { heard(text) }
+        private fun show(shown: VoiceLive.Heard) = tell { heard(shown) }
     }
 
     private suspend fun record() {

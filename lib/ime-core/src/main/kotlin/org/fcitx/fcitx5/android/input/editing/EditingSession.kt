@@ -52,6 +52,14 @@ class EditingSession(
         private set
 
     /**
+     * Told when a [provisional] composition is taken from the field by anything but its owner:
+     * [consumed] true when it is no longer in the field at all (the app cleared or sent the text),
+     * false when the cursor left it and it was taken away here. Voice's session listens: text the app
+     * took is not typed again, text taken away composes anew where the cursor went.
+     */
+    var provisionalTaken: ((consumed: Boolean) -> Unit)? = null
+
+    /**
      * Records [text] as the composing text without touching the editor -- for putting a session
      * into a known state. [updateComposingText] is what shows a new preedit in the editor.
      */
@@ -148,6 +156,14 @@ class EditingSession(
             return CursorUpdate.None
         }
         selection.resetTo(selStart, selEnd)
+        if (provisional && composingStart !in 0..<composingEnd && !provisionalStillThere(selStart, selEnd)) {
+            // the app took it (a chat's text sent, the field cleared): nothing left to take away, and
+            // its owner must not put it in again
+            CoreLog.d { "a provisional composition gone from the field: taken by the app" }
+            resetComposingState()
+            provisionalTaken?.invoke(true)
+            return CursorUpdate.None
+        }
         // the user moved the cursor, or the app changed the text: the pairs are not around it,
         // unless it moved within what is composed between them (the empty range still holds 0)
         if (selStart != selEnd || composing.isEmpty() || !composing.contains(selStart)) pairs.forget()
@@ -176,12 +192,70 @@ class EditingSession(
                 editor.setComposingText("", 1)
                 editor.setSelection(p, p)
             }
+            provisionalTaken?.invoke(false)
             return CursorUpdate.None
         }
         CoreLog.d { "cursor left the composition: finish it in place, focus out/in" }
         resetComposingState()
         editor.finishComposingText()
         return CursorUpdate.FocusOutIn
+    }
+
+    /**
+     * Input restarted over a [provisional] composition, which the restart's focus out would leave as
+     * text. [sameField]: taken away if still there as composed ([selStart]..[selEnd]: the restarted
+     * field's selection), for its owner to compose anew; if not there, the app took it. Another
+     * field (a WebView's inputs share one view): left in place as text, its owner's to forget.
+     * [provisionalTaken] told either way; nothing done if not provisional.
+     */
+    fun provisionalRestarted(sameField: Boolean, selStart: Int, selEnd: Int) {
+        checkThread()
+        if (!provisional) return
+        val start = composing.start
+        val end = composing.end
+        val there = sameField && selStart >= 0 && provisionalStillThere(selStart, selEnd)
+        resetComposingState()
+        if (there) {
+            CoreLog.d { "input restarted over a provisional composition: taken away" }
+            editor.batchEdit {
+                editor.setComposingRegion(start, end)
+                editor.setComposingText("", 1)
+            }
+        } else if (!sameField) {
+            editor.finishComposingText()
+        }
+        provisionalTaken?.invoke(!there)
+    }
+
+    /**
+     * Whether the provisional composition is still in the field as composed, the cursor now at
+     * [selStart]..[selEnd]: read around the cursor, the editor reporting no span (it reports one
+     * while the span is there; many report none at all). Text shorter than the range is gone; an
+     * editor that will not say, or a selection over it, is taken as still there.
+     */
+    private fun provisionalStillThere(selStart: Int, selEnd: Int): Boolean {
+        val start = composing.start
+        val end = composing.end
+        val text: String = when {
+            selStart >= end -> {
+                val before = editor.textBeforeCursor(selStart - start) ?: return true
+                if (before.length < selStart - start) return false
+                before.subSequence(0, end - start).toString()
+            }
+            selEnd <= start -> {
+                val after = editor.textAfterCursor(end - selEnd) ?: return true
+                if (after.length < end - selEnd) return false
+                after.subSequence(start - selEnd, end - selEnd).toString()
+            }
+            selStart == selEnd -> {
+                val before = editor.textBeforeCursor(selStart - start) ?: return true
+                val after = editor.textAfterCursor(end - selStart) ?: return true
+                if (before.length < selStart - start || after.length < end - selStart) return false
+                before.toString() + after.toString()
+            }
+            else -> return true
+        }
+        return text == composingText.toString()
     }
 
     /**

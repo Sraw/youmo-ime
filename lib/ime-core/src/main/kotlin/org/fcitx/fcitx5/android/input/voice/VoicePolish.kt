@@ -182,6 +182,16 @@ class VoicePolishStream(
         return tags.apply(text, seenOp.copyOf(text.size), seenAfter.copyOf(text.size), spaced)
     }
 
+    /**
+     * The first [count] characters of the text last [update]d, no more than are frozen, polished:
+     * what they write whatever is said after them, but for a pause's mark at its very end, which
+     * a mark coming next takes away ([VoicePolishTags.apply]).
+     */
+    fun frozenPrefix(count: Int): String {
+        val n = minOf(count, frozen)
+        return tags.apply(text.copyOf(n), seenOp.copyOf(n), seenAfter.copyOf(n), spaced.copyOf(n))
+    }
+
     private fun take(raw: String) {
         val next = VoicePolishTags.norm(raw)
         var same = 0

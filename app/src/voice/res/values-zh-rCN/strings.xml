@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="voice_no_permission">语音输入需要麦克风权限，按住话筒授权</string>
     <string name="voice_no_model">语音模型载入失败</string>
     <string name="voice_no_microphone">无法使用麦克风</string>
     <string name="voice_model_credit">语音识别：X-ASR 中英模型（Gilgamesh-J）；由 sherpa-onnx（k2-fsa）与 silero VAD 运行</string>
@@ -11,9 +10,7 @@
     <string name="voice_hold_cancel">松开手指，取消输入</string>
     <string name="voice_hold_hint">松开 上屏 · 上滑 取消</string>
     <string name="voice_hold_nothing">没有听清</string>
-    <string name="voice_press_to_talk">按住 说话</string>
-    <string name="voice_release_to_type">松开 上屏</string>
-    <string name="voice_release_to_cancel">松开 取消</string>
-    <string name="voice_panel_prompt">按住话筒说话 · 滑出话筒取消</string>
-    <string name="voice_no_password">密码框里不能用语音输入</string>
+    <string name="voice_tap_hint">点这里或麦克风 结束</string>
+    <string name="voice_tap_cancel">取消</string>
+    <string name="voice_tap_cut_short">最后几个字可能没识别完</string>
 </resources>

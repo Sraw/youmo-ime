@@ -344,7 +344,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 val action: ((View) -> Unit)? = when (button) {
                     // set where they are made: the emoji's in IdleUi, the hide's above with its swipe
                     ToolbarButton.Emoji, ToolbarButton.Hide -> null
-                    ToolbarButton.Voice -> { _ -> VoiceFeature.window()?.let { windowManager.attachWindow(it) } }
+                    ToolbarButton.Voice -> { _ -> commonKeyActionListener.voiceTap() }
                     ToolbarButton.Undo -> { _ -> service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true) }
                     ToolbarButton.Redo -> { _ -> service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true, shift = true) }
                     ToolbarButton.CursorMove -> { _ -> windowManager.attachWindow(TextEditingWindow()) }
@@ -481,6 +481,11 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             titleUi.removeExtension()
         }
         view.displayedChild = index
+    }
+
+    /** [button]'s view where the user sees it now (the toolbar shown, the button on it); null where not. */
+    fun shownButton(button: ToolbarButton): View? = idleUi.buttons.getValue(button).takeIf {
+        view.currentView === idleUi.root && idleUi.onScreen(button) && it.isShown
     }
 
     override val view by lazy {

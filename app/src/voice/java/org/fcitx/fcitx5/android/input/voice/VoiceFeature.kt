@@ -7,31 +7,48 @@ package org.fcitx.fcitx5.android.input.voice
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.widget.FrameLayout
 import androidx.core.content.ContextCompat
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.InputView
-import org.fcitx.fcitx5.android.input.wm.InputWindow
 
-/** A voice build's: the panel the bar's microphone opens (the text flavor's has none). */
+/** A voice build's: holding the space and tapping the bar's microphone talk (the text flavor's do nothing). */
 object VoiceFeature {
     class Credit(val title: String, val licence: String, val url: String)
 
     const val AVAILABLE = true
 
-    fun window(): InputWindow? = VoiceWindow()
-
     /**
      * Hold to talk: the long press on space has fired, its finger ([pointer]) still down; what is
      * said is [commit]ted once it lifts. Without the microphone permission, asks for it instead.
      */
-    fun hold(inputView: InputView, overlay: FrameLayout, pointer: Int, commit: (String) -> Unit) {
-        val context = inputView.context
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            VoicePermissionActivity.start(context)
-            return
+    fun hold(inputView: InputView, pointer: Int, commit: (String) -> Unit) {
+        // a talk going on already (tapped, then the space held): that one goes on
+        if (inputView.hold != null) return
+        if (!permitted(inputView.context)) return
+        VoiceHoldOverlay(inputView, pointer, commit).begin()
+    }
+
+    /**
+     * Tap to talk: the bar's microphone (or a key's shortcut) tapped. Stops the talk going on, or
+     * starts one, its mask over the keys; what is said is [commit]ted (the settled part as it is
+     * said: the session's own). Not in a password field, nor while a hold is still being
+     * recognized. Without the microphone permission, asks for it instead.
+     */
+    fun tap(inputView: InputView, commit: (String) -> Unit) {
+        when (val going = inputView.hold) {
+            is VoiceTapOverlay -> going.micTapped()
+            null -> if (!inputView.service.inPasswordField && permitted(inputView.context)) {
+                VoiceTapOverlay(inputView, commit).begin()
+            }
+            else -> {}
         }
-        VoiceHoldOverlay(inputView, overlay, pointer, commit).begin()
+    }
+
+    // the microphone allowed; else the asking page opened
+    private fun permitted(context: Context): Boolean {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) return true
+        VoicePermissionActivity.start(context)
+        return false
     }
 
     /** on the licences page */

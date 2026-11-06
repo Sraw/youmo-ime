@@ -22,7 +22,7 @@ an ime-core class with a test.
 `InputView` per configuration. `InputView` is a tree of components (`dependency/`, a small
 `UniqueViewComponent` injection) under one `InputWindowManager`, which shows one window at a time
 in the keyboard area: `KeyboardWindow` (the layouts), `PickerWindow` (symbols / emoji),
-`ClipboardWindow`, `TextEditingWindow`, `StatusAreaWindow`, `EditorInfoWindow` (debug, `internal.editorInfoInspector`), and in the voice build `VoiceWindow`.
+`ClipboardWindow`, `TextEditingWindow`, `StatusAreaWindow`, and `EditorInfoWindow` (debug, `internal.editorInfoInspector`). Voice has no window: its two ways in (the space held, the bar's microphone tapped) put an overlay over the keys as the keyboard view's own child (`InputView.overKeys`: `VoiceHoldOverlay` over all of it, `VoiceTapOverlay` from under the bar to the keys' bottom), so it moves and scales with a floating keyboard; the window under it left as it was.
 The bar above is `KawaiiBarComponent`: idle (toolbar, number row, the result of a sum just written, clipboard suggestion, inline
 autofill, decided by `IdleUiPolicy`; the sum is read off the field when what the service commits
 ends with `=`, worked out by `Calculation` in ime-core, and dropped as the cursor leaves the `=`) or candidates (`KawaiiBarStateMachine`,
@@ -725,21 +725,21 @@ of a field not learned from).
 ## The two flavors
 
 `speech` dimension: `text` and `voice`. Main code reaches voice only through `VoiceFeature`
-(`AVAILABLE`, the voice window, hold-to-talk), defined in both source sets with the same
+(`AVAILABLE`, `credits`, `hold` for the space, `tap` for the bar's microphone and the `Voice` key shortcut), defined in both source sets with the same
 signatures; the text one is empty. `VoiceDataPlugin` adds the recognizer and models to the voice
 build only; `RECORD_AUDIO` is in `app/src/voice/AndroidManifest.xml`. An input method cannot ask for
 a permission itself, so `VoicePermissionActivity` asks and closes. Voice decisions (number
-normalisation, reranking hypotheses with the pinyin model, blocked words, hotwords, hold-to-talk
-gestures) are in ime-core's `input/voice/` and tested there. `:app:compileVoiceDebugUnitTestKotlin`
+normalisation, reranking hypotheses with the pinyin model, blocked words, hotwords, the hold's and
+the tap's presses, what is typed as it is said) are in ime-core's `input/voice/` and tested there. `:app:compileVoiceDebugUnitTestKotlin`
 in CI keeps the voice source set compiling.
 
 ### Voice: the start
 
 - 正在听 only once the microphone is really on: `VoiceOnset` (ime-core) reports the first sample not zero,
-  `VoiceListener.Events.ready` → `VoiceHoldSession.Ui.ready`; before it the overlay and the panel say 准备中…. Why:
+  `VoiceListener.Events.ready` → `VoiceSession.Ui.ready`; before it both overlays say 准备中…. Why:
   the press-to-first-sample trace (dev/design/voice-start-latency.md) showed 正在听 lit hundreds of ms before
   anything was recorded, and the user chose to show it rather than record before the press (no pre-roll: the
-  status bar's microphone dot would flash on every space). Not after the lift or a drop (the session's guard).
+  status bar's microphone dot would flash on every space). Not after the stop or a drop (the session's guard).
 - 2 s of nothing but zeroes (`VoiceOnset.silent`, the privacy toggle off or the capture taken) say 麦克风没有声音
   (the user's rule), back to 正在听 at the first sound.
 - The cue's vibration and the voice ticks go through `VoiceStyle.vibrate` → `InputFeedbacks.hapticFeedback`, so
@@ -770,13 +770,47 @@ in CI keeps the voice source set compiling.
   behind; `VoiceText.clean` (numbers, spaces) runs after it. A tagger that fails to load leaves voice on without it.
 - What is heard so far is the field's composing text (`FcitxInputMethodService.composeVoice`): voice's text is the
   text itself, as English's word (pitfalls.md). Not in a password field, a raw-key (`TYPE_NULL`) one, nor when the
-  field composes a word of fcitx's when the hold starts (only the card or the panel shows it then), nor over a
+  field composes a word of fcitx's when the talk starts (only the card or the mask shows it then), nor over a
   preedit of fcitx's come meanwhile. It is `EditingSession.provisional`: the commit, through fcitx (`CommitAction`),
   replaces it, never finished in place first (`commitAndReset`'s `FinishComposing`, the input methods not Chinese:
   finished, it was typed twice), and fcitx's empty preedit (its reset) leaves it; the cursor leaving it (a tap in
-  the field, an app's edit) takes it away, the cursor where it went, and the next text heard composes there; input
-  finishing in the field takes it away before its connection goes; a drop, a give-up or nothing to type takes it
-  away, in the same field only.
+  the field, an app's edit) takes it away, the cursor where it went, and the next text heard composes there; gone
+  from the field with no span reported (the app sent or cleared the text: the text around the cursor no longer it,
+  `EditingSession.provisionalTaken(consumed = true)`), it is not taken away nor typed again (`VoiceTalk.consumed`:
+  all heard so far counts as typed) and the talk goes on; input restarted in the same field (`provisionalRestarted`;
+  the same field: `VoiceCommit.sameField`, the same package and view id, not the same `EditorInfo`) takes it away
+  (or finds it taken), another field's restart leaves it as text; input finishing in the field, or the keyboard
+  hidden, takes it away (not finished in place) before its connection goes; a drop, a give-up or nothing to type
+  takes it away, in the same field only. A preedit of fcitx's in the field meanwhile (another finger) stops typing as
+  it is said till it is gone (`voiceOwnsComposing`): the engine's text is never finished in place by voice.
+- One talk is a `VoiceSession` (app/src/voice), whatever starts and stops it: the listener, what is composed and
+  typed, the 15 s give-up, the end mark, `finish` (stopped: the tail, then the rest typed through fcitx), `cut`,
+  `drop`, `typeNow`. `VoiceHoldSession` adds the held finger (`VoiceHold`'s cancel zone, the lift);
+  `VoiceTapOverlay` adds the tap's: what each press does is `VoiceTap` (ime-core): the microphone, the mask or a
+  press off it (the bar's other buttons, the candidates) stop it, × drops it, a press after the stop cuts the tail,
+  another field (`inputEnded(LEFT)`, the overlay detached; `STARTED` in another field) types now, the keyboard
+  hidden (`HIDDEN`) stops it as a tap does, the tail taken away now and what is left typed straight into the field
+  once recognized (`VoiceSession.hidden`, `commitVoice`, the connection still there), input started again in the
+  same field (`STARTED`: a restart, the keyboard shown again) talks on, 60 s with nothing heard
+  (`VoiceTap.QUIET_MS`, counted from the last thing heard) stops it. A press off the mask is told by where the bar's
+  microphone is now (`InputView.voiceButton`), so a talk started from a key's shortcut is not stopped by the
+  microphone's own touch before its tap. No Enter on the mask (the user's decision 2026-11-06: it would not follow
+  the theme): to send, stop it, then the keyboard's Enter.
+- Tapped, what is settled is typed as it is said (060-voice-tap-to-talk.md, the user's decision): `VoiceLive.Heard`
+  carries `settled`, the end of the part that cannot change: of the closed segments only (`VoiceChoice` may still
+  choose the open one otherwise), of the tagger's frozen labels only (`VoicePolishStream.frozenPrefix`), and cut
+  just after a pause or end mark followed by something said (`VoiceLive.settledEnd`), so neither the tagger's
+  marks nor `VoiceText.clean`'s joins straddle the cut. `VoiceTalk` (ime-core) types what newly settled (cleaned on
+  its own) and composes the rest; were what was typed rewritten after all, only the part after the common prefix is
+  typed at the end. Mid-talk parts go straight in (`FcitxInputMethodService.voiceHeard`: `commitVoice`, synchronous,
+  then the tail composed, in one batch edit); the last part goes through fcitx as the hold's does. × takes only
+  the composing tail. Another field mid-talk types what was heard so far into the first at once (`typeNow`,
+  `commitVoice`: its connection is about to go); what the recognizer had not decoded yet is lost. Given up (15 s)
+  or failed after something was typed as it was said, what was heard last is typed too, the message
+  `voice_tap_cut_short`. The polish failing (`VoiceLive.Heard.fallback`: the raw text, not in step with the
+  polished part typed) stops typing as it is said for the rest of the talk. Each part is cleaned on its own, so a
+  sound alone between two marks (「嗯，」「哦。」) can go where the whole cleaned at once keeps it: accepted. Held,
+  nothing is typed before the lift (`asItGoes = false`).
 - The end mark: `VoiceEnd` (ime-core) by the field (`EditorTraits.sends`, `isMultiLine`, `isShortMessage`, a chat
   app's multi-line field) and 语音句末句号 (`keyboard.voiceEndMark`): a one-line field takes no end mark, a chat no
   「。」, anything else as said. Applied at the commit only; the composing text shows it as said.
@@ -797,18 +831,12 @@ in CI keeps the voice source set compiling.
   Why: lifting 300 ms before the speech ends lost the last character 57.7% of the time, at the end
   10.7%; with the tail, lifting 300 ms early lost it 10.7% of the time, as lifting at the end did
   (`~/voice-eval/tailquiet`, table 1 of `dev/design/voice-tail-and-quiet.md`). Lifting in the cancel
-  zone, `drop()`, `inputEnded()` and the panel's `onFinishInput`/`onStartInput` close at once, as before.
+  zone, `drop()` and `inputEnded()` close at once, as before. Tapped, the stop (the microphone, the mask, a
+  press off the mask, the keyboard hidden, the quiet minute) is `finish(now)`: the same tail from the tap.
   A new press after the lift (`ACTION_DOWN`/`POINTER_DOWN` anywhere on the input view for the space
-  card, the microphone for the panel) calls `pressedAgain()` → `Listening.cut()`: the tail ends,
+  card; the microphone, the mask or a press off it once tapped to stop) calls `Listening.cut()`: the tail ends,
   what was heard is still typed. On the card (it covers the keys only) the press counts for nothing; a press on the toolbar or the candidates ends the tail the same way and then acts as usual (design N2). The UI does not change (识别中… at once).
-  On the panel only, Enter pressed after the lift and before the end (`VoiceTailEnter`, ime-core;
-  R16 F4486) calls `pressedAgain()` once and waits, however often pressed: it is sent once the
-  session ends, typed, nothing heard or the model/microphone failing, in the field it was pressed in;
-  dropped with the session (`drop()`, another field) and by the 15 s give-up (`VoiceHoldSession.gaveUp`:
-  that late, it would send a forgotten draft). It goes from `Ui.ended` through `postFcitxJob` and then
-  the main thread: queued after the text's `commitOverEngine` job, which posts its own putting in to
-  the main thread first, so the text is in the field before the Enter is pressed (`VoiceHoldSession.lift`
-  commits before `end` for this). Backspace acts at once. The space card covers the keys, so there any
+  The space card covers the keys, so there any
   press only ends the tail and counts for nothing (VO-25, unchanged by owner decision 2026-10-26).
 - **Gain**: `VoiceGain` (ime-core), one per microphone opening, on each window after `read()` and
   before the recognizer and the level bar, so both hear the same. Level: the 3rd

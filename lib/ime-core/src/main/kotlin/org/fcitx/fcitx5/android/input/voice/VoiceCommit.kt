@@ -5,12 +5,26 @@
 package org.fcitx.fcitx5.android.input.voice
 
 /**
- * What the finger lifting from holding to talk types (VoiceHoldSession): what was said, into the
- * field it was said for only, not one the keyboard has gone to meanwhile, and never a password.
+ * Where what is said goes (VoiceSession): what was said, into the field it was said for only, not
+ * one the keyboard has gone to meanwhile, and never a password.
  */
 object VoiceCommit {
 
     /** [text] to type, or null: nothing heard, another field ([sameField] false), or a password one */
     fun typed(text: String, sameField: Boolean, passwordField: Boolean): String? =
         text.takeIf { it.isNotEmpty() && sameField && !passwordField }
+
+    /** A field told by its app ([packageName]) and its view's id ([fieldId], EditorInfo's). */
+    data class Field(val packageName: String?, val fieldId: Int)
+
+    /**
+     * Whether [now] is still the field [said] was, told by app and view id rather than by the
+     * EditorInfo object: the app restarting input in it (a WebView, an app's restartInput) gives a
+     * new one for the same field. An id not set (0, or View.NO_ID: -1) tells nothing, so two such
+     * fields are not taken as one; the same EditorInfo always is ([identical]).
+     */
+    fun sameField(said: Field?, now: Field?, identical: Boolean): Boolean = identical ||
+        (said != null && now != null && said == now && said.fieldId != 0 && said.fieldId != NO_ID)
+
+    private const val NO_ID = -1
 }

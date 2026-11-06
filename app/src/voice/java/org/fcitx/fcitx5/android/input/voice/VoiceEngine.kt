@@ -28,7 +28,7 @@ import timber.log.Timber
  * The streaming recognizer (X-ASR's 1920 ms streaming transducer, its encoder fine-tuned for
  * accented Mandarin; 060-voice-tagger.md §4.4) and the polish tagger ([VoicePolisher]): read in
  * once, which takes a second or two and some 400 MB, and kept while voice input is in use; let go a
- * while after the panel closes, so that coming back to it soon is instant and the memory is not held all day.
+ * while after the talk ends, so that coming back to it soon is instant and the memory is not held all day.
  */
 object VoiceEngine {
 
