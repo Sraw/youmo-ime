@@ -44,6 +44,14 @@ class EditingSession(
         private set
 
     /**
+     * The composing text is not the engine's but stands in for text still to come (voice's, as it
+     * is heard): replaced by the commit, never finished in place first, and taken away, not kept,
+     * when the cursor leaves it. Finished in place, it stayed as text and the commit typed it again.
+     */
+    var provisional = false
+        private set
+
+    /**
      * Records [text] as the composing text without touching the editor -- for putting a session
      * into a known state. [updateComposingText] is what shows a new preedit in the editor.
      */
@@ -155,6 +163,21 @@ class EditingSession(
             if (position == composingText.cursor) return CursorUpdate.None
             return CursorUpdate.MovePreeditCursor(composingText.codePointCountUntil(position), updateIndex)
         }
+        if (provisional) {
+            // the cursor is outside it: it goes, the cursor kept where the user put it. Where the
+            // editor reports its span, that (the app may have rewritten the text); many report
+            // none at all, so none reported is not taken as gone: the span as composed
+            val (start, end) = if (composingStart in 0..<composingEnd) composingStart to composingEnd else composing.start to composing.end
+            val p = if (selStart >= end) selStart - (end - start) else selStart
+            CoreLog.d { "cursor left a provisional composition: taken away" }
+            resetComposingState()
+            selection.predict(p)
+            editor.batchEdit {
+                editor.setComposingText("", 1)
+                editor.setSelection(p, p)
+            }
+            return CursorUpdate.None
+        }
         CoreLog.d { "cursor left the composition: finish it in place, focus out/in" }
         resetComposingState()
         editor.finishComposingText()
@@ -174,10 +197,12 @@ class EditingSession(
      */
     fun updateComposingText(
         text: FormattedText,
+        provisional: Boolean = false,
         render: (FormattedText) -> CharSequence = { it.toString() },
     ) {
         checkThread()
         if (!editor.isAvailable) return
+        this.provisional = provisional && text.length > 0
         val lastSelection = selection.latest
         // Nothing to change, nothing sent: an empty batch is still two calls on the editor. The
         // context left behind on an app switch sends its empty preedit as the next app binds, and
@@ -225,6 +250,7 @@ class EditingSession(
         checkThread()
         composing.clear()
         composingText = FormattedText.Empty
+        provisional = false
     }
 
     /**

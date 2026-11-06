@@ -258,6 +258,12 @@
     <string name="a11y_syllable">拼音 %1$s</string>
     <string name="a11y_key_number_pad">數字鍵盤</string>
     <string name="a11y_key_emoji">表情</string>
+    <string name="voice_polish">語音整理</string>
+    <string name="voice_polish_summary">邊說邊去掉口頭禪、重複和說錯改口的部分，並加上標點</string>
+    <string name="voice_end_mark">語音句末句號</string>
+    <string name="voice_end_mark_auto">按輸入框：聊天、搜尋框和單行輸入框裡不加</string>
+    <string name="voice_end_mark_keep">照說的保留</string>
+    <string name="voice_end_mark_drop">都不加</string>
     <string name="voice_input">語音輸入</string>
     <string name="a11y_candidates_prev_page">上一頁候選詞</string>
     <string name="a11y_candidates_next_page">更多候選詞</string>

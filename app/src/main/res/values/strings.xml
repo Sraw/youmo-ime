@@ -266,6 +266,12 @@
     <string name="a11y_syllable">Pinyin %1$s</string>
     <string name="a11y_key_number_pad">Number pad</string>
     <string name="a11y_key_emoji">Emoji</string>
+    <string name="voice_polish">Tidy voice text</string>
+    <string name="voice_polish_summary">As you speak, drop fillers, repeats and words taken back, and add punctuation</string>
+    <string name="voice_end_mark">Full stop at the end of voice text</string>
+    <string name="voice_end_mark_auto">By the field: none in chats, search boxes and one-line fields</string>
+    <string name="voice_end_mark_keep">As spoken</string>
+    <string name="voice_end_mark_drop">Never</string>
     <string name="voice_input">Voice input</string>
     <string name="a11y_candidates_prev_page">Previous candidates</string>
     <string name="a11y_candidates_next_page">More candidates</string>

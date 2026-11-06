@@ -33,14 +33,12 @@ class VoiceDataPluginTest {
         val ortFiles = ort.resolve(VoiceDataPlugin.ORT_DIR).apply { mkdirs() }
         for (name in VoiceDataPlugin.ORT_FILES) ortFiles.resolve(name).writeText(name)
         archive.resolve("bpe.model").writeBytes(sentencePieceModel("▁中", -1.5f))
-        val vad = folder.newFile("silero_vad.onnx").apply { writeText("vad") }
         val hotwords = folder.newFile("hotwords.txt").apply { writeText("新 词\n") }
 
         val project = ProjectBuilder.builder().withProjectDir(folder.newFolder("app")).build()
         val task = project.tasks.register("copyVoiceModels", VoiceDataPlugin.CopyVoiceModels::class.java).get()
         task.model.set(sources)
         task.ort.set(ort)
-        task.vad.set(vad)
         task.hotwords.set(hotwords)
         task.outputDir.set(folder.root.resolve("voice-assets"))
         task.copy()
@@ -48,9 +46,27 @@ class VoiceDataPluginTest {
         val out = folder.root.resolve("voice-assets/voice")
         for (name in VoiceDataPlugin.MODEL_FILES) assertTrue(name, Files.isSameFile(archive.resolve(name).toPath(), out.resolve(name).toPath()))
         for (name in VoiceDataPlugin.ORT_FILES) assertTrue(name, Files.isSameFile(ortFiles.resolve(name).toPath(), out.resolve(name).toPath()))
-        assertEquals("vad", out.resolve("silero_vad.onnx").readText())
         assertEquals("▁中\t-1.5\n", out.resolve("bpe.vocab").readText())
         // copied as the dict tool wrote it: its MainTest holds the spelling
         assertEquals("新 词\n", out.resolve("hotwords.txt").readText())
+    }
+
+    @Test
+    fun aLocalDirectoryStandsInForTheDownloadsWithThePolishTagger() {
+        val local = folder.newFolder("local")
+        for (name in VoiceDataPlugin.MODEL_FILES + VoiceDataPlugin.ORT_FILES + VoiceDataPlugin.TAGGER_FILES) local.resolve(name).writeText(name)
+        local.resolve("bpe.model").writeBytes(sentencePieceModel("▁中", -1.5f))
+        val project = ProjectBuilder.builder().withProjectDir(folder.newFolder("app")).build()
+        val task = project.tasks.register("copyVoiceModels", VoiceDataPlugin.CopyVoiceModels::class.java).get()
+        task.local.set(local)
+        task.hotwords.set(folder.newFile("hotwords.txt").apply { writeText("新 词\n") })
+        task.outputDir.set(folder.root.resolve("voice-assets"))
+        task.copy()
+
+        val out = folder.root.resolve("voice-assets/voice")
+        for (name in VoiceDataPlugin.MODEL_FILES + VoiceDataPlugin.ORT_FILES + VoiceDataPlugin.TAGGER_FILES) {
+            assertTrue(name, Files.isSameFile(local.resolve(name).toPath(), out.resolve(name).toPath()))
+        }
+        assertEquals("▁中\t-1.5\n", out.resolve("bpe.vocab").readText())
     }
 }

@@ -15,6 +15,7 @@ import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
@@ -45,7 +46,8 @@ import javax.inject.Inject
  *   it takes hotwords. Numbers it writes in characters: VoiceText puts them in digits. Its encoder
  *   is fine-tuned by us for accented Mandarin (KeSpeech's dialect speech 17.1% -> 14.6% wrong,
  *   standard sets unchanged), on synthesized dialect speech held to the original by anchor batches.
- * - silero VAD (MIT): where a stretch of speech ends.
+ * - The polish tagger (ours, 060-voice-tagger.md): drops fillers and words taken back, adds marks,
+ *   as the text streams; for now from [LOCAL_PROPERTY]'s directory only, with the streaming model.
  * - Hotwords: the new-word pack (EngineDataPlugin's `downloadEngineWords`), each word's characters
  *   apart by spaces as the dict tool's `hotwords` writes them (HotwordSpelling.spelled), and the
  *   model's BPE vocabulary, which sherpa-onnx encodes them with, read out of its SentencePiece model.
@@ -55,7 +57,7 @@ import javax.inject.Inject
  * where it lies in the APK, mapped, rather than reading it onto the heap (lib/sherpa-onnx README).
  *
  * Downloaded once, SHA-256 checked (DownloadTask), into the voice variants'
- * assets under `voice/`, uncompressed: mapped, or for the VAD read whole, as the recognizer loads them.
+ * assets under `voice/`, uncompressed: mapped, as the recognizer and the tagger load them.
  */
 class VoiceDataPlugin : Plugin<Project> {
 
@@ -82,8 +84,15 @@ class VoiceDataPlugin : Plugin<Project> {
         private const val ORT_SHA256 = "89416b38b51238674c19df4eb6c9d2356917e77e5276a028ce87b13234f785bf"
         internal const val ORT_DIR = "x-asr-ort"
         internal val ORT_FILES = listOf("encoder.ort", "decoder.ort", "joiner.ort")
-        private const val VAD_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
-        private const val VAD_SHA256 = "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"
+
+        /**
+         * A directory of the 0.6.0 models instead of the downloads, until they are published
+         * (dev/design/060-voice-tagger.md §5.1): the streaming transducer's [ORT_FILES], its
+         * [MODEL_FILES] and [BPE_MODEL], and the polish tagger's [TAGGER_FILES]. A machine's own,
+         * in ~/.gradle/gradle.properties.
+         */
+        const val LOCAL_PROPERTY = "youmo.voiceModelDir"
+        internal val TAGGER_FILES = listOf("polish-tagger.ort", "polish-tagger.json")
     }
 
     override fun apply(target: Project) {
@@ -118,11 +127,6 @@ class VoiceDataPlugin : Plugin<Project> {
             cmake.set(target.sdkCmake)
             outputDir.set(target.layout.buildDirectory.dir("voice-ort"))
         }
-        val vad = target.tasks.register<DownloadTask>("downloadVoiceVad") {
-            url.set(VAD_URL)
-            sha256.set(VAD_SHA256)
-            outputFile.set(downloadsDir.file("silero_vad.onnx"))
-        }
         val words = target.tasks.named<DownloadTask>(EngineDataPlugin.WORDS_TASK)
         val hotwords = target.tasks.register<CompileHotwords>("compileVoiceHotwords") {
             classpath.from(target.configurations.named(EngineDataPlugin.TOOL_CONFIGURATION))
@@ -130,10 +134,14 @@ class VoiceDataPlugin : Plugin<Project> {
             this.words.set(words.flatMap { it.outputFile })
             outputFile.set(target.layout.buildDirectory.file("generated/voice-hotwords/hotwords.txt"))
         }
+        val localDir = target.providers.gradleProperty(LOCAL_PROPERTY)
         val assets = target.tasks.register<CopyVoiceModels>("copyVoiceModels") {
-            model.set(modelDir.flatMap { it.outputDir })
-            ort.set(ortDir.flatMap { it.outputDir })
-            this.vad.set(vad.flatMap { it.outputFile })
+            if (localDir.isPresent) {
+                local.set(target.layout.projectDirectory.dir(localDir.get()))
+            } else {
+                model.set(modelDir.flatMap { it.outputDir })
+                ort.set(ortDir.flatMap { it.outputDir })
+            }
             this.hotwords.set(hotwords.flatMap { it.outputFile })
             outputDir.set(target.layout.buildDirectory.dir("generated/voice-assets"))
         }
@@ -182,20 +190,24 @@ class VoiceDataPlugin : Plugin<Project> {
         }
     }
 
-    /** The model (ORT) and its tokens, the VAD and the hotwords, as `voice/` in the assets. */
+    /** The model (ORT) and its tokens, the tagger (from [local]) and the hotwords, as `voice/` in the assets. */
     @DisableCachingByDefault(because = "linking is quicker than the cache would be")
     abstract class CopyVoiceModels : DefaultTask() {
+        @get:Optional
         @get:InputDirectory
         @get:PathSensitive(PathSensitivity.RELATIVE)
         abstract val model: DirectoryProperty
 
+        @get:Optional
         @get:InputDirectory
         @get:PathSensitive(PathSensitivity.RELATIVE)
         abstract val ort: DirectoryProperty
 
-        @get:InputFile
-        @get:PathSensitive(PathSensitivity.NAME_ONLY)
-        abstract val vad: RegularFileProperty
+        /** [LOCAL_PROPERTY]'s directory: [model] and [ort] are not read then */
+        @get:Optional
+        @get:InputDirectory
+        @get:PathSensitive(PathSensitivity.RELATIVE)
+        abstract val local: DirectoryProperty
 
         @get:InputFile
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
@@ -209,10 +221,16 @@ class VoiceDataPlugin : Plugin<Project> {
             val out = outputDir.get().asFile.resolve("voice")
             out.deleteRecursively()
             out.mkdirs()
-            val dir = model.get().asFile.resolve(MODEL_NAME)
+            // the release pinned is the offline model, which the streaming recognizer cannot load
+            // (sherpa-onnx ends the process): no APK with it until the streaming one is released
+            val local = checkNotNull(local.orNull?.asFile) {
+                "voice: the streaming model and the polish tagger come from $LOCAL_PROPERTY alone for now (in ~/.gradle/gradle.properties); the pinned release is the offline model"
+            }
+            val dir = local
+            val ortDir = local
             for (name in MODEL_FILES) link(dir.resolve(name), out.resolve(name))
-            for (name in ORT_FILES) link(ort.get().asFile.resolve(ORT_DIR).resolve(name), out.resolve(name))
-            vad.get().asFile.copyTo(out.resolve("silero_vad.onnx"))
+            for (name in ORT_FILES) link(ortDir.resolve(name), out.resolve(name))
+            for (name in TAGGER_FILES) link(local.resolve(name), out.resolve(name))
             out.resolve("bpe.vocab").writeText(vocabulary(dir.resolve(BPE_MODEL).readBytes()))
             hotwords.get().asFile.copyTo(out.resolve("hotwords.txt"))
         }

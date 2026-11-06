@@ -146,7 +146,7 @@ def dictate(d, clip):
             time.sleep(0.2)
     finally:
         p.kill()   # done or not, nothing left streaming into the next case
-    # the last stretch's silence (1.2 s: the VAD closes it), then up to 4 s for its text to show: on
+    # the last segment's silence (1.2 s: the recognizer's endpoint closes it), then up to 4 s for its text to show: on
     # a loaded host the recognizer takes longer than the silence, and VO-02 then saw only 正在听…
     heard = len(shown)
     end = time.time() + 4
@@ -234,17 +234,17 @@ def retried(d, clip, ok, before=""):
 
 
 RATE = 16000
-# how long after the speech's start the VAD's "voice speech started" line comes (its minimum speech
-# and a window or two); a first guess, the tries' own offsets move the lift after it
+# how long after the speech's start the app's "voice speech started" line comes; the streaming build
+# (0.6.0, no VAD) logs none, so the lift is timed from the host (cued stays False), as R15's was
 LIFT_CUE_LAG = 0.35
 # the HAL's "late delivering frames" lines a try may have and still count (a good try has 0 to 7)
 HAL_LATE_MOST = 20
 # whether the build logs the cue (a debug build of the voice tail; not R15): set from the first try
 cued = False
 NOTHING_HEARD = "nothing heard"   # lift_early's offset when the debug log has no speech segment
-# how far the VAD's segment.start falls before the speech's real start: sherpa puts the start at the
-# window it fired in less two windows and the minimum speech (the design's offset formula, + 1024)
-VAD_START_LAG = 1024
+# how far the first token's frame (speechStart, the recognizer's timestamp) falls after the speech's
+# real start, to subtract: 0 until measured on the device (the VAD's segment.start before 0.6.0 was 1024 early)
+TOKEN_START_LAG = 0
 
 
 def span(clip):
@@ -258,13 +258,14 @@ def span(clip):
 
 
 def capture_log(d):
-    """the debug build's one line at the microphone's close (VoiceListener): numbers, None if absent"""
+    """the debug build's lines at the microphone's close and the recognizer's end (VoiceListener): numbers, None if absent"""
     line = d.sh("logcat -d | grep 'voice capture:' | tail -1").strip()
     if not line:
         return None
+    line += " " + d.sh("logcat -d | grep 'voice segments:' | tail -1").strip()
     v = dict(re.findall(r"(\w+(?:\.\w+)?)=(\S+)", line))
     num = lambda k: None if v.get(k) in (None, "null") else float(v[k])
-    got = {k: num(k) for k in ("liftFrame", "stopAt", "read", "segment.start", "segments", "envPeak", "peakGainDb")}
+    got = {k: num(k) for k in ("liftFrame", "stopAt", "read", "speechStart", "segments", "envPeak", "peakGainDb")}
     # the emulator's sound card failing mid-capture ("pcm_readi failed with 'cannot read/write stream
     # data: I/O error'"): the HAL hands the app silence from there on, which can leave a speech
     # segment of a syllable or two and an empty text. The emulator's, not the app's
@@ -479,12 +480,12 @@ def lift_early(d, clip, before_s):
     cued = cued or bool(d.sh("logcat -d | grep -c 'voice speech started'").strip() not in ("", "0"))
     t = settle(d)
     log = capture_log(d)
-    if not log or log["segment.start"] is None or log["stopAt"] is None:
+    if not log or log["stopAt"] is None:
         return t, None, False
-    if log["segment.start"] < 0 or log["halErrors"] or log["halLate"] > HAL_LATE_MOST:   # no speech, or the sound card failed: the clip never arrived whole
+    if log["speechStart"] is None or log["halErrors"] or log["halLate"] > HAL_LATE_MOST:   # no speech, or the sound card failed: the clip never arrived whole
         return t, NOTHING_HEARD, False
-    # split in two: segment.start is the second one's, and the offset below would be off by the
-    # first one's length (a build without the count: None, taken as one)
+    # split in two at an endpoint: a pause in the clip, the speech's end then not the clip's
+    # (a build without the count: None, taken as one)
     if (log["segments"] or 1) > 1:
         return t, NOTHING_HEARD, False
     if not plain(t):
@@ -492,7 +493,7 @@ def lift_early(d, clip, before_s):
     # no timestamp: the frames read when the capture thread saw the lift, which adds the capture
     # path's latency to the offset
     lift = log["liftFrame"] if log["liftFrame"] is not None else log["stopAt"] - 0.3 * RATE
-    speech_end = log["segment.start"] + VAD_START_LAG + (end - start) * RATE
+    speech_end = log["speechStart"] - TOKEN_START_LAG + (end - start) * RATE
     return t, (lift - speech_end) * 1000 / RATE, log["liftFrame"] is not None
 
 

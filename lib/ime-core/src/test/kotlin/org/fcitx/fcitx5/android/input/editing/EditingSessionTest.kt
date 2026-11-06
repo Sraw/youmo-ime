@@ -765,6 +765,56 @@ class EditingSessionTest {
     private fun preedit(text: String, cursor: Int) = FormattedText(arrayOf(text), intArrayOf(0), cursor)
 
     @Test
+    fun aProvisionalCompositionIsTakenAwayWhenTheCursorLeavesIt() {
+        // voice's text still to come, composing after "ab"; the user taps before "a"
+        val (s, e) = session("ab", cursor = 2)
+        s.updateComposingText(formatted("你好"), provisional = true)
+        assertEquals("ab你好", e.text)
+        assertTrue(s.provisional)
+        assertEquals(EditingSession.CursorUpdate.None, s.report(0))
+        assertEquals("ab", e.text)
+        assertEquals(0, e.selectionStart)
+        assertFalse(s.provisional)
+        assertTrue(s.composing.isEmpty())
+    }
+
+    @Test
+    fun aProvisionalCompositionLeftForwardKeepsTheCursorWhereItWent() {
+        val (s, e) = session("ab", cursor = 1)
+        s.updateComposingText(formatted("你好"), provisional = true)
+        assertEquals("a你好b", e.text)
+        // after "b": two places on once the composition is gone
+        assertEquals(EditingSession.CursorUpdate.None, s.report(4))
+        assertEquals("ab", e.text)
+        assertEquals(2, e.selectionStart)
+    }
+
+    @Test
+    fun aProvisionalCompositionLeftIsMeasuredByTheSpanReported() {
+        val (s, e) = session("abc", cursor = 1)
+        s.updateComposingText(formatted("你好"), provisional = true)
+        // the app made it one character ("a你bc", its span 1..2), then the user tapped at the end
+        e.setComposingText("你", 1)
+        e.setSelection(4, 4)
+        assertEquals(EditingSession.CursorUpdate.None, s.report(4, composing = 1 to 2))
+        assertEquals("abc", e.text)
+        // one place back, the span's length as reported, not as composed
+        assertEquals(3, e.selectionStart)
+    }
+
+    @Test
+    fun aProvisionalCompositionIsReplacedByTheCommit() {
+        val (s, e) = session("ab")
+        s.updateComposingText(formatted("你好"), provisional = true)
+        s.commitText("你好世界")
+        assertEquals("ab你好世界", e.text)
+        assertFalse(s.provisional)
+        // the engine's composition is not provisional
+        s.updateComposingText(formatted("ni"))
+        assertFalse(s.provisional)
+    }
+
+    @Test
     fun anExpectedReportChangesNothing() {
         val (s, e) = session("abc", cursor = 3)
         s.commitText("d")

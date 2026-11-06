@@ -33,7 +33,7 @@ BUILDING.md's 5 GB counts the Gradle daemon beside it) and three table compiles 
 | `AndroidAppConventionPlugin` | app defaults (SDKs, version from tags, signing from env/properties, R8), and `PermissionCheckTask`: fails the build if the merged manifest asks for a permission not on its allowlist |
 | `AndroidLib…`, `AndroidBase…` | library and shared Android defaults |
 | `EngineDataPlugin` | downloads (SHA-256 pinned) and compiles the engine's data into generated assets, stored uncompressed (see below) |
-| `VoiceDataPlugin` | voice build only: the recognizer's models, VAD, hotword list |
+| `VoiceDataPlugin` | voice build only: the recognizer's models, the polish tagger (from `youmo.voiceModelDir`, which an APK build needs for now: the pinned release is the offline model), hotword list |
 | `HandwritingDataPlugin` | both builds: `:lib:handwriting` (onnxruntime, `pickFirst` with sherpa-onnx's identical copy) and the handwriting models |
 | `BuildMetadataPlugin` | build time and git hash into `BuildConfig` (the data release names are `EngineDataPlugin`'s fields) |
 | `DetektConventionPlugin` | detekt on every Kotlin module, one config, a baseline per module |

@@ -240,8 +240,6 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         )
         if (newState == idleUi.currentState) return
         idleUi.updateState(newState, fromUser)
-        // the toolbar out for any reason (the clipboard's suggestion timed out): its microphone too
-        prepareVoice()
     }
 
     private val hideKeyboardCallback = View.OnClickListener {
@@ -333,7 +331,6 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 if (clipboardTimeoutJob != null) {
                     launchClipboardTimeoutJob()
                 }
-                prepareVoice()
             }
             hideKeyboardButton.apply {
                 setOnClickListener(hideKeyboardCallback)
@@ -533,13 +530,6 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         arrangeButtons()
         addressStrip.start(info, capFlags)
         evalIdleUiState()
-        prepareVoice()
-    }
-
-    // the first hold of a process finds its VAD made (the start's latency); only with the microphone in sight,
-    // not folded away on a toolbar that is not out
-    private fun prepareVoice() {
-        if (idleUi.onScreen(ToolbarButton.Voice)) VoiceFeature.shown(context)
     }
 
     override fun onFinishInput() = addressStrip.finish()

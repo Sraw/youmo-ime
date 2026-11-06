@@ -12,11 +12,13 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
+import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 
 /**
  * One hold to talk, whatever is held (the space key, the panel's microphone): the microphone open
- * from the press, [VoiceHold] deciding what the finger does, what was said [commit]ted once it
- * lifts, into the field it was said for and never a password. Tells [ui] on the main thread, until
+ * from the press, [VoiceHold] deciding what the finger does, what is heard composing in the field
+ * as it is said, what was said [commit]ted once it lifts (its end as the field has it, [VoiceEnd]),
+ * into the field it was said for and never a password. Tells [ui] on the main thread, until
  * [Ui.ended]. Used from the main thread.
  */
 class VoiceHoldSession(
@@ -55,6 +57,12 @@ class VoiceHoldSession(
     private val main = Handler(Looper.getMainLooper())
     private var listener: Listening? = null
 
+    // what is heard shows in the field as it is said: not a password's, nor over a word the field
+    // composes already (English's, which fcitx still has); there only the hold's own view shows it
+    private val composes = service.voiceComposes
+    // something composing in the field now, ours: taken away if nothing is typed
+    private var composing = false
+
     var over = false
         private set
 
@@ -77,12 +85,13 @@ class VoiceHoldSession(
             if (!over && !hold.released) ui.silent()
         }
 
-        override fun speechStarted() = Unit
-        override fun speechEnded() = Unit
-
-        override fun recognized(text: String) {
-            hold.heard(text)
-            ui.heard(hold.text)
+        override fun heard(text: String) {
+            if (over) return
+            ui.heard(text)
+            if (composes && service.currentInputEditorInfo === field) {
+                service.composeVoice(text)
+                composing = text.isNotEmpty()
+            }
         }
 
         override fun level(level: Float) = ui.level(level)
@@ -102,6 +111,7 @@ class VoiceHoldSession(
             events,
             hotwords = { VoiceEngine.userHotwords(fcitx, habits = AppPrefs.getInstance().internal.useHabits.getValue()) },
             language = VoiceEngine.language(fcitx),
+            polish = AppPrefs.getInstance().keyboard.voicePolish.getValue(),
         )).also {
             it.load()
             it.start()
@@ -126,16 +136,18 @@ class VoiceHoldSession(
             gaveUp = true
             end(R.string.voice_hold_nothing)
         }, FINISH_MS)
-        listener?.finish(at) {
+        listener?.finish(at) { said ->
             // still the field it was said for: not text landing somewhere else
             val text = VoiceCommit.typed(
-                hold.text,
+                said?.let { ended(it) }.orEmpty(),
                 sameField = service.currentInputEditorInfo === field,
                 passwordField = service.inPasswordField,
             )
             if (text != null) {
                 // commit before end: the panel's waiting Enter goes out from Ui.ended, after the
-                // text's own fcitx job (VoiceWindow, VoiceTailEnter); ended first, it would beat the text
+                // text's own fcitx job (VoiceWindow, VoiceTailEnter); ended first, it would beat the
+                // text. It replaces what composes in the field: not taken away first, no flicker
+                composing = false
                 commit(text)
                 end(null)
             } else {
@@ -155,21 +167,30 @@ class VoiceHoldSession(
     /** Dropped, whatever was heard: another field, the keyboard gone, the touch taken away. */
     fun drop() = end(null)
 
+    // [text]'s end as the field it goes into has it, by the user's choice (语音输入 → 句末句号)
+    private fun ended(text: String): String {
+        val kind = field?.let { VoiceEnd.field(it.toEditorTraits(service.packageName), it.packageName) } ?: VoiceEnd.Field.OTHER
+        return VoiceEnd.apply(text, kind, AppPrefs.getInstance().keyboard.voiceEndMark.getValue().mode)
+    }
+
     private fun end(@StringRes message: Int?) {
         if (over) return
         over = true
         main.removeCallbacksAndMessages(null)
+        // dropped, nothing heard, given up: what composed goes, in the field it composed in only
+        if (composing && service.currentInputEditorInfo === field) service.composeVoice("")
+        composing = false
         listener?.close()
         listener = null
         ui.ended(message)
     }
 
-    /** What [VoiceListener] is to a session: the microphone, the VAD and the recognizer behind [VoiceListener.Events]. */
+    /** What [VoiceListener] is to a session: the microphone and the recognizer behind [VoiceListener.Events]. */
     interface Listening {
         fun load()
         fun start()
-        /** the microphone closed a tail after [liftedAt] (uptime, ms), what was heard typed, then [done] */
-        fun finish(liftedAt: Long, done: () -> Unit)
+        /** the microphone closed a tail after [liftedAt] (uptime, ms), all of it recognized, then [done] with what to type (null: nothing) */
+        fun finish(liftedAt: Long, done: (String?) -> Unit)
 
         /** the microphone closed now, what was heard still recognized */
         fun cut()
@@ -179,7 +200,7 @@ class VoiceHoldSession(
     companion object {
         /**
          * The JVM's UAT tests' recognizer: what is heard told straight to the events, the chain
-         * after the recognizer (VoiceHold, VoiceText, VoiceCommit, the commit) the app's own.
+         * after the recognizer (VoiceHold, VoiceEnd, VoiceCommit, the commit) the app's own.
          * sherpa-onnx and the microphone are a device's.
          */
         @VisibleForTesting

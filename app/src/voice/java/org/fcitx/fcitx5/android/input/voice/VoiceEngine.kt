@@ -8,16 +8,12 @@ import android.content.res.AssetManager
 import android.os.Handler
 import android.os.Looper
 import com.k2fsa.sherpa.onnx.FeatureConfig
-import com.k2fsa.sherpa.onnx.OfflineModelConfig
-import com.k2fsa.sherpa.onnx.OfflineRecognizer
-import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
-import com.k2fsa.sherpa.onnx.OfflineRecognizerResult
-import com.k2fsa.sherpa.onnx.OfflineStream
-import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
-import com.k2fsa.sherpa.onnx.SileroVadModelConfig
-import com.k2fsa.sherpa.onnx.SpeechSegment
-import com.k2fsa.sherpa.onnx.Vad
-import com.k2fsa.sherpa.onnx.VadModelConfig
+import com.k2fsa.sherpa.onnx.OnlineModelConfig
+import com.k2fsa.sherpa.onnx.OnlineRecognizer
+import com.k2fsa.sherpa.onnx.OnlineRecognizerConfig
+import com.k2fsa.sherpa.onnx.OnlineRecognizerResult
+import com.k2fsa.sherpa.onnx.OnlineStream
+import com.k2fsa.sherpa.onnx.OnlineTransducerModelConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -29,26 +25,35 @@ import org.fcitx.fcitx5.android.daemon.HostConnection
 import timber.log.Timber
 
 /**
- * The recognizer (X-ASR, VoiceDataPlugin): read in once, which takes a second or two and some
- * 200 MB, and kept while voice input is in use; let go a while after the panel closes, so
- * that coming back to it soon is instant and the memory is not held all day.
+ * The streaming recognizer (X-ASR's 1920 ms streaming transducer, its encoder fine-tuned for
+ * accented Mandarin; 060-voice-tagger.md §4.4) and the polish tagger ([VoicePolisher]): read in
+ * once, which takes a second or two and some 400 MB, and kept while voice input is in use; let go a
+ * while after the panel closes, so that coming back to it soon is instant and the memory is not held all day.
  */
 object VoiceEngine {
 
     const val SAMPLE_RATE = 16000
 
-    // the VAD's window: 32 ms at 16 kHz
+    // the microphone read 32 ms at a time
     const val WINDOW = 512
+
+    /**
+     * Zeros after the last of the speech so the last chunk is decoded: a chunk (1.92 s) and a second
+     * more, as voice-eval's seg_app.py measured it.
+     */
+    const val TAIL_PADDING = SAMPLE_RATE * 292 / 100
 
     private const val DIR = "voice"
     private const val KEEP_MS = 2 * 60 * 1000L
-    private const val THREADS = 4
-    // hypotheses kept: the n-best VoiceRerank ranks again; a quarter slower to decode than 4,
-    // the encoder most of the work either way
+    private const val THREADS = 2
+    // hypotheses kept: the n-best VoiceRerank ranks again, as measured (seg_app.py)
     private const val BEAM = 16
 
+    /** The recognizer and the tagger, if it loaded (none: the text as recognized, cleaned). */
+    class Models(val recognizer: OnlineRecognizer, val polisher: VoicePolisher?)
+
     private val lock = Any()
-    private var recognizer: OfflineRecognizer? = null
+    private var models: Models? = null
     private var users = 0
     private val main = Handler(Looper.getMainLooper())
     // on a worker: onnxruntime tearing its sessions down on the main thread could drop the keyboard's frames
@@ -56,21 +61,18 @@ object VoiceEngine {
         Dispatchers.IO.asExecutor().execute {
             synchronized(lock) {
                 if (users == 0) {
-                    recognizer?.release()
-                    recognizer = null
-                    // voice not used a while: the spare's native memory back too, made again on the next show
-                    spareVad.clear()
+                    models?.recognizer?.release()
+                    models?.polisher?.close()
+                    models = null
                 }
             }
         }
     }
 
-    /** The recognizer, read in if it is not; on a worker thread. [release] when done with it. */
-    fun acquire(assets: AssetManager): OfflineRecognizer = synchronized(lock) {
+    /** The models, read in if they are not; on a worker thread. [release] when done with them. */
+    fun acquire(assets: AssetManager): Models = synchronized(lock) {
         main.removeCallbacks(letGo)
-        // in use: the spare is let go with the recognizer (letGo), counted from the last use, not the last show
-        main.removeCallbacks(letGoSpare)
-        val loaded = recognizer ?: OfflineRecognizer(assets, config()).also { recognizer = it }
+        val loaded = models ?: Models(OnlineRecognizer(assets, config()), polisher(assets)).also { models = it }
         users++
         loaded
     }
@@ -80,69 +82,36 @@ object VoiceEngine {
         if (users == 0) main.postDelayed(letGo, KEEP_MS)
     }
 
-    // the VAD hears speech start a little late: this much before is put back (AudioHistory)
-    private const val LEAD_IN = SAMPLE_RATE * 3 / 10
-
-    // the longest stretch the VAD lets through, in seconds: the history holds as much and more
-    const val MAX_SPEECH_S = 20
-
-    /** enough for the longest stretch the VAD lets through, its pause and lead-in (under 2 s) */
-    fun history() = AudioHistory(SAMPLE_RATE * (MAX_SPEECH_S + 2))
-
-    /** The front stretch the VAD has cut, popped, with its lead-in from [history]. */
-    fun nextStretch(vad: Vad, history: AudioHistory, dropped: Long = 0): FloatArray {
-        val segment = vad.front()
-        vad.pop()
-        return stretch(segment, history, dropped)
-    }
-
-    /** [segment], popped already, with its lead-in from [history]: front() copies the whole stretch over JNI, read once */
-    fun stretch(segment: SpeechSegment, history: AudioHistory, dropped: Long = 0): FloatArray {
-        // the VAD's positions start after what a backlog dropped before it came (VoiceBacklog.dropped)
-        return history.before(segment.start + dropped, LEAD_IN) + segment.samples
+    // voice input without the polish rather than none
+    @Suppress("TooGenericExceptionCaught")
+    private fun polisher(assets: AssetManager): VoicePolisher? = try {
+        VoicePolisher.open(assets)
+    } catch (e: Exception) {
+        Timber.w(e, "voice polish tagger")
+        null
     }
 
     /**
-     * A stream to recognize a stretch in, listening for the user's [words] (VoiceHotwords.ofUser)
-     * besides the pack's; with [block], its search never completing a word they blocked, even
-     * within a longer one (see [recognize]). With hotwords of theirs, the recognizer builds its
-     * graph of hotwords, the pack's 78 thousand too, only when they differ from the last stream's
-     * (it keeps that graph): a tenth of a second or more, so made before the stretch it is for.
+     * A stream to recognize a hold in, listening for the user's [words] (VoiceHotwords.ofUser)
+     * besides the pack's, its search never completing a word they blocked, even within a longer
+     * one. With hotwords of theirs, the recognizer builds its graph of hotwords, the pack's 78
+     * thousand too, only when they differ from the last stream's (it keeps that graph): a tenth of a
+     * second or more.
      */
-    fun stream(recognizer: OfflineRecognizer, words: VoiceHotwords.Words, block: Boolean = false): OfflineStream = when {
-        block && words.blocked.isNotEmpty() -> recognizer.createStream(words.hotwords, words.blocked)
+    fun stream(recognizer: OnlineRecognizer, words: VoiceHotwords.Words): OnlineStream = when {
+        words.blocked.isNotEmpty() -> recognizer.createStream(words.hotwords, words.blocked)
         words.hotwords.isNotEmpty() -> recognizer.createStream(words.hotwords)
         else -> recognizer.createStream()
     }
 
-    /** A stretch of speech to the recognizer's result, in [stream], which it releases. */
-    fun result(recognizer: OfflineRecognizer, stream: OfflineStream, samples: FloatArray): OfflineRecognizerResult {
-        return try {
-            stream.acceptWaveform(samples, SAMPLE_RATE)
-            recognizer.decode(stream)
-            recognizer.getResult(stream)
-        } finally {
-            stream.release()
-        }
-    }
-
     /**
-     * A stretch of speech to text, in [prepared] (made by [stream] for [words], not blocking),
-     * which it releases: of the recognizer's hypotheses, the one [VoiceChoice] chooses with
-     * [language]; if each has a word the user blocked, the stretch searched again with them blocked.
+     * A segment's text, the recognizer's [result] at its endpoint: of its hypotheses, the one
+     * [VoiceChoice] chooses with [language]; the blocked words were blocked in the search already.
      */
-    suspend fun recognize(
-        recognizer: OfflineRecognizer,
-        prepared: OfflineStream,
-        samples: FloatArray,
-        words: VoiceHotwords.Words,
-        language: VoiceChoice.Language,
-    ): String = VoiceChoice.choose(heard(result(recognizer, prepared, samples)), words.blockedWords, language) {
-        heard(result(recognizer, stream(recognizer, words, block = true), samples))
+    suspend fun choose(result: OnlineRecognizerResult, words: VoiceHotwords.Words, language: VoiceChoice.Language): String {
+        val heard = VoiceChoice.Heard(result.nbest.toList(), result.nbestScores, result.text)
+        return VoiceChoice.choose(heard, words.blockedWords, language) { heard }
     }
-
-    private fun heard(result: OfflineRecognizerResult) =
-        VoiceChoice.Heard(result.nbest.toList(), result.nbestScores, result.text)
 
     /**
      * the words the user added and made (VoiceHotwords.ofUser), read again for each listener; with
@@ -184,87 +153,21 @@ object VoiceEngine {
     // the engine busy or starting: the text as heard, not a wait
     private const val LANGUAGE_MS = 1000L
 
-    // a VAD made ahead for the next opening: its model read in before the press, not after the
-    // microphone opens (the start's latency, dev/design/voice-start-latency.md). Its own, lock-free:
-    // under [lock] the capture thread waited out a whole model load (VoiceSpare)
-    private val spareVad = VoiceSpare<Vad> { it.release() }
-
-    /** One for each time the microphone opens, the spare if one was made: it keeps the state of what it has heard. */
-    fun takeVad(assets: AssetManager): Vad = spareVad.take() ?: vad(assets)
-
-    // the spare made on a show with no use after it: let go after the same idle as the recognizer
-    private val letGoSpare = Runnable {
-        Dispatchers.IO.asExecutor().execute {
-            synchronized(lock) { if (users == 0) spareVad.clear() }
-        }
-    }
-
-    /**
-     * [prepareVad] on a thread of its own: the voice key shown, the first press of a process finds
-     * one made (built on show rather than on the press: the cold press stays fast). Let go [KEEP_MS]
-     * after the last show if voice is not used meanwhile.
-     */
-    fun prepareVadSoon(assets: AssetManager) {
-        main.removeCallbacks(letGoSpare)
-        main.postDelayed(letGoSpare, KEEP_MS)
-        if (spareVad.ready) return
-        Dispatchers.IO.asExecutor().execute {
-            // an Error too (sherpa's library not loading, memory running out): no handler on this
-            // executor, it would end the process on every show
-            @Suppress("TooGenericExceptionCaught")
-            try {
-                prepareVad(assets)
-            } catch (e: Throwable) {
-                // made when the microphone opens instead
-                Timber.w(e, "voice vad")
-            }
-        }
-    }
-
-    /** [vad] made for an opening that closed before using it: kept for the next one, not made again */
-    fun offerVad(vad: Vad) {
-        spareVad.offer(vad)
-    }
-
-    /** A spare VAD made for the next opening, if there is none; off the main thread. */
-    fun prepareVad(assets: AssetManager) {
-        spareVad.build { vad(assets) }
-    }
-
-    private fun vad(assets: AssetManager) = Vad(
-        assets,
-        VadModelConfig(
-            sileroVadModelConfig = SileroVadModelConfig(
-                model = "$DIR/silero_vad.onnx",
-                threshold = 0.5f,
-                // a breath between phrases, not the end of what is being said
-                minSilenceDuration = 0.6f,
-                minSpeechDuration = 0.25f,
-                windowSize = WINDOW,
-                // a long run is cut and goes in by parts, each recognized while the next is heard
-                maxSpeechDuration = MAX_SPEECH_S.toFloat(),
-            ),
-            sampleRate = SAMPLE_RATE,
-            numThreads = 1,
-        ),
-    )
-
-    private fun config() = OfflineRecognizerConfig(
+    private fun config() = OnlineRecognizerConfig(
         featConfig = FeatureConfig(sampleRate = SAMPLE_RATE, featureDim = 80),
-        modelConfig = OfflineModelConfig(
-            transducer = OfflineTransducerModelConfig(
+        modelConfig = OnlineModelConfig(
+            transducer = OnlineTransducerModelConfig(
                 encoder = "$DIR/encoder.ort",
                 decoder = "$DIR/decoder.ort",
                 joiner = "$DIR/joiner.ort",
             ),
             tokens = "$DIR/tokens.txt",
             numThreads = THREADS,
-            // the only family built (lib/sherpa-onnx/README.md): empty or "transducer", Create refuses
-            // any other (a misspelt type fails at once, not as a model that will not load)
-            modelType = "transducer",
             modelingUnit = "bpe",
             bpeVocab = "$DIR/bpe.vocab",
         ),
+        // a segment ends where its rules say (sherpa-onnx's defaults), its hypotheses carried over (lib/sherpa-onnx README)
+        enableEndpoint = true,
         // hotwords and the n-best need the beam search
         decodingMethod = "modified_beam_search",
         maxActivePaths = BEAM,

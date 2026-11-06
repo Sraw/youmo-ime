@@ -8,16 +8,23 @@ import android.Manifest
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.text.InputType
 import android.view.View
+import android.view.inputmethod.BaseInputConnection
+import android.view.inputmethod.EditorInfo
 import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.voice.VoiceHoldSession
 import org.fcitx.fcitx5.android.input.voice.VoiceListener
+import org.fcitx.fcitx5.android.input.voice.VoiceLive
 import org.fcitx.fcitx5.android.input.voice.VoicePermissionActivity
 import org.fcitx.fcitx5.android.input.voice.VoiceStyle
 import org.junit.After
@@ -37,8 +44,9 @@ import org.robolectric.shadows.ShadowDialog
 
 /**
  * UAT cases of holding to talk (uat/12), everything after the recognizer: what it hears told
- * straight to the session ([VoiceHoldSession.listening]), the rest the app's own (the finger,
- * VoiceHold, VoiceText's clean-up and numbers, VoiceCommit, the commit into the field). Whether the
+ * straight to the session ([VoiceHoldSession.listening]) as segments closed, the rest the app's own
+ * (the finger, VoiceHold, VoiceLive's joining with VoiceText's clean-up and numbers, the polish
+ * tagger aside, VoiceEnd, VoiceCommit, the commit into the field). Whether the
  * model hears it right is the voice-eval benchmark's; the microphone end to end is VO-02's device smoke.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -47,12 +55,15 @@ import org.robolectric.shadows.ShadowDialog
 class VoiceHoldUatTest {
 
     /**
-     * The recognizer: what [said] holds is heard as the finger lifts; [opened] times the microphone
-     * opened. [held]: the tail after the lift still being recorded, until [release] or a [cut].
+     * The recognizer: what [said] holds is heard as the finger lifts, each a segment closed, [heard]
+     * one before; [opened] times the microphone opened. [held]: the tail after the lift still being
+     * recorded, until [release] or a [cut].
      */
     private class Recognizer : VoiceHoldSession.Listening {
         lateinit var events: VoiceListener.Events
         val said = mutableListOf<String>()
+        // as VoiceListener's, without the tagger (语音整理 is a device's: the model is); one a hold, as a listener is
+        private var live = VoiceLive()
         var opened = 0
         var held = false
         var cuts = 0
@@ -61,7 +72,7 @@ class VoiceHoldUatTest {
 
         /** a recognizer that never comes back, even cut: the session's 15 s give-up ends it */
         var stuck = false
-        private var waiting: (() -> Unit)? = null
+        private var waiting: ((String?) -> Unit)? = null
 
         /** the microphone's first sample not zero comes as it opens; false: only when [on] says so */
         var warm = true
@@ -69,6 +80,7 @@ class VoiceHoldUatTest {
         override fun load() = Unit
         override fun start() {
             opened++
+            live = VoiceLive()
             // from the capture thread, as VoiceListener's
             if (warm) Handler(Looper.getMainLooper()).post { on() }
         }
@@ -79,7 +91,10 @@ class VoiceHoldUatTest {
         /** 2 s of zeroes */
         fun silent() = events.silent()
 
-        override fun finish(liftedAt: Long, done: () -> Unit) {
+        /** a segment closed at an endpoint, the finger still down */
+        fun heard(raw: String) = events.heard(live.closed(raw))
+
+        override fun finish(liftedAt: Long, done: (String?) -> Unit) {
             finishes++
             this.liftedAt = liftedAt
             waiting = done
@@ -88,11 +103,11 @@ class VoiceHoldUatTest {
 
         /** the tail recorded: what was said heard, then the session's done */
         fun release() {
-            said.forEach(events::recognized)
+            said.forEach(::heard)
             said.clear()
             val done = waiting
             waiting = null
-            done?.invoke()
+            done?.invoke(live.finish())
         }
 
         // as VoiceListener's: the capture ends, and what was heard comes back from another thread
@@ -151,6 +166,9 @@ class VoiceHoldUatTest {
 
     private fun text() = h.field.text.toString()
 
+    // the field's composing region, -1 to -1 for none
+    private fun composing() = h.field.text.let { BaseInputConnection.getComposingSpanStart(it) to BaseInputConnection.getComposingSpanEnd(it) }
+
     private fun string(id: Int) = h.service.getString(id)
 
     private fun panel(): View {
@@ -160,6 +178,7 @@ class VoiceHoldUatTest {
     }
 
     private companion object {
+        const val MULTI_LINE = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
         const val RETURN = 0xff0d
         const val BACKSPACE = 0xff08
     }
@@ -183,20 +202,60 @@ class VoiceHoldUatTest {
     }
 
     @Test
+    fun underEnglishWhatIsSaidIsTypedOnce() {
+        allowMicrophone()
+        h.start(MULTI_LINE)
+        // not Chinese: what is composing is finished, not picked, before a commit (PendingInputPolicy);
+        // voice's own text was finished so and the commit typed it again
+        val english = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "", "En", "en", "androidengine", false)
+        h.api.inputMethodEntryCached = english
+        h.emit(HostEvent.InputMethodChanged(english))
+        h.advance(100)
+        val f = holdSpace()
+        voice.heard("你好")
+        h.advance(100)
+        assertEquals(0 to 2, composing())
+        voice.said += "世界。"
+        f.lift()
+        assertEquals("你好，世界。", text())
+        assertEquals(-1 to -1, composing())
+    }
+
+    @Test
+    fun theEndMarkGoesAsTheFieldHasIt() {
+        allowMicrophone()
+        // one line (a search, a name): no end mark at all
+        h.start()
+        say("你好吗？")
+        assertEquals("你好吗", text())
+        // a chat's message box: no full stop, a question keeps its mark
+        h.start(MULTI_LINE, imeOptions = EditorInfo.IME_ACTION_SEND)
+        say("我到了。")
+        assertEquals("我到了", text())
+        h.start(MULTI_LINE, imeOptions = EditorInfo.IME_ACTION_SEND)
+        say("你到了吗？")
+        assertEquals("你到了吗？", text())
+    }
+
+    @Test
     @Uat("VO-02")
     fun whatIsSaidShowsThenIsTyped() {
         allowMicrophone()
-        h.start()
+        // a note's field, many lines: what is said ends as said (VoiceEnd)
+        h.start(MULTI_LINE)
         val f = holdSpace()
         assertTrue(shown().toString(), string(R.string.voice_hold_listening) in shown())
-        // a stretch heard at a pause: shown, not typed
-        voice.events.recognized("今天天气")
+        // a segment heard at a pause: shown, and composing in the field, not typed yet
+        voice.heard("今天天气")
         h.advance(100)
         assertTrue(shown().toString(), "今天天气" in shown())
-        assertEquals("", text())
+        assertEquals("今天天气", text())
+        assertEquals(0 to 4, composing())
         voice.said += "很好。"
         f.lift()
-        assertEquals("今天天气很好。", text())
+        // the segments joined with a pause mark where they have none (VoiceLive)
+        assertEquals("今天天气，很好。", text())
+        assertEquals(-1 to -1, composing())
     }
 
     @Test
@@ -554,7 +613,7 @@ class VoiceHoldUatTest {
     @Uat("VO-23")
     fun theTailCountsFromTheLiftAndTypesOnceRecorded() {
         allowMicrophone()
-        h.start()
+        h.start(MULTI_LINE)
         voice.held = true
         val f = holdSpace()
         voice.said += "今天天气很好。"

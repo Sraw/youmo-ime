@@ -68,8 +68,8 @@ One process. Inside it:
   for the tables (`TableRegistry`). A session
   made meanwhile waits for them: `EngineAssets.pinyinData` and the word indexes are synchronized
   lazies.
-- **Voice** (voice build): the microphone reader, the VAD and the recognizer on threads of their own
-  (`VoiceListener`).
+- **Voice** (voice build): the microphone reader on an IO thread, the streaming recognizer and the polish
+  tagger on one thread of their own (`VoiceListener`'s `decoder`), handed the audio through a channel.
 - **`handwriting`** (`HandwritingRecognition`): the handwriting recognizers, one read at a time; a
   read made stale by a newer stroke is skipped. Its reading goes to the engine as a host job: a key
   (`Keyboard.INK`) carrying it (`EngineBridge.ink`, `KeyEvent.payload`), in order with the keys and

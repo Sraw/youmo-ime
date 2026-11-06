@@ -794,8 +794,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             // the engine's Enter while composing: what was typed, committed
             PendingInputPolicy.Resolution.CommitAsTyped -> sendKey(FcitxKeyMapping.FcitxKey_Return)
             // This runs on fcitx's thread pool, and the composing state belongs to the main thread.
+            // Voice's composing text is not finished: the commit replaces it (finished, it was typed twice).
             PendingInputPolicy.Resolution.FinishComposing ->
-                withContext(Dispatchers.Main) { finishComposing() }
+                withContext(Dispatchers.Main) { if (!editingSession.provisional) finishComposing() }
             PendingInputPolicy.Resolution.None -> {}
         }
         reset()
@@ -1464,8 +1465,32 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     }
 
-    private fun updateComposingText(text: FormattedText) =
+    private fun updateComposingText(text: FormattedText) {
+        // the engine's empty preedit (a reset before voice's commit) leaves voice's text for the commit to replace
+        if (text.isEmpty() && editingSession.provisional) return
         editingSession.updateComposingText(text) { it.toSpannedString(highlightColor) }
+    }
+
+    /**
+     * Voice may compose here ([composeVoice]): nothing composing in the field (English's word,
+     * handwriting's), not a password, not a field of raw keys (TYPE_NULL: it has no composing text).
+     */
+    val voiceComposes get() = editingSession.composingText.isEmpty() && !inPasswordField &&
+        currentInputEditorInfo?.isTypeNull() == false
+
+    /**
+     * What voice has heard so far as the field's composing text, replaced as it grows, empty to
+     * take it away; the text itself, as English's word is (specs/pitfalls.md). Its commit, through
+     * fcitx, replaces it.
+     */
+    fun composeVoice(text: String) {
+        // the engine's preedit came meanwhile (another finger typing): it is left alone
+        if (editingSession.composingText.isNotEmpty() && !editingSession.provisional) return
+        editingSession.updateComposingText(
+            if (text.isEmpty()) FormattedText.Empty else FormattedText(arrayOf(text), intArrayOf(0), -1),
+            provisional = true,
+        )
+    }
 
     /**
      * Finish composing text and leave cursor position as-is.
@@ -1556,6 +1581,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onFinishInput() {
         Timber.d("onFinishInput")
+        // voice's text still to come is taken from the field it was in, before its connection goes
+        // (the framework would finish it there, kept as text)
+        if (editingSession.provisional) editingSession.updateComposingText(FormattedText.Empty)
         postFcitxJob {
             focus(false)
         }

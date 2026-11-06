@@ -24,8 +24,6 @@ class VoiceHold(private val cancelDistance: Float, private val around: Boolean =
     var released = false
         private set
 
-    private val pieces = mutableListOf<String>()
-
     /**
      * The finger [dx] right of and [dy] below where it went down, or the button's centre if
      * [around] (left and up are negative); whether the zone changed.
@@ -39,18 +37,9 @@ class VoiceHold(private val cancelDistance: Float, private val around: Boolean =
         return true
     }
 
-    /** A stretch recognized, as the recognizer wrote it. */
-    fun heard(raw: String) {
-        VoiceText.clean(raw)?.let { pieces += it }
-    }
-
     /** What the finger lifting does: type what was said, or drop it. */
     fun release(): Boolean {
         released = true
         return zone == Zone.Talk
     }
-
-    /** What was said so far, as typed: the stretches one after another ([VoicePost.join]). */
-    val text: String
-        get() = VoicePost.join(pieces)
 }

@@ -34,20 +34,12 @@ object VoiceFeature {
         VoiceHoldOverlay(inputView, overlay, pointer, commit).begin()
     }
 
-    /** Voice offered on the keyboard (the bar's microphone shown): the next opening's VAD made ahead. */
-    fun shown(context: Context) {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            VoiceEngine.prepareVadSoon(context.assets)
-        }
-    }
-
     /** on the licences page */
     fun credits(context: Context) = listOf(
         Credit(context.getString(R.string.voice_model_credit), "Apache-2.0", "https://github.com/Gilgamesh-J/X-ASR"),
         // the encoder's fine-tuning kept its English with LibriSpeech, whose licence asks for the notice
         Credit("LibriSpeech", "CC-BY-4.0", "https://www.openslr.org/12/"),
         Credit("sherpa-onnx:1.13.8", "Apache-2.0", "https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE"),
-        Credit("silero-vad", "MIT", "https://github.com/snakers4/silero-vad/blob/master/LICENSE"),
         // what sherpa-onnx is built with (lib/sherpa-onnx/README.md), in its library in the APK; its
         // onnxruntime is handwriting's too, credited on the page with it
         Credit("kaldi-native-fbank:1.22.3", "Apache-2.0", "https://github.com/csukuangfj/kaldi-native-fbank/blob/master/LICENSE"),

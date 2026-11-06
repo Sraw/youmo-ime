@@ -67,5 +67,9 @@ fun EditorInfo.toEditorTraits(ownPackage: String? = null): EditorTraits {
         imeAction = action.takeIf {
             it != EditorInfo.IME_ACTION_UNSPECIFIED && it != EditorInfo.IME_ACTION_NONE
         },
+        sends = action == EditorInfo.IME_ACTION_SEND || (actionLabel?.isNotEmpty() == true && actionId == EditorInfo.IME_ACTION_SEND),
+        isMultiLine = type == InputType.TYPE_CLASS_TEXT &&
+            inputType and (InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_IME_MULTI_LINE) != 0,
+        isShortMessage = type == InputType.TYPE_CLASS_TEXT && variation == InputType.TYPE_TEXT_VARIATION_SHORT_MESSAGE,
     )
 }

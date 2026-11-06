@@ -15,10 +15,7 @@ class VoiceHoldTest {
 
     @Test
     fun liftedWhereItWentDownTypes() {
-        hold.heard("今天天气不错，")
-        hold.heard("我们出去走走。")
         assertTrue(hold.release())
-        assertEquals("今天天气不错，我们出去走走。", hold.text)
     }
 
     @Test
@@ -42,21 +39,6 @@ class VoiceHoldTest {
         hold.release()
         assertFalse(hold.moved(0f, -500f))
         assertEquals(VoiceHold.Zone.Talk, hold.zone)
-    }
-
-    @Test
-    fun stretchesCleanedAndJoined() {
-        hold.heard("嗯")
-        hold.heard(" 订了 C E P 的票， ")
-        hold.heard("hello")
-        hold.heard("world")
-        assertEquals("订了CEP的票，hello world", hold.text)
-    }
-
-    @Test
-    fun nothingHeardIsNothingTyped() {
-        hold.heard("")
-        assertEquals("", hold.text)
     }
 
     @Test

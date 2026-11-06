@@ -3,8 +3,8 @@
  * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
  */
 
-// OrtModel's native half: one ORT-format model of one float input and one float output, used
-// where it lies in the APK. The asset stays open, mapped (stored uncompressed), as long as the
+// OrtModel's native half: one ORT-format model of one input, floats or int64s (the voice polish
+// tagger's character ids), and float outputs, used where it lies in the APK. The asset stays open, mapped (stored uncompressed), as long as the
 // session; onnxruntime reads the weights in place. Prepacking would copy them, and crashes on bytes
 // used in place (lib/sherpa-onnx README), so it is off.
 
@@ -12,6 +12,7 @@
 #include <android/asset_manager_jni.h>
 #include <jni.h>
 
+#include <cstdint>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -28,30 +29,74 @@ Ort::Env &env() {
 
 using Asset = std::unique_ptr<AAsset, decltype(&AAsset_close)>;
 
+void raise(JNIEnv *jni, const char *cls, const std::string &what) {
+    jclass c = jni->FindClass(cls);
+    if (c) jni->ThrowNew(c, what.c_str());
+}
+
 struct Model {
     // declared before the session, so closed after it
     Asset asset;
     Ort::Session session;
     std::string input;
-    std::string output;
+    ONNXTensorElementDataType inputType;
+    std::vector<std::string> outputs;
 
     Model(Asset &&a, const void *data, size_t size, const Ort::SessionOptions &opts)
             : asset(std::move(a)), session(env(), data, size, opts) {
         Ort::AllocatorWithDefaultOptions alloc;
+        if (session.GetInputCount() != 1) throw std::invalid_argument("not one input");
         input = session.GetInputNameAllocated(0, alloc).get();
-        output = session.GetOutputNameAllocated(0, alloc).get();
-        // nativeRun reads the output as floats, another type's bytes wrongly (a narrower one's past
-        // its end): refused as the model opens, the recognizer then not loaded, rather than at each read
-        if (session.GetOutputTypeInfo(0).GetTensorTypeAndShapeInfo().GetElementType() !=
-            ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT) {
-            throw std::invalid_argument("output not of floats");
+        inputType = session.GetInputTypeInfo(0).GetTensorTypeAndShapeInfo().GetElementType();
+        if (inputType != ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT && inputType != ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64) {
+            throw std::invalid_argument("input neither floats nor int64s");
         }
+        for (size_t i = 0; i < session.GetOutputCount(); i++) {
+            outputs.emplace_back(session.GetOutputNameAllocated(i, alloc).get());
+            // the outputs are read as floats, another type's bytes wrongly (a narrower one's past
+            // its end): refused as the model opens, the recognizer then not loaded, rather than at each read
+            if (session.GetOutputTypeInfo(i).GetTensorTypeAndShapeInfo().GetElementType() !=
+                ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT) {
+                throw std::invalid_argument("output not of floats");
+            }
+        }
+        if (outputs.empty()) throw std::invalid_argument("no output");
     }
 };
 
-void raise(JNIEnv *jni, const char *cls, const std::string &what) {
-    jclass c = jni->FindClass(cls);
-    if (c) jni->ThrowNew(c, what.c_str());
+// [jshape]'s dimensions, and how many values they hold; -1 if one is negative
+std::vector<int64_t> shapeOf(JNIEnv *jni, jlongArray jshape, size_t &n) {
+    std::vector<int64_t> shape(jni->GetArrayLength(jshape));
+    jni->GetLongArrayRegion(jshape, 0, static_cast<jsize>(shape.size()), reinterpret_cast<jlong *>(shape.data()));
+    n = 1;
+    // a negative dimension, or a product past size_t, is no size an array has: -1, never matched
+    for (auto d: shape) {
+        auto u = static_cast<size_t>(d);
+        if (d < 0 || (u != 0 && n > SIZE_MAX / u)) {
+            n = static_cast<size_t>(-1);
+            break;
+        }
+        n *= u;
+    }
+    return shape;
+}
+
+// output [i] of [out]: its values, its dimensions into [jdims] from [at] (-1 past them); null with an
+// exception pending if they do not fit
+jfloatArray outputOf(JNIEnv *jni, std::vector<Ort::Value> &out, size_t i, jlongArray jdims, jsize at, jsize rank) {
+    auto info = out[i].GetTensorTypeAndShapeInfo();
+    auto dims = info.GetShape();
+    if (dims.size() > static_cast<size_t>(rank)) {
+        raise(jni, "java/lang/IllegalStateException", "output of more dimensions than expected");
+        return nullptr;
+    }
+    std::vector<jlong> d(rank, -1);
+    for (size_t k = 0; k < dims.size(); k++) d[k] = dims[k];
+    jni->SetLongArrayRegion(jdims, at, rank, d.data());
+    size_t count = info.GetElementCount();
+    jfloatArray result = jni->NewFloatArray(static_cast<jsize>(count));
+    if (result) jni->SetFloatArrayRegion(result, 0, static_cast<jsize>(count), out[i].GetTensorData<float>());
+    return result;
 }
 
 } // namespace
@@ -100,10 +145,12 @@ Java_org_fcitx_fcitx5_android_handwriting_OrtModel_nativeRun(
         JNIEnv *jni, jclass, jlong handle, jfloatArray jx, jlongArray jshape, jlongArray jout) {
     auto *model = reinterpret_cast<Model *>(handle);
     try {
-        std::vector<int64_t> shape(jni->GetArrayLength(jshape));
-        jni->GetLongArrayRegion(jshape, 0, static_cast<jsize>(shape.size()), reinterpret_cast<jlong *>(shape.data()));
-        size_t n = 1;
-        for (auto d: shape) n *= static_cast<size_t>(d);
+        if (model->inputType != ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT) {
+            raise(jni, "java/lang/IllegalArgumentException", "the model takes int64s, not floats");
+            return nullptr;
+        }
+        size_t n;
+        auto shape = shapeOf(jni, jshape, n);
         if (n != static_cast<size_t>(jni->GetArrayLength(jx))) {
             raise(jni, "java/lang/IllegalArgumentException", "input size does not match its shape");
             return nullptr;
@@ -113,25 +160,64 @@ Java_org_fcitx_fcitx5_android_handwriting_OrtModel_nativeRun(
         auto mem = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
         auto in = Ort::Value::CreateTensor<float>(mem, x.data(), n, shape.data(), shape.size());
         const char *inName = model->input.c_str();
-        const char *outName = model->output.c_str();
+        const char *outName = model->outputs[0].c_str();
         auto out = model->session.Run(Ort::RunOptions{nullptr}, &inName, &in, 1, &outName, 1);
-        auto info = out[0].GetTensorTypeAndShapeInfo();
-        auto dims = info.GetShape();
-        if (dims.size() > static_cast<size_t>(jni->GetArrayLength(jout))) {
-            raise(jni, "java/lang/IllegalStateException", "output of more dimensions than expected");
+        return outputOf(jni, out, 0, jout, 0, jni->GetArrayLength(jout));
+    } catch (const std::exception &e) {
+        raise(jni, "java/lang/IllegalStateException", e.what());
+        return nullptr;
+    }
+}
+
+// every output, on int64s: an array of float arrays, their dimensions [rank] each into [jdims]
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_org_fcitx_fcitx5_android_handwriting_OrtModel_nativeRunLongs(
+        JNIEnv *jni, jclass, jlong handle, jlongArray jx, jlongArray jshape, jlongArray jdims, jint rank) {
+    auto *model = reinterpret_cast<Model *>(handle);
+    try {
+        if (model->inputType != ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64) {
+            raise(jni, "java/lang/IllegalArgumentException", "the model takes floats, not int64s");
             return nullptr;
         }
-        std::vector<jlong> d(jni->GetArrayLength(jout), -1);
-        for (size_t i = 0; i < dims.size(); i++) d[i] = dims[i];
-        jni->SetLongArrayRegion(jout, 0, static_cast<jsize>(d.size()), d.data());
-        size_t count = info.GetElementCount();
-        jfloatArray result = jni->NewFloatArray(static_cast<jsize>(count));
-        if (result) jni->SetFloatArrayRegion(result, 0, static_cast<jsize>(count), out[0].GetTensorData<float>());
+        size_t outputs = model->outputs.size();
+        if (rank <= 0 || static_cast<size_t>(jni->GetArrayLength(jdims)) != outputs * static_cast<size_t>(rank)) {
+            raise(jni, "java/lang/IllegalArgumentException", "dimensions not rank for each output");
+            return nullptr;
+        }
+        size_t n;
+        auto shape = shapeOf(jni, jshape, n);
+        if (n != static_cast<size_t>(jni->GetArrayLength(jx))) {
+            raise(jni, "java/lang/IllegalArgumentException", "input size does not match its shape");
+            return nullptr;
+        }
+        std::vector<int64_t> x(n);
+        jni->GetLongArrayRegion(jx, 0, static_cast<jsize>(n), reinterpret_cast<jlong *>(x.data()));
+        auto mem = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
+        auto in = Ort::Value::CreateTensor<int64_t>(mem, x.data(), n, shape.data(), shape.size());
+        const char *inName = model->input.c_str();
+        std::vector<const char *> outNames;
+        for (auto &o: model->outputs) outNames.push_back(o.c_str());
+        auto out = model->session.Run(Ort::RunOptions{nullptr}, &inName, &in, 1, outNames.data(), outputs);
+        jclass floats = jni->FindClass("[F");
+        if (!floats) return nullptr;
+        jobjectArray result = jni->NewObjectArray(static_cast<jsize>(outputs), floats, nullptr);
+        if (!result) return nullptr;
+        for (size_t i = 0; i < outputs; i++) {
+            jfloatArray values = outputOf(jni, out, i, jdims, static_cast<jsize>(i) * rank, rank);
+            if (!values) return nullptr;
+            jni->SetObjectArrayElement(result, static_cast<jsize>(i), values);
+            jni->DeleteLocalRef(values);
+        }
         return result;
     } catch (const std::exception &e) {
         raise(jni, "java/lang/IllegalStateException", e.what());
         return nullptr;
     }
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_org_fcitx_fcitx5_android_handwriting_OrtModel_nativeOutputs(JNIEnv *, jclass, jlong handle) {
+    return static_cast<jint>(reinterpret_cast<Model *>(handle)->outputs.size());
 }
 
 extern "C" JNIEXPORT void JNICALL

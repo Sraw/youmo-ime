@@ -146,4 +146,18 @@ class VoicePolishTest {
         assertArrayEquals(longArrayOf(4, 2, 3, 1, 5), vocab.encode(codePoints("好😀吗")))
         assertArrayEquals(intArrayOf(2, 0), VoicePolishVocab.best(floatArrayOf(0f, 1f, 3f, 5f, -1f, 2f), n = 2, width = 3))
     }
+
+    @Test
+    fun theSpaceBetweenTwoEnglishWordsIsKeptPolished() {
+        val raw = "用 Google Maps 和 3 D 打印"
+        val normed = VoicePolishTags.norm(raw)
+        val spaced = VoicePolishTags.spaces(raw, normed)
+        // before M and D only: a space beside a Chinese character is not one between words
+        assertEquals(listOf("M", "D"), normed.indices.filter { spaced[it] }.map { String(Character.toChars(normed[it])) })
+        val keep = IntArray(normed.size)
+        assertEquals("用Google Maps和3 D打印", tags.apply(normed, keep, keep, spaced))
+        // a word deleted before: no space at the start
+        val op = IntArray(normed.size).also { for (i in 1..6) it[i] = VoicePolishTags.DEL }
+        assertEquals("用Maps和3 D打印", tags.apply(normed, op, keep, spaced))
+    }
 }

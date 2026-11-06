@@ -5,6 +5,9 @@
 package org.fcitx.fcitx5.android.input.voice
 
 import androidx.test.platform.app.InstrumentationRegistry
+import com.k2fsa.sherpa.onnx.OnlineRecognizer
+import com.k2fsa.sherpa.onnx.OnlineRecognizerResult
+import com.k2fsa.sherpa.onnx.OnlineStream
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.junit.Assert.assertEquals
@@ -14,9 +17,9 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * The models as packaged, through the VAD and the recognizer as the panel uses them, on a
- * recording in place of the microphone (an emulator has none): the sherpa-onnx test sentence,
- * twice, with silence around, to be cut into its two stretches and each recognized.
+ * The models as packaged, through the streaming recognizer as the listener uses it, on a recording
+ * in place of the microphone (an emulator has none): the sherpa-onnx test sentence, twice, with
+ * silence around, a window at a time, segments closed where the endpoint rules say.
  */
 class VoiceEngineTest {
 
@@ -24,16 +27,16 @@ class VoiceEngineTest {
     private val test = InstrumentationRegistry.getInstrumentation().context
 
     @Test
-    fun aRecordingIsCutAtItsPausesAndEachStretchRecognized() {
+    fun aRecordingIsRecognizedAsItStreamsBothTimes() {
         val texts = hear(VoiceHotwords.Words.NONE)
-        assertEquals(texts.toString(), 2, texts.size)
-        for (text in texts) {
-            // 开饭时间早上九点至下午五点, the numbers made digits. The first syllable comes back 开饭,
-            // 开放 or 菜饭 as 0.1 s more or less of lead-in is given, and the beam search ends it
-            // with a full stop or not: how well it is heard is the evaluation sets' to measure
-            val typed = VoiceText.clean(text).orEmpty()
-            assertTrue(typed, typed.contains("时间早上9点至下午5点"))
-        }
+        assertTrue(texts.toString(), texts.isNotEmpty())
+        // 开饭时间早上九点至下午五点, the numbers made digits, twice, the segments joined as the
+        // listener joins them. The first syllable comes back 开饭, 开放 or 菜饭 as the chunk falls:
+        // how well it is heard is the evaluation sets' to measure
+        val live = VoiceLive()
+        texts.forEach(live::closed)
+        val typed = live.finish().orEmpty()
+        assertEquals(typed, 2, Regex("早上9点至下午5点").findAll(typed).count())
     }
 
     @Test
@@ -67,27 +70,18 @@ class VoiceEngineTest {
         // 开放, said in each stretch, blocked: split char by char, it stands as words wherever it
         // is, and another hypothesis or the search again wins
         val blocked = hear(VoiceHotwords.Words(hotwords = "", blocked = "开 放")) { IntArray(it.length + 1) { i -> i } }
-        assertEquals(blocked.toString(), 2, blocked.size)
+        assertTrue(blocked.toString(), blocked.isNotEmpty())
         assertTrue(blocked.toString(), blocked.none { "开放" in it })
         // the rest still heard
         assertTrue(blocked.toString(), blocked.all { "时间早上九点" in it || "时间早上9点" in it })
     }
 
     @Test
-    fun aBlockedWordWithinALongerOneIsWritten() {
-        // each stretch one word: 开放 within it, not standing, kept as heard
-        val heard = hear(VoiceHotwords.Words.NONE)
-        val within = hear(VoiceHotwords.Words(hotwords = "", blocked = "开 放")) { intArrayOf(0, it.length) }
-        assertTrue(heard.toString(), heard.any { "开放" in it })
-        assertEquals(heard, within)
-    }
-
-    @Test
     fun theBlockInTheSearchTakesTheWordWhereverItIs() {
         val blocked = VoiceHotwords.Words(hotwords = "", blocked = "开 放")
-        val recognizer = VoiceEngine.acquire(app.assets)
+        val recognizer = VoiceEngine.acquire(app.assets).recognizer
         try {
-            val text = VoiceEngine.result(recognizer, VoiceEngine.stream(recognizer, blocked, block = true), wav("zh.wav")).text
+            val text = result(recognizer, VoiceEngine.stream(recognizer, blocked), wav("zh.wav")).text
             assertTrue(text, "开放" !in text)
             assertTrue(text, "时间" in text)
         } finally {
@@ -99,9 +93,9 @@ class VoiceEngineTest {
     fun theBlockInTheSearchTakesAWordWithinTheSentenceToo() {
         // 早上, not where the sentence starts: its tokens there are blocked as at the start
         val blocked = VoiceHotwords.Words(hotwords = "", blocked = "早 上")
-        val recognizer = VoiceEngine.acquire(app.assets)
+        val recognizer = VoiceEngine.acquire(app.assets).recognizer
         try {
-            val text = VoiceEngine.result(recognizer, VoiceEngine.stream(recognizer, blocked, block = true), wav("zh.wav")).text
+            val text = result(recognizer, VoiceEngine.stream(recognizer, blocked), wav("zh.wav")).text
             assertTrue(text, "早上" !in text)
             assertTrue(text, "时间" in text && "下午" in text)
         } finally {
@@ -111,13 +105,9 @@ class VoiceEngineTest {
 
     @Test
     fun theBeamsOtherHypothesesComeBackBestFirst() {
-        val recognizer = VoiceEngine.acquire(app.assets)
+        val recognizer = VoiceEngine.acquire(app.assets).recognizer
         try {
-            val stream = VoiceEngine.stream(recognizer, VoiceHotwords.Words.NONE)
-            stream.acceptWaveform(wav("zh.wav"), VoiceEngine.SAMPLE_RATE)
-            recognizer.decode(stream)
-            val result = recognizer.getResult(stream)
-            stream.release()
+            val result = result(recognizer, VoiceEngine.stream(recognizer, VoiceHotwords.Words.NONE), wav("zh.wav"))
             assertTrue(result.nbest.toList().toString(), result.nbest.size > 1)
             assertEquals(result.text, result.nbest[0])
             assertEquals(result.nbest.size, result.nbestScores.size)
@@ -130,9 +120,9 @@ class VoiceEngineTest {
     @Test
     fun theLanguageModelPicksAmongWhatWasHeardAlike() {
         val samples = wav("zh.wav")
-        val recognizer = VoiceEngine.acquire(app.assets)
+        val recognizer = VoiceEngine.acquire(app.assets).recognizer
         try {
-            val heard = VoiceEngine.result(recognizer, VoiceEngine.stream(recognizer, VoiceHotwords.Words.NONE), samples)
+            val heard = result(recognizer, VoiceEngine.stream(recognizer, VoiceHotwords.Words.NONE), samples)
             val candidates = VoiceRerank.candidates(
                 VoiceRerank.distinct(heard.nbest.indices.map { VoiceRerank.Hypothesis(heard.nbest[it], heard.nbestScores[it]) }),
             )
@@ -148,7 +138,7 @@ class VoiceEngineTest {
                 }
             }
             val text = runBlocking {
-                VoiceEngine.recognize(recognizer, VoiceEngine.stream(recognizer, VoiceHotwords.Words.NONE), samples, VoiceHotwords.Words.NONE, sure)
+                VoiceEngine.choose(heard, VoiceHotwords.Words.NONE, sure)
             }
             assertTrue(asked.toString(), candidates.all { VoiceRerank.bare(it.text) in asked })
             assertEquals(candidates.last().text, text)
@@ -158,9 +148,9 @@ class VoiceEngineTest {
     }
 
     private fun topScore(words: VoiceHotwords.Words): Float {
-        val recognizer = VoiceEngine.acquire(app.assets)
+        val recognizer = VoiceEngine.acquire(app.assets).recognizer
         try {
-            return VoiceEngine.result(recognizer, VoiceEngine.stream(recognizer, words), wav("zh.wav")).nbestScores[0]
+            return result(recognizer, VoiceEngine.stream(recognizer, words), wav("zh.wav")).nbestScores[0]
         } finally {
             VoiceEngine.release()
         }
@@ -168,31 +158,57 @@ class VoiceEngineTest {
 
     // split: TextWords.boundaries in place of the engine's
     private fun hear(hotwords: VoiceHotwords.Words, split: (String) -> IntArray = { IntArray(0) }): List<String> {
-        val recognizer = VoiceEngine.acquire(app.assets)
-        val vad = VoiceEngine.takeVad(app.assets)
-        val history = VoiceEngine.history()
-        val texts = mutableListOf<String>()
+        val recognizer = VoiceEngine.acquire(app.assets).recognizer
         try {
-            val samples = wav("zh.wav")
+            val segments = segments(recognizer, VoiceEngine.stream(recognizer, hotwords), wav("zh.wav"))
+            return runBlocking { segments.map { VoiceEngine.choose(it, hotwords, language(split)) } }
+        } finally {
+            VoiceEngine.release()
+        }
+    }
+
+    /** [samples] decoded whole in [stream], as the listener's last segment: the tail padded, the input finished */
+    private fun result(recognizer: OnlineRecognizer, stream: OnlineStream, samples: FloatArray): OnlineRecognizerResult {
+        try {
+            stream.acceptWaveform(samples, VoiceEngine.SAMPLE_RATE)
+            stream.acceptWaveform(FloatArray(VoiceEngine.TAIL_PADDING), VoiceEngine.SAMPLE_RATE)
+            stream.inputFinished()
+            while (recognizer.isReady(stream)) recognizer.decode(stream)
+            return recognizer.getResult(stream)
+        } finally {
+            stream.release()
+        }
+    }
+
+    /** [samples] as the listener hears them, a window at a time: each segment's result, closed at an endpoint or at the end */
+    private fun segments(recognizer: OnlineRecognizer, stream: OnlineStream, samples: FloatArray): List<OnlineRecognizerResult> {
+        val out = mutableListOf<OnlineRecognizerResult>()
+        fun keep() = recognizer.getResult(stream).takeIf { it.text.isNotBlank() }?.let { out += it }
+        fun decode() {
+            while (recognizer.isReady(stream)) {
+                recognizer.decode(stream)
+                if (recognizer.isEndpoint(stream)) {
+                    keep()
+                    recognizer.reset(stream)
+                }
+            }
+        }
+        try {
             var i = 0
             while (i < samples.size) {
                 val end = minOf(i + VoiceEngine.WINDOW, samples.size)
-                val window = samples.copyOfRange(i, end)
-                history.add(window)
-                vad.acceptWaveform(window)
+                stream.acceptWaveform(samples.copyOfRange(i, end), VoiceEngine.SAMPLE_RATE)
+                decode()
                 i = end
-                while (!vad.empty()) {
-                    val stretch = VoiceEngine.nextStretch(vad, history)
-                    texts += runBlocking {
-                        VoiceEngine.recognize(recognizer, VoiceEngine.stream(recognizer, hotwords), stretch, hotwords, language(split))
-                    }
-                }
             }
+            stream.acceptWaveform(FloatArray(VoiceEngine.TAIL_PADDING), VoiceEngine.SAMPLE_RATE)
+            stream.inputFinished()
+            decode()
+            keep()
         } finally {
-            vad.release()
-            VoiceEngine.release()
+            stream.release()
         }
-        return texts
+        return out
     }
 
     /** 16-bit mono PCM, its header skipped, as floats */

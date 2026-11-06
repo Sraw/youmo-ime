@@ -38,6 +38,20 @@ class EditorInfoTraitsTest {
     }
 
     @Test
+    fun aMessageFieldSendsAndTakesLinesAsItSays() {
+        // what VoiceEnd reads to tell a chat from a one-line field
+        val chat = info { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE; imeOptions = EditorInfo.IME_ACTION_SEND }
+        assertTrue(chat.sends)
+        assertTrue(chat.isMultiLine)
+        assertTrue(info { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_IME_MULTI_LINE }.isMultiLine)
+        assertTrue(info { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_SHORT_MESSAGE }.isShortMessage)
+        // its own labelled action, a send
+        assertTrue(info { inputType = InputType.TYPE_CLASS_TEXT; actionLabel = "发送"; actionId = EditorInfo.IME_ACTION_SEND }.sends)
+        // a number takes no lines, whatever its flags say
+        assertFalse(info { inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_TEXT_FLAG_MULTI_LINE }.isMultiLine)
+    }
+
+    @Test
     fun typeNullIsRawKeyInputWhateverTheFlags() {
         assertTrue(info { inputType = InputType.TYPE_NULL or InputType.TYPE_TEXT_FLAG_MULTI_LINE }.isRawKeyInput)
         assertFalse(info { inputType = InputType.TYPE_CLASS_NUMBER }.isRawKeyInput)

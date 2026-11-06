@@ -744,18 +744,44 @@ in CI keeps the voice source set compiling.
   (the user's rule), back to 正在听 at the first sound.
 - The cue's vibration and the voice ticks go through `VoiceStyle.vibrate` → `InputFeedbacks.hapticFeedback`, so
   they follow 按键时振动, its length and strength.
-- The microphone is read from the moment it opens, never waiting on the models: the VAD is built beside the
-  reading (`VoiceEngine.takeVad`, a spare made ahead in a lock-free `VoiceSpare`; the voice key shown makes one,
-  `letGo` frees it, and so does `letGoSpare` `KEEP_MS` (2 min) after the last show with no use), and what is read before it is in waits in `VoiceBacklog`, handed over in order. The handoff
-  (held until the VAD, fed in order, dropped on a close, a late VAD still fed on a lift or cut, stretch
-  starts shifted by what the backlog dropped) is `VoiceVadHandoff` in ime-core, tested there. The
-  recognizer's load holds `VoiceEngine.lock`; the spare once shared it and 准备中 lasted the whole load.
+- The microphone is read from the moment it opens, never waiting on the models: what it reads goes into an
+  unbounded channel in order, and the recognizer's coroutine (`Dispatchers.Default.limitedParallelism(1)`)
+  takes it once `VoiceEngine.acquire` is done. The recognizer's load holds `VoiceEngine.lock`; the models stay
+  `KEEP_MS` (2 min) after the last listener lets go.
 - The record's buffer is 2 s (`VoiceCaptureEnd`'s backlog cap follows it), the least the HAL takes as a last try.
-  If the HAL refuses the 2 s buffer and falls back to its minimum, the backlog fed when the VAD arrives (up to
-  several seconds, synchronously on the capture thread) can outlast the buffer; audio read meanwhile is lost.
-  Only on that fallback path; accepted rather than feeding in chunks between reads.
-- Debug lines the UAT parses: `voice ready: fromStartMs=` (start() to the first sample not zero) and
-  `voice speech started` (the VAD's onset, VO-23's lift cue).
+- Debug line the UAT parses: `voice ready: fromStartMs=` (start() to the first sample not zero).
+
+### Voice: streaming, the segments and the polish
+
+- One `OnlineRecognizer` (sherpa-onnx's streaming zipformer transducer, chunk 1920 ms, modified beam search 16,
+  n-best) decodes as the audio comes; no VAD. Its endpoint rules (sherpa's defaults: 2.4 s of silence before
+  anything, 1.4 s after something, 20 s at most) close a segment: `VoiceEngine.choose` picks its text among the
+  n-best (`VoiceChoice`, the pinyin engine's model), and the stream is reset. The user's blocked words are in the
+  search graph (`createStream(hotwords, blocked)`), not searched again. After the microphone closes, 2.92 s of
+  zeros pad the tail (`TAIL_PADDING`: a chunk and its right context, else the last words wait for a chunk that
+  never comes) and the input is finished. Why endpoints and not the VAD: measured on six sets
+  (`voice-eval/seg_app.py`, `ENDPOINTS=1`, 060-voice-tagger.md), endpoint segments are as good after the polish
+  (written CER within ±0.5 points either way) and it is one model less.
+- `VoiceLive` (ime-core) keeps the closed segments and the one being said: joined with 「，」 where neither has a
+  mark, a space between English words, and a segment that starts with a mark (the recognizer's context
+  outliving the reset) ends the one before with it. 语音整理 on (`keyboard.voicePolish`, default on), its
+  `VoicePolishStream` (K = 16, window 64) runs the polish tagger (`VoicePolisher`: ELECTRA-small int8 through
+  `OrtModel.runLongs`, `voice/polish-tagger.ort` + `.json`) on the text as it grows, freezing what is 16 characters
+  behind; `VoiceText.clean` (numbers, spaces) runs after it. A tagger that fails to load leaves voice on without it.
+- What is heard so far is the field's composing text (`FcitxInputMethodService.composeVoice`): voice's text is the
+  text itself, as English's word (pitfalls.md). Not in a password field, a raw-key (`TYPE_NULL`) one, nor when the
+  field composes a word of fcitx's when the hold starts (only the card or the panel shows it then), nor over a
+  preedit of fcitx's come meanwhile. It is `EditingSession.provisional`: the commit, through fcitx (`CommitAction`),
+  replaces it, never finished in place first (`commitAndReset`'s `FinishComposing`, the input methods not Chinese:
+  finished, it was typed twice), and fcitx's empty preedit (its reset) leaves it; the cursor leaving it (a tap in
+  the field, an app's edit) takes it away, the cursor where it went, and the next text heard composes there; input
+  finishing in the field takes it away before its connection goes; a drop, a give-up or nothing to type takes it
+  away, in the same field only.
+- The end mark: `VoiceEnd` (ime-core) by the field (`EditorTraits.sends`, `isMultiLine`, `isShortMessage`, a chat
+  app's multi-line field) and 语音句末句号 (`keyboard.voiceEndMark`): a one-line field takes no end mark, a chat no
+  「。」, anything else as said. Applied at the commit only; the composing text shows it as said.
+- Debug line at the recognizer's end: `voice segments: speechStart=` (the first token's frame, from the opening)
+  `segments=` (closed with something in them), for the UAT's lift offset (VO-23/24).
 
 ### Voice: the tail after the lift and the gain
 
@@ -785,16 +811,16 @@ in CI keeps the voice source set compiling.
   commits before `end` for this). Backspace acts at once. The space card covers the keys, so there any
   press only ends the tail and counts for nothing (VO-25, unchanged by owner decision 2026-10-26).
 - **Gain**: `VoiceGain` (ime-core), one per microphone opening, on each window after `read()` and
-  before `AudioHistory`, the VAD and the level bar, so all of them hear the same. Level: the 3rd
+  before the recognizer and the level bar, so both hear the same. Level: the 3rd
   loudest window RMS of the last 31 (~1 s), the first 3 windows left out; env falls at most 3 dB/s;
   gain clamp(−30 − env, 0, +20) dB, held so a window's peak stays under 0.99; rises ramp across the
   window. Normal speech passes unchanged, but for its first two windows (~64 ms) after a quiet
   stretch, lifted up to the peak limit until the 3rd loudest catches up. Why: VOICE_RECOGNITION has no AGC (CDD 5.4.2), soft speech comes in at −50 to −60 dBFS where
-  silero does not fire; at −26 dB CER 30.87% → 7.17%, no-result 15% → 0, noise 3·2·1·1 of 159.
+  silero (the VAD before 0.6.0) did not fire; at −26 dB CER 30.87% → 7.17%, no-result 15% → 0, noise 3·2·1·1 of 159.
   It is tailquiet's `Gain2` sample for sample (`VoiceGainTest`'s golden sample, ≤ 1e-5; its generator, with Gain2 copied in, is
   `lib/ime-core/src/test/resources/voice/gain_golden.py`, and each parameter changed alone changes it). Debug
-  builds log one line of numbers at the close (`voice capture:` liftFrame, stopAt, read,
-  segment.start, segments (stretches cut), envPeak, peakGainDb: the gain where env peaked) for the UAT (uat/12 VO-23/24/25).
+  builds log one line of numbers at the close (`voice capture:` liftFrame, stopAt, read, envPeak,
+  peakGainDb: the gain where env peaked) for the UAT (uat/12 VO-23/24/25), with `voice segments:` above.
 
 ## Strings and languages
 
