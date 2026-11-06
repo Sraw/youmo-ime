@@ -21,6 +21,15 @@ table, quick phrase tables, `charselectdata`) are in `app/src/main/host-assets/p
 tables fetch upstream fcitx5 442edbc9 and chinese-addons 0d3fd040 by `lib/ime-core/tools/upstream.sh`
 (GitHub tarballs, SHA-256 pinned, cached).
 
+`lib/keyboard-scene` is Kotlin Multiplatform, its JS tests run in node. Kotlin/JS downloads Node.js
+itself; the repository's repositories are set in `settings.gradle.kts` only (`FAIL_ON_PROJECT_REPOS`),
+so nodejs.org is declared there as an ivy repository for `org.nodejs:node` alone, the root build
+turns off the plugin's own repository (`downloadBaseUrl` null), and node's archives are in
+`gradle/verification-metadata.xml` (darwin and linux, arm64 and x64: add a platform's hash there to
+run the JS tests on it). npm, not yarn (`kotlin.js.yarn=false`), and its test packages (mocha and
+friends) are pinned with their integrity hashes by `kotlin-js-store/package-lock.json`. The root
+build applies `base` because the Kotlin/JS plugin wants the root's `clean`.
+
 Memory: compiling the pinyin data alone is ~4 GB resident (3.6 GB measured, in a JVM of its own;
 BUILDING.md's 5 GB counts the Gradle daemon beside it) and three table compiles run at once
 (1 GB each). The repository sets

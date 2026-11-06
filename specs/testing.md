@@ -9,6 +9,7 @@ compiled is not done.
 | Layer | Where | Run | For |
 |---|---|---|---|
 | ime-core unit tests | `lib/ime-core/src/test` | `./gradlew :lib:ime-core:check` (tests + animal-sniffer + Kover floors) | every decision and the whole engine; milliseconds each |
+| Drawing engine tests | `lib/keyboard-scene/src/commonTest` | `./gradlew :lib:keyboard-scene:check` (the same tests on the JVM and in node, animal-sniffer, Kover floors 90/60) | parsing, cascade, placement, hit, marks; scene snapshots in `src/commonTest/data/snapshots`, written by `jvmTest -Psnapshots.record=true` and compared on both targets, so JVM and JS must agree |
 | App JVM tests | `app/src/test` | `./gradlew :app:testTextDebugUnitTest` | glue that needs Android types: Robolectric where the framework is reached |
 | App JVM tests at minSdk | `app/src/test` | `./gradlew :app:testTextDebugUnitTestAt29` | the same tests at SDK 29, Android 10, which must keep working (below) |
 | Engine UAT replay | `lib/ime-eval/src/uatTest` | `./gradlew :lib:ime-eval:uatTest` (not in `check`) | the uat/ cases whose 预期 is what the engine types, through `Engines` with the app's own data: needs `:app`'s data tasks (minutes the first time), and a 2 GB heap; no network (its named keys are held to the host's `KeySyms`, which `KeySymsGoldenTest` holds to fcitx) |
