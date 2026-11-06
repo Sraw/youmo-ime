@@ -199,16 +199,15 @@ internal object VoicePostRun {
         source: String,
         misses: String?,
         out: Appendable,
-        layers: VoicePost.Layers = VoicePost.Layers(),
         texts: String? = null,
     ): Int {
         misses?.let { File(it).bufferedWriter() }.use { m ->
-            texts?.let { File(it).bufferedWriter() }.use { t -> run(paths, source, m, t, out, layers) }
+            texts?.let { File(it).bufferedWriter() }.use { t -> run(paths, source, m, t, out) }
         }
         return 0
     }
 
-    private fun run(paths: List<String>, source: String, missed: Appendable?, texts: Appendable?, out: Appendable, layers: VoicePost.Layers) {
+    private fun run(paths: List<String>, source: String, missed: Appendable?, texts: Appendable?, out: Appendable) {
         val all = Score()
         missed?.appendLine("set\twav\tref\thyp")
         texts?.appendLine("set\twav\tref\thyp")
@@ -222,7 +221,7 @@ internal object VoicePostRun {
             val scored = if (clips.any { it.written }) clips.filter { it.written } else clips
             score.unwritten = clips.size - scored.size
             for (clip in scored) {
-                val hyp = VoicePost.text(clip.stretches, layers)
+                val hyp = VoicePost.text(clip.stretches)
                 score.stretches += clip.stretches.size
                 val before = score.writtenErrors
                 score(clip.ref, hyp, score)

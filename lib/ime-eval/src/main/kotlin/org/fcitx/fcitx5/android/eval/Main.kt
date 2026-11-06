@@ -44,7 +44,6 @@ import org.fcitx.fcitx5.android.engine.user.LearningUse
 import org.fcitx.fcitx5.android.engine.user.WordPack
 import org.fcitx.fcitx5.android.eval.parity.PARITY_COMMANDS
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
-import org.fcitx.fcitx5.android.input.voice.VoicePost
 import java.io.File
 import java.io.RandomAccessFile
 import java.nio.channels.FileChannel
@@ -194,19 +193,13 @@ internal val COMMANDS = listOf(
         sentences(dataPath, setPath, outPath, RunOptions(args.options))
     },
     // the voice post-processing on voice-eval's recorded stretches (seg_app.py), no recognizer: dev/design/060-voice-post.md §5
-    Command("voice-post", "<seg-set.jsonl>... [--source app|top] [--without tidy,commands] [--misses <out.tsv>] [--texts <out.tsv>]", 1..Int.MAX_VALUE, "source", "without", "misses", "texts") { args, out, err ->
+    Command("voice-post", "<seg-set.jsonl>... [--source app|top] [--misses <out.tsv>] [--texts <out.tsv>]", 1..Int.MAX_VALUE, "source", "misses", "texts") { args, out, err ->
         val source = args.options["source"] ?: "app"
         if (source !in setOf("app", "top")) {
             err.appendLine("voice-post: --source app or top, not $source")
             return@Command null
         }
-        val without = args.options["without"]?.split(',')?.toSet().orEmpty()
-        if (!LAYERS.containsAll(without)) {
-            err.appendLine("voice-post: --without one or more of ${LAYERS.joinToString(",")}, not ${args.options["without"]}")
-            return@Command null
-        }
-        val layers = VoicePost.Layers(tidy = "tidy" !in without, commands = "commands" !in without)
-        VoicePostRun.run(args.operands, source, args.options["misses"], out, layers, args.options["texts"])
+        VoicePostRun.run(args.operands, source, args.options["misses"], out, args.options["texts"])
     },
     Command("lm", "<model.safetensors> <context> <text>...", 3..Int.MAX_VALUE) { args, out, _ ->
         val (modelPath, context) = args.operands
@@ -932,9 +925,6 @@ private fun tableHomographs(dataPath: String, setPath: String, preset: String, p
 }
 
 private val ON_OFF = setOf("on", "off")
-
-// what `voice-post --without` turns off
-private val LAYERS = setOf("tidy", "commands")
 
 // about 2,000 of 五笔's 100,000 entries
 private const val ENTRY_STEP = 50
