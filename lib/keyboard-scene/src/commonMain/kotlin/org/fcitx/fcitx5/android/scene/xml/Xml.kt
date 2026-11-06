@@ -7,7 +7,7 @@ package org.fcitx.fcitx5.android.scene.xml
 import org.fcitx.fcitx5.android.scene.Parsed
 
 /**
- * An element as read: its [name] without a namespace prefix, its [attributes] in the order written
+ * An element as read: its [name] (never prefixed: such an element is refused), its [attributes] in the order written
  * (prefixed ones, `xmlns` among them, kept as written), its [children] and the [line] it starts on.
  */
 class XmlElement(
@@ -126,10 +126,12 @@ private class Reader(private val s: String) {
         val startLine = line
         advance(1)
         val qName = name()
+        // the files are in one namespace, the default one: a prefixed element (l:key) is another's, or one not declared
+        if (':' in qName) fail("<$qName>: an element with a prefix (write the namespace as xmlns=)")
         val attributes = attributes(qName)
         if (at("/>")) {
             advance(2)
-            return XmlElement(qName.local(), attributes, emptyList(), "", startLine)
+            return XmlElement(qName, attributes, emptyList(), "", startLine)
         }
         if (!at(">")) fail("'>' expected in <$qName>")
         advance(1)
@@ -145,7 +147,7 @@ private class Reader(private val s: String) {
                     skipSpace()
                     if (!at(">")) fail("'>' expected in </$qName>")
                     advance(1)
-                    return XmlElement(qName.local(), attributes, children, text.toString(), startLine)
+                    return XmlElement(qName, attributes, children, text.toString(), startLine)
                 }
                 at("<!--") -> comment()
                 at("<![CDATA[") -> fail("CDATA is not allowed")
@@ -227,7 +229,6 @@ private class Reader(private val s: String) {
         return charArrayOf((HIGH_SURROGATE + (v shr TEN_BITS)).toChar(), (LOW_SURROGATE + (v and LOW_MASK)).toChar()).concatToString()
     }
 
-    private fun String.local(): String = substringAfter(':')
 
     private companion object {
         val PREDEFINED = mapOf("lt" to "<", "gt" to ">", "amp" to "&", "quot" to "\"", "apos" to "'")
@@ -249,7 +250,7 @@ private class Reader(private val s: String) {
 private fun Char.isXmlSpace(): Boolean = this == ' ' || this == '\n' || this == '\t' || this == '\r'
 
 // names are ASCII: what Unicode calls a letter the JVM's and JS's tables may not agree on, and no name here needs one.
-// `:` for a namespace's prefix (xmlns:xsi), which is dropped
+// `:` for an attribute's namespace prefix (xmlns:xsi, xsi:schemaLocation); an element's is refused
 private fun Char.isNameStart(): Boolean = this in 'a'..'z' || this in 'A'..'Z' || this == '_' || this == ':'
 
 private fun Char.isNameChar(): Boolean = isNameStart() || this in '0'..'9' || this == '-' || this == '.'

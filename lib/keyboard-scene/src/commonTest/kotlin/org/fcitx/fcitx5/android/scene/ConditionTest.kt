@@ -54,10 +54,12 @@ class ConditionTest {
             input = Input(roots = true, voice = true, holdVoice = true, langKey = true, composing = true, lookingUp = true),
         )
         for (flag in Condition.FLAGS) {
-            // one thumb's keyboard is only while the letters do not split (SplitKeyboard.placement)
-            assertTrue(holds(flag, if (flag == "one-handed") all.copy(split = false) else all), flag)
+            // one thumb's keyboard is only while the letters do not split (SplitKeyboard.placement), nor float
+            assertTrue(holds(flag, if (flag == "one-handed") all.copy(split = false, floating = null) else all), flag)
             assertFalse(holds(flag, env.copy(input = Input(langKey = false))), flag)
         }
+        // a floating keyboard is never one-handed: it is placed by its own (FloatingKeyboard)
+        assertFalse(holds("one-handed", env.copy(oneHanded = SplitKeyboard.Dock.LEFT, floating = 0.85)))
         assertTrue(holds("shifted", env.copy(shift = Shift.Once)))
         assertFalse(holds("caps-lock", env.copy(shift = Shift.Once)))
     }

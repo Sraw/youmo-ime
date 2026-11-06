@@ -55,9 +55,9 @@ class Attributes(private val element: XmlElement, private val problems: Problems
         raw.takeIf(WHOLE::matches)?.toIntOrNull()?.takeIf { it > 0 }
     }
 
-    /** Notes every attribute not asked for, but namespace declarations. */
+    /** Notes every attribute not asked for, but namespace declarations and XML Schema's (xsi:schemaLocation: an editor's). */
     fun done() {
-        element.attributes.keys.filter { it !in asked && it != "xmlns" && !it.startsWith("xmlns:") }
+        element.attributes.keys.filter { it !in asked && it != "xmlns" && !it.startsWith("xmlns:") && !it.startsWith("xsi:") }
             .forEach { problem("unknown attribute $it=") }
     }
 

@@ -97,6 +97,24 @@ class LayoutReaderTest {
         assertNull(LayoutReader.action("launch:rockets"))
         val p = problems(board("<row><key id=\"a\" label=\"a\" send=\"launch:rockets\"/></row>"))
         assertTrue(p.single().contains("send="), "$p")
+        // review L-2: one character, `:` too, is a key the input method is sent (HostKeyAction)
+        assertEquals(":", LayoutReader.action(":"))
+        assertNull(LayoutReader.action("::"))
+        // the placeholders P2 settles, each by name: no action:anything
+        assertEquals("action:tone-5", LayoutReader.action("action:tone-5"))
+        assertEquals("action:zhuyin-slot", LayoutReader.action("action:zhuyin-slot"))
+        assertNull(LayoutReader.action("action:tone"))
+        assertNull(LayoutReader.action("action:tone-6"))
+        assertNull(LayoutReader.action("action:anything"))
+    }
+
+    // review L-7: a board split in halves has no one side; asking which is refused until it means something
+    @Test
+    fun splitSideIsRefusedOnABoardSplitInHalves() {
+        val asks = "<row><key id=\"a\" label=\"a\" send=\"commit:a\" when=\"split-side=left\"/></row>"
+        val p = problems(board(asks, " on-split=\"split\""))
+        assertTrue(p.single().contains("not supported yet"), "$p")
+        assertEquals(emptyList(), problems(board(asks)))
     }
 
     @Test

@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.scene
 
+import org.fcitx.fcitx5.android.scene.layout.MenuItem
+import org.fcitx.fcitx5.android.scene.layout.Popup
 import org.fcitx.fcitx5.android.scene.theme.Argb
 
 /**
@@ -62,6 +64,11 @@ enum class KeyState(val xml: String) {
  * [shape] is its face's; [bounds] its cell (where a popup is placed, a screen reader's box); [hit]
  * where a finger counts as on it, gaps between keys and a row's blank ends included; [anchor] its
  * middle for glide typing and popups; [up] the way a swipe up goes (a unit vector, the screen's up).
+ *
+ * What the app needs to work it, so it never goes back to the layout: [label] and [alt] as shown (the
+ * bindings read; null where there is none), [altRaw] the alt as written (`{punct:~}`), its long
+ * press's [popup] as written (null: PopupPreset's by its label and send; [Scene.popups] off: none at
+ * all) and [menu], the [sound] it clicks with, the [shortcut] its swipes' symbols are kept under.
  */
 class KeyNode(
     val id: String,
@@ -79,6 +86,13 @@ class KeyNode(
     val faces: Map<Set<KeyState>, List<Op>>,
     val a11y: String,
     val actions: Map<String, String>,
+    val label: String? = null,
+    val alt: String? = null,
+    val altRaw: String? = null,
+    val popup: Popup? = null,
+    val menu: List<MenuItem> = emptyList(),
+    val sound: String = "standard",
+    val shortcut: String? = null,
 ) {
     /** What a backend draws for it: [faces] in its [states], pressed or not. */
     fun ops(pressed: Boolean): List<Op> = faces.getValue(if (pressed) states + KeyState.Pressed else states)

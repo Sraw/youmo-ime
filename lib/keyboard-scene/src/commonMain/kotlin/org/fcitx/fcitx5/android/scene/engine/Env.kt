@@ -50,9 +50,9 @@ data class Env(
     /** The keyboard's width in dp as Android's configuration has it (a whole number, rounded down). */
     val widthDp: Int get() = (width / density + DP_EPSILON).toInt()
 
-    /** Whether a board one-handed goes to a side here ([oneHanded] on, not split, room beside it: rules D §2). */
+    /** Whether a board one-handed goes to a side here ([oneHanded] on, not split, not floating, room beside it: rules D §2). */
     val isOneHanded: Boolean
-        get() = !split && SplitKeyboard.placement(oneHanded, dock, false, true, widthDp) != null
+        get() = floating == null && !split && SplitKeyboard.placement(oneHanded, dock, false, true, widthDp) != null
 
     /** The theme's scene prefixes this environment is in. */
     val scenes: Set<String>

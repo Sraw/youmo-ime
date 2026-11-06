@@ -12,7 +12,9 @@ import kotlin.math.roundToLong
  * order, numbers in px to a hundredth, written by this code and not the platform's (a Double prints
  * differently on the JVM and in JS; these lines are the same on both, which the snapshot test holds
  * them to). A key's pressed drawing is written as what it changes of its unpressed one: `+i op` put
- * in at i, `-i op` taken out from i (a shortest such list; most keys only gain a layer).
+ * in at i, `-i op` taken out from i (a shortest such list; most keys only gain a layer). Before its
+ * drawing, what the app works it by: `text` (label, alt, the alt as written where that differs), its
+ * sound and shortcut, its `popup` and `menu` as the layout wrote them.
  */
 object SceneText {
 
@@ -42,6 +44,7 @@ object SceneText {
         appendLine("  hit ${shape(k.hit)}")
         appendLine("  anchor ${n(k.anchor.x)},${n(k.anchor.y)} up ${n(k.up.x)},${n(k.up.y)}")
         if (k.actions.isNotEmpty()) appendLine("  actions ${k.actions.entries.sortedBy { it.key }.joinToString(" ") { "${it.key}=${q(it.value)}" }}")
+        interaction(k)
         val normal = k.ops(pressed = false)
         appendLine("  normal")
         normal.forEach { appendLine("    ${op(it)}") }
@@ -52,6 +55,24 @@ object SceneText {
             appendLine("  pressed")
             diff(normal.map(::op), pressed.map(::op)).forEach { appendLine("    $it") }
         }
+    }
+
+    // what the app works the key by: its texts as shown, its sound and shortcut, its long press as written
+    private fun StringBuilder.interaction(k: KeyNode) {
+        val texts = listOfNotNull(
+            k.label?.let { "label=${q(it)}" },
+            k.alt?.let { "alt=${q(it)}" },
+            k.altRaw?.takeIf { it != k.alt }?.let { "alt-raw=${q(it)}" },
+        )
+        if (texts.isNotEmpty()) appendLine("  text ${texts.joinToString(" ")}")
+        val how = listOfNotNull(k.sound.takeIf { it != "standard" }?.let { "sound=$it" }, k.shortcut?.let { "shortcut=${q(it)}" })
+        if (how.isNotEmpty()) appendLine("  ${how.joinToString(" ")}")
+        k.popup?.let { p ->
+            val options = p.options.entries.sortedBy { it.key }.joinToString("") { " ${it.key}=${q(it.value)}" }
+            appendLine("  popup from=${p.from}${p.preset?.let { " preset=${q(it)}" }.orEmpty()}$options")
+            p.items.forEach { (text, send) -> appendLine("    item ${q(text)}${send?.let { " send=${q(it)}" }.orEmpty()}") }
+        }
+        k.menu.forEach { appendLine("  menu ${q(it.label)}${it.icon?.let { i -> " icon=$i" }.orEmpty()} do=${q(it.action)}") }
     }
 
     /** [b] as [a] changed: `-i` lines of [a] taken out, `+i` lines of [b] put in (by a longest common run). */

@@ -46,7 +46,8 @@ object FakeMeasurer : TextMeasurer {
 object Fixtures {
     const val DENSITY = 2.625
 
-    val qwerty: Layout by lazy { LayoutReader.layout(testData("qwerty.xml")).ok() }
+    val qwertySource: String by lazy { testData("qwerty.xml") }
+    val qwerty: Layout by lazy { LayoutReader.layout(qwertySource).ok() }
     val materialLight: Theme by lazy { ThemeReader.theme(testData("material-light.xml")).ok() }
 
     private val texts = Texts(imeName = "拼音", returnLabel = "换行", returnIcon = "enter")

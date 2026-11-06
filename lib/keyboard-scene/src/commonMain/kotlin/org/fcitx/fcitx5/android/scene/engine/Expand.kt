@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.scene.engine
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Problems
+import org.fcitx.fcitx5.android.scene.layout.Condition
 import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Gap
 import org.fcitx.fcitx5.android.scene.layout.Include
@@ -44,6 +45,8 @@ class ExpandedKey(
     val icon: String?,
     val badge: String?,
     val a11y: String,
+    /** [alt] as the layout wrote it, a binding unread (`{punct:~}`): what the app offers in a long press. */
+    val altRaw: String? = null,
 ) : Item {
     override val width: Width get() = attrs.width ?: Width.Units(1.0)
     override val rows: Int get() = attrs.rows ?: 1
@@ -67,20 +70,27 @@ class ExpandedSlot(val slot: Slot) : Item {
  */
 object Expand {
 
-    fun rows(layout: Layout, fragments: Map<String, Fragment>, env: Env): Parsed<List<ExpandedRow>> {
+    /**
+     * [splitSide]: the side a board split goes to (`left`, `right`), which `split-side` asks; null
+     * where it is not split to a side (a board split in halves has both: LayoutReader refuses it there).
+     */
+    fun rows(layout: Layout, fragments: Map<String, Fragment>, env: Env, splitSide: String? = null): Parsed<List<ExpandedRow>> {
         val p = Problems()
-        val facts = env.facts
+        val all = env.facts
+        val facts = Condition.Facts { name, values ->
+            if (name == "split-side") splitSide != null && (values == null || splitSide in values) else all.has(name, values)
+        }
         val out = ArrayList<ExpandedRow>()
         for (part in layout.parts) {
             when (part) {
-                is Row -> if (part.condition?.holds(facts) != false) row(part, layout.defaults, env, p)?.let(out::add)
+                is Row -> if (part.condition?.holds(facts) != false) row(part, layout.defaults, env, facts, p)?.let(out::add)
                 is Include -> if (part.condition?.holds(facts) != false) {
                     val fragment = fragments[part.src]
                     if (fragment == null) {
                         p.add(part.line, "<include src=\"${part.src}\">: no such fragment")
                     } else {
                         val defaults = fragment.defaults.over(layout.defaults)
-                        fragment.rows.filter { it.condition?.holds(facts) != false }.mapNotNullTo(out) { row(it, defaults, env, p) }
+                        fragment.rows.filter { it.condition?.holds(facts) != false }.mapNotNullTo(out) { row(it, defaults, env, facts, p) }
                     }
                 }
             }
@@ -93,9 +103,8 @@ object Expand {
         return p.result { out }
     }
 
-    private fun row(row: Row, fileDefaults: KeyAttrs, env: Env, p: Problems): ExpandedRow? {
+    private fun row(row: Row, fileDefaults: KeyAttrs, env: Env, facts: Condition.Facts, p: Problems): ExpandedRow? {
         val defaults = row.defaults.over(fileDefaults)
-        val facts = env.facts
         val items = row.cells.filter { it.condition?.holds(facts) != false }.map { cell ->
             when (cell) {
                 is Key -> {
@@ -115,13 +124,36 @@ object Expand {
 
     private fun key(key: Key, attrs: KeyAttrs, env: Env): ExpandedKey {
         val label = attrs.label?.let { text(it, env) }
+        val alt = attrs.alt?.let { text(it, env) }?.takeIf { it.isNotEmpty() }
         return ExpandedKey(
-            key, attrs, label,
-            attrs.alt?.let { text(it, env) }?.takeIf { it.isNotEmpty() },
+            key, attrs, label, alt,
             attrs.icon?.let { icon(it, env) },
             attrs.badge?.let { icon(it, env) },
-            attrs.a11y?.let { text(it, env) } ?: label.orEmpty(),
+            attrs.a11y?.let { text(it, env) } ?: spoken(label, alt),
+            attrs.alt?.let(::written),
         )
+    }
+
+    /**
+     * What a screen reader says of a key the layout gives no a11y: its label, spelt out where it is
+     * letters (a group's `QW` as "Q W", `L;` as "L ;", as TalkBack read the old group keys), then its
+     * alt as shown ("Q W, 1").
+     */
+    fun spoken(label: String?, alt: String?): String {
+        val said = label?.let { if (SPELT.matches(it)) it.uppercase().toList().joinToString(" ") else it }.orEmpty()
+        return when {
+            alt == null -> said
+            said.isEmpty() -> alt
+            else -> "$said, $alt"
+        }
+    }
+
+    // two letters or more, maybe a sign among them (L;), from a letter: not .com, not 123
+    private val SPELT = Regex("[A-Za-z][A-Za-z;',./]+")
+
+    private fun written(t: Text): String = when (t) {
+        is Text.Literal -> t.text
+        is Text.Binding -> t.toString()
     }
 
     /** [t] as [env] reads it: a literal as written, a binding's value (empty where the environment has none). */

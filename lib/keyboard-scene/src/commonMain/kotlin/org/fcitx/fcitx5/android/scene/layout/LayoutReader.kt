@@ -74,6 +74,7 @@ object LayoutReader {
         }
         if (parts.isEmpty()) p.add(root.line, "<keyboard> has no rows")
         checkKeys(parts.filterIsInstance<Row>(), p)
+        if (onSplit == OnSplit.Split) splitSides(parts.filterIsInstance<Row>(), p)
         if (family == "letters") {
             val ids = parts.filterIsInstance<Row>().flatMap { r -> r.cells.mapNotNull { it.id } }.toSet()
             KeyNames.LETTERS.filter { it !in ids }.takeIf { it.isNotEmpty() }
@@ -108,6 +109,15 @@ object LayoutReader {
         rows.flatMap { it.cells }.filter { it.id != null }.groupBy { it.id }.forEach { (id, cells) ->
             if (cells.size > 1 && cells.any { it.condition == null }) p.add(cells[1].line, "the id \"$id\" is used twice")
         }
+    }
+
+    // `split-side` is the side a board split goes to; one split in halves is on both, which no row can be yet
+    private fun splitSides(rows: List<Row>, p: Problems) {
+        fun Condition?.asks() = this?.anyOf.orEmpty().any { group -> group.any { it.name == "split-side" } }
+        val lines = rows.filter { it.condition.asks() }.map { it.line } + rows.flatMap { r ->
+            r.cells.filter { c -> c.condition.asks() || (c is Key && c.variants.any { it.condition.asks() }) }.map { it.line }
+        }
+        lines.forEach { p.add(it, "split-side on a board split in halves (on-split=\"split\") is not supported yet") }
     }
 
     private fun defaults(parent: XmlElement, p: Problems): KeyAttrs {
@@ -180,7 +190,7 @@ object LayoutReader {
 
     private fun key(el: XmlElement, p: Problems): Key {
         val a = Attributes(el, p)
-        val id = a.matching("id", KEY_ID, "a key id (no spaces, no /)") ?: a.required("id")
+        val id = a.matching("id", KEY_ID, "a key id (1–32 characters, no spaces)") ?: a.required("id")
         val condition = condition(a)
         val attrs = look(a).copy(width = width(a), rows = a.positiveInt("rows"))
         a.done()
@@ -339,8 +349,13 @@ object LayoutReader {
         "preview" to Regex(".{1,16}"), "preview-alt" to Regex(".{1,16}"),
     )
     private val ACTION_PATTERNS = listOf(
-        Regex("[^\\s:]"),
-        Regex("(sym|layout|picker|shortcut|reading|emoji-search|action):[A-Za-z0-9_.-]*"),
+        // one character, sent to the engine as typed: `:` too (the 18 keys' M swipes it, HostKeyAction(":"))
+        Regex("\\S"),
+        Regex("(sym|layout|picker|shortcut|reading|emoji-search):[A-Za-z0-9_.-]*"),
+        // what the app does that is no key yet (P2 decides: code: or these with a table): a group's
+        // letter (by where the finger fell), a zhuyin symbol, tone 1–5 (ˉ ˊ ˇ ˋ ˙), 注音九键's slot
+        // the longer name first: Kotlin/JS matches the first alternative that starts a match, then wants it whole
+        Regex("action:(group|zhuyin-slot|zhuyin|tone-[1-5])"),
         Regex("commit:.+"),
         Regex("code:U\\+[0-9A-F]{4,6}"),
         Regex("keypad:[0-9]"),

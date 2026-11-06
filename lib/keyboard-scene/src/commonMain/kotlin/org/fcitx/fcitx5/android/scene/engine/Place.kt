@@ -25,7 +25,8 @@ class Placed(val item: Item, val copy: Int, val cell: Box, val hit: Box?)
  *
  * An item `rows="n"` (the nine keys' column, the handwriting pad: rules C §2, §8) is as tall as its
  * row and the n − 1 under it, and comes first or last in its row; the rows under it are laid out in
- * what it leaves them, as if their side of the board ended at its edge.
+ * what it leaves them, as if their side of the board ended at its edge. The rows counted are those
+ * shown here, after `when=`: a row hidden in this environment is not one of its n.
  *
  * The touch area (060-render-v2 §3, user's P0 decision): a key's whole cell, the gap inside it
  * included (rules B §2), and a row's blank ends belong to its end keys (A and L), so no touch on a row

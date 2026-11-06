@@ -49,33 +49,57 @@ class SceneBuilder(
     private val paint = Paint(theme, env.density)
     private val content = Content(env, measurer, icons)
 
-    /** [layout] with the files its includes name, [fragments] by id; its problems if it cannot be laid out here. */
-    fun build(layout: Layout, fragments: Map<String, Fragment> = emptyMap()): Parsed<Scene> {
-        val rows = Expand.rows(layout, fragments, env).getOr { return Parsed.Failed(it) }
-        val board = board(layout)
+    /**
+     * [layout] with the files its includes name, [fragments] by id; its problems if it cannot be laid
+     * out here. Never throws: a fault of the engine's own is a problem too, so a bad file a user
+     * imported cannot take the keyboard down.
+     */
+    // anything at all: the caller is the keyboard drawing itself, which has nowhere to send a throw
+    @Suppress("TooGenericExceptionCaught")
+    fun build(layout: Layout, fragments: Map<String, Fragment> = emptyMap()): Parsed<Scene> = try {
+        scene(layout, fragments)
+    } catch (e: Throwable) {
+        Parsed.Failed(0, "the scene could not be built: ${e::class.simpleName}")
+    }
+
+    private fun scene(layout: Layout, fragments: Map<String, Fragment>): Parsed<Scene> {
         val warnings = Problems()
+        // rules C §7: a number pad the app named no pad for (a field it does not know) is the full one
+        val padless = layout.family == "number" && env.input.pad == null
+        if (padless) warnings.add(0, "a number pad with no pad= given: the full pad")
+        val expanding = if (padless) env.copy(input = env.input.copy(pad = FULL_PAD)) else env
+        val placement = placement(layout)
+        val splitSide = placement?.side?.takeIf { env.split }?.name?.lowercase()
+        val rows = Expand.rows(layout, fragments, expanding, splitSide).getOr { return Parsed.Failed(it) }
+        val board = board(placement)
         val placed = Place.rows(rows, layout.columns, layout.onSplit, env, board, warnings).getOr { return Parsed.Failed(it) }
         val keys = placed.mapNotNull { p -> (p.item as? ExpandedKey)?.let { prepare(layout.id, p, it) } }
         val settled = settle(keys)
         val nodes = keys.mapIndexed { i, k -> node(k, settled[i]) }
         val slots = placed.mapNotNull { p ->
             val s = (p.item as? ExpandedSlot)?.slot ?: return@mapNotNull null
-            SlotNode(s.kind, s.id, p.cell, surface(layout.id, s.id, s.look, s.classes, s.face, p.cell))
+            SlotNode(s.kind, s.id, p.cell, surface(layout.id, s.id, s.look, s.classes, s.face, p.cell, slot = true))
         }
         val blanks = placed.flatMap { p ->
             val g = (p.item as? ExpandedGap)?.gap ?: return@flatMap emptyList()
-            surface(layout.id, g.id, g.look, g.classes, Face.Default, p.cell)
+            surface(layout.id, g.id, g.look, g.classes, Face.Default, p.cell, slot = false)
         }
         val whole = Box(0.0, 0.0, env.width, env.height)
         val side = sideRoom(board, whole)?.let { SlotNode(SIDE_BUTTONS, null, it) }
         return Parsed.Ok(Scene(env.width, env.height, base(whole) + blanks, nodes, slots + listOfNotNull(side), board, layout.preview, layout.popups, warnings.all))
     }
 
-    // where the keys go: the whole keyboard, or a side of it one-handed, or split for a board but the letters
-    private fun board(layout: Layout): Box {
+    // a side of the keyboard one-handed, or split for a board but the letters; null: the whole of it
+    private fun placement(layout: Layout): SplitKeyboard.Placement? = if (env.floating != null) {
+        null
+    } else {
+        SplitKeyboard.placement(env.oneHanded, env.dock, env.split, layout.onSplit != OnSplit.Side, env.widthDp)
+    }
+
+    // where the keys go
+    private fun board(placement: SplitKeyboard.Placement?): Box {
         val whole = Box(0.0, 0.0, env.width, env.height)
-        if (env.floating != null) return whole
-        val placement = SplitKeyboard.placement(env.oneHanded, env.dock, env.split, layout.onSplit != OnSplit.Side, env.widthDp) ?: return whole
+        if (placement == null) return whole
         val w = placement.widthDp * env.density
         return if (placement.side == SplitKeyboard.Dock.LEFT) Box(0.0, 0.0, w, env.height) else Box(env.width - w, 0.0, env.width, env.height)
     }
@@ -93,11 +117,12 @@ class SceneBuilder(
         return listOfNotNull(paint.fill(Shape.Rect(box, Faces.radii(look.radius, box, env.density)), look.fill))
     }
 
-    // a key's face where a slot or a blank place is given a look: never pressed, `keep` block on flat keys too
-    private fun surface(board: String, id: String?, look: String?, classes: List<String>, face: Face, cell: Box): List<Op> {
+    // a key's face where a slot or a blank place is given a look: never pressed, `keep` block on flat keys too;
+    // a slot is not one of its board's every key (`handwriting/*`), but by its own name and look, as theme 3.0 drew the pad
+    private fun surface(board: String, id: String?, look: String?, classes: List<String>, face: Face, cell: Box, slot: Boolean): List<Op> {
         if (look == null || face == Face.None) return emptyList()
         val c = if (face == Face.Keep) unflat else cascade
-        val l = KeyLook(c.of(Selector.Target("key", board, id, null, setOf(look) + classes)), theme)
+        val l = KeyLook(c.of(Selector.Target("key", board, id, null, setOf(look) + classes, slot = slot)), theme)
         return paint.face(Faces.of(cell, l, face, true, env.flat && face != Face.Keep, env.density), l, false)
     }
 
@@ -214,6 +239,13 @@ class SceneBuilder(
             faces = faces,
             a11y = k.key.a11y,
             actions = k.key.attrs.actions,
+            label = k.key.label,
+            alt = k.key.alt,
+            altRaw = k.key.altRaw,
+            popup = k.key.key.popup,
+            menu = k.key.key.menu,
+            sound = k.key.attrs.sound ?: "standard",
+            shortcut = k.key.attrs.shortcut,
         )
     }
 
@@ -223,6 +255,7 @@ class SceneBuilder(
 
         /** The slot beside a board one-handed or split at a side: the app's buttons there (rules D §2). */
         const val SIDE_BUTTONS = "side-buttons"
+        private const val FULL_PAD = "full"
         private val UP = Point(0.0, -1.0)
     }
 }

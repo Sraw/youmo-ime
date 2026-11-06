@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
+import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.xml.Xml
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -48,8 +49,15 @@ class XmlTest {
     }
 
     @Test
-    fun namespacePrefixesAreDropped() {
-        assertEquals("keyboard", Xml.parse("<l:keyboard xmlns:l=\"x\"/>").ok().name)
+    fun aPrefixedElementIsAProblemAndXsiAttributesAreLeftAlone() {
+        val p = assertIs<Parsed.Failed>(Xml.parse("<l:keyboard xmlns:l=\"x\"/>"))
+        assertTrue("prefix" in p.problems.single().message, p.problems.toString())
+        // an editor's schemaLocation is no unknown attribute
+        val withXsi = Fixtures.qwertySource.replaceFirst(
+            "<keyboard ",
+            "<keyboard xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"https://youmo-ime/layout/1 layout-1.xsd\" ",
+        )
+        LayoutReader.layout(withXsi).ok()
     }
 
     @Test
