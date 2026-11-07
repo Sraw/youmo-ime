@@ -355,7 +355,8 @@ class KeyboardPerfBaselineTest {
 
     private fun theme(to: Theme): KeyboardFrames.Sample {
         val before = onMain { keyboardFrame() }
-        return measure({ keyboardFrame().let { it != null && it !== before && it.isShown } }) { ThemeManager.setNormalModeTheme(to) }
+        // the 26 keys in the new frame, as a build's: the frame shown alone, its keyboard not yet in it, is not the switch done
+        return measure({ keyboardFrame().let { it !== before && shows(it, Board.FULL) } }) { ThemeManager.setNormalModeTheme(to) }
     }
 
     // a picture as wide as a phone's keyboard, as a theme's cut is: a gradient and some shapes
