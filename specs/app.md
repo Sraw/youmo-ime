@@ -421,7 +421,8 @@ once a process with the fragments it includes; ids stay as the theme format name
 `sceneEnv` (its `Input`, texts, marks; `GroupedKeyboard` through `TextBoardState`) and calls
 `invalidateScene()` on every change of what the keys show (punctuation, address keys, the language key,
 Return, the input method). What a key does: the 26 keys still wire each scene key as its view was
-(`refOf`, U4 A, till S5); a keyboard moved wires each from its node (U4 B): ime-core's `SceneBehavior.of`
+(`refOf`, U4 A, till S5); a keyboard moved wires each from its node (U4 B; the keys and the touch that
+finds them are `SceneKeys`, a node's key kept while it does the same): ime-core's `SceneBehavior.of`
 reads press, long press, repeat, swipe, double tap, bubble, long-press popup, menu, sound and axes from
 the layout, and `SceneKeyDef` makes the `KeyDef` the old wiring takes (the `action:` table: `sym:`
 keysyms by name, `layout:`, `picker:` (alone, the page shown last), `commit:`, `code:U+…`, `keypad:`,

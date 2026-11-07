@@ -17,7 +17,6 @@ import androidx.annotation.VisibleForTesting
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.children
 import androidx.core.view.isVisible
-import androidx.core.view.updateLayoutParams
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 import org.fcitx.fcitx5.android.R
@@ -56,7 +55,6 @@ import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupKeyboardUi
 import org.fcitx.fcitx5.android.input.popup.keyRef
 import org.fcitx.fcitx5.android.input.scene.KeyRef
-import org.fcitx.fcitx5.android.input.scene.SceneBehavior
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import splitties.dimensions.dp
@@ -244,44 +242,15 @@ abstract class BaseKeyboard(
 
     private val rowKeys = mutableListOf<Row>()
 
-    /**
-     * A row narrower than the keyboard: its outermost keys shown take the room left at the edges,
-     * their labels where they were. Only keys shown count, so a key hidden (the 双拼 `;`) leaves
-     * the row's ends widened again.
-     */
-    private fun fitRow(keyViews: List<View>, widths: List<Float>) {
-        val shown = keyViews.indices.filter { keyViews[it].visibility != View.GONE }.ifEmpty { return }
-        // back to their own widths first: fitted before, they may no longer be at an end
-        keyViews.forEachIndexed { i, view ->
-            if (view !is KeyView) return@forEachIndexed
-            view.updateLayoutParams<ConstraintLayout.LayoutParams> { matchConstraintPercentWidth = widths[i] }
-            view.layoutMarginLeft = 0f
-            view.layoutMarginRight = 0f
-        }
-        // 0f means fill remaining space, thus does not need expanding
-        val totalWidth = shown.sumOf { (widths[it].takeIf { w -> w != 0f } ?: 1f).toDouble() }.toFloat()
-        // a split row fills the keyboard by itself (SplitKeyboard.row)
-        if (!expandKeypressArea || keyWidths != null || totalWidth >= 1f) return
-        val free = (1f - totalWidth) / 2f
-        val first = shown.first()
-        val last = shown.last()
-        // a gap at an edge is no key to widen
-        (keyViews[first] as? KeyView)?.apply {
-            updateLayoutParams<ConstraintLayout.LayoutParams> { matchConstraintPercentWidth += free }
-            layoutMarginLeft = free / (widths[first] + free)
-        }
-        (keyViews[last] as? KeyView)?.apply {
-            updateLayoutParams<ConstraintLayout.LayoutParams> { matchConstraintPercentWidth += free }
-            layoutMarginRight = free / (widths[last] + free)
-        }
-    }
+    // a row narrower than the keyboard widens its outermost keys ([fitRow]); a split row fills it by itself (SplitKeyboard.row)
+    private val widens get() = expandKeypressArea && keyWidths == null
 
     /** [view] shown or not, its row fitted again ([fitRow]). */
     @VisibleForTesting(otherwise = VisibleForTesting.PROTECTED)
     internal fun showKey(view: View, shown: Boolean) {
         if (view.isVisible == shown) return
         view.isVisible = shown
-        rowKeys.firstOrNull { view in it.keys }?.let { fitRow(it.keys, it.widths) }
+        rowKeys.firstOrNull { view in it.keys }?.let { fitRow(it.keys, it.widths, widens) }
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
@@ -328,7 +297,7 @@ abstract class BaseKeyboard(
                         matchConstraintPercentWidth = widths[index]
                     })
                 }
-                fitRow(keyViews, widths)
+                fitRow(keyViews, widths, widens)
             }
         }
         keyRows.forEachIndexed { index, row ->
@@ -631,15 +600,14 @@ abstract class BaseKeyboard(
 
     /**
      * The keys drawn by the scene engine over this keyboard's own ([KeyboardCanvasView]), their views
-     * not drawn then: the touches handed to the scene's keys ([sceneTouch]) as vivo's workaround hands
+     * not drawn then: the touches handed to the scene's keys ([sceneKeys]) as vivo's workaround hands
      * them to the views ([routesTouches]). Null: the keys draw themselves. Set by [drawKeysOn].
      */
     protected var canvas: KeyboardCanvasView? = null
         private set
 
-    // the scene's keys, by the views they were wired as ([drawKeysOn]): what a touch on the canvas finds
-    private var sceneKeys: Map<KeyView, SceneKey> = emptyMap()
-    private var sceneTouch: SceneTouch? = null
+    // the scene's keys ([drawKeysOn], [drawKeysWithScene]) and what a touch on the canvas finds
+    private val sceneKeys = SceneKeys(this) { key, def -> wire(key, def, null) }
 
     /**
      * The board the scene engine draws this keyboard's keys from ([drawKeysWithScene], 060-render-p2
@@ -663,7 +631,14 @@ abstract class BaseKeyboard(
         val board = SceneBoard(context, theme, layout) { look, width, height -> sceneEnv(look, layout, width, height) }
         sceneBoard = board
         val view = board.view(keyImages) { node -> sceneKey(node) }
-        if (refOf != null) drawKeysOn(view, refOf) else drawKeysOnNodes(view)
+        if (refOf != null) {
+            drawKeysOn(view, refOf)
+        } else {
+            releaseAllTouchTargets()
+            spaceKeys.removeAll { it is SceneKey }
+            canvas = view
+            sceneKeys.byNodes(view, sceneTable) { old -> spaceKeys.remove(old) }
+        }
         keyRows.forEach { it.visibility = View.INVISIBLE }
         add(view, lParams(0, 0) {
             topOfParent()
@@ -685,32 +660,6 @@ abstract class BaseKeyboard(
     /** The keyboard's own words for its layout's keys (U4 B): its `action:` placeholders, its composed long presses. */
     protected open val sceneTable: SceneKeyDef.Table = object : SceneKeyDef.Table {}
 
-    // the keys made from the scene's nodes ([drawKeysOnNodes]), each with what it was made from: a node
-    // that does the same in a scene made anew keeps its key (a finger on it, its timers)
-    private val nodeKeys = HashMap<KeyRef, Pair<SceneBehavior, SceneKey>>()
-
-    // the keys drawn by [view], each wired as its layout's node says, made as the scene first has it
-    private fun drawKeysOnNodes(view: KeyboardCanvasView) {
-        releaseAllTouchTargets()
-        spaceKeys.removeAll { it is SceneKey }
-        nodeKeys.clear()
-        canvas = view
-        sceneKeys = emptyMap()
-        sceneTouch = SceneTouch(view, keyFor = { node -> nodeKey(view, node) }, shown = { true })
-    }
-
-    private fun nodeKey(view: KeyboardCanvasView, node: KeyNode): SceneKey {
-        val ref = KeyRef.scene(node.id, node.copy)
-        val b = SceneBehavior.of(node)
-        nodeKeys[ref]?.takeIf { it.first == b }?.let { return it.second }
-        nodeKeys[ref]?.second?.let { old -> spaceKeys.remove(old) }
-        val def = SceneKeyDef.of(b, node, sceneTable)
-        return SceneKey(ref, def, view, this).also {
-            wire(it, def, null)
-            nodeKeys[ref] = b to it
-        }
-    }
-
     /**
      * The keys drawn by [view] from now on, or by their own views again (null): each key the scene
      * draws, [refOf] its view's ([KeyRef.scene]; null, none), wired as its view was and touched where
@@ -721,18 +670,11 @@ abstract class BaseKeyboard(
         releaseAllTouchTargets()
         spaceKeys.removeAll { it is SceneKey }
         canvas = view
-        if (view == null) {
-            sceneKeys = emptyMap()
-            sceneTouch = null
-            return
-        }
-        sceneKeys = wired.mapNotNull { (v, def) -> refOf(v)?.let { ref -> v to SceneKey(ref, def, view, this).also { wire(it, def, null) } } }.toMap()
-        val viewOf = sceneKeys.entries.associate { (v, k) -> k to v }
-        sceneTouch = SceneTouch(view, sceneKeys.values.toList()) { k -> viewOf[k]?.visibility == View.VISIBLE }
+        if (view == null) sceneKeys.none() else sceneKeys.byViews(view, wired, refOf)
     }
 
     /** The scene's key wired as [view] was ([drawKeysOn]); null while the views draw the keys. */
-    internal fun sceneKeyOf(view: KeyView): SceneKey? = sceneKeys[view]
+    internal fun sceneKeyOf(view: KeyView): SceneKey? = sceneKeys.of(view)
 
     /** Where the scene drawn last has its key [id] (its first copy) in this keyboard, as a key's place is (glide typing's, strokes'): nowhere while the views draw the keys. */
     protected fun scenePlace(id: String): KeyPlace = KeyPlace { _, out ->
@@ -741,7 +683,7 @@ abstract class BaseKeyboard(
     }
 
     /** The key wired for the scene's [node] ([SceneTouch.keyOf]): what a screen reader's actions on it do; null while the views draw the keys. */
-    protected fun sceneKey(node: KeyNode): SceneKey? = sceneTouch?.keyOf(node)
+    protected fun sceneKey(node: KeyNode): SceneKey? = sceneKeys.of(node)
 
     // the keys' views take touches as the keyboard hands them: vivo's workaround, or keys drawn by the canvas
     private val routesTouches get() = vivoKeypressWorkaround || canvas != null
@@ -762,7 +704,7 @@ abstract class BaseKeyboard(
     }
 
     private fun findTouchTarget(event: MotionEvent, pointerIndex: Int): TouchTarget? {
-        sceneTouch?.let { return it.find(event.getX(pointerIndex), event.getY(pointerIndex)) }
+        sceneKeys.touch?.let { return it.find(event.getX(pointerIndex), event.getY(pointerIndex)) }
         val x0 = event.getX(pointerIndex).roundToInt()
         val y0 = event.getY(pointerIndex).roundToInt()
         val rowHitRect = Rect()

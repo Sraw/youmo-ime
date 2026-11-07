@@ -85,25 +85,28 @@ class SceneKeyDef(
                 act(b.swipe)?.let { add(Behavior.Swipe(it)) }
                 act(b.doubleTap)?.let { add(Behavior.DoubleTap(it)) }
             }
-            val popups = buildList {
-                b.bubble?.let { add(it.corner?.let { c -> Popup.AltPreview(it.content, c) } ?: Popup.Preview(it.content)) }
-                when (val p = b.popup) {
-                    is SceneBehavior.LongPopup.Preset -> add(Popup.Keyboard.Preset(p.label, p.transformPunctuation))
-                    is SceneBehavior.LongPopup.Listed -> add(Popup.Keyboard.Explicit(p.items.toTypedArray(), asIs = p.asIs))
-                    is SceneBehavior.LongPopup.Composed -> table.popup(p.from, node)?.let(::add)
-                        ?: Timber.w("scene key %s: no long press from %s", b.id, p.from)
-                    is SceneBehavior.LongPopup.Letters -> table.groupPopup(p.letters, node)?.let(::add)
-                        ?: Timber.w("scene key %s: no long press of %s", b.id, p.letters)
-                    null -> {}
-                }
-                if (b.menu.isNotEmpty()) {
-                    val items = b.menu.mapNotNull { m ->
-                        act(m.action)?.let { Popup.Menu.Item(m.label, m.icon?.let(SceneIcons::of) ?: 0, it) }
-                    }
-                    add(Popup.Menu(items.toTypedArray()))
-                }
-            }
+            val popups = popupsOf(b, node, table, ::act)
             return SceneKeyDef(b, behaviors, popups.toTypedArray().takeIf { it.isNotEmpty() })
+        }
+
+        // its bubble, long press and menu: each as the old keys' KeyDef had it
+        private fun popupsOf(b: SceneBehavior, node: KeyNode, table: Table, act: (SceneAction?) -> KeyAction?): List<Popup> = buildList {
+            b.bubble?.let { add(it.corner?.let { c -> Popup.AltPreview(it.content, c) } ?: Popup.Preview(it.content)) }
+            when (val p = b.popup) {
+                is SceneBehavior.LongPopup.Preset -> add(Popup.Keyboard.Preset(p.label, p.transformPunctuation))
+                is SceneBehavior.LongPopup.Listed -> add(Popup.Keyboard.Explicit(p.items.toTypedArray(), asIs = p.asIs))
+                is SceneBehavior.LongPopup.Composed -> table.popup(p.from, node)?.let(::add)
+                    ?: Timber.w("scene key %s: no long press from %s", b.id, p.from)
+                is SceneBehavior.LongPopup.Letters -> table.groupPopup(p.letters, node)?.let(::add)
+                    ?: Timber.w("scene key %s: no long press of %s", b.id, p.letters)
+                null -> {}
+            }
+            if (b.menu.isNotEmpty()) {
+                val items = b.menu.mapNotNull { m ->
+                    act(m.action)?.let { Popup.Menu.Item(m.label, m.icon?.let(SceneIcons::of) ?: 0, it) }
+                }
+                add(Popup.Menu(items.toTypedArray()))
+            }
         }
 
         // the keysyms the layouts name (sym:), FcitxKeyMapping's by their names
@@ -142,27 +145,31 @@ class SceneKeyDef(
             is SceneAction.Key -> KeyAction.HostKeyAction(a.text)
             is SceneAction.Sym -> SYMS[a.name]?.let { KeyAction.SymAction(KeySym(it), KeyStates.Virtual) }
             is SceneAction.Layout -> KeyAction.LayoutSwitchAction(a.name)
-            // picker: alone, the page shown last (ReturnKey's menu)
-            is SceneAction.Picker -> if (a.name == null) {
-                KeyAction.PickerSwitchAction()
-            } else {
-                PickerWindow.Key.entries.firstOrNull { it.name == a.name }?.let { KeyAction.PickerSwitchAction(it) }
-            }
+            is SceneAction.Picker -> picker(a.name)
             is SceneAction.Commit -> KeyAction.CommitAction(a.text)
             is SceneAction.Code -> KeyAction.SymAction(KeySym(UNICODE + a.codePoint), KeyStates.Virtual)
             is SceneAction.Keypad -> KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_KP_0 + a.digit), KeyStates.Virtual)
             is SceneAction.Caps -> KeyAction.CapsAction(a.lock)
             is SceneAction.Shortcut -> KeyCommand.entries.firstOrNull { it.key == a.name }?.let { KeyAction.ShortcutAction(KeyShortcut.Command(it)) }
-            is SceneAction.Reading -> if (a.style == null) {
-                KeyAction.ReadingAction()
-            } else {
-                ReadingStyle.entries.firstOrNull { it.key.equals(a.style, ignoreCase = true) }?.let { KeyAction.ReadingAction(it) }
-            }
+            is SceneAction.Reading -> reading(a.style)
             is SceneAction.EmojiSearch -> KeyAction.EmojiSearchAction(a.arg == "on")
             is SceneAction.Command -> COMMANDS[a.name]
             is SceneAction.Placeholder -> placeholder(a.name)
             // the keyboard's (Table.group): the engine's codes are its groups'
             is SceneAction.Group -> null
         }.also { if (it == null) Timber.w("scene key: no action for %s", a) }
+
+        // picker: alone, the page shown last (ReturnKey's menu)
+        private fun picker(name: String?): KeyAction? = if (name == null) {
+            KeyAction.PickerSwitchAction()
+        } else {
+            PickerWindow.Key.entries.firstOrNull { it.name == name }?.let { KeyAction.PickerSwitchAction(it) }
+        }
+
+        private fun reading(style: String?): KeyAction? = if (style == null) {
+            KeyAction.ReadingAction()
+        } else {
+            ReadingStyle.entries.firstOrNull { it.key.equals(style, ignoreCase = true) }?.let { KeyAction.ReadingAction(it) }
+        }
     }
 }

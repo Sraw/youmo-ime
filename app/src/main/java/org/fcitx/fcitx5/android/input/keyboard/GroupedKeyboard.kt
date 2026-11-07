@@ -136,7 +136,8 @@ class GroupedKeyboard(
         internal fun tapped(action: KeyAction, at: Float, letters: NineKeyLetters, leaning: Set<String>): KeyAction {
             val sym = (action as? KeyAction.SymAction)?.sym?.sym ?: return action
             val c = (sym - UNICODE).takeIf { it in 0..Char.MAX_VALUE.code }?.toChar() ?: return action
-            if (at.isNaN() || !letters.isCode(c) || letters.letters(c) !in leaning || !Keyboard.placesTaps(c)) return action
+            val leans = letters.isCode(c) && letters.letters(c) in leaning && Keyboard.placesTaps(c)
+            if (at.isNaN() || !leans) return action
             return KeyAction.SymAction(KeySym(UNICODE + Keyboard.tapKey(c, at)), KeyStates.Virtual)
         }
 
