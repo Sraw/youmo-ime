@@ -71,8 +71,9 @@ class VoiceSpare<T : Any>(private val release: (T) -> Unit) {
     val ready get() = spare.get() != null
 
     /** [made] kept for the next use; released if one is already there. Whether it was kept */
-    fun offer(made: T): Boolean {
-        if (spare.compareAndSet(null, made)) return true
+    fun offer(made: T, wanted: Boolean = true): Boolean {
+        // not wanted: nothing holds the models (a talk whose models failed), so nothing would let it go
+        if (wanted && spare.compareAndSet(null, made)) return true
         release(made)
         return false
     }

@@ -50,6 +50,15 @@ class VoiceSpareTest {
     }
 
     @Test
+    fun oneNotWantedIsReleasedNotKept() {
+        val released = mutableListOf<String>()
+        val spare = VoiceSpare<String> { released += it }
+        assertEquals(false, spare.offer("a", wanted = false))
+        assertEquals(listOf("a"), released)
+        assertEquals(null, spare.take())
+    }
+
+    @Test
     fun oneSpareAtATimeTheOtherReleased() {
         val released = mutableListOf<String>()
         val spare = VoiceSpare<String> { released += it }

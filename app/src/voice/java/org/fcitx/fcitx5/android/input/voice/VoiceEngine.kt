@@ -176,7 +176,8 @@ object VoiceEngine {
             vad.release()
             return
         }
-        spareVad.offer(vad)
+        // no talk holding the models and none loaded (they failed): let go now, no letGo would clear it
+        spareVad.offer(vad, wanted = synchronized(lock) { users > 0 || models != null })
     }
 
     /** The spare let go if no talk holds the models: one made for a talk whose models failed to load. */

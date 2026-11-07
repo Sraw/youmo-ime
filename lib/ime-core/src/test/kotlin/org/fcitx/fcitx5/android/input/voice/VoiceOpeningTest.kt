@@ -52,6 +52,31 @@ class VoiceOpeningTest {
     }
 
     @Test
+    fun anUnloadFailingIsThrownAndAStopFailingFirstCarriesIt() {
+        val unloadBroke = assertThrows(IllegalStateException::class.java) {
+            VoiceOpening.run({}, { "vad" }, { steps += "use $it" }, { steps += "stop" }, { error("unload") })
+        }
+        assertEquals("unload", unloadBroke.message)
+        assertEquals(listOf("use vad", "stop"), steps)
+        val both = assertThrows(IllegalStateException::class.java) {
+            VoiceOpening.run({}, { "vad" }, {}, { error("stop") }, { error("unload") })
+        }
+        assertEquals("stop", both.message)
+        assertEquals("unload", both.suppressed.single().message)
+    }
+
+    private fun returningEarly() {
+        VoiceOpening.run({}, { "vad" }, { return }, { steps += "stop" }, { steps += "unload $it" })
+        steps += "after"
+    }
+
+    @Test
+    fun aReturnOutOfUseStillStopsAndUnloads() {
+        returningEarly()
+        assertEquals(listOf("stop", "unload vad"), steps)
+    }
+
+    @Test
     fun theRecordIsLetGoWhateverBreaks() {
         assertThrows(IllegalStateException::class.java) { open({ "vad" }) { error("read") } }
         assertEquals(listOf("start", "load", "stop", "unload vad"), steps)

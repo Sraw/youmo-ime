@@ -13,10 +13,13 @@ package org.fcitx.fcitx5.android.input.voice
  */
 object VoiceOpening {
     @Suppress("TooGenericExceptionCaught")
+    // try/finally, not crossinline: [use] suspends at the caller (VoiceListener), and a return out of a
+    // lambda still runs the stop and the unload
     inline fun <V : Any> run(start: () -> Unit, load: () -> V, use: (V?) -> Unit, stop: () -> Unit, unload: (V) -> Unit, failed: (Throwable) -> Unit = {}) {
         var detector: V? = null
         // what broke first is what is thrown; a stop or unload failing after it is suppressed into it
         var broke: Throwable? = null
+        var after: Throwable? = null
         try {
             start()
             // an Error too: sherpa's library not loading, memory running out
@@ -28,19 +31,22 @@ object VoiceOpening {
             }
             use(detector)
         } catch (e: Throwable) {
-            broke = suppress(broke, e)
+            broke = e
+            throw e
+        } finally {
+            try {
+                stop()
+            } catch (e: Throwable) {
+                after = suppress(broke ?: after, e)
+            }
+            try {
+                detector?.let(unload)
+            } catch (e: Throwable) {
+                after = suppress(broke ?: after, e)
+            }
         }
-        try {
-            stop()
-        } catch (e: Throwable) {
-            broke = suppress(broke, e)
-        }
-        try {
-            detector?.let(unload)
-        } catch (e: Throwable) {
-            broke = suppress(broke, e)
-        }
-        broke?.let { throw it }
+        // reached only with nothing broken before: the stop's or the unload's failure
+        after?.let { throw it }
     }
 
     /** [e] the first failure, or suppressed into the one before it */
