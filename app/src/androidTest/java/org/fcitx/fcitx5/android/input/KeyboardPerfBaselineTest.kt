@@ -19,6 +19,7 @@ import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.view.ViewCompat
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -37,6 +38,8 @@ import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.theme.BoardBase
 import org.fcitx.fcitx5.android.input.theme.Crop
 import org.fcitx.fcitx5.android.input.theme.Picture
@@ -78,6 +81,10 @@ class KeyboardPerfBaselineTest {
     private val runs = InstrumentationRegistry.getArguments().getString("perfRuns")?.toInt() ?: 20
     private val warmUp = 3
 
+    // perfCanvas=true / false: the 26 keys drawn by the scene engine or by their views (060 P1); unset, as the setting is
+    private val canvas = InstrumentationRegistry.getArguments().getString("perfCanvas")?.toBooleanStrict()
+    private var canvasWas: Boolean? = null
+
     // perfScreenshot=true: the picture theme's keyboard captured once, to see the picture is drawn
     private val screenshots = InstrumentationRegistry.getArguments().getString("perfScreenshot") == "true"
 
@@ -95,8 +102,13 @@ class KeyboardPerfBaselineTest {
     @Test
     fun keyboardDrawingBaseline() {
         val sdk = android.os.Build.VERSION.SDK_INT
-        log("device ${android.os.Build.MODEL} sdk $sdk runs $runs warm-up $warmUp")
+        log("device ${android.os.Build.MODEL} sdk $sdk runs $runs warm-up $warmUp canvas ${canvas ?: "as set"}")
         selectThisInputMethod()
+        canvas?.let { on ->
+            val pref = AppPrefs.getInstance().internal.canvasKeyboard
+            canvasWas = pref.getValue()
+            onMain { pref.setValue(on) }
+        }
         memory("no keyboard shown yet")
         launch()
         memory("26 keys shown, first time")
@@ -107,6 +119,7 @@ class KeyboardPerfBaselineTest {
         buildEachKeyboard()
         switchThemes()
         pressFeedback()
+        sceneCosts()
         hideKeyboard()
         memory("after the runs (handwriting's models loaded), hidden")
         showKeyboard()
@@ -161,6 +174,7 @@ class KeyboardPerfBaselineTest {
         runCatching { if (::frames.isInitialized) onMain { frames.close() } }
         runCatching { putThemesBack() }
         pinyinKeyboardWas?.let { onMain { AppPrefs.getInstance().keyboard.pinyinKeyboard.setValue(it) } }
+        canvasWas?.let { onMain { AppPrefs.getInstance().internal.canvasKeyboard.setValue(it) } }
         runCatching {
             host {
                 imsWere?.let { setEnabledIme(it) }
@@ -428,6 +442,63 @@ class KeyboardPerfBaselineTest {
         settle()
     }
 
+    // ---- 3b. what the keys show changed: Shift
+
+    /**
+     * Shift tapped on the 26 keys (each letter shown anew: on the scene engine, the scene made again
+     * as the frame draws), counted from the lift to the frame showing Shift's state, Shift tapped back
+     * after; drawn by the scene engine, also what making the scene costs alone, on the main thread:
+     * made anew as things are, and asked again with nothing changed (the first key typed in pinyin).
+     */
+    private fun sceneCosts() {
+        fresh()
+        val shift = keyAt(onKeyboard().res(imePkg, "button_caps"))
+        val taps = mutableListOf<KeyboardFrames.Sample>()
+        repeat(warmUp + runs) { i ->
+            // on and back off, each a scene of its own; apart, so no tap is taken for a double tap's lock
+            repeat(2) {
+                val sample = shiftTap(shift)
+                if (i >= warmUp) taps += sample
+                SystemClock.sleep(SHIFT_APART_MS)
+            }
+        }
+        row("shift", "tap, on or off", taps)
+        val view = onMain { canvasView() } ?: return log("scene	no canvas: the keys drawn by their views")
+        val board = onMain { textKeyboard() }
+        fun timed(prepare: () -> Unit): List<Double> = (1..warmUp + runs).map {
+            onMain {
+                prepare()
+                val start = System.nanoTime()
+                checkNotNull(view.scene)
+                (System.nanoTime() - start) / NANOS_A_MS
+            }
+        }.drop(warmUp)
+        fun stats(ms: List<Double>) = Stats(ms).let { "%.2f / %.2f".format(Locale.ROOT, it.median, it.p90) }
+        log("scene\tmade anew (Shift's, a theme's)\t${stats(timed(board::forgetScene))}")
+        log("scene\tasked again, nothing changed (pinyin's first key)\t${stats(timed(view::invalidateScene))}")
+    }
+
+    private fun shiftTap(at: PointF): KeyboardFrames.Sample {
+        val caps = onMain { capsState() }
+        val mark = onMain { frames.mark(0) { capsState() != caps } }
+        val down = SystemClock.uptimeMillis()
+        inject(MotionEvent.ACTION_DOWN, at, down, down)
+        SystemClock.sleep(HOLD_MS)
+        val up = SystemClock.uptimeMillis()
+        mark.from = up * DownMarks.NS_PER_MS
+        inject(MotionEvent.ACTION_UP, at, down, up)
+        return frames.await(mark).also { settle() }
+    }
+
+    // Shift's state as its view tells a screen reader (set as Shift is tapped, before the frame showing it)
+    private fun capsState(): String? = keyboardFrame()?.findViewById<View>(R.id.button_caps)?.let { ViewCompat.getStateDescription(it)?.toString() }
+
+    private fun canvasView(): KeyboardCanvasView? = keyboardFrame()?.let(::all)?.filterIsInstance<KeyboardCanvasView>()?.firstOrNull()
+
+    private fun textKeyboard(): TextKeyboard = keyboardFrame()!!.let(::all).filterIsInstance<TextKeyboard>().first()
+
+    private fun all(v: View): List<View> = listOf(v) + ((v as? ViewGroup)?.let { g -> (0 until g.childCount).flatMap { all(g.getChildAt(it)) } } ?: emptyList())
+
     // ---- 4. memory
 
     private fun memory(label: String) {
@@ -520,6 +591,8 @@ class KeyboardPerfBaselineTest {
         const val PICTURE_W = 1080
         const val PICTURE_H = 900
         const val HOLD_MS = 80L
+        const val SHIFT_APART_MS = 400L
+        const val NANOS_A_MS = 1e6
         const val FAST_GAP_MS = 80L
         const val SETTLE_MS = 150L
         const val GC_WAIT_MS = 500L
