@@ -325,8 +325,13 @@ again. `composing` reaches the `Input` only with a table (qwerty.xml asks it of 
 pinyin's first key and its committed word make no scene; in a field with an action, Return's label
 changing with the composing (Done to Enter) still does. `AndroidTextMeasurer` keeps the last 512
 texts it measured (text, font, weight, size), so a scene made again measures only what is new.
+The theme's styles matched to a key (`Cascade.of`) are kept by target, a key no selector names
+as one with no key (the 26 letters share theirs), with what it inherits; `Cascades` keeps a theme's
+cascade by its scenes (`flat` and not), and `TextKeyboard` keeps the theme's `Cascades` a process
+(main thread), so neither a scene made again nor a keyboard made again matches a style anew.
 Systrace sections: `scene` (the view asking), in it `theme`, `env`, and the builder's phases
-(`expand`, `place`, `cascade`, `paint`; `Phases`, `SceneTrace`), `measure text` under them. `BaseKeyboard` intercepts every touch as the vivo workaround
+(`expand`, `place`, `cascade.of`, `faces`, `content`, `paint`; `Phases`, `SceneTrace`), `measure
+text` under them. `BaseKeyboard` intercepts every touch as the vivo workaround
 does and hands it to the view of the key the scene's `keyAt` names (`findTouchTarget`), so a key's
 gestures are its view's, unchanged; the view's `onPressedChanged` (CustomGestureView) shows the press.
 TalkBack reads the canvas's `ExploreByTouchHelper`: a virtual node a key, its words the scene's
@@ -372,31 +377,45 @@ up or down; the backspace's right-hand corner icons a pixel left (its view's rig
 other way). Fixing them means pixel rules for text in the engine, left to P2's theme work.
 
 What it costs (`KeyboardPerfBaselineTest`, 060-render-perf §4; `perfCanvas=true|false` the
-switch; youmo29: Android 10 (API 29), "Android SDK built for arm64" emulator, `-gpu host`, one
-session on 2026-11-07, both switches one after the other, 20 runs after 3 warm-ups; median / p90 ms;
-two such pairs, the second in brackets):
+switch): the benchmark build (specs/testing.md: R8, not debuggable), youmo29: Android 10 (API 29),
+"Android SDK built for arm64" emulator, `-gpu host`, one session on 2026-11-07, 20 runs after 3
+warm-ups, views then canvas, four such pairs; median / p90 ms, the pairs' medians as a range. Typing
+is from the window's receipt of the touch to the frame done; the rest from the action to its frame.
 
-| | views (off) | canvas (on) |
-|---|---|---|
-| a key pressed, to the frame | 27.4 / 31.2 (26.3 / 31.0) | 30.2 / 39.6 (27.6 / 36.3) |
-| ten keys, each, to the frame | 28.2 / 31.0 (28.8 / 30.7) | 27.8 / 34.9 (28.7 / 31.7) |
-| Shift tapped, to the frame | 22.1 / 26.2 (23.8 / 26.2) | 27.9 / 32.1 (27.0 / 30.1) |
-| Shift tapped, the frame's draw | 0.3 (0.2) | 3.7 (4.6) |
-| the 26 keys built and shown, to the frame | 50.0 / 63.3 (74.6 / 88.9) | 71.4 / 130.8 (96.8 / 130.1) |
-| a theme switched (block to flat), to the frame | 49–55 (81.7 / 92.5) | 60–66 (69.6 / 93.0) |
-| a scene made anew (Shift, a theme), timed alone | | 4.27 / 5.14 (3.64 / 4.40) |
-| a scene asked again, nothing changed (pinyin's first key) | | 0.52 / 0.70 (0.37 / 0.92) |
+| | views (off) | canvas (on) | 060-render-perf's bound |
+|---|---|---|---|
+| a key pressed | 19.5-20.6 / 21.1-22.1 | 18.8-21.3 / 20.7-23.5 | met in each pair |
+| ten keys, each | 18.9-20.0 / 21.0-21.9 | 19.2-19.5 / 21.0-21.7 | met |
+| ten keys in a send field (Return's label kept), each | 18.6-19.8 / 20.9-22.2 | 18.8-19.7 / 20.5-21.5 | met |
+| Shift tapped | 23.7-24.9 / 26.3-27.8 | 25.2-26.2 / 27.7-28.6 | met (+4 to +7%) |
+| the 26 keys built and shown | 58.7-61.7 / 70.2-73.8 | 58.4-63.6 / 66.9-69.4 | met |
+| a theme switched to flat (block to flat, to flat with a picture) | 40.3-43.6 / 42.7-46.6 | 61.1-63.2 / 64.7-67.2 | **over**: +41 to +57% |
+| a theme switched to block (flat to block, flat with a picture to block) | 67.5-69.6 / 69.8-70.8 | 60.7-63.9 / 63.5-66.7 | met (-6 to -10%) |
+| a scene made anew (Shift, a theme), timed alone | | 1.42-1.60 / 1.78-2.38 | |
+| a scene asked again, nothing changed (pinyin's first key) | | 0.29-0.35 / 0.42-0.51 | |
 
-Typing costs the same; a scene asked for nothing is half a millisecond, where pinyin's first key and
-its commit had each made one (4.7 to 9.6 ms in the frame). Shift costs a scene made anew in its
-frame's draw, 3 to 6 ms more to the frame; the keyboard's first showing costs about 22 ms more (its
-scene, every key's node recorded, the canvas's own layout), past 060-render-perf's bounds (median
-+10%, p90 +15%). In systrace (the same emulator) a scene made anew is 6.0 ms at the median, 4.9 of
-them `cascade` (the theme's styles matched key by key and state by state; measuring 0.1), and its
-first after a theme 26 ms at p90. That is over 5 ms, so P2 does not make the whole scene in the
-frame: either a key at a time (what changed: Shift's letters, Return; the cascade kept by key and
-state, it does not depend on sizes) or off the main thread, the frame drawing the last scene until
-the new one is ready (a touch already finds its keys in the scene drawn last).
+The theme rows are the last two pairs: in the first two a theme's frame was taken once the keyboard's
+frame showed, before its keys were in it (now `shows`, as a build's), and the views' were bimodal.
+Each switch builds the input view anew. With the views the frame is done 40 ms after a switch to a
+flat theme and 68 after one to a block theme (the keys measured in an earlier traversal, the main
+thread busy the frame's whole length all the same); with the canvas both are 61-64, the 26 keys'
+first measure in the shown frame (its layout 33.5 ms, the views' to flat 21.5). Until that is found
+(systrace of the switch with sections in `BaseKeyboard.onMeasure`: the canvas's frames measured the
+keyboard 7.5 times a frame, the views' 5.2), the switch stays off: everything else is within the
+bounds. A theme switch is a setting changed, not typing; averaged over the two directions the canvas
+is 62 ms to the views' 55.
+
+The 26 keys' layout, 4.6 ms with the views and 22 with the canvas in the first debug measurements, is
+not the canvas's: the new keyboard's first measure (25 ms in systrace, the same in both: its KeyViews,
+INVISIBLE or not, measured as before, the canvas's own measure 0.0) falls in the shown frame or in an
+earlier one from one run to the next (the views' 9 keys, no canvas at all, measured 29.7 one run and
+5.8 the next), so the frame's layout is bimodal; the frame done, its sum, is within the bounds.
+
+In systrace on the benchmark build (`atrace -a io.github.sraw.youmo.bench view`) a scene made anew is
+0.79 ms at the median (`cascade.of` 0.06, `content` 0.14, `paint` 0.15, `measure text` 0.06), one
+asked again 0.26; a debug build's was 4.9 ms, 4.2 of it the cascade, before the cascade kept its
+matches. Four of 401 took about 21 ms, each in a different phase (a pause of the process, not a
+phase's work). Making the scene a key at a time or off the main thread is not needed for its cost.
 
 ### Hardware keyboard
 

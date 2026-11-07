@@ -28,7 +28,14 @@ class MarkDrawn(val drawn: Drawn, val slot: Slot, val minScale: Double, val drop
 class KeyContent(val glyph: Drawn?, val marks: List<MarkDrawn>, val room: Box, val letter: Boolean, val baseline: Double, val yields: Boolean = true)
 
 /** What a key's content is drawn in, as the theme has it in its normal state: one per part. */
-class Looks(val label: TextLook, val icon: TextLook, val badge: TextLook, val mark: TextLook, val shortcut: TextLook)
+/** A key's parts' looks, each cascaded when asked: most keys have no badge, many no mark. */
+class Looks(private val of: (Part) -> TextLook) {
+    val label: TextLook get() = of(Part.Label)
+    val icon: TextLook get() = of(Part.Icon)
+    val badge: TextLook get() = of(Part.Badge)
+    val mark: TextLook get() = of(Part.Mark)
+    val shortcut: TextLook get() = of(Part.Shortcut)
+}
 
 /**
  * Step 5 of §6: a key's label, icon and marks where theme 3.0's KeyView put them (rules B §5), from

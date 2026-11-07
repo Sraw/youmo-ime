@@ -12,8 +12,10 @@ import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
+import org.fcitx.fcitx5.android.scene.theme.Cascades
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -41,10 +43,26 @@ class SceneBuilderTest {
             }
         }
         val scene = SceneBuilder(Fixtures.materialLight, Fixtures.portrait, FakeMeasurer, phases = phases).build(Fixtures.qwerty).ok()
-        assertEquals(listOf("expand", "/", "place", "/", "cascade", "/", "paint", "/"), told)
+        assertEquals(listOf("expand", "/", "place", "/", "cascade.of", "/", "faces", "/", "content", "/", "paint", "/"), told)
         val plain = Fixtures.scene(Fixtures.portrait)
         assertEquals(plain.keys.map { it.id to it.faces }, scene.keys.map { it.id to it.faces })
         assertEquals(plain.base, scene.base)
+    }
+
+    // a theme's cascades kept from scene to scene (TextKeyboard's) make each scene as a fresh one does:
+    // every snapshot's scene, in turn, through one theme's cascades, the same text as made alone
+    @Test
+    fun keptCascadesMakeTheSameScenes() {
+        for (theme in listOf(Fixtures.materialLight, Forms.materialDark)) {
+            val kept = Cascades(theme)
+            for (shot in Shots.all) {
+                val board = Forms.layout(shot.board)
+                val fresh = SceneBuilder(theme, shot.env, FakeMeasurer).build(board, Forms.fragments).ok()
+                val again = SceneBuilder(theme, shot.env, FakeMeasurer, cascades = kept).build(board, Forms.fragments).ok()
+                assertEquals(SceneText.of(fresh), SceneText.of(again), "${theme.name} ${shot.name}")
+            }
+        }
+        assertFailsWith<IllegalArgumentException> { SceneBuilder(Forms.materialDark, Fixtures.portrait, FakeMeasurer, cascades = Cascades(Fixtures.materialLight)) }
     }
 
     @Test

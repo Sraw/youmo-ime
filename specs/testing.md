@@ -200,6 +200,18 @@ a settings page, rotation, a field type, an upgrade) is tried on a device before
   from a release. What it cannot test, left to a phone and a person: a real microphone and its
   HAL (AudioRecord's failures, its timestamps, the zeroes before it opens), noise and distance, accents.
 - A real phone (arm64) for performance, voice latency and a real microphone.
+- Performance numbers are taken on the **benchmark** build type, not debug: release's R8, not
+  debuggable (a debuggable app runs its code interpreted and JIT'd differently, its frames up to
+  twice as slow and noisier), signed with the debug key, id `io.github.sraw.youmo.bench`, with debug's
+  typing host (`TypingHostActivity`). Instrumentation runs against it as against debug (same key):
+  `./gradlew :app:connectedTextBenchmarkAndroidTest -Pyoumo.testBuildType=benchmark
+  -Pandroid.testInstrumentationRunnerArguments.class=org.fcitx.fcitx5.android.input.KeyboardPerfBaselineTest
+  -Pandroid.testInstrumentationRunnerArguments.perfRuns=20 -Pandroid.testInstrumentationRunnerArguments.perfCanvas=true`,
+  its rows (`KeyboardPerf` in logcat) read with `adb logcat -d -s KeyboardPerf:I`. Two builds' numbers
+  are compared only from one emulator session, each pair run twice: a run's medians move by up to 30%
+  from session to session. Systrace sections of the app: `adb shell atrace --async_start -c -b 32768
+  -a io.github.sraw.youmo.bench view`, the test, then `atrace --async_dump` (a non-debuggable app's
+  `Trace` sections show only when it is named with `-a`).
 
 Worth checking by hand for keyboard changes: portrait and landscape; a password field (nothing
 learned, no hold-to-talk); a URL and an email field (address keys); a search field (Enter acts);

@@ -40,8 +40,11 @@ class SceneFonts(private val look: ThemeLook) {
 
 /**
  * The engine's text measured as Android draws it ([ScenePainter]): the same Paint settings, so what is
- * placed is what is drawn. Kept, the last [KEPT] texts by font and size: a scene made again (Shift,
- * Return's label) measures the same few dozen texts, and a measure is Paint's slowest part of it.
+ * placed is what is drawn. Kept, the last [KEPT] texts by text, font, weight and size: a scene made
+ * again (Shift, Return's label) measures only what it had not before. Measuring is a small part of a
+ * scene (youmo29: some 60 texts, 0.1 ms, specs/app.md), so this saves little, but nothing twice.
+ *
+ * The main thread's only, as the keyboard draws: its Paint and its map are one caller's at a time.
  */
 class AndroidTextMeasurer(private val fonts: SceneFonts) : TextMeasurer {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)

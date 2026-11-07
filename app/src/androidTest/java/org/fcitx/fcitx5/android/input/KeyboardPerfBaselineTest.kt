@@ -19,6 +19,7 @@ import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
 import androidx.core.view.ViewCompat
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
@@ -354,7 +355,8 @@ class KeyboardPerfBaselineTest {
 
     private fun theme(to: Theme): KeyboardFrames.Sample {
         val before = onMain { keyboardFrame() }
-        return measure({ keyboardFrame().let { it != null && it !== before && it.isShown } }) { ThemeManager.setNormalModeTheme(to) }
+        // the 26 keys in the new frame, as a build's: the frame shown alone, its keyboard not yet in it, is not the switch done
+        return measure({ keyboardFrame().let { it !== before && shows(it, Board.FULL) } }) { ThemeManager.setNormalModeTheme(to) }
     }
 
     // a picture as wide as a phone's keyboard, as a theme's cut is: a gradient and some shapes
@@ -410,9 +412,30 @@ class KeyboardPerfBaselineTest {
             row("press", "single key", single)
             row("press", "10-key run, every key", run)
             log("press\t10-key run, slowest key of a run\t${Stats(runWorst)}")
+            // a field that sends (a chat's): Return's label changes with the first key and the commit
+            // (发送, then 换行 while composing), the scene made again for each, where a plain field keeps it
+            fieldAction(EditorInfo.IME_ACTION_SEND)
+            val sent = mutableListOf<KeyboardFrames.Sample>()
+            repeat(warmUp + runs) { i ->
+                val ten = presses(marks, letters.map(at::getValue), gapMs = FAST_GAP_MS)
+                endTyping(space)
+                if (i >= warmUp) sent += ten
+            }
+            row("press", "10-key run in a send field, every key", sent)
         } finally {
+            runCatching { fieldAction(null) }
             onMain { service.window.window!!.callback = marks.original }
         }
+    }
+
+    // the field single-line with [action] (null: back to the plain field), the input method told anew
+    private fun fieldAction(action: Int?) {
+        scenario.onActivity {
+            it.field.isSingleLine = action != null
+            it.field.imeOptions = action ?: EditorInfo.IME_ACTION_UNSPECIFIED
+            context.inputMethodManager.restartInput(it.field)
+        }
+        settle()
     }
 
     private fun presses(marks: DownMarks, keys: List<PointF>, gapMs: Long): List<KeyboardFrames.Sample> {

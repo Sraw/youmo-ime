@@ -18,6 +18,9 @@ import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.engine.MarkContent
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
+import org.fcitx.fcitx5.android.scene.layout.Include
+import org.fcitx.fcitx5.android.scene.layout.Key
+import org.fcitx.fcitx5.android.scene.layout.Row
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -64,6 +67,36 @@ class TextBoardSceneTest {
         // and is no other environment: the keyboard keeps the scene it had (TextKeyboard.scene)
         assertEquals(TextBoardState(semicolonScheme = true).input(), TextBoardState(semicolonScheme = true, composing = true).input())
         assertNull(TextBoardState(tableExtra = 'x').input().tableExtra)
+    }
+
+    // why input() may drop composing without a table: qwerty.xml asks it nowhere else. Every when= in
+    // it, every other term either way, holds alike composing or not once there is no table
+    @Test
+    fun qwertyAsksComposingOnlyOfATable() {
+        val layout = SceneData.qwerty
+        val conditions = layout.parts.flatMap { part ->
+            when (part) {
+                is Row -> listOfNotNull(part.condition) + part.cells.flatMap { cell ->
+                    listOfNotNull(cell.condition) + ((cell as? Key)?.variants?.map { it.condition } ?: emptyList())
+                }
+                is Include -> listOfNotNull(part.condition)
+            }
+        }
+        val asking = conditions.filter { c -> c.anyOf.flatten().any { it.name == "composing" } }
+        assertTrue("qwerty.xml asks composing somewhere", asking.isNotEmpty())
+        for (c in asking) {
+            val others = c.anyOf.flatten().filter { it.name != "composing" && it.name != "table" }.map { it.copy(negated = false) }.distinct()
+            for (set in 0 until (1 shl others.size)) {
+                fun holds(composing: Boolean) = c.holds { name, values ->
+                    when (name) {
+                        "composing" -> composing
+                        "table" -> false
+                        else -> others.indexOfFirst { it.name == name && it.values == values }.let { set and (1 shl it) != 0 }
+                    }
+                }
+                assertEquals("$c", holds(false), holds(true))
+            }
+        }
     }
 
     // a table's roots over the letters: `when=roots` takes `{root:x}`, the corners the letters
