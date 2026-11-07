@@ -74,8 +74,12 @@ class SceneBuilder(
         val rows = phases.section("expand") { Expand.rows(layout, fragments, expanding, splitSide) }.getOr { return Parsed.Failed(it) }
         val board = board(placement)
         val placed = phases.section("place") { Place.rows(rows, layout.columns, layout.onSplit, env, board, warnings) }.getOr { return Parsed.Failed(it) }
-        // each key's looks cascaded, its face's layers and its texts placed (the texts measured)
-        val keys = phases.section("cascade") { placed.mapNotNull { p -> (p.item as? ExpandedKey)?.let { prepare(layout.id, p, it) } } }
+        // each key's looks cascaded, its face's layers and its texts placed (the texts measured): each a
+        // pass over the keys, so a trace tells the three apart
+        val keyed = placed.mapNotNull { p -> (p.item as? ExpandedKey)?.let { p to it } }
+        val styled = phases.section("cascade.of") { keyed.map { (_, k) -> styled(layout.id, k) } }
+        val shaped = phases.section("faces") { keyed.mapIndexed { i, (p, k) -> shaped(p, k, styled[i]) } }
+        val keys = phases.section("content") { keyed.mapIndexed { i, (p, k) -> prepare(p, k, styled[i], shaped[i]) } }
         val nodes = phases.section("paint") {
             val settled = settle(keys)
             keys.mapIndexed { i, k -> node(k, settled[i]) }
@@ -142,27 +146,41 @@ class SceneBuilder(
 
     private class Settled(val glyph: Drawn?, val marks: List<Drawn?>)
 
-    private fun prepare(board: String, placed: Placed, key: ExpandedKey): Prepared {
-        val face = key.attrs.face ?: Face.Default
-        val c = if (face == Face.Keep) unflat else cascade
-        val flat = env.flat && face != Face.Keep
-        val margin = key.attrs.margin ?: true
+    // a key's looks in its states and pressed: its face's and each part's
+    private class Styled(
+        val states: Set<KeyState>,
+        val looks: Map<Set<KeyState>, KeyLook>,
+        val parts: Map<Set<KeyState>, (Part) -> TextLook>,
+    )
+
+    private fun styled(board: String, key: ExpandedKey): Styled {
+        val c = if (key.attrs.face == Face.Keep) unflat else cascade
         val states = statesOf(key)
-        val sets = listOf(states, states + KeyState.Pressed)
         val looks = HashMap<Set<KeyState>, KeyLook>()
         val parts = HashMap<Set<KeyState>, (Part) -> TextLook>()
-        for (s in sets) {
+        for (s in listOf(states, states + KeyState.Pressed)) {
             // the key's own once a state, each part on it (M4)
             val own = c.of(target(board, key, s, null))
             looks[s] = KeyLook(own, theme)
             val byPart = Part.entries.associateWith { TextLook(c.of(target(board, key, s, it), own), theme) }
             parts[s] = byPart::getValue
         }
-        val geometry = looks.mapValues { (_, look) -> Faces.of(placed.cell, look, face, margin, flat, env.density) }
-        val now = parts.getValue(states)
+        return Styled(states, looks, parts)
+    }
+
+    // the key's face's layers in each state
+    private fun shaped(placed: Placed, key: ExpandedKey, styled: Styled): Map<Set<KeyState>, FaceGeometry> {
+        val face = key.attrs.face ?: Face.Default
+        val flat = env.flat && face != Face.Keep
+        val margin = key.attrs.margin ?: true
+        return styled.looks.mapValues { (_, look) -> Faces.of(placed.cell, look, face, margin, flat, env.density) }
+    }
+
+    private fun prepare(placed: Placed, key: ExpandedKey, styled: Styled, geometry: Map<Set<KeyState>, FaceGeometry>): Prepared {
+        val now = styled.parts.getValue(styled.states)
         val looksNow = Looks(now(Part.Label), now(Part.Icon), now(Part.Badge), now(Part.Mark), now(Part.Shortcut))
-        val drawn = content.of(key, placed.cell, geometry.getValue(states).content, looksNow)
-        return Prepared(placed, key, states, looks, parts, geometry, drawn)
+        val drawn = content.of(key, placed.cell, geometry.getValue(styled.states).content, looksNow)
+        return Prepared(placed, key, styled.states, styled.looks, styled.parts, geometry, drawn)
     }
 
     // the states a key is in but pressed: the environment's for its id or role, Shift's from the shift

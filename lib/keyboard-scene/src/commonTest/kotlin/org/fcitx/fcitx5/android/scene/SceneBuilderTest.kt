@@ -41,7 +41,7 @@ class SceneBuilderTest {
             }
         }
         val scene = SceneBuilder(Fixtures.materialLight, Fixtures.portrait, FakeMeasurer, phases = phases).build(Fixtures.qwerty).ok()
-        assertEquals(listOf("expand", "/", "place", "/", "cascade", "/", "paint", "/"), told)
+        assertEquals(listOf("expand", "/", "place", "/", "cascade.of", "/", "faces", "/", "content", "/", "paint", "/"), told)
         val plain = Fixtures.scene(Fixtures.portrait)
         assertEquals(plain.keys.map { it.id to it.faces }, scene.keys.map { it.id to it.faces })
         assertEquals(plain.base, scene.base)
