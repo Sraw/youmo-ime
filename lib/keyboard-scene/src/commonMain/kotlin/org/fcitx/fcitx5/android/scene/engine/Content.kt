@@ -213,8 +213,8 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         return Box(x, y, x + w, y + h)
     }
 
-    /** Text measured: its [box] as AutoScaleTextView sizes it (a single character's ink across, longer text's advance; the font's extent up), from the pen's start. */
-    private class Measured(val text: String, val m: TextMetrics, val size: Double, val font: String, val weight: Int, val scaleX: Double = 1.0) {
+    /** Text measured: its [box] as AutoScaleTextView sizes it (a single character's ink across, longer text's advance; the font's extent up), from the pen's start. The popups' text is centred so too ([PopupBuilder]). */
+    internal class Measured(val text: String, val m: TextMetrics, val size: Double, val font: String, val weight: Int, val scaleX: Double = 1.0) {
         val box: Box = if (codePoints(text) == 1) {
             Box(m.ink.left * scaleX, m.top, m.ink.right * scaleX, m.bottom)
         } else {

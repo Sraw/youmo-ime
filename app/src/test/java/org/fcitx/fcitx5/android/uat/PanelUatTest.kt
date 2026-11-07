@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.text.InputType
+import android.view.View
 import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
@@ -16,7 +17,9 @@ import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.picker.EmojiSearchUi
 import org.fcitx.fcitx5.android.input.popup.EmojiModifier
 import org.fcitx.fcitx5.android.input.picker.PickerData
+import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
 import org.fcitx.fcitx5.android.input.picker.PickerGridView
 import org.fcitx.fcitx5.android.input.picker.PickerLayout
 import org.fcitx.fcitx5.android.input.picker.PickerSideUi
@@ -24,6 +27,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -35,6 +39,9 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class PanelUatTest {
+
+    @get:Rule
+    val prefs = PrefsRule()
 
     private val h = KeyboardHarness()
 
@@ -59,6 +66,30 @@ class PanelUatTest {
             h.relayout()
         }
         error("no $label in the grid")
+    }
+
+    // a symbol's key is a view of no id (PickerGridAdapter): with the canvas off its bubble is a view's
+    // as before, never the engine's (060-render-p2 S2: its viewId is NO_VIEW as a scene key's is)
+    @Test
+    @Uat("PAN-21")
+    fun aSymbolHeldShowsTheViewsBubble() {
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, false)
+        h.start()
+        h.tap(h.key("符"))
+        val first = KeyboardHarness.all(KeyboardHarness.find<PickerGridView>(h.inputView)!!)
+            .filterIsInstance<TextKeyView>().first { h.shown(it) }
+        val symbol = first.mainText.text.toString()
+        val finger = h.finger(first, h.at(first))
+        h.after(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
+        val all = KeyboardHarness.all(h.inputView)
+        assertTrue(all.none { it is PopupSceneView })
+        // the bubble's text, a view over the panel: not a key's own
+        val bubble = all.filterIsInstance<TextView>().filter { h.shown(it) && it.text.toString() == symbol }
+            .filter { v -> generateSequence(v as View) { it.parent as? View }.none { it is KeyView } }
+        assertEquals(1, bubble.count())
+        finger.up(h.at(first))
+        h.idle()
+        assertEquals(symbol, h.field.text.toString())
     }
 
     @Test

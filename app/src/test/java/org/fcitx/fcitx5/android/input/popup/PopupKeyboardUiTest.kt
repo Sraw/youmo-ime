@@ -4,19 +4,28 @@
  */
 package org.fcitx.fcitx5.android.input.popup
 
+import android.graphics.Paint
 import android.graphics.Rect
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
+import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupScenes
+import org.fcitx.fcitx5.android.scene.KeyState
+import org.fcitx.fcitx5.android.scene.Op
+import org.fcitx.fcitx5.android.scene.Scene
+import org.fcitx.fcitx5.android.scene.engine.Popups
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
+import org.robolectric.ParameterizedRobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 import kotlin.math.ceil
 
 /**
@@ -24,9 +33,22 @@ import kotlin.math.ceil
  * row fills (13 entries: 5 columns, 3 rows), the empty slots fall at both ends when the popup is
  * centred over its key; laid out by gravity, the top row's keys were drawn a column or two off
  * from where the finger selects them, and the neighbour was typed.
+ *
+ * Each case twice: the keys as views, and as the engine's scene ([canvas]: a key the canvas draws,
+ * 060-render-p2 S2), read from the scene's keys where the views' are read.
  */
-@RunWith(RobolectricTestRunner::class)
-class PopupKeyboardUiTest {
+@RunWith(ParameterizedRobolectricTestRunner::class)
+// the canvas's scenes read the theme's look (ThemeManager, so AppPrefs)
+@Config(application = FcitxApplication::class)
+class PopupKeyboardUiTest(private val canvas: Boolean) {
+
+    companion object {
+        @JvmStatic
+        @ParameterizedRobolectricTestRunner.Parameters(name = "canvas={0}")
+        fun paths() = listOf(arrayOf<Any>(false), arrayOf<Any>(true))
+    }
+
+    private val context get() = RuntimeEnvironment.getApplication()
 
     private val keyWidth = 40
     private val keyHeight = 50
@@ -55,14 +77,25 @@ class PopupKeyboardUiTest {
             asIs = asIs,
             inRow = inRow,
             onFocusMoved = onFocusMoved,
+            scenes = if (canvas) PopupScenes(View(context), ThemePreset.PixelDark) else null,
         )
     }
 
     private fun View.label(): String? = ((this as? ViewGroup)?.getChildAt(0) as? TextView)?.text?.toString()
 
+    // the canvas's: the scene drawn
+    private fun PopupKeyboardUi.scene(): Scene = (root as PopupSceneView).scene!!
+
+    /** How many rows it has, drawn. */
+    private fun PopupKeyboardUi.rows(): Int = if (canvas) (scene().height / keyHeight).toInt() else (root as ViewGroup).childCount
+
     /** Every key drawn, by its label, at (row from the bottom, column), as laid out. */
     private fun drawn(ui: PopupKeyboardUi): Map<String, Pair<Int, Int>> {
-        val root = ui.root
+        if (canvas) {
+            val s = ui.scene()
+            return s.keys.associate { k -> k.label!! to (((s.height - k.bounds.bottom) / keyHeight).toInt() to (k.bounds.left / ui.keyWidth).toInt()) }
+        }
+        val root = ui.root as ViewGroup
         val unspecified = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
         root.measure(unspecified, unspecified)
         root.layout(0, 0, root.measuredWidth, root.measuredHeight)
@@ -121,10 +154,14 @@ class PopupKeyboardUiTest {
         assertTrue("7 symbols in rows 1 and 2", drawn.filterKeys { it in keys.drop(5) }.values.all { it.first in 1..2 })
         // the first symbol right above the digit, the key under the finger
         assertEquals(drawn["7"]!!.second, drawn["*"]!!.second)
-        val rows = ui.root.childCount
         drawn.forEach { (label, cell) -> assertEquals(KeyAction.HostKeyAction(label), ui.select(cell.first, cell.second)) }
-        // no line between them
-        assertTrue((0 until rows).all { ui.root.getChildAt(it).background == null })
+        // no line between them: the views' rows no background, the scene's base the panel only
+        if (canvas) {
+            assertEquals(listOf("Shadow", "Fill"), ui.scene().base.map { it::class.simpleName })
+        } else {
+            val root = ui.root as ViewGroup
+            assertTrue((0 until ui.rows()).all { root.getChildAt(it).background == null })
+        }
     }
 
     @Test
@@ -155,8 +192,7 @@ class PopupKeyboardUiTest {
         assertEquals(keys.size, drawn.size)
         assertTrue(drawn.filterKeys { it in keys.take(7) }.values.all { it.first in 0..1 })
         assertTrue(drawn.filterKeys { it in keys.drop(7) }.values.all { it.first == 2 })
-        val rows = ui.root.childCount
-        assertEquals(3, rows)
+        assertEquals(3, ui.rows())
     }
 
     @Test
@@ -226,9 +262,22 @@ class PopupKeyboardUiTest {
         assertEquals(KeyAction.CommitAction("\u05F2\u05B7"), PopupKeyboardUi.keyAction("\u05F2\u05B7"))
     }
 
-    private fun PopupKeyboardUi.labels(): List<TextView> {
+    /** A key's label as drawn: [size] px, [width] its text's at it, [drawn] how wide it is drawn (a view's measured width, the scene's squeezed). */
+    private class Label(val text: String, val size: Float, val width: Float, val drawn: Float)
+
+    private fun PopupKeyboardUi.labels(): List<Label> {
+        if (canvas) {
+            val paint = Paint()
+            return scene().keys.flatMap { it.ops(false) }.filterIsInstance<Op.Text>().map {
+                paint.textSize = it.size.toFloat()
+                val w = paint.measureText(it.text)
+                Label(it.text, it.size.toFloat(), w, ceil(w * it.scaleX).toFloat())
+            }
+        }
+        val root = root as ViewGroup
         val rows = (0 until root.childCount).map { root.getChildAt(it) as ViewGroup }
         return rows.flatMap { row -> (0 until row.childCount).mapNotNull { ((row.getChildAt(it) as? ViewGroup)?.getChildAt(0) as? TextView) } }
+            .map { Label(it.text.toString(), it.textSize, it.paint.measureText(it.text.toString()), it.measuredWidth.toFloat()) }
     }
 
     /** `.com`'s long press: its labels each fitted to a fixed width came out at four sizes. */
@@ -238,9 +287,9 @@ class PopupKeyboardUiTest {
         val ui = popup(domains, Rect(480, 500, 520, 550))
         val labels = ui.labels()
         assertEquals(4, labels.size)
-        assertEquals(1, labels.map { it.textSize }.toSet().size)
+        assertEquals(1, labels.map { it.size }.toSet().size)
         // wide enough for the widest, so none is made smaller
-        assertTrue(labels.all { it.paint.measureText(it.text.toString()) < ui.keyWidth })
+        assertTrue(labels.all { it.width < ui.keyWidth })
         assertTrue(ui.keyWidth >= keyWidth)
     }
 
@@ -257,9 +306,11 @@ class PopupKeyboardUiTest {
         val unspecified = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
         ui.root.measure(unspecified, unspecified)
         for (label in ui.labels()) {
-            val text = label.paint.measureText(label.text.toString())
+            val text = label.width
             assertTrue("${label.text}: $text in ${ui.keyWidth}", text + 12 <= ui.keyWidth)
-            assertEquals("${label.text}", ceil(text).toInt(), label.measuredWidth)
+            assertEquals(label.text, ceil(text).toInt(), label.drawn.toInt())
+            // the scene's at its full size (Popups' 20 dp; Robolectric's density is 1)
+            if (canvas) assertEquals(label.text, Popups.KEY_TEXT_DP.toFloat(), label.size)
         }
     }
 
@@ -298,13 +349,13 @@ class PopupKeyboardUiTest {
         val long = arrayOf("example", "ex", "examples", "e", "exam")
         val roomy = popup(long, Rect(480, 500, 520, 550))
         // five across, each half as wide as the widest label and its padding (6 dp a side, at 1 dp = 1 px)
-        val fitting = roomy.labels().maxOf { it.paint.measureText(it.text.toString()) }.toInt() + 12
+        val fitting = roomy.labels().maxOf { it.width }.toInt() + 12
         val narrow = Rect(0, 0, 5 * (fitting / 2), 600)
         val ui = popup(long, Rect(0, 500, 40, 550), narrow)
         assertEquals(fitting / 2, ui.keyWidth)
-        val sizes = ui.labels().map { it.textSize }.toSet()
+        val sizes = ui.labels().map { it.size }.toSet()
         assertEquals(1, sizes.size)
-        assertTrue(sizes.single() < roomy.labels().first().textSize)
+        assertTrue(sizes.single() < roomy.labels().first().size)
     }
 
     @Test
@@ -389,13 +440,49 @@ class PopupKeyboardUiTest {
         assertEquals(2, buzzes)
     }
 
+    // the scene's: a focus moved is the scene drawn again, that key selected, nothing else changed
+    @Test
+    fun theKeyInFocusIsDrawnSelected() {
+        if (!canvas) return
+        val ui = popup(arrayOf("a", "b", "c"), Rect(480, 500, 520, 550))
+        fun selected() = ui.scene().keys.filter { KeyState.Selected in it.states }.map { it.label }
+        assertEquals(listOf("a"), selected())
+        val before = ui.scene()
+        ui.onChangeFocus(0f, 0f)
+        ui.onChangeFocus(ui.keyWidth * PopupFocus.STEP, 0f)
+        val picked = (ui.onTrigger() as KeyAction.HostKeyAction).act
+        assertEquals(listOf(picked), selected())
+        assertEquals(before.keys.map { it.bounds }, ui.scene().keys.map { it.bounds })
+    }
+
+    // TalkBack reads each key of the scene, the one in focus selected, as it moves (M2: a basic node
+    // a key, its words and place; the keyboard's whole treatment is S3's)
+    @Test
+    fun talkBackReadsEachKeyOfTheScene() {
+        if (!canvas) return
+        val ui = popup(arrayOf("a", "b", "c"), Rect(480, 500, 520, 550))
+        val view = ui.root as PopupSceneView
+        fun read() = view.spokenKeys().associate { it.contentDescription.toString() to it.isSelected }
+        assertEquals(mapOf("a" to true, "b" to false, "c" to false), read())
+        ui.onChangeFocus(0f, 0f)
+        ui.onChangeFocus(ui.keyWidth * PopupFocus.STEP, 0f)
+        val picked = (ui.onTrigger() as KeyAction.HostKeyAction).act
+        assertEquals(listOf(picked), read().filterValues { it }.keys.toList())
+        // each where it is drawn: its box past the shadow's room
+        val a = ui.scene().keys.first { it.label == "a" }.bounds
+        @Suppress("DEPRECATION")
+        val box = android.graphics.Rect().also { view.spokenKeys().first { n -> n.contentDescription == "a" }.getBoundsInParent(it) }
+        assertEquals(a.left.toInt() + view.outset.left, box.left)
+        assertEquals(a.top.toInt() + view.outset.top, box.top)
+    }
+
     @Test
     fun aKeyOfNoLettersStillHasItsSymbolsFiveARow() {
         // a 1 the user left with its digit alone: its ten symbols two rows of five, not ten of one
         val keys = arrayOf("1") + Array(10) { "#$it" }
         val ui = popup(keys, Rect(480, 500, 520, 550), split = 1, inRow = 0)
         val drawn = drawn(ui)
-        assertEquals(3, ui.root.childCount)
+        assertEquals(3, ui.rows())
         assertEquals(0 to 0, drawn["1"])
         assertEquals(KeyAction.HostKeyAction("1"), ui.onTrigger())
     }

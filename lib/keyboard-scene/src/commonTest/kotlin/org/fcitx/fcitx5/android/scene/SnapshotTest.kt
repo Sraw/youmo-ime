@@ -16,6 +16,11 @@ class Shot(val name: String, val board: String, val env: Env, val theme: Theme =
     val scene: Scene by lazy { Forms.scene(board, env, theme) }
 }
 
+/** A popup's scene the snapshots hold, written to snapshots/[name].txt. */
+class PopupShot(val name: String, make: () -> Scene) {
+    val scene: Scene by lazy(make)
+}
+
 /**
  * Every scene the snapshots hold: every board of rules C in material-light in every form a phone
  * shows it in ([Forms.all]), and the states that change a board's look (dark, a table looking up,
@@ -72,6 +77,11 @@ object Shots {
 
     val all: List<Shot> get() = forms + states
 
+    /** Each popup ([Forms.popups]) in the forms that change how one looks: block, flat, floating (its text smaller). */
+    val popups: List<PopupShot> = listOf("block" to Forms.block, "flat" to Forms.flat, "floating" to Forms.floating).flatMap { (form, env) ->
+        Forms.popups(env).map { (name, make) -> PopupShot("popup-$name-$form", make) }
+    }
+
     // NumberPad's, full being every form's
     private val PADS = listOf("digits", "signed", "decimal", "signed-decimal", "phone", "datetime")
 }
@@ -91,6 +101,9 @@ class SnapshotTest {
     fun theStatesThatChangeABoard() = checkAll(Shots.states)
 
     @Test
+    fun everyPopup() = check(Shots.popups.map { it.name to it.scene })
+
+    @Test
     fun noBoardWarnsInAnyForm() {
         val warned = Shots.forms.mapNotNull { s -> s.scene.warnings.takeIf { it.isNotEmpty() }?.let { "${s.name}: $it" } }
         assertTrue(warned.isEmpty(), warned.joinToString("\n"))
@@ -101,17 +114,19 @@ class SnapshotTest {
     fun everySnapshotIsAShot() {
         // recording, the shots may not all be written yet (the tests run in any order)
         if (recording()) return
-        val names = Shots.all.map { it.name }
+        val names = Shots.all.map { it.name } + Shots.popups.map { it.name }
         assertEquals(names.toSet().size, names.size, "two shots of one name")
         val files = listNames("$TEST_DATA/snapshots")
         assertEquals(names.map { "$it.txt" }.sorted(), files)
     }
 
     // each differing file named, not just the first
-    private fun checkAll(shots: List<Shot>) {
-        val failed = shots.mapNotNull { shot ->
-            val text = SceneText.of(shot.scene)
-            val path = "$TEST_DATA/snapshots/${shot.name}.txt"
+    private fun checkAll(shots: List<Shot>) = check(shots.map { it.name to it.scene })
+
+    private fun check(shots: List<Pair<String, Scene>>) {
+        val failed = shots.mapNotNull { (name, scene) ->
+            val text = SceneText.of(scene)
+            val path = "$TEST_DATA/snapshots/$name.txt"
             val committed = readText(path)
             when {
                 recording() -> null.also { writeText(path, text) }
