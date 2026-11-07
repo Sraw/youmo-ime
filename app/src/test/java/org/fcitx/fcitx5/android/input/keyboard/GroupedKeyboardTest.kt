@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.g14Code
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
+import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -209,7 +210,7 @@ class GroupedKeyboardTest {
         // the preview too
         val previews = ArrayList<PopupAction>()
         keyboard.popupActionListener = PopupActionListener { previews += it }
-        keyboard.onPopupAction(PopupAction.PreviewAction(R.id.button_comma, ",", Rect()))
+        keyboard.onPopupAction(PopupAction.PreviewAction(KeyRef.view(R.id.button_comma), ",", Rect()))
         assertEquals("，", (previews.single() as PopupAction.PreviewAction).content)
     }
 
@@ -223,7 +224,7 @@ class GroupedKeyboardTest {
         // changed after the keyboard was made
         AppPrefs.getInstance().internal.popupOverrides.setValue("q % ^\nw &")
         val built = key("QW").popup!!.filterIsInstance<KeyDef.Popup.Keyboard.Explicit>().single()
-        keyboard.onPopupAction(PopupAction.ShowKeyboardAction(qw.existingOrNewId, built, Rect()))
+        keyboard.onPopupAction(PopupAction.ShowKeyboardAction(KeyRef.view(qw.existingOrNewId), built, Rect()))
         val opened = (shown.single() as PopupAction.ShowKeyboardAction).keyboard as KeyDef.Popup.Keyboard.Explicit
         assertEquals(listOf("Q", "W", "1", "q", "w", "%", "^", "&"), opened.items.toList())
     }

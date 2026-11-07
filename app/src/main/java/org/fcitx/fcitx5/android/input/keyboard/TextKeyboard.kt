@@ -44,6 +44,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
+import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.scene.SceneLetters
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
 import org.fcitx.fcitx5.android.input.scene.TextBoardState
@@ -322,7 +323,7 @@ class TextKeyboard private constructor(
     private var returnAppearance = ReturnKeyAppearance.Enter
 
     // the letter key whose long press shows its roots (TableKeyboard.rootsOf) in its bubble
-    private var rootsShownOn = View.NO_ID
+    private var rootsShownOn: KeyRef? = null
 
     private var scope: CoroutineScope? = null
 
@@ -697,26 +698,26 @@ class TextKeyboard private constructor(
         }
     }
 
-    private fun transformPopupPreview(viewId: Int, c: String) = previewOf(c, viewId, ::transformAlphabet, ::transformPunctuation)
+    private fun transformPopupPreview(key: KeyRef, c: String) = previewOf(c, key, ::transformAlphabet, ::transformPunctuation)
 
     override fun onPopupAction(action: PopupAction) {
         val newAction = when (action) {
-            is PopupAction.PreviewAction -> action.copy(content = transformPopupPreview(action.viewId, action.content))
+            is PopupAction.PreviewAction -> action.copy(content = transformPopupPreview(action.key, action.content))
             // the roots stay shown till the key is let go
-            is PopupAction.PreviewUpdateAction -> if (action.viewId == rootsShownOn) return else action.copy(content = transformPopupPreview(action.viewId, action.content))
-            is PopupAction.DismissAction -> action.also { if (it.viewId == rootsShownOn) rootsShownOn = View.NO_ID }
+            is PopupAction.PreviewUpdateAction -> if (action.key == rootsShownOn) return else action.copy(content = transformPopupPreview(action.key, action.content))
+            is PopupAction.DismissAction -> action.also { if (it.key == rootsShownOn) rootsShownOn = null }
             // let go: the bubble goes whether or not a press shows one (no long press's keys to take it down)
-            is PopupAction.TriggerAction -> if (action.viewId == rootsShownOn) {
-                rootsShownOn = View.NO_ID
+            is PopupAction.TriggerAction -> if (action.key == rootsShownOn) {
+                rootsShownOn = null
                 action.outConsumed = true
-                super.onPopupAction(PopupAction.DismissAction(action.viewId))
+                super.onPopupAction(PopupAction.DismissAction(action.key))
                 return
             } else action
             is PopupAction.ShowKeyboardAction -> {
                 // a table's roots, large, in the key's bubble while the keys show them; nothing to pick
                 rootsOf(action.keyboard)?.let { roots ->
-                    rootsShownOn = action.viewId
-                    super.onPopupAction(PopupAction.PreviewAction(action.viewId, roots, action.bounds))
+                    rootsShownOn = action.key
+                    super.onPopupAction(PopupAction.PreviewAction(action.key, roots, action.bounds))
                     return
                 }
                 when (action.keyboard) {
@@ -876,12 +877,12 @@ private val BOTTOM_ROW_KEYS = setOf(',', '.')
 
 
 /**
- * What the preview bubble of the key [viewId] shows for [content]: a letter as Shift has it
+ * What the preview bubble of the key [key] shows for [content]: a letter as Shift has it
  * ([letter]), punctuation as the input method maps it ([punctuation]); an address's keys what they
  * commit, . not 。, as their labels show (TextKeyboard.updatePunctuationKeys).
  */
-internal fun previewOf(content: String, viewId: Int, letter: (String) -> String, punctuation: (String) -> String): String = when {
-    content.length != 1 || viewId in ADDRESS_KEYS -> content
+internal fun previewOf(content: String, key: KeyRef, letter: (String) -> String, punctuation: (String) -> String): String = when {
+    content.length != 1 || key.viewId in ADDRESS_KEYS -> content
     content[0].isLetter() -> letter(content)
     else -> punctuation(content)
 }

@@ -311,9 +311,9 @@ class GroupedKeyboard(
     // public for its test, which has no touch to open one
     public override fun onPopupAction(action: PopupAction) {
         val shown = when (action) {
-            is PopupAction.PreviewAction -> action.copy(content = previewOf(action.content, action.viewId, { it }, ::mapped))
-            is PopupAction.PreviewUpdateAction -> action.copy(content = previewOf(action.content, action.viewId, { it }, ::mapped))
-            is PopupAction.ShowKeyboardAction -> groupOf[action.viewId]?.let { (group, corner) ->
+            is PopupAction.PreviewAction -> action.copy(content = previewOf(action.content, action.key, { it }, ::mapped))
+            is PopupAction.PreviewUpdateAction -> action.copy(content = previewOf(action.content, action.key, { it }, ::mapped))
+            is PopupAction.ShowKeyboardAction -> groupOf[action.key.viewId]?.let { (group, corner) ->
                 action.copy(keyboard = longPressOf(group, corner, ::symbolsOf))
             } ?: action
             else -> action

@@ -13,6 +13,8 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
 import org.fcitx.fcitx5.android.input.popup.PopupAction
+import org.fcitx.fcitx5.android.input.popup.keyRef
+import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
@@ -44,8 +46,8 @@ internal class KeySwipes(
         fun swipeText(view: KeyView): BaseKeyboard.SwipeChoice
         fun onAction(action: KeyAction, source: KeyActionListener.Source = KeyActionListener.Source.Keyboard)
         fun onPopupAction(action: PopupAction)
-        fun onPopupChangeFocus(viewId: Int, x: Float, y: Float): Boolean
-        fun onPopupTrigger(viewId: Int, cancelled: Boolean): Boolean
+        fun onPopupChangeFocus(key: KeyRef, x: Float, y: Float): Boolean
+        fun onPopupTrigger(key: KeyRef, cancelled: Boolean): Boolean
     }
 
     private val prefs = AppPrefs.getInstance()
@@ -86,9 +88,9 @@ internal class KeySwipes(
     /** What the preview of [view] of [def] shows, swiped [totalY]: its [popup]'s own content, or what the swipe reaches. */
     fun preview(view: KeyView, def: KeyDef, totalY: Int, popup: KeyDef.Popup.AltPreview): PopupAction.PreviewUpdateAction =
         when (val preview = KeySwipe.preview(swipeKey(view, def), swipeLayers, totalY, keyboard.inPasswordField)) {
-            KeySwipe.Preview.Symbol -> PopupAction.PreviewUpdateAction(view.id, keyboard.swipeText(view).preview(popup.alternative))
-            is KeySwipe.Preview.Shortcut -> PopupAction.PreviewUpdateAction(view.id, shortcutLabel(preview.shortcut), words = true)
-            KeySwipe.Preview.Own -> PopupAction.PreviewUpdateAction(view.id, popup.content)
+            KeySwipe.Preview.Symbol -> PopupAction.PreviewUpdateAction(view.keyRef, keyboard.swipeText(view).preview(popup.alternative))
+            is KeySwipe.Preview.Shortcut -> PopupAction.PreviewUpdateAction(view.keyRef, shortcutLabel(preview.shortcut), words = true)
+            KeySwipe.Preview.Own -> PopupAction.PreviewUpdateAction(view.keyRef, popup.content)
         }
 
     /** What the preview shows of [shortcut]: a command's name, a text as it is (fitted to the bubble by [org.fcitx.fcitx5.android.input.popup.PopupComponent]). */
@@ -125,7 +127,7 @@ internal class KeySwipes(
                 GestureType.Move -> when {
                     // the menu has the touch: no cursor moved under it either
                     menu -> {
-                        keyboard.onPopupChangeFocus(v.id, event.x, event.y)
+                        keyboard.onPopupChangeFocus(v.keyRef, event.x, event.y)
                         true
                     }
                     longPopup.shown || event.countY == 0 || event.totalY - event.countY != 0 -> false
@@ -137,7 +139,7 @@ internal class KeySwipes(
                 GestureType.Up -> if (menu) {
                     menu = false
                     // let go over nothing (a greyed cell, back down on the key): the menu gone, no tap
-                    if (!keyboard.onPopupTrigger(v.id, event.cancelled)) keyboard.onPopupAction(PopupAction.DismissAction(v.id))
+                    if (!keyboard.onPopupTrigger(v.keyRef, event.cancelled)) keyboard.onPopupAction(PopupAction.DismissAction(v.keyRef))
                     true
                 } else {
                     lifted(v, def, event, builtIn, longPopup.shown)
@@ -186,7 +188,7 @@ internal class KeySwipes(
         if (preview == KeySwipe.Preview.Own) return false
         InputFeedbacks.hapticFeedback(view)
         if (preview != KeySwipe.Preview.Shortcut(KeyShortcut.Command(KeyCommand.EditMenu))) return false
-        keyboard.onPopupAction(PopupAction.ShowEditMenuAction(view.id, view.bounds, keyboard.inPasswordField))
+        keyboard.onPopupAction(PopupAction.ShowEditMenuAction(view.keyRef, view.bounds, keyboard.inPasswordField))
         return true
     }
 
