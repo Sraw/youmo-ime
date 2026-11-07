@@ -317,8 +317,16 @@ INVISIBLE, still laid out (the popups, glide's key map and the gestures use thei
 draws the scene `lib/keyboard-scene` makes of qwerty.xml in the look converted by ime-core's
 `LookTheme` (`ScenePainter`: one `RenderNode` a key a face, both kept in the tree and a press only their alpha, since a node left out of a frame loses its recording; a
 software canvas, a screenshot's, gets the ops drawn straight); `TextKeyboard.scene` builds the
-`Env` from its state (`TextBoardState`, `SceneMarks`, the texts), made again on `invalidateScene()`,
-which each of its show functions calls. `BaseKeyboard` intercepts every touch as the vivo workaround
+`Env` from its state (`TextBoardState`, `SceneMarks`, the texts), asked again on `invalidateScene()`,
+which each of its show functions calls. It is made again only when what it is made of changed: the
+same theme, layout and measurer (by identity: `SceneThemes`, `SceneLayouts` keep theirs a process)
+and an equal `Env` return the last scene, which the view then neither records nor tells TalkBack
+again. `composing` reaches the `Input` only with a table (qwerty.xml asks it of nothing else), so
+pinyin's first key and its committed word make no scene; in a field with an action, Return's label
+changing with the composing (Done to Enter) still does. `AndroidTextMeasurer` keeps the last 512
+texts it measured (text, font, weight, size), so a scene made again measures only what is new.
+Systrace sections: `scene` (the view asking), in it `theme`, `env`, and the builder's phases
+(`expand`, `place`, `cascade`, `paint`; `Phases`, `SceneTrace`), `measure text` under them. `BaseKeyboard` intercepts every touch as the vivo workaround
 does and hands it to the view of the key the scene's `keyAt` names (`findTouchTarget`), so a key's
 gestures are its view's, unchanged; the view's `onPressedChanged` (CustomGestureView) shows the press.
 TalkBack reads the canvas's `ExploreByTouchHelper`: a virtual node a key, its words the scene's
@@ -351,8 +359,10 @@ The row's indent before A and after L is the end key's touch area (the user's P0
 060-render-v2 §3): a finger down there is A's, its swipes and long press A's, though it is outside A's
 view (`theIndentBeforeAIsAs`). Before, with `expand_keypress_area` off, it was nothing.
 
-Where the canvas still differs from the views, pixel for pixel (`sideBySide`, the default theme: 0.26%
-of the pixels past anti-aliasing): the engine puts row and key edges on whole pixels as Android laid
+Where the canvas still differs from the views, pixel for pixel (`sideBySide`, the share of pixels past
+anti-aliasing, each under 1.5%: PixelLight 0.27%, MaterialLight 0.26%, NordLight 0.27%, PixelDark
+0.26%, MaterialDark 0.26%, AMOLED black 0.27%, compact height 0.20%, landscape 0.10%, landscape
+split 0.16%): the engine puts row and key edges on whole pixels as Android laid
 the views out (rows 176, 175, 176, 175 px of a 702 px board; this fixed the bottom row a pixel up and
 Return's blurred top edge), and a shortcut's icon from the pixel its margins reach, its size whole
 pixels (fixed the corner icons a pixel off). Left: a label is centred in its face to the fraction of a
@@ -360,6 +370,33 @@ pixel where the view centred a TextView of whole pixels (its top rounded) and dr
 on rows of odd height (the middle row's letters, 符, 123, the comma and period) the text lands a pixel
 up or down; the backspace's right-hand corner icons a pixel left (its view's right margin rounded the
 other way). Fixing them means pixel rules for text in the engine, left to P2's theme work.
+
+What it costs (`KeyboardPerfBaselineTest`, 060-render-perf §4; `perfCanvas=true|false` the
+switch; youmo29: Android 10 (API 29), "Android SDK built for arm64" emulator, `-gpu host`, one
+session on 2026-11-07, both switches one after the other, 20 runs after 3 warm-ups; median / p90 ms;
+two such pairs, the second in brackets):
+
+| | views (off) | canvas (on) |
+|---|---|---|
+| a key pressed, to the frame | 27.4 / 31.2 (26.3 / 31.0) | 30.2 / 39.6 (27.6 / 36.3) |
+| ten keys, each, to the frame | 28.2 / 31.0 (28.8 / 30.7) | 27.8 / 34.9 (28.7 / 31.7) |
+| Shift tapped, to the frame | 22.1 / 26.2 (23.8 / 26.2) | 27.9 / 32.1 (27.0 / 30.1) |
+| Shift tapped, the frame's draw | 0.3 (0.2) | 3.7 (4.6) |
+| the 26 keys built and shown, to the frame | 50.0 / 63.3 (74.6 / 88.9) | 71.4 / 130.8 (96.8 / 130.1) |
+| a theme switched (block to flat), to the frame | 49–55 (81.7 / 92.5) | 60–66 (69.6 / 93.0) |
+| a scene made anew (Shift, a theme), timed alone | | 4.27 / 5.14 (3.64 / 4.40) |
+| a scene asked again, nothing changed (pinyin's first key) | | 0.52 / 0.70 (0.37 / 0.92) |
+
+Typing costs the same; a scene asked for nothing is half a millisecond, where pinyin's first key and
+its commit had each made one (4.7 to 9.6 ms in the frame). Shift costs a scene made anew in its
+frame's draw, 3 to 6 ms more to the frame; the keyboard's first showing costs about 22 ms more (its
+scene, every key's node recorded, the canvas's own layout), past 060-render-perf's bounds (median
++10%, p90 +15%). In systrace (the same emulator) a scene made anew is 6.0 ms at the median, 4.9 of
+them `cascade` (the theme's styles matched key by key and state by state; measuring 0.1), and its
+first after a theme 26 ms at p90. That is over 5 ms, so P2 does not make the whole scene in the
+frame: either a key at a time (what changed: Shift's letters, Return; the cascade kept by key and
+state, it does not depend on sizes) or off the main thread, the frame drawing the last scene until
+the new one is ready (a touch already finds its keys in the scene drawn last).
 
 ### Hardware keyboard
 
