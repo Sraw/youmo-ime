@@ -106,7 +106,7 @@ class VoiceListener(
 
     // what the microphone heard, window by window, for the recognizer to ask whether a segment was
     // the room (a lifted noise floor recognized as 「I'm sorry.」): fed on the capture thread
-    private val quiet = VoiceQuiet()
+    private val quiet = VoiceQuietSegments()
     // start()'s uptime: the debug log's time to the first sample not zero
     @Volatile
     private var startedAt = 0L
@@ -258,7 +258,7 @@ class VoiceListener(
             val segment = Segment(recognizer, stream, live, words)
             for (samples in audio) {
                 if (closed) return
-                segment.fed += samples.size
+                quiet.fed(samples.size)
                 stream.acceptWaveform(samples, VoiceEngine.SAMPLE_RATE)
                 segment.decode()
             }
@@ -297,10 +297,6 @@ class VoiceListener(
         // (each telling resets heard and the quiet's timer)
         private var shown = ""
 
-        /** samples handed to the recognizer, from the microphone's opening; this segment's from [start] */
-        var fed = 0L
-        private var start = 0L
-
         /** segments closed with something in them; the UAT's (VO-23/24): one, or the lift's offset is not measured */
         var kept = 0
             private set
@@ -315,13 +311,13 @@ class VoiceListener(
                 if (recognizer.isEndpoint(stream)) {
                     close()
                     recognizer.reset(stream)
-                    start = fed
+                    quiet.next()
                 } else {
                     val text = recognizer.getResult(stream).text
                     if (text != last) {
                         last = text
                         // the room's phrase shows no more than it is typed
-                        val heard = if (quiet.keeps(text, start, fed)) text else ""
+                        val heard = quiet.heard(text)
                         if (heard == shown) continue
                         shown = heard
                         show(orFallback("voice polish", VoiceLive.Heard(live.raw, 0, fallback = true)) { live.heard(heard) })
@@ -337,7 +333,7 @@ class VoiceListener(
             if (result.text.isBlank()) return
             val chosen = orFallback("voice choice", result.text) { VoiceEngine.choose(result, words, safeLanguage) }
             // the room's: what showed of it goes, nothing is kept
-            val text = if (quiet.keeps(chosen, start, fed)) chosen else ""
+            val text = quiet.heard(chosen)
             // the first segment's timestamps count from the stream's start, the microphone's opening
             if (text.isNotEmpty() && kept++ == 0) speechStart = result.timestamps.firstOrNull()?.let { (it * VoiceEngine.SAMPLE_RATE).toInt() }
             val closed = orFallback("voice polish", VoiceLive.Heard(live.raw, 0, fallback = true)) { live.closed(text) }
