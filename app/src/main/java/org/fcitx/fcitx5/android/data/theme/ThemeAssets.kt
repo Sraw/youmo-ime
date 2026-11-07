@@ -400,7 +400,10 @@ object ThemeAssets {
      */
     fun typeface(look: ThemeLook, path: String?, weight: Int): Typeface? {
         synchronized(lock) {
-            use(look)
+            // the system's font is no theme's file, kept whichever look asks: asked by another look
+            // than the one drawn (the built-in's a broken theme's keys fall back to, 060-render-p2 U8,
+            // while its candidates and picture are its own) it lets go of none of the drawn one's files
+            if (path != null) use(look)
             if (path == null && weight == NORMAL_WEIGHT) return null
             val key = path to weight
             if (key in fonts) return fonts[key]

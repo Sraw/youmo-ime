@@ -352,6 +352,24 @@ class KeyboardCanvasViewTest {
                     }
                     assertEquals(logged.toString(), 1, logged.count { it.startsWith("scene theme broken") })
                     assertEquals(logged.toString(), 1, logged.count { "no scene of theme broken" in it })
+                    // a frame of the keys in the built-in's fonts lets go of none of the broken theme's
+                    // files (its candidates', its picture): its font not read again after it
+                    val own = ThemeManager.shownLook(broken)
+                    val font = own.text.keyFont!!
+                    val real = ThemeAssets.decoder
+                    var reads = 0
+                    ThemeAssets.decoder = object : ThemeAssets.Decoder by real {
+                        override fun typeface(path: String) = real.typeface(path).also { if (path == font) reads++ }
+                    }
+                    try {
+                        ThemeAssets.typeface(own, font, 400)
+                        val before = reads
+                        c.draw(Canvas(Bitmap.createBitmap(c.width, c.height, Bitmap.Config.ARGB_8888)))
+                        ThemeAssets.typeface(own, font, 400)
+                        assertEquals(before, reads)
+                    } finally {
+                        ThemeAssets.decoder = real
+                    }
                     h.idle()
                     // the canvas kept, the views hidden under it: none drawn again
                     assertSame(c, h.canvas())

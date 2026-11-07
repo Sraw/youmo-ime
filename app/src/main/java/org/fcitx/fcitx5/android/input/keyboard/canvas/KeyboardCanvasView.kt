@@ -159,7 +159,7 @@ class KeyboardCanvasView(
                 return null
             }
             // painted in another look: nothing recorded in the last is kept
-            val repainted = drawn.shownLook !== painted
+            val repainted = drawn.shownLook != painted
             if (repainted) {
                 painter = ScenePainter(this, drawn.shownLook, images, drawn.fonts)
                 painted = drawn.shownLook

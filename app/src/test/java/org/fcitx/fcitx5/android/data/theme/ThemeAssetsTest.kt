@@ -9,6 +9,8 @@ import android.graphics.Typeface
 import android.view.View
 import org.fcitx.fcitx5.android.input.PictureHost
 import org.fcitx.fcitx5.android.input.PicturePaint
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
+import org.fcitx.fcitx5.android.input.scene.LookTheme
 import org.fcitx.fcitx5.android.input.theme.BarBase
 import org.fcitx.fcitx5.android.input.theme.BoardBase
 import org.fcitx.fcitx5.android.input.theme.Crop
@@ -298,6 +300,30 @@ class ThemeAssetsTest {
         assertNotNull(ThemeAssets.typeface(look, null, 700))
         assertNotNull(ThemeAssets.typeface(look, "f.ttf", 400))
         ThemeAssets.typeface(look, "f.ttf", 400)
+        assertEquals(1, decoder.fonts)
+    }
+
+    // a broken theme's keys drawn in the built-in theme's fonts (060-render-p2 U8, SceneFonts), its
+    // candidates and picture its own: the built-in's system font asked between lets go of none of the
+    // drawn theme's files, its picture decoding comes in, its font read once
+    @Test
+    fun theBuiltInsSystemFontLetsGoOfNoneOfTheDrawnThemesFiles() {
+        use("p.png" to intArrayOf(1000, 800))
+        val own = pictured().let { it.copy(text = it.text.copy(keyFont = "f.ttf")) }
+        val builtIn = SceneFonts(ThemePreset.PixelDark.look)
+        assertNotNull(ThemeAssets.typeface(own, "f.ttf", 400))
+        var told = 0
+        assertNull(ThemeAssets.pictureOrLater(own, false, 0, 1000, 2f) { told++ })
+        // a frame of the keys while the picture decodes: their letters, their bold symbols
+        builtIn.typeface(LookTheme.KEY_FONT, 400)
+        builtIn.typeface(LookTheme.KEY_FONT, 700)
+        builtIn.typeface("system", 700)
+        runQueued()
+        assertEquals(1, told)
+        builtIn.typeface(LookTheme.KEY_FONT, 700)
+        assertNotNull(ThemeAssets.pictureOrLater(own, false, 0, 1000, 2f) { told++ }!!.bitmap)
+        assertNotNull(ThemeAssets.typeface(own, "f.ttf", 400))
+        assertEquals(listOf("p.png"), decoder.decoded.map { it.first })
         assertEquals(1, decoder.fonts)
     }
 
