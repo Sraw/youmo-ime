@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.scene
 
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.scene.SceneBehavior.Bubble
 import org.fcitx.fcitx5.android.input.scene.SceneBehavior.LongPopup
 import org.fcitx.fcitx5.android.scene.KeyNode
@@ -142,6 +143,20 @@ class SceneBehaviorTest {
         assertNull(SceneGroups.letters(emptyList()))
         // none on the full keyboard
         assertEquals(emptyList<String>(), SceneGroups.of(SceneData.qwerty))
+    }
+
+    // 060-render-v2 §15 按落点加权: the 14 keys' two-letter groups lean, as they did (GroupedKeyboard.tapped);
+    // the 18 keys' none (lean="off"); a group of one letter has nowhere to lean
+    @Test
+    fun theFourteenKeysTwoLetterGroupsLeanTheEighteenKeysNone() {
+        val k14 = SceneGroups.leaning(layout("k14"), mapOf("grouped-bottom" to bottom))
+        assertEquals(NineKeyLetters.G14.tag().split(',').filter { it.length >= 2 }.toSet(), k14)
+        assertEquals(emptySet<String>(), SceneGroups.leaning(layout("k18"), mapOf("grouped-bottom" to bottom)))
+        assertTrue(keys("k14").getValue("r1c1").lean)
+        assertTrue(keys("k18").values.none { it.lean })
+        // the engine has places for the 14 keys' codes alone (Keyboard.TAPS): G18's go as codes (P3)
+        assertTrue(NineKeyLetters.G14.tag().split(',').all { Keyboard.placesTaps(NineKeyLetters.G14.key(it[0])) })
+        assertTrue(NineKeyLetters.G18.tag().split(',').none { Keyboard.placesTaps(NineKeyLetters.G18.key(it[0])) })
     }
 
     @Test

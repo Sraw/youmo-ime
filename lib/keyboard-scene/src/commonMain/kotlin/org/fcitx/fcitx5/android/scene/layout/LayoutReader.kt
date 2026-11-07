@@ -193,9 +193,14 @@ object LayoutReader {
         val id = a.matching("id", KEY_ID, "a key id (1–32 characters, no spaces)") ?: a.required("id")
         val condition = condition(a)
         val attrs = look(a).copy(width = width(a), rows = a.positiveInt("rows"))
-        val letters = a.matching("letters", LETTERS, "a group's letters (1–${LETTERS_MAX} of a–z and ;)")
+        val letters = a.matching("letters", LETTERS, "a group's letters (a–z and ;, rows apart by a space)")?.let(Letters::of)
+        val lean = a.oneOf("lean", ON_OFF)?.let { it == "on" }
         a.done()
-        if (letters != null && letters.toSet().size != letters.length) a.problem("letters=\"$letters\" has a letter twice")
+        letters?.group?.let { g ->
+            if (g.length > LETTERS_MAX) a.problem("letters=\"$letters\" has more than $LETTERS_MAX letters")
+            if (g.toSet().size != g.length) a.problem("letters=\"$letters\" has a letter twice")
+        }
+        if (lean != null && letters == null) a.problem("lean= is a group key's (letters=)")
         if (attrs.icon != null && attrs.label == null && attrs.a11y == null) a.problem("an icon key needs a11y= (what a screen reader says)")
         var popup: Popup? = null
         var menu = emptyList<MenuItem>()
@@ -208,7 +213,7 @@ object LayoutReader {
                 else -> p.add(child.line, "<${child.name}> is not allowed in <key>")
             }
         }
-        return Key(id.orEmpty(), condition, attrs, popup, menu, el.line, variants, letters)
+        return Key(id.orEmpty(), condition, attrs, popup, menu, el.line, variants, letters, lean)
     }
 
     // a <variant>: a when= and what it changes (no id, no width: the key stays where it is)
@@ -333,9 +338,10 @@ object LayoutReader {
     // KeyNames': 大千's `/` and the number pad's are keys too (a theme's `zhuyin//` is its own: Selector)
     private val KEY_ID = Regex("\\S{1,32}")
     private val CLASSES = Regex("[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*")
-    // a group of the 14/18 keys' kind: NineKeyLetters.MAX letters at most, ; (双拼's ing) one of them
+    // a group of the 14/18 keys' kind: NineKeyLetters.MAX letters at most, ; (双拼's ing) one of them;
+    // a row a space apart (060-render-v2 §15: where they sit on the key)
     private const val LETTERS_MAX = 5
-    private val LETTERS = Regex("[a-z;]{1,$LETTERS_MAX}")
+    private val LETTERS = Regex("[a-z;]+( [a-z;]+)*")
     private val SHORTCUT = Regex("([a-z0-9-]+/)?\\S{1,32}")
     private val BINDING = Regex("\\{([a-z-]+)(?::([^{}]*))?\\}")
     private val LETTER_ARG = Regex("[a-z;,./'?!~-]")

@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.scene.layout.Face
 import org.fcitx.fcitx5.android.scene.layout.Gap
 import org.fcitx.fcitx5.android.scene.layout.Key
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
+import org.fcitx.fcitx5.android.scene.layout.Letters
 import org.fcitx.fcitx5.android.scene.layout.OnSplit
 import org.fcitx.fcitx5.android.scene.layout.Row
 import org.fcitx.fcitx5.android.scene.layout.RowSplit
@@ -113,21 +114,38 @@ class LayoutReaderTest {
         assertNull(LayoutReader.action("action:group"))
     }
 
-    // 060-render-v2 §15: a key's letters as one group, the key's own (no variant's, no default's)
+    // 060-render-v2 §15: a key's letters as one group, the key's own (no variant's, no default's), row
+    // by row as they sit on the key; a tap leaning to where it fell unless lean="off"
     @Test
     fun aGroupKeysLettersAreItsOwn() {
         val k18 = Forms.layout("k18").parts.filterIsInstance<Row>().flatMap { it.cells }.filterIsInstance<Key>()
-        assertEquals("we", k18.single { it.id == "r1c2" }.letters)
+        assertEquals(Letters(listOf("we")), k18.single { it.id == "r1c2" }.letters)
         // L; whatever its face shows (pinyin's L): the group the engine reads its code by
-        assertEquals("l;", k18.single { it.id == "r2c6" }.letters)
+        assertEquals("l;", k18.single { it.id == "r2c6" }.letters?.group)
         assertNull(k18.single { it.id == "apostrophe" }.letters)
+        // the 18 keys send their codes alone; the 14 keys' two letters a row lean
+        assertTrue(k18.none { it.leans })
+        val k14 = Forms.layout("k14").parts.filterIsInstance<Row>().flatMap { it.cells }.filterIsInstance<Key>()
+        assertEquals(Letters(listOf("as")), k14.single { it.id == "r2c1" }.letters)
+        assertEquals(listOf(true, false), listOf("r2c1", "r2c5").map { id -> k14.single { it.id == id }.leans })
         assertEquals(emptyList(), problems(board("<row><key id=\"g\" label=\"PQRS\" letters=\"pqrs\"/></row>")))
-        for (bad in listOf("PQ", "abcdef", "a b", "", "ü")) {
+        val grid = LayoutReader.layout(board("<row><key id=\"g\" label=\"PQRS\" letters=\"pq rs\"/><key id=\"h\" label=\"T\" letters=\"tu\" lean=\"off\"/></row>")).ok()
+            .parts.filterIsInstance<Row>().single().cells.filterIsInstance<Key>()
+        assertEquals(listOf("pq", "rs"), grid[0].letters?.rows)
+        assertEquals("pqrs", grid[0].letters?.group)
+        assertEquals("pq rs", grid[0].letters.toString())
+        assertEquals(listOf(true, false), grid.map { it.leans })
+        for (bad in listOf("PQ", "abcdef", "ab cd ef", "a  b", " ab", "ab ", "", "ü")) {
             val p = problems(board("<row><key id=\"g\" label=\"x\" letters=\"$bad\"/></row>"))
             assertTrue(p.single().contains("letters="), "$bad: $p")
         }
-        val twice = problems(board("<row><key id=\"g\" label=\"x\" letters=\"aba\"/></row>"))
-        assertTrue(twice.single().contains("twice"), "$twice")
+        for (twice in listOf("aba", "ab a")) {
+            val p = problems(board("<row><key id=\"g\" label=\"x\" letters=\"$twice\"/></row>"))
+            assertTrue(p.single().contains("twice"), "$p")
+        }
+        // lean= is on or off, a group key's alone
+        assertTrue(problems(board("<row><key id=\"g\" label=\"x\" letters=\"ab\" lean=\"no\"/></row>")).single().contains("lean="))
+        assertTrue(problems(board("<row><key id=\"g\" label=\"x\" lean=\"off\"/></row>")).single().contains("lean="))
         // a variant's or the defaults' letters= is none of theirs
         assertTrue(problems(board("<row><key id=\"g\" label=\"x\" letters=\"a\"><variant when=\"ime=pinyin\" letters=\"b\"/></key></row>")).isNotEmpty())
         assertTrue(problems(board("<defaults letters=\"a\"/><row><key id=\"g\" label=\"x\"/></row>")).isNotEmpty())

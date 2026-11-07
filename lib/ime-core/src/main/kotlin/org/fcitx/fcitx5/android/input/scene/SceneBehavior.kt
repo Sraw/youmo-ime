@@ -148,7 +148,7 @@ data class SceneBehavior(
 
         fun of(node: KeyNode): SceneBehavior {
             val a = node.actions
-            val press = a["send"]?.let(SceneAction::of) ?: node.letters?.let(SceneAction::Group)
+            val press = a["send"]?.let(SceneAction::of) ?: node.letters?.group?.let(SceneAction::Group)
             val swipe = a["swipe-up"]?.let(SceneAction::of)
             val typing = node.role in TYPING_ROLES || (node.kind == "letter" && !node.label.isNullOrEmpty())
             val bubble = if (!typing) null else Bubble(content(node, press), swipe?.let(::typed))
@@ -186,7 +186,7 @@ data class SceneBehavior(
         private fun popupOf(node: KeyNode, press: SceneAction?, typing: Boolean): LongPopup? {
             val p = node.popup
             // a group's letters' own, unless the layout wrote another (060-render-v2 §15)
-            val letters = node.letters
+            val letters = node.letters?.group
             if (letters != null && (p == null || p.from == "group")) return LongPopup.Letters(letters)
             val transform = p?.options?.get("transform-punctuation") != "false"
             return when (p?.from) {

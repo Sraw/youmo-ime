@@ -533,6 +533,9 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
          * to the nearest of [TAP_STEPS]. Clamped first: just past 1 would round into the next code's
          * places, learned under that key. NaN is no place; send the code itself.
          */
+        /** Whether a tap's place goes with the code [code] ([tapKey]): the 14 keys' codes alone yet (P3: any layout's groups). */
+        fun placesTaps(code: Char): Boolean = code in FIRST_CODE..LAST_CODE
+
         fun tapKey(code: Char, at: Float): Int {
             require(code in FIRST_CODE..LAST_CODE && !at.isNaN()) { "tap $code at $at" }
             return TAPS.first + (code - FIRST_CODE) * TAP_STEPS + (at.coerceIn(0f, 1f) * (TAP_STEPS - 1)).roundToInt()

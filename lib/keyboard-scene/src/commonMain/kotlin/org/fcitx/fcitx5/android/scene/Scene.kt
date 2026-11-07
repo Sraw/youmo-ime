@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.scene
 
+import org.fcitx.fcitx5.android.scene.layout.Letters
 import org.fcitx.fcitx5.android.scene.layout.MenuItem
 import org.fcitx.fcitx5.android.scene.layout.Popup
 import org.fcitx.fcitx5.android.scene.theme.Argb
@@ -93,8 +94,10 @@ class KeyNode(
     val menu: List<MenuItem> = emptyList(),
     val sound: String = "standard",
     val shortcut: String? = null,
-    /** The letters it types as a group (the layout's `letters=`), null for a key of no group. */
-    val letters: String? = null,
+    /** The letters it types as a group, row by row as they sit on it (the layout's `letters=`), null for a key of no group. */
+    val letters: Letters? = null,
+    /** A tap on it leans to the letter it fell nearest ([Key.leans][org.fcitx.fcitx5.android.scene.layout.Key.leans]). */
+    val lean: Boolean = false,
 ) {
     /** What a backend draws for it: [faces] in its [states], pressed or not. */
     fun ops(pressed: Boolean): List<Op> = faces.getValue(if (pressed) states + KeyState.Pressed else states)

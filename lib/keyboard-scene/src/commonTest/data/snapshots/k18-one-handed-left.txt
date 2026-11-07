@@ -24,7 +24,7 @@ key r1c2 kind=letter a11y="W E，2"
   anchor 184.5,88 up 0,-1
   actions swipe-up="keypad:2"
   text label="WE" alt="2"
-  shortcut="g18/we" letters="we"
+  shortcut="g18/we" letters="we" lean=off
   normal
     shadow rect(130.88,18.38,238.13,160.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(130.88,18.38,238.13,157.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -39,7 +39,7 @@ key r1c3 kind=letter a11y="R T，3"
   anchor 307.5,88 up 0,-1
   actions swipe-up="keypad:3"
   text label="RT" alt="3"
-  shortcut="g18/rt" letters="rt"
+  shortcut="g18/rt" letters="rt" lean=off
   normal
     shadow rect(253.88,18.38,361.13,160.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(253.88,18.38,361.13,157.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -84,7 +84,7 @@ key r1c6 kind=letter a11y="I O，6"
   anchor 676.5,88 up 0,-1
   actions swipe-up="keypad:6"
   text label="IO" alt="6"
-  shortcut="g18/io" letters="io"
+  shortcut="g18/io" letters="io" lean=off
   normal
     shadow rect(622.88,18.38,730.13,160.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(622.88,18.38,730.13,157.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -129,7 +129,7 @@ key r2c2 kind=letter a11y="S D，9"
   anchor 215.5,263.5 up 0,-1
   actions swipe-up="keypad:9"
   text label="SD" alt="9"
-  shortcut="g18/sd" letters="sd"
+  shortcut="g18/sd" letters="sd" lean=off
   normal
     shadow rect(151.88,194.38,279.13,335.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(151.88,194.38,279.13,332.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -144,7 +144,7 @@ key r2c3 kind=letter a11y="F G，0"
   anchor 359,263.5 up 0,-1
   actions swipe-up="keypad:0"
   text label="FG" alt="0"
-  shortcut="g18/fg" letters="fg"
+  shortcut="g18/fg" letters="fg" lean=off
   normal
     shadow rect(294.88,194.38,423.13,335.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(294.88,194.38,423.13,332.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -174,7 +174,7 @@ key r2c5 kind=letter a11y="J K，）"
   anchor 646,263.5 up 0,-1
   actions swipe-up=")"
   text label="JK" alt="）" alt-raw="{punct:)}"
-  shortcut="g18/jk" letters="jk"
+  shortcut="g18/jk" letters="jk" lean=off
   normal
     shadow rect(581.88,194.38,710.13,335.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(581.88,194.38,710.13,332.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -189,7 +189,7 @@ key r2c6 kind=letter a11y="L，-"
   anchor 789.5,263.5 up 0,-1
   actions swipe-up="-"
   text label="L" alt="-" alt-raw="{punct:-}"
-  shortcut="g18/l" letters="l;"
+  shortcut="g18/l" letters="l;" lean=off
   normal
     shadow rect(725.88,194.38,853.13,335.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(725.88,194.38,853.13,332.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -233,7 +233,7 @@ key r3c2 kind=letter a11y="X C，！"
   anchor 310,439 up 0,-1
   actions swipe-up="!"
   text label="XC" alt="！" alt-raw="{punct:!}"
-  shortcut="g18/xc" letters="xc"
+  shortcut="g18/xc" letters="xc" lean=off
   normal
     shadow rect(257.88,369.38,362.13,511.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(257.88,369.38,362.13,508.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -263,7 +263,7 @@ key r3c4 kind=letter a11y="B N，？"
   anchor 551,439 up 0,-1
   actions swipe-up="?"
   text label="BN" alt="？" alt-raw="{punct:?}"
-  shortcut="g18/bn" letters="bn"
+  shortcut="g18/bn" letters="bn" lean=off
   normal
     shadow rect(498.88,369.38,603.13,511.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(498.88,369.38,603.13,508.63 r=10.5,10.5,10.5,10.5) #fffbfbfc

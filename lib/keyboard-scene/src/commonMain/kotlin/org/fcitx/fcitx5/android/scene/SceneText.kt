@@ -68,7 +68,8 @@ object SceneText {
         val how = listOfNotNull(
             k.sound.takeIf { it != "standard" }?.let { "sound=$it" },
             k.shortcut?.let { "shortcut=${q(it)}" },
-            k.letters?.let { "letters=${q(it)}" },
+            k.letters?.let { "letters=${q(it.toString())}" },
+            "lean=off".takeIf { (k.letters?.group?.length ?: 0) >= 2 && !k.lean },
         )
         if (how.isNotEmpty()) appendLine("  ${how.joinToString(" ")}")
         k.popup?.let { p ->

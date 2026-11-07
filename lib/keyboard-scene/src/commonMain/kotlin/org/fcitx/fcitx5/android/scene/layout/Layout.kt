@@ -77,8 +77,33 @@ class Key(
      * group's code, a long press its letters (the app's, 060-render-v2 §15). The key's own, no
      * variant's: a layout's groups are what the engine reads its codes by.
      */
-    val letters: String? = null,
-) : Cell
+    val letters: Letters? = null,
+    /** `lean=` as written: `off`, its tap sends the group's code alone, not where it fell (null: not written). */
+    val lean: Boolean? = null,
+) : Cell {
+    /**
+     * Whether a tap on it leans to the letter it fell nearest (060-render-v2 §15, 按落点加权): a group
+     * of two letters or more whose `lean=` is not off.
+     */
+    val leans: Boolean get() = letters != null && letters.group.length >= 2 && lean != false
+}
+
+/**
+ * A group key's letters as they sit on it (layout-1's `letters=`, 060-render-v2 §15): a row each, a
+ * space between rows (`"pq rs"`, 2 × 2), each row's letters sharing its width, the rows its height.
+ * Where a tap leans and, P3, where its letters are drawn by default.
+ */
+data class Letters(val rows: List<String>) {
+    /** The group's letters, row by row: what the engine reads it as. */
+    val group: String get() = rows.joinToString("")
+
+    /** As written. */
+    override fun toString() = rows.joinToString(" ")
+
+    companion object {
+        fun of(text: String) = Letters(text.split(' '))
+    }
+}
 
 /**
  * Room taking no touch (the old GapKey); with a [look], a key's face of that kind drawn there all the

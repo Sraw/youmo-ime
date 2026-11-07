@@ -22,12 +22,24 @@ import org.fcitx.fcitx5.android.scene.layout.Row
  */
 object SceneGroups {
     /** [layout]'s groups, row by row as written, an included fragment's where it is included; a key's own letters, whatever its condition. */
-    fun of(layout: Layout, fragments: Map<String, Fragment> = emptyMap()): List<String> = layout.parts.flatMap { part ->
+    fun of(layout: Layout, fragments: Map<String, Fragment> = emptyMap()): List<String> =
+        keys(layout, fragments).mapNotNull { it.letters?.group }
+
+    /**
+     * [layout]'s groups whose tap leans to the letter it fell nearest (their keys' `lean=`, 按落点加权,
+     * 060-render-v2 §15): two letters or more, lean= not off. Whether the engine can take a tap's place
+     * for the group's code is the engine's ([Keyboard.placesTaps][org.fcitx.fcitx5.android.engine.runtime.Keyboard.placesTaps]).
+     */
+    fun leaning(layout: Layout, fragments: Map<String, Fragment> = emptyMap()): Set<String> =
+        keys(layout, fragments).filter(Key::leans).mapNotNull { it.letters?.group }.toSet()
+
+    // [layout]'s keys row by row as written, an included fragment's where it is included
+    private fun keys(layout: Layout, fragments: Map<String, Fragment>): List<Key> = layout.parts.flatMap { part ->
         when (part) {
             is Row -> listOf(part)
             is Include -> fragments[part.src]?.rows.orEmpty()
         }
-    }.flatMap { row -> row.cells.mapNotNull { (it as? Key)?.letters } }
+    }.flatMap { row -> row.cells.filterIsInstance<Key>() }
 
     /** The grouped keyboard [groups] make: the built-in one with exactly these; null for none, or any other (P3). */
     fun letters(groups: List<String>): NineKeyLetters? = if (groups.isEmpty()) null else NineKeyLetters.grouped(groups.joinToString(","))
