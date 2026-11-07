@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import com.k2fsa.sherpa.onnx.OnlineRecognizer
+import com.k2fsa.sherpa.onnx.OnlineRecognizerResult
 import com.k2fsa.sherpa.onnx.OnlineStream
 import com.k2fsa.sherpa.onnx.Vad
 import kotlinx.coroutines.CancellationException
@@ -106,7 +107,7 @@ class VoiceListener(
 
     // what the microphone heard, window by window, for the recognizer to ask whether a segment was
     // the room (a lifted noise floor recognized as 「I'm sorry.」): fed on the capture thread
-    private val quiet = VoiceQuietSegments()
+    private val quiet = VoiceQuiet()
     // start()'s uptime: the debug log's time to the first sample not zero
     @Volatile
     private var startedAt = 0L
@@ -255,18 +256,20 @@ class VoiceListener(
             return
         }
         try {
-            val segment = Segment(recognizer, stream, live, words)
+            val segment = VoiceSegments(
+                Recognition(recognizer, stream),
+                VoiceEngine.SAMPLE_RATE,
+                choose = { result -> orFallback("voice choice", result.text) { VoiceEngine.choose(result, words, safeLanguage) } },
+                live = { heard -> show(orFallback("voice polish", VoiceLive.Heard(live.raw, 0, fallback = true)) { live.heard(heard) }) },
+                closed = { text -> show(orFallback("voice polish", VoiceLive.Heard(live.raw, 0, fallback = true)) { live.closed(text) }) },
+                quiet,
+            )
             for (samples in audio) {
                 if (closed) return
-                quiet.fed(samples.size)
-                stream.acceptWaveform(samples, VoiceEngine.SAMPLE_RATE)
-                segment.decode()
+                segment.accept(samples)
             }
             if (closed) return
-            stream.acceptWaveform(FloatArray(VoiceEngine.TAIL_PADDING), VoiceEngine.SAMPLE_RATE)
-            stream.inputFinished()
-            segment.decode()
-            segment.close()
+            segment.finish(FloatArray(VoiceEngine.TAIL_PADDING))
             // numbers only, nothing said: the UAT's measure of the lift against the speech's end (uat/12 VO-23/24)
             if (BuildConfig.DEBUG) Timber.d("voice segments: speechStart=%s segments=%d", segment.speechStart, segment.kept)
             // the polish failing: the raw text, told as such (what was typed as it was said is polished)
@@ -284,66 +287,20 @@ class VoiceListener(
         }
     }
 
-    /** The segment being said in [stream]: decoded as far as it can be, shown as it changes, closed at an endpoint. */
-    private inner class Segment(
-        private val recognizer: OnlineRecognizer,
-        private val stream: OnlineStream,
-        private val live: VoiceLive,
-        private val words: VoiceHotwords.Words,
-    ) {
-        private var last = ""
-
-        // what this segment showed: one held back as the room's, unchanged, is not told again
-        // (each telling resets heard and the quiet's timer)
-        private var shown = ""
-
-        /** segments closed with something in them; the UAT's (VO-23/24): one, or the lift's offset is not measured */
-        var kept = 0
-            private set
-
-        /** the first token's frame, from the microphone's opening: where the speech starts, for the UAT (VO-23/24) */
-        var speechStart: Int? = null
-            private set
-
-        suspend fun decode() {
-            while (recognizer.isReady(stream)) {
-                recognizer.decode(stream)
-                if (recognizer.isEndpoint(stream)) {
-                    close()
-                    recognizer.reset(stream)
-                    quiet.next()
-                } else {
-                    val text = recognizer.getResult(stream).text
-                    if (text != last) {
-                        last = text
-                        // the room's phrase shows no more than it is typed
-                        val heard = quiet.heard(text)
-                        if (heard == shown) continue
-                        shown = heard
-                        show(orFallback("voice polish", VoiceLive.Heard(live.raw, 0, fallback = true)) { live.heard(heard) })
-                    }
-                }
-            }
-        }
-
-        /** Its text chosen and kept, the next one starting empty. */
-        suspend fun close() {
-            val result = recognizer.getResult(stream)
-            last = ""
-            if (result.text.isBlank()) return
-            val chosen = orFallback("voice choice", result.text) { VoiceEngine.choose(result, words, safeLanguage) }
-            // the room's: what showed of it goes, nothing is kept
-            val text = quiet.heard(chosen)
-            // the first segment's timestamps count from the stream's start, the microphone's opening
-            if (text.isNotEmpty() && kept++ == 0) speechStart = result.timestamps.firstOrNull()?.let { (it * VoiceEngine.SAMPLE_RATE).toInt() }
-            val closed = orFallback("voice polish", VoiceLive.Heard(live.raw, 0, fallback = true)) { live.closed(text) }
-            // the room's, nothing of it shown: nothing to tell
-            if (text.isNotEmpty() || shown.isNotEmpty()) show(closed)
-            shown = ""
-        }
-
-        private fun show(shown: VoiceLive.Heard) = tell { heard(shown) }
+    /** [stream] of [recognizer] as VoiceSegments drives it */
+    private class Recognition(private val recognizer: OnlineRecognizer, private val stream: OnlineStream) : VoiceRecognition<OnlineRecognizerResult> {
+        override fun accept(samples: FloatArray) = stream.acceptWaveform(samples, VoiceEngine.SAMPLE_RATE)
+        override fun inputFinished() = stream.inputFinished()
+        override fun isReady() = recognizer.isReady(stream)
+        override fun decode() = recognizer.decode(stream)
+        override fun isEndpoint() = recognizer.isEndpoint(stream)
+        override fun reset() = recognizer.reset(stream)
+        override fun result() = recognizer.getResult(stream)
+        override fun text(result: OnlineRecognizerResult) = result.text
+        override fun firstTime(result: OnlineRecognizerResult) = result.timestamps.firstOrNull()
     }
+
+    private fun show(shown: VoiceLive.Heard) = tell { heard(shown) }
 
     private suspend fun record() {
         val record = open()
