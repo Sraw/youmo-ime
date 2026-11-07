@@ -500,9 +500,9 @@ def vo32(d):
 @case("VO-33", base="B0-语音", mutates="learn", needs=EV)
 def vo33(d):
     ok = lambda t: plain(t).lower() in ("ok", "okay")
-    shown, t, n, miss = retried(d, "ok", ok)
-    check(ok(t), f"松开后框里「{t}」{tries_note(n, miss)}")
-    return f"框里「{t}」{tries_note(n, miss)}"
+    _, t = dictate(d, "ok")
+    check(ok(t), f"松开后框里「{t}」")
+    return f"框里「{t}」"
 
 
 def soft_speech(d, clips):
