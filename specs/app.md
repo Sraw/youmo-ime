@@ -789,7 +789,8 @@ in CI keeps the voice source set compiling.
   typed, the 15 s give-up, the end mark, `finish` (stopped: the tail, then the rest typed through fcitx), `cut`,
   `drop`, `typeNow`. `VoiceHoldSession` adds the held finger (`VoiceHold`'s cancel zone, the lift);
   `VoiceTapOverlay` adds the tap's: what each press does is `VoiceTap` (ime-core): the microphone, the mask or a
-  press off it (the bar's other buttons, the candidates) stop it, × drops it, a press after the stop cuts the tail,
+  press off it (the bar's other buttons, the candidates) stop it (no ×: the user's decision 2026-11-07, what is
+  not wanted is deleted after), a press after the stop cuts the tail,
   another field (`inputEnded(LEFT)`, the overlay detached; `STARTED` in another field) types now, the keyboard
   hidden (`HIDDEN`, stopped or not) stops it as a tap does, the tail taken away now and what is left typed straight
   into the field once recognized (`VoiceSession.hidden`, `commitVoice`, the connection still there); another field
@@ -812,8 +813,7 @@ in CI keeps the voice source set compiling.
   raw's it lacks (the 「嗯」 the polish took out) passed over (`VoiceTalk.rest(raw = true)`): 「我到了。」 typed, raw
   「嗯我到了马上走」, only 「马上走」 is left. `VoiceLive.settled` types nothing where what shows does not start with
   the frozen part (out of step: it should not be). Mid-talk parts go straight in (`FcitxInputMethodService.voiceHeard`: `commitVoice`, synchronous,
-  then the tail composed, in one batch edit); the last part goes through fcitx as the hold's does. × takes only
-  the composing tail. Another field mid-talk types what was heard so far into the first at once (`typeNow`,
+  then the tail composed, in one batch edit); the last part goes through fcitx as the hold's does.  Another field mid-talk types what was heard so far into the first at once (`typeNow`,
   `commitVoice`: its connection is about to go); what the recognizer had not decoded yet is lost. Given up (15 s)
   or failed, tapped, what was heard last is typed too (what was said stays, the user's rule), and the message is
   `voice_tap_cut_short` if anything went in (as it was said or now), `voice_hold_nothing` only if nothing did. The polish failing (`VoiceLive.Heard.fallback`: the raw text, not in step with the

@@ -30,7 +30,7 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * UAT cases of tapping the bar's microphone to talk (uat/12), everything after the recognizer, as
- * [VoiceHoldUatTest]'s: the mask over the keys, the stop by the microphone or the mask, ×, what is
+ * [VoiceHoldUatTest]'s: the mask over the keys, the stop by the microphone or the mask, what is
  * settled typed as it is said, the keyboard floating, the app taking the text (the field left or
  * restarted, the keyboard hidden, the quiet stop: [VoiceTapFieldUatTest]). After each, the
  * microphone closed once ([FakeRecognizer.closes]).
@@ -111,43 +111,6 @@ class VoiceTapUatTest : VoiceTapUat() {
     }
 
     @Test
-    @Uat("VO-05")
-    fun cancelTakesOnlyTheUnsettledTail() {
-        allowMicrophone()
-        h.start(MULTI_LINE)
-        tapMic()
-        voice.heard("今天天气")
-        voice.heard("很好")
-        h.advance(100)
-        assertEquals("今天天气，很好", text())
-        h.tap(cancel())
-        h.advance(100)
-        // what was already typed stays; the tail still composing goes, nothing recognized after
-        assertEquals("今天天气，", text())
-        assertEquals(-1 to -1, composing())
-        assertEquals(0, voice.finishes)
-        assertFalse(talking)
-        assertEquals(1, voice.closes)
-    }
-
-    @Test
-    @Uat("VO-05")
-    fun cancelBeforeAnythingSettledLeavesTheFieldAsItWas() {
-        allowMicrophone()
-        h.start()
-        h.field.setText("ab")
-        h.field.setSelection(2)
-        tapMic()
-        voice.hearing("我们")
-        h.advance(100)
-        assertEquals("ab我们", text())
-        h.tap(cancel())
-        h.advance(100)
-        assertEquals("ab", text())
-        assertEquals(1, voice.closes)
-    }
-
-    @Test
     @Uat("VO-29")
     fun whatIsSettledIsTypedAsItIsSaid() {
         allowMicrophone()
@@ -181,9 +144,9 @@ class VoiceTapUatTest : VoiceTapUat() {
         allowMicrophone()
         h.start()
         tapMic()
-        // no Enter of its own on the mask: only × and the hint
+        // no Enter of its own on the mask, nor × (the user's decision 2026-11-07): no button at all
         val mask = mask()!!
-        assertEquals(listOf(string(R.string.voice_tap_cancel)), KeyboardHarness.all(mask).mapNotNull { it.contentDescription?.toString() }.toList())
+        assertEquals(emptyList<String>(), KeyboardHarness.all(mask).mapNotNull { it.contentDescription?.toString() }.toList())
         voice.said += "我们走吧"
         h.tap(mask)
         h.advance(1000)

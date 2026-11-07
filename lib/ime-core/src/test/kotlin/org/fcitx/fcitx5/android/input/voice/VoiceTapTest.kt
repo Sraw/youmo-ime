@@ -32,10 +32,8 @@ class VoiceTapTest {
     }
 
     @Test
-    fun cancelDropsAndAnotherFieldTypesAtOnce() {
-        assertEquals(Act.DROP to State.OVER, on(State.LISTENING, Press.CANCEL))
+    fun anotherFieldTypesAtOnce() {
         assertEquals(Act.TYPE_NOW to State.OVER, on(State.LISTENING, Press.INPUT_ENDED))
-        assertEquals(Act.DROP to State.OVER, on(State.STOPPING, Press.CANCEL))
         assertEquals(Act.TYPE_NOW to State.OVER, on(State.STOPPING, Press.INPUT_ENDED))
     }
 

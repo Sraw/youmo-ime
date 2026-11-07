@@ -11,6 +11,5 @@
     <string name="voice_hold_hint">Release to type · slide up to cancel</string>
     <string name="voice_hold_nothing">Didn\'t catch that</string>
     <string name="voice_tap_hint">Tap here or the microphone to stop</string>
-    <string name="voice_tap_cancel">Cancel</string>
     <string name="voice_tap_cut_short">The last words may be missing</string>
 </resources>

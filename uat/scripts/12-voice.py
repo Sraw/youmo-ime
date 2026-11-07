@@ -314,7 +314,7 @@ case("VO-03", needs="jvm:VoiceHoldUatTest.slidingUpDropsIt")(lambda d: None)
 case("VO-04", needs="jvm:VoiceTapUatTest.tappingTheMicrophoneTalksTillItIsTappedAgain、VoiceTapUatTest.tappingTheMaskStopsIt、VoiceTapUatTest.theMicrophoneTappedInTheTailEndsIt")(lambda d: None)
 
 
-case("VO-05", needs="jvm:VoiceTapUatTest.cancelTakesOnlyTheUnsettledTail、VoiceTapUatTest.cancelBeforeAnythingSettledLeavesTheFieldAsItWas")(lambda d: None)
+case("VO-05", needs="jvm:VoiceGlassTest、VoiceTapUatTest.theMaskHasNoEnterStoppedTheKeyboardsSendsIt；真机截图看毛玻璃")(lambda d: None)
 
 
 case("VO-06", needs="jvm:VoiceHoldUatTest.numbersAreWrittenInDigits")(lambda d: None)
@@ -707,20 +707,20 @@ def vo28_try(d):
     voice = s.find(desc="语音输入", where="ime")
     if not voice:
         raise Blocked("工具栏上没有「语音输入」（工具栏收起了？）")
-    # tapped, not held: the mask over the keys, only its × on it
+    # tapped, not held: the mask over the keys, its hint on it and no button
     d.tap(voice.c, 0.8)
     s = d.screen()
-    cancel = s.find(desc="取消", where="ime")
-    check(cancel, "点麦克风后没有盖层（没找到 ×）")
+    hint = s.find(text="点这里或麦克风 结束", where="ime")
+    check(hint, "点麦克风后没有盖层（没找到它的提示）")
     # the keyboard's Enter under it is named as the field's (the chat's: 发送); none on the mask itself
     enters = [n for n in s.ime() if n.desc in ("发送", "回车")]
     check(len(enters) == 1, f"点麦克风后有 {len(enters)} 个回车（盖层上不该有）")
     enter = enters[0]
     d.say("zouba")
     time.sleep(0.3)
-    # stopped on the mask (its middle, off the ×), then the tail and the rest recognized, the mask gone
-    cx, cy = cancel.c
-    d.tap((ex_mid(s), cy + 200), 0.1)
+    # stopped on the mask (its middle, above the hint), then the tail and the rest recognized, the mask gone
+    cx, cy = hint.c
+    d.tap((ex_mid(s), cy - 150), 0.1)
     time.sleep(3)
     ex, ey = enter.c
     d.touch(("down", ex, ey), ("sleep", 0.05), ("up", ex, ey))

@@ -11,7 +11,7 @@ package org.fcitx.fcitx5.android.input.voice
  *
  * Stopping keeps the microphone on for the tail ([VoiceCaptureEnd.tail], as a lift), then types
  * what is left; pressed again meanwhile, the tail ends at once (as a press after a lift, VO-25).
- * × drops what is not typed yet. The keyboard hidden stops it as a tap does, what is left typed
+ * No × (the user's decision 2026-11-07): what is not wanted is deleted after. The keyboard hidden stops it as a tap does, what is left typed
  * straight into the field (still its, its connection still good) once recognized. Another field
  * types what was heard so far at once, into the field it was said in: its connection is about to go.
  * To send what was said: stop it, then the keyboard's Enter (no Enter on the mask: the user's
@@ -28,9 +28,6 @@ class VoiceTap {
 
         /** a press off the mask (the bar's other buttons, the candidates): it then acts as usual */
         OUTSIDE,
-
-        /** the mask's ×: cancel */
-        CANCEL,
 
         /** [QUIET_MS] with nothing new heard */
         QUIET,
@@ -54,9 +51,6 @@ class VoiceTap {
         /** the keyboard hidden: stopped if not yet, what is left typed straight into the field, not through the engine */
         HIDE,
 
-        /** what is not typed yet dropped, at once */
-        DROP,
-
         /** what was heard so far typed at once, the rest not waited for */
         TYPE_NOW,
     }
@@ -71,13 +65,11 @@ class VoiceTap {
         val act = when (state) {
             State.OVER -> Act.NONE
             State.LISTENING -> when (press) {
-                Press.CANCEL -> Act.DROP
                 Press.INPUT_ENDED -> Act.TYPE_NOW
                 Press.HIDDEN -> Act.HIDE
                 else -> Act.STOP
             }
             State.STOPPING -> when (press) {
-                Press.CANCEL -> Act.DROP
                 Press.INPUT_ENDED -> Act.TYPE_NOW
                 Press.HIDDEN -> Act.HIDE
                 Press.QUIET -> Act.NONE
@@ -86,7 +78,7 @@ class VoiceTap {
         }
         when (act) {
             Act.STOP, Act.HIDE -> state = State.STOPPING
-            Act.DROP, Act.TYPE_NOW -> state = State.OVER
+            Act.TYPE_NOW -> state = State.OVER
             Act.NONE, Act.CUT -> {}
         }
         return act

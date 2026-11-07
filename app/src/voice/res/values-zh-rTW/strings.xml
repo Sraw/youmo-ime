@@ -11,6 +11,5 @@
     <string name="voice_hold_hint">鬆開 上屏 · 上滑 取消</string>
     <string name="voice_hold_nothing">沒有聽清</string>
     <string name="voice_tap_hint">點這裡或麥克風 結束</string>
-    <string name="voice_tap_cancel">取消</string>
     <string name="voice_tap_cut_short">最後幾個字可能沒辨識完</string>
 </resources>

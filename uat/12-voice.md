@@ -28,11 +28,11 @@
 - **预期**：点了以后键盘上盖一层（工具栏还在上面，麦克风也在），显示声音条和「准备中…」→「正在听…」，没有另开语音面板；第一次框里是「我们走吧」，第二次接着是「你好」；结束后那一层淡出，键盘照常能打。悬浮键盘说着时拖它的把手移动，不结束。
 - **JVM**：`VoiceTapUatTest.tappingTheMicrophoneTalksTillItIsTappedAgain`（点麦克风开始、盖层在键盘上、没有面板，再点结束上屏，可以再来一次）、`VoiceTapUatTest.tappingTheMaskStopsIt`、`VoiceTapUatTest.theMicrophoneTappedInTheTailEndsIt`（结束后的续录中再点：`cut()` 一次，不开新的）、`VoiceTapUatTest.gettingReadyShowsTillTheMicrophoneIsOn`、`VoiceTapUatTest.aSilentMicrophoneIsSaid`、`VoiceTapUatTest.floatingTheMaskGoesWithTheKeyboard`（悬浮键盘拖动、缩小后，盖层是键盘自己的子 View，在工具栏下面、盖住按键）、`VoiceTapUatTest.floatingDraggingItsHandleTalksOn`（拖把手不算点到盖层外）、`VoiceTapUatTest.startedFromAShortcutTheMicrophoneStillStopsItOnce`（从按键快捷键开始的，点麦克风只结束一次，不截掉续录）、`VoiceHoldUatTest.floatingTheCardGoesWithTheKeyboard`（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testVoiceDebugUnitTest`）；设备上看：盖层的位置（悬浮键盘拖动和缩放后、单手模式、横屏），说着时拖悬浮键盘的把手不结束。
 
-### VO-05 [P1] 点麦克风说话时点 × 取消
-- **前提**：B0-语音，多行的「普通文本」框。
-- **操作**：点工具栏上的麦克风，说"今天天气"，停一下，接着说"很好"，不停顿，马上点那一层右上角的 ×。
-- **预期**：已经上屏的「今天天气，」留着，还带下划线没定下来的「很好」撤掉；不再识别。说一句就点 × 的：框里什么都不加。
-- **JVM**：`VoiceTapUatTest.cancelTakesOnlyTheUnsettledTail`、`VoiceTapUatTest.cancelBeforeAnythingSettledLeavesTheFieldAsItWas`（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testVoiceDebugUnitTest`）；真机上照"操作"跑一遍（哪段已经定下来，跟说话的停顿有关）。
+### VO-05 [P1] 说话时的那一层是毛玻璃，没有 ×
+- **前提**：B0-语音；再换一个图片背景的主题、悬浮键盘、横屏各做一遍。
+- **操作**：点工具栏上的麦克风；再长按空格（不说话），手指上滑到取消区停一下再滑回。
+- **预期**：那一层下面的键是模糊的，只看得出大致的形状和颜色，位置和键盘对得上（悬浮、横屏、图片背景、圆角都一样）；「正在听…」和提示文字清楚，不和键帽上的字叠在一起；点按说话的那一层上没有 ×，只能点麦克风或这一层结束（不想要的结束后自己删）。长按空格的卡片同样是毛玻璃，上滑到取消区变红，滑回恢复。
+- **JVM**：`VoiceGlassTest`（盒式模糊的结果、缩小和放大的坐标换算、键盘画进缩小图时不画那一层自己）、`VoiceTapUatTest.theMaskHasNoEnterStoppedTheKeyboardsSendsIt`（那一层上没有按钮）（`:app:testVoiceDebugUnitTest`）；真机上照"操作"截图看。
 
 ### VO-06 [P1] 数字按习惯写
 - **前提**：B0-语音。
@@ -183,8 +183,8 @@
 ### VO-28 [P1] 点麦克风说话后发送
 - **前提**：B0-语音。
 - **操作**：打开测试页的「聊天」框（fields.html#chat，回车发送后清空），点工具栏上的 **麦克风**，说"我们走吧"，说完点那一层（或麦克风）结束，等字上屏、那一层收起，再点键盘上的回车（发送）。
-- **预期**：那一层上没有回车按钮（只有右上角的 ×）；聊天记录里发出的是「我们走吧」，只发了一条，聊天框清空了。（长按空格的语音卡片不在此列：那里的按下只结束续录，见 VO-25。）
-- **JVM**：`VoiceTapUatTest.theMaskHasNoEnterStoppedTheKeyboardsSendsIt`（那一层上只有 ×；结束、上屏、那一层收起后，键盘的回车照常发出）（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testVoiceDebugUnitTest`）。
+- **预期**：那一层上没有任何按钮（没有回车，也没有 ×）；聊天记录里发出的是「我们走吧」，只发了一条，聊天框清空了。（长按空格的语音卡片不在此列：那里的按下只结束续录，见 VO-25。）
+- **JVM**：`VoiceTapUatTest.theMaskHasNoEnterStoppedTheKeyboardsSendsIt`（那一层上没有按钮；结束、上屏、那一层收起后，键盘的回车照常发出）（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testVoiceDebugUnitTest`）。
 - **模拟器**：只做冒烟：聊天框里点麦克风，播 `zouba`，播完点那一层结束，等那一层收起后点键盘的回车；只看聊天记录里「我们走吧」正好一条、聊天框空了。模拟器声卡出错（`pcm_readi failed`）而没发出的这次不算，重开聊天页再来，最多 3 次，都不算时记为阻塞。
 
 ### VO-29 [P1] 点麦克风说话，定下来的边说边上屏

@@ -46,8 +46,8 @@ class VoiceHoldOverlay(
     private val main = Handler(Looper.getMainLooper())
     private var gone = false
 
-    private val talkColor = theme.keyboardColor
-    private val background = GradientDrawable().apply { setColor(talkColor) }
+    private val talkColor = VoiceStyle.mask(theme.keyboardColor)
+    private val glass = VoiceGlass(talkColor)
     private var colorAnimator: ValueAnimator? = null
     private var currentColor = talkColor
 
@@ -98,7 +98,7 @@ class VoiceHoldOverlay(
     private val card = LinearLayout(ctx).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER_HORIZONTAL
-        background = this@VoiceHoldOverlay.background
+        background = glass
         val pad = ctx.dp(12)
         setPadding(pad, pad, pad, 0)
         addView(heard, LinearLayout.LayoutParams(-1, 0, 1f))
@@ -131,6 +131,7 @@ class VoiceHoldOverlay(
     fun begin() {
         // the keyboard's own child: it moves and scales with it (floating, one-handed)
         inputView.overKeys(card, underBar = false)
+        glass.under(card, keyboard as ViewGroup)
         card.alpha = 0f
         pill.scaleX = APPEAR_SCALE
         pill.scaleY = APPEAR_SCALE
@@ -207,7 +208,7 @@ class VoiceHoldOverlay(
             duration = VoiceStyle.ANIMATE_MS
             addUpdateListener {
                 currentColor = it.animatedValue as Int
-                background.setColor(currentColor)
+                glass.color = currentColor
             }
             start()
         }

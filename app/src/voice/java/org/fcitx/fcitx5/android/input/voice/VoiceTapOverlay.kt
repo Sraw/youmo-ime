@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
-import android.content.res.ColorStateList
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
@@ -15,7 +14,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.graphics.ColorUtils
@@ -29,7 +27,8 @@ import splitties.dimensions.dp
 /**
  * Tap to talk, the bar's microphone (060-voice-tap-to-talk.md): a mask over the keys, the bar left
  * above it, the bars moving with the voice and what it is doing; listening on with no finger held
- * till the microphone or the mask is tapped, × cancels. The settled part of what is said is typed
+ * till the microphone or the mask is tapped (no ×: the user's decision 2026-11-07, what is not
+ * wanted is deleted after). The settled part of what is said is typed
  * as it is said, the tail composing in the field ([VoiceSession], [VoiceTalk]); what each press does
  * is [VoiceTap]'s. No Enter of its own (the user's decision 2026-11-06: it would not follow the
  * theme): to send, stop it, then the keyboard's Enter. The mask is the keyboard view's own child,
@@ -81,8 +80,9 @@ class VoiceTapOverlay(
         gravity = Gravity.CENTER or Gravity.BOTTOM
         VoiceStyle.heard(this)
         setTextColor(theme.keyTextColor)
+        // INVISIBLE, not GONE: its share of the height kept, the pill stays in the middle
         // what is said shows in the field as it is said; here only where the field cannot show it
-        visibility = if (session.composes) View.GONE else View.VISIBLE
+        visibility = if (session.composes) View.INVISIBLE else View.VISIBLE
     }
     private val wave = VoiceWaveView(ctx).apply {
         color = theme.accentKeyBackgroundColor
@@ -109,22 +109,10 @@ class VoiceTapOverlay(
         setText(R.string.voice_tap_hint)
     }
 
-    private fun button(icon: Int, description: CharSequence, pressed: () -> Unit) = ImageView(ctx).apply {
-        setImageResource(icon)
-        imageTintList = ColorStateList.valueOf(theme.altKeyTextColor)
-        scaleType = ImageView.ScaleType.CENTER
-        contentDescription = description
-        background = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(ColorUtils.setAlphaComponent(theme.keyTextColor, BUTTON_FILL))
-        }
-        setOnClickListener { pressed() }
-    }
-
-    private val cancel = button(R.drawable.ic_baseline_close_24, ctx.getString(R.string.voice_tap_cancel)) { press(Press.CANCEL) }
+    private val glass = VoiceGlass(VoiceStyle.mask(theme.keyboardColor))
 
     private val card: FrameLayout = FrameLayout(ctx).apply {
-        setBackgroundColor(theme.keyboardColor)
+        background = glass
         val column = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
@@ -138,9 +126,6 @@ class VoiceTapOverlay(
             addView(View(ctx), LinearLayout.LayoutParams(-1, 0, 1f))
         }
         addView(column, FrameLayout.LayoutParams(-1, -1))
-        val size = ctx.dp(BUTTON)
-        val margin = ctx.dp(BUTTON_MARGIN)
-        addView(cancel, FrameLayout.LayoutParams(size, size, Gravity.TOP or Gravity.END).apply { setMargins(margin, margin, margin, margin) })
         // anywhere on it stops; the keys under it get nothing
         setOnClickListener { press(Press.MASK) }
         addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
@@ -162,6 +147,7 @@ class VoiceTapOverlay(
     fun begin() {
         // under the bar (and the code row above it): the bar stays, its microphone stops it
         inputView.overKeys(card, underBar = true)
+        glass.under(card, inputView.keyboardView as ViewGroup)
         card.alpha = 0f
         card.animate().alpha(1f).setDuration(VoiceStyle.ANIMATE_MS).start()
         inputView.hold = this
@@ -214,7 +200,6 @@ class VoiceTapOverlay(
             Act.STOP -> session.finish(SystemClock.uptimeMillis())
             Act.CUT -> session.cut()
             Act.HIDE -> session.hidden(SystemClock.uptimeMillis())
-            Act.DROP -> session.drop()
             Act.TYPE_NOW -> session.typeNow()
         }
     }
@@ -228,7 +213,6 @@ class VoiceTapOverlay(
         // still shown a moment (the message, the fade), the keys under it not yet back: a press
         // goes through to them rather than stopping a talk that is over
         card.isClickable = false
-        cancel.isEnabled = false
         message?.let {
             status.setText(it)
             hint.visibility = View.INVISIBLE
@@ -244,8 +228,5 @@ class VoiceTapOverlay(
         private const val PILL_HEIGHT = 52
         private const val WAVE_WIDTH = 104
         private const val WAVE_HEIGHT = 32
-        private const val BUTTON = 44
-        private const val BUTTON_MARGIN = 8
-        private const val BUTTON_FILL = 0x14
     }
 }

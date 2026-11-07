@@ -21,7 +21,7 @@ import org.robolectric.Shadows.shadowOf
 
 /**
  * What tapping the bar's microphone to talk's UAT tests share (uat/12): the harness with the
- * [FakeRecognizer] behind the real VoiceSession, and how they find the microphone, the mask, × and
+ * [FakeRecognizer] behind the real VoiceSession, and how they find the microphone, the mask and
  * the field's text. [VoiceTapUatTest]: talking and stopping; [VoiceTapFieldUatTest]: the field
  * left, restarted or the keyboard hidden, and the ends with nothing back.
  */
@@ -67,8 +67,6 @@ open class VoiceTapUat {
         while (at != null && !at.hasOnClickListeners()) at = at.parent as? View
         return at?.takeIf { h.shown(it) }
     }
-
-    protected fun cancel(): View = described(string(R.string.voice_tap_cancel), mask()!!) ?: error("no × on the mask")
 
     // the keyboard's own Enter, named as the field's action
     protected fun enter(): View =

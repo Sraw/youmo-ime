@@ -29,6 +29,12 @@ object VoiceStyle {
     /** the colour of the finger in the zone where lifting drops it */
     const val CANCEL_RED = 0xFFC62828.toInt()
 
+    /** the mask over the keys while talking, on their blur ([VoiceGlass]): shapes and colours seen, the text clear (user 2026-11-07) */
+    const val MASK_ALPHA = 0xE0
+
+    /** [color] as the mask: its own alpha (a see-through theme) kept, scaled */
+    fun mask(color: Int): Int = (color and 0xFFFFFF) or ((color ushr 24) * MASK_ALPHA / 0xFF shl 24)
+
     /** how long each change they show takes */
     const val ANIMATE_MS = 150L
 
