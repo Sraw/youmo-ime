@@ -429,17 +429,41 @@ Not met: left with the default off. What was cut (one pair before, in the same e
 against the three after): an `Env` asked again (every key typed) made the layout's shortcut names, the marks' settings
 and the letters' corners anew, 31 KB of the 31 (Robolectric), now kept (3 KB left); the canvas view
 looked keys up by a string made for each in each frame and handed out new face lists; a key typed
-allocated 48 KiB more than the views', now 5; Shift 52 more, now 7 less. A theme not seen before is
-LookTheme's file written (29 KiB), read (`ThemeReader`, 256 KiB: a style's every property asked of it,
-each with a message made, and every attribute's value copied a character at a time; now 178) and its
-first scene with new cascades (about 400 KiB: matching 104, paint 158, content 62, the rest the
-builder's, spread over many small maps and lists); 668 KiB over the views then, 569 now, and 2.00
-GCs against the views' 0.70, the likely part of its +26% (not traced). The 26 keys built allocate what the views' do,
-+0.2%, but take 9 ms more and 0.16 more GCs: in canvas mode every keyboard built (9, 14 and 18 keys,
-注音, none of which the canvas draws; `KeyboardWindow` makes the 26 keys first in every new input
-view) is as much slower. In systrace (`view`, `dalvik`, `gfx`) the extra is the main thread's `draw`
-outside `Record View#draw` and outside GC waits, about 1.4 ms a frame over all of a run's frames, the
-render thread's alike: not found yet.
+allocated 48 KiB more than the views', now 5; Shift 52 more, now 7 less. What is left, each with
+what it is and whose it is:
+
+- **The 26 keys built (+17%, about 9 ms): GC waits on the main thread, not drawing or sync.** Traced
+  (2026-11-07, `view dalvik gfx`; API 29 has no `hwui` category, its sections come with `view` and
+  `gfx`) with each build marked, 57 builds a mode: the main thread's work besides GC is the same
+  (13.1 ms against 13.4 a build), and the whole gap is `GC: Wait For Completion Alloc` (13.7 ms a
+  build against 8.8; at the median 21 against 0: most canvas builds wait once for a collection, most
+  views builds none). The render thread's extra (`DrawFrame` +1 ms a frame) is `eglSwapBuffers` and
+  `dequeueBuffer`, the GPU's; `syncFrameState`, `prepareTree` and the vector drawables' updates are
+  within 10 ms a run of the views', and the main thread is not held through the frame (5 draws of
+  399). The icons and the blurred shadows off (each, then both) leave the GC waits as they were. The
+  canvas allocates what the views do a build (+0.2%) and its live heap after a run is 1.5% more
+  (31.6 MB against 31.2, 836 against 824 thousand objects, the scenes kept and the theme's looks),
+  but its collections are more (204-230 a run against 195) and each longer under load (a full one
+  27-31 ms against 25; at rest, an explicit one, no longer): the likely reason is the collector
+  sharing the CPU with the canvas's extra render-thread and GPU work on the emulator, not proved.
+  The 26 keys `KeyboardWindow` makes first in every new input view are made but neither laid out
+  into a scene nor drawn when another layout is the one shown (no scene, no node recorded, no draw in
+  any 9, 14 or 18 key or 注音 build); making them costs the same with either drawing (the canvas's own
+  part 0.1 ms), so making the shown layout first is a cut for both, not for this gap. P2's to do:
+  measured again once the key views go (they are most of what a build allocates: fewer collections
+  for the canvas to wait on), the waits traced with the CPU's scheduling (`sched`) to prove or drop
+  the sharing. Twice in six traced canvas processes (never in the views'), with the shadows on, the
+  main thread waited through most frames to their end (HWUI's mutable images not pinned,
+  `prepareTextures` false), 0.7 s a run: what image is pinned there is P2's to find.
+- **A theme not seen before (+26%, 569 KiB more): the engine's cold path.** LookTheme's file written
+  (29 KiB), read (`ThemeReader`, 256 KiB: a style's every property asked of it, each with a message
+  made, and every attribute's value copied a character at a time; now 178) and its first scene with
+  new cascades (about 400 KiB: matching 104, paint 158, content 62, the rest the builder's, spread over
+  many small maps and lists); 668 KiB over the views then, 569 now, and 2.00 GCs against the views'
+  0.70, the likely part of its +26% (not traced). P2 cuts `ThemeReader`'s and the cascades' allocation.
+- **Block to flat (p90 +19%, +15% with a picture): the GC's phase.** The same allocation as the
+  views' and the same GCs a switch; which switch a collection lands in moves the p90, the means are
+  within the gate.
 
 In systrace on the benchmark build (`atrace -a io.github.sraw.youmo.bench view`) a scene made anew is
 0.79 ms at the median (`cascade.of` 0.06, `content` 0.14, `paint` 0.15, `measure text` 0.06), one

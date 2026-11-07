@@ -498,7 +498,8 @@ class TextKeyboard private constructor(
     private fun letterShown(letter: String) = if (keepLettersUppercase) letter.uppercase() else transformAlphabet(letter)
 
     // a letter key's corner: its swipe (the long press's first, built in or the user's, as Shift has it) as
-    // the punctuation maps it; the letter itself while a table's roots are over it
+    // the punctuation maps it; the letter itself while a table's roots are over it. The corners are kept
+    // by AltsFor: whatever new this reads goes into AltsFor too, or a change to it leaves the corners stale
     private fun cornerOf(def: KeyDef.Appearance.AltText): String {
         val letter = def.displayText.singleOrNull()?.takeIf { it.isLetter() }
         return if (letter != null && table?.labelled == true) letter.lowercase() else transformPunctuation(swipeOverride(def) ?: def.altText)

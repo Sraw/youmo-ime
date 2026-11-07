@@ -12,6 +12,7 @@ import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.view.View
 import androidx.core.content.ContextCompat
@@ -236,8 +237,8 @@ class ScenePainter(
             SceneIcons.of(op.name)?.let { ContextCompat.getDrawable(view.context, it)?.mutate() }?.also {
                 it.setTint(op.tint.value)
                 it.setBounds(0, 0, w, h)
-            }
-        } ?: return
+            } ?: NO_ICON
+        }.takeIf { it !== NO_ICON } ?: return
         canvas.save()
         canvas.translate(left.toFloat(), top.toFloat())
         if (op.rotation != 0.0) canvas.rotate(op.rotation.toFloat(), w / 2f, h / 2f)
@@ -252,9 +253,12 @@ class ScenePainter(
         // the icons drawn, every painter's (main thread), the last KEPT_ICONS used: a keyboard made again (a
         // theme switched) inflates none again; let go when what inflating one reads changes (night mode,
         // density, font scale), not for the rest of the configuration (turning the screen keeps them)
-        private val icons = object : LinkedHashMap<IconKey, Drawable?>(KEPT_ICONS, LOAD, true) {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<IconKey, Drawable?>?) = size > KEPT_ICONS
+        private val icons = object : LinkedHashMap<IconKey, Drawable>(KEPT_ICONS, LOAD, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<IconKey, Drawable>?) = size > KEPT_ICONS
         }
+
+        // kept for a name with no icon (none in SceneIcons, or none inflated): not looked for again each frame
+        private val NO_ICON: Drawable = ColorDrawable()
         private const val LOAD = 0.75f
         private var iconsUiMode = 0
         private var iconsDensity = 0

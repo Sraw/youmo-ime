@@ -74,8 +74,7 @@ class PinyinDictManagerTest {
         assertThrows(IOException::class.java) { PinyinDictManager.importFromInputStream(broken, "theirs.txt") }
         assertTrue(broken.closed)
         assertFalse(File(RuntimeEnvironment.getApplication().cacheDir, "theirs.txt").exists())
-        val cache = RuntimeEnvironment.getApplication().cacheDir
-        val cached = cache.list()!!.toSet()
+        val cached = cachedFiles()
         val read = Provided("搭子 da'zi 0\n".toByteArray())
         runBlocking { PinyinDictManager.readWords(read, "words.txt") { it.toList() } }
         assertTrue(read.closed)
@@ -83,7 +82,7 @@ class PinyinDictManagerTest {
         assertThrows(IOException::class.java) { runBlocking { PinyinDictManager.readWords(unread, "words.txt") { it.toList() } } }
         assertTrue(unread.closed)
         // nor of the copy readWords makes and its text, read or not
-        assertEquals(cached, cache.list()!!.toSet())
+        assertEquals(cached, cachedFiles())
         assertEquals(listOf("mine.txt.gz"), names())
     }
 
@@ -150,16 +149,21 @@ class PinyinDictManagerTest {
         assertEquals(mapOf("gb" to 1, "pinyin-first" to 2, "sogou" to 2), MergedDictionary.sourceWords(dir))
     }
 
+    // the cache's files but lock files (*.lck): those another part of the app takes there come and go
+    // on their own while a test runs, nothing an import left
+    private fun cachedFiles(): Set<String> =
+        RuntimeEnvironment.getApplication().cacheDir.list()!!.filterNot { it.endsWith(".lck") }.toSet()
+
     // never imported half right: a file of two layouts, or initials only, is refused and nothing kept
     @Test
     fun aFileNotSurelyReadIsRefusedWithTheReason() {
-        val cache = RuntimeEnvironment.getApplication().cacheDir.list()!!.toSet()
+        val cache = cachedFiles()
         val mixed = PinyinDictManager.importFromInputStream("you mo 幽默\n搭子 da'zi\n".byteInputStream(), "mixed.txt")
         assertEquals(DictionaryFormat.Reason.MIXED, (mixed.exceptionOrNull() as PinyinDictManager.Refusal).reason)
         val initials = PinyinDictManager.importFromInputStream("幽默 ym\n搭子 dz\n".byteInputStream(), "initials.txt")
         assertEquals(DictionaryFormat.Reason.INITIALS, (initials.exceptionOrNull() as PinyinDictManager.Refusal).reason)
         assertEquals(emptyList<String>(), names())
-        assertEquals(cache, RuntimeEnvironment.getApplication().cacheDir.list()!!.toSet())
+        assertEquals(cache, cachedFiles())
     }
 
     // one of a name there, on or off, is not imported over (ImportedDictionaries.hasDictionary): its

@@ -38,6 +38,9 @@ import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.canvas.AndroidTextMeasurer
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
+import org.fcitx.fcitx5.android.input.popup.PopupOverrides
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.theme.Crop
 import org.fcitx.fcitx5.android.input.theme.KeyFill
 import org.fcitx.fcitx5.android.input.theme.Picture
@@ -59,6 +62,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
+import kotlin.math.roundToInt
 
 /**
  * The 26 keys drawn by the scene engine (AppPrefs.Internal.canvasKeyboard): one view drawing them,
@@ -307,6 +311,69 @@ class KeyboardCanvasViewTest {
             h.api.calls.clear()
             h.tap(q)
             assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") })
+        }
+    }
+
+    // what the env keeps (TextKeyboard's names, marks' settings, alts: by their inputs) follows each of
+    // them: every setting a letter's corner or marks are made of changed in turn, the scene asked again
+    // draws q (its corner, its marks, where they are) otherwise; a kept value missing an input would not
+    @Test
+    fun theKeptCornersAndMarksFollowEverySettingTheyAreMadeOf() {
+        // q's texts and icons as its face draws them, and where
+        fun q(h: KeyboardHarness): List<String> {
+            h.idle()
+            val c = h.canvas()!!
+            c.invalidateScene()
+            return c.scene!!.keys.first { it.id == "q" }.ops(false).mapNotNull {
+                when (it) {
+                    is Op.Text -> "text ${it.text} ${it.x.roundToInt()} ${it.baseline.roundToInt()} ${it.size}"
+                    is Op.Icon -> "icon ${it.name} ${it.box}"
+                    else -> null
+                }
+            }
+        }
+        harness(true).use { h ->
+            val board = h.textKeyboard()
+            var was = q(h)
+            fun changed(what: String, change: () -> Unit) {
+                change()
+                val now = q(h)
+                assertTrue("$what: q drawn as before, $now", now != was)
+                was = now
+            }
+            val internal = AppPrefs.getInstance().internal
+            val keyboard = AppPrefs.getInstance().keyboard
+            changed("q's long press the user's") {
+                prefs.set(internal.popupOverrides, PopupOverrides.Empty.with("q", listOf("Ω", "1")).serialize())
+            }
+            assertTrue(was.toString(), was.any { it.startsWith("text Ω ") })
+            changed("the punctuation mapped") { board.onPunctuationUpdate(mapOf("Ω" to "ω")) }
+            assertTrue(was.toString(), was.any { it.startsWith("text ω ") })
+            changed("a shortcut on q") {
+                prefs.set(internal.keyShortcuts, KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好")).serialize())
+            }
+            changed("no swipe to shortcuts") { prefs.set(keyboard.swipeLayers, SwipeLayersChoice.SymbolDownOnly) }
+            changed("the symbol elsewhere") { prefs.set(keyboard.punctuationPosition, KeyMarkPosition.BottomLeft) }
+            // the setting makes the input view anew (its other changes go with it): the corner's place is what
+            // tells the marks' kept spots followed it, left of the letter and below it
+            val letter = was.first { it.startsWith("text q ") }.split(" ")
+            val corner = was.first { !it.startsWith("text q ") }.split(" ")
+            assertTrue(was.toString(), corner[2].toInt() < letter[2].toInt() && corner[3].toInt() > letter[3].toInt())
+            changed("Shift") { h.tap(h.keyView("shift")) }
+        }
+        // a table's roots over the letters and not: the corner the letter, then the swipe again
+        harness(true, WUBI).use { h ->
+            try {
+                EngineState.tableKeyboardState.value = wubi(KeyLabels.NONE)
+                val none = q(h)
+                EngineState.tableKeyboardState.value = wubi(KeyLabels.ROOTS)
+                val roots = q(h)
+                assertTrue("roots: q drawn as with none, $roots", roots != none)
+                EngineState.tableKeyboardState.value = wubi(KeyLabels.NONE)
+                assertEquals(none, q(h))
+            } finally {
+                EngineState.tableKeyboardState.value = null
+            }
         }
     }
 
