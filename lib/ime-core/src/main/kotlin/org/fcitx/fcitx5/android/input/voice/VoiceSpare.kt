@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
+import java.util.concurrent.CancellationException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -47,6 +48,21 @@ class VoiceSpare<T : Any>(private val release: (T) -> Unit) {
         } finally {
             building.set(false)
         }
+    }
+
+    /**
+     * [build] off the talk's own path: a failure, an Error too (the native library not loading,
+     * memory running out), given to [failed] rather than thrown into a coroutine that would end the
+     * process; none made, the opening makes one or goes without. A cancellation is still thrown.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    fun tryBuild(make: () -> T, failed: (Throwable) -> Unit): Boolean = try {
+        build(make)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Throwable) {
+        failed(e)
+        false
     }
 
     /** the one made ahead, now no one else's; null if none */

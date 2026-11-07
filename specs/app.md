@@ -872,6 +872,11 @@ in CI keeps the voice source set compiling.
   taken after `startRecording()` (the record's 2 s buffer holds the first words meanwhile), a spare
   made beside the models' load and kept from opening to opening (`VoiceSpare`), let go with them;
   debug builds log its time per window (`voice capture:` vadMeanUs, vadMostUs).
+  The spare is made when a talk starts (`load()`, beside the models): the first press after the
+  process starts finds none ready and makes one after `startRecording()` (some tens of ms, the
+  record's buffer holding what is said meanwhile); from the second press on the last one is reused.
+  Not made when the voice key shows (0.5.x's prepareVadSoon): that would need a hook in the main
+  code and the text flavor for a cost the record's buffer already absorbs.
 
   Measured by `lib/ime-core/src/test/resources/voice/quiet_eval.py` (Gain2 → the 060 streaming models with the app's
   endpoints, silero per window; aishell 0–39, ascend 0–39, Kokoro's English phrases, the q44 clips,

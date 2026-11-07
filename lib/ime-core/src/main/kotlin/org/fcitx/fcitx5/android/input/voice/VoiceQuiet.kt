@@ -19,6 +19,9 @@ import kotlin.math.roundToInt
  * (specs/app.md, Quiet: the measurements; quiet_eval.py).
  *
  * Fed each window as read: its raw samples (before the gain) and whether the VAD heard speech in it.
+ * What counts as sound here is its own on purpose, not [VoiceOnset]'s (the first sample not zero:
+ * the microphone up) nor [VoiceGain]'s (the level it lifts by): a window under [SILENT] is no room,
+ * though the onset and the gain count it, so a floor is a room's and not a quiet microphone's.
  * A segment is told by its samples from the microphone's opening. The capture thread feeds it and
  * the recognizer's asks, so both are under one lock.
  */

@@ -171,9 +171,9 @@ object VoiceEngine {
         spareVad.offer(vad)
     }
 
-    /** A spare VAD made, if there is none; off the main thread. */
-    fun prepareVad(assets: AssetManager) {
-        spareVad.build { vad(assets) }
+    /** A spare VAD made, if there is none; off the main thread. A failure, an Error too, is [failed]'s. */
+    fun prepareVad(assets: AssetManager, failed: (Throwable) -> Unit) {
+        spareVad.tryBuild({ vad(assets) }, failed)
     }
 
     /**

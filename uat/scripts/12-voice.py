@@ -283,26 +283,6 @@ case("VO-07", needs="jvm:VoiceHoldUatTest.wordsWithNumeralsAreLeftAlone")(lambda
 case("VO-08", needs="jvm:VoiceHoldUatTest.englishInChineseIsTypedAsWritten")(lambda d: None)
 
 
-def room_talk(d, secs=3.0):
-    """hold space in the room's noise and let go while it still plays: (what showed, field). The noise
-    is queued before the hold, as a room is there before the talk: the clip microphone's faint tail
-    (-84 dBFS) around it would be a floor no room has, and the noise over it heard as speech (VoiceQuiet)"""
-    d.clip_mic()
-    p = d.say(["room", 0, "room", 0, "room"], wait=False)
-    try:
-        x, y = hold_space(d)
-        shown = []
-        end = time.time() + secs
-        while time.time() < end:
-            shown += [n.text for n in d.screen().nodes if n.text and n.pkg == PKG and n.text not in shown]
-            time.sleep(0.2)
-        d.touch(("up", x, y))
-        t = settle(d, seen=shown)
-    finally:
-        p.kill()
-    return shown, t
-
-
 # also on the JVM (VoiceHoldUatTest.aCoughTypesNothing); this one, the room's own noise through the gain:
 # digital silence shows no gain, so real noise is played
 @case("VO-09", base="B0-语音", mutates="learn", needs=EV)

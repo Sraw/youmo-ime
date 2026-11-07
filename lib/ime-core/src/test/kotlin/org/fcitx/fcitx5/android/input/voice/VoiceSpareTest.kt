@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.voice
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
@@ -13,6 +14,22 @@ import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 class VoiceSpareTest {
+
+    @Test
+    fun anErrorBuildingIsToldNotThrownAndLeavesNone() {
+        val spare = VoiceSpare<String> {}
+        var told: Throwable? = null
+        assertFalse(spare.tryBuild({ throw UnsatisfiedLinkError("no sherpa") }) { told = it })
+        assertTrue(told is UnsatisfiedLinkError)
+        assertFalse(spare.ready)
+        // and the next build is not blocked by the failed one
+        assertTrue(spare.tryBuild({ "vad" }) { told = it })
+        assertEquals("vad", spare.take())
+        // a cancellation is the coroutine's, not a failure
+        assertThrows(java.util.concurrent.CancellationException::class.java) {
+            spare.tryBuild({ throw java.util.concurrent.CancellationException() }) { error("told") }
+        }
+    }
 
     @Test
     fun aSecondBuildIsNotStartedWhileOneIsOnItsWay() {

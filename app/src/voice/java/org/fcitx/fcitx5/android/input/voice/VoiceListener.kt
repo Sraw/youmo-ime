@@ -127,7 +127,8 @@ class VoiceListener(
 
     override fun load() {
         // the opening's VAD made beside the models: none, or failing, it is made or done without then
-        scope.launch(Dispatchers.IO) { orFallback("voice vad", Unit) { VoiceEngine.prepareVad(assets) } }
+        // (an Error too, not only an Exception: on this scope it would end the process)
+        scope.launch(Dispatchers.IO) { VoiceEngine.prepareVad(assets) { Timber.w(it, "voice vad") } }
         scope.launch {
             // asked for while the models load, not after: the engine may be busy a while
             val user = async { userHotwords() }
@@ -361,10 +362,13 @@ class VoiceListener(
             load = { VoiceEngine.takeVad(assets) },
             use = { listen(record, opening, it) },
             stop = {
-                record.stop()
-                record.release()
-                // numbers only, nothing said: the UAT's check of the tail's timing and the level (uat/12 VO-23/24)
-                if (BuildConfig.DEBUG) opening.log()
+                try {
+                    record.stop()
+                } finally {
+                    record.release()
+                    // numbers only, nothing said: the UAT's check of the tail's timing and the level (uat/12 VO-23/24)
+                    if (BuildConfig.DEBUG) opening.log()
+                }
             },
             unload = VoiceEngine::offerVad,
             failed = { Timber.w(it, "voice vad") },
