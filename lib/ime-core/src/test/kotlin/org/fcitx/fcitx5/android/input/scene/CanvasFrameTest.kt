@@ -74,6 +74,12 @@ class CanvasFrameTest {
         val text = Op.Text("q", 140.0, 110.0, "system", 400, 20.0, black)
         val t = CanvasFrame.extent(bounds, listOf(text), 0.0)
         assertTrue(t.left <= 120.0 && t.top <= 80.0 && t.right >= 180.0 && t.bottom >= 120.0)
+        // turned: the square round its point reaching the farthest corner of what it was unturned
+        val icon = Op.Icon("x", Box(10.0, 10.0, 40.0, 50.0), black, rotation = 45.0)
+        assertEquals(Box(0.0, 5.0, 50.0, 55.0), CanvasFrame.extent(Box(10.0, 10.0, 40.0, 50.0), listOf(icon), 0.0))
+        val turned = CanvasFrame.extent(bounds, listOf(text.copy(rotation = 90.0)), 0.0)
+        // unturned it reached 20 × 1.5 above the baseline and well right of x: turned, as far below and left
+        assertTrue("$turned", turned.bottom >= 110.0 + 30.0 && turned.left <= 140.0 - 40.0)
         assertTrue(CanvasFrame.showsPicture(listOf(Op.Fill(face, black), Op.Picture(face, null, null))))
         assertFalse(CanvasFrame.showsPicture(listOf(Op.Fill(face, black))))
     }

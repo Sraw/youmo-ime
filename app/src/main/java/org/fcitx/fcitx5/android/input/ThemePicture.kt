@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.input.theme.PictureWindow
 import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.utils.DarkenColorFilter
+import java.lang.ref.WeakReference
 
 /**
  * The theme's picture under a keyboard: laid over [base] (the view under the whole keyboard) as
@@ -82,9 +83,12 @@ class PictureHost(private val look: ThemeLook, val base: View, private val lands
     private fun place(view: View, blurDp: Int, w: Int, h: Int): Placed? {
         // before it is asked for: let go while asked, it is asked again
         val generation = ThemeAssets.generation
+        // not holding the view till the decode is done: a keyboard let go meanwhile (its theme changed,
+        // the keys' canvas given up) is not kept
+        val asking = WeakReference(view)
         val got = ThemeAssets.pictureOrLater(look, landscape, blurDp, w, base.resources.displayMetrics.density) {
             decodingBlurs.remove(blurDp)
-            view.invalidate()
+            asking.get()?.invalidate()
         }
         if (got == null) {
             decodingBlurs.add(blurDp)

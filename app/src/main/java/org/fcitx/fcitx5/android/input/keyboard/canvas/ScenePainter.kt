@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.input.theme.NineSliceLayout
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Shape
+import java.lang.ref.WeakReference
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.roundToInt
@@ -49,6 +50,9 @@ class ScenePainter(
     private val fonts: SceneFonts,
 ) {
     var missed = false
+
+    // asked to be told when the images are in (BoardImages.whenReady): once
+    private var waiting = false
 
     private val files: Map<String, String> = LookTheme.fileNames(look).entries.associate { (path, name) -> name to path }
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -152,7 +156,14 @@ class ScenePainter(
             // drawn as nothing till it is in, then again
             if (!images.ready) {
                 missed = true
-                images.whenReady { view.invalidate() }
+                // once, and not holding the view: one the keyboard let go (its keys drawn by their views
+                // again, the theme changed) is not kept till the images are in
+                if (!waiting) {
+                    waiting = true
+                    val drawn = WeakReference(view)
+                    // this painter not held either (it holds the view): ready once, ready for good, never asked again
+                    images.whenReady { drawn.get()?.invalidate() }
+                }
             }
             return
         }

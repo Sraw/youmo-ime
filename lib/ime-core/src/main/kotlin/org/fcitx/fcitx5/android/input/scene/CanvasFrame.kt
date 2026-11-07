@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.scene
 
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Op
+import kotlin.math.hypot
 
 /**
  * What a frame of the keys' canvas (the app's KeyboardCanvasView) draws of a key, as values: the
@@ -29,8 +30,10 @@ object CanvasFrame {
 
     /**
      * The box a key's node is recorded in: its [bounds] and whatever of [ops] reaches past them (a
-     * shadow by its blur, a text by a generous guess of its ink), [pad] more round it for the edges'
-     * anti-aliasing. Not the whole view's: a node that size a key made every key's redraw the board's.
+     * shadow by its blur, a text by a generous guess of its ink, either turned any way about its
+     * point where it is rotated), [pad] more round it for the edges' anti-aliasing. The node is the
+     * key's place, not the whole view's, so what a key draws is all it holds; it does not narrow what a
+     * frame redraws: a press invalidates the view, whose list of nodes is recorded again, all of it.
      */
     fun extent(bounds: Box, ops: List<Op>, pad: Double): Box {
         var b = bounds
@@ -43,15 +46,22 @@ object CanvasFrame {
                 is Op.Gradient -> op.shape.bounds
                 is Op.NineSlice -> op.shape.bounds
                 is Op.Picture -> op.shape.bounds
-                is Op.Icon -> op.box
+                is Op.Icon -> op.box.let { i -> if (op.rotation == 0.0) i else turned(i, (i.left + i.right) / 2, (i.top + i.bottom) / 2) }
                 is Op.Text -> {
                     val wide = op.size * op.scaleX * (op.text.length + 1)
-                    Box(op.x - op.size, op.baseline - op.size * TEXT_UP, op.x + wide, op.baseline + op.size * TEXT_DOWN)
+                    val ink = Box(op.x - op.size, op.baseline - op.size * TEXT_UP, op.x + wide, op.baseline + op.size * TEXT_DOWN)
+                    if (op.rotation == 0.0) ink else turned(ink, op.x, op.baseline)
                 }
             }
             b = b.union(reach)
         }
         return Box(b.left - pad, b.top - pad, b.right + pad, b.bottom + pad)
+    }
+
+    // [box] turned any way about ([x], [y]): within the square round that point reaching its farthest corner
+    private fun turned(box: Box, x: Double, y: Double): Box {
+        val r = listOf(box.left, box.right).maxOf { cx -> listOf(box.top, box.bottom).maxOf { cy -> hypot(cx - x, cy - y) } }
+        return Box(x - r, y - r, x + r, y + r)
     }
 
     /** Whether [ops] show the theme's picture: drawn where the view is over it, recorded again when that moves. */

@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
 import kotlin.math.abs
+import kotlin.math.floor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -21,9 +22,18 @@ import kotlin.test.assertTrue
 class PlaceTest {
     private val env = Fixtures.portrait
 
-    // within a pixel: a key's edges inside the board are put on whole pixels, each by itself
+    // as computed: a value the engine does not put on a pixel (the board's own edges, a sum of units)
     private fun near(expected: Double, actual: Double, what: String = "") =
-        assertTrue(abs(expected - actual) <= 1.0, "$what: expected $expected, was $actual")
+        assertTrue(abs(expected - actual) <= 1e-6, "$what: expected $expected, was $actual")
+
+    // a key's edge inside the board: on the whole pixel nearest where it falls (Place's edges)
+    private fun edge(expected: Double, actual: Double, what: String = "") = near(floor(expected + 0.5), actual, what)
+
+    // a key [width] wide from [left]: its two edges each so, so its width within a pixel of [width]
+    private fun span(left: Double, width: Double, actual: Box, what: String = "") {
+        edge(left, actual.left, "$what left")
+        edge(left + width, actual.right, "$what right")
+    }
 
     private fun Scene.key(id: String, copy: Int = 0) = keys.first { it.id == id && it.copy == copy }
 
@@ -56,11 +66,10 @@ class PlaceTest {
     fun theSpaceFillsWhatIsLeft() {
         val s = Fixtures.scene(env)
         // 1.2 + 1.2 + 1 + fill + 1 + 1 + 1.5 = 10: fill 3.1
-        near(129.6 * 2 + 108.0, s.key("space").bounds.left)
-        near(3.1 * 108.0, s.key("space").bounds.width)
+        span(129.6 * 2 + 108.0, 3.1 * 108.0, s.key("space").bounds)
         // the 🌐 key hidden: the space takes its room too
         val noLang = Fixtures.scene(env.copy(input = Input(langKey = false)))
-        near(4.1 * 108.0, noLang.key("space").bounds.width)
+        span(129.6 * 2 + 108.0, 4.1 * 108.0, noLang.key("space").bounds)
     }
 
     // as the app's views were laid out: rows 175.5 px tall are 176, 175, 176, 175, a letter's face and
@@ -155,15 +164,15 @@ class PlaceTest {
         val sizes = SplitKeyboard.Sizes(914)
         near(0.4, sizes.gap, "914 dp: 1 - 480/914 over the most, 0.4")
         val letter = e.width * sizes.letter
-        near(letter, s.key("q").bounds.width)
-        near(letter, s.key("shift").bounds.width, "⇧ as wide as a letter (TextKeyboard.Split)")
-        near(e.width - letter * 5, s.key("y").bounds.left)
+        span(0.0, letter, s.key("q").bounds)
+        span(0.0, letter, s.key("shift").bounds, "⇧ as wide as a letter (TextKeyboard.Split)")
+        edge(e.width - letter * 5, s.key("y").bounds.left)
         assertNotNull(s.keys.firstOrNull { it.id == "g" && it.copy == 1 })
         assertNotNull(s.keys.firstOrNull { it.id == "v" && it.copy == 1 })
-        near(e.width - letter * 5, s.key("g", 1).bounds.left)
+        edge(e.width - letter * 5, s.key("g", 1).bounds.left)
         assertNull(s.keyAt(e.width / 2, 10.0), "the room between the halves takes no touch")
         // the bottom row scaled: as wide in split letters as in letters, the space across the room
-        near(1.2 * letter, s.key("symbols").bounds.width)
+        span(0.0, 1.2 * letter, s.key("symbols").bounds)
         assertEquals("space", s.keyAt(e.width / 2, e.height - 1)?.id)
     }
 
@@ -173,7 +182,7 @@ class PlaceTest {
         val s = Fixtures.scene(e)
         val letter = e.width * SplitKeyboard.Sizes(914).letter
         near(e.width, s.key("semicolon").bounds.right)
-        near(e.width - letter * 6, s.key("g", 1).bounds.left, "the right half six keys, the room giving way")
+        edge(e.width - letter * 6, s.key("g", 1).bounds.left, "the right half six keys, the room giving way")
     }
 
     @Test
@@ -220,7 +229,7 @@ class PlaceTest {
         assertTrue(s.warnings.single().message.contains("not 9 or 10"), "${s.warnings}")
         val letter = e.width * SplitKeyboard.Sizes(914).letter
         // each a split letter wide, the row centred: no room between halves
-        s.keys.forEach { near(letter, it.bounds.width, it.id) }
+        s.keys.forEachIndexed { i, k -> span(e.width / 2 + (i - 4) * letter, letter, k.bounds, k.id) }
         near(e.width / 2, (s.key("k4").bounds.right + s.key("k5").bounds.left) / 2)
     }
 
