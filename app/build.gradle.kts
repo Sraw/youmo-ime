@@ -54,6 +54,13 @@ fun Test.unitTestSettings() {
         .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
     // ThemeLookScreenshotTest's whole set of themes × keyboards × modes, for the eye: -PthemeShots=<dir>
     systemProperty("themeShots.dir", project.findProperty("themeShots")?.toString().orEmpty())
+    // the old drawing kept for 060's P3 (OldRenderBaselineTest): made with -PoldRenderBaseline=<dir>
+    // (a path from the repository root; app/src/test/baseline-060 the kept one), -PoldRenderBaselineOnly=<regex>
+    // some files of it; checked without
+    systemProperty("oldRenderBaseline.dir", project.findProperty("oldRenderBaseline")?.toString()?.let { rootProject.file(it).path }.orEmpty())
+    systemProperty("oldRenderBaseline.only", project.findProperty("oldRenderBaselineOnly")?.toString().orEmpty())
+    inputs.files(fileTree("src/test/baseline-060")).withPropertyName("oldRenderBaseline")
+        .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
 }
 
 android {
