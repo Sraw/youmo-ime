@@ -84,7 +84,22 @@ android {
             resValue("mipmap", "app_icon_round", "@mipmap/ic_launcher_round_debug")
             resValue("string", "app_name", "@string/app_name_debug")
         }
+        // what a release runs like, for the instrumented performance tests (KeyboardPerfBaselineTest,
+        // specs/testing.md): not debuggable, R8's, but the debug key, its own id, and debug's typing host.
+        // Nothing is removed (benchmark-rules.pro): the tests reach members only they use
+        create("benchmark") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".bench"
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = false
+            isShrinkResources = false
+            matchingFallbacks += listOf("release")
+            resValue("string", "app_name", "@string/app_name_debug")
+            proguardFile("benchmark-rules.pro")
+        }
     }
+    // `-Pyoumo.testBuildType=benchmark`: the instrumented tests against the benchmark build
+    testBuildType = providers.gradleProperty("youmo.testBuildType").getOrElse("debug")
 
     // Everything runs on the phone, with no network permission at all. Two builds, text or voice:
     // voice adds RECORD_AUDIO and the speech recognizer with its ~180 MB of models
@@ -167,6 +182,11 @@ android {
     // what the JVM tests and the instrumented ones both run: ClipboardScale's benchmark, numbers on a device too
     sourceSets.getByName("test").kotlin.srcDir("src/sharedTest/java")
     sourceSets.getByName("androidTest").kotlin.srcDir("src/sharedTest/java")
+    // the benchmark build types into debug's field (TypingHostActivity) and has its manifest
+    sourceSets.getByName("benchmark") {
+        kotlin.srcDir("src/debug/java")
+        manifest.srcFile("src/debug/AndroidManifest.xml")
+    }
 }
 
 // Screenshots are compared in the text flavor only: the voice build's bar has a microphone, so
