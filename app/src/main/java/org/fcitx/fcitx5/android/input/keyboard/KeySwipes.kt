@@ -187,7 +187,8 @@ internal class KeySwipes(
         if (preview == KeySwipe.Preview.Own) return false
         InputFeedbacks.hapticFeedback(key.feedback)
         if (preview != KeySwipe.Preview.Shortcut(KeyShortcut.Command(KeyCommand.EditMenu))) return false
-        keyboard.onPopupAction(PopupAction.ShowEditMenuAction(key.ref, key.bounds, keyboard.inPasswordField))
+        val bounds = key.bounds ?: return false
+        keyboard.onPopupAction(PopupAction.ShowEditMenuAction(key.ref, bounds, keyboard.inPasswordField))
         return true
     }
 

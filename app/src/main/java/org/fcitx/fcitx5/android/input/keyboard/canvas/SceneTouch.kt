@@ -36,10 +36,9 @@ class SceneKey(
 
     override val keyGesture = KeyGesture(this, ViewConfiguration.get(keyboard.context).scaledTouchSlop.toFloat())
 
-    // its cell as the finger came down ([SceneTouch.find]), in the keyboard: where its view was, the touch's
-    // coordinates from its corner and the finger off the key past its size, as a view's were. A finger in
-    // a row's blank end (before A) is on the key by its hit area, outside its cell, as it was outside its view
-    internal val frame = Rect()
+    // the cell of the finger stepping on it now ([SceneTouch.Pointer.send]): its size the touch's, the
+    // finger off the key past it, as a view's was
+    private val frame = Rect()
 
     private var pressed = false
     private var click: ((KeyHandle) -> Unit)? = null
@@ -57,8 +56,8 @@ class SceneKey(
     private val window = Rect()
 
     // as a popup over it is placed: the view's bounds were the face across and the cell down
-    override val bounds: Rect
-        get() = window.also { if (!canvas.popupBounds(ref, it)) it.setEmpty() }
+    override val bounds: Rect?
+        get() = window.takeIf { canvas.popupBounds(ref, it) }
 
     override val feedback: View get() = keyboard
 
@@ -86,6 +85,12 @@ class SceneKey(
     }
 
     override fun onGesture(event: CustomGestureView.Event): Boolean? = gestureListener?.invoke(this, event)
+
+    // [action] at ([x], [y]) in the keyboard, by a finger that came down in [cell] (the keyboard's)
+    internal fun touch(cell: Rect, action: Int, x: Float, y: Float, pointerId: Int, eventTime: Long) {
+        frame.set(cell)
+        keyGesture.onTouch(action, x - cell.left, y - cell.top, pointerId, eventTime)
+    }
 
     override fun onClick(listener: (KeyHandle) -> Unit) {
         click = listener
@@ -126,16 +131,18 @@ class SceneTouch(
 ) {
     private val byRef = keys.associateBy { it.ref }
 
-    /** A finger's key, from where its cell's corner was as it went down. */
-    internal class Pointer(val key: SceneKey) : TouchTarget {
+    /**
+     * A finger's key, and its cell in the keyboard as the finger went down: the touch's coordinates
+     * from its corner, as a view's were. A finger in a row's blank end (before A) is on the key by
+     * its hit area, outside its cell, as it was outside its view. The finger's own: a split row's
+     * two copies may be one key ([find]), each finger in its own copy's cell.
+     */
+    internal class Pointer(val key: SceneKey, val cell: Rect) : TouchTarget {
         override val ref get() = key.ref
         override val enabled get() = key.keyEnabled
 
         override fun send(event: MotionEvent, action: Int, pointerIndex: Int) {
-            key.keyGesture.onTouch(
-                action, event.getX(pointerIndex) - key.frame.left, event.getY(pointerIndex) - key.frame.top,
-                event.getPointerId(pointerIndex), event.eventTime,
-            )
+            key.touch(cell, action, event.getX(pointerIndex), event.getY(pointerIndex), event.getPointerId(pointerIndex), event.eventTime)
         }
 
         override fun cancel() = key.keyGesture.cancelGestures()
@@ -146,8 +153,8 @@ class SceneTouch(
         val node = canvas.keyAt(x - canvas.left, y - canvas.top) ?: return null
         // a split row's second copy with no key of its own is the first's, as its view was (Host.keyView)
         val key = (byRef[KeyRef.scene(node.id, node.copy)] ?: byRef[KeyRef(node.id)])?.takeIf(shown) ?: return null
-        key.frame.set(node.bounds)
-        key.frame.offset(canvas.left, canvas.top)
-        return Pointer(key)
+        val cell = Rect().apply { set(node.bounds) }
+        cell.offset(canvas.left, canvas.top)
+        return Pointer(key, cell)
     }
 }

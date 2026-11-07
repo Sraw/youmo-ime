@@ -436,6 +436,8 @@ abstract class BaseKeyboard(
     private fun wireSpace(key: KeyHandle) {
         val g = key.keyGesture
         spaceKeys.add(key)
+        // as updateSpaceBadges sets it: a key wired after it ran (the scene's, drawKeysOn) buzzes for nothing otherwise
+        g.longPressFeedbackEnabled = spaceLongPressTakesTouch(spaceLongPress.getValue(), VoiceFeature.AVAILABLE, inPasswordField)
         g.swipeEnabled = spaceSwipeMoveCursor.getValue()
         g.swipeRepeatEnabled = true
         g.swipeThresholdX = selectionSwipeThreshold
@@ -531,8 +533,10 @@ abstract class BaseKeyboard(
             // TODO: gesture processing middleware
             is KeyDef.Popup.Menu -> {
                 key.onLongClick { k ->
+                    // a key no longer where the scene drawn last has it shows no menu, at the window's corner or anywhere
+                    val bounds = k.bounds ?: return@onLongClick false
                     longPopup.shown = true
-                    onPopupAction(PopupAction.ShowMenuAction(k.ref, popup, k.bounds))
+                    onPopupAction(PopupAction.ShowMenuAction(k.ref, popup, bounds))
                     // do not consume this LongClick gesture
                     false
                 }
@@ -540,8 +544,9 @@ abstract class BaseKeyboard(
             }
             is KeyDef.Popup.Keyboard -> {
                 key.onLongClick { k ->
+                    val bounds = k.bounds ?: return@onLongClick false
                     longPopup.shown = true
-                    onPopupAction(PopupAction.ShowKeyboardAction(k.ref, popup, k.bounds))
+                    onPopupAction(PopupAction.ShowKeyboardAction(k.ref, popup, bounds))
                     // do not consume this LongClick gesture
                     false
                 }
@@ -552,9 +557,7 @@ abstract class BaseKeyboard(
                 key.gestureListener = { k, event ->
                     if (popupOnKeyPress) {
                         when (event.type) {
-                            GestureType.Down -> onPopupAction(
-                                PopupAction.PreviewAction(k.ref, popup.content, k.bounds)
-                            )
+                            GestureType.Down -> k.bounds?.let { onPopupAction(PopupAction.PreviewAction(k.ref, popup.content, it)) }
                             GestureType.Move -> {
                                 onPopupAction(swipes.preview(k, def, event.totalY, popup))
                             }
@@ -572,9 +575,7 @@ abstract class BaseKeyboard(
                 key.gestureListener = { k, event ->
                     if (popupOnKeyPress) {
                         when (event.type) {
-                            GestureType.Down -> onPopupAction(
-                                PopupAction.PreviewAction(k.ref, popup.content, k.bounds)
-                            )
+                            GestureType.Down -> k.bounds?.let { onPopupAction(PopupAction.PreviewAction(k.ref, popup.content, it)) }
                             GestureType.Up -> {
                                 onPopupAction(PopupAction.DismissAction(k.ref))
                             }
@@ -649,7 +650,7 @@ abstract class BaseKeyboard(
     }
 
     /** The scene's key wired as [view] was ([drawKeysOn]); null while the views draw the keys. */
-    protected fun sceneKeyOf(view: KeyView): SceneKey? = sceneKeys[view]
+    internal fun sceneKeyOf(view: KeyView): SceneKey? = sceneKeys[view]
 
     // the keys' views take touches as the keyboard hands them: vivo's workaround, or keys drawn by the canvas
     private val routesTouches get() = vivoKeypressWorkaround || canvas != null

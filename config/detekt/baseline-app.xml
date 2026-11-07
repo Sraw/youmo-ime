@@ -13,7 +13,6 @@
     <ID>LargeClass:FcitxInputMethodService.kt:FcitxInputMethodService : LifecycleInputMethodService</ID>
     <ID>LongMethod:CapabilityFlag.kt:CapabilityFlags.Companion$fun fromEditorInfo: CapabilityFlags</ID>
     <ID>LongMethod:ConfigDescriptor.kt:ConfigDescriptor.Companion$override fun parse: Either&lt;ParseException, ConfigDescriptor&lt;*, *&gt;&gt;</ID>
-    <ID>LongMethod:CustomGestureView.kt:CustomGestureView$@SuppressLint("ClickableViewAccessibility") override fun onTouchEvent: Boolean</ID>
     <ID>LongMethod:PreferenceScreenFactory.kt:PreferenceScreenFactory$private fun general</ID>
     <ID>LoopWithTooManyJumpStatements:GridDecoration.kt:GridDecoration$for</ID>
     <ID>NestedBlockDepth:FcitxInputMethodService.kt:FcitxInputMethodService$private fun handleFcitxEvent</ID>

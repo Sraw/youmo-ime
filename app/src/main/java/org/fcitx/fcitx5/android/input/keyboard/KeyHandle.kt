@@ -19,8 +19,11 @@ interface KeyHandle : KeyGesture.Key {
     /** Which key it is, to a popup ([org.fcitx.fcitx5.android.input.popup.PopupAction.key]). */
     val ref: KeyRef
 
-    /** Where a popup over it is placed, in the window: the face across, to the cell's foot down (KeyView.bounds). */
-    val bounds: Rect
+    /**
+     * Where a popup over it is placed, in the window: the face across, to the cell's foot down
+     * (KeyView.bounds). Null for a scene's key the scene drawn last has not: no popup over it.
+     */
+    val bounds: Rect?
 
     /** Its touch: the gesture's settings and where the finger is. */
     val keyGesture: KeyGesture

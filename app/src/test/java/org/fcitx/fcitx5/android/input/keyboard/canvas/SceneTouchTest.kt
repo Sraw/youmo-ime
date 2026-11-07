@@ -16,12 +16,16 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
+import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -219,11 +223,13 @@ class SceneTouchTest {
             val b = h.keyView("backspace")
             val height = h.box(b).height().toFloat()
             h.swipe(b, 0f, -height)
-            val cleared = h.api.calls.toList()
+            val cleared = h.api.calls.toList() to h.field.text.toString()
             h.swipe(b, 0f, height)
             cleared to h.field.text.toString()
         }
-        assertTrue(cleared.toString(), "clearTyped()" in cleared)
+        assertTrue(cleared.toString(), "clearTyped()" in cleared.first)
+        // what was before the cursor cleared, what was after it kept
+        assertEquals(" world", cleared.second)
         assertEquals("hello world", restored)
     }
 
@@ -247,6 +253,69 @@ class SceneTouchTest {
             }
         }
         typed.forEach { assertEquals(typed.toString(), 1, it.size) }
+    }
+
+    // a long press that does nothing buzzes for nothing (A4.13): the scene's space, wired after the
+    // keyboard set its views' (updateSpaceBadges), told as they were
+    @Test
+    fun theSpacesLongPressBuzzesAsTheViewsDid() {
+        listOf(SpaceLongPressBehavior.None to false, SpaceLongPressBehavior.Enumerate to true).forEach { (behavior, buzzes) ->
+            prefs.set(AppPrefs.getInstance().keyboard.spaceKeyLongPressBehavior, behavior)
+            val shown = both { h, on ->
+                val space = h.keyView("space")
+                if (!on) return@both space.longPressFeedbackEnabled
+                val scene = checkNotNull(h.textKeyboard().sceneKeyOf(space))
+                assertEquals(behavior.name, space.longPressFeedbackEnabled, scene.keyGesture.longPressFeedbackEnabled)
+                scene.keyGesture.longPressFeedbackEnabled
+            }
+            assertEquals(behavior.name, buzzes, shown)
+        }
+    }
+
+    // a split row's second copy with no key of its own is the first's ([SceneTouch.find]): a finger on
+    // each copy, each read from its own copy's cell, not from where the other finger came down
+    @Test
+    fun aKeysTwoCopiesEachReadFromItsOwnCell() {
+        ThemeManager.prefs.splitKeyboard.setValue(SplitKeyboardMode.Always)
+        prefs.later { ThemeManager.prefs.splitKeyboard.setValue(SplitKeyboardMode.Auto) }
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+        KeyboardHarness(im = KeyboardHarness.PINYIN).start().use { h ->
+            val kb = h.textKeyboard()
+            val c = checkNotNull(h.canvas())
+            val gs = h.views("g")
+            assertEquals(2, gs.size)
+            val g = checkNotNull(kb.sceneKeyOf(gs[0]))
+            val keys = KeyboardHarness.all(kb).filterIsInstance<KeyView>().mapNotNull { kb.sceneKeyOf(it) }
+                .filter { it.ref != KeyRef.scene("g", 1) }.toList()
+            val touch = SceneTouch(c, keys) { true }
+            val origin = h.box(kb)
+            val at = gs.map { v -> h.box(v).let { it.exactCenterX() - origin.left to it.exactCenterY() - origin.top } }
+            val pointers = at.map { (x, y) -> checkNotNull(touch.find(x, y)) }
+            pointers.forEach { assertSame(g, it.key) }
+            val xs = mutableListOf<Float>()
+            val wired = g.gestureListener
+            g.gestureListener = { k, e -> xs += e.x; wired?.invoke(k, e) ?: false }
+            // the first finger's step, after the second came down: from the first copy's corner, mid-key
+            val t = SystemClock.uptimeMillis()
+            val e = MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, at[0].first, at[0].second, 0)
+            pointers[0].send(e, MotionEvent.ACTION_DOWN, 0)
+            e.recycle()
+            pointers[0].cancel()
+            g.gestureListener = wired
+            assertEquals(gs[0].width / 2f, xs.first(), 2f)
+        }
+    }
+
+    // a key the scene drawn last has not: no place for a popup over it, so none shown (not at the window's corner)
+    @Test
+    fun aKeyTheSceneHasNotHasNoPopupPlace() {
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+        KeyboardHarness(im = KeyboardHarness.PINYIN).start().use { h ->
+            val kb = h.textKeyboard()
+            val q = checkNotNull(kb.sceneKeyOf(h.keyView("q")))
+            assertNotNull(q.bounds)
+            assertNull(SceneKey(KeyRef.scene("gone", 0), q.def, checkNotNull(h.canvas()), kb).bounds)
+        }
     }
 
     @Test
