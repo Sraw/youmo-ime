@@ -21,7 +21,7 @@ import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.OnSplit
 import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
-import org.fcitx.fcitx5.android.scene.theme.Cascade
+import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.KeyLook
 import org.fcitx.fcitx5.android.scene.theme.Selector
 import org.fcitx.fcitx5.android.scene.theme.TextLook
@@ -42,11 +42,17 @@ class SceneBuilder(
     private val measurer: TextMeasurer,
     icons: IconSizes = IconSizes.MATERIAL,
     private val phases: Phases = Phases.None,
+    /** [theme]'s cascades, kept by the caller to make its next scene of the theme with what these worked out. */
+    cascades: Cascades = Cascades(theme),
 ) {
-    private val cascade = Cascade(theme, env.scenes)
+    init {
+        require(cascades.theme === theme) { "the cascades of another theme" }
+    }
+
+    private val cascade = cascades.of(env.scenes)
 
     // `face="keep"`: the face theme 3.0 drew whatever 按键样式 said (the lookup key on, 确定)
-    private val unflat = Cascade(theme, env.scenes - "flat")
+    private val unflat = cascades.of(env.scenes - "flat")
     private val paint = Paint(theme, env.density)
     private val content = Content(env, measurer, icons)
 
@@ -158,12 +164,14 @@ class SceneBuilder(
         val states = statesOf(key)
         val looks = HashMap<Set<KeyState>, KeyLook>()
         val parts = HashMap<Set<KeyState>, (Part) -> TextLook>()
+        val classes = setOf(key.kind) + key.attrs.classes.orEmpty()
         for (s in listOf(states, states + KeyState.Pressed)) {
-            // the key's own once a state, each part on it (M4)
-            val own = c.of(target(board, key, s, null))
-            looks[s] = KeyLook(own, theme)
-            val byPart = Part.entries.associateWith { TextLook(c.of(target(board, key, s, it), own), theme) }
-            parts[s] = byPart::getValue
+            // the key's target once a state, its parts the same but the part's name
+            val whole = Selector.Target("key", board, key.key.id, key.attrs.role, classes, s.mapTo(HashSet()) { it.xml })
+            looks[s] = KeyLook(c.of(whole), theme)
+            // a part's look only when a text or an icon of it is placed or drawn
+            val byPart = HashMap<Part, TextLook>()
+            parts[s] = { part -> byPart.getOrPut(part) { TextLook(c.of(whole.copy(part = part.xml)), theme) } }
         }
         return Styled(states, looks, parts)
     }
@@ -177,8 +185,7 @@ class SceneBuilder(
     }
 
     private fun prepare(placed: Placed, key: ExpandedKey, styled: Styled, geometry: Map<Set<KeyState>, FaceGeometry>): Prepared {
-        val now = styled.parts.getValue(styled.states)
-        val looksNow = Looks(now(Part.Label), now(Part.Icon), now(Part.Badge), now(Part.Mark), now(Part.Shortcut))
+        val looksNow = Looks(styled.parts.getValue(styled.states))
         val drawn = content.of(key, placed.cell, geometry.getValue(styled.states).content, looksNow)
         return Prepared(placed, key, styled.states, styled.looks, styled.parts, geometry, drawn)
     }
@@ -192,10 +199,6 @@ class SceneBuilder(
             if (env.shift == Shift.Lock) add(KeyState.Locked)
         }
     }
-
-    private fun target(board: String, key: ExpandedKey, states: Set<KeyState>, part: Part?): Selector.Target = Selector.Target(
-        "key", board, key.key.id, key.attrs.role, setOf(key.kind) + key.attrs.classes.orEmpty(), states.map { it.xml }.toSet(), part?.xml,
-    )
 
     // rules B §7: the letters' marks kept apart together (one size for all the letters), the other keys' each
     private fun settle(keys: List<Prepared>): List<Settled> {

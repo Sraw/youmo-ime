@@ -33,18 +33,21 @@ data class Selector(
     val part: String? = null,
 ) {
     /** (ids, classes, elements), compared in that order. */
-    val specificity: Int
-        get() {
-            val a = if (key != null) 1 else 0
-            val b = classes.size + roles.size + states.size + scenes.size + (if (starRole != null) 2 else 0) +
-                (if (board != null && key == null) 1 else 0)
-            val c = 1 + (if (part != null) 1 else 0)
-            return (a * WEIGHT + b) * WEIGHT + c
-        }
+    // once: a cascade weighs it for every target it matches
+    val specificity: Int = run {
+        val a = if (key != null) 1 else 0
+        val b = classes.size + roles.size + states.size + scenes.size + (if (starRole != null) 2 else 0) +
+            (if (board != null && key == null) 1 else 0)
+        val c = 1 + (if (part != null) 1 else 0)
+        (a * WEIGHT + b) * WEIGHT + c
+    }
 
     /** Whether it selects [target] in [scene] (the scenes the environment is in). */
-    fun matches(target: Target, scene: Set<String>): Boolean =
-        widget == target.widget && part == target.part && scene.containsAll(scenes) &&
+    fun matches(target: Target, scene: Set<String>): Boolean = scene.containsAll(scenes) && selects(target)
+
+    /** Whether it selects [target], its scenes known to hold. */
+    fun selects(target: Target): Boolean =
+        widget == target.widget && part == target.part &&
             (board == null || board == target.board) && (key == null || key == target.key) &&
             !(target.slot && board != null && key == null) &&
             (starRole == null || starRole == target.role) && target.classes.containsAll(classes) &&

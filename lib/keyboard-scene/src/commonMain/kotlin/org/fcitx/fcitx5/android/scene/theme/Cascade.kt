@@ -18,25 +18,40 @@ class Cascade(theme: Theme, private val scene: Set<String>) {
 
     // the selectors that can hold here (their scenes this one's), by what a target must be to be selected:
     // a key is tried against its widget's and part's, and those naming it, not a theme's every style
+    // (their scenes checked here, once, not again a target)
     private val index: Map<Bucket, List<Pair<Selector, Style>>> = theme.styles
         .flatMap { style -> style.selectors.filter { scene.containsAll(it.scenes) }.map { it to style } }
         .groupBy { (sel, _) -> Bucket(sel.widget, sel.part, sel.key) }
 
     /**
-     * The properties set for [target]: a widget, a key, or a key's part, which inherits from the key:
-     * [key] its key's own, where the caller has them already (a key's every part in a state).
+     * The properties set for [target]: a widget, a key, or a key's part, which inherits from the key.
+     * Kept: the same target asked again (each key's every part in a state, every scene of a theme) is
+     * the map made the first time.
      */
-    fun of(target: Selector.Target, key: Map<String, Value>? = null): Map<String, Value> {
-        val own = own(target)
-        if (target.part == null) return own
-        val under = key ?: own(target.copy(part = null))
-        return under.filterKeys { it in INHERITED } + own
+    fun of(target: Selector.Target): Map<String, Value> {
+        val general = general(target)
+        looked[general]?.let { return it }
+        val own = own(general)
+        val out = if (general.part == null) own else of(general.copy(part = null)).filterKeys { it in INHERITED } + own
+        looked[general] = out
+        return out
     }
 
+    // a target with a key named by none of the selectors here nameless: such a key is selected only as
+    // any key of its kind, class and state, so the 26 letters are one entry, not 26
+    private fun general(target: Selector.Target) =
+        if (target.key == null || target.key in named) target else target.copy(key = null)
+
+    private val looked = HashMap<Selector.Target, Map<String, Value>>()
+
+    // the keys a selector here names
+    private val named: Set<String> = index.keys.mapNotNullTo(HashSet()) { it.key }
+
+    // what the styles selecting [target] set, nothing inherited
     private fun own(target: Selector.Target): Map<String, Value> {
         val best = HashMap<Style, Int>()
         fun from(bucket: Bucket) = index[bucket]?.forEach { (sel, style) ->
-            if (sel.matches(target, scene) && sel.specificity > (best[style] ?: -1)) best[style] = sel.specificity
+            if (sel.selects(target) && sel.specificity > (best[style] ?: -1)) best[style] = sel.specificity
         }
         from(Bucket(target.widget, target.part, null))
         if (target.key != null) from(Bucket(target.widget, target.part, target.key))
@@ -52,6 +67,17 @@ class Cascade(theme: Theme, private val scene: Set<String>) {
 }
 
 /** A key's look in one state, from its [Cascade]d properties: defaults for what no style sets. */
+/**
+ * A theme's cascades by the scenes they are in, kept: what a cascade has worked out (its [Cascade.of]s)
+ * depends on nothing else, so the scenes made again of one theme (Shift, Return, a key typed) find
+ * their keys' looks already there. One thread's, as the builder is.
+ */
+class Cascades(val theme: Theme) {
+    private val made = HashMap<Set<String>, Cascade>()
+
+    fun of(scene: Set<String>): Cascade = made.getOrPut(scene) { Cascade(theme, scene) }
+}
+
 class KeyLook(private val v: Map<String, Value>, private val theme: Theme) {
     val fill: Fill? get() = (v["fill"] as? Value.OfFill)?.fill
     val overlay: Argb? get() = (v["overlay"] as? Value.OfColor)?.color?.let(theme::color)

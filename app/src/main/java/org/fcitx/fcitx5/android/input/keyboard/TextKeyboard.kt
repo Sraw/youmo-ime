@@ -59,6 +59,7 @@ import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.engine.section
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard as SceneSplit
+import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.Theme as SceneTheme
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
@@ -357,7 +358,9 @@ class TextKeyboard private constructor(
         // the word committed: Return's look unchanged) is the last one, not made again in the frame
         made?.takeIf { it.theme === sceneTheme && it.layout === layout && it.measurer === measurer && it.env == env }?.let { return it.scene }
         scenesMade++
-        return when (val built = SceneBuilder(sceneTheme, env, measurer, phases = SceneTrace).build(layout, emptyMap())) {
+        // the theme's looks worked out for the last scene kept for the next: Shift's makes only what it changed
+        val kept = cascades?.takeIf { it.theme === sceneTheme } ?: Cascades(sceneTheme).also { cascades = it }
+        return when (val built = SceneBuilder(sceneTheme, env, measurer, phases = SceneTrace, cascades = kept).build(layout, emptyMap())) {
             is Parsed.Ok -> built.value.also { made = Made(sceneTheme, layout, measurer, env, it) }
             is Parsed.Failed -> null.also { Timber.e("keyboard canvas: the engine refused the scene: %s", built.problems) }
         }
@@ -427,6 +430,8 @@ class TextKeyboard private constructor(
     private class Made(val theme: SceneTheme, val layout: Layout, val measurer: TextMeasurer, val env: Env, val scene: Scene)
 
     private var made: Made? = null
+
+    private var cascades: Cascades? = null
 
     /** The scenes the engine made for this keyboard: a test's count of what was not kept. */
     @VisibleForTesting
