@@ -20,7 +20,12 @@ import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.junit.Assert.assertEquals
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.scene.Box
+import org.fcitx.fcitx5.android.scene.Op
+import org.fcitx.fcitx5.android.scene.Scene
+import org.fcitx.fcitx5.android.scene.Shape
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
+import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -234,6 +239,40 @@ class PopupComponentTest {
         } finally {
             Timber.uproot(tree)
         }
+    }
+
+    // a bubble up whose new text the engine cannot make goes, not left with the text before while
+    // a lift types the new one
+    @Test
+    fun aShownBubbleTheEngineCannotUpdateGoes() {
+        canvas()
+        // a character measured, anything longer not
+        popup.measuring = { real -> TextMeasurer { t, f, w, size -> if (t.length > 1) error("no font") else real.measure(t, f, w, size) } }
+        send(PopupAction.PreviewAction(SCENE, "q", key))
+        assertTrue(bubble is PopupSceneView)
+        send(PopupAction.PreviewUpdateAction(SCENE, "hello"))
+        assertEquals(0, popup.root.childCount)
+        // the next press has its bubble again, and one only
+        send(PopupAction.PreviewAction(SCENE, "w", key))
+        assertEquals(1, popup.root.childCount)
+        assertEquals("w", (bubble as PopupSceneView).scene!!.keys.single().label)
+    }
+
+    // a focus moved that changes the shadow's room keeps the keys' box where it was, the view moved round it
+    @Test
+    fun aLongPressWhoseShadowGrowsStaysWhereItIs() {
+        canvas()
+        send(PopupAction.ShowKeyboardAction(SCENE, five, key))
+        layOut()
+        val view = popup.root.getChildAt(0) as PopupSceneView
+        fun box() = (view.layoutParams as FrameLayout.LayoutParams).let { it.leftMargin + view.outset.left to it.topMargin + view.outset.top }
+        val was = box()
+        val s = view.scene!!
+        val wider = Op.Shadow(Shape.Rect(Box(0.0, 0.0, s.width, s.height)), view.outset.left + 20.0, Argb(0x40000000))
+        val before = Rect(view.outset)
+        view.scene = Scene(s.width, s.height, s.base + wider, s.keys, s.slots)
+        assertTrue(view.outset.left > before.left)
+        assertEquals(was, box())
     }
 
     // the focus moved and the engine could not make it: the scene before kept, the focus with it,
