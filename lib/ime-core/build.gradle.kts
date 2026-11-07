@@ -55,12 +55,18 @@ dependencies {
     // minSdk 29; keep in step with minSdk. gummy-bears publishes no coreLib2 (desugared java.*)
     // variant for API 29, so APIs only desugaring would supply are rejected here too
     signature(variantOf(libs.gummyBears.api29) { artifactType("signature") })
+    // the drawing engine (060): a theme 3.0 look and the keyboards' state said in its words (input/scene)
+    api(project(":lib:keyboard-scene"))
     testImplementation(libs.junit)
 }
 
 tasks.withType<Test>().configureEach {
     // Engines called off its host thread fails the test (HostThread.ofTests); the app's builds check it their own way
     systemProperty("youmo.engines.hostThreadStrict", "true")
+    // the engine's example layouts and themes, which input/scene's tests build scenes of
+    val sceneData = rootProject.file("lib/keyboard-scene/src/commonTest/data")
+    systemProperty("scene.data", sceneData.absolutePath)
+    inputs.dir(sceneData).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("sceneData")
     // MisreadingsTest checks the list the app build compiles: an edit to it alone runs it again
     inputs.file(rootProject.file("lexicon/misreadings.tsv")).withPathSensitivity(PathSensitivity.RELATIVE)
     testLogging {
