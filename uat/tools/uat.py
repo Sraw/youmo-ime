@@ -2585,11 +2585,13 @@ def up(port="5556"):
             os.makedirs(os.path.join(OUT, "emu"), exist_ok=True)
             # -gpu host: the Mac's GPU (its OpenGL, through emulator_env's shim with no display attached;
             # EMU_GPU=swiftshader_indirect for software, which the snapshot was not saved with: a cold boot).
+            # -audio none, not -no-audio: that drops the microphone, and the AudioRecord the clip
+            # microphone still opens would fail (NoMicrophone)
             gpu = os.environ.get("EMU_GPU", "host")
             with open(log, "w") as f:   # the emulator holds its own copy of the file
                 emu = subprocess.Popen([emulator_bin(), "-avd", AVD, "-port", port, "-snapshot", SNAPSHOT,
                                         "-no-snapshot-save", "-read-only", "-no-window", "-no-boot-anim",
-                                        "-no-audio", "-gpu", gpu],
+                                        "-audio", "none", "-gpu", gpu],
                                        stdout=f, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                                        env=emulator_env(gpu), start_new_session=True)
         for _ in range(180):
@@ -2631,7 +2633,8 @@ def up(port="5556"):
 
 
 def install(d, flavor="text"):
-    # UAT_APK_REPO: another checkout's build under this one's cases (a red baseline: VO-23 on R15)
+    # UAT_APK_REPO: another checkout's build under this one's cases (the voice cases need a debug
+    # build's clip microphone: R15 has none)
     apk_repo = os.environ.get("UAT_APK_REPO", REPO)
     apks = sorted((os.path.join(dp, f) for dp in [os.path.join(apk_repo, f"app/build/outputs/apk/{flavor}/{BUILD}")]
                    if os.path.isdir(dp) for f in os.listdir(dp) if ABI in f and f.endswith(".apk") and not f.endswith("-unsigned.apk")),

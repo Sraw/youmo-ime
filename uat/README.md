@@ -212,7 +212,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 键盘等不到时，先看当前输入法还是不是我们的（`pm clear` 后系统有时晚一点换成 LatinIME），是就再点一下框，
 还等不到就报阻塞，并写明当前输入法、进程在不在、前台是哪个界面。
 怀疑失败是时机问题时，加 `UAT_SLOW=1` 用原来的长停顿再跑一次对比。
-要在这份用例下跑另一个检出构建的包（红色基线，如 VO-23 在 R15 上先红），加 `UAT_APK_REPO=<那个检出的路径>`：装包时取它的 `app/build/outputs` 里最新的 APK，用例和脚本仍用这一份。
+要在这份用例下跑另一个检出构建的包（语音的设备用例要调试版的片段麦克风，R15 这类没有它的旧版跑不了），加 `UAT_APK_REPO=<那个检出的路径>`：装包时取它的 `app/build/outputs` 里最新的 APK，用例和脚本仍用这一份。
 测试页的本地网页服务按第一台设备取端口（5554 → 8800，5556 → 8801，……，5584 → 8815，每台各一个）；端口被占时运行器直接退出，
 停掉占用的服务或用 `UAT_HTTP_PORT=<端口>` 换一个。
 
@@ -270,7 +270,7 @@ uat/tools/uat.py jvm                             # 读 JUnit 结果，按编号�
 （`VoiceClipMic`）当作麦克风读到的声音（`Device.say`）：先 `content write` 写进 App 的 files，再
 `content call --uri content://<包名>.voiceclip --method queue --arg a.wav,800,b.wav` 排队（数字是停顿毫秒；`on` 打开但不排、
 `clear` 清空并关掉、`state` 查询），只认 shell 或 root 的 uid。按实时速度送，放完送很轻的底噪直到这次说话结束。
-模拟器照常 `-no-audio`。release 包里没有这段代码。`emu-up`/`emu-down` 还在，等于 `up/down --port 5554`。
+模拟器用 `-audio none`（不能 `-no-audio`：那会去掉麦克风，片段麦克风照样要打开的 AudioRecord 会失败）。release 包里没有这段代码。`emu-up`/`emu-down` 还在，等于 `up/down --port 5554`。
 
 ```sh
 BUILD_ABI=arm64-v8a ./gradlew :app:assembleVoiceDebug   # 语音版

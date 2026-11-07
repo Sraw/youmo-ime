@@ -65,12 +65,14 @@ class VoiceClipMicTest {
         f.read(buf)
         assertTrue((0 until 100).all { buf[it] == 0.5f })
         // 10 ms at 16 kHz: 160 samples of noise
-        assertTrue((100 until 260).all { buf[it] != 0f && abs(buf[it]) < 1e-3f })
+        assertTrue((100 until 260).all { abs(buf[it]) < 1e-3f } && (100 until 260).any { buf[it] != 0f })
         assertTrue((260 until 360).all { buf[it] == -0.5f })
-        assertTrue((360 until 500).all { buf[it] != 0f && abs(buf[it]) < 1e-3f })
-        // the queue run dry: noise for as long as the talk lasts
-        f.read(buf)
-        assertTrue(buf.all { it != 0f && abs(it) < 1e-3f })
+        assertTrue((360 until 500).all { abs(buf[it]) < 1e-3f } && (360 until 500).any { buf[it] != 0f })
+        // the queue run dry: noise for as long as the talk lasts, never a window of exact zeroes
+        repeat(20) {
+            f.read(buf)
+            assertTrue(buf.all { abs(it) < 1e-3f } && buf.any { it != 0f })
+        }
     }
 
     @Test
@@ -116,11 +118,48 @@ class VoiceClipMicTest {
     fun takingAPartSaysPlayingAtOnce() {
         VoiceClipMic.clear()
         VoiceClipMic.queue(listOf(clip(10, 0.5f)))
-        VoiceClipMic.take()
+        val f = VoiceClipMic.feed()!!
+        VoiceClipMic.take(f)
         // no moment with the queue empty and nothing playing, before the Feed says so itself
-        assertEquals("on=true talking=false playing=true queued=", VoiceClipMic.state())
+        assertEquals("on=true talking=true playing=true queued=", VoiceClipMic.state())
+        f.close()
         VoiceClipMic.clear()
         assertEquals("on=false talking=false playing=false queued=", VoiceClipMic.state())
+    }
+
+    @Test
+    fun aTalkEndingAfterTheNextBeganLeavesTheNextAlone() {
+        VoiceClipMic.clear()
+        VoiceClipMic.queue(listOf(clip(rate, 0.5f), clip(rate, -0.5f)))
+        val a = VoiceClipMic.feed()!!
+        val b = VoiceClipMic.feed()!!
+        val buf = FloatArray(512)
+        b.read(buf)
+        assertEquals(0.5f, buf[0])
+        // A's finally comes late: it takes nothing and stops nothing
+        a.read(buf)
+        assertTrue(buf.all { it != 0.5f && it != -0.5f })
+        a.close()
+        assertEquals("on=true talking=true playing=true queued=c", VoiceClipMic.state())
+        b.read(buf)
+        assertEquals(0.5f, buf[0])
+        b.close()
+        VoiceClipMic.clear()
+    }
+
+    @Test
+    fun clearStopsTheClipTheFeedIsPlaying() {
+        VoiceClipMic.clear()
+        VoiceClipMic.queue(listOf(clip(rate, 0.5f)))
+        val f = VoiceClipMic.feed()!!
+        val buf = FloatArray(512)
+        f.read(buf)
+        assertEquals(0.5f, buf[0])
+        VoiceClipMic.clear()
+        f.read(buf)
+        assertTrue(buf.all { it != 0.5f })
+        assertEquals("on=false talking=true playing=false queued=", VoiceClipMic.state())
+        f.close()
     }
 
     @Test
@@ -151,14 +190,15 @@ class VoiceClipMicTest {
 
     @Test
     fun eachClipSaysWhenItStarts() {
-        val started = mutableListOf<String>()
+        val started = mutableListOf<Pair<String, Long>>()
         val q = ArrayDeque<Part>(listOf(Part.Clip("a", FloatArray(600)), Part.Pause(10), Part.Clip("b", FloatArray(10))))
         val time = Time()
-        val f = VoiceClipMic.Feed(rate, { q.removeFirstOrNull() }, { time.ns }, time::sleep, started = { started += it })
+        val f = VoiceClipMic.Feed(rate, { q.removeFirstOrNull() }, { time.ns }, time::sleep, started = { n, at -> started += n to at })
         f.read(FloatArray(512))
-        assertEquals(listOf("a"), started)
+        assertEquals(listOf("a" to 0L), started)
         f.read(FloatArray(512))
-        assertEquals(listOf("a", "b"), started)
+        // 600 of a, then 10 ms (160 samples) of pause
+        assertEquals(listOf("a" to 0L, "b" to 760L), started)
     }
 
     @Test(expected = IllegalArgumentException::class)

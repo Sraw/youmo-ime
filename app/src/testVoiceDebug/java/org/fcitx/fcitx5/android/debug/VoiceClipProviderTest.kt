@@ -84,6 +84,11 @@ class VoiceClipProviderTest {
         assertThrows(IllegalArgumentException::class.java) { provider.call("queue", "b.wav,nope.wav", null) }
         assertThrows(IllegalArgumentException::class.java) { provider.call("queue", "../a.wav", null) }
         assertThrows(IllegalArgumentException::class.java) { provider.call("queue", "a.wav,60001", null) }
+        assertThrows(IllegalArgumentException::class.java) { provider.call("queue", ".", null) }
+        assertThrows(IllegalArgumentException::class.java) { provider.openFile(Uri.parse("content://x.voiceclip/."), "r") }
+        // over 16 MB
+        java.io.RandomAccessFile(File(dir, "big.wav"), "rw").use { it.setLength((16L shl 20) + 2) }
+        assertThrows(IllegalArgumentException::class.java) { provider.call("queue", "big.wav", null) }
         assertEquals("on=true talking=false playing=false queued=a.wav", state())
     }
 

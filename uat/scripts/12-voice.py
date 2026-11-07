@@ -167,25 +167,8 @@ def settle(d, timeout=15, seen=None):
     return d.field_text() or ""
 
 
-def retried(d, clip, ok, before=""):
-    """dictate once: the clip microphone hears the clip whole every time, so a miss is the app's
-    (the emulator's sound card it replaced dropped frames, and a miss was tried again). ok is kept
-    for the callers. Returns (shown, field, tries, misses)"""
-    d.sh("logcat -c")
-    shown, t = dictate(d, clip)
-    return shown, t, 1, []
-
-
 RATE = 16000
-# how long after the speech's start the app's "voice speech started" line comes; the streaming build
-# (0.6.0, no VAD) logs none, so the lift is timed from the host (cued stays False), as R15's was
-LIFT_CUE_LAG = 0.35
-# whether the build logs the cue (a debug build of the voice tail; not R15): set from the first try
-cued = False
 NOTHING_HEARD = "nothing heard"   # lift_early's offset when the debug log has no speech segment
-# how far the first token's frame (speechStart, the recognizer's timestamp) falls after the speech's
-# real start, to subtract: 0 until measured on the device (the VAD's segment.start before 0.6.0 was 1024 early)
-TOKEN_START_LAG = 0
 
 
 def span(clip):
@@ -209,10 +192,6 @@ def capture_log(d):
     return {k: num(k) for k in ("liftFrame", "stopAt", "read", "speechStart", "segments", "envPeak", "peakGainDb")}
 
 
-def tries_note(n, misses):
-    return "" if n == 1 else f"（第 {n} 次；之前听成 {misses}）"
-
-
 # also on the JVM (VoiceHoldUatTest.theFirstHoldAsksForTheMicrophone); the system dialog and the way back
 # to the field after 允许 are the framework's, which Robolectric does not run
 @case("VO-01", base="B0", mutates=True, needs=EV)
@@ -227,18 +206,18 @@ def vo01(d):
     check(d.field(s) and s.find(rid="keyboard_view", where="ime"), f"允许后没回到输入框：{d.top_activity()}")
     granted = "granted=true" in d.sh(f"dumpsys package {PKG} | grep -m1 'RECORD_AUDIO: granted'")
     check(granted, "允许后麦克风权限仍没给")
-    _, t, n, miss = retried(d, "nihao", lambda t: plain(t) == "你好")
-    check(plain(t) == "你好", f"再长按空格说「你好」，框里「{t}」{tries_note(n, miss)}")
-    return f"请求权限后允许，回到框里；再说「你好」→「{t}」{tries_note(n, miss)}"
+    _, t = dictate(d, "nihao")
+    check(plain(t) == "你好", f"再长按空格说「你好」，框里「{t}」")
+    return f"请求权限后允许，回到框里；再说「你好」→「{t}」"
 
 
 @case("VO-02", base="B0-语音", mutates="learn", needs=EV)
 def vo02(d):
-    shown, t, n, miss = retried(d, "jintian", lambda t: plain(t) == "今天天气很好")
+    shown, t = dictate(d, "jintian")
     live = [x for x in shown if "今天" in x]
-    check(plain(t) == "今天天气很好", f"松开后框里「{t}」{tries_note(n, miss)}")
+    check(plain(t) == "今天天气很好", f"松开后框里「{t}」")
     check(live, f"说的时候屏幕上没显示听到的内容：{shown[:8]}")
-    return f"听的时候显示 {live[:2]}；框里「{t}」{tries_note(n, miss)}"
+    return f"听的时候显示 {live[:2]}；框里「{t}」"
 
 
 case("VO-03", needs="jvm:VoiceHoldUatTest.slidingUpDropsIt")(lambda d: None)
@@ -326,10 +305,10 @@ def vo09(d):
 def vo10(d):
     script("13-words").block_word(d, "天气")
     d.open_page("text")
-    _, t, n, miss = retried(d, "jintian", lambda t: plain(t).startswith("今天") and plain(t).endswith("很好"))
-    check(plain(t).startswith("今天") and plain(t).endswith("很好"), f"没听全：「{t}」{tries_note(n, miss)}")
+    _, t = dictate(d, "jintian")
+    check(plain(t).startswith("今天") and plain(t).endswith("很好"), f"没听全：「{t}」")
     check("天气" not in t, f"屏蔽「天气」后说「今天天气很好」，框里「{t}」")
-    return f"框里「{t}」{tries_note(n, miss)}"
+    return f"框里「{t}」"
 
 
 case("VO-11", needs="jvm:VoiceKeyboardUatTest.aPasswordFieldHasNoVoice")(lambda d: None)
@@ -347,9 +326,9 @@ case("VO-13", needs="jvm:VoiceHoldUatTest.holdingTheSpaceForThePickerDoesNotTalk
 def vo14(d):
     script("13-words").add_word(d, "澜境花园")
     d.open_page("text")
-    _, t, n, miss = retried(d, "lanjing", lambda t: "澜境花园" in t)
-    check("澜境花园" in t, f"加了用户词「澜境花园」后说「我住在澜境花园」，框里「{t}」{tries_note(n, miss)}")
-    return f"框里「{t}」{tries_note(n, miss)}"
+    _, t = dictate(d, "lanjing")
+    check("澜境花园" in t, f"加了用户词「澜境花园」后说「我住在澜境花园」，框里「{t}」")
+    return f"框里「{t}」"
 
 
 case("VO-15", needs="jvm:SettingsPagesUatTest.theVoiceModelsDataIsCredited")(lambda d: None)
@@ -412,27 +391,21 @@ def keep_log(d, clip, why):
 
 def lift_early(d, clip, before_s):
     """hold space, play the clip and lift [before_s] before its speech ends; returns (field, offset ms
-    of the lift from the speech's end as the debug log puts it or None (a build without the log: R15),
-    whether timestamped). With the debug log the lift is timed on the device from the app's own
-    "voice speech started" line (the VAD's, LIFT_CUE_LAG after the speech's start). Without it (the
-    streaming build) from the clip microphone's "voice clip started" line"""
-    global cued
-    start, end = span(clip)
+    of the lift from the speech's end as the debug log puts it, whether timestamped). The lift is
+    timed on the device from the clip microphone's "voice clip started" line: the clip's start as
+    its frames are read"""
+    _, end = span(clip)
     d.sh("logcat -c")
     hold_space(d, raw=True)
     time.sleep(0.3)
-    if cued:
-        # 450 ms, not before_s: that one is the host-timed lift's, moved by its misses
-        wait = max(0.0, end - start - LIFT_CUE_LAG - 0.45)
-        cmd = f"logcat -m 1 -e 'voice speech started' >/dev/null; sleep {wait:.3f}; {raw_up(d)}"
-    else:
-        # timed from the clip microphone's line as it starts the clip (VoiceClipMic): the clip's
-        # start on the device, as its frames are read; timed from the host instead, adb's and the
-        # queueing's own time moved the lift by 300 ms from one try to the next
-        cmd = (f"logcat -m 1 -e 'voice clip started: {clip}.wav' >/dev/null; "
-               f"sleep {max(0.0, end - before_s):.3f}; {raw_up(d)}")
-    p = d.say(clip, wait=False)
+    # the wait on the device started before the clip is queued: started after, logcat -m 1 would
+    # match the line already out and the lift be timed from the host after all (adb's and the
+    # queueing's own time moved it by 300 ms from one try to the next)
+    cmd = (f"logcat -m 1 -e 'voice clip started: {clip}.wav' >/dev/null; "
+           f"sleep {max(0.0, end - before_s):.3f}; {raw_up(d)}")
     up = subprocess.Popen(["adb", "-s", d.serial, "shell", cmd])
+    time.sleep(0.5)   # adb's shell and logcat up
+    p = d.say(clip, wait=False)
     try:
         try:
             up.wait(end + 5)
@@ -442,11 +415,9 @@ def lift_early(d, clip, before_s):
         p.wait(30)
     finally:
         p.kill()
-    cued = cued or bool(d.sh("logcat -d | grep -c 'voice speech started'").strip() not in ("", "0"))
     t = settle(d)
     log = capture_log(d)
-    if not log or log["stopAt"] is None:
-        return t, None, False
+    check(log and log["stopAt"] is not None, f"没有调试日志的 voice capture 一行：{log}")
     if log["speechStart"] is None:   # no speech heard: the offset cannot be measured
         return t, NOTHING_HEARD, False
     # split in two at an endpoint: a pause in the clip, the speech's end then not the clip's
@@ -458,14 +429,19 @@ def lift_early(d, clip, before_s):
     # no timestamp: the frames read when the capture thread saw the lift, which adds the capture
     # path's latency to the offset
     lift = log["liftFrame"] if log["liftFrame"] is not None else log["stopAt"] - 0.3 * RATE
-    speech_end = log["speechStart"] - TOKEN_START_LAG + (end - start) * RATE
+    # the speech's end where the clip microphone put it: the clip's start frame (its log line) plus
+    # where the speech ends in the clip. Not from speechStart: the recognizer's first token moved by
+    # up to 800 ms from one try to the next
+    at = re.search(rf"voice clip started: {clip}\.wav frame=(\d+)", d.sh("logcat -d | grep 'voice clip started'"))
+    check(at, "没有片段麦克风的 voice clip started 一行")
+    speech_end = int(at.group(1)) + end * RATE
     return t, (lift - speech_end) * 1000 / RATE, log["liftFrame"] is not None
 
 
 def verdict(clip, results):
-    """three counted tries, judged by what was typed alone, so the same script runs on a build
-    without the debug log (R15, the red run) and with it: 3 of 3 right passes; 2 or more wrong is
-    the design's red; one wrong is neither and fails too"""
+    """three counted tries, judged by what was typed: 3 of 3 right passes; 2 or more wrong is the
+    design's red; one wrong is neither and fails too. Needs the debug build's clip microphone: R15
+    has none, so it cannot run there"""
     wrong = sum(not ok for ok, _ in results)
     notes = "、".join(n for _, n in results)
     if wrong:
@@ -502,16 +478,11 @@ def vo23(d):
             ok = plain(got) == want
             if off is NOTHING_HEARD:   # no speech segment, or two: says nothing about the tail
                 return ok, f"没听到语音或语音被切成两段「{got}」（不算）", False, t
-            if off is None:   # no log (R15): the time cannot be checked, the text is the result
-                return ok, f"「{got}」", True, t
             note = f"{off:+.0f} ms{'' if stamped else '（无时间戳）'}「{got}」"
             if -500 <= off <= -400:
                 return ok, note, True, t
-            # off the window: not counted. Timed from the host (no cue) the next lift moves by half
-            # what this one missed by: adb's and sendevent's start vary by some 100 ms, the
-            # window's width. Timed from the cue it stays: those land within ±10 ms of each other
-            if not cued:
-                before_s += (off + 450) / 2000
+            # off the window: not counted; the next lift moves by half what this one missed by
+            before_s += (off + 450) / 2000
             return ok, note + "（不在区间，不算）", False, t
 
         out.append(verdict(clip, counted_tries(d, clip, attempt, most=10)))
@@ -528,8 +499,7 @@ def vo24(d):
             got = t[len(before):] if t.startswith(before) else t
             ok = plain(got) == want
             log = capture_log(d)
-            if not log or log["envPeak"] is None:   # no log (R15): the text is the result
-                return ok, f"「{got}」", True, t
+            check(log and log["envPeak"] is not None, f"没有调试日志的 voice capture 一行：{log}")
             env, gain = log["envPeak"], log["peakGainDb"]
             note = f"env {env} dBFS、{gain:+.1f} dB「{got}」"
             # the level in the app off: not counted. The clip's own peak lands at -55 ± 1 dBFS

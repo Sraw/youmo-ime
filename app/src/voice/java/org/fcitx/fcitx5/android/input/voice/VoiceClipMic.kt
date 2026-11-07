@@ -59,20 +59,46 @@ object VoiceClipMic {
         on = false
     }
 
+    // the talk reading the queue now: one that ended (its close may come after the next talk's
+    // feed()) takes nothing more and says nothing of playing or talking
+    private var current: Feed? = null
+
     @Synchronized
     fun state(): String = "on=$on talking=$talking playing=$playing queued=${queue.joinToString(",") { it.label() }}"
 
     // playing set here, not after: uat.py's poll would see the queue empty and nothing playing in between
     @Synchronized
-    internal fun take(): Part? = queue.removeFirstOrNull()?.also { playing = true }
+    internal fun take(by: Feed): Part? =
+        if (by !== current) null else queue.removeFirstOrNull()?.also { playing = true }
+
+    // under the lock and checked against the generation: a window read before a clear() does not
+    // say playing after it
+    @Synchronized
+    private fun busy(by: Feed, b: Boolean) {
+        if (by === current && by.generationSeen == generation) playing = b
+    }
+
+    @Synchronized
+    private fun done(by: Feed) {
+        if (by !== current) return
+        current = null
+        talking = false
+        playing = false
+    }
 
     /** what this talk reads in place of the microphone ([Feed.close]d as it ends); null: the microphone */
+    @Synchronized
     fun feed(): Feed? {
         if (!on) return null
+        lateinit var f: Feed
+        f = Feed(VoiceEngine.SAMPLE_RATE, { take(f) }, generation = { generation }, busy = { busy(f, it) }, done = { done(f) },
+            // uat/scripts/12-voice.py times VO-23's lift from it (the clip's start as its frames are
+            // read) and measures the lift against the frame, the speech's real place in the record
+            started = { name, frame -> Timber.d("voice clip started: %s frame=%d", name, frame) })
+        current = f
         talking = true
-        return Feed(VoiceEngine.SAMPLE_RATE, ::take, generation = { generation }, busy = { playing = it }, done = { talking = false },
-            // uat/scripts/12-voice.py times VO-23's lift from it: the clip's start as its frames are read
-            started = { Timber.d("voice clip started: %s", it) })
+        playing = false
+        return f
     }
 
     private fun Part.label() = when (this) {
@@ -138,15 +164,21 @@ object VoiceClipMic {
         private val generation: () -> Int = { 0 },
         private val busy: (Boolean) -> Unit = {},
         private val done: () -> Unit = {},
-        private val started: (name: String) -> Unit = {},
+        /** a clip starts at [frame] of what the talk read */
+        private val started: (name: String, frame: Long) -> Unit = { _, _ -> },
     ) {
         private var start = 0L
         private var fed = 0L
+        private var frame = 0L
         private var clip: FloatArray? = null
         private var at = 0
         private var pause = 0
         private var noise = 1
+        private var sinceHiss = HISS_EVERY - 1
         private var seen = generation()
+
+        /** the generation as of the last [read]'s check */
+        internal val generationSeen get() = seen
 
         fun read(buffer: FloatArray): Int {
             if (fed == 0L) start = clock()
@@ -159,7 +191,10 @@ object VoiceClipMic {
                 clip = null
                 pause = 0
             }
-            for (i in buffer.indices) buffer[i] = next()
+            for (i in buffer.indices) {
+                frame = fed + i
+                buffer[i] = next()
+            }
             fed += buffer.size
             busy(clip?.let { at < it.size } == true || pause > 0)
             return buffer.size
@@ -188,7 +223,7 @@ object VoiceClipMic {
                     is Part.Clip -> {
                         clip = p.samples
                         at = 0
-                        started(p.name)
+                        started(p.name, frame)
                     }
                     is Part.Pause -> pause = (p.ms.toLong() * rate / MS_PER_S).toInt()
                     null -> return hiss()
@@ -196,10 +231,14 @@ object VoiceClipMic {
             }
         }
 
-        // ±2 of 16 bits, some -84 dBFS: never exact zero
+        // ±1 of 16 bits once in HISS_EVERY samples, zero between: never a window of exact zeroes
+        // (VoiceOnset's), yet nothing to hear. White noise of ±2 (and of ±1), a few seconds of it
+        // before the clip, was heard as speech ("I'm sorry.") on the emulator
         private fun hiss(): Float {
+            if (++sinceHiss < HISS_EVERY) return 0f
+            sinceHiss = 0
             noise = noise * LCG_A + LCG_C
-            return ((noise ushr NOISE_SHIFT) % NOISE_SPAN - 2).let { if (it >= 0) it + 1 else it } / PCM_16BIT_SCALE
+            return if ((noise ushr NOISE_SHIFT) and 1 == 0) -1f / PCM_16BIT_SCALE else 1f / PCM_16BIT_SCALE
         }
     }
 
@@ -213,5 +252,5 @@ object VoiceClipMic {
     private const val LCG_A = 1103515245
     private const val LCG_C = 12345
     private const val NOISE_SHIFT = 16
-    private const val NOISE_SPAN = 4
+    private const val HISS_EVERY = 128
 }
