@@ -4,11 +4,11 @@
 
     <application>
         <!--
-            The device UAT's clip microphone (uat.py Device.say): exported for the shell's `content
-            call` and `content write`, behind DUMP, which only the shell or the system holds, or an app it is granted to over
-            adb; the
-            provider itself takes only the shell's and root's uid too. ExportedContentProvider is
-            ignored because exported is the point and DUMP the guard. The voice debug build only.
+            The device UAT's clip microphone (uat.py Device.say): exported for the shell's
+            `content call` and `content write`, behind DUMP, which only the shell or the system
+            holds, or an app it is granted to over adb; the provider itself takes only the shell's
+            and root's uid too. ExportedContentProvider is ignored because exported is the point
+            and DUMP the guard. The voice debug build only.
         -->
         <provider
             android:name="org.fcitx.fcitx5.android.debug.VoiceClipProvider"

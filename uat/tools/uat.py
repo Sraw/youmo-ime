@@ -602,12 +602,15 @@ class Device:
             self._plugged = "Test USB Keyboard" in self.sh("dumpsys input | grep -m1 'Test USB Keyboard'")
         return self._plugged
 
-    def say(self, clip, wait=True):
+    def say(self, clip, wait=True, alongside=None):
         """dev/uat-out/voice-clips/<clip>.wav as what the microphone hears: the voice debug build's clip
         microphone (VoiceClipProvider), the file written into the app's files once, then queued; the
         talk open now (clip_mic() before it) or the next one reads it at the microphone's pace. clip:
         a name, or a list of names and pauses in ms ("a", 800, "b"). wait=False: returns at once
-        (poll/wait/kill, as a player would: done once the clips' time has passed)"""
+        (poll/wait/kill, as a player would: done once the clips' time has passed). alongside: a
+        device command started in the background in the same shell just before the queueing, and
+        waited for (lift_early's wait for the clip's start: begun after the queueing, it could miss
+        the line)"""
         parts = [clip] if isinstance(clip, str) else list(clip)
         secs = 0.0
         for c in parts:
@@ -627,7 +630,11 @@ class Device:
                     raise Blocked(f"片段麦克风写不进 {c}.wav（语音版 debug 包？）：{(r.stdout + r.stderr).strip()[:120]}")
                 self._clips_in.add(c)
         arg = ",".join(str(int(c)) if isinstance(c, (int, float)) else f"{c}.wav" for c in parts)
-        self.clip_call("queue", arg)
+        if alongside:
+            self.adb("shell", f"({alongside}) & sleep 0.2; content call --uri {CLIP_URI} --method queue "
+                     f"--arg '{arg}' >/dev/null; wait", timeout=120)
+        else:
+            self.clip_call("queue", arg)
         p = ClipPlay(self, secs)
         if wait:
             p.wait(30)

@@ -398,20 +398,14 @@ def lift_early(d, clip, before_s):
     d.sh("logcat -c")
     hold_space(d, raw=True)
     time.sleep(0.3)
-    # the wait on the device started before the clip is queued: started after, logcat -m 1 would
-    # match the line already out and the lift be timed from the host after all (adb's and the
-    # queueing's own time moved it by 300 ms from one try to the next)
-    cmd = (f"logcat -m 1 -e 'voice clip started: {clip}.wav' >/dev/null; "
+    # the wait on the device begun in the same shell as the queueing, before it: begun after, logcat
+    # -m 1 could miss the line or match it already out, and the lift be timed from the host after
+    # all (adb's and the queueing's own time moved it by 300 ms from one try to the next). Returns
+    # once the finger is up; no line in end + 5 s (nothing played): lifted all the same
+    cmd = (f"timeout {end + 5:.0f} logcat -m 1 -e 'voice clip started: {clip}.wav' >/dev/null; "
            f"sleep {max(0.0, end - before_s):.3f}; {raw_up(d)}")
-    up = subprocess.Popen(["adb", "-s", d.serial, "shell", cmd])
-    time.sleep(0.5)   # adb's shell and logcat up
-    p = d.say(clip, wait=False)
+    p = d.say(clip, wait=False, alongside=cmd)
     try:
-        try:
-            up.wait(end + 5)
-        except subprocess.TimeoutExpired:   # no cue: nothing was heard; the finger lifted all the same
-            up.kill()
-            d.sh(raw_up(d))
         p.wait(30)
     finally:
         p.kill()
@@ -426,16 +420,17 @@ def lift_early(d, clip, before_s):
         return t, NOTHING_HEARD, False
     if not plain(t):
         keep_log(d, clip, "empty")
-    # no timestamp: the frames read when the capture thread saw the lift, which adds the capture
-    # path's latency to the offset
-    lift = log["liftFrame"] if log["liftFrame"] is not None else log["stopAt"] - 0.3 * RATE
+    # the clip microphone gives no timestamp (VoiceListener): the frames read when the capture
+    # thread saw the lift, which adds the capture path's latency to the offset
+    check(log["liftFrame"] is None, f"片段麦克风下不该有时间戳：liftFrame={log['liftFrame']}")
+    lift = log["stopAt"] - 0.3 * RATE
     # the speech's end where the clip microphone put it: the clip's start frame (its log line) plus
     # where the speech ends in the clip. Not from speechStart: the recognizer's first token moved by
     # up to 800 ms from one try to the next
     at = re.search(rf"voice clip started: {clip}\.wav frame=(\d+)", d.sh("logcat -d | grep 'voice clip started'"))
     check(at, "没有片段麦克风的 voice clip started 一行")
     speech_end = int(at.group(1)) + end * RATE
-    return t, (lift - speech_end) * 1000 / RATE, log["liftFrame"] is not None
+    return t, (lift - speech_end) * 1000 / RATE, False
 
 
 def verdict(clip, results):
@@ -518,20 +513,21 @@ def vo24(d):
 @case("VO-25", base="B0-语音", mutates="learn", needs=EV)
 def vo25(d):
     d.sh("logcat -c")
+    # read before the hold: what is heard while it is held is in the field already, as composing
+    before = d.field_text() or ""
     x, y = hold_space(d)
     time.sleep(0.3)
     d.say("nihao")
     time.sleep(1.2)
-    before = d.field_text() or ""
     # lifted and pressed again at once, the second press held as long as a long press
     d.touch(("up", x, y), ("sleep", 0.05), ("down", x, y), ("sleep", 1.0), ("up", x, y))
     t = settle(d)
     got = t[len(before):] if t.startswith(before) else t
-    check(plain(got) == "你好", f"松开后马上再按住，上屏「{got}」，要「你好」")
+    check(plain(got) == "你好", f"松开后马上再按住，上屏「{got}」，要「你好」（之前框里「{before}」）")
     log = capture_log(d) or {}
     read, stop = log.get("read"), log.get("stopAt")
     when = "不明（没有调试日志）" if read is None or stop is None else "续录中（停在 stopAt 之前）" if read < stop else "识别中"
-    return f"上屏「{got}」；再按落在{when}（read={read}, stopAt={stop}）"
+    return f"之前框里「{before}」，上屏「{got}」；再按落在{when}（read={read}, stopAt={stop}）"
 
 
 # the rule on the JVM (VoiceHoldUatTest, VoiceOnsetTest); on the device, that 正在听 waits for the

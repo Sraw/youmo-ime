@@ -151,7 +151,7 @@
 - **JVM**：`VoiceHoldUatTest.theTailCountsFromTheLiftAndTypesOnceRecorded`（松开时 `finish` 收到这次 ACTION_UP 的时间；马上显示「识别中…」；续录完之前不上屏，之后上屏（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testVoiceDebugUnitTest`）），加上 `VoiceCaptureEndTest`（从松手的帧起 4800 帧、停在整窗边界、没有时间戳时从已读算、时间戳的限幅、超出缓冲的时间戳不信；松手后 1 s 没有新采样兜底；`lib/ime-core`）。
 - **模拟器**：播 `jintian`、`zouba`，用 sendevent 直接写触摸屏按住空格、到时抬起，抬起定在语音结束（片段的 `<clip>.json`）前约 450 ms：在设备上从片段麦克风开始放片段时的「voice clip started」一行起算（等这行的 logcat 先起，再排片段），抬起仍用 sendevent。
   - **判定只看上屏的字**：每段数 3 次，3 次都对才通过；≥ 2 次不对就是设计说的"红"（记为失败，结果里写"红"）；只错 1 次也记失败（"不稳定"）。要调试版的片段麦克风，R15 没有，跑不了。
-  - 有调试日志（`voice capture:` 一行）时，从它算实际偏移：`liftFrame`（没有时间戳时 `stopAt − 0.3 s`）− (片段麦克风那行的 `frame` + E × 16000)；不在 [−500, −400] ms 的这次不算，日志里没有语音段的也不算，最多 10 次；不在区间时下一次的抬起挪偏差的一半。
+  - 有调试日志（`voice capture:` 一行）时，从它算实际偏移：`stopAt − 0.3 s`（片段麦克风下没有时间戳）− (片段麦克风那行的 `frame` + E × 16000)；不在 [−500, −400] ms 的这次不算，日志里没有语音段的也不算，最多 10 次；不在区间时下一次的抬起挪偏差的一半。
   - 这个区间在 `~/voice-eval/tailquiet` 的 `cu2` 上验证过：不续录时两段都丢末字，续录 ≥ 200 ms 两段都对。
 - **真机（发版时）**：AudioRecord 的时间戳和开麦前的全零只在真机上验，片段麦克风没有这些（片段模式下松手位置按读到的帧数算，不用 AudioRecord 的时间戳）。这条在发版的真机清单里（uat/README.md「设备」）。
 
