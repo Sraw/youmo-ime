@@ -55,7 +55,8 @@ class LayoutReaderTest {
         assertEquals(true, semicolon.attrs.splitAfter)
         assertEquals(false, semicolon.attrs.mark)
         val enter = rows[3].cells.first { it.id == "enter" } as Key
-        assertEquals("picker:Emoji", enter.menu.single().action)
+        // the page shown last, as ReturnKey's menu opens it (picker: with no name)
+        assertEquals("picker:", enter.menu.single().action)
         val domain = rows[3].cells.first { it.id == "domain" } as Key
         assertEquals(listOf(".com", ".cn", ".net", ".org"), domain.popup?.items?.map { it.first })
         assertEquals(true, (rows[2].cells.first { it.id == "backspace" } as Key).attrs.actions["repeat"]?.toBoolean())
@@ -108,6 +109,28 @@ class LayoutReaderTest {
         assertNull(LayoutReader.action("action:tone"))
         assertNull(LayoutReader.action("action:tone-6"))
         assertNull(LayoutReader.action("action:anything"))
+        // a group's code is its letters=, no action (060-render-v2 §15)
+        assertNull(LayoutReader.action("action:group"))
+    }
+
+    // 060-render-v2 §15: a key's letters as one group, the key's own (no variant's, no default's)
+    @Test
+    fun aGroupKeysLettersAreItsOwn() {
+        val k18 = Forms.layout("k18").parts.filterIsInstance<Row>().flatMap { it.cells }.filterIsInstance<Key>()
+        assertEquals("we", k18.single { it.id == "r1c2" }.letters)
+        // L; whatever its face shows (pinyin's L): the group the engine reads its code by
+        assertEquals("l;", k18.single { it.id == "r2c6" }.letters)
+        assertNull(k18.single { it.id == "apostrophe" }.letters)
+        assertEquals(emptyList(), problems(board("<row><key id=\"g\" label=\"PQRS\" letters=\"pqrs\"/></row>")))
+        for (bad in listOf("PQ", "abcdef", "a b", "", "ü")) {
+            val p = problems(board("<row><key id=\"g\" label=\"x\" letters=\"$bad\"/></row>"))
+            assertTrue(p.single().contains("letters="), "$bad: $p")
+        }
+        val twice = problems(board("<row><key id=\"g\" label=\"x\" letters=\"aba\"/></row>"))
+        assertTrue(twice.single().contains("twice"), "$twice")
+        // a variant's or the defaults' letters= is none of theirs
+        assertTrue(problems(board("<row><key id=\"g\" label=\"x\" letters=\"a\"><variant when=\"ime=pinyin\" letters=\"b\"/></key></row>")).isNotEmpty())
+        assertTrue(problems(board("<defaults letters=\"a\"/><row><key id=\"g\" label=\"x\"/></row>")).isNotEmpty())
     }
 
     // review L-7: a board split in halves has no one side; asking which is refused until it means something

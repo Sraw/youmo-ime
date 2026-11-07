@@ -57,7 +57,7 @@ object SceneText {
         }
     }
 
-    // what the app works the key by: its texts as shown, its sound and shortcut, its long press as written
+    // what the app works the key by: its texts as shown, its sound, shortcut and group letters, its long press as written
     private fun StringBuilder.interaction(k: KeyNode) {
         val texts = listOfNotNull(
             k.label?.let { "label=${q(it)}" },
@@ -65,7 +65,11 @@ object SceneText {
             k.altRaw?.takeIf { it != k.alt }?.let { "alt-raw=${q(it)}" },
         )
         if (texts.isNotEmpty()) appendLine("  text ${texts.joinToString(" ")}")
-        val how = listOfNotNull(k.sound.takeIf { it != "standard" }?.let { "sound=$it" }, k.shortcut?.let { "shortcut=${q(it)}" })
+        val how = listOfNotNull(
+            k.sound.takeIf { it != "standard" }?.let { "sound=$it" },
+            k.shortcut?.let { "shortcut=${q(it)}" },
+            k.letters?.let { "letters=${q(it)}" },
+        )
         if (how.isNotEmpty()) appendLine("  ${how.joinToString(" ")}")
         k.popup?.let { p ->
             val options = p.options.entries.sortedBy { it.key }.joinToString("") { " ${it.key}=${q(it.value)}" }

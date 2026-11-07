@@ -93,6 +93,8 @@ class KeyNode(
     val menu: List<MenuItem> = emptyList(),
     val sound: String = "standard",
     val shortcut: String? = null,
+    /** The letters it types as a group (the layout's `letters=`), null for a key of no group. */
+    val letters: String? = null,
 ) {
     /** What a backend draws for it: [faces] in its [states], pressed or not. */
     fun ops(pressed: Boolean): List<Op> = faces.getValue(if (pressed) states + KeyState.Pressed else states)

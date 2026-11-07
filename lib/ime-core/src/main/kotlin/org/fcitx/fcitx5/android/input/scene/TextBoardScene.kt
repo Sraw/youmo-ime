@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.MarkContent
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
+import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Key
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.Row
@@ -121,9 +122,10 @@ object SceneMarks {
         )
     }
 
-    /** The shortcut names of [layout]'s keys, its variants' too. */
-    fun names(layout: Layout): Set<String> = layout.parts.filterIsInstance<Row>()
-        .flatMap { it.cells }.filterIsInstance<Key>()
+    /** The shortcut names of [layout]'s keys, its variants' too, and of the [fragments] it includes (a shared bottom row's). */
+    fun names(layout: Layout, fragments: Collection<Fragment> = emptyList()): Set<String> =
+        (layout.parts.filterIsInstance<Row>() + fragments.flatMap { it.rows })
+            .flatMap { it.cells }.filterIsInstance<Key>()
         .flatMap { k -> listOf(k.attrs.shortcut) + k.variants.map { it.attrs.shortcut } }
         .filterNotNull().toSet()
 

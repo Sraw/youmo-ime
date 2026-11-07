@@ -89,7 +89,7 @@
     <key id="enter" role="enter" kind="enter" face="special" width="1.5" icon="{return-icon}" a11y="{return}"
          sound="return" send="sym:Return" shortcut="return" when="!composing, !table">
       <menu>
-        <item label="emoji" icon="emoji" do="picker:Emoji"/>
+        <item label="Emoji" icon="emoji" do="picker:"/>
       </menu>
     </key>
     <key id="confirm" role="confirm" kind="enter" face="keep" width="1.5" label="{confirm}" text-size="16" text-style="bold"

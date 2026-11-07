@@ -125,7 +125,7 @@ class SceneBuilderTest {
         val plain = board(
             "symbols",
             "<row><key id=\"fn\" label=\"Fn\" send=\"commit:x\"/><key id=\"tab\" label=\"Tab\" alt=\"⇥\" send=\"sym:Tab\"/>" +
-                "<key id=\"g\" label=\"go\" send=\"action:group\"/></row>",
+                "<key id=\"g\" label=\"go\" letters=\"go\"/></row>",
         )
         val read = Fixtures.scene(Fixtures.portrait, plain).keys.associate { it.id to it.a11y }
         assertEquals(mapOf("fn" to "Fn", "tab" to "Tab, ⇥", "g" to "G O"), read)
@@ -139,7 +139,9 @@ class SceneBuilderTest {
         assertEquals("Q W，1", qw.a11y, "GroupedKeyboard's a11y_key_grouped, in Chinese")
         assertEquals("QW", qw.label)
         assertEquals("1", qw.alt)
-        assertEquals("group", qw.popup?.from)
+        // its letters, the long press the app makes of them (no popup written: 060-render-v2 §15)
+        assertEquals("qw", qw.letters)
+        assertNull(qw.popup)
         assertEquals("g14/qw", qw.shortcut)
         val zx = k14.getValue("r3c1")
         assertEquals("Z X，～", zx.a11y, "the corner as shown, Chinese punctuation's")

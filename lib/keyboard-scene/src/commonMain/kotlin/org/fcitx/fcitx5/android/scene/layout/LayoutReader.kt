@@ -193,7 +193,9 @@ object LayoutReader {
         val id = a.matching("id", KEY_ID, "a key id (1–32 characters, no spaces)") ?: a.required("id")
         val condition = condition(a)
         val attrs = look(a).copy(width = width(a), rows = a.positiveInt("rows"))
+        val letters = a.matching("letters", LETTERS, "a group's letters (1–${LETTERS_MAX} of a–z and ;)")
         a.done()
+        if (letters != null && letters.toSet().size != letters.length) a.problem("letters=\"$letters\" has a letter twice")
         if (attrs.icon != null && attrs.label == null && attrs.a11y == null) a.problem("an icon key needs a11y= (what a screen reader says)")
         var popup: Popup? = null
         var menu = emptyList<MenuItem>()
@@ -206,7 +208,7 @@ object LayoutReader {
                 else -> p.add(child.line, "<${child.name}> is not allowed in <key>")
             }
         }
-        return Key(id.orEmpty(), condition, attrs, popup, menu, el.line, variants)
+        return Key(id.orEmpty(), condition, attrs, popup, menu, el.line, variants, letters)
     }
 
     // a <variant>: a when= and what it changes (no id, no width: the key stays where it is)
@@ -331,6 +333,9 @@ object LayoutReader {
     // KeyNames': 大千's `/` and the number pad's are keys too (a theme's `zhuyin//` is its own: Selector)
     private val KEY_ID = Regex("\\S{1,32}")
     private val CLASSES = Regex("[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*")
+    // a group of the 14/18 keys' kind: NineKeyLetters.MAX letters at most, ; (双拼's ing) one of them
+    private const val LETTERS_MAX = 5
+    private val LETTERS = Regex("[a-z;]{1,$LETTERS_MAX}")
     private val SHORTCUT = Regex("([a-z0-9-]+/)?\\S{1,32}")
     private val BINDING = Regex("\\{([a-z-]+)(?::([^{}]*))?\\}")
     private val LETTER_ARG = Regex("[a-z;,./'?!~-]")
@@ -352,10 +357,11 @@ object LayoutReader {
         // one character, sent to the engine as typed: `:` too (the 18 keys' M swipes it, HostKeyAction(":"))
         Regex("\\S"),
         Regex("(sym|layout|picker|shortcut|reading|emoji-search):[A-Za-z0-9_.-]*"),
-        // what the app does that is no key yet (P2 decides: code: or these with a table): a group's
-        // letter (by where the finger fell), a zhuyin symbol, tone 1–5 (ˉ ˊ ˇ ˋ ˙), 注音九键's slot
+        // what the app does that is no key: a table of the app's says (060-render-p2 U4): a zhuyin
+        // symbol, tone 1–5 (ˉ ˊ ˇ ˋ ˙), 注音九键's slot. A group's code is no action: the key's
+        // letters= say it (060-render-v2 §15)
         // the longer name first: Kotlin/JS matches the first alternative that starts a match, then wants it whole
-        Regex("action:(group|zhuyin-slot|zhuyin|tone-[1-5])"),
+        Regex("action:(zhuyin-slot|zhuyin|tone-[1-5])"),
         Regex("commit:.+"),
         Regex("code:U\\+[0-9A-F]{4,6}"),
         Regex("keypad:[0-9]"),

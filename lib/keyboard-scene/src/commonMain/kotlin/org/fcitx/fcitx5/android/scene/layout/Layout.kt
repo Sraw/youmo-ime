@@ -72,6 +72,12 @@ class Key(
     override val line: Int,
     /** The first that holds is laid over [attrs]. */
     val variants: List<Variant> = emptyList(),
+    /**
+     * The letters the key types as one group (`letters="qw"`, the 14 and 18 keys'): a tap sends the
+     * group's code, a long press its letters (the app's, 060-render-v2 §15). The key's own, no
+     * variant's: a layout's groups are what the engine reads its codes by.
+     */
+    val letters: String? = null,
 ) : Cell
 
 /**

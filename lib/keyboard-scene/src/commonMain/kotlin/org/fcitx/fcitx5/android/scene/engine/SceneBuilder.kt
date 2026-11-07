@@ -327,6 +327,7 @@ class SceneBuilder(
             menu = k.key.key.menu,
             sound = k.key.attrs.sound ?: "standard",
             shortcut = k.key.attrs.shortcut,
+            letters = k.key.key.letters,
         )
     }
 
