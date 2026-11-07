@@ -18,6 +18,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import androidx.core.view.AccessibilityDelegateCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityEventCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -399,7 +400,8 @@ class KeyboardCanvasViewTest {
         val told = events.filter { it.contentChangeTypes and AccessibilityEventCompat.CONTENT_CHANGE_TYPE_STATE_DESCRIPTION != 0 }
         assertEquals(events.toString(), 1, told.size)
         val node = c.accessibilityNodeProvider!!.createAccessibilityNodeInfo(shift)!!
-        assertEquals(c.context.getString(R.string.a11y_state_shift_once), node.stateDescription?.toString())
+        // the compat's: a node's own stateDescription is API 30's, not Android 10's
+        assertEquals(c.context.getString(R.string.a11y_state_shift_once), AccessibilityNodeInfoCompat.wrap(node).stateDescription?.toString())
     }
 
     // the view moved over the picture (one-handed to the other side): the keys showing it recorded
