@@ -5,9 +5,6 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import android.content.ClipboardManager
-import android.view.View
-import android.widget.ImageView
-import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -80,7 +77,7 @@ class SwipePopupScreenshotTest {
     }
 
     private fun KeyboardHarness.spaceHeld(name: String) {
-        val space = inputView.findViewById<View>(R.id.button_space)
+        val space = keyWithId(R.id.button_space)!!
         val finger = finger(space, at(space))
         for (i in 1..6) finger.move(at(space, dy = -10f * i, ms = 16))
         capture("SwipePopupScreenshotTest/$name", inputView)
@@ -157,9 +154,7 @@ class SwipePopupScreenshotTest {
             h.start()
             val key = h.key("g")
             val finger = h.finger(key, h.at(key))
-            val size = KeyboardHarness.all(h.inputView).filterIsInstance<TextView>()
-                .filter { h.shown(it) && it.text.toString() == "g" }
-                .first { generateSequence(it.parent as? View) { p -> p.parent as? View }.none { p -> p is KeyView } }.textSize
+            val size = h.popupChoices().first { it.text == "g" }.size
             finger.up(h.at(key))
             size
         }
@@ -180,9 +175,7 @@ class SwipePopupScreenshotTest {
                 val key = h.key(label)
                 val finger = h.finger(key, h.at(key))
                 for (i in 1..5) finger.move(h.at(key, dy = -10f * i, ms = 16))
-                val shown = KeyboardHarness.all(h.inputView).filterIsInstance<TextView>()
-                    .filter { h.shown(it) && generateSequence(it.parent as? View) { p -> p.parent as? View }.none { p -> p is KeyView || p === h.bar } }
-                    .map { it.text.toString() }.filter { it.isNotEmpty() }.toList()
+                val shown = h.popupChoices().map { it.text }.filter { it.isNotEmpty() }
                 finger.up(h.at(key))
                 return shown.last()
             }
@@ -203,17 +196,14 @@ class SwipePopupScreenshotTest {
             h.after(500)
             assertNotNull("a notice up first", h.notice())
             // the icons outside the keys: the bar's, then the menu's cells as well
-            fun icons() = KeyboardHarness.all(h.inputView).filter { v ->
-                v is ImageView && h.shown(v) && generateSequence(v.parent as? View) { it.parent as? View }.none { it is KeyView }
-            }.toSet()
-            val before = icons()
-            val space = h.inputView.findViewById<View>(R.id.button_space)
+            val before = h.shownIcons().toSet()
+            val space = h.keyWithId(R.id.button_space)!!
             val finger = h.finger(space, h.at(space))
             for (i in 1..6) finger.move(h.at(space, dy = -10f * i, ms = 16))
-            val cells = icons() - before
+            val cells = h.shownIcons() - before
             assertEquals(5, cells.size)
             val keyboardTop = h.box(h.keyboard).top
-            assertTrue("above the keyboard: ${cells.map(h::box)} over $keyboardTop", cells.all { h.box(it).bottom <= keyboardTop })
+            assertTrue("above the keyboard: ${cells.map { it.box }} over $keyboardTop", cells.all { it.box.bottom <= keyboardTop })
             h.after(500)
             assertNull("the notice put away", h.notice())
             finger.move(h.at(space, dx = -35f, dy = -60f, ms = 16))
@@ -235,7 +225,7 @@ class SwipePopupScreenshotTest {
             h.after(500)
             val said = h.notice()!!.contentView
             assertTrue("shown first", said.isShown)
-            val space = h.inputView.findViewById<View>(R.id.button_space)
+            val space = h.keyWithId(R.id.button_space)!!
             val finger = h.finger(space, h.at(space))
             for (i in 1..6) finger.move(h.at(space, dy = -10f * i, ms = 16))
             h.after(500)
@@ -257,14 +247,11 @@ class SwipePopupScreenshotTest {
     fun theEditMenusCellsAreReadByTheirLabels() {
         KeyboardHarness(ThemePreset.PixelLight).use { h ->
             h.start(prefill = { it.setText("hello") })
-            fun icons() = KeyboardHarness.all(h.inputView).filter { v ->
-                v is ImageView && h.shown(v) && generateSequence(v.parent as? View) { it.parent as? View }.none { it is KeyView }
-            }.toSet()
-            val before = icons()
-            val space = h.inputView.findViewById<View>(R.id.button_space)
+            val before = h.shownIcons().toSet()
+            val space = h.keyWithId(R.id.button_space)!!
             val finger = h.finger(space, h.at(space))
             for (i in 1..6) finger.move(h.at(space, dy = -10f * i, ms = 16))
-            val read = (icons() - before).sortedBy { h.box(it).left }.map { it.contentDescription?.toString() }
+            val read = (h.shownIcons() - before).sortedBy { it.box.left }.map { it.text }
             assertEquals(EditMenuLayout.CELLS.map { h.service.getString(KeyShortcutLooks.of(it).label) }, read)
             finger.move(h.at(space, dy = 200f, ms = 16))
             finger.up(h.at(space, dy = 200f))
@@ -285,7 +272,7 @@ class SwipePopupScreenshotTest {
             val gone = popup.onMenuGone
             var goes = 0
             popup.onMenuGone = { goes++; gone() }
-            val space = h.inputView.findViewById<View>(R.id.button_space)
+            val space = h.keyWithId(R.id.button_space)!!
             val finger = h.finger(space, h.at(space))
             for (i in 1..6) finger.move(h.at(space, dy = -10f * i, ms = 16))
             h.after(500)

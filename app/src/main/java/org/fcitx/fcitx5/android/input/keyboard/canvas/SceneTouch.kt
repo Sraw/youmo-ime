@@ -72,16 +72,25 @@ class SceneKey(
     }
 
     // as a view's performClick: what it does, then a screen reader told it was clicked (a tap's or TalkBack's)
-    override fun click(): Boolean {
+    override fun click(): Boolean = click(ref)
+
+    // as a view's performLongClick: told first, then what it does
+    override fun longClick(): Boolean = longClick(ref)
+
+    /**
+     * [click] told on [node]'s virtual node: the one a screen reader clicked, a split row's second
+     * copy wired as the first ([SceneTouch.keyOf]) told on its own, not the first's.
+     */
+    fun click(node: KeyRef): Boolean {
         val l = click
         l?.invoke(this)
-        canvas.tell(ref, AccessibilityEvent.TYPE_VIEW_CLICKED)
+        canvas.tell(node, AccessibilityEvent.TYPE_VIEW_CLICKED)
         return l != null
     }
 
-    // as a view's performLongClick: told first, then what it does
-    override fun longClick(): Boolean {
-        canvas.tell(ref, AccessibilityEvent.TYPE_VIEW_LONG_CLICKED)
+    /** [longClick] told on [node]'s virtual node, as [click]. */
+    fun longClick(node: KeyRef): Boolean {
+        canvas.tell(node, AccessibilityEvent.TYPE_VIEW_LONG_CLICKED)
         return longClick?.invoke(this) ?: false
     }
 

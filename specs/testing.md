@@ -43,8 +43,13 @@ change to how keys are laid out or marked (not with `-PskipExhaustive`: the excl
   take it, by its place in the window. Either drawing gives one, a key view's (`ViewShownKey`) or the
   canvas's scene key (`SceneShownKey`), so a test written on it runs on both: `-PcanvasKeyboard` runs
   every harness with the canvas drawing the keys but where a test set `canvasKeyboard` itself
-  (`PrefsRule`). `viewKey(label)` is the old `TextKeyView`, for a test of the view itself (S8 deletes
-  both). `ShownKeyTest` and `SceneSpeechTest` hold the two to each other.
+  (`PrefsRule`, which puts the switch back after each test; `CanvasRun`, beside the harness, keeps
+  what it was). `keyWithId(R.id.button_*)` finds a key by its view's id, the scene's node's resource
+  name; `drawn(text)`, `textSize(text)`, `drawnTexts` and `drawnIcons` read what is drawn on a key
+  (a scene's text's box a guess from its size: compare places, not pixels). A popup's keys are
+  `popupChoices()` (`focused`, `cell`, `size`) and a menu's icons `shownIcons()`, either drawing.
+  `viewKey(label)` is the old `TextKeyView`, for a test of the view itself (S8 deletes both).
+  `ShownKeyTest` and `SceneSpeechTest` hold the two to each other.
 - New logic gets a test in the same change, in ime-core where the logic is.
 - Prefer fakes over mockk. `FakeEditor` (ime-core `testFixtures`) stands in for an
   `InputConnection` and is held to the real `BaseInputConnection` by a contract test.

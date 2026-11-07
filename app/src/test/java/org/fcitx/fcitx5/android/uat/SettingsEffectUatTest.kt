@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.uat
 
-import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
@@ -14,7 +13,6 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
@@ -67,8 +65,8 @@ class SettingsEffectUatTest {
 
     private fun sent() = h.api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
 
-    private fun space() = KeyboardHarness.all(h.inputView)
-        .first { h.shown(it) && it.contentDescription?.toString()?.let { d -> d == "Space" || d.startsWith("Space,") } == true }
+    private fun space() = h.keys()
+        .first { it.description?.let { d -> d == "Space" || d.startsWith("Space,") } == true }
 
     private fun corner(label: String): String? = h.key(label).alt
 
@@ -94,7 +92,7 @@ class SettingsEffectUatTest {
         prefs.set(keyboard.keyboardBottomPadding, 20)
         h.start()
         val q2 = h.box(h.key("q"))
-        val space = h.box(space())
+        val space = space().bounds
         assertTrue("$q -> $q2", q2.width() < q.width() && q2.left > q.left)
         assertTrue("bottom gap ${board.bottom - space.bottom}", board.bottom - space.bottom > h.service.resources.displayMetrics.density * 16)
     }
@@ -129,9 +127,9 @@ class SettingsEffectUatTest {
         fresh()
         prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.Bottom)
         h.start()
-        val w = h.viewKey("w") as AltTextKeyView
+        val w = h.key("w")
         assertEquals("2", corner("w"))
-        assertTrue("under the letter", h.box(w.altText).top >= h.box(w.mainText).centerY())
+        assertTrue("under the letter", w.drawn("2")!!.top >= w.drawn("w")!!.centerY())
     }
 
     @Test
@@ -140,7 +138,7 @@ class SettingsEffectUatTest {
         prefs.set(keyboard.popupOnKeyPress, false)
         h.start()
         h.press(h.key("a"))
-        assertTrue(h.popupKeys().map { it.text }.toString(), h.popupKeys().none { it.text.toString() == "a" })
+        assertTrue(h.popupChoices().map { it.text }.toString(), h.popupChoices().none { it.text == "a" })
         h.release()
     }
 
@@ -175,7 +173,7 @@ class SettingsEffectUatTest {
         assertTrue(sent().toString(), sent().size == 1 && "key=q," in sent().last())
         h.press(h.key("q"))
         h.after(600)
-        assertTrue(h.popupKeys().map { it.text }.toString(), h.popupKeys().any { it.text.toString() == "1" })
+        assertTrue(h.popupChoices().map { it.text }.toString(), h.popupChoices().any { it.text == "1" })
         h.release()
     }
 
@@ -219,12 +217,12 @@ class SettingsEffectUatTest {
     @Uat("ST-20")
     fun noLanguageKeyAWiderSpace() {
         h.start()
-        val wide = h.box(space()).width()
+        val wide = space().bounds.width()
         fresh()
         prefs.set(keyboard.showLangSwitchKey, false)
         h.start()
         assertTrue(KeyboardHarness.all(h.inputView).none { h.shown(it) && it.contentDescription == "Switch language" })
-        assertTrue(h.box(space()).width() > wide)
+        assertTrue(space().bounds.width() > wide)
     }
 
     @Test

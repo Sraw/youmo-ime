@@ -16,6 +16,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
+import android.view.accessibility.AccessibilityEvent
 import androidx.annotation.VisibleForTesting
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityEventCompat
@@ -72,9 +73,6 @@ class KeyboardCanvasView(
 
         /** The key wired for [node] (its touch, [SceneTouch.keyOf]): what a screen reader's click and long click on its node do; null, none. */
         fun key(node: KeyNode): SceneKey?
-
-        /** There was no scene of the keys ([scene] null): told once, the keyboard's to draw them another way. */
-        fun noScene(view: KeyboardCanvasView)
     }
 
     // a key's two faces, recorded once each when first drawn; kept across scenes where they are the same.
@@ -142,11 +140,14 @@ class KeyboardCanvasView(
             if (s != null && s === built) return s
             Timber.d("keyboard canvas: scene %d × %d made in %.2f ms", width, height, (SystemClock.elapsedRealtimeNanos() - start) / NANOS_A_MS)
             if (s == null) {
+                // none, even of the built-in theme (060-render-p2 U8, Host.scene): nothing drawn, nor
+                // touched or read, until what the keyboard shows changes ([invalidateScene]) and it is asked again
+                Timber.e("keyboard canvas: no scene of the keys %d × %d; none drawn", width, height)
                 failed = true
                 built = null
                 faces = emptyList()
                 base = null
-                host.noScene(this)
+                speech.invalidateRoot()
                 return null
             }
             val old = faces
@@ -170,6 +171,7 @@ class KeyboardCanvasView(
                 // a key gone with the scene is pressed no more: nothing carries it
                 f
             }
+            speech.reading.clear()
             speech.invalidateRoot()
             // a key's state changed told to a screen reader as a view's state description is: on the
             // key's node, which TalkBack reads out when it has focus
@@ -180,6 +182,7 @@ class KeyboardCanvasView(
     /** What the keyboard shows changed (Shift, Return, a key shown or hidden): the scene is made again, before it is next drawn. */
     fun invalidateScene() {
         dirty = true
+        failed = false
         invalidate()
     }
 
@@ -376,14 +379,6 @@ class KeyboardCanvasView(
     @VisibleForTesting
     fun shownPressed(id: String, copy: Int = 0): Boolean = faces.any { it.node.id == id && it.node.copy == copy && it.down }
 
-    /** The keys shown pressed now, every finger's (a split row's second G its own). */
-    @get:VisibleForTesting
-    val pressed: Set<KeyRef> get() = faces.filter { it.down }.mapTo(LinkedHashSet()) { KeyRef.scene(it.node.id, it.node.copy) }
-
-    /** Key [id]'s label as drawn; null where it shows none (an icon) or there is no such key. */
-    @VisibleForTesting
-    fun label(id: String, copy: Int = 0): String? = keyAt(id, copy)?.label
-
     /** Key [id]'s corner as drawn (a letter's symbol, the nine keys' digit); null where it has none. */
     @VisibleForTesting
     fun alt(id: String, copy: Int = 0): String? = keyAt(id, copy)?.alt?.takeIf { it.isNotEmpty() }
@@ -399,14 +394,6 @@ class KeyboardCanvasView(
     /** Key [id] clicked as the end of a tap clicks it, or TalkBack's click ([SceneKey.click]): whether anything took it. */
     @VisibleForTesting
     fun click(id: String, copy: Int = 0): Boolean = keyAt(id, copy)?.let(host::key)?.click() == true
-
-    /** Where the scene's slot [kind] is (the handwriting pad, the nine keys' column), in the window; null where it has none. */
-    @VisibleForTesting
-    fun slotBounds(kind: String): Rect? {
-        val b = scene?.slots?.firstOrNull { it.kind == kind }?.bounds ?: return null
-        val at = IntArray(2).also(::getLocationInWindow)
-        return Rect().apply { set(b); offset(at[0], at[1]) }
-    }
 
     /** Whether the frame drawn last missed something still coming (an image, the picture): to be recorded again. */
     @get:VisibleForTesting
@@ -466,15 +453,26 @@ class KeyboardCanvasView(
             node.isLongClickable = key?.longClickable == true
             if (node.isEnabled && node.isClickable) node.addAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_CLICK)
             if (node.isEnabled && node.isLongClickable) node.addAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_LONG_CLICK)
+            // its words read a character, word or paragraph at a time, as a view's description was
+            reading.node(virtualViewId, said.description, node)
+        }
+
+        val reading = NodeReading({ resources.configuration.locales[0] }, ::sendEventForVirtualView)
+
+        override fun onPopulateEventForVirtualView(virtualViewId: Int, event: AccessibilityEvent) {
+            reading.populate(virtualViewId, current?.keys?.getOrNull(virtualViewId)?.let { SceneA11y.of(it, ::stringNamed).description }, event)
         }
 
         // as a view's: a click on one that is clickable done and taken whatever it did (View.performAccessibilityAction)
         override fun onPerformActionForVirtualView(virtualViewId: Int, action: Int, arguments: Bundle?): Boolean {
             val k = current?.keys?.getOrNull(virtualViewId) ?: return false
+            // reading its words, as a view's (enabled or not): View.performAccessibilityActionInternal
+            reading.perform(virtualViewId, SceneA11y.of(k, ::stringNamed).description, action, arguments)?.let { return it }
             val key = host.key(k)?.takeIf { it.keyEnabled && KeyState.Disabled !in k.states } ?: return false
             return when (action) {
-                AccessibilityNodeInfoCompat.ACTION_CLICK -> true.also { key.click() }
-                AccessibilityNodeInfoCompat.ACTION_LONG_CLICK -> key.longClickable.also { if (it) key.longClick() }
+                // told on this node (virtualViewId's), whichever copy's key it is wired to
+                AccessibilityNodeInfoCompat.ACTION_CLICK -> true.also { key.click(KeyRef.scene(k.id, k.copy)) }
+                AccessibilityNodeInfoCompat.ACTION_LONG_CLICK -> key.longClickable.also { if (it) key.longClick(KeyRef.scene(k.id, k.copy)) }
                 else -> false
             }
         }

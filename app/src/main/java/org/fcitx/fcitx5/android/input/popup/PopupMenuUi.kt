@@ -84,7 +84,7 @@ class PopupMenuUi(
         else -> ((triggerBounds.width() - itemWidth) / 2) - (itemWidth * focusColumn)
     }
     override val offsetY = fixed?.at?.let { it.top - triggerBounds.top }
-        ?: scenes?.takeIf { builder != null }?.let { -Popups.px(Popups.MENU_LIFT_DP, it.density).toInt() }
+        ?: scenes?.let { -Popups.px(Popups.MENU_LIFT_DP, it.density).toInt() }
         ?: ctx.dp(-52)
 
     private val columnOrder = if (fixed != null) IntArray(columnCount) { it } else createColumnOrder(columnCount, focusColumn)

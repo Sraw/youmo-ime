@@ -299,7 +299,7 @@ class T9UatTest {
         assertEquals(email, column())
         // the bottom row as ever: space with the name, the globe
         assertTrue(h.texts().toString(), "Pinyin" in h.texts())
-        h.described(h.service.getString(R.string.a11y_key_switch_language))
+        h.describedKey(h.service.getString(R.string.a11y_key_switch_language))
         h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
         assertEquals(email, column())
         h.tap(h.textView("@"))
@@ -311,7 +311,7 @@ class T9UatTest {
     @Uat("T9-37")
     fun nineKeysEnglishStaysOverARotation() {
         val h = harness(KeyboardHarness.ENGLISH).start()
-        h.described("Shift")
+        h.describedKey("Shift")
         for (q in listOf("+land", "+port")) {
             RuntimeEnvironment.setQualifiers(q)
             h.service.onConfigurationChanged(h.service.resources.configuration)
@@ -319,7 +319,7 @@ class T9UatTest {
             h.relayout()
             val keys = h.texts()
             assertTrue("$q $keys", "ghi" in keys && "English" in keys && "q" !in keys)
-            h.described("Shift")
+            h.describedKey("Shift")
         }
     }
 
@@ -345,8 +345,8 @@ class T9UatTest {
     @Uat("T9-31")
     fun nineKeysEnglishShiftAtASentencesStartOnceAndLocked() {
         val h = harness(KeyboardHarness.ENGLISH).start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES)
-        val shift = h.described("Shift")
-        fun state() = ViewCompat.getStateDescription(shift)?.toString()
+        val shift = h.describedKey("Shift")
+        fun state() = shift.state
         val once = h.service.getString(R.string.a11y_state_shift_once)
         val lock = h.service.getString(R.string.a11y_state_caps_lock)
         // the nine keys' English keys sent, each in its case (Keyboard.nineKey), down only
@@ -456,7 +456,7 @@ class T9UatTest {
         val key = q.key("q")
         val g = q.finger(key, q.at(key))
         q.advance(700)
-        val full = (q.cell("Q").parent as View).width
+        val full = q.popupChoices().last { it.text == "Q" }.cell.width()
         g.up(q.at(key))
         assertEquals(full, cell)
     }
@@ -471,7 +471,7 @@ class T9UatTest {
         val globe = h.service.getString(R.string.a11y_key_switch_language)
         fun to(im: InputMethodEntry) {
             h.api.calls.clear()
-            h.tap(h.described(globe))
+            h.tap(h.describedKey(globe))
             assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("enumerateIme") })
             h.api.inputMethodEntryCached = im
             h.emit(HostEvent.InputMethodChanged(im))
@@ -486,7 +486,7 @@ class T9UatTest {
         h.idle()
         to(KeyboardHarness.ENGLISH)
         assertTrue(h.texts().toString(), h.texts().any { it.equals("ghi", ignoreCase = true) } && "English" in h.texts() && "q" !in h.texts())
-        h.described("Shift")
+        h.describedKey("Shift")
         to(KeyboardHarness.PINYIN)
         assertTrue(h.texts().toString(), "重输" in h.texts())
     }

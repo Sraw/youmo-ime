@@ -171,7 +171,7 @@ sealed interface Text {
 
         /** `{punct:x}`: any one character but a space or a brace (`(`, `@`, `:` among the 18 keys' corners). */
         const val PUNCT = "punct"
-        val PLAIN = setOf("ime-name", "return", "table-extra", "comma", "period")
+        val PLAIN = setOf("ime-name", "return", "confirm", "table-extra", "comma", "period")
 
         /** Icon bindings (`icon=`, `badge=`). */
         val ICONS = setOf("shift-icon", "return-icon", "hold-badge", "lock-icon")

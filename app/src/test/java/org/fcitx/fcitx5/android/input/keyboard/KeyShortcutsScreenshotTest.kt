@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -58,8 +59,7 @@ class KeyShortcutsScreenshotTest {
         KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN).use { h ->
             h.start()
             // a's select all top left, its @ top right: the two settings' defaults
-            val a = h.viewKey("a") as AltTextKeyView
-            assertEquals(View.VISIBLE, a.altText.visibility)
+            assertNotNull("a's symbol shown", h.key("a").alt)
             assertTrue(h.texts().contains("你好"))
             h.capture("KeyShortcutsScreenshotTest/default_light")
         }

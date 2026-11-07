@@ -64,6 +64,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
+import timber.log.Timber
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import kotlin.math.abs
@@ -317,30 +318,85 @@ class KeyboardCanvasViewTest {
         }
     }
 
-    // no scene (a theme the engine refuses: a font file's name 4.0 takes no file by): the views draw
-    // the keys again and take the touches, nothing left blank, their letters settled as a keyboard's
-    // that never had the canvas (BaseKeyboard.onLayout settles none under it)
+    // a theme the engine refuses (a font file's name 4.0 takes no file by): 060-render-p2 U8, the
+    // built-in theme of its lightness drawn, logged; never the views again (they go in S8). Its keys
+    // the built-in theme's as that theme draws them, touched and read as ever
     @Test
-    fun noSceneTheViewsDrawTheKeysAgain() {
-        val light = org.fcitx.fcitx5.android.data.theme.ThemePreset.PixelLight.look
-        val broken = Theme.Custom("broken", false, light.copy(text = light.text.copy(keyFont = "/themes/x/bad:name.ttf")))
-        // 紧凑 (KeyMarksEverywhereUatTest's): the letters settled smaller, clear of their symbols, not as laid out
-        prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
-        val viewsOnly = KeyboardHarness(broken).start().use { it.relayout(); it.settled() }
-        assertTrue(viewsOnly.toString(), viewsOnly.values.any { it.any { v -> v != 0f && v != 1f } })
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
-        KeyboardHarness(broken).start().use { h ->
-            val c = h.canvas()!!
+    fun noSceneOfTheThemeTheBuiltInOneOfItsLightness() {
+        val logged = mutableListOf<String>()
+        val tree = object : Timber.Tree() {
+            override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
+                logged += message
+            }
+        }
+        Timber.plant(tree)
+        try {
+            for (builtIn in listOf(ThemePreset.PixelLight, ThemePreset.PixelDark)) {
+                val look = builtIn.look
+                val broken = Theme.Custom("broken", builtIn.isDark, look.copy(text = look.text.copy(keyFont = "/themes/x/bad:name.ttf")))
+                prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+                val drawn = KeyboardHarness(builtIn).start().use { h -> h.canvas()!!.scene!!.let { it.base to it.keys.map { k -> k.id to k.faces } } }
+                logged.clear()
+                KeyboardHarness(broken).start().use { h ->
+                    val c = h.canvas()!!
+                    val scene = c.scene
+                    assertNotNull(scene)
+                    assertEquals(builtIn.name, drawn, scene!!.base to scene.keys.map { k -> k.id to k.faces })
+                    assertTrue(logged.toString(), logged.any { "broken" in it && builtIn.name in it })
+                    h.idle()
+                    // the canvas kept, the views hidden under it: none drawn again
+                    assertSame(c, h.canvas())
+                    assertTrue(KeyboardHarness.all(h.textKeyboard()).filterIsInstance<KeyView>().none { h.shown(it) })
+                    h.api.calls.clear()
+                    h.tap(h.key("q"))
+                    assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") })
+                    assertNotNull(c.accessibilityNodeProvider!!.createAccessibilityNodeInfo(scene.keys.indexOfFirst { it.id == "q" }))
+                }
+            }
+        } finally {
+            Timber.uproot(tree)
+        }
+    }
+
+    // no scene at all (the built-in theme's refused too, Host.scene null): nothing drawn, nothing for a
+    // reader, logged; no other drawing. Asked again once what the keyboard shows changes
+    @Test
+    fun noSceneAtAllNothingDrawn() {
+        val logged = mutableListOf<String>()
+        val tree = object : Timber.Tree() {
+            override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
+                logged += message
+            }
+        }
+        Timber.plant(tree)
+        try {
+            var asked = 0
+            val ctx = RuntimeEnvironment.getApplication()
+            val look = ThemePreset.PixelLight.look
+            val c = KeyboardCanvasView(
+                ctx, look, org.fcitx.fcitx5.android.data.theme.BoardImages(), SceneFonts(look),
+                object : KeyboardCanvasView.Host {
+                    override fun scene(width: Int, height: Int) = null.also { asked++ }
+                    override fun key(node: org.fcitx.fcitx5.android.scene.KeyNode) = null
+                },
+            )
+            c.measure(View.MeasureSpec.makeMeasureSpec(400, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(200, View.MeasureSpec.EXACTLY))
+            c.layout(0, 0, 400, 200)
             assertNull(c.scene)
-            h.idle()
-            assertNull(h.canvas())
-            // laid out again as the fallback asks (the frame's traversal, idle()), its letters settled as they would have been
-            assertEquals(viewsOnly, h.settled())
-            val q = h.keyView("q")
-            assertTrue(h.shown(q))
-            h.api.calls.clear()
-            h.tap(q)
-            assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") })
+            assertTrue(logged.toString(), logged.any { "none drawn" in it })
+            val bitmap = Bitmap.createBitmap(400, 200, Bitmap.Config.ARGB_8888)
+            c.draw(Canvas(bitmap))
+            assertTrue(IntArray(400 * 200).also { bitmap.getPixels(it, 0, 400, 0, 0, 400, 200) }.all { it == 0 })
+            assertNull(c.keyAt(200f, 100f))
+            assertEquals(1, asked)
+            // not asked again each frame; asked again as the keyboard changes
+            c.draw(Canvas(bitmap))
+            assertEquals(1, asked)
+            c.invalidateScene()
+            assertNull(c.scene)
+            assertEquals(2, asked)
+        } finally {
+            Timber.uproot(tree)
         }
     }
 
@@ -670,13 +726,6 @@ class KeyboardCanvasViewTest {
         f.up(KeyboardHarness.Touch(x, a.height / 2f))
         assertTrue(popup.toString(), "@" in popup)
     }
-
-    // what settling the letters set on each letter key's views (KeyView.settle): their scale, place and alpha
-    private fun KeyboardHarness.settled(): Map<String, List<Float>> =
-        KeyboardHarness.all(textKeyboard()).filterIsInstance<AltTextKeyView>().filter { it.visibility == View.VISIBLE && it.themeKey != null }
-            .associate { k ->
-                k.themeKey!! to KeyboardHarness.all(k).drop(1).flatMap { v -> listOf(v.scaleX, v.scaleY, v.translationX, v.translationY, v.alpha) }.toList()
-            }
 
     private fun KeyboardHarness.textKeyboard(): TextKeyboard = KeyboardHarness.all(inputView).filterIsInstance<TextKeyboard>().first()
 

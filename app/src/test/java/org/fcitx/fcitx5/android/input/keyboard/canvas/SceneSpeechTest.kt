@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.engine.table.TableRoots
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.scene.SceneA11y
@@ -214,6 +215,29 @@ class SceneSpeechTest {
         assertTrue(compared.map { it.reads }.toString(), compared.any { "Post it" in it.reads })
     }
 
+    // 标点位置 无: the views hid the letters' corners, so a reader was told none; the scene draws none,
+    // and its nodes say none and give none in their extras (nor does the harness's alt). With the
+    // corners where they were, the same keys told them
+    @Test
+    fun aCornerNotDrawnNotTold() {
+        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.None)
+        val none = differences()
+        assertEquals(none.joinToString("\n"), 0, none.size)
+        assertTrue(compared.toString(), compared.none { it.alt != null || "1" in it.reads })
+        harness(true).use { h ->
+            assertEquals(null, h.key("q").alt)
+            val c = h.canvas()
+            val q = c.accessibilityNodeProvider!!.createAccessibilityNodeInfo(c.scene!!.keys.indexOfFirst { it.id == "q" })!!
+            assertFalse(q.extras.containsKey(SceneA11y.EXTRA_ALT))
+            assertEquals("q", q.contentDescription.toString())
+        }
+        compared.clear()
+        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.Bottom)
+        val bottom = differences()
+        assertEquals(bottom.joinToString("\n"), 0, bottom.size)
+        assertTrue(compared.count { it.alt != null } >= 26)
+    }
+
     // a letter's node read as the scene says it, letter then corner (the engine's a11y_key_grouped, as
     // the grouped keys' descriptions were). Its view had no description: TalkBack read its two texts in
     // the order the view gave them, by place (ViewGroup's top to bottom, then start to end): on a
@@ -258,6 +282,115 @@ class SceneSpeechTest {
         }
         assertTrue(scene.toString(), scene.size >= 4)
         assertEquals(views, scene)
+    }
+
+    // a split row's second G and V (landscape): a tap on one, or TalkBack's click or long click on its
+    // node, told on its own node, not the first copy's, as its own view told its own
+    @Test
+    @Config(qualifiers = "w851dp-h393dp-land-440dpi")
+    fun aSplitRowsSecondCopyToldOnItsOwnNode() = harness(true).use { h ->
+        val c = h.canvas()
+        val told = mutableListOf<Pair<Int, Int>>()
+        ViewCompat.setAccessibilityDelegate(h.textKeyboard(), object : AccessibilityDelegateCompat() {
+            override fun onRequestSendAccessibilityEvent(host: ViewGroup, child: View, event: AccessibilityEvent): Boolean {
+                if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED || event.eventType == AccessibilityEvent.TYPE_VIEW_LONG_CLICKED) {
+                    // the virtual node's id, the high half of the event's source (AccessibilityNodeInfo.getVirtualDescendantId)
+                    val source = AccessibilityEvent::class.java.superclass!!.getDeclaredMethod("getSourceNodeId").invoke(event) as Long
+                    told += event.eventType to (source ushr 32).toInt()
+                }
+                return false
+            }
+        })
+        shadowOf(h.service.getSystemService(AccessibilityManager::class.java)).setEnabled(true)
+        val provider = c.accessibilityNodeProvider!!
+        for (id in listOf("g", "v")) {
+            val first = c.scene!!.keys.indexOfFirst { it.id == id && it.copy == 0 }
+            val second = c.scene!!.keys.indexOfFirst { it.id == id && it.copy == 1 }
+            assertTrue("$id split: $first, $second", first >= 0 && second >= 0)
+            told.clear()
+            h.tap(h.keyNamed(id, 1))
+            assertTrue(provider.performAction(second, AccessibilityNodeInfo.ACTION_CLICK, null))
+            assertTrue(provider.performAction(second, AccessibilityNodeInfo.ACTION_LONG_CLICK, null))
+            h.idle()
+            assertEquals(
+                listOf(AccessibilityEvent.TYPE_VIEW_CLICKED, AccessibilityEvent.TYPE_VIEW_CLICKED, AccessibilityEvent.TYPE_VIEW_LONG_CLICKED).map { it to second },
+                told,
+            )
+            told.clear()
+            assertTrue(provider.performAction(first, AccessibilityNodeInfo.ACTION_CLICK, null))
+            assertEquals(listOf(AccessibilityEvent.TYPE_VIEW_CLICKED to first), told)
+        }
+    }
+
+    // TalkBack reading a key's words a character, word or paragraph at a time (its "read by" menu):
+    // a view did it on its description (View.traverseAtGranularity), the node on its own the same
+    // way: each move's events (the selection's, the text traversed: from, to, which way, by what),
+    // whether it moved, and where the cursor is told on the node after, for each key a view described.
+    // A letter's view had no description, so nothing to move in; its node has, a reader gets more
+    @Test
+    fun theWordsReadAPieceAtATimeAsTheViewsWere() {
+        val ids = listOf("shift", "backspace", "space", "lang", "enter")
+        val (views, scene) = listOf(false, true).map { on ->
+            harness(on).use { h ->
+                val told = mutableListOf<String>()
+                ViewCompat.setAccessibilityDelegate(h.textKeyboard(), object : AccessibilityDelegateCompat() {
+                    override fun onRequestSendAccessibilityEvent(host: ViewGroup, child: View, event: AccessibilityEvent): Boolean {
+                        if (event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED ||
+                            event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_TRAVERSED_AT_MOVEMENT_GRANULARITY
+                        ) {
+                            told += "${AccessibilityEvent.eventTypeToString(event.eventType)} ${event.fromIndex}-${event.toIndex} " +
+                                "${event.action} ${event.movementGranularity} ${event.itemCount}"
+                        }
+                        return false
+                    }
+                })
+                shadowOf(h.service.getSystemService(AccessibilityManager::class.java)).setEnabled(true)
+                val c by lazy { h.canvas() }
+                val provider by lazy { c.accessibilityNodeProvider!! }
+                fun info(id: String): AccessibilityNodeInfo = if (on) {
+                    provider.createAccessibilityNodeInfo(c.scene!!.keys.indexOfFirst { it.id == id })!!
+                } else {
+                    AccessibilityNodeInfo.obtain().also(h.views().first { it.themeKey == id }::onInitializeAccessibilityNodeInfo)
+                }
+                fun act(id: String, action: Int, args: android.os.Bundle?): Boolean = if (on) {
+                    provider.performAction(c.scene!!.keys.indexOfFirst { it.id == id }, action, args)
+                } else {
+                    h.views().first { it.themeKey == id }.performAccessibilityAction(action, args)
+                }
+                fun by(granularity: Int) = android.os.Bundle().apply { putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_MOVEMENT_GRANULARITY_INT, granularity) }
+                val reading = setOf(
+                    AccessibilityNodeInfo.ACTION_NEXT_AT_MOVEMENT_GRANULARITY, AccessibilityNodeInfo.ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY,
+                    AccessibilityNodeInfo.ACTION_SET_SELECTION,
+                )
+                for (id in ids) {
+                    val first = info(id)
+                    told += "$id: ${first.movementGranularities} ${first.actionList.map { it.id }.filter { it in reading }.sorted()} ${first.textSelectionStart}"
+                    for (g in listOf(AccessibilityNodeInfo.MOVEMENT_GRANULARITY_WORD, AccessibilityNodeInfo.MOVEMENT_GRANULARITY_CHARACTER, AccessibilityNodeInfo.MOVEMENT_GRANULARITY_PARAGRAPH)) {
+                        for (i in 0 until 12) told += "next $g ${act(id, AccessibilityNodeInfo.ACTION_NEXT_AT_MOVEMENT_GRANULARITY, by(g))}"
+                        told += "at ${info(id).textSelectionStart}"
+                        for (i in 0 until 12) told += "previous $g ${act(id, AccessibilityNodeInfo.ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY, by(g))}"
+                    }
+                    // a line, a page: not a view's; no arguments, nothing
+                    told += "line ${act(id, AccessibilityNodeInfo.ACTION_NEXT_AT_MOVEMENT_GRANULARITY, by(AccessibilityNodeInfo.MOVEMENT_GRANULARITY_LINE))}"
+                    told += "none ${act(id, AccessibilityNodeInfo.ACTION_NEXT_AT_MOVEMENT_GRANULARITY, null)}"
+                    // the cursor put where the reader says, a selection refused
+                    val at = android.os.Bundle().apply {
+                        putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, 2)
+                        putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, 2)
+                    }
+                    val wide = android.os.Bundle().apply {
+                        putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, 0)
+                        putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, 3)
+                    }
+                    told += "set ${act(id, AccessibilityNodeInfo.ACTION_SET_SELECTION, at)} ${act(id, AccessibilityNodeInfo.ACTION_SET_SELECTION, wide)} ${info(id).textSelectionStart}"
+                    told += "then ${act(id, AccessibilityNodeInfo.ACTION_NEXT_AT_MOVEMENT_GRANULARITY, by(AccessibilityNodeInfo.MOVEMENT_GRANULARITY_CHARACTER))}"
+                }
+                h.idle()
+                told
+            }
+        }
+        assertTrue(scene.toString(), scene.count { it.startsWith("TYPE_VIEW_TEXT_TRAVERSED") } > 20)
+        assertEquals(views.joinToString("\n"), scene.joinToString("\n"))
     }
 
     // a node says what the scene says, whatever its view says: the hidden views are not read from

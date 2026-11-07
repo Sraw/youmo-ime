@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
@@ -80,9 +81,15 @@ class CompactKeyboardUatTest {
 
     private fun TextKeyView.size() = mainText.textSize
 
-    // its symbol in a right corner, not under the letter
-    private fun AltTextKeyView.inItsCorner(): Boolean =
-        altText.visibility == View.VISIBLE && h.box(altText).left >= h.box(mainText).right
+    // its letter's size, whichever draws it
+    private fun ShownKey.size() = textSize(label)!!
+
+    // its symbol in a right corner, not under the letter: right of its middle, above it
+    private fun ShownKey.inItsCorner(): Boolean {
+        val symbol = alt?.let(::drawn) ?: return false
+        val letter = drawn(label)!!
+        return symbol.left >= letter.centerX() && symbol.top < letter.centerY()
+    }
 
     private fun backspace(): KeyView =
         KeyboardHarness.all(h.inputView).filterIsInstance<KeyView>().first { it.def.viewId == R.id.button_backspace }
@@ -99,16 +106,16 @@ class CompactKeyboardUatTest {
     fun compactTextIsSmallerAndTheSymbolInItsCornerEvenAtBottom() {
         prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.Bottom)
         h.start()
-        val size = h.viewKey("q").size()
-        val height = h.box(h.viewKey("q")).height()
-        assertFalse("standard: under the letter", (h.viewKey("w") as AltTextKeyView).inItsCorner())
+        val size = h.key("q").size()
+        val height = h.key("q").height
+        assertFalse("standard: under the letter", h.key("w").inItsCorner())
         fresh()
         compact()
         h.start()
-        assertEquals(size * 0.9f, h.viewKey("q").size(), 0.5f)
-        assertTrue(h.box(h.viewKey("q")).height() < height * 0.8)
-        val w = h.viewKey("w") as AltTextKeyView
-        assertEquals("2", w.altText.text.toString())
+        assertEquals(size * 0.9f, h.key("q").size(), 0.5f)
+        assertTrue(h.key("q").height < height * 0.8)
+        val w = h.key("w")
+        assertEquals("2", w.alt)
         assertTrue("底部 too: in its corner", w.inItsCorner())
         // the swipe types it all the same
         h.swipe(w, 0f, w.height * 1.3f)
@@ -146,11 +153,12 @@ class CompactKeyboardUatTest {
         h.start()
         // 0.5.1 drew the symbol alone, the only corner then being the top right one
         assertTrue("紧凑: both too", "你好" in h.texts())
-        val q = h.viewKey("q") as AltTextKeyView
-        assertEquals("1", q.altText.text.toString())
+        val q = h.key("q")
+        assertEquals("1", q.alt)
         assertTrue(q.inItsCorner())
-        val text = h.box(q.markAt(KeyMarks.Slot.TopLeft)!!)
-        assertTrue("$text left of ${h.box(q.altText)}", text.right <= h.box(q.altText).left && text.centerY() < h.box(q.mainText).centerY())
+        val text = q.drawn("你好")!!
+        val symbol = q.drawn("1")!!
+        assertTrue("$text left of $symbol", text.right <= symbol.left && text.centerY() < q.drawn("q")!!.centerY())
         // the backspace's 清除 (up) and 恢复 (down) both
         assertEquals(icons, icons(backspace()))
         // the shortcut still swipes
@@ -171,7 +179,7 @@ class CompactKeyboardUatTest {
         h.idle()
         val small = h.keyboard
         assertNotSame(standard, small)
-        assertEquals(h.viewKey("w").let { (it as AltTextKeyView).altText.text.toString() }, "2")
+        assertEquals("2", h.key("w").alt)
         level(38, 60)
         h.idle()
         assertNotSame("out of it", small, h.keyboard)
@@ -181,7 +189,7 @@ class CompactKeyboardUatTest {
     @Uat("ST-51")
     fun floatingTakesTheSmallerOfItsScaleAndCompacts() {
         h.start()
-        val size = h.viewKey("q").size()
+        val size = h.key("q").size()
         fresh()
         prefs.set(ThemeManager.prefs.floatingKeyboard, true)
         compact()
@@ -189,7 +197,7 @@ class CompactKeyboardUatTest {
         val screen = h.service.resources.configuration.screenWidthDp
         val floating = FloatingKeyboard.textScale(FloatingKeyboard.widthDp(screen), screen)
         // the smaller, not the product (051-compact §1.3)
-        assertEquals(size * minOf(KeyTextScale.COMPACT, floating), h.viewKey("q").size(), 0.5f)
+        assertEquals(size * minOf(KeyTextScale.COMPACT, floating), h.key("q").size(), 0.5f)
         // narrow keys: each letter clear of its symbol in its corner (d and + crossed), the symbols
         // moved into their corners and smaller, the letters where they were (w sat lower, a further
         // left), Shift's capitals too
@@ -198,7 +206,7 @@ class CompactKeyboardUatTest {
         // theirs, top left, 7 dp at least: the letters a hair smaller, all of them
         assertTrue(lower.any { it.altText.scaleX < 1f })
         assertTrue(lower[0].mainText.scaleX.toString(), lower[0].mainText.scaleX >= 0.98f)
-        h.tap(h.described("Shift"))
+        h.tap(h.describedKey("Shift"))
         h.idle()
         assertEquals("Q", h.viewKey("Q").mainText.text.toString())
         // A taller than a, @ as small as it goes: every letter as much smaller
@@ -216,7 +224,7 @@ class CompactKeyboardUatTest {
         val lower = lettersStayClearOfTheirSymbols()
         assertEquals(setOf("a", "d", "h", "m"), lower.filter { it.altText.moved() }.map { it.mainText.text.toString() }.toSet())
         assertTrue(lower.all { it.altText.scaleX == 1f && it.mainText.scaleX == 1f })
-        h.tap(h.described("Shift"))
+        h.tap(h.describedKey("Shift"))
         h.idle()
         assertTrue(lettersStayClearOfTheirSymbols().any { it.altText.moved() })
         fresh()
@@ -267,15 +275,15 @@ class CompactKeyboardUatTest {
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun turnedItIsCompactToo() {
         h.start()
-        val size = h.viewKey("q").size()
-        val height = h.box(h.viewKey("q")).height()
+        val size = h.key("q").size()
+        val height = h.key("q").height
         fresh()
         compact()
         h.start()
-        assertEquals(size * 0.9f, h.viewKey("q").size(), 0.5f)
+        assertEquals(size * 0.9f, h.key("q").size(), 0.5f)
         // 34% of the height against 标准's 49%
-        assertTrue("${h.box(h.viewKey("q")).height()} of $height", h.box(h.viewKey("q")).height() < height * 0.8)
-        assertTrue((h.viewKey("w") as AltTextKeyView).inItsCorner())
+        assertTrue("${h.key("q").height} of $height", h.key("q").height < height * 0.8)
+        assertTrue(h.key("w").inItsCorner())
     }
 
     @Test

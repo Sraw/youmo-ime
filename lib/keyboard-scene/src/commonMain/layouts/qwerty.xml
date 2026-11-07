@@ -92,7 +92,7 @@
         <item label="emoji" icon="emoji" do="picker:Emoji"/>
       </menu>
     </key>
-    <key id="confirm" role="confirm" kind="enter" face="keep" width="1.5" label="确定" text-size="16" text-style="bold"
+    <key id="confirm" role="confirm" kind="enter" face="keep" width="1.5" label="{confirm}" text-size="16" text-style="bold"
          sound="return" send="sym:Return" shortcut="return" when="composing table"/>
   </row>
 </keyboard>

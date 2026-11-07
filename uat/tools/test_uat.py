@@ -140,6 +140,12 @@ class ScreenTest(unittest.TestCase):
             self.assertEqual(old[k], new[k], k)
         # and by the scene's id
         self.assertEqual(new["bksp"], new["backspace"])
+        # an id is an alias only where no label or corner took it, whichever node came first: a key
+        # whose id is "1" drawn before q does not take q's corner's 1 (as on the views)
+        first = '<node clickable="true" text="①" key="1" bounds="[0,0][10,10]"/>'
+        clash = keys(canvas.replace('<node clickable="true" text="q"', first + '<node clickable="true" text="q"'))
+        self.assertEqual(new["1"], clash["1"])
+        self.assertEqual(new["q"], clash["q"])
 
     def test_the_input_methods_touchable_region_is_read_from_dumpsys_input(self):
         # InputDispatcher's window line as redroid 14 printed it; the strip's band and the keyboard's

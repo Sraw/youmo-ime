@@ -145,6 +145,8 @@ data class Texts(
     val period: String = ".",
     val returnLabel: String = "",
     val returnIcon: String = "enter",
+    /** The key a table's code is confirmed by, in Return's place (key_confirm: 确定, OK in English). */
+    val confirm: String = "确定",
     val keepUppercase: Boolean = false,
     val alts: Map<String, String>? = null,
     val punctuation: Map<String, String> = emptyMap(),

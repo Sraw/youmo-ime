@@ -10,6 +10,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
+import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.host.HostEvent
@@ -41,7 +42,8 @@ class PagedCandidatesUiTest {
     }
 
     @Test
-    @Config(sdk = [35]) // View.hasOnLongClickListeners is API 30: the check, not the code under test
+    // View.hasOnLongClickListeners is API 30: the check, not the code under test; the app for AppPrefs (ThemeManager)
+    @Config(sdk = [35], application = FcitxApplication::class)
     fun aRecycledCandidateHoldsNeitherItsTapNorItsLongPress() {
         val ui = PagedCandidatesUi(
             PlainRecyclerViews(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark, {},

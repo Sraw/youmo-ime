@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.uat
 
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
+import org.fcitx.fcitx5.android.input.CanvasRun
 import org.junit.rules.ExternalResource
 
 /**
@@ -17,7 +18,8 @@ class PrefsRule : ExternalResource() {
     private val restore = mutableListOf<() -> Unit>()
 
     fun <T : Any> set(pref: ManagedPreference<T>, value: T) {
-        if (pref === AppPrefs.getInstance().internal.canvasKeyboard) drawingChosen = true
+        // the test chose the keys' drawing: -PcanvasKeyboard's run puts back what it turned on and leaves it be
+        if (pref === AppPrefs.getInstance().internal.canvasKeyboard) CanvasRun.chose()
         val was = pref.getValue()
         restore += { pref.setValue(was) }
         pref.setValue(value)
@@ -31,12 +33,6 @@ class PrefsRule : ExternalResource() {
     override fun after() {
         restore.asReversed().forEach { it() }
         restore.clear()
-        drawingChosen = false
-    }
-
-    companion object {
-        /** Whether the test running set the keys' drawing itself (canvas on or off): -PcanvasKeyboard leaves it be. */
-        var drawingChosen = false
-            private set
+        CanvasRun.over()
     }
 }

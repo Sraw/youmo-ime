@@ -4,8 +4,6 @@
  */
 package org.fcitx.fcitx5.android.uat
 
-import android.view.View
-import android.widget.ImageView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -23,11 +21,12 @@ import org.fcitx.fcitx5.android.engine.table.TableRoots
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
-import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -55,11 +54,10 @@ class TablesKeysUatTest {
         KeyboardHarness(im = entry(im, name)).also { h = it }.start().apply { told(state) }
 
     // the letter key whose corner shows [letter] (a table's roots on its face)
-    private fun letterKey(h: KeyboardHarness, letter: String) = KeyboardHarness.all(h.inputView).filterIsInstance<AltTextKeyView>()
-        .first { h.shown(it) && it.altText.text.toString() == letter }
+    private fun letterKey(h: KeyboardHarness, letter: String) = h.keys().first { it.alt == letter }
 
     // the command icons drawn on [letter]'s key: its shortcut's mark
-    private fun KeyboardHarness.shortcutIcons(letter: String) = KeyboardHarness.all(letterKey(this, letter)).count { it is ImageView && shown(it) }
+    private fun KeyboardHarness.shortcutIcons(letter: String) = letterKey(this, letter).drawnIcons
 
     @get:Rule
     val prefs = PrefsRule()
@@ -81,8 +79,6 @@ class TablesKeysUatTest {
         emit(HostEvent.InputMethodChanged(im))
     }
 
-    private fun KeyboardHarness.view(id: Int): View = inputView.findViewById(id)
-
     private fun KeyboardHarness.typed(code: String, auxUp: String = "") {
         emit(HostEvent.InputPanel(FormattedText(arrayOf(code), intArrayOf(0), code.length), FormattedText(arrayOf(auxUp), intArrayOf(0), -1), FormattedText.Empty))
     }
@@ -103,53 +99,62 @@ class TablesKeysUatTest {
         assertFalse("no capital: $labels", labels.any { it.length == 1 && it[0] in 'A'..'Z' })
         // its letters in the corners
         assertTrue(labels.toString(), "a" in labels && "z" in labels)
-        assertTrue(h.shown(h.view(R.id.button_star)))
-        assertFalse(h.shown(h.view(R.id.button_caps)))
+        assertNotNull(h.keyWithId(R.id.button_star))
+        assertNull(h.keyWithId(R.id.button_caps))
         h.capture("TablesKeysUatTest/cangjie_roots", h.inputView)
         // off: the letters, no * key (S's swipe types it)
         h.told(cangjie.copy(labels = KeyLabels.NONE))
         assertTrue(h.texts().toString(), "a" in h.texts() && "日" !in h.texts())
-        assertFalse(h.shown(h.view(R.id.button_star)))
+        assertNull(h.keyWithId(R.id.button_star))
     }
 
     @Test
     @Uat("TBL-47")
     fun theLookUpKeyIsInShiftsPlaceAndDarkWhileOn() {
         val h = harness(InputMethodCatalog.WUBI, "五笔", wubi())
-        assertFalse(h.shown(h.view(R.id.button_caps)))
-        assertTrue(h.shown(h.view(R.id.button_lookup)))
-        assertFalse(h.shown(h.view(R.id.button_lookup_on)))
-        h.tap(h.view(R.id.button_lookup))
+        assertNull(h.keyWithId(R.id.button_caps))
+        assertNotNull(h.keyWithId(R.id.button_lookup))
+        assertNull(h.keyWithId(R.id.button_lookup_on))
+        h.tap(h.keyWithId(R.id.button_lookup)!!)
         assertEquals(h.api.calls.toString(), "sym=${UNICODE + Keyboard.LOOKUP}", h.sentSyms().last().substringAfter('(').substringBefore(','))
         h.told(wubi(on = true))
-        assertFalse(h.shown(h.view(R.id.button_lookup)))
-        assertTrue(h.shown(h.view(R.id.button_lookup_on)))
+        assertNull(h.keyWithId(R.id.button_lookup))
+        assertNotNull(h.keyWithId(R.id.button_lookup_on))
         h.typed("hao", auxUp = "拼")
         h.capture("TablesKeysUatTest/wubi_lookup_on", h.inputView)
         // pressed again, off: the same key sent, shown light
-        h.tap(h.view(R.id.button_lookup_on))
+        h.tap(h.keyWithId(R.id.button_lookup_on)!!)
         assertEquals(2, h.sentSyms().count { "${UNICODE + Keyboard.LOOKUP}" in it })
         // not a table: Shift, no 拼
         h.switchTo(entry(InputMethodCatalog.PINYIN, "拼音"))
-        assertTrue(h.shown(h.view(R.id.button_caps)))
-        assertFalse(h.shown(h.view(R.id.button_lookup)) || h.shown(h.view(R.id.button_lookup_on)))
+        assertNotNull(h.keyWithId(R.id.button_caps))
+        assertTrue(h.keyWithId(R.id.button_lookup) == null && h.keyWithId(R.id.button_lookup_on) == null)
+    }
+
+    // the canvas's 确定 is the view's word: the app's key_confirm (OK in English), not the layout's Chinese
+    @Test
+    fun theCanvasConfirmIsTheAppsWord() {
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+        val h = harness(InputMethodCatalog.WUBI, "五笔", wubi())
+        h.typed("ggg")
+        assertEquals(h.service.getString(R.string.key_confirm), h.keyWithId(R.id.button_confirm)!!.label)
     }
 
     @Test
     @Uat("TBL-48")
     fun returnSaysConfirmWhileATableHasACode() {
         val h = harness(InputMethodCatalog.WUBI, "五笔", wubi())
-        assertTrue(h.shown(h.view(R.id.button_return)))
-        assertFalse(h.shown(h.view(R.id.button_confirm)))
+        assertNotNull(h.keyWithId(R.id.button_return))
+        assertNull(h.keyWithId(R.id.button_confirm))
         h.typed("ggg")
-        assertTrue(h.shown(h.view(R.id.button_confirm)))
-        assertFalse(h.shown(h.view(R.id.button_return)))
+        assertNotNull(h.keyWithId(R.id.button_confirm))
+        assertNull(h.keyWithId(R.id.button_return))
         assertTrue(h.texts().toString(), h.service.getString(R.string.key_confirm) in h.texts())
         h.capture("TablesKeysUatTest/wubi_confirm", h.inputView)
-        h.tap(h.view(R.id.button_confirm))
+        h.tap(h.keyWithId(R.id.button_confirm)!!)
         assertTrue(h.api.calls.toString(), h.sentSyms().last().startsWith("sendKey(sym=${0xff0d},"))
         h.typed("")
-        assertTrue(h.shown(h.view(R.id.button_return)))
+        assertNotNull(h.keyWithId(R.id.button_return))
     }
 
     @Test
@@ -215,17 +220,16 @@ class TablesKeysUatTest {
     fun erbisSemicolonHasAKey() {
         val erbi = TableKeyboard(InputMethodCatalog.ERBI, setOf(';', '\'', ',', '.', '/', '*'), false, KeyLabels.NONE, null)
         val h = harness(InputMethodCatalog.ERBI, "二笔", erbi)
-        val semicolon = h.view(R.id.button_semicolon)
-        assertTrue(h.shown(semicolon))
+        val semicolon = h.keyWithId(R.id.button_semicolon)!!
         // its * a swipe types (S), no key of its own
-        assertFalse(h.shown(h.view(R.id.button_star)))
+        assertNull(h.keyWithId(R.id.button_star))
         h.capture("TablesKeysUatTest/erbi_semicolon", h.inputView)
         h.tap(semicolon)
         assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") && ";" in it })
         // 五笔's codes are letters
         h.switchTo(entry(InputMethodCatalog.WUBI, "五笔"))
         h.told(wubi())
-        assertFalse(h.shown(h.view(R.id.button_semicolon)))
+        assertNull(h.keyWithId(R.id.button_semicolon))
     }
 
     // the halves split on a phone held sideways: the key after L in the right half, the room
@@ -237,11 +241,9 @@ class TablesKeysUatTest {
         try {
             val erbi = TableKeyboard(InputMethodCatalog.ERBI, setOf(';', '\'', ',', '.', '/', '*'), false, KeyLabels.NONE, null)
             val h = harness(InputMethodCatalog.ERBI, "二笔", erbi)
-            fun left(v: View) = IntArray(2).also(v::getLocationInWindow)[0]
             fun left(k: ShownKey) = k.bounds.left
-            val semicolon = h.view(R.id.button_semicolon)
+            val semicolon = h.keyWithId(R.id.button_semicolon)!!
             val l = h.key("l")
-            assertTrue(h.shown(semicolon))
             assertTrue("${left(semicolon)} after ${left(l)}", left(semicolon) >= left(l) + l.width - 1)
             assertTrue(left(semicolon) + semicolon.width <= h.service.resources.displayMetrics.widthPixels + 1)
             // the right half's other rows end where this one does
@@ -251,8 +253,8 @@ class TablesKeysUatTest {
             // 仓颉's * there as well
             h.switchTo(entry(InputMethodCatalog.CANGJIE, "仓颉"))
             h.told(cangjie)
-            assertTrue(h.shown(h.view(R.id.button_star)))
-            assertFalse(h.shown(semicolon))
+            assertNotNull(h.keyWithId(R.id.button_star))
+            assertNull(h.keyWithId(R.id.button_semicolon))
         } finally {
             ThemeManager.prefs.splitKeyboard.setValue(SplitKeyboardMode.Auto)
         }

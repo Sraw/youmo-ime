@@ -109,8 +109,8 @@ class HandwritingUatTest {
         assertTrue(keys.toString(), pad.width > h.keyboard.width / 2)
         // on the right ⌫, ，and 。; below 符 123 space globe enter
         assertTrue(keys.toString(), "，" in keys && "。" in keys)
-        h.described("Backspace")
-        h.described(h.service.getString(R.string.a11y_key_action_done))
+        h.describedKey("Backspace")
+        h.describedKey(h.service.getString(R.string.a11y_key_action_done))
         assertTrue(keys.toString(), keys.containsAll(listOf("符", "123")))
         h.capture("HandwritingUatTest/keyboard")
     }
@@ -122,7 +122,7 @@ class HandwritingUatTest {
         stroke(0.2f, 0.5f, 0.8f, 0.5f)
         assertEquals(1, pad.pad.strokes.size)
         h.api.calls.clear()
-        h.tap(h.described("Backspace"))
+        h.tap(h.describedKey("Backspace"))
         assertEquals(0, pad.pad.strokes.size)
         // the stroke, not the field's text: nothing to the engine to delete
         assertFalse(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") })

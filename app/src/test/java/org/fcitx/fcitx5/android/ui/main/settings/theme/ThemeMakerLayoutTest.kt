@@ -182,7 +182,7 @@ class ThemeMakerLayoutTest {
         prefs.set(ThemeManager.prefs.floatingKeyboard, shot.mode == Mode.FLOATING)
         return KeyboardHarness(PROBE, keyboards = ImKeyboards.Chosen(pinyin = shot.board.keyboard), codeRow = CodeRowStyle.Floating).use { h ->
             h.start()
-            shot.board.from?.let { role -> h.tap(KeyboardHarness.all(h.inputView).first { it is KeyView && it.themeKey == role && h.shown(it) }) }
+            shot.board.from?.let { role -> h.tap(h.keys().first { it.id == role }) }
             when (shot.state) {
                 State.IDLE -> Unit
                 State.TYPING -> typing(h)

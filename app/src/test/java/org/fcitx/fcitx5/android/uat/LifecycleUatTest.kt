@@ -12,8 +12,6 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.keyboard.KeyView
-import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -34,7 +32,7 @@ class LifecycleUatTest {
     @After
     fun close() = h.close()
 
-    private fun letters() = KeyboardHarness.all(h.inputView).any { h.shown(it) && it is KeyView && (it as? TextKeyView)?.mainText?.text?.toString() == "q" }
+    private fun letters() = h.keys().any { it.label == "q" }
 
     @Test
     @Uat("LC-05")
@@ -61,7 +59,7 @@ class LifecycleUatTest {
         h.api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH)
         h.api.enabledIme = h.api.availableIme
         h.start()
-        h.tap(h.described(h.service.getString(R.string.a11y_key_switch_language)))
+        h.tap(h.describedKey(h.service.getString(R.string.a11y_key_switch_language)))
         h.emit(HostEvent.InputMethodChanged(h.api.inputMethodEntryCached))
         assertTrue(h.texts().toString(), "English" in h.texts())
         h.api.calls.clear()

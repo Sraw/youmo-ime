@@ -5,11 +5,9 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.text.InputType
-import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.HorizontalScrollView
 import android.widget.TextView
-import androidx.core.view.ViewCompat
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
@@ -25,7 +23,6 @@ import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -61,7 +58,7 @@ class KeyboardUatTest {
         val rows = h.texts()
         assertEquals(listOf("+", "1", "2", "3", "/", "-", "4", "5", "6", "*", "7", "8", "9", "ABC", ",", "!?#", "0", "=", "."), rows)
         // space, ⌫ and ↵ are image keys
-        space(h); h.described("Backspace")
+        space(h); h.describedKey("Backspace")
         h.capture("KeyboardUatTest/number_pad")
         h.tap(h.key("4"))
         h.tap(h.key("2"))
@@ -94,10 +91,10 @@ class KeyboardUatTest {
         fun letters() = h.texts().filter { it.length == 1 && it[0].lowercaseChar() in 'a'..'z' }.joinToString("")
         assertEquals(rows.joinToString(""), letters())
         h.capture("KeyboardUatTest/shift_off")
-        h.tap(h.described("Shift"))
+        h.tap(h.describedKey("Shift"))
         assertEquals(rows.joinToString("").uppercase(), letters())
         h.capture("KeyboardUatTest/shift_on")
-        h.tap(h.described("Shift"))
+        h.tap(h.describedKey("Shift"))
         assertEquals(rows.joinToString(""), letters())
     }
 
@@ -126,8 +123,8 @@ class KeyboardUatTest {
     private fun s(id: Int) = h!!.service.getString(id)
 
     // "Space, <the input method>"
-    private fun space(h: KeyboardHarness) = KeyboardHarness.all(h.inputView)
-        .first { h.shown(it) && it.contentDescription?.toString()?.let { d -> d == "Space" || d.startsWith("Space,") } == true }
+    private fun space(h: KeyboardHarness) = h.keys()
+        .first { it.description?.let { d -> d == "Space" || d.startsWith("Space,") } == true }
 
     @Test
     @Uat("KB-03")
@@ -187,14 +184,14 @@ class KeyboardUatTest {
         val h = harness(KeyboardHarness.ENGLISH).start()
         // a double tap, its two touches at one time
         repeat(2) {
-            h.press(h.described("Shift"))
+            h.press(h.describedKey("Shift"))
             h.release()
         }
-        assertEquals(s(R.string.a11y_state_caps_lock), ViewCompat.getStateDescription(h.described("Shift")))
+        assertEquals(s(R.string.a11y_state_caps_lock), h.describedKey("Shift").state)
         h.tap(h.key("O"))
         h.tap(h.key("K"))
         assertTrue(sent().toString(), "key=O," in sent()[0] && "key=K," in sent()[1])
-        h.tap(h.described("Shift"))
+        h.tap(h.describedKey("Shift"))
         h.tap(h.key("a"))
         assertTrue(lastSent(), "key=a," in lastSent())
     }
@@ -245,7 +242,7 @@ class KeyboardUatTest {
         val lefts = sent().count { "sym=${FcitxKeyMapping.FcitxKey_Left}," in it }
         assertTrue(h.api.calls.toString(), lefts >= 2)
         assertTrue(h.api.calls.toString(), h.api.calls.none { "enumerate" in it.lowercase() || "toggleIme" in it })
-        assertTrue(h.popupKeys().toString(), h.popupKeys().isEmpty())
+        assertTrue(h.popupChoices().toString(), h.popupChoices().isEmpty())
         assertEquals("", h.field.text.toString())
         assertEquals(0, h.field.selectionStart)
         // the engine's cursor gone past the row's left edge: scrolled back to it
@@ -264,7 +261,7 @@ class KeyboardUatTest {
     @Uat("KB-09")
     fun backspaceOnce() {
         val h = harness().start()
-        h.tap(h.described("Backspace"))
+        h.tap(h.describedKey("Backspace"))
         assertEquals(1, backspaces())
     }
 
@@ -272,7 +269,7 @@ class KeyboardUatTest {
     @Uat("KB-11")
     fun holdingBackspaceRepeatsFasterTillLetGo() {
         val h = harness().start()
-        val key = h.described("Backspace")
+        val key = h.describedKey("Backspace")
         h.press(key)
         h.after(1000)
         val first = backspaces()
@@ -297,7 +294,7 @@ class KeyboardUatTest {
         h.field.setText("今天天气很好")
         h.field.setSelection(6)
         h.idle()
-        val key = h.described("Backspace")
+        val key = h.describedKey("Backspace")
         val b = h.box(key)
         h.drag(key, b.exactCenterX() - h.service.resources.displayMetrics.widthPixels * 0.4f, b.exactCenterY(), steps = 16, lift = false)
         assertTrue("selected ${h.field.selectionStart}..${h.field.selectionEnd}", h.field.selectionEnd - h.field.selectionStart >= 1)
@@ -311,7 +308,7 @@ class KeyboardUatTest {
         val h = harness().start()
         h.api.inputPanelCached = HostEvent.InputPanel(FormattedText(arrayOf("zhong guo"), intArrayOf(0), 9), FormattedText.Empty, FormattedText.Empty)
         h.emit(h.api.inputPanelCached)
-        val key = h.described("Backspace")
+        val key = h.describedKey("Backspace")
         val b = h.box(key)
         h.drag(key, b.exactCenterX() - h.service.resources.displayMetrics.widthPixels * 0.4f, b.exactCenterY(), steps = 16)
         assertTrue(h.api.calls.toString(), "reset()" in h.api.calls)
@@ -375,7 +372,7 @@ class KeyboardUatTest {
     @Uat("KB-20")
     fun searchFieldsReturnSearches() {
         val h = harness().start(InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_SEARCH)
-        val ret = h.described(s(R.string.a11y_key_action_search))
+        val ret = h.describedKey(s(R.string.a11y_key_action_search))
         val done = actions(h)
         h.tap(ret)
         // nothing typed, the engine lets the key through: the app's own action
@@ -388,7 +385,7 @@ class KeyboardUatTest {
     @Uat("KB-21")
     fun nextFieldsReturnGoesOn() {
         val h = harness().start(InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_NEXT)
-        val ret = h.described(s(R.string.a11y_key_action_next))
+        val ret = h.describedKey(s(R.string.a11y_key_action_next))
         val done = actions(h)
         h.tap(ret)
         returnLetThrough(h)
@@ -409,10 +406,10 @@ class KeyboardUatTest {
     fun aKeyHeldShowsItLarger() {
         val h = harness().start()
         h.press(h.key("a"))
-        assertTrue(h.popupKeys().map { it.text.toString() }.toString(), h.popupKeys().any { it.text.toString() == "a" })
+        assertTrue(h.popupChoices().map { it.text }.toString(), h.popupChoices().any { it.text == "a" })
         h.release()
         h.after(300)
-        assertTrue(h.popupKeys().map { it.text.toString() }.toString(), h.popupKeys().none { it.text.toString() == "a" })
+        assertTrue(h.popupChoices().map { it.text }.toString(), h.popupChoices().none { it.text == "a" })
     }
 
     @Test
@@ -459,7 +456,7 @@ class KeyboardUatTest {
             val h = harness(KeyboardHarness.ENGLISH).start()
             h.press(space(h))
             h.after(1000)
-            assertTrue(h.popupKeys().map { it.text }.toString(), h.popupKeys().isEmpty())
+            assertTrue(h.popupChoices().map { it.text }.toString(), h.popupChoices().isEmpty())
             h.release()
             assertEquals(sent().toString(), 1, sent().count { "sym=${FcitxKeyMapping.FcitxKey_space}," in it })
         } finally {
@@ -478,15 +475,16 @@ class KeyboardUatTest {
         h.drag(q, b.exactCenterX(), b.bottom + 3 * dp, steps = 0, lift = false)
         h.after(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
         h.move(b.exactCenterX() + 25 * dp, b.bottom + 3 * dp, steps = 1)
-        val keys = h.popupKeys()
-        val shown = keys.map { it.text.toString() }
+        val keys = h.popupChoices()
+        val shown = keys.map { it.text }
         assertTrue("the popup is still up", shown.isNotEmpty())
         // the key the finger is on, as the popup shows it (its focus is the only key with a background):
         // any popup key would also pass for a neighbour or a plain q listed in the popup (F4293); the
-        // boxes cannot say it, Robolectric leaves the popup's keys unplaced. The background is
-        // PopupKeyboardUi.markFocus's focusBackground on the key's root (markInactive sets it null)
+        // boxes cannot say it, Robolectric leaves the popup's keys unplaced. The views' is
+        // PopupKeyboardUi.markFocus's focusBackground on the key's root (markInactive sets it null),
+        // the scene's its key selected (PopupKey.focused)
         val x = b.exactCenterX() + 25 * dp
-        val under = keys.filter { (it.parent as View).background != null }.map { it.text.toString() }
+        val under = keys.filter { it.focused }.map { it.text }
         assertEquals("one key in focus: $shown", 1, under.size)
         h.move(x, b.bottom + 3 * dp, steps = 0, lift = true)
         // the lift types the popup's key under the finger, not a plain q nor a neighbour (F4211), read as KB-16 does

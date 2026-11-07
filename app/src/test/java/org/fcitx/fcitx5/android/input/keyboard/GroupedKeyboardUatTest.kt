@@ -343,9 +343,9 @@ class GroupedKeyboardUatTest {
         prefs.later { EngineState.shuangpinScheme = scheme }
         harness = KeyboardHarness(ThemePreset.PixelLight, shuangpin)
         h.start()
-        val semicolon = KeyboardHarness.all(h.keyboard).first { it.id == R.id.button_semicolon && h.shown(it) }
-        val l = h.box(h.key("l"))
-        assertTrue("${h.box(semicolon)} after $l", h.box(semicolon).left >= l.right - 2)
+        val semicolon = h.keyWithId(R.id.button_semicolon)!!
+        val l = h.key("l").bounds
+        assertTrue("${semicolon.bounds} after $l", semicolon.bounds.left >= l.right - 2)
         val s = h.key("s").width
         for (k in listOf("a", "l")) assertEquals(k, s, h.key(k).width)
         assertEquals(s, semicolon.width)

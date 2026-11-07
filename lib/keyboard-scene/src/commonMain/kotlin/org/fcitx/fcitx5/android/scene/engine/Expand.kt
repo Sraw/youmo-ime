@@ -178,6 +178,7 @@ object Expand {
             "period" -> texts.period
             "ime-name" -> texts.imeName
             "return" -> texts.returnLabel
+            "confirm" -> texts.confirm
             "nine-letters" -> nineLetters(texts.nineLetters[arg].orEmpty(), env)
             else -> texts.other[if (arg.isEmpty()) name else "$name:$arg"].orEmpty()
         }

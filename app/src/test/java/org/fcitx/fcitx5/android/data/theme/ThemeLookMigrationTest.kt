@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.data.theme
 
 import android.content.Context
 import androidx.core.content.edit
+import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.input.theme.LegacyLook
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -17,8 +18,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
+// the app's own application: a Monet theme reads the wallpaper's colours through it (appContext). With
+// Robolectric's plain one the Monet test passed only after another test had made the app once, never alone
 @RunWith(RobolectricTestRunner::class)
+@Config(application = FcitxApplication::class)
 class ThemeLookMigrationTest {
 
     private val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("t", Context.MODE_PRIVATE)

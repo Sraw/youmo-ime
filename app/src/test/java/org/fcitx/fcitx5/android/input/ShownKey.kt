@@ -5,12 +5,18 @@
 package org.fcitx.fcitx5.android.input
 
 import android.graphics.Rect
+import android.graphics.RectF
 import android.view.View
+import android.widget.ImageView
+import android.widget.TextView
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.Op
 import kotlin.math.roundToInt
 
 /**
@@ -39,6 +45,12 @@ interface ShownKey {
     /** Whether it takes a press (a blank key does not, nor a key the scene has as disabled). */
     val enabled: Boolean
 
+    /** The state a screen reader is told (Shift's once, locked): its view's state description, its node's; null for none. */
+    val state: String?
+
+    /** Its view's id's name (`button_caps`), its node's as told (the same name); null for none. */
+    val resourceName: String?
+
     /** Its cell in the window: a view's box, where a popup is placed from. */
     val bounds: Rect
 
@@ -54,6 +66,22 @@ interface ShownKey {
     /** A click, as the end of a tap calls it (a view's performClick, the scene key's click): whether anything took it. */
     fun click(): Boolean
 
+    /** The size [text] is drawn at on it (a text view's text size, a scene's text's); null where it draws no such text. */
+    fun textSize(text: String): Float?
+
+    /** How many icons are drawn on it: its own, its marks' (a shortcut's command). */
+    val drawnIcons: Int
+
+    /** Every text drawn on it (its label, corner, marks' words), in no order but its own. */
+    val drawnTexts: List<String>
+
+    /**
+     * Where [text] is drawn on it, in the window: a view's text view's box; a scene's text from its
+     * left and baseline, its ink's top and width a guess (0.75 and 0.6 of its size: letters and
+     * digits). Null where it draws no such text.
+     */
+    fun drawn(text: String): RectF?
+
     val width: Int get() = bounds.width()
     val height: Int get() = bounds.height()
 }
@@ -66,7 +94,10 @@ class ViewShownKey(val view: KeyView) : ShownKey {
     override val alt: String?
         get() = (view as? AltTextKeyView)?.altText?.takeIf { it.visibility == View.VISIBLE }?.text?.toString()?.takeIf { it.isNotEmpty() }
     override val description: String? get() = view.contentDescription?.toString()
+    // a resource's id only: View.generateViewId's are below a package's (0x01000000)
+    override val resourceName: String? get() = view.id.takeIf { it != View.NO_ID && it ushr 24 != 0 }?.let(view.resources::getResourceEntryName)
     override val enabled: Boolean get() = view.isEnabled
+    override val state: String? get() = ViewCompat.getStateDescription(view)?.toString()
     override val bounds: Rect
         get() {
             val at = IntArray(2).also(view::getLocationInWindow)
@@ -76,6 +107,22 @@ class ViewShownKey(val view: KeyView) : ShownKey {
     override val hit: Rect get() = bounds
     override val pressed: Boolean get() = view.isPressed
     override fun click(): Boolean = view.performClick()
+
+    private fun textViews() = KeyboardHarness.all(view).filterIsInstance<TextView>()
+        .filter { v -> generateSequence(v as View) { it.parent as? View }.takeWhile { it !== view }.all { it.visibility == View.VISIBLE } }
+
+    override fun textSize(text: String): Float? = textViews().firstOrNull { it.text.toString() == text }?.textSize
+
+    override val drawnIcons: Int
+        get() = KeyboardHarness.all(view).filterIsInstance<ImageView>()
+            .count { v -> generateSequence(v as View) { it.parent as? View }.takeWhile { it !== view }.all { it.visibility == View.VISIBLE } }
+
+    override val drawnTexts: List<String> get() = textViews().map { it.text.toString() }.filter { it.isNotEmpty() }.toList()
+
+    override fun drawn(text: String): RectF? = textViews().firstOrNull { it.text.toString() == text }?.let { v ->
+        val at = IntArray(2).also(v::getLocationInWindow)
+        RectF(at[0].toFloat(), at[1].toFloat(), (at[0] + v.width).toFloat(), (at[1] + v.height).toFloat())
+    }
     override fun toString() = "view key ${id ?: label}"
 }
 
@@ -91,12 +138,44 @@ class SceneShownKey(val canvas: KeyboardCanvasView, override val id: String, ove
     override val alt: String? get() = canvas.alt(id, copy)
     override val description: String? get() = canvas.spoken(id, copy)
     override val enabled: Boolean get() = canvas.enabled(id, copy)
+
+    // as its node tells it, the node made as TalkBack asks for it
+    override val state: String? get() = told()?.stateDescription?.toString()
+    override val resourceName: String? get() = told()?.viewIdResourceName?.substringAfter(":id/")
+
+    private fun told(): AccessibilityNodeInfoCompat? {
+        val i = canvas.scene?.keys?.indexOf(node) ?: return null
+        return canvas.accessibilityNodeProvider?.createAccessibilityNodeInfo(i)?.let(AccessibilityNodeInfoCompat::wrap)
+    }
     override val bounds: Rect get() = canvas.bounds(id, copy) ?: error("no key $id ($copy) in the scene now")
     override val face: Rect get() = inWindow(node.shape.bounds)
     override val hit: Rect get() = inWindow(node.hit.bounds)
     override val pressed: Boolean get() = canvas.shownPressed(id, copy)
     override fun click(): Boolean = canvas.click(id, copy)
+
+    private fun texts() = node.ops(false).filterIsInstance<Op.Text>()
+
+    override fun textSize(text: String): Float? = texts().firstOrNull { it.text == text }?.size?.toFloat()
+
+    override val drawnIcons: Int get() = node.ops(false).count { it is Op.Icon }
+
+    override val drawnTexts: List<String> get() = texts().map { it.text }
+
+    override fun drawn(text: String): RectF? = texts().firstOrNull { it.text == text }?.let { t ->
+        val at = IntArray(2).also(canvas::getLocationInWindow)
+        // drawn from its left (ScenePainter), its width guessed: about 0.6 of its size a character
+        val width = t.size * t.scaleX * WIDE * t.text.length
+        RectF((at[0] + t.x).toFloat(), (at[1] + t.baseline - t.size * INK).toFloat(), (at[0] + t.x + width).toFloat(), (at[1] + t.baseline).toFloat())
+    }
     override fun toString() = "scene key $id${if (copy != 0) " ($copy)" else ""}"
+
+    private companion object {
+        // a letter's or digit's ink above its baseline, of the text's size
+        const val INK = 0.75
+
+        // a character's width, of the text's size
+        const val WIDE = 0.6
+    }
 
     private fun inWindow(b: org.fcitx.fcitx5.android.scene.Box): Rect {
         val at = IntArray(2).also(canvas::getLocationInWindow)

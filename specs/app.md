@@ -375,8 +375,13 @@ not the hint, which TalkBack would read, 060-render-p2 U6); class FrameLayout, a
 role is read. What it can do is its `SceneKey`'s (`Host.key`): clickable, long clickable where the
 key's wiring has a long click, the two actions where enabled, and a click or long click on the node is
 the key's own `click`/`longClick`, which tell TalkBack `TYPE_VIEW_CLICKED`/`TYPE_VIEW_LONG_CLICKED`
-on the node as a view's performClick/performLongClick did. A key whose state changed (Shift) since the
-last scene is told as `CONTENT_CHANGE_TYPE_STATE_DESCRIPTION` on its node. The table of what each key
+on the node as a view's performClick/performLongClick did (a split row's second G or V on its own
+node, though its wiring is the first copy's: `SceneTouch.click(KeyRef)`). A node with words is read a
+character, word or paragraph at a time as a view's description was (`NodeReading`, `TextSegments`:
+View.traverseAtGranularity's moves and events, its cursor, `ACTION_SET_SELECTION` a cursor only).
+A key whose state changed (Shift) since the last scene is told as `CONTENT_CHANGE_TYPE_STATE_DESCRIPTION`
+on its node. A corner not drawn is not told: with 符号位置 无 (`KeyMarks.At.None`) a letter's
+`Texts.alts` is empty, so its node says the letter alone, as the view whose corner was hidden. The table of what each key
 says, the views' against the nodes', is `SceneSpeechTest`: the same, a letter's two words in either
 order (its view had no description, and TalkBack read its texts in the order the view laid them out:
 letter first on a device, as the node; corner first in Robolectric at SDK 30 and up).
@@ -389,16 +394,20 @@ too) are a `PopupSceneView` drawing a small scene `SceneBuilder.preview`/`popup`
 sizes the engine's (`engine/Popups`: theme 3.0's in dp, its text dp, not sp; its corners the keys'
 radius; its shadow drawn, rules D4.7/D4.9, which the views' elevation had and Robolectric never drew
 in their goldens; the view as large as the scene and `outset` round it for the shadow, placed
-that much up and left of where the views' popup goes). A focus moved is the scene made again, the key
+that much up and left of where the views' popup goes; the edit menu's lift, `MENU_LIFT_DP`, wherever
+the scenes are). A focus moved is the scene made again, the key
 in focus `Selected`; where it goes stays `PopupComponent`'s. The engine's entry points never throw
 (`Parsed`); what it could not make is logged (`Timber.w`) and not shown, never the views instead
 (they go in S8) and never a popup not drawn that a lift still types: the long press as one with no
 popup (`unmade`, not in `showingContainerUi`); a focus it could not draw keeps the scene and the
 focus before. A menu's icon is a `SceneIcons` name, a drawable's id read back only as a menu gave it. A key view's popups stay views
-(`SwipePopupScreenshotTest`'s `canvas_*` beside the views' goldens). A scene's popup has a basic
-node a key for TalkBack (`PopupSceneView`'s `ExploreByTouchHelper`: its words, place, selected,
-enabled; the rest S3's); the harness reads its keys, and a menu's words, from the scene
-(`KeyboardHarness.popupChoices`/`sceneChoices`).
+(`SwipePopupScreenshotTest`'s `canvas_*` beside the views' goldens). A scene's popup has a node
+a key for TalkBack (`PopupSceneView`'s `ExploreByTouchHelper`): its words, place, selected, enabled, its
+class the view's (a text's TextView, a menu icon's ImageView), read a piece at a time as the views'
+text was (`NodeReading`; not a TextView's line or page: one line, no page), and no click, as the views
+had none (picked as the finger lifts; `PopupMenuUiTest.onTheCanvasEachCellIsToldAsItsViewWas`). The
+harness reads its keys, which is in focus, its cells and text sizes, and a menu's icons from the scene
+(`KeyboardHarness.popupChoices`/`sceneChoices`/`shownIcons`).
 
 What the scene is given, so it draws what the views would: qwerty.xml is
 `lib/keyboard-scene/src/commonMain/layouts/qwerty.xml`, the one file the app copies and the engine's
@@ -406,7 +415,8 @@ tests read. A letter's corner is `{alt:x}`, the app's `Texts.alts` (`SceneLetter
 `TextKeyboard.cornerOf`: the user's own long press first, else Shift's swipe override, else the
 swipe; through `transformPunctuation`; the letter itself under a table's labels); a table's roots or
 names replace the letter through `when="roots"` and `{root:x}` (`SceneLetters.roots` of
-`TableKeyboard.label`), in two lines at 0.55 above three roots, as the views drew them.
+`TableKeyboard.label`), in two lines at 0.55 above three roots, as the views drew them. A table's 确定
+is `{confirm}`, the app's `key_confirm` (OK in English), as the view's text.
 
 The scene is made only as the view draws (`onDraw`, timed at debug level): a touch, a press shown
 and TalkBack find keys in the scene drawn last (made on the spot only before the first frame), and a
@@ -418,9 +428,11 @@ again when that moves (one-handed to the other side, the floating window dragged
 `missed` (record again next frame) is set only while an image or the picture is still being decoded
 (`PictureHost.decoding`), not for one that never will be (no host, a file that does not read).
 
-No scene (the theme the engine refuses, a layout that does not read, the builder's problems): the
-keyboard goes back to the views, told once (`Host.noScene`): the canvas removed, the rows VISIBLE,
-a warning logged; `SceneLayouts` keeps a layout that did not read as such, not read again a frame.
+No scene of the theme (one the engine refuses or cannot build): the built-in theme of its lightness
+(`ThemePreset.PixelLight`/`PixelDark`, 060-render-p2 U8) is drawn instead, a warning logged; that
+failing too (a layout that does not read, the builder's problems), nothing is drawn and an error
+logged, never the views again (they go in S8); a new scene is tried as anything changes
+(`invalidateScene`). `SceneLayouts` keeps a layout that did not read as such, not read again a frame.
 
 The row's indent before A and after L is the end key's touch area (the user's P0 decision in
 060-render-v2 §3): a finger down there is A's, its swipes and long press A's, though it is outside A's

@@ -57,6 +57,9 @@ class ExpandTest {
         assertEquals("。", Expand.text(Text.Binding("period", null), e))
         assertEquals("拼音", Expand.text(Text.Binding("ime-name", null), e))
         assertEquals("发送", Expand.text(Text.Binding("return", null), e))
+        // a table's 确定 as the app's language has it (key_confirm), 确定 by default
+        assertEquals("确定", Expand.text(Text.Binding("confirm", null), e))
+        assertEquals("OK", Expand.text(Text.Binding("confirm", null), e.copy(texts = texts.copy(confirm = "OK"))))
         // rules C §2: pinyin's in capitals, English's as Shift has them
         assertEquals("ABC", Expand.text(Text.Binding("nine-letters", "2"), e))
         assertEquals("wxyz", Expand.text(Text.Binding("nine-letters", "9"), e.copy(input = Input(ime = "english"))))

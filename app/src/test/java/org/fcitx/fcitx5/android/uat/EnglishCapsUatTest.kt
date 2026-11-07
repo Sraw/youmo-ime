@@ -13,7 +13,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
+import org.fcitx.fcitx5.android.input.ShownKey
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -45,8 +45,7 @@ class EnglishCapsUatTest {
     }
 
     // the letter key [c] whichever case it shows
-    private fun KeyboardHarness.letter(c: Char): TextKeyView = KeyboardHarness.all(inputView).filterIsInstance<TextKeyView>()
-        .first { shown(it) && it.mainText.text.toString().equals(c.toString(), ignoreCase = true) }
+    private fun KeyboardHarness.letter(c: Char): ShownKey = keys().first { it.label.equals(c.toString(), ignoreCase = true) }
 
     // the characters of the keys sent down, in order
     private fun KeyboardHarness.typed(): String = api.calls.filter { it.startsWith("sendKey") && "up=false" in it }.joinToString("") { call ->
@@ -82,7 +81,7 @@ class EnglishCapsUatTest {
     }
 
     private fun KeyboardHarness.glide(from: Char, to: Char) {
-        val end = box(letter(to))
+        val end = letter(to).bounds
         drag(letter(from), end.exactCenterX(), end.exactCenterY(), steps = 12)
     }
 
@@ -122,7 +121,7 @@ class EnglishCapsUatTest {
             q.typedIn("ok ")
             q.glide('i', 'm')
             q.typedIn("")
-            q.tap(q.described("Shift"))
+            q.tap(q.describedKey("Shift"))
             q.glide('h', 'o')
             assertEquals(listOf(false, true), glides.map { it.shift })
         } finally {

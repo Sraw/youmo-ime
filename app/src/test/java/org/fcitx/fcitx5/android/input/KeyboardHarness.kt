@@ -55,8 +55,10 @@ import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
 import org.fcitx.fcitx5.android.scene.Op
+import android.widget.ImageView
+import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
-import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.robolectric.Robolectric
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
@@ -97,11 +99,9 @@ class KeyboardHarness(
 
     private val codeRowWas = ThemeManager.prefs.codeRow.getValue().takeIf { it != codeRow }
 
-    // -PcanvasKeyboard: the canvas draws the keys (060-render-p2 S3), where the test did not choose
-    private val canvasWas = AppPrefs.getInstance().internal.canvasKeyboard.takeIf { CANVAS_RUN && !PrefsRule.drawingChosen }
-        ?.let { p -> p.getValue().also { p.setValue(true) } }
-
     init {
+        // -PcanvasKeyboard: the canvas draws the keys (060-render-p2 S3), where the test did not choose
+        CanvasRun.begin()
         keyboards?.let(::setKeyboards)
         codeRowWas?.let { ThemeManager.prefs.codeRow.setValue(codeRow) }
         val connection = host?.let { HarnessConnection(scope, it) } ?: FakeHostConnection(scope, api)
@@ -125,6 +125,7 @@ class KeyboardHarness(
         } catch (e: Throwable) {
             keyboardsWere?.let(::setKeyboards)
             codeRowWas?.let(ThemeManager.prefs.codeRow::setValue)
+            CanvasRun.end()
             HostDaemon.testConnection = null
             scope.cancel()
             throw e
@@ -289,6 +290,9 @@ class KeyboardHarness(
     /** The key the scene names [id] (`space`, `q`; a key view's theme name), the [copy]th of a split row's two. */
     fun keyNamed(id: String, copy: Int = 0): ShownKey = keys().firstOrNull { it.id == id && it.copy == copy }
         ?: error("no key named $id ($copy) in ${keys().map { it.id }}")
+
+    /** The key whose view had the id [id] (R.id.button_star), its node the same name; null for none shown. */
+    fun keyWithId(id: Int): ShownKey? = service.resources.getResourceEntryName(id).let { name -> keys().firstOrNull { it.resourceName == name } }
 
     /** The key read out as [description] (Shift, Backspace, Space's with the input method's name), whichever draws it. */
     fun describedKey(description: String): ShownKey = keys().firstOrNull { it.description == description }
@@ -455,15 +459,35 @@ class KeyboardHarness(
         .filter { shown(it) && generateSequence(it as View) { p -> p.parent as? View }.none { p -> p is KeyView } }
         .toList()
 
-    /** A popup's key as shown: its label and where it is in the window. */
-    data class PopupKey(val text: String, val box: Rect)
+    /**
+     * A popup's key as shown: its label and where it is in the window; [focused], the one the finger
+     * is on (its view's frame given the focus's background, the scene's key selected); [cell], its
+     * whole cell (a view's text is centred in a frame, not laid out to its size); [size], its text's
+     * size (0 for an icon).
+     */
+    data class PopupKey(val text: String, val box: Rect, val focused: Boolean = false, val cell: Rect = box, val size: Float = 0f)
 
     /**
      * The popup's keys up now as [popupKeys], drawn as views or, a key the canvas draws, as the
      * engine's scene (060-render-p2 S2: no view per key); a scene's in the views' order, top row first.
      */
-    fun popupChoices(): List<PopupKey> = popupKeys().map { PopupKey(it.text.toString(), box(it)) } +
-        all(inputView).filterIsInstance<PopupSceneView>().filter { shown(it) }.flatMap { sceneChoices(it, box(it)) }
+    fun popupChoices(): List<PopupKey> = popupKeys().map {
+        val frame = it.parent as View
+        PopupKey(it.text.toString(), box(it), frame.background != null, box(frame), it.textSize)
+    } + all(inputView).filterIsInstance<PopupSceneView>().filter { shown(it) }.flatMap { sceneChoices(it, box(it)) }
+
+    /**
+     * The icons shown outside the keys, as [PopupKey]s read by their descriptions: the bar's and a
+     * menu's cells (the edit menu's) as views, or a menu's cells the canvas's scene draws (S2).
+     */
+    fun shownIcons(): List<PopupKey> = all(inputView).filter { v ->
+        v is ImageView && shown(v) && generateSequence(v.parent as? View) { it.parent as? View }.none { it is KeyView }
+    }.map { PopupKey(it.contentDescription?.toString().orEmpty(), box(it)) }.toList() +
+        all(inputView).filterIsInstance<PopupSceneView>().filter { shown(it) }.flatMap { v ->
+            val at = box(v)
+            v.scene?.keys.orEmpty().filter { k -> k.kind == "menu" && k.ops(false).any { it is Op.Icon } }
+                .map { k -> PopupKey((k.a11y ?: k.label).orEmpty(), sceneBox(v, at, k)) }
+        }
 
     /**
      * A finger held on [v] past the long press, then slid onto the popup's key showing [pick]
@@ -691,12 +715,15 @@ class KeyboardHarness(
             .firstOrNull { shown(it) && it.altText.text.toString() == digit } ?: error("no key $digit in ${texts()}")
 
     /**
-     * Every text shown under [v] (visible ones only), depth first: a canvas's keys' labels and corners
-     * in its scene's order, as the key views' texts were in theirs.
+     * Every text shown under [v] (visible ones only), depth first: a canvas's keys' labels, corners and
+     * marks' words (a shortcut's text) in its scene's order, as the key views' texts were in theirs.
      */
     fun texts(v: View = keyboard): List<String> = when {
         v.visibility != View.VISIBLE -> emptyList()
-        v is KeyboardCanvasView -> v.scene?.keys.orEmpty().flatMap { listOfNotNull(it.label, it.alt?.takeIf(String::isNotEmpty)) }
+        v is KeyboardCanvasView -> v.scene?.keys.orEmpty().flatMap { k ->
+            val said = listOfNotNull(k.label, k.alt?.takeIf(String::isNotEmpty))
+            said + (k.ops(false).filterIsInstance<Op.Text>().map { it.text } - said.toSet())
+        }
         v is TextView -> listOf(v.text.toString())
         v is ViewGroup -> (0 until v.childCount).flatMap { texts(v.getChildAt(it)) }
         else -> emptyList()
@@ -747,7 +774,7 @@ class KeyboardHarness(
         }
         keyboardsWere?.let(::setKeyboards)
         codeRowWas?.let(ThemeManager.prefs.codeRow::setValue)
-        canvasWas?.let(AppPrefs.getInstance().internal.canvasKeyboard::setValue)
+        CanvasRun.end()
         HostDaemon.testConnection = null
         scope.cancel()
     }
@@ -763,8 +790,6 @@ class KeyboardHarness(
 
     companion object {
         /** Every harness's keys drawn by the canvas but where a test chose (`-PcanvasKeyboard`, app/build.gradle.kts). */
-        private val CANVAS_RUN = System.getProperty("youmo.canvasKeyboard") == "true"
-
         val PINYIN = InputMethodEntry(InputMethodCatalog.PINYIN, "拼音", "", "", "拼", "zh_CN", "androidengine", false)
         val ENGLISH = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "", "En", "en", "androidengine", false)
 
@@ -791,10 +816,16 @@ class KeyboardHarness(
             .filter { it.kind == "popup" || it.kind == "preview" || (it.kind == "menu" && it.ops(false).none { op -> op is Op.Icon }) }
             .sortedWith(compareBy({ it.bounds.top }, { it.bounds.left }))
             .map { k ->
-                val l = at.left + v.outset.left
-                val t = at.top + v.outset.top
-                PopupKey(k.label.orEmpty(), Rect(l + k.bounds.left.toInt(), t + k.bounds.top.toInt(), l + k.bounds.right.toInt(), t + k.bounds.bottom.toInt()))
+                val size = k.ops(false).filterIsInstance<Op.Text>().firstOrNull()?.size?.toFloat() ?: 0f
+                PopupKey(k.label.orEmpty(), sceneBox(v, at, k), KeyState.Selected in k.states, size = size)
             }
+
+        // [k]'s cell in the window, its popup view at [at]
+        fun sceneBox(v: PopupSceneView, at: Rect, k: KeyNode): Rect {
+            val l = at.left + v.outset.left
+            val t = at.top + v.outset.top
+            return Rect(l + k.bounds.left.toInt(), t + k.bounds.top.toInt(), l + k.bounds.right.toInt(), t + k.bounds.bottom.toInt())
+        }
 
         fun all(v: View): Sequence<View> = sequence {
             yield(v)

@@ -116,7 +116,7 @@ class CompactKeyboardScreenshotTest {
             h.start()
             h.capture("CompactKeyboardScreenshotTest/$name", h.inputView)
             if (shift) {
-                h.tap(h.described("Shift"))
+                h.tap(h.describedKey("Shift"))
                 h.idle()
                 h.capture("CompactKeyboardScreenshotTest/${name}_shift", h.inputView)
             }

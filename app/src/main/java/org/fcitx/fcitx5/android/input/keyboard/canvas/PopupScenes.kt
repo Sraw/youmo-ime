@@ -11,6 +11,7 @@ import android.graphics.Rect
 import android.os.Bundle
 import android.view.MotionEvent
 import android.view.View
+import android.view.accessibility.AccessibilityEvent
 import androidx.annotation.VisibleForTesting
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
@@ -116,6 +117,7 @@ class PopupSceneView internal constructor(context: Context, painter: (View) -> S
             if (outset != before) onOutsetChanged?.invoke(before, Rect(outset))
             if (resized || outset != before) requestLayout()
             invalidate()
+            speech.reading.clear()
             speech.invalidateRoot()
         }
 
@@ -138,9 +140,12 @@ class PopupSceneView internal constructor(context: Context, painter: (View) -> S
 
     override fun dispatchHoverEvent(event: MotionEvent): Boolean = speech.dispatchHoverEvent(event) || super.dispatchHoverEvent(event)
 
-    // a basic node a key (060-render-p2 S2): its words, where it is, selected and enabled as drawn; the
-    // keyboard's whole treatment (actions, states as its views') is S3's
+    // a node a key, as its view was (060-render-p2 S2, S3): its words, where it is, selected and enabled
+    // as drawn, its class the view's (a text's TextView, a menu's icon's ImageView), its words read a
+    // piece at a time; no click, as the views had none (picked as the finger lifts)
     private inner class Speech : ExploreByTouchHelper(this) {
+        val reading = NodeReading({ resources.configuration.locales[0] }, ::sendEventForVirtualView)
+
         override fun getVirtualViewAt(x: Float, y: Float): Int {
             val keys = scene?.keys ?: return INVALID_ID
             val at = keys.indexOfFirst { spoken(it) && it.bounds.contains(x.toDouble() - outset.left, y.toDouble() - outset.top) }
@@ -166,10 +171,19 @@ class PopupSceneView internal constructor(context: Context, painter: (View) -> S
             )
             node.isSelected = k != null && KeyState.Selected in k.states
             node.isEnabled = k != null && KeyState.Disabled !in k.states
+            node.className = if (k != null && k.ops(false).any { it is Op.Icon }) IMAGE_CLASS else TEXT_CLASS
+            // a character, word or paragraph at a time, as the views' text or description (not a
+            // TextView's line or page: one line, no page, the cell's words)
+            reading.node(virtualViewId, k?.let(::words), node)
+        }
+
+        override fun onPopulateEventForVirtualView(virtualViewId: Int, event: AccessibilityEvent) {
+            reading.populate(virtualViewId, scene?.keys?.getOrNull(virtualViewId)?.let(::words), event)
         }
 
         // picked as the finger lifts (PopupComponent), as the views' were: nothing done here
-        override fun onPerformActionForVirtualView(virtualViewId: Int, action: Int, arguments: Bundle?): Boolean = false
+        override fun onPerformActionForVirtualView(virtualViewId: Int, action: Int, arguments: Bundle?): Boolean =
+            reading.perform(virtualViewId, scene?.keys?.getOrNull(virtualViewId)?.let(::words), action, arguments) ?: false
     }
 
     // a key's words for TalkBack: the scene's (a menu's item's name), else its label; none, not read
@@ -187,5 +201,9 @@ class PopupSceneView internal constructor(context: Context, painter: (View) -> S
     private companion object {
         // room past what it draws for the edges' anti-aliasing, as a key's node has (KeyboardCanvasView)
         const val EDGE_PX = 2.0
+
+        // the views' classes it stands for: a key's or item's text, a menu item's icon
+        const val TEXT_CLASS = "android.widget.TextView"
+        const val IMAGE_CLASS = "android.widget.ImageView"
     }
 }

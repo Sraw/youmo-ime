@@ -1002,11 +1002,12 @@ class Device:
                  "button_return": "enter", "button_lang": "globe", "button_comma": ",",
                  "button_period": ".", "button_confirm": "enter"}
         k = {}
+        ids = []
         for n in kb.walk():
             if not n.clickable:
                 continue
             if n.key:
-                k.setdefault(n.key, n.c)
+                ids.append((n.key, n.c))
             if n.rid in names:
                 k[names[n.rid]] = n.c
                 continue
@@ -1020,6 +1021,10 @@ class Device:
             for x in t[1:]:   # the nine keys: "ABC" over "2"; a table's roots over their letter (日 over a)
                 if len(x) == 1 and (x.isdigit() or "a" <= x <= "z"):
                     k.setdefault(x, n.c)
+        # the scene's ids last: an alias only where no label or name took it (a corner's digit is its
+        # letter's key's, as on the views, not the digit key's of another layout's id)
+        for key, c in ids:
+            k.setdefault(key, c)
         self._keys = k
         return k
 

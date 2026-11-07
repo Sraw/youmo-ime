@@ -9,6 +9,7 @@ import android.graphics.Rect
 import android.text.InputType
 import android.view.View
 import android.widget.TextView
+import kotlin.math.abs
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -22,11 +23,11 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPadView
 import org.fcitx.fcitx5.android.input.keyboard.GroupedKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
@@ -34,6 +35,7 @@ import org.fcitx.fcitx5.android.input.keyboard.SplitDock
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -46,7 +48,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import kotlin.math.abs
 
 /** UAT cases of the keyboard turned sideways (uat/16), at redroid's screen turned: 851 × 393 dp. */
 @RunWith(RobolectricTestRunner::class)
@@ -72,8 +73,10 @@ class LandscapeUatTest {
 
     private fun x(v: View) = IntArray(2).also { v.getLocationInWindow(it) }[0]
 
-    private fun keys(label: String) = KeyboardHarness.all(h.inputView).filterIsInstance<TextKeyView>()
-        .filter { h.shown(it) && it.mainText.text.toString() == label }.toList()
+    private fun x(k: ShownKey) = k.bounds.left
+
+    // the keys labelled [label], whichever draws them (a key view, the canvas's scene)
+    private fun keys(label: String) = h.keysLabelled(label)
 
     private fun split() = keys("g").size == 2
 
@@ -104,10 +107,7 @@ class LandscapeUatTest {
     fun landscapeSplitsTheLetters() {
         h.start()
         val width = h.keyboard.width
-        fun row(letters: String) = letters.map { c ->
-            KeyboardHarness.all(h.inputView).filterIsInstance<TextKeyView>()
-                .filter { h.shown(it) && it.mainText.text.toString() == c.toString() }.map(::x).sorted().toList()
-        }
+        fun row(letters: String) = letters.map { c -> keys(c.toString()).map(::x).sorted() }
         // G and V on both halves
         assertEquals(2, row("g").single().size)
         assertEquals(2, row("v").single().size)
@@ -121,7 +121,7 @@ class LandscapeUatTest {
         // both halves' keys equally wide
         assertEquals(keyWidth, h.key("p").width)
         // the space across the middle
-        val space = KeyboardHarness.all(h.inputView).first { it.id == R.id.button_space && h.shown(it) }
+        val space = h.keyNamed("space")
         assertTrue(x(space) < width / 2 && x(space) + space.width > width / 2)
         h.capture("LandscapeUatTest/split")
     }
@@ -187,7 +187,7 @@ class LandscapeUatTest {
         h.start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
         val keys = h.texts()
         assertTrue(keys.toString(), "/" in keys && "." in keys && ".com" in keys)
-        val space = KeyboardHarness.all(h.inputView).first { it.id == R.id.button_space && h.shown(it) }
+        val space = h.keyNamed("space")
         assertTrue(x(space) < width / 2 && x(space) + space.width > width / 2)
         h.tap(h.key(".com"))
         assertEquals(".com", h.field.text.toString())
@@ -421,7 +421,7 @@ class LandscapeUatTest {
             assertEquals("$c", c in "we", x(k) < middle)
             h.tap(k)
         }
-        h.tap(KeyboardHarness.all(h.inputView).first { it.id == R.id.button_space && h.shown(it) })
+        h.tap(h.keyNamed("space"))
         val typed = sent().map { Regex("key=([^,]*)").find(it)?.groupValues?.get(1) ?: it }
         assertEquals(listOf("w", "o", "m", "e", "n"), typed.take(5))
         assertEquals(typed.toString(), 6, typed.size)
@@ -539,7 +539,7 @@ class LandscapeUatTest {
         harness = KeyboardHarness(im = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false))
         h.start()
         assertTrue(split())
-        assertFalse(KeyboardHarness.all(h.inputView).any { it.id == R.id.button_semicolon && h.shown(it) })
+        assertFalse(h.keys().any { it.id == "semicolon" })
         // L ends its row where the row above ends
         assertTrue(abs(h.box(h.key("l")).right - h.box(h.key("p")).right) <= 12)
         val popup = h.longPress(h.key("l"), null)

@@ -252,7 +252,7 @@ class PanelUatTest {
         h.field.setSelection(h.field.length())
         h.idle()
         h.tap(h.key("123"))
-        val space = h.described("Space")
+        val space = h.describedKey("Space")
         h.api.calls.clear()
         h.swipe(space, -space.width * 0.8f, 0f)
         // ← keys for the cursor (the engine passes them on), no space typed

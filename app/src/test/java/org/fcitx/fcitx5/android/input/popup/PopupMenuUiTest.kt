@@ -182,6 +182,53 @@ class PopupMenuUiTest {
         assertTrue(nodes.all { !it.getBoundsInParentCompat().isEmpty })
     }
 
+    // S3: each cell told as its view was: its class (a word's TextView, an icon's ImageView), its words,
+    // not clickable (picked as the finger lifts), read a character, word or paragraph at a time as the
+    // view's text or description (a TextView's line and page not: one line, no page)
+    @Test
+    fun onTheCanvasEachCellIsToldAsItsViewWas() {
+        for (cells in listOf(items, words)) {
+            // in a window: a view not attached tells nothing (View.onInitializeAccessibilityNodeInfoInternal)
+            val root = menu(items = cells).root
+            org.robolectric.Robolectric.buildActivity(android.app.Activity::class.java).setup().get().setContentView(root)
+            val views = KeyboardHarness.all(root)
+                .filter { (it is android.widget.TextView && it.text.isNotEmpty()) || (it is android.widget.ImageView && it.contentDescription != null) }
+                .map { v -> AccessibilityNodeInfoCompat.wrap(v.createAccessibilityNodeInfo()) to v }
+                .toList()
+                // in the scene's order: the views' are the columns' (the focus's first)
+                .sortedBy { (n, _) -> (n.contentDescription ?: n.text).toString() }
+            val ui = menu(canvas = true, items = cells)
+            val canvas = ui.root as PopupSceneView
+            val nodes = canvas.spokenKeys().sortedBy { it.contentDescription.toString() }
+            // the class a view's node is given (View.onInitializeAccessibilityNodeInfoInternal; Robolectric's node keeps none)
+            assertEquals(views.map { it.second.accessibilityClassName }, nodes.map { it.className })
+            assertEquals(views.map { (n, _) -> (n.contentDescription ?: n.text).toString() }, nodes.map { it.contentDescription.toString() })
+            assertTrue(nodes.none { it.isClickable || it.isLongClickable })
+            assertTrue(views.none { it.first.isClickable || it.first.isLongClickable })
+            val read = AccessibilityNodeInfoCompat.MOVEMENT_GRANULARITY_CHARACTER or
+                AccessibilityNodeInfoCompat.MOVEMENT_GRANULARITY_WORD or AccessibilityNodeInfoCompat.MOVEMENT_GRANULARITY_PARAGRAPH
+            for ((n, node) in views.map { it.first }.zip(nodes)) {
+                assertEquals(read, node.movementGranularities)
+                assertEquals("${n.text}: the view's are those and more", read, n.movementGranularities and read)
+            }
+            // a cell's words a character at a time, forward then back, as its view's (its events sent: TalkBack on)
+            org.robolectric.Shadows.shadowOf(root.context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)).setEnabled(true)
+            val provider = canvas.accessibilityNodeProvider!!
+            val keys = canvas.scene!!.keys
+            for ((i, v) in views.map { it.second }.withIndex()) {
+                val id = keys.indexOfFirst { k -> (k.a11y ?: k.label) == nodes[i].contentDescription.toString() }
+                val chars = android.os.Bundle().apply {
+                    putInt(AccessibilityNodeInfoCompat.ACTION_ARGUMENT_MOVEMENT_GRANULARITY_INT, AccessibilityNodeInfoCompat.MOVEMENT_GRANULARITY_CHARACTER)
+                }
+                val steps = listOf(true, true, true, true, false, false, false, false)
+                    .map { if (it) AccessibilityNodeInfoCompat.ACTION_NEXT_AT_MOVEMENT_GRANULARITY else AccessibilityNodeInfoCompat.ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY }
+                val viewSaid = steps.map { v.performAccessibilityAction(it, chars) }
+                val nodeSaid = steps.map { provider.performAction(id, it, chars) }
+                assertEquals("${v.accessibilityClassName} ${views[i].first.text ?: views[i].first.contentDescription}", viewSaid, nodeSaid)
+            }
+        }
+    }
+
     // the engine could not make the menu: unmade, nothing to show (PopupComponent shows none); it
     // could not make the focus moved: the scene before kept, the focus with it
     @Test

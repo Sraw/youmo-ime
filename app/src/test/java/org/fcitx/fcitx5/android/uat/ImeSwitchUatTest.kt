@@ -59,13 +59,13 @@ class ImeSwitchUatTest {
     fun theGlobeKeyGoesRoundAndTheSpaceSays() {
         h.start()
         assertTrue(h.texts().toString(), "Pinyin" in h.texts())
-        h.tap(h.described(h.service.getString(R.string.a11y_key_switch_language)))
+        h.tap(h.describedKey(h.service.getString(R.string.a11y_key_switch_language)))
         told()
         assertEquals(KeyboardHarness.ENGLISH.uniqueName, h.api.inputMethodEntryCached.uniqueName)
         val english = h.texts()
         // still the 26 keys
         assertTrue(english.toString(), "English" in english && "q" in english && "m" in english)
-        h.tap(h.described(h.service.getString(R.string.a11y_key_switch_language)))
+        h.tap(h.describedKey(h.service.getString(R.string.a11y_key_switch_language)))
         told()
         assertTrue(h.texts().toString(), "Pinyin" in h.texts())
     }
@@ -124,7 +124,7 @@ class ImeSwitchUatTest {
         fun spaceSays() = names.single { it in h.texts() }
         val said = mutableListOf(spaceSays())
         repeat(times) {
-            h.tap(h.described(h.service.getString(R.string.a11y_key_switch_language)))
+            h.tap(h.describedKey(h.service.getString(R.string.a11y_key_switch_language)))
             told()
             said += spaceSays()
         }

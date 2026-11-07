@@ -30,6 +30,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
@@ -355,18 +356,6 @@ class TextKeyboard private constructor(
         })
     }
 
-    // [view] had no scene to draw (a theme or the layout unread, the engine refusing them): the keys
-    // drawn by their views again, for as long as this keyboard lives, rather than none drawn or touched
-    private fun drawKeysThemselves(view: KeyboardCanvasView) {
-        if (canvas !== view) return
-        Timber.w("keyboard canvas: no scene of the keys (theme %s); their views draw them", theme.name)
-        drawKeysOn(null)
-        keyRows.forEach { it.visibility = View.VISIBLE }
-        removeView(view)
-        // laid out again: the letters settled (BaseKeyboard.onLayout) now the views draw them
-        requestLayout()
-    }
-
     private fun canvasView(): KeyboardCanvasView {
         val look = ThemeManager.shownLook(theme)
         val fonts = SceneFonts(look)
@@ -374,18 +363,26 @@ class TextKeyboard private constructor(
         return KeyboardCanvasView(context, look, keyImages, fonts, object : KeyboardCanvasView.Host {
             override fun scene(width: Int, height: Int) = scene(look, measurer, width, height)
             override fun key(node: KeyNode) = sceneKey(node)
-
-            // asked as it draws: the views swapped back after the frame, not in it
-            override fun noScene(view: KeyboardCanvasView) {
-                post { drawKeysThemselves(view) }
-            }
         })
     }
 
     // what the keys show now, as the scene engine's environment (qwerty.xml's when= and bindings)
+    // 060-render-p2 U8: a scene the theme makes none of (the engine refusing it, or what the theme made)
+    // is the built-in theme's of the same lightness, logged; none of that either, nothing (the canvas
+    // draws nothing and logs it). Never the views again: they go in S8
     private fun scene(look: ThemeLook, measurer: TextMeasurer, width: Int, height: Int): Scene? {
-        val sceneTheme = SceneTrace.section("theme") { SceneThemes.of(look, theme.name, theme.isDark) } ?: return null
         val layout = SceneLayouts.qwerty(context) ?: return null
+        SceneTrace.section("theme") { SceneThemes.of(look, theme.name, theme.isDark) }
+            ?.let { scene(it, look, layout, measurer, width, height) }?.let { return it }
+        val builtIn = if (theme.isDark) ThemePreset.PixelDark else ThemePreset.PixelLight
+        if (builtIn.name == theme.name) return null
+        Timber.w("keyboard canvas: no scene of theme %s; the built-in %s's drawn", theme.name, builtIn.name)
+        val builtInLook = ThemeManager.shownLook(builtIn)
+        return SceneThemes.of(builtInLook, builtIn.name, builtIn.isDark)?.let { scene(it, builtInLook, layout, measurer, width, height) }
+    }
+
+    // the scene of [sceneTheme] ([look]'s): the last kept for the same values, or made; null, the engine refused it
+    private fun scene(sceneTheme: SceneTheme, look: ThemeLook, layout: Layout, measurer: TextMeasurer, width: Int, height: Int): Scene? {
         val env = SceneTrace.section("env") { env(look, layout, width, height) }
         // the same values make the same scene: one asked again for nothing that shows (the first key typed,
         // the word committed: Return's look unchanged) is the last one, not made again in the frame
@@ -421,6 +418,7 @@ class TextKeyboard private constructor(
             period = transformPunctuation("."),
             returnLabel = returnAppearance.label(context).toString(),
             returnIcon = SceneIcons.returnName(returnAppearance.icon),
+            confirm = context.getString(R.string.key_confirm),
             keepUppercase = keepLettersUppercase,
             punctuation = punctuationMapping,
             // the corners and a table's roots as the views show them (updatePunctuationKeys, updateAlphabetKeys)
@@ -452,14 +450,24 @@ class TextKeyboard private constructor(
     // the letters' corners as last worked out, and what they were worked out from (cornerOf's inputs):
     // the canvas asks for a scene on every change the views show (a key typed), and these change only as
     // a setting or Shift does; the same map kept, the env compared with the last is equal at once
-    private data class AltsFor(val labelled: Boolean, val punctuation: Map<String, String>, val overrides: PopupOverrides, val caps: CapsState)
+    private data class AltsFor(
+        val shown: Boolean,
+        val labelled: Boolean,
+        val punctuation: Map<String, String>,
+        val overrides: PopupOverrides,
+        val caps: CapsState,
+    )
 
     private var altsMade: Pair<AltsFor, Map<String, String>>? = null
 
+    // none with 标点位置 无: the views hid their corners (AltTextKeyView.applyNoAltTextPosition), and a
+    // corner the scene does not draw is not said (TalkBack) or given (its node's extras, the harness)
     private fun alts(): Map<String, String> {
-        val now = AltsFor(table?.labelled == true, punctuationMapping, PopupOverridesCache.user.current, capsState)
+        val shown = markSpots().symbol != KeyMarks.At.None
+        val now = AltsFor(shown, table?.labelled == true, punctuationMapping, PopupOverridesCache.user.current, capsState)
         altsMade?.takeIf { it.first == now }?.let { return it.second }
-        return SceneLetters.alts { c -> letterDefs[c]?.let(::cornerOf) }.also { altsMade = now to it }
+        val made = if (shown) SceneLetters.alts { c -> letterDefs[c]?.let(::cornerOf) } else emptyMap()
+        return made.also { altsMade = now to it }
     }
 
     /** The scenes the engine made for this keyboard: a test's count of what was not kept. */

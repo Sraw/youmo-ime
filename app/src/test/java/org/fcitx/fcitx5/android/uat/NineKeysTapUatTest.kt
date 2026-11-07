@@ -72,7 +72,7 @@ class NineKeysTapUatTest {
     private fun KeyboardHarness.presses(keys: String, gap: Long) {
         keys.forEachIndexed { i, k ->
             if (i > 0) advance(gap)
-            tap(if (k == '⇧') described("Shift") else nineKey(k.toString()))
+            if (k == '⇧') tap(describedKey("Shift")) else tap(nineKey(k.toString()))
         }
         advance(PAUSE)
     }
