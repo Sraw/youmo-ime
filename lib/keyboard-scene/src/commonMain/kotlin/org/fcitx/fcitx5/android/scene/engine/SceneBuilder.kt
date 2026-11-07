@@ -41,7 +41,7 @@ class SceneBuilder(
     private val theme: Theme,
     private val env: Env,
     private val measurer: TextMeasurer,
-    icons: IconSizes = IconSizes.MATERIAL,
+    private val icons: IconSizes = IconSizes.MATERIAL,
     private val phases: Phases = Phases.None,
     /** [theme]'s cascades, kept by the caller to make its next scene of the theme with what these worked out. */
     cascades: Cascades = Cascades(theme),
@@ -56,6 +56,7 @@ class SceneBuilder(
     private val unflat = cascades.of(env.scenes - "flat")
     private val paint = Paint(theme, env.density)
     private val content = Content(env, measurer, icons)
+    private val popups by lazy { PopupBuilder(theme, env, measurer, icons, cascade, paint) }
 
     /**
      * [layout] with the files its includes name, [fragments] by id; its problems if it cannot be laid
@@ -68,6 +69,52 @@ class SceneBuilder(
         scene(layout, fragments)
     } catch (e: Throwable) {
         Parsed.Failed(0, "the scene could not be built: ${e::class.simpleName}")
+    }
+
+    /**
+     * A key's preview bubble (rules D §4, [PopupBuilder.preview]): [text] over a key [keyWidth] px
+     * across, at [size] px (a shortcut's words fitted), else a character's size. Never throws.
+     */
+    fun preview(text: String, keyWidth: Double, size: Double? = null): Parsed<Scene> = safely { popups.preview(text, keyWidth, size) }
+
+    /** The bubble's words' size and the least they shrink to, px (PreviewLabel fits them). */
+    fun previewWordsSize(): Pair<Double, Double> = popups.wordsSize()
+
+    /** The space each side of the bubble's text, px. */
+    fun previewPadding(): Double = popups.padding()
+
+    /** How wide [text] is drawn in the bubble at [size] px. */
+    fun previewWidth(text: String, size: Double): Double = popups.previewWidth(text, size)
+
+    /**
+     * A long press's keys' size for [labels] [columns] across in [room] px ([PopupBuilder.popupKeys]):
+     * at least [minWidth] wide, [height] tall, by default [Popups]'.
+     */
+    fun popupKeys(
+        labels: List<String>,
+        columns: Int,
+        room: Double?,
+        minWidth: Double = Popups.px(Popups.KEY_MIN_WIDTH_DP, env.density),
+        height: Double = Popups.px(Popups.KEY_HEIGHT_DP, env.density),
+    ): PopupKeys = popups.popupKeys(labels, columns, room, minWidth, height)
+
+    /** A long press's keys ([PopupBuilder.popup]): [rows] of [labels]' indices, the bottom one first, [selected] in focus. Never throws. */
+    fun popup(labels: List<String>, rows: List<List<Int>>, keys: PopupKeys, selected: Int): Parsed<Scene> =
+        safely { popups.popup(labels, rows, keys, selected) }
+
+    /** A menu's cells' size ([PopupBuilder.menuKeys]). */
+    fun menuKeys(cells: List<MenuCell>): PopupKeys = popups.menuKeys(cells)
+
+    /** A menu ([PopupBuilder.menu]): [cells] in [order] across, [selected] in focus, [disabled] faded. Never throws. */
+    fun menu(cells: List<MenuCell>, order: List<Int>, selected: Int, disabled: Set<Int> = emptySet()): Parsed<Scene> =
+        safely { popups.menu(cells, order, selected, disabled) }
+
+    // as build: a fault of the engine's own is a problem, never a throw into the keyboard drawing it
+    @Suppress("TooGenericExceptionCaught")
+    private fun safely(make: () -> Scene): Parsed<Scene> = try {
+        Parsed.Ok(make())
+    } catch (e: Throwable) {
+        Parsed.Failed(0, "the popup could not be built: ${e::class.simpleName}")
     }
 
     private fun scene(layout: Layout, fragments: Map<String, Fragment>): Parsed<Scene> {

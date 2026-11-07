@@ -13,6 +13,9 @@ import android.widget.Space
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
+import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupScenes
+import org.fcitx.fcitx5.android.scene.Parsed
+import org.fcitx.fcitx5.android.scene.engine.PopupKeys
 import splitties.dimensions.dp
 import splitties.views.dsl.core.Ui
 import splitties.views.dsl.core.add
@@ -47,6 +50,8 @@ import kotlin.math.min
  * finger first (KeyDef.Popup.Keyboard.Explicit.inRow); -1, the first under it and the others round it
  * @param onFocusMoved told, with the popup's view, each time another key comes into focus: a buzz,
  * as the finger is not over the key it picks ([PopupFocus])
+ * @param scenes the engine's, to draw the keys as its scene (a key the canvas draws, 060-render-p2
+ * S2): sized by its rules ([PopupKeys]), [radius] the theme's then; null, as views
  */
 class PopupKeyboardUi(
     override val ctx: Context,
@@ -64,7 +69,12 @@ class PopupKeyboardUi(
     private val asIs: Boolean = false,
     inRow: Int = -1,
     private val onFocusMoved: (View) -> Unit = {},
+    scenes: PopupScenes? = null,
 ) : PopupContainerUi(ctx, theme, outerBounds, triggerBounds, onDismissSelf) {
+
+    // the engine's scene of the keys, drawn instead of views: made again as the focus moves
+    private val builder = scenes?.builder()
+    private val sceneView = builder?.let { scenes?.view(ctx) }
 
     class PopupKeyUi(override val ctx: Context, val theme: Theme, val text: String) : Ui {
 
@@ -107,9 +117,12 @@ class PopupKeyboardUi(
     private val focusRow: Int
     internal val focusColumn: Int
 
-    private val keyUis = labels.map {
+    private val keyUis = if (builder != null) emptyList() else labels.map {
         PopupKeyUi(ctx, theme, it)
     }
+
+    // the scene's keys' size: the views' worked out below
+    private val sceneKeys: PopupKeys?
 
     /**
      * One for every key, wide enough for the widest label and no narrower than [minKeyWidth],
@@ -133,13 +146,14 @@ class PopupKeyboardUi(
         groupRows = groups.map { ceil(it.count().toFloat() / columnCount).toInt() }
         rowCount = groupRows.sum()
 
+        sceneKeys = builder?.popupKeys(labels.toList(), columnCount, outerBounds.takeUnless { it.isEmpty }?.width()?.toDouble(), minKeyWidth.toDouble(), keyHeight.toDouble())
         val padding = ctx.dp(KEY_PADDING)
         val widest = keyUis.maxOfOrNull { it.textView.paint.measureText(it.text) } ?: 0f
         val fitting = ceil(widest).toInt() + 2 * padding
         val wanted = max(minKeyWidth, fitting)
         // bounds not laid out yet are empty: nothing to fit in, rather than keys of no width
-        keyWidth = if (outerBounds.isEmpty) wanted else min(wanted, outerBounds.width() / columnCount)
-        if (fitting > keyWidth) {
+        keyWidth = sceneKeys?.width?.toInt() ?: if (outerBounds.isEmpty) wanted else min(wanted, outerBounds.width() / columnCount)
+        if (sceneKeys == null && fitting > keyWidth) {
             // its padding too, so never below nothing however narrow
             val size = TEXT_SIZE * keyWidth / fitting
             keyUis.forEach { it.textView.textSize = size }
@@ -216,9 +230,10 @@ class PopupKeyboardUi(
 
     init {
         markFocus(focusedIndex)
+        drawScene()
     }
 
-    override val root = verticalLayout root@{
+    override val root: View = sceneView ?: verticalLayout root@{
         background = inactiveBackground
         outlineProvider = ViewOutlineProvider.BACKGROUND
         elevation = dp(2f)
@@ -233,6 +248,12 @@ class PopupKeyboardUi(
                 }
             }, lParams(width = matchParent))
         }
+    }
+
+    // the keys in rows as keyOrders has them, the bottom first, the one in focus selected
+    private fun drawScene() {
+        val keys = sceneKeys ?: return
+        sceneView?.scene = (builder?.popup(labels.toList(), keyOrders.map { it.toList() }, keys, focusedIndex) as? Parsed.Ok)?.value
     }
 
     private fun markFocus(index: Int) {
@@ -271,6 +292,7 @@ class PopupKeyboardUi(
             markInactive(focusedIndex)
             markFocus(newFocus)
             focusedIndex = newFocus
+            drawScene()
             onFocusMoved(root)
         }
         return false

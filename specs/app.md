@@ -366,6 +366,16 @@ at its face across and its cell down in the window (`popupBounds`), as a view's 
 typing reads its cell (`KeyPlace`). No touch reaches a key view while the canvas draws the keys
 (`SceneTouchTest`, `everyGestureAsOnTheViews*`); the views keep their own wiring for TalkBack's actions
 (`performAccessibilityAction` on the key's view, S3) and draw and take the touches again without a scene.
+A scene's key's popups are the engine's too (060-render-p2 S2): `PopupComponent` gives a key with no
+view (`KeyRef.viewId == NO_VIEW`) and a theme that converted `PopupScenes`, and its bubble
+(`PopupEntryUi.showScene`), long press (`PopupKeyboardUi`) and menus (`PopupMenuUi`, the edit menu
+too) are a `PopupSceneView` drawing a small scene `SceneBuilder.preview`/`popup`/`menu` makes, its
+sizes the engine's (`engine/Popups`: theme 3.0's in dp, its text dp, not sp; its corners the keys'
+radius; its shadow drawn, the view as large as the scene and `outset` round it for the shadow, placed
+that much up and left of where the views' popup goes). A focus moved is the scene made again, the key
+in focus `Selected`; where it goes stays `PopupComponent`'s. A key view's popups stay views
+(`SwipePopupScreenshotTest`'s `canvas_*` beside the views' goldens). A scene's popup has no
+accessibility nodes yet (S3); the harness reads its keys from the scene (`KeyboardHarness.popupChoices`).
 TalkBack reads the canvas's `ExploreByTouchHelper`: a virtual node a key, its words the scene's
 `a11y` (an `a11y_*` name the app's string), id, state and actions its view's; a key whose view's state
 changed (Shift) since the last scene is told as `CONTENT_CHANGE_TYPE_STATE_DESCRIPTION` on its node.

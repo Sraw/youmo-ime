@@ -130,7 +130,15 @@ object SceneIcons {
     ) + KeyCommand.entries.associate { SceneMarks.icon(it) to KeyShortcutLooks.of(it).icon }
 
     @DrawableRes
-    fun of(name: String): Int? = all[name]
+    fun of(name: String): Int? = all[name] ?: name.takeIf { it.startsWith(DRAWABLE) }?.substring(DRAWABLE.length)?.toIntOrNull()
+
+    /**
+     * [icon]'s name for a scene (a menu's item, KeyDef's drawable): its own where it has one, else
+     * the drawable's id as a name ([of] reads it back), as the menus' icons are any drawable.
+     */
+    fun nameOf(@DrawableRes icon: Int): String = all.entries.firstOrNull { it.value == icon }?.key ?: "$DRAWABLE$icon"
+
+    private const val DRAWABLE = "drawable:"
 
     /** Return's icon's name for the scene: the one the keyboard shows it with now. */
     fun returnName(@DrawableRes icon: Int): String = returns.entries.firstOrNull { it.value == icon }?.key ?: "enter"

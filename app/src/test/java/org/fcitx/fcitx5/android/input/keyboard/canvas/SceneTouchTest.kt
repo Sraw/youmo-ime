@@ -175,7 +175,7 @@ class SceneTouchTest {
             h.after(16)
             f.move(KeyboardHarness.Touch(-slop - 2f, a.height / 2f))
             h.after(delay + 100L)
-            h.popupKeys().size.also { f.up(KeyboardHarness.Touch(-slop - 2f, a.height / 2f)) }
+            h.popupChoices().size.also { f.up(KeyboardHarness.Touch(-slop - 2f, a.height / 2f)) }
         }
         // the press's bubble at most, none of its long press's keys (12 on A)
         assertTrue("$shown", shown <= 1)

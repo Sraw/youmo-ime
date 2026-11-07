@@ -666,7 +666,7 @@ class KeyboardCanvasViewTest {
         // held there: A's long press
         val f = h.finger(a, KeyboardHarness.Touch(x, a.height / 2f))
         h.after(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
-        val popup = h.popupKeys().map { it.text.toString() }
+        val popup = h.popupChoices().map { it.text }
         f.up(KeyboardHarness.Touch(x, a.height / 2f))
         assertTrue(popup.toString(), "@" in popup)
     }

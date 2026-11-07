@@ -149,6 +149,8 @@ object LookTheme {
         style("preview, popup", "fill" to "@popupBackground", "color" to "@popupText", "radius" to "${keys.radiusDp}dp", "shadow" to "0 2dp 2dp #33000000")
         style("popup:selected", "fill" to "@genericActiveBackground", "color" to "@genericActiveForeground")
         style("menu", "fill" to "@accentKey", "color" to "@accentKeyText", "icon-color" to "@accentKeyText", "radius" to "50%")
+        // theme 3.0's cell in focus: the key's pressed colour over its own
+        style("menu:selected", "overlay" to "@keyPressHighlight")
         style("@floating keyboard", "radius" to "${keys.radiusDp + minOf(keys.gap.h, keys.gap.v)}dp")
         style("handle", "fill" to "mix(@background, @keyText, 10%)")
         appendLine("</theme>")

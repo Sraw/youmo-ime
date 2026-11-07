@@ -56,9 +56,14 @@ class SwipePopupScreenshotTest {
             .serialize(),
     )
 
+    // [label]'s key: its view, under the canvas not drawn (the scene's key drawn where it is) but there all the same
+    private fun KeyboardHarness.keyOf(label: String): View = KeyboardHarness.all(inputView).filterIsInstance<TextKeyView>()
+        .firstOrNull { it.mainText.text.toString() == label && generateSequence(it as View) { v -> v.parent as? View }.none { v -> v.visibility == View.GONE } }
+        ?: key(label)
+
     // [label]'s key swiped up past the threshold and held there, the bubble shown
     private fun KeyboardHarness.held(label: String, name: String) {
-        val key = key(label)
+        val key = keyOf(label)
         val finger = finger(key, at(key))
         for (i in 1..5) finger.move(at(key, dy = -10f * i, ms = 16))
         capture("SwipePopupScreenshotTest/$name", inputView)
@@ -68,7 +73,7 @@ class SwipePopupScreenshotTest {
     // [label]'s key swiped down to its symbol and held: a character in the bubble, scaled as the keys' text
     // (紧凑, floating). Held still, the long press would show its keys over it before the shot
     private fun KeyboardHarness.symbolHeld(label: String, name: String) {
-        val key = key(label)
+        val key = keyOf(label)
         val finger = finger(key, at(key))
         for (i in 1..5) finger.move(at(key, dy = 10f * i, ms = 16))
         capture("SwipePopupScreenshotTest/$name", inputView)
@@ -83,20 +88,23 @@ class SwipePopupScreenshotTest {
         finger.up(at(space))
     }
 
-    private fun shoot(suffix: String) {
+    private fun shoot(suffix: String, canvas: Boolean = false) {
         longShortcuts()
+        // the keys drawn by the canvas, their popups by the engine (060-render-p2 S2): pictures of their own
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, canvas)
+        val prefix = if (canvas) "canvas_" else ""
         // the edit menu's test copies "hello": its entry, kept in the app's object, would show in the bar of a later shot,
         // and one stored late (the clipboard's own thread, a test run before in the same JVM) would still reach the bar
         org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.lastEntry = null
         prefs.set(AppPrefs.getInstance().clipboard.clipboardSuggestion, false)
         KeyboardHarness(ThemePreset.PixelLight).use { h ->
             h.start()
-            h.symbolHeld("g", "symbol_$suffix")
-            h.held("a", "select_all_$suffix")
-            h.held("q", "text_$suffix")
-            h.held("w", "quick_input_$suffix")
-            h.held("e", "restore_$suffix")
-            h.spaceHeld("edit_menu_$suffix")
+            h.symbolHeld("g", "${prefix}symbol_$suffix")
+            h.held("a", "${prefix}select_all_$suffix")
+            h.held("q", "${prefix}text_$suffix")
+            h.held("w", "${prefix}quick_input_$suffix")
+            h.held("e", "${prefix}restore_$suffix")
+            h.spaceHeld("${prefix}edit_menu_$suffix")
         }
     }
 
@@ -120,6 +128,28 @@ class SwipePopupScreenshotTest {
     @Test
     @Config(qualifiers = "zh-rCN-w851dp-h393dp-land-440dpi")
     fun turned() = shoot("land")
+
+    // the same under the canvas: the bubbles and the edit menu the engine's scenes (060-render-p2 S2, §5.3's
+    // differences: their text dp, not sp; their shadow drawn)
+    @Test
+    fun uprightOnTheCanvas() = shoot("port", canvas = true)
+
+    @Test
+    fun compactOnTheCanvas() {
+        prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
+        prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
+        shoot("compact", canvas = true)
+    }
+
+    @Test
+    fun floatingOnTheCanvas() {
+        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        shoot("floating", canvas = true)
+    }
+
+    @Test
+    @Config(qualifiers = "zh-rCN-w851dp-h393dp-land-440dpi")
+    fun turnedOnTheCanvas() = shoot("land", canvas = true)
 
     // team-lead, 0.5.1: the letter in the bubble scaled as the keys' text, 紧凑 0.9 of the standard's
     @Test

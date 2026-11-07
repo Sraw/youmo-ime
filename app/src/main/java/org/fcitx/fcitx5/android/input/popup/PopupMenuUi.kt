@@ -17,6 +17,11 @@ import android.widget.ImageView
 import androidx.core.graphics.ColorUtils
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
+import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupScenes
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
+import org.fcitx.fcitx5.android.scene.Parsed
+import org.fcitx.fcitx5.android.scene.engine.MenuCell
+import org.fcitx.fcitx5.android.scene.engine.Popups
 import org.fcitx.fcitx5.android.input.shortcut.EditMenuLayout
 import splitties.dimensions.dp
 import splitties.resources.drawable
@@ -37,7 +42,15 @@ class PopupMenuUi(
     private val onFocusMoved: (View) -> Unit = {},
     /** Cells in their own order, [Fixed.start] over the finger: the edit menu's ([EditMenuLayout]). */
     private val fixed: Fixed? = null,
+    /** The engine's, to draw the cells as its scene (a key the canvas draws, 060-render-p2 S2), sized by its rules; null, as views. */
+    scenes: PopupScenes? = null,
 ) : PopupContainerUi(ctx, theme, outerBounds, triggerBounds, onDismissSelf) {
+
+    // the engine's scene of the cells, drawn instead of views: made again as the focus moves
+    private val builder = scenes?.builder()
+    private val sceneView = builder?.let { scenes?.view(ctx) }
+    private val cells = items.map { MenuCell(it.label, if (it.icon == 0) null else SceneIcons.nameOf(it.icon)) }
+    private val sceneKeys = builder?.menuKeys(cells)
 
     /**
      * A row whose cells stay where they are, the one in focus first [start]; [disabled] ones drawn
@@ -47,11 +60,11 @@ class PopupMenuUi(
      */
     class Fixed(val start: Int, val disabled: Set<Int>, val at: EditMenuLayout.Spot? = null)
 
-    private val keySize = ctx.dp(CELL_DP)
+    private val keySize = sceneKeys?.height?.toInt() ?: ctx.dp(CELL_DP)
 
     // words, not icons (an item of no icon: the handwriting pad's 注's 关 / 拼音 / 注音符号), in pills wide enough for them
     private val words = items.any { it.icon == 0 }
-    private val itemWidth = if (words) (keySize * WORDS_WIDTH).toInt() else keySize
+    private val itemWidth = sceneKeys?.width?.toInt() ?: if (words) (keySize * WORDS_WIDTH).toInt() else keySize
 
     private fun background(color: Int, inset: Int) = if (words) {
         InsetDrawable(GradientDrawable().apply { setColor(color); cornerRadius = (keySize - inset).toFloat() / 2 }, ctx.dp(2), inset / 2, ctx.dp(2), inset / 2)
@@ -72,13 +85,15 @@ class PopupMenuUi(
         fixed != null -> EditMenuLayout.rowLeft(triggerBounds.centerX(), itemWidth, outerBounds.left, outerBounds.right) - triggerBounds.left
         else -> ((triggerBounds.width() - itemWidth) / 2) - (itemWidth * focusColumn)
     }
-    override val offsetY = fixed?.at?.let { it.top - triggerBounds.top } ?: ctx.dp(-52)
+    override val offsetY = fixed?.at?.let { it.top - triggerBounds.top }
+        ?: scenes?.takeIf { builder != null }?.let { -Popups.px(Popups.MENU_LIFT_DP, it.density).toInt() }
+        ?: ctx.dp(-52)
 
     private val columnOrder = if (fixed != null) IntArray(columnCount) { it } else createColumnOrder(columnCount, focusColumn)
 
     private var focusedIndex = columnOrder[focusColumn]
 
-    private val keyViews: List<View> = items.map {
+    private val keyViews: List<View> = if (builder != null) emptyList() else items.map {
         if (it.icon == 0) {
             textView {
                 background = inactiveBackground
@@ -103,13 +118,20 @@ class PopupMenuUi(
 
     init {
         markFocus(focusedIndex)
+        drawScene()
     }
 
-    override val root = horizontalLayout root@{
+    override val root: View = sceneView ?: horizontalLayout root@{
         for (i in 0 until columnCount) {
             val view = keyViews[columnOrder[i]]
             add(view, lParams(itemWidth, keySize))
         }
+    }
+
+    // the cells in their columns' order, the one in focus selected, the disabled faded
+    private fun drawScene() {
+        val b = builder ?: return
+        sceneView?.scene = (b.menu(cells, columnOrder.toList(), focusedIndex, fixed?.disabled.orEmpty()) as? Parsed.Ok)?.value
     }
 
     private fun markFocus(index: Int) {
@@ -147,6 +169,7 @@ class PopupMenuUi(
             markInactive(focusedIndex)
             markFocus(newFocus)
             focusedIndex = newFocus
+            drawScene()
             onFocusMoved(root)
         }
         return false

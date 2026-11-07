@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.junit.Assert.assertEquals
+import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -113,8 +114,59 @@ class PopupComponentTest {
         assertTrue("wider for a text wider than the key", bubble.layoutParams.width > key.width())
     }
 
+    // 060-render-p2 S2: a key the canvas draws (no view) has its popups as the engine's scenes, in a
+    // view as large as the scene and its shadow's room, that room round where the views' popup is
+    @Test
+    fun aKeyTheCanvasDrawsHasItsBubbleAsASceneWhereTheViewsWouldBe() {
+        send(PopupAction.PreviewAction(ID, "q", key))
+        val (width, left, top) = placedAt()
+        popup.dismissAll()
+        send(PopupAction.PreviewAction(SCENE, "q", key))
+        val scene = bubble as PopupSceneView
+        val out = scene.outset
+        assertTrue("room for the shadow: $out", out.bottom > 0)
+        val lp = scene.layoutParams as FrameLayout.LayoutParams
+        // 1 dp = 1 px here: the engine's sizes are the views'
+        assertEquals(listOf(width, left, top), listOf(lp.width - out.left - out.right, lp.leftMargin + out.left, lp.topMargin + out.top))
+        assertEquals(scene.sceneHeight + out.top + out.bottom, lp.height)
+        assertEquals("q", scene.scene!!.keys.single().label)
+        // a view's key next: a view's bubble, not the scene's put away
+        popup.dismissAll()
+        send(PopupAction.PreviewAction(ID, "q", key))
+        assertFalse(bubble is PopupSceneView)
+        popup.dismissAll()
+        send(PopupAction.PreviewAction(SCENE, "w", key))
+        assertTrue(bubble is PopupSceneView)
+    }
+
+    @Test
+    fun aSceneBubbleShowsTheUpdatedTextAndIsWiderForWords() {
+        send(PopupAction.PreviewAction(SCENE, "q", key))
+        val scene = bubble as PopupSceneView
+        send(PopupAction.PreviewUpdateAction(SCENE, "1"))
+        assertEquals("1", scene.scene!!.keys.single().label)
+        // as the views' test: Robolectric measures a character 1 px
+        send(PopupAction.PreviewUpdateAction(SCENE, "w".repeat(60), words = true))
+        assertTrue("${scene.sceneWidth}", scene.sceneWidth > key.width())
+        assertEquals(scene.sceneWidth + scene.outset.left + scene.outset.right, bubble.layoutParams.width)
+    }
+
+    @Test
+    fun aSceneKeysLongPressIsTheEnginesSceneOverTheKey() {
+        send(PopupAction.ShowKeyboardAction(SCENE, five, key))
+        layOut()
+        val keys = popup.root.getChildAt(0) as PopupSceneView
+        val out = keys.outset
+        // the keys' bottom the lift over the key, its shadow below
+        assertEquals(key.top - PopupComponent.LONG_PRESS_LIFT, keys.bottom - out.bottom)
+        // the columns round the key pressed, as the views lay them out (PopupKeyboardUiTest)
+        assertEquals(listOf("1", "2", "3", "4", "5"), keys.scene!!.keys.mapNotNull { it.label }.sorted())
+        assertEquals(keys.sceneWidth + out.left + out.right, keys.width)
+    }
+
     private companion object {
         val ID = KeyRef.view(1)
+        val SCENE = KeyRef.scene("q", 0)
     }
 
     // 九键's: the digit and letters as they are, the symbols shown as Chinese punctuation maps them

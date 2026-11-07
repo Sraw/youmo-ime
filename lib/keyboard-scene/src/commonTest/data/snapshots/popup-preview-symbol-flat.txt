@@ -1,0 +1,12 @@
+scene 99x304
+key preview kind=preview a11y="g"
+  bounds 0,0,99,304
+  shape rect(0,0,99,304 r=10.5,10.5,10.5,10.5)
+  hit rect(0,0,99,304)
+  anchor 49.5,152 up 0,-1
+  text label="g"
+  normal
+    shadow rect(0,0,99,309.25 r=10.5,10.5,10.5,10.5) blur=5.25 #33000000
+    fill rect(0,0,99,304 r=10.5,10.5,10.5,10.5) #ffd9dbdd
+    text "g" 31.39,85.64 system 400 60.38 #ff37474f
+  pressed the same
