@@ -30,7 +30,7 @@ import kotlin.math.roundToInt
 /**
  * One view for a keyboard's keys (060-render-v2 §7): the scene the engine made of them drawn, each
  * key in a [RenderNode] of its own for each of its two faces (pressed or not), so a press shows by
- * swapping that key's node alone, nothing laid out or recorded again; the keyboard's base in one more,
+ * swapping that key's two nodes' alpha alone, nothing laid out or recorded again; the keyboard's base in one more,
  * drawn once. A key showing the picture through it is drawn from it clipped to its shape (the
  * engine's [Op.Picture]).
  *
@@ -120,14 +120,31 @@ class KeyboardCanvasView(
             faces.forEach { painter.draw(canvas, it.node.ops(isPressed(it.node))) }
             return
         }
-        canvas.drawRenderNode(base ?: record("base", s.base).also { base = it })
-        faces.forEach { canvas.drawRenderNode(nodeOf(it)) }
+        canvas.drawRenderNode(base.live() ?: record("base", s.base).also { base = it })
+        // both faces drawn once recorded, the one not shown at alpha 0: a node no display list
+        // draws any more is taken out of the tree and loses what was recorded (seen: a key let go
+        // drawn as nothing), so a press only changes the two nodes' alpha
+        for (f in faces) {
+            val on = isPressed(f.node)
+            val normal = f.normal.live() ?: record(f.node.id, f.node.ops(false)).also { f.normal = it }
+            normal.alpha = if (on) 0f else 1f
+            canvas.drawRenderNode(normal)
+            val pressed = f.pressed.live() ?: if (on) record(f.node.id, f.node.ops(true)).also { f.pressed = it } else null
+            pressed?.let {
+                it.alpha = if (on) 1f else 0f
+                canvas.drawRenderNode(it)
+            }
+        }
     }
 
+    // a node still holding what was recorded: one the renderer let go of (the window gone, memory
+    // trimmed) is recorded again
+    private fun RenderNode?.live(): RenderNode? = this?.takeIf { it.hasDisplayList() }
+
     private fun nodeOf(f: Faces): RenderNode = if (isPressed(f.node)) {
-        f.pressed ?: record(f.node.id, f.node.ops(true)).also { f.pressed = it }
+        f.pressed.live() ?: record(f.node.id, f.node.ops(true)).also { f.pressed = it }
     } else {
-        f.normal ?: record(f.node.id, f.node.ops(false)).also { f.normal = it }
+        f.normal.live() ?: record(f.node.id, f.node.ops(false)).also { f.normal = it }
     }
 
     // the whole view's size: a key's shadow, a mark, reach out of its cell

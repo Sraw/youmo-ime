@@ -96,7 +96,9 @@ class KeyboardCanvasViewTest {
         assertSame(w0, c.shownNode("w"))
         c.press("q", down = false)
         h.idle()
+        // the face let go is the one it had, still recorded
         assertSame(q0, c.shownNode("q"))
+        assertTrue(q0.hasDisplayList())
         // Shift relabels the letters: their nodes anew, the rest kept
         val space = c.shownNode("space")
         h.tap(h.keyView("shift"))

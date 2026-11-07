@@ -315,7 +315,7 @@ The 060 redraw's first step (`input/keyboard/canvas/`, `AppPrefs.Internal.canvas
 新绘制 26 键, off): `TextKeyboard` adds a `KeyboardCanvasView` over its rows and makes them
 INVISIBLE, still laid out (the popups, glide's key map and the gestures use their places). The canvas
 draws the scene `lib/keyboard-scene` makes of qwerty.xml in the look converted by ime-core's
-`LookTheme` (`ScenePainter`: one `RenderNode` a key a face, a press swapping that key's alone; a
+`LookTheme` (`ScenePainter`: one `RenderNode` a key a face, both kept in the tree and a press only their alpha, since a node left out of a frame loses its recording; a
 software canvas, a screenshot's, gets the ops drawn straight); `TextKeyboard.scene` builds the
 `Env` from its state (`TextBoardState`, `SceneMarks`, the texts), made again on `invalidateScene()`,
 which each of its show functions calls. `BaseKeyboard` intercepts every touch as the vivo workaround
