@@ -22,6 +22,7 @@ import android.inputmethodservice.InputMethodService
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.annotation.ColorInt
 import androidx.annotation.DrawableRes
@@ -38,6 +39,8 @@ import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef.Appearance.Border
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef.Appearance.Variant
+import org.fcitx.fcitx5.android.input.popup.keyRef
+import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.theme.KeyFaceGeometry
 import org.fcitx.fcitx5.android.input.theme.KeyLabel
 import org.fcitx.fcitx5.android.input.theme.KeyStyle
@@ -65,7 +68,32 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearance) :
-    CustomGestureView(ctx) {
+    CustomGestureView(ctx), KeyHandle, KeyPlace {
+
+    // a key as its keyboard wires it (KeyHandle): the view's own listeners
+    override val ref: KeyRef get() = keyRef
+
+    override var gestureListener: ((KeyHandle, Event) -> Boolean)? = null
+        set(value) {
+            field = value
+            onGestureListener = value?.let { l -> OnGestureListener { _, e -> l(this, e) } }
+        }
+
+    override fun onClick(listener: (KeyHandle) -> Unit) = setOnClickListener { listener(this) }
+    override fun onLongClick(listener: (KeyHandle) -> Boolean) = setOnLongClickListener { listener(this) }
+    override fun onRepeat(listener: (KeyHandle) -> Unit) {
+        onRepeatListener = { listener(this) }
+    }
+
+    override fun onDoubleTap(listener: (KeyHandle) -> Unit) {
+        onDoubleTapListener = { listener(this) }
+    }
+
+    // where it is in [keyboard], one of its descendants: the rows' views laid out, drawn or not
+    override fun place(keyboard: ViewGroup, out: Rect) {
+        out.set(0, 0, width, height)
+        keyboard.offsetDescendantRectToMyCoords(this, out)
+    }
 
     /** How the theme draws its keys ([ThemeManager.shownLook]: the theme's, under the key style settings): blocks or flat, corners, gaps, a press's effect, each kind's face. */
     protected val keys = ThemeManager.shownLook(theme).keys
@@ -91,7 +119,7 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
     private val cachedBounds = Rect()
     // where it is now, asked each time: the floating keyboard moves by translation, which lays
     // nothing out again (FloatingPlacer), so a rect kept from the last layout would be stale
-    val bounds: Rect
+    override val bounds: Rect
         get() = cachedBounds.also { updateBounds() }
 
     /**

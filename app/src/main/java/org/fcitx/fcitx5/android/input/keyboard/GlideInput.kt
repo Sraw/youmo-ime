@@ -27,8 +27,8 @@ class GlideInput(
     theme: Theme,
     // whether a glide is taken now: an input method that reads one, the setting on, a field where words are typed
     private val enabled: () -> Boolean,
-    // each letter and its key: the nine keys' several on one
-    private val letters: () -> List<Pair<Char, TextKeyView>>,
+    // each letter and its key, where it is (a key view, or a key the scene draws): the nine keys' several on one
+    private val letters: () -> List<Pair<Char, KeyPlace>>,
     private val longPressMillis: () -> Long,
     // how far up or down a glide starts, in key heights (GlideGesture)
     down: Float = GlideGesture.DOWN,
@@ -119,10 +119,9 @@ class GlideInput(
         glided(path, GlideLayout(centres))
     }
 
-    // where [view] is in the keyboard, in the one rect kept for it
-    private fun bounds(view: TextKeyView): Rect {
-        rect.set(0, 0, view.width, view.height)
-        keyboard.offsetDescendantRectToMyCoords(view, rect)
+    // where [key] is in the keyboard, in the one rect kept for it
+    private fun bounds(key: KeyPlace): Rect {
+        key.place(keyboard, rect)
         return rect
     }
 

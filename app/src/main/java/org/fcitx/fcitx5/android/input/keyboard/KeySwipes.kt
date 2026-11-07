@@ -11,9 +11,7 @@ import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
-import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
 import org.fcitx.fcitx5.android.input.popup.PopupAction
-import org.fcitx.fcitx5.android.input.popup.keyRef
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
@@ -43,7 +41,7 @@ internal class KeySwipes(
 
         /** Whether a character key's shortcut is marked on it: its swipe runs it all the same. */
         val charShortcutMarks: Boolean
-        fun swipeText(view: KeyView): BaseKeyboard.SwipeChoice
+        fun swipeText(def: KeyDef): BaseKeyboard.SwipeChoice
         fun onAction(action: KeyAction, source: KeyActionListener.Source = KeyActionListener.Source.Keyboard)
         fun onPopupAction(action: PopupAction)
         fun onPopupChangeFocus(key: KeyRef, x: Float, y: Float): Boolean
@@ -73,24 +71,24 @@ internal class KeySwipes(
         }
     }
 
-    /** What [view] of [def] swipes to as the settings are now ([KeySwipe.Key]). */
-    private fun swipeKey(view: KeyView, def: KeyDef): KeySwipe.Key {
+    /** What the key of [def] swipes to as the settings are now ([KeySwipe.Key]). */
+    private fun swipeKey(def: KeyDef): KeySwipe.Key {
         val name = def.shortcut?.takeIf { shortcuts }
         val stored = KeyShortcutsCache.current
         return if (name == null || '/' in name) {
-            val symbol = def.behaviors.any { it is KeyDef.Behavior.Swipe } && keyboard.swipeText(view) != BaseKeyboard.SwipeChoice.None
+            val symbol = def.behaviors.any { it is KeyDef.Behavior.Swipe } && keyboard.swipeText(def) != BaseKeyboard.SwipeChoice.None
             KeySwipe.Key.Char(symbol, name?.let(stored::resolve) ?: KeyShortcut.None)
         } else {
             KeySwipe.Key.Function(stored.resolve(KeyShortcuts.functionKey(name, up = true)), stored.resolve(KeyShortcuts.functionKey(name, up = false)))
         }
     }
 
-    /** What the preview of [view] of [def] shows, swiped [totalY]: its [popup]'s own content, or what the swipe reaches. */
-    fun preview(view: KeyView, def: KeyDef, totalY: Int, popup: KeyDef.Popup.AltPreview): PopupAction.PreviewUpdateAction =
-        when (val preview = KeySwipe.preview(swipeKey(view, def), swipeLayers, totalY, keyboard.inPasswordField)) {
-            KeySwipe.Preview.Symbol -> PopupAction.PreviewUpdateAction(view.keyRef, keyboard.swipeText(view).preview(popup.alternative))
-            is KeySwipe.Preview.Shortcut -> PopupAction.PreviewUpdateAction(view.keyRef, shortcutLabel(preview.shortcut), words = true)
-            KeySwipe.Preview.Own -> PopupAction.PreviewUpdateAction(view.keyRef, popup.content)
+    /** What the preview of [key] of [def] shows, swiped [totalY]: its [popup]'s own content, or what the swipe reaches. */
+    fun preview(key: KeyHandle, def: KeyDef, totalY: Int, popup: KeyDef.Popup.AltPreview): PopupAction.PreviewUpdateAction =
+        when (val preview = KeySwipe.preview(swipeKey(def), swipeLayers, totalY, keyboard.inPasswordField)) {
+            KeySwipe.Preview.Symbol -> PopupAction.PreviewUpdateAction(key.ref, keyboard.swipeText(def).preview(popup.alternative))
+            is KeySwipe.Preview.Shortcut -> PopupAction.PreviewUpdateAction(key.ref, shortcutLabel(preview.shortcut), words = true)
+            KeySwipe.Preview.Own -> PopupAction.PreviewUpdateAction(key.ref, popup.content)
         }
 
     /** What the preview shows of [shortcut]: a command's name, a text as it is (fitted to the bubble by [org.fcitx.fcitx5.android.input.popup.PopupComponent]). */
@@ -101,23 +99,24 @@ internal class KeySwipes(
     }
 
     /**
-     * [view]'s vertical swipe, of [def] ([KeySwipe]): a step past the threshold buzzing once, the edit
+     * [key]'s vertical swipe, of [def] ([KeySwipe]): a step past the threshold buzzing once, the edit
      * menu opened there and picked from as the finger moves on; none after its long press showed a
-     * popup ([longPopup]).
+     * popup ([longPopup]). Its marks drawn on its [view], where it has one: the scene's keys have
+     * theirs from the scene.
      */
-    fun attach(view: KeyView, def: KeyDef, longPopup: LongPopup) {
+    fun attach(key: KeyHandle, def: KeyDef, longPopup: LongPopup, view: KeyView?) {
         val builtIn = def.behaviors.firstNotNullOfOrNull { (it as? KeyDef.Behavior.Swipe)?.action }
         if (builtIn == null && (def.shortcut == null || !shortcuts)) return
         val both = def.swipesBothWays
-        if (shortcuts) swipingKeys.add(view to def)
-        view.swipeEnabled = true
-        view.swipeThresholdY = threshold
-        if (!both) view.swipeThresholdX = disabledThreshold
-        view.axisLock = both
+        if (shortcuts && view != null) swipingKeys.add(view to def)
+        val g = key.keyGesture
+        g.swipeEnabled = true
+        g.swipeThresholdY = threshold
+        if (!both) g.swipeThresholdX = disabledThreshold
+        g.axisLock = both
         var menu = false
-        val old = view.onGestureListener ?: OnGestureListener.Empty
-        view.onGestureListener = OnGestureListener { v, event ->
-            v as KeyView
+        val old = key.gestureListener
+        key.gestureListener = { v, event ->
             when (event.type) {
                 GestureType.Down -> {
                     menu = false
@@ -127,7 +126,7 @@ internal class KeySwipes(
                 GestureType.Move -> when {
                     // the menu has the touch: no cursor moved under it either
                     menu -> {
-                        keyboard.onPopupChangeFocus(v.keyRef, event.x, event.y)
+                        keyboard.onPopupChangeFocus(v.ref, event.x, event.y)
                         true
                     }
                     longPopup.shown || event.countY == 0 || event.totalY - event.countY != 0 -> false
@@ -139,12 +138,12 @@ internal class KeySwipes(
                 GestureType.Up -> if (menu) {
                     menu = false
                     // let go over nothing (a greyed cell, back down on the key): the menu gone, no tap
-                    if (!keyboard.onPopupTrigger(v.keyRef, event.cancelled)) keyboard.onPopupAction(PopupAction.DismissAction(v.keyRef))
+                    if (!keyboard.onPopupTrigger(v.ref, event.cancelled)) keyboard.onPopupAction(PopupAction.DismissAction(v.ref))
                     true
                 } else {
                     lifted(v, def, event, builtIn, longPopup.shown)
                 }
-            } || old.onGesture(v, event)
+            } || old?.invoke(v, event) ?: false
         }
     }
 
@@ -161,7 +160,7 @@ internal class KeySwipes(
         val charShortcuts = keyboard.charShortcutMarks
         val shortcutOn = layers.wayOf(SwipeLayers.Layer.Shortcut) != null
         swipingKeys.forEach { (view, def) ->
-            val placed = when (val key = swipeKey(view, def)) {
+            val placed = when (val key = swipeKey(def)) {
                 is KeySwipe.Key.Char -> {
                     val symbol = KeyView.Mark.Symbol.takeIf { (view as? AltTextKeyView)?.altText?.text?.isNotEmpty() == true }
                     val shortcut = markOf(key.shortcut).takeIf { charShortcuts && shortcutOn }
@@ -183,25 +182,25 @@ internal class KeySwipes(
     }
 
     // the threshold just passed ([attach]): a buzz where it reaches anything; whether it opened the edit menu
-    private fun swipeReached(view: KeyView, def: KeyDef, totalY: Int): Boolean {
-        val preview = KeySwipe.preview(swipeKey(view, def), swipeLayers, totalY, keyboard.inPasswordField)
+    private fun swipeReached(key: KeyHandle, def: KeyDef, totalY: Int): Boolean {
+        val preview = KeySwipe.preview(swipeKey(def), swipeLayers, totalY, keyboard.inPasswordField)
         if (preview == KeySwipe.Preview.Own) return false
-        InputFeedbacks.hapticFeedback(view)
+        InputFeedbacks.hapticFeedback(key.feedback)
         if (preview != KeySwipe.Preview.Shortcut(KeyShortcut.Command(KeyCommand.EditMenu))) return false
-        keyboard.onPopupAction(PopupAction.ShowEditMenuAction(view.keyRef, view.bounds, keyboard.inPasswordField))
+        keyboard.onPopupAction(PopupAction.ShowEditMenuAction(key.ref, key.bounds, keyboard.inPasswordField))
         return true
     }
 
-    private fun lifted(view: KeyView, def: KeyDef, event: CustomGestureView.Event, builtIn: KeyAction?, longPopup: Boolean): Boolean =
-        when (val outcome = KeySwipe.decide(swipeKey(view, def), swipeLayers, event.totalY, event.swipedY, event.consumed || longPopup, event.cancelled, keyboard.inPasswordField)) {
+    private fun lifted(key: KeyHandle, def: KeyDef, event: CustomGestureView.Event, builtIn: KeyAction?, longPopup: Boolean): Boolean =
+        when (val outcome = KeySwipe.decide(swipeKey(def), swipeLayers, event.totalY, event.swipedY, event.consumed || longPopup, event.cancelled, keyboard.inPasswordField)) {
             KeySwipe.Outcome.Symbol -> {
-                builtIn?.let { keyboard.swipeText(view).typed(it) }?.let { (action, source) -> keyboard.onAction(action, source) }
+                builtIn?.let { keyboard.swipeText(def).typed(it) }?.let { (action, source) -> keyboard.onAction(action, source) }
                 // consumed when it types nothing too, or a swipe that stayed on the key would type it as a tap
                 true
             }
             KeySwipe.Outcome.Tap -> {
-                // the key's click, here: one that left the key is no click to the view; consumed, so one on it clicks once
-                view.performClick()
+                // the key's click, here: one that left the key is no click to its touch; consumed, so one on it clicks once
+                key.click()
                 true
             }
             KeySwipe.Outcome.Cancel -> true

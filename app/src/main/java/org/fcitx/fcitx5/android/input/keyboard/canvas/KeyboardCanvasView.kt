@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.input.PictureHost
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.scene.CanvasFrame
+import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.scene.SceneA11y
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.scene.Box
@@ -47,11 +48,11 @@ import kotlin.math.roundToInt
  * The scene is made again only as the view draws ([onDraw]): a touch or a press shown in between
  * finds its keys in the scene drawn last, so no finger waits on the engine.
  *
- * What a key does stays with [Host.keyView]'s view (P1: the old keys, not drawn, still take the
- * touches the keyboard hands them, BaseKeyboard's findTouchTarget, and run their gestures): this
- * view finds the key a finger is on by the scene's hit areas ([keyViewAt]), shows it pressed as its
- * view is ([showPressed]), and gives a screen reader one virtual node a key ([Speech]), with the
- * key's own resource name (`button_space`), so UAT finds it as before.
+ * A key's touch is the scene's key's ([SceneTouch], 060-render-p2 S1): this view finds the key a
+ * finger is on by the scene's hit areas ([keyAt]) and where it is ([cell], [popupBounds]), shows it
+ * pressed as its touch says ([showPressed]), and gives a screen reader one virtual node a key
+ * ([Speech]), with the key's own resource name (`button_space`), so UAT finds it as before; its words
+ * and actions there are still [Host.keyView]'s view's (S3).
  */
 @SuppressLint("ViewConstructor")
 class KeyboardCanvasView(
@@ -69,7 +70,7 @@ class KeyboardCanvasView(
          */
         fun scene(width: Int, height: Int): Scene?
 
-        /** The view whose key [node] is: its gestures, its actions, its words. */
+        /** The view whose key [node] is: its state and its actions, to a screen reader (S3 takes them to the scene). */
         fun keyView(node: KeyNode): KeyView?
 
         /** There was no scene of the keys ([scene] null): told once, the keyboard's to draw them another way. */
@@ -285,25 +286,42 @@ class KeyboardCanvasView(
         }
     }
 
-    /** [view]'s key shown pressed or not, as the view is: its node swapped, nothing else drawn anew. */
-    fun showPressed(view: KeyView, on: Boolean) {
+    /** Key [ref] shown pressed or not, as its touch says ([SceneKey]): its node swapped, nothing else drawn anew. */
+    fun showPressed(ref: KeyRef, on: Boolean) {
         if (current == null) return
-        val f = faces.firstOrNull { host.keyView(it.node) === view } ?: return
+        val f = faces.firstOrNull { it.node.of(ref) } ?: return
         if (f.down == on) return
         f.down = on
         invalidate()
     }
 
+    /** The key at ([x], [y]) in this view, by the hit areas of the scene drawn last; null in a gap. */
+    fun keyAt(x: Float, y: Float): KeyNode? = current?.keyAt(x.toDouble(), y.toDouble())
+
     /**
-     * The view of the key at ([x], [y]) in this view, by the scene's hit areas, [hit] set to where the
-     * view is in the keyboard (the row's parent), as a touch target's; null in a gap, on a key with no
-     * view, or with one not shown (a key the scene drawn last had, hidden since).
+     * Key [ref]'s cell in this view, into [out], as the scene drawn last has it: where its view was, the
+     * frame its touch is read in ([SceneKey]); false where it has no such key.
      */
-    fun keyViewAt(x: Float, y: Float, hit: Rect = Rect()): KeyView? {
-        val key = current?.keyAt(x.toDouble(), y.toDouble())?.let(host::keyView)?.takeIf { it.visibility == VISIBLE } ?: return null
-        key.getHitRect(hit)
-        (key.parent as? View)?.let { row -> hit.offset(row.left, row.top) }
-        return key
+    fun cell(ref: KeyRef, out: Rect): Boolean {
+        val k = current?.keys?.firstOrNull { it.of(ref) } ?: return false
+        out.set(k.bounds)
+        return true
+    }
+
+    /**
+     * Where a popup over key [ref] is placed, in the window, into [out]: its face across and its cell
+     * down, as a key view's bounds were (KeyView.bounds); false where the scene drawn last has no such key.
+     */
+    fun popupBounds(ref: KeyRef, out: Rect): Boolean {
+        val k = current?.keys?.firstOrNull { it.of(ref) } ?: return false
+        getLocationInWindow(viewAt)
+        val face = k.shape.bounds
+        val cell = k.bounds
+        out.set(
+            viewAt[0] + face.left.roundToInt(), viewAt[1] + cell.top.roundToInt(),
+            viewAt[0] + face.right.roundToInt(), viewAt[1] + cell.bottom.roundToInt(),
+        )
+        return true
     }
 
     /** The scene's key [id] ([copy]: the one of a split row's two), for tests and UAT. */
@@ -448,3 +466,9 @@ class KeyboardCanvasView(
         )
     }
 }
+
+/** Whether this is key [ref]: a split row's second copy ([KeyNode.copy] 1) is its own. */
+internal fun KeyNode.of(ref: KeyRef) = id == ref.id && (copy != 0) == ref.copy
+
+/** [b] rounded to whole pixels, as a view's place is. */
+internal fun Rect.set(b: Box) = set(b.left.roundToInt(), b.top.roundToInt(), b.right.roundToInt(), b.bottom.roundToInt())

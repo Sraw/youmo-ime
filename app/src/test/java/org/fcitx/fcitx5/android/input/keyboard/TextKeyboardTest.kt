@@ -71,5 +71,10 @@ class TextKeyboardTest {
         // the full stop beside the space is the input method's, and a letter is as Shift has it
         assertEquals("。", previewOf(".", KeyRef.view(R.id.button_period), shift, punctuation))
         assertEquals("Q", previewOf("q", KeyRef.view(-1), shift, punctuation))
+        // the same keys the scene draws, by their names (060-render-p2 S1)
+        assertEquals(".", previewOf(".", KeyRef.scene("dot", 0), shift, punctuation))
+        assertEquals("/", previewOf("/", KeyRef.scene("slash", 0), shift, punctuation))
+        assertEquals("。", previewOf(".", KeyRef.scene("period", 0), shift, punctuation))
+        assertEquals("Q", previewOf("q", KeyRef.scene("q", 0), shift, punctuation))
     }
 }
