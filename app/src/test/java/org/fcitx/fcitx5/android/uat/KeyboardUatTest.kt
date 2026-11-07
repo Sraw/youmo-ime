@@ -155,7 +155,7 @@ class KeyboardUatTest {
         assertTrue(sent().toString(), sent().size == 1 && "key=Q," in lastSent())
     }
 
-    private fun corner(h: KeyboardHarness, letter: String) = (h.key(letter) as AltTextKeyView).altText.text.toString()
+    private fun corner(h: KeyboardHarness, letter: String) = h.key(letter).alt.orEmpty()
 
     @Test
     @Uat("KB-06")

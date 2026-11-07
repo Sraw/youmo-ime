@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -40,7 +41,7 @@ class KeyboardChoiceUatTest {
         keyboard.shuangpinKeyboard.let { it.setValue(it.defaultValue) }
     }
 
-    private fun KeyboardHarness.row() = box(inputView.findViewById(R.id.code_row_text)).height().toFloat()
+    private fun KeyboardHarness.row() = box(inputView.findViewById<View>(R.id.code_row_text)).height().toFloat()
 
     private fun KeyboardHarness.dp(v: Int) = inputView.resources.displayMetrics.density * v
 

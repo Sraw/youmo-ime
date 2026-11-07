@@ -197,7 +197,7 @@ class GroupedKeyboardUatTest {
         harness?.close()
         row.make().start()
         assertTrue(h.texts().toString(), row.probe in h.texts() && "中/英" !in h.texts())
-        h.tap(h.keyboard.findViewById(R.id.button_lang))
+        h.tap(h.keyboard.findViewById<View>(R.id.button_lang))
         assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("enumerateIme") || it == "toggleIme()" })
         switchTo(KeyboardHarness.ENGLISH)
         val english = h.texts()
@@ -281,8 +281,8 @@ class GroupedKeyboardUatTest {
     @Uat("ST-41")
     fun theCodeRowIsTallOnlyInPinyinOnTheFourteenKeys() {
         fun density() = h.inputView.resources.displayMetrics.density
-        fun row() = h.box(h.inputView.findViewById(R.id.code_row_text)).height() / density()
-        fun area() = h.box(h.board).bottom - h.box(h.inputView.findViewById(R.id.code_row_text)).top
+        fun row() = h.box(h.inputView.findViewById<View>(R.id.code_row_text)).height() / density()
+        fun area() = h.box(h.board).bottom - h.box(h.inputView.findViewById<View>(R.id.code_row_text)).top
         fun keys() = h.box(h.board).height()
         // the full keyboard first
         harness = KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN)
@@ -372,7 +372,7 @@ class GroupedKeyboardUatTest {
         assertFalse("nothing typed", h.shown(strip()))
         typing(InputMethodCatalog.PINYIN, "ni", "bu", "nu", "bi")
         val dp = h.inputView.resources.displayMetrics.density
-        val row = h.box(h.inputView.findViewById(R.id.code_row_text))
+        val row = h.box(h.inputView.findViewById<View>(R.id.code_row_text))
         assertTrue(h.shown(strip()))
         assertEquals(listOf("ni", "bu", "nu", "bi"), stripItems().map { it.text.toString() })
         // at the row's right end, each button a touch wide and the row's height (32dp)
@@ -389,7 +389,7 @@ class GroupedKeyboardUatTest {
         // many syllables: held at 60% of the row, the rest scrolled to
         val many = arrayOf("zhuang", "zhuan", "zhua", "zhu", "zh", "z", "xu", "xi", "cu", "ci", "ce", "ca")
         typing(InputMethodCatalog.PINYIN, *many, code = "zx gh ui as bn gh")
-        val text = h.box(h.inputView.findViewById(R.id.code_row_text))
+        val text = h.box(h.inputView.findViewById<View>(R.id.code_row_text))
         val share = h.box(strip()).width().toFloat() / (h.box(strip()).right - text.left)
         assertTrue("$share", share in 0.55f..0.61f)
         assertTrue("more than shown", strip().getChildAt(0).width > strip().width)
@@ -478,7 +478,7 @@ class GroupedKeyboardUatTest {
         // the mark to the engine, which types its Chinese ～ (KeyboardHalvesUatTest)
         assertTrue(sent().toString(), "key=~," in sent().last())
         h.field.setText("")
-        fun row() = h.box(h.inputView.findViewById(R.id.code_row_text)).height() / h.inputView.resources.displayMetrics.density
+        fun row() = h.box(h.inputView.findViewById<View>(R.id.code_row_text)).height() / h.inputView.resources.displayMetrics.density
         assertEquals(32f, row(), 1f)
         typing(InputMethodCatalog.SHUANGPIN, "mi", "ni")
         assertFalse("the column's on the letters", h.shown(strip()))

@@ -231,7 +231,7 @@ class KeyMarksUatTest {
     fun turnedTheSymbolWhereTheNewOrientationPutsIt() {
         symbolsAt(KeyMarkPosition.Bottom)
         h.start()
-        val q = h.key("q") as AltTextKeyView
+        val q = h.viewKey("q") as AltTextKeyView
         assertEquals(KeyMarks.Slot.Below, q.symbolSlot)
         val landscape = Configuration(q.resources.configuration).apply { orientation = Configuration.ORIENTATION_LANDSCAPE }
         q.dispatchConfigurationChanged(landscape)

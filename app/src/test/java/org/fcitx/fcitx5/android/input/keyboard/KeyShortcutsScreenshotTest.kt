@@ -58,7 +58,7 @@ class KeyShortcutsScreenshotTest {
         KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN).use { h ->
             h.start()
             // a's select all top left, its @ top right: the two settings' defaults
-            val a = h.key("a") as AltTextKeyView
+            val a = h.viewKey("a") as AltTextKeyView
             assertEquals(View.VISIBLE, a.altText.visibility)
             assertTrue(h.texts().contains("你好"))
             h.capture("KeyShortcutsScreenshotTest/default_light")

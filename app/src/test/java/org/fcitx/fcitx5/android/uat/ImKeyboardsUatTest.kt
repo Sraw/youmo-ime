@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -92,7 +93,7 @@ class ImKeyboardsUatTest {
 
     private fun sym(code: Int) = "sym=${UNICODE + code},"
 
-    private fun row(): Float = h.box(h.inputView.findViewById(R.id.code_row_text)).height() / h.inputView.resources.displayMetrics.density
+    private fun row(): Float = h.box(h.inputView.findViewById<View>(R.id.code_row_text)).height() / h.inputView.resources.displayMetrics.density
 
     @Test
     @Uat("PY-105")

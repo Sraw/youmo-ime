@@ -52,7 +52,9 @@ import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
+import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.robolectric.Robolectric
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
@@ -92,6 +94,10 @@ class KeyboardHarness(
     private val keyboardsWere = keyboards?.let { AppPrefs.getInstance().keyboard.imKeyboards() }
 
     private val codeRowWas = ThemeManager.prefs.codeRow.getValue().takeIf { it != codeRow }
+
+    // -PcanvasKeyboard: the canvas draws the keys (060-render-p2 S3), where the test did not choose
+    private val canvasWas = AppPrefs.getInstance().internal.canvasKeyboard.takeIf { CANVAS_RUN && !PrefsRule.drawingChosen }
+        ?.let { p -> p.getValue().also { p.setValue(true) } }
 
     init {
         keyboards?.let(::setKeyboards)
@@ -255,10 +261,41 @@ class KeyboardHarness(
         idle()
     }
 
-    /** The key showing [label] (its main text), in whatever keyboard or panel is up. */
-    fun key(label: String): TextKeyView = all(inputView).filterIsInstance<TextKeyView>()
+    /**
+     * The keys shown under [root] (060-render-p2 S3), depth first: a canvas's, its scene's in its order
+     * (row by row, left to right), and the key views shown, whichever draws a keyboard. [root] may be any
+     * view with keyboards in it (the settings' preview), not only the input method's.
+     */
+    fun keys(root: View = inputView): List<ShownKey> = shownKeys(root, root)
+
+    private fun shownKeys(v: View, root: View): List<ShownKey> = when {
+        v.visibility != View.VISIBLE -> emptyList()
+        v is KeyboardCanvasView -> v.scene?.keys?.map { SceneShownKey(v, it.id, it.copy) }.orEmpty()
+        v is KeyView -> if (v.isShownUnder(root)) listOf(ViewShownKey(v)) else emptyList()
+        v is ViewGroup -> (0 until v.childCount).flatMap { shownKeys(v.getChildAt(it), root) }
+        else -> emptyList()
+    }
+
+    private fun View.isShownUnder(root: View) = if (root === inputView) shown(this) else true
+
+    /** The key showing [label] (its main text), in whatever keyboard or panel is up, whichever draws it. */
+    fun key(label: String): ShownKey = keys().firstOrNull { it.label == label } ?: error("no key $label in ${texts()}")
+
+    /** Every key showing [label]: a split row draws G and V on both halves. */
+    fun keysLabelled(label: String): List<ShownKey> = keys().filter { it.label == label }
+
+    /** The key the scene names [id] (`space`, `q`; a key view's theme name), the [copy]th of a split row's two. */
+    fun keyNamed(id: String, copy: Int = 0): ShownKey = keys().firstOrNull { it.id == id && it.copy == copy }
+        ?: error("no key named $id ($copy) in ${keys().map { it.id }}")
+
+    /** The key read out as [description] (Shift, Backspace, Space's with the input method's name), whichever draws it. */
+    fun describedKey(description: String): ShownKey = keys().firstOrNull { it.description == description }
+        ?: error("no key described as $description in ${keys().mapNotNull { it.description }}")
+
+    /** The key view showing [label]: for what only the old drawing has (its text view's size, its marks' views); S7 moves these. */
+    fun viewKey(label: String): TextKeyView = all(inputView).filterIsInstance<TextKeyView>()
         .firstOrNull { shown(it) && it.mainText.text.toString() == label }
-        ?: error("no key $label in ${texts()}")
+        ?: error("no key view $label in ${texts()}")
 
     /** The view (key, bar button) read out as [description]. */
     fun described(description: String): View = all(inputView)
@@ -278,6 +315,13 @@ class KeyboardHarness(
     /** A click, as a finger's tap ends, then everything it set off. */
     fun tap(v: View) {
         check(v.performClick()) { "$v took no click" }
+        idle()
+        relayout()
+    }
+
+    /** A click on [k], as a finger's tap ends, then everything it set off. */
+    fun tap(k: ShownKey) {
+        check(k.click()) { "$k took no click" }
         idle()
         relayout()
     }
@@ -311,6 +355,9 @@ class KeyboardHarness(
         val at = IntArray(2).also { v.getLocationInWindow(it) }
         return Rect(at[0], at[1], at[0] + v.width, at[1] + v.height)
     }
+
+    /** Where [k]'s cell is on the screen, as [box] of its view. */
+    fun box(k: ShownKey): Rect = k.bounds
 
     private var downAt = 0L
 
@@ -360,8 +407,12 @@ class KeyboardHarness(
     private var heldAt = 0f to 0f
 
     /** A finger put on [v]'s middle and held there till [release]. */
-    fun press(v: View) {
-        val b = box(v)
+    fun press(v: View) = press(box(v))
+
+    /** A finger put on [k]'s middle and held there till [release]. */
+    fun press(k: ShownKey) = press(k.bounds)
+
+    private fun press(b: Rect) {
         heldAt = b.exactCenterX() to b.exactCenterY()
         finger(MotionEvent.ACTION_DOWN, heldAt.first, heldAt.second)
         idle()
@@ -378,8 +429,12 @@ class KeyboardHarness(
     fun after(ms: Long) = shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(ms))
 
     /** A finger put on [v]'s middle, slid by [dx], [dy] px in a few steps, lifted. */
-    fun swipe(v: View, dx: Float, dy: Float) {
-        val b = box(v)
+    fun swipe(v: View, dx: Float, dy: Float) = swipe(box(v), dx, dy)
+
+    /** A finger put on [k]'s middle, slid by [dx], [dy] px in a few steps, lifted. */
+    fun swipe(k: ShownKey, dx: Float, dy: Float) = swipe(k.bounds, dx, dy)
+
+    private fun swipe(b: Rect, dx: Float, dy: Float) {
         val x = b.exactCenterX()
         val y = b.exactCenterY()
         finger(MotionEvent.ACTION_DOWN, x, y)
@@ -402,8 +457,12 @@ class KeyboardHarness(
      * A finger held on [v] past the long press, then slid onto the popup's key showing [pick]
      * (left where it is when null) and lifted. Returns the popup keys' labels as shown.
      */
-    fun longPress(v: View, pick: String? = null): List<String> {
-        val b = box(v)
+    fun longPress(v: View, pick: String? = null): List<String> = longPress(box(v), pick)
+
+    /** [longPress] on [k]. */
+    fun longPress(k: ShownKey, pick: String? = null): List<String> = longPress(k.bounds, pick)
+
+    private fun longPress(b: Rect, pick: String?): List<String> {
         var x = b.exactCenterX()
         var y = b.exactCenterY()
         finger(MotionEvent.ACTION_DOWN, x, y)
@@ -432,8 +491,12 @@ class KeyboardHarness(
      * A finger put on [v]'s middle, held [holdMs] (a long press), moved to [toX], [toY] (the
      * screen's) in [steps] and lifted, or left down when [lift] is false (another finger next).
      */
-    fun drag(v: View, toX: Float, toY: Float, holdMs: Long = 0, steps: Int = 12, lift: Boolean = true) {
-        val b = box(v)
+    fun drag(v: View, toX: Float, toY: Float, holdMs: Long = 0, steps: Int = 12, lift: Boolean = true) = drag(box(v), toX, toY, holdMs, steps, lift)
+
+    /** [drag] from [k]'s middle. */
+    fun drag(k: ShownKey, toX: Float, toY: Float, holdMs: Long = 0, steps: Int = 12, lift: Boolean = true) = drag(k.bounds, toX, toY, holdMs, steps, lift)
+
+    private fun drag(b: Rect, toX: Float, toY: Float, holdMs: Long, steps: Int, lift: Boolean) {
         val x = b.exactCenterX()
         val y = b.exactCenterY()
         finger(MotionEvent.ACTION_DOWN, x, y)
@@ -548,8 +611,12 @@ class KeyboardHarness(
      * A finger on [v]: down at the first point, then each next one [Touch.ms] after the last, up at
      * the last. Points are in [v]'s own pixels, so a slide off the key is a point outside its size.
      */
-    fun touch(v: View, vararg path: Touch) {
-        val f = finger(v, path.first())
+    fun touch(v: View, vararg path: Touch) = touch(finger(v, path.first()), path)
+
+    /** [touch] on [k], the points in its cell's pixels. */
+    fun touch(k: ShownKey, vararg path: Touch) = touch(finger(k, path.first()), path)
+
+    private fun touch(f: Finger, path: Array<out Touch>) {
         path.drop(1).forEach { p ->
             advance(p.ms)
             f.move(p)
@@ -562,14 +629,18 @@ class KeyboardHarness(
      * go in where a finger's do, at the input view, so the keyboard sees them as on a device
      * (its own touch handling, the popup's focus) and not only the key.
      */
-    fun finger(v: View, at: Touch): Finger = Finger(v).also { it.send(MotionEvent.ACTION_DOWN, at) }
+    fun finger(v: View, at: Touch): Finger = Finger { IntArray(2).also(v::getLocationInWindow) }.also { it.send(MotionEvent.ACTION_DOWN, at) }
 
-    inner class Finger(private val v: View) {
+    /** [finger] on [k], [at] in its cell's pixels. */
+    fun finger(k: ShownKey, at: Touch): Finger = Finger { k.bounds.let { intArrayOf(it.left, it.top) } }.also { it.send(MotionEvent.ACTION_DOWN, at) }
+
+    /** A finger whose points are from [origin], the window's place of what it is on, read at each step. */
+    inner class Finger(private val origin: () -> IntArray) {
         private val down = SystemClock.uptimeMillis()
 
         /** [eventTime]: the event's own, earlier than now to tell it from the time it is handled */
         internal fun send(action: Int, p: Touch, eventTime: Long = SystemClock.uptimeMillis()) {
-            val from = IntArray(2).also(v::getLocationInWindow)
+            val from = origin()
             val root = IntArray(2).also(inputView::getLocationInWindow)
             val e = MotionEvent.obtain(
                 down, eventTime, action,
@@ -592,9 +663,14 @@ class KeyboardHarness(
     data class Touch(val x: Float, val y: Float, val ms: Long = 0)
 
     /** The middle of [v], in its own pixels, moved by [dx], [dy] dp. */
-    fun at(v: View, dx: Float = 0f, dy: Float = 0f, ms: Long = 0): Touch {
+    fun at(v: View, dx: Float = 0f, dy: Float = 0f, ms: Long = 0): Touch = at(v.width, v.height, dx, dy, ms)
+
+    /** The middle of [k]'s cell, in its pixels, moved by [dx], [dy] dp. */
+    fun at(k: ShownKey, dx: Float = 0f, dy: Float = 0f, ms: Long = 0): Touch = at(k.width, k.height, dx, dy, ms)
+
+    private fun at(width: Int, height: Int, dx: Float, dy: Float, ms: Long): Touch {
         val dp = service.resources.displayMetrics.density
-        return Touch(v.width / 2f + dx * dp, v.height / 2f + dy * dp, ms)
+        return Touch(width / 2f + dx * dp, height / 2f + dy * dp, ms)
     }
 
     /** The nine keys' key for [digit] (its small digit), or the column's punctuation key. */
@@ -602,9 +678,13 @@ class KeyboardHarness(
         all(inputView).filterIsInstance<AltTextKeyView>()
             .firstOrNull { shown(it) && it.altText.text.toString() == digit } ?: error("no key $digit in ${texts()}")
 
-    /** Every text shown under [v] (visible ones only), depth first. */
+    /**
+     * Every text shown under [v] (visible ones only), depth first: a canvas's keys' labels and corners
+     * in its scene's order, as the key views' texts were in theirs.
+     */
     fun texts(v: View = keyboard): List<String> = when {
         v.visibility != View.VISIBLE -> emptyList()
+        v is KeyboardCanvasView -> v.scene?.keys.orEmpty().flatMap { listOfNotNull(it.label, it.alt?.takeIf(String::isNotEmpty)) }
         v is TextView -> listOf(v.text.toString())
         v is ViewGroup -> (0 until v.childCount).flatMap { texts(v.getChildAt(it)) }
         else -> emptyList()
@@ -655,6 +735,7 @@ class KeyboardHarness(
         }
         keyboardsWere?.let(::setKeyboards)
         codeRowWas?.let(ThemeManager.prefs.codeRow::setValue)
+        canvasWas?.let(AppPrefs.getInstance().internal.canvasKeyboard::setValue)
         HostDaemon.testConnection = null
         scope.cancel()
     }
@@ -669,6 +750,9 @@ class KeyboardHarness(
     }
 
     companion object {
+        /** Every harness's keys drawn by the canvas but where a test chose (`-PcanvasKeyboard`, app/build.gradle.kts). */
+        private val CANVAS_RUN = System.getProperty("youmo.canvasKeyboard") == "true"
+
         val PINYIN = InputMethodEntry(InputMethodCatalog.PINYIN, "拼音", "", "", "拼", "zh_CN", "androidengine", false)
         val ENGLISH = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "", "En", "en", "androidengine", false)
 

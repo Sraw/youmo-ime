@@ -177,15 +177,4 @@ class TextBoardSceneTest {
         assertEquals("hide-keyboard", SceneMarks.icon(KeyCommand.HideKeyboard))
         assertEquals("undo", SceneMarks.icon(KeyCommand.Undo))
     }
-
-    @Test
-    fun spokenWordsTheAppsStringsWhereNamed() {
-        val strings = mapOf("a11y_key_shift" to "Shift")
-        assertEquals("Shift", SceneA11y.spoken("a11y_key_shift", null, strings::get))
-        assertEquals("⇧", SceneA11y.spoken("a11y_key_unknown", "⇧", strings::get))
-        assertEquals("a11y_key_unknown", SceneA11y.spoken("a11y_key_unknown", null, strings::get))
-        assertEquals("q，1", SceneA11y.spoken("q，1", "q", strings::get))
-        assertEquals("q", SceneA11y.spoken("", "q", strings::get))
-        assertEquals("", SceneA11y.spoken("", null, strings::get))
-    }
 }

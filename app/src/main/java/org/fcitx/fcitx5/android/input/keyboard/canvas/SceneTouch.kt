@@ -9,6 +9,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
+import android.view.accessibility.AccessibilityEvent
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CoroutineScope
@@ -20,6 +21,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyHandle
 import org.fcitx.fcitx5.android.input.keyboard.KeyPlace
 import org.fcitx.fcitx5.android.input.keyboard.TouchTarget
 import org.fcitx.fcitx5.android.input.scene.KeyRef
+import org.fcitx.fcitx5.android.scene.KeyNode
 
 /**
  * A key the scene draws (060-render-p2 S1), as its keyboard wires it: what a key view was to its
@@ -69,13 +71,22 @@ class SceneKey(
         canvas.showPressed(ref, pressed)
     }
 
+    // as a view's performClick: what it does, then a screen reader told it was clicked (a tap's or TalkBack's)
     override fun click(): Boolean {
-        val l = click ?: return false
-        l(this)
-        return true
+        val l = click
+        l?.invoke(this)
+        canvas.tell(ref, AccessibilityEvent.TYPE_VIEW_CLICKED)
+        return l != null
     }
 
-    override fun longClick(): Boolean = longClick?.invoke(this) ?: false
+    // as a view's performLongClick: told first, then what it does
+    override fun longClick(): Boolean {
+        canvas.tell(ref, AccessibilityEvent.TYPE_VIEW_LONG_CLICKED)
+        return longClick?.invoke(this) ?: false
+    }
+
+    /** Whether a long press does something of its own (a view's isLongClickable): a screen reader's long click offered. */
+    val longClickable: Boolean get() = longClick != null
     override fun doubleTap() {
         doubleTapAction?.invoke(this)
     }
@@ -148,11 +159,16 @@ class SceneTouch(
         override fun cancel() = key.keyGesture.cancelGestures()
     }
 
+    /**
+     * The key wired for the scene's [node]: a split row's second copy with no key of its own is the
+     * first's, as its view was. What a screen reader's actions on its node do ([KeyboardCanvasView]).
+     */
+    fun keyOf(node: KeyNode): SceneKey? = byRef[KeyRef.scene(node.id, node.copy)] ?: byRef[KeyRef(node.id)]
+
     /** The key at ([x], [y]) in the keyboard, its cell noted; null in a gap or on a key not shown. */
     internal fun find(x: Float, y: Float): Pointer? {
         val node = canvas.keyAt(x - canvas.left, y - canvas.top) ?: return null
-        // a split row's second copy with no key of its own is the first's, as its view was (Host.keyView)
-        val key = (byRef[KeyRef.scene(node.id, node.copy)] ?: byRef[KeyRef(node.id)])?.takeIf(shown) ?: return null
+        val key = keyOf(node)?.takeIf(shown) ?: return null
         val cell = Rect().apply { set(node.bounds) }
         cell.offset(canvas.left, canvas.top)
         return Pointer(key, cell)

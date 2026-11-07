@@ -70,8 +70,7 @@ class SettingsEffectUatTest {
     private fun space() = KeyboardHarness.all(h.inputView)
         .first { h.shown(it) && it.contentDescription?.toString()?.let { d -> d == "Space" || d.startsWith("Space,") } == true }
 
-    private fun corner(label: String): String? = (h.key(label) as? AltTextKeyView)?.altText
-        ?.takeIf { it.visibility == View.VISIBLE && it.text.isNotEmpty() }?.text?.toString()
+    private fun corner(label: String): String? = h.key(label).alt
 
     @Test
     @Uat("ST-10")
@@ -109,11 +108,11 @@ class SettingsEffectUatTest {
         h.capture("SettingsEffectUatTest/no_border")
         fresh(edited { it })
         h.start()
-        // the drawn key is inset by its margin: what lies between two keys
-        val gap = h.key("q").hMargin
+        // the drawn key (its face) is inset by its margin in its cell: what lies between two keys
+        val gap = h.key("q").let { (it.width - it.face.width()) / 2 }
         fresh(edited { it.copy(keys = it.keys.copy(radiusDp = 0, gap = Gap(5, 9, 5, 6))) })
         h.start()
-        val loose = h.key("q").hMargin
+        val loose = h.key("q").let { (it.width - it.face.width()) / 2 }
         assertTrue("gap $gap -> $loose", loose > gap)
         h.capture("SettingsEffectUatTest/loose_square")
     }
@@ -130,7 +129,7 @@ class SettingsEffectUatTest {
         fresh()
         prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.Bottom)
         h.start()
-        val w = h.key("w") as AltTextKeyView
+        val w = h.viewKey("w") as AltTextKeyView
         assertEquals("2", corner("w"))
         assertTrue("under the letter", h.box(w.altText).top >= h.box(w.mainText).centerY())
     }

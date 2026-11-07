@@ -108,6 +108,12 @@ public class Dumper {
         attr(sb, "scrollable", String.valueOf(n.isScrollable()));
         attr(sb, "visible", String.valueOf(n.isVisibleToUser()));
         attr(sb, "hint", String.valueOf(n.isShowingHintText()));
+        // a key the keyboard's canvas draws (060-render-p2 S3): its scene id and its corner, which its
+        // node keeps in its extras (KeyboardCanvasView's Speech; U6: not the hint, TalkBack reads that)
+        String key = n.getExtras().getString("youmo.key");
+        if (key != null) attr(sb, "key", key);
+        String alt = n.getExtras().getString("youmo.alt");
+        if (alt != null) attr(sb, "alt", alt);
         attr(sb, "bounds", "[" + b.left + "," + b.top + "][" + b.right + "," + b.bottom + "]");
         sb.append(">");
         for (int i = 0; i < n.getChildCount(); i++) {

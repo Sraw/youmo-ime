@@ -406,7 +406,7 @@ def _load_scripts(areas, files):
 
 class Node:
     __slots__ = ("text", "desc", "rid", "cls", "pkg", "b", "checked", "focused", "selected",
-                 "clickable", "parent", "kids", "enabled", "scrollable", "wtype")
+                 "clickable", "parent", "kids", "enabled", "scrollable", "wtype", "key", "alt")
 
     def __init__(self, e, parent):
         # an empty field reports its hint as its text
@@ -424,6 +424,9 @@ class Node:
         self.clickable = e.get("clickable") == "true"
         self.enabled = e.get("enabled") == "true"
         self.scrollable = e.get("scrollable") == "true"
+        # a key the canvas draws: its scene id and corner (Dumper's, from the node's extras); "" for others
+        self.key = e.get("key") or ""
+        self.alt = e.get("alt") or ""
         self.parent, self.kids = parent, []
 
     @property
@@ -989,7 +992,9 @@ class Device:
     # --- the keyboard
     def keys(self, refresh=False):
         """label -> centre, from the keyboard on screen: a letter key by its letter, the others by
-        name: space bksp shift enter globe , . 符 123 (and the nine keys' digits)"""
+        name: space bksp shift enter globe , . 符 123 (and the nine keys' digits). A key the canvas
+        draws (060-render-p2 S3) is one node: its label as text, its corner and scene id told apart
+        (Node.alt, Node.key), found by both as a key view was, and by its id too (`q`, `backspace`)"""
         if self._keys and not refresh:
             return self._keys
         kb = self.need_keyboard()
@@ -1000,6 +1005,8 @@ class Device:
         for n in kb.walk():
             if not n.clickable:
                 continue
+            if n.key:
+                k.setdefault(n.key, n.c)
             if n.rid in names:
                 k[names[n.rid]] = n.c
                 continue
@@ -1007,7 +1014,7 @@ class Device:
             if n.desc in byd or n.desc.startswith("空格"):
                 k.setdefault(byd.get(n.desc, "space"), n.c)
                 continue
-            t = [m.text for m in n.walk() if m.text]
+            t = [m.text for m in n.walk() if m.text] + ([n.alt] if n.alt else [])
             if t and t[0] not in k:
                 k[t[0].lower()] = n.c
             for x in t[1:]:   # the nine keys: "ABC" over "2"; a table's roots over their letter (日 over a)

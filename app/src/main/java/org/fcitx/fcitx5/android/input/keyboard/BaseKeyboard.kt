@@ -44,6 +44,7 @@ import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKey
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTouch
+import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupKeyboardUi
@@ -651,6 +652,9 @@ abstract class BaseKeyboard(
 
     /** The scene's key wired as [view] was ([drawKeysOn]); null while the views draw the keys. */
     internal fun sceneKeyOf(view: KeyView): SceneKey? = sceneKeys[view]
+
+    /** The key wired for the scene's [node] ([SceneTouch.keyOf]): what a screen reader's actions on it do; null while the views draw the keys. */
+    protected fun sceneKey(node: KeyNode): SceneKey? = sceneTouch?.keyOf(node)
 
     // the keys' views take touches as the keyboard hands them: vivo's workaround, or keys drawn by the canvas
     private val routesTouches get() = vivoKeypressWorkaround || canvas != null

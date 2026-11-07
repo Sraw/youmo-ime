@@ -146,18 +146,3 @@ object SceneMarks {
 
     private fun at(a: KeyMarks.At): SceneKeyMarks.At = SceneKeyMarks.At.valueOf(a.name)
 }
-
-/** A key's words for a screen reader ([org.fcitx.fcitx5.android.scene.KeyNode.a11y]) as the app says them. */
-object SceneA11y {
-    private val RESOURCE = Regex("a11y_[a-z0-9_]+")
-
-    /**
-     * [a11y] as it is, or, where the layout named one of the app's strings (`a11y_key_shift`), that
-     * string ([string]: null where the app has none, the [label] then); nothing at all, the label.
-     */
-    fun spoken(a11y: String, label: String?, string: (String) -> String?): String = when {
-        RESOURCE.matches(a11y) -> string(a11y) ?: label ?: a11y
-        a11y.isEmpty() -> label.orEmpty()
-        else -> a11y
-    }
-}

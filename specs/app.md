@@ -313,7 +313,7 @@ as none (up, up to the left) is dropped.
 
 The 060 redraw's first step (`input/keyboard/canvas/`, `AppPrefs.Internal.canvasKeyboard`, 开发者 →
 新绘制 26 键, off): `TextKeyboard` adds a `KeyboardCanvasView` over its rows and makes them
-INVISIBLE, still laid out (TalkBack's actions and a key's state are still read off them, S3). The canvas
+INVISIBLE, still laid out (the views' and the scene keys' wiring still made of the `KeyDef`s, S4). The canvas
 draws the scene `lib/keyboard-scene` makes of qwerty.xml in the look converted by ime-core's
 `LookTheme` (`ScenePainter`: one `RenderNode` a key a face, both kept in the tree and a press only their alpha, since a node left out of a frame loses its recording; a
 software canvas, a screenshot's, gets the ops drawn straight); `TextKeyboard.scene` builds the
@@ -364,11 +364,22 @@ same wiring for a key view and for the `SceneKey` made of its `KeyDef` (`drawKey
 what its view did. Its press is shown by the canvas (`showPressed(KeyRef)`), a popup over it placed
 at its face across and its cell down in the window (`popupBounds`), as a view's `bounds` were; glide
 typing reads its cell (`KeyPlace`). No touch reaches a key view while the canvas draws the keys
-(`SceneTouchTest`, `everyGestureAsOnTheViews*`); the views keep their own wiring for TalkBack's actions
-(`performAccessibilityAction` on the key's view, S3) and draw and take the touches again without a scene.
-TalkBack reads the canvas's `ExploreByTouchHelper`: a virtual node a key, its words the scene's
-`a11y` (an `a11y_*` name the app's string), id, state and actions its view's; a key whose view's state
-changed (Shift) since the last scene is told as `CONTENT_CHANGE_TYPE_STATE_DESCRIPTION` on its node.
+(`SceneTouchTest`, `everyGestureAsOnTheViews*`); the views draw and take the touches again without a scene.
+TalkBack reads the canvas's `ExploreByTouchHelper` and no key view (INVISIBLE, none visible to a
+reader): a virtual node a key, all it says the scene's (ime-core's
+`SceneA11y.of`): its text the label, its description the scene's `a11y` (an `a11y_*` name the app's
+string; a letter "q, 1", label then corner), Shift's state (`a11y_state_shift_*`), the old view's
+resource name by role (`KeyNames.RESOURCES`: `button_space`, `button_caps`…, what UAT and
+`SoftKeyboardTest` find keys by) and in its extras its scene id and corner (`youmo.key`, `youmo.alt`:
+not the hint, which TalkBack would read, 060-render-p2 U6); class FrameLayout, as the views', so no
+role is read. What it can do is its `SceneKey`'s (`Host.key`): clickable, long clickable where the
+key's wiring has a long click, the two actions where enabled, and a click or long click on the node is
+the key's own `click`/`longClick`, which tell TalkBack `TYPE_VIEW_CLICKED`/`TYPE_VIEW_LONG_CLICKED`
+on the node as a view's performClick/performLongClick did. A key whose state changed (Shift) since the
+last scene is told as `CONTENT_CHANGE_TYPE_STATE_DESCRIPTION` on its node. The table of what each key
+says, the views' against the nodes', is `SceneSpeechTest`: the same, a letter's two words in either
+order (its view had no description, and TalkBack read its texts in the order the view laid them out:
+letter first on a device, as the node; corner first in Robolectric at SDK 30 and up). The long press's popup keys are still views, read as before (S2's; their nodes after it).
 
 What the scene is given, so it draws what the views would: qwerty.xml is
 `lib/keyboard-scene/src/commonMain/layouts/qwerty.xml`, the one file the app copies and the engine's

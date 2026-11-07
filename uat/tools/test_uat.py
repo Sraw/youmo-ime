@@ -116,6 +116,31 @@ class ScreenTest(unittest.TestCase):
             s = uat.Screen(x)
             self.assertEqual([n.text for n in s.ime() if n.text], ["键"], t)
 
+    def test_the_keys_found_alike_on_the_views_and_the_canvas(self):
+        # the old drawing: a view a key, its letter and corner its children's texts; the canvas
+        # (060-render-p2 S3): a node a key, its label the text, its corner and id Dumper's alt and key
+        def keys(nodes):
+            x = (f'<hierarchy><window type="2"><node resource-id="{uat.PKG}:id/keyboard_view" package="{uat.PKG}" '
+                 f'bounds="[0,0][300,100]">{nodes}</node></window></hierarchy>')
+            d = uat.Device("5556")
+            d._keys = None
+            d.need_keyboard = lambda: uat.Screen(x).find(rid="keyboard_view", where="ime")
+            return d.keys()
+        views = ('<node clickable="true" bounds="[0,0][100,50]"><node text="1" bounds="[60,0][100,20]"/>'
+                 '<node text="q" bounds="[30,10][70,40]"/></node>'
+                 '<node clickable="true" resource-id="x:id/button_space" content-desc="空格，拼音" bounds="[0,50][200,100]">'
+                 '<node text="拼音" bounds="[80,60][120,90]"/></node>'
+                 '<node clickable="true" resource-id="x:id/button_backspace" content-desc="退格" bounds="[200,50][300,100]"/>')
+        canvas = ('<node class="android.widget.FrameLayout" bounds="[0,0][300,100]">'
+                  '<node clickable="true" text="q" key="q" alt="1" bounds="[0,0][100,50]"/>'
+                  '<node clickable="true" text="拼音" key="space" resource-id="x:id/button_space" content-desc="空格，拼音" bounds="[0,50][200,100]"/>'
+                  '<node clickable="true" key="backspace" resource-id="x:id/button_backspace" content-desc="退格" bounds="[200,50][300,100]"/></node>')
+        old, new = keys(views), keys(canvas)
+        for k in ("q", "1", "space", "bksp"):
+            self.assertEqual(old[k], new[k], k)
+        # and by the scene's id
+        self.assertEqual(new["bksp"], new["backspace"])
+
     def test_the_input_methods_touchable_region_is_read_from_dumpsys_input(self):
         # InputDispatcher's window line as redroid 14 printed it; the strip's band and the keyboard's
         # joined by |, an empty one as <empty>, the list ended by a comma

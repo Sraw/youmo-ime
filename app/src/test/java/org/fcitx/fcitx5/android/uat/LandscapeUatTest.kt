@@ -442,7 +442,7 @@ class LandscapeUatTest {
     }
 
     private fun rowFollows(keys: Rect) {
-        val row = h.box(h.inputView.findViewById(R.id.code_row_text))
+        val row = h.box(h.inputView.findViewById<View>(R.id.code_row_text))
         val strip = h.inputView.findViewById<View>(R.id.code_row_syllables)
         assertTrue(h.shown(strip))
         val s = h.box(strip)

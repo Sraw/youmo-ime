@@ -83,12 +83,12 @@ class KeyShortcutsHostTest {
         h.idle()
     }
 
-    private val backspace: View get() = h.inputView.findViewById(R.id.button_backspace)
+    private val backspace: ShownKey get() = h.keyNamed("backspace")
 
     private val preedit get() = fcitx.inputPanelCached.preedit.toString()
 
     // past the swipe's threshold and lifted: the key's shortcut that way
-    private fun swipe(v: View, up: Boolean) {
+    private fun swipe(v: ShownKey, up: Boolean) {
         val finger = h.finger(v, h.at(v))
         val way = if (up) -1f else 1f
         for (i in 1..6) finger.move(h.at(v, dy = way * 10f * i, ms = 16))

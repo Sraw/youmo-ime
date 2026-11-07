@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
+import org.fcitx.fcitx5.android.scene.rules.KeyNames
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
 import org.fcitx.fcitx5.android.scene.theme.Cascades
 import kotlin.test.Test
@@ -151,5 +152,16 @@ class SceneBuilderTest {
         assertEquals("space-long-press", space.actions["long-press"])
         assertEquals("space", space.sound)
         assertNull(space.label?.takeIf { it.isNotBlank() }, "no input method's name on the panel's space")
+    }
+
+    // what a screen reader's node gives as a key's id: the old views' names, a role each, every role the 26 keys' had one for
+    @Test
+    fun theOldViewsNamesByRole() {
+        assertTrue(KeyNames.ROLES.containsAll(KeyNames.RESOURCES.keys))
+        assertEquals(KeyNames.RESOURCES.size, KeyNames.RESOURCES.values.toSet().size, "a name a role")
+        assertTrue(KeyNames.RESOURCES.values.all { it.matches(Regex("button_[a-z_]+")) })
+        assertEquals("button_caps", KeyNames.RESOURCES["shift"])
+        assertEquals("button_return", KeyNames.RESOURCES["enter"])
+        assertNull(KeyNames.RESOURCES["symbols"], "符 and 123 had none")
     }
 }

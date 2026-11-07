@@ -95,7 +95,7 @@ class LifecycleUatTest {
                 system(night)
                 val want = (if (night) ThemeManager.prefs.darkModeTheme else ThemeManager.prefs.lightModeTheme).getValue()
                 assertEquals(want.name, ThemeManager.activeTheme.name)
-                val n = h.key("n")
+                val n = h.viewKey("n")
                 assertEquals("the keys in the theme", want.name, n.theme.name)
                 h.api.calls.clear()
                 "nihao".forEach { h.tap(h.key(it.toString())) }

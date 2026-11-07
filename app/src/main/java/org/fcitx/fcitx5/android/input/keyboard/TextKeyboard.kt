@@ -342,7 +342,7 @@ class TextKeyboard private constructor(
         if (AppPrefs.getInstance().internal.canvasKeyboard.getValue()) drawKeysWith(canvasView())
     }
 
-    // the keys drawn by [view] from now on: their rows left laid out but not drawn, nor read out (the view's nodes are),
+    // the keys drawn by [view] from now on: their rows left laid out but not drawn, nor read out (the canvas's nodes are),
     // nor touched: the scene's keys are, each the view's by its theme name and which of its name it is (a split row's G)
     private fun drawKeysWith(view: KeyboardCanvasView) {
         drawKeysOn(view) { v -> v.themeKey?.let { name -> keyViews[name]?.indexOf(v)?.takeIf { it >= 0 }?.let { KeyRef.scene(name, it) } } }
@@ -373,7 +373,7 @@ class TextKeyboard private constructor(
         val measurer = measurer(look)
         return KeyboardCanvasView(context, look, keyImages, fonts, object : KeyboardCanvasView.Host {
             override fun scene(width: Int, height: Int) = scene(look, measurer, width, height)
-            override fun keyView(node: KeyNode) = keyViews[node.id]?.let { it.getOrNull(node.copy) ?: it.firstOrNull() }
+            override fun key(node: KeyNode) = sceneKey(node)
 
             // asked as it draws: the views swapped back after the frame, not in it
             override fun noScene(view: KeyboardCanvasView) {

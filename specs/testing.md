@@ -37,6 +37,14 @@ change to how keys are laid out or marked (not with `-PskipExhaustive`: the excl
 
 ## Writing tests
 
+- A key on the keyboard is a `ShownKey` (060-render-p2 S3): `KeyboardHarness.key(label)`,
+  `keysLabelled`, `keyNamed(id, copy)` (the scene's id, a view's theme name: `q`, `space`, a split
+  row's second G copy 1), `describedKey(description)`, `keys()`; tap, press, long press, swipe, drag
+  take it, by its place in the window. Either drawing gives one, a key view's (`ViewShownKey`) or the
+  canvas's scene key (`SceneShownKey`), so a test written on it runs on both: `-PcanvasKeyboard` runs
+  every harness with the canvas drawing the keys but where a test set `canvasKeyboard` itself
+  (`PrefsRule`). `viewKey(label)` is the old `TextKeyView`, for a test of the view itself (S8 deletes
+  both). `ShownKeyTest` and `SceneSpeechTest` hold the two to each other.
 - New logic gets a test in the same change, in ime-core where the logic is.
 - Prefer fakes over mockk. `FakeEditor` (ime-core `testFixtures`) stands in for an
   `InputConnection` and is held to the real `BaseInputConnection` by a contract test.

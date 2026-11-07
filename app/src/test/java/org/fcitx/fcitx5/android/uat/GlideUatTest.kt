@@ -11,6 +11,8 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.ShownKey
+import org.fcitx.fcitx5.android.input.ViewShownKey
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -46,7 +48,7 @@ class GlideUatTest {
     }
 
     /** A finger down on the first of [keys], across the others' middles, shot as [shot] before it lifts on the last. */
-    private fun KeyboardHarness.glide(keys: List<View>, shot: String) {
+    private fun KeyboardHarness.glide(keys: List<ShownKey>, shot: String) {
         val first = box(keys.first())
         drag(keys.first(), first.exactCenterX(), first.exactCenterY(), steps = 0, lift = false)
         for (k in keys.drop(1)) box(k).let { move(it.exactCenterX(), it.exactCenterY()) }
@@ -72,6 +74,6 @@ class GlideUatTest {
         val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false)
         harness(wubi).let { h -> h.glide("wqiy".map { h.key("$it") }, "GlideUatTest/wubi_wqiy") }
         open?.close()
-        harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS).let { h -> h.glide("6426".map { h.nineKey("$it") }, "GlideUatTest/t9_6426") }
+        harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS).let { h -> h.glide("6426".map { ViewShownKey(h.nineKey("$it")) }, "GlideUatTest/t9_6426") }
     }
 }

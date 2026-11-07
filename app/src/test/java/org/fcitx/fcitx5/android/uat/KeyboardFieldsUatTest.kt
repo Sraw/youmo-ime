@@ -67,7 +67,7 @@ class KeyboardFieldsUatTest {
         h.field.setText("👍🏽")
         h.field.setSelection(h.field.text.length)
         h.idle()
-        h.tap(h.inputView.findViewById(R.id.button_backspace))
+        h.tap(h.inputView.findViewById<View>(R.id.button_backspace))
         assertTrue(h.api.calls.toString(), h.api.calls.any { "sym=${FcitxKeyMapping.FcitxKey_BackSpace}," in it })
         h.emit(HostEvent.Key(FcitxKeyMapping.FcitxKey_BackSpace, KeyStates.Virtual.states.toInt(), 0, false, 0))
         assertEquals("", h.field.text.toString())

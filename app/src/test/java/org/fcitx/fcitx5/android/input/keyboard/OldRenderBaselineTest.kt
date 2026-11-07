@@ -307,9 +307,9 @@ class OldRenderBaselineTest {
         }
         return when (name) {
             // the bubble over a key pressed
-            "bubble_q" -> held(h.key("q")) { h.after(50) }
+            "bubble_q" -> held(h.viewKey("q")) { h.after(50) }
             // a long press's choices
-            "long_press_e" -> held(h.key("e")) { h.after(longPress) }
+            "long_press_e" -> held(h.viewKey("e")) { h.after(longPress) }
             // Return's menu (its long press)
             "return_menu" -> held(h.inputView.findViewById(R.id.button_return)) { h.after(longPress) }
             // the space swiped up: the edit menu

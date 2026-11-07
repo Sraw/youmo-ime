@@ -487,7 +487,7 @@ class ToolbarUatTest {
         h.tap(h.described(s(R.string.hide_keyboard)))
         assertEquals(asked.toString(), 1, asked.size)
         hiddenThenTappedAgain()
-        assertTrue(h.texts().toString(), h.shown(h.key("q")) && has(R.string.hide_keyboard))
+        assertTrue(h.texts().toString(), h.keysLabelled("q").isNotEmpty() && has(R.string.hide_keyboard))
     }
 
     private fun candidates(vararg words: String) {

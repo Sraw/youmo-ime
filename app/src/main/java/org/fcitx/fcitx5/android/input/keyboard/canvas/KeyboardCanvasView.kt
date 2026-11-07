@@ -23,13 +23,13 @@ import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.customview.widget.ExploreByTouchHelper
 import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.input.PictureHost
-import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.scene.CanvasFrame
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.scene.SceneA11y
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Scene
 import timber.log.Timber
@@ -51,8 +51,8 @@ import kotlin.math.roundToInt
  * A key's touch is the scene's key's ([SceneTouch], 060-render-p2 S1): this view finds the key a
  * finger is on by the scene's hit areas ([keyAt]) and where it is ([cell], [popupBounds]), shows it
  * pressed as its touch says ([showPressed]), and gives a screen reader one virtual node a key
- * ([Speech]), with the key's own resource name (`button_space`), so UAT finds it as before; its words
- * and actions there are still [Host.keyView]'s view's (S3).
+ * ([Speech], S3): its words, id, state and corner the scene's ([SceneA11y.of]), with the old view's
+ * resource name (`button_space`) so UAT finds it as before; its actions its scene key's ([Host.key]).
  */
 @SuppressLint("ViewConstructor")
 class KeyboardCanvasView(
@@ -70,16 +70,17 @@ class KeyboardCanvasView(
          */
         fun scene(width: Int, height: Int): Scene?
 
-        /** The view whose key [node] is: its state and its actions, to a screen reader (S3 takes them to the scene). */
-        fun keyView(node: KeyNode): KeyView?
+        /** The key wired for [node] (its touch, [SceneTouch.keyOf]): what a screen reader's click and long click on its node do; null, none. */
+        fun key(node: KeyNode): SceneKey?
 
         /** There was no scene of the keys ([scene] null): told once, the keyboard's to draw them another way. */
         fun noScene(view: KeyboardCanvasView)
     }
 
     // a key's two faces, recorded once each when first drawn; kept across scenes where they are the same.
-    // Whether it is shown pressed ([down]) and what its view said of its state ([state]: Shift's) go with
-    // it: a scene made again for a key typed looks up nothing by a name made for it, a frame neither
+    // Whether it is shown pressed ([down]) and the state a screen reader is told ([state]: Shift's,
+    // SceneA11y.state) go with it: a scene made again for a key typed looks up nothing by a name made
+    // for it, a frame neither
     private class Faces(val node: KeyNode, val state: String?) {
         var normal: RenderNode? = null
         var pressed: RenderNode? = null
@@ -153,7 +154,7 @@ class KeyboardCanvasView(
             built = s
             var said: MutableList<Int>? = null
             faces = s.keys.mapIndexed { i, k ->
-                val f = Faces(k, host.keyView(k)?.let(ViewCompat::getStateDescription)?.toString())
+                val f = Faces(k, SceneA11y.state(k.role, k.states))
                 // the key in the last scene: at the same place in it mostly (a scene made again has the same keys)
                 val was = old.getOrNull(i)?.takeIf { it.of(k) } ?: old.firstOrNull { it.of(k) }
                 if (was != null) {
@@ -170,8 +171,8 @@ class KeyboardCanvasView(
                 f
             }
             speech.invalidateRoot()
-            // a key's state changed told to a screen reader as its view's was: on the key's node, which
-            // TalkBack reads out when it has focus
+            // a key's state changed told to a screen reader as a view's state description is: on the
+            // key's node, which TalkBack reads out when it has focus
             said?.forEach { speech.invalidateVirtualView(it, AccessibilityEventCompat.CONTENT_CHANGE_TYPE_STATE_DESCRIPTION) }
             return s
         }
@@ -295,6 +296,15 @@ class KeyboardCanvasView(
         invalidate()
     }
 
+    /**
+     * Key [ref]'s node told [type] (a click, a long click: [SceneKey]), as a view tells its own: a
+     * screen reader says what was typed. Nothing where the scene drawn last has no such key.
+     */
+    fun tell(ref: KeyRef, type: Int) {
+        val i = current?.keys?.indexOfFirst { it.of(ref) } ?: return
+        if (i >= 0) speech.sendEventForVirtualView(i, type)
+    }
+
     /** The key at ([x], [y]) in this view, by the hit areas of the scene drawn last; null in a gap. */
     fun keyAt(x: Float, y: Float): KeyNode? = current?.keyAt(x.toDouble(), y.toDouble())
 
@@ -366,6 +376,38 @@ class KeyboardCanvasView(
     @VisibleForTesting
     fun shownPressed(id: String, copy: Int = 0): Boolean = faces.any { it.node.id == id && it.node.copy == copy && it.down }
 
+    /** The keys shown pressed now, every finger's (a split row's second G its own). */
+    @get:VisibleForTesting
+    val pressed: Set<KeyRef> get() = faces.filter { it.down }.mapTo(LinkedHashSet()) { KeyRef.scene(it.node.id, it.node.copy) }
+
+    /** Key [id]'s label as drawn; null where it shows none (an icon) or there is no such key. */
+    @VisibleForTesting
+    fun label(id: String, copy: Int = 0): String? = keyAt(id, copy)?.label
+
+    /** Key [id]'s corner as drawn (a letter's symbol, the nine keys' digit); null where it has none. */
+    @VisibleForTesting
+    fun alt(id: String, copy: Int = 0): String? = keyAt(id, copy)?.alt?.takeIf { it.isNotEmpty() }
+
+    /** What a screen reader reads for key [id] (its node's description); null where there is no such key. */
+    @VisibleForTesting
+    fun spoken(id: String, copy: Int = 0): String? = keyAt(id, copy)?.let { SceneA11y.of(it, ::stringNamed).description }
+
+    /** Whether key [id] takes a press, as its node says. */
+    @VisibleForTesting
+    fun enabled(id: String, copy: Int = 0): Boolean = keyAt(id, copy)?.let { SceneA11y.of(it, ::stringNamed).enabled && host.key(it)?.keyEnabled != false } == true
+
+    /** Key [id] clicked as the end of a tap clicks it, or TalkBack's click ([SceneKey.click]): whether anything took it. */
+    @VisibleForTesting
+    fun click(id: String, copy: Int = 0): Boolean = keyAt(id, copy)?.let(host::key)?.click() == true
+
+    /** Where the scene's slot [kind] is (the handwriting pad, the nine keys' column), in the window; null where it has none. */
+    @VisibleForTesting
+    fun slotBounds(kind: String): Rect? {
+        val b = scene?.slots?.firstOrNull { it.kind == kind }?.bounds ?: return null
+        val at = IntArray(2).also(::getLocationInWindow)
+        return Rect().apply { set(b); offset(at[0], at[1]) }
+    }
+
     /** Whether the frame drawn last missed something still coming (an image, the picture): to be recorded again. */
     @get:VisibleForTesting
     val missed: Boolean get() = painter.missed
@@ -379,68 +421,72 @@ class KeyboardCanvasView(
     override fun dispatchHoverEvent(event: MotionEvent): Boolean = speech.dispatchHoverEvent(event) || super.dispatchHoverEvent(event)
 
     /**
-     * A screen reader's keys: one virtual node a key, its words the scene's ([KeyNode.a11y], the
-     * app's string where the layout names one), the rest as its view says (its resource name, Shift's
-     * state, what it can do), so TalkBack reads and works the keys as it did the views.
+     * A screen reader's keys: one virtual node a key of the scene drawn last, all it is told the
+     * scene's ([SceneA11y.of]: its words, the old view's resource name, Shift's state, its corner in
+     * the extras, U6), what it can do its scene key's ([Host.key]), so TalkBack reads and works the
+     * keys as it did the views with none of them. A click or long click on a node is the key's own
+     * ([SceneKey.click], [SceneKey.longClick]: what the end of a tap, the long press's moment call),
+     * as a view's performClick and performLongClick were.
      */
     private inner class Speech : ExploreByTouchHelper(this) {
         override fun getVirtualViewAt(x: Float, y: Float): Int {
             val s = current ?: return INVALID_ID
             val k = s.keyAt(x.toDouble(), y.toDouble()) ?: return INVALID_ID
-            return s.keys.indexOf(k).takeIf { spoken(k) } ?: INVALID_ID
+            return s.keys.indexOf(k)
         }
 
+        // every key: a blank place is no key of the scene's (Gap), nothing to TalkBack as its view was not
         override fun getVisibleVirtualViews(virtualViewIds: MutableList<Int>) {
-            current?.keys?.forEachIndexed { i, k -> if (spoken(k)) virtualViewIds += i }
+            current?.keys?.indices?.forEach { virtualViewIds += it }
         }
-
-        // a blank key is nothing to TalkBack (BlankKey), as its view was not
-        private fun spoken(k: KeyNode) = host.keyView(k)?.importantForAccessibility != IMPORTANT_FOR_ACCESSIBILITY_NO
 
         override fun onPopulateNodeForVirtualView(virtualViewId: Int, node: AccessibilityNodeInfoCompat) {
             val k = current?.keys?.getOrNull(virtualViewId)
             if (k == null) {
                 // asked of a key gone with the last scene: a node there must still have bounds and words
                 node.contentDescription = ""
+                @Suppress("DEPRECATION")
                 node.setBoundsInParent(Rect())
                 return
             }
-            val view = host.keyView(k)
-            node.text = k.label.orEmpty()
-            node.contentDescription = SceneA11y.spoken(k.a11y, k.label) { name -> stringNamed(name) }
+            val said = SceneA11y.of(k, ::stringNamed)
+            node.text = said.text
+            node.contentDescription = said.description
+            node.className = SceneA11y.CLASS_NAME
             val b = k.bounds
             @Suppress("DEPRECATION")
             node.setBoundsInParent(Rect(b.left.roundToInt(), b.top.roundToInt(), b.right.roundToInt(), b.bottom.roundToInt()))
-            if (view == null) return
-            // a layout's id (button_space), not one made at run time (a letter's, generateViewId: no package)
-            if (view.id != NO_ID && view.id ushr PACKAGE_SHIFT != 0) node.viewIdResourceName = resources.getResourceName(view.id)
-            val info = view.createAccessibilityNodeInfo()
-            try {
-                val own = AccessibilityNodeInfoCompat.wrap(info)
-                node.className = own.className
-                node.stateDescription = own.stateDescription
-                node.isEnabled = own.isEnabled
-                node.isClickable = own.isClickable
-                node.isLongClickable = own.isLongClickable
-                own.actionList.filter { it.id !in HELPERS }.forEach(node::addAction)
-            } finally {
-                // pooled before Android 13 (a no-op since): made for each key read out, given back
-                @Suppress("DEPRECATION")
-                info.recycle()
-            }
+            said.resourceName?.let { node.viewIdResourceName = "$resourcePackage:id/$it" }
+            node.stateDescription = said.state
+            node.extras.putString(SceneA11y.EXTRA_KEY, said.id)
+            said.alt?.let { node.extras.putString(SceneA11y.EXTRA_ALT, it) }
+            val key = host.key(k)
+            node.isEnabled = said.enabled && key?.keyEnabled != false
+            node.isClickable = key != null
+            node.isLongClickable = key?.longClickable == true
+            if (node.isEnabled && node.isClickable) node.addAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_CLICK)
+            if (node.isEnabled && node.isLongClickable) node.addAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_LONG_CLICK)
         }
 
+        // as a view's: a click on one that is clickable done and taken whatever it did (View.performAccessibilityAction)
         override fun onPerformActionForVirtualView(virtualViewId: Int, action: Int, arguments: Bundle?): Boolean {
             val k = current?.keys?.getOrNull(virtualViewId) ?: return false
-            return host.keyView(k)?.performAccessibilityAction(action, arguments) == true
+            val key = host.key(k)?.takeIf { it.keyEnabled && KeyState.Disabled !in k.states } ?: return false
+            return when (action) {
+                AccessibilityNodeInfoCompat.ACTION_CLICK -> true.also { key.click() }
+                AccessibilityNodeInfoCompat.ACTION_LONG_CLICK -> key.longClickable.also { if (it) key.longClick() }
+                else -> false
+            }
         }
     }
+
+    // the package the app's ids are named in (button_space's), as a view's resource name has it
+    private val resourcePackage: String by lazy { resources.getResourcePackageName(org.fcitx.fcitx5.android.R.id.keyboard_view) }
 
     // the layout's names of the app's strings (a11y_key_shift…): the ones its keys name, looked up by name
     private fun stringNamed(name: String): String? = A11Y_STRINGS[name]?.let(context::getString)
 
     private companion object {
-        const val PACKAGE_SHIFT = 24
         const val NANOS_A_MS = 1e6
 
         // a node's room past what it draws, for its edges' anti-aliasing
@@ -449,20 +495,12 @@ class KeyboardCanvasView(
         // where the view is over the picture's base (x, y) and the base's size (w, h)
         const val PICTURE_PLACE = 4
 
-        // the node's focus and selection are the helper's own
-        val HELPERS = setOf(
-            AccessibilityNodeInfoCompat.ACTION_ACCESSIBILITY_FOCUS,
-            AccessibilityNodeInfoCompat.ACTION_CLEAR_ACCESSIBILITY_FOCUS,
-            AccessibilityNodeInfoCompat.ACTION_FOCUS,
-            AccessibilityNodeInfoCompat.ACTION_CLEAR_FOCUS,
-            AccessibilityNodeInfoCompat.ACTION_SELECT,
-            AccessibilityNodeInfoCompat.ACTION_CLEAR_SELECTION,
-        )
-
         val A11Y_STRINGS = mapOf(
             "a11y_key_shift" to org.fcitx.fcitx5.android.R.string.a11y_key_shift,
             "a11y_key_backspace" to org.fcitx.fcitx5.android.R.string.a11y_key_backspace,
             "a11y_key_switch_language" to org.fcitx.fcitx5.android.R.string.a11y_key_switch_language,
+            SceneA11y.SHIFT_ONCE to org.fcitx.fcitx5.android.R.string.a11y_state_shift_once,
+            SceneA11y.CAPS_LOCK to org.fcitx.fcitx5.android.R.string.a11y_state_caps_lock,
         )
     }
 }

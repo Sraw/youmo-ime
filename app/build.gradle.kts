@@ -59,6 +59,9 @@ fun Test.unitTestSettings() {
     // some files of it; checked without
     systemProperty("oldRenderBaseline.dir", project.findProperty("oldRenderBaseline")?.toString()?.let { rootProject.file(it).path }.orEmpty())
     systemProperty("oldRenderBaseline.only", project.findProperty("oldRenderBaselineOnly")?.toString().orEmpty())
+    // the keys drawn by the canvas in every harness but where a test chose (060-render-p2 S3: KeyboardHarness):
+    // -PcanvasKeyboard, the tests written on ShownKey run on the new drawing
+    systemProperty("youmo.canvasKeyboard", project.hasProperty("canvasKeyboard").toString())
     inputs.files(fileTree("src/test/baseline-060")).withPropertyName("oldRenderBaseline")
         .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
 }

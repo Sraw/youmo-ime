@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.engine.table.TableRoots
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 import org.junit.After
@@ -237,6 +238,7 @@ class TablesKeysUatTest {
             val erbi = TableKeyboard(InputMethodCatalog.ERBI, setOf(';', '\'', ',', '.', '/', '*'), false, KeyLabels.NONE, null)
             val h = harness(InputMethodCatalog.ERBI, "二笔", erbi)
             fun left(v: View) = IntArray(2).also(v::getLocationInWindow)[0]
+            fun left(k: ShownKey) = k.bounds.left
             val semicolon = h.view(R.id.button_semicolon)
             val l = h.key("l")
             assertTrue(h.shown(semicolon))

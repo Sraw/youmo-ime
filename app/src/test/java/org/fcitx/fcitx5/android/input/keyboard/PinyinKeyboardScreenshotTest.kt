@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.InputMethodEntry
@@ -45,7 +46,7 @@ class PinyinKeyboardScreenshotTest {
             val labels = h.texts()
             for (l in listOf("QW", "ER", "OP", "AS", "L", "ZX", "BN", "M", "分词")) assertTrue("$l in $labels", l in labels)
             // the code row a touch tall, for the syllables on it
-            assertEquals(h.inputView.resources.displayMetrics.density * CodeRowHeight.STRIP_DP, h.box(h.inputView.findViewById(R.id.code_row_text)).height().toFloat(), 1f)
+            assertEquals(h.inputView.resources.displayMetrics.density * CodeRowHeight.STRIP_DP, h.box(h.inputView.findViewById<View>(R.id.code_row_text)).height().toFloat(), 1f)
             h.capture("PinyinKeyboardScreenshotTest/keys14_light")
         }
     }
@@ -58,7 +59,7 @@ class PinyinKeyboardScreenshotTest {
             h.start()
             h.relayout()
             val density = h.inputView.resources.displayMetrics.density
-            fun row() = h.box(h.inputView.findViewById(R.id.code_row_text)).height().toFloat()
+            fun row() = h.box(h.inputView.findViewById<View>(R.id.code_row_text)).height().toFloat()
             val keys = h.box(h.board).height()
             assertEquals(density * CodeRowHeight.STRIP_DP, row(), 1f)
             val english = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "", "En", "en", "keyboard", false)
@@ -88,7 +89,7 @@ class PinyinKeyboardScreenshotTest {
                 val density = h.inputView.resources.displayMetrics.density
                 val screenH = h.inputView.resources.displayMetrics.heightPixels
                 fun keys() = h.box(h.board).height()
-                fun area() = h.box(h.board).bottom - h.box(h.inputView.findViewById(R.id.code_row_text)).top
+                fun area() = h.box(h.board).bottom - h.box(h.inputView.findViewById<View>(R.id.code_row_text)).top
                 val tall = keys()
                 assertTrue("area ${area()} of $screenH", area() <= 0.70 * screenH + 2)
                 val english = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "", "En", "en", "keyboard", false)

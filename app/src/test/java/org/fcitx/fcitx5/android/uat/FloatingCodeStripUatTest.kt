@@ -223,7 +223,7 @@ class FloatingCodeStripUatTest {
         assertTrue(syllables().isShown)
         assertEquals(listOf("ni", "bu", "mi"), syllableItems().map { it.text.toString() })
         val s = h.box(syllables())
-        assertTrue("$s in $box", s.left >= h.box(h.inputView.findViewById(R.id.code_row_text)).right - 1 && s.right <= box.right)
+        assertTrue("$s in $box", s.left >= h.box(h.inputView.findViewById<View>(R.id.code_row_text)).right - 1 && s.right <= box.right)
         h.api.calls.clear()
         h.tap(syllableItems().first())
         assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") })
