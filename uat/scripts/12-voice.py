@@ -692,12 +692,6 @@ def vo28(d):
     raise Blocked("3 次都是模拟器声卡出错（pcm_readi failed）")
 
 
-def ex_mid(s):
-    """the middle of the keyboard's width, where the mask is"""
-    xs = [n.c[0] for n in s.ime()]
-    return (min(xs) + max(xs)) // 2 if xs else 540
-
-
 def vo28_try(d):
     """one sentence said, stopped on the mask, then the keyboard's Enter; None if the emulator's sound card failed"""
     host_calm()

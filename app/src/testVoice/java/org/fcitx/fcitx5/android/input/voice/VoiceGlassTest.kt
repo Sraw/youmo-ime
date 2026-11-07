@@ -126,24 +126,25 @@ class VoiceGlassTest {
         val board = FrameLayout(ctx)
         val colors = intArrayOf(Color.RED, Color.BLUE, Color.GREEN, Color.WHITE)
         val card = view(Color.YELLOW).apply { alpha = 0f }
-        // four quarters, the card off the board's corner: 80 in, 160 down, 480 × 400
+        // four quarters, the card over where they meet (240..400 each way): taken from anywhere else, x or y,
+        // a corner comes out another quarter's colour
         lay(
             board, 640, 640,
             view(colors[0]) to Rect(0, 0, 320, 320),
             view(colors[1]) to Rect(320, 0, 640, 320),
             view(colors[2]) to Rect(0, 320, 320, 640),
             view(colors[3]) to Rect(320, 320, 640, 640),
-            card to Rect(80, 160, 560, 560),
+            card to Rect(240, 240, 400, 400),
         )
         val glass = VoiceGlass(Color.TRANSPARENT)
         glass.take(board, card)
-        glass.setBounds(0, 0, 480, 400)
-        val out = Bitmap.createBitmap(480, 400, Bitmap.Config.ARGB_8888)
+        glass.setBounds(0, 0, 160, 160)
+        val out = Bitmap.createBitmap(160, 160, Bitmap.Config.ARGB_8888)
         glass.draw(Canvas(out))
         assertEquals(colors[0], out.getPixel(0, 0))
-        assertEquals(colors[1], out.getPixel(479, 0))
-        assertEquals(colors[2], out.getPixel(0, 399))
-        assertEquals(colors[3], out.getPixel(479, 399))
+        assertEquals(colors[1], out.getPixel(159, 0))
+        assertEquals(colors[2], out.getPixel(0, 159))
+        assertEquals(colors[3], out.getPixel(159, 159))
     }
 
     @Test
