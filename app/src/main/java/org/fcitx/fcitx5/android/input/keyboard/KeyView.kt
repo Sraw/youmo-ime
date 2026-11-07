@@ -428,7 +428,7 @@ internal fun keyTextScale(context: Context): Float {
     return KeyTextScale.of(keyboardCompact(), floating)
 }
 
-private fun Context.inInputMethod(): Boolean {
+internal fun Context.inInputMethod(): Boolean {
     var at: Context? = this
     while (at is ContextWrapper) {
         if (at is InputMethodService) return true

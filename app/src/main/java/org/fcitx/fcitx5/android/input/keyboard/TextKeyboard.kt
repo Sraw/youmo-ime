@@ -36,6 +36,23 @@ import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.canvas.AndroidTextMeasurer
+import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
+import org.fcitx.fcitx5.android.input.scene.SceneMarks
+import org.fcitx.fcitx5.android.input.scene.TextBoardState
+import org.fcitx.fcitx5.android.input.theme.ThemeLook
+import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.Scene
+import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
+import org.fcitx.fcitx5.android.scene.engine.Shift
+import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
+import org.fcitx.fcitx5.android.scene.engine.Texts
+import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard as SceneSplit
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
@@ -43,6 +60,12 @@ import org.fcitx.fcitx5.android.input.popup.PopupOverridesCache
 import org.fcitx.fcitx5.android.input.popup.PopupPreset
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import splitties.views.imageResource
+import splitties.views.dsl.constraintlayout.bottomOfParent
+import splitties.views.dsl.constraintlayout.lParams
+import splitties.views.dsl.constraintlayout.leftOfParent
+import splitties.views.dsl.constraintlayout.rightOfParent
+import splitties.views.dsl.constraintlayout.topOfParent
+import splitties.views.dsl.core.add
 
 @SuppressLint("ViewConstructor")
 class TextKeyboard private constructor(
@@ -212,6 +235,7 @@ class TextKeyboard private constructor(
         set(value) {
             field = value
             showAddressKeys()
+            canvas?.invalidateScene()
         }
 
     private val showLangSwitchKey = AppPrefs.getInstance().keyboard.showLangSwitchKey
@@ -244,6 +268,15 @@ class TextKeyboard private constructor(
     override val charShortcutMarks: Boolean
         get() = table?.let { it.labels == KeyLabels.ROOTS && it.roots != null } != true
 
+    // the table's code key the letters had no room for, as last shown (showSemicolonKey): the drawn keys' too
+    private var extraKey: Char? = null
+
+    // the keys' views by their theme names (KeyDef.name), in the layout's order, a split row's G the
+    // second's: before init, which draws the keys with the canvas
+    private val keyViews: Map<String, List<KeyView>> by lazy {
+        keyRows.flatMap { it.allViews.filterIsInstance<KeyView>().toList() }.filter { it.themeKey != null }.groupBy { it.themeKey!! }
+    }
+
     // Return as it was last shown: while something is typed, a table shows 确定 in its place
     private var returnAppearance = ReturnKeyAppearance.Enter
 
@@ -263,6 +296,92 @@ class TextKeyboard private constructor(
         confirm.mainText.text = context.getString(R.string.key_confirm)
         showLookUpKey()
         showConfirmKey()
+        // 060's redraw while it is made: the keys drawn by the scene engine, the views under it doing the work
+        if (AppPrefs.getInstance().internal.canvasKeyboard.getValue()) drawKeysWith(canvasView())
+    }
+
+    // the keys drawn by [view] from now on: their rows left laid out but not drawn, nor read out (the view's nodes are)
+    private fun drawKeysWith(view: KeyboardCanvasView) {
+        canvas = view
+        keyRows.forEach { it.visibility = View.INVISIBLE }
+        add(view, lParams(0, 0) {
+            topOfParent()
+            bottomOfParent()
+            leftOfParent()
+            rightOfParent()
+        })
+        // a key's press shown by the canvas as its view takes it
+        keyViews.values.flatten().forEach { v -> v.onPressedChanged = { on -> view.showPressed(v, on) } }
+    }
+
+    private fun canvasView(): KeyboardCanvasView {
+        val look = ThemeManager.shownLook(theme)
+        val fonts = SceneFonts(look)
+        val measurer = AndroidTextMeasurer(fonts)
+        return KeyboardCanvasView(context, look, keyImages, fonts, object : KeyboardCanvasView.Host {
+            override fun scene(width: Int, height: Int) = scene(look, measurer, width, height)
+            override fun keyView(node: KeyNode) = keyViews[node.id]?.let { it.getOrNull(node.copy) ?: it.firstOrNull() }
+        })
+    }
+
+    // what the keys show now, as the scene engine's environment (qwerty.xml's when= and bindings)
+    private fun scene(look: ThemeLook, measurer: TextMeasurer, width: Int, height: Int): Scene? {
+        val sceneTheme = SceneThemes.of(look, theme.name, theme.isDark) ?: return null
+        val layout = SceneLayouts.qwerty(context) ?: return null
+        val config = resources.configuration
+        val floating = if (ThemeManager.prefs.floatingKeyboard.getValue() && context.inInputMethod()) {
+            val screen = config.screenWidthDp
+            FloatingKeyboard.textScale(FloatingKeyboard.widthDp(screen), screen).toDouble()
+        } else {
+            null
+        }
+        val state = TextBoardState(
+            semicolonScheme = semicolonKey(imeName, EngineState.shuangpinScheme),
+            table = imeName in InputMethodCatalog.TABLES,
+            tableExtra = extraKey,
+            lookingUp = table?.lookingUp == true,
+            composing = returnAppearance.composing,
+            address = address,
+            langKey = showLangSwitchKey.getValue(),
+            holdVoice = holdsToTalk,
+        )
+        val texts = Texts(
+            imeName = shownImeName.orEmpty(),
+            comma = transformPunctuation(","),
+            period = transformPunctuation("."),
+            returnLabel = returnAppearance.label(context).toString(),
+            returnIcon = SceneIcons.returnName(returnAppearance.icon),
+            keepUppercase = keepLettersUppercase,
+            punctuation = punctuationMapping,
+            // the formats as they are: the engine fills their places (getString with no arguments formats nothing)
+            a11yGrouped = context.getString(R.string.a11y_key_grouped),
+            a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
+        )
+        val marks = SceneMarks.settings(
+            KeyShortcutsCache.current, AppPrefs.getInstance().keyboard.swipeLayers.getValue().layers, markSpots(),
+            charShortcutMarks, SceneMarks.names(layout),
+        )
+        val env = Env(
+            width.toDouble(), height.toDouble(), resources.displayMetrics.density.toDouble(),
+            landscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE,
+            compact = keyboardCompact(),
+            floating = floating,
+            split = isSplit,
+            // one-handed and at a side InputView placed the keyboard already: its keys fill what it was given
+            oneHanded = SceneSplit.Dock.FULL,
+            dock = SceneSplit.Dock.FULL,
+            dark = theme.isDark,
+            flat = !look.keys.blocks,
+            input = state.input(),
+            shift = when (capsState) {
+                CapsState.None -> Shift.None
+                CapsState.Once -> Shift.Once
+                CapsState.Lock -> Shift.Lock
+            },
+            texts = texts,
+            marks = marks,
+        )
+        return SceneBuilder(sceneTheme, env, measurer).build(layout, emptyMap()).orNull()
     }
 
     override fun onAttachedToWindow() {
@@ -303,6 +422,7 @@ class TextKeyboard private constructor(
         showKey(caps, !isTable)
         findViewById<View>(R.id.button_lookup)?.let { showKey(it, isTable && !on) }
         findViewById<View>(R.id.button_lookup_on)?.let { showKey(it, isTable && on) }
+        canvas?.invalidateScene()
     }
 
     // 确定 in Return's place while a table has a code typed: what Return does then, said
@@ -310,6 +430,7 @@ class TextKeyboard private constructor(
         val confirms = returnAppearance.composing && imeName in InputMethodCatalog.TABLES
         showKey(`return`, !confirms)
         showKey(confirm, confirms)
+        canvas?.invalidateScene()
     }
 
     private val textKeys: List<TextKeyView> by lazy {
@@ -324,6 +445,8 @@ class TextKeyboard private constructor(
     private fun showSemicolonKey() {
         // the table's code key the face has nowhere else: not on a corner its swipe types, unless the corners show roots
         val extra = table?.extraKey(EXTRA_SLOTS, BOTTOM_ROW_KEYS + if (table?.labelled == true) emptySet() else cornerKeys())
+        extraKey = extra
+        canvas?.invalidateScene()
         findViewById<View>(R.id.button_semicolon)?.let { showKey(it, (!isSplit && semicolonKey(imeName, EngineState.shuangpinScheme)) || extra == ';') }
         findViewById<View>(R.id.button_star)?.let { showKey(it, extra == '*') }
     }
@@ -417,6 +540,7 @@ class TextKeyboard private constructor(
     }
 
     override fun onAttach() {
+        canvas?.invalidateScene()
         capsState = CapsState.None
         autoCaps.changed()
         updateCapsButtonIcon()
@@ -440,6 +564,7 @@ class TextKeyboard private constructor(
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         showInputMethodName(space, ime)
         imeName = ime.uniqueName
+        canvas?.invalidateScene()
         // what the engine said last, if of this one: a table's state comes with its first answer
         showTable(EngineState.tableKeyboard.value)
         showLookUpKey()
@@ -529,10 +654,12 @@ class TextKeyboard private constructor(
                 CapsState.Lock -> context.getString(R.string.a11y_state_caps_lock)
             }
         )
+        canvas?.invalidateScene()
     }
 
     private fun updateLangSwitchKey(visible: Boolean) {
         lang.visibility = if (visible) View.VISIBLE else View.GONE
+        canvas?.invalidateScene()
     }
 
     // the letters' sizes and places set for the table shown: a Shift changes their text alone, and
@@ -601,6 +728,7 @@ class TextKeyboard private constructor(
             }
         }
         if (cornersChanged && isAttachedToWindow) showSwipeMarks()
+        canvas?.invalidateScene()
     }
 
 

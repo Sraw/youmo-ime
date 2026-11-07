@@ -211,8 +211,34 @@ tasks.register<Test>("testTextDebugUnitTestAt29") {
     useJUnit()
 }
 
+// The layouts the scene engine draws (060; KeyboardCanvasView behind internal.canvasKeyboard): one copy,
+// lib/keyboard-scene's, which its tests and snapshots hold; raw resources, so Robolectric reads them too
+// (the unit tests get the app's resources, not its assets: unit-test-resources)
+abstract class SceneLayoutsTask : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NAME_ONLY)
+    abstract val layouts: ConfigurableFileCollection
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val raw = outputDir.get().dir("raw").asFile
+        raw.deleteRecursively()
+        raw.mkdirs()
+        layouts.forEach { it.copyTo(File(raw, "scene_layout_${it.name}")) }
+    }
+}
+
+val sceneLayouts = tasks.register<SceneLayoutsTask>("copySceneLayouts") {
+    layouts.from(rootProject.file("lib/keyboard-scene/src/commonTest/data/qwerty.xml"))
+    outputDir.set(layout.buildDirectory.dir("generated/scene-layouts"))
+}
+
 androidComponents {
     onVariants { variant ->
+        variant.sources.res?.addGeneratedSourceDirectory(sceneLayouts, SceneLayoutsTask::outputDir)
         // The build type's resValue entries (app_icon, app_icon_round, app_name) point at launcher
         // resources that live in the app's own resource set. AGP copies them into the
         // androidTest APK too, where those references cannot be resolved and resource

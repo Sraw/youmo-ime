@@ -134,6 +134,15 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
     var onRepeatListener: ((View) -> Unit)? = null
     var onGestureListener: OnGestureListener? = null
 
+    /** Told each change of [isPressed]: a key drawn by another view (KeyboardCanvasView) shows its press so. */
+    var onPressedChanged: ((Boolean) -> Unit)? = null
+
+    override fun setPressed(pressed: Boolean) {
+        val was = isPressed
+        super.setPressed(pressed)
+        if (was != pressed) onPressedChanged?.invoke(pressed)
+    }
+
     var soundEffect: InputFeedbacks.SoundEffect = InputFeedbacks.SoundEffect.Standard
 
     init {

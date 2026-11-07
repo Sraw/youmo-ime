@@ -42,6 +42,7 @@ import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
+import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupKeyboardUi
@@ -82,6 +83,10 @@ abstract class BaseKeyboard(
 
     private val spaceSwipeMoveCursor = prefs.keyboard.spaceSwipeMoveCursor
     private val spaceKeys = mutableListOf<KeyView>()
+
+    /** Holding the space talks here ([updateSpaceBadges]): the microphone on it. Before init, which sets it. */
+    protected var holdsToTalk = false
+        private set
 
     // the theme's key images this keyboard draws, each file once: decoded off the main thread, the keys
     // drawn as their kinds till they are in (ThemeAssets)
@@ -326,6 +331,8 @@ abstract class BaseKeyboard(
     // holding the space to talk: a microphone on every keyboard's space says so, or no one would know
     private fun updateSpaceBadges(behavior: SpaceLongPressBehavior) {
         val voice = behavior.talks(VoiceFeature.AVAILABLE, inPasswordField)
+        holdsToTalk = voice
+        canvas?.invalidateScene()
         val icon = if (voice) R.drawable.ic_baseline_keyboard_voice_24 else null
         // a long press that does nothing here buzzes for nothing either
         val takes = spaceLongPressTakesTouch(behavior, VoiceFeature.AVAILABLE, inPasswordField)
@@ -588,6 +595,16 @@ abstract class BaseKeyboard(
     private class TouchTarget(val view: KeyView, val hitRect: Rect)
 
     /**
+     * The keys drawn by the scene engine over this keyboard's own ([KeyboardCanvasView]), which are
+     * not drawn then but still do the work: the touches handed to them as vivo's workaround hands them
+     * ([routesTouches]), each to the key the scene's hit areas say. Null: the keys draw themselves.
+     */
+    protected var canvas: KeyboardCanvasView? = null
+
+    // the keys' views take touches as the keyboard hands them: vivo's workaround, or keys drawn by the canvas
+    private val routesTouches get() = vivoKeypressWorkaround || canvas != null
+
+    /**
      * HashMap of [PointerId (Int)][MotionEvent.getPointerId] to [TouchTarget]
      * for custom touch event dispatching
      */
@@ -603,6 +620,10 @@ abstract class BaseKeyboard(
     }
 
     private fun findTouchTarget(event: MotionEvent, pointerIndex: Int): TouchTarget? {
+        canvas?.let { c ->
+            val hit = Rect()
+            return c.keyViewAt(event.getX(pointerIndex) - c.left, event.getY(pointerIndex) - c.top, hit)?.let { TouchTarget(it, hit) }
+        }
         val x0 = event.getX(pointerIndex).roundToInt()
         val y0 = event.getY(pointerIndex).roundToInt()
         val rowHitRect = Rect()
@@ -643,12 +664,12 @@ abstract class BaseKeyboard(
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         // intercept ACTION_DOWN and all following events will go to parent's onTouchEvent
-        return if (vivoKeypressWorkaround && ev.actionMasked == MotionEvent.ACTION_DOWN) true
+        return if (routesTouches && ev.actionMasked == MotionEvent.ACTION_DOWN) true
         else super.onInterceptTouchEvent(ev)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (vivoKeypressWorkaround) {
+        if (routesTouches) {
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     releaseAllTouchTargets()
@@ -734,7 +755,8 @@ abstract class BaseKeyboard(
     }
 
     /** The input method name last shown on the Space key; null until the first update. */
-    private var shownImeName: String? = null
+    protected var shownImeName: String? = null
+        private set
 
     /** Shows [ime] on [space]: its name, and its sub-mode's ([spaceLabel]). */
     protected fun showInputMethodName(space: TextKeyView, ime: InputMethodEntry) {

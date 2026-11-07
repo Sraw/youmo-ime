@@ -311,6 +311,19 @@ is typed a key's swipe is a stroke; on the lift the path, in key widths both way
 sent as the engine's stroke key, `KeyAction.SymAction` of `Keyboard.strokeKey`; a shape it reads
 as none (up, up to the left) is dropped.
 
+The 060 redraw's first step (`input/keyboard/canvas/`, `AppPrefs.Internal.canvasKeyboard`, 开发者 →
+新绘制 26 键, off): `TextKeyboard` adds a `KeyboardCanvasView` over its rows and makes them
+INVISIBLE, still laid out (the popups, glide's key map and the gestures use their places). The canvas
+draws the scene `lib/keyboard-scene` makes of qwerty.xml in the look converted by ime-core's
+`LookTheme` (`ScenePainter`: one `RenderNode` a key a face, a press swapping that key's alone; a
+software canvas, a screenshot's, gets the ops drawn straight); `TextKeyboard.scene` builds the
+`Env` from its state (`TextBoardState`, `SceneMarks`, the texts), made again on `invalidateScene()`,
+which each of its show functions calls. `BaseKeyboard` intercepts every touch as the vivo workaround
+does and hands it to the view of the key the scene's `keyAt` names (`findTouchTarget`), so a key's
+gestures are its view's, unchanged; the view's `onPressedChanged` (CustomGestureView) shows the press.
+TalkBack reads the canvas's `ExploreByTouchHelper`: a virtual node a key, its words the scene's
+`a11y` (an `a11y_*` name the app's string), id, state and actions its view's.
+
 ### Hardware keyboard
 
 A key pressed on one hides the touch keyboard and shows candidates by the cursor; a tap on the field
