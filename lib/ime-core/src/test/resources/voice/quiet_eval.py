@@ -36,7 +36,7 @@ EN = os.environ.get('VOICE_QUIET_EN', os.path.join(CLIPS, 'en-short'))
 SR, W = 16000, 512
 TAIL = SR * 292 // 100
 LOUD, RISE, SHORT = -50.0, 8.0, 12
-RULES = ['base', 'r1', 'a', 'b2', 'h2', 'h3']
+RULES = ['base', 'r1', 'a', 'b2', 'h2', 'h3', 'h4']
 # the app's hotwords (the pack's 78 thousand, score 1.5) and bpe vocabulary: they change what the room is heard as
 ASSETS = os.environ.get('VOICE_ASSETS', f'{HOME}/workspace/youmo-ime/app/build/generated/voice-assets/voice')
 EN_PHRASES = ["OK", "No", "Yes", "Hi", "Hello", "Thank you", "Good night", "See you", "I'm sorry", "Sounds good",
@@ -92,6 +92,20 @@ class Talk:
         l = s.third(a, b)
         return l is not None and any(s.voiced[a // W:-(-b // W)]) and (l >= LOUD or l - s.floor() >= RISE)
 
+    def loud_voiced(s, a, b):
+        l = s.third(a, b)
+        return l is not None and any(s.voiced[a // W:-(-b // W)]) and (l >= LOUD or l - s.floor() >= RISE)
+
+    def h4(s, segs):
+        """measured, not taken: h3, and every segment after one typed held to the short Latin bar
+        whatever its text (the room after the speech heard as more); loses a second soft sentence"""
+        out, typed = [], False
+        for a, b, t in segs:
+            keep = s.loud_voiced(a, b) if typed or latin_short(t) else s.h3(t, a, b)
+            if keep and clean(t): typed = True
+            if keep: out.append(t)
+        return clean(''.join(out))
+
     def h3(s, t, a, b):
         if not latin_short(t): return True
         l = s.third(a, b)
@@ -134,7 +148,7 @@ def run_talk(x):
         best = max(best, run)
     return dict(base=whole, r1=whole if r1 else '', a=whole if best >= 3 else '', b2=whole if any(tk.voiced) else '',
                 h2=clean(''.join(t for a, b, t in segs if tk.h2(t, a, b))),
-                h3=clean(''.join(t for a, b, t in segs if tk.h3(t, a, b))), segs=segs)
+                h3=clean(''.join(t for a, b, t in segs if tk.h3(t, a, b))), h4=tk.h4(segs), segs=segs)
 
 
 def ed(a, b):
@@ -169,16 +183,40 @@ def read(path):
     return a
 
 
+def sparse(n):
+    """the clip microphone's floor between clips: one sample of ±1 in 128"""
+    x = np.zeros(n, np.float32); x[::128] = 1 / 32768; return x
+
+
+def fade(a, ms=50):
+    n = SR * ms // 1000; r = np.linspace(0, 1, n, dtype=np.float32); a = a.copy(); a[:n] *= r; a[-n:] *= r[::-1]; return a
+
+
+def edge(a, v, k, rng):
+    """repro: the clip (hard cut) between the clip mic's floor, 3 s of it after; i: −60 pink room before
+    and after instead (joined at the clip's hard edges); i_fade: i with the clip faded; ii: repro with
+    the clip faded"""
+    if v in ('i_fade', 'ii'): a = fade(a)
+    if v in ('i', 'i_fade'):
+        pre = room('pink', -60, k, rng) if k else np.zeros(0, np.float32)
+        return np.concatenate([pre, a, room('pink', -60, SR * 3, rng)])
+    return np.concatenate([sparse(k), a, sparse(SR * 3)])
+
+
 def job(j):
     rng = np.random.default_rng(j['seed'])
     a = read(j['wav']) if j.get('wav') else np.zeros(SR * 3, np.float32)
     if j.get('L') is not None: a = a * np.float32(10 ** ((j['L'] - level(a)) / 20))
     elif j.get('att'): a = a * np.float32(10 ** (-j['att'] / 20))
     if j.get('then'):   # a second sentence after a pause, at the same level
-        b = read(j['then']); b = b * np.float32(10 ** ((j['L'] - level(b)) / 20))
+        b = read(j['then'])
+        if j.get('L') is not None: b = b * np.float32(10 ** ((j['L'] - level(b)) / 20))
         a = np.concatenate([a, np.zeros(int(SR * j['gap']), np.float32), b])
-    x = np.concatenate([np.zeros(int(SR * j.get('pre', 0.5)), np.float32), a, np.zeros(int(SR * j.get('post', 0.8)), np.float32)])
-    x = x + room(j.get('kind', 'white'), j.get('R'), len(x), rng)
+    if j.get('edge'):   # VO-32's clip, k samples after the opening, its ends as the variant says
+        x = edge(a, j['edge'], j['k'], rng)
+    else:
+        x = np.concatenate([np.zeros(int(SR * j.get('pre', 0.5)), np.float32), a, np.zeros(int(SR * j.get('post', 0.8)), np.float32)])
+        x = x + room(j.get('kind', 'white'), j.get('R'), len(x), rng)
     out = run_talk(x.astype(np.float32))
     r = dict(j); r['segs'] = out.pop('segs'); r['out'] = out
     if j.get('ref') is not None:
@@ -216,6 +254,10 @@ def jobs():
         for L in (-30, -40, -50, -52, -54, -56, -58, -60):
             for sid in (0, 1, 2):
                 for i, p in enumerate(EN_PHRASES): add(set='en', wav=f'{EN}/{sid}-{i:02d}.wav', ref=p, L=L, R=R)
+        # VO-32's 「你好。欢迎您」: nihao-q44-room as cut hard (clips-bak) at 32 offsets, four surroundings
+        if R == -60 and os.path.exists(f'{CLIPS}/hard/nihao-q44-room.wav'):
+            for v in ('repro', 'i', 'i_fade', 'ii'):
+                for k in range(0, 512, 16): add(set=f'edge-{v}', wav=f'{CLIPS}/hard/nihao-q44-room.wav', ref='你好', edge=v, k=k, R=None)
         # the room going on 3 s after the speech: what more it is heard as (tail; the q44 clips already in it)
         for c, ref in (('nihao-q44-room', '你好'), ('zouba-q44-room', '我们走吧'), ('nihao-q44', '你好'), ('zouba-q44', '我们走吧'), ('nihao', '你好'), ('zouba', '我们走吧'), ('jintian', '今天天气很好')):
             for _ in range(8): add(set='tail', wav=f'{CLIPS}/{c}.wav', ref=ref, R=R, post=3.0, kind='pink')

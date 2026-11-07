@@ -1,10 +1,11 @@
 """The spoken phrases of uat/12-voice.md as WAVs, for 12-voice.py on the emulator (its microphone is
-the host's PulseAudio source that uat.py plays them into). Made on this machine, offline: Kokoro
+the voice debug build's clip microphone, VoiceClipProvider, that uat.py's Device.say writes them into). Made on this machine, offline: Kokoro
 v1.1-zh through sherpa-onnx (the models of ~/voice-eval, VOICE_EVAL to move it), each checked by the
 X-ASR model of the same place so a clip that the recognizer cannot follow is not taken for the app's
-fault. A cough is filtered noise; `room` 3 s of pink noise at some -60 dBFS (`room-long` 10 s) (VO-09: digital silence
-shows no gain). `<name>-q44` is the clip 44 dB down, speech said softly (VO-24), `<name>-q44-room`
-the same in `room`'s noise. Out:
+fault. A cough is filtered noise; `room` 3 s of pink noise at some -60 dBFS, `room-long` 10 s of it (VO-09:
+digital silence shows no gain). `<name>-q44` is the clip 44 dB down, speech said softly (VO-24),
+`<name>-q44-room` the same in a room noise of its own length (VO-32). The room clips fade in and out
+over 50 ms. Out:
 dev/uat-out/voice-clips/<name>.wav, 16 kHz mono, and beside each spoken one <name>.json, where its
 speech starts and ends (`speech_start_s`, `speech_end_s`, as voice-eval's tailquiet/tq.py finds the
 end): VO-23 lifts the finger relative to that end.
@@ -92,8 +93,9 @@ def room(n=3 * RATE):
 
 
 def fade(s, ms=50):
-    """the room faded in and out at the clip's ends: cut hard, its step to the clip mic's floor
-    is heard as more words (「你好。欢迎您」, quiet_eval.py's tail; none with the fade)"""
+    """the room faded in and out at the clip's ends: a cleaner stimulus. Suspected, not shown, in VO-32's
+    occasional 「你好。欢迎您」: offline its hard edges in more room gave 「欢迎」 15/32, faded 9/32, the clip
+    mic's floor around it 0/32 either way (specs/app.md, Quiet)"""
     n = RATE * ms // 1000
     ramp = np.linspace(0, 1, n, dtype=np.float32)
     s = s.copy()

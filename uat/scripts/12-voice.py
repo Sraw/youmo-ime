@@ -291,9 +291,10 @@ def vo09(d):
     # the room all through the hold, lifted at 6 s while it plays: no floor after it for the
     # recognizer to end on, the room itself judged (dictate's 3 s clip then silence passed without VoiceQuiet)
     x, y = hold_space(d)
-    p = d.say("room-long", wait=False)
+    p = None
     shown = []
     try:
+        p = d.say("room-long", wait=False)
         end = time.time() + 6
         while time.time() < end:
             shown += [n.text for n in d.screen().nodes if n.text and n.pkg == PKG and n.text not in shown]
@@ -301,7 +302,8 @@ def vo09(d):
         d.touch(("up", x, y))
         t = settle(d, seen=shown)
     finally:
-        p.kill()
+        if p:
+            p.kill()
     log = capture_log(d)
     # with the debug log, the noise must have reached the app at its level (-60 dBFS played)
     if log and log["envPeak"] is not None:

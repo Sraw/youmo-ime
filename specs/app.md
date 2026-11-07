@@ -1000,14 +1000,22 @@ in CI keeps the voice source set compiling.
   room typed 8 of 15 talks (0), keyboard 9 (2), traffic 10 (5), 30 dB down 16 of 60 (2).
 
   The room going on after the speech (quiet_eval's `tail`: 你好/我们走吧/今天天气很好, normal and
-  q44, 3 s of pink room after, R−60/−66, the app's hotwords) types nothing more: 0 of 112 with 「欢迎」
-  or any extra word (q44 alone misheard 您好/我们走了 as before). VO-32's occasional 「你好。欢迎您」 was the
-  clip: its room cut hard at both ends, the step down to the clip mic's floor heard as 「欢迎您好」
-  (tokens at 1.96–2.32 s, the cut at 2.11 s, no window voiced); with more room joined at its hard edges
-  across that step 15 of 32 start offsets, with 50 ms fades 0 of 32, the floor alone 0 of 32. The
-  clips fade (voice-clips.py); no rule changed. A rule holding every segment after a typed one to the
-  short Latin bar (h4) was measured and not taken: two soft sentences 1.5 s apart, R−60 L−54, lost
-  the second (CER 27.9% → 65.1%).
+  q44, and the faded *-q44-room clips; 3 s of pink room after, R−60/−66, the app's hotwords; 8 each,
+  112) typed 「欢迎」 0 times. Extra text: nihao-q44 at R−66 typed 「你好好」 2 of 8 (h3 and h4 alike);
+  zouba-q44-room at R−60 was misheard 4 of 8 (我们走了, 我没走到), as the q44 clips were before.
+
+  VO-32's occasional 「你好。欢迎您」 on the emulator is not explained; suspected, not shown: the
+  room clip's hard-cut edges. Offline (quiet_eval's `edge-*`: nihao-q44-room as cut hard, kept outside
+  the repo at voice-clips/hard/, k = 0..496 samples in, 32 offsets, 「欢迎」 in the typed text):
+  repro, the clip mic's floor (±1 in 128) before and 3 s after: 0/32; (i) −60 pink room before and
+  after instead, joined at the clip's hard edges: 15/32; i_fade, (i) with the clip faded 50 ms: 9/32;
+  (ii) the floor with the clip faded: 0/32. The emulator's case (the floor around it) was never
+  reproduced here, and fading lowers (i) but does not end it, so the edge is at most part of it; in
+  the one traced (i) talk the 「欢迎您好」 tokens sat at 1.96–2.32 s, the clip ending at 2.11 s, no window
+  voiced. The clips fade now (voice-clips.py) as a cleaner stimulus; the emulator A/B is in uat/12-voice.md
+  (VO-32). No rule changed: h4, every segment after a typed one held to the short Latin bar, ends
+  「欢迎」 in all four (0/32) but loses a second soft sentence 1.5 s after the first (`two`, CER R−60
+  L−54 29.1% → 67.0%, L−58 48.1% → 73.6%, R−66 L−58 24.7% → 35.4%).
 
   A premise: a pause is a segment of its own only past the recognizer's endpoint (1.2 s of silence
   after text). Room heard as text and Chinese begun within 1.2 s of it would be one segment, the
