@@ -54,3 +54,6 @@ case("PAN-19", needs="jvm:FieldPadUatTest.decimalAndSignedFieldsKeepTheDotAndThe
 
 
 case("PAN-20", needs="jvm:FieldPadUatTest.leavingANumberFieldGoesBackToTheLetters")(lambda d: None)
+
+
+case("PAN-21", needs="jvm:PanelUatTest.aSymbolHeldShowsTheViewsBubble")(lambda d: None)

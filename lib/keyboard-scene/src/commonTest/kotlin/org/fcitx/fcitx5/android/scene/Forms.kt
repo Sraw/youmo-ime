@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.scene
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Input
+import org.fcitx.fcitx5.android.scene.engine.MenuCell
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.layout.Fragment
@@ -123,4 +124,27 @@ object Forms {
 
     fun scene(board: String, env: Env, theme: Theme = Fixtures.materialLight): Scene =
         SceneBuilder(theme, env, FakeMeasurer).build(layout(board), fragments).ok()
+
+    /**
+     * The popups in [env], by name, as the app asks for them: a letter's bubble over a key 36 dp
+     * across, a shortcut's words in one; a long press's seven keys in two rows round the second
+     * column, the top row's last slot empty (PopupKeyboardUi's order); the edit menu's icons, its
+     * middle in focus and its last disabled (a password field's); 手写's 注 menu of words.
+     */
+    fun popups(env: Env): List<Pair<String, () -> Scene>> {
+        val b = SceneBuilder(Fixtures.materialLight, env, FakeMeasurer)
+        val key = 36 * env.density
+        val letters = listOf("a", "b", "c", "d", "e", "f", "g")
+        val edit = listOf("select-all", "cut", "copy", "paste", "undo").map { MenuCell(it, it) }
+        val reading = listOf(MenuCell("关", null), MenuCell("拼音", null), MenuCell("注音符号", null))
+        return listOf(
+            "preview-symbol" to { b.preview("g", key).ok() },
+            "preview-words" to { b.preview("快速输入", key, b.previewWordsSize().ok().first).ok() },
+            "keys" to {
+                b.popup(letters, listOf(listOf(2, 0, 1, 3), listOf(6, 4, 5, -1)), b.popupKeys(letters, 4, env.width).ok(), selected = 0).ok()
+            },
+            "menu-icons" to { b.menu(edit, edit.indices.toList(), selected = 2, disabled = setOf(4)).ok() },
+            "menu-words" to { b.menu(reading, listOf(1, 0, 2), selected = 0).ok() },
+        )
+    }
 }

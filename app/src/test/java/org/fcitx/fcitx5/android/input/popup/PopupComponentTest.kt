@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.popup
 
 import android.graphics.Rect
+import android.util.Log
 import android.view.ContextThemeWrapper
 import android.view.View
 import android.view.ViewGroup
@@ -17,10 +18,17 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.junit.Assert.assertEquals
+import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
+import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mechdancer.dependency.DynamicScope
@@ -29,6 +37,7 @@ import org.mechdancer.dependency.plusAssign
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import timber.log.Timber
 
 /**
  * The bubble over a key pressed, as the finger moves on: a letter's preview sends an update on every
@@ -40,7 +49,13 @@ import org.robolectric.annotation.Config
 @Config(application = FcitxApplication::class)
 class PopupComponentTest {
 
+    @get:Rule
+    val prefs = PrefsRule()
+
     private val popup = PopupComponent()
+
+    // read by the popups as they first show one (the input view made again as it changes)
+    private fun canvas(on: Boolean = true) = prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, on)
 
     // in a root 150 px across (1 dp = 1 px): a long press of five has keys 30 wide
     private val key = Rect(55, 500, 95, 550)
@@ -113,8 +128,148 @@ class PopupComponentTest {
         assertTrue("wider for a text wider than the key", bubble.layoutParams.width > key.width())
     }
 
+    // 060-render-p2 S2: a key the canvas draws (no view) has its popups as the engine's scenes, in a
+    // view as large as the scene and its shadow's room, that room round where the views' popup is
+    @Test
+    fun aKeyTheCanvasDrawsHasItsBubbleAsASceneWhereTheViewsWouldBe() {
+        canvas()
+        send(PopupAction.PreviewAction(ID, "q", key))
+        val (width, left, top) = placedAt()
+        popup.dismissAll()
+        send(PopupAction.PreviewAction(SCENE, "q", key))
+        val scene = bubble as PopupSceneView
+        val out = scene.outset
+        assertTrue("room for the shadow: $out", out.bottom > 0)
+        val lp = scene.layoutParams as FrameLayout.LayoutParams
+        // 1 dp = 1 px here: the engine's sizes are the views'
+        assertEquals(listOf(width, left, top), listOf(lp.width - out.left - out.right, lp.leftMargin + out.left, lp.topMargin + out.top))
+        assertEquals(scene.sceneHeight + out.top + out.bottom, lp.height)
+        assertEquals("q", scene.scene!!.keys.single().label)
+        // a view's key next: a view's bubble, not the scene's put away
+        popup.dismissAll()
+        send(PopupAction.PreviewAction(ID, "q", key))
+        assertFalse(bubble is PopupSceneView)
+        popup.dismissAll()
+        send(PopupAction.PreviewAction(SCENE, "w", key))
+        assertTrue(bubble is PopupSceneView)
+    }
+
+    @Test
+    fun aSceneBubbleShowsTheUpdatedTextAndIsWiderForWords() {
+        canvas()
+        send(PopupAction.PreviewAction(SCENE, "q", key))
+        val scene = bubble as PopupSceneView
+        send(PopupAction.PreviewUpdateAction(SCENE, "1"))
+        assertEquals("1", scene.scene!!.keys.single().label)
+        // as the views' test: Robolectric measures a character 1 px
+        send(PopupAction.PreviewUpdateAction(SCENE, "w".repeat(60), words = true))
+        assertTrue("${scene.sceneWidth}", scene.sceneWidth > key.width())
+        assertEquals(scene.sceneWidth + scene.outset.left + scene.outset.right, bubble.layoutParams.width)
+    }
+
+    @Test
+    fun aSceneKeysLongPressIsTheEnginesSceneOverTheKey() {
+        canvas()
+        send(PopupAction.ShowKeyboardAction(SCENE, five, key))
+        layOut()
+        val keys = popup.root.getChildAt(0) as PopupSceneView
+        val out = keys.outset
+        // the keys' bottom the lift over the key, its shadow below
+        assertEquals(key.top - PopupComponent.LONG_PRESS_LIFT, keys.bottom - out.bottom)
+        // the columns round the key pressed, as the views lay them out (PopupKeyboardUiTest)
+        assertEquals(listOf("1", "2", "3", "4", "5"), keys.scene!!.keys.mapNotNull { it.label }.sorted())
+        assertEquals(keys.sceneWidth + out.left + out.right, keys.width)
+    }
+
+    // the canvas off (the default): nothing of the engine's, whatever the key
+    @Test
+    fun withTheCanvasOffNoPopupIsAScene() {
+        canvas(false)
+        for (key in listOf(NO_ID, SCENE)) {
+            send(PopupAction.PreviewAction(key, "q", this.key))
+            assertFalse("$key", bubble is PopupSceneView)
+            popup.dismissAll()
+            send(PopupAction.ShowKeyboardAction(key, five, this.key))
+            assertFalse("$key", popup.root.getChildAt(0) is PopupSceneView)
+            popup.dismissAll()
+        }
+    }
+
+    // a view of no id (a symbol's or an emoji's in their panels: PickerGridAdapter) is a view's key,
+    // its viewId NO_VIEW as a scene key's is: its popups are views under the canvas too
+    @Test
+    fun aViewOfNoIdKeepsTheViewsPopupsUnderTheCanvas() {
+        canvas()
+        send(PopupAction.PreviewAction(NO_ID, "，", key))
+        assertFalse(bubble is PopupSceneView)
+        popup.dismissAll()
+        send(PopupAction.ShowKeyboardAction(NO_ID, five, key))
+        assertFalse(popup.root.getChildAt(0) is PopupSceneView)
+    }
+
+    // what the engine cannot make (logged) is no popup this time, never one not drawn that a lift
+    // still types: the long press as one with no popup, the bubble none
+    @Test
+    fun aPopupTheEngineCannotMakeIsNoneAndALiftTypesNothing() {
+        canvas()
+        val logged = mutableListOf<String>()
+        val tree = object : Timber.Tree() {
+            override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
+                if (priority == Log.WARN) logged += message
+            }
+        }
+        Timber.plant(tree)
+        try {
+            popup.measuring = { TextMeasurer { _, _, _, _ -> error("no font") } }
+            send(PopupAction.PreviewAction(SCENE, "q", key))
+            assertEquals(0, popup.root.childCount)
+            send(PopupAction.ShowKeyboardAction(SCENE, five, key))
+            send(PopupAction.ShowMenuAction(SCENE, menu, key))
+            assertEquals(0, popup.root.childCount)
+            send(PopupAction.ChangeFocusAction(SCENE, 200f, 0f))
+            val lift = PopupAction.TriggerAction(SCENE).also { send(it) }
+            assertEquals(null, lift.outAction)
+            assertFalse(lift.outConsumed)
+            assertTrue(logged.toString(), logged.any { "not made" in it })
+        } finally {
+            Timber.uproot(tree)
+        }
+    }
+
+    // the focus moved and the engine could not make it: the scene before kept, the focus with it,
+    // so a lift types the key drawn selected
+    @Test
+    fun aFocusTheEngineCannotDrawStaysWhereItWas() {
+        canvas()
+        var broken = false
+        popup.measuring = { real -> TextMeasurer { t, f, w, size -> if (broken) error("no font") else real.measure(t, f, w, size) } }
+        fun lifted(key: KeyRef, moved: Boolean): KeyAction? {
+            send(PopupAction.ShowKeyboardAction(key, five, this.key))
+            layOut()
+            val view = popup.root.getChildAt(popup.root.childCount - 1) as PopupSceneView
+            // the first move is where the finger was as it opened: the focus moves from there
+            send(PopupAction.ChangeFocusAction(key, 20f, 25f))
+            val drawn = view.scene
+            broken = moved.not()
+            send(PopupAction.ChangeFocusAction(key, 200f, 25f))
+            if (!moved) assertSame(drawn, view.scene)
+            broken = false
+            return PopupAction.TriggerAction(key).also { send(it) }.outAction
+        }
+        val first = PopupAction.TriggerAction(SCENE).let {
+            send(PopupAction.ShowKeyboardAction(SCENE, five, key))
+            send(it)
+            it.outAction
+        }
+        assertNotEquals("a working move moves", first, lifted(KeyRef.scene("w", 1), moved = true))
+        assertEquals(first, lifted(KeyRef.scene("e", 2), moved = false))
+    }
+
     private companion object {
         val ID = KeyRef.view(1)
+        val NO_ID = KeyRef.view(View.NO_ID)
+        val SCENE = KeyRef.scene("q", 0)
+        val menu = KeyDef.Popup.Menu(arrayOf(KeyDef.Popup.Menu.Item("Emoji", 0, KeyAction.CommitAction("x"))))
     }
 
     // 九键's: the digit and letters as they are, the symbols shown as Chinese punctuation maps them

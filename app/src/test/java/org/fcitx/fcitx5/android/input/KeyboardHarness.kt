@@ -52,6 +52,8 @@ import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
+import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.robolectric.Robolectric
 import org.robolectric.RuntimeEnvironment
@@ -398,6 +400,16 @@ class KeyboardHarness(
         .filter { shown(it) && generateSequence(it as View) { p -> p.parent as? View }.none { p -> p is KeyView } }
         .toList()
 
+    /** A popup's key as shown: its label and where it is in the window. */
+    data class PopupKey(val text: String, val box: Rect)
+
+    /**
+     * The popup's keys up now as [popupKeys], drawn as views or, a key the canvas draws, as the
+     * engine's scene (060-render-p2 S2: no view per key); a scene's in the views' order, top row first.
+     */
+    fun popupChoices(): List<PopupKey> = popupKeys().map { PopupKey(it.text.toString(), box(it)) } +
+        all(inputView).filterIsInstance<PopupSceneView>().filter { shown(it) }.flatMap { sceneChoices(it, box(it)) }
+
     /**
      * A finger held on [v] past the long press, then slid onto the popup's key showing [pick]
      * (left where it is when null) and lifted. Returns the popup keys' labels as shown.
@@ -408,10 +420,10 @@ class KeyboardHarness(
         var y = b.exactCenterY()
         finger(MotionEvent.ACTION_DOWN, x, y)
         after(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
-        val popup = popupKeys()
-        val labels = popup.map { it.text.toString() }
+        val popup = popupChoices()
+        val labels = popup.map { it.text }
         if (pick != null) {
-            val t = box(popup.firstOrNull { it.text.toString() == pick } ?: error("no $pick in the popup: $labels"))
+            val t = (popup.firstOrNull { it.text == pick } ?: error("no $pick in the popup: $labels")).box
             // in steps, as a finger slides: the popup follows each move
             val (x0, y0) = x to y
             for (i in 1..4) {
@@ -686,6 +698,20 @@ class KeyboardHarness(
         inline fun <reified T : View> find(v: View): T? = all(v).firstNotNullOfOrNull { it as? T }
 
         /** [v] and every view under it, depth first. */
+        /**
+         * [v]'s keys with words, [at] where it is in the window: a bubble's, a long press's, a
+         * menu's words (the 注's pills, an item of no icon); a menu's icons are not, as their views
+         * (ImageView) are not among [popupKeys]. Top row first, then left to right.
+         */
+        fun sceneChoices(v: PopupSceneView, at: Rect): List<PopupKey> = v.scene?.keys.orEmpty()
+            .filter { it.kind == "popup" || it.kind == "preview" || (it.kind == "menu" && it.ops(false).none { op -> op is Op.Icon }) }
+            .sortedWith(compareBy({ it.bounds.top }, { it.bounds.left }))
+            .map { k ->
+                val l = at.left + v.outset.left
+                val t = at.top + v.outset.top
+                PopupKey(k.label.orEmpty(), Rect(l + k.bounds.left.toInt(), t + k.bounds.top.toInt(), l + k.bounds.right.toInt(), t + k.bounds.bottom.toInt()))
+            }
+
         fun all(v: View): Sequence<View> = sequence {
             yield(v)
             if (v is ViewGroup) for (i in 0 until v.childCount) yieldAll(all(v.getChildAt(i)))

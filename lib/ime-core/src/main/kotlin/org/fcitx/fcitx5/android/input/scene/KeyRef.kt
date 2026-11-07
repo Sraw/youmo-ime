@@ -15,6 +15,13 @@ data class KeyRef(val id: String, val copy: Boolean = false) {
     val viewId: Int
         get() = if (id.startsWith(VIEW)) id.substring(VIEW.length).toIntOrNull() ?: NO_VIEW else NO_VIEW
 
+    /**
+     * Whether a scene draws this key (made by [scene]), not a view: a view of no id ([NO_VIEW], a
+     * picker's key) is still a view's, whose popups are views (060-render-p2 S2).
+     */
+    val isScene: Boolean
+        get() = !id.startsWith(VIEW)
+
     companion object {
         private const val VIEW = "view:"
 

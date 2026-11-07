@@ -65,6 +65,7 @@
   <style select="preview, popup" fill="@popupBackground" color="@popupText" radius="4dp" shadow="0 2dp 2dp #33000000"/>
   <style select="popup:selected" fill="@genericActiveBackground" color="@genericActiveForeground"/>
   <style select="menu" fill="@accentKey" color="@accentKeyText" icon-color="@accentKeyText" radius="50%"/>
+  <style select="menu:selected" overlay="@keyPressHighlight"/>
 
   <!-- 悬浮：圆角 = 键圆角 + min(横缝, 竖缝) = 4 + 3（FloatingKeyboard.cornerDp）；把手 = 板底混 10% 字色 -->
   <style select="@floating keyboard" radius="7dp"/>

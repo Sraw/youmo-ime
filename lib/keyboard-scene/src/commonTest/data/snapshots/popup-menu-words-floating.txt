@@ -1,0 +1,32 @@
+scene 660x126
+key menu/1 kind=menu a11y="拼音"
+  bounds 0,0,220,126
+  shape rect(5,20,215,106 r=43,43,43,43)
+  hit rect(0,0,220,126)
+  anchor 110,63 up 0,-1
+  text label="拼音"
+  normal
+    fill rect(5,20,215,106 r=43,43,43,43) #ff5cb5ab
+    text "拼音" 73,76.78 system 400 36.75 #ffffffff
+  pressed the same
+key menu/0 kind=menu states=selected a11y="关"
+  bounds 220,0,440,126
+  shape rect(225,18,435,108 r=45,45,45,45)
+  hit rect(220,0,440,126)
+  anchor 330,63 up 0,-1
+  text label="关"
+  normal
+    fill rect(225,18,435,108 r=45,45,45,45) #ff5cb5ab
+    fill rect(225,18,435,108 r=45,45,45,45) #1f000000
+    text "关" 311.63,76.78 system 400 36.75 #ffffffff
+  pressed the same
+key menu/2 kind=menu a11y="注音符号"
+  bounds 440,0,660,126
+  shape rect(445,20,655,106 r=43,43,43,43)
+  hit rect(440,0,660,126)
+  anchor 550,63 up 0,-1
+  text label="注音符号"
+  normal
+    fill rect(445,20,655,106 r=43,43,43,43) #ff5cb5ab
+    text "注音符号" 476.5,76.78 system 400 36.75 #ffffffff
+  pressed the same

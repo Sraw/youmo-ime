@@ -1,0 +1,52 @@
+scene 630x126
+key menu/0 kind=menu a11y="select-all"
+  bounds 0,0,126,126
+  shape rect(20,20,106,106 r=43,43,43,43)
+  hit rect(0,0,126,126)
+  anchor 63,63 up 0,-1
+  text label="select-all"
+  normal
+    fill rect(20,20,106,106 r=43,43,43,43) #ff5cb5ab
+    icon select-all 31.5,31.5,94.5,94.5 #ffffffff
+  pressed the same
+key menu/1 kind=menu a11y="cut"
+  bounds 126,0,252,126
+  shape rect(146,20,232,106 r=43,43,43,43)
+  hit rect(126,0,252,126)
+  anchor 189,63 up 0,-1
+  text label="cut"
+  normal
+    fill rect(146,20,232,106 r=43,43,43,43) #ff5cb5ab
+    icon cut 157.5,31.5,220.5,94.5 #ffffffff
+  pressed the same
+key menu/2 kind=menu states=selected a11y="copy"
+  bounds 252,0,378,126
+  shape rect(270,18,360,108 r=45,45,45,45)
+  hit rect(252,0,378,126)
+  anchor 315,63 up 0,-1
+  text label="copy"
+  normal
+    fill rect(270,18,360,108 r=45,45,45,45) #ff5cb5ab
+    fill rect(270,18,360,108 r=45,45,45,45) #1f000000
+    icon copy 283.5,31.5,346.5,94.5 #ffffffff
+  pressed the same
+key menu/3 kind=menu a11y="paste"
+  bounds 378,0,504,126
+  shape rect(398,20,484,106 r=43,43,43,43)
+  hit rect(378,0,504,126)
+  anchor 441,63 up 0,-1
+  text label="paste"
+  normal
+    fill rect(398,20,484,106 r=43,43,43,43) #ff5cb5ab
+    icon paste 409.5,31.5,472.5,94.5 #ffffffff
+  pressed the same
+key menu/4 kind=menu states=disabled a11y="undo"
+  bounds 504,0,630,126
+  shape rect(524,20,610,106 r=43,43,43,43)
+  hit rect(504,0,630,126)
+  anchor 567,63 up 0,-1
+  text label="undo"
+  normal
+    fill rect(524,20,610,106 r=43,43,43,43) #4d5cb5ab
+    icon undo 535.5,31.5,598.5,94.5 #4dffffff
+  pressed the same

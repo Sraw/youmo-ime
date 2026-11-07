@@ -366,6 +366,25 @@ at its face across and its cell down in the window (`popupBounds`), as a view's 
 typing reads its cell (`KeyPlace`). No touch reaches a key view while the canvas draws the keys
 (`SceneTouchTest`, `everyGestureAsOnTheViews*`); the views keep their own wiring for TalkBack's actions
 (`performAccessibilityAction` on the key's view, S3) and draw and take the touches again without a scene.
+A scene's key's popups are the engine's too (060-render-p2 S2): `PopupComponent` gives a key the canvas
+draws (`KeyRef.isScene`: not a view's, so a picker's key of no id, whose `viewId` is `NO_VIEW` too,
+keeps its views), with the canvas switch on (read once: the input view is made again as it changes)
+and a theme that converted, `PopupScenes`, and its bubble
+(`PopupEntryUi.showScene`), long press (`PopupKeyboardUi`) and menus (`PopupMenuUi`, the edit menu
+too) are a `PopupSceneView` drawing a small scene `SceneBuilder.preview`/`popup`/`menu` makes, its
+sizes the engine's (`engine/Popups`: theme 3.0's in dp, its text dp, not sp; its corners the keys'
+radius; its shadow drawn, rules D4.7/D4.9, which the views' elevation had and Robolectric never drew
+in their goldens; the view as large as the scene and `outset` round it for the shadow, placed
+that much up and left of where the views' popup goes). A focus moved is the scene made again, the key
+in focus `Selected`; where it goes stays `PopupComponent`'s. The engine's entry points never throw
+(`Parsed`); what it could not make is logged (`Timber.w`) and not shown, never the views instead
+(they go in S8) and never a popup not drawn that a lift still types: the long press as one with no
+popup (`unmade`, not in `showingContainerUi`); a focus it could not draw keeps the scene and the
+focus before. A menu's icon is a `SceneIcons` name, a drawable's id read back only as a menu gave it. A key view's popups stay views
+(`SwipePopupScreenshotTest`'s `canvas_*` beside the views' goldens). A scene's popup has a basic
+node a key for TalkBack (`PopupSceneView`'s `ExploreByTouchHelper`: its words, place, selected,
+enabled; the rest S3's); the harness reads its keys, and a menu's words, from the scene
+(`KeyboardHarness.popupChoices`/`sceneChoices`).
 TalkBack reads the canvas's `ExploreByTouchHelper`: a virtual node a key, its words the scene's
 `a11y` (an `a11y_*` name the app's string), id, state and actions its view's; a key whose view's state
 changed (Shift) since the last scene is told as `CONTENT_CHANGE_TYPE_STATE_DESCRIPTION` on its node.
