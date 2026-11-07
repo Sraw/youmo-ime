@@ -37,7 +37,6 @@ class KeyNamesTest {
         assertEquals(14, KeyNames.POSITIONS.getValue("k14").size)
         assertEquals(18, KeyNames.POSITIONS.getValue("k18").size)
         assertTrue("r4c2" in KeyNames.POSITIONS.getValue("zhuyin-nine"))
-        assertEquals(listOf("pad"), KeyNames.POSITIONS.getValue("handwriting"))
         for ((board, keys) in KeyNames.POSITIONS) {
             assertEquals(board, keys.size, keys.toSet().size)
             // a key has one name: a place is never a role

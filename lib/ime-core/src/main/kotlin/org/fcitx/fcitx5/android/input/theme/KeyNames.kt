@@ -58,8 +58,7 @@ object KeyNames {
         NUMBER to (0..9).map(Int::toString) + listOf("+", "-", "*", "/", ",", "=", ".", "#", "(", ")", ":"),
         SYMBOLS to emptyList(),
         EMOJI to emptyList(),
-        // the pad, a native widget the 060 layout names (its theme name handwriting/pad; not one of handwriting/*)
-        HANDWRITING to listOf("pad"),
+        HANDWRITING to emptyList(),
     )
 
     val BOARDS: Set<String> get() = POSITIONS.keys
