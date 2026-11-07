@@ -37,6 +37,8 @@ SR, W = 16000, 512
 TAIL = SR * 292 // 100
 LOUD, RISE, SHORT = -50.0, 8.0, 12
 RULES = ['base', 'r1', 'a', 'b2', 'h2', 'h3']
+# the app's hotwords (the pack's 78 thousand, score 1.5) and bpe vocabulary: they change what the room is heard as
+ASSETS = os.environ.get('VOICE_ASSETS', f'{HOME}/workspace/youmo-ime/app/build/generated/voice-assets/voice')
 EN_PHRASES = ["OK", "No", "Yes", "Hi", "Hello", "Thank you", "Good night", "See you", "I'm sorry", "Sounds good",
               "Why not", "Of course", "Got it", "Me too", "Nice", "Sure"]
 HAN = re.compile(r'[㐀-鿿]')
@@ -52,7 +54,8 @@ def init():
     rec = so.OnlineRecognizer.from_transducer(
         tokens=f'{MODELS}/tokens.txt', encoder=f'{MODELS}/encoder.ort', decoder=f'{MODELS}/decoder.ort',
         joiner=f'{MODELS}/joiner.ort', num_threads=1, sample_rate=SR, feature_dim=80, enable_endpoint_detection=True,
-        decoding_method='modified_beam_search', max_active_paths=16)
+        decoding_method='modified_beam_search', max_active_paths=16,
+        hotwords_file=f'{ASSETS}/hotwords.txt', hotwords_score=1.5, modeling_unit='bpe', bpe_vocab=f'{ASSETS}/bpe.vocab')
 
 
 def vad(thr):
@@ -171,7 +174,10 @@ def job(j):
     a = read(j['wav']) if j.get('wav') else np.zeros(SR * 3, np.float32)
     if j.get('L') is not None: a = a * np.float32(10 ** ((j['L'] - level(a)) / 20))
     elif j.get('att'): a = a * np.float32(10 ** (-j['att'] / 20))
-    x = np.concatenate([np.zeros(int(SR * j.get('pre', 0.5)), np.float32), a, np.zeros(int(SR * 0.8), np.float32)])
+    if j.get('then'):   # a second sentence after a pause, at the same level
+        b = read(j['then']); b = b * np.float32(10 ** ((j['L'] - level(b)) / 20))
+        a = np.concatenate([a, np.zeros(int(SR * j['gap']), np.float32), b])
+    x = np.concatenate([np.zeros(int(SR * j.get('pre', 0.5)), np.float32), a, np.zeros(int(SR * j.get('post', 0.8)), np.float32)])
     x = x + room(j.get('kind', 'white'), j.get('R'), len(x), rng)
     out = run_talk(x.astype(np.float32))
     r = dict(j); r['segs'] = out.pop('segs'); r['out'] = out
@@ -210,6 +216,14 @@ def jobs():
         for L in (-30, -40, -50, -52, -54, -56, -58, -60):
             for sid in (0, 1, 2):
                 for i, p in enumerate(EN_PHRASES): add(set='en', wav=f'{EN}/{sid}-{i:02d}.wav', ref=p, L=L, R=R)
+        # the room going on 3 s after the speech: what more it is heard as (tail; the q44 clips already in it)
+        for c, ref in (('nihao-q44-room', '你好'), ('zouba-q44-room', '我们走吧'), ('nihao-q44', '你好'), ('zouba-q44', '我们走吧'), ('nihao', '你好'), ('zouba', '我们走吧'), ('jintian', '今天天气很好')):
+            for _ in range(8): add(set='tail', wav=f'{CLIPS}/{c}.wav', ref=ref, R=R, post=3.0, kind='pink')
+        # two soft sentences 1.5 s apart: the second its own segment
+        for L in (-54, -58):
+            for i in range(0, 40, 2):
+                add(set='two', wav=f"{EVAL}/sets/aishell/{aishell[i]['wav']}", then=f"{EVAL}/sets/aishell/{aishell[i + 1]['wav']}",
+                    ref=aishell[i]['ref'] + aishell[i + 1]['ref'], L=L, R=R, gap=1.5)
         for c, ref in (('nihao-q44', '你好'), ('zouba-q44', '我们走吧')):
             for _ in range(3): add(set='q44', wav=f'{CLIPS}/{c}.wav', ref=ref, R=R)
         for r in aishell: add(set='pre2', wav=f"{EVAL}/sets/aishell/{r['wav']}", ref=r['ref'], L=-58, R=R, pre=2.0)

@@ -999,6 +999,16 @@ in CI keeps the voice source set compiling.
   speech could pass) was measured and not taken: no English phrase more was typed, and FSD50K's
   room typed 8 of 15 talks (0), keyboard 9 (2), traffic 10 (5), 30 dB down 16 of 60 (2).
 
+  The room going on after the speech (quiet_eval's `tail`: 你好/我们走吧/今天天气很好, normal and
+  q44, 3 s of pink room after, R−60/−66, the app's hotwords) types nothing more: 0 of 112 with 「欢迎」
+  or any extra word (q44 alone misheard 您好/我们走了 as before). VO-32's occasional 「你好。欢迎您」 was the
+  clip: its room cut hard at both ends, the step down to the clip mic's floor heard as 「欢迎您好」
+  (tokens at 1.96–2.32 s, the cut at 2.11 s, no window voiced); with more room joined at its hard edges
+  across that step 15 of 32 start offsets, with 50 ms fades 0 of 32, the floor alone 0 of 32. The
+  clips fade (voice-clips.py); no rule changed. A rule holding every segment after a typed one to the
+  short Latin bar (h4) was measured and not taken: two soft sentences 1.5 s apart, R−60 L−54, lost
+  the second (CER 27.9% → 65.1%).
+
   A premise: a pause is a segment of its own only past the recognizer's endpoint (1.2 s of silence
   after text). Room heard as text and Chinese begun within 1.2 s of it would be one segment, the
   room's text typed with it. Not seen: in 160 talks of 1 or 2 s of room before aishell at L−58 the

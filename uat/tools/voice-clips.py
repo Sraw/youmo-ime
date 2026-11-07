@@ -2,7 +2,7 @@
 the host's PulseAudio source that uat.py plays them into). Made on this machine, offline: Kokoro
 v1.1-zh through sherpa-onnx (the models of ~/voice-eval, VOICE_EVAL to move it), each checked by the
 X-ASR model of the same place so a clip that the recognizer cannot follow is not taken for the app's
-fault. A cough is filtered noise; `room` 3 s of pink noise at some -60 dBFS (VO-09: digital silence
+fault. A cough is filtered noise; `room` 3 s of pink noise at some -60 dBFS (`room-long` 10 s) (VO-09: digital silence
 shows no gain). `<name>-q44` is the clip 44 dB down, speech said softly (VO-24), `<name>-q44-room`
 the same in `room`'s noise. Out:
 dev/uat-out/voice-clips/<name>.wav, 16 kHz mono, and beside each spoken one <name>.json, where its
@@ -91,6 +91,17 @@ def room(n=3 * RATE):
     return (x / np.sqrt(np.mean(x ** 2)) * 10 ** (-60 / 20)).astype(np.float32)
 
 
+def fade(s, ms=50):
+    """the room faded in and out at the clip's ends: cut hard, its step to the clip mic's floor
+    is heard as more words (「你好。欢迎您」, quiet_eval.py's tail; none with the fade)"""
+    n = RATE * ms // 1000
+    ramp = np.linspace(0, 1, n, dtype=np.float32)
+    s = s.copy()
+    s[:n] *= ramp
+    s[-n:] *= ramp[::-1]
+    return s
+
+
 def cough():
     rng = np.random.default_rng(7)
     n = int(0.35 * RATE)
@@ -118,7 +129,7 @@ def main():
             write_span(f"{name}-q{QUIET[name]}", s)
             # and said in the room's noise, which goes on all through it (VO-24's second step)
             soft = (s * 10 ** (-QUIET[name] / 20)).astype(np.float32) + room(len(s))
-            sf.write(f"{OUT}/{name}-q{QUIET[name]}-room.wav", soft, RATE)
+            sf.write(f"{OUT}/{name}-q{QUIET[name]}-room.wav", fade(soft), RATE)
             write_span(f"{name}-q{QUIET[name]}-room", s)
         st = r.create_stream()
         st.accept_waveform(RATE, s)
@@ -129,7 +140,9 @@ def main():
         print(f"{'ok ' if ok else 'BAD'} {name}: said {text} / X-ASR heard {heard}")
     sf.write(f"{OUT}/cough.wav", pad(cough()), RATE)
     print("cough.wav: filtered noise")
-    sf.write(f"{OUT}/room.wav", room(), RATE)
+    sf.write(f"{OUT}/room.wav", fade(room()), RATE)
+    # VO-09: playing all through a hold, lifted while it plays (VoiceQuiet judges the room itself)
+    sf.write(f"{OUT}/room-long.wav", fade(room(10 * RATE)), RATE)
     print("room.wav: pink noise, -60 dBFS")
     sys.exit(1 if bad else 0)
 

@@ -288,15 +288,28 @@ case("VO-08", needs="jvm:VoiceHoldUatTest.englishInChineseIsTypedAsWritten")(lam
 @case("VO-09", base="B0-语音", mutates="learn", needs=EV)
 def vo09(d):
     d.sh("logcat -c")   # this try's line only, not one an earlier case left
-    shown, t = dictate(d, "room")
+    # the room all through the hold, lifted at 6 s while it plays: no floor after it for the
+    # recognizer to end on, the room itself judged (dictate's 3 s clip then silence passed without VoiceQuiet)
+    x, y = hold_space(d)
+    p = d.say("room-long", wait=False)
+    shown = []
+    try:
+        end = time.time() + 6
+        while time.time() < end:
+            shown += [n.text for n in d.screen().nodes if n.text and n.pkg == PKG and n.text not in shown]
+            time.sleep(0.2)
+        d.touch(("up", x, y))
+        t = settle(d, seen=shown)
+    finally:
+        p.kill()
     log = capture_log(d)
     # with the debug log, the noise must have reached the app at its level (-60 dBFS played)
     if log and log["envPeak"] is not None:
         check(-70 <= log["envPeak"] <= -50, f"底噪没按电平送到 App：env {log['envPeak']} dBFS")
-    check(plain(t) == "", f"只播 3 s 底噪（约 -60 dBFS），框里「{t}」")
+    check(plain(t) == "", f"按住 6 s 一直播底噪（约 -60 dBFS），框里「{t}」")
     check(HEARD_NOTHING in shown, f"只播底噪，松开后没显示「{HEARD_NOTHING}」：{shown[:8]}")
     gain = f"，env 峰值 {log['envPeak']} dBFS 处增益 {log['peakGainDb']:+.1f} dB" if log and log["peakGainDb"] is not None else ""
-    return f"底噪 3 s：不上屏，显示「{HEARD_NOTHING}」{gain}"
+    return f"底噪贯穿按住 6 s：不上屏，显示「{HEARD_NOTHING}」{gain}"
 
 
 # also on the JVM (VoiceUatTest.aBlockedWordIsNotTypedFromVoice), which checks the string handed to the
