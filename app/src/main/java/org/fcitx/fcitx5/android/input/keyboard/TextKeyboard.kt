@@ -93,6 +93,10 @@ class TextKeyboard private constructor(
     companion object {
         const val Name = "Text"
 
+        // the scene theme's cascades (main thread), kept a process as SceneThemes keeps the theme: a
+        // keyboard made again (each setting that rebuilds the input view) matches no style anew
+        private var cascades: Cascades? = null
+
         /** Whether the letters are split here: as the setting is, the screen as wide as it is now; floating, never. */
         fun splits(context: Context): Boolean {
             if (ThemeManager.prefs.floatingKeyboard.getValue()) return false
@@ -430,8 +434,6 @@ class TextKeyboard private constructor(
     private class Made(val theme: SceneTheme, val layout: Layout, val measurer: TextMeasurer, val env: Env, val scene: Scene)
 
     private var made: Made? = null
-
-    private var cascades: Cascades? = null
 
     /** The scenes the engine made for this keyboard: a test's count of what was not kept. */
     @VisibleForTesting
