@@ -41,6 +41,7 @@ class SceneBuilder(
     private val env: Env,
     private val measurer: TextMeasurer,
     icons: IconSizes = IconSizes.MATERIAL,
+    private val phases: Phases = Phases.None,
 ) {
     private val cascade = Cascade(theme, env.scenes)
 
@@ -70,12 +71,15 @@ class SceneBuilder(
         val expanding = if (padless) env.copy(input = env.input.copy(pad = FULL_PAD)) else env
         val placement = placement(layout)
         val splitSide = placement?.side?.takeIf { env.split }?.name?.lowercase()
-        val rows = Expand.rows(layout, fragments, expanding, splitSide).getOr { return Parsed.Failed(it) }
+        val rows = phases.section("expand") { Expand.rows(layout, fragments, expanding, splitSide) }.getOr { return Parsed.Failed(it) }
         val board = board(placement)
-        val placed = Place.rows(rows, layout.columns, layout.onSplit, env, board, warnings).getOr { return Parsed.Failed(it) }
-        val keys = placed.mapNotNull { p -> (p.item as? ExpandedKey)?.let { prepare(layout.id, p, it) } }
-        val settled = settle(keys)
-        val nodes = keys.mapIndexed { i, k -> node(k, settled[i]) }
+        val placed = phases.section("place") { Place.rows(rows, layout.columns, layout.onSplit, env, board, warnings) }.getOr { return Parsed.Failed(it) }
+        // each key's looks cascaded, its face's layers and its texts placed (the texts measured)
+        val keys = phases.section("cascade") { placed.mapNotNull { p -> (p.item as? ExpandedKey)?.let { prepare(layout.id, p, it) } } }
+        val nodes = phases.section("paint") {
+            val settled = settle(keys)
+            keys.mapIndexed { i, k -> node(k, settled[i]) }
+        }
         val slots = placed.mapNotNull { p ->
             val s = (p.item as? ExpandedSlot)?.slot ?: return@mapNotNull null
             SlotNode(s.kind, s.id, p.cell, surface(layout.id, s.id, s.look, s.classes, s.face, p.cell, slot = true))

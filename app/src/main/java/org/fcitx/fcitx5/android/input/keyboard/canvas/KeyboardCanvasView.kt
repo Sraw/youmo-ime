@@ -11,6 +11,7 @@ import android.graphics.Rect
 import android.graphics.RenderNode
 import android.os.Bundle
 import android.os.SystemClock
+import android.os.Trace
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -62,7 +63,10 @@ class KeyboardCanvasView(
 ) : View(context) {
 
     interface Host {
-        /** The keys' scene at [width] × [height] px, as the keyboard is now; null where there is none to draw. */
+        /**
+         * The keys' scene at [width] × [height] px, as the keyboard is now; null where there is none to
+         * draw. The same instance as last time where nothing drawn changed: kept as it was drawn.
+         */
         fun scene(width: Int, height: Int): Scene?
 
         /** The view whose key [node] is: its gestures, its actions, its words. */
@@ -125,7 +129,14 @@ class KeyboardCanvasView(
             dirty = false
             builtFor = width to height
             val start = SystemClock.elapsedRealtimeNanos()
-            val s = host.scene(width, height)
+            Trace.beginSection("scene")
+            val s = try {
+                host.scene(width, height)
+            } finally {
+                Trace.endSection()
+            }
+            // the one drawn already (nothing that shows changed: Host.scene kept it): its keys' nodes kept, nothing said
+            if (s != null && s === built) return s
             Timber.d("keyboard canvas: scene %d × %d made in %.2f ms", width, height, (SystemClock.elapsedRealtimeNanos() - start) / NANOS_A_MS)
             if (s == null) {
                 failed = true

@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.Phases
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.engine.Texts
@@ -26,6 +27,26 @@ class SceneBuilderTest {
     ).ok()
 
     // review M-5: the app always says which pad; a board read without it is the full one, said so
+    // the phases a profiler is told, in order, each ended; the scene the same as told nothing
+    @Test
+    fun itsPhasesTold() {
+        val told = mutableListOf<String>()
+        val phases = object : Phases {
+            override fun begin(name: String) {
+                told += name
+            }
+
+            override fun end() {
+                told += "/"
+            }
+        }
+        val scene = SceneBuilder(Fixtures.materialLight, Fixtures.portrait, FakeMeasurer, phases = phases).build(Fixtures.qwerty).ok()
+        assertEquals(listOf("expand", "/", "place", "/", "cascade", "/", "paint", "/"), told)
+        val plain = Fixtures.scene(Fixtures.portrait)
+        assertEquals(plain.keys.map { it.id to it.faces }, scene.keys.map { it.id to it.faces })
+        assertEquals(plain.base, scene.base)
+    }
+
     @Test
     fun aNumberPadWithNoPadIsTheFullOne() {
         val pads = board(

@@ -8,7 +8,9 @@ import android.content.Context
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.Typeface
+import android.os.Trace
 import androidx.annotation.DrawableRes
+import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.input.scene.LookTheme
@@ -18,6 +20,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Parsed
+import org.fcitx.fcitx5.android.scene.engine.Phases
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.engine.TextMetrics
 import org.fcitx.fcitx5.android.scene.layout.Layout
@@ -35,25 +38,64 @@ class SceneFonts(private val look: ThemeLook) {
         ThemeAssets.typeface(look, if (font == LookTheme.KEY_FONT) look.text.keyFont else null, weight)
 }
 
-/** The engine's text measured as Android draws it ([ScenePainter]): the same Paint settings, so what is placed is what is drawn. */
+/**
+ * The engine's text measured as Android draws it ([ScenePainter]): the same Paint settings, so what is
+ * placed is what is drawn. Kept, the last [KEPT] texts by font and size: a scene made again (Shift,
+ * Return's label) measures the same few dozen texts, and a measure is Paint's slowest part of it.
+ */
 class AndroidTextMeasurer(private val fonts: SceneFonts) : TextMeasurer {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val ink = Rect()
     private val metrics = Paint.FontMetrics()
 
-    override fun measure(text: String, font: String, weight: Int, size: Double): TextMetrics {
-        paint.typeface = fonts.typeface(font, weight)
-        paint.textSize = size.toFloat()
-        val advance = paint.measureText(text)
-        paint.getTextBounds(text, 0, text.length, ink)
-        paint.getFontMetrics(metrics)
-        return TextMetrics(
-            advance.toDouble(),
-            Box(ink.left.toDouble(), ink.top.toDouble(), ink.right.toDouble(), ink.bottom.toDouble()),
-            metrics.top.toDouble(),
-            metrics.bottom.toDouble(),
-        )
+    private data class Asked(val text: String, val font: String, val weight: Int, val size: Double)
+
+    // the least recently asked let go first (access order), so a table's roots or another font for a
+    // while do not keep growing it
+    private val kept = object : LinkedHashMap<Asked, TextMetrics>(KEPT, LOAD, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Asked, TextMetrics>) = size > KEPT
     }
+
+    /** The texts measured with Paint, not found kept: for tests. */
+    @VisibleForTesting
+    var measured = 0
+        private set
+
+    override fun measure(text: String, font: String, weight: Int, size: Double): TextMetrics =
+        kept.getOrPut(Asked(text, font, weight, size)) { measured(text, font, weight, size) }
+
+    private fun measured(text: String, font: String, weight: Int, size: Double): TextMetrics {
+        measured++
+        Trace.beginSection("measure text")
+        try {
+            paint.typeface = fonts.typeface(font, weight)
+            paint.textSize = size.toFloat()
+            val advance = paint.measureText(text)
+            paint.getTextBounds(text, 0, text.length, ink)
+            paint.getFontMetrics(metrics)
+            return TextMetrics(
+                advance.toDouble(),
+                Box(ink.left.toDouble(), ink.top.toDouble(), ink.right.toDouble(), ink.bottom.toDouble()),
+                metrics.top.toDouble(),
+                metrics.bottom.toDouble(),
+            )
+        } finally {
+            Trace.endSection()
+        }
+    }
+
+    companion object {
+        // the 26 keys' texts in each state with Shift's and a table's: a few hundred
+        const val KEPT = 512
+        private const val LOAD = 0.75f
+    }
+}
+
+/** The engine's phases ([org.fcitx.fcitx5.android.scene.engine.SceneBuilder]) as Trace sections: a system trace shows where a scene's time goes. */
+object SceneTrace : Phases {
+    override fun begin(name: String) = Trace.beginSection(name)
+
+    override fun end() = Trace.endSection()
 }
 
 /** The icons a scene names ([org.fcitx.fcitx5.android.scene.Op.Icon]) as the app's drawables. */

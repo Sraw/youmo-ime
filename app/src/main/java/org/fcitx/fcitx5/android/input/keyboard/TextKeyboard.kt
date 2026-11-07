@@ -11,6 +11,7 @@ import android.text.SpannableString
 import android.util.TypedValue
 import android.view.View
 import androidx.annotation.Keep
+import androidx.annotation.VisibleForTesting
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.allViews
@@ -42,6 +43,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
 import org.fcitx.fcitx5.android.input.scene.SceneLetters
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
 import org.fcitx.fcitx5.android.input.scene.TextBoardState
@@ -54,7 +56,10 @@ import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.engine.Texts
+import org.fcitx.fcitx5.android.scene.engine.section
+import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard as SceneSplit
+import org.fcitx.fcitx5.android.scene.theme.Theme as SceneTheme
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
@@ -345,8 +350,21 @@ class TextKeyboard private constructor(
 
     // what the keys show now, as the scene engine's environment (qwerty.xml's when= and bindings)
     private fun scene(look: ThemeLook, measurer: TextMeasurer, width: Int, height: Int): Scene? {
-        val sceneTheme = SceneThemes.of(look, theme.name, theme.isDark) ?: return null
+        val sceneTheme = SceneTrace.section("theme") { SceneThemes.of(look, theme.name, theme.isDark) } ?: return null
         val layout = SceneLayouts.qwerty(context) ?: return null
+        val env = SceneTrace.section("env") { env(look, layout, width, height) }
+        // the same values make the same scene: one asked again for nothing that shows (the first key typed,
+        // the word committed: Return's look unchanged) is the last one, not made again in the frame
+        made?.takeIf { it.theme === sceneTheme && it.layout === layout && it.measurer === measurer && it.env == env }?.let { return it.scene }
+        scenesMade++
+        return when (val built = SceneBuilder(sceneTheme, env, measurer, phases = SceneTrace).build(layout, emptyMap())) {
+            is Parsed.Ok -> built.value.also { made = Made(sceneTheme, layout, measurer, env, it) }
+            is Parsed.Failed -> null.also { Timber.e("keyboard canvas: the engine refused the scene: %s", built.problems) }
+        }
+    }
+
+    // what the keys show now, as the scene engine's environment
+    private fun env(look: ThemeLook, layout: Layout, width: Int, height: Int): Env {
         val config = resources.configuration
         val floating = if (ThemeManager.prefs.floatingKeyboard.getValue() && context.inInputMethod()) {
             val screen = config.screenWidthDp
@@ -384,7 +402,7 @@ class TextKeyboard private constructor(
             KeyShortcutsCache.current, AppPrefs.getInstance().keyboard.swipeLayers.getValue().layers, markSpots(),
             charShortcutMarks, SceneMarks.names(layout),
         )
-        val env = Env(
+        return Env(
             width.toDouble(), height.toDouble(), resources.displayMetrics.density.toDouble(),
             landscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE,
             compact = keyboardCompact(),
@@ -404,10 +422,22 @@ class TextKeyboard private constructor(
             texts = texts,
             marks = marks,
         )
-        return when (val built = SceneBuilder(sceneTheme, env, measurer).build(layout, emptyMap())) {
-            is Parsed.Ok -> built.value
-            is Parsed.Failed -> null.also { Timber.e("keyboard canvas: the engine refused the scene: %s", built.problems) }
-        }
+    }
+
+    private class Made(val theme: SceneTheme, val layout: Layout, val measurer: TextMeasurer, val env: Env, val scene: Scene)
+
+    private var made: Made? = null
+
+    /** The scenes the engine made for this keyboard: a test's count of what was not kept. */
+    @VisibleForTesting
+    var scenesMade = 0
+        private set
+
+    /** The scene kept let go, the next asked made anew as things are: a measure of what making one costs (KeyboardPerfBaselineTest). */
+    @VisibleForTesting
+    fun forgetScene() {
+        made = null
+        canvas?.invalidateScene()
     }
 
     // the letters' keys' definitions by their letters: their corners' (cornerOf)

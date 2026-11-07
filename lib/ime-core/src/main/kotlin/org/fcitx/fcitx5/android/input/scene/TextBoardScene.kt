@@ -64,7 +64,9 @@ data class TextBoardState(
         voice = holdVoice,
         holdVoice = holdVoice,
         langKey = langKey,
-        composing = composing,
+        // qwerty.xml asks it only of a table (确定 in Return's place): elsewhere the first key typed and
+        // the word committed would each give a new environment, so a scene made again the same as before
+        composing = composing && table,
         lookingUp = lookingUp,
     )
 }

@@ -61,6 +61,8 @@ class TextBoardSceneTest {
         assertFalse("enter" in typing)
         // composing elsewhere keeps Return
         assertTrue("enter" in keys(TextBoardState(composing = true)))
+        // and is no other environment: the keyboard keeps the scene it had (TextKeyboard.scene)
+        assertEquals(TextBoardState(semicolonScheme = true).input(), TextBoardState(semicolonScheme = true, composing = true).input())
         assertNull(TextBoardState(tableExtra = 'x').input().tableExtra)
     }
 

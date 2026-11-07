@@ -22,18 +22,22 @@ import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.engine.table.TableRoots
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
+import org.fcitx.fcitx5.android.input.keyboard.canvas.AndroidTextMeasurer
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
 import org.fcitx.fcitx5.android.input.theme.Crop
 import org.fcitx.fcitx5.android.input.theme.KeyFill
 import org.fcitx.fcitx5.android.input.theme.Picture
@@ -51,6 +55,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
@@ -62,7 +67,7 @@ import java.io.File
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
+@Config(application = FcitxApplication::class, qualifiers = KeyboardCanvasViewTest.PORTRAIT)
 class KeyboardCanvasViewTest {
 
     @get:Rule
@@ -185,21 +190,69 @@ class KeyboardCanvasViewTest {
     @Test
     fun everyGestureAsOnTheViewsEnglish() = assertEquals(gestures(false, KeyboardHarness.ENGLISH), gestures(true, KeyboardHarness.ENGLISH))
 
-    // the default theme's 26 keys, the views' and the scene's side by side: for the eye (060's
-    // comparison), and close enough pixel for pixel (what differs: specs/app.md, the canvas)
+    // the 26 keys, the views' and the scene's side by side in each case: for the eye (060's comparison,
+    // build/outputs/canvas-compare), and close enough pixel for pixel (what differs: specs/app.md, the canvas)
+    // [set] the case's preferences, giving back what puts each back: the next case starts from the defaults
+    private class Case(val name: String, val theme: Theme, val qualifiers: String? = null, val set: () -> List<() -> Unit> = { emptyList() })
+
+    private fun <T : Any> ManagedPreference<T>.during(value: T): () -> Unit {
+        val was = getValue()
+        setValue(value)
+        return { setValue(was) }
+    }
+
     @Test
     fun sideBySide() {
+        val keyboard = AppPrefs.getInstance().keyboard
+        val cases = listOf(
+            Case("pixel-light", ThemePreset.PixelLight),
+            Case("material-light", ThemePreset.MaterialLight),
+            Case("nord-light", ThemePreset.NordLight),
+            Case("pixel-dark", ThemePreset.PixelDark),
+            Case("material-dark", ThemePreset.MaterialDark),
+            Case("amoled-black", ThemePreset.AMOLEDBlack),
+            Case("compact", ThemePreset.PixelLight) {
+                val compact = KeyboardHeightLevels.ALL[KeyboardHeightLevels.COMPACT]
+                listOf(keyboard.keyboardHeightPercent.during(compact.portrait), keyboard.keyboardHeightPercentLandscape.during(compact.landscape))
+            },
+            Case("landscape", ThemePreset.PixelLight, LANDSCAPE) { listOf(ThemeManager.prefs.splitKeyboard.during(SplitKeyboardMode.Off)) },
+            Case("split", ThemePreset.PixelLight, LANDSCAPE) { listOf(ThemeManager.prefs.splitKeyboard.during(SplitKeyboardMode.Always)) },
+        )
+        val shares = cases.associate { it.name to differingShare(it) }
+        val told = shares.entries.joinToString("\n") { (name, share) -> "$name ${"%.2f".format(share * 100)}%" }
+        File("build/outputs/canvas-compare/shares.txt").writeText(told + "\n")
+        assertTrue(told, shares.values.all { it < MOST_DIFFERING })
+    }
+
+    // the share of the pixels that differ between the views' keys and the scene's: a channel off by more
+    // than anti-aliasing's (the letters a pixel over where a row's height is odd: specs/app.md, the
+    // canvas); a key missing or misplaced is several percent
+    private fun differingShare(case: Case): Double {
         prefs.set(ThemeManager.prefs.floatingKeyboard, false)
-        val shots = listOf(false, true).map { on ->
-            prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, on)
-            KeyboardHarness(ThemeManager.DefaultTheme).start().use { h ->
-                // past the keyboard's sliding in
-                h.after(1000)
-                h.relayout()
-                val v = h.keyboard
-                Bitmap.createBitmap(v.width, v.height, Bitmap.Config.ARGB_8888).also { v.draw(Canvas(it)) }
+        val undo = case.set()
+        case.qualifiers?.let(RuntimeEnvironment::setQualifiers)
+        val shots = try {
+            listOf(false, true).map { on ->
+                prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, on)
+                KeyboardHarness(case.theme).start().use { h ->
+                    // past the keyboard's sliding in
+                    h.after(1000)
+                    h.relayout()
+                    val v = h.keyboard
+                    Bitmap.createBitmap(v.width, v.height, Bitmap.Config.ARGB_8888).also { v.draw(Canvas(it)) }
+                }
             }
+        } finally {
+            if (case.qualifiers != null) RuntimeEnvironment.setQualifiers(PORTRAIT)
+            undo.asReversed().forEach { it() }
         }
+        save(case.name, shots)
+        val (old, new) = shots
+        assertEquals(case.name, old.width to old.height, new.width to new.height)
+        return differing(old, new, CHANNEL_SLACK).toDouble() / (old.width * old.height)
+    }
+
+    private fun save(name: String, shots: List<Bitmap>) {
         val title = 64
         val gap = 16
         val w = shots.sumOf { it.width } + gap
@@ -213,18 +266,10 @@ class KeyboardCanvasViewTest {
             c.drawBitmap(s, x, title.toFloat(), null)
             x += s.width + gap
         }
-        val file = File("build/outputs/canvas-compare/qwerty-default.png")
+        val file = File("build/outputs/canvas-compare/qwerty-$name.png")
         file.parentFile!!.mkdirs()
         file.outputStream().use { out.compress(Bitmap.CompressFormat.PNG, 100, it) }
         assertTrue(file.length() > 0)
-        val (old, new) = shots
-        assertEquals(old.width to old.height, new.width to new.height)
-        // a pixel differs where a channel is off by more than anti-aliasing's: the letters a pixel over
-        // where a row's height is odd (specs/app.md, the canvas; measured 0.26%); a key missing or
-        // misplaced is several percent
-        val differ = differing(old, new, CHANNEL_SLACK)
-        val share = differ.toDouble() / (old.width * old.height)
-        assertTrue("${"%.2f".format(share * 100)}% of the pixels differ", share < MOST_DIFFERING)
     }
 
     private fun differing(a: Bitmap, b: Bitmap, slack: Int): Int {
@@ -306,6 +351,46 @@ class KeyboardCanvasViewTest {
         } finally {
             told(null)
         }
+    }
+
+    // pinyin's first key typed and its word committed in a plain field (Return ⏎ either way): the scene
+    // kept, none made in the frame (a table's 确定 is another scene: made)
+    @Test
+    fun typingKeepsTheScene() = harness(true).use { h ->
+        val c = h.canvas()!!
+        val board = h.textKeyboard()
+        board.onReturnDrawableUpdate(ReturnKeyAppearance.Enter)
+        val before = c.scene!!
+        val made = board.scenesMade
+        board.onReturnDrawableUpdate(ReturnKeyAppearance.Composing)
+        assertSame(before, c.scene)
+        board.onReturnDrawableUpdate(ReturnKeyAppearance.Enter)
+        assertSame(before, c.scene)
+        assertEquals(made, board.scenesMade)
+        // something shown changed: made again
+        h.api.inputMethodEntryCached = WUBI
+        h.emit(HostEvent.InputMethodChanged(WUBI))
+        h.idle()
+        assertNotSame(before, c.scene)
+        val tables = board.scenesMade
+        board.onReturnDrawableUpdate(ReturnKeyAppearance.Composing)
+        assertNotNull(c.scene!!.keys.firstOrNull { it.id == "confirm" })
+        assertEquals(tables + 1, board.scenesMade)
+    }
+
+    // a text measured once at a font and size, then kept; the least recently asked let go past the limit
+    @Test
+    fun aTextMeasuredOnce() {
+        val m = AndroidTextMeasurer(SceneFonts(org.fcitx.fcitx5.android.data.theme.ThemePreset.PixelLight.look))
+        val a = m.measure("a", "system", 400, 40.0)
+        assertEquals(a, m.measure("a", "system", 400, 40.0))
+        assertEquals(1, m.measured)
+        m.measure("a", "system", 700, 40.0)
+        m.measure("a", "system", 400, 41.0)
+        assertEquals(3, m.measured)
+        repeat(AndroidTextMeasurer.KEPT) { m.measure("$it", "system", 400, 40.0) }
+        m.measure("a", "system", 400, 40.0)
+        assertEquals(4 + AndroidTextMeasurer.KEPT, m.measured)
     }
 
     // a table's roots over the letters, its 拼 key in Shift's place, drawn by the scene as its views show them
@@ -485,11 +570,16 @@ class KeyboardCanvasViewTest {
 
     private fun wubi(labels: KeyLabels, on: Boolean = false) = TableKeyboard(InputMethodCatalog.WUBI, emptySet(), on, labels, TableRoots.WUBI86)
 
-    private companion object {
-        val WUBI = org.fcitx.fcitx5.android.core.InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false)
+    companion object {
+        const val PORTRAIT = "w393dp-h851dp-port-440dpi"
+
+        // the same phone on its side: 851 dp wide, wider than the 600 split starts from
+        private const val LANDSCAPE = "w851dp-h393dp-land-440dpi"
+
+        private val WUBI = org.fcitx.fcitx5.android.core.InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false)
 
         // a channel off by this little is anti-aliasing; this share of the pixels so, at most
-        const val CHANNEL_SLACK = 24
-        const val MOST_DIFFERING = 0.015
+        private const val CHANNEL_SLACK = 24
+        private const val MOST_DIFFERING = 0.015
     }
 }
