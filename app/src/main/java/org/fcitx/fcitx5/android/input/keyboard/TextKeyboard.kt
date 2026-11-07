@@ -124,6 +124,9 @@ class TextKeyboard private constructor(
         private fun marks(of: MarksFor): MarkSettings = marksMade?.takeIf { it.first == of }?.second
             ?: SceneMarks.settings(of.shortcuts, of.layers, of.spots, of.charShortcuts, of.names).also { marksMade = of to it }
 
+        // the themes (by name and look) that made no scene, the built-in drawn instead: logged once each
+        private val fellBack = mutableSetOf<Pair<String, ThemeLook>>()
+
         private fun measurer(look: ThemeLook): AndroidTextMeasurer = measurers.getOrPut(look) { AndroidTextMeasurer(SceneFonts(look)) }
             .also { if (measurers.size > KEPT_SCENES) measurers.remove(measurers.keys.first()) }
 
@@ -358,10 +361,8 @@ class TextKeyboard private constructor(
 
     private fun canvasView(): KeyboardCanvasView {
         val look = ThemeManager.shownLook(theme)
-        val fonts = SceneFonts(look)
-        val measurer = measurer(look)
-        return KeyboardCanvasView(context, look, keyImages, fonts, object : KeyboardCanvasView.Host {
-            override fun scene(width: Int, height: Int) = scene(look, measurer, width, height)
+        return KeyboardCanvasView(context, keyImages, object : KeyboardCanvasView.Host {
+            override fun scene(width: Int, height: Int) = scene(look, width, height)
             override fun key(node: KeyNode) = sceneKey(node)
         })
     }
@@ -370,15 +371,21 @@ class TextKeyboard private constructor(
     // 060-render-p2 U8: a scene the theme makes none of (the engine refusing it, or what the theme made)
     // is the built-in theme's of the same lightness, logged; none of that either, nothing (the canvas
     // draws nothing and logs it). Never the views again: they go in S8
-    private fun scene(look: ThemeLook, measurer: TextMeasurer, width: Int, height: Int): Scene? {
+    // The fallback's the built-in theme's whole: its look, its fonts, its measurer, as it draws itself
+    private fun scene(look: ThemeLook, width: Int, height: Int): KeyboardCanvasView.Drawn? {
         val layout = SceneLayouts.qwerty(context) ?: return null
-        SceneTrace.section("theme") { SceneThemes.of(look, theme.name, theme.isDark) }
-            ?.let { scene(it, look, layout, measurer, width, height) }?.let { return it }
+        drawn(theme, look, layout, width, height)?.let { return it }
         val builtIn = if (theme.isDark) ThemePreset.PixelDark else ThemePreset.PixelLight
         if (builtIn.name == theme.name) return null
-        Timber.w("keyboard canvas: no scene of theme %s; the built-in %s's drawn", theme.name, builtIn.name)
-        val builtInLook = ThemeManager.shownLook(builtIn)
-        return SceneThemes.of(builtInLook, builtIn.name, builtIn.isDark)?.let { scene(it, builtInLook, layout, measurer, width, height) }
+        // logged once a look: asked again each time what shows changes
+        if (fellBack.add(theme.name to look)) Timber.w("keyboard canvas: no scene of theme %s; the built-in %s's drawn", theme.name, builtIn.name)
+        return drawn(builtIn, ThemeManager.shownLook(builtIn), layout, width, height)
+    }
+
+    private fun drawn(of: Theme, look: ThemeLook, layout: Layout, width: Int, height: Int): KeyboardCanvasView.Drawn? {
+        val sceneTheme = SceneTrace.section("theme") { SceneThemes.of(look, of.name, of.isDark) } ?: return null
+        val measurer = measurer(look)
+        return scene(sceneTheme, look, layout, measurer, width, height)?.let { KeyboardCanvasView.Drawn(it, look, measurer.fonts) }
     }
 
     // the scene of [sceneTheme] ([look]'s): the last kept for the same values, or made; null, the engine refused it

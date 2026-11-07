@@ -84,11 +84,11 @@ class CompactKeyboardUatTest {
     // its letter's size, whichever draws it
     private fun ShownKey.size() = textSize(label)!!
 
-    // its symbol in a right corner, not under the letter: right of its middle, above it
+    // its symbol in a right corner, not under the letter: right of the letter, above its middle
     private fun ShownKey.inItsCorner(): Boolean {
         val symbol = alt?.let(::drawn) ?: return false
         val letter = drawn(label)!!
-        return symbol.left >= letter.centerX() && symbol.top < letter.centerY()
+        return symbol.left >= letter.right && symbol.top < letter.centerY()
     }
 
     private fun backspace(): KeyView =

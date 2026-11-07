@@ -47,7 +47,7 @@ class SceneFonts(private val look: ThemeLook) {
  *
  * The main thread's only, as the keyboard draws: its Paint and its map are one caller's at a time.
  */
-class AndroidTextMeasurer(private val fonts: SceneFonts) : TextMeasurer {
+class AndroidTextMeasurer(val fonts: SceneFonts) : TextMeasurer {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val ink = Rect()
     private val metrics = Paint.FontMetrics()
@@ -183,15 +183,24 @@ object SceneThemes {
     // in the order last asked for, the oldest first
     private val made = LinkedHashMap<Triple<ThemeLook, String, Boolean>, Made>(KEPT, 0.75f, true)
 
+    // the looks that made no theme: not read again, nor logged again, each scene asked of them (every
+    // key that changes what shows, Shift, Return); a look edited is another look, read
+    private val refused = LinkedHashMap<Triple<ThemeLook, String, Boolean>, Unit>(KEPT, 0.75f, true)
+
     fun of(look: ThemeLook, name: String, dark: Boolean): Theme? {
         val key = Triple(look, name, dark)
         made[key]?.let { return it.theme }
+        if (refused.containsKey(key)) return null
         return when (val t = ThemeReader.theme(LookTheme.xml(look, name, dark))) {
             is Parsed.Ok -> t.value.also {
                 made[key] = Made(it)
                 if (made.size > KEPT) made.remove(made.keys.first())
             }
-            is Parsed.Failed -> null.also { Timber.e("scene theme $name: ${t.problems}") }
+            is Parsed.Failed -> null.also {
+                Timber.e("scene theme $name: ${t.problems}")
+                refused[key] = Unit
+                if (refused.size > KEPT) refused.remove(refused.keys.first())
+            }
         }
     }
 

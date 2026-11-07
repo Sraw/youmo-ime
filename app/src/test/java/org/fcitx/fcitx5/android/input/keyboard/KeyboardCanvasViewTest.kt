@@ -343,6 +343,15 @@ class KeyboardCanvasViewTest {
                     assertNotNull(scene)
                     assertEquals(builtIn.name, drawn, scene!!.base to scene.keys.map { k -> k.id to k.faces })
                     assertTrue(logged.toString(), logged.any { "broken" in it && builtIn.name in it })
+                    // painted in the built-in's look, its fonts: none of the broken theme's
+                    assertSame(ThemeManager.shownLook(builtIn), c.paintedIn)
+                    // the broken theme read once, logged once: not again each scene asked (Shift, Return)
+                    repeat(3) {
+                        c.invalidateScene()
+                        assertNotNull(c.scene)
+                    }
+                    assertEquals(logged.toString(), 1, logged.count { it.startsWith("scene theme broken") })
+                    assertEquals(logged.toString(), 1, logged.count { "no scene of theme broken" in it })
                     h.idle()
                     // the canvas kept, the views hidden under it: none drawn again
                     assertSame(c, h.canvas())
@@ -372,9 +381,8 @@ class KeyboardCanvasViewTest {
         try {
             var asked = 0
             val ctx = RuntimeEnvironment.getApplication()
-            val look = ThemePreset.PixelLight.look
             val c = KeyboardCanvasView(
-                ctx, look, org.fcitx.fcitx5.android.data.theme.BoardImages(), SceneFonts(look),
+                ctx, org.fcitx.fcitx5.android.data.theme.BoardImages(),
                 object : KeyboardCanvasView.Host {
                     override fun scene(width: Int, height: Int) = null.also { asked++ }
                     override fun key(node: org.fcitx.fcitx5.android.scene.KeyNode) = null

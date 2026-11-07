@@ -429,10 +429,13 @@ again when that moves (one-handed to the other side, the floating window dragged
 (`PictureHost.decoding`), not for one that never will be (no host, a file that does not read).
 
 No scene of the theme (one the engine refuses or cannot build): the built-in theme of its lightness
-(`ThemePreset.PixelLight`/`PixelDark`, 060-render-p2 U8) is drawn instead, a warning logged; that
-failing too (a layout that does not read, the builder's problems), nothing is drawn and an error
-logged, never the views again (they go in S8); a new scene is tried as anything changes
-(`invalidateScene`). `SceneLayouts` keeps a layout that did not read as such, not read again a frame.
+(`ThemePreset.PixelLight`/`PixelDark`, 060-render-p2 U8) is drawn instead, the whole of it: its look,
+its fonts and measurer, its painter (`KeyboardCanvasView.Drawn`), none of the broken theme's; the
+warning logged once a theme's look (`TextKeyboard.fellBack`). That failing too (a layout that does not
+read, the builder's problems), nothing is drawn and an error logged, never the views again (they go
+in S8); a new scene is tried as anything changes (`invalidateScene`). `SceneLayouts` keeps a layout
+that did not read as such, not read again a frame; `SceneThemes` a look that made no theme (read and
+logged once, not again each scene asked).
 
 The row's indent before A and after L is the end key's touch area (the user's P0 decision in
 060-render-v2 §3): a finger down there is A's, its swipes and long press A's, though it is outside A's

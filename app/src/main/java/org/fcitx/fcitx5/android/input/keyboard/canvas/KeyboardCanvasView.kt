@@ -58,18 +58,23 @@ import kotlin.math.roundToInt
 @SuppressLint("ViewConstructor")
 class KeyboardCanvasView(
     context: Context,
-    look: ThemeLook,
-    images: BoardImages,
-    fonts: SceneFonts,
+    private val images: BoardImages,
     private val host: Host,
 ) : View(context) {
+
+    /**
+     * A [scene] and the look it was made in ([shownLook], ThemeManager.shownLook's), with its [fonts]:
+     * what paints it. The theme's, or the built-in theme's a theme that makes no scene falls back to
+     * (060-render-p2 U8), the whole of it.
+     */
+    class Drawn(val scene: Scene, val shownLook: ThemeLook, val fonts: SceneFonts)
 
     interface Host {
         /**
          * The keys' scene at [width] × [height] px, as the keyboard is now; null where there is none to
-         * draw. The same instance as last time where nothing drawn changed: kept as it was drawn.
+         * draw. The same scene as last time where nothing drawn changed: kept as it was drawn.
          */
-        fun scene(width: Int, height: Int): Scene?
+        fun scene(width: Int, height: Int): Drawn?
 
         /** The key wired for [node] (its touch, [SceneTouch.keyOf]): what a screen reader's click and long click on its node do; null, none. */
         fun key(node: KeyNode): SceneKey?
@@ -88,7 +93,9 @@ class KeyboardCanvasView(
         fun of(k: KeyNode) = node.id == k.id && node.copy == k.copy
     }
 
-    private val painter = ScenePainter(this, look, images, fonts)
+    // the look of the scene drawn, and what paints in it: another look (the built-in's, U8), another painter
+    private var painter: ScenePainter? = null
+    private var painted: ThemeLook? = null
     private var built: Scene? = null
     private var builtFor = 0 to 0
     private var dirty = true
@@ -131,11 +138,12 @@ class KeyboardCanvasView(
             builtFor = width to height
             val start = SystemClock.elapsedRealtimeNanos()
             Trace.beginSection("scene")
-            val s = try {
+            val drawn = try {
                 host.scene(width, height)
             } finally {
                 Trace.endSection()
             }
+            val s = drawn?.scene
             // the one drawn already (nothing that shows changed: Host.scene kept it): its keys' nodes kept, nothing said
             if (s != null && s === built) return s
             Timber.d("keyboard canvas: scene %d × %d made in %.2f ms", width, height, (SystemClock.elapsedRealtimeNanos() - start) / NANOS_A_MS)
@@ -150,8 +158,14 @@ class KeyboardCanvasView(
                 speech.invalidateRoot()
                 return null
             }
+            // painted in another look: nothing recorded in the last is kept
+            val repainted = drawn.shownLook !== painted
+            if (repainted) {
+                painter = ScenePainter(this, drawn.shownLook, images, drawn.fonts)
+                painted = drawn.shownLook
+            }
             val old = faces
-            if (s.base != built?.base) base = null
+            if (repainted || s.base != built?.base) base = null
             built = s
             var said: MutableList<Int>? = null
             faces = s.keys.mapIndexed { i, k ->
@@ -160,7 +174,7 @@ class KeyboardCanvasView(
                 val was = old.getOrNull(i)?.takeIf { it.of(k) } ?: old.firstOrNull { it.of(k) }
                 if (was != null) {
                     // drawn as before, it keeps its nodes: Shift relabels the letters, not the rest
-                    if (was.node.faces == k.faces) {
+                    if (!repainted && was.node.faces == k.faces) {
                         f.normal = was.normal
                         f.pressed = was.pressed
                     }
@@ -232,6 +246,7 @@ class KeyboardCanvasView(
 
     override fun onDraw(canvas: Canvas) {
         val s = scene ?: return
+        val painter = painter ?: return
         // an image or the picture in since it was recorded: recorded again
         if (painter.missed) {
             painter.missed = false
@@ -284,7 +299,7 @@ class KeyboardCanvasView(
         val c = beginRecording(r - l, b - t)
         try {
             c.translate(-l.toFloat(), -t.toFloat())
-            painter.draw(c, ops)
+            painter?.draw(c, ops)
         } finally {
             endRecording()
         }
@@ -395,9 +410,13 @@ class KeyboardCanvasView(
     @VisibleForTesting
     fun click(id: String, copy: Int = 0): Boolean = keyAt(id, copy)?.let(host::key)?.click() == true
 
+    /** The look the scene drawn was painted in: the theme's, or the built-in's it fell back to (U8). */
+    @get:VisibleForTesting
+    val paintedIn: ThemeLook? get() = painted
+
     /** Whether the frame drawn last missed something still coming (an image, the picture): to be recorded again. */
     @get:VisibleForTesting
-    val missed: Boolean get() = painter.missed
+    val missed: Boolean get() = painter?.missed == true
 
     /** The pictures' places looked at, as a frame does before it is drawn: what showed the picture recorded again if the view moved over it. */
     @VisibleForTesting
