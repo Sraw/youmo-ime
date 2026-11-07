@@ -322,7 +322,44 @@ which each of its show functions calls. `BaseKeyboard` intercepts every touch as
 does and hands it to the view of the key the scene's `keyAt` names (`findTouchTarget`), so a key's
 gestures are its view's, unchanged; the view's `onPressedChanged` (CustomGestureView) shows the press.
 TalkBack reads the canvas's `ExploreByTouchHelper`: a virtual node a key, its words the scene's
-`a11y` (an `a11y_*` name the app's string), id, state and actions its view's.
+`a11y` (an `a11y_*` name the app's string), id, state and actions its view's; a key whose view's state
+changed (Shift) since the last scene is told as `CONTENT_CHANGE_TYPE_STATE_DESCRIPTION` on its node.
+
+What the scene is given, so it draws what the views would: qwerty.xml is
+`lib/keyboard-scene/src/commonMain/layouts/qwerty.xml`, the one file the app copies and the engine's
+tests read. A letter's corner is `{alt:x}`, the app's `Texts.alts` (`SceneLetters.alts` of
+`TextKeyboard.cornerOf`: the user's own long press first, else Shift's swipe override, else the
+swipe; through `transformPunctuation`; the letter itself under a table's labels); a table's roots or
+names replace the letter through `when="roots"` and `{root:x}` (`SceneLetters.roots` of
+`TableKeyboard.label`), in two lines at 0.55 above three roots, as the views drew them.
+
+The scene is made only as the view draws (`onDraw`, timed at debug level): a touch, a press shown
+and TalkBack find keys in the scene drawn last (made on the spot only before the first frame), and a
+touch finds only a key whose view is VISIBLE (one hidden since that scene finds nothing). Each key's
+node is the size of what it draws (`CanvasFrame.extent`: its cell, its shadow's blur, a stroke), and
+which faces a frame draws at what alpha is `CanvasFrame.faces`. A key showing the theme's picture
+(`Op.Picture`) is recorded where the view is over the picture's base; a pre-draw listener records it
+again when that moves (one-handed to the other side, the floating window dragged). The painter's
+`missed` (record again next frame) is set only while an image or the picture is still being decoded
+(`PictureHost.decoding`), not for one that never will be (no host, a file that does not read).
+
+No scene (the theme the engine refuses, a layout that does not read, the builder's problems): the
+keyboard goes back to the views, told once (`Host.noScene`): the canvas removed, the rows VISIBLE,
+a warning logged; `SceneLayouts` keeps a layout that did not read as such, not read again a frame.
+
+The row's indent before A and after L is the end key's touch area (the user's P0 decision in
+060-render-v2 §3): a finger down there is A's, its swipes and long press A's, though it is outside A's
+view (`theIndentBeforeAIsAs`). Before, with `expand_keypress_area` off, it was nothing.
+
+Where the canvas still differs from the views, pixel for pixel (`sideBySide`, the default theme: 0.26%
+of the pixels past anti-aliasing): the engine puts row and key edges on whole pixels as Android laid
+the views out (rows 176, 175, 176, 175 px of a 702 px board; this fixed the bottom row a pixel up and
+Return's blurred top edge), and a shortcut's icon from the pixel its margins reach, its size whole
+pixels (fixed the corner icons a pixel off). Left: a label is centred in its face to the fraction of a
+pixel where the view centred a TextView of whole pixels (its top rounded) and drew the text in it, so
+on rows of odd height (the middle row's letters, 符, 123, the comma and period) the text lands a pixel
+up or down; the backspace's right-hand corner icons a pixel left (its view's right margin rounded the
+other way). Fixing them means pixel rules for text in the engine, left to P2's theme work.
 
 ### Hardware keyboard
 
