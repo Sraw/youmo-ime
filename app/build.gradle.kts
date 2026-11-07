@@ -232,7 +232,7 @@ abstract class SceneLayoutsTask : DefaultTask() {
 }
 
 val sceneLayouts = tasks.register<SceneLayoutsTask>("copySceneLayouts") {
-    layouts.from(rootProject.file("lib/keyboard-scene/src/commonTest/data/qwerty.xml"))
+    layouts.from(rootProject.file("lib/keyboard-scene/src/commonMain/layouts/qwerty.xml"))
     outputDir.set(layout.buildDirectory.dir("generated/scene-layouts"))
 }
 

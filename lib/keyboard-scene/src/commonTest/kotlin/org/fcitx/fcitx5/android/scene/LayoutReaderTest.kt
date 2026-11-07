@@ -42,7 +42,9 @@ class LayoutReaderTest {
         assertEquals(listOf(RowSplit.Halves, RowSplit.Halves, RowSplit.Halves, RowSplit.Scale), rows.map { it.split })
         val q = rows[0].cells.first() as Key
         assertEquals(Text.Binding("case", "q"), q.attrs.label)
-        assertEquals(Text.Literal("1"), q.attrs.alt)
+        assertEquals(Text.Binding("alt", "q"), q.attrs.alt)
+        // a table's roots over the letter where it shows them
+        assertEquals(Text.Binding("root", "q"), q.variants.single().attrs.label)
         assertEquals("q", q.attrs.actions["send"])
         assertEquals("full/q", q.attrs.shortcut)
         val space = rows[3].cells.first { it.id == "space" } as Key

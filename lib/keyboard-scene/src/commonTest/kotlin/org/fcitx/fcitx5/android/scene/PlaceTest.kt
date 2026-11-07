@@ -21,8 +21,9 @@ import kotlin.test.assertTrue
 class PlaceTest {
     private val env = Fixtures.portrait
 
+    // within a pixel: a key's edges inside the board are put on whole pixels, each by itself
     private fun near(expected: Double, actual: Double, what: String = "") =
-        assertTrue(abs(expected - actual) < 1e-6, "$what: expected $expected, was $actual")
+        assertTrue(abs(expected - actual) <= 1.0, "$what: expected $expected, was $actual")
 
     private fun Scene.key(id: String, copy: Int = 0) = keys.first { it.id == id && it.copy == copy }
 
@@ -31,7 +32,8 @@ class PlaceTest {
         val s = Fixtures.scene(env)
         assertEquals(Box(0.0, 0.0, 108.0, 180.0), s.key("q").bounds)
         assertEquals(Box(972.0, 0.0, 1080.0, 180.0), s.key("p").bounds)
-        assertEquals(Box(0.0, 540.0, 129.6, 720.0), s.key("symbols").bounds)
+        // 129.6 on a whole pixel
+        assertEquals(Box(0.0, 540.0, 130.0, 720.0), s.key("symbols").bounds)
     }
 
     @Test
@@ -59,6 +61,22 @@ class PlaceTest {
         // the 🌐 key hidden: the space takes its room too
         val noLang = Fixtures.scene(env.copy(input = Input(langKey = false)))
         near(4.1 * 108.0, noLang.key("space").bounds.width)
+    }
+
+    // as the app's views were laid out: rows 175.5 px tall are 176, 175, 176, 175, a letter's face and
+    // text where its view drew them; the board's own edges where they are
+    @Test
+    fun edgesInsideTheBoardOnWholePixels() {
+        for (e in listOf(env.copy(height = 702.0), Fixtures.landscape, env.copy(width = 1079.0, height = 701.0))) {
+            val s = Fixtures.scene(e)
+            for (k in s.keys) {
+                for (v in listOf(k.bounds.left, k.bounds.top, k.bounds.right, k.bounds.bottom)) {
+                    assertTrue(v == 0.0 || v == e.width || v == e.height || v == kotlin.math.floor(v), "${k.id}: $v")
+                }
+            }
+        }
+        val s = Fixtures.scene(env.copy(height = 702.0))
+        assertEquals(listOf(0.0, 176.0, 351.0, 527.0), listOf("q", "a", "z", "space").map { s.key(it).bounds.top })
     }
 
     @Test

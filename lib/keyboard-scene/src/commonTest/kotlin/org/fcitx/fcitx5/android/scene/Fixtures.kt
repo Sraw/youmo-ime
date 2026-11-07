@@ -50,7 +50,10 @@ object Fixtures {
     val qwerty: Layout by lazy { LayoutReader.layout(qwertySource).ok() }
     val materialLight: Theme by lazy { ThemeReader.theme(testData("material-light.xml")).ok() }
 
-    private val texts = Texts(imeName = "拼音", returnLabel = "换行", returnIcon = "enter")
+    /** The letters' long press firsts as built in (PopupPreset's): what the app gives `{alt:x}` till the user changes one. */
+    val qwertyAlts: Map<String, String> = "q1w2e3r4t5y6u7i8o9p0a@s*d+f-g=h/j#k(l)z'x:c\"v?b!n~m\\".chunked(2).associate { it.take(1) to it.drop(1) }
+
+    private val texts = Texts(imeName = "拼音", returnLabel = "换行", returnIcon = "enter", alts = qwertyAlts)
 
     /** A phone upright, 411 dp wide, the keyboard 274 dp tall. */
     val portrait = Env(1080.0, 720.0, DENSITY, input = Input(langKey = true), texts = texts)

@@ -37,6 +37,21 @@ object Shots {
                 "qwerty-table-looking-up", "qwerty",
                 on("qwerty") { it.copy(input = it.input.copy(ime = "table", table = "wbx", composing = true, lookingUp = true)) },
             ),
+            // 五笔's roots over the letters, more than three in two lines (TableKeyboard.label), a letter
+            // with none itself (the app's); the letters in the corners
+            Shot(
+                "qwerty-table-roots", "qwerty",
+                on("qwerty") {
+                    it.copy(
+                        input = it.input.copy(ime = "table", table = "wbx", roots = true),
+                        texts = it.texts.copy(
+                            alts = Fixtures.qwertyAlts.mapValues { (k, _) -> k },
+                            other = Fixtures.qwertyAlts.keys.associate { k -> "root:$k" to k } +
+                                mapOf("root:g" to "王一\n五戋", "root:f" to "土士二干\n十寸雨", "root:q" to "金", "root:y" to "言文方"),
+                        ),
+                    )
+                },
+            ),
             Shot(
                 "qwerty-shuangpin-semicolon", "qwerty",
                 on("qwerty") { it.copy(input = it.input.copy(ime = "shuangpin", schemeTypes = setOf("semicolon"))) },

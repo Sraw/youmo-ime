@@ -46,6 +46,7 @@ object Forms {
     /** The texts the app gives a pinyin keyboard in Chinese: Chinese punctuation, its name on the space, the screen reader's. */
     val texts = Texts(
         imeName = "拼音", comma = "，", period = "。", returnLabel = "换行", returnIcon = "enter",
+        alts = Fixtures.qwertyAlts,
         punctuation = mapOf(
             "," to "，", "." to "。", "?" to "？", "!" to "！", "~" to "～", ":" to "：", "(" to "（", ")" to "）",
         ),

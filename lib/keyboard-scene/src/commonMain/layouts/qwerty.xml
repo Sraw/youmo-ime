@@ -1,34 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   26 键（qwerty）照现在的 TextKeyboard.Layout（TextKeyboard.kt:82-144）、KeyDefPreset 和 show*Key 的条件转写。
+  App 画的就是这一份（app/build.gradle.kts 的 copySceneLayouts 拷进 raw），引擎的测试和快照读的也是这一份。
   拼音、双拼、英文、5 个码表共用这一块，差别都在 when= 里。宽度：字母键 = 1（原 percentWidth 0.1）。
   不写的：每个字母的长按/上下滑字符（PopupPreset + 用户 PopupOverrides，按 label 自动取）、快捷键的内容（KeyShortcuts）。
-  分体：行上 split="halves" 两半各五键（A §8，引擎按 SplitKeyboard 算宽），; 和 * 写 split="after" 接在右半后面。角标 alt 写的是内置值；用户改过长按首字时角标跟着变，那是 {alt:x}，这里为了可读写成固定字。
+  分体：行上 split="halves" 两半各五键（A §8，引擎按 SplitKeyboard 算宽），; 和 * 写 split="after" 接在右半后面。
+  角标 {alt:x}：App 给（Texts.alts）——长按首字（内置或用户改的，随 Shift），按标点映射显示；码表键上显示字根时是字母本身。
+  码表显示字根/键名（when=roots）：字母键换成 {root:x}（Texts.other 的 root:x），多行时一行的高度放两行，宽了缩到键里。
 -->
 <keyboard xmlns="https://youmo-ime/layout/1" id="qwerty" name="26 键" family="letters" columns="10" arrange="rows" on-split="split">
   <defaults kind="letter" text-size="23"/>
   <row split="halves">
-    <key id="q" label="{case:q}" alt="1" send="q" shortcut="full/q"/>
-    <key id="w" label="{case:w}" alt="2" send="w" shortcut="full/w"/>
-    <key id="e" label="{case:e}" alt="3" send="e" shortcut="full/e"/>
-    <key id="r" label="{case:r}" alt="4" send="r" shortcut="full/r"/>
-    <key id="t" label="{case:t}" alt="5" send="t" shortcut="full/t"/>
-    <key id="y" label="{case:y}" alt="6" send="y" shortcut="full/y"/>
-    <key id="u" label="{case:u}" alt="7" send="u" shortcut="full/u"/>
-    <key id="i" label="{case:i}" alt="8" send="i" shortcut="full/i"/>
-    <key id="o" label="{case:o}" alt="9" send="o" shortcut="full/o"/>
-    <key id="p" label="{case:p}" alt="0" send="p" shortcut="full/p"/>
+    <key id="q" label="{case:q}" alt="{alt:q}" send="q" shortcut="full/q"><variant when="roots" label="{root:q}"/></key>
+    <key id="w" label="{case:w}" alt="{alt:w}" send="w" shortcut="full/w"><variant when="roots" label="{root:w}"/></key>
+    <key id="e" label="{case:e}" alt="{alt:e}" send="e" shortcut="full/e"><variant when="roots" label="{root:e}"/></key>
+    <key id="r" label="{case:r}" alt="{alt:r}" send="r" shortcut="full/r"><variant when="roots" label="{root:r}"/></key>
+    <key id="t" label="{case:t}" alt="{alt:t}" send="t" shortcut="full/t"><variant when="roots" label="{root:t}"/></key>
+    <key id="y" label="{case:y}" alt="{alt:y}" send="y" shortcut="full/y"><variant when="roots" label="{root:y}"/></key>
+    <key id="u" label="{case:u}" alt="{alt:u}" send="u" shortcut="full/u"><variant when="roots" label="{root:u}"/></key>
+    <key id="i" label="{case:i}" alt="{alt:i}" send="i" shortcut="full/i"><variant when="roots" label="{root:i}"/></key>
+    <key id="o" label="{case:o}" alt="{alt:o}" send="o" shortcut="full/o"><variant when="roots" label="{root:o}"/></key>
+    <key id="p" label="{case:p}" alt="{alt:p}" send="p" shortcut="full/p"><variant when="roots" label="{root:p}"/></key>
   </row>
   <row split="halves">
-    <key id="a" label="{case:a}" alt="@" send="a" shortcut="full/a"/>
-    <key id="s" label="{case:s}" alt="*" send="s" shortcut="full/s"/>
-    <key id="d" label="{case:d}" alt="+" send="d" shortcut="full/d"/>
-    <key id="f" label="{case:f}" alt="-" send="f" shortcut="full/f"/>
-    <key id="g" label="{case:g}" alt="=" send="g" shortcut="full/g"/>
-    <key id="h" label="{case:h}" alt="/" send="h" shortcut="full/h"/>
-    <key id="j" label="{case:j}" alt="#" send="j" shortcut="full/j"/>
-    <key id="k" label="{case:k}" alt="(" send="k" shortcut="full/k"/>
-    <key id="l" label="{case:l}" alt=")" send="l" shortcut="full/l"/>
+    <key id="a" label="{case:a}" alt="{alt:a}" send="a" shortcut="full/a"><variant when="roots" label="{root:a}"/></key>
+    <key id="s" label="{case:s}" alt="{alt:s}" send="s" shortcut="full/s"><variant when="roots" label="{root:s}"/></key>
+    <key id="d" label="{case:d}" alt="{alt:d}" send="d" shortcut="full/d"><variant when="roots" label="{root:d}"/></key>
+    <key id="f" label="{case:f}" alt="{alt:f}" send="f" shortcut="full/f"><variant when="roots" label="{root:f}"/></key>
+    <key id="g" label="{case:g}" alt="{alt:g}" send="g" shortcut="full/g"><variant when="roots" label="{root:g}"/></key>
+    <key id="h" label="{case:h}" alt="{alt:h}" send="h" shortcut="full/h"><variant when="roots" label="{root:h}"/></key>
+    <key id="j" label="{case:j}" alt="{alt:j}" send="j" shortcut="full/j"><variant when="roots" label="{root:j}"/></key>
+    <key id="k" label="{case:k}" alt="{alt:k}" send="k" shortcut="full/k"><variant when="roots" label="{root:k}"/></key>
+    <key id="l" label="{case:l}" alt="{alt:l}" send="l" shortcut="full/l"><variant when="roots" label="{root:l}"/></key>
     <!-- 双拼方案会打 ; 且不分体（SemicolonKey.kt），或码表的额外码键在 ; 位（TableKeyboard.extraKey）：TextKeyboard.kt:324-329 -->
     <key id="semicolon" role="semicolon" label=";" send=";" mark="false" split="after"
          when="ime=shuangpin scheme-types=semicolon !split, table-extra=semicolon"/>
@@ -42,13 +45,13 @@
          send="code:U+F0104" when="table !looking-up"/>
     <key id="lookup-on" role="lookup-on" kind="enter" face="keep" width="1.5" label="拼" text-size="18" text-style="bold"
          send="code:U+F0104" when="table looking-up"/>
-    <key id="z" label="{case:z}" alt="'" send="z" shortcut="full/z"/>
-    <key id="x" label="{case:x}" alt=":" send="x" shortcut="full/x"/>
-    <key id="c" label="{case:c}" alt="&quot;" send="c" shortcut="full/c"/>
-    <key id="v" label="{case:v}" alt="?" send="v" shortcut="full/v"/>
-    <key id="b" label="{case:b}" alt="!" send="b" shortcut="full/b"/>
-    <key id="n" label="{case:n}" alt="~" send="n" shortcut="full/n"/>
-    <key id="m" label="{case:m}" alt="\" send="m" shortcut="full/m"/>
+    <key id="z" label="{case:z}" alt="{alt:z}" send="z" shortcut="full/z"><variant when="roots" label="{root:z}"/></key>
+    <key id="x" label="{case:x}" alt="{alt:x}" send="x" shortcut="full/x"><variant when="roots" label="{root:x}"/></key>
+    <key id="c" label="{case:c}" alt="{alt:c}" send="c" shortcut="full/c"><variant when="roots" label="{root:c}"/></key>
+    <key id="v" label="{case:v}" alt="{alt:v}" send="v" shortcut="full/v"><variant when="roots" label="{root:v}"/></key>
+    <key id="b" label="{case:b}" alt="{alt:b}" send="b" shortcut="full/b"><variant when="roots" label="{root:b}"/></key>
+    <key id="n" label="{case:n}" alt="{alt:n}" send="n" shortcut="full/n"><variant when="roots" label="{root:n}"/></key>
+    <key id="m" label="{case:m}" alt="{alt:m}" send="m" shortcut="full/m"><variant when="roots" label="{root:m}"/></key>
     <key id="backspace" role="backspace" kind="function" width="1.5" icon="backspace" a11y="a11y_key_backspace"
          sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both" shortcut="backspace"/>
   </row>

@@ -67,6 +67,8 @@ tasks.withType<Test>().configureEach {
     val sceneData = rootProject.file("lib/keyboard-scene/src/commonTest/data")
     systemProperty("scene.data", sceneData.absolutePath)
     inputs.dir(sceneData).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("sceneData")
+    // and the layouts the app draws, which they read beside it (SceneData)
+    inputs.dir(rootProject.file("lib/keyboard-scene/src/commonMain/layouts")).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("sceneLayouts")
     // MisreadingsTest checks the list the app build compiles: an edit to it alone runs it again
     inputs.file(rootProject.file("lexicon/misreadings.tsv")).withPathSensitivity(PathSensitivity.RELATIVE)
     testLogging {

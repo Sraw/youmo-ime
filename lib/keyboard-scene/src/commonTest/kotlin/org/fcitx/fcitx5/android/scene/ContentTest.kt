@@ -82,13 +82,14 @@ class ContentTest {
         val redo = icons(s, "y").single()
         assertEquals("redo", redo.name)
         val f = face(s, "y")
-        near(f.left + 3 * d, redo.box.left)
-        near(f.top + 2 * d, redo.box.top)
-        near(11 * d, redo.box.width)
+        // as its ImageView was laid out: from the pixel its margins reach, whole pixels wide
+        near(kotlin.math.floor(f.left + 3 * d), redo.box.left)
+        near(kotlin.math.floor(f.top + 2 * d), redo.box.top)
+        near(kotlin.math.floor(11 * d + 0.5), redo.box.width)
         val backspace = icons(s, "backspace").map { it.name }
         assertEquals(listOf("backspace", "delete-sweep", "restore").sorted(), backspace.sorted())
         val down = icons(s, "backspace").first { it.name == "restore" }
-        near(face(s, "backspace").bottom - 2 * d, down.box.bottom, "down's at the bottom")
+        assertTrue(kotlin.math.abs(face(s, "backspace").bottom - 2 * d - down.box.bottom) < 1.0, "down's at the bottom, within its pixel")
         assertEquals("cursor-move", icons(s, "space").single().name)
     }
 
@@ -201,6 +202,41 @@ class ContentTest {
         assertEquals(1, sizes.size, "$sizes")
         assertTrue(sizes.single() < 23 * d, "${sizes.single()}")
         assertTrue(sizes.single() >= 23 * d * 0.75 - 0.01, "a quarter smaller at most")
+    }
+
+    // a table's roots over the letters (TextKeyboard): `when=roots`, `{root:x}`; the letter in the corner
+    @Test
+    fun aTablesRootsInLinesInOneLinesHeightShrunkToTheFace() {
+        val roots = env.copy(
+            input = env.input.copy(ime = "table", table = "wbx", roots = true),
+            texts = env.texts.copy(
+                alts = Fixtures.qwertyAlts.mapValues { (k, _) -> k },
+                other = mapOf("root:q" to "金", "root:w" to "人亻八\n癶", "root:e" to "月彡乃用"),
+            ),
+        )
+        val s = Fixtures.scene(roots)
+        val size = 23 * d
+        // a name: one character, as a letter is drawn, the letter in its corner
+        near(size, texts(s, "q").first { it.text == "金" }.size)
+        assertTrue(texts(s, "q").any { it.text == "q" })
+        // in two lines, each at 0.55 of the size, one under the other, centred across; three wide
+        // characters at that wider than the face less 6 dp a side: the two shrunk into it alike
+        val w = texts(s, "w").filter { it.text != "w" }
+        assertEquals(listOf("人亻八", "癶"), w.map { it.text })
+        val f = face(s, "w")
+        val room = f.width - 2 * Content.ROOTS_INSET_DP * d
+        near(minOf(size * Content.ROOTS_LINES_SCALE, room / 3), w[0].size)
+        near(w[0].size, w[1].size)
+        near(1.35 * w[0].size, w[1].baseline - w[0].baseline, "a line's height")
+        near(f.centerX, w[0].x + 3 * w[0].size / 2, "centred")
+        near(f.centerX, w[1].x + w[1].size / 2, "centred")
+        // four roots on a line of the full size are wider than the face less 6 dp a side: shrunk into
+        // it (and with the letters then, out of their corners' way: one line's ink is measured)
+        val e = texts(s, "e").single { it.text == "月彡乃用" }
+        assertTrue(4 * e.size <= room + 0.01, "shrunk to the face: ${4 * e.size}")
+        assertTrue(4 * e.size > room * 0.7, "not past the letters' yield: ${4 * e.size}")
+        // no roots: the letters as ever
+        assertTrue(texts(Fixtures.scene(env), "w").any { it.text == "w" })
     }
 
     @Test

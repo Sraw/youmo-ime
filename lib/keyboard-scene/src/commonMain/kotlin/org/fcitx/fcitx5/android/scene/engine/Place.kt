@@ -12,6 +12,8 @@ import org.fcitx.fcitx5.android.scene.layout.OnSplit
 import org.fcitx.fcitx5.android.scene.layout.RowSplit
 import org.fcitx.fcitx5.android.scene.layout.Width
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
+import kotlin.math.abs
+import kotlin.math.floor
 
 /** An item where it goes: its [cell], and its [hit] (a key's: its cell, a row's blank end included). */
 class Placed(val item: Item, val copy: Int, val cell: Box, val hit: Box?)
@@ -42,11 +44,13 @@ class Placed(val item: Item, val copy: Int, val cell: Box, val hit: Box?)
 object Place {
     private const val EPSILON = 1e-9
     private const val ODD_HALVES = 9
+    private const val HALF = 0.5
 
     private enum class Side { Left, Right }
 
-    // what an item across rows keeps of the rows under it: [left, right) px, down to row [last]
-    private class Kept(val side: Side, val left: Double, val right: Double, val last: Int)
+    // what an item across rows keeps of the rows under it: [left, right) px, down to row [last]; [at],
+    // [to]: its edges before they were put on whole pixels, what the rows' units are counted in
+    private class Kept(val side: Side, val left: Double, val right: Double, val last: Int, val at: Double, val to: Double)
 
     fun rows(
         rows: List<ExpandedRow>,
@@ -64,16 +68,16 @@ object Place {
         var y = board.top
         rows.forEachIndexed { r, row ->
             y = if (r == rows.lastIndex) board.bottom else y + board.height * row.height / total
-            bottoms += y
+            bottoms += if (r == rows.lastIndex) y else pixel(y)
         }
         val out = ArrayList<Placed>()
         val kept = ArrayList<Kept>()
         rows.forEachIndexed { r, row ->
             val top = if (r == 0) board.top else bottoms[r - 1]
             kept.removeAll { it.last < r }
-            val lo = kept.filter { it.side == Side.Left }.maxOfOrNull { it.right } ?: board.left
-            val hi = kept.filter { it.side == Side.Right }.minOfOrNull { it.left } ?: board.right
-            val room = (hi - lo) / unit
+            val (lo, hi) = left(kept, board, Kept::right) to right(kept, board, Kept::left)
+            val from = left(kept, board, Kept::to)
+            val room = (right(kept, board, Kept::at) - from) / unit
             val laid = if (sizes == null) Laid(row.items.map { Triple(it, 0, it.width) }, row.indent, row.endIndent) else split(row, sizes, columns, warnings)
             val widths = laid.items
             val fixed = widths.sumOf { (it.third as? Width.Units)?.units ?: 0.0 } + laid.indent + laid.endIndent
@@ -82,14 +86,14 @@ object Place {
             val fillUnits = if (fills > 0) maxOf(0.0, room - fixed) / fills else 0.0
             val used = fixed + fillUnits * fills
             // what no fill takes, half each side (a row's own indents on top)
-            var x = lo + ((room - used) / 2 + laid.indent) * unit
+            var x = from + ((room - used) / 2 + laid.indent) * unit
             val cells = widths.mapIndexed { i, (item, copy, width) ->
                 val w = (if (width is Width.Units) width.units else fillUnits) * unit
                 val n = item.rows
                 val bottom = if (n > 1) span(n, r, i, widths.size, bottoms, row.line, p) else bottoms[r]
                 if (n > 1 && width !is Width.Units) p.add(row.line, "an item across rows needs a width in units, not fill")
-                val cell = Box(x, top, x + w, bottom)
-                if (n > 1) kept += Kept(if (i == 0) Side.Left else Side.Right, cell.left, cell.right, minOf(r + n - 1, rows.lastIndex))
+                val cell = Box(edge(x, board), top, edge(x + w, board), bottom)
+                if (n > 1) kept += Kept(if (i == 0) Side.Left else Side.Right, cell.left, cell.right, minOf(r + n - 1, rows.lastIndex), x, x + w)
                 x += w
                 Triple(item, copy, cell)
             }
@@ -104,6 +108,19 @@ object Place {
         }
         return p.result { out }
     }
+
+    // an edge between two rows or two keys on a whole pixel, as the app's views were laid out (Android
+    // lays a view out at whole pixels): a key's face, text and icons then where its view drew them, not
+    // half a pixel off and rounded the other way (a letter a pixel higher, an edge blurred); the
+    // board's own edges stay where they are (a one-handed board's, a split's, may be between pixels)
+    private fun pixel(v: Double): Double = floor(v + HALF)
+
+    private fun edge(x: Double, board: Box): Double = if (abs(x - board.left) < EPSILON || abs(x - board.right) < EPSILON) x else pixel(x)
+
+    // where the rows' items across rows leave a row: its left end, its right one, by an item's [edge]
+    private fun left(kept: List<Kept>, board: Box, edge: (Kept) -> Double) = kept.filter { it.side == Side.Left }.maxOfOrNull(edge) ?: board.left
+
+    private fun right(kept: List<Kept>, board: Box, edge: (Kept) -> Double) = kept.filter { it.side == Side.Right }.minOfOrNull(edge) ?: board.right
 
     // the bottom of an item [n] rows tall at [i] of [count] in row [r]: first or last in its row, the rows there
     private fun span(n: Int, r: Int, i: Int, count: Int, bottoms: List<Double>, line: Int, p: Problems): Double {

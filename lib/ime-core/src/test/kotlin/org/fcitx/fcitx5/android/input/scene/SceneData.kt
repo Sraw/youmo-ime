@@ -17,11 +17,14 @@ import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import java.io.File
 
-/** keyboard-scene's example layouts and themes (its commonTest/data, the build says where: `scene.data`). */
+/**
+ * keyboard-scene's example layouts and themes (its commonTest/data, the build says where: `scene.data`),
+ * and the layouts the app draws (its commonMain/layouts, beside: qwerty.xml).
+ */
 object SceneData {
     private val dir = File(System.getProperty("scene.data") ?: error("scene.data not set"))
 
-    fun read(name: String) = File(dir, name).readText()
+    fun read(name: String) = File(dir, name).takeIf { it.exists() }?.readText() ?: File(dir, "../../commonMain/layouts/$name").readText()
 
     fun theme(name: String): Theme = (ThemeReader.theme(read(name)) as Parsed.Ok).value
 

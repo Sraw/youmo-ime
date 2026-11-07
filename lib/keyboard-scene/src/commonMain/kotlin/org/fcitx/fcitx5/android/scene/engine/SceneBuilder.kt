@@ -191,7 +191,7 @@ class SceneBuilder(
         keys.forEachIndexed { i, k ->
             if (out[i] != null) return@forEachIndexed
             val c = k.content
-            out[i] = if (c.glyph == null || c.marks.isEmpty()) {
+            out[i] = if (c.glyph == null || c.marks.isEmpty() || !c.yields) {
                 Settled(c.glyph, c.marks.map { it.drawn })
             } else {
                 settled(c, KeyMarkYield.key(c.glyph.ink.toInk(), c.marks.map(::mark), c.room.toInk(), gap))

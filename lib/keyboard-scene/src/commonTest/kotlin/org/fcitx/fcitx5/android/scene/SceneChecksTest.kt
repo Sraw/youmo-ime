@@ -59,11 +59,12 @@ class SceneChecksTest {
      *   sits across the pill's corner; its marks only, never its label;
      * - [ICON_ON_COMPACT]: a key's icon, on a key with no text ([all]; marks of icons beside it), at its own 24 dp
      *   (ImageKeyView's wrap_content), taller than a compact key's face (⌫, 🌐, ↵ on the boards whose
-     *   rows are four to the height).
+     *   rows are four to the height), or wider than a narrow key's (the floating keyboard's 🌐, its face
+     *   62.25 px under a 63 px icon once its edges are on whole pixels: the view's was the same).
      */
     private fun leeway(shot: Shot, k: KeyNode, c: Drawn, all: List<Drawn>): String? = when {
         shot.env.flat && k.kind == "space" && c.part == Part.MARK -> FLAT_SPACE
-        shot.env.compact && c.part == Part.ICON && all.none { it.text } &&
+        c.part == Part.ICON && all.none { it.text } &&
             kotlin.math.abs(c.box.height - ICON_DP * shot.env.density) < EDGE -> ICON_ON_COMPACT
         else -> null
     }
@@ -132,7 +133,8 @@ class SceneChecksTest {
             }
             is Op.Icon -> {
                 val dp = if (shot.env.compact) SHORTCUT_ICON_COMPACT_DP else SHORTCUT_ICON_DP
-                val mark = kotlin.math.abs(op.box.height - dp * shot.env.density) < EDGE
+                // its dp in whole pixels, as its ImageView was
+                val mark = kotlin.math.abs(op.box.height - dp * shot.env.density) <= HALF_PX + EDGE
                 Drawn("icon ${op.name}", op.box, if (mark) Part.MARK else Part.ICON)
             }
             else -> null
@@ -145,10 +147,11 @@ class SceneChecksTest {
         // a hundredth of a pixel each way, what the snapshots round to
         const val AREA = 1e-4
         const val EDGE = 0.01
+        const val HALF_PX = 0.5
         const val ICON_DP = 24.0
         const val SHORTCUT_ICON_DP = 11.0
         const val SHORTCUT_ICON_COMPACT_DP = 8.0
         const val FLAT_SPACE = "flat space: marks by the key, not its inset pill"
-        const val ICON_ON_COMPACT = "an icon alone at its own 24 dp on a compact key"
+        const val ICON_ON_COMPACT = "an icon alone at its own 24 dp on a key smaller than it"
     }
 }

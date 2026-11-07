@@ -5,12 +5,14 @@
 package org.fcitx.fcitx5.android.scene.engine
 
 import org.fcitx.fcitx5.android.scene.Box
+import org.fcitx.fcitx5.android.scene.layout.Text
 import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks.Slot
 import org.fcitx.fcitx5.android.scene.rules.KeyTextScale
 import org.fcitx.fcitx5.android.scene.theme.TextLook
 import kotlin.math.ceil
+import kotlin.math.floor
 
 /**
  * A mark as placed before any yields ([KeyMarkYield.Mark] of it), and where it would be elsewhere;
@@ -18,8 +20,12 @@ import kotlin.math.ceil
  */
 class MarkDrawn(val drawn: Drawn, val slot: Slot, val minScale: Double, val drop: Int, val elsewhere: List<Pair<Slot, Drawn>>, val top: Double)
 
-/** A key's [glyph] (label, icon, badge; null: none) and [marks], before they yield to each other. */
-class KeyContent(val glyph: Drawn?, val marks: List<MarkDrawn>, val room: Box, val letter: Boolean, val baseline: Double)
+/**
+ * A key's [glyph] (label, icon, badge; null: none) and [marks], before they yield to each other;
+ * where it [yields] not, they stay as placed (a table's roots in lines: theme 3.0 measured no ink of
+ * a styled text, so nothing gave way to it).
+ */
+class KeyContent(val glyph: Drawn?, val marks: List<MarkDrawn>, val room: Box, val letter: Boolean, val baseline: Double, val yields: Boolean = true)
 
 /** What a key's content is drawn in, as the theme has it in its normal state: one per part. */
 class Looks(val label: TextLook, val icon: TextLook, val badge: TextLook, val mark: TextLook, val shortcut: TextLook)
@@ -37,6 +43,9 @@ class Looks(val label: TextLook, val icon: TextLook, val badge: TextLook, val ma
  * shortcut's not. A theme's `hidden` label hides the label, the icon and the symbol, never the badge
  * or the shortcuts (rules B §5); the badge keeps its place beside the label hidden, or beside no
  * label where there is none (an input method with no name: the label's 3 dp still after it).
+ * A table's roots (`{root:x}`, TextKeyboard's) are set as theme 3.0 set them: in lines, two in the
+ * height of one ([ROOTS_LINES_SCALE] of the size), the whole shrunk to the face less [ROOTS_INSET_DP]
+ * a side where it is wider (AutoScaleTextView's Proportional), each line centred.
  */
 class Content(private val env: Env, private val measurer: TextMeasurer, private val icons: IconSizes = IconSizes.MATERIAL) {
     private val d = env.density
@@ -53,29 +62,55 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
             Measured(text, measurer.measure(text, looks.label.font, weight, size), size, looks.label.font, weight)
         }
         val label = measured?.takeIf { !hidden }
+        val roots = (key.attrs.label as? Text.Binding)?.name == ROOT
+        val lines = roots && label != null && '\n' in label.text
         val icon = key.icon?.takeIf { !hidden }
         val badge = key.badge
         val cy = if (below != null) (content.top + below.top) / 2 else content.centerY
-        val glyph = when {
-            badge != null -> badged(badge, measured, label, content.centerX, cy)
-            label != null && icon != null -> {
-                val iconSize = ICON_WITH_LABEL_DP * d
-                val (labelPad, iconPad) = if (env.landscape) LANDSCAPE_PADS else PORTRAIT_PADS
-                val t = label.at(content.centerX, content.bottom - labelPad * d - label.box.height / 2, Part.Label)
-                val top = content.top + iconPad * d
-                val i = PlacedIcon(icon, Box(content.centerX - iconSize / 2, top, content.centerX + iconSize / 2, top + iconSize), Part.Icon)
-                Drawn(t.texts, listOf(i), t.ink.union(i.box))
-            }
-            label != null -> label.at(content.centerX, cy, Part.Label)
-            icon != null -> {
-                val (w, h) = icons.dp(icon).let { (w, h) -> w * d to h * d }
-                Drawn.of(PlacedIcon(icon, Box(content.centerX - w / 2, cy - h / 2, content.centerX + w / 2, cy + h / 2), Part.Icon))
-            }
-            else -> null
-        }
+        val glyph = glyph(badge, measured, label, icon, roots, content, cy)
         val room = content.inset(ROOM_H_DP * d, ROOM_V_DP * d, ROOM_H_DP * d, ROOM_V_DP * d)
-        val letter = key.attrs.alt != null && label != null && icon == null && badge == null
-        return KeyContent(glyph, marks, room, letter, glyph?.texts?.firstOrNull()?.baseline ?: 0.0)
+        val letter = key.attrs.alt != null && label != null && icon == null && badge == null && !lines
+        return KeyContent(glyph, marks, room, letter, glyph?.texts?.firstOrNull()?.baseline ?: 0.0, yields = !lines)
+    }
+
+    // the key's one thing in the middle: its badge and label, its label over its icon, its roots, its label, its icon
+    private fun glyph(badge: String?, measured: Measured?, label: Measured?, icon: String?, roots: Boolean, content: Box, cy: Double): Drawn? = when {
+        badge != null -> badged(badge, measured, label, content.centerX, cy)
+        label != null && icon != null -> {
+            val iconSize = ICON_WITH_LABEL_DP * d
+            val (labelPad, iconPad) = if (env.landscape) LANDSCAPE_PADS else PORTRAIT_PADS
+            val t = label.at(content.centerX, content.bottom - labelPad * d - label.box.height / 2, Part.Label)
+            val top = content.top + iconPad * d
+            val i = PlacedIcon(icon, Box(content.centerX - iconSize / 2, top, content.centerX + iconSize / 2, top + iconSize), Part.Icon)
+            Drawn(t.texts, listOf(i), t.ink.union(i.box))
+        }
+        label != null && roots -> roots(label, content, cy)
+        label != null -> label.at(content.centerX, cy, Part.Label)
+        icon != null -> {
+            val (w, h) = icons.dp(icon).let { (w, h) -> w * d to h * d }
+            Drawn.of(PlacedIcon(icon, Box(content.centerX - w / 2, cy - h / 2, content.centerX + w / 2, cy + h / 2), Part.Icon))
+        }
+        else -> null
+    }
+
+    // [m]'s text in lines centred on the face at [cy], shrunk to fit it as a whole
+    private fun roots(m: Measured, content: Box, cy: Double): Drawn {
+        val lines = m.text.split('\n')
+        val first = if (lines.size > 1) m.size * ROOTS_LINES_SCALE else m.size
+        val at = lines.map { measurer.measure(it, m.font, m.weight, first) }
+        val wide = at.maxOf { it.advance }
+        val tall = at.first().let { it.bottom - it.top } * lines.size
+        val roomX = content.width - 2 * ROOTS_INSET_DP * d
+        val fit = minOf(1.0, if (wide > 0) roomX / wide else 1.0, if (tall > 0) content.height / tall else 1.0)
+        val size = if (fit < 1.0 && fit > 0.0) first * fit else first
+        val ms = if (size == first) at else lines.map { measurer.measure(it, m.font, m.weight, size) }
+        val lineHeight = ms.first().let { it.bottom - it.top }
+        val top = cy - lineHeight * lines.size / 2
+        val texts = lines.mapIndexed { i, line ->
+            PlacedText(line, content.centerX - ms[i].advance / 2, top + i * lineHeight - ms[i].top, size, 1.0, m.font, m.weight, Part.Label)
+        }
+        val ink = texts.mapIndexed { i, t -> ms[i].ink.moved(t.x, t.baseline) }.reduce(Box::union)
+        return Drawn(texts, emptyList(), ink)
     }
 
     // the badge 15 dp, 3 dp, the label ([measured]'s room kept where it is hidden: [label] null), the two centred at [cx]
@@ -134,7 +169,7 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         val (drawnAt, minScale) = when (mark) {
             is MarkContent.Icon -> {
                 val dp = if (compact) SHORTCUT_ICON_COMPACT_DP else SHORTCUT_ICON_DP
-                val f = { at: Slot -> Drawn.of(PlacedIcon(mark.name, slotBox(at, dp * d, dp * d, content, h, v), Part.Shortcut)) }
+                val f = { at: Slot -> Drawn.of(PlacedIcon(mark.name, laidOut(slotBox(at, dp * d, dp * d, content, h, v)), Part.Shortcut)) }
                 f to KeyMarkYield.minScale(KeyMarkYield.MIN_ICON_DP, dp)
             }
             is MarkContent.Text -> {
@@ -149,6 +184,15 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         val drawn = drawnAt(slot)
         // a shortcut is never under the label (KeyMarks.Slot.Below): its top centres nothing
         return MarkDrawn(drawn, slot, minScale, drop, elsewhere, drawn.ink.top)
+    }
+
+    // where a view of [b] was laid out: its corner on the pixel it starts in, its size whole pixels (a
+    // shortcut's ImageView, its margins and size in dp): drawn half a pixel off it, its edges rounded the
+    // other way, an icon a pixel over
+    private fun laidOut(b: Box): Box {
+        val x = floor(b.left)
+        val y = floor(b.top)
+        return Box(x, y, x + floor(b.width + HALF_PX), y + floor(b.height + HALF_PX))
     }
 
     /** A box [w]×[h] in [slot] of [content]: [hPad] in from a side, [vPad] from the top or bottom; centred ones in the middle. */
@@ -204,6 +248,15 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         const val SHORTCUT_EDGE_COMPACT_DP = 1.0
         const val ROOM_H_DP = 2.0
         const val ROOM_V_DP = 1.0
+
+        /** A table's roots in two lines: each at this of the size (TextKeyboard's ROOTS_TEXT_SCALE). */
+        const val ROOTS_LINES_SCALE = 0.55
+
+        /** The roots kept this far in from the face's sides (TextKeyboard's ROOTS_INSET_DP). */
+        const val ROOTS_INSET_DP = 6.0
+
+        private const val ROOT = "root"
+        private const val HALF_PX = 0.5
 
         /** ImageTextKeyView's: the label's and the icon's distance from the bottom and the top, portrait and landscape. */
         private val PORTRAIT_PADS = 4.0 to 8.0
