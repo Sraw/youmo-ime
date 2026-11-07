@@ -35,6 +35,7 @@ import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.preedit.SyllableStrip
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.After
@@ -83,8 +84,8 @@ class GroupedKeyboardUatTest {
         }
     }
 
-    private fun group(face: String): AltTextKeyView = KeyboardHarness.all(h.inputView).filterIsInstance<AltTextKeyView>()
-        .firstOrNull { h.shown(it) && it.mainText.text.toString() == face } ?: error("no $face in ${h.texts()}")
+    // a group's key by its face, whichever draws it (060-render-p2 S4a: the canvas's where it is on)
+    private fun group(face: String): ShownKey = h.key(face)
 
     private fun sent() = h.api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
 
@@ -124,7 +125,7 @@ class GroupedKeyboardUatTest {
         // the third row's corners shown as fcitx types them
         chinesePunctuation(KeyboardHarness.PINYIN, "~" to "～", "!" to "！", "?" to "？", "," to "，", "." to "。")
         val corners = listOf("QW", "ER", "TY", "UI", "OP", "AS", "DF", "GH", "JK", "L", "ZX", "CV", "BN", "M")
-            .associateWith { group(it).altText.text.toString() }
+            .associateWith { group(it).alt }
         assertEquals("1 2 3 4 5 6 7 8 9 0 ～ ！ @ ？".split(" "), corners.values.toList())
         // three rows, top to bottom, each across the keyboard
         val rows = listOf(listOf("QW", "OP"), listOf("AS", "L"), listOf("ZX", "M")).map { (a, b) -> h.box(group(a)) to h.box(group(b)) }
@@ -134,11 +135,11 @@ class GroupedKeyboardUatTest {
         val labels = h.texts()
         for (l in listOf("分词", "符", "123", "，", "。")) assertTrue("$l in $labels", l in labels)
         listOf(R.id.button_space, R.id.button_lang, R.id.button_return, R.id.button_backspace).forEach {
-            assertTrue(h.shown(h.keyboard.findViewById<View>(it)))
+            assertTrue(h.keyWithId(it) != null)
         }
         assertFalse(labels.toString(), "中/英" in labels)
-        assertFalse(KeyboardHarness.all(h.keyboard).any { h.shown(it) && it.contentDescription?.toString() == "Shift" })
-        h.capture("GroupedKeyboardUatTest/keys14_chinese")
+        assertFalse(h.keys().any { it.description == "Shift" })
+        h.captureBoard("GroupedKeyboardUatTest/keys14_chinese")
     }
 
     @Test
@@ -197,7 +198,7 @@ class GroupedKeyboardUatTest {
         harness?.close()
         row.make().start()
         assertTrue(h.texts().toString(), row.probe in h.texts() && "中/英" !in h.texts())
-        h.tap(h.keyboard.findViewById<View>(R.id.button_lang))
+        h.tap(h.keyWithId(R.id.button_lang)!!)
         assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("enumerateIme") || it == "toggleIme()" })
         switchTo(KeyboardHarness.ENGLISH)
         val english = h.texts()
@@ -270,7 +271,7 @@ class GroupedKeyboardUatTest {
         val gh = h.box(group("GH"))
         h.drag(group("BN"), ui.exactCenterX(), ui.exactCenterY(), lift = false)
         h.move(gh.exactCenterX(), gh.exactCenterY())
-        h.capture("GroupedKeyboardUatTest/keys14_dragged")
+        h.captureBoard("GroupedKeyboardUatTest/keys14_dragged")
         h.release()
         assertFalse(h.api.calls.toString(), "offerGlide" in h.api.calls)
         // a swipe on BN alone: at most its one key
@@ -349,7 +350,7 @@ class GroupedKeyboardUatTest {
         val s = h.key("s").width
         for (k in listOf("a", "l")) assertEquals(k, s, h.key(k).width)
         assertEquals(s, semicolon.width)
-        h.capture("GroupedKeyboardUatTest/shuangpin_microsoft")
+        h.captureBoard("GroupedKeyboardUatTest/shuangpin_microsoft")
         h.api.calls.clear()
         h.tap(semicolon)
         // the key's own ;: the engine reads it as a final or a mark (HostCasesUatTest.microsoftsSemicolonIsAFinal)
@@ -382,7 +383,7 @@ class GroupedKeyboardUatTest {
             assertEquals("${b.text}", 32f, b.height / dp, 1f)
         }
         assertEquals(32f, row.height() / dp, 1f)
-        h.capture("GroupedKeyboardUatTest/keys14_strip")
+        h.captureBoard("GroupedKeyboardUatTest/keys14_strip")
         h.api.calls.clear()
         h.tap(stripItems().first())
         assertTrue(sent().toString(), sent().size == 1 && syllableSent(0) in sent().single())

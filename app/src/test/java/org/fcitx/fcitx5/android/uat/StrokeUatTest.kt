@@ -21,7 +21,6 @@ import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.ViewShownKey
-import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.junit.After
@@ -143,8 +142,8 @@ class StrokeUatTest {
         harness(KeyboardHarness.PINYIN)
         typed("hao")
         h.api.calls.clear()
-        val gh = KeyboardHarness.all(h.inputView).filterIsInstance<AltTextKeyView>().first { h.shown(it) && it.mainText.text.toString() == "GH" }
-        draw(gh, across = 0f, down = 2f)
+        // whichever draws the keys (060-render-p2 S4a: the canvas where it is on)
+        draw(h.key("GH"), across = 0f, down = 2f)
         assertEquals(downs().toString(), listOf(true), downs().map { stroke('s') in it })
         close()
         // pinyin's 18 keys
@@ -152,8 +151,7 @@ class StrokeUatTest {
         typed("hao")
         h.api.calls.clear()
         val faces18 = NineKeyLetters.G18.tag().split(',').map { it.uppercase() }
-        val top18 = KeyboardHarness.all(h.inputView).filterIsInstance<AltTextKeyView>().first { h.shown(it) && it.mainText.text.toString() in faces18 }
-        draw(top18, across = 0f, down = 2f)
+        draw(h.keys().first { it.label in faces18 }, across = 0f, down = 2f)
         assertEquals(downs().toString(), listOf(true), downs().map { stroke('s') in it })
         close()
         // 双拼's nine keys, whose keys glide no letters (T9Keyboard's other path): a stroke all the same

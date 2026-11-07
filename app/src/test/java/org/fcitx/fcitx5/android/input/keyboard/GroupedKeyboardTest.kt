@@ -5,9 +5,6 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import android.graphics.Rect
-import android.view.View
-import android.view.ViewGroup
-import androidx.core.view.children
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -23,7 +20,6 @@ import org.fcitx.fcitx5.android.engine.pinyin.g14Code
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
-import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -32,7 +28,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
-import splitties.views.existingOrNewId
 
 /**
  * The 14 keys (拼音双键) as iFlytek lays them out: five, five, then the separator, four and
@@ -139,98 +134,99 @@ class GroupedKeyboardTest {
     // the fourteen keys (pinyin's) and the eighteen (shuangpin's) have the same bottom row
     @Test
     @Uat("PY-91", "SP-20")
-    fun theBottomRowHasNoChineseEnglishKeyAndTheLanguageSwitchFollowsItsSetting() = assertRows(
-        listOf("PY-91: fourteen keys" to NineKeyLetters.G14, "SP-20: eighteen keys" to NineKeyLetters.G18),
-        { it.first },
-    ) { (_, letters) ->
-        val showLang = AppPrefs.getInstance().keyboard.showLangSwitchKey
-        showLang.setValue(showLang.defaultValue)
-        val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark, letters)
-        // English is the language key's round, as on the full keyboard
-        assertEquals(View.VISIBLE, keyboard.findViewById<View>(R.id.button_lang).visibility)
-        listOf(R.id.button_space, R.id.button_return, R.id.button_comma, R.id.button_period, R.id.button_backspace).forEach {
-            assertEquals(View.VISIBLE, keyboard.findViewById<View>(it).visibility)
+    fun theBottomRowHasNoChineseEnglishKeyAndTheLanguageSwitchFollowsItsSetting() = bothDrawings {
+        assertRows(
+            listOf("PY-91: fourteen keys" to NineKeyLetters.G14, "SP-20: eighteen keys" to NineKeyLetters.G18),
+            { it.first },
+        ) { (_, letters) ->
+            val showLang = AppPrefs.getInstance().keyboard.showLangSwitchKey
+            showLang.setValue(showLang.defaultValue)
+            val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark, letters).laidOut()
+            // English is the language key's round, as on the full keyboard
+            assertTrue(keyboard.shownKeyWithId(R.id.button_lang) != null)
+            listOf(R.id.button_space, R.id.button_return, R.id.button_comma, R.id.button_period, R.id.button_backspace).forEach {
+                assertTrue(keyboard.resources.getResourceEntryName(it), keyboard.shownKeyWithId(it) != null)
+            }
+            showLang.setValue(false)
+            assertEquals(null, keyboard.shownKeyWithId(R.id.button_lang))
+            assertEquals(null, GroupedKeyboard(context, ThemePreset.PixelDark, letters).laidOut().shownKeyWithId(R.id.button_lang))
+            showLang.setValue(showLang.defaultValue)
         }
-        showLang.setValue(false)
-        assertEquals(View.GONE, keyboard.findViewById<View>(R.id.button_lang).visibility)
-        assertEquals(View.GONE, GroupedKeyboard(context, ThemePreset.PixelDark, letters).findViewById<View>(R.id.button_lang).visibility)
     }
 
     @Test
     @Uat("PY-93")
-    fun theSpaceIsAtLeast15PercentOfTheRowInEveryField() {
+    fun theSpaceIsAtLeast15PercentOfTheRowInEveryField() = bothDrawings {
         assertSpaceAtLeast15Percent(GroupedKeyboard(context, ThemePreset.PixelDark))
     }
 
     @Test
-    fun anAddressFieldShowsWhatAddressesAreMadeOf() {
-        val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark)
+    fun anAddressFieldShowsWhatAddressesAreMadeOf() = bothDrawings {
+        val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark).laidOut()
         keyboard.address = AddressKeys.URL
-        assertEquals(View.GONE, keyboard.findViewById<View>(R.id.button_comma).visibility)
-        assertEquals(View.VISIBLE, keyboard.findViewById<View>(R.id.button_slash).visibility)
-        assertEquals(View.VISIBLE, keyboard.findViewById<View>(R.id.button_domain).visibility)
+        assertEquals(null, keyboard.shownKeyWithId(R.id.button_comma))
+        assertTrue(keyboard.shownKeyWithId(R.id.button_slash) != null)
+        assertTrue(keyboard.shownKeyWithId(R.id.button_domain) != null)
     }
 
     @Test
     @Uat("PY-105")
-    fun talkBackReadsAGroupLetterByLetterWithItsCorner() {
-        val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark)
-        val views = keyboard.keyRows().flatMap { it.children.toList() }
-        val described = views.filterIsInstance<AltTextKeyView>().associate { (it.def as KeyDef.Appearance.AltText).displayText to it.contentDescription.toString() }
+    fun talkBackReadsAGroupLetterByLetterWithItsCorner() = bothDrawings {
+        val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark).laidOut()
+        val groups = keyboard.shownKeys().filter { it.id?.matches(PLACE) == true }
+        val described = groups.associate { it.label to it.description }
         assertEquals(context.getString(R.string.a11y_key_grouped, "Q W", "1"), described["QW"])
         assertEquals(context.getString(R.string.a11y_key_grouped, "L", "0"), described["L"])
         assertEquals(context.getString(R.string.a11y_key_grouped, "B N", "@"), described["BN"])
         assertEquals(14, described.size)
-        val separator = views.filterIsInstance<TextKeyView>().single { (it.def as? KeyDef.Appearance.Text)?.displayText == "分词" }
-        assertEquals(context.getString(R.string.a11y_key_separator), separator.contentDescription)
+        assertEquals(context.getString(R.string.a11y_key_separator), keyboard.shownKey("分词").description)
         // pinyin's 18 keys: the L key, shown without its `;`, is still a group key (its long press, corner, TalkBack
         // and a stroke drawn from it go by the groups the views were matched to; once it was matched against "L;" and left out)
-        val g18 = GroupedKeyboard(context, ThemePreset.PixelDark, NineKeyLetters.G18, Keyboard::pinyin18Key, semicolon = false)
-        val keys18 = g18.keyRows().flatMap { it.children.toList() }.filterIsInstance<AltTextKeyView>()
-        val described18 = keys18.associate { (it.def as KeyDef.Appearance.AltText).displayText to it.contentDescription?.toString() }
-        val l = keys18.single { (it.def as KeyDef.Appearance.AltText).displayText == "L" }
-        assertEquals(context.getString(R.string.a11y_key_grouped, "L", (l.def as KeyDef.Appearance.AltText).altText), described18["L"])
-        assertEquals(18, described18.values.count { it != null })
+        val g18 = GroupedKeyboard(context, ThemePreset.PixelDark, NineKeyLetters.G18, Keyboard::pinyin18Key, semicolon = false).laidOut()
+        val keys18 = g18.shownKeys().filter { it.id?.matches(PLACE) == true }
+        val l = keys18.single { it.label == "L" }
+        assertEquals(context.getString(R.string.a11y_key_grouped, "L", l.alt), l.description)
+        assertEquals(18, keys18.count { it.description != null })
     }
 
     @Test
-    fun theCommaFullStopAndCornersShowWhatTheyType() {
-        val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark)
+    fun theCommaFullStopAndCornersShowWhatTheyType() = bothDrawings {
+        val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark).laidOut()
         keyboard.onPunctuationUpdate(mapOf("," to "，", "." to "。", "~" to "～"))
-        assertEquals("，", keyboard.findViewById<TextKeyView>(R.id.button_comma).mainText.text.toString())
-        assertEquals("。", keyboard.findViewById<TextKeyView>(R.id.button_period).mainText.text.toString())
-        val zx = keyboard.keyRows().flatMap { it.children.toList() }.filterIsInstance<AltTextKeyView>()
-            .single { (it.def as KeyDef.Appearance.AltText).displayText == "ZX" }
-        assertEquals("～", zx.altText.text.toString())
+        assertEquals("，", keyboard.shownKeyWithId(R.id.button_comma)!!.label)
+        assertEquals("。", keyboard.shownKeyWithId(R.id.button_period)!!.label)
+        val zx = keyboard.shownKey("ZX")
+        assertEquals("～", zx.alt)
         // and TalkBack reads the corner drawn, not the key's own ~
-        assertEquals(context.getString(R.string.a11y_key_grouped, "Z X", "～"), zx.contentDescription)
-        // an address's keys commit as they are, and say so
-        keyboard.address = AddressKeys.URL
-        assertEquals(".", keyboard.findViewById<TextKeyView>(R.id.button_dot).mainText.text.toString())
+        assertEquals(context.getString(R.string.a11y_key_grouped, "Z X", "～"), zx.description)
         // the preview too
         val previews = ArrayList<PopupAction>()
         keyboard.popupActionListener = PopupActionListener { previews += it }
-        keyboard.onPopupAction(PopupAction.PreviewAction(KeyRef.view(R.id.button_comma), ",", Rect()))
+        keyboard.onPopupAction(PopupAction.PreviewAction(keyboard.shownKeyWithId(R.id.button_comma)!!.ref(), ",", Rect()))
         assertEquals("，", (previews.single() as PopupAction.PreviewAction).content)
+        // an address's keys commit as they are, and say so
+        keyboard.address = AddressKeys.URL
+        assertEquals(".", keyboard.shownKeyWithId(R.id.button_dot)!!.label)
     }
 
     @Test
-    fun theLongPressIsReadAsItOpensFromTheUsersKeys() {
-        val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark)
+    fun theLongPressIsReadAsItOpensFromTheUsersKeys() = bothDrawings {
+        val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark).laidOut()
         val shown = ArrayList<PopupAction>()
         keyboard.popupActionListener = PopupActionListener { shown += it }
-        val qw = keyboard.keyRows().flatMap { it.children.toList() }.filterIsInstance<AltTextKeyView>()
-            .single { (it.def as KeyDef.Appearance.AltText).displayText == "QW" }
+        val qw = keyboard.shownKey("QW")
         // changed after the keyboard was made
         AppPrefs.getInstance().internal.popupOverrides.setValue("q % ^\nw &")
         val built = key("QW").popup!!.filterIsInstance<KeyDef.Popup.Keyboard.Explicit>().single()
-        keyboard.onPopupAction(PopupAction.ShowKeyboardAction(KeyRef.view(qw.existingOrNewId), built, Rect()))
+        keyboard.onPopupAction(PopupAction.ShowKeyboardAction(qw.ref(), built, Rect()))
         val opened = (shown.single() as PopupAction.ShowKeyboardAction).keyboard as KeyDef.Popup.Keyboard.Explicit
         assertEquals(listOf("Q", "W", "1", "q", "w", "%", "^", "&"), opened.items.toList())
+        AppPrefs.getInstance().internal.popupOverrides.let { it.setValue(it.defaultValue) }
     }
 
-    // the rows of keys, as BaseKeyboard lays them out
-    private fun GroupedKeyboard.keyRows() = (0 until childCount).map { getChildAt(it) }.filterIsInstance<ViewGroup>()
+    private companion object {
+        val PLACE = Regex("r[0-9]c[0-9]")
+    }
 }
 
 /**
@@ -247,12 +243,8 @@ internal fun assertSpaceAtLeast15Percent(keyboard: GroupedKeyboard) {
             showLang.setValue(lang)
             for (address in listOf(AddressKeys.NONE, AddressKeys.URL, AddressKeys.EMAIL)) {
                 keyboard.address = address
-                keyboard.measure(
-                    View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
-                    View.MeasureSpec.makeMeasureSpec(800, View.MeasureSpec.EXACTLY),
-                )
-                keyboard.layout(0, 0, width, 800)
-                val space = keyboard.findViewById<View>(R.id.button_space).width
+                keyboard.laidOut(width, 800)
+                val space = keyboard.shownKeyWithId(R.id.button_space)!!.width
                 if (space < 0.15 * width) narrow += "$address, language key $lang: space $space of $width"
             }
         }

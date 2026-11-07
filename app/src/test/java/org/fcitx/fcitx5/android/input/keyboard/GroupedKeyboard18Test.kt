@@ -4,9 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import android.view.View
-import android.view.ViewGroup
-import androidx.core.view.children
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -16,6 +13,8 @@ import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
+import org.fcitx.fcitx5.android.input.scene.SceneGroups
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -86,9 +85,14 @@ class GroupedKeyboard18Test {
     @Test
     fun aTapIsTheCodeAloneWhereverItFalls() {
         val we = press("WE")
-        // the 14 keys' taps have places (Keyboard.TAPS); the 18 keys' have none yet
-        assertEquals(we, GroupedKeyboard.tapped(we, 0.1f, NineKeyLetters.G18))
-        assertEquals(we, GroupedKeyboard.tapped(we, 0.9f, NineKeyLetters.G18))
+        // the 18 keys' layout has none of its taps lean (lean="off", 060-render-v2 §15)
+        val k18 = SceneLayouts.of(context, "k18")!!
+        val leaning = SceneGroups.leaning(k18.layout, k18.fragments)
+        assertEquals(emptySet<String>(), leaning)
+        assertEquals(we, GroupedKeyboard.tapped(we, 0.1f, NineKeyLetters.G18, leaning))
+        assertEquals(we, GroupedKeyboard.tapped(we, 0.9f, NineKeyLetters.G18, leaning))
+        // a layout's own lean on them: the engine has no places for G18's codes yet (Keyboard.TAPS, P3)
+        assertEquals(we, GroupedKeyboard.tapped(we, 0.1f, NineKeyLetters.G18, setOf("we")))
     }
 
     @Test
@@ -119,19 +123,17 @@ class GroupedKeyboard18Test {
 
     @Test
     @Uat("SP-21")
-    fun theSpaceIsAtLeast15PercentOfTheRowInEveryField() {
+    fun theSpaceIsAtLeast15PercentOfTheRowInEveryField() = bothDrawings {
         assertSpaceAtLeast15Percent(GroupedKeyboard(context, ThemePreset.PixelDark, NineKeyLetters.G18))
     }
 
     @Test
-    fun theKeyboardHasItsBottomRowAndTalkBackReadsEachGroup() {
-        val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark, NineKeyLetters.G18)
+    fun theKeyboardHasItsBottomRowAndTalkBackReadsEachGroup() = bothDrawings {
+        val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark, NineKeyLetters.G18).laidOut()
         listOf(R.id.button_lang, R.id.button_space, R.id.button_return, R.id.button_comma, R.id.button_backspace).forEach {
-            assertEquals(View.VISIBLE, keyboard.findViewById<View>(it).visibility)
+            assertTrue(keyboard.resources.getResourceEntryName(it), keyboard.shownKeyWithId(it) != null)
         }
-        val described = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ViewGroup>()
-            .flatMap { it.children.toList() }.filterIsInstance<AltTextKeyView>()
-            .associate { (it.def as KeyDef.Appearance.AltText).displayText to it.contentDescription.toString() }
+        val described = keyboard.shownKeys().filter { it.id?.matches(Regex("r[0-9]c[0-9]")) == true }.associate { it.label to it.description }
         assertEquals(18, described.size)
         assertEquals(context.getString(R.string.a11y_key_grouped, "W E", "2"), described["WE"])
         assertEquals(context.getString(R.string.a11y_key_grouped, "Y", "4"), described["Y"])

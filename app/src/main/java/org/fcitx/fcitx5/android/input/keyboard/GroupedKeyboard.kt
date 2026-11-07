@@ -25,11 +25,26 @@ import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.popup.PopupOverridesCache
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.input.scene.KeyRef
+import org.fcitx.fcitx5.android.input.scene.SceneAction
+import org.fcitx.fcitx5.android.input.scene.SceneBehavior
+import org.fcitx.fcitx5.android.input.scene.SceneGroups
+import org.fcitx.fcitx5.android.input.scene.TextBoardState
 import org.fcitx.fcitx5.android.input.theme.KeyNames
+import org.fcitx.fcitx5.android.input.theme.ThemeLook
+import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.Texts
 import splitties.views.existingOrNewId
+import timber.log.Timber
 
 /**
  * Pinyin on the 14 keys of two letters each (拼音双键), as iFlytek lays them out: QW ER TY UI OP,
@@ -113,13 +128,15 @@ class GroupedKeyboard(
         /** A group's code as the engine reads it: a Unicode character, as 九键's syllables are sent. */
         internal fun code(c: Char, wire: (Char) -> Int = Char::code) = KeyAction.SymAction(KeySym(UNICODE + wire(c)), KeyStates.Virtual)
 
-        /** [action], a group's [code], as tapped at [at] across its key ([Keyboard.tapKey]) where it has two letters and a place. */
-        internal fun tapped(action: KeyAction, at: Float, letters: NineKeyLetters): KeyAction {
+        /**
+         * [action], a group's [code], as tapped at [at] across its key ([Keyboard.tapKey]) where its
+         * layout has the group lean ([leaning]: its key's lean=, 060-render-v2 §15) and the engine
+         * places a tap of its code (the 14 keys' alone yet: the 18 keys' send the code).
+         */
+        internal fun tapped(action: KeyAction, at: Float, letters: NineKeyLetters, leaning: Set<String>): KeyAction {
             val sym = (action as? KeyAction.SymAction)?.sym?.sym ?: return action
             val c = (sym - UNICODE).takeIf { it in 0..Char.MAX_VALUE.code }?.toChar() ?: return action
-            // the 14 keys' taps alone have places yet (Keyboard.TAPS): the 18 keys' send the code
-            if (letters != NineKeyLetters.G14) return action
-            if (at.isNaN() || !letters.isCode(c) || letters.letters(c).length < 2) return action
+            if (at.isNaN() || !letters.isCode(c) || letters.letters(c) !in leaning || !Keyboard.placesTaps(c)) return action
             return KeyAction.SymAction(KeySym(UNICODE + Keyboard.tapKey(c, at)), KeyStates.Virtual)
         }
 
@@ -175,6 +192,9 @@ class GroupedKeyboard(
                 shortcut = KeyShortcuts.charKey(form, group.lowercase().replace(";", "")),
             )
         }
+
+        /** The layouts their keys are drawn from where the canvas is on (lib/keyboard-scene's k14.xml, k18.xml). */
+        internal fun layoutOf(letters: NineKeyLetters): String = shapeOf(letters).board
 
         /** [letters]' groups as their keys show them: without `;` unless [semicolon]. */
         private fun groupsOf(letters: NineKeyLetters, semicolon: Boolean) =
@@ -251,6 +271,7 @@ class GroupedKeyboard(
         set(value) {
             field = value
             showAddressKeys()
+            canvas?.invalidateScene()
         }
 
     private val showLangSwitchKey = AppPrefs.getInstance().keyboard.showLangSwitchKey
@@ -262,6 +283,7 @@ class GroupedKeyboard(
 
     private fun showLanguageKey() {
         lang.isVisible = showLangSwitchKey.getValue()
+        canvas?.invalidateScene()
     }
 
     init {
@@ -285,12 +307,55 @@ class GroupedKeyboard(
         }
     }
 
+    // the groups' keys where the scene draws them: each key's letters= (060-render-v2 §15), its first letter's
+    private fun groupPlaces(): List<Pair<Char, KeyPlace>> =
+        canvas?.scene?.keys.orEmpty().mapNotNull { k -> k.letters?.let { it.group[0] to scenePlace(k.id) } }
+
     // no glide: a stroke drawn alone (笔画筛选), over the group keys, each its first letter's
-    override val glide = glideInput(letters = { groupViews.map { (v, g) -> g[0] to v } }, enabled = { false }, filters = { InputMethodCatalog.filtersByStrokes(imeName) }) { _, _ -> }
+    override val glide = glideInput(
+        letters = { if (canvas != null) groupPlaces() else groupViews.map { (v, g) -> g[0] to v } },
+        enabled = { false },
+        filters = { InputMethodCatalog.filtersByStrokes(imeName) },
+    ) { _, _ -> }
 
     // a key's popup names it by its view's id
     private val groupOf: Map<Int, Pair<String, String>> by lazy {
         groupViews.associate { (view, group) -> view.existingOrNewId to (group to view.corner) }
+    }
+
+    // the group and corner of the key [ref]: a view's by its id, the scene's by its node's letters= and swipe
+    private fun groupOf(ref: KeyRef): Pair<String, String>? =
+        if (!ref.isScene) groupOf[ref.viewId] else canvas?.keyAt(ref.id, if (ref.copy) 1 else 0)?.let(::groupOfNode)
+
+    private fun groupOfNode(node: KeyNode): Pair<String, String>? = node.letters?.let { shown(it.group) to cornerOf(node) }
+
+    // a group's letters as its key shows them: pinyin's 18 keys' L without the `;` the engine reads it by
+    private fun shown(group: String) = if (semicolon) group else group.replace(";", "")
+
+    // the corner a group key swipes (its keypad digit, its mark as typed: ~, not the ～ drawn)
+    private fun cornerOf(node: KeyNode): String =
+        node.actions["swipe-up"]?.let(SceneAction::of)?.let(SceneBehavior::typed).orEmpty()
+
+    /**
+     * The engine's groups as the layout writes them (060-render-v2 §15): its keys' letters=, collected
+     * (SceneGroups) and held to [letters], what the engine reads this keyboard's codes and record by.
+     * Any other grouping the engine has none of yet (P3): logged, and [letters] gone by.
+     */
+    private val groups: NineKeyLetters by lazy {
+        val layout = sceneBoard?.layout ?: return@lazy letters
+        val written = SceneGroups.of(layout.layout, layout.fragments)
+        SceneGroups.mismatch(written, letters)?.let { Timber.e("scene layout %s: %s", layout.id, it); letters }
+            ?: SceneGroups.letters(written) ?: letters
+    }
+
+    // a group key's (letters=) code and long press (060-render-v2 §15): the code of the engine's group its
+    // first letter is in, sent as [wire] has it (a tap's place added by [pressed]); its letters around its
+    // corner, made again as it opens ([onPopupAction])
+    override val sceneTable = object : SceneKeyDef.Table {
+        override fun group(letters: String, node: KeyNode): KeyAction = code(groups.key(letters[0]), wire)
+
+        override fun groupPopup(letters: String, node: KeyNode): KeyDef.Popup.Keyboard =
+            longPressOf(shown(letters), cornerOf(node), ::symbolsOf)
     }
 
     private var punctuationMapping: Map<String, String> = emptyMap()
@@ -305,6 +370,7 @@ class GroupedKeyboard(
         listOf(R.id.button_comma to ",", R.id.button_period to ".").forEach { (id, p) ->
             findViewById<TextKeyView>(id).mainText.text = mapped(p)
         }
+        canvas?.invalidateScene()
     }
 
     // the long press made as it opens, from the user's 「按键字符」 as they are now, as the full keyboard's Preset is;
@@ -313,7 +379,7 @@ class GroupedKeyboard(
         val shown = when (action) {
             is PopupAction.PreviewAction -> action.copy(content = previewOf(action.content, action.key, { it }, ::mapped))
             is PopupAction.PreviewUpdateAction -> action.copy(content = previewOf(action.content, action.key, { it }, ::mapped))
-            is PopupAction.ShowKeyboardAction -> groupOf[action.key.viewId]?.let { (group, corner) ->
+            is PopupAction.ShowKeyboardAction -> groupOf(action.key)?.let { (group, corner) ->
                 action.copy(keyboard = longPressOf(group, corner, ::symbolsOf))
             } ?: action
             else -> action
@@ -327,10 +393,23 @@ class GroupedKeyboard(
 
     // a tap on a key of two letters as its code with where it fell; a click no touch made (TalkBack),
     // a swipe's, L and M as the code alone
-    override fun pressed(clickAt: Float, action: KeyAction): KeyAction = tapped(action, clickAt, letters)
+    override fun pressed(clickAt: Float, action: KeyAction): KeyAction = tapped(action, clickAt, letters, leaning)
+
+    // the groups whose taps lean (按落点加权), as the layout writes them whichever draws the keys (its
+    // keys' lean=, 060-render-v2 §15); a layout unread: none (logged)
+    private val leaning: Set<String> by lazy {
+        val layout = sceneBoard?.layout ?: SceneLayouts.of(context, layoutOf(letters))
+        layout?.let { SceneGroups.leaning(it.layout, it.fragments) }
+            ?: emptySet<String>().also { Timber.e("no layout %s: no tap leans", layoutOf(letters)) }
+    }
+
+    // Return as last shown: its icon on the scene's key too
+    private var returnAppearance = ReturnKeyAppearance.Enter
 
     override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
+        returnAppearance = appearance
         `return`.showReturnAction(appearance)
+        canvas?.invalidateScene()
     }
 
     // the input method shown, for whether a stroke is drawn (笔画筛选)
@@ -339,10 +418,38 @@ class GroupedKeyboard(
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         imeName = ime.uniqueName
         showInputMethodName(space, ime)
+        canvas?.invalidateScene()
     }
 
-    // last: describeGroups reads [groupViews] and [punctuationMapping], which an init above them would find not yet made
+    // what the keys show now as the scene engine's environment (k14.xml's, k18.xml's and grouped-bottom.xml's
+    // when= and bindings): the 18 keys' L; under a scheme that types `;`, an address's keys, the language
+    // key, the space's microphone; the corners, the comma and the full stop as punctuation maps them
+    override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env {
+        val state = TextBoardState(
+            semicolonScheme = groupsOf(letters, semicolon).any { ';' in it },
+            address = address,
+            langKey = showLangSwitchKey.getValue(),
+            holdVoice = holdsToTalk,
+        )
+        val texts = Texts(
+            imeName = shownImeName.orEmpty(),
+            comma = mapped(","),
+            period = mapped("."),
+            returnLabel = returnAppearance.label(context).toString(),
+            returnIcon = SceneIcons.returnName(returnAppearance.icon),
+            confirm = context.getString(R.string.key_confirm),
+            punctuation = punctuationMapping,
+            // the formats as they are: the engine fills their places (getString with no arguments formats nothing)
+            a11yGrouped = context.getString(R.string.a11y_key_grouped),
+            a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
+        )
+        return SceneEnvs.of(this, look, theme.isDark, width, height, input = state.input(), texts = texts, marks = SceneBoard.marks(layout, charShortcutMarks))
+    }
+
+    // last: describeGroups reads [groupViews] and [punctuationMapping], which an init above them would find not yet made;
+    // the scene reads them all (060's redraw: the keys drawn by the scene engine where the canvas is on, each as its layout says)
     init {
         describeGroups()
+        drawKeysWithScene(layoutOf(letters))
     }
 }

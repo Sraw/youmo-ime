@@ -312,9 +312,10 @@ sent as the engine's stroke key, `KeyAction.SymAction` of `Keyboard.strokeKey`; 
 as none (up, up to the left) is dropped.
 
 The 060 redraw's first step (`input/keyboard/canvas/`, `AppPrefs.Internal.canvasKeyboard`, 开发者 →
-新绘制 26 键, off): `TextKeyboard` adds a `KeyboardCanvasView` over its rows and makes them
-INVISIBLE, still laid out (the views' and the scene keys' wiring still made of the `KeyDef`s, S4). The canvas
-draws the scene `lib/keyboard-scene` makes of qwerty.xml in the look converted by ime-core's
+新绘制键盘, off): `TextKeyboard` (qwerty.xml) and, since 060-render-p2 S4a, `GroupedKeyboard` (the 14
+and 18 keys: k14.xml, k18.xml, their bottom row grouped-bottom.xml) add a `KeyboardCanvasView` over their
+rows and make them INVISIBLE, still laid out (S8 deletes them) — the next paragraph but one says how a
+keyboard moves. The canvas draws the scene `lib/keyboard-scene` makes of its layout in the look converted by ime-core's
 `LookTheme` (`ScenePainter`: one `RenderNode` a key a face, both kept in the tree and a press only their alpha, since a node left out of a frame loses its recording; a
 software canvas, a screenshot's, gets the ops drawn straight); `TextKeyboard.scene` builds the
 `Env` from its state (`TextBoardState`, `SceneMarks`, the texts) through `SceneEnvs.of`, which adds
@@ -409,6 +410,37 @@ had none (picked as the finger lifts; `PopupMenuUiTest.onTheCanvasEachCellIsTold
 harness reads its keys, which is in focus, its cells and text sizes, and a menu's icons from the scene
 (`KeyboardHarness.popupChoices`/`sceneChoices`/`shownIcons`).
 
+How a keyboard is drawn by the scene (060-render-p2 S4: the 14/18 keys first, S4b–S5 the rest the same way):
+`BaseKeyboard.drawKeysWithScene(layout id)`, last in its init, does it where the switch is on and
+`SceneLayouts.of(context, id)` has the layout (else the views draw, as before). The layouts are read
+through a `LayoutSource` by id (`BuiltInLayouts`: `lib/keyboard-scene/src/commonMain/layouts/<id>.xml`,
+copied by the build as raw resources `scene_layout_<id>`, `-` made `_`; P3 a theme pack's first), each
+once a process with the fragments it includes; ids stay as the theme format names the boards (`k14/r1c1`,
+`ThemeKeyNamesTest.aSceneLayoutsKeysAreItsBoardsNames`). `SceneBoard` makes the canvas view and its scenes
+(the U8 fallback, the kept scenes, the marks' settings) for any keyboard; the keyboard gives its state as
+`sceneEnv` (its `Input`, texts, marks; `GroupedKeyboard` through `TextBoardState`) and calls
+`invalidateScene()` on every change of what the keys show (punctuation, address keys, the language key,
+Return, the input method). What a key does: the 26 keys still wire each scene key as its view was
+(`refOf`, U4 A, till S5); a keyboard moved wires each from its node (U4 B): ime-core's `SceneBehavior.of`
+reads press, long press, repeat, swipe, double tap, bubble, long-press popup, menu, sound and axes from
+the layout, and `SceneKeyDef` makes the `KeyDef` the old wiring takes (the `action:` table: `sym:`
+keysyms by name, `layout:`, `picker:` (alone, the page shown last), `commit:`, `code:U+…`, `keypad:`,
+`caps`, `shortcut:`, `reading`, `emoji-search:`, the bare words `lang`, `ime-picker`, `quickphrase`,
+`unicode`, `space-long-press`…; `action:<name>` the keyboard's `sceneTable`, zhuyin's in S4d; anything
+else logged and doing nothing). A key that does the same in a scene made anew keeps its `SceneKey`.
+A group key writes its letters (`letters="qw"`, 060-render-v2 §15): its tap is its group's code (the
+keyboard's `sceneTable.group`, as `wire` sends it, its place added by `pressed`), its long press with no
+`popup` written (or `from="group"`) the letters' row the views' was (`sceneTable.groupPopup`). The
+app collects a layout's groups (`SceneGroups.of`, row by row, a fragment's where included) into a
+`NineKeyLetters` and holds it to the keyboard's (G14, G18): any other is logged and the keyboard's own
+kept, so codes, learning and `wire` never change by a layout (`SceneBehaviorTest`; other groupings, a
+17-key layout's, are P3's engine work). `letters` keep their rows (`"pq rs"` 2 × 2, a space a row):
+where a tap leans and, P3, where the default label draws; the built-ins write their labels (`QW`, one
+word centred), so no label is drawn by the rows yet. Whether a tap leans (按落点加权) is the layout's:
+a group of two letters or more without `lean="off"` (`SceneGroups.leaning`, read whichever draws the
+keys), the 18 keys writing `lean="off"`; the engine places taps of G14's codes alone (`Keyboard.placesTaps`),
+so 双拼's 14 keys (sent as `shuangpin14Key`) and any 18 keys send the code only, as before.
+
 What the scene is given, so it draws what the views would: qwerty.xml is
 `lib/keyboard-scene/src/commonMain/layouts/qwerty.xml`, the one file the app copies and the engine's
 tests read. A letter's corner is `{alt:x}`, the app's `Texts.alts` (`SceneLetters.alts` of
@@ -441,10 +473,12 @@ The row's indent before A and after L is the end key's touch area (the user's P0
 060-render-v2 §3): a finger down there is A's, its swipes and long press A's, though it is outside A's
 view (`theIndentBeforeAIsAs`). Before, with `expand_keypress_area` off, it was nothing.
 
-Where the canvas still differs from the views, pixel for pixel (`sideBySide`, the share of pixels past
-anti-aliasing, each under 1.5%: PixelLight 0.27%, MaterialLight 0.26%, NordLight 0.27%, PixelDark
+Where the canvas still differs from the views, pixel for pixel (`BoardCanvasCompareTest`, a keyboard
+moved a row, its pictures in `build/outputs/canvas-compare`; the share of pixels past
+anti-aliasing, each under 1.5%: qwerty PixelLight 0.27%, MaterialLight 0.26%, NordLight 0.27%, PixelDark
 0.26%, MaterialDark 0.26%, AMOLED black 0.27%, compact height 0.20%, landscape 0.10%, landscape
-split 0.16%): the engine puts row and key edges on whole pixels as Android laid
+split 0.16%; the 14 keys 0.10–0.17%, the 18 keys 0.11–0.14%, both 0.01% landscape and 0.05–0.07% split;
+the grouped goldens' `canvas_` siblings 0.13–0.36% from the views', all in the bottom row and ⌫): the engine puts row and key edges on whole pixels as Android laid
 the views out (rows 176, 175, 176, 175 px of a 702 px board; this fixed the bottom row a pixel up and
 Return's blurred top edge), and a shortcut's icon from the pixel its margins reach, its size whole
 pixels (fixed the corner icons a pixel off). Left: a label is centred in its face to the fraction of a
@@ -633,7 +667,7 @@ finger came down: `CustomGestureView.downAt` (x / width, the view's, its margins
 made `clickAt` at ACTION_UP before `resetState` (NaN if the touch left the key or swiped past the
 threshold; a few pixels' MOVE keep it), cleared once the click returns and at DOWN and CANCEL;
 `BaseKeyboard.pressed(view, action)`, which `GroupedKeyboard` overrides, sends `Keyboard.tapKey`
-for it. TalkBack's click, a swipe's own Tap, L and M send the code alone; a swipe its corner (1–0, `~ ! @ ?`), a
+for it where k14.xml has the group lean (its `lean=`, above). TalkBack's click, a swipe's own Tap, L and M send the code alone; a swipe its corner (1–0, `~ ! @ ?`), a
 digit as a keypad key; a long press one row as the nine keys' (`Q W 1 q w`), the letters' full
 keyboard symbols above. `'` is the separator key, ⌫ backspace, no ⇧, no glide. No 中/英 (R16 F4346,
 owner 2026-10-26): English is the language key's round or the space's long press, as on the full

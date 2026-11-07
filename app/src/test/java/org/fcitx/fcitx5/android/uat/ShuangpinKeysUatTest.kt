@@ -80,7 +80,7 @@ class ShuangpinKeysUatTest {
         val strip = h.strip()
         assertTrue(strip.isVisible)
         assertTrue(h.texts(strip).toString(), "wo" in h.texts(strip))
-        h.capture("ShuangpinKeysUatTest/keys18_wo", h.inputView)
+        h.captureBoard("ShuangpinKeysUatTest/keys18_wo", h.inputView)
     }
 
     @Test

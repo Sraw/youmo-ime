@@ -460,7 +460,7 @@ class LandscapeUatTest {
         assertTrue("$keys of $width", keys.width() < width * 0.5 && (onRight(keys) || onLeft(keys)))
         typing(InputMethodCatalog.PINYIN)
         rowFollows(keys)
-        h.capture("LandscapeUatTest/keys14_side")
+        h.captureBoard("LandscapeUatTest/keys14_side")
         EngineState.syllablesState.value = EngineState.SyllableState()
     }
 
@@ -526,7 +526,7 @@ class LandscapeUatTest {
         typing(InputMethodCatalog.SHUANGPIN)
         rowFollows(keys)
         assertTrue(h.texts(h.inputView).toString(), "ni" in h.texts(h.inputView.findViewById(R.id.code_row_syllables)))
-        h.capture("LandscapeUatTest/keys18_side")
+        h.captureBoard("LandscapeUatTest/keys18_side")
         EngineState.syllablesState.value = EngineState.SyllableState()
     }
 

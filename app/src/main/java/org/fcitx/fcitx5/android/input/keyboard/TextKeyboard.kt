@@ -15,7 +15,6 @@ import androidx.annotation.VisibleForTesting
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.allViews
-import androidx.core.view.isVisible
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -30,7 +29,6 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
@@ -38,32 +36,18 @@ import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
-import org.fcitx.fcitx5.android.input.keyboard.canvas.AndroidTextMeasurer
-import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
-import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
-import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
-import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
-import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.scene.SceneLetters
-import org.fcitx.fcitx5.android.input.scene.SceneMarks
 import org.fcitx.fcitx5.android.input.scene.TextBoardState
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
-import org.fcitx.fcitx5.android.scene.KeyNode
-import org.fcitx.fcitx5.android.scene.Parsed
-import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Env
-import org.fcitx.fcitx5.android.scene.engine.MarkSettings
-import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.Shift
-import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.engine.Texts
-import org.fcitx.fcitx5.android.scene.engine.section
 import org.fcitx.fcitx5.android.scene.layout.Layout
-import org.fcitx.fcitx5.android.scene.theme.Theme as SceneTheme
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
@@ -71,13 +55,6 @@ import org.fcitx.fcitx5.android.input.popup.PopupOverridesCache
 import org.fcitx.fcitx5.android.input.popup.PopupPreset
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import splitties.views.imageResource
-import splitties.views.dsl.constraintlayout.bottomOfParent
-import splitties.views.dsl.constraintlayout.lParams
-import splitties.views.dsl.constraintlayout.leftOfParent
-import splitties.views.dsl.constraintlayout.rightOfParent
-import splitties.views.dsl.constraintlayout.topOfParent
-import splitties.views.dsl.core.add
-import timber.log.Timber
 
 @SuppressLint("ViewConstructor")
 class TextKeyboard private constructor(
@@ -93,42 +70,11 @@ class TextKeyboard private constructor(
 
     enum class CapsState { None, Once, Lock }
 
-    // what the marks' settings are made from (KeyShortcuts compared as the same instance: the cache's)
-    private data class MarksFor(
-        val shortcuts: KeyShortcuts,
-        val layers: SwipeLayers,
-        val spots: KeyMarks.Spots,
-        val charShortcuts: Boolean,
-        val names: Set<String>,
-    )
-
     companion object {
         const val Name = "Text"
 
-        // kept a process (main thread), as SceneThemes keeps the themes, for a keyboard made again (each
-        // theme switch builds the input view): a look's measurer and the last KEPT_SCENES scenes made, so
-        // a theme switched back to makes no scene again and measures no text again; what a switch allocates
-        // more than the views' decides whether a GC stops its first frame (specs/app.md)
-        private const val KEPT_SCENES = 4
-        private val measurers = LinkedHashMap<ThemeLook, AndroidTextMeasurer>(KEPT_SCENES, 0.75f, true)
-        private val scenesKept = ArrayDeque<Made>()
-
-        // a layout's shortcut names, and the marks' settings as last made from their inputs: as alts(), kept
-        // for the scene asked again, the same instances making the env equal to the last at once
-        private var namesMade: Pair<Layout, Set<String>>? = null
-        private var marksMade: Pair<MarksFor, MarkSettings>? = null
-
-        private fun names(layout: Layout): Set<String> =
-            namesMade?.takeIf { it.first === layout }?.second ?: SceneMarks.names(layout).also { namesMade = layout to it }
-
-        private fun marks(of: MarksFor): MarkSettings = marksMade?.takeIf { it.first == of }?.second
-            ?: SceneMarks.settings(of.shortcuts, of.layers, of.spots, of.charShortcuts, of.names).also { marksMade = of to it }
-
-        // the themes (by name and look) that made no scene, the built-in drawn instead: logged once each
-        private val fellBack = mutableSetOf<Pair<String, ThemeLook>>()
-
-        private fun measurer(look: ThemeLook): AndroidTextMeasurer = measurers.getOrPut(look) { AndroidTextMeasurer(SceneFonts(look)) }
-            .also { if (measurers.size > KEPT_SCENES) measurers.remove(measurers.keys.first()) }
+        // the layout its keys are drawn from where the canvas is on (lib/keyboard-scene's qwerty.xml)
+        private const val LAYOUT = "qwerty"
 
         /** Whether the letters are split here: as the setting is, the screen as wide as it is now; floating, never. */
         fun splits(context: Context): Boolean {
@@ -342,72 +288,14 @@ class TextKeyboard private constructor(
         confirm.mainText.text = context.getString(R.string.key_confirm)
         showLookUpKey()
         showConfirmKey()
-        // 060's redraw while it is made: the keys drawn by the scene engine, the views under it doing the work
-        if (AppPrefs.getInstance().internal.canvasKeyboard.getValue()) drawKeysWith(canvasView())
-    }
-
-    // the keys drawn by [view] from now on: their rows left laid out but not drawn, nor read out (the canvas's nodes are),
-    // nor touched: the scene's keys are, each the view's by its theme name and which of its name it is (a split row's G)
-    private fun drawKeysWith(view: KeyboardCanvasView) {
-        drawKeysOn(view) { v -> v.themeKey?.let { name -> keyViews[name]?.indexOf(v)?.takeIf { it >= 0 }?.let { KeyRef.scene(name, it) } } }
-        keyRows.forEach { it.visibility = View.INVISIBLE }
-        add(view, lParams(0, 0) {
-            topOfParent()
-            bottomOfParent()
-            leftOfParent()
-            rightOfParent()
-        })
-    }
-
-    private fun canvasView(): KeyboardCanvasView {
-        val look = ThemeManager.shownLook(theme)
-        return KeyboardCanvasView(context, keyImages, object : KeyboardCanvasView.Host {
-            override fun scene(width: Int, height: Int) = scene(look, width, height)
-            override fun key(node: KeyNode) = sceneKey(node)
-        })
-    }
-
-    // what the keys show now, as the scene engine's environment (qwerty.xml's when= and bindings)
-    // 060-render-p2 U8: a scene the theme makes none of (the engine refusing it, or what the theme made)
-    // is the built-in theme's of the same lightness, logged; none of that either, nothing (the canvas
-    // draws nothing and logs it). Never the views again: they go in S8
-    // The fallback's the built-in theme's whole: its look, its fonts, its measurer, as it draws itself
-    private fun scene(look: ThemeLook, width: Int, height: Int): KeyboardCanvasView.Drawn? {
-        val layout = SceneLayouts.qwerty(context) ?: return null
-        drawn(theme, look, layout, width, height)?.let { return it }
-        val builtIn = if (theme.isDark) ThemePreset.PixelDark else ThemePreset.PixelLight
-        if (builtIn.name == theme.name) return null
-        // logged once a look: asked again each time what shows changes
-        if (fellBack.add(theme.name to look)) Timber.w("keyboard canvas: no scene of theme %s; the built-in %s's drawn", theme.name, builtIn.name)
-        return drawn(builtIn, ThemeManager.shownLook(builtIn), layout, width, height)
-    }
-
-    private fun drawn(of: Theme, look: ThemeLook, layout: Layout, width: Int, height: Int): KeyboardCanvasView.Drawn? {
-        val sceneTheme = SceneTrace.section("theme") { SceneThemes.of(look, of.name, of.isDark) } ?: return null
-        val measurer = measurer(look)
-        return scene(sceneTheme, look, layout, measurer, width, height)?.let { KeyboardCanvasView.Drawn(it, look, measurer.fonts) }
-    }
-
-    // the scene of [sceneTheme] ([look]'s): the last kept for the same values, or made; null, the engine refused it
-    private fun scene(sceneTheme: SceneTheme, look: ThemeLook, layout: Layout, measurer: TextMeasurer, width: Int, height: Int): Scene? {
-        val env = SceneTrace.section("env") { env(look, layout, width, height) }
-        // the same values make the same scene: one asked again for nothing that shows (the first key typed,
-        // the word committed: Return's look unchanged) is the last one, not made again in the frame
-        scenesKept.lastOrNull { it.theme === sceneTheme && it.layout === layout && it.measurer === measurer && it.env == env }?.let { return it.scene }
-        scenesMade++
-        // the theme's looks worked out for the last scene kept for the next: Shift's makes only what it changed
-        return when (val built = SceneBuilder(sceneTheme, env, measurer, phases = SceneTrace, cascades = SceneThemes.cascades(sceneTheme)).build(layout, emptyMap())) {
-            is Parsed.Ok -> built.value.also {
-                scenesKept.addLast(Made(sceneTheme, layout, measurer, env, it))
-                if (scenesKept.size > KEPT_SCENES) scenesKept.removeFirst()
-            }
-            is Parsed.Failed -> null.also { Timber.e("keyboard canvas: the engine refused the scene: %s", built.problems) }
-        }
+        // 060's redraw while it is made: the keys drawn by the scene engine, each wired as its view was
+        // (U4 A till qwerty.xml says what they do), by its theme name and which of its name it is (a split row's G)
+        drawKeysWithScene(LAYOUT) { v -> v.themeKey?.let { name -> keyViews[name]?.indexOf(v)?.takeIf { it >= 0 }?.let { KeyRef.scene(name, it) } } }
     }
 
     // what the keys show now, as the scene engine's environment: the screen's and the settings' as every
     // keyboard's (SceneEnvs), this one's state, Shift, texts and marks its own
-    private fun env(look: ThemeLook, layout: Layout, width: Int, height: Int): Env {
+    override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env {
         val state = TextBoardState(
             semicolonScheme = semicolonKey(imeName, EngineState.shuangpinScheme),
             table = imeName in InputMethodCatalog.TABLES,
@@ -435,9 +323,7 @@ class TextKeyboard private constructor(
             a11yGrouped = context.getString(R.string.a11y_key_grouped),
             a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
         )
-        val marks = marks(
-            MarksFor(KeyShortcutsCache.current, AppPrefs.getInstance().keyboard.swipeLayers.getValue().layers, markSpots(), charShortcutMarks, names(layout)),
-        )
+        val marks = SceneBoard.marks(layout, charShortcutMarks)
         return SceneEnvs.of(
             this, look, theme.isDark, width, height,
             input = state.input(),
@@ -451,8 +337,6 @@ class TextKeyboard private constructor(
             marks = marks,
         )
     }
-
-    private class Made(val theme: SceneTheme, val layout: Layout, val measurer: TextMeasurer, val env: Env, val scene: Scene)
 
     // the letters' corners as last worked out, and what they were worked out from (cornerOf's inputs):
     // the canvas asks for a scene on every change the views show (a key typed), and these change only as
@@ -479,13 +363,12 @@ class TextKeyboard private constructor(
 
     /** The scenes the engine made for this keyboard: a test's count of what was not kept. */
     @VisibleForTesting
-    var scenesMade = 0
-        private set
+    val scenesMade: Int get() = sceneBoard?.scenesMade ?: 0
 
     /** The scenes kept let go, the next asked made anew as things are: a measure of what making one costs (KeyboardPerfBaselineTest). */
     @VisibleForTesting
     fun forgetScene() {
-        scenesKept.clear()
+        SceneBoard.forgetScenes()
         canvas?.invalidateScene()
     }
 

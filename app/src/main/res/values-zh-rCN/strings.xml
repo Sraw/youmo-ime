@@ -138,8 +138,8 @@
     <string name="clipboard_suggestion">显示剪贴板提示</string>
     <string name="disabled">禁用</string>
     <string name="system_default">系统默认</string>
-    <string name="canvas_keyboard">新绘制 26 键（实验）</string>
-    <string name="canvas_keyboard_summary">正在做的重绘：26 键键盘改由新引擎绘制。测试用</string>
+    <string name="canvas_keyboard">新绘制键盘（实验）</string>
+    <string name="canvas_keyboard_summary">正在做的重绘：26 键、14 键和 18 键键盘改由新引擎绘制。测试用</string>
     <string name="editor_info_inspector">编辑器信息 (EditorInfo) 检查器</string>
     <string name="default_">默认</string>
     <string name="saving">保存中</string>

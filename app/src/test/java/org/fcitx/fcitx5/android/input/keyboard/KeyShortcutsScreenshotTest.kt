@@ -47,10 +47,11 @@ class KeyShortcutsScreenshotTest {
         position.setValue(position.defaultValue)
     }
 
-    private fun shot(name: String, theme: Theme = ThemePreset.PixelLight) =
+    // [moved]: a keyboard the canvas draws where it is on (060-render-p2 S4: the 14 keys), its golden `canvas_`
+    private fun shot(name: String, theme: Theme = ThemePreset.PixelLight, moved: Boolean = false) =
         KeyboardHarness(theme, KeyboardHarness.PINYIN).use { h ->
             h.start()
-            h.capture("KeyShortcutsScreenshotTest/$name")
+            if (moved) h.captureBoard("KeyShortcutsScreenshotTest/$name") else h.capture("KeyShortcutsScreenshotTest/$name")
         }
 
     @Test
@@ -85,7 +86,7 @@ class KeyShortcutsScreenshotTest {
         prefs.keyboard.pinyinKeyboard.setValue(PinyinKeyboard.NineKeys)
         shot("nine")
         prefs.keyboard.pinyinKeyboard.setValue(PinyinKeyboard.Keys14)
-        shot("keys14")
+        shot("keys14", moved = true)
     }
 
     // the space swiped up: the edit menu over it, paste (straight up) picked, the cells the finger reaches next beside it

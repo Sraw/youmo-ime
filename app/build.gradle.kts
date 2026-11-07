@@ -257,12 +257,14 @@ abstract class SceneLayoutsTask : DefaultTask() {
         val raw = outputDir.get().dir("raw").asFile
         raw.deleteRecursively()
         raw.mkdirs()
-        layouts.forEach { it.copyTo(File(raw, "scene_layout_${it.name}")) }
+        // a resource's name has no `-`: grouped-bottom.xml is scene_layout_grouped_bottom (SceneLayouts.RAW)
+        layouts.forEach { it.copyTo(File(raw, "scene_layout_${it.name.replace('-', '_')}")) }
     }
 }
 
 val sceneLayouts = tasks.register<SceneLayoutsTask>("copySceneLayouts") {
-    layouts.from(rootProject.file("lib/keyboard-scene/src/commonMain/layouts/qwerty.xml"))
+    // every layout the app draws and the fragments they include (060-render-p2 S4: a keyboard's moved there as it is drawn)
+    layouts.from(rootProject.fileTree("lib/keyboard-scene/src/commonMain/layouts") { include("*.xml") })
     outputDir.set(layout.buildDirectory.dir("generated/scene-layouts"))
 }
 

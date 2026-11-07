@@ -516,6 +516,7 @@ class KeyboardCanvasView(
             "a11y_key_shift" to org.fcitx.fcitx5.android.R.string.a11y_key_shift,
             "a11y_key_backspace" to org.fcitx.fcitx5.android.R.string.a11y_key_backspace,
             "a11y_key_switch_language" to org.fcitx.fcitx5.android.R.string.a11y_key_switch_language,
+            "a11y_key_separator" to org.fcitx.fcitx5.android.R.string.a11y_key_separator,
             SceneA11y.SHIFT_ONCE to org.fcitx.fcitx5.android.R.string.a11y_state_shift_once,
             SceneA11y.CAPS_LOCK to org.fcitx.fcitx5.android.R.string.a11y_state_caps_lock,
         )

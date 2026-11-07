@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard.canvas
 
-import android.content.Context
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.Typeface
@@ -23,8 +22,6 @@ import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.engine.Phases
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.engine.TextMetrics
-import org.fcitx.fcitx5.android.scene.layout.Layout
-import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
@@ -148,23 +145,6 @@ object SceneIcons {
 
     /** Return's icon's name for the scene: the one the keyboard shows it with now. */
     fun returnName(@DrawableRes icon: Int): String = returns.entries.firstOrNull { it.value == icon }?.key ?: "enter"
-}
-
-/** The layouts the app has (raw `scene_layout_*`, app/build.gradle.kts), read once a process: one that did not read, too (null). */
-object SceneLayouts {
-    private var qwerty: Result<Layout?>? = null
-
-    fun qwerty(context: Context): Layout? =
-        (qwerty ?: runCatching { read(context, R.raw.scene_layout_qwerty) }.also { qwerty = it }.onFailure { Timber.e(it, "scene layout unread") })
-            .getOrNull()
-
-    private fun read(context: Context, id: Int): Layout? {
-        val text = context.resources.openRawResource(id).use { it.readBytes().decodeToString() }
-        return when (val l = LayoutReader.layout(text)) {
-            is Parsed.Ok -> l.value
-            is Parsed.Failed -> null.also { Timber.e("scene layout: ${l.problems}") }
-        }
-    }
 }
 
 /**

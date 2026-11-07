@@ -269,17 +269,7 @@ class KeyboardHarness(
      * (row by row, left to right), and the key views shown, whichever draws a keyboard. [root] may be any
      * view with keyboards in it (the settings' preview), not only the input method's.
      */
-    fun keys(root: View = inputView): List<ShownKey> = shownKeys(root, root)
-
-    private fun shownKeys(v: View, root: View): List<ShownKey> = when {
-        v.visibility != View.VISIBLE -> emptyList()
-        v is KeyboardCanvasView -> v.scene?.keys?.map { SceneShownKey(v, it.id, it.copy) }.orEmpty()
-        v is KeyView -> if (v.isShownUnder(root)) listOf(ViewShownKey(v)) else emptyList()
-        v is ViewGroup -> (0 until v.childCount).flatMap { shownKeys(v.getChildAt(it), root) }
-        else -> emptyList()
-    }
-
-    private fun View.isShownUnder(root: View) = if (root === inputView) shown(this) else true
+    fun keys(root: View = inputView): List<ShownKey> = keysOf(root) { v -> if (root === inputView) shown(v) else true }
 
     /** The key showing [label] (its main text), in whatever keyboard or panel is up, whichever draws it. */
     fun key(label: String): ShownKey = keys().firstOrNull { it.label == label } ?: error("no key $label in ${texts()}")
@@ -729,6 +719,15 @@ class KeyboardHarness(
         else -> emptyList()
     }
 
+    /**
+     * [capture] of a keyboard moved to the scene (060-render-p2 S4 step 8): drawn by the canvas, its
+     * golden is its own (`canvas_` before the file's name), beside the views' one, which stays as it was.
+     */
+    fun captureBoard(path: String, view: View = keyboard) {
+        val canvas = all(view).any { it is KeyboardCanvasView && it.visibility == View.VISIBLE }
+        capture(if (canvas) path.substringBeforeLast('/', "").let { if (it.isEmpty()) "canvas_$path" else "$it/canvas_${path.substringAfterLast('/')}" } else path, view)
+    }
+
     // drawn by hand: Roborazzi's View capture wants an Activity, and the service's window is none
     fun capture(path: String, view: View = keyboard) {
         settled()
@@ -825,6 +824,18 @@ class KeyboardHarness(
             val l = at.left + v.outset.left
             val t = at.top + v.outset.top
             return Rect(l + k.bounds.left.toInt(), t + k.bounds.top.toInt(), l + k.bounds.right.toInt(), t + k.bounds.bottom.toInt())
+        }
+
+        /**
+         * The keys [root] shows, depth first, whichever draws them: a canvas's scene's in its order, the
+         * key views visible and [shown]. [root] may be a keyboard made alone (no input view), laid out.
+         */
+        fun keysOf(root: View, shown: (View) -> Boolean = { true }): List<ShownKey> = when {
+            root.visibility != View.VISIBLE -> emptyList()
+            root is KeyboardCanvasView -> root.scene?.keys?.map { SceneShownKey(root, it.id, it.copy) }.orEmpty()
+            root is KeyView -> if (shown(root)) listOf(ViewShownKey(root)) else emptyList()
+            root is ViewGroup -> (0 until root.childCount).flatMap { keysOf(root.getChildAt(it), shown) }
+            else -> emptyList()
         }
 
         fun all(v: View): Sequence<View> = sequence {

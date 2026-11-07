@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import android.view.MotionEvent
-import android.view.View
 import androidx.core.view.allViews
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -14,9 +13,17 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.pinyin.g14Code
+import org.fcitx.fcitx5.android.input.SceneShownKey
+import org.fcitx.fcitx5.android.input.ShownKey
+import org.fcitx.fcitx5.android.input.ViewShownKey
+import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
+import org.fcitx.fcitx5.android.input.keyboard.canvas.LayoutSource
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -42,24 +49,37 @@ class GroupedKeyboardTapTest {
         override val lifecycle = LifecycleRegistry(this)
     }
 
-    private val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark).apply {
+    private fun grouped() = GroupedKeyboard(context, ThemePreset.PixelDark).apply {
         setViewTreeLifecycleOwner(Owner())
         keyActionListener = KeyActionListener { action, _ -> sent += action }
-        measure(exactly(1080), exactly(800))
-        layout(0, 0, 1080, 800)
+        laidOut(1080, 800)
     }
 
-    private fun exactly(size: Int) = View.MeasureSpec.makeMeasureSpec(size, View.MeasureSpec.EXACTLY)
+    private var keyboard = grouped()
 
-    private fun key(face: String) = keyboard.allViews.filterIsInstance<AltTextKeyView>().first { (it.def as KeyDef.Appearance.AltText).displayText == face }
+    // the keyboard made again as the switch is now (bothDrawings), nothing sent yet
+    private fun drawn(check: () -> Unit) = bothDrawings {
+        keyboard = grouped()
+        sent.clear()
+        check()
+    }
+
+    private fun key(face: String) = keyboard.shownKey(face)
 
     private fun code(c: Char) = KeyAction.SymAction(KeySym(UNICODE + c.code), KeyStates.Virtual)
 
     private fun tap(c: Char, at: Float) = KeyAction.SymAction(KeySym(UNICODE + Keyboard.tapKey(c, at)), KeyStates.Virtual)
 
-    // a touch on [view]: down at [x], then each move by (dx, dy) from there, then up where the last left it
-    private fun touch(view: View, x: Float, vararg moves: Pair<Float, Float>) {
-        val y = view.height / 2f
+    // a touch on [key]: down at [x] across it, then each move by (dx, dy) from there, then up where the last
+    // left it; to its view, or to the keyboard (whose touches go to the scene's keys) at the key's place
+    private fun touch(key: ShownKey, x: Float, vararg moves: Pair<Float, Float>) {
+        val (view, left, top) = when (key) {
+            is ViewShownKey -> Triple(key.view, 0, 0)
+            // the bounds the canvas's own (no window here): its place in the keyboard added
+            is SceneShownKey -> Triple(keyboard, key.canvas.left + key.bounds.left, key.canvas.top + key.bounds.top)
+            else -> error("$key")
+        }
+        val y = top + key.height / 2f
         var time = 1_000L
         fun send(action: Int, ex: Float, ey: Float) {
             val event = MotionEvent.obtain(1_000L, time, action, ex, ey, 0)
@@ -67,17 +87,17 @@ class GroupedKeyboardTapTest {
             event.recycle()
             time += 10
         }
-        send(MotionEvent.ACTION_DOWN, x, y)
-        var last = x to y
+        send(MotionEvent.ACTION_DOWN, left + x, y)
+        var last = left + x to y
         for ((dx, dy) in moves) {
-            last = x + dx to y + dy
+            last = left + x + dx to y + dy
             send(MotionEvent.ACTION_MOVE, last.first, last.second)
         }
         send(MotionEvent.ACTION_UP, last.first, last.second)
     }
 
     @Test
-    fun aTapSendsItsCodeWithWhereTheFingerCameDown() {
+    fun aTapSendsItsCodeWithWhereTheFingerCameDown() = drawn {
         val bn = key("BN")
         assertTrue(bn.width > 0)
         touch(bn, bn.width * 0.75f)
@@ -88,7 +108,7 @@ class GroupedKeyboardTapTest {
     }
 
     @Test
-    fun aFingerThatMovedALittleStillTapsWithItsPlace() {
+    fun aFingerThatMovedALittleStillTapsWithItsPlace() = drawn {
         // a real finger moves a few pixels between down and up: no swipe, the place kept
         val bn = key("BN")
         touch(bn, bn.width * 0.75f, 2f to 1f)
@@ -96,31 +116,88 @@ class GroupedKeyboardTapTest {
     }
 
     @Test
-    fun aSwipeTheOtherWayIsATapWithNoPlace() {
+    fun aSwipeTheOtherWayIsATapWithNoPlace() = drawn {
         // up, past the threshold, where the corner is down: KeySwipe's Tap, the code alone
         val bn = key("BN")
         touch(bn, bn.width * 0.75f, 0f to -bn.height.toFloat() / 2 + 1, 0f to -bn.height.toFloat() / 2 + 1)
         assertTrue(sent.toString(), sent.isNotEmpty() && sent.all { it == code(g14Code('b')) })
     }
 
+    // 060-render-v2 §15 按落点加权: whether a tap leans is its layout's (lean=), whichever draws the keys
     @Test
-    fun aKeyOfOneLetterAndAClickNoTouchMadeSendTheCode() {
+    fun aGroupItsLayoutLeansNotSendsItsCodeAlone() {
+        val builtIn = SceneLayouts.source
+        SceneLayouts.source = { ctx ->
+            val own = BuiltInLayouts(ctx)
+            LayoutSource { id -> own.text(id)?.let { if (id == "k14") it.replace("letters=\"bn\"", "letters=\"bn\" lean=\"off\"") else it } }
+        }
+        try {
+            drawn {
+                val bn = key("BN")
+                touch(bn, bn.width * 0.75f)
+                assertEquals(listOf<KeyAction>(code(g14Code('b'))), sent)
+                sent.clear()
+                // the others as they were
+                val cv = key("CV")
+                touch(cv, cv.width * 0.75f)
+                assertEquals(listOf<KeyAction>(tap(g14Code('c'), 0.75f)), sent)
+            }
+        } finally {
+            SceneLayouts.source = builtIn
+        }
+    }
+
+    // 060-render-v2 §15: groups a layout writes that are not the keyboard's (G14) make no codes of their
+    // own (P3): logged, and the keyboard's groups typed, its codes and record as ever
+    @Test
+    fun aLayoutsOtherGroupsAreLoggedAndTheKeyboardsKept() {
+        val builtIn = SceneLayouts.source
+        SceneLayouts.source = { ctx ->
+            val own = BuiltInLayouts(ctx)
+            LayoutSource { id -> own.text(id)?.let { if (id == "k14") it.replace("letters=\"bn\"", "letters=\"nb\"") else it } }
+        }
+        val logged = mutableListOf<String>()
+        val tree = object : timber.log.Timber.Tree() {
+            override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
+                if (priority == android.util.Log.ERROR) logged += message
+            }
+        }
+        timber.log.Timber.plant(tree)
+        val switch = AppPrefs.getInstance().internal.canvasKeyboard
+        val was = switch.getValue()
+        try {
+            switch.setValue(true)
+            keyboard = grouped()
+            val bn = key("BN")
+            touch(bn, bn.width * 0.25f)
+            assertEquals(listOf<KeyAction>(code(g14Code('b'))), sent)
+            assertTrue(logged.toString(), logged.single().contains(NineKeyLetters.G14.tag()))
+        } finally {
+            timber.log.Timber.uproot(tree)
+            switch.setValue(was)
+            SceneLayouts.source = builtIn
+        }
+    }
+
+    @Test
+    fun aKeyOfOneLetterAndAClickNoTouchMadeSendTheCode() = drawn {
         val m = key("M")
         touch(m, m.width * 0.9f)
         assertEquals(listOf<KeyAction>(code(g14Code('m'))), sent)
         sent.clear()
         // TalkBack's double tap clicks with no touch
-        key("BN").performClick()
+        key("BN").click()
         assertEquals(listOf<KeyAction>(code(g14Code('b'))), sent)
     }
 
     // a CANCEL clears the place too, but DOWN already has, so no test can see that: it is a safeguard
     @Test
     fun thePlaceIsTheClicksAloneClearedAfterIt() {
-        val bn = key("BN")
+        // the views' own (CustomGestureView's clickAt): the canvas keeps no place on a key (SceneTouch)
+        val bn = keyboard.allViews.filterIsInstance<AltTextKeyView>().first { (it.def as KeyDef.Appearance.AltText).displayText == "BN" }
         var seen = Float.NaN
         bn.setOnClickListener { seen = (it as CustomGestureView).clickAt }
-        touch(bn, bn.width * 0.75f)
+        touch(ViewShownKey(bn), bn.width * 0.75f)
         assertEquals(0.75f, seen, 1e-3f)
         assertTrue(bn.clickAt.isNaN())
     }

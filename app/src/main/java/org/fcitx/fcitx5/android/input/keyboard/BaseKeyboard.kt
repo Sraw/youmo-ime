@@ -42,14 +42,22 @@ import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKey
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTouch
 import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupKeyboardUi
 import org.fcitx.fcitx5.android.input.popup.keyRef
 import org.fcitx.fcitx5.android.input.scene.KeyRef
+import org.fcitx.fcitx5.android.input.scene.SceneBehavior
+import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.above
@@ -418,6 +426,8 @@ abstract class BaseKeyboard(
      */
     private fun wire(key: KeyHandle, def: KeyDef, view: KeyView?) {
         key.keyGesture.soundEffect = when (def) {
+            // a layout's key: its node's sound (060-render-p2 S4)
+            is SceneKeyDef -> def.sound
             is SpaceKey -> InputFeedbacks.SoundEffect.SpaceBar
             is MiniSpaceKey -> InputFeedbacks.SoundEffect.SpaceBar
             is BackspaceKey -> InputFeedbacks.SoundEffect.Delete
@@ -425,7 +435,8 @@ abstract class BaseKeyboard(
             else -> InputFeedbacks.SoundEffect.Standard
         }
         // the number pad's space moves the cursor too (UAT PAN-14): it had the press only
-        if (def is SpaceKey || def is MiniSpaceKey) wireSpace(key) else if (def is BackspaceKey) wireBackspace(key)
+        val space = def is SpaceKey || def is MiniSpaceKey || (def is SceneKeyDef && def.isSpace)
+        if (space) wireSpace(key) else if (def is BackspaceKey || (def is SceneKeyDef && def.isBackspace)) wireBackspace(key)
         wireBehaviors(key, def)
         // set as its long press shows a popup, which then has the touch: no swipe of the key's after that
         val longPopup = LongPopup()
@@ -631,6 +642,76 @@ abstract class BaseKeyboard(
     private var sceneTouch: SceneTouch? = null
 
     /**
+     * The board the scene engine draws this keyboard's keys from ([drawKeysWithScene], 060-render-p2
+     * S4); null while the views draw them.
+     */
+    protected var sceneBoard: SceneBoard? = null
+        private set
+
+    /**
+     * The keys drawn by the scene of the layout [layoutName] from now on, where the canvas is on
+     * (internal.canvasKeyboard) and the layout is one the app draws ([SceneLayouts.of]); else the
+     * views go on drawing them, as they always did. Called last in a keyboard's init: the scene
+     * reads its state ([sceneEnv]). Each key wired as its view was where [refOf] says which (U4 A:
+     * the 26 keys, till their layout says what they do), else as its layout's node says ([SceneKeyDef],
+     * [sceneTable] the keyboard's own words: U4 B). The rows of views stay laid out, not drawn, not
+     * touched, not read out (S8 deletes them). Whether the scene draws them.
+     */
+    protected fun drawKeysWithScene(layoutName: String, refOf: ((KeyView) -> KeyRef?)? = null): Boolean {
+        if (!AppPrefs.getInstance().internal.canvasKeyboard.getValue()) return false
+        val layout = SceneLayouts.of(context, layoutName) ?: return false
+        val board = SceneBoard(context, theme, layout) { look, width, height -> sceneEnv(look, layout, width, height) }
+        sceneBoard = board
+        val view = board.view(keyImages) { node -> sceneKey(node) }
+        if (refOf != null) drawKeysOn(view, refOf) else drawKeysOnNodes(view)
+        keyRows.forEach { it.visibility = View.INVISIBLE }
+        add(view, lParams(0, 0) {
+            topOfParent()
+            bottomOfParent()
+            leftOfParent()
+            rightOfParent()
+        })
+        return true
+    }
+
+    /**
+     * What this keyboard's keys show now as the scene engine's environment, in [look] at [width] ×
+     * [height] ([SceneEnvs.of] with its own Input, texts, marks): asked for each frame whose scene
+     * was invalidated ([KeyboardCanvasView.invalidateScene], every change of what the keys show).
+     */
+    protected open fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env =
+        SceneEnvs.of(this, look, theme.isDark, width, height, Input(), marks = SceneBoard.marks(layout, charShortcutMarks))
+
+    /** The keyboard's own words for its layout's keys (U4 B): its `action:` placeholders, its composed long presses. */
+    protected open val sceneTable: SceneKeyDef.Table = object : SceneKeyDef.Table {}
+
+    // the keys made from the scene's nodes ([drawKeysOnNodes]), each with what it was made from: a node
+    // that does the same in a scene made anew keeps its key (a finger on it, its timers)
+    private val nodeKeys = HashMap<KeyRef, Pair<SceneBehavior, SceneKey>>()
+
+    // the keys drawn by [view], each wired as its layout's node says, made as the scene first has it
+    private fun drawKeysOnNodes(view: KeyboardCanvasView) {
+        releaseAllTouchTargets()
+        spaceKeys.removeAll { it is SceneKey }
+        nodeKeys.clear()
+        canvas = view
+        sceneKeys = emptyMap()
+        sceneTouch = SceneTouch(view, keyFor = { node -> nodeKey(view, node) }, shown = { true })
+    }
+
+    private fun nodeKey(view: KeyboardCanvasView, node: KeyNode): SceneKey {
+        val ref = KeyRef.scene(node.id, node.copy)
+        val b = SceneBehavior.of(node)
+        nodeKeys[ref]?.takeIf { it.first == b }?.let { return it.second }
+        nodeKeys[ref]?.second?.let { old -> spaceKeys.remove(old) }
+        val def = SceneKeyDef.of(b, node, sceneTable)
+        return SceneKey(ref, def, view, this).also {
+            wire(it, def, null)
+            nodeKeys[ref] = b to it
+        }
+    }
+
+    /**
      * The keys drawn by [view] from now on, or by their own views again (null): each key the scene
      * draws, [refOf] its view's ([KeyRef.scene]; null, none), wired as its view was and touched where
      * the scene places it (060-render-p2 S1). A key hidden takes no touch, as its view says till its
@@ -652,6 +733,12 @@ abstract class BaseKeyboard(
 
     /** The scene's key wired as [view] was ([drawKeysOn]); null while the views draw the keys. */
     internal fun sceneKeyOf(view: KeyView): SceneKey? = sceneKeys[view]
+
+    /** Where the scene drawn last has its key [id] (its first copy) in this keyboard, as a key's place is (glide typing's, strokes'): nowhere while the views draw the keys. */
+    protected fun scenePlace(id: String): KeyPlace = KeyPlace { _, out ->
+        val c = canvas
+        if (c != null && c.cell(KeyRef(id), out)) out.offset(c.left, c.top) else out.setEmpty()
+    }
 
     /** The key wired for the scene's [node] ([SceneTouch.keyOf]): what a screen reader's actions on it do; null while the views draw the keys. */
     protected fun sceneKey(node: KeyNode): SceneKey? = sceneTouch?.keyOf(node)

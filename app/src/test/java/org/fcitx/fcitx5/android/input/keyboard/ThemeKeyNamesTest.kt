@@ -13,11 +13,15 @@ import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.picker.emojiPicker
 import org.fcitx.fcitx5.android.input.picker.emoticonPicker
 import org.fcitx.fcitx5.android.input.picker.symbolPicker
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.theme.KeyName
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.fcitx.fcitx5.android.scene.layout.Include
+import org.fcitx.fcitx5.android.scene.layout.Key
+import org.fcitx.fcitx5.android.scene.layout.Row
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
@@ -95,5 +99,21 @@ class ThemeKeyNamesTest {
         assertEquals(KeyNames.NUMBER, keyboard.themeBoard)
         val names = keyboard.allViews.filterIsInstance<KeyView>().mapNotNull { it.themeKey }.toList()
         assertTrue(names.toString(), "backspace" in names && "1" in names)
+    }
+
+    // a keyboard drawn by the scene (060-render-p2 S4) styled by the same names as its views were: its
+    // layout's id the board, its keys' ids the keys a theme's override selects (k14/r1c1, qwerty/q)
+    @Test
+    fun aSceneLayoutsKeysAreItsBoardsNames() {
+        val drawn = mapOf("qwerty" to "qwerty", "k14" to "k14", "k18" to "k18")
+        for ((id, board) in drawn) {
+            val layout = SceneLayouts.of(context, id) ?: error("no layout $id")
+            assertEquals(board, layout.layout.id)
+            val rows = layout.layout.parts.flatMap { p -> if (p is Row) listOf(p) else layout.fragments.getValue((p as Include).src).rows }
+            val ids = rows.flatMap { r -> r.cells.filterIsInstance<Key>().mapNotNull { it.id } }.toSet()
+            ids.forEach { assertTrue("$board/$it is not a name of the format", KeyNames.isKnown(KeyName(board, it))) }
+            val views = boards().getValue(board).flatten().mapNotNull { it.name }.toSet()
+            assertEquals(board, views, ids intersect views)
+        }
     }
 }

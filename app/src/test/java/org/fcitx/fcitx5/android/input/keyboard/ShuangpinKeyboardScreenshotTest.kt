@@ -49,7 +49,7 @@ class ShuangpinKeyboardScreenshotTest {
             for (l in listOf("Q", "WE", "IO", "SD", "L", "XC", "BN", "M", "分词")) assertTrue("$l in $labels", l in labels)
             // the code row a touch tall, for the syllables on it
             assertEquals(h.inputView.resources.displayMetrics.density * CodeRowHeight.STRIP_DP, h.box(h.inputView.findViewById<View>(R.id.code_row_text)).height().toFloat(), 1f)
-            h.capture("ShuangpinKeyboardScreenshotTest/keys18_light")
+            h.captureBoard("ShuangpinKeyboardScreenshotTest/keys18_light")
         }
     }
 

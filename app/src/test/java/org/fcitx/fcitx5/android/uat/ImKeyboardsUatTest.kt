@@ -23,9 +23,7 @@ import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
-import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -82,11 +80,12 @@ class ImKeyboardsUatTest {
     }
 
     // the keys' faces, in order
-    private fun faces() = KeyboardHarness.all(h.keyboard).filterIsInstance<AltTextKeyView>().filter { h.shown(it) }
-        .map { (it.def as KeyDef.Appearance.AltText).displayText }.toList()
+    // the group keys shown, named by their place (r1c1…) whichever draws them (060-render-p2 S4a)
+    private fun groups() = h.keys().filter { it.id?.matches(PLACE) == true }
 
-    private fun face(group: String) = KeyboardHarness.all(h.keyboard).filterIsInstance<AltTextKeyView>()
-        .first { h.shown(it) && (it.def as KeyDef.Appearance.AltText).displayText == group }
+    private fun faces() = groups().map { it.label }
+
+    private fun face(group: String) = groups().first { it.label == group }
 
     // the keysyms sent down, as `sym=<n>,`
     private fun sents() = h.api.calls.filter { it.startsWith("sendKey") && "up=false" in it }.map { Regex("sym=\\d+,").find(it)?.value ?: it }
@@ -104,7 +103,7 @@ class ImKeyboardsUatTest {
         // L alone: pinyin has no ; (双拼's 18 keys keep L;)
         val groups = NineKeyLetters.G18.tag().split(',').map { it.replace(";", "").uppercase() }
         assertEquals(groups, faces())
-        h.capture("ImKeyboardsUatTest/pinyin18")
+        h.captureBoard("ImKeyboardsUatTest/pinyin18")
         // B N: the group's code as pinyin's 18 keys send it, not 双拼's
         h.tap(face("BN"))
         assertEquals(listOf(sym(Keyboard.pinyin18Key(NineKeyLetters.G18.key('n')))), sents())
@@ -125,7 +124,7 @@ class ImKeyboardsUatTest {
         start(shuangpin)
         val groups = NineKeyLetters.G14.tag().split(',').map { it.uppercase() }
         assertEquals(groups, faces())
-        h.capture("ImKeyboardsUatTest/shuangpin14")
+        h.captureBoard("ImKeyboardsUatTest/shuangpin14")
         h.tap(face("BN"))
         assertEquals(listOf(sym(Keyboard.shuangpin14Key(NineKeyLetters.G14.key('n')))), sents())
         h.relayout()
@@ -143,5 +142,9 @@ class ImKeyboardsUatTest {
         // a scheme with the 14 keys again leaves the 18 keys as stored
         configured(EngineSettings())
         assertEquals(ShuangpinKeyboard.Keys18, AppPrefs.getInstance().keyboard.shuangpinKeyboard.getValue())
+    }
+
+    private companion object {
+        val PLACE = Regex("r[0-9]c[0-9]")
     }
 }
