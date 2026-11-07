@@ -97,9 +97,9 @@ class PopupMenuUi(
      * The engine's, and it could not make the cells (logged): nothing to show, the long press as one
      * with no menu, never cells not drawn that a lift would still pick (no views either: they go).
      */
-    val unmade: Boolean get() = builder != null && sceneView == null
+    val unmade: Boolean get() = scenes != null && sceneView == null
 
-    private val keyViews: List<View> = if (builder != null) emptyList() else items.map {
+    private val keyViews: List<View> = if (scenes != null) emptyList() else items.map {
         if (it.icon == 0) {
             textView {
                 background = inactiveBackground

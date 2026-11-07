@@ -211,7 +211,11 @@ class PopupComponent :
             val text = fit?.text ?: content
             if (sceneView != null) {
                 if (sceneText == text && sceneSize == fit?.size?.toDouble()) return
-                if (!show(this, text, fit, trigger.width())) return
+                if (!show(this, text, fit, trigger.width())) {
+                    // not the text before left up while a lift types this one: none, as showPopup's
+                    dismissJobs.remove(key)?.cancel()
+                    return dismissPopupEntry(key, this)
+                }
             } else {
                 val px = fit?.size ?: symbolSize()
                 if (textView.text.contentEquals(text) && textView.textSize == px) return
@@ -423,6 +427,14 @@ class PopupComponent :
                 leftMargin = ui.triggerBounds.left + ui.offsetX - rootBounds.left - out.left
                 topMargin = ui.triggerBounds.top + ui.offsetY - rootBounds.top - out.top
             })
+        }
+        // a focus moved can change the shadow's room: the box kept where it is, the view moved round it
+        (ui.root as? PopupSceneView)?.onOutsetChanged = { was, now ->
+            (ui.root.layoutParams as? FrameLayout.LayoutParams)?.apply {
+                leftMargin += was.left - now.left
+                topMargin += was.top - now.top
+                ui.root.layoutParams = this
+            }
         }
         showingContainerUi[key] = ui
         // out of the key pressed (its middle, in the container's pixels); it goes at once, the
