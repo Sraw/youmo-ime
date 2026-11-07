@@ -15,8 +15,8 @@ import kotlin.math.roundToInt
  * no level tells them apart without losing it (077374d11's rule dropped 9 in 10 at 6 dB over the
  * room); what was heard does: a segment with a Chinese character in it, or longer than a short
  * phrase, is typed as before; one of a few Latin letters only ([latinShort]) only where it was
- * both loud ([loud]) and voiced, silero's say on the gained samples (specs/app.md, Quiet: the
- * measurements).
+ * loud (at least [LOUD], or over the floor) and voiced, silero's say on the gained samples
+ * (specs/app.md, Quiet: the measurements; quiet_eval.py).
  *
  * Fed each window as read: its raw samples (before the gain) and whether the VAD heard speech in it.
  * A segment is told by its samples from the microphone's opening. The capture thread feeds it and
@@ -28,6 +28,9 @@ class VoiceQuiet {
     private var ends = LongArray(INITIAL)
     private var levels = DoubleArray(INITIAL)
     private var voiced = BooleanArray(INITIAL)
+
+    // windows read with no detector (its model failed to load): what they are in is kept
+    private var blind = BooleanArray(INITIAL)
     private var count = 0
     private var read = 0L
     private var withSound = 0
@@ -36,15 +39,18 @@ class VoiceQuiet {
     private val bins = IntArray(BINS)
     private var binned = 0
 
-    /** The next [n] raw samples of [samples], the VAD having heard speech in them or not ([speech]). */
+    /** The next [n] raw samples of [samples], the VAD having heard speech in them or not ([speech]; null: no VAD). */
     @Synchronized
-    fun window(samples: FloatArray, n: Int = samples.size, speech: Boolean = false) {
+    fun window(samples: FloatArray, n: Int = samples.size, speech: Boolean? = false) {
         if (n <= 0) return
         var sum = 0.0
         for (i in 0 until n) sum += samples[i].toDouble() * samples[i]
         read += n
-        // NaN or infinite samples (a HAL's garbage) are no sound, not a crash on the capture thread
-        val sound = sum > 0.0 && !sum.isInfinite() && ++withSound > SKIP
+        // NaN or infinite samples (a HAL's garbage) are no sound, not a crash on the capture thread;
+        // under [SILENT] digital silence as zeroes are (the UAT clip microphone's sparse ±1 between
+        // clips, -111 dBFS, would set the floor 50 dB under a real room's)
+        val audible = sum > 0.0 && !sum.isInfinite() && 10 * log10(sum / n) >= SILENT
+        val sound = audible && ++withSound > SKIP
         val db = if (sound) 10 * log10(sum / n) else Double.NaN
         if (sound) {
             bins[(db - BOTTOM).roundToInt().coerceIn(0, BINS - 1)]++
@@ -53,13 +59,16 @@ class VoiceQuiet {
         if (count == ends.size) grow()
         ends[count] = read
         levels[count] = db
-        voiced[count] = speech
+        voiced[count] = speech == true
+        blind[count] = speech == null
         count++
     }
 
     /**
      * Whether [text], the segment heard from sample [from] to [to] of the opening, is typed: not a
-     * short Latin phrase ([latinShort]), or one the microphone heard [loud] and the VAD as speech.
+     * short Latin phrase ([latinShort]); or one loud (at least [LOUD], or [RISE] over the floor)
+     * that the VAD heard as speech: a lone 「OK」「Hi」 said at a normal level is (quiet_eval.py),
+     * and loud alone is a fan's or the traffic's. Kept too where there was no VAD to ask.
      */
     @Synchronized
     fun keeps(text: String, from: Long, to: Long): Boolean {
@@ -68,13 +77,16 @@ class VoiceQuiet {
         // through the window sample to - 1 is in
         val last = minOf(firstEndingAfter(to - 1) + 1, count)
         var anyVoiced = false
+        var anyBlind = false
         val top = DoubleArray(RANK) { Double.NEGATIVE_INFINITY }
         for (i in first until last) {
             if (voiced[i]) anyVoiced = true
+            if (blind[i]) anyBlind = true
             // NaN (no sound) is above nothing
             if (levels[i] > top[RANK - 1]) insert(top, levels[i])
         }
         val level = top[RANK - 1]
+        if (anyBlind) return true
         return anyVoiced && level.isFinite() && (level >= LOUD || level - floor() >= RISE)
     }
 
@@ -113,6 +125,7 @@ class VoiceQuiet {
         ends = ends.copyOf(ends.size * 2)
         levels = levels.copyOf(levels.size * 2)
         voiced = voiced.copyOf(voiced.size * 2)
+        blind = blind.copyOf(blind.size * 2)
     }
 
     companion object {
@@ -123,6 +136,9 @@ class VoiceQuiet {
         const val RISE = 8.0
         const val RANK = 3
         const val SKIP = 3
+
+        /** dBFS (a window's raw level) under which it is digital silence, not a room: a phone's quietest room is some -70 */
+        const val SILENT = -100.0
         const val FLOOR_PERCENT = 10
 
         /** letters at most of a phrase taken for the room's: 「I'm sorry」 is 7, 「Look friends」 11 */

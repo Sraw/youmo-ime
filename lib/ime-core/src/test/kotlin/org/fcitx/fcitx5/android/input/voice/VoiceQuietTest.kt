@@ -19,12 +19,12 @@ class VoiceQuietTest {
 
     private fun VoiceQuiet.feed(power: Double, times: Int, voiced: Boolean = false) = repeat(times) { window(window(power), speech = voiced) }
 
-    // resources/voice/quiet_golden.py: real clips in a room's noise, Gain2 and silero as the app has them
+    // resources/voice/quiet_golden.py: real clips in a room's noise, Gain2, silero and the recognizer's
+    // own segments as the app has them
     @Test
     fun goldenCases() {
         val lines = javaClass.getResourceAsStream("/voice/quiet-golden.tsv")!!.bufferedReader().readLines()
-        assertEquals(8, lines.size)
-        val got = lines.map { line ->
+        val got = lines.associate { line ->
             val f = line.split('\t')
             val quiet = VoiceQuiet()
             for (w in f.drop(5)) {
@@ -33,12 +33,24 @@ class VoiceQuietTest {
             }
             val keeps = quiet.keeps(f[1], f[2].toLong(), f[3].toLong())
             assertEquals(f[0], f[4] == "1", keeps)
-            f[0] to keeps
-        }.toMap()
-        // both ways: the room's 「I'm sorry.」 goes, speech of every kind stays
-        assertFalse(got.getValue("white-66"))
-        assertTrue(got.getValue("q44-in-room"))
-        assertTrue(got.getValue("soft-english-over-room"))
+            f[0].substringBefore('#') to keeps
+        }
+        // the room's 「I'm sorry.」 goes
+        for (room in listOf("white-66", "pink-60")) assertFalse(room, got.getValue(room))
+        // speech of every kind stays: soft Chinese, soft English over the room, a lone word at a normal level
+        for (speech in listOf("loud-english", "ok", "no", "yes", "hi", "soft-english-over-room", "q44-in-room", "soft-chinese")) {
+            assertTrue(speech, got.getValue(speech))
+        }
+        // a known leak: a fan 30 dB down is loud and voiced, its 「I'm sorry.」 typed (specs/app.md, Quiet)
+        assertTrue(got.getValue("fan"))
+    }
+
+    @Test
+    fun noDetectorKeepsEverything() {
+        // silero failed to load (VoiceOpening): the rule lets all through rather than lose speech
+        val quiet = VoiceQuiet()
+        repeat(90) { quiet.window(window(db(-66.0)), speech = null) }
+        assertTrue(quiet.keeps("I'm sorry.", 0, 90L * 512))
     }
 
     @Test
@@ -83,6 +95,22 @@ class VoiceQuietTest {
         quiet.window(FloatArray(0))
         // an emulator's silent microphone: the recognizer's 「H」 goes
         assertFalse(quiet.keeps("H", 0, 52L * 512))
+    }
+
+    @Test
+    fun digitalSilenceIsNoFloor() {
+        // the UAT clip microphone between clips: a ±1 sample in 128, -111 dBFS a window
+        val sparse = FloatArray(512) { if (it % 128 == 0) 1f / 32768 else 0f }
+        val quiet = VoiceQuiet()
+        repeat(200) { quiet.window(sparse) }
+        quiet.feed(db(-60.0), 40, voiced = true)
+        // the room at -60 alone is the floor: its own 「I'm sorry.」 is not 50 dB over anything
+        assertFalse(quiet.keeps("I'm sorry.", 200L * 512, 240L * 512))
+        // as all-zero windows would be
+        val zeroes = VoiceQuiet()
+        repeat(200) { zeroes.window(FloatArray(512)) }
+        zeroes.feed(db(-60.0), 40, voiced = true)
+        assertFalse(zeroes.keeps("I'm sorry.", 200L * 512, 240L * 512))
     }
 
     @Test

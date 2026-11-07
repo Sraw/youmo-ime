@@ -516,6 +516,15 @@ def vo32(d):
     return soft_speech(d, (("zouba-q44-room", "我们走吧"), ("nihao-q44-room", "你好")))
 
 
+# a lone English word at a normal level: VoiceQuiet's short Latin phrase, typed (silero hears it)
+@case("VO-33", base="B0-语音", mutates="learn", needs=EV)
+def vo33(d):
+    ok = lambda t: plain(t).lower() in ("ok", "okay")
+    shown, t, n, miss = retried(d, "ok", ok)
+    check(ok(t), f"松开后框里「{t}」{tries_note(n, miss)}")
+    return f"框里「{t}」{tries_note(n, miss)}"
+
+
 def soft_speech(d, clips):
     out = []
     for clip, want in clips:

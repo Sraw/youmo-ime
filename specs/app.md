@@ -864,34 +864,55 @@ in CI keeps the voice source set compiling.
   −66 dBFS typed 「I'm sory」, 2026-11-06; an emulator's silent microphone 「H」「I'm」). A segment with a
   Chinese character, or of more than 12 letters, is typed as before; a short Latin one only if its
   windows are loud (3rd loudest −50 dBFS or louder, or 8 dB over the talk's 10th-percentile floor;
-  raw windows before the gain, all-zero and the first 3 with sound left out) **and** silero VAD
-  (threshold 0.2, on the gained samples; its segments unused) heard speech in them. Measured on the
-  app's pipeline on the host (Gain2 → the 060 streaming models; aishell 40, ascend 40, the q44 clips;
-  white rooms at −66/−60 dBFS; L is the speech's 3rd loudest window; CER / share of "没有听清"):
+  raw windows before the gain; all-zero ones, ones under −100 dBFS (digital silence: the UAT clip
+  microphone's sparse ±1 between clips is −111, and would put the floor 50 dB under the room) and the
+  first 3 with sound left out) **and** silero VAD
+  (threshold 0.2, on the gained samples, its flag read each window; its segments unused) heard speech
+  in them. No VAD (its model failing to load): everything is typed (`VoiceOpening`). The VAD is
+  taken after `startRecording()` (the record's 2 s buffer holds the first words meanwhile), a spare
+  made beside the models' load and kept from opening to opening (`VoiceSpare`), let go with them;
+  debug builds log its time per window (`voice capture:` vadMeanUs, vadMostUs).
 
-  | case | d4d0981c6 | 077374d11 (level) | (a) rise 6, 3 in a row | (b) silero 0.2 | chosen: Latin-short & level & silero |
+  Measured by `lib/ime-core/src/test/resources/voice/quiet_eval.py` (Gain2 → the 060 streaming models with the app's
+  endpoints, silero per window; aishell 0–39, ascend 0–39, Kokoro's English phrases, the q44 clips,
+  FSD50K; R the room's white noise, L the speech's 3rd loudest window, dBFS; CER / share of
+  "没有听清"; noise rows: talks typed). Rules: d4d0981c6 none; 077374d11 the talk's level; (a) rise
+  6 dB, 3 windows in a row; (b) silero 0.2 heard any speech; chosen: short Latin and loud and voiced.
+
+  | case | d4d0981c6 | 077374d11 | (a) | (b) | chosen |
   |---|---|---|---|---|---|
-  | aishell R−66 L−58 | 22.8% / 0% | 27.1% / 5% | 22.8% / 0% | 32.8% / 18% | 22.8% / 0% |
-  | aishell R−66 L−60 | 30.1% / 0% | 94.6% / 90% | 57.9% / 32% | 64.3% / 55% | 30.1% / 0% |
-  | aishell R−60 L−54 | 28.4% / 0% | 94.8% / 90% | 54.7% / 32% | 44.0% / 30% | 28.4% / 0% |
-  | aishell R−60 L−58 | 50.8% / 8% | 100% / 100% | 100% / 100% | 99.7% / 98% | 50.8% / 8% |
-  | q44 clips in R−60 | 0% / 0% | 100% / 100% | 100% / 100% | 100% / 100% | 0% / 0% |
-  | 2 s quiet then L−58, R−66 | 22.2% / 0% | 23.9% / 2% | 22.2% / 0% | 31.5% / 20% | 22.2% / 0% |
-  | ascend R−60 L−54 / L−58 | 55.7/73.6% | 98.7/100% | — | 55.7/96.0% | 56.2/74.5% (+6%/+2% 没有听清) |
-  | room alone: white/pink, −66/−60 (32) | 31 typed | 5 | 6 | 0 | 0 |
-  | FSD50K room, household, keyboard, traffic (60 at −30 dB) | 53 | 26 | 23 | 4 | 4 |
-  | the same at their level (60) | 42 | 37 | 37 | 12 | 11 |
+  | aishell R−66 L−58 | 20.6% / 0% | 26.7% / 8% | 20.6% / 0% | 33.8% / 20% | 20.6% / 0% |
+  | aishell R−66 L−60 | 29.9% / 0% | 95.3% / 90% | 54.1% / 30% | 62.6% / 52% | 29.9% / 0% |
+  | aishell R−66 L−62 | 38.1% / 0% | 100% / 100% | 97.6% / 92% | 93.4% / 90% | 38.1% / 0% |
+  | aishell R−60 L−54 | 29.9% / 0% | 96.6% / 92% | 61.6% / 40% | 43.7% / 25% | 29.9% / 0% |
+  | aishell R−60 L−58 | 49.9% / 12% | 100% / 100% | 100% / 100% | 97.6% / 98% | 49.9% / 12% |
+  | aishell R−60 L−62 | 85.3% / 42% | 100% / 100% | 100% / 100% | 100% / 100% | 85.3% / 45% |
+  | q44 clips in R−60 / R−66 | 0% / 0% | 100% / 100% | 100% and 67% | 100% and 67% | 0% / 0% |
+  | 2 s of room, then aishell L−58, R−60 | 47.9% / 8% | 100% / 100% | 100% / 100% | 100% / 100% | 47.9% / 8% |
+  | ascend R−60 L−54 / L−58 | 56.6 / 71.7% | 99.3 / 100% | 62.1 / 100% | 59.6 / 96.2% | 57.1 / 72.2% (+3% 没有听清 each) |
+  | English phrases (48) R−66 L−30 to −56 | 4.7–13.6% / 0% | the same | the same | the same | the same |
+  | English phrases R−66 L−58 / L−60 | 22.1 / 19.0% / 0% | 22.9 / 100% | 22.1 / 19.0% | 26.4 / 39.9% | **27.1% / 6%, 98.8% / 90%** |
+  | English phrases R−60 L−50 / L−52 | 18.6 / 12.8% / 0% | 18.6 / 16.7% | the same as d4d0981c6 | the same | 18.6% / 0%, 16.7% / 4% |
+  | English phrases R−60 L−54 / −56 / −58 / −60 | 11–26% / 0–2% | 100% | 11% to 100% | 11% to 100% | **100% / 98%, 98%, 96%, 94%** |
+  | room alone: white/pink, −66/−60 (32) | 31 typed | 1 | 5 | 0 | 0 |
+  | FSD50K room, household, keyboard, traffic 30 dB down (60) | 52 | 25 | 22 | 2 | 2 |
+  | the same at their level (60) | 40 | 35 | 35 | 10 | 9 |
   | zeroes | 0 (the app: 「H」「I'm」) | 0 | 0 | 0 | 0 |
 
-  No level or VAD rule keeps soft speech: 6 dB over the room, as soft speech is, is where steady
-  noise is too, and silero at 0.5 lost half of L−58. The text tells them apart: the cost is a short
-  English phrase said softly in a noisy room (ascend: 「make friends」 heard as 「Look friends.」 dropped).
-  A pause inside a talk is a segment of its own, judged alone. Option (c), the gain only on speech,
-  needs a per-window speech decision before the gain, which neither the level nor silero (on raw
-  samples) gives at these levels: not built. The q44 clips: 3rd loudest window −59.5 dBFS as
-  made, the debug log's env −60 to −54 on the emulator. The measuring scripts:
-  `lib/ime-core/src/test/resources/voice/quiet_golden.py` (VoiceQuietTest's golden cases) and the
-  report of 2026-11-07.
+  The cost is English said softly: a short English phrase (「OK」「Thank you」「Good night」…, 12
+  letters or fewer, no Chinese) whose 3rd loudest window is under about −52 dBFS in a −60 room, or
+  −60 in a −66 room, is dropped nearly always (没有听清). Said at a normal level (−30 to −50) it is
+  typed, a lone 「OK」「No」「Yes」「Hi」 too (silero hears them: VoiceQuietTest's golden cases, VO-33).
+  Typing a loud short Latin segment without the VAD (so a lone word shorter than silero's 0.25 s of
+  speech could pass) was measured and not taken: no English phrase more was typed, and FSD50K's
+  room typed 8 of 15 talks (0), keyboard 9 (2), traffic 10 (5), 30 dB down 16 of 60 (2).
+
+  A premise: a pause is a segment of its own only past the recognizer's endpoint (1.2 s of silence
+  after text). Room heard as text and Chinese begun within 1.2 s of it would be one segment, the
+  room's text typed with it. Not seen: in 160 talks of 1 or 2 s of room before aishell at L−58 the
+  room was never heard as text (it takes a longer stretch of room alone), so no Latin was typed with
+  the Chinese. The q44 clips: 3rd loudest window −59.5 dBFS as made, the debug log's env −60 to −54
+  on the emulator. VoiceQuietTest's golden cases: `lib/ime-core/src/test/resources/voice/quiet_golden.py`.
 - **Polish guard**: `VoicePolishStream` applies `VoicePolishTags.guarded` to the tagger's labels:
   an English letter is kept, nothing written after a full stop. Its del took the second r of
   「sorry」 (「I'm sory.。」); on ascend's 142 texts with English it changed letters in 10, guarded

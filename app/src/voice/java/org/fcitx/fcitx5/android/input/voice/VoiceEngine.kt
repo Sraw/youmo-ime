@@ -67,6 +67,7 @@ object VoiceEngine {
                     models?.recognizer?.release()
                     models?.polisher?.close()
                     models = null
+                    spareVad.clear()
                 }
             }
         }
@@ -156,11 +157,30 @@ object VoiceEngine {
     // the engine busy or starting: the text as heard, not a wait
     private const val LANGUAGE_MS = 1000L
 
+    // a VAD made ahead (the talk's start, beside the models) or kept from the last opening: the
+    // press waits on no model read (dev/design/voice-start-latency.md). Lock-free: under [lock] the
+    // capture thread would wait out a whole model load (VoiceSpare); let go with the models
+    private val spareVad = VoiceSpare<Vad> { it.release() }
+
+    /** One for this microphone opening: the spare if there is one, else made now. */
+    fun takeVad(assets: AssetManager): Vad = spareVad.take() ?: vad(assets)
+
+    /** [vad], done with, kept for the next opening (its state cleared) or let go if one is kept. */
+    fun offerVad(vad: Vad) {
+        vad.reset()
+        spareVad.offer(vad)
+    }
+
+    /** A spare VAD made, if there is none; off the main thread. */
+    fun prepareVad(assets: AssetManager) {
+        spareVad.build { vad(assets) }
+    }
+
     /**
      * silero VAD for one microphone opening (VoiceQuiet): the threshold that kept the soft speech
      * measured (0.2; 0.5 lost half of it at -58 dBFS), segments as sherpa-onnx's defaults.
      */
-    fun vad(assets: AssetManager) = Vad(
+    private fun vad(assets: AssetManager) = Vad(
         assets,
         VadModelConfig(
             sileroVadModelConfig = SileroVadModelConfig(model = "$DIR/silero_vad.onnx", threshold = VAD_THRESHOLD, windowSize = WINDOW),

@@ -126,6 +126,8 @@ class VoiceListener(
     }
 
     override fun load() {
+        // the opening's VAD made beside the models: none, or failing, it is made or done without then
+        scope.launch(Dispatchers.IO) { orFallback("voice vad", Unit) { VoiceEngine.prepareVad(assets) } }
         scope.launch {
             // asked for while the models load, not after: the engine may be busy a while
             val user = async { userHotwords() }
@@ -288,6 +290,10 @@ class VoiceListener(
     ) {
         private var last = ""
 
+        // what this segment showed: one held back as the room's, unchanged, is not told again
+        // (each telling resets heard and the quiet's timer)
+        private var shown = ""
+
         /** samples handed to the recognizer, from the microphone's opening; this segment's from [start] */
         var fed = 0L
         private var start = 0L
@@ -313,6 +319,8 @@ class VoiceListener(
                         last = text
                         // the room's phrase shows no more than it is typed
                         val heard = if (quiet.keeps(text, start, fed)) text else ""
+                        if (heard == shown) continue
+                        shown = heard
                         show(orFallback("voice polish", VoiceLive.Heard(live.raw, 0, fallback = true)) { live.heard(heard) })
                     }
                 }
@@ -329,7 +337,10 @@ class VoiceListener(
             val text = if (quiet.keeps(chosen, start, fed)) chosen else ""
             // the first segment's timestamps count from the stream's start, the microphone's opening
             if (text.isNotEmpty() && kept++ == 0) speechStart = result.timestamps.firstOrNull()?.let { (it * VoiceEngine.SAMPLE_RATE).toInt() }
-            show(orFallback("voice polish", VoiceLive.Heard(live.raw, 0, fallback = true)) { live.closed(text) })
+            val closed = orFallback("voice polish", VoiceLive.Heard(live.raw, 0, fallback = true)) { live.closed(text) }
+            // the room's, nothing of it shown: nothing to tell
+            if (text.isNotEmpty() || shown.isNotEmpty()) show(closed)
+            shown = ""
         }
 
         private fun show(shown: VoiceLive.Heard) = tell { heard(shown) }
@@ -343,18 +354,21 @@ class VoiceListener(
         }
         val opening = Opening(record.bufferSizeInFrames)
         // whether a window is speech (VoiceQuiet), on the gained samples: silero did not fire at the
-        // -50 to -60 dBFS of soft speech before the gain (specs/app.md)
-        val vad = VoiceEngine.vad(assets)
-        try {
-            record.startRecording()
-            listen(record, opening, vad)
-        } finally {
-            record.stop()
-            record.release()
-            vad.release()
-            // numbers only, nothing said: the UAT's check of the tail's timing and the level (uat/12 VO-23/24)
-            if (BuildConfig.DEBUG) opening.log()
-        }
+        // -50 to -60 dBFS of soft speech before the gain (specs/app.md). Taken once the microphone is
+        // on: the record's 2 s buffer holds the first words meanwhile; none (its model failing): all kept
+        VoiceOpening.run(
+            start = { record.startRecording() },
+            load = { VoiceEngine.takeVad(assets) },
+            use = { listen(record, opening, it) },
+            stop = {
+                record.stop()
+                record.release()
+                // numbers only, nothing said: the UAT's check of the tail's timing and the level (uat/12 VO-23/24)
+                if (BuildConfig.DEBUG) opening.log()
+            },
+            unload = VoiceEngine::offerVad,
+            failed = { Timber.w(it, "voice vad") },
+        )
     }
 
     /** One microphone opening's: the gain, where it stops, and the debug log's numbers. */
@@ -362,14 +376,25 @@ class VoiceListener(
         val gain = VoiceGain(VoiceEngine.SAMPLE_RATE)
         val end = VoiceCaptureEnd(VoiceEngine.SAMPLE_RATE, bufferFrames)
         val onset = VoiceOnset(VoiceEngine.SAMPLE_RATE)
+        private var vadWindows = 0
+        private var vadNs = 0L
+        private var vadMostNs = 0L
+
+        /** a window's VAD time, for the log: a phone's to be measured */
+        fun vadTook(ns: Long) {
+            vadWindows++
+            vadNs += ns
+            vadMostNs = maxOf(vadMostNs, ns)
+        }
 
         // Locale.ROOT: uat/scripts/12-voice.py parses it, a decimal comma would not
         fun log() = Timber.d(
             String.format(
                 Locale.ROOT,
-                "voice capture: liftFrame=%s stopAt=%s read=%d envPeak=%s peakGainDb=%.1f",
+                "voice capture: liftFrame=%s stopAt=%s read=%d envPeak=%s peakGainDb=%.1f vadWindows=%d vadMeanUs=%d vadMostUs=%d",
                 end.liftFrame, end.stopAt, end.read,
                 gain.envPeak?.let { String.format(Locale.ROOT, "%.1f", it) }, 20 * log10(gain.peakGain),
+                vadWindows, if (vadWindows > 0) vadNs / vadWindows / NS_PER_US else 0L, vadMostNs / NS_PER_US,
             )
         )
     }
@@ -409,7 +434,7 @@ class VoiceListener(
         return null
     }
 
-    private suspend fun listen(record: AudioRecord, opening: Opening, vad: Vad) {
+    private suspend fun listen(record: AudioRecord, opening: Opening, vad: Vad?) {
         val buffer = FloatArray(VoiceEngine.WINDOW)
         val shorts = if (record.audioFormat == AudioFormat.ENCODING_PCM_16BIT) ShortArray(VoiceEngine.WINDOW) else null
         val timestamp = AudioTimestamp()
@@ -443,10 +468,7 @@ class VoiceListener(
                 val samples = buffer.copyOf(n)
                 // before all of it: the recognizer and the level hear the same
                 opening.gain.apply(samples)
-                vad.acceptWaveform(samples)
-                // its segments are not used: only whether it is in one now
-                if (!vad.empty()) vad.clear()
-                quiet.window(buffer, n, vad.isSpeechDetected())
+                quiet.window(buffer, n, vad?.let { speech(it, samples, opening) })
                 audio.trySend(samples)
                 if (++windows % LEVEL_EVERY == 0) {
                     val level = rms(samples)
@@ -458,6 +480,16 @@ class VoiceListener(
             // ended mid-clip (a lift in the speech): nothing left playing for uat.py to wait on
             clips?.close()
         }
+    }
+
+    /** Whether [vad] is in speech after [samples]; its segments are not used. Its time counted for the debug log. */
+    private fun speech(vad: Vad, samples: FloatArray, opening: Opening): Boolean {
+        val at = System.nanoTime()
+        vad.acceptWaveform(samples)
+        if (!vad.empty()) vad.clear()
+        val speech = vad.isSpeechDetected()
+        opening.vadTook(System.nanoTime() - at)
+        return speech
     }
 
     /**
@@ -498,6 +530,7 @@ class VoiceListener(
         private const val LEVEL_EVERY = 3
         private const val LEVEL_SCALE = 5f
         private const val NS_PER_MS = 1_000_000L
+        private const val NS_PER_US = 1_000L
         private const val BUFFER_S = 2
     }
 }

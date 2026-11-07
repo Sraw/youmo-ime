@@ -42,6 +42,9 @@ PHRASES = {   # name: (what Kokoro is given, what X-ASR alone should hear, None:
     "wangxiaoming": ("汪小明", None),
     "wangmingtian": ("汪小明明天来", None),
 }
+# said by an English voice of the same Kokoro (VO-33: a lone English word at a normal level)
+ENGLISH = {"ok": ("OK", "ok")}
+ENGLISH_VOICE = 0
 
 
 def tts():
@@ -101,8 +104,8 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     t, r = tts(), asr()
     bad = 0
-    for name, (text, want) in PHRASES.items():
-        a = t.generate(text, sid=VOICE, speed=1.0)
+    for name, (text, want) in [*PHRASES.items(), *ENGLISH.items()]:
+        a = t.generate(text, sid=ENGLISH_VOICE if name in ENGLISH else VOICE, speed=1.0)
         s = np.array(a.samples, dtype=np.float32)
         if a.sample_rate != RATE:
             s = resample_poly(s, RATE, a.sample_rate).astype(np.float32)
