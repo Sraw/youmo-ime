@@ -65,7 +65,7 @@ class PopupsTest {
         assertEquals(Popups.SYMBOL_DP * d, size(Forms.block), 1e-9)
         assertEquals(Popups.SYMBOL_DP * d * 0.9, size(Forms.compact), 1e-9)
         assertEquals(Popups.SYMBOL_DP * d * 0.85, size(Forms.floating), 1e-9)
-        val (words, least) = builder(Forms.compact).previewWordsSize()
+        val (words, least) = builder(Forms.compact).previewWordsSize().ok()
         assertEquals(Popups.WORDS_DP * d * 0.9, words, 1e-9)
         assertEquals(Popups.MIN_WORDS_DP * d * 0.9, least, 1e-9)
     }
@@ -90,16 +90,16 @@ class PopupsTest {
         val size = Popups.KEY_TEXT_DP * d
         val pad = px(Popups.TEXT_PADDING_DP)
         val labels = listOf(".com", ".cn", ".net")
-        val keys = b.popupKeys(labels, 3, 2000.0)
+        val keys = b.popupKeys(labels, 3, 2000.0).ok()
         assertEquals(ceil(4 * 0.6 * size) + 2 * pad, keys.width)
         assertEquals(size, keys.size)
         assertEquals(px(Popups.KEY_HEIGHT_DP), keys.height)
         // one letter: the least width
-        assertEquals(px(Popups.KEY_MIN_WIDTH_DP), b.popupKeys(listOf("a", "b"), 2, 2000.0).width)
+        assertEquals(px(Popups.KEY_MIN_WIDTH_DP), b.popupKeys(listOf("a", "b"), 2, 2000.0).ok().width)
         // no room known: as wide as they want
-        assertEquals(keys.width, b.popupKeys(labels, 3, null).width)
+        assertEquals(keys.width, b.popupKeys(labels, 3, null).ok().width)
         // too wide for the room: narrower, the text smaller alike
-        val narrow = b.popupKeys(labels, 3, 3 * 50.0)
+        val narrow = b.popupKeys(labels, 3, 3 * 50.0).ok()
         assertEquals(50.0, narrow.width)
         assertEquals(size * 50 / keys.width, narrow.size, 1e-9)
     }
@@ -108,7 +108,7 @@ class PopupsTest {
     fun aLongPresssRowsAreDrawnBottomFirstTheOneInFocusSelected() {
         val labels = listOf("a", "b", "c", "d", "e", "f", "g")
         val b = builder()
-        val keys = b.popupKeys(labels, 4, null)
+        val keys = b.popupKeys(labels, 4, null).ok()
         // the 4 columns round the 2nd, the top row's last slot empty
         val s = b.popup(labels, listOf(listOf(2, 0, 1, 3), listOf(6, 4, 5, -1)), keys, selected = 0).ok()
         assertEquals(4 * keys.width, s.width)
@@ -165,7 +165,7 @@ class PopupsTest {
         val s = b.menu(cells, listOf(1, 0, 2), selected = 0).ok()
         val cell = px(Popups.MENU_CELL_DP)
         val wide = floor(cell * Popups.MENU_WORDS_WIDTH)
-        assertEquals(wide, b.menuKeys(cells).width)
+        assertEquals(wide, b.menuKeys(cells).ok().width)
         assertEquals(3 * wide, s.width)
         // in [order]: 拼音 first
         assertEquals("拼音", s.keys.first().label)
@@ -182,5 +182,7 @@ class PopupsTest {
         assertIs<Parsed.Failed>(b.preview("g", 10.0))
         assertIs<Parsed.Failed>(b.popup(listOf("a"), listOf(listOf(0)), org.fcitx.fcitx5.android.scene.engine.PopupKeys(10.0, 10.0, 10.0), 0))
         assertIs<Parsed.Failed>(b.menu(listOf(MenuCell("a", null)), listOf(0), 0))
+        assertIs<Parsed.Failed>(b.popupKeys(listOf("a"), 1, null))
+        assertIs<Parsed.Failed>(b.previewWidth("a", 10.0))
     }
 }

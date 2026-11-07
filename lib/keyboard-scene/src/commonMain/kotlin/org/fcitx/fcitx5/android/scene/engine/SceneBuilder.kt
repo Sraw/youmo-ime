@@ -77,18 +77,18 @@ class SceneBuilder(
      */
     fun preview(text: String, keyWidth: Double, size: Double? = null): Parsed<Scene> = safely { popups.preview(text, keyWidth, size) }
 
-    /** The bubble's words' size and the least they shrink to, px (PreviewLabel fits them). */
-    fun previewWordsSize(): Pair<Double, Double> = popups.wordsSize()
+    /** The bubble's words' size and the least they shrink to, px (PreviewLabel fits them). Never throws. */
+    fun previewWordsSize(): Parsed<Pair<Double, Double>> = safely { popups.wordsSize() }
 
-    /** The space each side of the bubble's text, px. */
-    fun previewPadding(): Double = popups.padding()
+    /** The space each side of the bubble's text, px. Never throws. */
+    fun previewPadding(): Parsed<Double> = safely { popups.padding() }
 
-    /** How wide [text] is drawn in the bubble at [size] px. */
-    fun previewWidth(text: String, size: Double): Double = popups.previewWidth(text, size)
+    /** How wide [text] is drawn in the bubble at [size] px. Never throws. */
+    fun previewWidth(text: String, size: Double): Parsed<Double> = safely { popups.previewWidth(text, size) }
 
     /**
      * A long press's keys' size for [labels] [columns] across in [room] px ([PopupBuilder.popupKeys]):
-     * at least [minWidth] wide, [height] tall, by default [Popups]'.
+     * at least [minWidth] wide, [height] tall, by default [Popups]'. Never throws.
      */
     fun popupKeys(
         labels: List<String>,
@@ -96,14 +96,14 @@ class SceneBuilder(
         room: Double?,
         minWidth: Double = Popups.px(Popups.KEY_MIN_WIDTH_DP, env.density),
         height: Double = Popups.px(Popups.KEY_HEIGHT_DP, env.density),
-    ): PopupKeys = popups.popupKeys(labels, columns, room, minWidth, height)
+    ): Parsed<PopupKeys> = safely { popups.popupKeys(labels, columns, room, minWidth, height) }
 
     /** A long press's keys ([PopupBuilder.popup]): [rows] of [labels]' indices, the bottom one first, [selected] in focus. Never throws. */
     fun popup(labels: List<String>, rows: List<List<Int>>, keys: PopupKeys, selected: Int): Parsed<Scene> =
         safely { popups.popup(labels, rows, keys, selected) }
 
-    /** A menu's cells' size ([PopupBuilder.menuKeys]). */
-    fun menuKeys(cells: List<MenuCell>): PopupKeys = popups.menuKeys(cells)
+    /** A menu's cells' size ([PopupBuilder.menuKeys]). Never throws. */
+    fun menuKeys(cells: List<MenuCell>): Parsed<PopupKeys> = safely { popups.menuKeys(cells) }
 
     /** A menu ([PopupBuilder.menu]): [cells] in [order] across, [selected] in focus, [disabled] faded. Never throws. */
     fun menu(cells: List<MenuCell>, order: List<Int>, selected: Int, disabled: Set<Int> = emptySet()): Parsed<Scene> =
@@ -111,7 +111,7 @@ class SceneBuilder(
 
     // as build: a fault of the engine's own is a problem, never a throw into the keyboard drawing it
     @Suppress("TooGenericExceptionCaught")
-    private fun safely(make: () -> Scene): Parsed<Scene> = try {
+    private fun <T> safely(make: () -> T): Parsed<T> = try {
         Parsed.Ok(make())
     } catch (e: Throwable) {
         Parsed.Failed(0, "the popup could not be built: ${e::class.simpleName}")

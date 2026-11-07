@@ -15,7 +15,6 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupScenes
-import org.fcitx.fcitx5.android.scene.Parsed
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.centerHorizontally
 import splitties.views.dsl.constraintlayout.constraintLayout
@@ -74,11 +73,17 @@ class PopupEntryUi(override val ctx: Context, theme: Theme, keyHeight: Int, radi
         textView.text = text
     }
 
-    /** The scene of [text] at [size] px (null: a character's) over a key [keyWidth] px across: the bubble sized by the engine. */
-    fun showScene(text: String, size: Double?, keyWidth: Int) {
+    /**
+     * The scene of [text] at [size] px (null: a character's) over a key [keyWidth] px across: the
+     * bubble sized by the engine. False where it could not be made, the scene before kept.
+     */
+    fun showScene(text: String, size: Double?, keyWidth: Int): Boolean {
+        val s = scenes ?: return false
+        val scene = s.made("bubble", s.builder()?.preview(text, keyWidth.toDouble(), size)) ?: return false
         sceneText = text
         sceneSize = size
-        sceneView?.scene = (scenes?.builder()?.preview(text, keyWidth.toDouble(), size) as? Parsed.Ok)?.value
+        sceneView?.scene = scene
+        return true
     }
 
     /** How wide [text] is drawn, in px. */

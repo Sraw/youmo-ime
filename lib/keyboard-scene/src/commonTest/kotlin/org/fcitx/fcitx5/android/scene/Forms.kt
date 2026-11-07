@@ -139,9 +139,9 @@ object Forms {
         val reading = listOf(MenuCell("关", null), MenuCell("拼音", null), MenuCell("注音符号", null))
         return listOf(
             "preview-symbol" to { b.preview("g", key).ok() },
-            "preview-words" to { b.preview("快速输入", key, b.previewWordsSize().first).ok() },
+            "preview-words" to { b.preview("快速输入", key, b.previewWordsSize().ok().first).ok() },
             "keys" to {
-                b.popup(letters, listOf(listOf(2, 0, 1, 3), listOf(6, 4, 5, -1)), b.popupKeys(letters, 4, env.width), selected = 0).ok()
+                b.popup(letters, listOf(listOf(2, 0, 1, 3), listOf(6, 4, 5, -1)), b.popupKeys(letters, 4, env.width).ok(), selected = 0).ok()
             },
             "menu-icons" to { b.menu(edit, edit.indices.toList(), selected = 2, disabled = setOf(4)).ok() },
             "menu-words" to { b.menu(reading, listOf(1, 0, 2), selected = 0).ok() },

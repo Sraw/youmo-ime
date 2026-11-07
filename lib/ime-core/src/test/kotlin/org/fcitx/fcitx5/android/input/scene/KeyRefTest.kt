@@ -5,7 +5,9 @@
 package org.fcitx.fcitx5.android.input.scene
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class KeyRefTest {
@@ -15,6 +17,16 @@ class KeyRefTest {
         assertEquals(42, KeyRef.view(42).viewId)
         assertEquals(KeyRef.view(42), KeyRef.view(42))
         assertNotEquals(KeyRef.view(42), KeyRef.view(43))
+    }
+
+    @Test
+    fun aViewOfNoIdIsStillAViewsKey() {
+        // a picker's keys have no id: View.NO_ID, the same -1 as a scene's viewId
+        assertEquals(KeyRef.NO_VIEW, KeyRef.view(-1).viewId)
+        assertFalse(KeyRef.view(-1).isScene)
+        assertFalse(KeyRef.view(42).isScene)
+        assertTrue(KeyRef.scene("q", 0).isScene)
+        assertTrue(KeyRef.scene("g", 1).isScene)
     }
 
     @Test

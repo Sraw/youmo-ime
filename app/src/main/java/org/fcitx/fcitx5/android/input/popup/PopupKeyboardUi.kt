@@ -14,7 +14,6 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupScenes
-import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.engine.PopupKeys
 import splitties.dimensions.dp
 import splitties.views.dsl.core.Ui
@@ -69,12 +68,11 @@ class PopupKeyboardUi(
     private val asIs: Boolean = false,
     inRow: Int = -1,
     private val onFocusMoved: (View) -> Unit = {},
-    scenes: PopupScenes? = null,
+    private val scenes: PopupScenes? = null,
 ) : PopupContainerUi(ctx, theme, outerBounds, triggerBounds, onDismissSelf) {
 
     // the engine's scene of the keys, drawn instead of views: made again as the focus moves
     private val builder = scenes?.builder()
-    private val sceneView = builder?.let { scenes?.view(ctx) }
 
     class PopupKeyUi(override val ctx: Context, val theme: Theme, val text: String) : Ui {
 
@@ -146,7 +144,8 @@ class PopupKeyboardUi(
         groupRows = groups.map { ceil(it.count().toFloat() / columnCount).toInt() }
         rowCount = groupRows.sum()
 
-        sceneKeys = builder?.popupKeys(labels.toList(), columnCount, outerBounds.takeUnless { it.isEmpty }?.width()?.toDouble(), minKeyWidth.toDouble(), keyHeight.toDouble())
+        val room = outerBounds.takeUnless { it.isEmpty }?.width()?.toDouble()
+        sceneKeys = scenes?.made("keys' size", builder?.popupKeys(labels.toList(), columnCount, room, minKeyWidth.toDouble(), keyHeight.toDouble()))
         val padding = ctx.dp(KEY_PADDING)
         val widest = keyUis.maxOfOrNull { it.textView.paint.measureText(it.text) } ?: 0f
         val fitting = ceil(widest).toInt() + 2 * padding
@@ -228,9 +227,16 @@ class PopupKeyboardUi(
 
     private var focusedIndex = keyOrders[focusRow][focusColumn]
 
+    private val sceneView = sceneKeys?.let { made(it, focusedIndex) }?.let { first -> scenes?.view(ctx)?.also { it.scene = first } }
+
+    /**
+     * The engine's, and it could not make the keys (logged): nothing to show, the long press as one
+     * with no popup, never keys not drawn that a lift would still type (no views either: they go).
+     */
+    val unmade: Boolean get() = builder != null && sceneView == null
+
     init {
         markFocus(focusedIndex)
-        drawScene()
     }
 
     override val root: View = sceneView ?: verticalLayout root@{
@@ -251,9 +257,14 @@ class PopupKeyboardUi(
     }
 
     // the keys in rows as keyOrders has them, the bottom first, the one in focus selected
-    private fun drawScene() {
-        val keys = sceneKeys ?: return
-        sceneView?.scene = (builder?.popup(labels.toList(), keyOrders.map { it.toList() }, keys, focusedIndex) as? Parsed.Ok)?.value
+    private fun made(keys: PopupKeys, focus: Int) = scenes?.made("keys", builder?.popup(labels.toList(), keyOrders.map { it.toList() }, keys, focus))
+
+    // the focus to move to [focus]: the scene made again; false where it could not be, the one before
+    // kept and the focus with it, so a lift types the key drawn selected
+    private fun drawScene(focus: Int): Boolean {
+        val view = sceneView ?: return true
+        view.scene = made(sceneKeys ?: return false, focus) ?: return false
+        return true
     }
 
     private fun markFocus(index: Int) {
@@ -288,11 +299,10 @@ class PopupKeyboardUi(
             onDismissSelf(this)
             return true
         }
-        if (newFocus != focusedIndex) {
+        if (newFocus != focusedIndex && drawScene(newFocus)) {
             markInactive(focusedIndex)
             markFocus(newFocus)
             focusedIndex = newFocus
-            drawScene()
             onFocusMoved(root)
         }
         return false

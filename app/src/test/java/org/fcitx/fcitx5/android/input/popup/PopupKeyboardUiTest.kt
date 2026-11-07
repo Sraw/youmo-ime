@@ -455,6 +455,27 @@ class PopupKeyboardUiTest(private val canvas: Boolean) {
         assertEquals(before.keys.map { it.bounds }, ui.scene().keys.map { it.bounds })
     }
 
+    // TalkBack reads each key of the scene, the one in focus selected, as it moves (M2: a basic node
+    // a key, its words and place; the keyboard's whole treatment is S3's)
+    @Test
+    fun talkBackReadsEachKeyOfTheScene() {
+        if (!canvas) return
+        val ui = popup(arrayOf("a", "b", "c"), Rect(480, 500, 520, 550))
+        val view = ui.root as PopupSceneView
+        fun read() = view.spokenKeys().associate { it.contentDescription.toString() to it.isSelected }
+        assertEquals(mapOf("a" to true, "b" to false, "c" to false), read())
+        ui.onChangeFocus(0f, 0f)
+        ui.onChangeFocus(ui.keyWidth * PopupFocus.STEP, 0f)
+        val picked = (ui.onTrigger() as KeyAction.HostKeyAction).act
+        assertEquals(listOf(picked), read().filterValues { it }.keys.toList())
+        // each where it is drawn: its box past the shadow's room
+        val a = ui.scene().keys.first { it.label == "a" }.bounds
+        @Suppress("DEPRECATION")
+        val box = android.graphics.Rect().also { view.spokenKeys().first { n -> n.contentDescription == "a" }.getBoundsInParent(it) }
+        assertEquals(a.left.toInt() + view.outset.left, box.left)
+        assertEquals(a.top.toInt() + view.outset.top, box.top)
+    }
+
     @Test
     fun aKeyOfNoLettersStillHasItsSymbolsFiveARow() {
         // a 1 the user left with its digit alone: its ten symbols two rows of five, not ten of one

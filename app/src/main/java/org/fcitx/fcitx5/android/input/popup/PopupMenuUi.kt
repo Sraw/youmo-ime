@@ -19,7 +19,6 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupScenes
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
-import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.engine.MenuCell
 import org.fcitx.fcitx5.android.scene.engine.Popups
 import org.fcitx.fcitx5.android.input.shortcut.EditMenuLayout
@@ -43,14 +42,13 @@ class PopupMenuUi(
     /** Cells in their own order, [Fixed.start] over the finger: the edit menu's ([EditMenuLayout]). */
     private val fixed: Fixed? = null,
     /** The engine's, to draw the cells as its scene (a key the canvas draws, 060-render-p2 S2), sized by its rules; null, as views. */
-    scenes: PopupScenes? = null,
+    private val scenes: PopupScenes? = null,
 ) : PopupContainerUi(ctx, theme, outerBounds, triggerBounds, onDismissSelf) {
 
     // the engine's scene of the cells, drawn instead of views: made again as the focus moves
     private val builder = scenes?.builder()
-    private val sceneView = builder?.let { scenes?.view(ctx) }
     private val cells = items.map { MenuCell(it.label, if (it.icon == 0) null else SceneIcons.nameOf(it.icon)) }
-    private val sceneKeys = builder?.menuKeys(cells)
+    private val sceneKeys = scenes?.made("menu's size", builder?.menuKeys(cells))
 
     /**
      * A row whose cells stay where they are, the one in focus first [start]; [disabled] ones drawn
@@ -93,6 +91,14 @@ class PopupMenuUi(
 
     private var focusedIndex = columnOrder[focusColumn]
 
+    private val sceneView = sceneKeys?.let { made(focusedIndex) }?.let { first -> scenes?.view(ctx)?.also { it.scene = first } }
+
+    /**
+     * The engine's, and it could not make the cells (logged): nothing to show, the long press as one
+     * with no menu, never cells not drawn that a lift would still pick (no views either: they go).
+     */
+    val unmade: Boolean get() = builder != null && sceneView == null
+
     private val keyViews: List<View> = if (builder != null) emptyList() else items.map {
         if (it.icon == 0) {
             textView {
@@ -118,10 +124,10 @@ class PopupMenuUi(
 
     init {
         markFocus(focusedIndex)
-        drawScene()
     }
 
-    override val root: View = sceneView ?: horizontalLayout root@{
+    // unmade: never shown (PopupComponent), so nothing
+    override val root: View = sceneView ?: if (unmade) View(ctx) else horizontalLayout root@{
         for (i in 0 until columnCount) {
             val view = keyViews[columnOrder[i]]
             add(view, lParams(itemWidth, keySize))
@@ -129,9 +135,14 @@ class PopupMenuUi(
     }
 
     // the cells in their columns' order, the one in focus selected, the disabled faded
-    private fun drawScene() {
-        val b = builder ?: return
-        sceneView?.scene = (b.menu(cells, columnOrder.toList(), focusedIndex, fixed?.disabled.orEmpty()) as? Parsed.Ok)?.value
+    private fun made(focus: Int) = scenes?.made("menu", builder?.menu(cells, columnOrder.toList(), focus, fixed?.disabled.orEmpty()))
+
+    // the focus to move to [focus]: the scene made again; false where it could not be, the one before
+    // kept and the focus with it, so a lift picks the cell drawn selected
+    private fun drawScene(focus: Int): Boolean {
+        val view = sceneView ?: return true
+        view.scene = made(focus) ?: return false
+        return true
     }
 
     private fun markFocus(index: Int) {
@@ -165,11 +176,10 @@ class PopupMenuUi(
             onDismissSelf(this)
             return true
         }
-        if (newFocus != focusedIndex) {
+        if (newFocus != focusedIndex && drawScene(newFocus)) {
             markInactive(focusedIndex)
             markFocus(newFocus)
             focusedIndex = newFocus
-            drawScene()
             onFocusMoved(root)
         }
         return false

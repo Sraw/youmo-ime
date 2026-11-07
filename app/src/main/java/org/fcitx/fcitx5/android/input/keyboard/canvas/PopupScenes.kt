@@ -8,18 +8,30 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Rect
+import android.os.Bundle
+import android.view.MotionEvent
 import android.view.View
+import androidx.annotation.VisibleForTesting
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
+import androidx.customview.widget.ExploreByTouchHelper
 import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.scene.CanvasFrame
+import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Box
+import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
+import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
+import timber.log.Timber
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.roundToInt
 
 /**
  * The popups of the keys the canvas draws, drawn by the engine too (060-render-p2 S2): [theme] as the
@@ -27,10 +39,15 @@ import kotlin.math.floor
  * environment the keyboard is in now ([view]'s: landscape, 紧凑, floating, dark, flat), so its
  * looks are the keyboard's. A popup asks [builder] for each scene (a focus moved is a new one).
  */
-class PopupScenes(private val view: View, private val theme: Theme) {
+class PopupScenes(
+    private val view: View,
+    private val theme: Theme,
+    /** The text measured through this: a test's, to make the engine fail. */
+    @VisibleForTesting measuring: (TextMeasurer) -> TextMeasurer = { it },
+) {
     private val look = ThemeManager.shownLook(theme)
     private val fonts = SceneFonts(look)
-    private val measurer = AndroidTextMeasurer(fonts)
+    private val measurer = measuring(AndroidTextMeasurer(fonts))
     private val sceneTheme = SceneThemes.of(look, theme.name, theme.isDark)
 
     /** Whether the theme converted: its popups drawn as scenes. */
@@ -40,6 +57,16 @@ class PopupScenes(private val view: View, private val theme: Theme) {
     fun builder(): SceneBuilder? = sceneTheme?.let {
         val env = SceneEnvs.of(view, look, theme.isDark, view.width, view.height, Input())
         SceneBuilder(it, env, measurer, cascades = SceneThemes.cascades(it))
+    }
+
+    /**
+     * What [made] made of [what]; a failure logged and null, the popup then its views (a new one) or
+     * the scene it had (a focus moved): a popup the engine could not make is never one not drawn.
+     */
+    fun <T> made(what: String, made: Parsed<T>?): T? = when (made) {
+        is Parsed.Ok -> made.value
+        is Parsed.Failed -> null.also { Timber.w("popup %s not made: %s", what, made.problems) }
+        null -> null
     }
 
     /** px a dp, as the scenes are made in. */
@@ -52,18 +79,26 @@ class PopupScenes(private val view: View, private val theme: Theme) {
 /**
  * A popup's [scene] drawn ([ScenePainter]): its size the scene's and [outset] round it, where its
  * shadow reaches (a view draws nothing outside itself; theme 3.0's elevation shadow was the
- * renderer's). Placed [outset] up and left of where the popup is.
+ * renderer's). Placed [outset] up and left of where the popup is. TalkBack reads its keys as it
+ * read the views' (their text or description): one virtual node a key, the one in focus selected.
  */
 @SuppressLint("ViewConstructor")
 class PopupSceneView internal constructor(context: Context, painter: (View) -> ScenePainter) : View(context) {
 
     private val painter = painter(this)
 
+    private val speech = Speech()
+
+    init {
+        ViewCompat.setAccessibilityDelegate(this, speech)
+    }
+
     /** How far past the scene's box what it draws reaches, each side, px. */
     val outset = Rect()
 
     var scene: Scene? = null
         set(value) {
+            val before = Rect(outset)
             val resized = value?.width != field?.width || value?.height != field?.height
             field = value
             outset.setEmpty()
@@ -73,9 +108,10 @@ class PopupSceneView internal constructor(context: Context, painter: (View) -> S
                 val e = CanvasFrame.extent(Box(0.0, 0.0, value.width, value.height), ops, EDGE_PX)
                 outset.set(ceil(-e.left).toInt().coerceAtLeast(0), ceil(-e.top).toInt().coerceAtLeast(0), ceil(e.right - value.width).toInt().coerceAtLeast(0), ceil(e.bottom - value.height).toInt().coerceAtLeast(0))
             }
-            // a focus moved draws again, its size the same
-            if (resized) requestLayout()
+            // a focus moved draws again, its size the same; its shadow's reach is its size too
+            if (resized || outset != before) requestLayout()
             invalidate()
+            speech.invalidateRoot()
         }
 
     /** The scene's size in whole px (the engine's are). */
@@ -93,6 +129,54 @@ class PopupSceneView internal constructor(context: Context, painter: (View) -> S
         painter.draw(canvas, s.base)
         s.keys.forEach { painter.draw(canvas, it.ops(false)) }
         canvas.restore()
+    }
+
+    override fun dispatchHoverEvent(event: MotionEvent): Boolean = speech.dispatchHoverEvent(event) || super.dispatchHoverEvent(event)
+
+    // a basic node a key (060-render-p2 S2): its words, where it is, selected and enabled as drawn; the
+    // keyboard's whole treatment (actions, states as its views') is S3's
+    private inner class Speech : ExploreByTouchHelper(this) {
+        override fun getVirtualViewAt(x: Float, y: Float): Int {
+            val keys = scene?.keys ?: return INVALID_ID
+            val at = keys.indexOfFirst { spoken(it) && it.bounds.contains(x.toDouble() - outset.left, y.toDouble() - outset.top) }
+            return if (at < 0) INVALID_ID else at
+        }
+
+        override fun getVisibleVirtualViews(virtualViewIds: MutableList<Int>) {
+            scene?.keys?.forEachIndexed { i, k -> if (spoken(k)) virtualViewIds += i }
+        }
+
+        override fun onPopulateNodeForVirtualView(virtualViewId: Int, node: AccessibilityNodeInfoCompat) {
+            val k = scene?.keys?.getOrNull(virtualViewId)
+            val b = k?.bounds
+            // asked of a key gone with the last scene: a node there must still have bounds and words
+            node.contentDescription = k?.let(::words).orEmpty()
+            node.text = k?.label.orEmpty()
+            @Suppress("DEPRECATION")
+            node.setBoundsInParent(
+                if (b == null) Rect() else Rect(
+                    b.left.roundToInt() + outset.left, b.top.roundToInt() + outset.top,
+                    b.right.roundToInt() + outset.left, b.bottom.roundToInt() + outset.top,
+                ),
+            )
+            node.isSelected = k != null && KeyState.Selected in k.states
+            node.isEnabled = k != null && KeyState.Disabled !in k.states
+        }
+
+        // picked as the finger lifts (PopupComponent), as the views' were: nothing done here
+        override fun onPerformActionForVirtualView(virtualViewId: Int, action: Int, arguments: Bundle?): Boolean = false
+    }
+
+    // a key's words for TalkBack: the scene's (a menu's item's name), else its label; none, not read
+    private fun words(k: KeyNode): String? = (k.a11y ?: k.label)?.takeIf { it.isNotEmpty() }
+
+    private fun spoken(k: KeyNode) = words(k) != null
+
+    /** The nodes TalkBack has for the keys read out, as its provider makes them: for tests. */
+    @VisibleForTesting
+    fun spokenKeys(): List<AccessibilityNodeInfoCompat> {
+        val provider = speech.getAccessibilityNodeProvider(this) ?: return emptyList()
+        return scene?.keys.orEmpty().indices.filter { spoken(scene!!.keys[it]) }.mapNotNull { provider.createAccessibilityNodeInfo(it) }
     }
 
     private companion object {
