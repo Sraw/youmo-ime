@@ -180,7 +180,7 @@ class VoiceSession(
         if (!over && stopped) listener?.cut()
     }
 
-    /** Dropped, whatever was heard and not typed yet: another field, the keyboard gone, the touch taken away, ×. */
+    /** Dropped, whatever was heard and not typed yet: another field, the keyboard gone, the touch taken away. */
     fun drop() = end(null)
 
     /**

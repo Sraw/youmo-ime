@@ -9,12 +9,13 @@ import android.graphics.Canvas
 import android.graphics.ColorFilter
 import android.graphics.Paint
 import android.graphics.PixelFormat
-import android.graphics.Rect
 import android.graphics.drawable.Drawable
+import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
 import androidx.annotation.VisibleForTesting
 import androidx.core.view.doOnPreDraw
+import timber.log.Timber
 
 /**
  * The mask's frosted glass (the user's decision 2026-11-07): the keys under it blurred, only their
@@ -27,18 +28,20 @@ import androidx.core.view.doOnPreDraw
 class VoiceGlass(color: Int) : Drawable() {
     private var shot: Bitmap? = null
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
-    private val fill = Paint().apply { this.color = color }
+    private val fill = Paint()
 
-    var color: Int
-        get() = fill.color
+    // nothing taken (it could not be drawn): the mask opaque, the keys not seen through it plain
+    private var failed = false
+
+    var color: Int = color
         set(value) {
-            fill.color = value
+            field = value
             invalidateSelf()
         }
 
     /** Once [card], a child of [board], is laid out: what is under it taken; freed as it goes. */
     fun under(card: View, board: ViewGroup) {
-        card.doOnPreDraw { shot = capture(board, card)?.also { invalidateSelf() } }
+        card.doOnPreDraw { take(board, card) }
         card.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
             override fun onViewAttachedToWindow(v: View) = Unit
 
@@ -47,6 +50,15 @@ class VoiceGlass(color: Int) : Drawable() {
                 shot = null
             }
         })
+    }
+
+    @VisibleForTesting
+    internal fun take(board: ViewGroup, card: View) {
+        val start = SystemClock.elapsedRealtimeNanos()
+        shot = capture(board, card)
+        failed = shot == null
+        Timber.d("voice glass %d×%d taken and blurred in %.2f ms", card.width, card.height, (SystemClock.elapsedRealtimeNanos() - start) / 1e6)
+        invalidateSelf()
     }
 
     override fun draw(canvas: Canvas) {
@@ -59,6 +71,7 @@ class VoiceGlass(color: Int) : Drawable() {
             canvas.drawBitmap(it, 0f, 0f, paint)
             canvas.restore()
         }
+        fill.color = if (failed) color or OPAQUE else color
         canvas.drawRect(b, fill)
     }
 
@@ -81,11 +94,13 @@ class VoiceGlass(color: Int) : Drawable() {
         @VisibleForTesting
         internal fun small(size: Int) = (size + SCALE - 1) / SCALE
 
-        /** Where [board]'s point ([x], [y]) is in the small picture of [card]: its own place taken away, then scaled. */
-        @VisibleForTesting
-        internal fun toSmall(card: Rect, x: Float, y: Float) = floatArrayOf((x - card.left) / SCALE, (y - card.top) / SCALE)
+        private const val OPAQUE = 0xFF shl 24
 
-        /** [board] under [card] (the card itself left out), small and blurred; null where it cannot be drawn. */
+        /**
+         * [board] under [card], small and blurred; null where it cannot be drawn. Drawn as the board
+         * draws itself, its children's alpha, clips and transforms with it: the card is taken before
+         * its first frame, at alpha 0, so left out; a mask still fading out is taken as seen.
+         */
         @VisibleForTesting
         internal fun capture(board: ViewGroup, card: View): Bitmap? {
             val w = small(card.width)
@@ -97,16 +112,7 @@ class VoiceGlass(color: Int) : Drawable() {
             canvas.translate(-card.left.toFloat(), -card.top.toFloat())
             @Suppress("TooGenericExceptionCaught", "SwallowedException")
             try {
-                board.background?.draw(canvas)
-                for (i in 0 until board.childCount) {
-                    val child = board.getChildAt(i)
-                    if (child === card || child.visibility != View.VISIBLE) continue
-                    canvas.save()
-                    canvas.translate(child.left.toFloat(), child.top.toFloat())
-                    canvas.concat(child.matrix)
-                    child.draw(canvas)
-                    canvas.restore()
-                }
+                board.draw(canvas)
             } catch (e: RuntimeException) {
                 // a hardware bitmap somewhere under it (a software canvas cannot draw one): the plain mask
                 bitmap.recycle()

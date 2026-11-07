@@ -718,9 +718,8 @@ def vo28_try(d):
     enter = enters[0]
     d.say("zouba")
     time.sleep(0.3)
-    # stopped on the mask (its middle, above the hint), then the tail and the rest recognized, the mask gone
-    cx, cy = hint.c
-    d.tap((ex_mid(s), cy - 150), 0.1)
+    # stopped on the mask (its hint), then the tail and the rest recognized, the mask gone
+    d.tap(hint.c, 0.1)
     time.sleep(3)
     ex, ey = enter.c
     d.touch(("down", ex, ey), ("sleep", 0.05), ("up", ex, ey))
