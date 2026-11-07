@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.engine.TextMetrics
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
+import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import timber.log.Timber
@@ -152,16 +153,34 @@ object SceneLayouts {
     }
 }
 
-/** A theme 3.0 look as the engine's theme ([LookTheme]), made once for each look. */
+/**
+ * A theme 3.0 look as the engine's theme ([LookTheme]), and its [Cascades], kept for the last
+ * [KEPT] looks (main thread). A theme switched back to (day and night, the settings' preview and
+ * back) is not read and matched again: each switch rebuilds the input view, and the 700 KiB a theme
+ * read and its first scene's matching allocate were what made the canvas's switch wait for a GC.
+ */
 object SceneThemes {
-    private var made: Pair<Triple<ThemeLook, String, Boolean>, Theme>? = null
+    private const val KEPT = 4
+
+    private class Made(val theme: Theme) {
+        val cascades = Cascades(theme)
+    }
+
+    // in the order last asked for, the oldest first
+    private val made = LinkedHashMap<Triple<ThemeLook, String, Boolean>, Made>(KEPT, 0.75f, true)
 
     fun of(look: ThemeLook, name: String, dark: Boolean): Theme? {
         val key = Triple(look, name, dark)
-        made?.takeIf { it.first == key }?.let { return it.second }
+        made[key]?.let { return it.theme }
         return when (val t = ThemeReader.theme(LookTheme.xml(look, name, dark))) {
-            is Parsed.Ok -> t.value.also { made = key to it }
+            is Parsed.Ok -> t.value.also {
+                made[key] = Made(it)
+                if (made.size > KEPT) made.remove(made.keys.first())
+            }
             is Parsed.Failed -> null.also { Timber.e("scene theme $name: ${t.problems}") }
         }
     }
+
+    /** [theme]'s cascades, [of]'s theme kept; a theme not kept (none [of] made), new ones. */
+    fun cascades(theme: Theme): Cascades = made.values.firstOrNull { it.theme === theme }?.cascades ?: Cascades(theme)
 }

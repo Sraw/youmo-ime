@@ -21,6 +21,7 @@ import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.OnSplit
 import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
+import org.fcitx.fcitx5.android.scene.theme.Cascade
 import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.KeyLook
 import org.fcitx.fcitx5.android.scene.theme.Selector
@@ -159,12 +160,19 @@ class SceneBuilder(
         val parts: Map<Set<KeyState>, (Part) -> TextLook>,
     )
 
+    // what a key's looks are worked out from: the same in the next scene, its looks kept by the cascade
+    private data class StyledFor(val board: String, val id: String, val role: String?, val classes: Set<String>, val states: Set<KeyState>)
+
     private fun styled(board: String, key: ExpandedKey): Styled {
         val c = if (key.attrs.face == Face.Keep) unflat else cascade
         val states = statesOf(key)
+        val classes = setOf(key.kind) + key.attrs.classes.orEmpty()
+        return c.kept(StyledFor(board, key.key.id, key.attrs.role, classes, states)) { styled(c, board, key, classes, states) }
+    }
+
+    private fun styled(c: Cascade, board: String, key: ExpandedKey, classes: Set<String>, states: Set<KeyState>): Styled {
         val looks = HashMap<Set<KeyState>, KeyLook>()
         val parts = HashMap<Set<KeyState>, (Part) -> TextLook>()
-        val classes = setOf(key.kind) + key.attrs.classes.orEmpty()
         for (s in listOf(states, states + KeyState.Pressed)) {
             // the key's target once a state, its parts the same but the part's name
             val whole = Selector.Target("key", board, key.key.id, key.attrs.role, classes, s.mapTo(HashSet()) { it.xml })

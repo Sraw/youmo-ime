@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name_release">Youmo IME</string>
     <string name="app_name_debug">Youmo IME (Debug)</string>
+    <string name="app_name_bench">Youmo IME (Bench)</string>
     <string name="input_methods">Input Methods</string>
     <string name="advanced">Advanced</string>
     <string name="ignore_sys_cursor">Ignore system cursor position</string>

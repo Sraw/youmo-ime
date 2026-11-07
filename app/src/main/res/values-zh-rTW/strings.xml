@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name_release">幽默輸入法</string>
     <string name="app_name_debug">幽默輸入法 (除錯)</string>
+    <string name="app_name_bench">幽默輸入法 (測速)</string>
     <string name="input_methods">輸入法</string>
     <string name="advanced">進階</string>
     <string name="ignore_sys_cursor">忽略系統游標位置</string>

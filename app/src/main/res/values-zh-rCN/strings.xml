@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name_release">幽默输入法</string>
     <string name="app_name_debug">幽默输入法 (调试)</string>
+    <string name="app_name_bench">幽默输入法 (测速)</string>
     <string name="input_methods">输入法</string>
     <string name="advanced">高级</string>
     <string name="ignore_sys_cursor">忽略系统光标位置</string>

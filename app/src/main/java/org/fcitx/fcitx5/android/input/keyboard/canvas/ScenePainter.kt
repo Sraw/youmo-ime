@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard.canvas
 
+import android.content.res.Configuration
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.LinearGradient
@@ -61,7 +62,6 @@ class ScenePainter(
     private val path = Path()
     private val rect = RectF()
     private val src = Rect()
-    private val icons = HashMap<IconKey, Drawable?>()
 
     // an icon's drawable by what it is drawn as, not where: one a size, drawn moved to its place
     private data class IconKey(val name: String, val tint: Int, val width: Int, val height: Int)
@@ -226,6 +226,11 @@ class ScenePainter(
         val top = b.top.roundToInt()
         val w = b.right.roundToInt() - left
         val h = b.bottom.roundToInt() - top
+        val config = view.resources.configuration
+        if (config != iconsUnder || icons.size > KEPT_ICONS) {
+            icons.clear()
+            iconsUnder = Configuration(config)
+        }
         val d = icons.getOrPut(IconKey(op.name, op.tint.value, w, h)) {
             SceneIcons.of(op.name)?.let { ContextCompat.getDrawable(view.context, it)?.mutate() }?.also {
                 it.setTint(op.tint.value)
@@ -241,5 +246,11 @@ class ScenePainter(
 
     private companion object {
         const val RADII = 8
+        private const val KEPT_ICONS = 256
+
+        // the icons drawn, every painter's (main thread): a keyboard made again (a theme switched) inflates
+        // none again; let go when the configuration they were inflated under changes (night, density)
+        private val icons = HashMap<IconKey, Drawable?>()
+        private var iconsUnder: Configuration? = null
     }
 }

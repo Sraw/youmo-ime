@@ -226,4 +226,39 @@ class ThemeTest {
         assertEquals(1.0, TextLook(c.of(q.copy(part = "label")), t).scale)
         assertEquals(false, TextLook(c.of(q.copy(part = "label")), t).hidden)
     }
+    // Cascade.of keeps a target by its general form, a key no selector names as any key: what it gives
+    // must be what a cascade keeping nothing would, whatever was asked before
+    @Test
+    fun keptLooksAreEachKeysOwn() {
+        val t = ThemeReader.theme(
+            withStyle(
+                "<style select=\"qwerty/q\" fill=\"#00ff00\"/>\n" +
+                    "<style select=\"@flat qwerty/w\" radius=\"7dp\"/>\n" +
+                    "<style select=\"qwerty/e label\" color=\"#123456\"/>",
+            ),
+        ).ok()
+        fun key(name: String, part: String? = null) = Selector.Target("key", "qwerty", name, null, setOf("letter"), emptySet(), part)
+        val asked = listOf(key("a"), key("q"), key("w"), key("e"), key("a", "label"), key("e", "label"), key("q", "label"), key("w", "mark"))
+        for (scene in listOf(emptySet(), setOf("flat"))) {
+            val c = Cascade(t, scene)
+            // asked in one order and the other, each against a cascade that has seen nothing
+            val one = asked.associateWith { c.of(it) }
+            val other = Cascade(t, scene).let { o -> asked.reversed().associateWith { o.of(it) } }
+            for (k in asked) {
+                val fresh = Cascade(t, scene).of(k)
+                assertEquals(fresh, one[k], "$k in $scene")
+                assertEquals(fresh, other[k], "$k in $scene, the other order")
+            }
+            // a named key and an unnamed one mixed: q's fill is q's alone
+            assertEquals(Fill.Solid(ColorExpr.Literal(Argb(0xFF00FF00.toInt()))), KeyLook(c.of(key("q")), t).fill)
+            assertEquals(KeyLook(c.of(key("a")), t).fill, KeyLook(c.of(key("r")), t).fill)
+            // named only under @flat: w is any letter elsewhere
+            val wRadius = KeyLook(c.of(key("w")), t).radius.corners.first()
+            if ("flat" in scene) assertEquals(7.0, wRadius) else assertEquals(KeyLook(c.of(key("a")), t).radius, KeyLook(c.of(key("w")), t).radius)
+            // one key's part overridden: e's label, not a's nor q's
+            assertEquals(Argb(0xFF123456.toInt()), TextLook(c.of(key("e", "label")), t).color)
+            assertEquals(TextLook(c.of(key("a", "label")), t).color, TextLook(c.of(key("q", "label")), t).color)
+            assertTrue(TextLook(c.of(key("a", "label")), t).color != Argb(0xFF123456.toInt()))
+        }
+    }
 }

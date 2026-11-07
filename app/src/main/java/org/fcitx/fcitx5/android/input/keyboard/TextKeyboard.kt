@@ -59,7 +59,6 @@ import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.engine.section
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard as SceneSplit
-import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.Theme as SceneTheme
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
@@ -93,9 +92,16 @@ class TextKeyboard private constructor(
     companion object {
         const val Name = "Text"
 
-        // the scene theme's cascades (main thread), kept a process as SceneThemes keeps the theme: a
-        // keyboard made again (each setting that rebuilds the input view) matches no style anew
-        private var cascades: Cascades? = null
+        // kept a process (main thread), as SceneThemes keeps the themes, for a keyboard made again (each
+        // theme switch builds the input view): a look's measurer and the last KEPT_SCENES scenes made, so
+        // a theme switched back to makes no scene again and measures no text again; what a switch allocates
+        // more than the views' decides whether a GC stops its first frame (specs/app.md)
+        private const val KEPT_SCENES = 4
+        private val measurers = LinkedHashMap<ThemeLook, AndroidTextMeasurer>(KEPT_SCENES, 0.75f, true)
+        private val scenesKept = ArrayDeque<Made>()
+
+        private fun measurer(look: ThemeLook): AndroidTextMeasurer = measurers.getOrPut(look) { AndroidTextMeasurer(SceneFonts(look)) }
+            .also { if (measurers.size > KEPT_SCENES) measurers.remove(measurers.keys.first()) }
 
         /** Whether the letters are split here: as the setting is, the screen as wide as it is now; floating, never. */
         fun splits(context: Context): Boolean {
@@ -336,12 +342,14 @@ class TextKeyboard private constructor(
         keyViews.values.flatten().forEach { it.onPressedChanged = null }
         keyRows.forEach { it.visibility = View.VISIBLE }
         removeView(view)
+        // laid out again: the letters settled (BaseKeyboard.onLayout) now the views draw them
+        requestLayout()
     }
 
     private fun canvasView(): KeyboardCanvasView {
         val look = ThemeManager.shownLook(theme)
         val fonts = SceneFonts(look)
-        val measurer = AndroidTextMeasurer(fonts)
+        val measurer = measurer(look)
         return KeyboardCanvasView(context, look, keyImages, fonts, object : KeyboardCanvasView.Host {
             override fun scene(width: Int, height: Int) = scene(look, measurer, width, height)
             override fun keyView(node: KeyNode) = keyViews[node.id]?.let { it.getOrNull(node.copy) ?: it.firstOrNull() }
@@ -360,12 +368,14 @@ class TextKeyboard private constructor(
         val env = SceneTrace.section("env") { env(look, layout, width, height) }
         // the same values make the same scene: one asked again for nothing that shows (the first key typed,
         // the word committed: Return's look unchanged) is the last one, not made again in the frame
-        made?.takeIf { it.theme === sceneTheme && it.layout === layout && it.measurer === measurer && it.env == env }?.let { return it.scene }
+        scenesKept.lastOrNull { it.theme === sceneTheme && it.layout === layout && it.measurer === measurer && it.env == env }?.let { return it.scene }
         scenesMade++
         // the theme's looks worked out for the last scene kept for the next: Shift's makes only what it changed
-        val kept = cascades?.takeIf { it.theme === sceneTheme } ?: Cascades(sceneTheme).also { cascades = it }
-        return when (val built = SceneBuilder(sceneTheme, env, measurer, phases = SceneTrace, cascades = kept).build(layout, emptyMap())) {
-            is Parsed.Ok -> built.value.also { made = Made(sceneTheme, layout, measurer, env, it) }
+        return when (val built = SceneBuilder(sceneTheme, env, measurer, phases = SceneTrace, cascades = SceneThemes.cascades(sceneTheme)).build(layout, emptyMap())) {
+            is Parsed.Ok -> built.value.also {
+                scenesKept.addLast(Made(sceneTheme, layout, measurer, env, it))
+                if (scenesKept.size > KEPT_SCENES) scenesKept.removeFirst()
+            }
             is Parsed.Failed -> null.also { Timber.e("keyboard canvas: the engine refused the scene: %s", built.problems) }
         }
     }
@@ -433,17 +443,15 @@ class TextKeyboard private constructor(
 
     private class Made(val theme: SceneTheme, val layout: Layout, val measurer: TextMeasurer, val env: Env, val scene: Scene)
 
-    private var made: Made? = null
-
     /** The scenes the engine made for this keyboard: a test's count of what was not kept. */
     @VisibleForTesting
     var scenesMade = 0
         private set
 
-    /** The scene kept let go, the next asked made anew as things are: a measure of what making one costs (KeyboardPerfBaselineTest). */
+    /** The scenes kept let go, the next asked made anew as things are: a measure of what making one costs (KeyboardPerfBaselineTest). */
     @VisibleForTesting
     fun forgetScene() {
-        made = null
+        scenesKept.clear()
         canvas?.invalidateScene()
     }
 

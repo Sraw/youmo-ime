@@ -327,8 +327,12 @@ changing with the composing (Done to Enter) still does. `AndroidTextMeasurer` ke
 texts it measured (text, font, weight, size), so a scene made again measures only what is new.
 The theme's styles matched to a key (`Cascade.of`) are kept by target, a key no selector names
 as one with no key (the 26 letters share theirs), with what it inherits; `Cascades` keeps a theme's
-cascade by its scenes (`flat` and not), and `TextKeyboard` keeps the theme's `Cascades` a process
-(main thread), so neither a scene made again nor a keyboard made again matches a style anew.
+cascade by its scenes (`flat` and not), and a cascade keeps the looks the builder worked out of it for
+a key (`Cascade.kept`: by board, id, role, classes and states). Kept a process too (main thread), for
+a keyboard made again (each theme switch builds the input view): `SceneThemes` the last 4 themes read
+and their `Cascades`, `TextKeyboard` a look's `AndroidTextMeasurer` and the last 4 scenes made,
+`ScenePainter` the icons it inflated (let go when the configuration changes). A theme switched back to
+reads, matches, measures and builds nothing again.
 Systrace sections: `scene` (the view asking), in it `theme`, `env`, and the builder's phases
 (`expand`, `place`, `cascade.of`, `faces`, `content`, `paint`; `Phases`, `SceneTrace`), `measure
 text` under them. `BaseKeyboard` intercepts every touch as the vivo workaround
@@ -379,37 +383,44 @@ other way). Fixing them means pixel rules for text in the engine, left to P2's t
 What it costs (`KeyboardPerfBaselineTest`, 060-render-perf §4; `perfCanvas=true|false` the
 switch): the benchmark build (specs/testing.md: R8, not debuggable), youmo29: Android 10 (API 29),
 "Android SDK built for arm64" emulator, `-gpu host`, one session on 2026-11-07, 20 runs after 3
-warm-ups, views then canvas, four such pairs; median / p90 ms, the pairs' medians as a range. Typing
-is from the window's receipt of the touch to the frame done; the rest from the action to its frame.
+warm-ups, views then canvas, two such pairs; median / p90 ms, the pairs' as a range. Typing is from
+the window's receipt of the touch to the frame done; the rest from the action to its frame.
 
 | | views (off) | canvas (on) | 060-render-perf's bound |
 |---|---|---|---|
-| a key pressed | 19.5-20.6 / 21.1-22.1 | 18.8-21.3 / 20.7-23.5 | met in each pair |
-| ten keys, each | 18.9-20.0 / 21.0-21.9 | 19.2-19.5 / 21.0-21.7 | met |
-| ten keys in a send field (Return's label kept), each | 18.6-19.8 / 20.9-22.2 | 18.8-19.7 / 20.5-21.5 | met |
-| Shift tapped | 23.7-24.9 / 26.3-27.8 | 25.2-26.2 / 27.7-28.6 | met (+4 to +7%) |
-| the 26 keys built and shown | 58.7-61.7 / 70.2-73.8 | 58.4-63.6 / 66.9-69.4 | met |
-| a theme switched to flat (block to flat, to flat with a picture) | 40.3-43.6 / 42.7-46.6 | 61.1-63.2 / 64.7-67.2 | **over**: +41 to +57% |
-| a theme switched to block (flat to block, flat with a picture to block) | 67.5-69.6 / 69.8-70.8 | 60.7-63.9 / 63.5-66.7 | met (-6 to -10%) |
-| a scene made anew (Shift, a theme), timed alone | | 1.42-1.60 / 1.78-2.38 | |
-| a scene asked again, nothing changed (pinyin's first key) | | 0.29-0.35 / 0.42-0.51 | |
+| a key pressed | 19.6-19.7 / 20.5-22.3 | 19.1-19.3 / 20.2-21.1 | met |
+| ten keys, each | 19.7-19.9 / 21.3-21.9 | 19.1-19.2 / 20.9-21.4 | met |
+| ten keys in a send field (Return's label kept), each | 19.6-19.9 / 21.3-21.9 | 19.0-19.5 / 21.4 | met |
+| Shift tapped | 24.5-24.8 / 26.9 | 24.6-25.3 / 27.2-28.2 | met (+0 to +2%) |
+| the 26 keys built and shown | 50.1-58.0 / 66.1-71.0 | 63.5-63.8 / 68.9-69.8 | p90 met; median +9% and **+27%** |
+| a theme switched to flat (block to flat, to flat with a picture) | 40.6-45.1 / 67.3-73.4 | 50.5-67.9 / 69.4-70.7 | p90 met; median **over** (+24 to +55%) |
+| a theme switched to block (flat to block, flat with a picture to block) | 64.6-68.0 / 69.0-71.0 | 40.1-41.7 / 64.9-69.1 | met (-35 to -41%) |
+| a theme switched, the four medians' mean | 54.6-55.0 | 49.5-53.6 | |
+| a scene made anew (Shift, a theme), timed alone | | 1.57-1.81 / 2.03-2.62 | |
+| a scene asked again, nothing changed (pinyin's first key) | | 0.28-0.35 / 0.37-0.44 | |
 
-The theme rows are the last two pairs: in the first two a theme's frame was taken once the keyboard's
-frame showed, before its keys were in it (now `shows`, as a build's), and the views' were bimodal.
-Each switch builds the input view anew. With the views the frame is done 40 ms after a switch to a
-flat theme and 68 after one to a block theme (the keys measured in an earlier traversal, the main
-thread busy the frame's whole length all the same); with the canvas both are 61-64, the 26 keys'
-first measure in the shown frame (its layout 33.5 ms, the views' to flat 21.5). Until that is found
-(systrace of the switch with sections in `BaseKeyboard.onMeasure`: the canvas's frames measured the
-keyboard 7.5 times a frame, the views' 5.2), the switch stays off: everything else is within the
-bounds. A theme switch is a setting changed, not typing; averaged over the two directions the canvas
-is 62 ms to the views' 55.
+A theme switch is bimodal in both, about 40 or about 68 ms, and which direction is the fast one is
+the GC's phase, not the look's: the views' fast direction was to block in one pair of the session and
+to flat in the other three; the canvas's, once kept (the last two pairs), the opposite of the views' in
+the same pair. Each switch builds
+the input view anew, some 5.6 MB allocated with the views; a concurrent GC every ~2.8 MB, and when one
+is still running as the main thread allocates, the main thread waits for it ("GC: Wait For Completion
+Alloc", 20-32 ms in systrace with `dalvik`), in whichever traversal it falls: the views' "9 keys
+measured in 29.7 ms one run and 5.8 the next" were such waits, not measuring. Before the switches'
+keeping (SceneThemes' 4 themes, the cascades' looks, the scenes, the measurer, the icons) the canvas
+allocated 6.5 MB a switch, 2.0 GCs a switch against the views' 1.25-1.75, and a
+wait before every switch's first frame: 60-64 ms both ways, the views' 26-29 one way and 68 the other.
+Kept, a switch back allocates what the views' does, and the canvas is bimodal as the views are. The
+bound is met at p90 in every direction and by the mean of the two; the median of one direction is
+whichever the GC landed on. The extra measures first suspected are not there: the keyboard's measure
+specs are EXACTLY 1080×662 in both (the canvas's `lParams(0, 0)` with four constraints included; 968
+and 960 measures of `TextKeyboard` in one trace of each), its measure 0.5-1.7 ms; the 25 ms "measure"
+was a GC wait inside it.
 
-The 26 keys' layout, 4.6 ms with the views and 22 with the canvas in the first debug measurements, is
-not the canvas's: the new keyboard's first measure (25 ms in systrace, the same in both: its KeyViews,
-INVISIBLE or not, measured as before, the canvas's own measure 0.0) falls in the shown frame or in an
-earlier one from one run to the next (the views' 9 keys, no canvas at all, measured 29.7 one run and
-5.8 the next), so the frame's layout is bimodal; the frame done, its sum, is within the bounds.
+The 26 keys built and shown: the canvas 63-65 in every pair of the session (58-64 in the session
+before), the views 49-60 from pair to pair. Not the canvas's drawing: in canvas mode every keyboard
+built (9, 14 and 18 keys, 注音, none of which the canvas draws) is 61-65, the views' 47-64, and the 26
+keys' layout is a GC wait (33.5 ms) in both. Left with the default off.
 
 In systrace on the benchmark build (`atrace -a io.github.sraw.youmo.bench view`) a scene made anew is
 0.79 ms at the median (`cascade.of` 0.06, `content` 0.14, `paint` 0.15, `measure text` 0.06), one

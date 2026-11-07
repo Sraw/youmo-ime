@@ -203,7 +203,9 @@ a settings page, rotation, a field type, an upgrade) is tried on a device before
 - Performance numbers are taken on the **benchmark** build type, not debug: release's R8, not
   debuggable (a debuggable app runs its code interpreted and JIT'd differently, its frames up to
   twice as slow and noisier), signed with the debug key, id `io.github.sraw.youmo.bench`, with debug's
-  typing host (`TypingHostActivity`). Instrumentation runs against it as against debug (same key):
+  typing host (`TypingHostActivity`); the text flavor only (`textBenchmark`: the voice build's models are
+  no part of what is timed, and its variant is not set up), no unit tests of its own. Instrumentation
+  runs against it as against debug (same key):
   `./gradlew :app:connectedTextBenchmarkAndroidTest -Pyoumo.testBuildType=benchmark
   -Pandroid.testInstrumentationRunnerArguments.class=org.fcitx.fcitx5.android.input.KeyboardPerfBaselineTest
   -Pandroid.testInstrumentationRunnerArguments.perfRuns=20 -Pandroid.testInstrumentationRunnerArguments.perfCanvas=true`,

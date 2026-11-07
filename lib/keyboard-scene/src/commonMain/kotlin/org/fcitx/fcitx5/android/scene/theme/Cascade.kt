@@ -26,7 +26,7 @@ class Cascade(theme: Theme, private val scene: Set<String>) {
     /**
      * The properties set for [target]: a widget, a key, or a key's part, which inherits from the key.
      * Kept: the same target asked again (each key's every part in a state, every scene of a theme) is
-     * the map made the first time.
+     * the map made the first time, the same map to every caller: read only, never changed.
      */
     fun of(target: Selector.Target): Map<String, Value> {
         val general = general(target)
@@ -47,6 +47,15 @@ class Cascade(theme: Theme, private val scene: Set<String>) {
     // the keys a selector here names
     private val named: Set<String> = index.keys.mapNotNullTo(HashSet()) { it.key }
 
+    private val keptLooks = HashMap<Any, Any>()
+
+    /**
+     * What [make] works out of this cascade's looks for [key], made the first time and the same after:
+     * a builder's looks of a key, by what they depend on ([key] equal only where [make]'s result would be).
+     */
+    @Suppress("UNCHECKED_CAST")
+    fun <T : Any> kept(key: Any, make: () -> T): T = keptLooks.getOrPut(key, make) as T
+
     // what the styles selecting [target] set, nothing inherited
     private fun own(target: Selector.Target): Map<String, Value> {
         val best = HashMap<Style, Int>()
@@ -66,7 +75,6 @@ class Cascade(theme: Theme, private val scene: Set<String>) {
     }
 }
 
-/** A key's look in one state, from its [Cascade]d properties: defaults for what no style sets. */
 /**
  * A theme's cascades by the scenes they are in, kept: what a cascade has worked out (its [Cascade.of]s)
  * depends on nothing else, so the scenes made again of one theme (Shift, Return, a key typed) find
@@ -78,6 +86,7 @@ class Cascades(val theme: Theme) {
     fun of(scene: Set<String>): Cascade = made.getOrPut(scene) { Cascade(theme, scene) }
 }
 
+/** A key's look in one state, from its [Cascade]d properties: defaults for what no style sets. */
 class KeyLook(private val v: Map<String, Value>, private val theme: Theme) {
     val fill: Fill? get() = (v["fill"] as? Value.OfFill)?.fill
     val overlay: Argb? get() = (v["overlay"] as? Value.OfColor)?.color?.let(theme::color)

@@ -270,7 +270,8 @@ abstract class BaseKeyboard(
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
-        settleLetters()
+        // under the canvas the views' glyphs are not drawn: nothing to settle (laid out again without it)
+        if (canvas == null) settleLetters()
     }
 
     // after the keys' own layout: their letters clear of their symbols and shortcuts (KeyMarkYield.letters), at one

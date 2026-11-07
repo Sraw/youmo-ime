@@ -94,7 +94,7 @@ android {
             isDebuggable = false
             isShrinkResources = false
             matchingFallbacks += listOf("release")
-            resValue("string", "app_name", "@string/app_name_debug")
+            resValue("string", "app_name", "@string/app_name_bench")
             proguardFile("benchmark-rules.pro")
         }
     }
@@ -257,6 +257,10 @@ val sceneLayouts = tasks.register<SceneLayoutsTask>("copySceneLayouts") {
 }
 
 androidComponents {
+    // the benchmark build is timed on a device only: its unit tests would be release's again
+    beforeVariants(selector().withBuildType("benchmark")) { variant ->
+        variant.hostTests[com.android.build.api.variant.HostTestBuilder.UNIT_TEST_TYPE]?.enable = false
+    }
     onVariants { variant ->
         variant.sources.res?.addGeneratedSourceDirectory(sceneLayouts, SceneLayoutsTask::outputDir)
         // The build type's resValue entries (app_icon, app_icon_round, app_name) point at launcher
