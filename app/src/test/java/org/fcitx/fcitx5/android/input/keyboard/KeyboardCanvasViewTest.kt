@@ -4,10 +4,12 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Rect
 import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
@@ -39,6 +41,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.AndroidTextMeasurer
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
+import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.theme.Crop
@@ -63,6 +66,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -104,13 +108,19 @@ class KeyboardCanvasViewTest {
         assertTrue(q.width > 0)
         val scene = c.scene!!
         assertEquals(26, scene.keys.count { it.id.length == 1 })
-        // every key the scene draws has its view, at the same place
+        // every key the scene draws has its view, at the same place; a touch finds it where it is drawn,
+        // read from its cell's corner as from its view's, and a popup over it is placed where the view's was
+        val board = h.textKeyboard()
         for (k in scene.keys) {
             val v = h.keyView(k.id)
             val box = h.box(v)
             val b = c.bounds(k.id)!!
             assertTrue("${k.id} at $b, its view at $box", box.contains(b.centerX(), b.centerY()))
-            assertSame(k.id, v, c.keyViewAt(k.anchor.x.toFloat(), k.anchor.y.toFloat()))
+            assertSame(k.id, k, c.keyAt(k.anchor.x.toFloat(), k.anchor.y.toFloat()))
+            val ref = KeyRef.scene(k.id, k.copy)
+            val cell = Rect().also { assertTrue(c.cell(ref, it)) }.apply { offset(c.left, c.top) }
+            assertNear("${k.id}'s cell", Rect().also { v.place(board, it) }, cell)
+            assertNear("${k.id}'s popup's place", v.bounds, Rect().also { assertTrue(c.popupBounds(ref, it)) })
         }
         assertEquals("q", c.keyAt("q")?.label)
         assertNull(c.keyAt("nothing"))
@@ -124,7 +134,9 @@ class KeyboardCanvasViewTest {
         assertSame(q0, c.shownNode("q"))
         assertTrue(c.press("q"))
         h.idle()
-        assertTrue(h.keyView("q").isPressed)
+        assertTrue(c.shownPressed("q"))
+        // the scene's key took the touch, not its view
+        assertFalse(h.keyView("q").isPressed)
         val q1 = c.shownNode("q")
         assertNotSame(q0, q1)
         assertSame(w0, c.shownNode("w"))
@@ -171,6 +183,9 @@ class KeyboardCanvasViewTest {
 
     // the same fingers on both: what reaches the engine and the field, and the popups shown, the same
     private fun gestures(on: Boolean, im: org.fcitx.fcitx5.android.core.InputMethodEntry): List<Any> = harness(on, im).use { h ->
+        // on, the scene's keys take every touch: none reaches a view (BaseKeyboard dispatches to its touch listener first)
+        val viewsTouched = mutableListOf<String>()
+        if (on) h.untouchedViews(viewsTouched)
         val out = mutableListOf<Any>()
         h.field.setText("hello world")
         h.field.setSelection(5)
@@ -186,7 +201,22 @@ class KeyboardCanvasViewTest {
         out.add(h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") || it.startsWith("reset") })
         out += h.field.text.toString()
         out += h.field.selectionStart
+        assertEquals(emptyList<String>(), viewsTouched)
         out
+    }
+
+    // each of the keyboard's key views records a touch reaching it in [touched]
+    @SuppressLint("ClickableViewAccessibility")
+    private fun KeyboardHarness.untouchedViews(touched: MutableList<String>) {
+        KeyboardHarness.all(textKeyboard()).filterIsInstance<KeyView>().forEach { v ->
+            v.setOnTouchListener { _, e -> touched += "${v.themeKey} ${e.actionMasked}"; false }
+        }
+    }
+
+    // [actual] within a pixel of [expected] on every side: the scene's rounding and the views' layout's
+    private fun assertNear(what: String, expected: Rect, actual: Rect) {
+        val off = maxOf(abs(expected.left - actual.left), abs(expected.top - actual.top), abs(expected.right - actual.right), abs(expected.bottom - actual.bottom))
+        assertTrue("$what $actual, the view's $expected", off <= 1)
     }
 
     @Test
@@ -308,7 +338,6 @@ class KeyboardCanvasViewTest {
             assertEquals(viewsOnly, h.settled())
             val q = h.keyView("q")
             assertTrue(h.shown(q))
-            assertNull(q.onPressedChanged)
             h.api.calls.clear()
             h.tap(q)
             assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") })
@@ -403,7 +432,7 @@ class KeyboardCanvasViewTest {
                 .filter { it.visibility == View.VISIBLE && it.themeKey != null && it.parent is View && (it.parent as View).parent === board }
                 .mapTo(HashSet()) { it.themeKey!! }
             assertEquals(what, shown, scene.keys.mapTo(HashSet()) { it.id })
-            for (k in scene.keys) assertEquals("$what ${k.id}", View.VISIBLE, c.keyViewAt(k.anchor.x.toFloat(), k.anchor.y.toFloat())?.visibility)
+            for (k in scene.keys) assertSame("$what ${k.id}", k, c.keyAt(k.anchor.x.toFloat(), k.anchor.y.toFloat()))
         }
         fun told(t: TableKeyboard?) {
             EngineState.tableKeyboardState.value = t
@@ -433,7 +462,9 @@ class KeyboardCanvasViewTest {
             // a key hidden since the scene was drawn: its place finds nothing till the next frame's
             val shift = c.keyAt("shift")!!
             h.keyView("shift").visibility = View.INVISIBLE
-            assertNull(c.keyViewAt(shift.anchor.x.toFloat(), shift.anchor.y.toFloat()))
+            assertSame(shift, c.keyAt(shift.anchor.x.toFloat(), shift.anchor.y.toFloat()))
+            assertFalse("a hidden key took the touch", c.press("shift"))
+            assertFalse(c.shownPressed("shift"))
         } finally {
             told(null)
         }

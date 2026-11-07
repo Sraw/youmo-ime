@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.input.dependency.imeScope
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
+import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
 import org.fcitx.fcitx5.android.input.keyboard.keyTextScale
 import org.fcitx.fcitx5.android.input.keyboard.longPressOf
@@ -49,11 +50,11 @@ class PopupComponent :
     private val theme by manager.theme()
     private val punctuation: PunctuationComponent by manager.must()
 
-    private val showingEntryUi = HashMap<Int, PopupEntryUi>()
-    private val dismissJobs = HashMap<Int, Job>()
+    private val showingEntryUi = HashMap<KeyRef, PopupEntryUi>()
+    private val dismissJobs = HashMap<KeyRef, Job>()
     private val freeEntryUi = LinkedList<PopupEntryUi>()
 
-    private val showingContainerUi = HashMap<Int, PopupContainerUi>()
+    private val showingContainerUi = HashMap<KeyRef, PopupContainerUi>()
 
     private val keyBottomMargin by lazy {
         val gap = ThemeManager.shownLook(theme).keys.gap
@@ -103,7 +104,7 @@ class PopupComponent :
     var onMenuGone: () -> Unit = {}
 
     // the key whose edit menu is up where the notices go, for [onMenuGone]
-    private var menuAbove: Int? = null
+    private var menuAbove: KeyRef? = null
 
     class MenuRoom(val notice: UndoChipPlacement.Place, val barMiddle: Int)
 
@@ -126,10 +127,10 @@ class PopupComponent :
         }
     }
 
-    private fun showPopup(viewId: Int, content: String, bounds: Rect) {
-        showingEntryUi[viewId]?.apply {
-            dismissJobs[viewId]?.also {
-                dismissJobs.remove(viewId)?.cancel()
+    private fun showPopup(key: KeyRef, content: String, bounds: Rect) {
+        showingEntryUi[key]?.apply {
+            dismissJobs[key]?.also {
+                dismissJobs.remove(key)?.cancel()
             }
             lastShowTime = System.currentTimeMillis()
             setText(content, symbolSize())
@@ -151,14 +152,14 @@ class PopupComponent :
             (popup.root.parent as? ViewGroup)?.removeView(popup.root)
             root.addView(popup.root)
         }
-        showingEntryUi[viewId] = popup
+        showingEntryUi[key] = popup
     }
 
-    private fun updatePopup(viewId: Int, content: String, words: Boolean) {
+    private fun updatePopup(key: KeyRef, content: String, words: Boolean) {
         // a long press's keys shown, showKeyboard dismissed the bubble: a letter's preview, wrapped by
         // its long press, still sends this on every move, not to show it again over them
-        if (viewId in showingContainerUi) return
-        showingEntryUi[viewId]?.apply {
+        if (key in showingContainerUi) return
+        showingEntryUi[key]?.apply {
             val fit = if (words && PreviewLabel.isWords(content)) wordsFit(content, this) else null
             val text = fit?.text ?: content
             val px = fit?.size ?: symbolSize()
@@ -229,7 +230,7 @@ class PopupComponent :
         return maxOf(minPopupWidth, bounds.width(), text)
     }
 
-    private fun showKeyboard(viewId: Int, keyboard: KeyDef.Popup.Keyboard, bounds: Rect) {
+    private fun showKeyboard(key: KeyRef, keyboard: KeyDef.Popup.Keyboard, bounds: Rect) {
         var keys: Array<String>
         var labels: Array<String>
         val split: Int
@@ -254,16 +255,16 @@ class PopupComponent :
         }
         // the keys float over the key on their own: the bubble under the one in focus, as one shape
         // with it, was as wide as the key pressed, and so were they
-        showingEntryUi[viewId]?.let {
-            dismissJobs.remove(viewId)?.cancel()
-            dismissPopupEntry(viewId, it)
+        showingEntryUi[key]?.let {
+            dismissJobs.remove(key)?.cancel()
+            dismissPopupEntry(key, it)
         }
         val keyboardUi = PopupKeyboardUi(
             context,
             theme,
             rootBounds,
             bounds,
-            { dismissPopup(viewId) },
+            { dismissPopup(key) },
             popupRadius,
             longPressKeyWidth,
             longPressKeyHeight,
@@ -275,28 +276,28 @@ class PopupComponent :
             inRow,
             onFocusMoved = { InputFeedbacks.hapticFeedback(it) },
         )
-        showPopupContainer(viewId, keyboardUi)
+        showPopupContainer(key, keyboardUi)
     }
 
-    private fun showMenu(viewId: Int, menu: KeyDef.Popup.Menu, bounds: Rect) {
-        showingEntryUi[viewId]?.let {
-            dismissPopupEntry(viewId, it)
+    private fun showMenu(key: KeyRef, menu: KeyDef.Popup.Menu, bounds: Rect) {
+        showingEntryUi[key]?.let {
+            dismissPopupEntry(key, it)
         }
         val menuUi = PopupMenuUi(
             context,
             theme,
             rootBounds,
             bounds,
-            { dismissPopup(viewId) },
+            { dismissPopup(key) },
             menu.items,
             onFocusMoved = { InputFeedbacks.hapticFeedback(it) },
         )
-        showPopupContainer(viewId, menuUi)
+        showPopupContainer(key, menuUi)
     }
 
-    private fun showEditMenu(viewId: Int, bounds: Rect, password: Boolean) {
-        showingEntryUi[viewId]?.let {
-            dismissPopupEntry(viewId, it)
+    private fun showEditMenu(key: KeyRef, bounds: Rect, password: Boolean) {
+        showingEntryUi[key]?.let {
+            dismissPopupEntry(key, it)
         }
         val cells = EditMenuLayout.CELLS
         val cell = context.dp(PopupMenuUi.CELL_DP)
@@ -305,7 +306,7 @@ class PopupComponent :
             EditMenuLayout.place(room.notice, bounds.centerX(), cell, rootBounds.left, rootBounds.right, rootBounds.top, room.barMiddle)
         }
         if (at != null) {
-            menuAbove = viewId
+            menuAbove = key
             onMenuShown(Rect(at.left, at.top, at.left + cell * cells.size, at.top + cell))
         }
         val menuUi = PopupMenuUi(
@@ -313,7 +314,7 @@ class PopupComponent :
             theme,
             rootBounds,
             bounds,
-            { dismissPopup(viewId) },
+            { dismissPopup(key) },
             cells.map {
                 // its name as the settings and the swipe's preview say it: what TalkBack reads of the cell
                 val looks = KeyShortcutLooks.of(it)
@@ -326,17 +327,17 @@ class PopupComponent :
                 at = at,
             ),
         )
-        showPopupContainer(viewId, menuUi)
+        showPopupContainer(key, menuUi)
     }
 
-    private fun showPopupContainer(viewId: Int, ui: PopupContainerUi) {
+    private fun showPopupContainer(key: KeyRef, ui: PopupContainerUi) {
         root.apply {
             add(ui.root, lParams {
                 leftMargin = ui.triggerBounds.left + ui.offsetX - rootBounds.left
                 topMargin = ui.triggerBounds.top + ui.offsetY - rootBounds.top
             })
         }
-        showingContainerUi[viewId] = ui
+        showingContainerUi[key] = ui
         // out of the key pressed (its middle, in the container's pixels); it goes at once, the
         // character picked typed already. Focus follows the finger by position, not by its scale
         ui.root.popIn(
@@ -345,46 +346,46 @@ class PopupComponent :
         )
     }
 
-    private fun changeFocus(viewId: Int, x: Float, y: Float): Boolean {
-        return showingContainerUi[viewId]?.changeFocus(x, y) ?: false
+    private fun changeFocus(key: KeyRef, x: Float, y: Float): Boolean {
+        return showingContainerUi[key]?.changeFocus(x, y) ?: false
     }
 
-    private fun triggerFocused(viewId: Int): KeyAction? {
-        return showingContainerUi[viewId]?.onTrigger()
+    private fun triggerFocused(key: KeyRef): KeyAction? {
+        return showingContainerUi[key]?.onTrigger()
     }
 
-    private fun dismissPopup(viewId: Int) {
-        dismissPopupContainer(viewId)
-        showingEntryUi[viewId]?.also {
+    private fun dismissPopup(key: KeyRef) {
+        dismissPopupContainer(key)
+        showingEntryUi[key]?.also {
             val timeLeft = it.lastShowTime + hideThreshold - System.currentTimeMillis()
             if (timeLeft <= 0L) {
-                dismissPopupEntry(viewId, it)
+                dismissPopupEntry(key, it)
             } else {
-                dismissJobs[viewId] = imeScope.launch {
+                dismissJobs[key] = imeScope.launch {
                     delay(timeLeft)
-                    dismissPopupEntry(viewId, it)
-                    dismissJobs.remove(viewId)
+                    dismissPopupEntry(key, it)
+                    dismissJobs.remove(key)
                 }
             }
         }
     }
 
-    private fun dismissPopupContainer(viewId: Int) {
-        showingContainerUi[viewId]?.also {
-            showingContainerUi.remove(viewId)
+    private fun dismissPopupContainer(key: KeyRef) {
+        showingContainerUi[key]?.also {
+            showingContainerUi.remove(key)
             root.removeView(it.root)
         }
-        menuGone(viewId)
+        menuGone(key)
     }
 
-    private fun menuGone(viewId: Int?) {
-        if (viewId == null || viewId != menuAbove) return
+    private fun menuGone(key: KeyRef?) {
+        if (key == null || key != menuAbove) return
         menuAbove = null
         onMenuGone()
     }
 
-    private fun dismissPopupEntry(viewId: Int, popup: PopupEntryUi) {
-        showingEntryUi.remove(viewId)
+    private fun dismissPopupEntry(key: KeyRef, popup: PopupEntryUi) {
+        showingEntryUi.remove(key)
         root.removeView(popup.root)
         freeEntryUi.add(popup)
     }
@@ -412,14 +413,14 @@ class PopupComponent :
     val listener = PopupActionListener { action ->
         with(action) {
             when (this) {
-                is PopupAction.ChangeFocusAction -> outResult = changeFocus(viewId, x, y)
-                is PopupAction.DismissAction -> dismissPopup(viewId)
-                is PopupAction.PreviewAction -> showPopup(viewId, content, bounds)
-                is PopupAction.PreviewUpdateAction -> updatePopup(viewId, content, words)
-                is PopupAction.ShowKeyboardAction -> showKeyboard(viewId, keyboard, bounds)
-                is PopupAction.ShowMenuAction -> showMenu(viewId, menu, bounds)
-                is PopupAction.ShowEditMenuAction -> showEditMenu(viewId, bounds, password)
-                is PopupAction.TriggerAction -> outAction = triggerFocused(viewId)
+                is PopupAction.ChangeFocusAction -> outResult = changeFocus(key, x, y)
+                is PopupAction.DismissAction -> dismissPopup(key)
+                is PopupAction.PreviewAction -> showPopup(key, content, bounds)
+                is PopupAction.PreviewUpdateAction -> updatePopup(key, content, words)
+                is PopupAction.ShowKeyboardAction -> showKeyboard(key, keyboard, bounds)
+                is PopupAction.ShowMenuAction -> showMenu(key, menu, bounds)
+                is PopupAction.ShowEditMenuAction -> showEditMenu(key, bounds, password)
+                is PopupAction.TriggerAction -> outAction = triggerFocused(key)
             }
         }
     }

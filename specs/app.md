@@ -313,11 +313,13 @@ as none (up, up to the left) is dropped.
 
 The 060 redraw's first step (`input/keyboard/canvas/`, `AppPrefs.Internal.canvasKeyboard`, 开发者 →
 新绘制 26 键, off): `TextKeyboard` adds a `KeyboardCanvasView` over its rows and makes them
-INVISIBLE, still laid out (the popups, glide's key map and the gestures use their places). The canvas
+INVISIBLE, still laid out (TalkBack's actions and a key's state are still read off them, S3). The canvas
 draws the scene `lib/keyboard-scene` makes of qwerty.xml in the look converted by ime-core's
 `LookTheme` (`ScenePainter`: one `RenderNode` a key a face, both kept in the tree and a press only their alpha, since a node left out of a frame loses its recording; a
 software canvas, a screenshot's, gets the ops drawn straight); `TextKeyboard.scene` builds the
-`Env` from its state (`TextBoardState`, `SceneMarks`, the texts), asked again on `invalidateScene()`,
+`Env` from its state (`TextBoardState`, `SceneMarks`, the texts) through `SceneEnvs.of`, which adds
+what every keyboard's has alike (size, density, landscape, compact, floating's text scale in the input
+method only, dark, flat; one-handed and dock FULL, InputView having placed the keyboard), asked again on `invalidateScene()`,
 which each of its show functions calls. It is made again only when what it is made of changed: the
 same theme, layout and measurer (by identity: `SceneThemes`, `SceneLayouts` keep theirs a process)
 and an equal `Env` return the last scene, which the view then neither records nor tells TalkBack
@@ -349,9 +351,21 @@ process ends or four other looks push them out. A known issue from before these 
 and is not fixed here.
 Systrace sections: `scene` (the view asking), in it `theme`, `env`, and the builder's phases
 (`expand`, `place`, `cascade.of`, `faces`, `content`, `paint`; `Phases`, `SceneTrace`), `measure
-text` under them. `BaseKeyboard` intercepts every touch as the vivo workaround
-does and hands it to the view of the key the scene's `keyAt` names (`findTouchTarget`), so a key's
-gestures are its view's, unchanged; the view's `onPressedChanged` (CustomGestureView) shows the press.
+text` under them.
+
+The scene's keys take their touches themselves (060-render-p2 S1): `BaseKeyboard` intercepts every
+touch as the vivo workaround does and hands each finger (`TouchTarget`) to the `SceneKey` the scene's
+`keyAt` names (`SceneTouch.find`), a key by its `KeyRef` (id, and which copy of a split row's G or V). A
+key's touch is `KeyGesture`, `CustomGestureView`'s state machine and timers taken out of the view, read
+from the corner of the key's cell as a view's was from its own (a finger in a row's blank end is left of
+it, as it was left of A's view). `BaseKeyboard.wire` gives a `KeyHandle` its sound, the space's and
+backspace's swipes, its press, long press, repeat, double tap, swipes (`KeySwipes`) and popups: the
+same wiring for a key view and for the `SceneKey` made of its `KeyDef` (`drawKeysOn`), so a key does
+what its view did. Its press is shown by the canvas (`showPressed(KeyRef)`), a popup over it placed
+at its face across and its cell down in the window (`popupBounds`), as a view's `bounds` were; glide
+typing reads its cell (`KeyPlace`). No touch reaches a key view while the canvas draws the keys
+(`SceneTouchTest`, `everyGestureAsOnTheViews*`); the views keep their own wiring for TalkBack's actions
+(`performAccessibilityAction` on the key's view, S3) and draw and take the touches again without a scene.
 TalkBack reads the canvas's `ExploreByTouchHelper`: a virtual node a key, its words the scene's
 `a11y` (an `a11y_*` name the app's string), id, state and actions its view's; a key whose view's state
 changed (Shift) since the last scene is told as `CONTENT_CHANGE_TYPE_STATE_DESCRIPTION` on its node.

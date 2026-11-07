@@ -28,6 +28,8 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
+import org.fcitx.fcitx5.android.input.popup.keyRef
+import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.utils.alpha
 import splitties.dimensions.dp
 
@@ -185,9 +187,9 @@ class PickerGridAdapter(
                     // never "consume" the gesture on touch down
                     false
                 }
-                CustomGestureView.GestureType.Move -> changeFocus(view.id, event.x, event.y)
-                CustomGestureView.GestureType.Up -> (!event.cancelled && trigger(view.id)).also {
-                    popupActionListener.onPopupAction(PopupAction.DismissAction(view.id))
+                CustomGestureView.GestureType.Move -> changeFocus(view.keyRef, event.x, event.y)
+                CustomGestureView.GestureType.Up -> (!event.cancelled && trigger(view.keyRef)).also {
+                    popupActionListener.onPopupAction(PopupAction.DismissAction(view.keyRef))
                 }
             }
         }
@@ -200,23 +202,23 @@ class PickerGridAdapter(
     private fun showKeyboard(view: KeyView, popup: KeyDef.Popup.Keyboard) {
         // the list may have scrolled since the key was laid out: where it is now
         if (!popupOnKeyPress) view.updateBounds()
-        popupActionListener.onPopupAction(PopupAction.ShowKeyboardAction(view.id, popup, view.bounds))
+        popupActionListener.onPopupAction(PopupAction.ShowKeyboardAction(view.keyRef, popup, view.bounds))
     }
 
     private fun showPreview(view: KeyView, item: String) {
         if (!popupOnKeyPress) return
         view.updateBounds()
-        popupActionListener.onPopupAction(PopupAction.PreviewAction(view.id, item, view.bounds))
+        popupActionListener.onPopupAction(PopupAction.PreviewAction(view.keyRef, item, view.bounds))
     }
 
-    private fun changeFocus(viewId: Int, x: Float, y: Float): Boolean {
-        val action = PopupAction.ChangeFocusAction(viewId, x, y)
+    private fun changeFocus(key: KeyRef, x: Float, y: Float): Boolean {
+        val action = PopupAction.ChangeFocusAction(key, x, y)
         popupActionListener.onPopupAction(action)
         return action.outResult
     }
 
-    private fun trigger(viewId: Int): Boolean {
-        val action = PopupAction.TriggerAction(viewId)
+    private fun trigger(key: KeyRef): Boolean {
+        val action = PopupAction.TriggerAction(key)
         popupActionListener.onPopupAction(action)
         // a candidate longer than one character (user-entered) arrives as a CommitAction
         val text = when (val picked = action.outAction) {
@@ -225,7 +227,7 @@ class PickerGridAdapter(
             else -> return false
         }
         commit(text)
-        popupActionListener.onPopupAction(PopupAction.DismissAction(viewId))
+        popupActionListener.onPopupAction(PopupAction.DismissAction(key))
         return true
     }
 

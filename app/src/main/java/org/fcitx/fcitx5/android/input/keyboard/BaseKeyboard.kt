@@ -41,11 +41,14 @@ import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
-import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKey
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTouch
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupKeyboardUi
+import org.fcitx.fcitx5.android.input.popup.keyRef
+import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.above
@@ -82,7 +85,10 @@ abstract class BaseKeyboard(
     private val expandKeypressArea by prefs.keyboard.expandKeypressArea
 
     private val spaceSwipeMoveCursor = prefs.keyboard.spaceSwipeMoveCursor
-    private val spaceKeys = mutableListOf<KeyView>()
+    private val spaceKeys = mutableListOf<KeyHandle>()
+
+    // each key's view and its def, as made: the scene's keys wired from them ([drawKeysOn])
+    private val wired = mutableListOf<Pair<KeyView, KeyDef>>()
 
     /** Holding the space talks here ([updateSpaceBadges]): the microphone on it. Before init, which sets it. */
     protected var holdsToTalk = false
@@ -105,14 +111,15 @@ abstract class BaseKeyboard(
     }
 
     // a space with shortcuts swipes up whether it moves the cursor or not: only its sideways steps go
-    private fun spaceSwipesCursor(view: KeyView, on: Boolean) {
+    private fun spaceSwipesCursor(key: KeyHandle, on: Boolean) {
+        val g = key.keyGesture
         if (!shortcuts) {
-            view.swipeEnabled = on
+            g.swipeEnabled = on
             return
         }
-        view.swipeEnabled = true
-        view.swipeRepeatEnabled = on
-        view.swipeThresholdX = if (on) selectionSwipeThreshold else disabledSwipeThreshold
+        g.swipeEnabled = true
+        g.swipeRepeatEnabled = on
+        g.swipeThresholdX = if (on) selectionSwipeThreshold else disabledSwipeThreshold
     }
 
     private val spaceLongPress = prefs.keyboard.spaceKeyLongPressBehavior
@@ -173,7 +180,7 @@ abstract class BaseKeyboard(
      * reads as none is dropped.
      */
     protected fun glideInput(
-        letters: () -> List<Pair<Char, TextKeyView>>,
+        letters: () -> List<Pair<Char, KeyPlace>>,
         down: Float = GlideGesture.DOWN,
         enabled: () -> Boolean = { true },
         filters: () -> Boolean = { false },
@@ -214,11 +221,11 @@ abstract class BaseKeyboard(
     private val swipes = KeySwipes(this, shortcuts, inputSwipeThreshold, disabledSwipeThreshold, object : KeySwipes.Keyboard {
         override val inPasswordField get() = this@BaseKeyboard.inPasswordField
         override val charShortcutMarks get() = this@BaseKeyboard.charShortcutMarks
-        override fun swipeText(view: KeyView) = this@BaseKeyboard.swipeText(view)
+        override fun swipeText(def: KeyDef) = this@BaseKeyboard.swipeText(def)
         override fun onAction(action: KeyAction, source: KeyActionListener.Source) = this@BaseKeyboard.onAction(action, source)
         override fun onPopupAction(action: PopupAction) = this@BaseKeyboard.onPopupAction(action)
-        override fun onPopupChangeFocus(viewId: Int, x: Float, y: Float) = this@BaseKeyboard.onPopupChangeFocus(viewId, x, y)
-        override fun onPopupTrigger(viewId: Int, cancelled: Boolean) = this@BaseKeyboard.onPopupTrigger(viewId, cancelled)
+        override fun onPopupChangeFocus(key: KeyRef, x: Float, y: Float) = this@BaseKeyboard.onPopupChangeFocus(key, x, y)
+        override fun onPopupTrigger(key: KeyRef, cancelled: Boolean) = this@BaseKeyboard.onPopupTrigger(key, cancelled)
     })
 
     protected val keyRows: List<ConstraintLayout>
@@ -339,7 +346,7 @@ abstract class BaseKeyboard(
         val takes = spaceLongPressTakesTouch(behavior, VoiceFeature.AVAILABLE, inPasswordField)
         spaceKeys.forEach {
             (it as? TextKeyView)?.showBadge(icon)
-            it.longPressFeedbackEnabled = takes
+            it.keyGesture.longPressFeedbackEnabled = takes
         }
     }
 
@@ -378,11 +385,11 @@ abstract class BaseKeyboard(
         }
     }
 
-    /** What swiping [view] types where the user chose it ([TextKeyboard]): [SwipeChoice.BuiltIn] for what its key says. */
-    protected open fun swipeText(view: KeyView): SwipeChoice = SwipeChoice.BuiltIn
+    /** What swiping the key of [def] types where the user chose it ([TextKeyboard]): [SwipeChoice.BuiltIn] for what its key says. */
+    protected open fun swipeText(def: KeyDef): SwipeChoice = SwipeChoice.BuiltIn
 
-    /** What a tap on [view] sends for its [action]: the action itself, but where a keyboard adds where it fell ([CustomGestureView.clickAt]). */
-    protected open fun pressed(view: CustomGestureView, action: KeyAction): KeyAction = action
+    /** What a tap sends for its key's [action]: the action itself, but where a keyboard adds where it fell, [clickAt] ([KeyGesture.clickAt]). */
+    protected open fun pressed(clickAt: Float, action: KeyAction): KeyAction = action
 
     private fun createKeyView(def: KeyDef): KeyView {
         return when (def.appearance) {
@@ -393,214 +400,256 @@ abstract class BaseKeyboard(
         }.apply {
             themeKey = def.name
             style(themeBoard, keyImages)
-            soundEffect = when (def) {
-                is SpaceKey -> InputFeedbacks.SoundEffect.SpaceBar
-                is MiniSpaceKey -> InputFeedbacks.SoundEffect.SpaceBar
-                is BackspaceKey -> InputFeedbacks.SoundEffect.Delete
-                is ReturnKey -> InputFeedbacks.SoundEffect.Return
-                else -> InputFeedbacks.SoundEffect.Standard
-            }
             if (def is BlankKey) {
                 isEnabled = false
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             }
-            // the number pad's space moves the cursor too (UAT PAN-14): it had the press only
-            if (def is SpaceKey || def is MiniSpaceKey) {
-                spaceKeys.add(this)
-                swipeEnabled = spaceSwipeMoveCursor.getValue()
-                swipeRepeatEnabled = true
-                swipeThresholdX = selectionSwipeThreshold
-                swipeThresholdY = disabledSwipeThreshold
-                spaceSwipesCursor(this, spaceSwipeMoveCursor.getValue())
-                onGestureListener = OnGestureListener { view, event ->
-                    when (event.type) {
-                        GestureType.Move -> when (val count = event.countX) {
-                            0 -> false
-                            else -> {
-                                val sym =
-                                    if (count > 0) FcitxKeyMapping.FcitxKey_Right else FcitxKeyMapping.FcitxKey_Left
-                                val action = KeyAction.SymAction(KeySym(sym), KeyStates.Virtual)
-                                repeat(count.absoluteValue) {
-                                    onAction(action)
-                                    if (hapticOnRepeat) InputFeedbacks.hapticFeedback(view)
-                                }
-                                true
-                            }
+            wire(this, def, this)
+            wired += this to def
+        }
+    }
+
+    /**
+     * What [key] of [def] does, its view's ([view]) or a key the scene draws (060-render-p2 S1): its
+     * sound, the space's and backspace's swipes, its press, long press, repeat and double tap, its
+     * symbol's and shortcut's swipes ([KeySwipes]), its popups. One wiring for both, so the canvas's
+     * keys do what the views did.
+     */
+    private fun wire(key: KeyHandle, def: KeyDef, view: KeyView?) {
+        key.keyGesture.soundEffect = when (def) {
+            is SpaceKey -> InputFeedbacks.SoundEffect.SpaceBar
+            is MiniSpaceKey -> InputFeedbacks.SoundEffect.SpaceBar
+            is BackspaceKey -> InputFeedbacks.SoundEffect.Delete
+            is ReturnKey -> InputFeedbacks.SoundEffect.Return
+            else -> InputFeedbacks.SoundEffect.Standard
+        }
+        // the number pad's space moves the cursor too (UAT PAN-14): it had the press only
+        if (def is SpaceKey || def is MiniSpaceKey) wireSpace(key) else if (def is BackspaceKey) wireBackspace(key)
+        wireBehaviors(key, def)
+        // set as its long press shows a popup, which then has the touch: no swipe of the key's after that
+        val longPopup = LongPopup()
+        swipes.attach(key, def, longPopup, view)
+        def.popup?.forEach { wirePopup(key, def, it, longPopup) }
+    }
+
+    // the space's sideways swipe moves the cursor, as the setting says ([spaceSwipesCursor])
+    private fun wireSpace(key: KeyHandle) {
+        val g = key.keyGesture
+        spaceKeys.add(key)
+        g.swipeEnabled = spaceSwipeMoveCursor.getValue()
+        g.swipeRepeatEnabled = true
+        g.swipeThresholdX = selectionSwipeThreshold
+        g.swipeThresholdY = disabledSwipeThreshold
+        spaceSwipesCursor(key, spaceSwipeMoveCursor.getValue())
+        key.gestureListener = { k, event ->
+            when (event.type) {
+                GestureType.Move -> when (val count = event.countX) {
+                    0 -> false
+                    else -> {
+                        val sym =
+                            if (count > 0) FcitxKeyMapping.FcitxKey_Right else FcitxKeyMapping.FcitxKey_Left
+                        val action = KeyAction.SymAction(KeySym(sym), KeyStates.Virtual)
+                        repeat(count.absoluteValue) {
+                            onAction(action)
+                            if (hapticOnRepeat) InputFeedbacks.hapticFeedback(k.feedback)
                         }
-                        else -> false
+                        true
                     }
                 }
-            } else if (def is BackspaceKey) {
-                swipeEnabled = true
-                swipeRepeatEnabled = true
-                swipeThresholdX = selectionSwipeThreshold
-                swipeThresholdY = disabledSwipeThreshold
-                onGestureListener = OnGestureListener { view, event ->
-                    when (event.type) {
-                        // must stay reachable: it resets what a cancelled swipe left behind
-                        GestureType.Down -> {
-                            onAction(KeyAction.BeginSelectionSwipeAction)
-                            false
-                        }
-                        GestureType.Move -> {
-                            val count = event.countX
-                            if (count != 0) {
-                                onAction(KeyAction.MoveSelectionAction(count))
-                                if (hapticOnRepeat) InputFeedbacks.hapticFeedback(view)
-                                true
-                            } else false
-                        }
-                        GestureType.Up -> {
-                            // cancelled, the selection stays selected; the next Down resets the swipe
-                            if (!event.cancelled) onAction(KeyAction.DeleteSelectionAction(event.totalX))
-                            false
-                        }
-                        else -> false
-                    }
-                }
+                else -> false
             }
-            def.behaviors.forEach {
-                when (it) {
-                    is KeyDef.Behavior.Press -> {
-                        setOnClickListener { view ->
-                            onAction(pressed(view as CustomGestureView, it.action))
-                        }
-                    }
-                    is KeyDef.Behavior.LongPress -> {
-                        // hold to talk follows the finger that holds the space
-                        setOnLongClickListener { view ->
-                            val action = it.action
-                            if (action is KeyAction.SpaceLongPressAction && !spaceLongPressTakesTouch(spaceLongPress.getValue(), VoiceFeature.AVAILABLE, inPasswordField)) {
-                                // nothing to do: not taken, or a slow drag on the space, its first step past the delay, moved no cursor (PY-41)
-                                false
-                            } else {
-                                onAction(if (action is KeyAction.SpaceLongPressAction) action.copy(pointer = (view as CustomGestureView).touchPointer) else action)
-                                true
-                            }
-                        }
-                    }
-                    is KeyDef.Behavior.Repeat -> {
-                        repeatEnabled = true
-                        onRepeatListener = { view ->
-                            onAction(it.action)
-                            if (hapticOnRepeat) InputFeedbacks.hapticFeedback(view)
-                        }
-                    }
-                    // its lift is the swipe's, below ([KeySwipes.attach])
-                    is KeyDef.Behavior.Swipe -> {}
-                    is KeyDef.Behavior.DoubleTap -> {
-                        doubleTapEnabled = true
-                        onDoubleTapListener = { _ ->
-                            onAction(it.action)
-                        }
-                    }
+        }
+    }
+
+    // backspace swiped sideways selects what it deletes as it lifts
+    private fun wireBackspace(key: KeyHandle) {
+        val g = key.keyGesture
+        g.swipeEnabled = true
+        g.swipeRepeatEnabled = true
+        g.swipeThresholdX = selectionSwipeThreshold
+        g.swipeThresholdY = disabledSwipeThreshold
+        key.gestureListener = { k, event ->
+            when (event.type) {
+                // must stay reachable: it resets what a cancelled swipe left behind
+                GestureType.Down -> {
+                    onAction(KeyAction.BeginSelectionSwipeAction)
+                    false
                 }
-            }
-            // set as its long press shows a popup, which then has the touch: no swipe of the key's after that
-            val longPopup = LongPopup()
-            swipes.attach(this, def, longPopup)
-            def.popup?.forEach { popup ->
-                when (popup) {
-                    // TODO: gesture processing middleware
-                    is KeyDef.Popup.Menu -> {
-                        setOnLongClickListener { view ->
-                            view as KeyView
-                            longPopup.shown = true
-                            onPopupAction(PopupAction.ShowMenuAction(view.id, popup, view.bounds))
-                            // do not consume this LongClick gesture
-                            false
-                        }
-                        val oldOnGestureListener = onGestureListener ?: OnGestureListener.Empty
-                        swipeEnabled = true
-                        onGestureListener = OnGestureListener { view, event ->
-                            view as KeyView
-                            when (event.type) {
-                                GestureType.Move -> {
-                                    onPopupChangeFocus(view.id, event.x, event.y)
-                                }
-                                GestureType.Up -> {
-                                    onPopupTrigger(view.id, event.cancelled)
-                                }
-                                else -> false
-                            } || oldOnGestureListener.onGesture(view, event)
-                        }
-                    }
-                    is KeyDef.Popup.Keyboard -> {
-                        setOnLongClickListener { view ->
-                            view as KeyView
-                            longPopup.shown = true
-                            onPopupAction(PopupAction.ShowKeyboardAction(view.id, popup, view.bounds))
-                            // do not consume this LongClick gesture
-                            false
-                        }
-                        val oldOnGestureListener = onGestureListener ?: OnGestureListener.Empty
-                        swipeEnabled = true
-                        onGestureListener = OnGestureListener { view, event ->
-                            view as KeyView
-                            when (event.type) {
-                                GestureType.Move -> {
-                                    onPopupChangeFocus(view.id, event.x, event.y)
-                                }
-                                GestureType.Up -> {
-                                    onPopupTrigger(view.id, event.cancelled)
-                                }
-                                else -> false
-                            } || oldOnGestureListener.onGesture(view, event)
-                        }
-                    }
-                    is KeyDef.Popup.AltPreview -> {
-                        val oldOnGestureListener = onGestureListener ?: OnGestureListener.Empty
-                        onGestureListener = OnGestureListener { view, event ->
-                            view as KeyView
-                            if (popupOnKeyPress) {
-                                when (event.type) {
-                                    GestureType.Down -> onPopupAction(
-                                        PopupAction.PreviewAction(view.id, popup.content, view.bounds)
-                                    )
-                                    GestureType.Move -> {
-                                        onPopupAction(swipes.preview(view, def, event.totalY, popup))
-                                    }
-                                    GestureType.Up -> {
-                                        onPopupAction(PopupAction.DismissAction(view.id))
-                                    }
-                                }
-                            }
-                            // never consume gesture in preview popup
-                            oldOnGestureListener.onGesture(view, event)
-                        }
-                    }
-                    is KeyDef.Popup.Preview -> {
-                        val oldOnGestureListener = onGestureListener ?: OnGestureListener.Empty
-                        onGestureListener = OnGestureListener { view, event ->
-                            view as KeyView
-                            if (popupOnKeyPress) {
-                                when (event.type) {
-                                    GestureType.Down -> onPopupAction(
-                                        PopupAction.PreviewAction(view.id, popup.content, view.bounds)
-                                    )
-                                    GestureType.Up -> {
-                                        onPopupAction(PopupAction.DismissAction(view.id))
-                                    }
-                                    else -> {}
-                                }
-                            }
-                            // never consume gesture in preview popup
-                            oldOnGestureListener.onGesture(view, event)
-                        }
-                    }
+                GestureType.Move -> {
+                    val count = event.countX
+                    if (count != 0) {
+                        onAction(KeyAction.MoveSelectionAction(count))
+                        if (hapticOnRepeat) InputFeedbacks.hapticFeedback(k.feedback)
+                        true
+                    } else false
+                }
+                GestureType.Up -> {
+                    // cancelled, the selection stays selected; the next Down resets the swipe
+                    if (!event.cancelled) onAction(KeyAction.DeleteSelectionAction(event.totalX))
+                    false
                 }
             }
         }
     }
 
-    private class TouchTarget(val view: KeyView, val hitRect: Rect)
+    private fun wireBehaviors(key: KeyHandle, def: KeyDef) {
+        val g = key.keyGesture
+        def.behaviors.forEach {
+            when (it) {
+                is KeyDef.Behavior.Press -> key.onClick { k -> onAction(pressed(k.keyGesture.clickAt, it.action)) }
+                // hold to talk follows the finger that holds the space
+                is KeyDef.Behavior.LongPress -> key.onLongClick { k ->
+                    val action = it.action
+                    if (action is KeyAction.SpaceLongPressAction && !spaceLongPressTakesTouch(spaceLongPress.getValue(), VoiceFeature.AVAILABLE, inPasswordField)) {
+                        // nothing to do: not taken, or a slow drag on the space, its first step past the delay, moved no cursor (PY-41)
+                        false
+                    } else {
+                        onAction(if (action is KeyAction.SpaceLongPressAction) action.copy(pointer = k.keyGesture.touchPointer) else action)
+                        true
+                    }
+                }
+                is KeyDef.Behavior.Repeat -> {
+                    g.repeatEnabled = true
+                    key.onRepeat { k ->
+                        onAction(it.action)
+                        if (hapticOnRepeat) InputFeedbacks.hapticFeedback(k.feedback)
+                    }
+                }
+                // its lift is the swipe's, below ([KeySwipes.attach])
+                is KeyDef.Behavior.Swipe -> {}
+                is KeyDef.Behavior.DoubleTap -> {
+                    g.doubleTapEnabled = true
+                    key.onDoubleTap { _ -> onAction(it.action) }
+                }
+            }
+        }
+    }
+
+    // its long press's popup, or its press's bubble
+    private fun wirePopup(key: KeyHandle, def: KeyDef, popup: KeyDef.Popup, longPopup: LongPopup) {
+        when (popup) {
+            // TODO: gesture processing middleware
+            is KeyDef.Popup.Menu -> {
+                key.onLongClick { k ->
+                    longPopup.shown = true
+                    onPopupAction(PopupAction.ShowMenuAction(k.ref, popup, k.bounds))
+                    // do not consume this LongClick gesture
+                    false
+                }
+                choosesFromPopup(key)
+            }
+            is KeyDef.Popup.Keyboard -> {
+                key.onLongClick { k ->
+                    longPopup.shown = true
+                    onPopupAction(PopupAction.ShowKeyboardAction(k.ref, popup, k.bounds))
+                    // do not consume this LongClick gesture
+                    false
+                }
+                choosesFromPopup(key)
+            }
+            is KeyDef.Popup.AltPreview -> {
+                val old = key.gestureListener
+                key.gestureListener = { k, event ->
+                    if (popupOnKeyPress) {
+                        when (event.type) {
+                            GestureType.Down -> onPopupAction(
+                                PopupAction.PreviewAction(k.ref, popup.content, k.bounds)
+                            )
+                            GestureType.Move -> {
+                                onPopupAction(swipes.preview(k, def, event.totalY, popup))
+                            }
+                            GestureType.Up -> {
+                                onPopupAction(PopupAction.DismissAction(k.ref))
+                            }
+                        }
+                    }
+                    // never consume gesture in preview popup
+                    old?.invoke(k, event) ?: false
+                }
+            }
+            is KeyDef.Popup.Preview -> {
+                val old = key.gestureListener
+                key.gestureListener = { k, event ->
+                    if (popupOnKeyPress) {
+                        when (event.type) {
+                            GestureType.Down -> onPopupAction(
+                                PopupAction.PreviewAction(k.ref, popup.content, k.bounds)
+                            )
+                            GestureType.Up -> {
+                                onPopupAction(PopupAction.DismissAction(k.ref))
+                            }
+                            else -> {}
+                        }
+                    }
+                    // never consume gesture in preview popup
+                    old?.invoke(k, event) ?: false
+                }
+            }
+        }
+    }
+
+    // a long press's popup (a menu, a keyboard), its cell focused as the finger moves and picked as it lifts
+    private fun choosesFromPopup(key: KeyHandle) {
+        val old = key.gestureListener
+        key.keyGesture.swipeEnabled = true
+        key.gestureListener = { k, event ->
+            when (event.type) {
+                GestureType.Move -> onPopupChangeFocus(k.ref, event.x, event.y)
+                GestureType.Up -> onPopupTrigger(k.ref, event.cancelled)
+                else -> false
+            } || old?.invoke(k, event) ?: false
+        }
+    }
+
+    // a key view's touch, the finger's event made the view's own ([forKey]) and dispatched to it
+    private class ViewTarget(val view: KeyView, val hitRect: Rect) : TouchTarget {
+        override val ref get() = view.keyRef
+        override val enabled get() = view.isEnabled
+
+        override fun send(event: MotionEvent, action: Int, pointerIndex: Int) {
+            val keyEvent = event.forKey(action, pointerIndex, hitRect)
+            view.dispatchTouchEvent(keyEvent)
+            // the key reads it in place and keeps none of it: back to the pool, not left to the finalizer
+            keyEvent.recycle()
+        }
+
+        override fun cancel() = view.cancelGestures()
+    }
 
     /**
-     * The keys drawn by the scene engine over this keyboard's own ([KeyboardCanvasView]), which are
-     * not drawn then but still do the work: the touches handed to them as vivo's workaround hands them
-     * ([routesTouches]), each to the key the scene's hit areas say. Null: the keys draw themselves.
+     * The keys drawn by the scene engine over this keyboard's own ([KeyboardCanvasView]), their views
+     * not drawn then: the touches handed to the scene's keys ([sceneTouch]) as vivo's workaround hands
+     * them to the views ([routesTouches]). Null: the keys draw themselves. Set by [drawKeysOn].
      */
     protected var canvas: KeyboardCanvasView? = null
+        private set
+
+    // the scene's keys, by the views they were wired as ([drawKeysOn]): what a touch on the canvas finds
+    private var sceneKeys: Map<KeyView, SceneKey> = emptyMap()
+    private var sceneTouch: SceneTouch? = null
+
+    /**
+     * The keys drawn by [view] from now on, or by their own views again (null): each key the scene
+     * draws, [refOf] its view's ([KeyRef.scene]; null, none), wired as its view was and touched where
+     * the scene places it (060-render-p2 S1). A key hidden takes no touch, as its view says till its
+     * layout does (S4).
+     */
+    protected fun drawKeysOn(view: KeyboardCanvasView?, refOf: (KeyView) -> KeyRef? = { null }) {
+        releaseAllTouchTargets()
+        spaceKeys.removeAll { it is SceneKey }
+        canvas = view
+        if (view == null) {
+            sceneKeys = emptyMap()
+            sceneTouch = null
+            return
+        }
+        sceneKeys = wired.mapNotNull { (v, def) -> refOf(v)?.let { ref -> v to SceneKey(ref, def, view, this).also { wire(it, def, null) } } }.toMap()
+        val viewOf = sceneKeys.entries.associate { (v, k) -> k to v }
+        sceneTouch = SceneTouch(view, sceneKeys.values.toList()) { k -> viewOf[k]?.visibility == View.VISIBLE }
+    }
+
+    /** The scene's key wired as [view] was ([drawKeysOn]); null while the views draw the keys. */
+    protected fun sceneKeyOf(view: KeyView): SceneKey? = sceneKeys[view]
 
     // the keys' views take touches as the keyboard hands them: vivo's workaround, or keys drawn by the canvas
     private val routesTouches get() = vivoKeypressWorkaround || canvas != null
@@ -613,18 +662,15 @@ abstract class BaseKeyboard(
 
     private fun releaseAllTouchTargets() {
         touchTargets.forEach {
-            val keyView = it.value.view
-            keyView.cancelGestures()
-            onPopupAction(PopupAction.DismissAction(keyView.id))
+            val target = it.value
+            target.cancel()
+            onPopupAction(PopupAction.DismissAction(target.ref))
         }
         touchTargets.clear()
     }
 
     private fun findTouchTarget(event: MotionEvent, pointerIndex: Int): TouchTarget? {
-        canvas?.let { c ->
-            val hit = Rect()
-            return c.keyViewAt(event.getX(pointerIndex) - c.left, event.getY(pointerIndex) - c.top, hit)?.let { TouchTarget(it, hit) }
-        }
+        sceneTouch?.let { return it.find(event.getX(pointerIndex), event.getY(pointerIndex)) }
         val x0 = event.getX(pointerIndex).roundToInt()
         val y0 = event.getY(pointerIndex).roundToInt()
         val rowHitRect = Rect()
@@ -640,27 +686,15 @@ abstract class BaseKeyboard(
             keyHitRect.contains(x1, y1)
         } ?: return null
         keyHitRect.offset(rowHitRect.left, rowHitRect.top)
-        return TouchTarget(key, keyHitRect)
+        return ViewTarget(key, keyHitRect)
     }
 
     /** Gives finger [pointerIndex] of [event] to [target] for the rest of its touch. */
     private fun dispatchDown(event: MotionEvent, pointerIndex: Int, target: TouchTarget) {
         // a disabled key takes no touch, as on the system's dispatch: CustomGestureView refuses its Down, not its Up
-        if (!target.view.isEnabled) return
+        if (!target.enabled) return
         touchTargets[event.getPointerId(pointerIndex)] = target
-        dispatchMotionEventToTarget(event, MotionEvent.ACTION_DOWN, pointerIndex, target)
-    }
-
-    private fun dispatchMotionEventToTarget(
-        event: MotionEvent,
-        action: Int,
-        pointerIndex: Int,
-        target: TouchTarget
-    ) {
-        val keyEvent = event.forKey(action, pointerIndex, target.hitRect)
-        target.view.dispatchTouchEvent(keyEvent)
-        // the key reads it in place and keeps none of it: back to the pool, not left to the finalizer
-        keyEvent.recycle()
+        target.send(event, MotionEvent.ACTION_DOWN, pointerIndex)
     }
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
@@ -689,7 +723,7 @@ abstract class BaseKeyboard(
                     for (i in 0 until event.pointerCount) {
                         val pid = event.getPointerId(i)
                         val target = touchTargets[pid] ?: continue
-                        dispatchMotionEventToTarget(event, MotionEvent.ACTION_MOVE, i, target)
+                        target.send(event, MotionEvent.ACTION_MOVE, i)
                     }
                     return true
                 }
@@ -697,7 +731,7 @@ abstract class BaseKeyboard(
                     val i = event.actionIndex
                     val pid = event.getPointerId(i)
                     val target = touchTargets[pid] ?: return true
-                    dispatchMotionEventToTarget(event, MotionEvent.ACTION_UP, i, target)
+                    target.send(event, MotionEvent.ACTION_UP, i)
                     touchTargets.remove(pid)
                     return true
                 }
@@ -708,7 +742,7 @@ abstract class BaseKeyboard(
                         releaseAllTouchTargets()
                         return true
                     }
-                    dispatchMotionEventToTarget(event, MotionEvent.ACTION_UP, 0, target)
+                    target.send(event, MotionEvent.ACTION_UP, 0)
                     touchTargets.remove(pid)
                     return true
                 }
@@ -734,24 +768,24 @@ abstract class BaseKeyboard(
         popupActionListener?.onPopupAction(action)
     }
 
-    private fun onPopupChangeFocus(viewId: Int, x: Float, y: Float): Boolean {
-        val changeFocusAction = PopupAction.ChangeFocusAction(viewId, x, y)
+    private fun onPopupChangeFocus(key: KeyRef, x: Float, y: Float): Boolean {
+        val changeFocusAction = PopupAction.ChangeFocusAction(key, x, y)
         popupActionListener?.onPopupAction(changeFocusAction)
         return changeFocusAction.outResult
     }
 
-    private fun onPopupTrigger(viewId: Int, cancelled: Boolean): Boolean {
+    private fun onPopupTrigger(key: KeyRef, cancelled: Boolean): Boolean {
         if (cancelled) {
             // consumed: the listeners under this one would dismiss it a second time
-            onPopupAction(PopupAction.DismissAction(viewId))
+            onPopupAction(PopupAction.DismissAction(key))
             return true
         }
-        val triggerAction = PopupAction.TriggerAction(viewId)
+        val triggerAction = PopupAction.TriggerAction(key)
         // ask popup keyboard whether there's a pending KeyAction
         onPopupAction(triggerAction)
         val action = triggerAction.outAction ?: return triggerAction.outConsumed
         onAction(action, KeyActionListener.Source.Popup)
-        onPopupAction(PopupAction.DismissAction(viewId))
+        onPopupAction(PopupAction.DismissAction(key))
         return true
     }
 

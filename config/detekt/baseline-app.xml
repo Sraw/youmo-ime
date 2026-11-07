@@ -4,7 +4,6 @@
   <CurrentIssues>
     <ID>ComplexCondition:IdleUi.kt:IdleUi$!fromUser || disableAnimation || (state == State.InlineSuggestion || currentState == State.InlineSuggestion) || (state == State.NumberRow || currentState == State.NumberRow)</ID>
     <ID>ComplexCondition:PopupKeyboardUi.kt:PopupKeyboardUi$newRow &lt; -2 || newRow &gt; rowCount + 1 || newColumn &lt; -2 || newColumn &gt; columnCount + 1</ID>
-    <ID>CyclomaticComplexMethod:BaseKeyboard.kt:BaseKeyboard$private fun createKeyView: KeyView</ID>
     <ID>CyclomaticComplexMethod:CapabilityFlag.kt:CapabilityFlags.Companion$fun fromEditorInfo: CapabilityFlags</ID>
     <ID>CyclomaticComplexMethod:ConfigDescriptor.kt:ConfigDescriptor.Companion$override fun parse: Either&lt;ParseException, ConfigDescriptor&lt;*, *&gt;&gt;</ID>
     <ID>CyclomaticComplexMethod:EditingSessionOverRealEditorTest.kt:EditingSessionOverRealEditorTest$@Test fun randomSessions</ID>
@@ -12,7 +11,6 @@
     <ID>CyclomaticComplexMethod:PreferenceScreenFactory.kt:PreferenceScreenFactory$private fun general</ID>
     <ID>CyclomaticComplexMethod:StatusIconMapping.kt:StatusIconMapping$@DrawableRes fun fromEntry: Int</ID>
     <ID>LargeClass:FcitxInputMethodService.kt:FcitxInputMethodService : LifecycleInputMethodService</ID>
-    <ID>LongMethod:BaseKeyboard.kt:BaseKeyboard$private fun createKeyView: KeyView</ID>
     <ID>LongMethod:CapabilityFlag.kt:CapabilityFlags.Companion$fun fromEditorInfo: CapabilityFlags</ID>
     <ID>LongMethod:ConfigDescriptor.kt:ConfigDescriptor.Companion$override fun parse: Either&lt;ParseException, ConfigDescriptor&lt;*, *&gt;&gt;</ID>
     <ID>LongMethod:CustomGestureView.kt:CustomGestureView$@SuppressLint("ClickableViewAccessibility") override fun onTouchEvent: Boolean</ID>

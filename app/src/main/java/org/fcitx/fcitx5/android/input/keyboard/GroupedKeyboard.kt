@@ -311,9 +311,9 @@ class GroupedKeyboard(
     // public for its test, which has no touch to open one
     public override fun onPopupAction(action: PopupAction) {
         val shown = when (action) {
-            is PopupAction.PreviewAction -> action.copy(content = previewOf(action.content, action.viewId, { it }, ::mapped))
-            is PopupAction.PreviewUpdateAction -> action.copy(content = previewOf(action.content, action.viewId, { it }, ::mapped))
-            is PopupAction.ShowKeyboardAction -> groupOf[action.viewId]?.let { (group, corner) ->
+            is PopupAction.PreviewAction -> action.copy(content = previewOf(action.content, action.key, { it }, ::mapped))
+            is PopupAction.PreviewUpdateAction -> action.copy(content = previewOf(action.content, action.key, { it }, ::mapped))
+            is PopupAction.ShowKeyboardAction -> groupOf[action.key.viewId]?.let { (group, corner) ->
                 action.copy(keyboard = longPressOf(group, corner, ::symbolsOf))
             } ?: action
             else -> action
@@ -327,7 +327,7 @@ class GroupedKeyboard(
 
     // a tap on a key of two letters as its code with where it fell; a click no touch made (TalkBack),
     // a swipe's, L and M as the code alone
-    override fun pressed(view: CustomGestureView, action: KeyAction): KeyAction = tapped(action, view.clickAt, letters)
+    override fun pressed(clickAt: Float, action: KeyAction): KeyAction = tapped(action, clickAt, letters)
 
     override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
         `return`.showReturnAction(appearance)
