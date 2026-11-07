@@ -645,14 +645,9 @@ class Device:
         """every talk from here hears the clips Device.say queues, not the microphone (the app's
         process restarted, pm clear: off again, and the files gone)"""
         self._clips_in = set() if "on=false" in self.clip_call("state") else self._clips_in
+        # cleared first: nothing an earlier case left queued is heard in this one
+        self.clip_call("clear")
         self.clip_call("on")
-
-    def recording(self):
-        """seconds the active AudioRecord has been recording (dumpsys audio: the monitor's active riid,
-        its first event against the device's clock), None if none is"""
-        return record_age(self.sh("date +'%m-%d %H:%M:%S.%N'; dumpsys audio | sed -n "
-                                  "'/^RecordActivityMonitor dump time/,/^Events log: recording activity/p;"
-                                  "/^Events log: recording activity/,/^$/p'").splitlines())
 
     # --- reading the screen
     # the dump server (Dumper.java): one UiAutomation connection kept open, ~0.1 s a dump
@@ -2518,41 +2513,19 @@ def tail(path, n=3):
         return path
 
 
-def record_age(out, pkg=None):
-    """Device.recording's parse: out is the device's date, then dumpsys audio's recording monitor and
-    events; an active riid whose lines name a package (pack:) counts only if one is pkg (the app's)"""
-    pkg = pkg or PKG
-    if not out:
-        return None
-    for riid in (m.group(1) for l in out if (m := re.match(r"\s*riid (\d+); active\? true", l))):
-        mine = [l for l in out if re.search(rf"\briid:{riid}\b", l)]
-        packs = [l for l in mine if "pack:" in l]
-        if packs and not any(f"pack:{pkg} " in l + " " for l in packs):
-            continue
-        now = datetime.datetime.strptime("2000-" + out[0][:21], "%Y-%m-%d %H:%M:%S.%f")
-        for l in mine:
-            if re.match(r"\d\d-\d\d \d", l):
-                then = datetime.datetime.strptime("2000-" + l[:18], "%Y-%m-%d %H:%M:%S:%f")
-                return max(0.0, (now - then).total_seconds())
-        return 0.0   # active, its start not logged yet: just opened
-    return None
-
-
-def grpc_port(port):
-    """the emulator's gRPC port, from its console port (8554 for 5554: one each, two can run at once)"""
-    return 8554 + int(port) - 5554
-
-
-def need_mic():
-    """kept for the scripts: Device.say needs nothing on the host (the clip microphone is the app's)"""
-
-
 CLIP_URI = f"content://{PKG}.voiceclip"
+
+
+def clips_done(state):
+    """VoiceClipProvider's state: nothing queued, and nothing playing or no talk to play it (a lift
+    mid-clip ends the talk, what was left of the clip with it)"""
+    v = dict(re.findall(r"(\w+)=(\S*)", state))
+    return v.get("queued") == "" and (v.get("playing") == "false" or v.get("talking") == "false")
 
 
 class ClipPlay:
     """Device.say's queue as a player: done once its clips' time has passed and the app says none is
-    left; kill() drops what is left (the clip microphone stays on)"""
+    left; kill() drops what is left, the clip playing too (the clip microphone stays on)"""
 
     def __init__(self, d, secs):
         self.d, self.end = d, time.time() + secs + 0.2
@@ -2560,8 +2533,7 @@ class ClipPlay:
     def poll(self):
         if time.time() < self.end:
             return None
-        st = self.d.clip_call("state")
-        return 0 if "playing=false" in st and st.endswith("queued=") else None
+        return 0 if clips_done(self.d.clip_call("state")) else None
 
     def wait(self, timeout=None):
         until = time.time() + (timeout or 600)
@@ -2617,7 +2589,7 @@ def up(port="5556"):
             with open(log, "w") as f:   # the emulator holds its own copy of the file
                 emu = subprocess.Popen([emulator_bin(), "-avd", AVD, "-port", port, "-snapshot", SNAPSHOT,
                                         "-no-snapshot-save", "-read-only", "-no-window", "-no-boot-anim",
-                                        "-grpc", str(grpc_port(port)), "-audio", "none", "-gpu", gpu],
+                                        "-no-audio", "-gpu", gpu],
                                        stdout=f, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                                        env=emulator_env(gpu), start_new_session=True)
         for _ in range(180):

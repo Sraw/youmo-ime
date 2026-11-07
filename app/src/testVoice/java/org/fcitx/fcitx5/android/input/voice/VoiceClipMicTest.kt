@@ -92,10 +92,78 @@ class VoiceClipMicTest {
         VoiceClipMic.clear()
         assertEquals(null, VoiceClipMic.feed())
         VoiceClipMic.queue(listOf(clip(10, 0.1f), Part.Pause(800)))
-        assertEquals("on=true playing=false queued=c,800ms", VoiceClipMic.state())
-        assertTrue(VoiceClipMic.feed() != null)
+        assertEquals("on=true talking=false playing=false queued=c,800ms", VoiceClipMic.state())
+        val f = VoiceClipMic.feed()!!
+        assertEquals("on=true talking=true playing=false queued=c,800ms", VoiceClipMic.state())
+        f.close()
         VoiceClipMic.clear()
-        assertEquals("on=false playing=false queued=", VoiceClipMic.state())
+        assertEquals("on=false talking=false playing=false queued=", VoiceClipMic.state())
+    }
+
+    @Test
+    fun theTalkEndingMidClipLeavesNothingPlaying() {
+        VoiceClipMic.clear()
+        VoiceClipMic.queue(listOf(clip(rate, 0.5f)))
+        val f = VoiceClipMic.feed()!!
+        f.read(FloatArray(512))
+        assertEquals("on=true talking=true playing=true queued=", VoiceClipMic.state())
+        f.close()
+        assertEquals("on=true talking=false playing=false queued=", VoiceClipMic.state())
+        VoiceClipMic.clear()
+    }
+
+    @Test
+    fun takingAPartSaysPlayingAtOnce() {
+        VoiceClipMic.clear()
+        VoiceClipMic.queue(listOf(clip(10, 0.5f)))
+        VoiceClipMic.take()
+        // no moment with the queue empty and nothing playing, before the Feed says so itself
+        assertEquals("on=true talking=false playing=true queued=", VoiceClipMic.state())
+        VoiceClipMic.clear()
+        assertEquals("on=false talking=false playing=false queued=", VoiceClipMic.state())
+    }
+
+    @Test
+    fun clearingStopsTheClipPlaying() {
+        var gen = 0
+        val busy = mutableListOf<Boolean>()
+        val q = ArrayDeque<Part>(listOf(clip(rate, 0.5f)))
+        val time = Time()
+        val f = VoiceClipMic.Feed(rate, { q.removeFirstOrNull() }, { time.ns }, time::sleep, { gen }, { busy += it })
+        val buf = FloatArray(512)
+        f.read(buf)
+        assertEquals(0.5f, buf[0])
+        gen++
+        f.read(buf)
+        assertTrue(buf.all { it != 0.5f })
+        assertEquals(listOf(true, false), busy)
+    }
+
+    @Test
+    fun theLastWindowOfAClipIsNotBusyAfter() {
+        val busy = mutableListOf<Boolean>()
+        val q = ArrayDeque<Part>(listOf(clip(512, 0.5f)))
+        val time = Time()
+        val f = VoiceClipMic.Feed(rate, { q.removeFirstOrNull() }, { time.ns }, time::sleep, busy = { busy += it })
+        f.read(FloatArray(512))
+        assertEquals(listOf(false), busy)
+    }
+
+    @Test
+    fun eachClipSaysWhenItStarts() {
+        val started = mutableListOf<String>()
+        val q = ArrayDeque<Part>(listOf(Part.Clip("a", FloatArray(600)), Part.Pause(10), Part.Clip("b", FloatArray(10))))
+        val time = Time()
+        val f = VoiceClipMic.Feed(rate, { q.removeFirstOrNull() }, { time.ns }, time::sleep, started = { started += it })
+        f.read(FloatArray(512))
+        assertEquals(listOf("a"), started)
+        f.read(FloatArray(512))
+        assertEquals(listOf("a", "b"), started)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun aPauseOverAMinuteIsRefused() {
+        Part.Pause(60_001)
     }
 
     private fun wav(samples: ShortArray, rate: Int = 16000, channels: Int = 1, extra: Boolean = false): ByteArray {
@@ -130,5 +198,23 @@ class VoiceClipMicTest {
     @Test(expected = IllegalArgumentException::class)
     fun aStereoWavIsRefused() {
         VoiceClipMic.decode(wav(shortArrayOf(0, 1), channels = 2))
+    }
+
+    @Test
+    fun aBrokenWavIsRefused() {
+        val good = wav(shortArrayOf(0, 1))
+        // RIFF but not WAVE
+        val riff = good.copyOf().also { "AVI ".toByteArray().copyInto(it, 8) }
+        // fmt cut short: its header says 16 bytes, 4 follow
+        val cut = good.copyOf(12 + 8 + 4)
+        // data before fmt
+        val dataFirst = good.copyOf(12) + "data".toByteArray() + byteArrayOf(4, 0, 0, 0, 0, 0, 1, 0)
+        for (bad in listOf(riff, cut, dataFirst)) {
+            try {
+                VoiceClipMic.decode(bad)
+                throw AssertionError("decoded")
+            } catch (_: IllegalArgumentException) {
+            }
+        }
     }
 }

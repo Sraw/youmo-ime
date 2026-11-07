@@ -4,6 +4,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import tempfile
 import threading
 import time
@@ -578,40 +579,61 @@ class ResultsFileTest(unittest.TestCase):
             self.assertEqual([], uat.build_sheets(uat.Run("r", []), {}))
 
 
-class MicTest(unittest.TestCase):
-    def test_each_emulator_has_its_own_grpc_port(self):
-        self.assertEqual((8554, 8558, 8560), tuple(uat.grpc_port(p) for p in ("5554", "5558", "5560")))
+class ClipMicTest(unittest.TestCase):
+    def device(self, states, idle="on=true talking=false playing=false queued="):
+        d = uat.Device.__new__(uat.Device)
+        d.calls = []
 
-    def test_an_audio_packet_is_encoded_as_the_proto_says(self):
-        # AudioFormat{samplingRate=16000, channels=Mono, format=S16, mode=REAL_TIME}: 0x08 varint 16000 ...
-        fmt = uat._pb_field(1, 16000) + uat._pb_field(2, 0) + uat._pb_field(3, 1) + uat._pb_field(4, 1)
-        self.assertEqual(bytes.fromhex("08807d1000180120 01"), fmt)
-        self.assertEqual(b"\x1a\x02ab", uat._pb_field(3, b"ab"))
+        def sh(cmd):
+            d.calls.append(cmd)
+            method = re.search(r"--method (\w+)", cmd).group(1)
+            st = states.pop(0) if method == "state" and states else idle
+            return "Result: Bundle[{state=%s}]\n" % st
+        d.sh = sh
+        return d
 
-    DUMP = ["11-04 10:00:05.500000000", "RecordActivityMonitor dump time: 11-04 10:00:05",
-            "  riid 7; active? true", "  riid 9; active? true",
-            "Events log: recording activity",
-            "11-04 10:00:01:000 rec start riid:7 uid:10050 session:1 src:MIC pack:com.other.app",
-            "11-04 10:00:04:000 rec start riid:9 uid:10150 session:2 src:MIC pack:%s" % uat.PKG]
+    def test_clip_call_reads_the_state_line(self):
+        d = self.device(["on=true talking=true playing=true queued=a.wav,800ms"])
+        self.assertEqual("on=true talking=true playing=true queued=a.wav,800ms", d.clip_call("state"))
+        self.assertIn("content call --uri content://%s.voiceclip --method state" % uat.PKG, d.calls[0])
 
-    def test_recording_counts_only_the_apps_audiorecord(self):
-        self.assertAlmostEqual(1.5, uat.record_age(self.DUMP))
-        self.assertIsNone(uat.record_age(self.DUMP[:3] + self.DUMP[4:6]))
+    def test_clip_call_with_no_state_is_blocked(self):
+        d = uat.Device.__new__(uat.Device)
+        d.sh = lambda cmd: "Error while accessing provider"
+        with self.assertRaises(uat.Blocked):
+            d.clip_call("state")
 
-    def test_recording_without_package_names_takes_the_active_one(self):
-        out = [self.DUMP[0], "  riid 3; active? true", "11-04 10:00:05:000 rec start riid:3 uid:1 session:1"]
-        self.assertAlmostEqual(0.5, uat.record_age(out))
-        self.assertEqual(0.0, uat.record_age(out[:2]))
-        self.assertIsNone(uat.record_age([self.DUMP[0], "  riid 3; active? false"]))
+    def test_done_once_nothing_is_queued_and_nothing_plays_or_no_talk_is_on(self):
+        self.assertTrue(uat.clips_done("on=true talking=true playing=false queued="))
+        self.assertTrue(uat.clips_done("on=true talking=false playing=true queued="))
+        self.assertFalse(uat.clips_done("on=true talking=true playing=true queued="))
+        self.assertFalse(uat.clips_done("on=true talking=false playing=false queued=b.wav"))
 
-    def test_a_mic_wait_that_times_out_stops_the_stream(self):
-        m = uat.Mic.__new__(uat.Mic)
-        m.stop, m.error = threading.Event(), None
-        m.thread = threading.Thread(target=m.stop.wait, daemon=True)
-        m.thread.start()
-        with self.assertRaises(uat.subprocess.TimeoutExpired):
-            m.wait(0.05)
-        self.assertTrue(m.stop.is_set())
+    def test_poll_waits_for_the_clips_time_then_the_app(self):
+        d = self.device(["on=true talking=true playing=true queued=", "on=true talking=true playing=false queued="])
+        p = uat.ClipPlay(d, 0)
+        p.end = 0
+        self.assertIsNone(p.poll())
+        self.assertEqual(0, p.poll())
+        p.end = time.time() + 60
+        self.assertIsNone(p.poll())   # its time not passed: the app not even asked
+        self.assertEqual(2, len(d.calls))
+
+    def test_a_wait_that_times_out_kills_it(self):
+        d = self.device([], idle="on=true talking=true playing=true queued=")
+        p = uat.ClipPlay(d, 0)
+        p.end = 0
+        with mock.patch.object(uat.time, "sleep", lambda s: None), \
+                self.assertRaises(uat.subprocess.TimeoutExpired):
+            p.wait(0.01)
+        self.assertEqual(["clear", "on"], [re.search(r"--method (\w+)", c).group(1) for c in d.calls[-2:]])
+
+    def test_clip_mic_clears_before_it_turns_on(self):
+        d = self.device([])
+        d._clips_in = {"a"}
+        d.clip_mic()
+        self.assertEqual(["state", "clear", "on"], [re.search(r"--method (\w+)", c).group(1) for c in d.calls])
+        self.assertEqual({"a"}, d._clips_in)
 
 
 class PlugTest(unittest.TestCase):

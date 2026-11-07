@@ -12,10 +12,12 @@ import android.os.Binder
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
 import org.fcitx.fcitx5.android.input.voice.VoiceClipMic
+import timber.log.Timber
 import java.io.File
 
 /**
- * The device UAT's clip microphone ([VoiceClipMic]), from the shell only (uid 2000, or root):
+ * The device UAT's clip microphone ([VoiceClipMic]), from the shell only (uid 2000, or root; the
+ * manifest asks for DUMP too):
  *
  *     adb shell content write --uri content://<package>.voiceclip/a.wav < a.wav   # into files/voiceclips/
  *     adb shell content call --uri content://<package>.voiceclip --method queue --arg a.wav,800,b.wav
@@ -23,9 +25,9 @@ import java.io.File
  *     adb shell content call --uri content://<package>.voiceclip --method state
  *     adb shell content call --uri content://<package>.voiceclip --method clear
  *
- * A queue's names are files in files/voiceclips/ (or absolute paths the app can read), its numbers
- * pauses in ms; from it on every talk hears the clips, not the microphone, till cleared. The voice
- * debug build only.
+ * A queue's names are files in files/voiceclips/ (16 MB at most), its numbers pauses in ms (to
+ * 60 s); from it on every talk hears the clips, not the microphone, till cleared. The voice debug
+ * build only.
  */
 class VoiceClipProvider : ContentProvider() {
 
@@ -38,16 +40,32 @@ class VoiceClipProvider : ContentProvider() {
 
     private fun dir() = File(requireNotNull(context).filesDir, "voiceclips")
 
+    // a name in files/voiceclips/, no path out of it; no absolute paths either: the app's own files are enough
+    private fun clip(name: String): File {
+        require('/' !in name && name != "." && name != "..") { "a name, not a path: $name" }
+        return File(dir(), name)
+    }
+
     private fun part(name: String): VoiceClipMic.Part = name.toIntOrNull()?.let { VoiceClipMic.Part.Pause(it) } ?: run {
-        val file = if (name.startsWith("/")) File(name) else File(dir(), name)
+        val file = clip(name)
+        require(file.isFile) { "no clip $name" }
+        require(file.length() <= MAX_BYTES) { "$name is over $MAX_BYTES bytes" }
         VoiceClipMic.Part.Clip(name, VoiceClipMic.decode(file.readBytes()))
     }
 
     override fun call(method: String, arg: String?, extras: Bundle?): Bundle {
         shellOnly()
         when (method) {
-            "queue" -> VoiceClipMic.queue(arg.orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }.map(::part))
-            "on" -> VoiceClipMic.queue(emptyList())
+            "queue" -> {
+                // all of it read before any is queued: a clip missing leaves the queue as it was
+                val parts = arg.orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }.map(::part)
+                VoiceClipMic.queue(parts)
+                Timber.w("voice clip microphone: queued %s", arg)
+            }
+            "on" -> {
+                VoiceClipMic.queue(emptyList())
+                Timber.w("voice clip microphone: on")
+            }
             "clear" -> VoiceClipMic.clear()
             "state" -> Unit
             else -> throw IllegalArgumentException("method: queue, on, clear or state, not $method")
@@ -57,9 +75,8 @@ class VoiceClipProvider : ContentProvider() {
 
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
         shellOnly()
-        val name = requireNotNull(uri.lastPathSegment) { "content://…voiceclip/<name>" }
-        require('/' !in name && name != "..") { "a name, not a path: $name" }
-        val file = File(dir().apply { mkdirs() }, name)
+        val file = clip(requireNotNull(uri.lastPathSegment) { "content://…voiceclip/<name>" })
+        dir().mkdirs()
         return ParcelFileDescriptor.open(file, ParcelFileDescriptor.parseMode(mode))
     }
 
@@ -73,5 +90,6 @@ class VoiceClipProvider : ContentProvider() {
         const val PER_USER = 100_000
         const val SHELL_UID = 2000
         const val ROOT_UID = 0
+        const val MAX_BYTES = 16L shl 20
     }
 }

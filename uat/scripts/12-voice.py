@@ -7,7 +7,7 @@ import re
 import subprocess
 import time
 
-from uat import CLIPS, OUT, PKG, Blocked, Fail, case, check, need_mic, script
+from uat import CLIPS, OUT, PKG, Blocked, Fail, case, check, script
 
 LISTEN, HEARD_NOTHING, PREPARING, SILENT = "正在听…", "没有听清", "准备中…", "麦克风没有声音"
 EV = "voice:语音只在语音版跑（--flavor voice）"
@@ -76,18 +76,6 @@ def raw_up(d):
     return f"sendevent {dev} 3 57 4294967295; sendevent {dev} 0 0 0"
 
 
-class HalBroke(Blocked):
-    """the emulator's sound card failing (pcm_readi failed): the try says nothing of the app; a
-    case that does not retry is blocked by it"""
-
-    def __init__(self):
-        super().__init__("模拟器声卡出错（pcm_readi failed），准备中…等不到声音")
-
-
-def hal_errors(d):
-    return int(d.sh("logcat -d | grep -c 'pcm_readi failed'").strip() or 0)
-
-
 def hold_space(d, timeout=60, wait_quiet=True, raw=False):
     """finger down on the space key until the hold shows (准备中… or 正在听…; the first use after a
     reset loads the models); returns the space key's centre. raw: through sendevent, to be lifted with raw_up"""
@@ -99,7 +87,6 @@ def hold_space(d, timeout=60, wait_quiet=True, raw=False):
         d.sh(raw_down(d, x, y))
     else:
         d.touch(("down", x, y))
-    start = time.time()
 
     def lift():
         if raw:
@@ -108,20 +95,11 @@ def hold_space(d, timeout=60, wait_quiet=True, raw=False):
             d.touch(("up", x, y))
 
     def listening(s):
-        # nothing shown past 5 s with the sound card failing: the app's start waits on the HAL
-        # (rare; the hal_errors check after the wait is the one that mostly catches it)
-        if time.time() - start > 5 and hal_errors(d):
-            raise HalBroke()
-        # 准备中… is held too: the emulator's microphone reads exact zeroes till a clip plays, so
-        # 正在听 comes with the clip (VO-26)
+        # 准备中… is held too: the models may still be loading
         return anywhere(s, LISTEN) or anywhere(s, PREPARING) or anywhere(s, SILENT)
 
     try:
         d.wait(listening, timeout, step=0.2, what=LISTEN)
-    except HalBroke:
-        lift()
-        settle(d)
-        raise
     except Blocked:
         s = d.screen()
         d.shot("full", f"长按空格 {timeout} s，没有「{LISTEN}」")
@@ -189,57 +167,19 @@ def settle(d, timeout=15, seen=None):
     return d.field_text() or ""
 
 
-def host_calm(timeout=30):
-    """wait (at most [timeout] s) till the host's 1-minute load is under its core count: with the
-    host saturated (other checkouts' Gradle) the emulator's vCPUs starve, the guest's audio HAL logs
-    "pcm_readi was late delivering frames, inserting … silence" for every 16 ms and the app hears
-    digital silence (envPeak -120 dBFS, no segment) though the clip played into uat-mic"""
-    need_mic()   # nothing to wait for till a clip can be said
-    end = time.time() + timeout
-    while time.time() < end and os.getloadavg()[0] >= os.cpu_count():
-        time.sleep(5)
-
-
 def retried(d, clip, ok, before=""):
-    """dictate until ok(field) holds, three times at most: the emulator's microphone drops frames
-    when the host is busy (the HAL's "late delivering frames, inserting … silence"). What a miss
-    added after before is taken back between tries. Returns (shown, field, tries, misses)"""
-    misses, shown, t = [], [], before
-    hal = False   # the last try lost to the sound card: the result is the emulator's, blocked
-    for n in range(1, 4):
-        host_calm()
-        d.sh("logcat -c")
-        hal = True
-        try:
-            shown, t = dictate(d, clip)
-        except HalBroke:   # a try lost to the emulator's sound card, as a dropped frame's
-            misses.append("（模拟器声卡出错）")
-            time.sleep(5)
-            continue
-        if hal_errors(d) and not ok(t):   # it failed after 准备中… had shown: not the app's miss either
-            misses.append(f"（模拟器声卡出错）{t[len(before):]}")
-            if len(t) > len(before):
-                d.bksp(len(t) - len(before))
-                t = before
-            time.sleep(5)
-            continue
-        hal = False
-        if ok(t) or not t.startswith(before):
-            return shown, t, n, misses
-        misses.append(t[len(before):])
-        if len(t) > len(before):
-            d.bksp(len(t) - len(before))
-    if hal:
-        raise Blocked(f"3 次里最后一次模拟器声卡出错（pcm_readi failed），不算 App 的：{misses}")
-    return shown, t, 3, misses
+    """dictate once: the clip microphone hears the clip whole every time, so a miss is the app's
+    (the emulator's sound card it replaced dropped frames, and a miss was tried again). ok is kept
+    for the callers. Returns (shown, field, tries, misses)"""
+    d.sh("logcat -c")
+    shown, t = dictate(d, clip)
+    return shown, t, 1, []
 
 
 RATE = 16000
 # how long after the speech's start the app's "voice speech started" line comes; the streaming build
 # (0.6.0, no VAD) logs none, so the lift is timed from the host (cued stays False), as R15's was
 LIFT_CUE_LAG = 0.35
-# the HAL's "late delivering frames" lines a try may have and still count (a good try has 0 to 7)
-HAL_LATE_MOST = 20
 # whether the build logs the cue (a debug build of the voice tail; not R15): set from the first try
 cued = False
 NOTHING_HEARD = "nothing heard"   # lift_early's offset when the debug log has no speech segment
@@ -266,15 +206,7 @@ def capture_log(d):
     line += " " + d.sh("logcat -d | grep 'voice segments:' | tail -1").strip()
     v = dict(re.findall(r"(\w+(?:\.\w+)?)=(\S+)", line))
     num = lambda k: None if v.get(k) in (None, "null") else float(v[k])
-    got = {k: num(k) for k in ("liftFrame", "stopAt", "read", "speechStart", "segments", "envPeak", "peakGainDb")}
-    # the emulator's sound card failing mid-capture ("pcm_readi failed with 'cannot read/write stream
-    # data: I/O error'"): the HAL hands the app silence from there on, which can leave a speech
-    # segment of a syllable or two and an empty text. The emulator's, not the app's
-    got["halErrors"] = hal_errors(d)
-    # and running late: past a few, the silence it pads with shifts the record's frames against the
-    # speech, so the lift's offset is not where the finger was (seen: +83, -716 ms around -450)
-    got["halLate"] = int(d.sh("logcat -d | grep -c 'late delivering frames'").strip() or 0)
-    return got
+    return {k: num(k) for k in ("liftFrame", "stopAt", "read", "speechStart", "segments", "envPeak", "peakGainDb")}
 
 
 def tries_note(n, misses):
@@ -356,9 +288,7 @@ def vo04(d):
     d.tap(hint.c, 0.1)
     t2 = mask_gone(d)
     check(t2.startswith(t1) and plain(t2[len(t1):]).lstrip("，,。. ") == "你好", f"再点麦克风说「你好」点盖层，框里「{t2}」")
-    d.type("a")
-    t3 = d.field_text() or ""
-    check(len(t3) > len(t2) or d.screen().ime(), f"结束后键盘不能打：「{t3}」")
+    check(d.screen().find(rid="keyboard_view", where="ime"), "结束后键盘没回来")
     return f"点麦克风结束「{t1}」；点盖层结束「{t2}」"
 
 
@@ -378,35 +308,16 @@ case("VO-08", needs="jvm:VoiceHoldUatTest.englishInChineseIsTypedAsWritten")(lam
 # digital silence shows no gain, so real noise is played
 @case("VO-09", base="B0-语音", mutates="learn", needs=EV)
 def vo09(d):
-    lost = []
-    for _ in range(4):
-        host_calm()
-        d.sh("logcat -c")   # this try's line only, not one an earlier case left
-        try:
-            shown, t = dictate(d, "room")
-        except HalBroke:
-            lost.append("准备中…时声卡出错")
-            time.sleep(5)   # its failures come in runs: let it settle
-            continue
-        log = capture_log(d)
-        # with the debug log, the noise must have reached the app at its level (-60 dBFS played)
-        # through a working sound card: digital silence (-120) or a failed HAL leaves the field
-        # empty too and says nothing of the gain
-        if log and log["halErrors"]:
-            lost.append("声卡出错")
-        elif log and log["envPeak"] is not None and not -70 <= log["envPeak"] <= -50:
-            lost.append(f"env {log['envPeak']} dBFS")
-        else:
-            break
-        if plain(t):
-            d.bksp(len(t))
-        time.sleep(5)
-    else:
-        raise Blocked(f"4 次噪声都没按电平送到 App：{lost}")
+    d.sh("logcat -c")   # this try's line only, not one an earlier case left
+    shown, t = dictate(d, "room")
+    log = capture_log(d)
+    # with the debug log, the noise must have reached the app at its level (-60 dBFS played)
+    if log and log["envPeak"] is not None:
+        check(-70 <= log["envPeak"] <= -50, f"底噪没按电平送到 App：env {log['envPeak']} dBFS")
     check(plain(t) == "", f"只播 3 s 底噪（约 -60 dBFS），框里「{t}」")
     check(HEARD_NOTHING in shown, f"只播底噪，松开后没显示「{HEARD_NOTHING}」：{shown[:8]}")
     gain = f"，env 峰值 {log['envPeak']} dBFS 处增益 {log['peakGainDb']:+.1f} dB" if log and log["peakGainDb"] is not None else ""
-    return f"底噪 3 s：不上屏，显示「{HEARD_NOTHING}」{gain}" + (f"（之前不算：{lost}）" if lost else "")
+    return f"底噪 3 s：不上屏，显示「{HEARD_NOTHING}」{gain}"
 
 
 # also on the JVM (VoiceUatTest.aBlockedWordIsNotTypedFromVoice), which checks the string handed to the
@@ -503,28 +414,25 @@ def lift_early(d, clip, before_s):
     """hold space, play the clip and lift [before_s] before its speech ends; returns (field, offset ms
     of the lift from the speech's end as the debug log puts it or None (a build without the log: R15),
     whether timestamped). With the debug log the lift is timed on the device from the app's own
-    "voice speech started" line (the VAD's, LIFT_CUE_LAG after the speech's start): the clip's way
-    from the host's player into the guest varies by ±500 ms, the cue's by tens. Without the log
-    (R15) from the moment the player starts, as before"""
+    "voice speech started" line (the VAD's, LIFT_CUE_LAG after the speech's start). Without it (the
+    streaming build) from the clip microphone's "voice clip started" line"""
     global cued
     start, end = span(clip)
     d.sh("logcat -c")
-    try:
-        hold_space(d, raw=True)
-    except HalBroke:
-        return d.field_text() or "", NOTHING_HEARD, False
+    hold_space(d, raw=True)
     time.sleep(0.3)
     if cued:
         # 450 ms, not before_s: that one is the host-timed lift's, moved by its misses
         wait = max(0.0, end - start - LIFT_CUE_LAG - 0.45)
         cmd = f"logcat -m 1 -e 'voice speech started' >/dev/null; sleep {wait:.3f}; {raw_up(d)}"
     else:
-        # R15: timed from before say(), which first waits for the app's AudioRecord (~0.5 s): the lift
-        # comes that much earlier than before_s asks. Timed from the stream's start instead, VO-23 lost
-        # the whole utterance one time in three on the emulator; this way it passes
-        cmd = f"sleep {max(0.0, end - before_s):.3f}; {raw_up(d)}"
-    up = subprocess.Popen(["adb", "-s", d.serial, "shell", cmd])
+        # timed from the clip microphone's line as it starts the clip (VoiceClipMic): the clip's
+        # start on the device, as its frames are read; timed from the host instead, adb's and the
+        # queueing's own time moved the lift by 300 ms from one try to the next
+        cmd = (f"logcat -m 1 -e 'voice clip started: {clip}.wav' >/dev/null; "
+               f"sleep {max(0.0, end - before_s):.3f}; {raw_up(d)}")
     p = d.say(clip, wait=False)
+    up = subprocess.Popen(["adb", "-s", d.serial, "shell", cmd])
     try:
         try:
             up.wait(end + 5)
@@ -539,7 +447,7 @@ def lift_early(d, clip, before_s):
     log = capture_log(d)
     if not log or log["stopAt"] is None:
         return t, None, False
-    if log["speechStart"] is None or log["halErrors"] or log["halLate"] > HAL_LATE_MOST:   # no speech, or the sound card failed: the clip never arrived whole
+    if log["speechStart"] is None:   # no speech heard: the offset cannot be measured
         return t, NOTHING_HEARD, False
     # split in two at an endpoint: a pause in the clip, the speech's end then not the clip's
     # (a build without the count: None, taken as one)
@@ -569,7 +477,6 @@ def counted_tries(d, clip, attempt, most=5):
     """[attempt]() → (ok, note, counted) until three are counted, [most] attempts at most"""
     results, every = [], []
     for _ in range(most):
-        host_calm()
         before = d.field_text() or ""
         ok, note, counted, t = attempt(before)
         every.append(note)
@@ -593,19 +500,16 @@ def vo23(d):
             t, off, stamped = lift_early(d, clip, before_s)
             got = t[len(before):] if t.startswith(before) else t
             ok = plain(got) == want
-            if off is NOTHING_HEARD:   # the emulator's HAL failed: says nothing about the tail
-                time.sleep(5)   # its failures come in runs: let it settle
-                return ok, f"没收到声音、声卡出错或语音被切成两段「{got}」（不算）", False, t
+            if off is NOTHING_HEARD:   # no speech segment, or two: says nothing about the tail
+                return ok, f"没听到语音或语音被切成两段「{got}」（不算）", False, t
             if off is None:   # no log (R15): the time cannot be checked, the text is the result
                 return ok, f"「{got}」", True, t
             note = f"{off:+.0f} ms{'' if stamped else '（无时间戳）'}「{got}」"
             if -500 <= off <= -400:
                 return ok, note, True, t
-            # off the window: not counted. Timed from the host's player (no cue: R15's first try)
-            # the next lift moves by half what this one missed by: `input`'s start and the clip's
-            # way in vary by ±300 ms there, wider than the 100 ms window. Timed from the cue it
-            # stays: those land within ±10 ms of each other (-466, -477, -483, -474), so a try off
-            # the window is one the emulator's audio upset, and moving after it chased that noise
+            # off the window: not counted. Timed from the host (no cue) the next lift moves by half
+            # what this one missed by: adb's and sendevent's start vary by some 100 ms, the
+            # window's width. Timed from the cue it stays: those land within ±10 ms of each other
             if not cued:
                 before_s += (off + 450) / 2000
             return ok, note + "（不在区间，不算）", False, t
@@ -620,11 +524,7 @@ def vo24(d):
     for clip, want in (("zouba-q44", "我们走吧"), ("nihao-q44", "你好")):
         def attempt(before):
             d.sh("logcat -c")
-            try:
-                _, t = dictate(d, clip)
-            except HalBroke:
-                time.sleep(5)   # its failures come in runs: let it settle
-                return False, "准备中…时模拟器声卡出错（不算）", False, d.field_text() or ""
+            _, t = dictate(d, clip)
             got = t[len(before):] if t.startswith(before) else t
             ok = plain(got) == want
             log = capture_log(d)
@@ -632,10 +532,7 @@ def vo24(d):
                 return ok, f"「{got}」", True, t
             env, gain = log["envPeak"], log["peakGainDb"]
             note = f"env {env} dBFS、{gain:+.1f} dB「{got}」"
-            if log["halErrors"]:   # the emulator's sound card failed mid-capture
-                time.sleep(5)   # its failures come in runs: let it settle
-                return ok, note + "（模拟器声卡出错，不算）", False, t
-            # the level in the guest off: not counted. The clip's own peak lands at -55 ± 1 dBFS
+            # the level in the app off: not counted. The clip's own peak lands at -55 ± 1 dBFS
             # (measured -55.3 to -54.3), so the top of the window has 5 dB of room; the gain is
             # what says it was quiet speech
             if -65 <= env <= -50 and gain >= 15:
@@ -671,29 +568,13 @@ def vo25(d):
 # microphone's first sample not zero, and how long that took (the debug log's fromStartMs)
 @case("VO-26", base="B0-语音", mutates="learn", needs=EV)
 def vo26(d):
-    broke = 0
-    for _ in range(4):
-        r = vo26_try(d)
-        if r is not None:
-            return r + (f"（之前 {broke} 次模拟器声卡出错，不算）" if broke else "")
-        broke += 1
-        time.sleep(5)   # its failures come in runs: let it settle
-    raise Blocked(f"4 次都是模拟器声卡出错（pcm_readi failed）")
-
-
-def vo26_try(d):
-    """one hold: 准备中… till the clip's first sound, then 正在听…, and the text; None if the
-    emulator's sound card failed. The emulator's microphone reads exact zeroes while nothing plays
-    (a phone's never does), so there 正在听 must wait for the clip"""
-    need_mic()
+    """one hold: 准备中… till the microphone's first sound, then 正在听…, and the text. The clip
+    microphone hisses from the start (a phone's microphone never reads exact zeroes for long), so
+    正在听 mostly shows at once here; the wait for the first sound is the phone's to see"""
     quiet(d)
     d.sh("logcat -c")
-    try:
-        hold_space(d, raw=True)
-    except HalBroke:
-        return None
+    hold_space(d, raw=True)
     s = d.screen()
-    # the emulator reads zeroes till the clip: 2 s of them say 麦克风没有声音 (VO-27), still before 正在听
     first = LISTEN if anywhere(s, LISTEN) else PREPARING
     before = d.field_text() or ""
     early = d.sh("logcat -d | grep -c 'voice ready'").strip() not in ("", "0")
@@ -710,14 +591,9 @@ def vo26_try(d):
     d.sh(raw_up(d))
     t = settle(d)
     got = t[len(before):] if t.startswith(before) else t
-    if hal_errors(d):
-        if len(t) > len(before):
-            d.bksp(len(t) - len(before))
-        return None
     ready = d.sh("logcat -d | grep -o 'voice ready: fromStartMs=[0-9]*' | tail -1").strip()
-    # the rule: 正在听 never before the first sample not zero. The emulator's microphone mostly reads
-    # exact zeroes till the clip plays, but not always (a HAL's padding): either order of the two
-    # is fine, 正在听 without the log is not
+    # the rule: 正在听 never before the first sample not zero: either order of the two is fine,
+    # 正在听 without the log is not
     check(first == PREPARING or early, f"按下后第一眼「{first}」，却没有 voice ready 日志：正在听亮得比麦克风早")
     check(seen and ready, f"播「你好」时{'' if seen else '没'}出现「{LISTEN}」，{ready or '没有 voice ready 日志'}")
     check(plain(got) == "你好", f"说「你好」，框里「{got}」")
@@ -729,20 +605,7 @@ def vo26_try(d):
 # its own) tapped to stop after the clip, then the keyboard's Enter once it has gone sends the sentence
 @case("VO-28", base="B0-语音", mutates="learn", needs=EV, page="chat")
 def vo28(d):
-    lost = []
-    for _ in range(3):
-        r = vo28_try(d)
-        if r is not None:
-            return r + (f"（之前 {len(lost)} 次模拟器声卡出错，不算）" if lost else "")
-        lost.append("声卡出错")
-        d.open_page("chat")   # a fresh box and log for the next try
-        time.sleep(5)    # its failures come in runs: let it settle
-    raise Blocked("3 次都是模拟器声卡出错（pcm_readi failed）")
-
-
-def vo28_try(d):
-    """one sentence said, stopped on the mask, then the keyboard's Enter; None if the emulator's sound card failed"""
-    host_calm()
+    """one sentence said, stopped on the mask, then the keyboard's Enter"""
     quiet(d)
     d.sh("logcat -c")
     s = d.screen()
@@ -772,7 +635,5 @@ def vo28_try(d):
     # the page's log skips an empty send, so an empty ↵ before the sentence shows as the sentence
     # left in the box, not as a line of its own
     sent = sum((n.text or "").count("我们走吧") for n in s.app() if n.cls != "EditText")
-    if sent == 0 and hal_errors(d):
-        return None
     check(sent == 1 and not plain(box), f"聊天记录里「我们走吧」{sent} 次，聊天框「{box}」")
     return "发出「我们走吧」一次，聊天框已清空"
