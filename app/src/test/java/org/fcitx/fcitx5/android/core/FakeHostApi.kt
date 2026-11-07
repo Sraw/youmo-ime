@@ -194,8 +194,12 @@ class FakeHostApi : HostApi {
         return learned(op)
     }
 
+    /** The glides offered, as given: their paths and the letters' places. */
+    val glides: MutableList<Glide> = CopyOnWriteArrayList()
+
     override suspend fun offerGlide(glide: Glide): Boolean {
         calls += "offerGlide"
+        glides += glide
         return true
     }
 

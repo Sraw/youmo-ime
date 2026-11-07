@@ -41,9 +41,11 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.AndroidTextMeasurer
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
+import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.scene.SceneLetters
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
 import org.fcitx.fcitx5.android.input.scene.TextBoardState
@@ -60,7 +62,6 @@ import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.engine.section
 import org.fcitx.fcitx5.android.scene.layout.Layout
-import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard as SceneSplit
 import org.fcitx.fcitx5.android.scene.theme.Theme as SceneTheme
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
@@ -322,7 +323,7 @@ class TextKeyboard private constructor(
     private var returnAppearance = ReturnKeyAppearance.Enter
 
     // the letter key whose long press shows its roots (TableKeyboard.rootsOf) in its bubble
-    private var rootsShownOn = View.NO_ID
+    private var rootsShownOn: KeyRef? = null
 
     private var scope: CoroutineScope? = null
 
@@ -341,9 +342,10 @@ class TextKeyboard private constructor(
         if (AppPrefs.getInstance().internal.canvasKeyboard.getValue()) drawKeysWith(canvasView())
     }
 
-    // the keys drawn by [view] from now on: their rows left laid out but not drawn, nor read out (the view's nodes are)
+    // the keys drawn by [view] from now on: their rows left laid out but not drawn, nor read out (the view's nodes are),
+    // nor touched: the scene's keys are, each the view's by its theme name and which of its name it is (a split row's G)
     private fun drawKeysWith(view: KeyboardCanvasView) {
-        canvas = view
+        drawKeysOn(view) { v -> v.themeKey?.let { name -> keyViews[name]?.indexOf(v)?.takeIf { it >= 0 }?.let { KeyRef.scene(name, it) } } }
         keyRows.forEach { it.visibility = View.INVISIBLE }
         add(view, lParams(0, 0) {
             topOfParent()
@@ -351,8 +353,6 @@ class TextKeyboard private constructor(
             leftOfParent()
             rightOfParent()
         })
-        // a key's press shown by the canvas as its view takes it
-        keyViews.values.flatten().forEach { v -> v.onPressedChanged = { on -> view.showPressed(v, on) } }
     }
 
     // [view] had no scene to draw (a theme or the layout unread, the engine refusing them): the keys
@@ -360,8 +360,7 @@ class TextKeyboard private constructor(
     private fun drawKeysThemselves(view: KeyboardCanvasView) {
         if (canvas !== view) return
         Timber.w("keyboard canvas: no scene of the keys (theme %s); their views draw them", theme.name)
-        canvas = null
-        keyViews.values.flatten().forEach { it.onPressedChanged = null }
+        drawKeysOn(null)
         keyRows.forEach { it.visibility = View.VISIBLE }
         removeView(view)
         // laid out again: the letters settled (BaseKeyboard.onLayout) now the views draw them
@@ -402,15 +401,9 @@ class TextKeyboard private constructor(
         }
     }
 
-    // what the keys show now, as the scene engine's environment
+    // what the keys show now, as the scene engine's environment: the screen's and the settings' as every
+    // keyboard's (SceneEnvs), this one's state, Shift, texts and marks its own
     private fun env(look: ThemeLook, layout: Layout, width: Int, height: Int): Env {
-        val config = resources.configuration
-        val floating = if (ThemeManager.prefs.floatingKeyboard.getValue() && context.inInputMethod()) {
-            val screen = config.screenWidthDp
-            FloatingKeyboard.textScale(FloatingKeyboard.widthDp(screen), screen).toDouble()
-        } else {
-            null
-        }
         val state = TextBoardState(
             semicolonScheme = semicolonKey(imeName, EngineState.shuangpinScheme),
             table = imeName in InputMethodCatalog.TABLES,
@@ -440,18 +433,10 @@ class TextKeyboard private constructor(
         val marks = marks(
             MarksFor(KeyShortcutsCache.current, AppPrefs.getInstance().keyboard.swipeLayers.getValue().layers, markSpots(), charShortcutMarks, names(layout)),
         )
-        return Env(
-            width.toDouble(), height.toDouble(), resources.displayMetrics.density.toDouble(),
-            landscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE,
-            compact = keyboardCompact(),
-            floating = floating,
-            split = isSplit,
-            // one-handed and at a side InputView placed the keyboard already: its keys fill what it was given
-            oneHanded = SceneSplit.Dock.FULL,
-            dock = SceneSplit.Dock.FULL,
-            dark = theme.isDark,
-            flat = !look.keys.blocks,
+        return SceneEnvs.of(
+            this, look, theme.isDark, width, height,
             input = state.input(),
+            split = isSplit,
             shift = when (capsState) {
                 CapsState.None -> Shift.None
                 CapsState.Once -> Shift.Once
@@ -584,7 +569,10 @@ class TextKeyboard private constructor(
     }
 
     // glide typing (滑行输入) where the input method reads one; a stroke (笔画筛选) in pinyin's and 双拼's
-    override val glide = glideInput(letters = { letterKeys }, enabled = { glides }, filters = { InputMethodCatalog.filtersByStrokes(imeName) }) { path, layout ->
+    // the letters where the scene places them while the canvas draws the keys (drawKeysWith): the scene's keys
+    private val sceneLetters: List<Pair<Char, KeyPlace>> by lazy { letterKeys.map { (c, v) -> c to (sceneKeyOf(v) ?: v) } }
+
+    override val glide = glideInput(letters = { if (canvas != null) sceneLetters else letterKeys }, enabled = { glides }, filters = { InputMethodCatalog.filtersByStrokes(imeName) }) { path, layout ->
         onAction(KeyAction.GlideAction(Glide(path, layout, shift = capsState == CapsState.Once, capsLock = capsState == CapsState.Lock)))
         // as a letter typed: Shift-once used up in any input method, as a tap uses it up (only English reads it)
         if (capsState == CapsState.Once) switchCapsState()
@@ -697,26 +685,26 @@ class TextKeyboard private constructor(
         }
     }
 
-    private fun transformPopupPreview(viewId: Int, c: String) = previewOf(c, viewId, ::transformAlphabet, ::transformPunctuation)
+    private fun transformPopupPreview(key: KeyRef, c: String) = previewOf(c, key, ::transformAlphabet, ::transformPunctuation)
 
     override fun onPopupAction(action: PopupAction) {
         val newAction = when (action) {
-            is PopupAction.PreviewAction -> action.copy(content = transformPopupPreview(action.viewId, action.content))
+            is PopupAction.PreviewAction -> action.copy(content = transformPopupPreview(action.key, action.content))
             // the roots stay shown till the key is let go
-            is PopupAction.PreviewUpdateAction -> if (action.viewId == rootsShownOn) return else action.copy(content = transformPopupPreview(action.viewId, action.content))
-            is PopupAction.DismissAction -> action.also { if (it.viewId == rootsShownOn) rootsShownOn = View.NO_ID }
+            is PopupAction.PreviewUpdateAction -> if (action.key == rootsShownOn) return else action.copy(content = transformPopupPreview(action.key, action.content))
+            is PopupAction.DismissAction -> action.also { if (it.key == rootsShownOn) rootsShownOn = null }
             // let go: the bubble goes whether or not a press shows one (no long press's keys to take it down)
-            is PopupAction.TriggerAction -> if (action.viewId == rootsShownOn) {
-                rootsShownOn = View.NO_ID
+            is PopupAction.TriggerAction -> if (action.key == rootsShownOn) {
+                rootsShownOn = null
                 action.outConsumed = true
-                super.onPopupAction(PopupAction.DismissAction(action.viewId))
+                super.onPopupAction(PopupAction.DismissAction(action.key))
                 return
             } else action
             is PopupAction.ShowKeyboardAction -> {
                 // a table's roots, large, in the key's bubble while the keys show them; nothing to pick
                 rootsOf(action.keyboard)?.let { roots ->
-                    rootsShownOn = action.viewId
-                    super.onPopupAction(PopupAction.PreviewAction(action.viewId, roots, action.bounds))
+                    rootsShownOn = action.key
+                    super.onPopupAction(PopupAction.PreviewAction(action.key, roots, action.bounds))
                     return
                 }
                 when (action.keyboard) {
@@ -853,8 +841,8 @@ class TextKeyboard private constructor(
     // a letter's swipe is the first of its long press, as built in (q: 1, then Q) and as the user
     // changed it: one thing, drawn in its corner too (updatePunctuationKeys); none when the user
     // turned its long press off
-    override fun swipeText(view: KeyView): SwipeChoice =
-        SwipeChoice.of(((view as? AltTextKeyView)?.def as? KeyDef.Appearance.AltText)?.let(::swipeOverride))
+    override fun swipeText(def: KeyDef): SwipeChoice =
+        SwipeChoice.of((def.appearance as? KeyDef.Appearance.AltText)?.let(::swipeOverride))
 
     private fun swipeOverride(def: KeyDef.Appearance.AltText): String? {
         val letter = def.displayText.takeIf { it.length == 1 && it[0].isLetter() }?.lowercase() ?: return null
@@ -871,17 +859,20 @@ internal fun PopupOverrides.longPressOf(label: String): Array<String>? = resolve
 // the 双拼 `;` is a key of the scheme, shown as it is too (; not ；)
 private val ADDRESS_KEYS = setOf(R.id.button_slash, R.id.button_at, R.id.button_dot, R.id.button_domain, R.id.button_semicolon, R.id.button_star)
 
+// the same keys as the scene names them (qwerty.xml's ids, the keys' theme names)
+private val ADDRESS_NAMES = setOf("slash", "at", "dot", "domain", "semicolon", "star")
+
 // the bottom row's own keys a table's code may have: the comma and the full stop
 private val BOTTOM_ROW_KEYS = setOf(',', '.')
 
 
 /**
- * What the preview bubble of the key [viewId] shows for [content]: a letter as Shift has it
+ * What the preview bubble of the key [key] shows for [content]: a letter as Shift has it
  * ([letter]), punctuation as the input method maps it ([punctuation]); an address's keys what they
  * commit, . not 。, as their labels show (TextKeyboard.updatePunctuationKeys).
  */
-internal fun previewOf(content: String, viewId: Int, letter: (String) -> String, punctuation: (String) -> String): String = when {
-    content.length != 1 || viewId in ADDRESS_KEYS -> content
+internal fun previewOf(content: String, key: KeyRef, letter: (String) -> String, punctuation: (String) -> String): String = when {
+    content.length != 1 || key.viewId in ADDRESS_KEYS || key.id in ADDRESS_NAMES -> content
     content[0].isLetter() -> letter(content)
     else -> punctuation(content)
 }

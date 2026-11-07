@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
+import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -64,11 +65,16 @@ class TextKeyboardTest {
         val zh = mapOf("." to "。", "/" to "、")
         val punctuation = { p: String -> zh.getOrDefault(p, p) }
         val shift = { c: String -> c.uppercase() }
-        assertEquals(".", previewOf(".", R.id.button_dot, shift, punctuation))
-        assertEquals("/", previewOf("/", R.id.button_slash, shift, punctuation))
-        assertEquals(".com", previewOf(".com", R.id.button_domain, shift, punctuation))
+        assertEquals(".", previewOf(".", KeyRef.view(R.id.button_dot), shift, punctuation))
+        assertEquals("/", previewOf("/", KeyRef.view(R.id.button_slash), shift, punctuation))
+        assertEquals(".com", previewOf(".com", KeyRef.view(R.id.button_domain), shift, punctuation))
         // the full stop beside the space is the input method's, and a letter is as Shift has it
-        assertEquals("。", previewOf(".", R.id.button_period, shift, punctuation))
-        assertEquals("Q", previewOf("q", -1, shift, punctuation))
+        assertEquals("。", previewOf(".", KeyRef.view(R.id.button_period), shift, punctuation))
+        assertEquals("Q", previewOf("q", KeyRef.view(-1), shift, punctuation))
+        // the same keys the scene draws, by their names (060-render-p2 S1)
+        assertEquals(".", previewOf(".", KeyRef.scene("dot", 0), shift, punctuation))
+        assertEquals("/", previewOf("/", KeyRef.scene("slash", 0), shift, punctuation))
+        assertEquals("。", previewOf(".", KeyRef.scene("period", 0), shift, punctuation))
+        assertEquals("Q", previewOf("q", KeyRef.scene("q", 0), shift, punctuation))
     }
 }

@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
+import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -113,7 +114,7 @@ class PopupComponentTest {
     }
 
     private companion object {
-        const val ID = 1
+        val ID = KeyRef.view(1)
     }
 
     // 九键's: the digit and letters as they are, the symbols shown as Chinese punctuation maps them
@@ -143,14 +144,14 @@ class PopupComponentTest {
     // symbols in rows of their own
     @Test
     fun aKeyboardsWayOfTypingAndItsSymbolsReachTheKeysShown() {
-        var id = ID
+        var id = 1
         // each on a key of its own (a dismissal runs in the IME's scope, not here)
         fun shown(keyboard: KeyDef.Popup.Keyboard.Explicit): Pair<KeyAction?, Int> {
-            send(PopupAction.ShowKeyboardAction(++id, keyboard, key))
+            send(PopupAction.ShowKeyboardAction(KeyRef.view(++id), keyboard, key))
             layOut()
             // the long press's keys, added last: a row a child
             val rows = (popup.root.getChildAt(popup.root.childCount - 1) as ViewGroup).childCount
-            return PopupAction.TriggerAction(id).also { send(it) }.outAction to rows
+            return PopupAction.TriggerAction(KeyRef.view(id)).also { send(it) }.outAction to rows
         }
         assertEquals(KeyAction.CommitAction(".") to 1, shown(KeyDef.Popup.Keyboard.Explicit(arrayOf(".", "-"), asIs = true)))
         assertEquals(KeyAction.HostKeyAction(".") to 1, shown(KeyDef.Popup.Keyboard.Explicit(arrayOf(".", "-"))))

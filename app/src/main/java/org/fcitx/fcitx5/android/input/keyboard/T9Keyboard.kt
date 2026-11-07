@@ -47,6 +47,7 @@ import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
+import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.theme.KeyFaceGeometry
@@ -785,8 +786,8 @@ class T9Keyboard(
     /** A digit key gone down at [time]: its press counts from then, as its preview did. */
     private class Pressed(val digit: Char, val time: Long)
 
-    /** The [letter] the preview of the key of view [viewId] shows in place of its own [letters] (GHI), while it is held. */
-    private class Previewing(val viewId: Int, val letters: String, val letter: String)
+    /** The [letter] the preview of the key [key] shows in place of its own [letters] (GHI), while it is held. */
+    private class Previewing(val key: KeyRef, val letters: String, val letter: String)
 
     private var previewing: Previewing? = null
 
@@ -797,17 +798,17 @@ class T9Keyboard(
     override fun onPopupAction(action: PopupAction) {
         val shown = when (action) {
             is PopupAction.PreviewAction -> {
-                val digit = digitOf[action.viewId]
+                val digit = digitOf[action.key.viewId]
                 val now = SystemClock.uptimeMillis()
                 pressed = digit?.let { Pressed(it, now) }
                 // 九键双拼 has no 连按: a key's preview is its letters
                 val letter = digit?.takeUnless { shuangpin }?.let { multiTap.peek(it, letters.letters(it), now) }
-                previewing = letter?.let { Previewing(action.viewId, action.content, if (!english || runUpper) it.uppercase() else it.lowercase()) }
+                previewing = letter?.let { Previewing(action.key, action.content, if (!english || runUpper) it.uppercase() else it.lowercase()) }
                 previewing?.let { action.copy(content = it.letter) }
             }
             // back from the digit a swipe shows
             is PopupAction.PreviewUpdateAction ->
-                previewing?.takeIf { it.viewId == action.viewId && it.letters == action.content }?.let { action.copy(content = it.letter) }
+                previewing?.takeIf { it.key == action.key && it.letters == action.content }?.let { action.copy(content = it.letter) }
             else -> null
         }
         super.onPopupAction(shown ?: action)
