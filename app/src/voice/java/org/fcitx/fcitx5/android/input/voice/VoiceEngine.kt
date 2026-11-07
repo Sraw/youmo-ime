@@ -167,8 +167,21 @@ object VoiceEngine {
 
     /** [vad], done with, kept for the next opening (its state cleared) or let go if one is kept. */
     fun offerVad(vad: Vad) {
-        vad.reset()
+        @Suppress("TooGenericExceptionCaught")
+        try {
+            vad.reset()
+        } catch (e: Throwable) {
+            // not kept in a state no one knows: let go
+            Timber.w(e, "voice vad")
+            vad.release()
+            return
+        }
         spareVad.offer(vad)
+    }
+
+    /** The spare let go if no talk holds the models: one made for a talk whose models failed to load. */
+    fun letGoVadIfIdle() = synchronized(lock) {
+        if (users == 0) spareVad.clear()
     }
 
     /** A spare VAD made, if there is none; off the main thread. A failure, an Error too, is [failed]'s. */

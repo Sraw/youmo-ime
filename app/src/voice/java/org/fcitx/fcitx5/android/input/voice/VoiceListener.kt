@@ -142,6 +142,8 @@ class VoiceListener(
                 Timber.w(e, "voice model")
                 user.cancel()
                 ready.cancel()
+                // the spare made beside them: not held for good, no idle timer being set without users
+                VoiceEngine.letGoVadIfIdle()
                 tell { failed(Failure.NoModel) }
                 return@launch
             }

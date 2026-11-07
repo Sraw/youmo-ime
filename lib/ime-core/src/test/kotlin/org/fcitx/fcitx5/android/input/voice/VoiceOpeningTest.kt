@@ -35,6 +35,23 @@ class VoiceOpeningTest {
     }
 
     @Test
+    fun aStopFailingStillUnloadsAndDoesNotHideWhatBrokeFirst() {
+        val stopBroke = assertThrows(IllegalStateException::class.java) {
+            VoiceOpening.run({ steps += "start" }, { "vad" }, { steps += "use $it" }, { error("stop") }, { steps += "unload $it" })
+        }
+        assertEquals("stop", stopBroke.message)
+        assertEquals(listOf("start", "use vad", "unload vad"), steps)
+        steps.clear()
+        val readBroke = assertThrows(IllegalArgumentException::class.java) {
+            VoiceOpening.run({}, { "vad" }, { throw IllegalArgumentException("read") }, { error("stop") }, { steps += "unload $it" })
+        }
+        // the read's failure, the stop's beside it
+        assertEquals("read", readBroke.message)
+        assertEquals("stop", readBroke.suppressed.single().message)
+        assertEquals(listOf("unload vad"), steps)
+    }
+
+    @Test
     fun theRecordIsLetGoWhateverBreaks() {
         assertThrows(IllegalStateException::class.java) { open({ "vad" }) { error("read") } }
         assertEquals(listOf("start", "load", "stop", "unload vad"), steps)
