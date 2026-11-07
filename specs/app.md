@@ -432,29 +432,24 @@ looked keys up by a string made for each in each frame and handed out new face l
 allocated 48 KiB more than the views', now 5; Shift 52 more, now 7 less. What is left, each with
 what it is and whose it is:
 
-- **The 26 keys built (+17%, about 9 ms): GC waits on the main thread, not drawing or sync.** Traced
-  (2026-11-07, `view dalvik gfx`; API 29 has no `hwui` category, its sections come with `view` and
-  `gfx`) with each build marked, 57 builds a mode: the main thread's work besides GC is the same
-  (13.1 ms against 13.4 a build), and the whole gap is `GC: Wait For Completion Alloc` (13.7 ms a
-  build against 8.8; at the median 21 against 0: most canvas builds wait once for a collection, most
-  views builds none). The render thread's extra (`DrawFrame` +1 ms a frame) is `eglSwapBuffers` and
-  `dequeueBuffer`, the GPU's; `syncFrameState`, `prepareTree` and the vector drawables' updates are
-  within 10 ms a run of the views', and the main thread is not held through the frame (5 draws of
-  399). The icons and the blurred shadows off (each, then both) leave the GC waits as they were. The
-  canvas allocates what the views do a build (+0.2%) and its live heap after a run is 1.5% more
-  (31.6 MB against 31.2, 836 against 824 thousand objects, the scenes kept and the theme's looks),
-  but its collections are more (204-230 a run against 195) and each longer under load (a full one
-  27-31 ms against 25; at rest, an explicit one, no longer): the likely reason is the collector
-  sharing the CPU with the canvas's extra render-thread and GPU work on the emulator, not proved.
-  The 26 keys `KeyboardWindow` makes first in every new input view are made but neither laid out
-  into a scene nor drawn when another layout is the one shown (no scene, no node recorded, no draw in
-  any 9, 14 or 18 key or 注音 build); making them costs the same with either drawing (the canvas's own
-  part 0.1 ms), so making the shown layout first is a cut for both, not for this gap. P2's to do:
-  measured again once the key views go (they are most of what a build allocates: fewer collections
-  for the canvas to wait on), the waits traced with the CPU's scheduling (`sched`) to prove or drop
-  the sharing. Twice in six traced canvas processes (never in the views'), with the shadows on, the
-  main thread waited through most frames to their end (HWUI's mutable images not pinned,
-  `prepareTextures` false), 0.7 s a run: what image is pinned there is P2's to find.
+- **The 26 keys built (+17%, about 9 ms on the benchmark): in a trace, about 4.6 ms, mostly GC waits.**
+  Traced (2026-11-07, `view dalvik gfx`, 4 runs; API 29 has no `hwui` category, its sections come
+  with `view` and `gfx`) with each build marked, 57 builds a mode (run r5): from the action to the
+  frame 39.4 ms against 36.2, the main thread busy 4.6 ms more a build, of it `GC: Wait For
+  Completion Alloc` 13.7 ms against 8.8 (its other work 13.1 against 13.4). What the benchmark's 9 ms
+  has beyond the trace's 4.6 is not explained. The render thread's extra (`DrawFrame` about 1 ms a
+  frame, run r1) is `eglSwapBuffers` and `dequeueBuffer`; `syncFrameState`, `prepareTree` and the
+  vector drawables' updates are within 10 ms a run of the views'. The icons and the blurred shadows
+  off (each, then both) leave the GC waits as they were. The 26 keys `KeyboardWindow` makes first in
+  every new input view are made but neither made a scene nor drawn when another layout is shown
+  (none in any 9, 14 or 18 key or 注音 build), and cost the same with either drawing (the canvas's
+  part 0.1 ms). The canvas allocates what the views do a build (+0.2%), its live heap after a run
+  1.5% more. GCs a run (each traced run's collections): 201-230 with the canvas (r1-r5), 195-201 without (r1, r5); r5's
+  pair 204 against 201, about the same. A full collection 25.4-30.6 ms with the canvas over runs
+  r1-r5, 24.5-24.6 without (r1, r5); r5's pair about the same. That the collector shares the CPU with
+  the canvas's render-thread and GPU work is a guess, and the more and longer GCs it rests on are not
+  clear in r5. Twice in six traced canvas processes (never in the views'), the main thread waited
+  through most frames to their end (HWUI's mutable images not pinned, `prepareTextures` false).
 - **A theme not seen before (+26%, 569 KiB more): the engine's cold path.** LookTheme's file written
   (29 KiB), read (`ThemeReader`, 256 KiB: a style's every property asked of it, each with a message
   made, and every attribute's value copied a character at a time; now 178) and its first scene with
@@ -464,6 +459,8 @@ what it is and whose it is:
 - **Block to flat (p90 +19%, +15% with a picture): the GC's phase.** The same allocation as the
   views' and the same GCs a switch; which switch a collection lands in moves the p90, the means are
   within the gate.
+
+Performance is measured again, and then cut, all at once after P2 removes the old drawing.
 
 In systrace on the benchmark build (`atrace -a io.github.sraw.youmo.bench view`) a scene made anew is
 0.79 ms at the median (`cascade.of` 0.06, `content` 0.14, `paint` 0.15, `measure text` 0.06), one

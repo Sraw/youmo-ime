@@ -48,6 +48,7 @@ import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
@@ -332,6 +333,13 @@ class KeyboardCanvasViewTest {
                 }
             }
         }
+        // q's texts as [text, x, baseline, size]; its corner the one drawn at the corner's size (the letter's is
+        // larger, a table's roots smaller), which the first step's known corner tells
+        fun texts(ops: List<String>) = ops.filter { it.startsWith("text ") }.map { it.removePrefix("text ").split(" ") }
+        var cornerSize = ""
+        fun corner(ops: List<String>) = texts(ops).single { it[3] == cornerSize }
+        // é, not a symbol: under Shift the long press's list is upper-cased, É, which a corner kept from before Shift is not
+        val overrides = PopupOverrides.Empty.with("q", listOf("é", "1"))
         harness(true).use { h ->
             val board = h.textKeyboard()
             var was = q(h)
@@ -343,12 +351,10 @@ class KeyboardCanvasViewTest {
             }
             val internal = AppPrefs.getInstance().internal
             val keyboard = AppPrefs.getInstance().keyboard
-            changed("q's long press the user's") {
-                prefs.set(internal.popupOverrides, PopupOverrides.Empty.with("q", listOf("Ω", "1")).serialize())
-            }
-            assertTrue(was.toString(), was.any { it.startsWith("text Ω ") })
-            changed("the punctuation mapped") { board.onPunctuationUpdate(mapOf("Ω" to "ω")) }
-            assertTrue(was.toString(), was.any { it.startsWith("text ω ") })
+            changed("q's long press the user's") { prefs.set(internal.popupOverrides, overrides.serialize()) }
+            cornerSize = texts(was).single { it[0] == "é" }[3]
+            changed("the punctuation mapped") { board.onPunctuationUpdate(mapOf("é" to "ω")) }
+            assertEquals(was.toString(), "ω", corner(was)[0])
             changed("a shortcut on q") {
                 prefs.set(internal.keyShortcuts, KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好")).serialize())
             }
@@ -356,19 +362,25 @@ class KeyboardCanvasViewTest {
             changed("the symbol elsewhere") { prefs.set(keyboard.punctuationPosition, KeyMarkPosition.BottomLeft) }
             // the setting makes the input view anew (its other changes go with it): the corner's place is what
             // tells the marks' kept spots followed it, left of the letter and below it
-            val letter = was.first { it.startsWith("text q ") }.split(" ")
-            val corner = was.first { !it.startsWith("text q ") }.split(" ")
-            assertTrue(was.toString(), corner[2].toInt() < letter[2].toInt() && corner[3].toInt() > letter[3].toInt())
-            changed("Shift") { h.tap(h.keyView("shift")) }
+            val letter = texts(was).single { it[0] == "q" }
+            val at = corner(was)
+            assertTrue(was.toString(), at[1].toInt() < letter[1].toInt() && at[2].toInt() > letter[2].toInt())
+            // Shift: the letter changes whatever the corner does; the corner is what tells the alts kept followed it
+            val before = corner(was)[0]
+            h.tap(h.keyView("shift"))
+            val shifted = corner(q(h))[0]
+            assertEquals(overrides.swipeOf("q", "Q"), shifted)
+            assertNotEquals(before, shifted)
         }
-        // a table's roots over the letters and not: the corner the letter, then the swipe again
+        // a table's roots over the letters and not: the corner the letter itself, then the swipe again
         harness(true, WUBI).use { h ->
             try {
                 EngineState.tableKeyboardState.value = wubi(KeyLabels.NONE)
                 val none = q(h)
+                assertNotEquals(none.toString(), "q", corner(none)[0])
                 EngineState.tableKeyboardState.value = wubi(KeyLabels.ROOTS)
                 val roots = q(h)
-                assertTrue("roots: q drawn as with none, $roots", roots != none)
+                assertEquals(roots.toString(), "q", corner(roots)[0])
                 EngineState.tableKeyboardState.value = wubi(KeyLabels.NONE)
                 assertEquals(none, q(h))
             } finally {
