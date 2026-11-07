@@ -53,6 +53,25 @@ class VoicePolishTest {
     }
 
     @Test
+    fun englishLettersAreKeptAndAFullStopGetsNoMarkAfter() {
+        // the tagger on a OnePlus 6T (2026-11-06): 「I'm sorry.」 labelled del on the second r and 。
+        // after the full stop, typed 「I'm sory」 once the end's marks went
+        val text = VoicePolishTags.norm("I'm sorry.")
+        val op = IntArray(text.size)
+        op[6] = VoicePolishTags.DEL
+        op[0] = tags.ops.indexOf("的")
+        val after = IntArray(text.size)
+        after[text.size - 1] = tags.afters.indexOf("。")
+        val (gop, gafter) = tags.guarded(text, op, after)
+        // no spaces passed: the letters and marks only
+        assertEquals("I'msorry.", tags.apply(text, gop, gafter))
+        // a Chinese character's labels still apply, a digit's too (「2个」 to 「两个」)
+        val zh = VoicePolishTags.norm("嗯2个")
+        val (zop, zafter) = tags.guarded(zh, intArrayOf(VoicePolishTags.DEL, tags.ops.indexOf("两"), 0), intArrayOf(0, 0, tags.afters.indexOf("。")))
+        assertEquals("两个。", tags.apply(zh, zop, zafter))
+    }
+
+    @Test
     fun freezesAsFusionExp() {
         for (c in cases("stream")) {
             val text = codePoints(c[1])

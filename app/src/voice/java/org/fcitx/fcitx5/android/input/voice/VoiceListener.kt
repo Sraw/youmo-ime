@@ -102,6 +102,11 @@ class VoiceListener(
     // the lift's uptime in ms, from the main thread: the capture thread stops VoiceCaptureEnd's tail after it
     @Volatile
     private var liftAt: Long? = null
+
+    // the capture thread's VoiceQuiet.speech as it goes (zeroes alone none): what the room alone was heard as is
+    // neither shown nor typed (a lifted noise floor recognized as 「I'm sory」)
+    @Volatile
+    private var speech = false
     // start()'s uptime: the debug log's time to the first sample not zero
     @Volatile
     private var startedAt = 0L
@@ -260,7 +265,7 @@ class VoiceListener(
             if (BuildConfig.DEBUG) Timber.d("voice segments: speechStart=%s segments=%d", segment.speechStart, segment.kept)
             // the polish failing: the raw text, told as such (what was typed as it was said is polished)
             val polished = orFallback<String?>("voice polish", null) { live.finished() }
-            said.complete(if (polished != null) polished to false else live.raw to true)
+            if (!speech) said.complete(null) else said.complete(if (polished != null) polished to false else live.raw to true)
         } catch (e: CancellationException) {
             throw e
         } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
@@ -317,7 +322,9 @@ class VoiceListener(
             show(orFallback("voice polish", VoiceLive.Heard(live.raw, 0, fallback = true)) { live.closed(text) })
         }
 
-        private fun show(shown: VoiceLive.Heard) = tell { heard(shown) }
+        private fun show(shown: VoiceLive.Heard) {
+            if (speech) tell { heard(shown) }
+        }
     }
 
     private suspend fun record() {
@@ -343,6 +350,7 @@ class VoiceListener(
         val gain = VoiceGain(VoiceEngine.SAMPLE_RATE)
         val end = VoiceCaptureEnd(VoiceEngine.SAMPLE_RATE, bufferFrames)
         val onset = VoiceOnset(VoiceEngine.SAMPLE_RATE)
+        val quiet = VoiceQuiet()
 
         // Locale.ROOT: uat/scripts/12-voice.py parses it, a decimal comma would not
         fun log() = Timber.d(
@@ -421,6 +429,8 @@ class VoiceListener(
                     // the UAT's (VO-26): from start() to the first sample not zero
                     if (BuildConfig.DEBUG) Timber.d("voice ready: fromStartMs=%d", SystemClock.uptimeMillis() - startedAt)
                 }
+                opening.quiet.window(buffer, n)
+                speech = opening.quiet.speech
                 val samples = buffer.copyOf(n)
                 // before all of it: the recognizer and the level hear the same
                 opening.gain.apply(samples)

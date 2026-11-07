@@ -42,6 +42,20 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>) {
         return PAUSE_BEFORE_MARK.replace(out, "").replace("…", "……")
     }
 
+    /**
+     * The model's labels of [text] (normed) with what it does wrong in English undone, in place:
+     * an English letter is kept (its ops are Chinese words and a del, which took the second r of
+     * 「sorry」 as a stutter: 「I'm sory」 typed on a OnePlus 6T, 2026-11-06), and nothing is written
+     * after a full stop (「I'm sorry.。」). Not in [apply], which is voice-eval's tags.py to the letter.
+     */
+    fun guarded(text: IntArray, op: IntArray, after: IntArray): Pair<IntArray, IntArray> {
+        for (i in text.indices) {
+            if (text[i] < 0x80 && Character.isLetter(text[i])) op[i] = KEEP
+            if (text[i] == '.'.code) after[i] = 0
+        }
+        return op to after
+    }
+
     companion object {
         const val KEEP = 0
         const val DEL = 1

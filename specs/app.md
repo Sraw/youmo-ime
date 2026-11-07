@@ -858,6 +858,14 @@ in CI keeps the voice source set compiling.
   `lib/ime-core/src/test/resources/voice/gain_golden.py`, and each parameter changed alone changes it). Debug
   builds log one line of numbers at the close (`voice capture:` liftFrame, stopAt, read, envPeak,
   peakGainDb: the gain where env peaked) for the UAT (uat/12 VO-23/24/25), with `voice segments:` above.
+- **Quiet**: `VoiceQuiet` (ime-core), on the raw windows before the gain: a talk is typed (and shown)
+  only once its 3rd loudest window is −50 dBFS or louder, or 8 dB over its 10th-percentile floor
+  (all-zero windows and the first 3 with sound left out). Why: the gain lifts a quiet room 20 dB and
+  the recognizer reads the lifted floor (or plain zeroes) as 「I'm sorry.」「H」「I'm」 — a OnePlus 6T at
+  −66 dBFS, 2026-11-06. Soft speech over the room (the −59 dBFS q44 clips) still passes; steady noise
+  rises 1 (white) to 5 (pink) dB over its floor. The polish tagger's labels are guarded too
+  (`VoicePolishTags.guarded`): an English letter is kept, nothing written after a full stop (its del
+  took the second r of 「sorry」).
 
 ## Strings and languages
 
