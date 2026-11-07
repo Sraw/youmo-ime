@@ -1012,8 +1012,10 @@ in CI keeps the voice source set compiling.
   (ii) the floor with the clip faded: 0/32. The emulator's case (the floor around it) was never
   reproduced here, and fading lowers (i) but does not end it, so the edge is at most part of it; in
   the one traced (i) talk the 「欢迎您好」 tokens sat at 1.96–2.32 s, the clip ending at 2.11 s, no window
-  voiced. The clips fade now (voice-clips.py) as a cleaner stimulus; the emulator A/B is in uat/12-voice.md
-  (VO-32). No rule changed: h4, every segment after a typed one held to the short Latin bar, ends
+  voiced. On the emulator (2026-11-07, 8 runs each, nihao-q44-room 3 tries a run) the hard-cut
+  clips failed VO-32 in 4 runs, 5 of 24 tries wrong (「你好。欢迎您好」 among them); the faded ones
+  passed all 8, 0 of 24: the edge is the likely trigger there, though offline it is not reproduced.
+  The clips fade now (voice-clips.py). No rule changed: h4, every segment after a typed one held to the short Latin bar, ends
   「欢迎」 in all four (0/32) but loses a second soft sentence 1.5 s after the first (`two`, CER R−60
   L−54 29.1% → 67.0%, L−58 48.1% → 73.6%, R−66 L−58 24.7% → 35.4%).
 
