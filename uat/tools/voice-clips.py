@@ -3,7 +3,8 @@ the host's PulseAudio source that uat.py plays them into). Made on this machine,
 v1.1-zh through sherpa-onnx (the models of ~/voice-eval, VOICE_EVAL to move it), each checked by the
 X-ASR model of the same place so a clip that the recognizer cannot follow is not taken for the app's
 fault. A cough is filtered noise; `room` 3 s of pink noise at some -60 dBFS (VO-09: digital silence
-shows no gain). `<name>-q44` is the clip 44 dB down, speech said softly (VO-24). Out:
+shows no gain). `<name>-q44` is the clip 44 dB down, speech said softly (VO-24), `<name>-q44-room`
+the same in `room`'s noise. Out:
 dev/uat-out/voice-clips/<name>.wav, 16 kHz mono, and beside each spoken one <name>.json, where its
 speech starts and ends (`speech_start_s`, `speech_end_s`, as voice-eval's tailquiet/tq.py finds the
 end): VO-23 lifts the finger relative to that end.
@@ -77,10 +78,9 @@ def write_span(name, s):
         json.dump({"speech_start_s": round(float(start), 3), "speech_end_s": round(float(end), 3)}, f)
 
 
-def room():
-    """pink noise (1/f, by filtering white in the spectrum), 3 s at -60 dBFS RMS"""
+def room(n=3 * RATE):
+    """pink noise (1/f, by filtering white in the spectrum), 3 s (n samples) at -60 dBFS RMS"""
     rng = np.random.default_rng(11)
-    n = 3 * RATE
     spec = np.fft.rfft(rng.standard_normal(n))
     spec[1:] /= np.sqrt(np.arange(1, len(spec)))
     spec[0] = 0
@@ -113,6 +113,10 @@ def main():
             # the same speech softly: where it is stays where it was found at full level
             sf.write(f"{OUT}/{name}-q{QUIET[name]}.wav", (s * 10 ** (-QUIET[name] / 20)).astype(np.float32), RATE)
             write_span(f"{name}-q{QUIET[name]}", s)
+            # and said in the room's noise, which goes on all through it (VO-24's second step)
+            soft = (s * 10 ** (-QUIET[name] / 20)).astype(np.float32) + room(len(s))
+            sf.write(f"{OUT}/{name}-q{QUIET[name]}-room.wav", soft, RATE)
+            write_span(f"{name}-q{QUIET[name]}-room", s)
         st = r.create_stream()
         st.accept_waveform(RATE, s)
         r.decode_stream(st)

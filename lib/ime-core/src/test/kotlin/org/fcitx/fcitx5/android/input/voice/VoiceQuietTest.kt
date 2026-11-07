@@ -4,104 +4,120 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.PI
-import kotlin.math.sin
-import kotlin.random.Random
+import kotlin.math.sqrt
 
 class VoiceQuietTest {
 
-    private val random = Random(1)
+    // a window of [power] (mean square): the level is all VoiceQuiet reads of it
+    private fun window(power: Double, n: Int = 512) = FloatArray(n) { sqrt(power).toFloat() }
 
-    // a window of white noise at [db] dBFS rms
-    private fun noise(db: Double) = FloatArray(512) { (random.nextGaussian() * Math.pow(10.0, db / 20)).toFloat() }
+    private fun db(d: Double) = Math.pow(10.0, d / 10)
 
-    // a window of a tone at [db] dBFS rms: speech's stand-in
-    private fun tone(db: Double) = FloatArray(512) { i -> (Math.sqrt(2.0) * Math.pow(10.0, db / 20) * sin(2 * PI * 220 * i / 16000)).toFloat() }
+    private fun VoiceQuiet.feed(power: Double, times: Int, voiced: Boolean = false) = repeat(times) { window(window(power), speech = voiced) }
 
-    private fun Random.nextGaussian(): Double {
-        // Box-Muller
-        val u = 1 - nextDouble()
-        return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * PI * nextDouble())
+    // resources/voice/quiet_golden.py: real clips in a room's noise, Gain2 and silero as the app has them
+    @Test
+    fun goldenCases() {
+        val lines = javaClass.getResourceAsStream("/voice/quiet-golden.tsv")!!.bufferedReader().readLines()
+        assertEquals(8, lines.size)
+        val got = lines.map { line ->
+            val f = line.split('\t')
+            val quiet = VoiceQuiet()
+            for (w in f.drop(5)) {
+                val (p, v) = w.split(':')
+                quiet.window(window(p.toDouble()), speech = v == "1")
+            }
+            val keeps = quiet.keeps(f[1], f[2].toLong(), f[3].toLong())
+            assertEquals(f[0], f[4] == "1", keeps)
+            f[0] to keeps
+        }.toMap()
+        // both ways: the room's 「I'm sorry.」 goes, speech of every kind stays
+        assertFalse(got.getValue("white-66"))
+        assertTrue(got.getValue("q44-in-room"))
+        assertTrue(got.getValue("soft-english-over-room"))
     }
 
     @Test
-    fun aQuietRoomAloneIsNotSpeech() {
-        // the OnePlus 6T's room, 2026-11-06: -66 dBFS, typed 「I'm sory」 once lifted 20 dB
+    fun aChineseCharacterOrALongerTextIsAlwaysTyped() {
         val quiet = VoiceQuiet()
-        repeat(90) { quiet.window(noise(-66.0)) }
-        assertFalse(quiet.speech)
+        quiet.feed(db(-66.0), 90)
+        assertTrue(quiet.keeps("你好", 0, 90L * 512))
+        assertTrue(quiet.keeps("I think this is a whole sentence", 0, 90L * 512))
+        assertFalse(quiet.keeps("I'm sorry.", 0, 90L * 512))
     }
 
     @Test
-    fun aLouderSteadyNoiseIsNotSpeechEither() {
+    fun aShortLatinPhraseNeedsTheRoomLoudAndVoiced() {
         val quiet = VoiceQuiet()
-        repeat(90) { quiet.window(noise(-56.0)) }
-        assertFalse(quiet.speech)
+        quiet.feed(db(-66.0), 40)
+        quiet.feed(db(-55.0), 20, voiced = true)
+        quiet.feed(db(-66.0), 40)
+        quiet.feed(db(-55.0), 20)
+        // voiced and 11 dB over the floor
+        assertTrue(quiet.keeps("OK", 40L * 512, 60L * 512))
+        // as loud, the VAD hearing none: a fan's hum, not speech
+        assertFalse(quiet.keeps("OK", 100L * 512, 120L * 512))
+        // voiced, not loud: the room's own stretch
+        val soft = VoiceQuiet()
+        soft.feed(db(-66.0), 60, voiced = true)
+        assertFalse(soft.keeps("OK", 0, 60L * 512))
     }
 
     @Test
-    fun softSpeechAboveTheRoomIsSpeech() {
-        // -58 dBFS said softly over the -66 room: under LOUD, 8 dB over the floor
+    fun loudSpeechIsLoudWhateverTheFloor() {
         val quiet = VoiceQuiet()
-        repeat(30) { quiet.window(noise(-66.0)) }
-        repeat(20) { quiet.window(tone(-57.0)) }
-        repeat(30) { quiet.window(noise(-66.0)) }
-        assertTrue(quiet.speech)
+        quiet.feed(db(-45.0), 30, voiced = true)
+        assertTrue(quiet.keeps("Yeah.", 0, 30L * 512))
     }
 
     @Test
-    fun softSpeechInDigitalSilenceIsSpeech() {
-        // the device UAT's -q44 clips: speech at -59, zeroes around it
+    fun zeroesAndBrokenSamplesAreNoSound() {
         val quiet = VoiceQuiet()
-        repeat(20) { quiet.window(FloatArray(512)) }
-        repeat(20) { quiet.window(tone(-59.0)) }
-        repeat(5) { quiet.window(FloatArray(512) { 1e-7f }) }
-        assertTrue(quiet.speech)
-    }
-
-    @Test
-    fun speechAtItsUsualLevelIsSpeechFromTheStart() {
-        val quiet = VoiceQuiet()
-        repeat(10) { quiet.window(tone(-25.0)) }
-        assertTrue(quiet.speech)
-    }
-
-    @Test
-    fun aClickOrTwoIsNotSpeech() {
-        val quiet = VoiceQuiet()
-        repeat(40) { quiet.window(noise(-66.0)) }
-        // the start-up pop's left out, a click later is a window or two: the 3rd loudest stays the room
-        repeat(2) { quiet.window(tone(-20.0)) }
-        repeat(40) { quiet.window(noise(-66.0)) }
-        assertFalse(quiet.speech)
-    }
-
-    @Test
-    fun theStartUpPopIsLeftOut() {
-        val quiet = VoiceQuiet()
-        repeat(3) { quiet.window(tone(-20.0)) }
-        repeat(60) { quiet.window(noise(-66.0)) }
-        assertFalse(quiet.speech)
-    }
-
-    @Test
-    fun zeroesAloneAreNotSpeech() {
-        // an emulator's microphone with no audio: the recognizer typed 「H」, 「I'm」 from them
-        val quiet = VoiceQuiet()
-        assertFalse(quiet.speech)
-        repeat(50) { quiet.window(FloatArray(512)) }
+        quiet.feed(0.0, 50)
+        quiet.window(FloatArray(512) { Float.NaN })
+        quiet.window(FloatArray(512) { Float.POSITIVE_INFINITY })
         quiet.window(FloatArray(0))
-        assertFalse(quiet.speech)
+        // an emulator's silent microphone: the recognizer's 「H」 goes
+        assertFalse(quiet.keeps("H", 0, 52L * 512))
     }
 
     @Test
-    fun onceSpeechItStays() {
+    fun theSegmentIsTheWindowsItSpans() {
         val quiet = VoiceQuiet()
-        repeat(10) { quiet.window(tone(-30.0)) }
-        repeat(300) { quiet.window(noise(-66.0)) }
-        assertTrue(quiet.speech)
+        quiet.feed(db(-66.0), 10)
+        quiet.feed(db(-40.0), 5, voiced = true)
+        quiet.feed(db(-66.0), 10)
+        assertFalse(quiet.keeps("OK", 0, 10L * 512))
+        // a sample into the third loud window takes it in: three loud ones are the level
+        assertFalse(quiet.keeps("OK", 0, 12L * 512))
+        assertTrue(quiet.keeps("OK", 0, 12L * 512 + 1))
+        assertFalse(quiet.keeps("OK", 15L * 512, 25L * 512))
+        // past what was read: what there is
+        assertTrue(quiet.keeps("OK", 0, 1_000_000))
+        // windows of any size
+        val odd = VoiceQuiet()
+        repeat(40) { odd.window(window(db(-40.0), 300), speech = true) }
+        assertTrue(odd.keeps("OK", 0, 40L * 300))
+        // many windows: the record grows
+        val long = VoiceQuiet()
+        long.feed(db(-66.0), 1000)
+        assertFalse(long.keeps("OK", 0, 1000L * 512))
+    }
+
+    @Test
+    fun latinShortIsWhatTheRoomIsWrittenAs() {
+        assertTrue(VoiceQuiet.latinShort("I'm sorry."))
+        assertTrue(VoiceQuiet.latinShort("H"))
+        assertTrue(VoiceQuiet.latinShort("Look friends."))
+        assertFalse(VoiceQuiet.latinShort("I'm sorry.嗯。"))
+        assertFalse(VoiceQuiet.latinShort("abcdefghijklm"))
+        assertFalse(VoiceQuiet.latinShort("。"))
+        assertFalse(VoiceQuiet.latinShort(""))
+        // Extension B: a Han character all the same
+        assertFalse(VoiceQuiet.latinShort("𠀀"))
     }
 }

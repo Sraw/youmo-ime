@@ -40,6 +40,7 @@ class VoiceDataPluginTest {
         task.model.set(sources)
         task.ort.set(ort)
         task.hotwords.set(hotwords)
+        task.vad.set(folder.newFile("silero_vad.onnx").apply { writeText("vad") })
         task.outputDir.set(folder.root.resolve("voice-assets"))
         task.copy()
 
@@ -60,6 +61,7 @@ class VoiceDataPluginTest {
         val task = project.tasks.register("copyVoiceModels", VoiceDataPlugin.CopyVoiceModels::class.java).get()
         task.local.set(local)
         task.hotwords.set(folder.newFile("hotwords.txt").apply { writeText("新 词\n") })
+        task.vad.set(folder.newFile("silero_vad.onnx").apply { writeText("vad") })
         task.outputDir.set(folder.root.resolve("voice-assets"))
         task.copy()
 
@@ -68,5 +70,6 @@ class VoiceDataPluginTest {
             assertTrue(name, Files.isSameFile(local.resolve(name).toPath(), out.resolve(name).toPath()))
         }
         assertEquals("▁中\t-1.5\n", out.resolve("bpe.vocab").readText())
+        assertEquals("vad", out.resolve("silero_vad.onnx").readText())
     }
 }

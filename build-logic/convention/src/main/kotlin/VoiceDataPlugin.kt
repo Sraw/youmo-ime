@@ -46,6 +46,7 @@ import javax.inject.Inject
  *   it takes hotwords. Numbers it writes in characters: VoiceText puts them in digits. Its encoder
  *   is fine-tuned by us for accented Mandarin (KeSpeech's dialect speech 17.1% -> 14.6% wrong,
  *   standard sets unchanged), on synthesized dialect speech held to the original by anchor batches.
+ * - silero VAD (MIT): whether what was heard is speech at all (VoiceQuiet).
  * - The polish tagger (ours, 060-voice-tagger.md): drops fillers and words taken back, adds marks,
  *   as the text streams; for now from [LOCAL_PROPERTY]'s directory only, with the streaming model.
  * - Hotwords: the new-word pack (EngineDataPlugin's `downloadEngineWords`), each word's characters
@@ -93,6 +94,10 @@ class VoiceDataPlugin : Plugin<Project> {
          */
         const val LOCAL_PROPERTY = "youmo.voiceModelDir"
         internal val TAGGER_FILES = listOf("polish-tagger.ort", "polish-tagger.json")
+
+        // whether a stretch heard is speech at all (VoiceQuiet): not where it ends, as before 0.6.0
+        private const val VAD_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
+        private const val VAD_SHA256 = "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"
     }
 
     override fun apply(target: Project) {
@@ -127,6 +132,11 @@ class VoiceDataPlugin : Plugin<Project> {
             cmake.set(target.sdkCmake)
             outputDir.set(target.layout.buildDirectory.dir("voice-ort"))
         }
+        val vad = target.tasks.register<DownloadTask>("downloadVoiceVad") {
+            url.set(VAD_URL)
+            sha256.set(VAD_SHA256)
+            outputFile.set(downloadsDir.file("silero_vad.onnx"))
+        }
         val words = target.tasks.named<DownloadTask>(EngineDataPlugin.WORDS_TASK)
         val hotwords = target.tasks.register<CompileHotwords>("compileVoiceHotwords") {
             classpath.from(target.configurations.named(EngineDataPlugin.TOOL_CONFIGURATION))
@@ -143,6 +153,7 @@ class VoiceDataPlugin : Plugin<Project> {
                 ort.set(ortDir.flatMap { it.outputDir })
             }
             this.hotwords.set(hotwords.flatMap { it.outputFile })
+            this.vad.set(vad.flatMap { it.outputFile })
             outputDir.set(target.layout.buildDirectory.dir("generated/voice-assets"))
         }
 
@@ -213,6 +224,10 @@ class VoiceDataPlugin : Plugin<Project> {
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val hotwords: RegularFileProperty
 
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val vad: RegularFileProperty
+
         @get:OutputDirectory
         abstract val outputDir: DirectoryProperty
 
@@ -233,6 +248,7 @@ class VoiceDataPlugin : Plugin<Project> {
             for (name in TAGGER_FILES) link(local.resolve(name), out.resolve(name))
             out.resolve("bpe.vocab").writeText(vocabulary(dir.resolve(BPE_MODEL).readBytes()))
             hotwords.get().asFile.copyTo(out.resolve("hotwords.txt"))
+            vad.get().asFile.copyTo(out.resolve("silero_vad.onnx"))
         }
 
         // some 175 MB already unpacked in the build directory: a second name for it, not a second copy

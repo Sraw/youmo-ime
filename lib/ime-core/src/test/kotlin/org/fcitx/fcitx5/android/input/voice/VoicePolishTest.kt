@@ -69,6 +69,15 @@ class VoicePolishTest {
         val zh = VoicePolishTags.norm("嗯2个")
         val (zop, zafter) = tags.guarded(zh, intArrayOf(VoicePolishTags.DEL, tags.ops.indexOf("两"), 0), intArrayOf(0, 0, tags.afters.indexOf("。")))
         assertEquals("两个。", tags.apply(zh, zop, zafter))
+        // the stream guards what the model says: 「I'm sorry.」 polished as it was said
+        val stream = VoicePolishStream(tags, { t ->
+            IntArray(t.size) { if (t[it] == 'r'.code) VoicePolishTags.DEL else 0 } to IntArray(t.size) { if (t[it] == '.'.code) tags.afters.indexOf("。") else 0 }
+        })
+        assertEquals("I'm sorry.", stream.finish("I'm sorry."))
+        val bare = VoicePolishStream(tags, { t ->
+            IntArray(t.size) { if (t[it] == 'r'.code) VoicePolishTags.DEL else 0 } to IntArray(t.size)
+        }, guard = false)
+        assertEquals("I'm soy.", bare.finish("I'm sorry."))
     }
 
     @Test
@@ -76,7 +85,7 @@ class VoicePolishTest {
         for (c in cases("stream")) {
             val text = codePoints(c[1])
             val step = c[2].toInt()
-            val stream = VoicePolishStream(tags, ::fake, freezeAfter = c[3].toInt(), window = c[4].toInt())
+            val stream = VoicePolishStream(tags, ::fake, freezeAfter = c[3].toInt(), window = c[4].toInt(), guard = false)
             var p = step
             while (p < text.size) {
                 stream.update(String(text, 0, p))

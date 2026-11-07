@@ -14,6 +14,9 @@ import com.k2fsa.sherpa.onnx.OnlineRecognizerConfig
 import com.k2fsa.sherpa.onnx.OnlineRecognizerResult
 import com.k2fsa.sherpa.onnx.OnlineStream
 import com.k2fsa.sherpa.onnx.OnlineTransducerModelConfig
+import com.k2fsa.sherpa.onnx.SileroVadModelConfig
+import com.k2fsa.sherpa.onnx.Vad
+import com.k2fsa.sherpa.onnx.VadModelConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -152,6 +155,21 @@ object VoiceEngine {
 
     // the engine busy or starting: the text as heard, not a wait
     private const val LANGUAGE_MS = 1000L
+
+    /**
+     * silero VAD for one microphone opening (VoiceQuiet): the threshold that kept the soft speech
+     * measured (0.2; 0.5 lost half of it at -58 dBFS), segments as sherpa-onnx's defaults.
+     */
+    fun vad(assets: AssetManager) = Vad(
+        assets,
+        VadModelConfig(
+            sileroVadModelConfig = SileroVadModelConfig(model = "$DIR/silero_vad.onnx", threshold = VAD_THRESHOLD, windowSize = WINDOW),
+            sampleRate = SAMPLE_RATE,
+            numThreads = 1,
+        ),
+    )
+
+    private const val VAD_THRESHOLD = 0.2f
 
     private fun config() = OnlineRecognizerConfig(
         featConfig = FeatureConfig(sampleRate = SAMPLE_RATE, featureDim = 80),

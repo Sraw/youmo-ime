@@ -858,14 +858,45 @@ in CI keeps the voice source set compiling.
   `lib/ime-core/src/test/resources/voice/gain_golden.py`, and each parameter changed alone changes it). Debug
   builds log one line of numbers at the close (`voice capture:` liftFrame, stopAt, read, envPeak,
   peakGainDb: the gain where env peaked) for the UAT (uat/12 VO-23/24/25), with `voice segments:` above.
-- **Quiet**: `VoiceQuiet` (ime-core), on the raw windows before the gain: a talk is typed (and shown)
-  only once its 3rd loudest window is −50 dBFS or louder, or 8 dB over its 10th-percentile floor
-  (all-zero windows and the first 3 with sound left out). Why: the gain lifts a quiet room 20 dB and
-  the recognizer reads the lifted floor (or plain zeroes) as 「I'm sorry.」「H」「I'm」 — a OnePlus 6T at
-  −66 dBFS, 2026-11-06. Soft speech over the room (the −59 dBFS q44 clips) still passes; steady noise
-  rises 1 (white) to 5 (pink) dB over its floor. The polish tagger's labels are guarded too
-  (`VoicePolishTags.guarded`): an English letter is kept, nothing written after a full stop (its del
-  took the second r of 「sorry」).
+- **Quiet**: `VoiceQuiet` (ime-core) decides per recognizer segment whether it is typed (and shown).
+  The gain lifts a quiet room 20 dB and the recognizer reads the lifted floor (a fan, traffic, plain
+  zeroes) as a short English phrase, 「I'm sorry.」 in 118 of 126 such results measured (a OnePlus 6T at
+  −66 dBFS typed 「I'm sory」, 2026-11-06; an emulator's silent microphone 「H」「I'm」). A segment with a
+  Chinese character, or of more than 12 letters, is typed as before; a short Latin one only if its
+  windows are loud (3rd loudest −50 dBFS or louder, or 8 dB over the talk's 10th-percentile floor;
+  raw windows before the gain, all-zero and the first 3 with sound left out) **and** silero VAD
+  (threshold 0.2, on the gained samples; its segments unused) heard speech in them. Measured on the
+  app's pipeline on the host (Gain2 → the 060 streaming models; aishell 40, ascend 40, the q44 clips;
+  white rooms at −66/−60 dBFS; L is the speech's 3rd loudest window; CER / share of "没有听清"):
+
+  | case | d4d0981c6 | 077374d11 (level) | (a) rise 6, 3 in a row | (b) silero 0.2 | chosen: Latin-short & level & silero |
+  |---|---|---|---|---|---|
+  | aishell R−66 L−58 | 22.8% / 0% | 27.1% / 5% | 22.8% / 0% | 32.8% / 18% | 22.8% / 0% |
+  | aishell R−66 L−60 | 30.1% / 0% | 94.6% / 90% | 57.9% / 32% | 64.3% / 55% | 30.1% / 0% |
+  | aishell R−60 L−54 | 28.4% / 0% | 94.8% / 90% | 54.7% / 32% | 44.0% / 30% | 28.4% / 0% |
+  | aishell R−60 L−58 | 50.8% / 8% | 100% / 100% | 100% / 100% | 99.7% / 98% | 50.8% / 8% |
+  | q44 clips in R−60 | 0% / 0% | 100% / 100% | 100% / 100% | 100% / 100% | 0% / 0% |
+  | 2 s quiet then L−58, R−66 | 22.2% / 0% | 23.9% / 2% | 22.2% / 0% | 31.5% / 20% | 22.2% / 0% |
+  | ascend R−60 L−54 / L−58 | 55.7/73.6% | 98.7/100% | — | 55.7/96.0% | 56.2/74.5% (+6%/+2% 没有听清) |
+  | room alone: white/pink, −66/−60 (32) | 31 typed | 5 | 6 | 0 | 0 |
+  | FSD50K room, household, keyboard, traffic (60 at −30 dB) | 53 | 26 | 23 | 4 | 4 |
+  | the same at their level (60) | 42 | 37 | 37 | 12 | 11 |
+  | zeroes | 0 (the app: 「H」「I'm」) | 0 | 0 | 0 | 0 |
+
+  No level or VAD rule keeps soft speech: 6 dB over the room, as soft speech is, is where steady
+  noise is too, and silero at 0.5 lost half of L−58. The text tells them apart: the cost is a short
+  English phrase said softly in a noisy room (ascend: 「make friends」 heard as 「Look friends.」 dropped).
+  A pause inside a talk is a segment of its own, judged alone. Option (c), the gain only on speech,
+  needs a per-window speech decision before the gain, which neither the level nor silero (on raw
+  samples) gives at these levels: not built. The q44 clips: 3rd loudest window −59.5 dBFS as
+  made, the debug log's env −60 to −54 on the emulator. The measuring scripts:
+  `lib/ime-core/src/test/resources/voice/quiet_golden.py` (VoiceQuietTest's golden cases) and the
+  report of 2026-11-07.
+- **Polish guard**: `VoicePolishStream` applies `VoicePolishTags.guarded` to the tagger's labels:
+  an English letter is kept, nothing written after a full stop. Its del took the second r of
+  「sorry」 (「I'm sory.。」); on ascend's 142 texts with English it changed letters in 10, guarded
+  in 0, the Chinese unchanged; repeated English words (「big big」) are no longer taken out.
+  `apply` stays voice-eval's tags.py to the letter (`guard = false` for its goldens).
 
 ## Strings and languages
 

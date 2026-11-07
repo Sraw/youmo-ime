@@ -15,6 +15,7 @@ import android.os.Looper
 import android.os.SystemClock
 import com.k2fsa.sherpa.onnx.OnlineRecognizer
 import com.k2fsa.sherpa.onnx.OnlineStream
+import com.k2fsa.sherpa.onnx.Vad
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -103,10 +104,9 @@ class VoiceListener(
     @Volatile
     private var liftAt: Long? = null
 
-    // the capture thread's VoiceQuiet.speech as it goes (zeroes alone none): what the room alone was heard as is
-    // neither shown nor typed (a lifted noise floor recognized as 「I'm sory」)
-    @Volatile
-    private var speech = false
+    // what the microphone heard, window by window, for the recognizer to ask whether a segment was
+    // the room (a lifted noise floor recognized as 「I'm sorry.」): fed on the capture thread
+    private val quiet = VoiceQuiet()
     // start()'s uptime: the debug log's time to the first sample not zero
     @Volatile
     private var startedAt = 0L
@@ -253,6 +253,7 @@ class VoiceListener(
             val segment = Segment(recognizer, stream, live, words)
             for (samples in audio) {
                 if (closed) return
+                segment.fed += samples.size
                 stream.acceptWaveform(samples, VoiceEngine.SAMPLE_RATE)
                 segment.decode()
             }
@@ -265,7 +266,7 @@ class VoiceListener(
             if (BuildConfig.DEBUG) Timber.d("voice segments: speechStart=%s segments=%d", segment.speechStart, segment.kept)
             // the polish failing: the raw text, told as such (what was typed as it was said is polished)
             val polished = orFallback<String?>("voice polish", null) { live.finished() }
-            if (!speech) said.complete(null) else said.complete(if (polished != null) polished to false else live.raw to true)
+            said.complete(if (polished != null) polished to false else live.raw to true)
         } catch (e: CancellationException) {
             throw e
         } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
@@ -287,6 +288,10 @@ class VoiceListener(
     ) {
         private var last = ""
 
+        /** samples handed to the recognizer, from the microphone's opening; this segment's from [start] */
+        var fed = 0L
+        private var start = 0L
+
         /** segments closed with something in them; the UAT's (VO-23/24): one, or the lift's offset is not measured */
         var kept = 0
             private set
@@ -301,11 +306,14 @@ class VoiceListener(
                 if (recognizer.isEndpoint(stream)) {
                     close()
                     recognizer.reset(stream)
+                    start = fed
                 } else {
                     val text = recognizer.getResult(stream).text
                     if (text != last) {
                         last = text
-                        show(orFallback("voice polish", VoiceLive.Heard(live.raw, 0, fallback = true)) { live.heard(text) })
+                        // the room's phrase shows no more than it is typed
+                        val heard = if (quiet.keeps(text, start, fed)) text else ""
+                        show(orFallback("voice polish", VoiceLive.Heard(live.raw, 0, fallback = true)) { live.heard(heard) })
                     }
                 }
             }
@@ -316,15 +324,15 @@ class VoiceListener(
             val result = recognizer.getResult(stream)
             last = ""
             if (result.text.isBlank()) return
+            val chosen = orFallback("voice choice", result.text) { VoiceEngine.choose(result, words, safeLanguage) }
+            // the room's: what showed of it goes, nothing is kept
+            val text = if (quiet.keeps(chosen, start, fed)) chosen else ""
             // the first segment's timestamps count from the stream's start, the microphone's opening
-            if (kept++ == 0) speechStart = result.timestamps.firstOrNull()?.let { (it * VoiceEngine.SAMPLE_RATE).toInt() }
-            val text = orFallback("voice choice", result.text) { VoiceEngine.choose(result, words, safeLanguage) }
+            if (text.isNotEmpty() && kept++ == 0) speechStart = result.timestamps.firstOrNull()?.let { (it * VoiceEngine.SAMPLE_RATE).toInt() }
             show(orFallback("voice polish", VoiceLive.Heard(live.raw, 0, fallback = true)) { live.closed(text) })
         }
 
-        private fun show(shown: VoiceLive.Heard) {
-            if (speech) tell { heard(shown) }
-        }
+        private fun show(shown: VoiceLive.Heard) = tell { heard(shown) }
     }
 
     private suspend fun record() {
@@ -334,12 +342,16 @@ class VoiceListener(
             return
         }
         val opening = Opening(record.bufferSizeInFrames)
+        // whether a window is speech (VoiceQuiet), on the gained samples: silero did not fire at the
+        // -50 to -60 dBFS of soft speech before the gain (specs/app.md)
+        val vad = VoiceEngine.vad(assets)
         try {
             record.startRecording()
-            listen(record, opening)
+            listen(record, opening, vad)
         } finally {
             record.stop()
             record.release()
+            vad.release()
             // numbers only, nothing said: the UAT's check of the tail's timing and the level (uat/12 VO-23/24)
             if (BuildConfig.DEBUG) opening.log()
         }
@@ -350,7 +362,6 @@ class VoiceListener(
         val gain = VoiceGain(VoiceEngine.SAMPLE_RATE)
         val end = VoiceCaptureEnd(VoiceEngine.SAMPLE_RATE, bufferFrames)
         val onset = VoiceOnset(VoiceEngine.SAMPLE_RATE)
-        val quiet = VoiceQuiet()
 
         // Locale.ROOT: uat/scripts/12-voice.py parses it, a decimal comma would not
         fun log() = Timber.d(
@@ -398,7 +409,7 @@ class VoiceListener(
         return null
     }
 
-    private suspend fun listen(record: AudioRecord, opening: Opening) {
+    private suspend fun listen(record: AudioRecord, opening: Opening, vad: Vad) {
         val buffer = FloatArray(VoiceEngine.WINDOW)
         val shorts = if (record.audioFormat == AudioFormat.ENCODING_PCM_16BIT) ShortArray(VoiceEngine.WINDOW) else null
         val timestamp = AudioTimestamp()
@@ -429,11 +440,13 @@ class VoiceListener(
                     // the UAT's (VO-26): from start() to the first sample not zero
                     if (BuildConfig.DEBUG) Timber.d("voice ready: fromStartMs=%d", SystemClock.uptimeMillis() - startedAt)
                 }
-                opening.quiet.window(buffer, n)
-                speech = opening.quiet.speech
                 val samples = buffer.copyOf(n)
                 // before all of it: the recognizer and the level hear the same
                 opening.gain.apply(samples)
+                vad.acceptWaveform(samples)
+                // its segments are not used: only whether it is in one now
+                if (!vad.empty()) vad.clear()
+                quiet.window(buffer, n, vad.isSpeechDetected())
                 audio.trySend(samples)
                 if (++windows % LEVEL_EVERY == 0) {
                     val level = rms(samples)

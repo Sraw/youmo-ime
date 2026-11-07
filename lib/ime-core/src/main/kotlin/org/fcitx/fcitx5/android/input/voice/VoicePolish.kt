@@ -46,7 +46,8 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>) {
      * The model's labels of [text] (normed) with what it does wrong in English undone, in place:
      * an English letter is kept (its ops are Chinese words and a del, which took the second r of
      * 「sorry」 as a stutter: 「I'm sory」 typed on a OnePlus 6T, 2026-11-06), and nothing is written
-     * after a full stop (「I'm sorry.。」). Not in [apply], which is voice-eval's tags.py to the letter.
+     * after a full stop (「I'm sorry.。」). Applied by [VoicePolishStream] to what the model says; not in
+     * [apply], which is voice-eval's tags.py to the letter.
      */
     fun guarded(text: IntArray, op: IntArray, after: IntArray): Pair<IntArray, IntArray> {
         for (i in text.indices) {
@@ -150,6 +151,8 @@ class VoicePolishStream(
     private val tagger: Tagger,
     private val freezeAfter: Int = FREEZE_AFTER,
     private val window: Int = WINDOW,
+    /** the labels [VoicePolishTags.guarded]; false only for voice-eval's goldens, which have none */
+    private val guard: Boolean = true,
 ) {
     /** The op and after labels of [text] (code points), a character each; the model run. */
     fun interface Tagger {
@@ -225,8 +228,10 @@ class VoicePolishStream(
         val start = maxOf(0, end - window)
         // left the window before freezeAfter characters followed: frozen as last tagged
         frozen = maxOf(frozen, start)
-        val (op, after) = tagger.labels(text.copyOfRange(start, end))
+        val part = text.copyOfRange(start, end)
+        val (op, after) = tagger.labels(part)
         check(op.size == end - start && after.size == end - start) { "a label each of ${end - start} characters" }
+        if (guard) tags.guarded(part, op, after)
         // a frozen character keeps its labels, though tagged again in the window
         op.copyInto(seenOp, frozen, frozen - start, op.size)
         after.copyInto(seenAfter, frozen, frozen - start, after.size)

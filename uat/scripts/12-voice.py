@@ -506,8 +506,19 @@ def vo23(d):
 
 @case("VO-24", base="B0-语音", mutates="learn", needs=EV)
 def vo24(d):
+    return soft_speech(d, (("zouba-q44", "我们走吧"), ("nihao-q44", "你好")))
+
+
+# the same in the room's noise, which goes on all through the clip: VoiceQuiet must not take soft
+# speech for the room (077374d11 dropped it: 没有听清)
+@case("VO-32", base="B0-语音", mutates="learn", needs=EV)
+def vo32(d):
+    return soft_speech(d, (("zouba-q44-room", "我们走吧"), ("nihao-q44-room", "你好")))
+
+
+def soft_speech(d, clips):
     out = []
-    for clip, want in (("zouba-q44", "我们走吧"), ("nihao-q44", "你好")):
+    for clip, want in clips:
         def attempt(before):
             d.sh("logcat -c")
             _, t = dictate(d, clip)

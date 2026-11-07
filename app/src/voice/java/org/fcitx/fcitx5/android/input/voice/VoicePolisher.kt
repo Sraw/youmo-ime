@@ -29,7 +29,7 @@ class VoicePolisher private constructor(
         val ids = vocab.encode(text)
         // by position, as exported (op, after): the two are 44 and 28 wide, so swapped, rows() fails loudly
         val (op, after) = model.runLongs(ids, longArrayOf(1, ids.size.toLong()))
-        return tags.guarded(text, rows(op, text.size, tags.ops.size), rows(after, text.size, tags.afters.size))
+        return rows(op, text.size, tags.ops.size) to rows(after, text.size, tags.afters.size)
     }
 
     // the text's rows of [out] ([1, n, width]): the export leaves [CLS] and [SEP]'s out already (voice-eval tagger.py)
