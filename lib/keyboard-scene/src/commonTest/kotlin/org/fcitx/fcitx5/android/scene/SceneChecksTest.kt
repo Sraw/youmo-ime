@@ -30,6 +30,12 @@ class SceneChecksTest {
             .map { (i, j) -> "${shot.name} ${k.id}: ${boxes[i].what} and ${boxes[j].what} meet" }
     }
 
+    // TalkBack has something to read on every key
+    @Test
+    fun everyKeyHasSomethingToSay() = expectNone { shot, k ->
+        listOfNotNull("${shot.name} ${k.id}: no a11y".takeIf { k.a11y.isBlank() })
+    }
+
     // within the face, or for the known exceptions ([leeway]) within the key's cell
     @Test
     fun theTextsOfAKeyKeepToItsFace() = expectNone { shot, k ->

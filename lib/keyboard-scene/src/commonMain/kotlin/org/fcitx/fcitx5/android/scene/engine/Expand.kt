@@ -154,7 +154,8 @@ object Expand {
         return when {
             alt == null -> said
             said.isEmpty() -> alt
-            else -> texts.a11yGrouped.replace(ARG1, said).replace(ARG2, alt)
+            // one pass: a literal "%2$s" in the label must not be taken for the alt's place
+            else -> ARGS.replace(texts.a11yGrouped) { if (it.value == ARG1) said else alt }
         }
     }
 
@@ -163,7 +164,7 @@ object Expand {
 
     // the space with no name to say (an input method with none, a scene built before the name is known): the app's "Space"
     private const val A11Y_SPACE = "a11y_key_space"
-    private const val ARG2 = "%2\$s"
+    private val ARGS = Regex("%[12]\\$" + "s")
 
     private fun written(t: Text): String = when (t) {
         is Text.Literal -> t.text
