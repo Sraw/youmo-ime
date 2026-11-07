@@ -283,17 +283,24 @@ class KeyboardCanvasViewTest {
     }
 
     // no scene (a theme the engine refuses: a font file's name 4.0 takes no file by): the views draw
-    // the keys again and take the touches, nothing left blank
+    // the keys again and take the touches, nothing left blank, their letters settled as a keyboard's
+    // that never had the canvas (BaseKeyboard.onLayout settles none under it)
     @Test
     fun noSceneTheViewsDrawTheKeysAgain() {
         val light = org.fcitx.fcitx5.android.data.theme.ThemePreset.PixelLight.look
         val broken = Theme.Custom("broken", false, light.copy(text = light.text.copy(keyFont = "/themes/x/bad:name.ttf")))
+        // 紧凑 (KeyMarksEverywhereUatTest's): the letters settled smaller, clear of their symbols, not as laid out
+        prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
+        val viewsOnly = KeyboardHarness(broken).start().use { it.relayout(); it.settled() }
+        assertTrue(viewsOnly.toString(), viewsOnly.values.any { it.any { v -> v != 0f && v != 1f } })
         prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         KeyboardHarness(broken).start().use { h ->
             val c = h.canvas()!!
             assertNull(c.scene)
             h.idle()
             assertNull(h.canvas())
+            // laid out again as the fallback asks (the frame's traversal, idle()), its letters settled as they would have been
+            assertEquals(viewsOnly, h.settled())
             val q = h.keyView("q")
             assertTrue(h.shown(q))
             assertNull(q.onPressedChanged)
@@ -553,6 +560,13 @@ class KeyboardCanvasViewTest {
         f.up(KeyboardHarness.Touch(x, a.height / 2f))
         assertTrue(popup.toString(), "@" in popup)
     }
+
+    // what settling the letters set on each letter key's views (KeyView.settle): their scale, place and alpha
+    private fun KeyboardHarness.settled(): Map<String, List<Float>> =
+        KeyboardHarness.all(textKeyboard()).filterIsInstance<AltTextKeyView>().filter { it.visibility == View.VISIBLE && it.themeKey != null }
+            .associate { k ->
+                k.themeKey!! to KeyboardHarness.all(k).drop(1).flatMap { v -> listOf(v.scaleX, v.scaleY, v.translationX, v.translationY, v.alpha) }.toList()
+            }
 
     private fun KeyboardHarness.textKeyboard(): TextKeyboard = KeyboardHarness.all(inputView).filterIsInstance<TextKeyboard>().first()
 

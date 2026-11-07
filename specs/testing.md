@@ -209,9 +209,14 @@ a settings page, rotation, a field type, an upgrade) is tried on a device before
   `./gradlew :app:connectedTextBenchmarkAndroidTest -Pyoumo.testBuildType=benchmark
   -Pandroid.testInstrumentationRunnerArguments.class=org.fcitx.fcitx5.android.input.KeyboardPerfBaselineTest
   -Pandroid.testInstrumentationRunnerArguments.perfRuns=20 -Pandroid.testInstrumentationRunnerArguments.perfCanvas=true`,
-  its rows (`KeyboardPerf` in logcat) read with `adb logcat -d -s KeyboardPerf:I`. Two builds' numbers
-  are compared only from one emulator session, each pair run twice: a run's medians move by up to 30%
-  from session to session. Systrace sections of the app: `adb shell atrace --async_start -c -b 32768
+  its rows (`KeyboardPerf` in logcat) read with `adb logcat -d -s KeyboardPerf:I`: median, p90 and the
+  mean of all samples, ms, and what each step allocated (`Debug.getRuntimeStat`'s
+  `art.gc.bytes-allocated` and `art.gc.gc-count` read before and after it, the process's, a press's
+  shared by the keys of its run) as KiB and GCs. Two builds' (or the switch's two sides') numbers are
+  compared only from one emulator session, in at least three pairs, the order alternated (views first,
+  then canvas first, ...): a run's medians move by up to 30% from session to session, and neither
+  side should always be the one run on the emulator longer up. The canvas's gates are in specs/app.md.
+  Systrace sections of the app: `adb shell atrace --async_start -c -b 32768
   -a io.github.sraw.youmo.bench view`, the test, then `atrace --async_dump` (a non-debuggable app's
   `Trace` sections show only when it is named with `-a`).
 

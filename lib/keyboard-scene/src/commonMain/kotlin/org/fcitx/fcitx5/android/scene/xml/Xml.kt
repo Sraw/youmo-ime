@@ -195,7 +195,14 @@ private class Reader(private val s: String) {
 
     // text up to [end] (not taken), references read; '<' is never in a value
     private fun chars(end: Char): String {
-        val b = StringBuilder()
+        val start = i
+        while (i < s.length && s[i] != end && s[i] != '&') {
+            if (s[i] == '<') fail("'<' in a value")
+            advance(1)
+        }
+        // no reference in it (most values): the text as it is, not copied a character at a time
+        if (i >= s.length || s[i] == end) return s.substring(start, i)
+        val b = StringBuilder().appendRange(s, start, i)
         while (i < s.length && s[i] != end) {
             when (val c = s[i]) {
                 '&' -> b.append(reference())

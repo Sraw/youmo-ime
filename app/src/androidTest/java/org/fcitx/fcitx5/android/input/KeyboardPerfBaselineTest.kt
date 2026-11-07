@@ -43,6 +43,7 @@ import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.theme.BoardBase
 import org.fcitx.fcitx5.android.input.theme.Crop
+import org.fcitx.fcitx5.android.input.theme.Keys
 import org.fcitx.fcitx5.android.input.theme.Picture
 import org.fcitx.fcitx5.android.utils.inputMethodManager
 import org.junit.After
@@ -268,20 +269,22 @@ class KeyboardPerfBaselineTest {
         // the area as it is before the tap: the symbols take the keyboard's frame away
         onMain { keyboardArea() }
         val mark = onMain { frames.mark(0) { shows(keyboardFrame(), board) } }
+        val heap = Heap.now()
         val down = SystemClock.uptimeMillis()
         inject(MotionEvent.ACTION_DOWN, key, down, down)
         SystemClock.sleep(HOLD_MS)
         val up = SystemClock.uptimeMillis()
         mark.from = up * DownMarks.NS_PER_MS
         inject(MotionEvent.ACTION_UP, key, down, up)
-        return frames.await(mark).also { settle() }
+        return frames.await(mark).also { settle() }.heap(Heap.now() - heap)
     }
 
     private fun switchTo(im: String, board: Board): KeyboardFrames.Sample {
         val mark = onMain { frames.mark(0) { shows(keyboardFrame(), board) } }
+        val heap = Heap.now()
         mark.from = System.nanoTime()
         host { activateIme(im) }
-        return frames.await(mark).also { settle() }
+        return frames.await(mark).also { settle() }.heap(Heap.now() - heap)
     }
 
     /**
@@ -351,6 +354,20 @@ class KeyboardPerfBaselineTest {
             }
         }
         samples.forEach { (label, s) -> row("theme", label, s.drop(warmUp)) }
+        row("theme", "every switch above", samples.values.flatMap { it.drop(warmUp) })
+        // a theme not seen before: a flat one with corners of its own each run, saved before it is timed
+        val unseen = mutableListOf<KeyboardFrames.Sample>()
+        repeat(warmUp + runs) { i ->
+            val radius = (flat.look.keys.radiusDp + 1 + i) % (Keys.MAX_RADIUS_DP + 1)
+            val new = Theme.Custom("$UNSEEN-$i", isDark = false, look = flat.look.copy(keys = flat.look.keys.copy(radiusDp = radius)))
+            assumeTrue("a theme could not be saved", onMain { ThemeManager.saveTheme(new) })
+            themesMade += new.name
+            settle()
+            val sample = theme(new)
+            if (i >= warmUp) unseen += sample
+            theme(block)
+        }
+        row("theme", "block → a flat one not seen before", unseen)
     }
 
     private fun theme(to: Theme): KeyboardFrames.Sample {
@@ -441,6 +458,7 @@ class KeyboardPerfBaselineTest {
     private fun presses(marks: DownMarks, keys: List<PointF>, gapMs: Long): List<KeyboardFrames.Sample> {
         marks.marks.clear()
         marks.recording = true
+        val heap = Heap.now()
         for (key in keys) {
             val down = SystemClock.uptimeMillis()
             inject(MotionEvent.ACTION_DOWN, key, down, down)
@@ -452,7 +470,9 @@ class KeyboardPerfBaselineTest {
         // a down with no frame after it (nothing drawn for the press) is told, not counted
         val drawn = marks.marks.mapNotNull { runCatching { frames.await(it) }.getOrNull() }
         if (drawn.size != keys.size) log("press\t${keys.size - drawn.size} of ${keys.size} downs had no frame")
-        return drawn
+        settle()
+        val step = Heap.now() - heap
+        return drawn.onEach { it.heap(step, keys.size) }
     }
 
     // what was typed committed and the field emptied, for the next run to start alike
@@ -504,13 +524,14 @@ class KeyboardPerfBaselineTest {
     private fun shiftTap(at: PointF): KeyboardFrames.Sample {
         val caps = onMain { capsState() }
         val mark = onMain { frames.mark(0) { capsState() != caps } }
+        val heap = Heap.now()
         val down = SystemClock.uptimeMillis()
         inject(MotionEvent.ACTION_DOWN, at, down, down)
         SystemClock.sleep(HOLD_MS)
         val up = SystemClock.uptimeMillis()
         mark.from = up * DownMarks.NS_PER_MS
         inject(MotionEvent.ACTION_UP, at, down, up)
-        return frames.await(mark).also { settle() }
+        return frames.await(mark).also { settle() }.heap(Heap.now() - heap)
     }
 
     // Shift's state as its view tells a screen reader (set as Shift is tapped, before the frame showing it)
@@ -556,11 +577,12 @@ class KeyboardPerfBaselineTest {
 
     /** Counts [action] (main thread) to the first frame where [ready] holds. */
     private fun measure(ready: () -> Boolean, action: () -> Unit): KeyboardFrames.Sample {
+        val heap = Heap.now()
         val mark = onMain {
             val from = System.nanoTime()
             frames.mark(from, ready).also { action() }
         }
-        return frames.await(mark).also { settle() }
+        return frames.await(mark).also { settle() }.heap(Heap.now() - heap)
     }
 
     private fun inject(action: Int, at: PointF, down: Long, time: Long) {
@@ -591,7 +613,9 @@ class KeyboardPerfBaselineTest {
         log(
             "$what\t$label\tn ${samples.size} (metrics $withMetrics)\tto frame done ${stats { it.latency }}" +
                 "\tto commit ${stats { it.toCommit }}\tmain before draw ${stats { it.toPreDraw }}$dispatch" +
-                "\tframe total ${stats { it.frameTotal }}\tlayout ${stats { it.layoutMeasure }}\tdraw ${stats { it.draw }}\t$extra",
+                "\tframe total ${stats { it.frameTotal }}\tlayout ${stats { it.layoutMeasure }}\tdraw ${stats { it.draw }}" +
+                "\tmean ${"%.1f".format(Locale.ROOT, stats { it.fromDispatch ?: it.latency }.mean)}" +
+                "\tallocated ${"%.0f".format(Locale.ROOT, stats { it.allocated }.mean / KIB)} KiB\tgcs ${"%.2f".format(Locale.ROOT, stats { it.gcs }.mean)}\t$extra",
         )
     }
 
@@ -611,11 +635,13 @@ class KeyboardPerfBaselineTest {
         const val HANDWRITING = InputMethodCatalog.HANDWRITING
         const val FLAT = "perf-baseline-flat"
         const val PICTURED = "perf-baseline-picture"
+        const val UNSEEN = "perf-baseline-new"
         const val PICTURE_W = 1080
         const val PICTURE_H = 900
         const val HOLD_MS = 80L
         const val SHIFT_APART_MS = 400L
         const val NANOS_A_MS = 1e6
+        const val KIB = 1024.0
         const val FAST_GAP_MS = 80L
         const val SETTLE_MS = 150L
         const val GC_WAIT_MS = 500L

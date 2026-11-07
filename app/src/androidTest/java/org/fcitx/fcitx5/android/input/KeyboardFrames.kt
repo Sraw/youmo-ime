@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input
 
 import android.content.Context
 import android.content.ContextWrapper
+import android.os.Debug
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.SystemClock
@@ -95,6 +96,16 @@ internal class KeyboardFrames(private val window: Window) : AutoCloseable {
 
         /** The number compared: to the frame done, to its commit without metrics. */
         val latency get() = toDone ?: toCommit
+
+        /** What the process allocated for it (bytes) and the GCs that ran, from its action till it settled ([Heap]); null untold. */
+        var allocated: Double? = null
+        var gcs: Double? = null
+
+        /** [step]'s allocations and GCs as this sample's, or [share] of them (a run of keys, one heap step for all). */
+        fun heap(step: Heap, share: Int = 1) = apply {
+            allocated = step.bytes.toDouble() / share
+            gcs = step.gcs.toDouble() / share
+        }
     }
 
     private val thread = HandlerThread("keyboard-frames").apply { start() }
@@ -205,10 +216,26 @@ internal class DownMarks(val original: Window.Callback, private val frames: Keyb
     }
 }
 
-/** Median and 90th percentile (nearest rank) of [values]. */
+/**
+ * What the process has allocated (bytes) and how many GCs have run, ART's counts since it began
+ * ([Debug.getRuntimeStat]); one minus another is what happened between, every thread's (the test's own
+ * waiting allocates a little, the same with either drawing).
+ */
+internal data class Heap(val bytes: Long, val gcs: Long) {
+    operator fun minus(o: Heap) = Heap(bytes - o.bytes, gcs - o.gcs)
+
+    companion object {
+        fun now() = Heap(stat("art.gc.bytes-allocated"), stat("art.gc.gc-count"))
+
+        private fun stat(name: String) = Debug.getRuntimeStat(name)?.toLongOrNull() ?: 0L
+    }
+}
+
+/** Median, 90th percentile (nearest rank) and mean of [values]. */
 internal class Stats(values: List<Double>) {
     private val sorted = values.sorted()
     val n = sorted.size
+    val mean: Double = if (sorted.isEmpty()) Double.NaN else sorted.sum() / n
     val median: Double = when {
         sorted.isEmpty() -> Double.NaN
         n % 2 == 1 -> sorted[n / 2]

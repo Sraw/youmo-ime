@@ -159,9 +159,12 @@ object ThemeReader {
         val a = Attributes(el, p)
         val select = a.required("select")
         val selectors = select?.let { Selector.parseList(it) ?: null.also { a.problem("select=\"$select\" is no selector") } }
-        val values = Values.PROPERTIES.mapNotNull { prop ->
-            a.value(prop, "a value of $prop") { Values.read(prop, it) }?.let { prop to it }
-        }.toMap()
+        // the properties it sets, in PROPERTIES' order: a theme's styles are many, each sets a few
+        val values = LinkedHashMap<String, Value>()
+        for ((prop, what) in PROPERTY_VALUES) {
+            if (el[prop] == null) continue
+            a.value(prop, what) { Values.read(prop, it) }?.let { values[prop] = it }
+        }
         a.done()
         for (v in values.values) {
             colorsOf(v).flatMap { it.refs() }.filter { it !in colors }.forEach { a.problem("@$it is no colour") }
@@ -170,6 +173,9 @@ object ThemeReader {
         if (values.isEmpty()) a.problem("a style that sets nothing")
         return selectors?.let { Style(it, values, order, el.line) }
     }
+
+    // each property and how a problem names its value
+    private val PROPERTY_VALUES = Values.PROPERTIES.map { it to "a value of $it" }
 
     private fun colorsOf(v: Value): List<ColorExpr> = when (v) {
         is Value.OfColor -> listOf(v.color)

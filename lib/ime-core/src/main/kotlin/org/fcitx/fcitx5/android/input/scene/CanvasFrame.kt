@@ -23,10 +23,18 @@ object CanvasFrame {
      * taken out of the render tree and loses its recording (seen on a device: a key let go drawn as
      * nothing), so both stay drawn and a press only changes their alpha, the face not shown at 0.
      */
-    fun faces(pressed: Boolean, normalRecorded: Boolean, pressedRecorded: Boolean): List<Face> = buildList {
+    fun faces(pressed: Boolean, normalRecorded: Boolean, pressedRecorded: Boolean): List<Face> =
+        FACES[(if (pressed) PRESSED else 0) + (if (normalRecorded) NORMAL_RECORDED else 0) + (if (pressedRecorded) 1 else 0)]
+
+    private fun made(pressed: Boolean, normalRecorded: Boolean, pressedRecorded: Boolean): List<Face> = buildList {
         add(Face(pressed = false, alpha = if (pressed) 0f else 1f, record = !normalRecorded))
         if (pressed || pressedRecorded) add(Face(pressed = true, alpha = if (pressed) 1f else 0f, record = !pressedRecorded))
     }
+
+    // the eight answers made once: asked for each key in each frame, a list and its faces each time
+    private const val PRESSED = 4
+    private const val NORMAL_RECORDED = 2
+    private val FACES = List(PRESSED * 2) { i -> made(i and PRESSED != 0, i and NORMAL_RECORDED != 0, i and 1 != 0) }
 
     /**
      * The box a key's node is recorded in: its [bounds] and whatever of [ops] reaches past them (a

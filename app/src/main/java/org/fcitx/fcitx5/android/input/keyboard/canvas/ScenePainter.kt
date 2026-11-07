@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard.canvas
 
-import android.content.res.Configuration
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.LinearGradient
@@ -227,9 +226,11 @@ class ScenePainter(
         val w = b.right.roundToInt() - left
         val h = b.bottom.roundToInt() - top
         val config = view.resources.configuration
-        if (config != iconsUnder || icons.size > KEPT_ICONS) {
+        if (config.uiMode != iconsUiMode || config.densityDpi != iconsDensity || config.fontScale != iconsFontScale) {
             icons.clear()
-            iconsUnder = Configuration(config)
+            iconsUiMode = config.uiMode
+            iconsDensity = config.densityDpi
+            iconsFontScale = config.fontScale
         }
         val d = icons.getOrPut(IconKey(op.name, op.tint.value, w, h)) {
             SceneIcons.of(op.name)?.let { ContextCompat.getDrawable(view.context, it)?.mutate() }?.also {
@@ -246,11 +247,17 @@ class ScenePainter(
 
     private companion object {
         const val RADII = 8
-        private const val KEPT_ICONS = 256
+        private const val KEPT_ICONS = 64
 
-        // the icons drawn, every painter's (main thread): a keyboard made again (a theme switched) inflates
-        // none again; let go when the configuration they were inflated under changes (night, density)
-        private val icons = HashMap<IconKey, Drawable?>()
-        private var iconsUnder: Configuration? = null
+        // the icons drawn, every painter's (main thread), the last KEPT_ICONS used: a keyboard made again (a
+        // theme switched) inflates none again; let go when what inflating one reads changes (night mode,
+        // density, font scale), not for the rest of the configuration (turning the screen keeps them)
+        private val icons = object : LinkedHashMap<IconKey, Drawable?>(KEPT_ICONS, LOAD, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<IconKey, Drawable?>?) = size > KEPT_ICONS
+        }
+        private const val LOAD = 0.75f
+        private var iconsUiMode = 0
+        private var iconsDensity = 0
+        private var iconsFontScale = Float.NaN
     }
 }

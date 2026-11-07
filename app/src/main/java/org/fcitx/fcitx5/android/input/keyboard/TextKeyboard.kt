@@ -47,11 +47,13 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
 import org.fcitx.fcitx5.android.input.scene.SceneLetters
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
 import org.fcitx.fcitx5.android.input.scene.TextBoardState
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
@@ -89,6 +91,15 @@ class TextKeyboard private constructor(
 
     enum class CapsState { None, Once, Lock }
 
+    // what the marks' settings are made from (KeyShortcuts compared as the same instance: the cache's)
+    private data class MarksFor(
+        val shortcuts: KeyShortcuts,
+        val layers: SwipeLayers,
+        val spots: KeyMarks.Spots,
+        val charShortcuts: Boolean,
+        val names: Set<String>,
+    )
+
     companion object {
         const val Name = "Text"
 
@@ -99,6 +110,17 @@ class TextKeyboard private constructor(
         private const val KEPT_SCENES = 4
         private val measurers = LinkedHashMap<ThemeLook, AndroidTextMeasurer>(KEPT_SCENES, 0.75f, true)
         private val scenesKept = ArrayDeque<Made>()
+
+        // a layout's shortcut names, and the marks' settings as last made from their inputs: as alts(), kept
+        // for the scene asked again, the same instances making the env equal to the last at once
+        private var namesMade: Pair<Layout, Set<String>>? = null
+        private var marksMade: Pair<MarksFor, MarkSettings>? = null
+
+        private fun names(layout: Layout): Set<String> =
+            namesMade?.takeIf { it.first === layout }?.second ?: SceneMarks.names(layout).also { namesMade = layout to it }
+
+        private fun marks(of: MarksFor): MarkSettings = marksMade?.takeIf { it.first == of }?.second
+            ?: SceneMarks.settings(of.shortcuts, of.layers, of.spots, of.charShortcuts, of.names).also { marksMade = of to it }
 
         private fun measurer(look: ThemeLook): AndroidTextMeasurer = measurers.getOrPut(look) { AndroidTextMeasurer(SceneFonts(look)) }
             .also { if (measurers.size > KEPT_SCENES) measurers.remove(measurers.keys.first()) }
@@ -409,15 +431,14 @@ class TextKeyboard private constructor(
             keepUppercase = keepLettersUppercase,
             punctuation = punctuationMapping,
             // the corners and a table's roots as the views show them (updatePunctuationKeys, updateAlphabetKeys)
-            alts = SceneLetters.alts { c -> letterDefs[c]?.let(::cornerOf) },
+            alts = alts(),
             other = SceneLetters.roots(table) { c -> letterShown(c.toString()) },
             // the formats as they are: the engine fills their places (getString with no arguments formats nothing)
             a11yGrouped = context.getString(R.string.a11y_key_grouped),
             a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
         )
-        val marks = SceneMarks.settings(
-            KeyShortcutsCache.current, AppPrefs.getInstance().keyboard.swipeLayers.getValue().layers, markSpots(),
-            charShortcutMarks, SceneMarks.names(layout),
+        val marks = marks(
+            MarksFor(KeyShortcutsCache.current, AppPrefs.getInstance().keyboard.swipeLayers.getValue().layers, markSpots(), charShortcutMarks, names(layout)),
         )
         return Env(
             width.toDouble(), height.toDouble(), resources.displayMetrics.density.toDouble(),
@@ -442,6 +463,19 @@ class TextKeyboard private constructor(
     }
 
     private class Made(val theme: SceneTheme, val layout: Layout, val measurer: TextMeasurer, val env: Env, val scene: Scene)
+
+    // the letters' corners as last worked out, and what they were worked out from (cornerOf's inputs):
+    // the canvas asks for a scene on every change the views show (a key typed), and these change only as
+    // a setting or Shift does; the same map kept, the env compared with the last is equal at once
+    private data class AltsFor(val labelled: Boolean, val punctuation: Map<String, String>, val overrides: PopupOverrides, val caps: CapsState)
+
+    private var altsMade: Pair<AltsFor, Map<String, String>>? = null
+
+    private fun alts(): Map<String, String> {
+        val now = AltsFor(table?.labelled == true, punctuationMapping, PopupOverridesCache.user.current, capsState)
+        altsMade?.takeIf { it.first == now }?.let { return it.second }
+        return SceneLetters.alts { c -> letterDefs[c]?.let(::cornerOf) }.also { altsMade = now to it }
+    }
 
     /** The scenes the engine made for this keyboard: a test's count of what was not kept. */
     @VisibleForTesting

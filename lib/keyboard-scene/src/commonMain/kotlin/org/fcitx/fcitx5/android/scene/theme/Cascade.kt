@@ -47,14 +47,18 @@ class Cascade(theme: Theme, private val scene: Set<String>) {
     // the keys a selector here names
     private val named: Set<String> = index.keys.mapNotNullTo(HashSet()) { it.key }
 
-    private val keptLooks = HashMap<Any, Any>()
+    private val keptLooks = HashMap<KeptKey<*>, Any>()
+
+    /** What [kept] keeps a [T] under: equal only where what is made for it would be. */
+    interface KeptKey<T : Any>
 
     /**
      * What [make] works out of this cascade's looks for [key], made the first time and the same after:
-     * a builder's looks of a key, by what they depend on ([key] equal only where [make]'s result would be).
+     * a builder's looks of a key, by what they depend on. The key's type names what is kept with it, so
+     * nothing else is ever found under it.
      */
     @Suppress("UNCHECKED_CAST")
-    fun <T : Any> kept(key: Any, make: () -> T): T = keptLooks.getOrPut(key, make) as T
+    fun <T : Any> kept(key: KeptKey<T>, make: () -> T): T = keptLooks.getOrPut(key, make) as T
 
     // what the styles selecting [target] set, nothing inherited
     private fun own(target: Selector.Target): Map<String, Value> {

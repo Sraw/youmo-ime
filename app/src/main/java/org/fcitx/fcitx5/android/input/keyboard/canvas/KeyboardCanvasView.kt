@@ -76,11 +76,16 @@ class KeyboardCanvasView(
         fun noScene(view: KeyboardCanvasView)
     }
 
-    // a key's two faces, recorded once each when first drawn; kept across scenes where they are the same
-    private class Faces(val node: KeyNode) {
+    // a key's two faces, recorded once each when first drawn; kept across scenes where they are the same.
+    // Whether it is shown pressed ([down]) and what its view said of its state ([state]: Shift's) go with
+    // it: a scene made again for a key typed looks up nothing by a name made for it, a frame neither
+    private class Faces(val node: KeyNode, val state: String?) {
         var normal: RenderNode? = null
         var pressed: RenderNode? = null
+        var down = false
         val pictured = node.faces.values.any(CanvasFrame::showsPicture)
+
+        fun of(k: KeyNode) = node.id == k.id && node.copy == k.copy
     }
 
     private val painter = ScenePainter(this, look, images, fonts)
@@ -90,11 +95,7 @@ class KeyboardCanvasView(
     private var failed = false
     private var faces: List<Faces> = emptyList()
     private var base: RenderNode? = null
-    private val pressed = HashSet<String>()
     private val speech = Speech()
-
-    // what each key's view said of its state (Shift's) when the scene was last made
-    private var states: Map<String, CharSequence?> = emptyMap()
 
     // where the view was over the picture's base, and the base's size, when the picture was recorded
     private val pictureAt = IntArray(PICTURE_PLACE)
@@ -146,32 +147,33 @@ class KeyboardCanvasView(
                 host.noScene(this)
                 return null
             }
-            val old = faces.associateBy { key(it.node) }
+            val old = faces
             if (s.base != built?.base) base = null
             built = s
-            // a key drawn as before keeps its nodes: Shift relabels the letters, not the rest
-            faces = s.keys.map { k ->
-                old[key(k)]?.takeIf { it.node.faces == k.faces }?.let { f -> Faces(k).also { it.normal = f.normal; it.pressed = f.pressed } } ?: Faces(k)
+            var said: MutableList<Int>? = null
+            faces = s.keys.mapIndexed { i, k ->
+                val f = Faces(k, host.keyView(k)?.let(ViewCompat::getStateDescription)?.toString())
+                // the key in the last scene: at the same place in it mostly (a scene made again has the same keys)
+                val was = old.getOrNull(i)?.takeIf { it.of(k) } ?: old.firstOrNull { it.of(k) }
+                if (was != null) {
+                    // drawn as before, it keeps its nodes: Shift relabels the letters, not the rest
+                    if (was.node.faces == k.faces) {
+                        f.normal = was.normal
+                        f.pressed = was.pressed
+                    }
+                    f.down = was.down
+                    // its state changed (Shift once, locked): told below
+                    if (was.state != f.state) (said ?: ArrayList<Int>().also { said = it }) += i
+                }
+                // a key gone with the scene is pressed no more: nothing carries it
+                f
             }
-            // a key gone with the scene is pressed no more
-            pressed.retainAll(s.keys.mapTo(HashSet(), ::key))
             speech.invalidateRoot()
-            sayStates(s)
+            // a key's state changed told to a screen reader as its view's was: on the key's node, which
+            // TalkBack reads out when it has focus
+            said?.forEach { speech.invalidateVirtualView(it, AccessibilityEventCompat.CONTENT_CHANGE_TYPE_STATE_DESCRIPTION) }
             return s
         }
-
-    // a key's state changed (Shift once, locked) told to a screen reader as its view's was: on the key's
-    // node, which TalkBack reads out when it has focus
-    private fun sayStates(s: Scene) {
-        val now = s.keys.associate { k -> key(k) to host.keyView(k)?.let(ViewCompat::getStateDescription) }
-        s.keys.forEachIndexed { i, k ->
-            val was = states[key(k)]
-            if (key(k) in states && was?.toString() != now[key(k)]?.toString()) {
-                speech.invalidateVirtualView(i, AccessibilityEventCompat.CONTENT_CHANGE_TYPE_STATE_DESCRIPTION)
-            }
-        }
-        states = now
-    }
 
     /** What the keyboard shows changed (Shift, Return, a key shown or hidden): the scene is made again, before it is next drawn. */
     fun invalidateScene() {
@@ -235,12 +237,15 @@ class KeyboardCanvasView(
             // a software canvas (a bitmap's: screenshots) draws no RenderNode, keeps nothing to record again
             painter.missed = false
             painter.draw(canvas, s.base)
-            faces.forEach { painter.draw(canvas, it.node.ops(isPressed(it.node))) }
+            faces.forEach { painter.draw(canvas, it.node.ops(it.down)) }
             return
         }
         canvas.drawRenderNode(base.live() ?: record("base", Box(0.0, 0.0, width.toDouble(), height.toDouble()), s.base).also { base = it })
         for (f in faces) {
-            for (face in CanvasFrame.faces(isPressed(f.node), f.normal.live() != null, f.pressed.live() != null)) {
+            val shown = CanvasFrame.faces(f.down, f.normal.live() != null, f.pressed.live() != null)
+            // by index: no iterator for each key in each frame
+            for (i in shown.indices) {
+                val face = shown[i]
                 val node = if (face.record) {
                     record(f.node.id, f.node.bounds, f.node.ops(face.pressed)).also { if (face.pressed) f.pressed = it else f.normal = it }
                 } else {
@@ -256,7 +261,7 @@ class KeyboardCanvasView(
     // trimmed) is recorded again
     private fun RenderNode?.live(): RenderNode? = this?.takeIf { it.hasDisplayList() }
 
-    private fun nodeOf(f: Faces): RenderNode = if (isPressed(f.node)) {
+    private fun nodeOf(f: Faces): RenderNode = if (f.down) {
         f.pressed.live() ?: record(f.node.id, f.node.bounds, f.node.ops(true)).also { f.pressed = it }
     } else {
         f.normal.live() ?: record(f.node.id, f.node.bounds, f.node.ops(false)).also { f.normal = it }
@@ -280,15 +285,13 @@ class KeyboardCanvasView(
         }
     }
 
-    private fun key(n: KeyNode) = "${n.id}#${n.copy}"
-
-    private fun isPressed(n: KeyNode) = key(n) in pressed
-
     /** [view]'s key shown pressed or not, as the view is: its node swapped, nothing else drawn anew. */
     fun showPressed(view: KeyView, on: Boolean) {
-        val node = current?.keys?.firstOrNull { host.keyView(it) === view } ?: return
-        val changed = if (on) pressed.add(key(node)) else pressed.remove(key(node))
-        if (changed) invalidate()
+        if (current == null) return
+        val f = faces.firstOrNull { host.keyView(it.node) === view } ?: return
+        if (f.down == on) return
+        f.down = on
+        invalidate()
     }
 
     /**
@@ -343,7 +346,7 @@ class KeyboardCanvasView(
 
     /** Whether key [id] is shown pressed. */
     @VisibleForTesting
-    fun shownPressed(id: String, copy: Int = 0): Boolean = "$id#$copy" in pressed
+    fun shownPressed(id: String, copy: Int = 0): Boolean = faces.any { it.node.id == id && it.node.copy == copy && it.down }
 
     /** Whether the frame drawn last missed something still coming (an image, the picture): to be recorded again. */
     @get:VisibleForTesting

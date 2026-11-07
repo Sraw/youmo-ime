@@ -161,7 +161,8 @@ class SceneBuilder(
     )
 
     // what a key's looks are worked out from: the same in the next scene, its looks kept by the cascade
-    private data class StyledFor(val board: String, val id: String, val role: String?, val classes: Set<String>, val states: Set<KeyState>)
+    private data class StyledFor(val board: String, val id: String, val role: String?, val classes: Set<String>, val states: Set<KeyState>) :
+        Cascade.KeptKey<Styled>
 
     private fun styled(board: String, key: ExpandedKey): Styled {
         val c = if (key.attrs.face == Face.Keep) unflat else cascade
