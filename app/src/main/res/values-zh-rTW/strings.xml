@@ -137,6 +137,8 @@
     <string name="clipboard_suggestion">顯示剪貼簿建議</string>
     <string name="disabled">已停用</string>
     <string name="system_default">系統預設</string>
+    <string name="canvas_keyboard">新繪製 26 鍵（實驗）</string>
+    <string name="canvas_keyboard_summary">正在做的重繪：26 鍵鍵盤改由新引擎繪製。測試用</string>
     <string name="editor_info_inspector">EditorInfo 檢查器</string>
     <string name="default_">預設</string>
     <string name="saving">正在儲存</string>

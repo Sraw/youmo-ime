@@ -99,6 +99,14 @@ class DeveloperFragment : PaddingPreferenceFragment() {
                 isIconSpaceReserved = false
                 isSingleLineTitle = false
             })
+            addPreference(MySwitchPreference(context).apply {
+                key = AppPrefs.getInstance().internal.canvasKeyboard.key
+                setTitle(R.string.canvas_keyboard)
+                setSummary(R.string.canvas_keyboard_summary)
+                setDefaultValue(false)
+                isIconSpaceReserved = false
+                isSingleLineTitle = false
+            })
             addPreference(R.string.restart_fcitx_instance) {
                 AlertDialog.Builder(context)
                     .setTitle(R.string.restart_fcitx_instance)

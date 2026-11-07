@@ -137,6 +137,8 @@
     <string name="clipboard_suggestion">Show clipboard suggestions</string>
     <string name="disabled">Disabled</string>
     <string name="system_default">System default</string>
+    <string name="canvas_keyboard">Draw the 26 keys anew (experimental)</string>
+    <string name="canvas_keyboard_summary">The redraw in the making: the 26-key keyboards drawn by the new engine. For testing</string>
     <string name="editor_info_inspector">EditorInfo Inspector</string>
     <string name="default_">Default</string>
     <string name="saving">Saving</string>
