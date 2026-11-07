@@ -24,8 +24,8 @@ interface VoiceRecognition<R> {
 
 /**
  * The segments said in one talk: decoded as far as the recognizer can, shown as they change, each
- * closed at an endpoint, the room's (VoiceQuiet) neither shown nor typed. The capture thread feeds
- * [window]; the decoder the rest, in order.
+ * closed at an endpoint, the room's neither shown nor typed: [quiet], shared, the capture thread
+ * feeding it each window; the decoder the rest, in order.
  *
  * [choose]: a closed segment's text (VoiceChoice); [live]: the segment so far, to show; [closed]:
  * a segment's text at its end ("" the room's, shown only if something of it showed).
@@ -36,7 +36,7 @@ class VoiceSegments<R>(
     private val choose: suspend (R) -> String,
     private val live: suspend (String) -> Unit,
     private val closed: suspend (String) -> Unit,
-    private val quiet: VoiceQuiet = VoiceQuiet(),
+    private val quiet: VoiceQuiet,
 ) {
     /** samples handed to the recognizer, from the microphone's opening; this segment's from [start] */
     private var fed = 0L
@@ -54,9 +54,6 @@ class VoiceSegments<R>(
     /** the first token's frame, from the microphone's opening: where the speech starts, for the UAT (VO-23/24) */
     var speechStart: Int? = null
         private set
-
-    /** The capture thread's window: its raw samples (before the gain), [speech] the VAD's say (null: no VAD). */
-    fun window(samples: FloatArray, n: Int, speech: Boolean?) = quiet.window(samples, n, speech)
 
     /** What the microphone read, gained, decoded as far as it can be. */
     suspend fun accept(samples: FloatArray) {
@@ -82,7 +79,8 @@ class VoiceSegments<R>(
                 start = fed
             } else {
                 val text = recognizer.text(recognizer.result())
-                if (text != last) {
+                // a short word held back while it had no level is shown once it has, though unchanged
+                if (text != last || (shown != text && text.isNotEmpty())) {
                     last = text
                     // the room's phrase shows no more than it is typed
                     val heard = heard(text)

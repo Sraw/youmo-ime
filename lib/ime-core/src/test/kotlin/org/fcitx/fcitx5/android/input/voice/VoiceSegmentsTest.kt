@@ -42,13 +42,15 @@ class VoiceSegmentsTest {
     private val lives = mutableListOf<String>()
     private val closes = mutableListOf<String>()
 
+    private val quiet = VoiceQuiet()
+
     private fun segments(vararg steps: Step) =
-        VoiceSegments(Script(steps.toList()), 16000, choose = { it }, live = { lives += it }, closed = { closes += it })
+        VoiceSegments(Script(steps.toList()), 16000, choose = { it }, live = { lives += it }, closed = { closes += it }, quiet)
 
     // a window at [db] dBFS, as the capture thread hands it: to the quiet, then to the recognizer
     private fun VoiceSegments<String>.hear(db: Double, voiced: Boolean, times: Int) = repeat(times) {
         val w = FloatArray(512) { sqrt(Math.pow(10.0, db / 10)).toFloat() }
-        window(w, w.size, voiced)
+        quiet.window(w, w.size, voiced)
         go { accept(w) }
     }
 
@@ -91,6 +93,24 @@ class VoiceSegmentsTest {
         s.hear(-30.0, voiced = true, times = 8)
         assertEquals(listOf("OK"), closes)
         assertEquals(1, s.kept)
+    }
+
+    @Test
+    fun aShortWordHeldBackShowsOnceItHasALevelAndOnlyOnce() {
+        // the first 3 windows with sound have no level (VoiceQuiet.SKIP): 「OK」 held back, unchanged after
+        val s = segments(*Array(8) { Step("OK") })
+        s.hear(-30.0, voiced = true, times = 8)
+        assertEquals(listOf("OK"), lives)
+    }
+
+    @Test
+    fun aShownSegmentJudgedTheRoomsAtItsCloseIsTakenBack() {
+        // 「你」 shown as said, the segment closed as 「I'm sorry.」 in the room: what showed goes
+        val s = segments(Step("你"), Step("I'm sorry.", endpoint = true))
+        s.hear(-60.0, voiced = false, times = 2)
+        assertEquals(listOf("你"), lives)
+        assertEquals(listOf(""), closes)
+        assertEquals(0, s.kept)
     }
 
     @Test

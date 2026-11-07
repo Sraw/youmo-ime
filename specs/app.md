@@ -946,6 +946,9 @@ in CI keeps the voice source set compiling.
   builds log one line of numbers at the close (`voice capture:` liftFrame, stopAt, read, envPeak,
   peakGainDb: the gain where env peaked) for the UAT (uat/12 VO-23/24/25), with `voice segments:` above.
 - **Quiet**: `VoiceQuiet` (ime-core) decides per recognizer segment whether it is typed (and shown).
+  `VoiceSegments` (ime-core) cuts the talk into those segments and asks it; `VoiceRecognition` is
+  its seam to the recognizer (sherpa-onnx in VoiceListener, a script in VoiceSegmentsTest); the one
+  `VoiceQuiet`, fed by the capture thread, is handed in.
   The gain lifts a quiet room 20 dB and the recognizer reads the lifted floor (a fan, traffic, plain
   zeroes) as a short English phrase, 「I'm sorry.」 in 118 of 126 such results measured (a OnePlus 6T at
   −66 dBFS typed 「I'm sory」, 2026-11-06; an emulator's silent microphone 「H」「I'm」). A segment with a
