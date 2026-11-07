@@ -21,7 +21,7 @@ import org.fcitx.fcitx5.android.scene.theme.Argb
  * themes' are (keyboard-scene's material-light.xml: LookDefaults as styles): the palette as its
  * colours, the shape, gaps and press as `key` styles, each kind's fill and pressed face as its
  * class's, single keys' overrides by their names, which theme 4 selects by the same `board/key` and
- * `*`/role. Files are named by their names alone (4.0 takes no path): [fileName] is what the app
+ * `*`/role. Files are named by their names alone (4.0 takes no path): [fileNames] is what the app
  * looks a file up by.
  */
 object LookTheme {
@@ -57,11 +57,27 @@ object LookTheme {
     /** A file of the look ([ThemeLook.files]) as theme 4 names it: its name without the folders. */
     fun fileName(path: String): String = path.substringAfterLast('/')
 
+    /**
+     * The look's files ([ThemeLook.files]) by the names theme 4 gives them: each its [fileName], one
+     * that another file has already numbered (`a~2.png`), so two images of one name in two folders
+     * stay two. What the app looks a file up by, and the theme written ([xml]) names.
+     */
+    fun fileNames(look: ThemeLook): Map<String, String> {
+        val taken = HashSet<String>()
+        return look.files().associateWith { path ->
+            val name = fileName(path)
+            val dot = name.lastIndexOf('.').takeIf { it > 0 } ?: name.length
+            generateSequence(1) { it + 1 }.map { n -> if (n == 1) name else "${name.take(dot)}~$n${name.drop(dot)}" }.first(taken::add)
+        }
+    }
+
     /** The font's name in the file written, for the look's key font (theme 4 names a `<font>`). */
     const val KEY_FONT = "key"
 
     fun xml(look: ThemeLook, name: String, dark: Boolean): String = buildString {
         val keys = look.keys
+        val names = fileNames(look)
+        fun fileName(path: String) = names.getOrElse(path) { LookTheme.fileName(path) }
         appendLine("""<?xml version="1.0" encoding="UTF-8"?>""")
         appendLine("""<theme xmlns="https://youmo-ime/theme/4" name="${escape(name)}" dark="$dark" version="4.0">""")
         appendLine("  <colors>")
@@ -94,7 +110,7 @@ object LookTheme {
         val text = look.text
         style(
             "key",
-            "fill" to fill(keys.letter.fill, "@key"),
+            "fill" to fill(names, keys.letter.fill, "@key"),
             "radius" to "${keys.radiusDp}dp",
             "border" to if (keys.borderDp > 0) "${keys.borderDp}dp @keyBorder" else "none",
             "shadow" to if (keys.shadowDp > 0) "0 ${keys.shadowDp}dp 0 @keyShadow" else "none",
@@ -108,11 +124,11 @@ object LookTheme {
         )
         style("@landscape key", "inset" to "${keys.gap.vLand}dp ${keys.gap.hLand}dp")
         style("key:pressed", "overlay" to "@keyPressHighlight")
-        style("key.function", "fill" to fill(keys.function.fill, "@altKey"), "color" to "@altKeyText", "icon-color" to "@altKeyText")
-        style("key.enter", "fill" to fill(keys.enter.fill, "@accentKey"), "color" to "@accentKeyText", "icon-color" to "@accentKeyText")
-        style("key.space", "fill" to fill(keys.space.fill, "@key"))
+        style("key.function", "fill" to fill(names, keys.function.fill, "@altKey"), "color" to "@altKeyText", "icon-color" to "@altKeyText")
+        style("key.enter", "fill" to fill(names, keys.enter.fill, "@accentKey"), "color" to "@accentKeyText", "icon-color" to "@accentKeyText")
+        style("key.space", "fill" to fill(names, keys.space.fill, "@key"))
         listOf("letter" to keys.letter, "function" to keys.function, "enter" to keys.enter, "space" to keys.space)
-            .forEach { (kind, k) -> pressed("key.$kind:pressed", k.pressed) }
+            .forEach { (kind, k) -> pressed(names, "key.$kind:pressed", k.pressed) }
         style("key.alt-text", "color" to "@altKeyText", "icon-color" to "@altKeyText")
         style("key mark, key shortcut", "color" to "@keyHint", "icon-color" to "@keyHint")
         // a shortcut's text is not of the theme's size (rules B §6: keyScale leaves it be)
@@ -126,8 +142,8 @@ object LookTheme {
         // single keys over their kinds, later so they win the tie
         keys.overrides.toSortedMap().forEach { (key, o) ->
             // Color: the kind's colour, which the kind's style gives already
-            o.fill?.takeIf { it != KeyFill.Color }?.let { style(key, "fill" to fill(it, "")) }
-            o.pressed?.let { pressed("$key:pressed", it) }
+            o.fill?.takeIf { it != KeyFill.Color }?.let { style(key, "fill" to fill(names, it, "")) }
+            o.pressed?.let { pressed(names, "$key:pressed", it) }
             if (o.label == KeyLabel.Hide) style("$key label", "hidden" to "true")
         }
         style("preview, popup", "fill" to "@popupBackground", "color" to "@popupText", "radius" to "${keys.radiusDp}dp", "shadow" to "0 2dp 2dp #33000000")
@@ -139,23 +155,23 @@ object LookTheme {
     }
 
     /** The kinds' fills as the look has them: what the kind's own [KindStyle] says. */
-    private fun fill(f: KeyFill, color: String): String = when (f) {
+    private fun fill(names: Map<String, String>, f: KeyFill, color: String): String = when (f) {
         KeyFill.Color -> color
-        is KeyFill.Image -> image(f.slice)
+        is KeyFill.Image -> image(names, f.slice)
         is KeyFill.Picture -> picture(f.blurDp, f.brightness)
     }
 
     // a pressed face of its own is not tinted too (rules B §3): press="face"
-    private fun StringBuilder.pressed(select: String, p: KeyPressed) {
+    private fun StringBuilder.pressed(names: Map<String, String>, select: String, p: KeyPressed) {
         when (p) {
             KeyPressed.Darken -> Unit
             is KeyPressed.Color -> style(select, "fill" to Argb(p.argb).toString(), "press" to "face")
-            is KeyPressed.Image -> style(select, "fill" to image(p.slice), "press" to "face")
+            is KeyPressed.Image -> style(select, "fill" to image(names, p.slice), "press" to "face")
         }
     }
 
-    private fun image(s: NineSlice) =
-        "image(${fileName(s.file)}, ${s.insets.left} ${s.insets.top} ${s.insets.right} ${s.insets.bottom}, ${s.pxPerDp}x)"
+    private fun image(names: Map<String, String>, s: NineSlice) =
+        "image(${names[s.file] ?: fileName(s.file)}, ${s.insets.left} ${s.insets.top} ${s.insets.right} ${s.insets.bottom}, ${s.pxPerDp}x)"
 
     private fun picture(blurDp: Int, brightness: Int) = "picture(${blurDp}dp, $brightness%)"
 

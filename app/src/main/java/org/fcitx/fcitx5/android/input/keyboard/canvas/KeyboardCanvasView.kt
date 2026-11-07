@@ -14,25 +14,37 @@ import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import androidx.annotation.VisibleForTesting
 import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityEventCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.customview.widget.ExploreByTouchHelper
 import org.fcitx.fcitx5.android.data.theme.BoardImages
+import org.fcitx.fcitx5.android.input.PictureHost
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
-import org.fcitx.fcitx5.android.input.theme.ThemeLook
+import org.fcitx.fcitx5.android.input.scene.CanvasFrame
 import org.fcitx.fcitx5.android.input.scene.SceneA11y
+import org.fcitx.fcitx5.android.input.theme.ThemeLook
+import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Scene
+import timber.log.Timber
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.roundToInt
 
 /**
  * One view for a keyboard's keys (060-render-v2 §7): the scene the engine made of them drawn, each
  * key in a [RenderNode] of its own for each of its two faces (pressed or not), so a press shows by
- * swapping that key's two nodes' alpha alone, nothing laid out or recorded again; the keyboard's base in one more,
- * drawn once. A key showing the picture through it is drawn from it clipped to its shape (the
- * engine's [Op.Picture]).
+ * swapping that key's two nodes' alpha alone ([CanvasFrame.faces]), nothing laid out or recorded
+ * again; the keyboard's base in one more, drawn once. A key showing the picture through it is drawn
+ * from it clipped to its shape (the engine's [Op.Picture]), recorded again when the view moves over
+ * the picture (one-handed to the other side).
+ *
+ * The scene is made again only as the view draws ([onDraw]): a touch or a press shown in between
+ * finds its keys in the scene drawn last, so no finger waits on the engine.
  *
  * What a key does stays with [Host.keyView]'s view (P1: the old keys, not drawn, still take the
  * touches the keyboard hands them, BaseKeyboard's findTouchTarget, and run their gestures): this
@@ -55,22 +67,41 @@ class KeyboardCanvasView(
 
         /** The view whose key [node] is: its gestures, its actions, its words. */
         fun keyView(node: KeyNode): KeyView?
+
+        /** There was no scene of the keys ([scene] null): told once, the keyboard's to draw them another way. */
+        fun noScene(view: KeyboardCanvasView)
     }
 
     // a key's two faces, recorded once each when first drawn; kept across scenes where they are the same
     private class Faces(val node: KeyNode) {
         var normal: RenderNode? = null
         var pressed: RenderNode? = null
+        val pictured = node.faces.values.any(CanvasFrame::showsPicture)
     }
 
     private val painter = ScenePainter(this, look, images, fonts)
     private var built: Scene? = null
     private var builtFor = 0 to 0
     private var dirty = true
+    private var failed = false
     private var faces: List<Faces> = emptyList()
     private var base: RenderNode? = null
     private val pressed = HashSet<String>()
     private val speech = Speech()
+
+    // what each key's view said of its state (Shift's) when the scene was last made
+    private var states: Map<String, CharSequence?> = emptyMap()
+
+    // where the view was over the picture's base, and the base's size, when the picture was recorded
+    private val pictureAt = IntArray(PICTURE_PLACE)
+    private val pictureNow = IntArray(PICTURE_PLACE)
+    private val viewAt = IntArray(2)
+    private val baseAt = IntArray(2)
+
+    private val moved = ViewTreeObserver.OnPreDrawListener {
+        if (pictureMoved()) dropPictures()
+        true
+    }
 
     init {
         ViewCompat.setAccessibilityDelegate(this, speech)
@@ -78,25 +109,60 @@ class KeyboardCanvasView(
         isClickable = false
     }
 
-    /** The scene as the keyboard is now: made again after [invalidateScene], or at another size. */
+    /**
+     * The scene drawn last, not made again: what a touch, a press and a screen reader find the keys
+     * in. Made here only if there was none yet (asked before the first frame: a screen reader, a test).
+     */
+    private val current: Scene? get() = built ?: if (failed) null else scene
+
+    /** The scene as the keyboard is now: made again after [invalidateScene], or at another size (drawing, and tests). */
+    @get:VisibleForTesting
     val scene: Scene?
         get() {
+            if (failed) return null
             if (!dirty && builtFor == (width to height)) return built
+            if (width <= 0 || height <= 0) return null
             dirty = false
             builtFor = width to height
+            val start = SystemClock.elapsedRealtimeNanos()
+            val s = host.scene(width, height)
+            Timber.d("keyboard canvas: scene %d × %d made in %.2f ms", width, height, (SystemClock.elapsedRealtimeNanos() - start) / NANOS_A_MS)
+            if (s == null) {
+                failed = true
+                built = null
+                faces = emptyList()
+                base = null
+                host.noScene(this)
+                return null
+            }
             val old = faces.associateBy { key(it.node) }
-            val s = if (width > 0 && height > 0) host.scene(width, height) else null
-            if (s?.base != built?.base) base = null
+            if (s.base != built?.base) base = null
             built = s
             // a key drawn as before keeps its nodes: Shift relabels the letters, not the rest
-            faces = s?.keys?.map { k ->
+            faces = s.keys.map { k ->
                 old[key(k)]?.takeIf { it.node.faces == k.faces }?.let { f -> Faces(k).also { it.normal = f.normal; it.pressed = f.pressed } } ?: Faces(k)
-            }.orEmpty()
+            }
+            // a key gone with the scene is pressed no more
+            pressed.retainAll(s.keys.mapTo(HashSet(), ::key))
             speech.invalidateRoot()
+            sayStates(s)
             return s
         }
 
-    /** What the keyboard shows changed (Shift, Return, a key shown or hidden): the scene is made again, before it is next drawn or touched. */
+    // a key's state changed (Shift once, locked) told to a screen reader as its view's was: on the key's
+    // node, which TalkBack reads out when it has focus
+    private fun sayStates(s: Scene) {
+        val now = s.keys.associate { k -> key(k) to host.keyView(k)?.let(ViewCompat::getStateDescription) }
+        s.keys.forEachIndexed { i, k ->
+            val was = states[key(k)]
+            if (key(k) in states && was?.toString() != now[key(k)]?.toString()) {
+                speech.invalidateVirtualView(i, AccessibilityEventCompat.CONTENT_CHANGE_TYPE_STATE_DESCRIPTION)
+            }
+        }
+        states = now
+    }
+
+    /** What the keyboard shows changed (Shift, Return, a key shown or hidden): the scene is made again, before it is next drawn. */
     fun invalidateScene() {
         dirty = true
         invalidate()
@@ -104,6 +170,46 @@ class KeyboardCanvasView(
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         invalidateScene()
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        viewTreeObserver.addOnPreDrawListener(moved)
+    }
+
+    override fun onDetachedFromWindow() {
+        viewTreeObserver.removeOnPreDrawListener(moved)
+        super.onDetachedFromWindow()
+    }
+
+    // whether the view is elsewhere over the picture's base (or the base another size) than when the
+    // picture was last recorded: one-handed to the other side moves the keyboard, not the base under it
+    private fun pictureMoved(): Boolean {
+        val pictureHost = PictureHost.of(this) ?: return false
+        getLocationInWindow(viewAt)
+        pictureHost.base.getLocationInWindow(baseAt)
+        pictureNow[0] = viewAt[0] - baseAt[0]
+        pictureNow[1] = viewAt[1] - baseAt[1]
+        pictureNow[2] = pictureHost.base.width
+        pictureNow[3] = pictureHost.base.height
+        if (pictureNow.contentEquals(pictureAt)) return false
+        pictureNow.copyInto(pictureAt)
+        return true
+    }
+
+    // what shows the picture recorded again, where it is now (the frame about to be drawn draws it)
+    private fun dropPictures() {
+        var any = false
+        if (built?.base?.let(CanvasFrame::showsPicture) == true) {
+            base = null
+            any = true
+        }
+        faces.filter { it.pictured }.forEach {
+            it.normal = null
+            it.pressed = null
+            any = true
+        }
+        if (any) invalidate()
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -115,24 +221,22 @@ class KeyboardCanvasView(
             faces.forEach { it.normal = null; it.pressed = null }
         }
         if (!canvas.isHardwareAccelerated) {
-            // a software canvas (a bitmap's: screenshots) draws no RenderNode
+            // a software canvas (a bitmap's: screenshots) draws no RenderNode, keeps nothing to record again
+            painter.missed = false
             painter.draw(canvas, s.base)
             faces.forEach { painter.draw(canvas, it.node.ops(isPressed(it.node))) }
             return
         }
-        canvas.drawRenderNode(base.live() ?: record("base", s.base).also { base = it })
-        // both faces drawn once recorded, the one not shown at alpha 0: a node no display list
-        // draws any more is taken out of the tree and loses what was recorded (seen: a key let go
-        // drawn as nothing), so a press only changes the two nodes' alpha
+        canvas.drawRenderNode(base.live() ?: record("base", Box(0.0, 0.0, width.toDouble(), height.toDouble()), s.base).also { base = it })
         for (f in faces) {
-            val on = isPressed(f.node)
-            val normal = f.normal.live() ?: record(f.node.id, f.node.ops(false)).also { f.normal = it }
-            normal.alpha = if (on) 0f else 1f
-            canvas.drawRenderNode(normal)
-            val pressed = f.pressed.live() ?: if (on) record(f.node.id, f.node.ops(true)).also { f.pressed = it } else null
-            pressed?.let {
-                it.alpha = if (on) 1f else 0f
-                canvas.drawRenderNode(it)
+            for (face in CanvasFrame.faces(isPressed(f.node), f.normal.live() != null, f.pressed.live() != null)) {
+                val node = if (face.record) {
+                    record(f.node.id, f.node.bounds, f.node.ops(face.pressed)).also { if (face.pressed) f.pressed = it else f.normal = it }
+                } else {
+                    (if (face.pressed) f.pressed else f.normal)!!
+                }
+                node.alpha = face.alpha
+                canvas.drawRenderNode(node)
             }
         }
     }
@@ -142,17 +246,23 @@ class KeyboardCanvasView(
     private fun RenderNode?.live(): RenderNode? = this?.takeIf { it.hasDisplayList() }
 
     private fun nodeOf(f: Faces): RenderNode = if (isPressed(f.node)) {
-        f.pressed.live() ?: record(f.node.id, f.node.ops(true)).also { f.pressed = it }
+        f.pressed.live() ?: record(f.node.id, f.node.bounds, f.node.ops(true)).also { f.pressed = it }
     } else {
-        f.normal.live() ?: record(f.node.id, f.node.ops(false)).also { f.normal = it }
+        f.normal.live() ?: record(f.node.id, f.node.bounds, f.node.ops(false)).also { f.normal = it }
     }
 
-    // the whole view's size: a key's shadow, a mark, reach out of its cell
-    private fun record(name: String, ops: List<Op>): RenderNode = RenderNode(name).apply {
-        setPosition(0, 0, width, height)
+    // a node the size of what [ops] draw round [bounds] (a key's shadow reaches out of its cell), drawn where it is
+    private fun record(name: String, bounds: Box, ops: List<Op>): RenderNode = RenderNode(name).apply {
+        val e = CanvasFrame.extent(bounds, ops, EDGE_PX)
+        val l = floor(e.left).toInt()
+        val t = floor(e.top).toInt()
+        val r = ceil(e.right).toInt()
+        val b = ceil(e.bottom).toInt()
+        setPosition(l, t, r, b)
         setClipToBounds(false)
-        val c = beginRecording(width, height)
+        val c = beginRecording(r - l, b - t)
         try {
+            c.translate(-l.toFloat(), -t.toFloat())
             painter.draw(c, ops)
         } finally {
             endRecording()
@@ -165,17 +275,18 @@ class KeyboardCanvasView(
 
     /** [view]'s key shown pressed or not, as the view is: its node swapped, nothing else drawn anew. */
     fun showPressed(view: KeyView, on: Boolean) {
-        val node = scene?.keys?.firstOrNull { host.keyView(it) === view } ?: return
+        val node = current?.keys?.firstOrNull { host.keyView(it) === view } ?: return
         val changed = if (on) pressed.add(key(node)) else pressed.remove(key(node))
         if (changed) invalidate()
     }
 
     /**
      * The view of the key at ([x], [y]) in this view, by the scene's hit areas, [hit] set to where the
-     * view is in the keyboard (the row's parent), as a touch target's; null in a gap or on a key with no view.
+     * view is in the keyboard (the row's parent), as a touch target's; null in a gap, on a key with no
+     * view, or with one not shown (a key the scene drawn last had, hidden since).
      */
     fun keyViewAt(x: Float, y: Float, hit: Rect = Rect()): KeyView? {
-        val key = scene?.keyAt(x.toDouble(), y.toDouble())?.let(host::keyView) ?: return null
+        val key = current?.keyAt(x.toDouble(), y.toDouble())?.let(host::keyView)?.takeIf { it.visibility == VISIBLE } ?: return null
         key.getHitRect(hit)
         (key.parent as? View)?.let { row -> hit.offset(row.left, row.top) }
         return key
@@ -219,6 +330,20 @@ class KeyboardCanvasView(
         return faces.firstOrNull { it.node.id == id && it.node.copy == copy }?.let(::nodeOf)
     }
 
+    /** Whether key [id] is shown pressed. */
+    @VisibleForTesting
+    fun shownPressed(id: String, copy: Int = 0): Boolean = "$id#$copy" in pressed
+
+    /** Whether the frame drawn last missed something still coming (an image, the picture): to be recorded again. */
+    @get:VisibleForTesting
+    val missed: Boolean get() = painter.missed
+
+    /** The pictures' places looked at, as a frame does before it is drawn: what showed the picture recorded again if the view moved over it. */
+    @VisibleForTesting
+    fun beforeFrame() {
+        moved.onPreDraw()
+    }
+
     override fun dispatchHoverEvent(event: MotionEvent): Boolean = speech.dispatchHoverEvent(event) || super.dispatchHoverEvent(event)
 
     /**
@@ -228,20 +353,20 @@ class KeyboardCanvasView(
      */
     private inner class Speech : ExploreByTouchHelper(this) {
         override fun getVirtualViewAt(x: Float, y: Float): Int {
-            val s = scene ?: return INVALID_ID
+            val s = current ?: return INVALID_ID
             val k = s.keyAt(x.toDouble(), y.toDouble()) ?: return INVALID_ID
             return s.keys.indexOf(k).takeIf { spoken(k) } ?: INVALID_ID
         }
 
         override fun getVisibleVirtualViews(virtualViewIds: MutableList<Int>) {
-            scene?.keys?.forEachIndexed { i, k -> if (spoken(k)) virtualViewIds += i }
+            current?.keys?.forEachIndexed { i, k -> if (spoken(k)) virtualViewIds += i }
         }
 
         // a blank key is nothing to TalkBack (BlankKey), as its view was not
         private fun spoken(k: KeyNode) = host.keyView(k)?.importantForAccessibility != IMPORTANT_FOR_ACCESSIBILITY_NO
 
         override fun onPopulateNodeForVirtualView(virtualViewId: Int, node: AccessibilityNodeInfoCompat) {
-            val k = scene?.keys?.getOrNull(virtualViewId)
+            val k = current?.keys?.getOrNull(virtualViewId)
             if (k == null) {
                 // asked of a key gone with the last scene: a node there must still have bounds and words
                 node.contentDescription = ""
@@ -257,17 +382,24 @@ class KeyboardCanvasView(
             if (view == null) return
             // a layout's id (button_space), not one made at run time (a letter's, generateViewId: no package)
             if (view.id != NO_ID && view.id ushr PACKAGE_SHIFT != 0) node.viewIdResourceName = resources.getResourceName(view.id)
-            val own = AccessibilityNodeInfoCompat.wrap(view.createAccessibilityNodeInfo())
-            node.className = own.className
-            node.stateDescription = own.stateDescription
-            node.isEnabled = own.isEnabled
-            node.isClickable = own.isClickable
-            node.isLongClickable = own.isLongClickable
-            own.actionList.filter { it.id !in HELPERS }.forEach(node::addAction)
+            val info = view.createAccessibilityNodeInfo()
+            try {
+                val own = AccessibilityNodeInfoCompat.wrap(info)
+                node.className = own.className
+                node.stateDescription = own.stateDescription
+                node.isEnabled = own.isEnabled
+                node.isClickable = own.isClickable
+                node.isLongClickable = own.isLongClickable
+                own.actionList.filter { it.id !in HELPERS }.forEach(node::addAction)
+            } finally {
+                // pooled before Android 13 (a no-op since): made for each key read out, given back
+                @Suppress("DEPRECATION")
+                info.recycle()
+            }
         }
 
         override fun onPerformActionForVirtualView(virtualViewId: Int, action: Int, arguments: Bundle?): Boolean {
-            val k = scene?.keys?.getOrNull(virtualViewId) ?: return false
+            val k = current?.keys?.getOrNull(virtualViewId) ?: return false
             return host.keyView(k)?.performAccessibilityAction(action, arguments) == true
         }
     }
@@ -277,6 +409,13 @@ class KeyboardCanvasView(
 
     private companion object {
         const val PACKAGE_SHIFT = 24
+        const val NANOS_A_MS = 1e6
+
+        // a node's room past what it draws, for its edges' anti-aliasing
+        const val EDGE_PX = 2.0
+
+        // where the view is over the picture's base (x, y) and the base's size (w, h)
+        const val PICTURE_PLACE = 4
 
         // the node's focus and selection are the helper's own
         val HELPERS = setOf(

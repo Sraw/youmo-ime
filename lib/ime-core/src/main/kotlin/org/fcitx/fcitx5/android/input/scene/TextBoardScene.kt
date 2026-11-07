@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.scene
 
+import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
@@ -38,6 +39,8 @@ data class TextBoardState(
     val langKey: Boolean = true,
     /** Holding the space talks: a microphone on it. */
     val holdVoice: Boolean = false,
+    /** A table's roots or their names over the letters (TableKeyboard.labelled): `{root:x}` on them. */
+    val roots: Boolean = false,
 ) {
     fun input(): Input = Input(
         ime = when {
@@ -47,6 +50,7 @@ data class TextBoardState(
         },
         schemeTypes = if (semicolonScheme) setOf("semicolon") else emptySet(),
         table = if (table) "table" else null,
+        roots = roots,
         tableExtra = when (tableExtra) {
             ';' -> "semicolon"
             '*' -> "star"
@@ -63,6 +67,22 @@ data class TextBoardState(
         composing = composing,
         lookingUp = lookingUp,
     )
+}
+
+/**
+ * The letters' texts the 26 keys' bindings read ([org.fcitx.fcitx5.android.scene.engine.Texts]):
+ * `{alt:x}` each letter's corner as the keyboard shows it ([corner]: null, none), `{root:x}` what a
+ * table shows over it ([TableKeyboard.label]; the letter as [letter] shows it where the table has none).
+ */
+object SceneLetters {
+    private val LETTERS = 'a'..'z'
+
+    fun alts(corner: (Char) -> String?): Map<String, String> =
+        LETTERS.mapNotNull { c -> corner(c)?.let { c.toString() to it } }.toMap()
+
+    /** `root:x`'s, for Texts.other: none where [table] shows no roots. */
+    fun roots(table: TableKeyboard?, letter: (Char) -> String): Map<String, String> =
+        if (table?.labelled != true) emptyMap() else LETTERS.associate { c -> "root:$c" to (table.label(c) ?: letter(c)) }
 }
 
 /** The marks' settings ([MarkSettings]) from the app's: the swipe layers, where marks go, the user's shortcuts. */

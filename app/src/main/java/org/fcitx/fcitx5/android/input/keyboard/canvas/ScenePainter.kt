@@ -34,11 +34,13 @@ import kotlin.math.sin
 /**
  * Draws a scene's ops ([Op]) on a canvas, in [view]'s coordinates: it computes nothing of where
  * anything goes (the engine did), only how Android draws each. The theme's files are [look]'s,
- * named by their names alone ([LookTheme.fileName]); its key images [images]', the picture
- * [PictureHost]'s under [view].
+ * named as the theme written names them ([LookTheme.fileNames]); its key images [images]', the
+ * picture [PictureHost]'s under [view].
  *
- * [missed] is set when something was not drawn as it will be (an image or the picture still being
- * decoded): what was recorded then is to be recorded again.
+ * [missed] is set when something was not drawn as it will be: an image or the picture still being
+ * decoded, which draws the view again once in; what was recorded then is to be recorded again. Not
+ * for what will never come (no picture host, a file that does not decode): that would record every
+ * frame again for nothing.
  */
 class ScenePainter(
     private val view: View,
@@ -48,14 +50,17 @@ class ScenePainter(
 ) {
     var missed = false
 
-    private val files: Map<String, String> = look.files().associateBy(LookTheme::fileName)
+    private val files: Map<String, String> = LookTheme.fileNames(look).entries.associate { (path, name) -> name to path }
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val picture = PicturePaint()
     private val path = Path()
     private val rect = RectF()
     private val src = Rect()
-    private val icons = HashMap<Op.Icon, Drawable?>()
+    private val icons = HashMap<IconKey, Drawable?>()
+
+    // an icon's drawable by what it is drawn as, not where: one a size, drawn moved to its place
+    private data class IconKey(val name: String, val tint: Int, val width: Int, val height: Int)
 
     fun draw(canvas: Canvas, ops: List<Op>) = ops.forEach { draw(canvas, it) }
 
@@ -176,9 +181,11 @@ class ScenePainter(
         val p = look.picture ?: return
         val blur = op.blurDp?.roundToInt() ?: p.blurDp
         val brightness = op.brightness?.roundToInt() ?: p.brightness
-        val paint = PictureHost.of(view)?.paint(view, blur, brightness, picture)
+        val host = PictureHost.of(view) ?: return
+        val paint = host.paint(view, blur, brightness, picture)
         if (paint == null) {
-            missed = true
+            // drawn as nothing till it is in (the host draws the view again then); none that reads, nothing
+            if (host.decoding(blur)) missed = true
             return
         }
         canvas.drawPath(pathOf(op.shape), paint)
@@ -200,22 +207,25 @@ class ScenePainter(
     }
 
     private fun icon(canvas: Canvas, op: Op.Icon) {
-        // one drawable a place and tint: a vector's tint and bounds are the drawable's own, which a
-        // display list recorded with it reads when drawn, not when recorded
-        val d = icons.getOrPut(op) {
+        // one drawable a name, tint and size, its bounds at 0, 0 and the canvas moved to the place: a
+        // vector's tint and bounds are the drawable's own, which a display list recorded with it reads
+        // when drawn, not when recorded, so two sizes must be two drawables; places need not be
+        val b = op.box
+        val left = b.left.roundToInt()
+        val top = b.top.roundToInt()
+        val w = b.right.roundToInt() - left
+        val h = b.bottom.roundToInt() - top
+        val d = icons.getOrPut(IconKey(op.name, op.tint.value, w, h)) {
             SceneIcons.of(op.name)?.let { ContextCompat.getDrawable(view.context, it)?.mutate() }?.also {
                 it.setTint(op.tint.value)
-                val b = op.box
-                it.setBounds(b.left.roundToInt(), b.top.roundToInt(), b.right.roundToInt(), b.bottom.roundToInt())
+                it.setBounds(0, 0, w, h)
             }
         } ?: return
-        val b = op.box
-        if (op.rotation != 0.0) {
-            canvas.save()
-            canvas.rotate(op.rotation.toFloat(), ((b.left + b.right) / 2).toFloat(), ((b.top + b.bottom) / 2).toFloat())
-        }
+        canvas.save()
+        canvas.translate(left.toFloat(), top.toFloat())
+        if (op.rotation != 0.0) canvas.rotate(op.rotation.toFloat(), w / 2f, h / 2f)
         d.draw(canvas)
-        if (op.rotation != 0.0) canvas.restore()
+        canvas.restore()
     }
 
     private companion object {

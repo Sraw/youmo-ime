@@ -8,17 +8,39 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.os.SystemClock
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
+import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityManager
 import android.view.accessibility.AccessibilityNodeInfo
+import androidx.core.view.AccessibilityDelegateCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityEventCompat
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.core.EngineState
+import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.table.KeyLabels
+import org.fcitx.fcitx5.android.engine.table.TableKeyboard
+import org.fcitx.fcitx5.android.engine.table.TableRoots
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
+import org.fcitx.fcitx5.android.input.theme.Crop
+import org.fcitx.fcitx5.android.input.theme.KeyFill
+import org.fcitx.fcitx5.android.input.theme.Picture
+import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -28,6 +50,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
@@ -161,7 +184,8 @@ class KeyboardCanvasViewTest {
     @Test
     fun everyGestureAsOnTheViewsEnglish() = assertEquals(gestures(false, KeyboardHarness.ENGLISH), gestures(true, KeyboardHarness.ENGLISH))
 
-    // the default theme's 26 keys, the views' and the scene's side by side: for the eye (060's comparison)
+    // the default theme's 26 keys, the views' and the scene's side by side: for the eye (060's
+    // comparison), and close enough pixel for pixel (what differs: specs/app.md, the canvas)
     @Test
     fun sideBySide() {
         prefs.set(ThemeManager.prefs.floatingKeyboard, false)
@@ -192,5 +216,278 @@ class KeyboardCanvasViewTest {
         file.parentFile!!.mkdirs()
         file.outputStream().use { out.compress(Bitmap.CompressFormat.PNG, 100, it) }
         assertTrue(file.length() > 0)
+        val (old, new) = shots
+        assertEquals(old.width to old.height, new.width to new.height)
+        // a pixel differs where a channel is off by more than anti-aliasing's: the letters a pixel over
+        // where a row's height is odd (specs/app.md, the canvas; measured 0.26%); a key missing or
+        // misplaced is several percent
+        val differ = differing(old, new, CHANNEL_SLACK)
+        val share = differ.toDouble() / (old.width * old.height)
+        assertTrue("${"%.2f".format(share * 100)}% of the pixels differ", share < MOST_DIFFERING)
+    }
+
+    private fun differing(a: Bitmap, b: Bitmap, slack: Int): Int {
+        val pa = IntArray(a.width * a.height).also { a.getPixels(it, 0, a.width, 0, 0, a.width, a.height) }
+        val pb = IntArray(b.width * b.height).also { b.getPixels(it, 0, b.width, 0, 0, b.width, b.height) }
+        return pa.indices.count { i ->
+            val x = pa[i]
+            val y = pb[i]
+            (0 until 4).any { ch -> kotlin.math.abs((x ushr (ch * 8) and 0xff) - (y ushr (ch * 8) and 0xff)) > slack }
+        }
+    }
+
+    // no scene (a theme the engine refuses: a font file's name 4.0 takes no file by): the views draw
+    // the keys again and take the touches, nothing left blank
+    @Test
+    fun noSceneTheViewsDrawTheKeysAgain() {
+        val light = org.fcitx.fcitx5.android.data.theme.ThemePreset.PixelLight.look
+        val broken = Theme.Custom("broken", false, light.copy(text = light.text.copy(keyFont = "/themes/x/bad:name.ttf")))
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+        KeyboardHarness(broken).start().use { h ->
+            val c = h.canvas()!!
+            assertNull(c.scene)
+            h.idle()
+            assertNull(h.canvas())
+            val q = h.keyView("q")
+            assertTrue(h.shown(q))
+            assertNull(q.onPressedChanged)
+            h.api.calls.clear()
+            h.tap(q)
+            assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") })
+        }
+    }
+
+    // the keys a finger finds are the keys shown: as each state shows and hides keys, the scene has
+    // exactly the keys whose views are shown, and a hidden key's place finds no hidden view
+    @Test
+    fun theScenesKeysAreTheShownViewsInEveryState() = harness(true, WUBI).use { h ->
+        val c = h.canvas()!!
+        val board = h.textKeyboard()
+        fun check(what: String) {
+            h.idle()
+            h.relayout()
+            val scene = c.scene!!
+            val shown = KeyboardHarness.all(board).filterIsInstance<KeyView>()
+                .filter { it.visibility == View.VISIBLE && it.themeKey != null && it.parent is View && (it.parent as View).parent === board }
+                .mapTo(HashSet()) { it.themeKey!! }
+            assertEquals(what, shown, scene.keys.mapTo(HashSet()) { it.id })
+            for (k in scene.keys) assertEquals("$what ${k.id}", View.VISIBLE, c.keyViewAt(k.anchor.x.toFloat(), k.anchor.y.toFloat())?.visibility)
+        }
+        fun told(t: TableKeyboard?) {
+            EngineState.tableKeyboardState.value = t
+        }
+        try {
+            check("a table, told nothing yet")
+            told(wubi(KeyLabels.NONE))
+            check("a table")
+            told(wubi(KeyLabels.NONE, on = true))
+            check("looking up")
+            board.onReturnDrawableUpdate(ReturnKeyAppearance.Composing)
+            check("a table with a code typed")
+            board.onReturnDrawableUpdate(ReturnKeyAppearance.Enter)
+            told(TableKeyboard(InputMethodCatalog.WUBI, setOf('*'), false, KeyLabels.ROOTS, TableRoots.WUBI86))
+            check("roots, a code key")
+            board.address = AddressKeys.URL
+            check("an address")
+            board.address = AddressKeys.EMAIL
+            check("an e-mail address")
+            board.address = AddressKeys.NONE
+            prefs.set(AppPrefs.getInstance().keyboard.showLangSwitchKey, false)
+            check("no language key")
+            told(null)
+            h.api.inputMethodEntryCached = KeyboardHarness.PINYIN
+            h.emit(HostEvent.InputMethodChanged(KeyboardHarness.PINYIN))
+            check("pinyin")
+            // a key hidden since the scene was drawn: its place finds nothing till the next frame's
+            val shift = c.keyAt("shift")!!
+            h.keyView("shift").visibility = View.INVISIBLE
+            assertNull(c.keyViewAt(shift.anchor.x.toFloat(), shift.anchor.y.toFloat()))
+        } finally {
+            told(null)
+        }
+    }
+
+    // a table's roots over the letters, its 拼 key in Shift's place, drawn by the scene as its views show them
+    @Test
+    fun aTablesRootsAndKeys() = harness(true, WUBI).use { h ->
+        val c = h.canvas()!!
+        val wubi = wubi(KeyLabels.ROOTS)
+        try {
+            EngineState.tableKeyboardState.value = wubi
+            h.idle()
+            h.relayout()
+            val g = c.keyAt("g")!!
+            assertEquals(wubi.label('g'), g.label)
+            assertEquals("g", g.alt)
+            val two = ('a'..'z').first { '\n' in wubi.label(it).orEmpty() }
+            val lines = c.keyAt("$two")!!.ops(false).filterIsInstance<Op.Text>().map { it.text }
+            assertTrue(lines.toString(), wubi.label(two)!!.split('\n').all { it in lines })
+            assertNotNull(c.keyAt("lookup"))
+            assertNull(c.keyAt("shift"))
+            // its names: one each, the letter in the corner still
+            EngineState.tableKeyboardState.value = wubi.copy(labels = KeyLabels.NAMES)
+            h.idle()
+            assertEquals(wubi.copy(labels = KeyLabels.NAMES).label('g'), c.keyAt("g")?.label)
+            // none: the letters, their corners their swipes again
+            EngineState.tableKeyboardState.value = wubi.copy(labels = KeyLabels.NONE)
+            h.idle()
+            assertEquals("g", c.keyAt("g")?.label)
+            assertEquals("=", c.keyAt("g")?.alt)
+        } finally {
+            EngineState.tableKeyboardState.value = null
+        }
+    }
+
+    // the user's own long press first on a letter: its corner as the views show it, Shift's list under Shift
+    @Test
+    fun aCornerIsTheUsersLongPressFirst() = harness(true).use { h ->
+        val c = h.canvas()!!
+        assertEquals("1", c.keyAt("q")?.alt)
+        assertEquals((h.keyView("q") as AltTextKeyView).altText.text.toString(), c.keyAt("q")?.alt)
+        for (letter in 'a'..'z') {
+            assertEquals("$letter", (h.keyView("$letter") as AltTextKeyView).altText.text.toString().ifEmpty { null }, c.keyAt("$letter")?.alt)
+        }
+    }
+
+    // two fingers down on two keys: both shown pressed, each let go alone
+    @Test
+    fun twoFingersTwoKeysPressed() = harness(true).use { h ->
+        val c = h.canvas()!!
+        val q = c.bounds("q")!!
+        val p = c.bounds("p")!!
+        val target = (h.inputView.parent as? ViewGroup) ?: h.inputView
+        val down = SystemClock.uptimeMillis()
+        val props = Array(2) { MotionEvent.PointerProperties().apply { id = it; toolType = MotionEvent.TOOL_TYPE_FINGER } }
+        val at = arrayOf(
+            MotionEvent.PointerCoords().apply { x = q.exactCenterX(); y = q.exactCenterY() },
+            MotionEvent.PointerCoords().apply { x = p.exactCenterX(); y = p.exactCenterY() },
+        )
+        fun send(action: Int, n: Int) {
+            val e = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, n, props, at, 0, 0, 1f, 1f, 0, 0, 0, 0)
+            target.dispatchTouchEvent(e)
+            e.recycle()
+            h.idle()
+        }
+        send(MotionEvent.ACTION_DOWN, 1)
+        assertTrue(c.shownPressed("q"))
+        send(MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2)
+        assertTrue(c.shownPressed("q") && c.shownPressed("p"))
+        // each its own node: a press swaps that key's alone
+        assertNotSame(c.shownNode("q"), c.shownNode("p"))
+        send(MotionEvent.ACTION_POINTER_UP or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2)
+        assertTrue(c.shownPressed("q"))
+        assertFalse(c.shownPressed("p"))
+        send(MotionEvent.ACTION_UP, 1)
+        assertFalse(c.shownPressed("q"))
+    }
+
+    // Shift's state told to a screen reader on its node, as its view's was
+    @Test
+    fun shiftsStateToldToAScreenReader() = harness(true).use { h ->
+        val c = h.canvas()!!
+        val events = mutableListOf<AccessibilityEvent>()
+        ViewCompat.setAccessibilityDelegate(h.textKeyboard(), object : AccessibilityDelegateCompat() {
+            override fun onRequestSendAccessibilityEvent(host: ViewGroup, child: View, event: AccessibilityEvent): Boolean {
+                if (child === c) events += AccessibilityEvent.obtain(event)
+                return false
+            }
+        })
+        shadowOf(c.context.getSystemService(AccessibilityManager::class.java)).setEnabled(true)
+        val shift = c.scene!!.keys.indexOfFirst { it.id == "shift" }
+        h.tap(h.keyView("shift"))
+        c.scene
+        val told = events.filter { it.contentChangeTypes and AccessibilityEventCompat.CONTENT_CHANGE_TYPE_STATE_DESCRIPTION != 0 }
+        assertEquals(events.toString(), 1, told.size)
+        val node = c.accessibilityNodeProvider!!.createAccessibilityNodeInfo(shift)!!
+        assertEquals(c.context.getString(R.string.a11y_state_shift_once), node.stateDescription?.toString())
+    }
+
+    // the view moved over the picture (one-handed to the other side): the keys showing it recorded
+    // again where they are now, the others kept
+    @Test
+    fun aKeyShowingThePictureRecordedAgainWhenTheViewMoves() {
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+        KeyboardHarness(pictured()).start().use { h ->
+            val c = h.canvas()!!
+            assertTrue(c.keyAt("shift")!!.ops(false).any { it is Op.Picture })
+            c.beforeFrame()
+            val shift = c.shownNode("shift")
+            val q = c.shownNode("q")
+            c.beforeFrame()
+            assertSame(shift, c.shownNode("shift"))
+            h.textKeyboard().offsetLeftAndRight(40)
+            c.beforeFrame()
+            assertNotSame(shift, c.shownNode("shift"))
+            assertSame(q, c.shownNode("q"))
+        }
+    }
+
+    // a frame drawn while the picture is still being decoded missed it (drawn again once in); one
+    // drawn after it did not read (no such file) misses nothing: it will never come, no frame waits on it
+    @Test
+    fun missedOnlyWhileThePictureIsComing() {
+        val held = ArrayList<Runnable>()
+        val runner = ThemeAssets.runner
+        ThemeAssets.runner = { held += it }
+        try {
+            prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+            KeyboardHarness(pictured()).start().use { h ->
+                val c = h.canvas()!!
+                fun frame() = Bitmap.createBitmap(c.width, c.height, Bitmap.Config.ARGB_8888).also { c.draw(Canvas(it)) }
+                frame()
+                assertTrue(c.missed)
+                while (held.isNotEmpty()) held.removeAt(0).run()
+                h.idle()
+                frame()
+                assertFalse(c.missed)
+            }
+        } finally {
+            ThemeAssets.runner = runner
+        }
+    }
+
+    // a finger down in the room before A (the row's indent), outside A's view: A's, its swipe and its long press as on A
+    @Test
+    fun theIndentBeforeAIsAs() = harness(true).use { h ->
+        val a = h.keyView("a")
+        val dp = h.service.resources.displayMetrics.density
+        val board = h.textKeyboard()
+        val aBox = h.box(a)
+        // the indent: left of A's view, inside the board
+        assertTrue(aBox.left - h.box(board).left > 4 * dp)
+        val x = -2 * dp
+        h.api.calls.clear()
+        h.touch(a, KeyboardHarness.Touch(x, a.height / 2f), KeyboardHarness.Touch(x, a.height / 2f + 30 * dp, 16), KeyboardHarness.Touch(x, a.height / 2f + 60 * dp, 16))
+        assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey(key=@,") })
+        // held there: A's long press
+        val f = h.finger(a, KeyboardHarness.Touch(x, a.height / 2f))
+        h.after(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
+        val popup = h.popupKeys().map { it.text.toString() }
+        f.up(KeyboardHarness.Touch(x, a.height / 2f))
+        assertTrue(popup.toString(), "@" in popup)
+    }
+
+    private fun KeyboardHarness.textKeyboard(): TextKeyboard = KeyboardHarness.all(inputView).filterIsInstance<TextKeyboard>().first()
+
+    // the light theme with a picture (a file that is not there: it never reads) shown through the function keys
+    private fun pictured(): Theme.Custom {
+        val light = org.fcitx.fcitx5.android.data.theme.ThemePreset.PixelLight.look
+        return Theme.Custom(
+            "pictured", false,
+            light.copy(
+                picture = Picture("/themes/p/src.jpg", Crop("/themes/p/p.jpg", null, 0), null, 80, 0),
+                keys = light.keys.copy(function = light.keys.function.copy(fill = KeyFill.Picture(0, 90))),
+            ),
+        )
+    }
+
+    private fun wubi(labels: KeyLabels, on: Boolean = false) = TableKeyboard(InputMethodCatalog.WUBI, emptySet(), on, labels, TableRoots.WUBI86)
+
+    private companion object {
+        val WUBI = org.fcitx.fcitx5.android.core.InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false)
+
+        // a channel off by this little is anti-aliasing; this share of the pixels so, at most
+        const val CHANNEL_SLACK = 24
+        const val MOST_DIFFERING = 0.015
     }
 }

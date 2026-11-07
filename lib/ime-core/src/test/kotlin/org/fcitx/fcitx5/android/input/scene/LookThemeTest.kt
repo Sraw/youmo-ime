@@ -111,6 +111,23 @@ class LookThemeTest {
         assertTrue(key(scene, "space").ops(false).any { it is Op.NineSlice })
     }
 
+    // two images of one name in two folders stay two: the second numbered, in the theme written and the app's lookup alike
+    @Test
+    fun filesOfOneNameInTwoFoldersKeptApart() {
+        val base = LookDefaults.look(palette(SceneData.theme("material-light.xml")))
+        val look = base.copy(
+            keys = base.keys.copy(
+                letter = KindStyle(KeyFill.Image(NineSlice("/t/a/key.png", Insets(1, 1, 1, 1), 1)), KeyPressed.Image(NineSlice("/t/b/key.png", Insets(0, 0, 0, 0), 1))),
+                function = KindStyle(KeyFill.Image(NineSlice("/t/c/key", Insets(0, 0, 0, 0), 1)), KeyPressed.Image(NineSlice("/t/d/key", Insets(0, 0, 0, 0), 1))),
+            ),
+        )
+        val names = LookTheme.fileNames(look)
+        assertEquals(mapOf("/t/a/key.png" to "key.png", "/t/b/key.png" to "key~2.png", "/t/c/key" to "key", "/t/d/key" to "key~2"), names)
+        val q = key(scene(theme(LookTheme.xml(look, "T", false)), SceneData.portrait), "q")
+        assertEquals("key.png", q.ops(false).filterIsInstance<Op.NineSlice>().single().file)
+        assertTrue("key~2.png" in q.ops(true).filterIsInstance<Op.NineSlice>().map { it.file })
+    }
+
     @Test
     fun fileNamesLoseTheirFolders() {
         assertEquals("a.png", LookTheme.fileName("/x/y/a.png"))

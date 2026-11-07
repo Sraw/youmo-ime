@@ -90,11 +90,13 @@ object SceneIcons {
     fun returnName(@DrawableRes icon: Int): String = returns.entries.firstOrNull { it.value == icon }?.key ?: "enter"
 }
 
-/** The layouts the app has (raw `scene_layout_*`, app/build.gradle.kts), read once a process. */
+/** The layouts the app has (raw `scene_layout_*`, app/build.gradle.kts), read once a process: one that did not read, too (null). */
 object SceneLayouts {
-    private var qwerty: Layout? = null
+    private var qwerty: Result<Layout?>? = null
 
-    fun qwerty(context: Context): Layout? = qwerty ?: read(context, R.raw.scene_layout_qwerty)?.also { qwerty = it }
+    fun qwerty(context: Context): Layout? =
+        (qwerty ?: runCatching { read(context, R.raw.scene_layout_qwerty) }.also { qwerty = it }.onFailure { Timber.e(it, "scene layout unread") })
+            .getOrNull()
 
     private fun read(context: Context, id: Int): Layout? {
         val text = context.resources.openRawResource(id).use { it.readBytes().decodeToString() }

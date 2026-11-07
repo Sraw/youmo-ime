@@ -42,10 +42,12 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
+import org.fcitx.fcitx5.android.input.scene.SceneLetters
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
 import org.fcitx.fcitx5.android.input.scene.TextBoardState
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
@@ -66,6 +68,7 @@ import splitties.views.dsl.constraintlayout.leftOfParent
 import splitties.views.dsl.constraintlayout.rightOfParent
 import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.add
+import timber.log.Timber
 
 @SuppressLint("ViewConstructor")
 class TextKeyboard private constructor(
@@ -314,6 +317,17 @@ class TextKeyboard private constructor(
         keyViews.values.flatten().forEach { v -> v.onPressedChanged = { on -> view.showPressed(v, on) } }
     }
 
+    // [view] had no scene to draw (a theme or the layout unread, the engine refusing them): the keys
+    // drawn by their views again, for as long as this keyboard lives, rather than none drawn or touched
+    private fun drawKeysThemselves(view: KeyboardCanvasView) {
+        if (canvas !== view) return
+        Timber.w("keyboard canvas: no scene of the keys (theme %s); their views draw them", theme.name)
+        canvas = null
+        keyViews.values.flatten().forEach { it.onPressedChanged = null }
+        keyRows.forEach { it.visibility = View.VISIBLE }
+        removeView(view)
+    }
+
     private fun canvasView(): KeyboardCanvasView {
         val look = ThemeManager.shownLook(theme)
         val fonts = SceneFonts(look)
@@ -321,6 +335,11 @@ class TextKeyboard private constructor(
         return KeyboardCanvasView(context, look, keyImages, fonts, object : KeyboardCanvasView.Host {
             override fun scene(width: Int, height: Int) = scene(look, measurer, width, height)
             override fun keyView(node: KeyNode) = keyViews[node.id]?.let { it.getOrNull(node.copy) ?: it.firstOrNull() }
+
+            // asked as it draws: the views swapped back after the frame, not in it
+            override fun noScene(view: KeyboardCanvasView) {
+                post { drawKeysThemselves(view) }
+            }
         })
     }
 
@@ -344,6 +363,7 @@ class TextKeyboard private constructor(
             address = address,
             langKey = showLangSwitchKey.getValue(),
             holdVoice = holdsToTalk,
+            roots = table?.labelled == true,
         )
         val texts = Texts(
             imeName = shownImeName.orEmpty(),
@@ -353,6 +373,9 @@ class TextKeyboard private constructor(
             returnIcon = SceneIcons.returnName(returnAppearance.icon),
             keepUppercase = keepLettersUppercase,
             punctuation = punctuationMapping,
+            // the corners and a table's roots as the views show them (updatePunctuationKeys, updateAlphabetKeys)
+            alts = SceneLetters.alts { c -> letterDefs[c]?.let(::cornerOf) },
+            other = SceneLetters.roots(table) { c -> letterShown(c.toString()) },
             // the formats as they are: the engine fills their places (getString with no arguments formats nothing)
             a11yGrouped = context.getString(R.string.a11y_key_grouped),
             a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
@@ -381,7 +404,25 @@ class TextKeyboard private constructor(
             texts = texts,
             marks = marks,
         )
-        return SceneBuilder(sceneTheme, env, measurer).build(layout, emptyMap()).orNull()
+        return when (val built = SceneBuilder(sceneTheme, env, measurer).build(layout, emptyMap())) {
+            is Parsed.Ok -> built.value
+            is Parsed.Failed -> null.also { Timber.e("keyboard canvas: the engine refused the scene: %s", built.problems) }
+        }
+    }
+
+    // the letters' keys' definitions by their letters: their corners' (cornerOf)
+    private val letterDefs: Map<Char, KeyDef.Appearance.AltText> by lazy {
+        letterKeys.mapNotNull { (c, v) -> (v.def as? KeyDef.Appearance.AltText)?.let { c to it } }.toMap()
+    }
+
+    // a letter as its key shows it with no table's roots over it: Shift's case, or kept upper case
+    private fun letterShown(letter: String) = if (keepLettersUppercase) letter.uppercase() else transformAlphabet(letter)
+
+    // a letter key's corner: its swipe (the long press's first, built in or the user's, as Shift has it) as
+    // the punctuation maps it; the letter itself while a table's roots are over it
+    private fun cornerOf(def: KeyDef.Appearance.AltText): String {
+        val letter = def.displayText.singleOrNull()?.takeIf { it.isLetter() }
+        return if (letter != null && table?.labelled == true) letter.lowercase() else transformPunctuation(swipeOverride(def) ?: def.altText)
     }
 
     override fun onAttachedToWindow() {
@@ -693,7 +734,7 @@ class TextKeyboard private constructor(
                     // two lines in the height of one
                     it.mainText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, it.def.textSize * keyTextScale(context) * if (lines) ROOTS_TEXT_SCALE else 1f)
                 }
-                if (lines) SpannableString(label) else label ?: if (keepLettersUppercase) str.uppercase() else transformAlphabet(str)
+                if (lines) SpannableString(label) else label ?: letterShown(str)
             }
         }
     }
@@ -709,12 +750,9 @@ class TextKeyboard private constructor(
         var cornersChanged = false
         textKeys.forEach {
             if (it is AltTextKeyView) {
-                it.def as KeyDef.Appearance.AltText
-                val letter = it.def.displayText.singleOrNull()?.takeIf { c -> c.isLetter() }
                 val had = it.altText.text.isNotEmpty()
                 // a table's roots over the letter: the letter in the corner, its swipe as it was
-                it.altText.text = if (letter != null && table?.labelled == true) letter.lowercase()
-                else transformPunctuation(swipeOverride(it.def) ?: it.def.altText)
+                it.altText.text = cornerOf(it.def as KeyDef.Appearance.AltText)
                 if (had != it.altText.text.isNotEmpty()) cornersChanged = true
             } else {
                 it.def as KeyDef.Appearance.Text

@@ -4,6 +4,10 @@
  */
 package org.fcitx.fcitx5.android.input.scene
 
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.table.KeyLabels
+import org.fcitx.fcitx5.android.engine.table.TableKeyboard
+import org.fcitx.fcitx5.android.engine.table.TableRoots
 import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
@@ -58,6 +62,28 @@ class TextBoardSceneTest {
         // composing elsewhere keeps Return
         assertTrue("enter" in keys(TextBoardState(composing = true)))
         assertNull(TextBoardState(tableExtra = 'x').input().tableExtra)
+    }
+
+    // a table's roots over the letters: `when=roots` takes `{root:x}`, the corners the letters
+    @Test
+    fun aTablesRootsOverTheLetters() {
+        val wubi = TableKeyboard(InputMethodCatalog.WUBI, emptySet(), false, KeyLabels.ROOTS, TableRoots.WUBI86)
+        val roots = SceneLetters.roots(wubi) { it.uppercase() }
+        assertEquals(26, roots.size)
+        assertEquals(wubi.label('g'), roots["root:g"])
+        assertTrue(roots.values.any { '\n' in it })
+        // none shown: nothing for the binding, nor while the table shows the letters
+        assertTrue(SceneLetters.roots(null) { "$it" }.isEmpty())
+        assertTrue(SceneLetters.roots(wubi.copy(labels = KeyLabels.NONE)) { "$it" }.isEmpty())
+        val alts = SceneLetters.alts { c -> if (c == 'q') null else "$c!" }
+        assertEquals(25, alts.size)
+        assertEquals("a!", alts["a"])
+        val state = TextBoardState(table = true, roots = true)
+        assertTrue(state.input().roots)
+        val env = SceneData.portrait.copy(input = state.input(), texts = SceneData.portrait.texts.copy(alts = SceneLetters.alts { "$it" }, other = roots))
+        val g = (SceneBuilder(theme, env, SceneData.measurer).build(SceneData.qwerty, emptyMap()) as Parsed.Ok).value.keys.first { it.id == "g" }
+        assertEquals(wubi.label('g'), g.label)
+        assertEquals("g", g.alt)
     }
 
     @Test

@@ -68,13 +68,29 @@ class PictureHost(private val look: ThemeLook, val base: View, private val lands
         return into.of(bitmap, matrix, brightness)
     }
 
+    // the blurs asked for and still being decoded ([decoding])
+    private val decodingBlurs = HashSet<Int>()
+
+    /**
+     * Whether [paint] found nothing for [blurDp] only because the picture is still being decoded: what
+     * asked is drawn again once it is in. False where nothing will come (no picture, none that reads,
+     * the base not laid out): no point recording a view again each frame for it.
+     */
+    fun decoding(blurDp: Int): Boolean = blurDp in decodingBlurs
+
     // null while it is decoded on another thread
     private fun place(view: View, blurDp: Int, w: Int, h: Int): Placed? {
         // before it is asked for: let go while asked, it is asked again
         val generation = ThemeAssets.generation
         val got = ThemeAssets.pictureOrLater(look, landscape, blurDp, w, base.resources.displayMetrics.density) {
+            decodingBlurs.remove(blurDp)
             view.invalidate()
-        } ?: return null
+        }
+        if (got == null) {
+            decodingBlurs.add(blurDp)
+            return null
+        }
+        decodingBlurs.remove(blurDp)
         val bitmap = got.bitmap
         val p = bitmap?.let { PictureWindow.centerCrop(it.width, it.height, w.toFloat(), h.toFloat()) }
         return Placed(bitmap, w, h, p?.scale ?: 1f, p?.dx ?: 0f, p?.dy ?: 0f, generation).also { placed.put(blurDp, it) }
