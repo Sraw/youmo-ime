@@ -60,8 +60,9 @@ class PopupScenes(
     }
 
     /**
-     * What [made] made of [what]; a failure logged and null, the popup then its views (a new one) or
-     * the scene it had (a focus moved): a popup the engine could not make is never one not drawn.
+     * What [made] made of [what]; a failure logged and null: the popup then not shown (a new one) or
+     * the scene it had kept (a focus moved), never the views instead (they go in S8) and never a
+     * popup not drawn that a lift would still type.
      */
     fun <T> made(what: String, made: Parsed<T>?): T? = when (made) {
         is Parsed.Ok -> made.value
@@ -96,6 +97,9 @@ class PopupSceneView internal constructor(context: Context, painter: (View) -> S
     /** How far past the scene's box what it draws reaches, each side, px. */
     val outset = Rect()
 
+    /** Told the [outset] before and now as a scene changes it: where it is placed moves by as much. */
+    var onOutsetChanged: ((was: Rect, now: Rect) -> Unit)? = null
+
     var scene: Scene? = null
         set(value) {
             val before = Rect(outset)
@@ -109,6 +113,7 @@ class PopupSceneView internal constructor(context: Context, painter: (View) -> S
                 outset.set(ceil(-e.left).toInt().coerceAtLeast(0), ceil(-e.top).toInt().coerceAtLeast(0), ceil(e.right - value.width).toInt().coerceAtLeast(0), ceil(e.bottom - value.height).toInt().coerceAtLeast(0))
             }
             // a focus moved draws again, its size the same; its shadow's reach is its size too
+            if (outset != before) onOutsetChanged?.invoke(before, Rect(outset))
             if (resized || outset != before) requestLayout()
             invalidate()
             speech.invalidateRoot()

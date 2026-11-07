@@ -115,7 +115,7 @@ class PopupKeyboardUi(
     private val focusRow: Int
     internal val focusColumn: Int
 
-    private val keyUis = if (builder != null) emptyList() else labels.map {
+    private val keyUis = if (scenes != null) emptyList() else labels.map {
         PopupKeyUi(ctx, theme, it)
     }
 
@@ -233,7 +233,7 @@ class PopupKeyboardUi(
      * The engine's, and it could not make the keys (logged): nothing to show, the long press as one
      * with no popup, never keys not drawn that a lift would still type (no views either: they go).
      */
-    val unmade: Boolean get() = builder != null && sceneView == null
+    val unmade: Boolean get() = scenes != null && sceneView == null
 
     init {
         markFocus(focusedIndex)
