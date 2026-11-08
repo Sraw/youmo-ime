@@ -281,18 +281,19 @@ class SceneBuilder(
         }
     }
 
-    // rules B §7, 060-render-p2 S4e: each class's glyphs one size (KeyMarkYield.group), their marks kept apart
-    // from them; a key of no class (no glyph, a table's roots in lines) as placed
+    // rules B §7, 060-render-p2 S4e: each class's glyphs one size (KeyMarkYield.board), their marks kept apart
+    // from them; a key of no class (no glyph, a table's roots in lines) as placed, its marks of their classes
     private fun settle(keys: List<Prepared>, loose: List<KeyContent>): List<Settled> {
         val gap = GAP_DP * env.density
-        // a key with no glyph but marks (a space with no name) too: its marks are of their classes
-        val members = keys.indices.filter { keys[it].content.let { c -> c.yields && (c.glyphClass != null || c.marks.isNotEmpty()) } }
+        // a key with no glyph but marks (a space with no name) too, and one whose glyph stays as placed (a
+        // table's roots in lines) as one with none: its marks are of their classes
+        val members = keys.indices.filter { keys[it].content.let { c -> (c.yields && c.glyphClass != null) || c.marks.isNotEmpty() } }
         val board = KeyMarkYield.board(members.map { member(loose[it]) }, gap)
         val out = arrayOfNulls<Settled>(keys.size)
         members.forEachIndexed { n, i ->
             val c = keys[i].content
             val s = KeyMarkYield.onto(member(c), member(loose[i]), board, board.keys[n])
-            val glyph = c.glyphClass?.let { c.glyph?.mapTo(s.glyph.toBox(), board.scales.getValue(it.ordinal)) } ?: c.glyph
+            val glyph = c.glyphClass?.takeIf { c.yields }?.let { c.glyph?.mapTo(s.glyph.toBox(), board.scales.getValue(it.ordinal)) } ?: c.glyph
             out[i] = Settled(glyph, c.marks.mapIndexed { j, m -> s.marks[j]?.let { m.drawn.mapTo(it.toBox(), board.markScale(mark(m))) } })
         }
         keys.forEachIndexed { i, k ->
@@ -303,7 +304,7 @@ class SceneBuilder(
 
     // a key as its class's member: a main character about its baseline, where its row's stand, and never moved off it
     private fun member(c: KeyContent): KeyMarkYield.Member {
-        val cls = c.glyphClass ?: return KeyMarkYield.Member(KeyMarkYield.NO_GLYPH, 0.0, 0.0, c.marks.map(::mark), c.room.toInk(), c.edge, glyphClass = -1)
+        val cls = c.glyphClass?.takeIf { c.yields } ?: return KeyMarkYield.Member(KeyMarkYield.NO_GLYPH, 0.0, 0.0, c.marks.map(::mark), c.room.toInk(), c.edge, glyphClass = -1)
         val ink = c.glyph!!.ink.toInk()
         val main = cls == GlyphClass.Main
         val y = if (main) c.baseline else (ink.top + ink.bottom) / 2

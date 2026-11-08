@@ -72,8 +72,8 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
     shadow rect(684.88,18.38,779.63,103.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(684.88,18.38,779.63,100.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
     icon backspace 715.03,29.89,774.25,89.11 #ff7a858a
-    icon delete-sweep 686.28,25.81,712.52,52.05 #ff7a858a
-    icon restore 686.29,67.28,712.53,93.51 #ff7a858a
+    icon delete-sweep 686.28,25.83,712.52,52.07 #ff7a858a
+    icon restore 686.29,67.25,712.53,93.49 #ff7a858a
   pressed
     +2 fill rect(684.88,18.38,779.63,100.63 r=10.5,10.5,10.5,10.5) #1f000000
 key r2c1 kind=function a11y="ˊ"

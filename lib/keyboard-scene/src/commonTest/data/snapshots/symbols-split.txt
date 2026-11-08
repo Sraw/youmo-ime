@@ -64,9 +64,9 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
   normal
     shadow rect(2052.88,407.5,2185.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(2052.88,407.5,2185.13,518.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    icon backspace 2090.12,431.5,2153.12,494.5 #ff7a858a
-    icon delete-sweep 2058.6,412.5,2087.6,441.5 #ff7a858a
-    icon restore 2058.6,484.38,2087.6,513.38 #ff7a858a
+    icon backspace 2087.5,431.5,2150.5,494.5 #ff7a858a
+    icon delete-sweep 2055.98,412.5,2084.98,441.5 #ff7a858a
+    icon restore 2055.98,484.38,2084.98,513.38 #ff7a858a
   pressed
     +2 fill rect(2052.88,407.5,2185.13,518.5 r=10.5,10.5,10.5,10.5) #1f000000
 key enter kind=enter role=enter a11y="换行"

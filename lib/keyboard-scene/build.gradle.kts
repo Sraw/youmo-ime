@@ -22,7 +22,8 @@ kotlin {
     }
     js {
         // node, not a browser: the tests need no headless Chromium, and read the snapshot files
-        nodejs()
+        // the scanning tests (ContentTest's px-by-px sweeps) build a few thousand scenes: past mocha's 2 s
+        nodejs { testTask { useMocha { timeout = "120s" } } }
     }
     sourceSets {
         commonTest.dependencies {
