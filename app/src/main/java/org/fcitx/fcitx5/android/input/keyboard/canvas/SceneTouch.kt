@@ -149,23 +149,10 @@ class SceneKey(
  */
 class SceneTouch(
     private val canvas: KeyboardCanvasView,
-    /** The key wired for a node of the scene ([keyOf]): one of a list of keys' by its ref, or made from the node (060-render-p2 S4, U4 B). */
+    /** The key wired for a node of the scene ([keyOf]), made from the node (060-render-p2 U4 B). */
     private val keyFor: (KeyNode) -> SceneKey?,
     private val shown: (SceneKey) -> Boolean,
 ) {
-    /**
-     * [keys], each wired as a key view was (U4 A): a node's the one of its ref, a split row's second
-     * copy with no key of its own the first's, as its view was.
-     */
-    constructor(canvas: KeyboardCanvasView, keys: List<SceneKey>, shown: (SceneKey) -> Boolean) :
-        this(canvas, keyFor = byRef(keys), shown = shown)
-
-    private companion object {
-        fun byRef(keys: List<SceneKey>): (KeyNode) -> SceneKey? {
-            val byRef = keys.associateBy { it.ref }
-            return { node -> byRef[KeyRef.scene(node.id, node.copy)] ?: byRef[KeyRef(node.id)] }
-        }
-    }
 
     /**
      * A finger's key, and its cell in the keyboard as the finger went down: the touch's coordinates

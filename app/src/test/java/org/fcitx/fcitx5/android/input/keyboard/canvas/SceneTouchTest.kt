@@ -285,8 +285,8 @@ class SceneTouchTest {
             val gs = h.views("g")
             assertEquals(2, gs.size)
             val g = checkNotNull(kb.sceneKey(checkNotNull(c.keyAt("g"))))
-            val keys = c.scene!!.keys.mapNotNull { kb.sceneKey(it) }.filter { it.ref != KeyRef.scene("g", 1) }
-            val touch = SceneTouch(c, keys) { true }
+            // each node's key its first copy's: g's two copies one key
+            val touch = SceneTouch(c, keyFor = { n -> c.keyAt(n.id)?.let(kb::sceneKey) }, shown = { true })
             val origin = h.box(kb)
             val at = gs.map { v -> h.box(v).let { it.exactCenterX() - origin.left to it.exactCenterY() - origin.top } }
             val pointers = at.map { (x, y) -> checkNotNull(touch.find(x, y)) }

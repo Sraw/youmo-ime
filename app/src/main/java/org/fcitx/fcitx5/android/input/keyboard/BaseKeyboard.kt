@@ -95,8 +95,6 @@ abstract class BaseKeyboard(
     private val spaceSwipeMoveCursor = prefs.keyboard.spaceSwipeMoveCursor
     private val spaceKeys = mutableListOf<KeyHandle>()
 
-    // each key's view and its def, as made: the scene's keys wired from them ([drawKeysOn])
-    private val wired = mutableListOf<Pair<KeyView, KeyDef>>()
 
     /** Holding the space talks here ([updateSpaceBadges]): the microphone on it. Before init, which sets it. */
     protected var holdsToTalk = false
@@ -384,7 +382,6 @@ abstract class BaseKeyboard(
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             }
             wire(this, def, this)
-            wired += this to def
         }
     }
 
@@ -418,7 +415,7 @@ abstract class BaseKeyboard(
     private fun wireSpace(key: KeyHandle) {
         val g = key.keyGesture
         spaceKeys.add(key)
-        // as updateSpaceBadges sets it: a key wired after it ran (the scene's, drawKeysOn) buzzes for nothing otherwise
+        // as updateSpaceBadges sets it: a key wired after it ran (the scene's, SceneKeys.byNodes) buzzes for nothing otherwise
         g.longPressFeedbackEnabled = spaceLongPressTakesTouch(spaceLongPress.getValue(), VoiceFeature.AVAILABLE, inPasswordField)
         g.swipeEnabled = spaceSwipeMoveCursor.getValue()
         g.swipeRepeatEnabled = true
@@ -626,25 +623,20 @@ abstract class BaseKeyboard(
      * [BuiltInLayouts.has]); else the views go on drawing them, as they always did. A layout that
      * does not read ([SceneLayouts.of], logged there) draws nothing: never the views again (U8,
      * they go in S8). Called last in a keyboard's init: the scene reads its state ([sceneEnv]).
-     * Each key wired as its view was where [refOf] says which (U4 A: the 26 keys, till their layout
-     * says what they do), else as its layout's node says ([SceneKeyDef], [sceneTable] the keyboard's
-     * own words: U4 B). The rows of views stay laid out, not drawn, not touched, not read out (S8
-     * deletes them). Whether the canvas is put over the keyboard.
+     * Each key wired as its layout's node says ([SceneKeyDef], [sceneTable] the keyboard's own words:
+     * U4 B). The rows of views stay laid out, not drawn, not touched, not read out (S8 deletes them).
+     * Whether the canvas is put over the keyboard.
      */
-    protected fun drawKeysWithScene(layoutName: String, refOf: ((KeyView) -> KeyRef?)? = null): Boolean {
+    protected fun drawKeysWithScene(layoutName: String): Boolean {
         if (!AppPrefs.getInstance().internal.canvasKeyboard.getValue() || !BuiltInLayouts.has(layoutName)) return false
         val layout = SceneLayouts.of(context, layoutName)
         val board = SceneBoard(context, theme, layout) { look, read, width, height -> sceneEnv(look, read, width, height) }
         sceneBoard = board
         val view = board.view(keyImages) { node -> sceneKey(node) }
-        if (refOf != null) {
-            drawKeysOn(view, refOf)
-        } else {
-            releaseAllTouchTargets()
-            spaceKeys.removeAll { it is SceneKey }
-            canvas = view
-            sceneKeys.byNodes(view, sceneTable) { old -> spaceKeys.remove(old) }
-        }
+        releaseAllTouchTargets()
+        spaceKeys.removeAll { it is SceneKey }
+        canvas = view
+        sceneKeys.byNodes(view, sceneTable) { old -> spaceKeys.remove(old) }
         keyRows.forEach { it.visibility = View.INVISIBLE }
         add(view, lParams(0, 0) {
             topOfParent()
@@ -665,22 +657,6 @@ abstract class BaseKeyboard(
 
     /** The keyboard's own words for its layout's keys (U4 B): its `action:` placeholders, its composed long presses. */
     protected open val sceneTable: SceneKeyDef.Table = object : SceneKeyDef.Table {}
-
-    /**
-     * The keys drawn by [view] from now on, or by their own views again (null): each key the scene
-     * draws, [refOf] its view's ([KeyRef.scene]; null, none), wired as its view was and touched where
-     * the scene places it (060-render-p2 S1). A key hidden takes no touch, as its view says till its
-     * layout does (S4).
-     */
-    protected fun drawKeysOn(view: KeyboardCanvasView?, refOf: (KeyView) -> KeyRef? = { null }) {
-        releaseAllTouchTargets()
-        spaceKeys.removeAll { it is SceneKey }
-        canvas = view
-        if (view == null) sceneKeys.none() else sceneKeys.byViews(view, wired, refOf)
-    }
-
-    /** The scene's key wired as [view] was ([drawKeysOn]); null while the views draw the keys. */
-    internal fun sceneKeyOf(view: KeyView): SceneKey? = sceneKeys.of(view)
 
     /** Where the scene drawn last has its key [id] (its second [copy], a split row's) in this keyboard, as a key's place is (glide typing's, strokes'): nowhere while the views draw the keys. */
     protected fun scenePlace(id: String, copy: Boolean = false): KeyPlace = KeyPlace { _, out ->
