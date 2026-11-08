@@ -190,7 +190,7 @@ object LookTheme {
     internal fun selector(name: String): String {
         val slash = name.indexOf('/')
         if (slash < 0) return name
-        val key = name.substring(slash + 1).fold(StringBuilder()) { b, c -> if (c in SELECTOR_CHARS) b.append('\\'); b.append(c) }
+        val key = name.substring(slash + 1).map { c -> if (c in SELECTOR_CHARS) "\\$c" else "$c" }.joinToString("")
         return name.substring(0, slash + 1) + key
     }
 

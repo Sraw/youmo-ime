@@ -15,9 +15,11 @@ import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
+import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -174,9 +176,12 @@ class ZhuyinSceneGesturesTest {
     }
 
     // the bottom row follows what the engine tells with no layout between (each change invalidates the scene):
-    // the comma and full stop as punctuation maps them, Return's face, the space's input method; as the views do
+    // the comma and full stop as punctuation maps them, Return's face, the space's input method, an address's
+    // keys; as the views do
     @Test
     fun theBottomRowFollowsPunctuationReturnAndTheInputMethod() {
+        // Return's icon as the scene draws it, step by step (the views' drawable is no name to compare)
+        val returnIcons = mutableListOf<List<String>>()
         val shown = listOf(false, true).map { canvas ->
             harness(canvas, InputType.TYPE_CLASS_TEXT).use { h ->
                 val kb = KeyboardHarness.find<ZhuyinKeyboard>(h.keyboard)!!
@@ -188,6 +193,7 @@ class ZhuyinSceneGesturesTest {
                         // the text itself on the scene (S3's nodes), read the same
                         h.keyNamed(id).run { "$label ${if (id in setOf("enter", "space")) description.orEmpty() else ""} icons=$drawnIcons" }
                     }
+                    if (canvas) returnIcons += (h.keyNamed("enter") as SceneShownKey).node.ops(false).filterIsInstance<Op.Icon>().map { it.name }
                 }
                 look("first")
                 kb.onPunctuationUpdate(mapOf("," to "，", "." to "。"))
@@ -196,12 +202,17 @@ class ZhuyinSceneGesturesTest {
                 look("return")
                 kb.onInputMethodUpdate(InputMethodEntry("other", "别的", "", "", "", "zh_TW", "androidengine", false))
                 look("input method")
+                kb.address = AddressKeys.URL
+                h.idle()
+                out += "address: " + h.keys().mapNotNull { k -> k.id?.let { "$it ${k.label}" } }.filter { it.substringBefore(' ') !in SYMBOL_IDS }
                 out
             }
         }
         assertEquals(shown[0].joinToString("\n"), shown[1].joinToString("\n"))
         // each a change seen
-        assertTrue(shown[1].toString(), shown[1].zipWithNext().all { (a, b) -> a.substringAfter(": ") != b.substringAfter(": ") })
+        assertTrue(shown[1].toString(), shown[1].dropLast(1).zipWithNext().all { (a, b) -> a.substringAfter(": ") != b.substringAfter(": ") })
+        assertTrue(shown[1].last(), "slash /" in shown[1].last())
+        assertTrue(returnIcons.toString(), returnIcons[1] != returnIcons[2] && returnIcons[2] == returnIcons[3])
     }
 
     // a long press's symbol or tone typed as the keyboard's code, whichever draws (C5.8): the comma's own,
@@ -254,6 +265,9 @@ class ZhuyinSceneGesturesTest {
         // ⌫ held this long repeats: some deletes at least, the same count each side
         const val HOLD_MS = 1500L
         const val MIN_REPEATS = 3
+
+        // 大千's symbol and tone keys, by their places
+        val SYMBOL_IDS = ZhuyinKeys.DACHEN_QWERTY.keys.map(Char::toString).toSet()
 
         // past a bubble's going (PopupComponent's dismiss delay and fade)
         const val BUBBLE_GONE_MS = 1000L
