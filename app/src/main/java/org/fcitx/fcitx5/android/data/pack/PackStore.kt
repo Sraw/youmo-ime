@@ -181,7 +181,8 @@ object PackStore {
         if (generateSequence(e) { it.cause }.take(MAX_CAUSES).any { it is PackUnavailableException }) return false
         val gen = shelf.dir(kind) ?: return false
         val verifiedAt = shelf.verifiedAt(kind)
-        if (verifiedAt != null && (System.currentTimeMillis() - verifiedAt in 0..RECENTLY_MS || verifiedAt >= processStartedAt())) {
+        val now = System.currentTimeMillis()
+        if (verifiedAt != null && (now - verifiedAt in 0..RECENTLY_MS || verifiedAt in processStartedAt()..now)) {
             Timber.i("resource pack %s read through lately: not again after the host failed", kind.id)
             return false
         }

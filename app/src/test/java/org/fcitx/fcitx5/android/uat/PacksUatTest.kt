@@ -489,6 +489,31 @@ class PacksUatTest {
         }
     }
 
+    /** The clock set back: a mark later than now does not count as read since the process started. */
+    @Test
+    fun aMarkLaterThanNowDoesNotSkipTheReadAfterAFailure() {
+        val root = Files.createTempDirectory("packs").toFile()
+        val started = PackStore.processStartedAt
+        val restart = PackStore.restartHost
+        PackStore.restartHost = { true }
+        val real = System.currentTimeMillis()
+        try {
+            val shelf = shelfAt(root)
+            assertTrue(shelf.import(TestShelves.pack(PackKind.TEXT).inputStream()) is ImportResult.Imported)
+            damage(shelf, PackKind.TEXT)
+            File(shelf.dir(PackKind.TEXT)!!, PackShelf.VERIFIED).writeText("${real + 2 * 60 * 60 * 1000L}")
+            PackStore.useShelf(shelfAt(root))
+            PackStore.processStartedAt = { real - 60 * 60 * 1000L }
+            assertTrue(PackStore.verifyAfterFailure(PackKind.TEXT, java.io.IOException("Map failed")))
+            assertTrue(PackStore.status(PackKind.TEXT) is PackStatus.Damaged)
+        } finally {
+            PackStore.processStartedAt = started
+            PackStore.restartHost = restart
+            TestShelves.use()
+            root.deleteRecursively()
+        }
+    }
+
     /** Review L-7: what tells the rest of an import failing leaves it imported, counted all the same. */
     @Test
     fun anImportWhoseRestartFailsIsImportedAndCounted() {
