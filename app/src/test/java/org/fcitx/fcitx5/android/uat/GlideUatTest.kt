@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.uat
 
-import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.InputMethodEntry
@@ -12,7 +11,6 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
-import org.fcitx.fcitx5.android.input.ViewShownKey
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -74,6 +72,6 @@ class GlideUatTest {
         val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false)
         harness(wubi).let { h -> h.glide("wqiy".map { h.key("$it") }, "GlideUatTest/wubi_wqiy") }
         open?.close()
-        harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS).let { h -> h.glide("6426".map { ViewShownKey(h.nineKey("$it")) }, "GlideUatTest/t9_6426") }
+        harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS).let { h -> h.glide("6426".map { h.nineKey("$it") }, "GlideUatTest/t9_6426") }
     }
 }

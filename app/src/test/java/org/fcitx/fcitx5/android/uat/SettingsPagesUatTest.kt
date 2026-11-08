@@ -187,10 +187,8 @@ class SettingsPagesUatTest {
                 // emptied, 3 is as on a phone (the field's hint says so); its two symbols one row, not a column
                 var rows = emptySet<Int>()
                 val three = h.longPressed('3') {
-                    rows = listOf("+", "-").map { t ->
-                        val c = KeyboardHarness.all(inputView).filterIsInstance<TextView>().last { shown(it) && it.text.toString() == t }
-                        IntArray(2).also((c.parent as View)::getLocationInWindow)[1]
-                    }.toSet()
+                    // each cell's top, whichever draws the popup
+                    rows = listOf("+", "-").map { t -> popupChoices().last { it.text == t }.cell.top }.toSet()
                 }
                 assertTrue(three.toString(), three.containsAll(listOf("+", "-", "D", "3", "d")))
                 assertEquals(1, rows.size)
@@ -240,8 +238,8 @@ class SettingsPagesUatTest {
         val before = texts(inputView).size
         val f = finger(key, at(key))
         advance(700)
-        // the popup's texts: after the keyboard's in the tree, the popup drawn over it
-        val popup = texts(inputView).drop(before)
+        // the popup's texts, whichever draws it
+        val popup = popupChoices().map { it.text }
         shown()
         f.move(at(key))
         val out = KeyboardHarness.Touch(key.width / 2f, key.height * 3f)

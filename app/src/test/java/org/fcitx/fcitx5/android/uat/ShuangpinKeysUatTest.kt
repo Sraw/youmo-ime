@@ -96,7 +96,7 @@ class ShuangpinKeysUatTest {
         val column = KeyboardHarness.all(h.keyboard).filterIsInstance<ScrollView>().single().getChildAt(0) as ViewGroup
         val shown = (0 until column.childCount).map { column.getChildAt(it) as TextView }.filter { it.isVisible }.map { it.text.toString() }
         assertEquals(listOf("wo", "w"), shown)
-        h.capture("ShuangpinKeysUatTest/nine_wo", h.inputView)
+        h.captureBoard("ShuangpinKeysUatTest/nine_wo", h.inputView)
     }
 
     @Test

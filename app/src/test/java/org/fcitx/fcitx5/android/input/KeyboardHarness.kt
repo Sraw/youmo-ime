@@ -47,7 +47,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.HostEvent
-import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
+import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
@@ -447,7 +447,8 @@ class KeyboardHarness(
 
     /** The popup's keys up now (a long press's choices), not the keyboard's own labels. */
     fun popupKeys(): List<TextView> = all(inputView).filterIsInstance<AutoScaleTextView>()
-        .filter { shown(it) && generateSequence(it as View) { p -> p.parent as? View }.none { p -> p is KeyView } }
+        // a key's texts, and the nine keys' column's items (a keyboard's own), are no popup's
+        .filter { shown(it) && generateSequence(it as View) { p -> p.parent as? View }.none { p -> p is KeyView || p is BaseKeyboard } }
         .toList()
 
     /**
@@ -700,10 +701,8 @@ class KeyboardHarness(
         return Touch(width / 2f + dx * dp, height / 2f + dy * dp, ms)
     }
 
-    /** The nine keys' key for [digit] (its small digit), or the column's punctuation key. */
-    fun nineKey(digit: String): AltTextKeyView =
-        all(inputView).filterIsInstance<AltTextKeyView>()
-            .firstOrNull { shown(it) && it.altText.text.toString() == digit } ?: error("no key $digit in ${texts()}")
+    /** The nine keys' key for [digit] (its small digit), or the column's punctuation key, whichever draws it. */
+    fun nineKey(digit: String): ShownKey = keys().firstOrNull { it.alt == digit } ?: error("no key $digit in ${texts()}")
 
     /**
      * Every text shown under [v] (visible ones only), depth first: a canvas's keys' labels, corners and

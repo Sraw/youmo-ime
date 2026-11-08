@@ -53,6 +53,7 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
             arrayOf<Any>("k18", PinyinKeyboard.Keys18),
             arrayOf<Any>("zhuyin", PinyinKeyboard.ZhuyinFull),
             arrayOf<Any>("zhuyin-nine", PinyinKeyboard.ZhuyinNine),
+            arrayOf<Any>("nine", PinyinKeyboard.NineKeys),
         ) + FIELDS.keys.map { arrayOf<Any>(it, PinyinKeyboard.Full) }
 
         // each number pad by the field that shows it (NumberPad.of): the full pad's a plain number field's

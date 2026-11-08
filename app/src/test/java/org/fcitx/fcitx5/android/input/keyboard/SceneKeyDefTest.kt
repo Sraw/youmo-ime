@@ -220,25 +220,25 @@ class SceneKeyDefTest {
             assertEquals(listOf("k14", "k18", "grouped-bottom"), pack.asked)
             assertEquals(listOf("k14", "grouped-bottom"), app.asked)
             // neither has it
-            assertNull(SceneLayouts.of(context, "nine"))
-            assertNull(SceneLayouts.of(context, "nine"))
-            assertEquals(listOf("k14", "k18", "grouped-bottom", "nine"), pack.asked)
-            assertEquals(listOf("k14", "grouped-bottom", "nine"), app.asked)
+            assertNull(SceneLayouts.of(context, "symbols"))
+            assertNull(SceneLayouts.of(context, "symbols"))
+            assertEquals(listOf("k14", "k18", "grouped-bottom", "symbols"), pack.asked)
+            assertEquals(listOf("k14", "grouped-bottom", "symbols"), app.asked)
             // the pack's read again, the app's kept (P3: a theme pack changed)
             SceneLayouts.invalidate("pack")
             SceneLayouts.of(context, "k14")
             SceneLayouts.of(context, "k18")
-            assertEquals(listOf("k14", "k18", "grouped-bottom", "nine", "k14", "k18", "grouped-bottom"), pack.asked)
-            assertEquals(listOf("k14", "grouped-bottom", "nine"), app.asked)
+            assertEquals(listOf("k14", "k18", "grouped-bottom", "symbols", "k14", "k18", "grouped-bottom"), pack.asked)
+            assertEquals(listOf("k14", "grouped-bottom", "symbols"), app.asked)
             // all of them read again
             SceneLayouts.invalidate()
             SceneLayouts.of(context, "k14")
-            assertEquals(listOf("k14", "grouped-bottom", "nine", "k14", "grouped-bottom"), app.asked)
+            assertEquals(listOf("k14", "grouped-bottom", "symbols", "k14", "grouped-bottom"), app.asked)
         }
         // a source that throws: none from it; the app's own the one step back, its own key's no step at all
         sources(Counted("throws") { error("no file") }, app) { assertNotNull(SceneLayouts.of(context, "k18")) }
         sources(Counted(BuiltInLayouts.KEY) { error("no file") }, Counted(BuiltInLayouts.KEY, builtIn::text)) { assertNull(SceneLayouts.of(context, "k18")) }
-        assertTrue(BuiltInLayouts.has("k14") && BuiltInLayouts.has("qwerty") && !BuiltInLayouts.has("nine"))
+        assertTrue(BuiltInLayouts.has("k14") && BuiltInLayouts.has("qwerty") && !BuiltInLayouts.has("symbols"))
     }
 
     // a keyboard moved to the scene (the app has its layout) whose layout does not read draws nothing with
@@ -285,7 +285,7 @@ class SceneKeyDefTest {
     fun aKeyboardNotMovedIsDrawnByItsViews() {
         prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         val unmoved = object : BaseKeyboard(context, ThemePreset.PixelLight, emptyList()) {
-            val scene = drawKeysWithScene("nine")
+            val scene = drawKeysWithScene("symbols")
             val moved = drawKeysWithScene("qwerty")
         }.laidOut()
         assertEquals(false, unmoved.scene)
