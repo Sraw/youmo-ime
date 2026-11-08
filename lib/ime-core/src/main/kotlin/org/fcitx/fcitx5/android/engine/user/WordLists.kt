@@ -214,7 +214,7 @@ class WordLists(private val dir: UserFiles?, private val onError: (IOException) 
             val word = text.trim()
             val chars = word.codePointCount(0, word.length)
             // only a text of no Han nor ASCII letter or digit (an emoji, ℹ️ too): a word's are a syllable each
-            if (word.isEmpty() || word.codePoints().anyMatch { Han.isHan(it) || it < ASCII_END && Character.isLetterOrDigit(it) }) return entry(text, pinyin)
+            if (word.isEmpty() || word.codePoints().anyMatch(::wordly)) return entry(text, pinyin)
             val ids = pieces(pinyin.lowercase()).map { Syllables.id(WordText.spelling(it)) }
             return if (ids.isNotEmpty() && ids.none { it < 0 } && ids.size != chars) Entry(word, ids.toIntArray()) else entry(text, pinyin)
         }
@@ -256,3 +256,6 @@ class WordLists(private val dir: UserFiles?, private val onError: (IOException) 
 
 // below it, ASCII
 private const val ASCII_END = 0x80
+
+// what makes a text a word: Han, an ASCII letter or digit
+private fun wordly(c: Int) = Han.isHan(c) || c < ASCII_END && Character.isLetterOrDigit(c)
