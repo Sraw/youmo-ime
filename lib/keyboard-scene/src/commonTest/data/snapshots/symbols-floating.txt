@@ -50,7 +50,7 @@ key space kind=space role=space a11y="a11y_key_space"
   normal
     shadow rect(314.88,465.38,543.13,580.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(314.88,465.38,543.13,577.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    icon cursor-move 321,470,350,499 #ff7a858a
+    icon cursor-move 322,470,351,499 #ff7a858a
   pressed
     +2 fill rect(314.88,465.38,543.13,577.63 r=10.5,10.5,10.5,10.5) #1f000000
 key backspace kind=function role=backspace a11y="a11y_key_backspace"
