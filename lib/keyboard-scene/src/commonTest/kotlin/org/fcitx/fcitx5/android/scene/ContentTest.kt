@@ -82,15 +82,37 @@ class ContentTest {
         val redo = icons(s, "y").single()
         assertEquals("redo", redo.name)
         val f = face(s, "y")
-        // as its ImageView was laid out: from the pixel its margins reach, whole pixels wide
-        near(kotlin.math.floor(f.left + 3 * d), redo.box.left)
-        near(kotlin.math.floor(f.top + 2 * d), redo.box.top)
+        // as its ImageView was laid out: from the pixel its margins (whole pixels, rounded down) reach, whole pixels wide
+        near(kotlin.math.floor(f.left + kotlin.math.floor(3 * d)), redo.box.left)
+        near(kotlin.math.floor(f.top + kotlin.math.floor(2 * d)), redo.box.top)
         near(kotlin.math.floor(11 * d + 0.5), redo.box.width)
         val backspace = icons(s, "backspace").map { it.name }
         assertEquals(listOf("backspace", "delete-sweep", "restore").sorted(), backspace.sorted())
         val down = icons(s, "backspace").first { it.name == "restore" }
         assertTrue(kotlin.math.abs(face(s, "backspace").bottom - 2 * d - down.box.bottom) < 1.0, "down's at the bottom, within its pixel")
         assertEquals("cursor-move", icons(s, "space").single().name)
+    }
+
+    @Test
+    fun aShortBackspaceKeepsBothItsIconsOneOverTheOtherAsItsViewDid() {
+        // 注音大千 on a 360 dp phone at 440 dpi, compact at 20%: a ⌫ face 43.5 px tall. Its 8 dp icons 1 dp
+        // in, as their views' margins were (2 px, not 2.75), are 39 px apart: both fit at their least (7 dp:
+        // 38.5 px), as the views drew them; 2.75 px in, 38, one was left out
+        val d = 2.75
+        val small = Forms.env("zhuyin", Fixtures.compact.copy(width = 990.0, height = 407.0, density = d))
+        val s = Forms.scene("zhuyin", small)
+        val f = face(s, "backspace")
+        near(43.5, f.height, "the face")
+        val icons = icons(s, "backspace").associate { it.name to it.box }
+        assertEquals(setOf("backspace", "delete-sweep", "restore"), icons.keys)
+        val glyph = icons.getValue("backspace")
+        val up = icons.getValue("delete-sweep")
+        val down = icons.getValue("restore")
+        assertTrue(up.right < glyph.left && down.right < glyph.left, "both left of ⌫: $up $down $glyph")
+        assertTrue(up.bottom <= down.top, "one over the other: $up $down")
+        near(kotlin.math.floor(f.top + kotlin.math.floor(1 * d)), up.top, "up's 1 dp from the top, in whole px")
+        near(kotlin.math.floor(f.left + kotlin.math.floor(2 * d)), up.left, "2 dp from the side, in whole px")
+        assertTrue(up.height >= 7 * d - 0.01 && down.height >= 7 * d - 0.01, "no smaller than 7 dp: $up $down")
     }
 
     @Test

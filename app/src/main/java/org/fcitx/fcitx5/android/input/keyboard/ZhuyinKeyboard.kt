@@ -29,7 +29,16 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
+import org.fcitx.fcitx5.android.input.scene.TextBoardState
 import org.fcitx.fcitx5.android.input.theme.KeyNames
+import org.fcitx.fcitx5.android.input.theme.ThemeLook
+import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.Texts
 
 /**
  * Pinyin typed in zhuyin (design 051), on one of two keyboards, both sending codes of their own
@@ -43,6 +52,11 @@ import org.fcitx.fcitx5.android.input.theme.KeyNames
  * 分词 while typing, punctuation else (pinyin's nine keys' 1). A group's long press each of its symbols. The bottom row is the grouped keyboards'.
  * A symbol key's swipe reaches its shortcut ([ZhuyinShortcutNames]: 大千's by QWERTY place, the groups' by
  * their place); the tones (ˉ swipes to ˙) and the slot have none, as the nine keys' 1.
+ *
+ * Where the canvas is on, a keyboard moved to the scene ([layoutOf]: 大千's zhuyin.xml, 060-render-p2 S4c;
+ * 注音九键's zhuyin-nine.xml once the app has it, S4d) is drawn and wired from its layout: what its keys
+ * send is the layout's `action:` placeholders, each this keyboard's ([placeholder]), and what the bottom
+ * row shows its state ([sceneEnv]), drawn again as it changes.
  */
 @SuppressLint("ViewConstructor")
 class ZhuyinKeyboard(
@@ -106,6 +120,25 @@ class ZhuyinKeyboard(
             }
             if (r == 3) keys + BackspaceKey(0.15f) else keys
         } + listOf(GroupedKeyboard.bottomRow())
+
+        /** The layout the keys of [nine] or 大千 are drawn from where the canvas is on (lib/keyboard-scene's zhuyin.xml, zhuyin-nine.xml), named as the theme names the board. */
+        internal fun layoutOf(nine: Boolean): String = if (nine) KeyNames.ZHUYIN_NINE else KeyNames.ZHUYIN
+
+        /**
+         * What the layout's `action:`[name] sends on a key showing [label] (060-render-p2 U4 B: the app's
+         * table): `zhuyin` the code of the symbol shown ([codeOf]; 注音九键's, its group's of the symbols
+         * shown), `tone-1`…`tone-5` the tone's (ˉ ˊ ˇ ˋ ˙), `zhuyin-slot` 注音九键's slot as it is while
+         * nothing is typed ([onAction] makes it 分词 while typing); null for anything else (the key does nothing, logged).
+         */
+        internal fun placeholder(name: String, label: String?, nine: Boolean): KeyAction? = when {
+            name.startsWith(TONE) -> name.removePrefix(TONE).toIntOrNull()?.let { ZhuyinKeys.MARKS.getOrNull(it - 1) }?.let { codeOf(it, nine) }?.let(::sym)
+            name == "zhuyin-slot" -> if (nine) slotAction(typing = false) else null
+            name != "zhuyin" -> null
+            nine -> ZhuyinKeys.GROUP_SYMBOLS.indexOf(label).takeIf { it >= 0 }?.let { sym(Keyboard.zhuyinNineKey(it)) }
+            else -> label?.singleOrNull()?.let { codeOf(it, nine = false) }?.let(::sym)
+        }
+
+        private const val TONE = "tone-"
 
         /** The 分词 key's face while something is typed; else [PUNCTUATION]'s first, which it types. */
         internal const val SEPARATOR = "分词"
@@ -188,28 +221,39 @@ class ZhuyinKeyboard(
         set(value) {
             field = value
             showAddressKeys()
+            canvas?.invalidateScene()
         }
 
     private val showLangSwitchKey = AppPrefs.getInstance().keyboard.showLangSwitchKey
 
     @Keep
     private val showLangSwitchKeyListener = ManagedPreference.OnChangeListener<Boolean> { _, _ ->
+        showLanguageKey()
+    }
+
+    private fun showLanguageKey() {
         lang.isVisible = showLangSwitchKey.getValue()
+        canvas?.invalidateScene()
     }
 
     init {
         showAddressKeys()
-        lang.isVisible = showLangSwitchKey.getValue()
+        showLanguageKey()
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
     }
 
+    private var punctuationMapping: Map<String, String> = emptyMap()
+    private fun mapped(p: String) = punctuationMapping.getOrDefault(p, p)
+
     override fun onPunctuationUpdate(mapping: Map<String, String>) {
+        punctuationMapping = mapping
         listOf(R.id.button_comma to ",", R.id.button_period to ".").forEach { (id, p) ->
-            findViewById<TextKeyView>(id).mainText.text = mapping.getOrDefault(p, p)
+            findViewById<TextKeyView>(id).mainText.text = mapped(p)
         }
         // the slot's comma the same: ，or, as the bottom row's
-        comma = mapping.getOrDefault(",", ",")
+        comma = mapped(",")
         if (!typing) slot?.mainText?.text = comma
+        canvas?.invalidateScene()
     }
 
     // something typed, as the engine last told
@@ -257,11 +301,47 @@ class ZhuyinKeyboard(
         super.onAction(sent, source)
     }
 
+    // Return as last shown: its icon on the scene's key too
+    private var returnAppearance = ReturnKeyAppearance.Enter
+
     override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
+        returnAppearance = appearance
         `return`.showReturnAction(appearance)
+        canvas?.invalidateScene()
     }
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         showInputMethodName(space, ime)
+        canvas?.invalidateScene()
+    }
+
+    // a symbol's or a tone's code (the layout's action:zhuyin, action:tone-N) by what its key shows
+    override val sceneTable = object : SceneKeyDef.Table {
+        override fun action(name: String, node: KeyNode): KeyAction? = placeholder(name, node.label, nine)
+    }
+
+    // what the bottom row shows now (grouped-bottom.xml's when= and bindings, as the grouped keyboards'): an
+    // address's keys, the language key, the space's input method and microphone, Return, the comma and the
+    // full stop as punctuation maps them
+    override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env {
+        val state = TextBoardState(address = address, langKey = showLangSwitchKey.getValue(), holdVoice = holdsToTalk)
+        val texts = Texts(
+            imeName = shownImeName.orEmpty(),
+            comma = mapped(","),
+            period = mapped("."),
+            returnLabel = returnAppearance.label(context).toString(),
+            returnIcon = SceneIcons.returnName(returnAppearance.icon),
+            confirm = context.getString(R.string.key_confirm),
+            punctuation = punctuationMapping,
+            // the format as it is: the engine fills its place (getString with no arguments formats nothing)
+            a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
+        )
+        return SceneEnvs.of(this, look, theme.isDark, width, height, input = state.input(), texts = texts, marks = SceneBoard.marks(layout, charShortcutMarks))
+    }
+
+    // last: the scene reads the state above (060's redraw: the keys drawn by the scene engine where the canvas
+    // is on and the app has the layout; 注音九键's views till S4d moves it)
+    init {
+        drawKeysWithScene(layoutOf(nine))
     }
 }

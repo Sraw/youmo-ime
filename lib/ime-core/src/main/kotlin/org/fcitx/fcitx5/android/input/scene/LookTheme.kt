@@ -140,7 +140,8 @@ object LookTheme {
         style("@flat key.space", "fill" to "@spaceBar", "shape" to "bar", "radius" to "3dp")
         style("@flat key.enter", "fill" to "@accentKey", "shape" to "circle")
         // single keys over their kinds, later so they win the tie
-        keys.overrides.toSortedMap().forEach { (key, o) ->
+        keys.overrides.toSortedMap().forEach { (name, o) ->
+            val key = selector(name)
             // Color: the kind's colour, which the kind's style gives already
             o.fill?.takeIf { it != KeyFill.Color }?.let { style(key, "fill" to fill(names, it, "")) }
             o.pressed?.let { pressed(names, "$key:pressed", it) }
@@ -182,6 +183,19 @@ object LookTheme {
         props.forEach { (k, v) -> append(""" $k="${escape(v)}"""") }
         appendLine("/>")
     }
+
+    // a 3.0 key name as a selector: what a selector reads otherwise in the key's name escaped, so that
+    // 大千's zhuyin/, is its comma key, not a list of two, and number/* the star key, not every key
+    // (theme-4 §selectors); a role's name (*/space) has none of them
+    internal fun selector(name: String): String {
+        val slash = name.indexOf('/')
+        if (slash < 0) return name
+        val key = name.substring(slash + 1).map { c -> if (c in SELECTOR_CHARS) "\\$c" else "$c" }.joinToString("")
+        return name.substring(0, slash + 1) + key
+    }
+
+    // the space is escaped only to be safe: KeyNames.parse takes no whitespace in a key's name, so none reaches here
+    private const val SELECTOR_CHARS = ",.:[* \\"
 
     private fun escape(s: String) = s.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;")
 }

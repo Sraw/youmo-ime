@@ -35,7 +35,7 @@ key 3 kind=letter a11y="ˇ"
   shape rect(164.88,18.38,227.13,121.63 r=10.5,10.5,10.5,10.5)
   hit rect(157,0,235,140)
   anchor 196,70 up 0,-1
-  actions send="action:zhuyin"
+  actions send="action:tone-3"
   text label="ˇ"
   shortcut="zyfull/3"
   normal
@@ -49,7 +49,7 @@ key 4 kind=letter a11y="ˋ"
   shape rect(242.88,18.38,305.13,121.63 r=10.5,10.5,10.5,10.5)
   hit rect(235,0,313,140)
   anchor 274,70 up 0,-1
-  actions send="action:zhuyin"
+  actions send="action:tone-4"
   text label="ˋ"
   shortcut="zyfull/4"
   normal
@@ -77,7 +77,7 @@ key 6 kind=letter a11y="ˊ"
   shape rect(398.88,18.38,462.13,121.63 r=10.5,10.5,10.5,10.5)
   hit rect(391,0,470,140)
   anchor 430.5,70 up 0,-1
-  actions send="action:zhuyin"
+  actions send="action:tone-2"
   text label="ˊ"
   shortcut="zyfull/6"
   normal
@@ -91,7 +91,7 @@ key 7 kind=letter a11y="˙"
   shape rect(477.88,18.38,540.13,121.63 r=10.5,10.5,10.5,10.5)
   hit rect(470,0,548,140)
   anchor 509,70 up 0,-1
-  actions send="action:zhuyin"
+  actions send="action:tone-5"
   text label="˙"
   shortcut="zyfull/7"
   normal
@@ -645,7 +645,7 @@ key space kind=space role=space a11y="空格，注音"
     shadow rect(300.88,580.38,552.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(300.88,580.38,552.13,683.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "注音" 392,644.8 system 400 34.13 #ff37474f
-    icon cursor-move 308,585,337,614 #ff7a858a
+    icon cursor-move 307,585,336,614 #ff7a858a
   pressed
     +2 fill rect(300.88,580.38,552.13,683.63 r=10.5,10.5,10.5,10.5) #1f000000
 key period kind=function role=period a11y="。"

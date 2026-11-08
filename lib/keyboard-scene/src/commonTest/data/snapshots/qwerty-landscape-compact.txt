@@ -88,7 +88,7 @@ key y kind=letter a11y="y，6"
     shadow rect(1177.88,10.5,1396.13,84.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1177.88,10.5,1396.13,81.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "y" 1270.7,66.38 system 400 54.34 #ff37474f
-    icon redo 1183,13,1204,34 #ff7a858a
+    icon redo 1182,12,1203,33 #ff7a858a
     text "6" 1371.01,36.96 system 700 25.2 #ff7a858a
   pressed
     +2 fill rect(1177.88,10.5,1396.13,81.5 r=10.5,10.5,10.5,10.5) #1f000000
@@ -164,7 +164,7 @@ key a kind=letter a11y="a，@"
     shadow rect(124.88,102.5,343.13,176.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(124.88,102.5,343.13,173.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "a" 217.7,158.38 system 400 54.34 #ff37474f
-    icon select-all 130,105,151,126 #ff7a858a
+    icon select-all 129,104,150,125 #ff7a858a
     text "@" 318.01,128.96 system 700 25.2 #ff7a858a
   pressed
     +2 fill rect(124.88,102.5,343.13,173.5 r=10.5,10.5,10.5,10.5) #1f000000
@@ -313,7 +313,7 @@ key z kind=letter a11y="z，'"
     shadow rect(358.88,194.5,577.13,267.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(358.88,194.5,577.13,264.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "z" 451.7,249.88 system 400 54.34 #ff37474f
-    icon undo 364,197,385,218 #ff7a858a
+    icon undo 363,196,384,217 #ff7a858a
     text "'" 552.01,220.96 system 700 25.2 #ff7a858a
   pressed
     +2 fill rect(358.88,194.5,577.13,264.5 r=10.5,10.5,10.5,10.5) #1f000000
@@ -329,7 +329,7 @@ key x kind=letter a11y="x，:"
     shadow rect(592.88,194.5,811.13,267.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(592.88,194.5,811.13,264.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "x" 685.7,249.88 system 400 54.34 #ff37474f
-    icon content-cut 598,197,619,218 #ff7a858a
+    icon content-cut 597,196,618,217 #ff7a858a
     text ":" 786.01,220.96 system 700 25.2 #ff7a858a
   pressed
     +2 fill rect(592.88,194.5,811.13,264.5 r=10.5,10.5,10.5,10.5) #1f000000
@@ -345,7 +345,7 @@ key c kind=letter a11y="c，\""
     shadow rect(826.88,194.5,1045.13,267.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(826.88,194.5,1045.13,264.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "c" 919.7,249.88 system 400 54.34 #ff37474f
-    icon content-copy 832,197,853,218 #ff7a858a
+    icon content-copy 831,196,852,217 #ff7a858a
     text "\"" 1020.01,220.96 system 700 25.2 #ff7a858a
   pressed
     +2 fill rect(826.88,194.5,1045.13,264.5 r=10.5,10.5,10.5,10.5) #1f000000
@@ -361,7 +361,7 @@ key v kind=letter a11y="v，?"
     shadow rect(1060.88,194.5,1279.13,267.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1060.88,194.5,1279.13,264.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "v" 1153.7,249.88 system 400 54.34 #ff37474f
-    icon content-paste 1066,197,1087,218 #ff7a858a
+    icon content-paste 1065,196,1086,217 #ff7a858a
     text "?" 1254.01,220.96 system 700 25.2 #ff7a858a
   pressed
     +2 fill rect(1060.88,194.5,1279.13,264.5 r=10.5,10.5,10.5,10.5) #1f000000
@@ -421,8 +421,8 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
     shadow rect(1996.88,194.5,2332.13,267.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1996.88,194.5,2332.13,264.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
     icon backspace 2133,198,2196,261 #ff7a858a
-    icon delete-sweep 2002,197,2023,218 #ff7a858a
-    icon restore 2002,240,2023,261 #ff7a858a
+    icon delete-sweep 2001,196,2022,217 #ff7a858a
+    icon restore 2001,241,2022,262 #ff7a858a
   pressed
     +2 fill rect(1996.88,194.5,2332.13,264.5 r=10.5,10.5,10.5,10.5) #1f000000
 key symbols kind=function role=symbols a11y="符"
@@ -479,7 +479,7 @@ key space kind=space role=space a11y="空格，拼音"
     shadow rect(803.88,285.5,1513.13,359.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(803.88,285.5,1513.13,356.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "拼音" 1127.5,332.52 system 400 30.71 #ff37474f
-    icon cursor-move 809,288,830,309 #ff7a858a
+    icon cursor-move 808,287,829,308 #ff7a858a
   pressed
     +2 fill rect(803.88,285.5,1513.13,356.5 r=10.5,10.5,10.5,10.5) #1f000000
 key period kind=function role=period a11y="。"

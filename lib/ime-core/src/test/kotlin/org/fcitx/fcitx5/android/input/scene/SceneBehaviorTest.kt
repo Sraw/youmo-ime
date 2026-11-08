@@ -131,6 +131,26 @@ class SceneBehaviorTest {
         assertEquals(SceneAction.Key("x"), SceneBehavior.of(group).press)
     }
 
+    // 大千 (060-render-p2 S4c): a symbol's and a tone's tap the keyboard's table's, no long press, the
+    // bubble its face both ways (AltPreview(c, c)): swiped, the shortcut it reaches shows in its place
+    @Test
+    fun dachensKeysTypeByTheTableAndTheirBubbleShowsTheShortcutSwipedTo() {
+        val k = keys("zhuyin").mapValues { SceneBehavior.of(it.value) }
+        val q = k.getValue("q")
+        assertEquals(SceneAction.Placeholder("zhuyin"), q.press)
+        assertEquals(Bubble("ㄆ", "ㄆ"), q.bubble)
+        assertNull(q.popup)
+        assertNull(q.swipe)
+        assertEquals("zyfull/q", q.shortcut)
+        assertEquals(mapOf("3" to "tone-3", "4" to "tone-4", "6" to "tone-2", "7" to "tone-5"), listOf("3", "4", "6", "7").associateWith { (k.getValue(it).press as SceneAction.Placeholder).name })
+        assertEquals(Bubble("ˇ", "ˇ"), k.getValue("3").bubble)
+        // a letter of no shortcut its face alone; a swipe's own corner whatever its shortcut
+        assertEquals(Bubble("A", null), SceneBehavior.of(node("<key id=\"a\" label=\"A\" send=\"a\"/>")).bubble)
+        assertEquals(Bubble("A", "!"), SceneBehavior.of(node("<key id=\"a\" label=\"A\" send=\"a\" swipe-up=\"!\" shortcut=\"x/a\"/>")).bubble)
+        // the bottom row's comma (a function key's kind) as it was: no corner
+        assertEquals(Bubble(",", null), k.getValue("comma").bubble)
+    }
+
     private fun node(key: String): KeyNode {
         val text = "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"grouped\" columns=\"10\"><defaults kind=\"letter\"/><row>$key</row></keyboard>"
         val l = (LayoutReader.layout(text) as Parsed.Ok).value

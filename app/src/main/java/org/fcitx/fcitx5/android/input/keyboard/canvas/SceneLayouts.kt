@@ -54,6 +54,7 @@ class BuiltInLayouts(private val context: Context) : LayoutSource {
             "qwerty" to R.raw.scene_layout_qwerty,
             "k14" to R.raw.scene_layout_k14,
             "k18" to R.raw.scene_layout_k18,
+            "zhuyin" to R.raw.scene_layout_zhuyin,
             "grouped-bottom" to R.raw.scene_layout_grouped_bottom,
             "number" to R.raw.scene_layout_number,
         )

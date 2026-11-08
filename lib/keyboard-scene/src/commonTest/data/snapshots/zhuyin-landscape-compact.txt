@@ -34,7 +34,7 @@ key 3 kind=letter a11y="ˇ"
   shape rect(432.88,10.5,630.13,62.5 r=10.5,10.5,10.5,10.5)
   hit rect(425,0,638,73)
   anchor 531.5,36.5 up 0,-1
-  actions send="action:zhuyin"
+  actions send="action:tone-3"
   text label="ˇ"
   shortcut="zyfull/3"
   normal
@@ -48,7 +48,7 @@ key 4 kind=letter a11y="ˋ"
   shape rect(645.88,10.5,843.13,62.5 r=10.5,10.5,10.5,10.5)
   hit rect(638,0,851,73)
   anchor 744.5,36.5 up 0,-1
-  actions send="action:zhuyin"
+  actions send="action:tone-4"
   text label="ˋ"
   shortcut="zyfull/4"
   normal
@@ -76,7 +76,7 @@ key 6 kind=letter a11y="ˊ"
   shape rect(1071.88,10.5,1268.13,62.5 r=10.5,10.5,10.5,10.5)
   hit rect(1064,0,1276,73)
   anchor 1170,36.5 up 0,-1
-  actions send="action:zhuyin"
+  actions send="action:tone-2"
   text label="ˊ"
   shortcut="zyfull/6"
   normal
@@ -90,7 +90,7 @@ key 7 kind=letter a11y="˙"
   shape rect(1283.88,10.5,1481.13,62.5 r=10.5,10.5,10.5,10.5)
   hit rect(1276,0,1489,73)
   anchor 1382.5,36.5 up 0,-1
-  actions send="action:zhuyin"
+  actions send="action:tone-5"
   text label="˙"
   shortcut="zyfull/7"
   normal
@@ -586,8 +586,8 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
     shadow rect(1996.88,230.5,2332.13,286.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1996.88,230.5,2332.13,283.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
     icon backspace 2133,225.5,2196,288.5 #ff7a858a
-    icon delete-sweep 2002,233,2023,254 #ff7a858a
-    icon restore 2002,259,2023,280 #ff7a858a
+    icon delete-sweep 2001,232,2022,253 #ff7a858a
+    icon restore 2001,260,2022,281 #ff7a858a
   pressed
     +2 fill rect(1996.88,230.5,2332.13,283.5 r=10.5,10.5,10.5,10.5) #1f000000
 key symbols kind=function role=symbols a11y="符"
@@ -644,7 +644,7 @@ key space kind=space role=space a11y="空格，注音"
     shadow rect(803.88,304.5,1513.13,359.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(803.88,304.5,1513.13,356.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "注音" 1130.5,340.87 system 400 27.64 #ff37474f
-    icon cursor-move 809,307,830,328 #ff7a858a
+    icon cursor-move 808,306,829,327 #ff7a858a
   pressed
     +2 fill rect(803.88,304.5,1513.13,356.5 r=10.5,10.5,10.5,10.5) #1f000000
 key period kind=function role=period a11y="。"

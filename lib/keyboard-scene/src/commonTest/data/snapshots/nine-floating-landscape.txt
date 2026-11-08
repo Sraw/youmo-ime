@@ -63,8 +63,8 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
     shadow rect(911.88,10.5,1094.63,104.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(911.88,10.5,1094.63,101.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
     icon backspace 971.75,24.5,1034.75,87.5 #ff7a858a
-    icon delete-sweep 919,15,948,44 #ff7a858a
-    icon restore 919,67,948,96 #ff7a858a
+    icon delete-sweep 918,15,947,44 #ff7a858a
+    icon restore 918,67,947,96 #ff7a858a
   pressed
     +2 fill rect(911.88,10.5,1094.63,101.5 r=10.5,10.5,10.5,10.5) #1f000000
 key 4 kind=letter a11y="GHI，4"
@@ -231,7 +231,7 @@ key space kind=space role=space a11y="空格，拼音"
     shadow rect(338.88,347.5,786.13,441.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(338.88,347.5,786.13,438.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "拼音" 533,403.88 system 400 29.01 #ff37474f
-    icon cursor-move 346,352,375,381 #ff7a858a
+    icon cursor-move 345,352,374,381 #ff7a858a
   pressed
     +2 fill rect(338.88,347.5,786.13,438.5 r=10.5,10.5,10.5,10.5) #1f000000
 key lang kind=letter role=lang a11y="a11y_key_switch_language"

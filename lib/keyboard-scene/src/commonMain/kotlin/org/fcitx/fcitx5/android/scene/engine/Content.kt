@@ -171,8 +171,10 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         mark: MarkContent, slot: Slot, taken: List<Slot>, drop: Int, index: Int, slots: List<Slot>, cell: Box, content: Box, looks: Looks,
     ): MarkDrawn {
         val compact = env.compact
-        val h = (if (compact) SHORTCUT_SIDE_COMPACT_DP else SHORTCUT_SIDE_DP) * d
-        val v = (if (compact) SHORTCUT_EDGE_COMPACT_DP else SHORTCUT_EDGE_DP) * d
+        // in whole px, as its view's margins were (splitties' dp, rounded down): at 2.75 a compact 1 dp is
+        // 2 px, and a ⌫'s two icons on a short face, 39 px apart not 38, both still fit (at their least, 38.5)
+        val h = Popups.px(if (compact) SHORTCUT_SIDE_COMPACT_DP else SHORTCUT_SIDE_DP, d)
+        val v = Popups.px(if (compact) SHORTCUT_EDGE_COMPACT_DP else SHORTCUT_EDGE_DP, d)
         val (drawnAt, minScale) = when (mark) {
             is MarkContent.Icon -> {
                 val dp = if (compact) SHORTCUT_ICON_COMPACT_DP else SHORTCUT_ICON_DP

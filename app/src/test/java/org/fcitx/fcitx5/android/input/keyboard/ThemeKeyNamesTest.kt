@@ -102,10 +102,10 @@ class ThemeKeyNamesTest {
     }
 
     // a keyboard drawn by the scene (060-render-p2 S4) styled by the same names as its views were: its
-    // layout's id the board, its keys' ids the keys a theme's override selects (k14/r1c1, qwerty/q)
+    // layout's id the board, its keys' ids the keys a theme's override selects (k14/r1c1, qwerty/q, zhuyin/,)
     @Test
     fun aSceneLayoutsKeysAreItsBoardsNames() {
-        val drawn = mapOf("qwerty" to "qwerty", "k14" to "k14", "k18" to "k18", "number" to "number")
+        val drawn = mapOf("qwerty" to "qwerty", "k14" to "k14", "k18" to "k18", "zhuyin" to "zhuyin", "number" to "number")
         for ((id, board) in drawn) {
             val layout = SceneLayouts.of(context, id) ?: error("no layout $id")
             assertEquals(board, layout.layout.id)
