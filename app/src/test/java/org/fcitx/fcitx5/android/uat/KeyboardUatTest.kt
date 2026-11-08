@@ -167,13 +167,13 @@ class KeyboardUatTest {
         PunctuationManager.forget()
         val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
         h.api.statusAreaCached = active
-        h.emit(HostEvent.StatusArea(active, KeyboardHarness.PINYIN))
+        h.emit(HostEvent.StatusArea(active, KeyboardHarness.PINYIN, entries.associate { it.key to it.mapping }))
         assertEquals("、", corner(h, "m"))
         assertEquals("？", corner(h, "v"))
         // English: the addon off for it
         val inactive = listOf(StatusEntry(1, "punctuation", "fcitx-punc-inactive", ""))
         h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
-        h.emit(HostEvent.StatusArea(inactive, KeyboardHarness.ENGLISH))
+        h.emit(HostEvent.StatusArea(inactive, KeyboardHarness.ENGLISH, emptyMap()))
         assertEquals("\\", corner(h, "m"))
         assertEquals("?", corner(h, "v"))
         PunctuationManager.forget()

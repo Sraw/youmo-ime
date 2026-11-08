@@ -710,7 +710,9 @@ class InputView(
             listOf(
                 inputPanelCached,
                 HostEvent.InputMethodChanged(entry),
-                HostEvent.StatusArea(statusAreaCached, entry),
+                // the keys' marks as the host last said; null (none said yet, or a host stopped): kept as they are,
+                // not taken for punctuation off (a status replayed empty drew , where the engine typed 、)
+                HostEvent.StatusArea(statusAreaCached, entry, punctuationCached),
                 candidatesCached,
             )
         }.forEach { handleFcitxEvent(it) }
@@ -743,11 +745,15 @@ class InputView(
                 broadcaster.onImeUpdate(it.entry)
             }
             is HostEvent.PunctuationAsTyped -> punctuation.updateAsTyped(it.marks)
-            // a host started anew: its keys type themselves as it tells them, none yet
-            is HostEvent.Ready -> punctuation.updateAsTyped(emptySet())
+            // a host started anew: its keys type themselves as it tells them, none yet; the marks it types before a
+            // status, worked out on its thread before it sent Ready (a cached read)
+            is HostEvent.Ready -> {
+                punctuation.updateAsTyped(emptySet())
+                punctuation.update(fcitx.runImmediately { punctuationCached })
+            }
             // the status of a view made anew (InputView recreation) comes too, from onStartHandleFcitxEvent
             is HostEvent.StatusArea -> {
-                punctuation.updatePunctuationMapping(it.entries, it.entry.languageCode)
+                punctuation.update(it.punctuation)
                 broadcaster.onStatusAreaUpdate(it.entries)
             }
             else -> {}

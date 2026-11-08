@@ -115,7 +115,7 @@ class GroupedKeyboardUatTest {
         PunctuationManager.forget()
         val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
         h.api.statusAreaCached = active
-        h.emit(HostEvent.StatusArea(active, im))
+        h.emit(HostEvent.StatusArea(active, im, marks.toMap()))
     }
 
     @Test

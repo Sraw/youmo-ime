@@ -74,9 +74,14 @@ sealed class HostEvent {
     /** `InputContextSwitchInputMethod` on the active context (`:349-359`). */
     data class SwitchInputMethod(val reason: SwitchReason, val oldInputMethod: String) : HostEvent()
 
-    /** The active context's status area anew, with its input method (`statusAreaUpdateCallback`, `androidfrontend.cpp:376-379`). */
-    data class StatusArea(val entries: List<StatusEntry>, val entry: InputMethodEntry) : HostEvent() {
-        constructor(entries: List<StatusEntry>, im: String) : this(entries, InputMethodEntries.of(im))
+    /**
+     * The active context's status area anew, with its input method (`statusAreaUpdateCallback`, `androidfrontend.cpp:376-379`),
+     * and [punctuation]: what each punctuation key types now (`,` to `，`; empty, punctuation off), worked out on the host's
+     * thread with the status, so the keyboard switches in this event, before any key after it. Null: not told (a status
+     * replayed before the host sent one): the keyboard keeps what it has.
+     */
+    data class StatusArea(val entries: List<StatusEntry>, val entry: InputMethodEntry, val punctuation: Map<String, String>? = null) : HostEvent() {
+        constructor(entries: List<StatusEntry>, im: String, punctuation: Map<String, String>? = null) : this(entries, InputMethodEntries.of(im), punctuation)
 
         val im: String get() = entry.uniqueName
     }

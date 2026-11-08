@@ -338,7 +338,7 @@ class ZhuyinSceneGesturesTest {
                 PunctuationManager.forget()
                 val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
                 h.api.statusAreaCached = active
-                h.emit(HostEvent.StatusArea(active, KeyboardHarness.PINYIN))
+                h.emit(HostEvent.StatusArea(active, KeyboardHarness.PINYIN, mapOf("," to "，")))
                 h.idle()
                 h.tap(h.key("ABC"))
                 h.idle()

@@ -93,6 +93,8 @@ class ChineseModules(private val inputs: ModuleInputs, private val strings: Host
                 override fun candidates(unicode: Int) = punctuation.getPunctuationCandidates(unicode)
                 override fun get(unicode: Int) = punctuation.getPunctuation(unicode)
                 override fun push(ic: InputContext, unicode: Int) = punctuation.pushPunctuationV2(ic, unicode)
+                override fun keys(ic: InputContext) = punctuation.keys(ic)
+                override fun keys(chinese: Boolean) = punctuation.keys(chinese)
             },
             statusArea = statusArea,
             quickPhrase = quickPhrase,

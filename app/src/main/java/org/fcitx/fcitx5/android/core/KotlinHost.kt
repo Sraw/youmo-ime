@@ -151,6 +151,10 @@ class KotlinHost(
         private set
 
     @Volatile
+    override var punctuationCached: Map<String, String>? = null
+        private set
+
+    @Volatile
     override var clientPreeditCached = FormattedText.Empty
         private set
 
@@ -349,6 +353,8 @@ class KotlinHost(
         // (PunctuationSaves): used here anyway, the edit would hold this run and be gone at the next
         punctuationMaps.save(ZH_CN, profile.entries.map { PunctuationMapEntry(it.key, it.mapping, it.altMapping) })
         modules?.punctuation?.setProfile(profile)
+        // with no context focused no status goes out: the keys' marks kept for the keyboard to come
+        punctuationCached = punctuationKeys()
     }
 
     // ---- quick input, focus, status area, candidates
@@ -432,6 +438,7 @@ class KotlinHost(
     private fun forgetCaches() {
         inputMethodEntryCached = noInputMethod
         statusAreaCached = emptyList()
+        punctuationCached = null
         clientPreeditCached = FormattedText.Empty
         inputPanelCached = HostEvent.InputPanel.EMPTY
         candidatesCached = HostEvent.Candidates.EMPTY
@@ -526,6 +533,8 @@ class KotlinHost(
         if (wasFirstRun) firstRun = false
         Timber.i("Kotlin host ready in %d ms", (System.nanoTime() - started) / NANOS_PER_MILLI)
         lifecycleRegistry.postEvent(HostLifecycle.Event.ON_READY)
+        // the keys' marks before any context is focused, on this thread: the keyboard draws them from Ready on
+        punctuationCached = made.punctuationKeys()
         emit(HostEvent.Ready)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             lifecycle.launchWhenReady { SubtypeManager.syncWith(enabledIme()) }
@@ -540,6 +549,7 @@ class KotlinHost(
             it.setProfile(punctuationProfile())
             // read, not changed: not written back
             it.setConfigQuietly(ModuleConfigs.punctuation(confTexts[ModuleConfigs.PUNCTUATION]))
+            punctuationCached = punctuationKeys()
         }
         // traditional per input method as the file now says, the toggle's icon told anew
         modules?.chttrans?.reload(ModuleConfigs.chttrans(confTexts[ModuleConfigs.CHTTRANS]))
@@ -817,6 +827,7 @@ class KotlinHost(
             }
             is HostEvent.StatusArea -> {
                 statusAreaCached = event.entries
+                event.punctuation?.let { punctuationCached = it }
                 // a sub mode changed, which no InputMethodChanged tells: told first, as Fcitx's handler does
                 if (event.entry != inputMethodEntryCached) {
                     inputMethodEntryCached = event.entry

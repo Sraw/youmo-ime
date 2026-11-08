@@ -22,9 +22,6 @@ object PunctuationManager {
         return entries
     }
 
-    /** What [load] kept for [lang], without asking fcitx: null when not read since the last [forget]. */
-    fun known(lang: String): List<PunctuationMapEntry>? = synchronized(this) { kept[lang] }
-
     suspend fun save(fcitx: HostApi, lang: String, entries: List<PunctuationMapEntry>) {
         try {
             fcitx.setPunctuationMap(lang, entries)

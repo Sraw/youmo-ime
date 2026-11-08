@@ -40,6 +40,12 @@ interface HostApi : TypingApi, InputMethodsApi, EngineSettingsApi, PunctuationAp
 
     val statusAreaCached: List<StatusEntry>
 
+    /**
+     * What each punctuation key types now ([HostEvent.StatusArea.punctuation]): the last status's, or at the host's
+     * start (before a status) for its input method; null while no host has said (none started, or stopped).
+     */
+    val punctuationCached: Map<String, String>?
+
     val clientPreeditCached: FormattedText
 
     val inputPanelCached: HostEvent.InputPanel

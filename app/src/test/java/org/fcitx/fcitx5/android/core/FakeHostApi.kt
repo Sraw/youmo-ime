@@ -48,6 +48,7 @@ class FakeHostApi : HostApi {
     override var isReady = true
     override var inputMethodEntryCached = InputMethodEntry("fake")
     override var statusAreaCached: List<StatusEntry> = emptyList()
+    override var punctuationCached: Map<String, String>? = null
     override var clientPreeditCached = FormattedText.Empty
     override var inputPanelCached = HostEvent.InputPanel.EMPTY
     override var candidatesCached = HostEvent.Candidates.EMPTY

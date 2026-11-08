@@ -435,6 +435,15 @@ class HostCore(
     }
 
     /** The input method of the active context (`currentIme`). */
+    /**
+     * What each punctuation key types now: on the active context as its status says, or before one is focused, under
+     * [currentInputMethod] (the keyboard's at the host's start, and after a new table).
+     */
+    fun punctuationKeys(): Map<String, String> {
+        val p = modules.punctuation ?: return emptyMap()
+        return contexts.active?.let(p::keys) ?: p.keys(InputMethodCatalog.listed(currentInputMethod())?.chinese == true)
+    }
+
     fun currentInputMethod(): String = contexts.active?.let(contexts::inputMethod) ?: contexts.group.inputMethods.firstOrNull().orEmpty()
 
     private fun changedProfile() {
@@ -578,7 +587,7 @@ class HostCore(
             if (!statusDirty) return
             statusDirty = false
             val ic = contexts.active ?: return
-            emit(HostEvent.StatusArea(modules.statusArea?.entries(ic).orEmpty(), contexts.inputMethod(ic)))
+            emit(HostEvent.StatusArea(modules.statusArea?.entries(ic).orEmpty(), contexts.inputMethod(ic), modules.punctuation?.keys(ic).orEmpty()))
         }
 
         /** `InputContextFlushUI` (`androidfrontend.cpp:360-382`): the active context's panel and candidates. */

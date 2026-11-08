@@ -88,28 +88,13 @@ class PunctuationMapUatTest {
             h.service.postFcitxJob { activate(1, "org.example.app") }
             h.start()
             val what = "canvas $canvas, option $on"
-            settle()
             val comma = { h.keyWithId(R.id.button_comma)!! }
             // the views' bubble shows the key's own character, mapped or not (the old drawing's, never
             // made to map; S8 deletes it): on the views the face only
             val shown = { faceAndBubble(comma).let { if (canvas) it else it.take(1) } }
             val twice = { c: String -> if (canvas) listOf(c, c) else listOf(c) }
-            // the statuses at the start can flip punctuation off and on: each press till the table's mark shows,
-            // what showed then is what it typed
-            var p = ""
-            while (true) {
-                val face = shown()
-                until("the press typed") { h.field.text.length == p.length + 1 }
-                val typed = h.field.text.last().toString()
-                // the views redraw their face on a later post, so while the statuses settle it can be a press
-                // behind (failed once in the full suite: face , typed ，); the views are not held to it
-                // (060-pending-decisions: canvas off not considered), the canvas is on every press
-                if (canvas) assertEquals(what, twice(typed), face)
-                p += typed
-                if (typed == "，") break
-                assertTrue(what, p.length < SETTLING_PRESSES)
-            }
-            // each press below is lifted, so typed: what goes in is checked with what showed
+            // the first press at once, the start's statuses not waited for: its mark shown and typed
+            val p = ""
             assertEquals(what, twice("，"), shown())
             until("the mark typed") { h.field.text.toString() == p + "，" }
             // a letter the engine leaves (the scripted one composes only a to z): typed as itself, the A of shift's
@@ -129,6 +114,24 @@ class PunctuationMapUatTest {
         }
     }
 
+    // the first press as soon as the keyboard is up, nothing waited for: face, bubble and what it types one mark
+    // (the status a view made anew replayed before the host had sent one drew , where the engine typed 、, S7a)
+    @Test
+    fun theFirstPressAtOnceShowsWhatItTypes() {
+        fcitx = startedHost(ScriptedEngine(home))
+        runBlocking { fcitx.setPunctuationMap("zh_CN", listOf(PunctuationMapEntry(",", "、", ""))) }
+        h = KeyboardHarness(host = fcitx)
+        h.service.postFcitxJob { activate(1, "org.example.app") }
+        h.start()
+        val k = h.keyWithId(R.id.button_comma)!!
+        val face = k.label
+        h.press(k)
+        val bubble = h.popupChoices().map { it.text }.single()
+        h.release()
+        until("the press typed") { h.field.text.isNotEmpty() }
+        assertEquals(listOf("、", "、", "、"), listOf(face, bubble, h.field.text.toString()))
+    }
+
     // punctuation turned off, then on again (the toggle's action): each press of the comma before, between and
     // after shows on its face and bubble the mark it types, the switch made in the status's own event
     @Test
@@ -138,7 +141,6 @@ class PunctuationMapUatTest {
         h = KeyboardHarness(host = fcitx)
         h.service.postFcitxJob { activate(1, "org.example.app") }
         h.start()
-        settle()
         val comma = { h.keyWithId(R.id.button_comma)!! }
         var typed = ""
         val press = { want: String ->
@@ -163,11 +165,6 @@ class PunctuationMapUatTest {
     }
 
     // the key's face and the bubble it shows pressed
-    // the start's statuses delivered before the first press: the host's thread asked till its work is done, each
-    // turn's events then handed to the main thread (else, under load, the status turning off and on again at the
-    // start came during a press: its bubble , between a face and a typed mark)
-    private fun settle() = repeat(3) { runBlocking { fcitx.isEmpty() }; h.idle() }
-
     private fun faceAndBubble(key: () -> org.fcitx.fcitx5.android.input.ShownKey): List<String> {
         h.after(BUBBLE_GONE_MS)
         val k = key()
@@ -179,8 +176,5 @@ class PunctuationMapUatTest {
 
     private companion object {
         const val BUBBLE_GONE_MS = 1000L
-
-        // the presses the start's statuses may take to settle, at most
-        const val SETTLING_PRESSES = 5
     }
 }

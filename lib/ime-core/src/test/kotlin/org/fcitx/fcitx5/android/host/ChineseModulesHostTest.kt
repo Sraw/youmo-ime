@@ -91,6 +91,26 @@ class ChineseModulesHostTest {
         assertTrue(log.filterIsInstance<HostEvent.StatusArea>().last().entries.isEmpty())
     }
 
+    // the keys' marks worked out on this thread and sent with the status: off and on, English, a new table,
+    // each in the event that changes it; before any context, for the input method it would take (060-render-p2 S7a)
+    @Test
+    fun `the punctuation keys' marks go out with the status, switched in its event`() {
+        val marks = mapOf("." to "。", "," to "，")
+        assertEquals(marks, core.punctuationKeys())
+        open()
+        assertEquals(marks, log.filterIsInstance<HostEvent.StatusArea>().last().punctuation)
+        core.activateAction(core.statusArea().first { it.name == "punctuation" }.id)
+        assertEquals(emptyMap<String, String>(), log.filterIsInstance<HostEvent.StatusArea>().last().punctuation)
+        assertEquals(emptyMap<String, String>(), core.punctuationKeys())
+        core.activateAction(core.statusArea().first { it.name == "punctuation" }.id)
+        assertEquals(marks, log.filterIsInstance<HostEvent.StatusArea>().last().punctuation)
+        log.clear()
+        modules.punctuation.setProfile(PunctuationProfile.parse(", 、\n"))
+        assertEquals(mapOf("," to "、"), log.filterIsInstance<HostEvent.StatusArea>().last().punctuation)
+        core.toggle()
+        assertEquals(emptyMap<String, String>(), log.filterIsInstance<HostEvent.StatusArea>().last().punctuation)
+    }
+
     @Test
     fun `a status area tap toggles, is saved at once and tells the area anew, no tip (ca chttrans cpp 198-213)`() {
         open()

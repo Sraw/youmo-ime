@@ -73,12 +73,16 @@ class Punctuation(
     /** A new table: the edit page saved one, or the user's file went away (`setSubConfig`, `reloadConfig`). */
     fun setProfile(profile: PunctuationProfile) {
         this.profile = profile
+        // the keys' marks ([keys]) go out with the status: sent anew
+        focused?.let(action::updateOn)
     }
 
     /** The options page's change (`setConfig`); the toggle's own state comes in with it. */
     fun setConfig(config: PunctuationConfig) {
         this.config = config
         save(config)
+        // on or off: the status, and the keys' marks with it ([keys]), sent anew
+        focused?.let(action::updateOn)
         // "half width after a letter or number" may have turned: the keyboard shown anew
         focused?.let(::tell)
     }
@@ -105,6 +109,20 @@ class Punctuation(
         setConfig(config.copy(enabled = enabled))
         action.updateOn(ic)
         if (ic !== focused) tell(ic)
+    }
+
+    /**
+     * What each key types now on [ic] (a key's first mark), none where punctuation is off or its input method
+     * has not the toggle: what the keyboard draws on the keys, sent with the status (060-render-p2 S7a).
+     */
+    fun keys(ic: InputContext): Map<String, String> = keys(inWhiteList(ic))
+
+    /** [keys] for an input method [chinese] or not, before a context has one (the host's start). */
+    fun keys(chinese: Boolean): Map<String, String> {
+        if (!enabled || !chinese) return emptyMap()
+        val map = LinkedHashMap<String, String>()
+        profile.entries.forEach { map.putIfAbsent(it.key, it.mapping) }
+        return map
     }
 
     /** `inWhiteList` (`:434-436`): the context's input method put the toggle in its status area. */

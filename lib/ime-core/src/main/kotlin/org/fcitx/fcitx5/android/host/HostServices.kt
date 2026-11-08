@@ -126,6 +126,12 @@ interface EnginePunctuation {
      * together), turning a pair typed a half at a time over; empty when it types nothing.
      */
     fun push(ic: InputContext, unicode: Int): Pair<String, String>
+
+    /** What each key types now on [ic] (`,` to `，`), none where off: sent with the status ([HostEvent.StatusArea.punctuation]). */
+    fun keys(ic: InputContext): Map<String, String> = emptyMap()
+
+    /** [keys] before a context has an input method, for one [chinese] or not. */
+    fun keys(chinese: Boolean): Map<String, String> = emptyMap()
 }
 
 /**
