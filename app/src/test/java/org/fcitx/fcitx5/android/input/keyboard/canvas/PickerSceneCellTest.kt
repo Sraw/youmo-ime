@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.input.picker.PickerPolicy
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.scene.Op
+import org.fcitx.fcitx5.android.scene.engine.Content
 import org.fcitx.fcitx5.android.scene.layout.Text
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
@@ -96,10 +97,15 @@ class PickerSceneCellTest {
         return (t.x + m.ink.left * t.scaleX) to (t.x + m.ink.right * t.scaleX)
     }
 
-    // outside the cell is cut off; half a px of rounding allowed
+    // outside the engine's room is out of rule B §8a (and outside the cell cut off): the room its content box (a
+    // grid cell's face is a rectangle: the face) less 2 dp a side; half a px of rounding allowed
     private fun outside(cell: SceneKeyCell): String? {
         val (l, r) = ink(cell)
-        return if (l < -HALF_PX || r > cell.width + HALF_PX) "${cell.keyNode?.label} ink $l..$r in 0..${cell.width}" else null
+        val face = cell.keyNode!!.shape.bounds
+        val inset = Content.ROOM_H_DP * cell.resources.displayMetrics.density
+        val left = face.left + inset
+        val right = face.right - inset
+        return if (l < left - HALF_PX || r > right + HALF_PX) "${cell.keyNode?.label} ink $l..$r in $left..$right" else null
     }
 
     private fun everyEmoticonWhole(width: String) {
@@ -132,6 +138,7 @@ class PickerSceneCellTest {
 
     @Test
     fun everyEmoticonWholeInItsCellAt393dp() = everyEmoticonWhole("+w393dp")
+
 
     @Test
     fun aLongEmoticonShownWholeAndReadAsItIs() = KeyboardHarness().start().use { h ->
