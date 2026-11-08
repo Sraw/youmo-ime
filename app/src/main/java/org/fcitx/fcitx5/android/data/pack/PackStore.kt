@@ -136,7 +136,14 @@ object PackStore {
         withContext(Dispatchers.IO) {
             val result = shelf.import(input.buffered(BUFFER), progress)
             Timber.i("pack import: %s", describe(result))
-            if (result is ImportResult.Imported) changed()
+            if (result is ImportResult.Imported) {
+                // imported whatever comes of telling the rest: the pack is in use from the next start
+                try {
+                    changed()
+                } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
+                    Timber.e(e, "after a pack import")
+                }
+            }
             result
         }
     }
@@ -149,8 +156,13 @@ object PackStore {
     private fun changed() {
         // the host restarted first: its engines (mapped on the old pack, or not made without one)
         // made anew. The state after it, so what the keyboard queues on it (its field focused again)
-        // waits for the new host, not the one going
-        val restarted = restartHost()
+        // waits for the new host, not the one going. A restart that throws is no reason not to count
+        val restarted = try {
+            restartHost()
+        } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
+            Timber.e(e, "host not restarted after a pack change")
+            false
+        }
         // an import and a verify may both count: neither count lost
         mutableState.update { State(snapshot(), it.generation + 1) }
         // the generation replaced, once the host is up on the new one (restartIfRunning waits for

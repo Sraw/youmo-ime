@@ -308,6 +308,25 @@ class PacksUatTest {
     private fun shelfAt(root: File) =
         PackShelf(root, listOf(TestShelves.packs.publicKey), TestShelves.requirements).apply { load() }
 
+    /** Review L-7: what tells the rest of an import failing leaves it imported, counted all the same. */
+    @Test
+    fun anImportWhoseRestartFailsIsImportedAndCounted() {
+        val restart = PackStore.restartHost
+        PackStore.restartHost = { throw IllegalStateException("host gone") }
+        val shelf = TestShelves.shelf(PackKind.VOICE)
+        try {
+            PackStore.useShelf(shelf)
+            val generation = PackStore.state.value.generation
+            val result = runBlocking { PackStore.import(TestShelves.pack(PackKind.TEXT).inputStream()) }
+            assertTrue("$result", result is ImportResult.Imported)
+            assertEquals(generation + 1, PackStore.state.value.generation)
+            assertTrue(PackStore.state.value.ready(PackKind.TEXT))
+        } finally {
+            PackStore.restartHost = restart
+            TestShelves.use()
+        }
+    }
+
     /**
      * Review L-2: the host not up anew in time (still starting, on what files is not known): the
      * pack it replaced is not deleted under it, but by the next start's load.

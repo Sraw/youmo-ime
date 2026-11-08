@@ -203,6 +203,7 @@ they stay: a pack carries no code.
   restarting it: that one may have read the old files), then `PackShelf.sweep`; a host still starting
   after 10 s (before or after the restart) is not known to have left them: not deleted then, left
   for the next start's load. A killed import leaves the old pack in use; the next start deletes what is not `current`.
+  What fails after the copy (the restart, the state told) is logged: the import stands, counted.
   The user's file is never deleted; the results say they may delete it.
 - **Storage.** Device-protected (`createDeviceProtectedStorageContext().filesDir/packs`), so Direct Boot
   reads it before the first unlock, and an upgrade keeps it. Excluded from cloud and key/value backup
