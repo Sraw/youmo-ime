@@ -307,7 +307,7 @@ class LandscapeUatTest {
         val word = KeyboardHarness.all(h.inputView).firstOrNull { h.shown(it) && it is TextView && it.text.toString() == "你好" }
             ?: error(h.texts(h.inputView).toString())
         assertTrue("${h.box(word)}", h.box(word).left >= b.left - 60)
-        h.capture("LandscapeUatTest/t9_right")
+        h.captureBoard("LandscapeUatTest/t9_right")
     }
 
     @Test

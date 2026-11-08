@@ -84,7 +84,7 @@ class KeyShortcutsScreenshotTest {
     @Test
     fun theNineAndFourteenKeys() {
         prefs.keyboard.pinyinKeyboard.setValue(PinyinKeyboard.NineKeys)
-        shot("nine")
+        shot("nine", moved = true)
         prefs.keyboard.pinyinKeyboard.setValue(PinyinKeyboard.Keys14)
         shot("keys14", moved = true)
     }
