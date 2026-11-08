@@ -260,17 +260,19 @@ object KeyMarkYield {
         return Settled(glyph, marks)
     }
 
-    // a key's need of the symbols and of the shortcuts: only of the class that meets, if one alone, else both
-    // alike; [fits] with those of the class [symbol] (both if null) [t] their size, the others [u]
+    // a key's need of the symbols and of the shortcuts: both alike, the least that fits; from there the
+    // symbols as large as fits, then the shortcuts (the more expendable) as large as fits with them, so a
+    // class that does not meet is its size. Each from a size that fits, so it moves as the room does (a
+    // class's choice of which gives way never flips it). [fits] with the symbols [t] their size, the
+    // shortcuts [u] (both [t] if [symbol] is null)
     private fun markNeed(floor: Double, minMark: Double, fits: (Double, Double, Boolean?) -> Boolean): Pair<Double, Double> {
         fun asked(t: Double) = if (t >= minMark) t else 1.0 - (1.0 - minMark) * share(t, minMark)
         val both = largest(floor) { t -> fits(t, t, null) }
-        return when {
-            both == 1.0 -> 1.0 to 1.0
-            fits(both, 1.0, true) -> asked(largest(floor) { t -> fits(t, 1.0, true) }) to 1.0
-            fits(both, 1.0, false) -> 1.0 to asked(largest(floor) { t -> fits(t, 1.0, false) })
-            else -> asked(both) to asked(both)
-        }
+        if (both == 1.0) return 1.0 to 1.0
+        if (!fits(both, both, null)) return asked(both) to asked(both)
+        val symbol = largest(both) { t -> fits(t, both, true) }
+        val shortcut = largest(both) { u -> fits(symbol, u, true) }
+        return asked(symbol) to asked(shortcut)
     }
 
     // how much of its need a key whose marks fit at [t] asks: all at [minMark], none [HOPELESS_BAND] below it
