@@ -359,9 +359,12 @@ class SceneBuilder(
 
     // rules B §8a's last word: a label's ink as drawn at its class's size (§8b: not even about its middle) moved
     // the least way back into its room where it stands out
-    // (as wide as the room to a rounding's worth: put in it whole; wider, which the class's ask leaves none: its middle the room's)
+    // (as wide as the room to a rounding's worth: put in it whole; wider, which the class's ask leaves none: its middle the room's).
+    // Out by half a px or less it stays: that is the glyph mapped onto whole pixels (KeyMarkYield.onto), and moved
+    // in it would meet a mark kept at the gap and have them all placed again, a pixel's rounding moving a mark
+    // px (060-render-p2 S4e, S7a review #4); the room is inside the face's padding, nothing is cut
     private fun within(g: Drawn, room: Box): Drawn {
-        if (g.texts.isEmpty() || (g.ink.left >= room.left && g.ink.right <= room.right)) return g
+        if (g.texts.isEmpty() || (g.ink.left >= room.left - SNAP && g.ink.right <= room.right + SNAP)) return g
         val left = if (g.ink.width > room.width + ROUNDING) room.centerX - g.ink.width / 2 else room.left.coerceAtLeast(minOf(g.ink.left, room.right - g.ink.width))
         return g.mapTo(Box(left, g.ink.top, left + g.ink.width, g.ink.bottom), 1.0)
     }
@@ -422,6 +425,9 @@ class SceneBuilder(
         private const val FIT_LEAST = 0.5
         // a double's rounding over a box's width
         private const val ROUNDING = 1e-6
+
+        // a whole pixel's rounding, px: what within leaves out of the room as it is
+        private const val SNAP = 0.5
         private const val FIT_STEPS = 16
 
         /** KeyMarkYield's: a glyph and a mark this far apart at least. */
