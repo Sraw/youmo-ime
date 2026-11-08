@@ -100,6 +100,15 @@ class PickerSceneCellTest {
 
     private fun everyEmoticonWhole(width: String) {
         RuntimeEnvironment.setQualifiers(width)
+        // the width put back after: a later test in this sandbox starts at the class's
+        try {
+            everyEmoticonWholeAt()
+        } finally {
+            RuntimeEnvironment.setQualifiers(KeyboardCanvasViewTest.PORTRAIT)
+        }
+    }
+
+    private fun everyEmoticonWholeAt() {
         KeyboardHarness().start().use { h ->
             h.emoticons()
             val cell = h.shownCells().first()
