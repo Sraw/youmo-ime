@@ -12,7 +12,6 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.core.view.children
 import androidx.core.view.isVisible
-import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -25,8 +24,6 @@ import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
-import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
-import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.assertRows
@@ -69,7 +66,6 @@ class GroupedKeyboardUatTest {
     fun close() {
         harness?.close()
         EngineState.syllablesState.value = EngineState.SyllableState()
-        PunctuationManager.forget()
     }
 
     private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
@@ -111,10 +107,7 @@ class GroupedKeyboardUatTest {
 
     // fcitx's Chinese punctuation, as its addon has it on
     private fun chinesePunctuation(im: InputMethodEntry, vararg marks: Pair<String, String>) {
-        runBlocking { h.api.setPunctuationMap("zh_CN", marks.map { (k, v) -> PunctuationMapEntry(k, v, "") }) }
-        PunctuationManager.forget()
         val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
-        h.api.statusAreaCached = active
         h.emit(HostEvent.StatusArea(active, im, marks.toMap()))
     }
 

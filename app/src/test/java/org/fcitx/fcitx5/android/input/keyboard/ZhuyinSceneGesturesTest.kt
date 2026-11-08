@@ -19,10 +19,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.host.HostEvent
-import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
-import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
 import org.fcitx.fcitx5.android.host.StatusEntry
-import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.SceneShownKey
@@ -334,17 +331,13 @@ class ZhuyinSceneGesturesTest {
                 assertEquals("canvas $canvas", ",", h.keyNamed("comma").label)
                 h.tap(h.key("123"))
                 h.idle()
-                runBlocking { h.api.setPunctuationMap("zh_CN", listOf(PunctuationMapEntry(",", "，", ""))) }
-                PunctuationManager.forget()
                 val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
-                h.api.statusAreaCached = active
                 h.emit(HostEvent.StatusArea(active, KeyboardHarness.PINYIN, mapOf("," to "，")))
                 h.idle()
                 h.tap(h.key("ABC"))
                 h.idle()
                 assertEquals("canvas $canvas", listOf("，", "，"), listOf(h.keyNamed("comma").label, h.keyNamed("r4c4").label))
             }
-            PunctuationManager.forget()
         }
     }
 
