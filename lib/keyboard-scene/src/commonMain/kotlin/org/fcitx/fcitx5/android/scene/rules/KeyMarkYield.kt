@@ -248,16 +248,20 @@ object KeyMarkYield {
         val marks = key.marks.mapIndexed { i, m ->
             settled.marks[i]?.let { c ->
                 val t = board.markScale(m)
-                if (t == 1.0 && c == was.marks[i].ink) return@let m.within(key.edge).ink
+                if (t == 1.0 && c == was.marks[i].ink) return@let m.within(key.edge)
                 // only smaller there (and slid off the arc): as much smaller about its corner where [key] has it and
                 // slid as far, so a class nearing 1 nears the mark as it is
                 val w = was.marks[i].scaled(t)
                 val at = if (c == w.within(was.edge).ink) m.scaled(t).let { it.copy(ink = it.ink.moved(c.left - w.ink.left, c.top - w.ink.top)) } else m.copy(ink = c)
                 // its corners within the arcs of [key]'s face as rounded, whatever it is
-                at.within(key.edge).ink
+                at.within(key.edge)
             }
         }
-        return Settled(glyph, marks)
+        // each mapped on its own, a pixel's snap apart (a shortcut's icon laid out on whole pixels) can bring two
+        // kept apart where [was] has them together again: kept apart once more where [key] has them
+        val shown = marks.indices.filter { marks[it] != null }
+        val apart = keptApart(shown.map { marks[it]!! }, key.edge)
+        return Settled(glyph, marks.indices.map { i -> shown.indexOf(i).takeIf { it >= 0 }?.let { apart[it]?.ink } })
     }
 
     // this mark's size: [t] if of the class [symbol] (both if null), else [u]
