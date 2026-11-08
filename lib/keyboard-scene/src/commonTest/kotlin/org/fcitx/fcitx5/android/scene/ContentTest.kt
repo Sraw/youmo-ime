@@ -550,8 +550,31 @@ class ContentTest {
         near(Content.SYMBOL_DP * d * 0.85, texts(Fixtures.scene(Fixtures.floating), "q").first { it.text == "1" }.size)
     }
 
-    // rules B §8a: a label wider than its key's room after the classes, shrunk alone to fit it, both ways alike;
-    // a key beside it whose label fits as it was (a 颜文字 cell, 060-render-p2 S6 review)
+    // rules B §8a: a label a little wider than its key's room shrinks its class all, the most its widest needs:
+    // a key beside it whose label fits one size with it (the class's cap not reached)
+    @Test
+    fun aLabelALittleWiderThanItsRoomShrinksItsClassAllRuleB8a() {
+        val l = LayoutReader.layout(
+            "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"10\">" +
+                "<row><key id=\"a\" label=\"a\" width=\"1\"/><key id=\"w\" label=\"ab\" width=\"1\"/></row></keyboard>",
+        ).ok()
+        // the fake font: two Latin letters 1.2 of the size across, ink 0.05 of it in from each side: 1.1 of it
+        val ink = 1.1 * 23 * d
+        fun room(s: Scene) = face(s, "w").let { Box(it.left + 2 * d, it.top, it.right - 2 * d, it.bottom) }
+        // a keyboard as wide as makes the room 0.95 to 0.98 of that ink
+        val s = (700..1080 step 2).asSequence().map { Fixtures.scene(Fixtures.portrait.copy(width = it.toDouble()), l) }
+            .first { room(it).width / ink in 0.95..0.98 }
+        val w = texts(s, "w").single()
+        assertTrue(w.size * 1.1 <= room(s).width + 0.5, "within its room: ${w.size * 1.1} in ${room(s).width}")
+        // to the class's search's step (a thousandth of the size)
+        val needs = 23 * d * room(s).width / ink
+        assertTrue(abs(needs - w.size) < 0.001 * 23 * d, "as much smaller as it needs: expected $needs, was ${w.size}")
+        assertEquals(w.size, texts(s, "a").single().size, "its class one size")
+    }
+
+    // rules B §8a: a label wider than its key's room past what its class gives ([KeyMarkYield.MAX_CLASS_SHRINK]):
+    // the class that much smaller, the label shrunk alone the rest, both ways alike, to fit it (a 颜文字 cell,
+    // 060-render-p2 S6 review)
     @Test
     fun aLabelWiderThanItsRoomShrunkAloneToFitRuleB8a() {
         val l = LayoutReader.layout(
@@ -559,7 +582,7 @@ class ContentTest {
                 "<row><key id=\"a\" label=\"a\" width=\"1\"/><key id=\"w\" label=\"abcdefghij\" width=\"1\"/></row></keyboard>",
         ).ok()
         val s = Fixtures.scene(Fixtures.portrait, l)
-        near(23 * d, texts(s, "a").single().size, "a fitting label")
+        near(23 * d * (1 - KeyMarkYield.MAX_CLASS_SHRINK), texts(s, "a").single().size, "the class at its cap")
         // the fake font: ten Latin letters 6.0 of the size across, ink 0.05 of it in from each side: 5.9 of it
         val room = face(s, "w").let { Box(it.left + 2 * d, it.top, it.right - 2 * d, it.bottom) }
         val w = texts(s, "w").single()
@@ -598,23 +621,46 @@ class ContentTest {
 
     @Test
     fun crowdedLettersShrinkTogetherRuleB7Yield() {
-        // shorter and shorter keys: every letter one size at each height, the class's cap at most; so short its
-        // symbols meet their letters past what the classes give, the letters their size and those symbols left
-        // out rather than every letter smaller for none (060-render-p2 S4e)
-        // 600 px across: the fixture's letters (30 px of ink) inside their room, so only the height crowds them
-        // (at 540 each is wider than its room and shrunk alone, rule B §8a)
+        // shorter and shorter keys: every letter one size at each height (060-render-p2 S4e). 540 px across: the
+        // fixture's letters wider than their room too (rule B §8a), past the class's cap: the class at its cap,
+        // the rest each shrunk alone alike, so one size still, the same at every height (nothing left for the
+        // height to take); so short its symbols meet their letters, those symbols left out
+        val all = mutableSetOf<Double>()
         for (h in 240..400 step 8) {
-            val s = Fixtures.scene(env.copy(width = 600.0, height = h.toDouble()))
+            val s = Fixtures.scene(env.copy(width = 540.0, height = h.toDouble()))
             val letters = s.keys.filter { it.kind == "letter" && it.role == null }
             val sizes = letters.map { k -> k.ops(false).filterIsInstance<Op.Text>().first { it.text == k.id }.size }.toSet()
             // one class, one scale: the same size to the last bit
             assertEquals(1, sizes.size, "at $h: $sizes")
-            assertTrue(sizes.single() >= 23 * d * (1 - KeyMarkYield.MAX_CLASS_SHRINK) - 0.01, "the class's cap at most at $h")
-            if (h == 240) {
-                near(23 * d, sizes.single())
-                assertTrue(letters.any { k -> k.ops(false).filterIsInstance<Op.Text>().size == 1 }, "a symbol left out")
+            assertTrue(sizes.single() < 23 * d * (1 - KeyMarkYield.MAX_CLASS_SHRINK), "past the class's cap at $h")
+            all += sizes.single()
+            if (h == 240) assertTrue(letters.any { k -> k.ops(false).filterIsInstance<Op.Text>().size == 1 }, "a symbol left out")
+        }
+        assertEquals(1, all.size, "every height: $all")
+    }
+
+    // rules B §8a before the marks yield: a letter shrunk alone to fit its room (540 px across, past the class's
+    // cap) and its symbol kept apart from it as drawn, never over it
+    @Test
+    fun aLetterShrunkToItsRoomKeepsApartFromItsSymbolRuleB8a() {
+        fun ink(t: Op.Text) = FakeMeasurer.measure(t.text, t.font, t.weight, t.size).ink.let {
+            Box(t.x + it.left * t.scaleX, t.baseline + it.top, t.x + it.right * t.scaleX, t.baseline + it.bottom)
+        }
+        val s = Fixtures.scene(env.copy(width = 540.0, height = 600.0))
+        val letters = s.keys.filter { it.kind == "letter" && it.role == null }
+        var both = 0
+        for (k in letters) {
+            val texts = k.ops(false).filterIsInstance<Op.Text>()
+            val letter = texts.first { it.text == k.id }
+            assertTrue(letter.size < 23 * d * (1 - KeyMarkYield.MAX_CLASS_SHRINK), "${k.id} shrunk past the cap")
+            val g = ink(letter)
+            for (m in texts - letter) {
+                val i = ink(m)
+                both++
+                assertTrue(i.right <= g.left || i.left >= g.right || i.bottom <= g.top || i.top >= g.bottom, "${k.id}: ${m.text} $i over $g")
             }
         }
+        assertTrue(both > 20, "symbols shown: $both")
     }
 
     // a table's roots over the letters (TextKeyboard): `when=roots`, `{root:x}`; the letter in the corner

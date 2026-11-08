@@ -140,7 +140,7 @@ class KeyMarkYieldTest {
             assertNotNull(g.keys[0].marks[0], "the clear key's mark kept $at")
             // nothing needing: no smaller; one no shrink saves: none for it, its mark left out, the others kept
             assertEquals(1.0, KeyMarkYield.group(listOf(clear), 1.0 * d).scale, at)
-            val hopeless = k.letter(Ink(k.room.left, -k.h, k.w, 2 * k.h), listOf(k.mark(Slot.TopRight)))
+            val hopeless = k.letter(Ink(k.room.left, -k.h, k.room.right, 2 * k.h), listOf(k.mark(Slot.TopRight)))
             val h = KeyMarkYield.group(listOf(clear, hopeless), 1.0 * d)
             assertEquals(1.0, h.scale, "none for it $at")
             assertNull(h.keys[1].marks[0], "the hopeless key's mark left out $at")

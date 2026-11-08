@@ -143,7 +143,7 @@ class SceneBuilder(
                 if (keys[i].content.marks.isEmpty()) return@mapIndexed keys[i].content
                 val cell = cells[i].cell
                 val g = Faces.of(cell, styled[i].looks.getValue(styled[i].states), k.attrs.face ?: Face.Default, k.attrs.margin ?: true, env.flat && k.attrs.face != Face.Keep, env.density)
-                content.of(k, cell, g.content, Looks(styled[i].parts.getValue(styled[i].states)), g, snap = false)
+                fitted(content.of(k, cell, g.content, Looks(styled[i].parts.getValue(styled[i].states)), g, snap = false))
             }
         }
         val nodes = phases.section("paint") {
@@ -267,7 +267,7 @@ class SceneBuilder(
     private fun prepare(placed: Placed, key: ExpandedKey, styled: Styled, geometry: Map<Set<KeyState>, FaceGeometry>): Prepared {
         val looksNow = Looks(styled.parts.getValue(styled.states))
         val g = geometry.getValue(styled.states)
-        val drawn = content.of(key, placed.cell, g.content, looksNow, g)
+        val drawn = fitted(content.of(key, placed.cell, g.content, looksNow, g))
         return Prepared(placed, key, styled.states, styled.looks, styled.parts, geometry, drawn)
     }
 
@@ -299,24 +299,42 @@ class SceneBuilder(
         keys.forEachIndexed { i, k ->
             if (out[i] == null) out[i] = Settled(k.content.glyph, k.content.marks.map { it.drawn })
         }
-        return out.mapIndexed { i, st -> st!!.copy(glyph = fitted(st.glyph, keys[i].content.room)) }
+        return out.map { it!! }
     }
 
-    // rules B §8a (060-render-p2 S6 review): after the classes' sizes, a label still wider than its key's room
-    // shrunk alone, both ways alike, to fit it (as a table's roots are), centred on the room across; one that fits
-    // but whose ink stands out of it (a text centred by its advance, its ink off to one side: （#-_-)┯━┯) moved
-    // in the least way back into it. What is cut off is not shown, and what is shown is what the key types.
-    private fun fitted(g: Drawn?, room: Box): Drawn? {
-        if (g == null || g.texts.isEmpty() || g.ink.width <= 0) return g
-        if (g.ink.width > room.width) {
-            val s = room.width / g.ink.width
-            val h = g.ink.height * s
-            val cy = g.ink.centerY
-            return g.mapTo(Box(room.left, cy - h / 2, room.right, cy + h / 2), s)
+    // rules B §8a (060-render-p2 S6 review): a label wider than its key's room shrinks, before its marks yield
+    // (so they yield to it as drawn). A class's: the class all as much smaller ([KeyMarkYield.board] asks it of
+    // each), to [KeyMarkYield.MAX_CLASS_SHRINK] at most with what its marks ask; only what is wider still shrunk
+    // alone here, by what the class's most leaves. A key of no class shrunk alone to fit, both ways alike, about
+    // its scaling point (a main character's baseline kept), centred on the room across, its ink measured at the
+    // size drawn (§8b). One that fits but whose ink stands out of the room (a text centred by its advance, its
+    // ink off to one side: （#-_-)┯━┯) moved the least way back into it. What is cut off is not shown, and what
+    // is shown is what the key types.
+    private fun fitted(c: KeyContent): KeyContent {
+        val g = c.glyph
+        if (g == null || g.texts.isEmpty() || g.ink.width <= 0) return c
+        val room = c.room
+        val classed = c.yields && c.glyphClass != null
+        val least = if (classed) 1.0 - KeyMarkYield.MAX_CLASS_SHRINK else 1.0
+        val py = if (classed && c.glyphClass == GlyphClass.Main) c.baseline else g.ink.centerY
+        val fit = if (g.ink.width * least > room.width) {
+            val s = room.width / (g.ink.width * least)
+            val d = g.grows(measurer)?.at(s)
+            val w = g.ink.width * s + (d?.let { it.left + it.right } ?: 0.0)
+            val top = py + (g.ink.top - py) * s - (d?.top ?: 0.0)
+            val bottom = py + (g.ink.bottom - py) * s + (d?.bottom ?: 0.0)
+            val cx = room.centerX
+            g.drawnAt(Box(cx - w / 2, top, cx + w / 2, bottom), s, g.grows(measurer))
+        } else {
+            g
         }
-        if (g.ink.left >= room.left && g.ink.right <= room.right) return g
-        val left = g.ink.left.coerceIn(room.left, room.right - g.ink.width)
-        return g.mapTo(Box(left, g.ink.top, left + g.ink.width, g.ink.bottom), 1.0)
+        val placed = if (fit.ink.left >= room.left && fit.ink.right <= room.right || fit.ink.width > room.width) {
+            fit
+        } else {
+            val left = fit.ink.left.coerceIn(room.left, room.right - fit.ink.width)
+            fit.mapTo(Box(left, fit.ink.top, left + fit.ink.width, fit.ink.bottom), 1.0)
+        }
+        return if (placed === g) c else KeyContent(placed, c.marks, room, c.glyphClass, c.baseline, c.yields, c.edge)
     }
 
     // a key as its class's member: a main character about its baseline, where its row's stand, and never moved off it
@@ -325,7 +343,7 @@ class SceneBuilder(
         val ink = c.glyph!!.ink.toInk()
         val main = cls == GlyphClass.Main
         val y = if (main) c.baseline else (ink.top + ink.bottom) / 2
-        return KeyMarkYield.Member(ink, (ink.left + ink.right) / 2, y, c.marks.map(::mark), c.room.toInk(), c.edge, moves = !main, glyphClass = cls.ordinal, grows = c.glyph.grows(measurer))
+        return KeyMarkYield.Member(ink, (ink.left + ink.right) / 2, y, c.marks.map(::mark), c.room.toInk(), c.edge, moves = !main, glyphClass = cls.ordinal, grows = c.glyph.grows(measurer), across = c.glyph.texts.isNotEmpty())
     }
 
     private fun mark(m: MarkDrawn) = KeyMarkYield.Mark(m.drawn.ink.toInk(), m.slot, m.drop, m.drawn.grows(measurer))

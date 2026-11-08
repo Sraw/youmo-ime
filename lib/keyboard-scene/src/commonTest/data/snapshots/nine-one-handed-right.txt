@@ -17,7 +17,7 @@ key 1 kind=letter a11y="，。？！，1"
   normal
     shadow rect(364.88,18.38,538.13,160.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(364.88,18.38,538.13,157.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "，。？！" 368.04,103.66 system 400 41.73 #ff37474f
+    text "，。？！" 367.89,103.75 system 400 41.8 #ff37474f
     text "1" 511.38,47.78 system 700 28 #ff7a858a
   pressed
     +2 fill rect(364.88,18.38,538.13,157.63 r=10.5,10.5,10.5,10.5) #1f000000
@@ -33,7 +33,7 @@ key 2 kind=letter a11y="ABC，2"
   normal
     shadow rect(553.88,18.38,728.13,160.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(553.88,18.38,728.13,157.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ABC" 593.5,107.69 system 400 52.5 #ff37474f
+    text "ABC" 593.72,107.69 system 400 52.25 #ff37474f
     text "2" 701.38,47.78 system 700 28 #ff7a858a
   pressed
     +2 fill rect(553.88,18.38,728.13,157.63 r=10.5,10.5,10.5,10.5) #1f000000
@@ -49,7 +49,7 @@ key 3 kind=letter a11y="DEF，3"
   normal
     shadow rect(743.88,18.38,917.13,160.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(743.88,18.38,917.13,157.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "DEF" 783,107.69 system 400 52.5 #ff37474f
+    text "DEF" 783.22,107.69 system 400 52.25 #ff37474f
     text "3" 890.38,47.78 system 700 28 #ff7a858a
   pressed
     +2 fill rect(743.88,18.38,917.13,157.63 r=10.5,10.5,10.5,10.5) #1f000000
@@ -80,7 +80,7 @@ key 4 kind=letter a11y="GHI，4"
   normal
     shadow rect(364.88,194.38,538.13,335.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(364.88,194.38,538.13,332.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "GHI" 404,283.19 system 400 52.5 #ff37474f
+    text "GHI" 404.22,283.19 system 400 52.25 #ff37474f
     text "4" 511.38,223.78 system 700 28 #ff7a858a
   pressed
     +2 fill rect(364.88,194.38,538.13,332.63 r=10.5,10.5,10.5,10.5) #1f000000
@@ -96,7 +96,7 @@ key 5 kind=letter a11y="JKL，5"
   normal
     shadow rect(553.88,194.38,728.13,335.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(553.88,194.38,728.13,332.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "JKL" 593.5,283.19 system 400 52.5 #ff37474f
+    text "JKL" 593.72,283.19 system 400 52.25 #ff37474f
     text "5" 701.38,223.78 system 700 28 #ff7a858a
   pressed
     +2 fill rect(553.88,194.38,728.13,332.63 r=10.5,10.5,10.5,10.5) #1f000000
@@ -112,7 +112,7 @@ key 6 kind=letter a11y="MNO，6"
   normal
     shadow rect(743.88,194.38,917.13,335.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(743.88,194.38,917.13,332.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "MNO" 783,283.19 system 400 52.5 #ff37474f
+    text "MNO" 783.22,283.19 system 400 52.25 #ff37474f
     text "6" 890.38,223.78 system 700 28 #ff7a858a
   pressed
     +2 fill rect(743.88,194.38,917.13,332.63 r=10.5,10.5,10.5,10.5) #1f000000
@@ -142,7 +142,7 @@ key 7 kind=letter a11y="PQRS，7"
   normal
     shadow rect(364.88,369.38,538.13,511.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(364.88,369.38,538.13,508.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "PQRS" 388.5,458.69 system 400 52.5 #ff37474f
+    text "PQRS" 388.8,458.69 system 400 52.25 #ff37474f
     text "7" 511.38,398.78 system 700 28 #ff7a858a
   pressed
     +2 fill rect(364.88,369.38,538.13,508.63 r=10.5,10.5,10.5,10.5) #1f000000
@@ -158,7 +158,7 @@ key 8 kind=letter a11y="TUV，8"
   normal
     shadow rect(553.88,369.38,728.13,511.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(553.88,369.38,728.13,508.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "TUV" 593.5,458.69 system 400 52.5 #ff37474f
+    text "TUV" 593.72,458.69 system 400 52.25 #ff37474f
     text "8" 701.38,398.78 system 700 28 #ff7a858a
   pressed
     +2 fill rect(553.88,369.38,728.13,508.63 r=10.5,10.5,10.5,10.5) #1f000000
@@ -174,7 +174,7 @@ key 9 kind=letter a11y="WXYZ，9"
   normal
     shadow rect(743.88,369.38,917.13,511.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(743.88,369.38,917.13,508.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "WXYZ" 767.5,458.69 system 400 52.5 #ff37474f
+    text "WXYZ" 767.8,458.69 system 400 52.25 #ff37474f
     text "9" 890.38,398.78 system 700 28 #ff7a858a
   pressed
     +2 fill rect(743.88,369.38,917.13,508.63 r=10.5,10.5,10.5,10.5) #1f000000

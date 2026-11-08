@@ -115,6 +115,8 @@ object KeyMarkYield {
         val moves: Boolean = true,
         val glyphClass: Int = 0,
         val grows: Grows? = null,
+        /** Its glyph a label, kept within [room] across (rules B §8a); an icon is as large as it is. */
+        val across: Boolean = false,
     )
 
     /** Every glyph of a class scaled by [scale] about its point; each key's [keys] settled. */
@@ -220,8 +222,15 @@ object KeyMarkYield {
             fits = { s, marks -> fit(k, keys[k].at(s), marks) },
         )
         // a key with both: no more than its symbols alone ask, so they are not let go with the shortcuts
+        // rules B §8a: and each glyph within its room across, the class as much smaller as its widest needs, to
+        // [MAX_CLASS_SHRINK] with the rest (what is wider still shrunk alone before: SceneBuilder.fitted)
+        fun across(k: Int): Double {
+            val g = keys[k].glyph
+            if (!keys[k].across || g.left.isNaN() || g.width <= keys[k].room.width) return 1.0
+            return largest(least) { s -> keys[k].at(s).width <= keys[k].room.width }
+        }
         val asked = keys.indices.map { k ->
-            if (whole(k)) 1.0 else minOf(asks(k, false), asks(k, true))
+            minOf(if (whole(k)) 1.0 else minOf(asks(k, false), asks(k, true)), across(k))
         }
         val scales = keys.indices.groupBy { keys[it].glyphClass }.mapValues { (_, ks) -> ks.minOf { asked[it] } }
         // the marks: of the class (or both) that meets, as much smaller as lets them
