@@ -701,5 +701,28 @@ class PlugTest(unittest.TestCase):
         sleep.assert_not_called()
 
 
+class CanvasOnTest(unittest.TestCase):
+    def test_the_debug_build_writes_as_the_app(self):
+        cmd = uat.canvas_on_cmd("debug")
+        self.assertIn(f"run-as {uat.PKG} sh -c '", cmd)
+        self.assertIn('<boolean name=\\"canvas_keyboard\\" value=\\"true\\" />', cmd)
+        self.assertNotIn("chown", cmd)
+        self.assertTrue(cmd.startswith(f"am force-stop {uat.PKG};"))
+
+    def test_the_release_build_writes_as_root_with_the_apps_owner_and_context(self):
+        cmd = uat.canvas_on_cmd("release")
+        self.assertNotIn("run-as", cmd)
+        for part in ("chown -R $u:$u", "chmod 660", "chcon -R"):
+            self.assertIn(part, cmd)
+
+    def test_the_canvas_off_after_the_app_started_blocks_the_case(self):
+        d = mock.Mock()
+        d.sh.return_value = "<map><boolean name=\"canvas_keyboard\" value=\"false\" /></map>"
+        with self.assertRaises(uat.Blocked):
+            uat.canvas_check(d)
+        d.sh.return_value = "<map><boolean name=\"canvas_keyboard\" value=\"true\" /></map>"
+        uat.canvas_check(d)
+
+
 if __name__ == "__main__":
     unittest.main()

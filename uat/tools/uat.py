@@ -63,9 +63,9 @@ os.environ.setdefault("ADB_MDNS", "0")
 # the devices: emulators of one AVD, each on its console port (serial emulator-<port>). 5554 and 5556
 # are the two of a run; a worktree may start its own on another even port up to 5584 (uat.py up --port)
 AVD = os.environ.get("UAT_AVD", "youmo")
-SNAPSHOT = "clean"
+SNAPSHOT = "clean"   # the AVD's state after uat/tools/avd.sh: zh-CN, three-button nav, the WebView shell
 # UAT_CANVAS=1: every case on 060's new drawing (internal.canvasKeyboard, canvas_on)
-CANVAS = os.environ.get("UAT_CANVAS") == "1"   # the AVD's state after uat/tools/avd.sh: zh-CN, three-button nav, the WebView shell
+CANVAS = os.environ.get("UAT_CANVAS") == "1"
 # the default pair; any number runs (--devices 5554,5556,5558,… or auto: device_count from free memory)
 PORTS = ("5554", "5556")
 
@@ -1721,6 +1721,8 @@ def reset(d, base, page):
     if CANVAS:
         canvas_on(d)
     ensure_ime(d)
+    if CANVAS:
+        canvas_check(d)
     d._keys = None
     if not base.startswith("B0"):
         raise Blocked(f"unknown baseline {base}")
@@ -1755,15 +1757,36 @@ def reset(d, base, page):
         raise Blocked(f"unknown baseline {base}")
 
 
+# the cleared app's prefs with internal.canvasKeyboard on (its key, canvas_keyboard)
+CANVAS_PREFS = '<map><boolean name=\\"canvas_keyboard\\" value=\\"true\\" /></map>'
+CANVAS_SET = 'name="canvas_keyboard" value="true"'
+
+
+def canvas_on_cmd(build=None):
+    """the shell command writing the cleared app's prefs with the canvas on: as the app (run-as, the
+    debug build's: its owner and SELinux context its own), else as root, given the data dir's owner and context"""
+    build = build or BUILD
+    f = f"shared_prefs/{PKG}_preferences.xml"
+    write = f'mkdir -p shared_prefs && echo "{CANVAS_PREFS}" > {f}'
+    if build == "debug":
+        return f"am force-stop {PKG}; run-as {PKG} sh -c '{write}'"
+    dd = f"/data/data/{PKG}"
+    return (f"am force-stop {PKG}; cd {dd} && {write}; u=$(stat -c %u {dd}); chown -R $u:$u {dd}/shared_prefs; "
+            f"chmod 660 {dd}/{f}; chcon -R $(ls -dZ {dd} | cut -d' ' -f1) {dd}/shared_prefs")
+
+
 def canvas_on(d):
     """UAT_CANVAS=1: internal.canvasKeyboard on in the cleared app's prefs (060's new drawing; the
-    developer page's switch), written as root before the app first starts"""
-    dd = f"/data/data/{PKG}"
-    f = f"{dd}/shared_prefs/{PKG}_preferences.xml"
-    d.sh(f"am force-stop {PKG}; mkdir -p {dd}/shared_prefs; "
-         f"echo \"<?xml version='1.0' encoding='utf-8' standalone='yes' ?><map>"
-         f"<boolean name=\\\"canvas_keyboard\\\" value=\\\"true\\\" /></map>\" > {f}; "
-         f"u=$(stat -c %u {dd}); chown -R $u:$u {dd}/shared_prefs; chmod 660 {f}; chcon -R $(ls -dZ {dd} | cut -d' ' -f1) {dd}/shared_prefs")
+    developer page's switch), written before the app first starts ([canvas_on_cmd])"""
+    d.sh(canvas_on_cmd())
+
+
+def canvas_check(d):
+    """the canvas still on once the app is up, or Blocked: a case meant for the new drawing never runs on the old"""
+    f = f"shared_prefs/{PKG}_preferences.xml"
+    read = d.sh(f"run-as {PKG} cat {f}" if BUILD == "debug" else f"cat /data/data/{PKG}/{f}")
+    if CANVAS_SET not in read:
+        raise Blocked(f"UAT_CANVAS=1 但 canvas_keyboard 没有打开：{read.strip()[:200]}")
 
 
 def plug(d, base):
