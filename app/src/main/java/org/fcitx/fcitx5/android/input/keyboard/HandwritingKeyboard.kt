@@ -277,6 +277,10 @@ class HandwritingKeyboard(
      */
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         if (canvas == null) return super.dispatchTouchEvent(ev)
+        // a finger the event no longer has (a stream cut short): out of its side
+        padFingers.retainAll { ev.findPointerIndex(it) >= 0 }
+        keyFingers.retainAll { ev.findPointerIndex(it) >= 0 }
+        var taken = false
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                 if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
@@ -289,52 +293,57 @@ class HandwritingKeyboard(
                 val onPad = padView.isVisible && padHit.contains(ev.getX(i).toInt(), ev.getY(i).toInt())
                 val to = if (onPad) padFingers else keyFingers
                 to += id
-                send(ev, to, onPad, if (to.size == 1) MotionEvent.ACTION_DOWN else MotionEvent.ACTION_POINTER_DOWN, id)
+                taken = send(ev, to, onPad, if (to.size == 1) MotionEvent.ACTION_DOWN else MotionEvent.ACTION_POINTER_DOWN, id)
             }
             MotionEvent.ACTION_MOVE -> {
-                if (padFingers.isNotEmpty()) send(ev, padFingers, true, MotionEvent.ACTION_MOVE, -1)
-                if (keyFingers.isNotEmpty()) send(ev, keyFingers, false, MotionEvent.ACTION_MOVE, -1)
+                if (padFingers.isNotEmpty()) taken = send(ev, padFingers, true, MotionEvent.ACTION_MOVE, -1)
+                if (keyFingers.isNotEmpty()) taken = send(ev, keyFingers, false, MotionEvent.ACTION_MOVE, -1) || taken
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
                 val id = ev.getPointerId(ev.actionIndex)
                 val onPad = id in padFingers
                 val from = if (onPad) padFingers else keyFingers
                 if (id in from) {
-                    send(ev, from, onPad, if (from.size == 1) MotionEvent.ACTION_UP else MotionEvent.ACTION_POINTER_UP, id)
+                    taken = send(ev, from, onPad, if (from.size == 1) MotionEvent.ACTION_UP else MotionEvent.ACTION_POINTER_UP, id)
                     from -= id
                 }
             }
             MotionEvent.ACTION_CANCEL -> {
-                if (padFingers.isNotEmpty()) send(ev, padFingers, true, MotionEvent.ACTION_CANCEL, -1)
-                if (keyFingers.isNotEmpty()) send(ev, keyFingers, false, MotionEvent.ACTION_CANCEL, -1)
+                if (padFingers.isNotEmpty()) taken = send(ev, padFingers, true, MotionEvent.ACTION_CANCEL, -1)
+                if (keyFingers.isNotEmpty()) taken = send(ev, keyFingers, false, MotionEvent.ACTION_CANCEL, -1) || taken
                 padFingers.clear()
                 keyFingers.clear()
             }
         }
-        return true
+        return taken
     }
 
-    // [ev] with only the fingers [ids] (in their order), [action] on finger [id]'s index among them: to the pad in
-    // its own pixels, or to the keys (the keyboard's own dispatch, the scene's routing)
-    private fun send(ev: MotionEvent, ids: List<Int>, toPad: Boolean, action: Int, id: Int) {
-        val props = Array(ids.size) { MotionEvent.PointerProperties() }
-        val coords = Array(ids.size) { MotionEvent.PointerCoords() }
-        ids.forEachIndexed { n, pid ->
-            val i = ev.findPointerIndex(pid)
-            ev.getPointerProperties(i, props[n])
-            ev.getPointerCoords(i, coords[n])
-            if (toPad) {
-                coords[n].x -= padView.left
-                coords[n].y -= padView.top
+    // [ev] with only the fingers [ids] (in their order), its batched samples too (a stroke's points between
+    // frames), [action] on finger [id]'s index among them: to the pad in its own pixels, or to the keys (the
+    // keyboard's own dispatch, the scene's routing). Whether the side took it
+    private fun send(ev: MotionEvent, ids: List<Int>, toPad: Boolean, action: Int, id: Int): Boolean {
+        val at = ids.map(ev::findPointerIndex)
+        val props = Array(ids.size) { MotionEvent.PointerProperties().also { p -> ev.getPointerProperties(at[it], p) } }
+        val dx = if (toPad) -padView.left.toFloat() else 0f
+        val dy = if (toPad) -padView.top.toFloat() else 0f
+        // the coordinates of each finger at sample [h] (its history's, or the current one at historySize)
+        fun coords(h: Int) = Array(ids.size) { n ->
+            MotionEvent.PointerCoords().also { c ->
+                if (h < ev.historySize) ev.getHistoricalPointerCoords(at[n], h, c) else ev.getPointerCoords(at[n], c)
+                c.x += dx
+                c.y += dy
             }
         }
-        val at = ids.indexOf(id).coerceAtLeast(0)
+        val time = { h: Int -> if (h < ev.historySize) ev.getHistoricalEventTime(h) else ev.eventTime }
         val e = MotionEvent.obtain(
-            ev.downTime, ev.eventTime, action or (at shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), ids.size, props, coords,
-            ev.metaState, ev.buttonState, ev.xPrecision, ev.yPrecision, ev.deviceId, ev.edgeFlags, ev.source, ev.flags,
+            ev.downTime, time(0), action or (ids.indexOf(id).coerceAtLeast(0) shl MotionEvent.ACTION_POINTER_INDEX_SHIFT),
+            ids.size, props, coords(0), ev.metaState, ev.buttonState, ev.xPrecision, ev.yPrecision, ev.deviceId, ev.edgeFlags,
+            ev.source, ev.flags,
         )
-        if (toPad) padView.dispatchTouchEvent(e) else super.dispatchTouchEvent(e)
+        for (h in 1..ev.historySize) e.addBatch(time(h), coords(h), ev.metaState)
+        val taken = if (toPad) padView.dispatchTouchEvent(e) else super.dispatchTouchEvent(e)
         e.recycle()
+        return taken
     }
 
     // the vivo workaround takes every touch for a key: the pad's are the pad's

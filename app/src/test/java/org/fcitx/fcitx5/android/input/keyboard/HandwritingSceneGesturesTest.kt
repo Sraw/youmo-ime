@@ -230,6 +230,36 @@ class HandwritingSceneGesturesTest {
         }
     }
 
+    // a stroke's points as the pad got them under the views: one MOVE's batched samples (between frames) each a point
+    private fun strokePoints(canvas: Boolean): String = harness(canvas).use { h ->
+        val kb = KeyboardHarness.find<HandwritingKeyboard>(h.keyboard)!!
+        val pad = h.pad()
+        val x0 = pad.left + pad.width * 0.3f
+        val y0 = pad.top + pad.height * 0.3f
+        val t = android.os.SystemClock.uptimeMillis()
+        fun send(e: android.view.MotionEvent) = kb.dispatchTouchEvent(e).also { e.recycle() }
+        send(android.view.MotionEvent.obtain(t, t, android.view.MotionEvent.ACTION_DOWN, x0, y0, 0))
+        // one MOVE carrying 3 batched samples before its current one
+        send(
+            android.view.MotionEvent.obtain(t, t + 4, android.view.MotionEvent.ACTION_MOVE, x0 + 10, y0, 0).apply {
+                addBatch(t + 8, x0 + 20, y0, 1f, 1f, 0)
+                addBatch(t + 12, x0 + 30, y0, 1f, 1f, 0)
+                addBatch(t + 16, x0 + 40, y0, 1f, 1f, 0)
+            },
+        )
+        // out of the pad, onto the keys to its right, then up there
+        send(android.view.MotionEvent.obtain(t, t + 20, android.view.MotionEvent.ACTION_MOVE, pad.right + 30f, y0, 0))
+        send(android.view.MotionEvent.obtain(t, t + 24, android.view.MotionEvent.ACTION_UP, pad.right + 30f, y0, 0))
+        h.idle()
+        val s = pad.pad.strokes
+        "strokes=${s.size} points=${s.map { it.size / 2 }} calls=${h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") }}"
+    }
+
+    @Test
+    fun aStrokesBatchedPointsAsTheViewsGotThem() {
+        assertEquals(strokePoints(false), strokePoints(true))
+    }
+
     // ，。 as they type: with Chinese punctuation on, full width; off (the mapping empty), what is typed is half width
     @Test
     fun commaAndFullStopShownAsTheyType() {
