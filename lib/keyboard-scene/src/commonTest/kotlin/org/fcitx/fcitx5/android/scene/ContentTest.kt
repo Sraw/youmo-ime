@@ -547,13 +547,33 @@ class ContentTest {
         near(Content.SYMBOL_DP * d * 0.85, texts(Fixtures.scene(Fixtures.floating), "q").first { it.text == "1" }.size)
     }
 
+    // rules B §8a: a label wider than its key's room after the classes, shrunk alone to fit it, both ways alike;
+    // a key beside it whose label fits as it was (a 颜文字 cell, 060-render-p2 S6 review)
+    @Test
+    fun aLabelWiderThanItsRoomShrunkAloneToFitRuleB8a() {
+        val l = LayoutReader.layout(
+            "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"10\">" +
+                "<row><key id=\"a\" label=\"a\" width=\"1\"/><key id=\"w\" label=\"abcdefghij\" width=\"1\"/></row></keyboard>",
+        ).ok()
+        val s = Fixtures.scene(Fixtures.portrait, l)
+        near(23 * d, texts(s, "a").single().size, "a fitting label")
+        // the fake font: ten Latin letters 6.0 of the size across, ink 0.05 of it in from each side: 5.9 of it
+        val room = face(s, "w").let { Box(it.left + 2 * d, it.top, it.right - 2 * d, it.bottom) }
+        val w = texts(s, "w").single()
+        near(room.width / 5.9, w.size, "shrunk to the room")
+        near(room.left, w.x + 0.05 * w.size, "its ink's left the room's")
+        near(1.0, w.scaleX, "both ways alike")
+    }
+
     @Test
     fun crowdedLettersShrinkTogetherRuleB7Yield() {
         // shorter and shorter keys: every letter one size at each height, the class's cap at most; so short its
         // symbols meet their letters past what the classes give, the letters their size and those symbols left
         // out rather than every letter smaller for none (060-render-p2 S4e)
+        // 600 px across: the fixture's letters (30 px of ink) inside their room, so only the height crowds them
+        // (at 540 each is wider than its room and shrunk alone, rule B §8a)
         for (h in 240..400 step 8) {
-            val s = Fixtures.scene(env.copy(width = 540.0, height = h.toDouble()))
+            val s = Fixtures.scene(env.copy(width = 600.0, height = h.toDouble()))
             val letters = s.keys.filter { it.kind == "letter" && it.role == null }
             val sizes = letters.map { k -> k.ops(false).filterIsInstance<Op.Text>().first { it.text == k.id }.size }.toSet()
             // one class, one scale: the same size to the last bit

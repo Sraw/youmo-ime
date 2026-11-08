@@ -558,7 +558,7 @@ key . kind=letter a11y="ㄡ"
   normal
     shadow rect(543.88,376.38,594.13,461.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(543.88,376.38,594.13,458.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄡ" 546.69,434.23 system 400 44.63 #ff37474f
+    text "ㄡ" 546.92,434.07 system 400 44.17 #ff37474f
   pressed
     +2 fill rect(543.88,376.38,594.13,458.63 r=10.5,10.5,10.5,10.5) #1f000000
 key / kind=letter a11y="ㄥ"

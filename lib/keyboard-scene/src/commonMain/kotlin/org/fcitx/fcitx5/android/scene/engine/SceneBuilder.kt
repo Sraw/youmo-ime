@@ -222,7 +222,7 @@ class SceneBuilder(
         val content: KeyContent,
     )
 
-    private class Settled(val glyph: Drawn?, val marks: List<Drawn?>)
+    private data class Settled(val glyph: Drawn?, val marks: List<Drawn?>)
 
     // a key's looks in its states and pressed: its face's and each part's
     private class Styled(
@@ -299,7 +299,19 @@ class SceneBuilder(
         keys.forEachIndexed { i, k ->
             if (out[i] == null) out[i] = Settled(k.content.glyph, k.content.marks.map { it.drawn })
         }
-        return out.map { it!! }
+        return out.mapIndexed { i, st -> st!!.copy(glyph = fitted(st.glyph, keys[i].content.room)) }
+    }
+
+    // rules B §8a (060-render-p2 S6 review): after the classes' sizes, a label still wider than its key's room
+    // shrunk alone, both ways alike, to fit it (as a table's roots are): what is cut off is not shown, and what is
+    // shown is what the key types. Centred on the room across, its own middle kept up and down.
+    private fun fitted(g: Drawn?, room: Box): Drawn? {
+        if (g == null || g.texts.isEmpty() || g.ink.width <= room.width || g.ink.width <= 0) return g
+        val s = room.width / g.ink.width
+        val w = g.ink.width * s
+        val h = g.ink.height * s
+        val cy = g.ink.centerY
+        return g.mapTo(Box(room.centerX - w / 2, cy - h / 2, room.centerX + w / 2, cy + h / 2), s)
     }
 
     // a key as its class's member: a main character about its baseline, where its row's stand, and never moved off it
