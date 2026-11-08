@@ -29,6 +29,8 @@ data class HostModules(
     val contextListeners: List<ContextListener> = emptyList(),
     val activationListeners: List<ActivationListener> = emptyList(),
     val punctuation: EnginePunctuation? = null,
+    /** Whether full width is on for [InputContext] (on and its input method has the toggle): sent with the status. */
+    val fullWidth: ((InputContext) -> Boolean)? = null,
     /** The status area the modules put their toggles in: what [HostCore.statusArea] lists. */
     val statusArea: StatusArea? = null,
     /** Quick input, for the keyboard button ([HostCore.triggerQuickPhrase]). */
@@ -441,8 +443,18 @@ class HostCore(
      */
     fun punctuationKeys(): Map<String, String> {
         val p = modules.punctuation ?: return emptyMap()
-        return contexts.active?.let(p::keys) ?: p.keys(InputMethodCatalog.listed(currentInputMethod())?.chinese == true)
+        return contexts.active?.let(p::keys) ?: startPunctuationKeys()
     }
+
+    /**
+     * [punctuationKeys] as a host started now would have them before any context: under [currentInputMethod], full
+     * width off (it is not saved). What the app keeps for its next start, to draw the keys before the host is up.
+     */
+    fun startPunctuationKeys(): Map<String, String> =
+        modules.punctuation?.keys(InputMethodCatalog.listed(currentInputMethod())?.chinese == true).orEmpty()
+
+    /** [block]'s changes as one event: the status, however often changed in it, sent once at its end. */
+    fun <T> batch(block: () -> T): T = pipeline.batch(block)
 
     fun currentInputMethod(): String = contexts.active?.let(contexts::inputMethod) ?: contexts.group.inputMethods.firstOrNull().orEmpty()
 
@@ -587,7 +599,12 @@ class HostCore(
             if (!statusDirty) return
             statusDirty = false
             val ic = contexts.active ?: return
-            emit(HostEvent.StatusArea(modules.statusArea?.entries(ic).orEmpty(), contexts.inputMethod(ic), modules.punctuation?.keys(ic).orEmpty()))
+            emit(
+                HostEvent.StatusArea(
+                    modules.statusArea?.entries(ic).orEmpty(), contexts.inputMethod(ic), modules.punctuation?.keys(ic).orEmpty(),
+                    modules.fullWidth?.invoke(ic) == true,
+                ),
+            )
         }
 
         /** `InputContextFlushUI` (`androidfrontend.cpp:360-382`): the active context's panel and candidates. */

@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
@@ -33,6 +34,7 @@ import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
+import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.preedit.PreeditComponent
@@ -199,8 +201,29 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private val spaceKeys = SpaceKeyInputMethod()
 
+    // a punctuation key while what it types is not known (a first install, the host not up): held back, a tap felt
+    // once, as no face could show what it would type (060-render-p2 S7a)
+    private fun heldBack(action: KeyAction): Boolean {
+        if (punctuation.known) return false
+        val c = when (action) {
+            is KeyAction.HostKeyAction -> action.act.singleOrNull()?.code
+            is KeyAction.SymAction -> action.sym.sym
+            else -> null
+        } ?: return false
+        if (!isAsciiMark(c)) return false
+        if (!heldBackFelt) {
+            heldBackFelt = true
+            InputFeedbacks.hapticFeedback(keyboardView)
+        }
+        return true
+    }
+
+    private var heldBackFelt = false
+
     private val keyActionListener = KeyActionListener { it, source ->
-        if (it is KeyAction.LayoutSwitchAction) {
+        if (heldBack(it)) {
+            Unit
+        } else if (it is KeyAction.LayoutSwitchAction) {
             switchLayout(it.act)
         } else {
             commonKeyActionListener.listener.onKeyAction(it, source)
@@ -208,7 +231,11 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     }
 
     private val popupActionListener: PopupActionListener by lazy {
-        popup.listener
+        val shown = popup.listener
+        // nor its bubble
+        PopupActionListener { a ->
+            if (punctuation.known || a !is PopupAction.PreviewAction || a.content.singleOrNull()?.code?.let(::isAsciiMark) != true) shown.onPopupAction(a)
+        }
     }
 
     // This will be called EXACTLY ONCE
@@ -484,3 +511,6 @@ internal class SpaceKeyInputMethod {
         if (keyboard !is NumberKeyboard) seen = ime
     }
 }
+
+/** An ASCII mark (not a letter, digit or space): what a punctuation key sends. */
+internal fun isAsciiMark(c: Int): Boolean = c in '!'.code..'~'.code && !Character.isLetterOrDigit(c)

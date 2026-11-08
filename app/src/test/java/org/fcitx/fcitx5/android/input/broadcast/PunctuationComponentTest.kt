@@ -81,4 +81,40 @@ class PunctuationComponentTest {
         f.punctuation.updateAsTyped(emptySet())
         assertEquals("，", f.punctuation.transform(","))
     }
+
+    // full width on or off, Chinese punctuation on or off, a key typing itself: each key shown as typed, the
+    // engine's commit filter turning marks and own characters alike (S7a: , shown, ， U+FF0C typed)
+    @Test
+    fun fullWidthTurnsWhatEachKeyTypes() {
+        val f = Fixture()
+        val marks = mapOf("," to "，", "." to "。")
+        f.punctuation.update(emptyMap(), fullWidth = true)
+        assertEquals("\uFF0C", f.punctuation.transform(","))
+        assertEquals("\uFF0E", f.punctuation.transform("."))
+        assertTrue(f.punctuation.enabled)
+        f.punctuation.update(marks, fullWidth = true)
+        assertEquals("，", f.punctuation.transform(","))
+        assertEquals("。", f.punctuation.transform("."))
+        // after a letter . types itself, full width
+        f.punctuation.updateAsTyped(setOf("."))
+        assertEquals("\uFF0E", f.punctuation.transform("."))
+        assertEquals("\uFF0E", f.punctuation.mapping["."])
+        f.punctuation.update(marks, fullWidth = false)
+        assertEquals(".", f.punctuation.transform("."))
+        assertEquals("，", f.punctuation.transform(","))
+        f.punctuation.update(emptyMap(), fullWidth = false)
+        assertEquals(",", f.punctuation.transform(","))
+        assertFalse(f.punctuation.enabled)
+    }
+
+    // a status not told keeps what is known; told, known (the keys no longer held back)
+    @Test
+    fun knownOnceTold() {
+        val f = Fixture()
+        assertFalse(f.punctuation.known)
+        f.punctuation.update(null)
+        assertFalse(f.punctuation.known)
+        f.punctuation.update(emptyMap())
+        assertTrue(f.punctuation.known)
+    }
 }

@@ -96,6 +96,7 @@ class ChineseModules(private val inputs: ModuleInputs, private val strings: Host
                 override fun keys(ic: InputContext) = punctuation.keys(ic)
                 override fun keys(chinese: Boolean) = punctuation.keys(chinese)
             },
+            fullWidth = { ic -> fullWidth.enabled && fullWidth.inWhiteList(ic) },
             statusArea = statusArea,
             quickPhrase = quickPhrase,
             unicode = unicode,

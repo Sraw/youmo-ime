@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMaps
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.data.quickphrase.QuickPhraseManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.glide.Glide
@@ -153,6 +154,13 @@ class KotlinHost(
     @Volatile
     override var punctuationCached: Map<String, String>? = null
         private set
+
+    @Volatile
+    override var fullWidthCached: Boolean = false
+        private set
+
+    // what the keys type at a start, kept for the next one (the keyboard's before this host is up): on this thread
+    private fun HostCore.keepStartKeys() = PunctuationStartKeys.write(context, startPunctuationKeys())
 
     @Volatile
     override var clientPreeditCached = FormattedText.Empty
@@ -355,6 +363,7 @@ class KotlinHost(
         modules?.punctuation?.setProfile(profile)
         // with no context focused no status goes out: the keys' marks kept for the keyboard to come
         punctuationCached = punctuationKeys()
+        keepStartKeys()
     }
 
     // ---- quick input, focus, status area, candidates
@@ -439,6 +448,7 @@ class KotlinHost(
         inputMethodEntryCached = noInputMethod
         statusAreaCached = emptyList()
         punctuationCached = null
+        fullWidthCached = false
         clientPreeditCached = FormattedText.Empty
         inputPanelCached = HostEvent.InputPanel.EMPTY
         candidatesCached = HostEvent.Candidates.EMPTY
@@ -535,6 +545,7 @@ class KotlinHost(
         lifecycleRegistry.postEvent(HostLifecycle.Event.ON_READY)
         // the keys' marks before any context is focused, on this thread: the keyboard draws them from Ready on
         punctuationCached = made.punctuationKeys()
+        made.keepStartKeys()
         emit(HostEvent.Ready)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             lifecycle.launchWhenReady { SubtypeManager.syncWith(enabledIme()) }
@@ -542,7 +553,10 @@ class KotlinHost(
     }
 
     // the module files read again (fcitx's reloadConfig): the punctuation table, the modules' files, quick phrases, the engine options
-    private fun HostCore.readModuleFiles() {
+    // one event: the punctuation's new table and config and the status sent anew at the end, the status sent once
+    private fun HostCore.readModuleFiles() = batch { readModuleFilesNow() }
+
+    private fun HostCore.readModuleFilesNow() {
         // one that cannot be read now keeps what was read before
         for (path in CONF_FILES) readConfig(path).onSuccess { confTexts[path] = it }
         modules?.punctuation?.let {
@@ -550,6 +564,7 @@ class KotlinHost(
             // read, not changed: not written back
             it.setConfigQuietly(ModuleConfigs.punctuation(confTexts[ModuleConfigs.PUNCTUATION]))
             punctuationCached = punctuationKeys()
+            keepStartKeys()
         }
         // traditional per input method as the file now says, the toggle's icon told anew
         modules?.chttrans?.reload(ModuleConfigs.chttrans(confTexts[ModuleConfigs.CHTTRANS]))
@@ -828,6 +843,9 @@ class KotlinHost(
             is HostEvent.StatusArea -> {
                 statusAreaCached = event.entries
                 event.punctuation?.let { punctuationCached = it }
+                fullWidthCached = event.fullWidth
+                // the toggle or the input method changed: the start's keys as they now would be
+                core?.keepStartKeys()
                 // a sub mode changed, which no InputMethodChanged tells: told first, as Fcitx's handler does
                 if (event.entry != inputMethodEntryCached) {
                     inputMethodEntryCached = event.entry

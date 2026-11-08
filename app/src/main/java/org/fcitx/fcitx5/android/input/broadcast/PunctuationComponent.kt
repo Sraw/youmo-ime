@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.broadcast
 
+import org.fcitx.fcitx5.android.host.FullWidth
 import org.mechdancer.dependency.Dependent
 import org.mechdancer.dependency.UniqueComponent
 import org.mechdancer.dependency.manager.ManagedHandler
@@ -25,9 +26,26 @@ class PunctuationComponent :
      * What each punctuation key types now, the host's less the keys typing themselves: a keyboard attached
      * again takes it (KeyboardWindow.attachLayout), and shows on its keys what they type.
      */
-    val mapping: Map<String, String> get() = if (asTyped.isEmpty()) loaded else loaded - asTyped
+    val mapping: Map<String, String>
+        get() {
+            val base = if (asTyped.isEmpty()) loaded else loaded - asTyped
+            if (!fullWidth) return base
+            // full width: every key's mark, or its own character, typed full width (FullWidth's commit filter)
+            return (base.keys + ASCII_MARKS).associateWith { FullWidth.convert(base[it] ?: it) }
+        }
 
-    val enabled: Boolean get() = loaded.isNotEmpty()
+    // full width on (HostEvent.StatusArea.fullWidth): applied in the same event as the marks
+    private var fullWidth = false
+
+    val enabled: Boolean get() = mapping.isNotEmpty()
+
+    /**
+     * Whether what the punctuation keys type is known: told by the host, or kept from the last run
+     * ([org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys]). Not known (a first install, before the host
+     * is up), the keyboard holds them back: what they would type cannot be shown.
+     */
+    var known = false
+        private set
 
     fun transform(p: String) = mapping.getOrDefault(p, p)
 
@@ -36,9 +54,12 @@ class PunctuationComponent :
      * worked out on its thread with the status): the keys shown as it types them, in this event, before any key typed
      * after it (显示和输出一致). Null, not said: kept as they are.
      */
-    fun update(keys: Map<String, String>?) {
-        if (keys == null || keys == loaded) return
+    fun update(keys: Map<String, String>?, fullWidth: Boolean = false) {
+        if (keys == null) return
+        known = true
+        if (keys == loaded && fullWidth == this.fullWidth) return
         loaded = keys
+        this.fullWidth = fullWidth
         broadcaster.onPunctuationUpdate(mapping)
     }
 
@@ -47,5 +68,10 @@ class PunctuationComponent :
         if (marks == asTyped) return
         asTyped = marks
         broadcaster.onPunctuationUpdate(mapping)
+    }
+
+    private companion object {
+        // the keys' own characters full width turns: ASCII's marks (not letters or digits, which are not punctuation keys)
+        val ASCII_MARKS = ('!'..'~').filterNot { it.isLetterOrDigit() }.map { it.toString() }
     }
 }

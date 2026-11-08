@@ -422,6 +422,23 @@ class KotlinHostTest {
         val check: suspend KotlinHost.() -> Unit,
     )
 
+    // a reload's new table, config and status are one event: the status sent once, with the new marks (S7a)
+    @Test
+    fun reloadConfigSendsTheStatusOnce() = runBlocking {
+        fcitx.activate(1, "org.example")
+        fcitx.focus(true)
+        fcitx.setPunctuationMap("zh_CN", listOf(PunctuationMapEntry(",", "、", "")))
+        fcitx.isEmpty()
+        idle()
+        val before = events.count { it is HostEvent.StatusArea }
+        fcitx.reloadConfig()
+        fcitx.isEmpty()
+        idle()
+        val sent = events.filterIsInstance<HostEvent.StatusArea>().drop(before)
+        assertEquals(1, sent.size)
+        assertEquals(mapOf("," to "、"), sent.single().punctuation)
+    }
+
     @Test
     fun reloadConfigReadsChttransEnabledStateAgain() = runBlocking {
         suspend fun trad() = fcitx.statusArea().first { it.name == "chttrans" }

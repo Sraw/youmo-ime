@@ -37,6 +37,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.comparesScreenshots
 import org.fcitx.fcitx5.android.core.FakeHostApi
 import org.fcitx.fcitx5.android.core.FakeHostConnection
+import org.fcitx.fcitx5.android.core.whenReady
 import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.daemon.HostConnection
@@ -798,7 +799,9 @@ class KeyboardHarness(
     // the daemon's connection to a real host, which answers on its own thread
     private class HarnessConnection(override val lifecycleScope: CoroutineScope, val host: HostApi) : HostConnection {
         override fun <T> runImmediately(block: suspend HostApi.() -> T): T = runBlocking { block(host) }
-        override suspend fun <T> runOnReady(block: suspend HostApi.() -> T): T = block(host)
+        // as the daemon's: a host not up yet (a test pressing before it starts) does it once it is
+        override suspend fun <T> runOnReady(block: suspend HostApi.() -> T): T =
+            if (host is org.fcitx.fcitx5.android.core.KotlinHost) host.lifecycle.whenReady { host.block() } else block(host)
         override fun runIfReady(block: suspend HostApi.() -> Unit) {
             if (host.isReady) lifecycleScope.launch { block(host) }
         }

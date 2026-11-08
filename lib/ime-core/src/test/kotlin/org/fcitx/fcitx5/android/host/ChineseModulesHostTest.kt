@@ -111,6 +111,17 @@ class ChineseModulesHostTest {
         assertEquals(emptyMap<String, String>(), log.filterIsInstance<HostEvent.StatusArea>().last().punctuation)
     }
 
+    // full width with the status, in the same event, on a Chinese input method only (S7a)
+    @Test
+    fun `full width goes out with the status`() {
+        open()
+        assertFalse(log.filterIsInstance<HostEvent.StatusArea>().last().fullWidth)
+        core.activateAction(core.statusArea().first { it.name == "fullwidth" }.id)
+        assertTrue(log.filterIsInstance<HostEvent.StatusArea>().last().fullWidth)
+        core.toggle()
+        assertFalse("English has not the toggle", log.filterIsInstance<HostEvent.StatusArea>().last().fullWidth)
+    }
+
     @Test
     fun `a status area tap toggles, is saved at once and tells the area anew, no tip (ca chttrans cpp 198-213)`() {
         open()

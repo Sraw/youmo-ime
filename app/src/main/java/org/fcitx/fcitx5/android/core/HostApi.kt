@@ -46,6 +46,9 @@ interface HostApi : TypingApi, InputMethodsApi, EngineSettingsApi, PunctuationAp
      */
     val punctuationCached: Map<String, String>?
 
+    /** Full width on, as the last status said ([HostEvent.StatusArea.fullWidth]); off before one. */
+    val fullWidthCached: Boolean
+
     val clientPreeditCached: FormattedText
 
     val inputPanelCached: HostEvent.InputPanel

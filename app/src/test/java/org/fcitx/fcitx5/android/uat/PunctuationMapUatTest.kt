@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
 import org.fcitx.fcitx5.android.host.ModuleConfigs
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.until as waitUntil
 import org.fcitx.fcitx5.android.utils.appContext
@@ -130,6 +131,62 @@ class PunctuationMapUatTest {
         h.release()
         until("the press typed") { h.field.text.isNotEmpty() }
         assertEquals(listOf("、", "、", "、"), listOf(face, bubble, h.field.text.toString()))
+    }
+
+    // a host that ran before saved its table, and stopped; a new one made, not started, and the keyboard up before it,
+    // with what the last run kept ([kept]) or none
+    private fun keyboardBeforeTheHost(kept: Boolean): KotlinHost {
+        PunctuationStartKeys.forget(appContext)
+        startedHost(ScriptedEngine(home)).let { first ->
+            runBlocking { first.setPunctuationMap("zh_CN", listOf(PunctuationMapEntry(",", "、", ""))) }
+            first.stop()
+        }
+        // the next process: what the last one kept, read from the file; or a first install's none
+        if (kept) PunctuationStartKeys.loadNow(appContext) else PunctuationStartKeys.forget(appContext)
+        val next = KotlinHost(appContext, ScriptedEngine(home))
+        h = KeyboardHarness(host = next)
+        h.service.postFcitxJob { activate(1, "org.example.app") }
+        h.start()
+        assertTrue("the host not up yet", !next.isReady)
+        return next
+    }
+
+    // the comma pressed before the host is up, its keys as the last run started with them (PunctuationStartKeys, read
+    // from its file): face and bubble the mark typed once the host is up (S7a: , shown, 、 typed)
+    @Test
+    fun beforeTheHostIsUpTheKeysAreTheLastRunsStart() {
+        val next = keyboardBeforeTheHost(kept = true)
+        assertEquals(mapOf("," to "、"), PunctuationStartKeys.known)
+        val k = h.keyWithId(R.id.button_comma)!!
+        val face = k.label
+        h.press(k)
+        val bubble = h.popupChoices().map { it.text }.single()
+        h.release()
+        fcitx = next.apply { start() }
+        until("the press typed") { h.field.text.isNotEmpty() }
+        assertEquals(listOf("、", "、", "、"), listOf(face, bubble, h.field.text.toString()))
+    }
+
+    // none kept (a first install): the comma pressed before the host is up neither types nor bubbles, as no face
+    // could show what it would type; once the host is up it types its mark
+    @Test
+    fun beforeTheHostIsUpWithNoneKeptTheKeysAreHeldBack() {
+        fcitx = keyboardBeforeTheHost(kept = false)
+        val k = h.keyWithId(R.id.button_comma)!!
+        h.press(k)
+        assertEquals(emptyList<String>(), h.popupChoices().map { it.text })
+        h.release()
+        fcitx.start()
+        until("the host up") { fcitx.isReady }
+        // whatever was queued for it done, and its events handed over
+        // (a key queued for the host goes through the service's jobs and the main thread: a few turns, time run on)
+        repeat(5) { runBlocking { fcitx.isEmpty() }; h.after(200) }
+        assertEquals("", h.field.text.toString())
+        h.after(BUBBLE_GONE_MS)
+        assertEquals(listOf("、", "、"), faceAndBubble { h.keyWithId(R.id.button_comma)!! })
+        until("the mark typed") { h.field.text.isNotEmpty() }
+        repeat(5) { runBlocking { fcitx.isEmpty() }; h.after(200) }
+        assertEquals("the held one never typed", "、", h.field.text.toString())
     }
 
     // punctuation turned off, then on again (the toggle's action): each press of the comma before, between and

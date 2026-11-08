@@ -39,6 +39,7 @@ import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.daemon.HostConnection
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
@@ -375,6 +376,9 @@ class InputView(
 
         // make sure KeyboardWindow's view has been created before it receives any broadcast
         windowManager.addEssentialWindow(keyboardWindow, createView = true)
+        // the punctuation keys as the last run's host started with them, till this one says (its status, or the
+        // replay below): none kept, they are held back (PunctuationComponent.known)
+        punctuation.update(PunctuationStartKeys.known)
         windowManager.addEssentialWindow(symbolPicker)
         windowManager.addEssentialWindow(emojiPicker)
         windowManager.addEssentialWindow(emoticonPicker)
@@ -712,7 +716,7 @@ class InputView(
                 HostEvent.InputMethodChanged(entry),
                 // the keys' marks as the host last said; null (none said yet, or a host stopped): kept as they are,
                 // not taken for punctuation off (a status replayed empty drew , where the engine typed 、)
-                HostEvent.StatusArea(statusAreaCached, entry, punctuationCached),
+                HostEvent.StatusArea(statusAreaCached, entry, punctuationCached, fullWidthCached),
                 candidatesCached,
             )
         }.forEach { handleFcitxEvent(it) }
@@ -749,11 +753,11 @@ class InputView(
             // status, worked out on its thread before it sent Ready (a cached read)
             is HostEvent.Ready -> {
                 punctuation.updateAsTyped(emptySet())
-                punctuation.update(fcitx.runImmediately { punctuationCached })
+                fcitx.runImmediately { punctuationCached to fullWidthCached }.let { (keys, full) -> punctuation.update(keys, full) }
             }
             // the status of a view made anew (InputView recreation) comes too, from onStartHandleFcitxEvent
             is HostEvent.StatusArea -> {
-                punctuation.update(it.punctuation)
+                punctuation.update(it.punctuation, it.fullWidth)
                 broadcaster.onStatusAreaUpdate(it.entries)
             }
             else -> {}

@@ -74,6 +74,7 @@ import org.fcitx.fcitx5.android.core.plus
 import org.fcitx.fcitx5.android.core.toSpannedString
 import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.daemon.HostDaemon
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -478,6 +479,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     override fun onCreate() {
         EngineNotices.sayer = engineSayer
         pickedLocalesChanged()
+        // the punctuation keys the last run started with, read off this thread before the keyboard is made
+        PunctuationStartKeys.preload(this)
         fcitx = HostDaemon.connect(javaClass.name)
         lifecycleScope.launch {
             jobs.consumeEach { it.join() }
