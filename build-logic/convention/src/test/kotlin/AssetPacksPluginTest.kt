@@ -197,5 +197,15 @@ class AssetPacksPluginTest {
         val release = AssetPacksPlugin.readKeys(dir.resolve("release.pub"))
         assertTrue("release.pub has a key", release.isNotEmpty())
         assertTrue("the test key is never a release key", release.none { it.contentEquals(test[0]) })
+        // what a release build trusts is release.pub's keys, and only them
+        val b64 = Base64.getEncoder()
+        assertEquals(release.joinToString(",") { b64.encodeToString(it) }, AssetPacksPlugin.packKeys("release", release, test))
+        assertEquals(
+            dir.resolve("release.pub").readLines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") },
+            AssetPacksPlugin.packKeys("release", release, test).split(","),
+        )
+        // the test key only where listed: a build type not listed is a release's
+        for (type in listOf("debug", "benchmark")) assertTrue(type, b64.encodeToString(test[0]) in AssetPacksPlugin.packKeys(type, release, test))
+        for (type in listOf("release", "staging", null)) assertFalse("$type", b64.encodeToString(test[0]) in AssetPacksPlugin.packKeys(type, release, test))
     }
 }

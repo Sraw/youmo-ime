@@ -53,8 +53,9 @@ import java.util.zip.ZipOutputStream
  *   `<same name>.json`: what the release listing reads. The same inputs make the same bytes.
  * - Signed with the key at local.properties' `youmo.packKey` (or `YOUMO_PACK_KEY`), the release's;
  *   without one, with the test key `app/pack-keys/test-ed25519.pem`, which only debug builds trust.
- * - What each build trusts goes into `BuildConfig.PACK_KEYS`: a release build the keys of
- *   `app/pack-keys/release.pub` only, and fails to build without one; any other the test key's too.
+ * - What each build trusts goes into `BuildConfig.PACK_KEYS`: the keys of `app/pack-keys/release.pub`,
+ *   and the test key's only in [TEST_KEY_BUILDS] (debug, benchmark); any other build type fails to
+ *   build with no release key.
  *   What each pack must be (format, oldest version) goes in as `PACK_<ID>_FORMAT`, `PACK_<ID>_MIN_VERSION`.
  * - `releaseBundles`: the release APK with the text pack (文字版), and with both (语音版), and
  *   `release-packs.json`, saying of each pack whether its content changed since the last
@@ -208,6 +209,19 @@ class AssetPacksPlugin : Plugin<Project> {
         /** The last release's `release-packs.json`, committed: what [ReleaseBundlesTask] compares with by default. */
         const val RELEASED = "packs-released.json"
 
+        /**
+         * The build types that take packs signed with the test key, too: debug, and benchmark (the
+         * instrumented performance tests' build: debug-signed, its own id, never shipped; its device
+         * runs import what `:app:packs` made, the test key's without a release key, as on CI). A
+         * list of those that may, not of those that may not: a build type added later trusts the
+         * release key only.
+         */
+        val TEST_KEY_BUILDS = setOf("debug", "benchmark")
+
+        /** `BuildConfig.PACK_KEYS` of a [buildType]: the keys it trusts, base64, comma-separated. */
+        fun packKeys(buildType: String?, release: List<ByteArray>, test: List<ByteArray>): String =
+            (if (buildType in TEST_KEY_BUILDS) release + test else release).joinToString(",") { Base64.getEncoder().encodeToString(it) }
+
         fun jsonString(s: String) = "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
     }
 
@@ -252,18 +266,17 @@ class AssetPacksPlugin : Plugin<Project> {
         val release = readKeys(keysDir.file("release.pub").asFile)
         val test = readKeys(keysDir.file("test.pub").asFile)
         components.onVariants { variant ->
-            val trusted = if (variant.buildType == "release") release else release + test
             val fields = variant.buildConfigFields ?: return@onVariants
             fields.put(
                 "PACK_KEYS",
-                BuildConfigField("String", jsonString(trusted.joinToString(",") { Base64.getEncoder().encodeToString(it) }), "the Ed25519 keys whose packs this build takes"),
+                BuildConfigField("String", jsonString(packKeys(variant.buildType, release, test)), "the Ed25519 keys whose packs this build takes"),
             )
             for (id in OWNED.keys) {
                 val up = id.uppercase()
                 fields.put("PACK_${up}_FORMAT", BuildConfigField("int", prop("$id.format").toString(), "the $id pack's data format this build reads"))
                 fields.put("PACK_${up}_MIN_VERSION", BuildConfigField("int", prop("$id.minVersion").toString(), "the oldest $id pack this build takes"))
             }
-            if (variant.buildType == "release" && release.isEmpty()) {
+            if (variant.buildType !in TEST_KEY_BUILDS && release.isEmpty()) {
                 // a release that trusted no key would take no pack, and one that trusted the test key anyone's
                 val check = target.tasks.register("checkPackKeys${variant.name.replaceFirstChar(Char::uppercase)}") {
                     doLast { throw GradleException("app/pack-keys/release.pub has no key: a release build must trust the release key (never the test key)") }

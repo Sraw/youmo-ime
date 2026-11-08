@@ -184,9 +184,11 @@ they stay: a pack carries no code.
   app refuses another format and says which pack and version it needs; a pack below `minVersion` stays
   installed but unused (需要更新到 vN), one above what the app knows says 需要更新应用.
 - **Signing.** Ed25519, pure Kotlin in ime-core (`Ed25519`, RFC 8032 vectors); the build signs with the
-  JDK's. The APK trusts the keys in `BuildConfig.PACK_KEYS`: a release build `app/pack-keys/release.pub`'s
-  only, and fails to build without one; debug builds and tests the committed test key
-  (`test-ed25519.pem`, `test.pub`) too. Several keys may be listed, for a key change: old and new packs
+  JDK's. The APK trusts the keys in `BuildConfig.PACK_KEYS`: `app/pack-keys/release.pub`'s, and the
+  committed test key (`test-ed25519.pem`, `test.pub`) too only in the build types listed in
+  `AssetPacksPlugin.TEST_KEY_BUILDS` (debug, which the tests run, and benchmark, debug-signed and never
+  shipped); any other build type, release and any added later, trusts release.pub's only and fails to
+  build without one (`AssetPacksPluginTest` holds release's to release.pub). Several keys may be listed, for a key change: old and new packs
   both load. The release key's private half is never in the repo: its path is `youmo.packKey` in
   local.properties (or `YOUMO_PACK_KEY`); without it `:app:packs` signs with the test key, which release
   builds refuse.
