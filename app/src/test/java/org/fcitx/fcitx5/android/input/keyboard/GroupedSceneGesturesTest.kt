@@ -52,7 +52,14 @@ class GroupedSceneGesturesTest {
     // what a finger does on each key: the keys that put another keyboard up (符, 123, the globe) left to
     // GroupedKeyboardTest's bottom-row cases, as they would take the rest away
     // in a field of [inputType], text in it and the cursor at its end (what ⌫ and space's swipes act on)
-    private fun gestures(canvas: Boolean, im: InputMethodEntry, inputType: Int = InputType.TYPE_CLASS_TEXT): List<String> {
+    // [shown] the ids that must be among the keys, [hidden] those that must not
+    private fun gestures(
+        canvas: Boolean,
+        im: InputMethodEntry,
+        inputType: Int = InputType.TYPE_CLASS_TEXT,
+        shown: Set<String> = emptySet(),
+        hidden: Set<String> = emptySet(),
+    ): List<String> {
         prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, canvas)
         val prefill = { e: android.widget.EditText ->
             e.setText(TEXT)
@@ -63,6 +70,7 @@ class GroupedSceneGesturesTest {
             assertEquals(canvas, KeyboardHarness.all(h.keyboard).any { it is KeyboardCanvasView && it.visibility == android.view.View.VISIBLE })
             val ids = h.keys().mapNotNull { it.id }.filter { it !in SWITCHING }
             assertTrue(ids.toString(), ids.size >= MOST_KEYS_AT_LEAST)
+            assertTrue("canvas $canvas: $ids", ids.containsAll(shown) && ids.none { it in hidden })
             val out = mutableListOf<String>()
             fun sent(what: String) {
                 out += "$what: " + h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") } +
@@ -102,9 +110,14 @@ class GroupedSceneGesturesTest {
         }
     }
 
-    private fun assertSame(im: InputMethodEntry, inputType: Int = InputType.TYPE_CLASS_TEXT) {
-        val views = gestures(false, im, inputType)
-        val scene = gestures(true, im, inputType)
+    private fun assertSame(
+        im: InputMethodEntry,
+        inputType: Int = InputType.TYPE_CLASS_TEXT,
+        shown: Set<String> = emptySet(),
+        hidden: Set<String> = emptySet(),
+    ) {
+        val views = gestures(false, im, inputType, shown, hidden)
+        val scene = gestures(true, im, inputType, shown, hidden)
         assertEquals(views.joinToString("\n"), scene.joinToString("\n"))
     }
 
@@ -141,9 +154,9 @@ class GroupedSceneGesturesTest {
     fun theFourteenAndEighteenKeysInAnAddressField() {
         for (keys in listOf(org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard.Keys14, org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard.Keys18)) {
             prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, keys)
-            for (type in listOf(InputType.TYPE_TEXT_VARIATION_URI, InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)) {
-                assertSame(KeyboardHarness.PINYIN, InputType.TYPE_CLASS_TEXT or type)
-            }
+            // a URL's / . and domains, no @; an address's @ . and domains, no /; neither a , or 。 of its own
+            assertSame(KeyboardHarness.PINYIN, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI, setOf("slash", "dot", "domain"), setOf("at", "comma", "period"))
+            assertSame(KeyboardHarness.PINYIN, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, setOf("at", "dot", "domain"), setOf("slash", "comma", "period"))
         }
     }
 

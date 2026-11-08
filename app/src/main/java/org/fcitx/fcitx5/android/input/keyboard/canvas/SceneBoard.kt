@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.keyboard.canvas
 
 import android.content.Context
+import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.Theme
@@ -68,7 +69,7 @@ class SceneBoard(
         val builtIn = if (theme.isDark) ThemePreset.PixelDark else ThemePreset.PixelLight
         if (builtIn.name == theme.name) return null
         // logged once a look: asked again each time what shows changes
-        if (fellBack.add(theme.name to look)) Timber.w("keyboard canvas: no scene of theme %s; the built-in %s's drawn", theme.name, builtIn.name)
+        if (firstFallBack(theme.name, look)) Timber.w("keyboard canvas: no scene of theme %s; the built-in %s's drawn", theme.name, builtIn.name)
         return drawn(builtIn, ThemeManager.shownLook(builtIn), width, height)
     }
 
@@ -117,8 +118,15 @@ class SceneBoard(
         private val measurers = LinkedHashMap<ThemeLook, AndroidTextMeasurer>(KEPT_SCENES, 0.75f, true)
         private val scenesKept = ArrayDeque<Made>()
 
-        // the themes (by name and look) that made no scene, the built-in drawn instead: logged once each
-        private val fellBack = mutableSetOf<Pair<String, ThemeLook>>()
+        // the themes (by name and look) that made no scene, the built-in drawn instead: logged once each,
+        // the last KEPT_FELL_BACK of them (a theme switched through many looks logs a look again, no more)
+        private const val KEPT_FELL_BACK = 16
+        private val fellBack = LinkedHashSet<Pair<String, ThemeLook>>()
+
+        /** Whether [name] in [look] is a fall back not logged yet (the last [KEPT_FELL_BACK] kept). */
+        @VisibleForTesting
+        internal fun firstFallBack(name: String, look: ThemeLook): Boolean =
+            fellBack.add(name to look).also { if (fellBack.size > KEPT_FELL_BACK) fellBack.remove(fellBack.first()) }
 
         // a layout's shortcut names, and the marks' settings as last made from their inputs: kept for the
         // scene asked again, the same instances making the env equal to the last at once

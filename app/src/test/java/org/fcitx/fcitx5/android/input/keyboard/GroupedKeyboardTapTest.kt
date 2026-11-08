@@ -66,6 +66,13 @@ class GroupedKeyboardTapTest {
 
     private fun key(face: String) = keyboard.shownKey(face)
 
+    // a test's layouts under [key]
+    private fun source(key: String, read: (String) -> String?) = object : LayoutSource {
+        override val key = key
+
+        override fun text(id: String) = read(id)
+    }
+
     private fun code(c: Char) = KeyAction.SymAction(KeySym(UNICODE + c.code), KeyStates.Virtual)
 
     private fun tap(c: Char, at: Float) = KeyAction.SymAction(KeySym(UNICODE + Keyboard.tapKey(c, at)), KeyStates.Virtual)
@@ -129,7 +136,7 @@ class GroupedKeyboardTapTest {
         val builtIn = SceneLayouts.source
         SceneLayouts.source = { ctx ->
             val own = BuiltInLayouts(ctx)
-            LayoutSource { id -> own.text(id)?.let { if (id == "k14") it.replace("letters=\"bn\"", "letters=\"bn\" lean=\"off\"") else it } }
+            source("lean-off") { id -> own.text(id)?.let { if (id == "k14") it.replace("letters=\"bn\"", "letters=\"bn\" lean=\"off\"") else it } }
         }
         try {
             drawn {
@@ -154,7 +161,7 @@ class GroupedKeyboardTapTest {
         val builtIn = SceneLayouts.source
         SceneLayouts.source = { ctx ->
             val own = BuiltInLayouts(ctx)
-            LayoutSource { id -> own.text(id)?.let { if (id == "k14") it.replace("letters=\"bn\"", "letters=\"nb\"") else it } }
+            source("nb") { id -> own.text(id)?.let { if (id == "k14") it.replace("letters=\"bn\"", "letters=\"nb\"") else it } }
         }
         val logged = mutableListOf<String>()
         val tree = object : timber.log.Timber.Tree() {

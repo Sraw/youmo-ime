@@ -63,6 +63,7 @@ import org.robolectric.Robolectric
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.android.controller.ServiceController
+import org.robolectric.shadows.ShadowDialog
 import org.robolectric.shadows.ShadowPopupMenu
 
 /**
@@ -766,6 +767,15 @@ class KeyboardHarness(
         }
         // destroyed first: it learns the last field's address
         destroy()
+        // Robolectric keeps every dialog shown till the test method ends (ShadowDialog.shownDialogs): the
+        // input method's window, and through its mService the whole service, views and themes, of each
+        // harness a test made. ThemeMakerLayoutTest makes a hundred and more: a full run's heap out (the
+        // S4a review's OOM, a heap dump's 157 services all held there). Let go of this one's.
+        service.window?.let { window ->
+            // as many times as it was shown
+            ShadowDialog.getShownDialogs().removeAll { it === window }
+            if (ShadowDialog.getLatestDialog() === window) ShadowDialog.setLatestDialog(null)
+        }
         // what the address bar learned in a test's email field: not the next test's (PrefsRule restores only what a test set)
         AppPrefs.getInstance().internal.run {
             addressCounts.setValue("")

@@ -20,11 +20,15 @@ import timber.log.Timber
  * own now ([BuiltInLayouts]); P3 a theme pack's `layouts/<id>.xml` first and the app's under it,
  * keyboard by keyboard. Ids are kept as they are: a theme's styles name them.
  */
-fun interface LayoutSource {
+interface LayoutSource {
     fun text(id: String): String?
 
-    /** What the layouts read from it are kept under, with their ids ([SceneLayouts.invalidate]): each source its own. */
-    val key: String get() = javaClass.name
+    /**
+     * What the layouts read from it are kept under, with their ids ([SceneLayouts.invalidate]): each
+     * source its own, the same each time it is made. The app's: [BuiltInLayouts.KEY]; P3, a theme
+     * pack's by the pack's id, so a pack changed is read again by its key and no other's.
+     */
+    val key: String
 }
 
 /**

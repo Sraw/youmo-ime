@@ -195,7 +195,7 @@ class SceneKeyDefTest {
             assertEquals(listOf("k14", "grouped-bottom", "nine", "k14", "grouped-bottom"), app.asked)
         }
         // a source that throws: none from it; the app's own the one step back, its own key's no step at all
-        sources(LayoutSource { error("no file") }, app) { assertNotNull(SceneLayouts.of(context, "k18")) }
+        sources(Counted("throws") { error("no file") }, app) { assertNotNull(SceneLayouts.of(context, "k18")) }
         sources(Counted(BuiltInLayouts.KEY) { error("no file") }, Counted(BuiltInLayouts.KEY, builtIn::text)) { assertNull(SceneLayouts.of(context, "k18")) }
         assertTrue(BuiltInLayouts.has("k14") && BuiltInLayouts.has("qwerty") && !BuiltInLayouts.has("nine"))
     }

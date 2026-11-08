@@ -675,6 +675,33 @@ class KeyboardCanvasViewTest {
 
     private fun wubi(labels: KeyLabels, on: Boolean = false) = TableKeyboard(InputMethodCatalog.WUBI, emptySet(), on, labels, TableRoots.WUBI86)
 
+    // a theme's fall back logged once a look, the last 16 kept: a set no theme switching grows past that
+    @Test
+    fun aFallBackIsLoggedOnceALookTheLastSixteenKept() {
+        val look = ThemeManager.shownLook(ThemePreset.PixelLight)
+        val names = (0 until 17).map { "fell-back-$it" }
+        assertTrue(org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard.firstFallBack(names[0], look))
+        assertFalse(org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard.firstFallBack(names[0], look))
+        for (n in names.drop(1)) assertTrue(n, org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard.firstFallBack(n, look))
+        // the first let go of: logged again
+        assertTrue(org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard.firstFallBack(names[0], look))
+        assertFalse(org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard.firstFallBack(names[16], look))
+    }
+
+    // a harness closed lets go of its input method's window: Robolectric keeps every dialog shown till the
+    // test ends (ShadowDialog.shownDialogs), and the window holds the whole service (the S4a review's OOM)
+    @Test
+    fun aHarnessClosedLetsGoOfItsWindow() {
+        val windows = (0 until 3).map {
+            KeyboardHarness(ThemePreset.PixelLight).start().use { h ->
+                val w = h.service.window
+                assertTrue(org.robolectric.shadows.ShadowDialog.getShownDialogs().any { it === w })
+                w
+            }
+        }
+        assertTrue(windows.none { w -> org.robolectric.shadows.ShadowDialog.getShownDialogs().any { it === w } })
+    }
+
     companion object {
         const val PORTRAIT = "w393dp-h851dp-port-440dpi"
 
