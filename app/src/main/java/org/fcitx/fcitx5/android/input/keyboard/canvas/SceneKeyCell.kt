@@ -105,7 +105,10 @@ open class SceneKeyCell(context: Context, private val theme: Theme) : CustomGest
 
     private fun build(): Scene? {
         val t = sceneTheme ?: return null.also { Timber.e("key cell: theme %s not converted; nothing drawn", theme.name) }
+        // the text the size [attrs] gives it: a grid's own, not the keyboard's 紧凑 or floating scale (the cells'
+        // key views never took either)
         val env = SceneEnvs.of(this, look, theme.isDark, width, height, Input(), texts = Texts(), marks = marks)
+            .copy(compact = false, floating = null)
             .let { if (states.isEmpty()) it else it.copy(states = mapOf(KEY to states)) }
         val layout = Layout(
             KEY, KEY, KEY, 1.0, OnSplit.None, KeyAttrs(),
