@@ -103,7 +103,8 @@ class DeveloperFragment : PaddingPreferenceFragment() {
                 key = AppPrefs.getInstance().internal.canvasKeyboard.key
                 setTitle(R.string.canvas_keyboard)
                 setSummary(R.string.canvas_keyboard_summary)
-                setDefaultValue(false)
+                // the pref's own default (on since 060-render-p2 S7): the page opened writes no other
+                setDefaultValue(AppPrefs.getInstance().internal.canvasKeyboard.defaultValue)
                 isIconSpaceReserved = false
                 isSingleLineTitle = false
             })

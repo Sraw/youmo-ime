@@ -148,7 +148,8 @@ class SceneShownKey(val canvas: KeyboardCanvasView, override val id: String, ove
         val i = canvas.scene?.keys?.indexOf(node) ?: return null
         return canvas.accessibilityNodeProvider?.createAccessibilityNodeInfo(i)?.let(AccessibilityNodeInfoCompat::wrap)
     }
-    override val bounds: Rect get() = canvas.bounds(id, copy) ?: error("no key $id ($copy) in the scene now")
+    // where the window shows it: the canvas, or a keyboard over it, moved or scaled (a floating one dragged smaller) too
+    override val bounds: Rect get() = inWindow(node.bounds)
     override val face: Rect get() = inWindow(node.shape.bounds)
     override val hit: Rect get() = inWindow(node.hit.bounds)
     override val pressed: Boolean get() = canvas.shownPressed(id, copy)
@@ -170,7 +171,51 @@ class SceneShownKey(val canvas: KeyboardCanvasView, override val id: String, ove
     }
     override fun toString() = "scene key $id${if (copy != 0) " ($copy)" else ""}"
 
+    /**
+     * Where the scene drew the key's marks (rules E 疑问 3, the slot by slot hook): its symbol's
+     * ([alt]'s text) and each shortcut's (an icon, or a text but its label and symbol), in the order
+     * drawn, as T(op) or B(ottom) and L(eft), C(entre) or R(ight) of the face's middle; null, no
+     * symbol drawn. The key's own label or icon, in its middle, is no mark.
+     */
+    fun markPlaces(): MarkPlaces {
+        val face = node.shape.bounds
+        fun place(x: Double, y: Double): String? {
+            val dx = x - face.centerX
+            val dy = y - face.centerY
+            // its own label or icon: the middle
+            if (kotlin.math.abs(dx) < face.width * CENTRE && kotlin.math.abs(dy) < face.height * CENTRE) return null
+            val side = when {
+                kotlin.math.abs(dx) < face.width * CENTRE -> "C"
+                dx < 0 -> "L"
+                else -> "R"
+            }
+            return (if (dy < 0) "T" else "B") + side
+        }
+        val symbolText = alt
+        var symbol: String? = null
+        val shortcuts = mutableListOf<String>()
+        for (op in node.ops(false)) {
+            when (op) {
+                is Op.Icon -> place(op.box.centerX, op.box.centerY)?.let(shortcuts::add)
+                is Op.Text -> {
+                    if (op.text == label) continue
+                    val wide = op.text.sumOf { if (it.code < 0x2E80) WIDE else 1.0 }
+                    val at = place(op.x + op.size * op.scaleX * wide / 2, op.baseline - op.size * INK / 2) ?: continue
+                    if (op.text == symbolText && symbol == null) symbol = at else shortcuts += at
+                }
+                else -> {}
+            }
+        }
+        return MarkPlaces(symbol, shortcuts)
+    }
+
+    /** [markPlaces]: the symbol's place, null for none drawn, and each shortcut's. */
+    data class MarkPlaces(val symbol: String?, val shortcuts: List<String>)
+
     private companion object {
+        // within this share of the face's width or height of its middle: centred
+        const val CENTRE = 0.08
+
         // a letter's or digit's ink above its baseline, of the text's size
         const val INK = 0.75
 
@@ -179,7 +224,22 @@ class SceneShownKey(val canvas: KeyboardCanvasView, override val id: String, ove
     }
 
     private fun inWindow(b: org.fcitx.fcitx5.android.scene.Box): Rect {
-        val at = IntArray(2).also(canvas::getLocationInWindow)
-        return Rect(at[0] + b.left.roundToInt(), at[1] + b.top.roundToInt(), at[0] + b.right.roundToInt(), at[1] + b.bottom.roundToInt())
+        val p = floatArrayOf(b.left.toFloat(), b.top.toFloat(), b.right.toFloat(), b.bottom.toFloat())
+        // each view's matrix and place in its parent, up to the window
+        var v: View = canvas
+        while (true) {
+            v.matrix.mapPoints(p)
+            for (i in p.indices step 2) {
+                p[i] += v.left.toFloat()
+                p[i + 1] += v.top.toFloat()
+            }
+            val parent = v.parent as? View ?: break
+            for (i in p.indices step 2) {
+                p[i] -= parent.scrollX.toFloat()
+                p[i + 1] -= parent.scrollY.toFloat()
+            }
+            v = parent
+        }
+        return Rect(p[0].roundToInt(), p[1].roundToInt(), p[2].roundToInt(), p[3].roundToInt())
     }
 }

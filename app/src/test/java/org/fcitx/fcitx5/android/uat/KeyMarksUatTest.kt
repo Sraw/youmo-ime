@@ -4,19 +4,13 @@
  */
 package org.fcitx.fcitx5.android.uat
 
-import android.content.res.Configuration
-import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
-import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
-import org.fcitx.fcitx5.android.input.keyboard.KeyView
+import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
-import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.junit.After
@@ -27,6 +21,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -58,31 +53,16 @@ class KeyMarksUatTest {
         made?.close()
     }
 
-    // [v]'s place on [key]: T(op) or B(ottom); L(eft), C(entre) or R(ight); - for none drawn
-    private fun corner(key: View, v: View?): String {
-        if (v == null || !h.shown(v) || v.alpha == 0f) return "-"
-        val k = h.box(key)
-        val b = h.box(v)
-        val x = when {
-            kotlin.math.abs(b.centerX() - k.centerX()) <= 1 -> "C"
-            b.centerX() < k.centerX() -> "L"
-            else -> "R"
-        }
-        return (if (b.centerY() < k.centerY()) "T" else "B") + x
+    // every key's marks as the scene drew them (SceneShownKey.markPlaces): its shortcuts' places, its
+    // symbol's; T(op) or B(ottom), L(eft), C(entre) or R(ight); - for none drawn
+    private fun marks(): List<String> = h.keys().map { k ->
+        val m = (k as SceneShownKey).markPlaces()
+        "${k.label.ifEmpty { k.description }} ${m.shortcuts.joinToString(",").ifEmpty { "-" }} ${m.symbol ?: "-"}"
     }
-
-    // every key's marks: its shortcuts' places, its symbol's
-    private fun marks(): List<String> = KeyboardHarness.all(h.keyboard).filterIsInstance<KeyView>().filter { h.shown(it) }.map { k ->
-        val name = (k as? TextKeyView)?.mainText?.text ?: k.contentDescription
-        val symbol = (k as? AltTextKeyView)?.altText
-        "$name ${k.shortcutMarks.values.joinToString(",") { corner(k, it) }.ifEmpty { "-" }} ${corner(k, symbol)}"
-    }.toList()
 
     private fun marksOf(name: String) = marks().first { it.startsWith("$name ") }
 
-    private fun backspace() = KeyboardHarness.all(h.keyboard).filterIsInstance<KeyView>().first { it.def.viewId == R.id.button_backspace }
-
-    private fun backspaceMarks() = backspace().let { b -> b.shortcutMarks.values.joinToString(",") { corner(b, it) } }
+    private fun backspaceMarks() = (h.keyNamed("backspace") as SceneShownKey).markPlaces().shortcuts.joinToString(",")
 
     private fun at(position: KeyMarkPosition) {
         prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, position)
@@ -231,10 +211,9 @@ class KeyMarksUatTest {
     fun turnedTheSymbolWhereTheNewOrientationPutsIt() {
         symbolsAt(KeyMarkPosition.Bottom)
         h.start()
-        val q = h.viewKey("q") as AltTextKeyView
-        assertEquals(KeyMarks.Slot.Below, q.symbolSlot)
-        val landscape = Configuration(q.resources.configuration).apply { orientation = Configuration.ORIENTATION_LANDSCAPE }
-        q.dispatchConfigurationChanged(landscape)
-        assertEquals(KeyMarks.Slot.TopRight, q.symbolSlot)
+        assertEquals("q - BC", marksOf("q"))
+        RuntimeEnvironment.setQualifiers("+land")
+        h.turn()
+        assertEquals("q - TR", marksOf("q"))
     }
 }

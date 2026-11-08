@@ -790,6 +790,7 @@ class InputView(
                 updateCodeRow(it.im)
                 broadcaster.onImeUpdate(it.entry)
             }
+            is HostEvent.PunctuationAsTyped -> punctuation.updateAsTyped(it.marks)
             is HostEvent.StatusArea -> {
                 punctuation.updatePunctuationMapping(it.entries)
                 broadcaster.onStatusAreaUpdate(it.entries)

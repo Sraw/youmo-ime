@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.engine.TextMetrics
+import org.fcitx.fcitx5.android.scene.engine.toInk
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
@@ -656,5 +657,33 @@ class ContentTest {
         assertEquals(1, Content.codePoints("😀"))
         assertEquals(2, Content.codePoints("ab"))
         assertEquals(1, Content.codePoints("\uD83D"))
+    }
+    // 060-render-p2 S4f: a phone upright 393 dp at 2.75, "@" as wide as Roboto's at the bottom left and 全选 at
+    // the bottom: the yields keep them apart with the icon where it is placed, drawn on whole pixels ([Content]'s
+    // laidOut) almost a px further left, back onto the "@" they had moved left of it
+    @Test
+    fun aKeysMarksStayApartWhereItsIconIsLaidOutOnWholePixels() {
+        val wide = object : org.fcitx.fcitx5.android.scene.engine.TextMeasurer {
+            override fun measure(text: String, font: String, weight: Int, size: Double) = FakeMeasurer.measure(text, font, weight, size).let { m ->
+                if (text == "@") m.copy(ink = Box(m.ink.left, m.ink.top, m.ink.left + 0.82 * size, m.ink.bottom), advance = 0.9 * size) else m
+            }
+        }
+        val d = 2.75
+        val marks = MarkSettings(symbolAt = KeyMarks.At.BottomLeft, shortcutAt = KeyMarks.At.Bottom)
+        for (share in listOf(0.30, 0.32, 0.34, 0.36)) {
+            val env = Forms.env("qwerty", Forms.compact.copy(compact = false, width = 393 * d, height = 851 * d * share, density = d, marks = marks))
+            val key = SceneBuilder(Fixtures.materialLight, env, wide).build(Forms.layout("qwerty"), Forms.fragments).ok().keys.first { it.id == "a" }
+            val inks = key.ops(false).mapNotNull { op ->
+                when (op) {
+                    is Op.Icon -> op.box
+                    is Op.Text -> if (op.text == "@") wide.measure(op.text, op.font, op.weight, op.size).ink.let {
+                        Box(it.left * op.scaleX + op.x, it.top + op.baseline, it.right * op.scaleX + op.x, it.bottom + op.baseline)
+                    } else null
+                    else -> null
+                }
+            }
+            assertEquals(2, inks.size, "$share: both drawn")
+            assertTrue(!inks[0].toInk().meets(inks[1].toInk(), 0.0), "$share: ${inks[0]} meets ${inks[1]}")
+        }
     }
 }

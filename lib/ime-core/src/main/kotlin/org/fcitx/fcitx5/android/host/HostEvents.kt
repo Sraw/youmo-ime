@@ -81,6 +81,12 @@ sealed class HostEvent {
         val im: String get() = entry.uniqueName
     }
 
+    /**
+     * The punctuation keys (`,` `.`) that now type their own character, not their mark: after a letter
+     * or digit with "half width after a letter or number" on ([Punctuation.typesAsItself]); empty, none.
+     */
+    data class PunctuationAsTyped(val marks: Set<String>) : HostEvent()
+
     /** A tip (`showTip`): the app shows it on the keyboard, not through its event flow (`Fcitx.showToast`). */
     data class Tip(val text: String) : HostEvent()
 

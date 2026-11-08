@@ -30,6 +30,8 @@ import org.fcitx.fcitx5.android.core.FakeHostConnection
 import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
+import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.ui.main.MainActivity
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.robolectric.Robolectric
@@ -117,9 +119,16 @@ class SettingsHarness(
     fun pref(title: Int) = pref(s(title))
 
     /** Every text shown in the activity's window. */
+    /** Every text shown, depth first: a text view's, and each a key cap the engine draws (SceneKeyCell) draws. */
     fun texts(): List<String> = KeyboardHarness.all(activity.window.decorView)
         .filter { it.visibility == View.VISIBLE && it.isShown }
-        .filterIsInstance<TextView>().map { it.text.toString() }.toList()
+        .flatMap { v ->
+            when (v) {
+                is TextView -> sequenceOf(v.text.toString())
+                is SceneKeyCell -> v.keyNode?.ops(false).orEmpty().filterIsInstance<Op.Text>().map { it.text }.asSequence()
+                else -> emptySequence()
+            }
+        }.toList()
 
     fun capture(path: String) {
         idle()

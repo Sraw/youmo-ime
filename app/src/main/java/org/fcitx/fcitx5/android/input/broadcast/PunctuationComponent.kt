@@ -23,9 +23,17 @@ class PunctuationComponent :
     private val imeScope by manager.imeScope()
     private val broadcaster: InputBroadcaster by manager.must()
 
-    /** The mapping last loaded: a keyboard attached again takes it (KeyboardWindow.attachLayout). */
-    var mapping: Map<String, String> = emptyMap()
-        private set
+    // the table's mapping last loaded
+    private var loaded: Map<String, String> = emptyMap()
+
+    // the keys that now type their own character (HostEvent.PunctuationAsTyped): the engine's call, not made again here
+    private var asTyped: Set<String> = emptySet()
+
+    /**
+     * What each punctuation key types now, the table's mapping less the keys typing themselves: a
+     * keyboard attached again takes it (KeyboardWindow.attachLayout), and shows on its keys what they type.
+     */
+    val mapping: Map<String, String> get() = if (asTyped.isEmpty()) loaded else loaded - asTyped
 
     // an older update still loading would otherwise overwrite a newer one's mapping
     private var update: Job? = null
@@ -42,7 +50,7 @@ class PunctuationComponent :
         }
         update?.cancel()
         update = imeScope.launch {
-            mapping = if (enabled) {
+            loaded = if (enabled) {
                 fcitx.runOnReady {
                     val items = PunctuationManager.load(this, inputMethodEntryCached.languageCode)
                     val map = HashMap<String, String>()
@@ -57,5 +65,12 @@ class PunctuationComponent :
             } else emptyMap()
             broadcaster.onPunctuationUpdate(mapping)
         }
+    }
+
+    /** The engine's keys typing their own character now ([org.fcitx.fcitx5.android.host.HostEvent.PunctuationAsTyped]): the keys shown anew. */
+    fun updateAsTyped(marks: Set<String>) {
+        if (marks == asTyped) return
+        asTyped = marks
+        broadcaster.onPunctuationUpdate(mapping)
     }
 }

@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.input.voice.VoicePolishStream
@@ -49,7 +50,7 @@ class VoiceTapUatTest : VoiceTapUat() {
         assertTrue(talking)
         assertTrue(shown().toString(), string(R.string.voice_hold_listening) in shown())
         // no panel: the keys stay where they were, under the mask, the bar above it with its microphone
-        assertTrue(KeyboardHarness.all(h.inputView).any { h.shown(it) && it.contentDescription?.startsWith("Space") == true })
+        assertTrue(h.keys().any { it.id == "space" })
         assertNotNullMask()
         assertTrue(h.shown(mic()))
         assertEquals(1, voice.opened)
@@ -320,8 +321,7 @@ class VoiceTapUatTest : VoiceTapUat() {
         assertTrue("$seen not in $board", board.contains(seen))
         // under the bar, over the keys
         assertTrue("$seen over $bar", seen.top >= bar.bottom - 1)
-        val space = KeyboardHarness.all(h.keyboard).first { h.shown(it) && it.contentDescription?.startsWith("Space") == true }
-        val key = Rect().also { space.getGlobalVisibleRect(it) }
+        val key = h.keyNamed("space").bounds
         assertTrue("$key not under $seen", seen.contains(key))
         voice.said += "你好"
         tapMic()

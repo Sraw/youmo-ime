@@ -149,7 +149,7 @@ class PacksUatTest {
             h.idle()
             assertNull("the keyboard types without the voice pack", gate(h))
             // holding the space (voice input, the default): nothing, as 0.5.x's text build; no notice, nothing opened
-            val space = KeyboardHarness.all(h.inputView).first { h.shown(it) && it.contentDescription?.startsWith("Space") == true }
+            val space = h.keyNamed("space")
             val f = h.finger(space, h.at(space))
             h.advance(700)
             f.up(h.at(space))

@@ -48,6 +48,36 @@ data class Drawn(val texts: List<PlacedText>, val icons: List<PlacedIcon>, val i
     }
 }
 
+/**
+ * How much more its ink is at a scale than its ink scaled ([KeyMarkYield.Grows]): each text measured again by
+ * [measurer] at the size it is drawn, its pen where [mapTo] puts it; each scale measured once.
+ */
+fun Drawn.grows(measurer: TextMeasurer): KeyMarkYield.Grows? {
+    if (texts.isEmpty()) return null
+    // the ink at [s], from the ink's corner as [mapTo] has it at [s]
+    fun at(s: Double): Box = texts.map { t ->
+        val m = measurer.measure(t.text, t.font, t.weight, t.size * s).ink
+        val x = (t.x - ink.left) * s
+        val y = (t.baseline - ink.top) * s
+        Box(x + m.left * t.scaleX, y + m.top, x + m.right * t.scaleX, y + m.bottom)
+    }.plus(icons.map { i -> Box((i.box.left - ink.left) * s, (i.box.top - ink.top) * s, (i.box.right - ink.left) * s, (i.box.bottom - ink.top) * s) })
+        .reduce(Box::union)
+    val whole = at(1.0)
+    val seen = HashMap<Double, KeyMarkYield.Ink>()
+    return KeyMarkYield.Grows { s ->
+        seen.getOrPut(s) {
+            val b = at(s)
+            KeyMarkYield.Ink(whole.left * s - b.left, whole.top * s - b.top, b.right - whole.right * s, b.bottom - whole.bottom * s)
+        }
+    }
+}
+
+/** Moved and scaled by [scale] so its ink as drawn ([grows]) is [target]. */
+fun Drawn.drawnAt(target: Box, scale: Double, grows: KeyMarkYield.Grows?): Drawn {
+    val d = grows?.at(scale) ?: return mapTo(target, scale)
+    return mapTo(Box(target.left + d.left, target.top + d.top, target.right - d.right, target.bottom - d.bottom), scale).copy(ink = target)
+}
+
 fun Box.toInk() = KeyMarkYield.Ink(left, top, right, bottom)
 
 fun KeyMarkYield.Ink.toBox() = Box(left, top, right, bottom)

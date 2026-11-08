@@ -8,8 +8,6 @@ import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
-import android.widget.LinearLayout
-import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -22,7 +20,6 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -45,49 +42,65 @@ class KeyCapsTest {
 
     private val ctx get() = ContextThemeWrapper(RuntimeEnvironment.getApplication(), R.style.Theme_FcitxAppTheme)
 
-    private fun key() = KeyCaps.key(ctx, "W", "2", marked = false, dimmed = false)
+    private enum class At { Under, TopRight, BottomRight, TopLeft, BottomLeft, None }
 
-    // the symbol's own TextView: in a column under the letter, or in the frame's top right
-    private fun under(key: FrameLayout) = key.getChildAt(0) is LinearLayout
+    // the key as the page lays it out, the engine's cell in it
+    private fun key(): FrameLayout = KeyCaps.key(ctx, "W", "2", marked = false, dimmed = false).apply {
+        measure(View.MeasureSpec.makeMeasureSpec(SIZE, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(SIZE, View.MeasureSpec.EXACTLY))
+        layout(0, 0, SIZE, SIZE)
+    }
 
-    private fun corner(key: FrameLayout, gravity: Int): Boolean =
-        (0 until key.childCount).map { key.getChildAt(it) }.any {
-            it is TextView && it.text == "2" && (it.layoutParams as FrameLayout.LayoutParams).gravity == gravity
+    // where the engine drew the symbol, from the letter: under it (in its column), or in a corner of the key
+    private fun at(key: FrameLayout): At {
+        val cell = (0 until key.childCount).map(key::getChildAt).filterIsInstance<SceneKeyCell>().single()
+        val texts = cell.keyNode!!.ops(false).filterIsInstance<Op.Text>()
+        val letter = texts.single { it.text == "W" }
+        val symbol = texts.singleOrNull { it.text == "2" } ?: return At.None
+        // a text drawn from its left: its middle, its width about its size a character
+        fun middle(t: Op.Text) = t.x + t.size * t.scaleX * 0.3 * t.text.length
+        val below = symbol.baseline > letter.baseline
+        val side = middle(symbol) - SIZE / 2.0
+        return when {
+            below && kotlin.math.abs(side) < SIZE / 10.0 -> At.Under
+            below && side > 0 -> At.BottomRight
+            below -> At.BottomLeft
+            side > 0 -> At.TopRight
+            else -> At.TopLeft
         }
+    }
 
     @Test
     @Uat("ST-51")
     fun atBottomTheSymbolIsUnderTheLetterButInItsCornerWhenCompact() {
         prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.Bottom)
-        val standard = key()
-        assertTrue(under(standard))
+        assertEquals(At.Under, at(key()))
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
         // the shortcuts top left (the default): top right
-        assertTrue(corner(key(), Gravity.TOP or Gravity.END))
+        assertEquals(At.TopRight, at(key()))
         // the shortcuts top right: bottom right
         prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, KeyMarkPosition.TopRight)
-        assertTrue(corner(key(), Gravity.BOTTOM or Gravity.END))
+        assertEquals(At.BottomRight, at(key()))
         // 滑动 moves nothing
         prefs.set(AppPrefs.getInstance().keyboard.swipeLayers, SwipeLayersChoice.SymbolUpShortcutDown)
-        assertTrue(corner(key(), Gravity.BOTTOM or Gravity.END))
+        assertEquals(At.BottomRight, at(key()))
         // 无 is none whatever the height
         prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.None)
-        assertEquals(1, key().childCount)
+        assertEquals(At.None, at(key()))
     }
 
     @Test
     fun theOtherCornersAsChosen() {
-        val at = mapOf(
-            KeyMarkPosition.TopRight to (Gravity.TOP or Gravity.END),
-            KeyMarkPosition.BottomRight to (Gravity.BOTTOM or Gravity.END),
-            KeyMarkPosition.TopLeft to (Gravity.TOP or Gravity.START),
-            KeyMarkPosition.BottomLeft to (Gravity.BOTTOM or Gravity.START),
+        val corners = mapOf(
+            KeyMarkPosition.TopRight to At.TopRight,
+            KeyMarkPosition.BottomRight to At.BottomRight,
+            KeyMarkPosition.TopLeft to At.TopLeft,
+            KeyMarkPosition.BottomLeft to At.BottomLeft,
         )
         prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, KeyMarkPosition.Bottom)
-        for ((position, gravity) in at) {
+        for ((position, corner) in corners) {
             prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, position)
-            assertTrue("$position", corner(key(), gravity))
+            assertEquals("$position", corner, at(key()))
         }
     }
 
@@ -125,8 +138,10 @@ class KeyCapsTest {
         assertEquals(Argb(ThemeManager.activeTheme.accentKeyBackgroundColor), line.color)
     }
 
-    companion object {
+    private companion object {
         private const val W = 150
         private const val H = 160
+        // a key cap's size on the page, about 56dp at 440dpi
+        const val SIZE = 154
     }
 }

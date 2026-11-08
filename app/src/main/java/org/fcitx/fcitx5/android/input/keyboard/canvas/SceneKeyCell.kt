@@ -38,10 +38,11 @@ import kotlin.math.roundToInt
  * One key drawn by the engine on its own (060-render-p2 S6): a scene of a board of that key only, its
  * size the view's, in the keyboard's theme and the environment the view is in. The symbol grid's cells
  * and the settings' key caps, which were key views each. No board under it: it sits on what is under
- * the view. A scene not made is logged and nothing drawn (never a key view instead).
+ * the view. A scene not made is logged and nothing drawn (never a key view instead). A grid's cell
+ * ([ownSize]) is the size its attrs give, not the keyboard's 紧凑 or floating; a key cap is as the keyboard.
  */
 @SuppressLint("ViewConstructor")
-open class SceneKeyCell(context: Context, private val theme: Theme) : CustomGestureView(context) {
+open class SceneKeyCell(context: Context, private val theme: Theme, private val ownSize: Boolean = false) : CustomGestureView(context) {
 
     private val look = ThemeManager.shownLook(theme)
     private val fonts = SceneFonts(look)
@@ -126,10 +127,10 @@ open class SceneKeyCell(context: Context, private val theme: Theme) : CustomGest
 
     private fun build(): Scene? {
         val t = sceneTheme ?: return null.also { Timber.e("key cell: theme %s not converted; nothing drawn", theme.name) }
-        // the text the size [attrs] gives it: a grid's own, not the keyboard's 紧凑 or floating scale (the cells'
-        // key views never took either)
+        // a grid's cell the text the size [attrs] gives it, not the keyboard's 紧凑 or floating scale (the cells'
+        // key views never took either); a key cap as the keyboard is, its marks' corners as there
         val env = SceneEnvs.of(this, look, theme.isDark, width, height, Input(), texts = Texts(), marks = marks)
-            .copy(compact = false, floating = null)
+            .let { if (ownSize) it.copy(compact = false, floating = null) else it }
             .let { if (states.isEmpty()) it else it.copy(states = mapOf(KEY to states)) }
         val layout = Layout(
             KEY, KEY, KEY, 1.0, OnSplit.None, KeyAttrs(),

@@ -7,7 +7,6 @@ package org.fcitx.fcitx5.android.ui.main.settings
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
-import android.widget.ImageView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.scene.Op
 import android.widget.TextView
@@ -76,7 +75,6 @@ class KeyShortcutsPageScreenshotTest {
     private fun key(label: String): View = KeyboardHarness.all(decor)
         .first { it.contentDescription?.toString()?.substringBefore(',') == label && it.hasOnClickListeners() }
 
-    private fun icons(v: View) = KeyboardHarness.all(v).count { it is ImageView && it.isShown }
 
     private fun capture(name: String) = st.capture("KeyShortcutsPageScreenshotTest/$name")
 
@@ -101,8 +99,8 @@ class KeyShortcutsPageScreenshotTest {
     fun everyTabsKeysWithTheirMarks() {
         open()
         // a's select all top left and its @ top right (标点位置's default), as on the keyboard; s's * alone top right
-        assertEquals(1, icons(key("a")))
-        assertEquals(0, icons(key("s")))
+        assertEquals(1, sceneIcons(key("a")))
+        assertEquals(0, sceneIcons(key("s")))
         capture("full")
         for ((title, name) in listOf(
             R.string.shortcut_page_nine to "nine",
@@ -116,7 +114,7 @@ class KeyShortcutsPageScreenshotTest {
             capture(name)
         }
         // the backspace's clear up and restore down, each its icon: no names cut short
-        assertEquals(2, icons(key(st.s(R.string.fn_key_backspace))))
+        assertEquals(2, sceneIcons(key(st.s(R.string.fn_key_backspace))))
     }
 
     // the caps drawn by the engine where the canvas keyboard is on (060-render-p2 S6): the same marks as the
@@ -129,7 +127,6 @@ class KeyShortcutsPageScreenshotTest {
         prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         open()
         st.idle()
-        assertEquals(0, icons(key("a")))
         assertEquals(1, sceneIcons(key("a")))
         assertEquals(0, sceneIcons(key("s")))
         // s's * in its corner, a text the engine draws
@@ -160,7 +157,7 @@ class KeyShortcutsPageScreenshotTest {
         prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.Bottom)
         open("num/5" to KeyShortcut.Command(KeyCommand.Copy))
         tab(R.string.shortcut_page_number)
-        assertEquals(1, icons(key("5")))
+        assertEquals(1, sceneIcons(key("5")))
         capture("number_bottom")
         // the 14 keys' corners drawn too, under their letters there
         tab(R.string.shortcut_page_g14)
@@ -185,7 +182,7 @@ class KeyShortcutsPageScreenshotTest {
             if (at == KeyMarkPosition.TopRight) prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.BottomRight)
             prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, at)
             open()
-            assertEquals(if (at == KeyMarkPosition.None) 0 else 1, icons(key("a")))
+            assertEquals(if (at == KeyMarkPosition.None) 0 else 1, sceneIcons(key("a")))
             capture("full_${at.name}")
             tab(R.string.shortcut_page_function)
             capture("function_${at.name}")
@@ -202,7 +199,7 @@ class KeyShortcutsPageScreenshotTest {
     fun noSymbolsWhereThePunctuationPositionIsNone() {
         prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.None)
         open()
-        assertEquals(1, icons(key("a")))
+        assertEquals(1, sceneIcons(key("a")))
         capture("full_symbols_None")
     }
 

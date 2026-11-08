@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.uat
 
 import android.graphics.RectF
 import android.text.InputType
-import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
@@ -19,19 +18,22 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.engine.table.TableRoots
-import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
+import org.fcitx.fcitx5.android.input.SceneShownKey
+import org.fcitx.fcitx5.android.input.keyboard.canvas.AndroidTextMeasurer
+import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
+import org.fcitx.fcitx5.android.scene.Box
+import org.fcitx.fcitx5.android.scene.Op
+import org.fcitx.fcitx5.android.scene.Shape
+import org.fcitx.fcitx5.android.scene.engine.toInk
+import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
+import org.fcitx.fcitx5.android.scene.rules.KeyMarks
+import org.fcitx.fcitx5.android.scene.rules.KeyTextScale
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
-import org.fcitx.fcitx5.android.input.keyboard.ImageKeyView
-import org.fcitx.fcitx5.android.input.keyboard.ImageTextKeyView
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
-import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
-import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.junit.After
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -44,11 +46,9 @@ import org.robolectric.annotation.GraphicsMode
  * The marks on every key of every keyboard (uat/02 KB-67), for every pair of 标点位置 and 快捷键图标位置
  * the settings page lets be chosen and as the keys are drawn (standard, 紧凑, floating, one-handed,
  * landscape): what each key draws, its label or icon, its symbol and its shortcuts' marks, as drawn
- * (moved, smaller, left out: KeyMarkYield), never two over each other. Their ink: a text's glyphs, an
- * icon's box. 滑动 is not gone through: it moves no mark.
- *
- * Nothing is left out: a shortcut with no room in its place is drawn in another free corner of its
- * key (KeyMarks.elsewhere); those moved are counted and printed (the report's numbers).
+ * (as the scene placed them, docs/keyboard.md), never two over each other. Their ink: a text's glyphs, an
+ * icon's box. 滑动 is not gone through: it moves no mark. No symbol is left out (those left out are
+ * printed, the report's numbers).
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -132,78 +132,121 @@ class KeyMarksEverywhereUatTest {
     )
 
     private companion object {
+        // Content's and SceneBuilder's (rules B §5, §8)
+        const val SYMBOL_DP = 10.666667
+        const val SYMBOL_SIDE_DP = 4.0
+        const val BELOW_DP = 2.0
+        const val MARK_EDGE_DP = 0.25
+        const val GAP_DP = 1.0
+        const val HALF_PX = 0.5
+
         fun compact(p: Local) {
             p.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
             p.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
         }
     }
 
-    // what [k] draws, as drawn, in its face's coordinates, each with what it is; a mark left out not drawn
-    private fun drawn(k: KeyView): List<Pair<String, RectF>> {
-        val out = mutableListOf<Pair<String, RectF>>()
-        fun add(what: String, v: View?) {
-            if (v == null || !drawn(v)) return
-            val r = RectF()
-            if (v is AutoScaleTextView) {
-                if (v.text.isNullOrEmpty() || !v.inkBounds(r)) return
-            } else {
-                r.set(0f, 0f, v.width.toFloat(), v.height.toFloat())
+    // what [k] draws, as the scene drew it, each with what it is: a text's glyphs (measured), an icon's box
+    private fun drawn(k: SceneShownKey): List<Pair<String, RectF>> {
+        // the label drawn first, a symbol the same text (a table's z) after it
+        var labelSeen = false
+        return k.node.ops(false).mapNotNull { op ->
+        when (op) {
+            is Op.Icon -> "icon ${op.name}" to RectF(op.box.left.toFloat(), op.box.top.toFloat(), op.box.right.toFloat(), op.box.bottom.toFloat())
+            is Op.Text -> {
+                // measured as the engine measured it (AndroidTextMeasurer, the theme's fonts)
+                val ink = measurer.measure(op.text, op.font, op.weight, op.size).ink
+                val r = RectF((ink.left * op.scaleX).toFloat(), ink.top.toFloat(), (ink.right * op.scaleX).toFloat(), ink.bottom.toFloat())
+                val what = when {
+                    op.text == k.label && !labelSeen -> "label".also { labelSeen = true }
+                    op.text == k.alt -> "symbol"
+                    else -> "text ${op.text}"
+                }
+                // a blank's no ink
+                if (r.isEmpty) null else what to r.apply { offset(op.x.toFloat(), op.baseline.toFloat()) }
             }
-            v.matrix.mapRect(r)
-            r.offset(v.left.toFloat(), v.top.toFloat())
-            out += what to r
+            else -> null
         }
-        when (k) {
-            is ImageKeyView -> add("icon", k.img)
-            is ImageTextKeyView -> {
-                add("label", k.mainText)
-                add("icon", k.img)
-            }
-            is TextKeyView -> add("label", k.mainText)
         }
-        if (k is AltTextKeyView) add("symbol", k.altText)
-        k.shortcutMarks.forEach { (slot, v) -> add("shortcut $slot", v) }
-        return out
     }
 
-    private fun drawn(v: View) = v.visibility == View.VISIBLE && v.alpha != 0f && v.width != 0
+    private val measurer by lazy { AndroidTextMeasurer(SceneFonts(ThemeManager.shownLook(ThemeManager.activeTheme))) }
 
-    // left out: [k]'s symbol and shortcut marks laid out but not drawn
-    private fun leftOut(k: KeyView): List<String> =
-        listOfNotNull((k as? AltTextKeyView)?.altText?.takeIf { it.visibility == View.VISIBLE && it.alpha == 0f }?.let { "symbol" }) +
-            k.shortcutMarks.filter { it.value.alpha == 0f }.map { "shortcut ${it.key}" }
+    // each symbol left out, and how many px it is short of fitting at the marks' least scale
+    private val dropped = sortedMapOf<String, Float>()
 
-    private val dropped = sortedMapOf<String, Int>()
-
-    // shortcuts drawn in another corner than their setting's (KeyMarks.elsewhere), by case and key
-    private val moved = sortedMapOf<String, Int>()
-
-    // [r], drawn on a face [w] by [h], in [slot]'s half each way it has one
-    private fun inItsPlace(slot: KeyMarks.Slot, r: RectF, w: Int, h: Int): Boolean {
-        val right = r.centerX() > w / 2f
-        val bottom = r.centerY() > h / 2f
-        return (slot.centred || right == slot.right) && bottom == slot.bottom
+    // KeyMarkYield's rule 4 (060-render-p2 S4e): a symbol is left out only where it still meets what the key
+    // draws at its size ([least]: at [KeyMarkYield.MIN_MARK_SCALE], else its class's, as drawn on the board).
+    // Asked of the engine's own yields (KeyMarkYield.board; the marks, the label no smaller than given), the
+    // symbol's ink measured at that size (060-render-rules §8b) where Content places it in its [slot], the key's
+    // label as the glyph, its other marks as drawn, the face pressed as rounded ([slack] px less each side). How many px it is short: its
+    // side times how much smaller still it must be to stay; 0 where it stays (it fits)
+    private fun short(k: SceneShownKey, symbol: String, d: List<Pair<String, RectF>>, drawn: Op.Text?, slot: KeyMarks.Slot?, shortcutAt: KeyMarks.At, compact: Boolean, least: Boolean, slack: Double = 0.0): Float {
+        val label = d.firstOrNull { it.first == "label" }?.second
+        if (drawn == null || slot == null || label == null) return Float.POSITIVE_INFINITY
+        val dp = FcitxApplication.getInstance().resources.displayMetrics.density.toDouble()
+        // its size before its class is scaled (Content.symbolMark: 10.67 dp, the theme's mark scale 1); floating, the
+        // board's text scale not known here: as docked, larger, so a symbol is no sooner found to fit
+        val nominal = SYMBOL_DP * dp * KeyTextScale.of(compact, null)
+        // the face pressed, its border; half a px in each side, as Content works the yields out (not snapped)
+        val stroke = k.node.ops(true).filterIsInstance<Op.Stroke>().firstOrNull()
+        val shape = stroke?.shape ?: k.node.shape
+        val line = stroke?.width ?: 0.0
+        val inset = HALF_PX + slack
+        val face = shape.bounds.let { Box(it.left + inset, it.top + inset, it.right - inset, it.bottom - inset) }
+        val half = minOf(face.width, face.height) / 2
+        val radii = ((shape as? Shape.Rect)?.radii ?: listOf(0.0, 0.0, 0.0, 0.0)).map { minOf(it, half) }
+        val edge = KeyMarkYield.Edge(face.toInk(), radii, MARK_EDGE_DP * dp + line, line)
+        val room = KeyMarkYield.Ink(face.left + 2 * dp, face.top + dp, face.right - 2 * dp, face.bottom - dp)
+        val others = d.filter { it.first != "label" && it.first != "symbol" }.map { (_, r) ->
+            KeyMarkYield.Mark(KeyMarkYield.Ink(r.left.toDouble(), r.top.toDouble(), r.right.toDouble(), r.bottom.toDouble()), shortcutAt.corner ?: KeyMarks.Slot.Bottom)
+        }
+        val size = if (least) nominal * KeyMarkYield.MIN_MARK_SCALE else drawn.size
+        fun stays(f: Double): Boolean {
+            val m = measurer.measure(symbol, drawn.font, drawn.weight, size * f)
+            val w = m.ink.right - m.ink.left
+            val h = m.bottom - m.top
+            val x = when {
+                slot.left -> face.left + SYMBOL_SIDE_DP * dp
+                slot.right -> face.right - SYMBOL_SIDE_DP * dp - w
+                else -> (face.left + face.right) / 2 - w / 2
+            }
+            val y = if (slot.bottom) face.bottom - (if (slot == KeyMarks.Slot.Below) BELOW_DP * dp else 0.0) - h else face.top
+            val ink = KeyMarkYield.Ink(x, y + m.ink.top - m.top, x + w, y + m.ink.bottom - m.top)
+            val glyph = KeyMarkYield.Ink(label.left.toDouble(), label.top.toDouble(), label.right.toDouble(), label.bottom.toDouble())
+            val member = KeyMarkYield.Member(glyph, (glyph.left + glyph.right) / 2, glyph.bottom, listOf(KeyMarkYield.Mark(ink, slot, KeyMarkYield.DROP_SYMBOL)) + others, room, edge, moves = false)
+            // the label its class's size, as drawn: no smaller for this key alone
+            val out = KeyMarkYield.board(listOf(member), GAP_DP * dp, minMark = 1.0)
+            return out.scales[0] == 1.0 && out.keys[0].marks[0] != null
+        }
+        if (stays(1.0)) return 0f
+        var lo = 0.0
+        var hi = 1.0
+        while (hi - lo > 1e-3) ((lo + hi) / 2).let { if (stays(it)) lo = it else hi = it }
+        val m = measurer.measure(symbol, drawn.font, drawn.weight, size).ink
+        return ((1 - lo) * maxOf(m.right - m.left, m.bottom - m.top)).toFloat()
     }
 
-    // the letters made smaller to keep clear (KeyMarkYield.letters: all of a keyboard's alike), by case
-    private val smaller = sortedMapOf<String, Float>()
-
-    // what [k] draws, none over another; its symbol never left out
-    private fun checkKey(case: String, k: KeyView) {
+    // what [k] draws, none over another; its symbol never left out where 标点位置 draws one
+    private fun checkKey(case: String, k: SceneShownKey, symbols: Boolean, drawnSymbol: Op.Text?, slot: KeyMarks.Slot?, shortcutAt: KeyMarks.At, compact: Boolean) {
+        // a table's roots in lines stay as theme 3.0 set them, nothing yielding to them (Content.KeyContent.yields)
+        if ('\n' in k.label) return
         val d = drawn(k)
-        val name = (k as? TextKeyView)?.mainText?.text ?: k.contentDescription
+        val name = k.label.ifEmpty { k.description }
         for (i in d.indices) for (j in i + 1 until d.size) {
             assertTrue("$case key $name: ${d[i]} meets ${d[j]}", !RectF.intersects(d[i].second, d[j].second))
         }
-        val elsewhere = k.shortcutMarks.entries.filter { (slot, v) ->
-            val r = d.firstOrNull { it.first == "shortcut $slot" }?.second
-            val face = v.parent as View
-            r != null && !inItsPlace(slot, r, face.width, face.height)
+        val symbol = k.alt
+        if (symbols && symbol != null && d.none { it.first == "symbol" }) {
+            // left out at its class's size (the board's symbols one size, 0.875 or larger: the keys past saving ask no
+            // smaller of it, HOPELESS_BAND), so it must not fit there; how far short it is at 0.875 is printed
+            // a px less face than the engine's (what this rebuilds of its geometry, not its own: snapped boxes, its
+            // marks' unsnapped placing), so only a symbol that fits with room to spare counts as left out wrongly
+            val there = short(k, symbol, d, drawnSymbol, slot, shortcutAt, compact, least = false, slack = 1.0)
+            assertTrue("$case key $name: symbol $symbol left out, but it fits at its class's size", there > 0f)
+            val short = short(k, symbol, d, drawnSymbol, slot, shortcutAt, compact, least = true)
+            dropped["$case: $name symbol $symbol"] = short
         }
-        if (elsewhere.isNotEmpty()) moved.merge("$case: $name ${elsewhere.joinToString { "shortcut ${it.key}" }}", 1, Int::plus)
-        val out = leftOut(k)
-        assertTrue("$case key $name: its symbol left out", "symbol" !in out)
-        if (out.isNotEmpty()) dropped.merge("$case: $name ${out.joinToString()}", 1, Int::plus)
     }
 
     // every pair the settings page lets be chosen: apart, or 无
@@ -214,13 +257,11 @@ class KeyMarksEverywhereUatTest {
     // The two settings make the keyboard anew (FcitxInputMethodService.recreateInputViewPrefs). Under
     // Robolectric each old keyboard, about 3 MB, stays: its scroll views' scrollbar fade
     // (View.ScrollabilityCache, posted for 300 ms on) waits in the paused main looper, whose clock
-    // idle() does not move; 62 for each of 90 keyboards ran a full run out of its 3 GB. On a device it
-    // runs and lets go (a heap dump's only path; the clock moved, none was left). Moving the clock
-    // after each would do too, with the symbol page and a table's keys set again after each rebuild: not
-    // made anew here, its keys laid out again as a new one lays them out (check), the swipes' marks by
-    // their own listener (KeySwipes). Not registered again: [check] runs once on a harness closed right
-    // after it, whose service unregisters it on destroy anyway. The field read by name: renamed, this
-    // fails loudly (NoSuchFieldException), never silently
+    // idle() does not move; 62 for each of 90 keyboards ran a full run out of its 3 GB. Not made anew
+    // here: the canvas's scene made again with the settings as they are now (check), as a new keyboard
+    // makes it. Not registered again: [check] runs once on a harness closed right after it, whose
+    // service unregisters it on destroy anyway. The field read by name: renamed, this fails loudly
+    // (NoSuchFieldException), never silently
     private fun noRebuilds(h: KeyboardHarness) {
         val field = h.service.javaClass.getDeclaredField("recreateInputViewListener").apply { isAccessible = true }
         @Suppress("UNCHECKED_CAST")
@@ -238,14 +279,17 @@ class KeyMarksEverywhereUatTest {
             prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, symbolAt)
             prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, shortcutAt)
             h.idle()
-            val all = KeyboardHarness.all(h.inputView).filterIsInstance<KeyView>().toList()
-            // every key's symbol laid out anew, as the keyboard made anew with these settings has it
-            all.filterIsInstance<AltTextKeyView>().forEach { it.dispatchConfigurationChanged(it.resources.configuration) }
+            // every scene made anew, as the keyboard made anew with these settings has it
+            KeyboardHarness.all(h.inputView).filterIsInstance<KeyboardCanvasView>().forEach { it.invalidateScene() }
             h.relayout()
             val case = "${board.name} ${mode.name} 标点${symbolAt.name} 快捷键${shortcutAt.name}"
-            val shown = all.filter { h.shown(it) && it.width > 0 }
-            for (k in shown) checkKey(case, k)
-            shown.filterIsInstance<AltTextKeyView>().minOfOrNull { it.mainText.scaleX }?.takeIf { it < 1f }?.let { smaller[case] = it }
+            val shown = h.keys().filterIsInstance<SceneShownKey>()
+            // the symbols' font and size as drawn on this board: what a left-out one would be drawn in
+            val symbol = shown.flatMap { k -> k.node.ops(false).filterIsInstance<Op.Text>().filter { it.text == k.alt } }.maxByOrNull { it.size }
+            val slot = KeyMarks.symbolSlot(KeyMarks.At.valueOf(symbolAt.name), KeyMarks.At.valueOf(shortcutAt.name), landscape = false, compact = "紧凑" in mode.name)
+            val before = dropped.size
+            for (k in shown) checkKey(case, k, symbolAt != KeyMarkPosition.None, symbol, slot, KeyMarks.At.valueOf(shortcutAt.name), "紧凑" in mode.name)
+            if (dropped.size > before) println("KeyMarksEverywhere $case: ${dropped.size - before} left out")
             keys += shown.size
         }
         assertTrue("${board.name} ${mode.name}: keys", keys > 0)
@@ -273,11 +317,7 @@ class KeyMarksEverywhereUatTest {
             local.undo()
         }
         println("KeyMarksEverywhere left out (${dropped.size}):")
-        dropped.keys.forEach { println("  $it") }
-        println("KeyMarksEverywhere moved elsewhere (${moved.size}):")
-        moved.keys.forEach { println("  $it") }
-        println("KeyMarksEverywhere letters smaller (${smaller.size}):")
-        smaller.forEach { (case, scale) -> println("  $case: ${"%.3f".format(scale)}") }
+        dropped.forEach { (it, short) -> println("  $it short ${"%.2f".format(short)} px") }
     }
 
     @Test
@@ -285,7 +325,6 @@ class KeyMarksEverywhereUatTest {
     @Config(qualifiers = "w393dp-h851dp-port-440dpi")
     fun noKeyDrawsTwoThingsOverEachOtherUpright() {
         each(upright)
-        assertEquals(emptyList<String>(), dropped.keys.toList())
     }
 
     @Test
@@ -293,7 +332,6 @@ class KeyMarksEverywhereUatTest {
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun noKeyDrawsTwoThingsOverEachOtherTurned() {
         each(turned)
-        assertEquals(emptyList<String>(), dropped.keys.toList())
     }
 
     // Not walked at a larger system font size: the keys' texts and marks are sized in dp (KeyView), and

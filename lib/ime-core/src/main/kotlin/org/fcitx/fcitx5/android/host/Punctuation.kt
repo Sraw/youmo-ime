@@ -34,6 +34,11 @@ class Punctuation(
     private val statusArea: StatusArea,
     private val tip: (Tip) -> Unit,
     private val save: (PunctuationConfig) -> Unit = {},
+    /**
+     * The marks that now type as the key's own character ([typesAsItself]) changed on [InputContext]:
+     * the keyboard shows them as they will be typed (060-render-p2 S7 #7).
+     */
+    private val asTyped: (InputContext, Set<String>) -> Unit = { _, _ -> },
 ) {
     /** `PunctuationState` (`:64-72`); the backups only serve the surrounding text rebuild, not ported. */
     class State {
@@ -43,6 +48,9 @@ class Punctuation(
     }
 
     private val stateProperty = IcProperty { State() }
+
+    // the marks last told through [asTyped]
+    private var told: Set<String> = emptySet()
 
     var profile: PunctuationProfile = profile
         private set
@@ -71,11 +79,28 @@ class Punctuation(
         save(config)
     }
 
+    /**
+     * Whether the key [unicode] now types its own character, not its mark: after a letter or digit,
+     * `.` and `,` while "half width after a letter or number" is on (`:444-448`). What [push] types
+     * and what the keyboard shows ([asTyped]) both come from here.
+     */
+    fun typesAsItself(ic: InputContext, unicode: Int): Boolean =
+        enabled && state(ic).lastIsEngOrDigit != 0 && config.halfWidthAfterLatinOrNumber && dontConvertWhenEn(unicode)
+
+    // the marks [typesAsItself] now, told when they change
+    private fun tell(ic: InputContext) {
+        val now = AS_TYPED.filter { typesAsItself(ic, it.code) }.mapTo(HashSet()) { it.toString() }
+        if (now == told) return
+        told = now
+        asTyped(ic, now)
+    }
+
     /** `setEnabled` (`punctuation.h:150-155`): saved, and the action shown anew. */
     fun setEnabled(enabled: Boolean, ic: InputContext) {
         if (enabled == config.enabled) return
         setConfig(config.copy(enabled = enabled))
         action.updateOn(ic)
+        tell(ic)
     }
 
     /** `inWhiteList` (`:434-436`): the context's input method put the toggle in its status area. */
@@ -85,6 +110,7 @@ class Punctuation(
     val commitFilter = CommitFilter { ic, text ->
         val last = text.lastOrNull()
         state(ic).lastIsEngOrDigit = if (last != null && isAsciiLetterOrDigit(last)) last.code else 0
+        tell(ic)
         text
     }
 
@@ -101,6 +127,7 @@ class Punctuation(
             s.lastIsEngOrDigit = 0
             s.notConverted = 0
             s.lastPuncStack.clear()
+            tell(ic)
         }
     }
 
@@ -117,6 +144,7 @@ class Punctuation(
         // Key.isDigit takes the keypad's digits too, as fcitx's (fcitx-utils/key.cpp:412-415)
         val letterOrDigit = key.isUAZ || key.isLAZ || key.isDigit
         state(ic).lastIsEngOrDigit = if (letterOrDigit) KeySyms.toUnicode(key.sym) else 0
+        tell(ic)
     }
 
     /** `getPunctuation` (`:531-543`): the key's first entry, whatever the context; empty when off. */
@@ -142,7 +170,7 @@ class Punctuation(
     private fun push(ic: InputContext, unicode: Int, paired: Boolean): Pair<String, String>? {
         if (!enabled) return null
         val state = state(ic)
-        if (state.lastIsEngOrDigit != 0 && config.halfWidthAfterLatinOrNumber && dontConvertWhenEn(unicode)) {
+        if (typesAsItself(ic, unicode)) {
             state.notConverted = unicode
             return null
         }
@@ -173,5 +201,8 @@ class Punctuation(
         private fun isAsciiLetterOrDigit(c: Char) = c in 'A'..'Z' || c in 'a'..'z' || c in '0'..'9'
 
         private fun dontConvertWhenEn(c: Int) = c == '.'.code || c == ','.code
+
+        // the keys [dontConvertWhenEn] takes
+        private const val AS_TYPED = ".,"
     }
 }

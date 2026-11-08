@@ -21,6 +21,7 @@ class ChineseAddonsTest {
     private val log = mutableListOf<String>()
     private val tips = mutableListOf<Tip>()
     private val saved = mutableListOf<Any>()
+    private val asTyped = mutableListOf<Set<String>>()
 
     private val output = object : HostOutput {
         override fun commit(ic: InputContext, text: String, cursor: Int) {
@@ -47,6 +48,7 @@ class ChineseAddonsTest {
         statusArea,
         tips::add,
         saved::add,
+        { _, marks -> asTyped += marks },
     )
     private lateinit var pipeline: KeyPipeline
     private val fullWidth = FullWidth(statusArea) { c, s -> pipeline.commit(c, s) }
@@ -142,6 +144,32 @@ class ChineseAddonsTest {
         assertEquals("once", "", punctuation.cancelLast(ic))
         pipeline.commit(ic, "中")
         assertEquals("。" to "", punctuation.pushPunctuationV2(ic, '.'.code))
+    }
+
+    @Test
+    fun `the keys typing themselves are told as they change, what the push types (060-render-p2 S7 7)`() {
+        punctuation.setConfig(punctuation.config.copy(halfWidthAfterLatinOrNumber = true))
+        pipeline.commit(ic, "a")
+        assertEquals(listOf(setOf(",", ".")), asTyped)
+        assertTrue(punctuation.typesAsItself(ic, ','.code))
+        assertFalse("only . and ,", punctuation.typesAsItself(ic, '?'.code))
+        pipeline.commit(ic, "b3")
+        assertEquals("no change, not told again", 1, asTyped.size)
+        pipeline.commit(ic, "中")
+        assertEquals(setOf<String>(), asTyped.last())
+        assertFalse(punctuation.typesAsItself(ic, ','.code))
+        assertEquals("，" to "", punctuation.pushPunctuationV2(ic, ','.code))
+        press('7'.code)
+        assertEquals(setOf(",", "."), asTyped.last())
+        punctuation.setEnabled(false, ic)
+        assertEquals("off, nothing typed as a mark either", setOf<String>(), asTyped.last())
+    }
+
+    @Test
+    fun `the option off tells nothing after a letter`() {
+        pipeline.commit(ic, "a")
+        assertEquals(listOf<Set<String>>(), asTyped)
+        assertFalse(punctuation.typesAsItself(ic, '.'.code))
     }
 
     @Test

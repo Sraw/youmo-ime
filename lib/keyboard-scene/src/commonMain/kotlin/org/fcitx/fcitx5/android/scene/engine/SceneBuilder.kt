@@ -293,8 +293,8 @@ class SceneBuilder(
         members.forEachIndexed { n, i ->
             val c = keys[i].content
             val s = KeyMarkYield.onto(member(c), member(loose[i]), board, board.keys[n])
-            val glyph = c.glyphClass?.takeIf { c.yields }?.let { c.glyph?.mapTo(s.glyph.toBox(), board.scales.getValue(it.ordinal)) } ?: c.glyph
-            out[i] = Settled(glyph, c.marks.mapIndexed { j, m -> s.marks[j]?.let { m.drawn.mapTo(it.toBox(), board.markScale(mark(m))) } })
+            val glyph = c.glyphClass?.takeIf { c.yields }?.let { c.glyph?.let { g -> g.drawnAt(s.glyph.toBox(), board.scales.getValue(it.ordinal), g.grows(measurer)) } } ?: c.glyph
+            out[i] = Settled(glyph, c.marks.mapIndexed { j, m -> s.marks[j]?.let { m.drawn.drawnAt(it.toBox(), board.markScale(mark(m)), m.drawn.grows(measurer)) } })
         }
         keys.forEachIndexed { i, k ->
             if (out[i] == null) out[i] = Settled(k.content.glyph, k.content.marks.map { it.drawn })
@@ -325,10 +325,10 @@ class SceneBuilder(
         val ink = c.glyph!!.ink.toInk()
         val main = cls == GlyphClass.Main
         val y = if (main) c.baseline else (ink.top + ink.bottom) / 2
-        return KeyMarkYield.Member(ink, (ink.left + ink.right) / 2, y, c.marks.map(::mark), c.room.toInk(), c.edge, moves = !main, glyphClass = cls.ordinal)
+        return KeyMarkYield.Member(ink, (ink.left + ink.right) / 2, y, c.marks.map(::mark), c.room.toInk(), c.edge, moves = !main, glyphClass = cls.ordinal, grows = c.glyph.grows(measurer))
     }
 
-    private fun mark(m: MarkDrawn) = KeyMarkYield.Mark(m.drawn.ink.toInk(), m.slot, m.drop)
+    private fun mark(m: MarkDrawn) = KeyMarkYield.Mark(m.drawn.ink.toInk(), m.slot, m.drop, m.drawn.grows(measurer))
 
     private fun node(k: Prepared, s: Settled): KeyNode {
         val cell = k.placed.cell
