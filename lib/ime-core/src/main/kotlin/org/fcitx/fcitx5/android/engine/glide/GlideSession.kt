@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.glide
 
+import org.fcitx.fcitx5.android.engine.learn.control.BlockScope
 import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.engine.reading.WordReading
 import org.fcitx.fcitx5.android.engine.session.Action
@@ -213,7 +214,7 @@ class GlideSession(
     // the others are read by their text: their keys are not what [session] read
     override fun readingOf(index: Int): List<WordReading>? = if (others(index) != null) null else session.readingOf(inner(index))
 
-    override fun blocksUnderKeys(index: Int): Boolean = others(index) == null && session.blocksUnderKeys(inner(index))
+    override fun blockScope(index: Int): BlockScope? = if (others(index) != null) null else session.blockScope(inner(index))
 
     override fun lookedUp(index: Int): String? = if (others(index) != null) null else session.lookedUp(inner(index))
 

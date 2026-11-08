@@ -248,9 +248,10 @@ internal class LearningOps(
         }
         // a table blocks its candidate under the code typed alone (U-28, stream C; review-E-ui Q1);
         // what may follow, as pinyin's, everywhere
-        // a character by its strokes, under them alone as a table's (U-28)
-        val underCode = im in InputMethodCatalog.TABLES && why?.code?.kind != Kinds.PREDICTION || s.blocksUnderKeys(op.index)
-        val scope = if (underCode) BlockScope.UNDER_CODE else BlockScope.EVERYWHERE
+        // the session's where it says (review H3): a character by its strokes under them alone as a
+        // table's (U-28), one a table looked up by pinyin everywhere, as pinyin blocks it
+        val underCode = im in InputMethodCatalog.TABLES && why?.code?.kind != Kinds.PREDICTION
+        val scope = s.blockScope(op.index) ?: if (underCode) BlockScope.UNDER_CODE else BlockScope.EVERYWHERE
         return LearningResult.Menu(op.text, kindOf(op.text), items, why, scope)
     }
 

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.stroke
 
+import org.fcitx.fcitx5.android.engine.learn.control.BlockScope
 import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.engine.reading.WordReading
 import org.fcitx.fcitx5.android.engine.session.Action
@@ -129,7 +130,7 @@ class StrokeLookup(
     override fun readingOf(index: Int): List<WordReading>? = if (looking) null else pinyin.readingOf(index)
 
     // a character found by its strokes, nothing typed before it (the lookup starts only then)
-    override fun blocksUnderKeys(index: Int): Boolean = if (looking) found[index] != null else pinyin.blocksUnderKeys(index)
+    override fun blockScope(index: Int): BlockScope? = if (!looking) pinyin.blockScope(index) else if (found[index] != null) BlockScope.UNDER_CODE else null
 
     override fun lookedUp(index: Int): String? = if (looking) found[index]?.let { "" } else pinyin.lookedUp(index)
 
