@@ -195,13 +195,17 @@ they stay: a pack carries no code.
 - **Import** (`PackShelf` in ime-core, `PackStore`/`PackImports` in the app): the manifest's signature is
   checked first, then each file is copied into a new generation directory while its size and SHA-256 are
   checked, after a free-space check against the manifest's sizes; only when all are right is the
-  `current` pointer swapped atomically (rename). A pack already there at that version is not copied
-  again. A killed import leaves the old pack in use; the next start deletes what is not `current`.
+  `current` pointer swapped atomically (rename). A pack already there at that version (the same
+  manifest) is not copied again if its files in use, read through then, still are it; else it is
+  copied anew. A killed import leaves the old pack in use; the next start deletes what is not `current`.
   The user's file is never deleted; the results say they may delete it.
 - **Storage.** Device-protected (`createDeviceProtectedStorageContext().filesDir/packs`), so Direct Boot
   reads it before the first unlock, and an upgrade keeps it. Excluded from cloud and key/value backup
   (over 25 MB); a device transfer carries it. Loading checks the signature and each file's size, not
-  every hash (that would read hundreds of MB at each start).
+  every hash (that would read hundreds of MB at each start). Thirty seconds after the start, a
+  thread of the lowest priority reads each pack in use through (`PackStore.verifyInBackground`,
+  `PackShelf.verify`): one changed is `PackStatus.Damaged`, not used till imported again (the gate:
+  文字包已损坏，请重新导入; the page's row: vN 已损坏，请重新导入; voice input's tip the same).
 - **Reading** (`AppData`): every asset path the engine, handwriting and voice open goes through it, to
   the pack's file if a pack owns the path, else to the APK's asset; `.data`, `.safetensors` and `.ort`
   are memory-mapped from the file. When a pack changes, `PackStore.state` bumps a generation and the

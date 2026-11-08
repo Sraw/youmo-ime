@@ -39,6 +39,7 @@ class PackGateView(context: Context, theme: Theme, status: PackStatus) : LinearL
         val message = when (status) {
             is PackStatus.NeedsUpdate -> context.getString(R.string.pack_text_needed_update, status.needed.minVersion)
             is PackStatus.NeedsNewerApp -> context.getString(R.string.pack_text_needed_app, status.manifest.version)
+            is PackStatus.Damaged -> context.getString(R.string.pack_text_damaged)
             else -> context.getString(R.string.pack_text_needed)
         }
         addView(TextView(context).apply {

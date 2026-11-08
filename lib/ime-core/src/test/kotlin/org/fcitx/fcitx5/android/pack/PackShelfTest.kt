@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.pack.TestPacks.Companion.VOICE_FILES
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -84,6 +85,57 @@ class PackShelfTest {
         val dir = shelf.dir(PackKind.TEXT)
         assertTrue(shelf.take(text()) is ImportResult.AlreadyThere)
         assertEquals(dir, shelf.dir(PackKind.TEXT))
+    }
+
+    // a byte of a file in use changed, its size not (what a start does not see)
+    private fun damage(shelf: PackShelf, kind: PackKind, path: String) {
+        val file = File(shelf.dir(kind)!!, path)
+        val bytes = file.readBytes()
+        bytes[0] = (bytes[0].toInt() xor 1).toByte()
+        file.writeBytes(bytes)
+    }
+
+    @Test
+    fun `the same pack again over one damaged is copied anew, not already there`() {
+        val shelf = shelf()
+        shelf.take(text())
+        val dir = shelf.dir(PackKind.TEXT)
+        damage(shelf, PackKind.TEXT, "engine/pinyin.data")
+        val result = shelf.take(text())
+        assertTrue("$result", result is ImportResult.Imported)
+        assertNotEquals(dir, shelf.dir(PackKind.TEXT))
+        assertReady(shelf, PackKind.TEXT, 3, TEXT_FILES)
+        assertEquals(listOf(shelf.dir(PackKind.TEXT)!!.name), leftovers(PackKind.TEXT))
+    }
+
+    @Test
+    fun `a pack read through and found changed is damaged till imported again`() {
+        val shelf = shelf()
+        shelf.take(text())
+        shelf.take(packs.pack(PackKind.VOICE, VOICE_FILES))
+        // as it was copied: nothing changes
+        assertFalse(shelf.verify(PackKind.TEXT))
+        assertReady(shelf, PackKind.TEXT, 3, TEXT_FILES)
+        // none there: nothing to read
+        assertFalse(PackShelf(tmp.newFolder(), listOf(packs.publicKey), needs).apply { load() }.verify(PackKind.TEXT))
+        damage(shelf, PackKind.TEXT, "engine/pinyin.data")
+        assertTrue(shelf.verify(PackKind.TEXT))
+        val status = shelf.status(PackKind.TEXT)
+        assertTrue("$status", status is PackStatus.Damaged)
+        assertEquals(3, (status as PackStatus.Damaged).manifest.version)
+        assertNull(shelf.dir(PackKind.TEXT))
+        // the other pack as it was
+        assertFalse(shelf.verify(PackKind.VOICE))
+        assertTrue(shelf.status(PackKind.VOICE) is PackStatus.Ready)
+        // a file gone is damage too
+        File(shelf.dir(PackKind.VOICE)!!, VOICE_FILES.keys.first()).delete()
+        assertTrue(shelf.verify(PackKind.VOICE))
+        // the same pack imported again mends it
+        val result = shelf.take(text())
+        assertTrue("$result", result is ImportResult.Imported)
+        assertEquals(3, (result as ImportResult.Imported).replaced?.version)
+        assertReady(shelf, PackKind.TEXT, 3, TEXT_FILES)
+        assertFalse(shelf.verify(PackKind.TEXT))
     }
 
     @Test

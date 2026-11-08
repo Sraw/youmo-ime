@@ -595,3 +595,6 @@ case("ST-63", needs="release,scripted:发布包每次重置都经文件选择器
 
 
 case("ST-64", needs="release:要上一版（0.5.x）的包覆盖安装；方法见 dev/design/060-asset-packs.md 的实现记录")(lambda d: None)
+
+
+case("ST-65", needs="jvm:PacksUatTest.aPackDamagedSinceItsImportIsSaidSoAndImportedAgainMended")(lambda d: None)

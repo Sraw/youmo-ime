@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -28,6 +29,7 @@ import timber.log.Timber
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
+import kotlin.concurrent.thread
 
 /**
  * The app's resource packs (dev/design/060-asset-packs.md): ime-core's [PackShelf] in the
@@ -93,6 +95,29 @@ object PackStore {
         mutableState.value = State(snapshot(), mutableState.value.generation + 1)
     }
 
+    /**
+     * The packs in use read through ([PackShelf.verify]: a start reads their sizes only), on a
+     * thread of the lowest priority, [VERIFY_AFTER_MS] after the start: not competing with the
+     * keyboard's first look. One found damaged is not used (the keyboard's gate, the page say
+     * 已损坏，请重新导入), the engine made anew without it.
+     */
+    fun verifyInBackground() {
+        thread(name = "packs-verify", priority = Thread.MIN_PRIORITY, isDaemon = true) {
+            Thread.sleep(VERIFY_AFTER_MS)
+            runCatching { verifyNow() }.onFailure { Timber.e(it, "resource packs not verified") }
+        }
+    }
+
+    /** [verifyInBackground]'s work, now, on this thread: true if a pack was found damaged. */
+    @VisibleForTesting
+    fun verifyNow(): Boolean {
+        val damaged = PackKind.entries.filter { shelf.verify(it) }
+        if (damaged.isEmpty()) return false
+        Timber.w("resource packs damaged: %s", damaged.joinToString { it.id })
+        changed()
+        return true
+    }
+
     /** [uri] (a file the user picked) imported; [progress] told on the worker as it copies. */
     suspend fun import(resolver: ContentResolver, uri: Uri, progress: (Long, Long) -> Unit = { _, _ -> }): ImportResult =
         withContext(Dispatchers.IO) {
@@ -122,7 +147,8 @@ object PackStore {
         // made anew. The state after it, so what the keyboard queues on it (its field focused again)
         // waits for the new host, not the one going
         HostDaemon.restartIfRunning()
-        mutableState.value = State(snapshot(), mutableState.value.generation + 1)
+        // an import and a verify may both count: neither count lost
+        mutableState.update { State(snapshot(), it.generation + 1) }
     }
 
     private fun snapshot() = PackKind.entries.associateWith { shelf.status(it) }
@@ -141,6 +167,7 @@ object PackStore {
         is PackStatus.Ready -> "v${status.manifest.version} (format ${status.manifest.format})"
         is PackStatus.NeedsUpdate -> "v${status.manifest.version} needs v${status.needed.minVersion} format ${status.needed.format}"
         is PackStatus.NeedsNewerApp -> "v${status.manifest.version} format ${status.manifest.format}, newer than this app's ${status.needed.format}"
+        is PackStatus.Damaged -> "v${status.manifest.version} damaged"
     }
 
     private fun describe(result: ImportResult) = when (result) {
@@ -150,4 +177,5 @@ object PackStore {
     }
 
     private const val BUFFER = 1 shl 16
+    private const val VERIFY_AFTER_MS = 30_000L
 }

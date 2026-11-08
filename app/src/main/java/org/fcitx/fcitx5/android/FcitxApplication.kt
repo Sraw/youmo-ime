@@ -161,9 +161,11 @@ class FcitxApplication : Application() {
             deleteNativeData(createDeviceProtectedStorageContext().dataDir)
         }
         // the resource packs read (an import killed midway cleaned up, the signatures checked) before
-        // the keyboard first asks: it would wait on this on the main thread
+        // the keyboard first asks: it would wait on this on the main thread. Their files' contents
+        // read through later, in the background (a damaged pack then said so)
         thread(name = "packs-load") {
             runCatching { PackStore.warmUp() }.onFailure { Timber.e(it, "resource packs not read") }
+            PackStore.verifyInBackground()
         }
         if (!isDirectBootMode) {
             AppPrefs.getInstance().syncToDeviceEncryptedStorage()

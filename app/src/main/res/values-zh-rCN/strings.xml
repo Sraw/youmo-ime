@@ -1084,6 +1084,7 @@
     <string name="pack_status_ready">已导入 v%1$d</string>
     <string name="pack_status_needs_update">需要更新到 v%1$d（现在是 v%2$d）</string>
     <string name="pack_status_needs_app">已导入的 v%1$d 是给更新版应用的：请更新幽默输入法</string>
+    <string name="pack_status_damaged">v%1$d 已损坏，请重新导入</string>
     <string name="pack_import">导入资源包</string>
     <string name="pack_import_summary">选 .youmopack 文件，可以一次选多个</string>
     <string name="pack_importing">正在导入 %1$s… %2$d%%</string>
@@ -1104,9 +1105,11 @@
     <string name="pack_text_needed">需要导入文字包才能打字</string>
     <string name="pack_text_needed_update">文字包需要更新到 v%1$d</string>
     <string name="pack_text_needed_app">文字包 v%1$d 是给更新版应用的：请更新幽默输入法</string>
+    <string name="pack_text_damaged">文字包已损坏，请重新导入</string>
     <string name="pack_gate_hint">点这里打开「资源包」</string>
     <string name="pack_gate_switch">切换输入法</string>
     <string name="pack_text_needed_short">需要导入文字包：设置 → 资源包</string>
     <string name="pack_voice_needed">语音输入需要导入语音包：设置 → 资源包</string>
     <string name="pack_voice_needed_update">语音输入需要把语音包更新到 v%1$d：设置 → 资源包</string>
+    <string name="pack_voice_damaged">语音包已损坏，请重新导入：设置 → 资源包</string>
 </resources>

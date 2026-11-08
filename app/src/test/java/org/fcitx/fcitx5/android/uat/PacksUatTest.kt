@@ -37,6 +37,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
+import java.io.File
 import java.nio.file.Files
 
 /**
@@ -235,6 +236,39 @@ class PacksUatTest {
     }
 
     @Test
+    @Uat("ST-65")
+    fun aPackDamagedSinceItsImportIsSaidSoAndImportedAgainMended() {
+        val app = RuntimeEnvironment.getApplication()
+        val shelf = TestShelves.shelf(PackKind.TEXT, PackKind.VOICE)
+        try {
+            KeyboardHarness().use { h ->
+                h.start()
+                PackStore.useShelf(shelf)
+                h.idle()
+                assertNull(gate(h))
+                // as copied: nothing found
+                assertFalse(PackStore.verifyNow())
+                // a byte of the text pack's changed, its size not: what a start does not see
+                val file = File(shelf.dir(PackKind.TEXT)!!, "handwriting/test.txt")
+                file.writeBytes(file.readBytes().also { it[0] = (it[0].toInt() xor 1).toByte() })
+                assertTrue(PackStore.verifyNow())
+                h.idle()
+                assertEquals(h.service.getString(R.string.pack_text_damaged), gate(h)?.contentDescription)
+                assertEquals(app.getString(R.string.pack_status_damaged, 1), PackImports.describe(app, PackStore.status(PackKind.TEXT)))
+                // the voice pack as it was
+                assertTrue(PackStore.ready(PackKind.VOICE))
+                // the same pack imported again: copied anew (not 已经导入过), the keyboard back
+                val again = runBlocking { PackStore.import(TestShelves.pack(PackKind.TEXT).inputStream()) }
+                assertTrue("$again", again is ImportResult.Imported)
+                h.idle()
+                assertNull(gate(h))
+            }
+        } finally {
+            TestShelves.use()
+        }
+    }
+
+    @Test
     fun theStatusAPackRowSaysForEachState() {
         val app = RuntimeEnvironment.getApplication()
         val manifest = org.fcitx.fcitx5.android.pack.PackManifest.parse(
@@ -250,5 +284,6 @@ class PacksUatTest {
             app.getString(R.string.pack_status_needs_app, 3),
             PackImports.describe(app, PackStatus.NeedsNewerApp(manifest, PackRequirement(format = 1, minVersion = 1))),
         )
+        assertEquals(app.getString(R.string.pack_status_damaged, 3), PackImports.describe(app, PackStatus.Damaged(manifest)))
     }
 }

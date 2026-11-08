@@ -25,6 +25,9 @@ sealed class PackStatus {
 
     /** Imported, of a newer format than this APK reads: the app needs updating, not the pack. */
     class NeedsNewerApp(val manifest: PackManifest, val needed: PackRequirement) : PackStatus()
+
+    /** Imported, but its files no longer what [manifest] says ([PackShelf.verify]): not used, to be imported again. */
+    class Damaged(val manifest: PackManifest) : PackStatus()
 }
 
 /** Why a file was not imported. */
@@ -122,6 +125,44 @@ class PackShelf(
         return status to gen.takeIf { status is PackStatus.Ready }
     }
 
+    /**
+     * Reads [kind]'s files in use through, against its manifest: what [load] does not (sizes
+     * only). One found changed is [PackStatus.Damaged] from then on, till imported again; true
+     * then. Long (a pack's hundreds of MB), so not under the shelf's lock: an import meanwhile
+     * (its files replaced, the old ones deleted) leaves the new pack as it is.
+     */
+    fun verify(kind: PackKind): Boolean {
+        val (status, gen) = state.getValue(kind)
+        if (status !is PackStatus.Ready || gen == null) return false
+        if (intact(status.manifest, gen)) return false
+        synchronized(this) {
+            if (state.getValue(kind).second != gen) return false
+            state = state + (kind to (PackStatus.Damaged(status.manifest) to null))
+        }
+        return true
+    }
+
+    // each of [manifest]'s files in [gen], its size and SHA-256 as it says; one unreadable is not
+    private fun intact(manifest: PackManifest, gen: File): Boolean = try {
+        val buffer = ByteArray(BUFFER)
+        manifest.files.all { entry ->
+            val file = File(gen, entry.path)
+            val digest = MessageDigest.getInstance("SHA-256")
+            var size = 0L
+            file.inputStream().use { input ->
+                while (true) {
+                    val n = input.read(buffer)
+                    if (n < 0) break
+                    size += n
+                    digest.update(buffer, 0, n)
+                }
+            }
+            size == entry.size && PackManifest.hex(digest.digest()) == entry.sha256
+        }
+    } catch (_: IOException) {
+        false
+    }
+
     private fun judge(manifest: PackManifest): PackStatus {
         val needed = requirements.getValue(manifest.kind)
         return when {
@@ -175,9 +216,15 @@ class PackShelf(
             is PackStatus.Ready -> before.manifest
             is PackStatus.NeedsUpdate -> before.manifest
             is PackStatus.NeedsNewerApp -> before.manifest
+            is PackStatus.Damaged -> before.manifest
             PackStatus.Missing -> null
         }
-        if (before is PackStatus.Ready && before.manifest.sameAs(manifest)) return ImportResult.AlreadyThere(manifest)
+        // the same pack: nothing to copy, if what is in use still is it (its files read through
+        // again: a start reads only their sizes); else copied anew, the import mending it
+        if (before is PackStatus.Ready && before.manifest.sameAs(manifest)) {
+            val gen = state.getValue(manifest.kind).second
+            if (gen != null && intact(before.manifest, gen)) return ImportResult.AlreadyThere(manifest)
+        }
 
         val dir = roomFor(manifest)
         val staging = File(dir, "$STAGING${System.nanoTime()}")

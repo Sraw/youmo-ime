@@ -110,6 +110,7 @@ object PackImports {
         is PackStatus.Ready -> context.getString(R.string.pack_status_ready, status.manifest.version)
         is PackStatus.NeedsUpdate -> context.getString(R.string.pack_status_needs_update, status.needed.minVersion, status.manifest.version)
         is PackStatus.NeedsNewerApp -> context.getString(R.string.pack_status_needs_app, status.manifest.version)
+        is PackStatus.Damaged -> context.getString(R.string.pack_status_damaged, status.manifest.version)
     }
 
     /** What became of [outcome], a line of the results. */

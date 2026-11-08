@@ -94,6 +94,7 @@ class PackImportProvider : ContentProvider() {
         is PackStatus.Ready -> "v${status.manifest.version}"
         is PackStatus.NeedsUpdate -> "needs-update:v${status.manifest.version}"
         is PackStatus.NeedsNewerApp -> "needs-app:v${status.manifest.version}"
+        is PackStatus.Damaged -> "damaged:v${status.manifest.version}"
     }
 
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {

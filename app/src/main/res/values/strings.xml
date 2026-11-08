@@ -1110,6 +1110,7 @@
     <string name="pack_status_ready">Imported: v%1$d</string>
     <string name="pack_status_needs_update">v%2$d imported; this app needs v%1$d or later</string>
     <string name="pack_status_needs_app">v%1$d imported, made for a newer app: update Youmo IME</string>
+    <string name="pack_status_damaged">v%1$d is damaged: import it again</string>
     <string name="pack_import">Import packs</string>
     <string name="pack_import_summary">Pick the .youmopack files (several at once if you like)</string>
     <string name="pack_importing">Importing %1$s… %2$d%%</string>
@@ -1130,9 +1131,11 @@
     <string name="pack_text_needed">Import the text pack to type</string>
     <string name="pack_text_needed_update">The text pack needs updating to v%1$d</string>
     <string name="pack_text_needed_app">The text pack v%1$d is for a newer app: update Youmo IME</string>
+    <string name="pack_text_damaged">The text pack is damaged: import it again</string>
     <string name="pack_gate_hint">Tap here to open Resource packs</string>
     <string name="pack_gate_switch">Switch keyboard</string>
     <string name="pack_text_needed_short">The text pack is needed: Settings → Resource packs</string>
     <string name="pack_voice_needed">Voice input needs the voice pack: Settings → Resource packs</string>
     <string name="pack_voice_needed_update">Voice input needs the voice pack updated to v%1$d: Settings → Resource packs</string>
+    <string name="pack_voice_damaged">The voice pack is damaged: import it again (Settings → Resource packs)</string>
 </resources>
