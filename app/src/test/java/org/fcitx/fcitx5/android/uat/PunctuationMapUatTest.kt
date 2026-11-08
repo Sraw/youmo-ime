@@ -5,12 +5,10 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.view.View
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.KotlinHost
 import org.fcitx.fcitx5.android.core.ScriptedEngine
 import org.fcitx.fcitx5.android.core.startedHost
@@ -24,6 +22,7 @@ import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
 import org.junit.Rule
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -94,14 +93,18 @@ class PunctuationMapUatTest {
             // made to map; S8 deletes it): on the views the face only
             val shown = { faceAndBubble(comma).let { if (canvas) it else it.take(1) } }
             val twice = { c: String -> if (canvas) listOf(c, c) else listOf(c) }
-            // the table read (till then the key shows and types its own mark: beforeTheTableIsRead...)
-            // the statuses at the start can flip punctuation off and on (the mapping emptied, then read again):
-            // the face drawn anew a frame later than the bubble asks; settled when both show the table's mark
-            var presses = 0
-            until("the table read") { presses++; shown() == twice("，") }
-            // what those presses typed (each a mark), the start of what follows
-            until("the presses typed") { h.field.text.length == presses }
-            val p = h.field.text.toString()
+            // the statuses at the start can flip punctuation off and on: each press till the table's mark shows,
+            // what showed then is what it typed
+            var p = ""
+            while (true) {
+                val face = shown()
+                until("the press typed") { h.field.text.length == p.length + 1 }
+                val typed = h.field.text.last().toString()
+                assertEquals(what, twice(typed), face)
+                p += typed
+                if (typed == "，") break
+                assertTrue(what, p.length < SETTLING_PRESSES)
+            }
             // each press below is lifted, so typed: what goes in is checked with what showed
             assertEquals(what, twice("，"), shown())
             until("the mark typed") { h.field.text.toString() == p + "，" }
@@ -122,32 +125,36 @@ class PunctuationMapUatTest {
         }
     }
 
-    // the table read off the main thread (PunctuationComponent) and not read yet: the comma's face, bubble and
-    // what it types alike all the while, then alike as the table has it
+    // punctuation turned off, then on again (the toggle's action): each press of the comma before, between and
+    // after shows on its face and bubble the mark it types, the switch made in the status's own event
     @Test
-    fun beforeTheTableIsReadTheCommaShowsAndTypesAlike() {
+    fun offThenOnTheCommaShowsWhatItTypesEachPress() {
         fcitx = startedHost(ScriptedEngine(home))
         runBlocking { fcitx.setPunctuationMap("zh_CN", listOf(PunctuationMapEntry(",", "、", ""))) }
-        val read = CompletableDeferred<Unit>()
-        val slow = object : HostApi by fcitx {
-            override suspend fun punctuationMap(lang: String): List<PunctuationMapEntry> {
-                read.await()
-                return fcitx.punctuationMap(lang)
-            }
-        }
-        h = KeyboardHarness(host = slow)
+        h = KeyboardHarness(host = fcitx)
         h.service.postFcitxJob { activate(1, "org.example.app") }
         h.start()
         val comma = { h.keyWithId(R.id.button_comma)!! }
-        val before = faceAndBubble(comma)
-        assertEquals(before.toString(), 1, before.toSet().size)
-        until("the mark typed") { h.field.text.isNotEmpty() }
-        assertEquals(before.first(), h.field.text.toString())
-        read.complete(Unit)
-        until("the table read") { comma().label == "、" }
-        assertEquals(listOf("、", "、"), faceAndBubble(comma))
-        until("the mark typed") { h.field.text.length == 2 }
-        assertEquals(before.first() + "、", h.field.text.toString())
+        var typed = ""
+        val press = { want: String ->
+            val shown = faceAndBubble(comma)
+            until("the press typed") { h.field.text.length == typed.length + 1 }
+            val c = h.field.text.last().toString()
+            assertEquals(listOf(c, c), shown)
+            assertEquals(want, c)
+            typed += c
+        }
+        val toggle = {
+            runBlocking { fcitx.activateAction(fcitx.statusArea().single { it.name == "punctuation" }.id) }
+            h.idle()
+        }
+        press("、")
+        toggle()
+        press(",")
+        press(",")
+        toggle()
+        press("、")
+        press("、")
     }
 
     // the key's face and the bubble it shows pressed
@@ -162,5 +169,8 @@ class PunctuationMapUatTest {
 
     private companion object {
         const val BUBBLE_GONE_MS = 1000L
+
+        // the presses the start's statuses may take to settle, at most
+        const val SETTLING_PRESSES = 5
     }
 }

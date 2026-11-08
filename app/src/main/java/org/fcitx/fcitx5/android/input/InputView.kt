@@ -40,7 +40,6 @@ import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.daemon.HostConnection
-import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
@@ -409,11 +408,6 @@ class InputView(
     init {
         // MUST call before any operation
         setupScope()
-
-        // restore punctuation mapping in case of InputView recreation
-        fcitx.launchOnReady {
-            punctuation.updatePunctuationMapping(it.statusAreaCached)
-        }
 
         // make sure KeyboardWindow's view has been created before it receives any broadcast
         windowManager.addEssentialWindow(keyboardWindow, createView = true)
@@ -791,8 +785,11 @@ class InputView(
                 broadcaster.onImeUpdate(it.entry)
             }
             is HostEvent.PunctuationAsTyped -> punctuation.updateAsTyped(it.marks)
+            // a host started anew: its keys type themselves as it tells them, none yet
+            is HostEvent.Ready -> punctuation.updateAsTyped(emptySet())
+            // the status of a view made anew (InputView recreation) comes too, from onStartHandleFcitxEvent
             is HostEvent.StatusArea -> {
-                punctuation.updatePunctuationMapping(it.entries)
+                punctuation.updatePunctuationMapping(it.entries, it.entry.languageCode)
                 broadcaster.onStatusAreaUpdate(it.entries)
             }
             else -> {}

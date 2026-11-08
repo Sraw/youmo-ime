@@ -17,7 +17,6 @@ import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
-import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.broadcast.PreeditEmptyStateComponent
 import org.fcitx.fcitx5.android.input.dependency.context
@@ -65,7 +64,6 @@ class CommonKeyActionListener :
     private val inputView by manager.inputView()
     private val popup: PopupComponent by manager.must()
     private val bar: KawaiiBarComponent by manager.must()
-    private val punctuation: PunctuationComponent by manager.must()
 
     private val shortcutRunner by lazy {
         KeyShortcutRunner(service, windowManager, bar::tradSimp, bar::chooseKeyboard, { voiceTap() }) { !preeditState.isEmpty }
@@ -119,10 +117,7 @@ class CommonKeyActionListener :
                 // as the address keys are: through the engine a digit would pick a candidate, _ be ——
                 is HostKeyAction -> {
                     val address = service.inAddressField
-                    // the punctuation table not read yet, the key showing its own mark: that mark goes in, not the
-                    // engine's mapping of it the keyboard cannot show yet
-                    val asShown = punctuation.reading && action.act.singleOrNull()?.let { !it.isLetterOrDigit() && !it.isWhitespace() } == true
-                    typeOrSend(if (asShown) { _, _, _ -> action.act } else keyAsIs(action.act, address, EngineState::shuangpinScheme)) {
+                    typeOrSend(keyAsIs(action.act, address, EngineState::shuangpinScheme)) {
                         sendKey(action.act, action.states.states, action.code)
                     }
                 }

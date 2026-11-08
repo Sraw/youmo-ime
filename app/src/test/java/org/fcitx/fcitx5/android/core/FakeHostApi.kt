@@ -290,7 +290,10 @@ class FakeHostApi : HostApi {
         imOptions[im] = values.toMap()
     }
 
-    override suspend fun punctuationMap(lang: String) = punctuationMaps[lang].orEmpty()
+    override suspend fun punctuationMap(lang: String): List<PunctuationMapEntry> {
+        calls += "punctuationMap($lang)"
+        return punctuationMaps[lang].orEmpty()
+    }
 
     override suspend fun setPunctuationMap(lang: String, entries: List<PunctuationMapEntry>) {
         calls += "setPunctuationMap($lang)"

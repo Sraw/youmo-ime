@@ -98,7 +98,7 @@ class PunctuationComponentTest {
         val f = Fixture(this)
         f.configure("zh_CN", entry(",", "，"), entry(".", "。"))
 
-        f.punctuation.updatePunctuationMapping(listOf(punctuationAction(active = true)))
+        f.punctuation.updatePunctuationMapping(listOf(punctuationAction(active = true)), "zh_CN")
         advanceUntilIdle()
 
         assertTrue(f.punctuation.enabled)
@@ -113,41 +113,52 @@ class PunctuationComponentTest {
         val f = Fixture(this)
         f.configure("zh_CN", entry("'", "‘"), entry("'", "’"))
 
-        f.punctuation.updatePunctuationMapping(listOf(punctuationAction(active = true)))
+        f.punctuation.updatePunctuationMapping(listOf(punctuationAction(active = true)), "zh_CN")
         advanceUntilIdle()
 
         assertEquals("‘", f.punctuation.transform("'"))
     }
 
     @Test
-    fun anInactivePunctuationActionBroadcastsAnEmptyMapping() = runTest(StandardTestDispatcher()) {
+    fun anInactivePunctuationActionMapsNothingAndTellsNoChange() = runTest(StandardTestDispatcher()) {
         val f = Fixture(this)
         f.configure("zh_CN", entry(",", "，"))
 
-        f.punctuation.updatePunctuationMapping(listOf(punctuationAction(active = false)))
-        advanceUntilIdle()
+        f.punctuation.updatePunctuationMapping(listOf(punctuationAction(active = false)), "zh_CN")
 
         assertFalse(f.punctuation.enabled)
         assertEquals(",", f.punctuation.transform(","))
-        assertEquals(listOf(emptyMap<String, String>()), f.recorder.updates)
+        assertEquals(emptyList<Map<String, String>>(), f.recorder.updates)
     }
 
+    // the keys shown as the engine types in the status's own call, before any key after it: off and on switch
+    // there and then, the table read once (060-render-p2 S7a)
     @Test
-    fun anOlderUpdateStillLoadingDoesNotOverwriteANewerOne() = runTest(StandardTestDispatcher()) {
+    fun offAndOnSwitchTheMappingInTheCallItself() = runTest(StandardTestDispatcher()) {
         val f = Fixture(this)
         f.configure("zh_CN", entry(",", "，"))
-        f.held.hold = true
 
-        f.punctuation.updatePunctuationMapping(listOf(punctuationAction(active = true)))
-        advanceUntilIdle()
-        f.punctuation.updatePunctuationMapping(listOf(punctuationAction(active = false)))
-        advanceUntilIdle()
-        // the on update's load finishes last
-        f.held.release()
-        advanceUntilIdle()
-
-        assertFalse(f.punctuation.enabled)
+        f.punctuation.updatePunctuationMapping(listOf(punctuationAction(active = true)), "zh_CN")
+        assertEquals("，", f.punctuation.transform(","))
+        f.punctuation.updatePunctuationMapping(listOf(punctuationAction(active = false)), "zh_CN")
         assertEquals(",", f.punctuation.transform(","))
-        assertEquals(listOf(emptyMap<String, String>()), f.recorder.updates)
+        // the same status again: nothing new to show
+        f.punctuation.updatePunctuationMapping(listOf(punctuationAction(active = false)), "zh_CN")
+        f.punctuation.updatePunctuationMapping(listOf(punctuationAction(active = true)), "zh_CN")
+        assertEquals("，", f.punctuation.transform(","))
+        assertEquals(listOf(mapOf("," to "，"), emptyMap(), mapOf("," to "，")), f.recorder.updates)
+        assertEquals(1, f.fcitx.api.calls.count { it.startsWith("punctuationMap") })
+    }
+
+    // a new host's keys typing themselves are told anew: what an earlier one told goes (060-render-p2 S7a)
+    @Test
+    fun theKeysTypingThemselvesClearedShowTheTableAgain() = runTest(StandardTestDispatcher()) {
+        val f = Fixture(this)
+        f.configure("zh_CN", entry(",", "，"))
+        f.punctuation.updatePunctuationMapping(listOf(punctuationAction(active = true)), "zh_CN")
+        f.punctuation.updateAsTyped(setOf(","))
+        assertEquals(",", f.punctuation.transform(","))
+        f.punctuation.updateAsTyped(emptySet())
+        assertEquals("，", f.punctuation.transform(","))
     }
 }
