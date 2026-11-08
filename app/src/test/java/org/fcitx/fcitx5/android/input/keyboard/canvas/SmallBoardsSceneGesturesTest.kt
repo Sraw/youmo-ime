@@ -6,6 +6,8 @@ package org.fcitx.fcitx5.android.input.keyboard.canvas
 
 import android.text.InputType
 import android.view.View
+import android.view.accessibility.AccessibilityManager
+import android.view.accessibility.AccessibilityNodeInfo
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -20,12 +22,14 @@ import org.fcitx.fcitx5.android.input.picker.PickerGridView
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -123,6 +127,15 @@ class SmallBoardsSceneGesturesTest {
                 h.press(up())
                 h.release()
                 out += "up at the top: first ${first()} sent $acts"
+                if (on) {
+                    // a screen reader's double tap on the page that cannot turn: refused, nothing sent (060-render-p2 §5.3)
+                    shadowOf(h.service.getSystemService(AccessibilityManager::class.java)).setEnabled(true)
+                    val c = KeyboardHarness.find<KeyboardCanvasView>(side)!!
+                    val i = c.scene!!.keys.indexOfFirst { it.id == "page-up" }
+                    assertFalse(c.accessibilityNodeProvider!!.performAction(i, AccessibilityNodeInfo.ACTION_CLICK, null))
+                    h.idle()
+                    assertEquals("first 字0 sent []", "first ${first()} sent $acts")
+                }
                 h.tap(down())
                 h.after(1000)
                 h.relayout()
