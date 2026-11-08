@@ -62,6 +62,21 @@ class TableRegistryTest : EnginesFixture() {
         assertEquals(listOf("wqvb" to "你好"), shared.words("wqvb"))
     }
 
+    // review R2 L5: what a table leaves out as blocked everywhere is a word of Chinese; an emoji
+    // blocked in pinyin's reading (👍🏻 for hao) is no table's word blocked
+    @Test
+    fun anEmojiBlockedInPinyinIsNoWordATableLeavesOut() {
+        val now = Executor { it.run() }
+        val assets = EngineAssets(::load, {}, null)
+        val lexicon = UserLexicon(userDir = null, onError = {}, additions = { null }, assets = assets, forgetInTables = {}, dropSessions = {})
+        val registry = wired(now, assets, lexicon)
+        val shared = registry.shared(registry.table(WUBI), WUBI)
+        lexicon.addListed(emptyList(), listOf("👍🏻" to "hao", "你好" to "ni hao"))
+        assertTrue(lexicon.isBlocked("👍🏻"))
+        assertFalse(shared.blocked("👍🏻"))
+        assertTrue(shared.blocked("你好"))
+    }
+
     // D8 / TBL-12: 一二's vava is 七上八下's alone, which commits itself; 你好's wqvb the table has nothing under
     @Test
     fun aWordWhoseCodeATableCommitsAloneIsToldWithThatWord() {

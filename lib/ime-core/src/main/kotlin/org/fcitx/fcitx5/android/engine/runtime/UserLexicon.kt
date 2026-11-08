@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.runtime
 
 import org.fcitx.fcitx5.android.engine.english.EnglishBlocks
 import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
+import org.fcitx.fcitx5.android.engine.learn.Han
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
@@ -326,7 +327,7 @@ internal class UserLexicon(
      * A word blocked, for a table. Not a character: blocked in pinyin under one reading (了 liao),
      * a table, which has no readings, would lose it under all.
      */
-    fun isBlockedWord(text: String): Boolean = text.codePointCount(0, text.length) >= 2 && text in blockedTexts()
+    fun isBlockedWord(text: String): Boolean = text.codePointCount(0, text.length) >= 2 && Han.any(text) && text in blockedTexts()
 
     /** The user's words read again if the dictionaries are no longer as they were [before] ([UserAdditions.drop]): see [Engines.reload]. */
     fun reloadDictionaries(before: String) {
