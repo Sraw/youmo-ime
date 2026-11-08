@@ -1112,5 +1112,6 @@
     <string name="pack_text_needed_short">需要导入文字包：设置 → 资源包</string>
     <string name="pack_voice_needed">语音输入需要导入语音包：设置 → 资源包</string>
     <string name="pack_voice_needed_update">语音输入需要把语音包更新到 v%1$d：设置 → 资源包</string>
+    <string name="pack_voice_needed_app">语音包 v%1$d 是给更新版应用的：请更新幽默输入法</string>
     <string name="pack_voice_damaged">语音包已损坏，请重新导入：设置 → 资源包</string>
 </resources>

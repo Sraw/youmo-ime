@@ -1112,5 +1112,6 @@
     <string name="pack_text_needed_short">需要匯入文字包：設定 → 資源包</string>
     <string name="pack_voice_needed">語音輸入需要匯入語音包：設定 → 資源包</string>
     <string name="pack_voice_needed_update">語音輸入需要把語音包更新到 v%1$d：設定 → 資源包</string>
+    <string name="pack_voice_needed_app">語音包 v%1$d 是給更新版應用程式的：請更新幽默輸入法</string>
     <string name="pack_voice_damaged">語音包已損壞，請重新匯入：設定 → 資源包</string>
 </resources>

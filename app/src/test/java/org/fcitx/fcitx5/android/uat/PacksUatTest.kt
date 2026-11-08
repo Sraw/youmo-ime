@@ -165,6 +165,32 @@ class PacksUatTest {
         }
     }
 
+    // a voice pack newer than this app reads: the microphone says to update the app, not the pack
+    @Test
+    fun aVoicePackForANewerAppAsksForTheAppsUpdate() {
+        val dir = Files.createTempDirectory("packs").toFile()
+        val newer = PackShelf(dir, listOf(TestShelves.packs.publicKey), TestShelves.requirements + (PackKind.VOICE to PackRequirement(format = 2, minVersion = 1)))
+        newer.load()
+        assertTrue(newer.import(TestShelves.pack(PackKind.TEXT).inputStream()) is ImportResult.Imported)
+        assertTrue(newer.import(TestShelves.pack(PackKind.VOICE, version = 5, format = 2).inputStream()) is ImportResult.Imported)
+        // this app reads format 1
+        val shelf = PackShelf(dir, listOf(TestShelves.packs.publicKey), TestShelves.requirements).apply { load() }
+        assertTrue(shelf.status(PackKind.VOICE) is PackStatus.NeedsNewerApp)
+        try {
+            KeyboardHarness().use { h ->
+                h.start()
+                PackStore.useShelf(shelf)
+                h.idle()
+                val mic = KeyboardHarness.all(h.inputView).first { h.shown(it) && it.contentDescription == h.service.getString(R.string.voice_input) }
+                h.tap(mic)
+                h.idle()
+                assertEquals(listOf(h.service.getString(R.string.pack_voice_needed_app, 5)), h.noticeTexts())
+            }
+        } finally {
+            TestShelves.use()
+        }
+    }
+
     @Test
     @Uat("ST-62")
     fun thePageListsEachPacksStateAndWhatItIsFor() {

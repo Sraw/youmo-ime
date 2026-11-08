@@ -61,6 +61,9 @@ object VoiceFeature {
         if (status is PackStatus.Ready) return true
         if (status is PackStatus.NeedsUpdate) {
             EngineNotices.tip(context.getString(R.string.pack_voice_needed_update, status.needed.minVersion))
+        } else if (status is PackStatus.NeedsNewerApp) {
+            // the pack is newer than this app reads: the app is what needs updating, not the pack
+            EngineNotices.tip(context.getString(R.string.pack_voice_needed_app, status.manifest.version))
         } else if (status is PackStatus.Damaged) {
             EngineNotices.tip(context.getString(R.string.pack_voice_damaged))
         } else {

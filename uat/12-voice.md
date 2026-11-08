@@ -226,5 +226,5 @@
 ### VO-34 [P0] 没有语音包时麦克风提示导入
 - **前提**：B0，导入了文字包、没导入语音包。
 - **操作**：点候选栏的麦克风；再长按空格。
-- **预期**：键盘照常能打字。点麦克风时提示「语音输入需要导入语音包：设置 → 资源包」并打开资源包页，不问录音权限；语音包版本太旧时提示要更新到哪一版。长按空格什么都不做（和 0.5.x 文字版一样）：没有提示、不打开页面，空格上没有麦克风角标，按住后照样能左右慢拖移动光标。导入语音包后空格上出现麦克风角标，长按就能说话。
-- **JVM**：`PacksUatTest.withoutTheVoicePackTheMicrophoneAsksForItAndTheSpaceDoesNothing`、`KeyboardUatTest.withoutTheVoicePackTheDefaultHoldLeavesTheSlowDragItsCursor`（`:app:testDebugUnitTest`）。
+- **预期**：键盘照常能打字。点麦克风时提示「语音输入需要导入语音包：设置 → 资源包」并打开资源包页，不问录音权限；语音包版本太旧时提示要更新到哪一版；语音包比应用新（格式更新）时提示「语音包 vN 是给更新版应用的：请更新幽默输入法」；语音包已损坏时提示重新导入。长按空格什么都不做（和 0.5.x 文字版一样）：没有提示、不打开页面，空格上没有麦克风角标，按住后照样能左右慢拖移动光标。导入语音包后空格上出现麦克风角标，长按就能说话。
+- **JVM**：`PacksUatTest.withoutTheVoicePackTheMicrophoneAsksForItAndTheSpaceDoesNothing`、`aVoicePackForANewerAppAsksForTheAppsUpdate`、`KeyboardUatTest.withoutTheVoicePackTheDefaultHoldLeavesTheSlowDragItsCursor`（`:app:testDebugUnitTest`）。

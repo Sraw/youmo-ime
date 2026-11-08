@@ -1138,5 +1138,6 @@
     <string name="pack_text_needed_short">The text pack is needed: Settings → Resource packs</string>
     <string name="pack_voice_needed">Voice input needs the voice pack: Settings → Resource packs</string>
     <string name="pack_voice_needed_update">Voice input needs the voice pack updated to v%1$d: Settings → Resource packs</string>
+    <string name="pack_voice_needed_app">Voice pack v%1$d is for a newer app: update Youmo IME</string>
     <string name="pack_voice_damaged">The voice pack is damaged: import it again (Settings → Resource packs)</string>
 </resources>
