@@ -67,7 +67,15 @@ object KeyMarkYield {
     }
 
     /** A mark's [ink] in its [slot]; [drop], how soon it is left out where nothing else clears it (the higher the sooner). */
-    data class Mark(val ink: Ink, val slot: Slot, val drop: Int = DROP_SHORTCUT)
+    data class Mark(val ink: Ink, val slot: Slot, val drop: Int = DROP_SHORTCUT, val grows: Grows? = null)
+
+    /**
+     * How much more a glyph's or mark's ink is at a scale than its ink scaled (each side, out positive): its
+     * text measured again at the size drawn, a font's ink no linear function of its size (whole pixels, hinting).
+     */
+    fun interface Grows {
+        fun at(s: Double): Ink
+    }
 
     /** Where a key's glyph and marks end up: [glyph]'s new ink; each mark's in order, null for left out. */
     data class Settled(val glyph: Ink, val marks: List<Ink?>)
@@ -106,6 +114,9 @@ object KeyMarkYield {
         val edge: Edge = Edge(room),
         val moves: Boolean = true,
         val glyphClass: Int = 0,
+        val grows: Grows? = null,
+        /** Its glyph a label, kept within [room] across (rules B §8a); an icon is as large as it is. */
+        val across: Boolean = false,
     )
 
     /** Every glyph of a class scaled by [scale] about its point; each key's [keys] settled. */
@@ -211,8 +222,9 @@ object KeyMarkYield {
             fits = { s, marks -> fit(k, keys[k].at(s), marks) },
         )
         // a key with both: no more than its symbols alone ask, so they are not let go with the shortcuts
+        // rules B §8a: and each glyph within its room across
         val asked = keys.indices.map { k ->
-            if (whole(k)) 1.0 else minOf(asks(k, false), asks(k, true))
+            minOf(if (whole(k)) 1.0 else minOf(asks(k, false), asks(k, true)), keys[k].across())
         }
         val scales = keys.indices.groupBy { keys[it].glyphClass }.mapValues { (_, ks) -> ks.minOf { asked[it] } }
         // the marks: of the class (or both) that meets, as much smaller as lets them
@@ -248,16 +260,20 @@ object KeyMarkYield {
         val marks = key.marks.mapIndexed { i, m ->
             settled.marks[i]?.let { c ->
                 val t = board.markScale(m)
-                if (t == 1.0 && c == was.marks[i].ink) return@let m.within(key.edge).ink
+                if (t == 1.0 && c == was.marks[i].ink) return@let m.within(key.edge)
                 // only smaller there (and slid off the arc): as much smaller about its corner where [key] has it and
                 // slid as far, so a class nearing 1 nears the mark as it is
                 val w = was.marks[i].scaled(t)
                 val at = if (c == w.within(was.edge).ink) m.scaled(t).let { it.copy(ink = it.ink.moved(c.left - w.ink.left, c.top - w.ink.top)) } else m.copy(ink = c)
                 // its corners within the arcs of [key]'s face as rounded, whatever it is
-                at.within(key.edge).ink
+                at.within(key.edge)
             }
         }
-        return Settled(glyph, marks)
+        // each mapped on its own, a pixel's snap apart (a shortcut's icon laid out on whole pixels) can bring two
+        // kept apart where [was] has them together again: kept apart once more where [key] has them
+        val shown = marks.indices.filter { marks[it] != null }
+        val apart = keptApart(shown.map { marks[it]!! }, key.edge)
+        return Settled(glyph, marks.indices.map { i -> shown.indexOf(i).takeIf { it >= 0 }?.let { apart[it]?.ink } })
     }
 
     // this mark's size: [t] if of the class [symbol] (both if null), else [u]
@@ -317,7 +333,7 @@ object KeyMarkYield {
         if (t == 1.0) return this
         val f = ink.inFrame(slot)
         val x = if (slot.centred) (f.left + f.right) / 2.0 else f.right
-        return copy(ink = f.scaled(t, x, f.top).inFrame(slot))
+        return copy(ink = f.scaled(t, x, f.top).inFrame(slot).grown(grows, t))
     }
 
     // [key] with its glyph at [glyph]: its [marks] placed, those still meeting it left out the most expendable first
@@ -390,7 +406,18 @@ object KeyMarkYield {
         return still.copy(glyph = glyph.moved(dx, 0.0), x = side)
     }
 
-    private fun Member.at(s: Double): Ink = if (s == 1.0) glyph else glyph.scaled(s, x, y)
+    // rules B §8a: what a label wider than its room asks of its class, the class as much smaller as its widest
+    // needs, to [MAX_CLASS_SHRINK] with the rest (what is wider still shrunk alone before: SceneBuilder.fitted)
+    private fun Member.across(): Double {
+        if (!across || glyph.left.isNaN() || glyph.width <= room.width) return 1.0
+        return largest(1.0 - MAX_CLASS_SHRINK) { s -> at(s).width <= room.width }
+    }
+
+    private fun Member.at(s: Double): Ink = if (s == 1.0) glyph else glyph.scaled(s, x, y).grown(grows, s)
+
+    // [g] as drawn at [s]: out on each side by what [grows] has
+    private fun Ink.grown(grows: Grows?, s: Double): Ink =
+        grows?.at(s)?.let { d -> Ink(left - d.left, top - d.top, right + d.right, bottom + d.bottom) } ?: this
 
     // the least of 0 to [whole] (to [step]) that [clears], [all] clearing at the whole of it
     private fun <T : Any> least(all: T, whole: Double, step: Double, clears: (Double) -> T?): T {

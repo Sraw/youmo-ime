@@ -5,16 +5,19 @@
 package org.fcitx.fcitx5.android.ui.main.settings
 
 import android.view.ContextThemeWrapper
+import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
-import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.scene.Op
+import org.fcitx.fcitx5.android.scene.theme.Argb
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -23,6 +26,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import kotlin.math.roundToInt
 
 /**
  * The settings' keys put a key's symbol where the keyboard does: where 标点位置 says; 底部 under the
@@ -99,7 +104,43 @@ class KeyCapsTest {
         }
     }
 
+    // the engine's cap (060-render-p2 S6 review): dimmed (its long press off), its words faded alone, the face and
+    // the symbol as they are, never a disabled key's fading; edited, outlined along the face drawn in the keyboard
+    // theme's accent
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun theEnginesCapFadesItsWordsAloneAndOutlinesItsFace() {
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+        fun cap(marked: Boolean, dimmed: Boolean): SceneKeyCell =
+            KeyCaps.key(ctx, "W", "2", marked = marked, dimmed = dimmed).let { k ->
+                k.measure(View.MeasureSpec.makeMeasureSpec(W, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(H, View.MeasureSpec.EXACTLY))
+                k.layout(0, 0, W, H)
+                (0 until k.childCount).map(k::getChildAt).filterIsInstance<SceneKeyCell>().single()
+            }
+        val plain = cap(marked = false, dimmed = false).drawn()
+        val dim = cap(marked = false, dimmed = true).drawn()
+        assertEquals(plain.size, dim.size)
+        for ((a, b) in plain.zip(dim)) {
+            if (a is Op.Text && a.text == "W") {
+                assertEquals(a.copy(color = Argb(0)), (b as Op.Text).copy(color = Argb(0)))
+                // 0.4 of its alpha, the colour itself kept
+                assertEquals((a.color.alpha * 0.4).roundToInt(), b.color.alpha)
+                assertEquals(a.color.value and 0xFFFFFF, b.color.value and 0xFFFFFF)
+            } else {
+                assertEquals("the face and the symbol as they are", a, b)
+            }
+        }
+        val edited = cap(marked = true, dimmed = false)
+        val drawn = edited.drawn()
+        assertEquals(plain, drawn.dropLast(1))
+        val line = drawn.last() as Op.Stroke
+        assertEquals(edited.keyNode!!.shape, line.shape)
+        assertEquals(Argb(ThemeManager.activeTheme.accentKeyBackgroundColor), line.color)
+    }
+
     private companion object {
+        private const val W = 150
+        private const val H = 160
         // a key cap's size on the page, about 56dp at 440dpi
         const val SIZE = 154
     }

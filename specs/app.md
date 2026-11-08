@@ -184,7 +184,7 @@ two settings with one list of places (`KeyMarkPosition`, `KeyMarks.At`: 右上 �
 五笔's 全部字根 leaves the letters' shortcuts unmarked (`TextKeyboard.charShortcutMarks`: its roots start in the top left corner), shown as 键名 at 紧凑 though (`TableKeyboard.atHeight`, the setting kept); at 键盘高度 紧凑 (`KeyboardHeightLevels.isCompact`, read as the keys
 are made by `keyboardCompact()`) the symbol never under the letter, the shortcuts drawn as anywhere, smaller, and the keys' text 0.9 (`KeyTextScale`, the smaller of it and floating's; 大千's symbols 0.9 again, `KeyTextScale.dachen`, cut off on a 360 dp phone otherwise). The service
 makes the keys anew only when a height change crosses into or out of 紧凑 (`compactBuilt`, as
-`floatingBuilt`); the theme page's preview does the same in `recalculateSize`. A key's glyph (label, icon) and its marks (shortcut icons and texts, a letter's symbol) keep apart only where their ink meets (`KeyMarkYield`, by `AutoScaleTextView.inkBounds`; an icon's box), every slot worked out as the top right one mirrored. `KeyView.settleMarks` after the face's layout (`KeyView.glyphs`: a `TextKeyView`'s label, an `ImageKeyView`'s icon, an `ImageTextKeyView`'s two as one; `KeyMarkYield.key`): marks meeting each other first smaller about their corners, as much, the least that parts them (`keptApart`), else left out (no move parts them), then the marks into their corners (a corner's sideways or out, the less; an edge's middle only out), then the glyph moves (any way, the least, in the face), then the marks smaller (a symbol or text to 6 dp, an icon to 7, `MIN_SYMBOL_DP`, `MIN_ICON_DP`), then the glyph smaller about its middle, a fifth at most, then a shortcut still meeting tried in the key's other free corners (`Mark.elsewhere`), then left out, the most expendable first (`Mark.drop`: a function key's down shortcut, a shortcut); a symbol is never left out (`DROP_SYMBOL`: kept, the glyph at its smallest; drawn over it were that not enough, which the walk finds nowhere). An `AltTextKeyView` (letters; `KeyMarkYield.letters`, run by `BaseKeyboard.onLayout` over all its letter keys once they are laid out): the letter stays, its marks into their corners and smaller; what still meets, every letter of the keyboard the same smaller about its baseline, a quarter at most (a shortcut that would need more is tried elsewhere, then left out; a symbol that would, the letters a quarter smaller). The views are moved by `KeyView.settle`: scaled from their own top left, translated to the ink `KeyMarkYield` gives; a mark left out is drawn at alpha 0. `KeyMarksEverywhereUatTest` measures every key of every keyboard (standard, 紧凑, floating, one-handed, landscape; every pair of places the settings allow) for nothing drawn over anything else and no symbol left out, (the system's font size changes none of it: the keys are sized in dp), and prints what was left out (nothing) and moved. The icon 8 dp at 紧凑. `KeyCaps`' keys don't yield. 注音 keyboards name their keys `zyfull/<QWERTY letter>` and
+`floatingBuilt`); the theme page's preview does the same in `recalculateSize`. A key's glyph (label, icon) and its marks (shortcut icons and texts, a letter's symbol) keep apart only where their ink meets (`KeyMarkYield`, by `AutoScaleTextView.inkBounds`; an icon's box), every slot worked out as the top right one mirrored. `KeyView.settleMarks` after the face's layout (`KeyView.glyphs`: a `TextKeyView`'s label, an `ImageKeyView`'s icon, an `ImageTextKeyView`'s two as one; `KeyMarkYield.key`): marks meeting each other first smaller about their corners, as much, the least that parts them (`keptApart`), else left out (no move parts them), then the marks into their corners (a corner's sideways or out, the less; an edge's middle only out), then the glyph moves (any way, the least, in the face), then the marks smaller (a symbol or text to 6 dp, an icon to 7, `MIN_SYMBOL_DP`, `MIN_ICON_DP`), then the glyph smaller about its middle, a fifth at most, then a shortcut still meeting tried in the key's other free corners (`Mark.elsewhere`), then left out, the most expendable first (`Mark.drop`: a function key's down shortcut, a shortcut); a symbol is never left out (`DROP_SYMBOL`: kept, the glyph at its smallest; drawn over it were that not enough, which the walk finds nowhere). An `AltTextKeyView` (letters; `KeyMarkYield.letters`, run by `BaseKeyboard.onLayout` over all its letter keys once they are laid out): the letter stays, its marks into their corners and smaller; what still meets, every letter of the keyboard the same smaller about its baseline, a quarter at most (a shortcut that would need more is tried elsewhere, then left out; a symbol that would, the letters a quarter smaller). The views are moved by `KeyView.settle`: scaled from their own top left, translated to the ink `KeyMarkYield` gives; a mark left out is drawn at alpha 0. `KeyMarksEverywhereUatTest` measures every key of every keyboard (standard, 紧凑, floating, one-handed, landscape; every pair of places the settings allow) for nothing drawn over anything else and no symbol left out, (the system's font size changes none of it: the keys are sized in dp), and prints what was left out (nothing) and moved. The icon 8 dp at 紧凑. `KeyCaps`' key views don't yield (the canvas off); with the canvas on its caps are scenes and yield as every scene key does (below, S6). 注音 keyboards name their keys `zyfull/<QWERTY letter>` and
 `zy9/1`…`zy9/11`, the groups by their place (`ZhuyinShortcutNames`; the tones and 注音九键's slot none, as 九键's 1). A long press's keys (`PopupKeyboardUi`, `PopupMenuUi`) are one small size whatever the
 key (`PopupComponent.LONG_PRESS_KEY_*`; as wide as the key pressed, 九键's 7 filled the screen),
 floating above it, the bubble gone; the finger picks by how far it moved since they opened, not
@@ -475,6 +475,37 @@ Return offers Emoji as on every other keyboard (the views swallowed it: rules C 
 canvas alone, `NumberSceneGesturesTest`). A place a pad has no key for is a `<gap look>`: drawn
 `:disabled`, faded to `Popups.DISABLED_ALPHA` op by op as the blank key's view was as a whole, no touch,
 no node. The space is still `button_mini_space` to TalkBack (`KeyNames.BOARD_RESOURCES`, read by board).
+
+Any key in the `:disabled` state is faded the same way by the engine (`SceneBuilder.node`: every op of the face,
+words and marks at `Popups.DISABLED_ALPHA`), and `SceneTouch.Pointer` takes no press on it (no tap, no long press,
+no repeat; TalkBack's double tap does nothing either): 展开候选's page key that cannot turn is the one so far.
+
+The small boards and cells (S6). Three more families: `emoji-search` (表情搜索's letters, its 返回 key
+`emoji-search:off` labelled `{back}`, ⌫ `sym:BackSpace` repeating), `expanded-side` (展开候选's column: `page-up`
+and `page-down`, `action:page-up|page-down`, then ⌫ and Return with its Emoji menu) and `number-row` (the
+password field's bar row, ten digits `sym:0`…`sym:9`, `face="none" margin="false"`); each the keyboard's
+`drawKeysWithScene(<id>)` over its `BaseKeyboard`. A keyboard's `sceneTable` is a `SceneKeyDef.Table`: its
+`action:` names, and `repeat(press, node)`, a key's repeat as the keyboard has it (表情搜索's ⌫ tells a hold
+from a tap: a hold clears the query and stops short of the field). `BaseKeyboard.sceneDrawsBase` (true by
+default) says whether the canvas draws the board's base under the keys (`KeyboardCanvasView.drawsBase`): the
+three small boards say no and sit on what their panel draws. `BaseKeyboard.showReturnView` and
+`showImageView` give a picker's own return and image keys (`PickerLayout`) without the board holding key views.
+`ExpandedCandidateLayout.Keyboard.showPages(up, down)` marks a page key `:disabled` where the list cannot turn
+(`BaseExpandedCandidateWindow`). `NumberRow`'s collapse swipe (`checkGesture`) is still its own, seen before
+the scene's touch; a swipe told as one cancels the keys' press.
+
+`SceneKeyCell` (`input/keyboard/canvas`) is one key drawn by the engine on its own: a scene of a one-key layout
+the view's size, in the keyboard's theme, its words `attrs`, its `states` and `marks`, no board under it.
+It takes the size its `attrs` give, never the keyboard's 紧凑 or floating text scale. The symbol and emoji grids'
+cells are these with the canvas on (`PickerGridAdapter`: label, kind letter, the grid's text size, a face and
+margin where the grid is bordered, its a11y and `contentDescription` the item, set again on every bind), and a
+popup over one is over its face (`SceneKeyCell.bounds`: the face across, rounded as
+`KeyboardCanvasView.popupBounds`). 按键字符和快捷键's caps (`KeyCaps`) are too: their marks from
+`SceneMarks.settings` and the cap's `Shortcut`; a cap whose long press is off fades its words alone
+(`SceneKeyCell.labelAlpha`, 0.4, never `:disabled`), and the edited one is outlined along its face
+(`SceneKeyCell.outline`, an `Op.Stroke` of the key's shape) in the keyboard theme's accent, so the caps are the
+keyboard theme's whatever the settings' own. A label the engine cannot fit across its key's room is shrunk
+alone, and one whose ink stands out of it moved back in (060-render-rules B §8a): a long 颜文字 is never cut.
 
 What the scene is given, so it draws what the views would: qwerty.xml is
 `lib/keyboard-scene/src/commonMain/layouts/qwerty.xml`, the one file the app copies and the engine's

@@ -6,6 +6,8 @@ package org.fcitx.fcitx5.android.input.keyboard.canvas
 
 import android.text.InputType
 import android.view.View
+import android.view.accessibility.AccessibilityManager
+import android.view.accessibility.AccessibilityNodeInfo
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -20,11 +22,14 @@ import org.fcitx.fcitx5.android.input.picker.PickerGridView
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -65,7 +70,14 @@ class SmallBoardsSceneGesturesTest {
                 h.field.setSelection(2)
                 h.idle()
                 h.tap(h.described(h.service.getString(R.string.a11y_key_emoji)))
-                h.tap(h.described(h.service.getString(R.string.emoji_search)))
+                // the bar's 表情 opens the panel last shown: no 搜索 (the 颜文字), its own 表情 key back to the emoji
+                h.relayout()
+                val searchName = h.service.getString(R.string.emoji_search)
+                if (KeyboardHarness.all(h.inputView).none { h.shown(it) && it.contentDescription?.toString() == searchName }) {
+                    h.tap(h.keys().first { it.description == h.service.getString(R.string.a11y_key_emoji) })
+                    h.relayout()
+                }
+                h.tap(h.described(searchName))
                 val search = KeyboardHarness.find<EmojiSearchUi>(h.inputView)!!
                 assertEquals(on, drawnByScene(search))
                 val keys = h.keys(search)
@@ -73,12 +85,12 @@ class SmallBoardsSceneGesturesTest {
                 for (c in "xiao") h.tap(keys.single { it.label == c.toString() })
                 out += "xiao: ${"😄" in h.texts(search)}"
                 h.tap(h.keys(search).single { it.description == "Backspace" })
-                out += "⌫: ${h.texts(search).take(3)} field '${h.field.text}'"
+                out += "⌫: query '${h.texts(search).first()}' field '${h.field.text}' engine ${h.sent()}"
                 // held: the query cleared, the field kept
                 h.press(h.keys(search).single { it.description == "Backspace" })
                 h.after(3000)
                 h.release()
-                out += "⌫ held: ${h.texts(search).take(3)} field '${h.field.text}' engine ${h.sent()}"
+                out += "⌫ held: query '${h.texts(search).first()}' field '${h.field.text}' engine ${h.sent()}"
                 h.tap(h.keys(search).single { it.label == h.service.getString(R.string.picker_back) })
                 out += "back: search ${KeyboardHarness.find<EmojiSearchUi>(h.inputView)?.let(h::shown) == true}"
                 out
@@ -87,7 +99,11 @@ class SmallBoardsSceneGesturesTest {
         // independently: 26 letters, 返回 and ⌫; xiao finds 😄; the field's ab kept, nothing typed into it nor deleted; 返回 closes the search
         assertEquals(28, out[0].removePrefix("keys [").removeSuffix("]").split(", ").size)
         assertEquals("xiao: true", out[1])
-        assertTrue(out.toString(), out.all { "field 'ab'" in it || !it.contains("field") })
+        // ⌫ takes the query's last letter; held, the query is cleared to its hint and stops there: the field's ab
+        // kept and nothing sent to the engine either time
+        val hint = RuntimeEnvironment.getApplication().getString(R.string.emoji_search_hint)
+        assertEquals("⌫: query 'xia' field 'ab' engine []", out[2])
+        assertEquals("⌫ held: query '$hint' field 'ab' engine []", out[3])
         assertTrue(out.toString(), out.last() == "back: search false")
     }
 
@@ -118,6 +134,15 @@ class SmallBoardsSceneGesturesTest {
                 h.press(up())
                 h.release()
                 out += "up at the top: first ${first()} sent $acts"
+                if (on) {
+                    // a screen reader's double tap on the page that cannot turn: refused, nothing sent (060-render-p2 §5.3)
+                    shadowOf(h.service.getSystemService(AccessibilityManager::class.java)).setEnabled(true)
+                    val c = KeyboardHarness.find<KeyboardCanvasView>(side)!!
+                    val i = c.scene!!.keys.indexOfFirst { it.id == "page-up" }
+                    assertFalse(c.accessibilityNodeProvider!!.performAction(i, AccessibilityNodeInfo.ACTION_CLICK, null))
+                    h.idle()
+                    assertEquals("first 字0 sent []", "first ${first()} sent $acts")
+                }
                 h.tap(down())
                 h.after(1000)
                 h.relayout()

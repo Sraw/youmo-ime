@@ -7,10 +7,8 @@ package org.fcitx.fcitx5.android.ui.main.settings
 import android.content.Context
 import android.content.res.ColorStateList
 import android.content.res.Configuration
-import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.LayerDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
@@ -25,6 +23,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
+import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.scene.KeyState
@@ -53,6 +52,9 @@ object KeyCaps {
     // the cap's label, as the views' (20sp)
     private const val CAP_TEXT_SIZE = 20.0
 
+    // a dimmed cap's label, as the views' (0.4)
+    private const val DIMMED = 0.4
+
     /** A key's face: [marked] outlined in the accent colour, [selected] filled with it */
     fun background(ctx: Context, marked: Boolean = false, radius: Int = 8, selected: Boolean = false) = GradientDrawable().apply {
         cornerRadius = ctx.dp(radius).toFloat()
@@ -66,15 +68,13 @@ object KeyCaps {
      */
     class Shortcut(val name: String, val shortcuts: KeyShortcuts, val charShortcuts: Boolean = true)
 
-    // the edited key's outline in the accent colour, over the engine's face
-    private fun outline(ctx: Context) = GradientDrawable().apply {
-        cornerRadius = ctx.dp(8).toFloat()
-        setColor(Color.TRANSPARENT)
-        setStroke(ctx.dp(2), ctx.styledColor(android.R.attr.colorPrimary))
-    }
-
-    private fun sceneKey(ctx: Context, text: String, hint: String, dimmed: Boolean, selected: Boolean, shortcut: Shortcut?) =
+    // the edited key outlined along the engine's face, in the keyboard theme's accent (as light or dark as the
+    // face it is on, whatever the settings' own theme); dimmed (its long press off), its words faded alone, the
+    // face and marks as they are, as the key views fade theirs (060-render-p2 S6 review)
+    private fun sceneKey(ctx: Context, text: String, hint: String, marked: Boolean, dimmed: Boolean, selected: Boolean, shortcut: Shortcut?) =
         SceneKeyCell(ctx, ThemeManager.activeTheme).apply {
+            if (marked) outline = Argb(ThemeManager.activeTheme.accentKeyBackgroundColor)
+            labelAlpha = if (dimmed) DIMMED else 1.0
             isClickable = false
             isFocusable = false
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -86,7 +86,7 @@ object KeyCaps {
                 textSize = CAP_TEXT_SIZE,
                 shortcut = shortcut?.name,
             )
-            states = setOfNotNull(KeyState.Selected.takeIf { selected }, KeyState.Disabled.takeIf { dimmed })
+            states = setOfNotNull(KeyState.Selected.takeIf { selected })
             // the symbol where 标点位置 puts it on the keyboard, a key with no shortcut too
             marks = SceneMarks.settings(
                 shortcut?.shortcuts ?: KeyShortcuts.Empty, AppPrefs.getInstance().keyboard.swipeLayers.getValue().layers, markSpots(),
@@ -140,9 +140,9 @@ object KeyCaps {
         isSelected = selected
         if (SceneKeyCell.on) {
             // drawn by the engine as the keyboard draws the key (060-render-p2 S6): its face in the keyboard's
-            // theme, its symbol and shortcut's marks placed by the engine; edited, outlined over it
-            foreground = if (!marked) ripple else LayerDrawable(listOfNotNull(ripple, outline(ctx)).toTypedArray())
-            add(sceneKey(ctx, text, hint, dimmed, selected, shortcut), lParams(matchParent, matchParent))
+            // theme, its symbol and shortcut's marks placed by the engine; edited, outlined along its face
+            foreground = ripple
+            add(sceneKey(ctx, text, hint, marked, dimmed, selected, shortcut), lParams(matchParent, matchParent))
             return@apply
         }
         background = background(ctx, marked, selected = selected)

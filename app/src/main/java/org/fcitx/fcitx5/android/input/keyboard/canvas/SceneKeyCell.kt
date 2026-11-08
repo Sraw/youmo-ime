@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.KeyState
+import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Input
@@ -29,16 +30,19 @@ import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.OnSplit
 import org.fcitx.fcitx5.android.scene.layout.Row
 import org.fcitx.fcitx5.android.scene.layout.RowSplit
+import org.fcitx.fcitx5.android.scene.theme.Argb
 import timber.log.Timber
+import kotlin.math.roundToInt
 
 /**
  * One key drawn by the engine on its own (060-render-p2 S6): a scene of a board of that key only, its
  * size the view's, in the keyboard's theme and the environment the view is in. The symbol grid's cells
  * and the settings' key caps, which were key views each. No board under it: it sits on what is under
- * the view. A scene not made is logged and nothing drawn (never a key view instead).
+ * the view. A scene not made is logged and nothing drawn (never a key view instead). A grid's cell
+ * ([ownSize]) is the size its attrs give, not the keyboard's 紧凑 or floating; a key cap is as the keyboard.
  */
 @SuppressLint("ViewConstructor")
-open class SceneKeyCell(context: Context, private val theme: Theme) : CustomGestureView(context) {
+open class SceneKeyCell(context: Context, private val theme: Theme, private val ownSize: Boolean = false) : CustomGestureView(context) {
 
     private val look = ThemeManager.shownLook(theme)
     private val fonts = SceneFonts(look)
@@ -68,6 +72,25 @@ open class SceneKeyCell(context: Context, private val theme: Theme) : CustomGest
             if (field == value) return
             field = value
             dropScene()
+        }
+
+    /**
+     * The key's own words at this of their alpha, its face and marks as they are (the settings' cap of a key
+     * whose long press is off, as its key view faded its label alone): the cell's, not a scene state.
+     */
+    var labelAlpha: Double = 1.0
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
+
+    /** An outline in this colour along the key's face, its corners the face's (the key being edited); none if null. */
+    var outline: Argb? = null
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
         }
 
     private var made: Scene? = null
@@ -104,7 +127,10 @@ open class SceneKeyCell(context: Context, private val theme: Theme) : CustomGest
 
     private fun build(): Scene? {
         val t = sceneTheme ?: return null.also { Timber.e("key cell: theme %s not converted; nothing drawn", theme.name) }
+        // a grid's cell the text the size [attrs] gives it, not the keyboard's 紧凑 or floating scale (the cells'
+        // key views never took either); a key cap as the keyboard is, its marks' corners as there
         val env = SceneEnvs.of(this, look, theme.isDark, width, height, Input(), texts = Texts(), marks = marks)
+            .let { if (ownSize) it.copy(compact = false, floating = null) else it }
             .let { if (states.isEmpty()) it else it.copy(states = mapOf(KEY to states)) }
         val layout = Layout(
             KEY, KEY, KEY, 1.0, OnSplit.None, KeyAttrs(),
@@ -131,23 +157,39 @@ open class SceneKeyCell(context: Context, private val theme: Theme) : CustomGest
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        val k = keyNode ?: return
-        painter.draw(canvas, k.ops(isPressed))
+        painter.draw(canvas, drawn())
     }
+
+    /** What the cell draws: its key's ops, its label at [labelAlpha], its [outline] over the face. */
+    @VisibleForTesting
+    fun drawn(): List<Op> {
+        val k = keyNode ?: return emptyList()
+        val ops = k.ops(isPressed).let { ops ->
+            if (labelAlpha == 1.0) ops
+            else ops.map { if (it is Op.Text && it.text == k.label) it.copy(color = it.color.times(labelAlpha)) else it }
+        }
+        val line = outline ?: return ops
+        return ops + Op.Stroke(k.shape, OUTLINE_DP * resources.displayMetrics.density, line)
+    }
+
+    private fun Argb.times(a: Double) = Argb((value and RGB) or ((alpha * a).roundToInt() shl ALPHA_SHIFT))
 
     private val at = IntArray(2)
 
-    /** Where the key's face is, in the window: what a popup over it aligns with. */
+    /** Where the key's face is, in the window: what a popup over it aligns with (across its face, as [KeyboardCanvasView.popupBounds]). */
     val bounds: Rect
         get() {
             getLocationInWindow(at)
-            val b = keyNode?.bounds
-            return if (b == null) Rect(at[0], at[1], at[0] + width, at[1] + height)
-            else Rect(at[0] + b.left.toInt(), at[1], at[0] + b.right.toInt(), at[1] + height)
+            val f = keyNode?.shape?.bounds
+            return if (f == null) Rect(at[0], at[1], at[0] + width, at[1] + height)
+            else Rect(at[0] + f.left.roundToInt(), at[1], at[0] + f.right.roundToInt(), at[1] + height)
         }
 
     companion object {
         const val KEY = "key"
+        private const val OUTLINE_DP = 2.0
+        private const val RGB = 0xFFFFFF
+        private const val ALPHA_SHIFT = 24
         private val NO_MARKS = MarkSettings(shortcuts = emptyMap())
 
         /** Whether one key is drawn by the engine (the canvas keyboard on), not as a key view. */

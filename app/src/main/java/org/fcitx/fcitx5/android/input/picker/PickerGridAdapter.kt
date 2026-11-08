@@ -130,7 +130,7 @@ class PickerGridAdapter(
             gravity = Gravity.CENTER_VERTICAL
             setPaddingRelative(dp(12), 0, dp(12), 0)
             layoutParams = RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT, grid.headerHeight)
-        } else if (drawnByScene) SceneKeyCell(ctx, grid.theme).apply {
+        } else if (drawnByScene) SceneKeyCell(ctx, grid.theme, ownSize = true).apply {
             layoutParams = RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT, grid.rowHeight)
         } else TextKeyView(ctx, grid.theme, keyAppearance).apply {
             if (grid.density.autoScale) {

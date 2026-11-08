@@ -12,6 +12,9 @@ import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.MarkContent
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
+import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
+import org.fcitx.fcitx5.android.scene.engine.TextMetrics
+import org.fcitx.fcitx5.android.scene.engine.toInk
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
@@ -549,21 +552,22 @@ class ContentTest {
 
     @Test
     fun crowdedLettersShrinkTogetherRuleB7Yield() {
-        // shorter and shorter keys: every letter one size at each height, the class's cap at most; so short its
-        // symbols meet their letters past what the classes give, the letters their size and those symbols left
-        // out rather than every letter smaller for none (060-render-p2 S4e)
+        // shorter and shorter keys: every letter one size at each height (060-render-p2 S4e). 540 px across: the
+        // fixture's letters wider than their room too (rule B §8a), past the class's cap: the class at its cap,
+        // the rest each shrunk alone alike, so one size still, the same at every height (nothing left for the
+        // height to take); so short its symbols meet their letters, those symbols left out
+        val all = mutableSetOf<Double>()
         for (h in 240..400 step 8) {
             val s = Fixtures.scene(env.copy(width = 540.0, height = h.toDouble()))
             val letters = s.keys.filter { it.kind == "letter" && it.role == null }
             val sizes = letters.map { k -> k.ops(false).filterIsInstance<Op.Text>().first { it.text == k.id }.size }.toSet()
             // one class, one scale: the same size to the last bit
             assertEquals(1, sizes.size, "at $h: $sizes")
-            assertTrue(sizes.single() >= 23 * d * (1 - KeyMarkYield.MAX_CLASS_SHRINK) - 0.01, "the class's cap at most at $h")
-            if (h == 240) {
-                near(23 * d, sizes.single())
-                assertTrue(letters.any { k -> k.ops(false).filterIsInstance<Op.Text>().size == 1 }, "a symbol left out")
-            }
+            assertTrue(sizes.single() < 23 * d * (1 - KeyMarkYield.MAX_CLASS_SHRINK), "past the class's cap at $h")
+            all += sizes.single()
+            if (h == 240) assertTrue(letters.any { k -> k.ops(false).filterIsInstance<Op.Text>().size == 1 }, "a symbol left out")
         }
+        assertEquals(1, all.size, "every height: $all")
     }
 
     // a table's roots over the letters (TextKeyboard): `when=roots`, `{root:x}`; the letter in the corner
@@ -606,5 +610,33 @@ class ContentTest {
         assertEquals(1, Content.codePoints("😀"))
         assertEquals(2, Content.codePoints("ab"))
         assertEquals(1, Content.codePoints("\uD83D"))
+    }
+    // 060-render-p2 S4f: a phone upright 393 dp at 2.75, "@" as wide as Roboto's at the bottom left and 全选 at
+    // the bottom: the yields keep them apart with the icon where it is placed, drawn on whole pixels ([Content]'s
+    // laidOut) almost a px further left, back onto the "@" they had moved left of it
+    @Test
+    fun aKeysMarksStayApartWhereItsIconIsLaidOutOnWholePixels() {
+        val wide = object : org.fcitx.fcitx5.android.scene.engine.TextMeasurer {
+            override fun measure(text: String, font: String, weight: Int, size: Double) = FakeMeasurer.measure(text, font, weight, size).let { m ->
+                if (text == "@") m.copy(ink = Box(m.ink.left, m.ink.top, m.ink.left + 0.82 * size, m.ink.bottom), advance = 0.9 * size) else m
+            }
+        }
+        val d = 2.75
+        val marks = MarkSettings(symbolAt = KeyMarks.At.BottomLeft, shortcutAt = KeyMarks.At.Bottom)
+        for (share in listOf(0.30, 0.32, 0.34, 0.36)) {
+            val env = Forms.env("qwerty", Forms.compact.copy(compact = false, width = 393 * d, height = 851 * d * share, density = d, marks = marks))
+            val key = SceneBuilder(Fixtures.materialLight, env, wide).build(Forms.layout("qwerty"), Forms.fragments).ok().keys.first { it.id == "a" }
+            val inks = key.ops(false).mapNotNull { op ->
+                when (op) {
+                    is Op.Icon -> op.box
+                    is Op.Text -> if (op.text == "@") wide.measure(op.text, op.font, op.weight, op.size).ink.let {
+                        Box(it.left * op.scaleX + op.x, it.top + op.baseline, it.right * op.scaleX + op.x, it.bottom + op.baseline)
+                    } else null
+                    else -> null
+                }
+            }
+            assertEquals(2, inks.size, "$share: both drawn")
+            assertTrue(!inks[0].toInk().meets(inks[1].toInk(), 0.0), "$share: ${inks[0]} meets ${inks[1]}")
+        }
     }
 }

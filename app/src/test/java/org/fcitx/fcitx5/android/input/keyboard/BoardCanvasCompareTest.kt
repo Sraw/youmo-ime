@@ -94,7 +94,24 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
                 h.relayout()
                 KeyboardHarness.find<PickerGridView>(h.inputView)!!
             },
+            // the 颜文字's cells (S6 review): long ones shrunk to fit theirs (rules B §8a), the views' scaled down alike
+            "emoticon-grid" to { h ->
+                val emoji = h.service.getString(R.string.a11y_key_emoji)
+                h.tap(h.described(emoji))
+                h.relayout()
+                // the bar's button opens the panel last shown: the 颜文字's own switch key (表情 too) back to the emoji first
+                if (h.keys().none { it.label == ":-)" }) {
+                    h.tap(h.keys().first { it.description == emoji })
+                    h.relayout()
+                }
+                h.tap(h.key(":-)"))
+                h.relayout()
+                KeyboardHarness.find<PickerGridView>(h.inputView)!!
+            },
         )
+
+        // the small boards whose keys are each a cell of a grid, no canvas
+        private val GRIDS = setOf("symbol-grid", "emoticon-grid")
 
         // each number pad by the field that shows it (NumberPad.of): the full pad's a plain number field's
         private val FIELDS = mapOf(
@@ -127,7 +144,18 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
         // voice pack in (integ-060), the space's microphone a few pixels apart on the two adds up to 0.07%: 2.02% compact
         // the number row compact (S6): its digits stood on the engine's baseline, a pixel or two off the views'
         // centred text in the 紧凑 height's shorter row, 1.73%
-        private val DIFFERING_MORE = mapOf("zhuyin" to 0.021, "number-row" to 0.018)
+        // the 颜文字 grid compact (S6 review): its rows shorter than the text's extent with the views' padding (69 px
+        // in 48), where AutoScaleTextView puts the text's top at the padding's and lets it run out below (baseline
+        // 74.2 in an 86 px cell); the scene centres it in the cell (63.5), 10.7 px higher: 4.19% (060-render-p2 §5.3)
+        // by board and case; a board's null case its every case (大千's, from before S6)
+        private val DIFFERING_MORE = mapOf(
+            ("zhuyin" to null) to 0.021,
+            ("number-row" to "compact") to 0.018,
+            ("emoticon-grid" to "compact") to 0.045,
+        )
+
+        private fun most(board: String, case: String) =
+            DIFFERING_MORE[board to case] ?: DIFFERING_MORE[board to null] ?: MOST_DIFFERING
     }
 
     @get:Rule
@@ -165,7 +193,7 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
         val shares = cases.associate { it.name to differingShare(it) }
         val told = shares.entries.joinToString("\n") { (name, share) -> "$board $name ${"%.2f".format(share * 100)}%" }
         File("build/outputs/canvas-compare/$board-shares.txt").apply { parentFile!!.mkdirs() }.writeText(told + "\n")
-        assertTrue(told, shares.values.all { it < (DIFFERING_MORE[board] ?: MOST_DIFFERING) })
+        assertTrue(told, shares.all { (name, share) -> share < most(board, name) })
     }
 
     // the share of the pixels that differ between the views' keys and the scene's: a channel off by more
@@ -197,7 +225,7 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
                     // the shown ones: the bar's number row is made with the bar, hidden but for a password
                     val canvases = KeyboardHarness.all(v).filterIsInstance<KeyboardCanvasView>().filter { it.isShown }.toList()
                     val keys = KeyboardHarness.keysOf(v)
-                    if (board == "symbol-grid") {
+                    if (board in GRIDS) {
                         // no canvas: each cell its own key's scene, or a key view
                         assertEquals(case.name, on, KeyboardHarness.all(v).any { it is SceneKeyCell })
                     } else if (on) {
