@@ -72,4 +72,45 @@ class EnginesAlikeBlockTest : EnginesFixture() {
             assertEquals(setOf("国", "國"), e.blocked())
         }
     }
+
+    // review R4 M1: the pressed one refused by the host (its list changed), the one shown alike
+    // acted on before it is taken back: Unavailable, and nothing blocked
+    @Test
+    fun aBlockWhoseOwnActIsRefusedLeavesNothingBlocked() {
+        Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+            e.onEvent(PINYIN, EngineEvent.RESET, 0)
+            e.type(PINYIN, "uzps")
+            val before = e.candidates(PINYIN, 0, 30).map { it.text }
+            val at = before.indexOf("国")
+            val acts = ArrayList<String>()
+            val done = e.learning(PINYIN, LearningOp.Block(at, "国"), traditional) { ev, i, t ->
+                acts += t
+                i != at && e.pressShown(PINYIN, ev, i)
+            }
+            assertEquals(LearningResult.Unavailable, done)
+            assertTrue("$acts", "國" in acts)
+            assertEquals(emptySet<String>(), e.underCode())
+        }
+    }
+
+    // the same of a delete: the words added by hand, deleted with it, are back
+    @Test
+    fun aDeleteWhoseOwnActIsRefusedLeavesTheWords() {
+        Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+            assertTrue(e.addWord("国甲", "guo jia"))
+            assertTrue(e.addWord("國甲", "guo jia"))
+            e.onEvent(PINYIN, EngineEvent.RESET, 0)
+            val list = e.type(PINYIN, "guojia").candidates
+            val at = list.indexOf("国甲")
+            assertTrue("$list", at >= 0 && "國甲" in list)
+            val acts = ArrayList<String>()
+            val done = e.learning(PINYIN, LearningOp.Delete(at, "国甲"), traditional) { ev, i, t ->
+                acts += t
+                i != at && e.pressShown(PINYIN, ev, i)
+            }
+            assertEquals(LearningResult.Unavailable, done)
+            assertTrue("$acts", "國甲" in acts)
+            assertEquals(setOf("国甲", "國甲"), e.userWords().map { it.text }.toSet())
+        }
+    }
 }

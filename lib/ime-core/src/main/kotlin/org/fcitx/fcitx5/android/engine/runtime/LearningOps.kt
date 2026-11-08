@@ -164,9 +164,12 @@ internal class LearningOps(
 
     // [act] made undoable: its token, or null where the host made no act of it (the list it was
     // asked of gone by then; review-E-engine S4)
-    private fun acted(inverse: () -> Unit = {}, act: () -> Boolean): Long? {
+    // asked of gone by then; review-E-engine S4). Not done but [wrote] something (another candidate
+    // shown alike acted on, the pressed one then refused): that taken back at once (review R4 M1)
+    private fun acted(inverse: () -> Unit = {}, wrote: () -> Boolean = { false }, act: () -> Boolean): Long? {
         var did = false
         val token = control.undoable(inverse) { did = act() }
+        if (!did && wrote()) control.undo(token)
         return token.takeIf { did }
     }
 
@@ -229,19 +232,19 @@ internal class LearningOps(
 
     private fun blockAlike(im: String, s: Session, op: LearningOp.Block, shown: (String) -> String, act: (Int, Int, String) -> Boolean): LearningResult {
         val all = alike(s, op, shown)
-        return block(all.map { it.value }) { actOn(im, all, Offer.BLOCK, EngineEvent.BLOCK, act).isNotEmpty() }
+        return block(all.map { it.value }) { actOn(im, all, Offer.BLOCK, EngineEvent.BLOCK, act) }
     }
 
     // [event] on each of [words] still where the list had it, the last first (an act takes one off
-    // the list, those before it where they were); the pressed one ([words]' first) must be done, the
-    // others where they are. The texts done
+    // the list, those before it where they were). The texts done: the pressed one ([words]' first)
+    // among them or the act is not (and those done taken back: acted)
     private fun actOn(im: String, words: List<IndexedValue<String>>, offer: Offer, event: Int, act: (Int, Int, String) -> Boolean): List<String> {
         val done = ArrayList<String>()
         for ((at, t) in words.sortedByDescending { it.index }) {
             val s = session(im) ?: break
             if (offer in s.offers(at) && act(event, at, t)) done += t
         }
-        return if (words.first().value in done) done else done.also { it.clear() }
+        return done
     }
 
     // [whole]: the whole phrase (U-73) [texts]' first is the rest of, "" for a word; [texts]: it and
@@ -252,9 +255,9 @@ internal class LearningOps(
         val added = if (whole.isEmpty()) lexicon.addedPlaces(texts.flatMap { lexicon.addedOf(it) }) else emptyList()
         val forgets = tableForgets()
         var done = emptyList<String>()
-        val token = acted(inverse = { lexicon.reAdd(added.filter { it.value.text in done }) }) {
+        val token = acted(inverse = { lexicon.reAdd(added.filter { it.value.text in done }) }, wrote = { done.isNotEmpty() }) {
             done = act()
-            done.isNotEmpty()
+            texts.first() in done
         } ?: return LearningResult.Unavailable
         // what the tables' own logs forgot (a phrase they saved, theirs or shared with pinyin) no
         // rewrite of the learning record brings back: no chip, rather than one that half undoes;
@@ -263,7 +266,8 @@ internal class LearningOps(
         return LearningResult.Done(if (tableForgets() != forgets) LearningResult.NO_UNDO else token)
     }
 
-    private fun block(texts: List<String>, act: () -> Boolean): LearningResult {
+    // [texts]: the pressed one first, then those shown alike; [act] the texts blocked
+    private fun block(texts: List<String>, act: () -> List<String>): LearningResult {
         val before = texts.flatMap { lexicon.blockedOf(it) }.toSet()
         // English's words have a list of their own (no reading)
         val english = lexicon.englishBlocks
@@ -271,14 +275,15 @@ internal class LearningOps(
         val englishBefore = english.blocked.toSet()
         var blocked = emptyList<Entry>()
         var englishBlocked = emptyList<String>()
+        var done = emptyList<String>()
         val token = acted(inverse = {
             lexicon.unblock(blocked)
             english.unblock(englishBlocked)
-        }) {
-            act().also {
-                blocked = texts.flatMap { lexicon.blockedOf(it) }.filter { it !in before }
-                englishBlocked = english.blocked.filter { it !in englishBefore }
-            }
+        }, wrote = { done.isNotEmpty() }) {
+            done = act()
+            blocked = texts.flatMap { lexicon.blockedOf(it) }.filter { it !in before }
+            englishBlocked = english.blocked.filter { it !in englishBefore }
+            texts.first() in done
         } ?: return LearningResult.Unavailable
         return LearningResult.Done(token)
     }
