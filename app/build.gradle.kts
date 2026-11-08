@@ -36,6 +36,12 @@ fun Test.unitTestSettings() {
         "-Djdk.attach.allowAttachSelf=true", "-XX:+EnableDynamicAgentLoading",
         "-Dsun.tools.attach.attachTimeout=60000",
     )
+    // a test JVM out of memory ends there, its heap written for the cause (build/test-oom/java_pid<n>.hprof):
+    // once (060 P2 S4c's gate) one ran out in ThemeMakerLayoutTest and the next class and spun in GC for
+    // 17 min, nothing left to find why; five runs since (at 3 GB, at 1 GB, under full CPU load) never did
+    val oom = layout.buildDirectory.dir("test-oom").get().asFile
+    jvmArgs("-XX:+ExitOnOutOfMemoryError", "-XX:+HeapDumpOnOutOfMemoryError", "-XX:HeapDumpPath=${oom.path}")
+    doFirst { oom.mkdirs() }
     val test = this
     // the byte-buddy-agent on the test's own classpath: the version mockk resolved to
     jvmArgumentProviders.add(CommandLineArgumentProvider {
