@@ -3039,8 +3039,8 @@ def jvm_record(found, results, expected=()):
 
 def cmd_jvm(a):
     """the cases the app's and ime-core's JVM tests assert, recorded as a run of their own"""
-    roots = [os.path.join(REPO, p) for p in ("app/src/test", "app/src/testText", "app/src/testVoice", "lib/ime-core/src/test",
-                                                "lib/ime-eval/src/uatTest")]
+    # one APK since 0.6.0: the speech flavors' testText and testVoice are gone
+    roots = [os.path.join(REPO, p) for p in ("app/src/test", "lib/ime-core/src/test", "lib/ime-eval/src/uatTest")]
     dirs = [os.path.join(REPO, p) for p in a.results.split(",")]
     load_scripts()
     expected = [c.id for c in CASES.values() if place(c.needs) == "jvm"]
