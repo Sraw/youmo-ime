@@ -208,12 +208,12 @@ internal class LearningOps(
         return asShown.at(asShown.index, text).takeIf { text == asShown.text || asked && shown(text) == asShown.text }
     }
 
-    // the other candidates of the list shown as [text] is where the host converts it (國家: 国家 and a
+    // the other candidates of the list shown as [text] is, where the host converts one of them (國家: 国家 and a
     // dictionary's own 國家): what is blocked or deleted is gone as shown, not left in its other
     // form (review R2). Their texts, the engine's
     private fun alike(s: Session, text: String, shown: (String) -> String): List<String> {
         val asShown = shown(text)
-        if (asShown == text) return emptyList()
+        // the pressed one may be the dictionary's own 國家, 国家 the one converted: either way round
         return s.candidates(0, ALIKE_SCAN).map { it.text }.filter { it != text && shown(it) == asShown }.distinct()
     }
 

@@ -65,6 +65,18 @@ class EnginesConvertedMenuTest : EnginesFixture() {
         }
     }
 
+    // the dictionary's own 國家 pressed: 国家, converted to it, blocked with it (UAT PY-116)
+    @Test
+    fun blockingTheDictionarysOwnTakesTheOneConvertedToIt() {
+        Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+            val at = e.typed().indexOf("國家")
+            val menu = e.learning(PINYIN, LearningOp.Menu(at, "國家"), traditional) as LearningResult.Menu
+            e.learning(PINYIN, LearningOp.Block(at, menu.text), traditional) as LearningResult.Done
+            assertFalse("国家" in e.typed())
+            assertFalse("國家" in e.typed())
+        }
+    }
+
     // the menu was for the dictionary's own 國家; the list changed and the index names 国家, shown
     // alike: the act's text is the engine's, and not the one there now (review R2)
     @Test
