@@ -396,6 +396,9 @@ class PacksUatTest {
     @Test
     fun theHostFailingOnTheTextPackReadsItThroughOnce() {
         val root = Files.createTempDirectory("packs").toFile()
+        val restart = PackStore.restartHost
+        val restartedOn = java.util.concurrent.LinkedBlockingQueue<Thread>()
+        PackStore.restartHost = { restartedOn.add(Thread.currentThread()); true }
         try {
             // its files not readable at first (no descriptor left): read, nothing found nor marked
             var unreadable = true
@@ -417,13 +420,22 @@ class PacksUatTest {
             damage(shelf, PackKind.TEXT)
             assertFalse(PackStore.verifyAfterFailure(PackKind.TEXT, RuntimeException(org.fcitx.fcitx5.android.data.pack.PackUnavailableException(PackKind.TEXT, PackStatus.Missing))))
             val generation = PackStore.state.value.generation
+            assertTrue(restartedOn.isEmpty())
             assertTrue(PackStore.verifyAfterFailure(PackKind.TEXT, failure))
+            // review r4 LOW-2: the host restarted (the engines it loaded off the damaged files), not
+            // on the caller's thread, the host's, which restartIfRunning would wait for
+            val on = restartedOn.poll(5, java.util.concurrent.TimeUnit.SECONDS)
+            assertNotNull(on)
+            assertTrue(on !== Thread.currentThread())
             assertTrue(PackStore.status(PackKind.TEXT) is PackStatus.Damaged)
             assertTrue(PackStore.state.value.status(PackKind.TEXT) is PackStatus.Damaged)
             assertEquals(generation + 1, PackStore.state.value.generation)
             // no pack in use now: nothing to read
             assertFalse(PackStore.verifyAfterFailure(PackKind.TEXT, failure))
+            // once
+            assertNull(restartedOn.poll(200, java.util.concurrent.TimeUnit.MILLISECONDS))
         } finally {
+            PackStore.restartHost = restart
             TestShelves.use()
             root.deleteRecursively()
         }
@@ -438,6 +450,8 @@ class PacksUatTest {
     fun aPackReadThroughLatelyIsNotReadAgainAfterAFailure() {
         val root = Files.createTempDirectory("packs").toFile()
         val started = PackStore.processStartedAt
+        val restart = PackStore.restartHost
+        PackStore.restartHost = { true }
         val real = System.currentTimeMillis()
         try {
             val shelf = shelfAt(root)
@@ -469,6 +483,7 @@ class PacksUatTest {
             assertTrue(PackStore.status(PackKind.TEXT) is PackStatus.Damaged)
         } finally {
             PackStore.processStartedAt = started
+            PackStore.restartHost = restart
             TestShelves.use()
             root.deleteRecursively()
         }

@@ -172,8 +172,10 @@ object PackStore {
      * an engine failing at each start, a process ending at each start). Not for a pack missing
      * ([PackUnavailableException]); once a generation a process; nor for one read through in the
      * last [RECENTLY_MS] or since this process started ([processStartedAt]): a start failing at
-     * each start (a crash loop) does not read hundreds of MB at each. The host is not restarted:
-     * it is the caller; what reads the pack looks again by [state]. True if found damaged.
+     * each start (a crash loop) does not read hundreds of MB at each. Found damaged, what reads the
+     * pack looks again by [state], and the host is restarted ([restartHost]) on a thread of its
+     * own: its engines loaded before stop using the damaged files. Not on this one, the host's
+     * (restartIfRunning waits for the host it would be stopping). True if found damaged.
      */
     fun verifyAfterFailure(kind: PackKind, e: Throwable): Boolean {
         if (generateSequence(e) { it.cause }.take(MAX_CAUSES).any { it is PackUnavailableException }) return false
@@ -193,6 +195,13 @@ object PackStore {
         if (!damaged) return false
         Timber.w("resource pack %s damaged, found after the host failed on it", kind.id)
         mutableState.update { State(snapshot(), it.generation + 1) }
+        thread(name = "packs-restart", isDaemon = true) {
+            try {
+                restartHost()
+            } catch (@Suppress("TooGenericExceptionCaught") t: RuntimeException) {
+                Timber.e(t, "host not restarted after a pack found damaged")
+            }
+        }
         return true
     }
 

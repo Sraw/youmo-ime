@@ -449,6 +449,9 @@ class EngineBridgeTest {
         fun anEngineThatCannotLoadADamagedTextPackSaysItIsDamaged() {
             val shelf = org.fcitx.fcitx5.android.data.pack.TestShelves.shelf(org.fcitx.fcitx5.android.pack.PackKind.TEXT)
             val said = ArrayList<String>()
+            val restart = org.fcitx.fcitx5.android.data.pack.PackStore.restartHost
+            val restarted = java.util.concurrent.CountDownLatch(1)
+            org.fcitx.fcitx5.android.data.pack.PackStore.restartHost = { restarted.countDown(); true }
             bridge.unloadable.clear()
             try {
                 org.fcitx.fcitx5.android.data.pack.PackStore.useShelf(shelf)
@@ -461,7 +464,10 @@ class EngineBridgeTest {
                 org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
                 assertEquals(listOf(appContext.getString(org.fcitx.fcitx5.android.R.string.pack_text_damaged)), said)
                 assertTrue(org.fcitx.fcitx5.android.data.pack.PackStore.status(org.fcitx.fcitx5.android.pack.PackKind.TEXT) is org.fcitx.fcitx5.android.pack.PackStatus.Damaged)
+                // the host restarted (off this thread): its engines no longer on the damaged files
+                assertTrue(restarted.await(5, java.util.concurrent.TimeUnit.SECONDS))
             } finally {
+                org.fcitx.fcitx5.android.data.pack.PackStore.restartHost = restart
                 EngineNotices.sayer = null
                 bridge.unloadable.clear()
                 org.fcitx.fcitx5.android.data.pack.TestShelves.use()
