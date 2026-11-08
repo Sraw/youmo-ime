@@ -208,16 +208,23 @@ they stay: a pack carries no code.
 - **Storage.** Device-protected (`createDeviceProtectedStorageContext().filesDir/packs`), so Direct Boot
   reads it before the first unlock, and an upgrade keeps it. Excluded from cloud and key/value backup
   (over 25 MB); a device transfer carries it. Loading checks the signature and each file's size, not
-  every hash (that would read hundreds of MB at each start). Each generation is read through
-  (`PackShelf.verify`) when due (`PackShelf.due`): at the first start after its import (the
-  import's own check was of the bytes as they were written), then once its last read is 30 days old
-  (or in the future by more than a day: the clock set back). A read found intact writes `verified`
-  (the time) into the generation. Thirty seconds after the start a thread of the lowest priority
-  does what is due (`PackStore.verifyInBackground`); the 30-day one waits for the phone to be
-  charging (`BatteryManager.isCharging`, looked at every 15 minutes while the process lives; no
-  JobScheduler: the process is there whenever the keyboard is). One changed is
-  `PackStatus.Damaged`, not used till imported again (the gate: 文字包已损坏，请重新导入; the page's
-  row: vN 已损坏，请重新导入; voice input's tip the same).
+  every hash (that would read hundreds of MB at each start); a size not the manifest's is
+  `PackStatus.Damaged`. Each generation is read through (`PackShelf.verify`) when due
+  (`PackShelf.due`): at the first start after its import (the import's own check was of the bytes as
+  they were written), then once its last read is 30 days old (or in the future by more than a day: the
+  clock set back). A read found intact writes `verified` (the time) into the generation. Thirty
+  seconds after the start a thread of the lowest priority does what is due
+  (`PackStore.verifyInBackground`); the 30-day one waits for the phone to be charging
+  (`BatteryManager.isCharging`, looked at every 15 minutes while the process lives; no JobScheduler:
+  the process is there whenever the keyboard is). One changed is `PackStatus.Damaged`: a
+  `damaged` file written into its generation, so every later start reads it so at once, not used
+  till imported again (the gate: 文字包已损坏，请重新导入; the page's row: vN 已损坏，请重新导入;
+  voice input's tip the same).
+  When the host fails on the text pack (an engine
+  that cannot load its data, `EngineBridge.unloadable`; the host's start throwing, `KotlinHost`), the
+  text pack is read through there and then (`PackStore.verifyAfterFailure`, once a generation a
+  process): damaged, the keyboard says so, and the next start's gate is up instead of the same
+  failure, or the same crash, at each start. Voice input's failures are not hooked so (its own tip).
   JVM tests do not start the background pass (`youmo.packs.verify=off`); PacksUatTest runs its pass.
 - **Reading** (`AppData`): every asset path the engine, handwriting and voice open goes through it, to
   the pack's file if a pack owns the path, else to the APK's asset; `.data`, `.safetensors` and `.ort`

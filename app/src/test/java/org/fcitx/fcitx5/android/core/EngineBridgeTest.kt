@@ -440,6 +440,34 @@ class EngineBridgeTest {
             }
         }
 
+        /**
+         * Review M-2: an engine that cannot load its text pack's file (one damaged since it was last
+         * read through, its size the same) has the pack read through there: found damaged, the
+         * keyboard says 已损坏 (the gate's words), not 引擎无法加载, and the pack is marked so.
+         */
+        @Test
+        fun anEngineThatCannotLoadADamagedTextPackSaysItIsDamaged() {
+            val shelf = org.fcitx.fcitx5.android.data.pack.TestShelves.shelf(org.fcitx.fcitx5.android.pack.PackKind.TEXT)
+            val said = ArrayList<String>()
+            bridge.unloadable.clear()
+            try {
+                org.fcitx.fcitx5.android.data.pack.PackStore.useShelf(shelf)
+                EngineNotices.sayer = EngineNotices.Sayer { message, _ -> said += message; true }
+                val file = File(shelf.dir(org.fcitx.fcitx5.android.pack.PackKind.TEXT)!!, "handwriting/test.txt")
+                file.writeBytes(file.readBytes().also { it[0] = (it[0].toInt() xor 1).toByte() })
+                assertThrows(DataFormatException::class.java) {
+                    bridge.unloadable.call(InputMethodCatalog.PINYIN) { throw DataFormatException("not pinyin data") }
+                }
+                org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+                assertEquals(listOf(appContext.getString(org.fcitx.fcitx5.android.R.string.pack_text_damaged)), said)
+                assertTrue(org.fcitx.fcitx5.android.data.pack.PackStore.status(org.fcitx.fcitx5.android.pack.PackKind.TEXT) is org.fcitx.fcitx5.android.pack.PackStatus.Damaged)
+            } finally {
+                EngineNotices.sayer = null
+                bridge.unloadable.clear()
+                org.fcitx.fcitx5.android.data.pack.TestShelves.use()
+            }
+        }
+
         @Test
         fun handwritingWhosePinyinDataCannotLoadIsTriedOnceThenSkippedThrowingNothing() {
             bridge.unloadable.clear()

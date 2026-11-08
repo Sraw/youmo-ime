@@ -29,7 +29,10 @@ sealed class PackStatus {
     /** Imported, of a newer format than this APK reads: the app needs updating, not the pack. */
     class NeedsNewerApp(val manifest: PackManifest, val needed: PackRequirement) : PackStatus()
 
-    /** Imported, but its files no longer what [manifest] says ([PackShelf.verify]): not used, to be imported again. */
+    /**
+     * Imported, but its files no longer what [manifest] says ([PackShelf.verify], or a size a start
+     * reads): not used, to be imported again. Kept so: marked in its generation, read so by the next start.
+     */
     class Damaged(val manifest: PackManifest) : PackStatus()
 }
 
@@ -89,7 +92,7 @@ sealed class ImportResult {
  * [sweep]: the app's host, reading it, is restarted on the new one first.
  *
  * A generation read through ([verify]) and found as signed has a `verified` file (when, epoch
- * milliseconds).
+ * milliseconds); one found changed a `damaged` file, read as [PackStatus.Damaged] from then on.
  *
  * [trusted]: the raw Ed25519 public keys this build takes a pack signed by. [requirements]: what
  * it reads of each pack. [margin]: bytes kept free beyond a pack's size. [clock]: now, in epoch
@@ -140,7 +143,8 @@ class PackShelf(
      * (staging, older generations, a `current` half written). Each pack's manifest is checked
      * against the keys again, and its files' sizes, not their contents (read at every start, a
      * pack's 300 MB would cost seconds): their contents were checked as they were copied, and are
-     * read through after ([due], [verify]).
+     * read through after ([due], [verify]). One found damaged before, or of a size not its
+     * manifest's, is [PackStatus.Damaged].
      */
     @Synchronized
     fun load() {
@@ -160,7 +164,11 @@ class PackShelf(
             val signature = File(gen, PackManifest.SIGNATURE).readBytes()
             PackManifest.parse(bytes).takeIf { signed(bytes, signature) }
         }.getOrNull() ?: return Held(PackStatus.Missing)
-        if (manifest.kind != kind || manifest.files.any { File(gen, it.path).length() != it.size }) return Held(PackStatus.Missing)
+        if (manifest.kind != kind) return Held(PackStatus.Missing)
+        // found changed by a verify before, or a file of another size now (cut short, written over)
+        if (File(gen, DAMAGED).exists() || manifest.files.any { File(gen, it.path).length() != it.size }) {
+            return Held(PackStatus.Damaged(manifest))
+        }
         val status = judge(manifest)
         if (status !is PackStatus.Ready) return Held(status)
         // unreadable or half written (a power cut as it was written): read through again
@@ -183,8 +191,9 @@ class PackShelf(
 
     /**
      * Reads [kind]'s files in use through, against its manifest: what [load] does not (sizes
-     * only). One found changed is [PackStatus.Damaged] from then on, till imported again; true
-     * then. Found as signed, it is marked verified ([due]).
+     * only). One found changed is [PackStatus.Damaged] from then on (its generation marked, the
+     * next start reads it so), till imported again; true then. Found as signed, it is marked
+     * verified ([due]).
      * Long (a pack's hundreds of MB), so not under the shelf's lock: an import meanwhile (its
      * files replaced, the old ones deleted) leaves the new pack as it is.
      */
@@ -199,7 +208,10 @@ class PackShelf(
             if (state.getValue(kind).dir != gen) return false
             when (read) {
                 Read.INTACT -> state = state + (kind to held.copy(verifiedAt = markVerified(gen)))
-                Read.DAMAGED -> state = state + (kind to Held(PackStatus.Damaged(status.manifest)))
+                Read.DAMAGED -> {
+                    mark(gen, DAMAGED, "damaged".toByteArray())
+                    state = state + (kind to Held(PackStatus.Damaged(status.manifest)))
+                }
             }
         }
         return read == Read.DAMAGED
@@ -236,7 +248,7 @@ class PackShelf(
         return now
     }
 
-    // [name] written in [gen]; what cannot be is logged: read through again at the next start
+    // [name] written in [gen]; what cannot be is logged: a damaged mark lost, the next verify finds it again
     private fun mark(gen: File, name: String, bytes: ByteArray) {
         try {
             File(gen, name).writeSynced(bytes)
@@ -426,6 +438,9 @@ class PackShelf(
 
         /** In a generation: when it was last read through and found as signed (epoch ms, text). */
         const val VERIFIED = "verified"
+
+        /** In a generation: found changed by a read through; [PackStatus.Damaged] till imported again. */
+        const val DAMAGED = "damaged"
 
         /** How long a pack read through stays so: read through again after (at a start, charging). */
         const val VERIFY_EVERY_MS = 30L * 24 * 60 * 60 * 1000

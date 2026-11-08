@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
+import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
@@ -58,6 +59,7 @@ import org.fcitx.fcitx5.android.host.QuickPhraseBook
 import org.fcitx.fcitx5.android.host.QuickPhraseEntry
 import org.fcitx.fcitx5.android.host.QuickPhraseHooks
 import org.fcitx.fcitx5.android.host.StatusEntry
+import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.utils.AppUtil
 import timber.log.Timber
 import java.io.File
@@ -394,6 +396,9 @@ class KotlinHost(
                 // the executor would keep it and the host stay STARTING, the keyboard dead with no
                 // word said: the process ends instead, as the native host's startup failure did
                 Timber.e(e, "Kotlin host failed to start")
+                // the text pack read through first, so one damaged is marked so (the next start's
+                // load reads it as such, the gate up) rather than this ending every start (review M-2)
+                runCatching { PackStore.verifyAfterFailure(PackKind.TEXT, e) }
                 val thread = Thread.currentThread()
                 // never null: a live thread without its own handler answers with its group
                 thread.uncaughtExceptionHandler.uncaughtException(thread, e)

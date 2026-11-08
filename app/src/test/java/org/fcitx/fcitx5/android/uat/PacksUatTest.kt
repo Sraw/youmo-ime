@@ -315,6 +315,47 @@ class PacksUatTest {
         file.writeBytes(file.readBytes().also { it[0] = (it[0].toInt() xor 1).toByte() })
     }
 
+    /**
+     * Review M-1, M-2: read through at the first start after the import, found damaged then; that
+     * kept, so the next start's keyboard is under the gate at once (not an engine failing at each
+     * start); imported again, mended, and so after a restart too.
+     */
+    @Test
+    @Uat("ST-65")
+    fun aPackFoundDamagedIsStillSoAfterARestartTillImportedAgain() {
+        val app = RuntimeEnvironment.getApplication()
+        val root = Files.createTempDirectory("packs").toFile()
+        try {
+            KeyboardHarness().use { h ->
+                h.start()
+                val shelf = shelfAt(root)
+                for (kind in PackKind.entries) assertTrue(shelf.import(TestShelves.pack(kind).inputStream()) is ImportResult.Imported)
+                PackStore.useShelf(shelf)
+                damage(shelf, PackKind.TEXT)
+                // the first pass after the import reads both, charging or not
+                assertFalse(PackStore.verifyDue { false })
+                h.idle()
+                assertEquals(h.service.getString(R.string.pack_text_damaged), gate(h)?.contentDescription)
+                // the process restarted: its load says damaged, no read through needed
+                PackStore.useShelf(shelfAt(root))
+                h.idle()
+                assertEquals(h.service.getString(R.string.pack_text_damaged), gate(h)?.contentDescription)
+                assertEquals(app.getString(R.string.pack_status_damaged, 1), PackImports.describe(app, PackStore.status(PackKind.TEXT)))
+                assertTrue(PackStore.ready(PackKind.VOICE))
+                assertTrue(runBlocking { PackStore.import(TestShelves.pack(PackKind.TEXT).inputStream()) } is ImportResult.Imported)
+                h.idle()
+                assertNull(gate(h))
+                PackStore.useShelf(shelfAt(root))
+                h.idle()
+                assertNull(gate(h))
+                assertTrue(PackStore.ready(PackKind.TEXT))
+            }
+        } finally {
+            TestShelves.use()
+            root.deleteRecursively()
+        }
+    }
+
     /** Review M-1: read through again after 30 days, but only with the phone charging. */
     @Test
     fun aPackReadThroughA30DaysAgoWaitsForTheCharger() {
@@ -342,6 +383,42 @@ class PacksUatTest {
             assertEquals(generation + 1, PackStore.state.value.generation)
         } finally {
             PackStore.restartHost = restart
+            TestShelves.use()
+            root.deleteRecursively()
+        }
+    }
+
+    /**
+     * Review M-2: the host failing on the text pack (an engine that cannot load, a start that
+     * throws) reads it through there and then: damaged, it is said so; once a generation a process;
+     * a pack missing is not read.
+     */
+    @Test
+    fun theHostFailingOnTheTextPackReadsItThroughOnce() {
+        val root = Files.createTempDirectory("packs").toFile()
+        try {
+            val shelf = shelfAt(root)
+            assertTrue(shelf.import(TestShelves.pack(PackKind.TEXT).inputStream()) is ImportResult.Imported)
+            PackStore.useShelf(shelf)
+            val failure = java.io.IOException("Map failed")
+            // intact: nothing found
+            assertFalse(PackStore.verifyAfterFailure(PackKind.TEXT, failure))
+            damage(shelf, PackKind.TEXT)
+            // that generation read through once this process: not again at each failure
+            assertFalse(PackStore.verifyAfterFailure(PackKind.TEXT, failure))
+            assertTrue(PackStore.ready(PackKind.TEXT))
+            // imported again (damaged after): read through, found so, the state counted up
+            assertTrue(shelf.import(TestShelves.pack(PackKind.TEXT, version = 2).inputStream()) is ImportResult.Imported)
+            damage(shelf, PackKind.TEXT)
+            assertFalse(PackStore.verifyAfterFailure(PackKind.TEXT, RuntimeException(org.fcitx.fcitx5.android.data.pack.PackUnavailableException(PackKind.TEXT, PackStatus.Missing))))
+            val generation = PackStore.state.value.generation
+            assertTrue(PackStore.verifyAfterFailure(PackKind.TEXT, failure))
+            assertTrue(PackStore.status(PackKind.TEXT) is PackStatus.Damaged)
+            assertTrue(PackStore.state.value.status(PackKind.TEXT) is PackStatus.Damaged)
+            assertEquals(generation + 1, PackStore.state.value.generation)
+            // no pack in use now: nothing to read
+            assertFalse(PackStore.verifyAfterFailure(PackKind.TEXT, failure))
+        } finally {
             TestShelves.use()
             root.deleteRecursively()
         }

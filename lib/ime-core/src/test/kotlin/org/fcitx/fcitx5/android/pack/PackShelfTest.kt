@@ -150,6 +150,29 @@ class PackShelfTest {
         assertFalse(shelf.verify(PackKind.TEXT))
     }
 
+    // review M-2: the damage found is kept, a restart's load reads it (the gate up at once), till imported again
+    @Test
+    fun `a pack found damaged stays so after a restart till imported again`() {
+        val shelf = shelf()
+        shelf.take(text())
+        val gen = shelf.dir(PackKind.TEXT)!!
+        damage(shelf, PackKind.TEXT, "engine/pinyin.data")
+        assertTrue(shelf.verify(PackKind.TEXT))
+        assertTrue(File(gen, PackShelf.DAMAGED).exists())
+        val restarted = shelf()
+        val status = restarted.status(PackKind.TEXT)
+        assertTrue("$status", status is PackStatus.Damaged)
+        assertEquals(3, (status as PackStatus.Damaged).manifest.version)
+        assertNull(restarted.dir(PackKind.TEXT))
+        assertSame(VerifyDue.NONE, restarted.due(PackKind.TEXT))
+        // imported again: mended, and so after the next restart
+        val result = restarted.take(text())
+        assertTrue("$result", result is ImportResult.Imported)
+        assertReady(restarted, PackKind.TEXT, 3, TEXT_FILES)
+        assertReady(shelf(), PackKind.TEXT, 3, TEXT_FILES)
+        assertFalse(shelf().verify(PackKind.TEXT))
+    }
+
     // review M-1: read through at the first start after an import, then once its 30 days are past
     @Test
     fun `a pack is read through once after its import, then after 30 days, the time kept by the next start`() {
@@ -471,12 +494,14 @@ class PackShelfTest {
         assertEquals(listOf(next.dir(PackKind.TEXT)!!.name), leftovers(PackKind.TEXT))
     }
 
+    // its manifest signed and there, a file of another size: damaged, said so, not as if never imported
     @Test
-    fun `a pack whose files are not all there reads as missing`() {
+    fun `a pack whose files are not all there reads as damaged`() {
         val shelf = shelf()
         shelf.take(text())
         File(shelf.dir(PackKind.TEXT), "engine/table/wbx.data").writeText("w")
-        assertSame(PackStatus.Missing, shelf().status(PackKind.TEXT))
+        val status = shelf().status(PackKind.TEXT)
+        assertTrue("$status", status is PackStatus.Damaged)
         // the pointer naming nothing, or something unsafe
         File(root, "text/current").writeText("../voice")
         assertSame(PackStatus.Missing, shelf().status(PackKind.TEXT))

@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.RecentlyUsed
 import org.fcitx.fcitx5.android.data.pack.AppData
+import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.pack.PackUnavailableException
 import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
@@ -40,6 +41,7 @@ import org.fcitx.fcitx5.android.host.EngineHost
 import org.fcitx.fcitx5.android.input.address.AddressStore
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.popup.EmojiModifier
+import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.utils.Const
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.toast
@@ -201,9 +203,16 @@ class EngineBridge {
     // what cannot load is not loaded again on every key: the keys go to the app, the user told once
     internal val unloadable = Unloadable { im, e ->
         Timber.e("%s cannot load (%s): not called again till the engine is reloaded", im, e.javaClass.name)
-        // said on the keyboard (§3: not a toast, which Android 13 drops); a pack missing is told as such
+        // said on the keyboard (§3: not a toast, which Android 13 drops); a pack missing is told as such,
+        // one damaged since it was last read through too (read through now, on this thread: review M-2)
         val pack = generateSequence(e) { it.cause }.take(MAX_CAUSES).filterIsInstance<PackUnavailableException>().firstOrNull()
-        EngineNotices.failed(if (pack != null) R.string.pack_text_needed_short else R.string.engine_unloadable)
+        EngineNotices.failed(
+            when {
+                pack != null -> R.string.pack_text_needed_short
+                PackStore.verifyAfterFailure(PackKind.TEXT, e) -> R.string.pack_text_damaged
+                else -> R.string.engine_unloadable
+            },
+        )
     }
 
     /**

@@ -159,6 +159,34 @@ object PackStore {
         return true
     }
 
+    // generations already read through after a failure of the host on them, this process: an
+    // engine's failure that is no pack's (a bug) does not cost a read of hundreds of MB at each
+    private val readAfterFailure = HashSet<File>()
+
+    /**
+     * The host failed on [kind]'s pack ([e]: an engine that could not load, its start that threw):
+     * its files read through now, on the caller's thread (the host's), before the keyboard asks
+     * for them again, so a pack damaged since its last read is [PackStatus.Damaged] (the gate, not
+     * an engine failing at each start, a process ending at each start). Not for a pack missing
+     * ([PackUnavailableException]); once a generation a process. The host is not restarted: it is
+     * the caller; what reads the pack looks again by [state]. True if found damaged.
+     */
+    fun verifyAfterFailure(kind: PackKind, e: Throwable): Boolean {
+        if (generateSequence(e) { it.cause }.take(MAX_CAUSES).any { it is PackUnavailableException }) return false
+        val gen = shelf.dir(kind) ?: return false
+        if (!synchronized(readAfterFailure) { readAfterFailure.add(gen) }) return false
+        val damaged = try {
+            shelf.verify(kind)
+        } catch (@Suppress("TooGenericExceptionCaught") t: RuntimeException) {
+            Timber.e(t, "resource pack %s not verified", kind.id)
+            false
+        }
+        if (!damaged) return false
+        Timber.w("resource pack %s damaged, found after the host failed on it", kind.id)
+        mutableState.update { State(snapshot(), it.generation + 1) }
+        return true
+    }
+
     private fun charging(): Boolean =
         appContext.getSystemService(Context.BATTERY_SERVICE)?.let { (it as BatteryManager).isCharging } == true
 
@@ -243,4 +271,5 @@ object PackStore {
     private const val BUFFER = 1 shl 16
     private const val VERIFY_AFTER_MS = 30_000L
     private const val CHARGING_POLL_MS = 15L * 60 * 1000
+    private const val MAX_CAUSES = 8
 }
