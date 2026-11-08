@@ -1139,4 +1139,8 @@
     <string name="pack_voice_needed_update">Voice input needs the voice pack updated to v%1$d: Settings → Resource packs</string>
     <string name="pack_voice_needed_app">Voice pack v%1$d is for a newer app: update Youmo IME</string>
     <string name="pack_voice_damaged">The voice pack is damaged: import it again (Settings → Resource packs)</string>
+    <string name="letter_case">Letter case on Chinese keys</string>
+    <string name="letter_case_lower">Always lowercase</string>
+    <string name="letter_case_shift">Follow Shift</string>
+    <string name="letter_case_upper">Always uppercase</string>
 </resources>

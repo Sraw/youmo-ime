@@ -21,6 +21,8 @@ import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.keyboard.T9Keyboard
+import org.fcitx.fcitx5.android.scene.engine.LetterCaseRule
+import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import splitties.views.dsl.core.add
@@ -75,13 +77,17 @@ class NineKeyLettersFragment : KeyCapsPageFragment() {
         }
     }
 
+    // the keys' letters as 九键 shows them (拼音键字母大小写: capitals but where it says otherwise)
+    private val upper: Boolean
+        get() = LetterCaseRule.upper(AppPrefs.getInstance().keyboard.letterCase.getValue().case, Shift.None, shiftless = true)
+
     private fun key(ctx: Context, digit: Char, current: NineKeyLetters): View {
         // 1 types punctuation, not letters: drawn as on the keyboard, not set here
         if (digit == '1') return KeyCaps.key(ctx, T9Keyboard.ONE, "1", marked = false, dimmed = true).apply { isClickable = false }
         val shown = current.letters(digit)
         val edited = shown != NineKeyLetters.STANDARD.letters(digit)
         val state = getString(R.string.edited_x, digit.toString()).takeIf { edited }
-        return KeyCaps.key(ctx, shown.uppercase(), digit.toString(), marked = edited, dimmed = shown.isEmpty(), state = state).apply {
+        return KeyCaps.key(ctx, LetterCaseRule.shown(shown, upper), digit.toString(), marked = edited, dimmed = shown.isEmpty(), state = state).apply {
             setOnClickListener { edit(digit) }
         }
     }

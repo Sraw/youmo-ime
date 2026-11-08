@@ -318,6 +318,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // every key's symbol laid out anew, those no swipe marks too; was a theme setting's
         prefs.keyboard.punctuationPosition,
         prefs.keyboard.shortcutMarkPosition,
+        // the letters' faces (拼音键字母大小写): every keyboard made anew, its env read as it is now
+        prefs.keyboard.letterCase,
     )
 
     private val keyboardHeightPrefs = listOf(prefs.keyboard.keyboardHeightPercent, prefs.keyboard.keyboardHeightPercentLandscape)

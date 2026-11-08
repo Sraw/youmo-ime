@@ -30,6 +30,7 @@ import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.NineKeySymbols
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
+import org.fcitx.fcitx5.android.input.keyboard.LetterCaseChoice
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
@@ -160,6 +161,8 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 false
             )
         }
+        /** 拼音键字母大小写: a Chinese input method's letter keys' faces ([LetterCaseChoice]); English's follow Shift whatever it is. */
+        val letterCase = enumList(R.string.letter_case, "letter_case", LetterCaseChoice.Shift)
         val expandKeypressArea =
             hidden { switch(R.string.expand_keypress_area, "expand_keypress_area", false) }
         /** What a key's swipe up and down reach ([SwipeLayers]); the old 划动输入标点符号及数字 moves over ([dropRetired]). */
