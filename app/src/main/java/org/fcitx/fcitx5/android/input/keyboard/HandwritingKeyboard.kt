@@ -426,6 +426,13 @@ class HandwritingKeyboard(
         return if (readingOn) env.copy(states = READING_ON) else env
     }
 
+    // 注 said as its view said it (SceneA11y's _on and _off)
+    override fun sceneString(name: String): String? = when (name) {
+        "a11y_key_reading_on" -> context.getString(R.string.hw_reading_key_on, context.getString(R.string.im_candidate_reading))
+        "a11y_key_reading_off" -> context.getString(R.string.hw_reading_key_off, context.getString(R.string.im_candidate_reading))
+        else -> null
+    }
+
     // a getter: asked in init (drawKeysWithScene), before this class's own properties are made
     override val sceneTable: SceneKeyDef.Table get() = object : SceneKeyDef.Table {
         override fun menuLabel(label: String): String = MENU_LABELS[label]?.let(context::getString) ?: label

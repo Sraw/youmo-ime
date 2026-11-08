@@ -120,6 +120,13 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
             return if (locked) env.copy(states = LOCKED) else env
         }
 
+        // the lock said as what a tap does, as its view said (SceneA11y's _on and _off)
+        override fun sceneString(name: String): String? = when (name) {
+            "a11y_key_panel_lock_on" -> context.getString(R.string.picker_unlock)
+            "a11y_key_panel_lock_off" -> context.getString(R.string.picker_lock)
+            else -> null
+        }
+
         // last: the scene reads the keyboard's state
         init {
             // the canvas at another size (one-handed, split, another height): the panel's views to the slots of the scene at that size

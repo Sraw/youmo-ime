@@ -633,7 +633,7 @@ abstract class BaseKeyboard(
         val layout = SceneLayouts.of(context, layoutName)
         val board = SceneBoard(context, theme, layout) { look, read, width, height -> sceneEnv(look, read, width, height) }
         sceneBoard = board
-        val view = board.view(keyImages) { node -> sceneKey(node) }
+        val view = board.view(keyImages, ::sceneString) { node -> sceneKey(node) }
         if (refOf != null) {
             drawKeysOn(view, refOf)
         } else {
@@ -659,6 +659,9 @@ abstract class BaseKeyboard(
      */
     protected open fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env =
         SceneEnvs.of(this, look, theme.isDark, width, height, Input(), marks = SceneBoard.marks(layout, charShortcutMarks))
+
+    /** The keyboard's own words for a string its layout names ([KeyboardCanvasView.Host.string]): null, the app's shared ones. */
+    protected open fun sceneString(name: String): String? = null
 
     /** The keyboard's own words for its layout's keys (U4 B): its `action:` placeholders, its composed long presses. */
     protected open val sceneTable: SceneKeyDef.Table = object : SceneKeyDef.Table {}

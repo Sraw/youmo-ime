@@ -81,6 +81,9 @@ class KeyboardCanvasView(
 
         /** Its layout's id (a key's resource name may be its board's: [SceneA11y.of]); null for none. */
         val board: String? get() = null
+
+        /** The keyboard's own words for a string its layout names (注's on and off, the lock's), over the app's shared ones; null for none. */
+        fun string(name: String): String? = null
     }
 
     // a key's two faces, recorded once each when first drawn; kept across scenes where they are the same.
@@ -519,15 +522,7 @@ class KeyboardCanvasView(
     private val resourcePackage: String by lazy { resources.getResourcePackageName(org.fcitx.fcitx5.android.R.id.keyboard_view) }
 
     // the layout's names of the app's strings (a11y_key_shift…): the ones its keys name, looked up by name
-    private fun stringNamed(name: String): String? = when (name) {
-        // handwriting's 注 as its view said it (SceneA11y.onOrOff)
-        "a11y_key_reading_on" -> context.getString(org.fcitx.fcitx5.android.R.string.hw_reading_key_on, context.getString(org.fcitx.fcitx5.android.R.string.im_candidate_reading))
-        "a11y_key_reading_off" -> context.getString(org.fcitx.fcitx5.android.R.string.hw_reading_key_off, context.getString(org.fcitx.fcitx5.android.R.string.im_candidate_reading))
-        // the symbol panel's lock: what a tap does, as its view said
-        "a11y_key_panel_lock_on" -> context.getString(org.fcitx.fcitx5.android.R.string.picker_unlock)
-        "a11y_key_panel_lock_off" -> context.getString(org.fcitx.fcitx5.android.R.string.picker_lock)
-        else -> A11Y_STRINGS[name]?.let(context::getString)
-    }
+    private fun stringNamed(name: String): String? = host.string(name) ?: A11Y_STRINGS[name]?.let(context::getString)
 
     private companion object {
         const val NANOS_A_MS = 1e6
