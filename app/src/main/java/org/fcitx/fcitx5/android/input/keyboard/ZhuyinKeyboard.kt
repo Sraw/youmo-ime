@@ -33,6 +33,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
+import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.scene.TextBoardState
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
@@ -141,11 +142,13 @@ class ZhuyinKeyboard(
         private const val TONE = "tone-"
 
         /**
-         * 注音九键's group's long press (its layout's `popup from="group"`): each symbol the key shows
-         * (a group's label is its symbols), as its view's ([nineLayout]); null where it shows none.
+         * 注音九键's group's long press (its layout's `popup from="group"`): each zhuyin symbol the key
+         * shows, as its view's ([nineLayout]); null where it shows none. The built-in groups show their
+         * symbols alone; the filter is for a layout P3's themes may bring, whose group's label could
+         * carry something else (a space, a mark): never offered as a symbol the session has no code for.
          */
         internal fun groupPopup(label: String?): KeyDef.Popup.Keyboard? =
-            label?.ifEmpty { null }?.map { it.toString() }?.let { KeyDef.Popup.Keyboard.Explicit(it.toTypedArray()) }
+            label?.filter { it in ZhuyinKeys.SYMBOLS }?.ifEmpty { null }?.map { it.toString() }?.let { KeyDef.Popup.Keyboard.Explicit(it.toTypedArray()) }
 
         /** The 分词 key's face while something is typed; else [PUNCTUATION]'s first, which it types. */
         internal const val SEPARATOR = "分词"
@@ -261,6 +264,17 @@ class ZhuyinKeyboard(
         comma = mapped(",")
         if (!typing) slot?.mainText?.text = comma
         canvas?.invalidateScene()
+    }
+
+    // a bubble as its key shows it, what it types: ? ! ~ and the bottom row's comma and full stop as punctuation
+    // maps them (060-render-p2 §5.3, the user's 「显示和输出一致」), as GroupedKeyboard's; public for its test
+    public override fun onPopupAction(action: PopupAction) {
+        val shown = when (action) {
+            is PopupAction.PreviewAction -> action.copy(content = previewOf(action.content, action.key, { it }, ::mapped))
+            is PopupAction.PreviewUpdateAction -> action.copy(content = previewOf(action.content, action.key, { it }, ::mapped))
+            else -> action
+        }
+        super.onPopupAction(shown)
     }
 
     // something typed, as the engine last told

@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
+import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
@@ -53,6 +54,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private val popup: PopupComponent by manager.must()
     private val bar: KawaiiBarComponent by manager.must()
     private val returnKeyDrawable: ReturnKeyDrawableComponent by manager.must()
+    private val punctuation: PunctuationComponent by manager.must()
     private val preedit: PreeditComponent by manager.must()
 
     companion object : EssentialWindow.Key {
@@ -240,6 +242,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
                 keyboardView.apply { add(it, lParams(matchParent, matchParent)) }
                 it.onAttach()
                 it.onReturnDrawableUpdate(returnKeyDrawable.appearance)
+                // the punctuation as it is now: a keyboard kept while another was shown missed what changed
+                // meanwhile, and would show , where it types ， (the user's 「显示和输出一致」, 060-render-p2 S4d)
+                it.onPunctuationUpdate(punctuation.mapping)
             }
         }
     }

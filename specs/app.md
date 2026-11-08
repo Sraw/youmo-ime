@@ -429,14 +429,18 @@ first, and where it has none or it does not read, one step back to the app's own
 (the U8 fallback, the kept scenes, the marks' settings) for any keyboard; the keyboard gives its state as
 `sceneEnv` (its `Input`, texts, marks; `GroupedKeyboard` through `TextBoardState`) and calls
 `invalidateScene()` on every change of what the keys show (punctuation, address keys, the language key,
-Return, the input method). What a key does: the 26 keys still wire each scene key as its view was
+Return, the input method; a keyboard kept while another was shown is told the punctuation as it is now
+when `KeyboardWindow.attachLayout` attaches it again, `PunctuationComponent.mapping`). What a key does: the 26 keys still wire each scene key as its view was
 (`refOf`, U4 A, till S5); a keyboard moved wires each from its node (U4 B; the keys and the touch that
 finds them are `SceneKeys`, a node's key kept while it does the same): ime-core's `SceneBehavior.of`
 reads press, long press, repeat, swipe, double tap, bubble, long-press popup, menu, sound and axes from
 the layout (the bubble's corner what a swipe types, or, on a letter key with a shortcut and no swipe of its
 own, its own face, so the bubble names the shortcut as it is swiped to: 大千's symbols' `AltPreview(c, c)`; a key's
 `preview="on|off"` over its kind, which gives letters and typing roles one: 注音九键's tones and `{punct:?}` `{punct:!}`
-`{punct:~}` theirs though function keys, its slot none though a letter, as their views), and `SceneKeyDef` makes the `KeyDef` the old wiring takes (the `action:` table: `sym:`
+`{punct:~}` theirs though function keys, its slot none though a letter, as their views; the key's word over its
+`<defaults>`, the board's `preview="off"` the last, `SceneKeyDef.onBoard`; what types and bubbles is what offers
+its character's preset long press where none is written; a bubble shown as punctuation maps it, as the key's face
+and what it types: `ZhuyinKeyboard.onPopupAction`, as `GroupedKeyboard`'s), and `SceneKeyDef` makes the `KeyDef` the old wiring takes (the `action:` table: `sym:`
 keysyms by name, `layout:`, `picker:` (alone, the page shown last), `commit:`, `code:U+…`, `keypad:`,
 `caps`, `shortcut:`, `reading`, `emoji-search:`, the bare words `lang`, `ime-picker`, `quickphrase`,
 `unicode`, `space-long-press`…; `action:<name>` the keyboard's `sceneTable`: 大千's `action:zhuyin` the

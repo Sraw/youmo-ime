@@ -100,8 +100,11 @@ sealed interface SceneAction {
  * letter's or a group's face, the comma, the full stop, an address's key) shows a bubble of what
  * it types, with its corner where it swipes one (a letter that swipes none but to its shortcut, its
  * face again: the bubble shows the shortcut swiped to); a function key (分词, 符, 123, ⌫) shows none. A
- * key's `preview="on|off"` says otherwise (注音九键's tones and ? ! ~ show theirs, its slot none). A
- * key that types one character and names no long press offers its character's preset (SymbolKey's).
+ * key's `preview="on|off"` says otherwise (注音九键's tones and ? ! ~ show theirs, its slot none); one on
+ * the key overrides its `<defaults>`, but a board of `preview="off"` shows no bubble whatever its keys say
+ * (the app's `SceneKeyDef.onBoard`). A key that types one character and names no long press offers its
+ * character's preset (SymbolKey's): one that types, by its kind or its `preview`, so `preview` decides
+ * that default long press too.
  */
 data class SceneBehavior(
     val id: String,

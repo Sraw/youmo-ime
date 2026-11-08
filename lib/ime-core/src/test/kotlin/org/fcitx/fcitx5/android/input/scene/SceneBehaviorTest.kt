@@ -185,6 +185,21 @@ class SceneBehaviorTest {
         assertNull(SceneBehavior.of(node("<key id=\"a\" kind=\"function\" label=\"+\" send=\"+\"/>")).bubble)
     }
 
+    // <defaults preview="off"> a key's preview="on" overrides; what preview says decides the default preset too
+    // (060-render-p2 S4d M1, M2)
+    @Test
+    fun aDefaultsPreviewOffAKeysOnOverrides() {
+        val text = "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"grouped\" columns=\"10\">" +
+            "<defaults kind=\"letter\" preview=\"off\"/><row><key id=\"a\" label=\"?\" preview=\"on\" send=\"?\"/>" +
+            "<key id=\"b\" label=\"!\" send=\"!\"/></row></keyboard>"
+        val l = (LayoutReader.layout(text) as Parsed.Ok).value
+        val k = (SceneBuilder(theme, SceneData.portrait, SceneData.measurer).build(l, emptyMap()) as Parsed.Ok).value.keys.associate { it.id to SceneBehavior.of(it) }
+        assertEquals(Bubble("?", null), k.getValue("a").bubble)
+        assertEquals(SceneBehavior.LongPopup.Preset("?", true), k.getValue("a").popup)
+        assertNull(k.getValue("b").bubble)
+        assertNull(k.getValue("b").popup)
+    }
+
     private fun node(key: String): KeyNode {
         val text = "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"grouped\" columns=\"10\"><defaults kind=\"letter\"/><row>$key</row></keyboard>"
         val l = (LayoutReader.layout(text) as Parsed.Ok).value

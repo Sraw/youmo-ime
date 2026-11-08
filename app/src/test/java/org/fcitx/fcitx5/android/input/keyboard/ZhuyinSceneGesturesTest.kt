@@ -18,6 +18,11 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
+import org.fcitx.fcitx5.android.host.StatusEntry
+import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.SceneShownKey
@@ -235,6 +240,9 @@ class ZhuyinSceneGesturesTest {
                 EngineState.syllablesState.value = EngineState.SyllableState(im = InputMethodCatalog.PINYIN)
                 tap("r3c1")
                 slot("a tone")
+                // a tone typing nothing of pinyin's: the slot still the comma key (L5)
+                tap("r4c4")
+                slot("the slot after a tone")
                 tap("r4c3")
                 slot("a group")
                 assertEquals("canvas $canvas", idle, others())
@@ -257,12 +265,13 @@ class ZhuyinSceneGesturesTest {
         assertEquals(shown[0].joinToString("\n"), shown[1].joinToString("\n"))
         val sep = UNICODE + Keyboard.zhuyinNineTone(0)
         val expected = listOf(
-            "half-width: ,", "mapped: ，", "tapped: ，", "a tone: ，", "a group: 分词", "tapped typing: 分词", "the engine typing: 分词",
+            "half-width: ,", "mapped: ，", "tapped: ，", "a tone: ，", "the slot after a tone: ，", "a group: 分词", "tapped typing: 分词", "the engine typing: 分词",
             "the engine done: ，", "half-width typing: 分词", "another input method: ,", "a group to it: ,",
         )
         assertEquals(expected, shown[1].map { it.substringBefore(" [") })
         assertTrue(shown[1][2], "sendKey(sym=44," in shown[1][2])
-        assertTrue(shown[1][5], "sendKey(sym=$sep," in shown[1][5])
+        assertTrue(shown[1][4], "sendKey(sym=44," in shown[1][4])
+        assertTrue(shown[1][6], "sendKey(sym=$sep," in shown[1][6])
     }
 
     // ? ! ~ shown as punctuation maps them, as they are typed (060-render-p2 §5.3, rules C 疑问 5): the views
@@ -272,13 +281,23 @@ class ZhuyinSceneGesturesTest {
         val mapping = mapOf("?" to "？", "!" to "！", "~" to "～", "," to "，", "." to "。")
         val shown = listOf(false, true).map { canvas ->
             harness(canvas, InputType.TYPE_CLASS_TEXT, PinyinKeyboard.ZhuyinNine).use { h ->
-                KeyboardHarness.find<ZhuyinKeyboard>(h.keyboard)!!.onPunctuationUpdate(mapping)
+                val kb = KeyboardHarness.find<ZhuyinKeyboard>(h.keyboard)!!
+                kb.onPunctuationUpdate(mapping)
                 h.idle()
-                listOf("r2c5", "r3c5", "r4c5").map { id ->
+                val typed = listOf("r2c5", "r3c5", "r4c5").map { id ->
                     h.api.calls.clear()
                     h.tap(h.keyNamed(id))
                     "$id ${h.keyNamed(id).label} " + h.api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
                 }
+                if (canvas) {
+                    // shown as typed (the user's 「显示和输出一致」): the face, the bubble and what the input method maps
+                    // it to the one character; with no mapping (English, half-width punctuation) all half-width again
+                    for ((id, c) in QUESTION_MARKS) assertEquals(id, List(3) { mapping.getValue(c) }, faceAndBubble(h, id) + mapping.getValue(c))
+                    kb.onPunctuationUpdate(emptyMap())
+                    h.idle()
+                    for ((id, c) in QUESTION_MARKS) assertEquals(id, listOf(c, c), faceAndBubble(h, id))
+                }
+                typed
             }
         }
         assertEquals(listOf("?", "!", "~"), shown[0].map { it.split(' ')[1] })
@@ -286,6 +305,56 @@ class ZhuyinSceneGesturesTest {
         // each typed as itself, the input method mapping it
         assertEquals(shown[0].map { it.substringAfter('[') }, shown[1].map { it.substringAfter('[') })
         listOf("?", "!", "~").forEachIndexed { i, c -> assertTrue(shown[1][i], "key=$c," in shown[1][i]) }
+    }
+
+    // 大千's bottom row's comma and full stop: their bubble as their face, as punctuation maps them (060-render-p2 S4d,
+    // M3: its old views bubbled , and . whatever they showed)
+    @Test
+    fun dachensCommaAndFullStopBubbleAsShown() {
+        for (canvas in listOf(false, true)) {
+            harness(canvas, InputType.TYPE_CLASS_TEXT).use { h ->
+                val kb = KeyboardHarness.find<ZhuyinKeyboard>(h.keyboard)!!
+                kb.onPunctuationUpdate(mapOf("," to "，", "." to "。"))
+                h.idle()
+                assertEquals("canvas $canvas", listOf("，", "，", "。", "。"), faceAndBubble(h, "comma") + faceAndBubble(h, "period"))
+                kb.onPunctuationUpdate(emptyMap())
+                h.idle()
+                assertEquals("canvas $canvas", listOf(",", ",", ".", "."), faceAndBubble(h, "comma") + faceAndBubble(h, "period"))
+            }
+        }
+    }
+
+    // a keyboard kept while another was shown, shown again: its punctuation as it changed meanwhile (KeyboardWindow.attachLayout,
+    // 060-render-p2 S4d L1: it showed , where it typed ，), whichever draws it
+    @Test
+    fun aKeyboardShownAgainShowsThePunctuationChangedMeanwhile() {
+        for (canvas in listOf(false, true)) {
+            harness(canvas, InputType.TYPE_CLASS_TEXT, PinyinKeyboard.ZhuyinNine).use { h ->
+                assertEquals("canvas $canvas", ",", h.keyNamed("comma").label)
+                h.tap(h.key("123"))
+                h.idle()
+                runBlocking { h.api.setPunctuationMap("zh_CN", listOf(PunctuationMapEntry(",", "，", ""))) }
+                PunctuationManager.forget()
+                val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
+                h.api.statusAreaCached = active
+                h.emit(HostEvent.StatusArea(active, KeyboardHarness.PINYIN))
+                h.idle()
+                h.tap(h.key("ABC"))
+                h.idle()
+                assertEquals("canvas $canvas", listOf("，", "，"), listOf(h.keyNamed("comma").label, h.keyNamed("r4c4").label))
+            }
+            PunctuationManager.forget()
+        }
+    }
+
+    // [id]'s face and the bubble it shows pressed
+    private fun faceAndBubble(h: KeyboardHarness, id: String): List<String> {
+        h.after(BUBBLE_GONE_MS)
+        val k = h.keyNamed(id)
+        h.press(k)
+        val bubble = h.popupChoices().map { it.text }.single()
+        h.release()
+        return listOf(k.label, bubble)
     }
 
     // a group's long press picks its symbol, ˉ's ˙, each sent as its code (C6.3, C6.5), whichever draws
@@ -482,6 +551,8 @@ class ZhuyinSceneGesturesTest {
 
         // 41 symbols and tones, ⌫ and the bottom row: a key missing on one side is caught by the ids compared
         const val MOST_KEYS_AT_LEAST = 45
+
+        val QUESTION_MARKS = listOf("r2c5" to "?", "r3c5" to "!", "r4c5" to "~")
 
         // 注音九键's keys that must be among those compared: a tone, a group, the slot, ?, ⌫, the bottom row's
         val NINE_SHOWN = setOf("r1c1", "r1c2", "r4c4", "r2c5", "backspace", "comma", "space", "enter")

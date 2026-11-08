@@ -12,6 +12,12 @@ import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
+import android.graphics.Rect
+import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.input.popup.PopupAction
+import org.fcitx.fcitx5.android.input.popup.PopupActionListener
+import org.fcitx.fcitx5.android.input.scene.KeyRef
+import org.robolectric.RuntimeEnvironment
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -33,6 +39,29 @@ class ZhuyinKeyboardTest {
     private fun faces(rows: List<List<KeyDef>>) = rows.map { row -> row.mapNotNull { (it.appearance as? KeyDef.Appearance.Text)?.displayText } }
 
     private fun press(key: KeyDef) = key.behaviors.filterIsInstance<KeyDef.Behavior.Press>().single().action
+
+    // a bubble shown as punctuation maps its character, the first and as a swipe updates it (back to the key's own,
+    // KeySwipes.preview), as the key shows it and types it (060-render-p2 S4d H1)
+    @Test
+    fun aBubbleShowsThePunctuationAsMapped() {
+        val keyboard = ZhuyinKeyboard(RuntimeEnvironment.getApplication(), ThemePreset.PixelLight, nine = true)
+        keyboard.onPunctuationUpdate(mapOf("?" to "？"))
+        val shown = ArrayList<PopupAction>()
+        keyboard.popupActionListener = PopupActionListener { shown += it }
+        keyboard.onPopupAction(PopupAction.PreviewAction(KeyRef("r2c5"), "?", Rect()))
+        keyboard.onPopupAction(PopupAction.PreviewUpdateAction(KeyRef("r2c5"), "?"))
+        assertEquals(listOf("？", "？"), shown.map { (it as? PopupAction.PreviewAction)?.content ?: (it as PopupAction.PreviewUpdateAction).content })
+    }
+
+    // a group's long press: the zhuyin symbols on its face alone, nothing a layout P3's themes may bring
+    // could put there besides (a space, a mark), none where it shows none (060-render-p2 S4d L3)
+    @Test
+    fun aGroupsLongPressOffersItsZhuyinSymbolsAlone() {
+        val popup = ZhuyinKeyboard.groupPopup("ㄅ ㄉ!") as KeyDef.Popup.Keyboard.Explicit
+        assertEquals(listOf("ㄅ", "ㄉ"), popup.items.toList())
+        assertEquals(null, ZhuyinKeyboard.groupPopup("?!"))
+        assertEquals(null, ZhuyinKeyboard.groupPopup(null))
+    }
 
     @Test
     fun dachenHasEachSymbolAndToneWhereTaiwanPrintsIt() {

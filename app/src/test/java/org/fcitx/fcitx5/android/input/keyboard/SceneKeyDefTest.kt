@@ -117,6 +117,19 @@ class SceneKeyDefTest {
         }
     }
 
+    // a key's preview="on" on a board of preview="off": no bubble, the board's word the last (060-render-p2 S4d M1)
+    @Test
+    fun aKeysPreviewOnGivesWayToItsBoardsOff() {
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+        val keyboard = ZhuyinKeyboard(context, ThemePreset.PixelLight, nine = true).laidOut()
+        val canvas = KeyboardHarness.all(keyboard).filterIsInstance<KeyboardCanvasView>().single()
+        // ?: a function key with preview="on"
+        val question = SceneBehavior.of(canvas.scene!!.keys.single { it.id == "r2c5" })
+        assertEquals(SceneBehavior.Bubble("?", null), question.bubble)
+        val off = Scene(1.0, 1.0, emptyList(), emptyList(), emptyList(), preview = false, popups = true)
+        assertNull(SceneKeyDef.onBoard(question, off).bubble)
+    }
+
     // the 14 keys' nodes, from the canvas a GroupedKeyboard draws with the switch on
     private fun nodes(): Map<String, KeyNode> {
         prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
