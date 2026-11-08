@@ -5,7 +5,9 @@
 package org.fcitx.fcitx5.android.data.pack
 
 import android.content.ContentResolver
+import android.content.Context
 import android.net.Uri
+import android.os.BatteryManager
 import android.util.Base64
 import androidx.annotation.VisibleForTesting
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +26,7 @@ import org.fcitx.fcitx5.android.pack.PackRequirement
 import org.fcitx.fcitx5.android.pack.PackShelf
 import org.fcitx.fcitx5.android.pack.PackStatus
 import org.fcitx.fcitx5.android.pack.Refusal
+import org.fcitx.fcitx5.android.pack.VerifyDue
 import org.fcitx.fcitx5.android.utils.appContext
 import timber.log.Timber
 import java.io.File
@@ -104,20 +107,49 @@ object PackStore {
     var verifiesInBackground = System.getProperty("youmo.packs.verify") != "off"
 
     /**
-     * The packs in use read through ([PackShelf.verify]: a start reads their sizes only), on a
-     * thread of the lowest priority, [VERIFY_AFTER_MS] after the start: not competing with the
-     * keyboard's first look. One found damaged is not used (the keyboard's gate, the page say
-     * 已损坏，请重新导入), the engine made anew without it.
+     * The packs in use read through when due ([PackShelf.due]: the first start after an import,
+     * then every 30 days; a start reads their sizes only), on a thread of the lowest priority,
+     * [VERIFY_AFTER_MS] after the start: not competing with the keyboard's first look. Hundreds of
+     * MB read, so the 30 days' read waits for the phone to be charging (checked every
+     * [CHARGING_POLL_MS] while the process lives); the first one after an import does not wait. One
+     * found damaged is not used (the keyboard's gate, the page say 已损坏，请重新导入), the engine
+     * made anew without it.
      */
     fun verifyInBackground() {
         if (!verifiesInBackground) return
         thread(name = "packs-verify", priority = Thread.MIN_PRIORITY, isDaemon = true) {
             Thread.sleep(VERIFY_AFTER_MS)
-            runCatching { verifyNow() }.onFailure { Timber.e(it, "resource packs not verified") }
+            while (true) {
+                val waiting = runCatching { verifyDue(::charging) }
+                    .onFailure { Timber.e(it, "resource packs not verified") }.getOrDefault(false)
+                if (!waiting) break
+                Thread.sleep(CHARGING_POLL_MS)
+            }
         }
     }
 
-    /** [verifyInBackground]'s work, now, on this thread: true if a pack was found damaged. */
+    /**
+     * [verifyInBackground]'s one pass, now, on this thread: each pack due read through, one due
+     * only for its age only if [charging]. True if one is left waiting for the charger.
+     */
+    @VisibleForTesting
+    fun verifyDue(charging: () -> Boolean): Boolean {
+        var waiting = false
+        val damaged = PackKind.entries.filter { kind ->
+            when (shelf.due(kind)) {
+                VerifyDue.NONE -> false
+                VerifyDue.UNVERIFIED -> shelf.verify(kind)
+                VerifyDue.STALE -> if (charging()) shelf.verify(kind) else false.also { waiting = true }
+            }
+        }
+        if (damaged.isNotEmpty()) {
+            Timber.w("resource packs damaged: %s", damaged.joinToString { it.id })
+            changed()
+        }
+        return waiting
+    }
+
+    /** Every pack in use read through, due or not, now, on this thread: true if one was found damaged. */
     @VisibleForTesting
     fun verifyNow(): Boolean {
         val damaged = PackKind.entries.filter { shelf.verify(it) }
@@ -126,6 +158,9 @@ object PackStore {
         changed()
         return true
     }
+
+    private fun charging(): Boolean =
+        appContext.getSystemService(Context.BATTERY_SERVICE)?.let { (it as BatteryManager).isCharging } == true
 
     /** [uri] (a file the user picked) imported; [progress] told on the worker as it copies. */
     suspend fun import(resolver: ContentResolver, uri: Uri, progress: (Long, Long) -> Unit = { _, _ -> }): ImportResult =
@@ -207,4 +242,5 @@ object PackStore {
 
     private const val BUFFER = 1 shl 16
     private const val VERIFY_AFTER_MS = 30_000L
+    private const val CHARGING_POLL_MS = 15L * 60 * 1000
 }

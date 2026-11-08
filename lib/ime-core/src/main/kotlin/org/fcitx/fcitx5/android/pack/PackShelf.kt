@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.pack
 
+import org.fcitx.fcitx5.android.core.CoreLog
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -30,6 +31,18 @@ sealed class PackStatus {
 
     /** Imported, but its files no longer what [manifest] says ([PackShelf.verify]): not used, to be imported again. */
     class Damaged(val manifest: PackManifest) : PackStatus()
+}
+
+/** Whether a pack in use is to be read through ([PackShelf.verify]) now. */
+enum class VerifyDue {
+    /** Read through since it was imported, and not long ago. */
+    NONE,
+
+    /** Never read through since it was imported: the first start after an import. */
+    UNVERIFIED,
+
+    /** Read through over [PackShelf.VERIFY_EVERY_MS] ago (or at a time the clock has not reached). */
+    STALE,
 }
 
 /** Why a file was not imported. */
@@ -75,14 +88,19 @@ sealed class ImportResult {
  * is left over (staging, older generations), at the next start. The generation replaced stays till
  * [sweep]: the app's host, reading it, is restarted on the new one first.
  *
+ * A generation read through ([verify]) and found as signed has a `verified` file (when, epoch
+ * milliseconds).
+ *
  * [trusted]: the raw Ed25519 public keys this build takes a pack signed by. [requirements]: what
- * it reads of each pack. [margin]: bytes kept free beyond a pack's size.
+ * it reads of each pack. [margin]: bytes kept free beyond a pack's size. [clock]: now, in epoch
+ * milliseconds.
  */
 class PackShelf(
     private val root: File,
     private val trusted: List<ByteArray>,
     private val requirements: Map<PackKind, PackRequirement>,
     private val margin: Long = DEFAULT_MARGIN,
+    private val clock: () -> Long = System::currentTimeMillis,
     // a test's hook: which directories an import synced
     private val syncDir: (File) -> Unit = ::syncDirectory,
 ) {
@@ -92,42 +110,62 @@ class PackShelf(
         require(requirements.keys == PackKind.entries.toSet()) { "a requirement for each pack" }
     }
 
-    @Volatile
-    private var state: Map<PackKind, Pair<PackStatus, File?>> = PackKind.entries.associateWith { PackStatus.Missing to null }
+    // a pack's status; its generation if Ready, and when that was last read through (null: never)
+    private data class Held(val status: PackStatus, val dir: File? = null, val verifiedAt: Long? = null)
 
-    fun status(kind: PackKind): PackStatus = state.getValue(kind).first
+    @Volatile
+    private var state: Map<PackKind, Held> = PackKind.entries.associateWith { Held(PackStatus.Missing) }
+
+    fun status(kind: PackKind): PackStatus = state.getValue(kind).status
 
     /** The directory of [kind]'s files if it is [PackStatus.Ready], else null. */
-    fun dir(kind: PackKind): File? = state.getValue(kind).second
+    fun dir(kind: PackKind): File? = state.getValue(kind).dir
+
+    /**
+     * Whether [kind]'s pack in use is to be read through: once after its import (the copy was
+     * checked as it was written, not as it was kept), then every [VERIFY_EVERY_MS]. A pack not
+     * Ready has nothing to read.
+     */
+    fun due(kind: PackKind): VerifyDue {
+        val held = state.getValue(kind)
+        if (held.status !is PackStatus.Ready) return VerifyDue.NONE
+        val at = held.verifiedAt ?: return VerifyDue.UNVERIFIED
+        val now = clock()
+        // a time the clock has not reached: the clock was set back, when it was read is not known
+        return if (now - at > VERIFY_EVERY_MS || at > now + CLOCK_SLACK_MS) VerifyDue.STALE else VerifyDue.NONE
+    }
 
     /**
      * Reads which packs are there and what they are, deleting what an import left behind
      * (staging, older generations, a `current` half written). Each pack's manifest is checked
      * against the keys again, and its files' sizes, not their contents (read at every start, a
-     * pack's 300 MB would cost seconds): their contents were checked as they were copied, and the
-     * app's own storage is not written by anyone else.
+     * pack's 300 MB would cost seconds): their contents were checked as they were copied, and are
+     * read through after ([due], [verify]).
      */
     @Synchronized
     fun load() {
         state = PackKind.entries.associateWith { kind -> loadOne(kind) }
     }
 
-    private fun loadOne(kind: PackKind): Pair<PackStatus, File?> {
+    private fun loadOne(kind: PackKind): Held {
         val dir = File(root, kind.id)
         val current = File(dir, CURRENT).takeIf { it.isFile }?.readText()?.trim()?.takeIf { PackManifest.safePath(it) && '/' !in it }
         // anything but the generation in use: staging, older ones, a pointer half written
         dir.listFiles()?.forEach { if (it.name != CURRENT && it.name != current) it.deleteRecursively() }
-        if (current == null) return PackStatus.Missing to null
+        if (current == null) return Held(PackStatus.Missing)
         val gen = File(dir, current)
         // unreadable, unsigned or unparsable: as good as none, imported anew
         val manifest = runCatching {
             val bytes = File(gen, PackManifest.NAME).readBytes()
             val signature = File(gen, PackManifest.SIGNATURE).readBytes()
             PackManifest.parse(bytes).takeIf { signed(bytes, signature) }
-        }.getOrNull() ?: return PackStatus.Missing to null
-        if (manifest.kind != kind || manifest.files.any { File(gen, it.path).length() != it.size }) return PackStatus.Missing to null
+        }.getOrNull() ?: return Held(PackStatus.Missing)
+        if (manifest.kind != kind || manifest.files.any { File(gen, it.path).length() != it.size }) return Held(PackStatus.Missing)
         val status = judge(manifest)
-        return status to gen.takeIf { status is PackStatus.Ready }
+        if (status !is PackStatus.Ready) return Held(status)
+        // unreadable or half written (a power cut as it was written): read through again
+        val verifiedAt = runCatching { File(gen, VERIFIED).readText().trim().toLongOrNull() }.getOrNull()
+        return Held(status, gen, verifiedAt)
     }
 
     /**
@@ -146,28 +184,36 @@ class PackShelf(
     /**
      * Reads [kind]'s files in use through, against its manifest: what [load] does not (sizes
      * only). One found changed is [PackStatus.Damaged] from then on, till imported again; true
-     * then. Long (a pack's hundreds of MB), so not under the shelf's lock: an import meanwhile
-     * (its files replaced, the old ones deleted) leaves the new pack as it is.
+     * then. Found as signed, it is marked verified ([due]).
+     * Long (a pack's hundreds of MB), so not under the shelf's lock: an import meanwhile (its
+     * files replaced, the old ones deleted) leaves the new pack as it is.
      */
     fun verify(kind: PackKind): Boolean {
-        val (status, gen) = state.getValue(kind)
+        val held = state.getValue(kind)
+        val status = held.status
+        val gen = held.dir
         if (status !is PackStatus.Ready || gen == null) return false
-        if (intact(status.manifest, gen)) return false
+        val read = read(status.manifest, gen)
         synchronized(this) {
-            if (state.getValue(kind).second != gen) return false
-            state = state + (kind to (PackStatus.Damaged(status.manifest) to null))
+            // an import came between: what was read is no longer what is used
+            if (state.getValue(kind).dir != gen) return false
+            when (read) {
+                Read.INTACT -> state = state + (kind to held.copy(verifiedAt = markVerified(gen)))
+                Read.DAMAGED -> state = state + (kind to Held(PackStatus.Damaged(status.manifest)))
+            }
         }
-        return true
+        return read == Read.DAMAGED
     }
 
+    private enum class Read { INTACT, DAMAGED }
+
     // each of [manifest]'s files in [gen], its size and SHA-256 as it says; one unreadable is not
-    private fun intact(manifest: PackManifest, gen: File): Boolean = try {
+    private fun read(manifest: PackManifest, gen: File): Read = try {
         val buffer = ByteArray(BUFFER)
-        manifest.files.all { entry ->
-            val file = File(gen, entry.path)
+        val same = manifest.files.all { entry ->
             val digest = MessageDigest.getInstance("SHA-256")
             var size = 0L
-            file.inputStream().use { input ->
+            File(gen, entry.path).inputStream().use { input ->
                 while (true) {
                     val n = input.read(buffer)
                     if (n < 0) break
@@ -177,8 +223,26 @@ class PackShelf(
             }
             size == entry.size && PackManifest.hex(digest.digest()) == entry.sha256
         }
+        if (same) Read.INTACT else Read.DAMAGED
     } catch (_: IOException) {
-        false
+        Read.DAMAGED
+    }
+
+    // now written in [gen] as when it was read through, and returned; not written (the storage
+    // refusing), the next start reads it through again
+    private fun markVerified(gen: File): Long {
+        val now = clock()
+        mark(gen, VERIFIED, now.toString().toByteArray())
+        return now
+    }
+
+    // [name] written in [gen]; what cannot be is logged: read through again at the next start
+    private fun mark(gen: File, name: String, bytes: ByteArray) {
+        try {
+            File(gen, name).writeSynced(bytes)
+        } catch (e: IOException) {
+            CoreLog.e("pack mark $name not written: ${e.javaClass.simpleName}")
+        }
     }
 
     private fun judge(manifest: PackManifest): PackStatus {
@@ -229,7 +293,7 @@ class PackShelf(
         }
         val status = judge(manifest)
         if (status !is PackStatus.Ready) refuse(Refusal.Incompatible(manifest, requirements.getValue(manifest.kind)))
-        val before = state.getValue(manifest.kind).first
+        val before = state.getValue(manifest.kind).status
         val installed = when (before) {
             is PackStatus.Ready -> before.manifest
             is PackStatus.NeedsUpdate -> before.manifest
@@ -240,8 +304,12 @@ class PackShelf(
         // the same pack: nothing to copy, if what is in use still is it (its files read through
         // again: a start reads only their sizes); else copied anew, the import mending it
         if (before is PackStatus.Ready && before.manifest.sameAs(manifest)) {
-            val gen = state.getValue(manifest.kind).second
-            if (gen != null && intact(before.manifest, gen)) return ImportResult.AlreadyThere(manifest)
+            val held = state.getValue(manifest.kind)
+            val gen = held.dir
+            if (gen != null && read(before.manifest, gen) == Read.INTACT) {
+                state = state + (manifest.kind to held.copy(verifiedAt = markVerified(gen)))
+                return ImportResult.AlreadyThere(manifest)
+            }
         }
 
         val dir = roomFor(manifest)
@@ -260,7 +328,8 @@ class PackShelf(
             // the one step that changes which pack is used
             pointer.renameOrFail(File(dir, CURRENT))
             syncDir(dir)
-            state = state + (manifest.kind to (PackStatus.Ready(manifest) to gen))
+            // not marked verified: read through at the next start (the copy checked as it was written, not as kept)
+            state = state + (manifest.kind to Held(PackStatus.Ready(manifest), gen))
             // the old generation kept: what reads it (the engine) is made anew on the new one first,
             // then [sweep] deletes it; a process ended before then, [load] does
         } finally {
@@ -354,6 +423,15 @@ class PackShelf(
         }
 
         const val CURRENT = "current"
+
+        /** In a generation: when it was last read through and found as signed (epoch ms, text). */
+        const val VERIFIED = "verified"
+
+        /** How long a pack read through stays so: read through again after (at a start, charging). */
+        const val VERIFY_EVERY_MS = 30L * 24 * 60 * 60 * 1000
+
+        // a verify's time ahead of the clock by more than this: the clock set back, read through again
+        private const val CLOCK_SLACK_MS = 24L * 60 * 60 * 1000
         private const val STAGING = ".staging-"
         private const val BUFFER = 1 shl 16
         private const val GEN_SPREAD = 1_000_000L

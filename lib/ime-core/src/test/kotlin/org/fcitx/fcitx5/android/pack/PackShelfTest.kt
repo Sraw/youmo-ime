@@ -150,6 +150,40 @@ class PackShelfTest {
         assertFalse(shelf.verify(PackKind.TEXT))
     }
 
+    // review M-1: read through at the first start after an import, then once its 30 days are past
+    @Test
+    fun `a pack is read through once after its import, then after 30 days, the time kept by the next start`() {
+        var now = 1_000_000_000_000L
+        fun shelf() = PackShelf(root, listOf(packs.publicKey), needs, 0, { now }).apply { load() }
+        val shelf = shelf()
+        assertSame(VerifyDue.NONE, shelf.due(PackKind.TEXT))
+        shelf.take(text())
+        assertSame(VerifyDue.UNVERIFIED, shelf.due(PackKind.TEXT))
+        // the import's own check is of the bytes as written, not as kept: still due at the next start
+        assertSame(VerifyDue.UNVERIFIED, shelf().due(PackKind.TEXT))
+        assertFalse(shelf.verify(PackKind.TEXT))
+        assertSame(VerifyDue.NONE, shelf.due(PackKind.TEXT))
+        assertEquals("$now", File(shelf.dir(PackKind.TEXT), PackShelf.VERIFIED).readText())
+        val read = now
+        now += PackShelf.VERIFY_EVERY_MS
+        assertSame(VerifyDue.NONE, shelf().due(PackKind.TEXT))
+        now += 1
+        assertSame(VerifyDue.STALE, shelf().due(PackKind.TEXT))
+        // the clock set back past a day: when it was read is not known
+        now = read - 2 * 24 * 60 * 60 * 1000L
+        assertSame(VerifyDue.STALE, shelf().due(PackKind.TEXT))
+        now = read - 60_000
+        assertSame(VerifyDue.NONE, shelf().due(PackKind.TEXT))
+        // the mark half written: read through again
+        File(shelf.dir(PackKind.TEXT), PackShelf.VERIFIED).writeText("x")
+        assertSame(VerifyDue.UNVERIFIED, shelf().due(PackKind.TEXT))
+        // the same pack imported again is read through, and so marked
+        val again = shelf()
+        assertTrue(again.take(text()) is ImportResult.AlreadyThere)
+        assertSame(VerifyDue.NONE, again.due(PackKind.TEXT))
+        assertSame(VerifyDue.NONE, shelf().due(PackKind.TEXT))
+    }
+
     @Test
     fun `a newer pack replaces the old one, which is deleted`() {
         val shelf = shelf()

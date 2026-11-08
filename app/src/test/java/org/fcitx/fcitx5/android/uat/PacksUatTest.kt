@@ -304,9 +304,48 @@ class PacksUatTest {
         }
     }
 
-    // a shelf of its own, on [root] (a restart: another on the same root)
-    private fun shelfAt(root: File) =
-        PackShelf(root, listOf(TestShelves.packs.publicKey), TestShelves.requirements).apply { load() }
+    // a shelf of its own, on [root] (a restart: another on the same root), its clock [now]
+    private fun shelfAt(root: File, now: () -> Long = System::currentTimeMillis) =
+        PackShelf(root, listOf(TestShelves.packs.publicKey), TestShelves.requirements, clock = now).apply { load() }
+
+    // a byte of [shelf]'s [kind] pack changed, its size not: what a start does not see
+    private fun damage(shelf: PackShelf, kind: PackKind) {
+        val path = if (kind == PackKind.TEXT) "handwriting/test.txt" else "voice/test.txt"
+        val file = File(shelf.dir(kind)!!, path)
+        file.writeBytes(file.readBytes().also { it[0] = (it[0].toInt() xor 1).toByte() })
+    }
+
+    /** Review M-1: read through again after 30 days, but only with the phone charging. */
+    @Test
+    fun aPackReadThroughA30DaysAgoWaitsForTheCharger() {
+        val root = Files.createTempDirectory("packs").toFile()
+        var now = 1_000_000_000_000L
+        val restart = PackStore.restartHost
+        PackStore.restartHost = { true }
+        try {
+            val shelf = shelfAt(root) { now }
+            assertTrue(shelf.import(TestShelves.pack(PackKind.TEXT).inputStream()) is ImportResult.Imported)
+            PackStore.useShelf(shelf)
+            assertFalse(PackStore.verifyDue { error("not asked: the first read does not wait") })
+            damage(shelf, PackKind.TEXT)
+            // read days ago: nothing due
+            now += 10L * 24 * 60 * 60 * 1000
+            assertFalse(PackStore.verifyDue { error("not asked: nothing due") })
+            assertTrue(PackStore.ready(PackKind.TEXT))
+            now += 30L * 24 * 60 * 60 * 1000
+            // due, not charging: left waiting
+            assertTrue(PackStore.verifyDue { false })
+            assertTrue(PackStore.ready(PackKind.TEXT))
+            val generation = PackStore.state.value.generation
+            assertFalse(PackStore.verifyDue { true })
+            assertTrue(PackStore.status(PackKind.TEXT) is PackStatus.Damaged)
+            assertEquals(generation + 1, PackStore.state.value.generation)
+        } finally {
+            PackStore.restartHost = restart
+            TestShelves.use()
+            root.deleteRecursively()
+        }
+    }
 
     /** Review L-7: what tells the rest of an import failing leaves it imported, counted all the same. */
     @Test
