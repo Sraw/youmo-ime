@@ -207,6 +207,24 @@ class PackShelfTest {
         assertSame(VerifyDue.NONE, shelf().due(PackKind.TEXT))
     }
 
+    // review L-6: the same pack again is read through, its progress told as an import's
+    @Test
+    fun `the same pack again tells how far its read through got`() {
+        val shelf = shelf()
+        shelf.take(text())
+        var last = 0L
+        var total = 0L
+        assertTrue(
+            shelf.import(ByteArrayInputStream(text())) { read, of ->
+                assertTrue(read in last..of)
+                last = read
+                total = of
+            } is ImportResult.AlreadyThere,
+        )
+        assertEquals(TEXT_FILES.values.sumOf { it.size }.toLong(), total)
+        assertEquals(total, last)
+    }
+
     // review L-1: an import while a verify reads (the hook holds it between its read and its word):
     // what it read is no longer used, the new pack neither marked damaged nor verified
     @Test

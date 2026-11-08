@@ -208,7 +208,7 @@ class PackShelf(
         val status = held.status
         val gen = held.dir
         if (status !is PackStatus.Ready || gen == null) return false
-        val read = read(kind, status.manifest, gen)
+        val read = read(kind, status.manifest, gen) { _, _ -> }
         afterRead(kind)
         synchronized(this) {
             // an import came between: what was read is no longer what is used
@@ -229,8 +229,9 @@ class PackShelf(
 
     // each of [manifest]'s files in [gen], its size and SHA-256 as it says; one gone is damage, one
     // that cannot be read (an I/O error) says nothing of what it holds
-    private fun read(kind: PackKind, manifest: PackManifest, gen: File): Read = try {
+    private fun read(kind: PackKind, manifest: PackManifest, gen: File, progress: (Long, Long) -> Unit): Read = try {
         val buffer = ByteArray(BUFFER)
+        var done = 0L
         val same = manifest.files.all { entry ->
             val digest = MessageDigest.getInstance("SHA-256")
             var size = 0L
@@ -239,7 +240,9 @@ class PackShelf(
                     val n = input.read(buffer)
                     if (n < 0) break
                     size += n
+                    done += n
                     digest.update(buffer, 0, n)
+                    progress(done, manifest.size)
                 }
             }
             size == entry.size && PackManifest.hex(digest.digest()) == entry.sha256
@@ -326,12 +329,12 @@ class PackShelf(
             PackStatus.Missing -> null
         }
         // the same pack: nothing to copy, if what is in use still is it (its files read through
-        // again: a start reads only their sizes); else copied anew, the import mending it. One
-        // that cannot be read now is copied anew too: the user asked for it
+        // again, told as [progress]: a start reads only their sizes); else copied anew, the import
+        // mending it. One that cannot be read now is copied anew too: the user asked for it
         if (before is PackStatus.Ready && before.manifest.sameAs(manifest)) {
             val held = state.getValue(manifest.kind)
             val gen = held.dir
-            if (gen != null && read(manifest.kind, before.manifest, gen) == Read.INTACT) {
+            if (gen != null && read(manifest.kind, before.manifest, gen, progress) == Read.INTACT) {
                 state = state + (manifest.kind to held.copy(verifiedAt = markVerified(gen)))
                 return ImportResult.AlreadyThere(manifest)
             }

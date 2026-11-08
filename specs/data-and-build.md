@@ -196,8 +196,8 @@ they stay: a pack carries no code.
   checked first, then each file is copied into a new generation directory while its size and SHA-256 are
   checked, after a free-space check against the manifest's sizes; only when all are right is the
   `current` pointer swapped atomically (rename; the pack's directory fsynced after each rename, so a power cut keeps them). A pack already there at that version (the same
-  manifest) is not copied again if its files in use, read through then, still are it; else (one
-  changed, gone, or not readable now) it is copied anew. An older version over a newer one is imported (a pack gone wrong taken back; it must
+  manifest) is not copied again if its files in use, read through then (the import's progress
+  telling the read), still are it; else (one changed, gone, or not readable now) it is copied anew. An older version over a newer one is imported (a pack gone wrong taken back; it must
   still meet the app's `minVersion`), the result saying 已用 vX 替换了更新的 vN. The generation replaced is deleted only once the host is up
   on the new one (`HostDaemon.restartIfRunning` waits for it, and for a host still starting before
   restarting it: that one may have read the old files), then `PackShelf.sweep`; a host still starting
