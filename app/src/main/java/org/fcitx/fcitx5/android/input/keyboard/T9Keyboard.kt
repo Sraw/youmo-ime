@@ -14,6 +14,8 @@ import android.os.SystemClock
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -64,6 +66,7 @@ import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.input.theme.KeyStyleResolver
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.engine.Texts
@@ -918,9 +921,17 @@ class T9Keyboard(
         return SceneEnvs.of(this, look, theme.isDark, width, height, input = input, shift = caps, texts = texts, marks = SceneBoard.marks(layout, charShortcutMarks))
     }
 
-    // the column in the scene's slot `side` (nine.xml), over the canvas: placed where the scene drawn last has it
-    private fun placeColumn() {
-        val box = canvas?.scene?.slots?.firstOrNull { it.id == SIDE_KEY }?.bounds ?: return
+    // each scene made anew: the column placed where it has the slot, after this frame (a layout pass, not one in a
+    // draw); on the main looper, not View.post, which holds it till the keyboard is attached
+    override fun onSceneBuilt(scene: Scene?) {
+        Handler(Looper.getMainLooper()).post { placeColumn(scene) }
+    }
+
+    // the column in the scene's slot `side` (nine.xml), over the canvas: placed where [scene] has it; hidden with no scene
+    private fun placeColumn(scene: Scene?) {
+        val box = scene?.slots?.firstOrNull { it.id == SIDE_KEY }?.bounds
+        column.visibility = if (box == null) View.GONE else View.VISIBLE
+        if (box == null) return
         val lp = column.layoutParams as ConstraintLayout.LayoutParams
         val at = listOf(box.left.roundToInt(), box.top.roundToInt(), box.right.roundToInt(), box.bottom.roundToInt())
         // laid out there already: no layout again
@@ -938,7 +949,6 @@ class T9Keyboard(
             // the slot's face is the scene's: the column draws only its items
             column.background = null
             column.bringToFront()
-            canvas?.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> post { placeColumn() } }
         }
     }
 }

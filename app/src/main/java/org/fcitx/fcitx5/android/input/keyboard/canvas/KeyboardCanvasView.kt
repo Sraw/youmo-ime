@@ -81,6 +81,9 @@ class KeyboardCanvasView(
 
         /** Its layout's id (a key's resource name may be its board's: [SceneA11y.of]); null for none. */
         val board: String? get() = null
+
+        /** A scene made anew, about to be drawn: [scene], or null for none (nothing drawn). */
+        fun built(scene: Scene?) {}
     }
 
     // a key's two faces, recorded once each when first drawn; kept across scenes where they are the same.
@@ -159,6 +162,7 @@ class KeyboardCanvasView(
                 faces = emptyList()
                 base = null
                 speech.invalidateRoot()
+                host.built(null)
                 return null
             }
             // painted in another look: nothing recorded in the last is kept
@@ -193,6 +197,7 @@ class KeyboardCanvasView(
             // a key's state changed told to a screen reader as a view's state description is: on the
             // key's node, which TalkBack reads out when it has focus
             said?.forEach { speech.invalidateVirtualView(it, AccessibilityEventCompat.CONTENT_CHANGE_TYPE_STATE_DESCRIPTION) }
+            host.built(s)
             return s
         }
 
