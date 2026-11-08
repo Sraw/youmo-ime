@@ -618,11 +618,11 @@ class HostCore(
         return CandidateEntry(if (label.isEmpty()) "" else filterOutput(ic, label), text, filterOutput(ic, word.comment), readings = readings)
     }
 
-    // `shows` (`androidfrontend.cpp:303-307`): the word the user tapped, by the text sent for it,
-    // filtered (traditional, say); an empty text (a key's pick) is not checked
     /** [text] as the active context shows a candidate of it: filtered (繁體: chttrans), the long press's menu naming it so. */
     fun shownText(text: String): String = contexts.active?.let { filterOutput(it, text) } ?: text
 
+    // `shows` (`androidfrontend.cpp:303-307`): the word the user tapped, by the text sent for it,
+    // filtered (traditional, say); an empty text (a key's pick) is not checked
     private fun shows(ic: InputContext, word: PanelCandidate, text: String) = text.isEmpty() || shown(ic, word) == text
 
     // the text sent for [word]: filtered, one put in as it is ([PanelCandidate.asIs]) as it is

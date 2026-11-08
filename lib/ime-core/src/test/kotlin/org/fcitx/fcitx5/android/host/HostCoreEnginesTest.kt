@@ -8,6 +8,10 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
+import org.fcitx.fcitx5.android.engine.runtime.UserWord
+import org.fcitx.fcitx5.android.engine.learn.control.MenuItem
+import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
+import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.runtime.EnginesFixture
 import org.fcitx.fcitx5.android.engine.runtime.EnginesHost
@@ -289,6 +293,41 @@ class HostCoreEnginesTest : EnginesFixture() {
         assertTrue("nothing predicted after it", log.filterIsInstance<HostEvent.Candidates>().all { it.candidates.isEmpty() })
         assertEquals("頭髮", pick(1))
         assertEquals(learnt, engines.userWords())
+        engines.close()
+    }
+
+    // review R2: a long press under 繁體 as the app's host makes it (KotlinHost.learning: the engines
+    // told the core's shownText): the menu named by the text shown, converted, answers with the
+    // engine's; the acts name that, the converted one nothing
+    @Test
+    fun `a long press under traditional names the candidate as shown and acts on the engine's text`() {
+        val engines = engines()
+        val converter = ChineseConverterTest.converter(characters = mapOf("你" to "妳"))
+        val modules = ChineseModules(
+            ModuleInputs(PunctuationProfile.parse(""), chttransEnabled = setOf(InputMethodCatalog.PINYIN), converter = { converter }),
+        )
+        val profile = Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "Default")
+        val core = HostCore(EnginesHost(engines), clock, profile, firstRun = true, modules = modules::build)
+        val log = mutableListOf<HostEvent>()
+        core.events += HostEvents { log += it }
+        core.activate(1)
+        core.setCapabilities(Capability.PREEDIT or Capability.CLIENT_UNFOCUS_COMMIT)
+        core.focus(true)
+        fun shown(): List<String> = log.filterIsInstance<HostEvent.Candidates>().last().candidates.map { it.text }
+        "ni".forEach { core.sendKey(Key(it.code), virtual = true) }
+        val at = shown().indexOf("妳")
+        assertTrue("${shown()}", at >= 0)
+        assertEquals("妳", core.shownText("你"))
+        fun learning(op: LearningOp) = engines.learning(InputMethodCatalog.PINYIN, op, core::shownText)
+        val menu = learning(LearningOp.Menu(at, "妳")) as LearningResult.Menu
+        assertEquals("你", menu.text)
+        assertTrue("${menu.items}", MenuItem.BLOCK in menu.items && MenuItem.PIN in menu.items)
+        // the converted text is no act's: delete, pin and block all named by the menu's
+        assertEquals(LearningResult.Unavailable, learning(LearningOp.Delete(at, "妳")))
+        assertEquals(LearningResult.Unavailable, learning(LearningOp.Pin(at, "妳")))
+        assertTrue(learning(LearningOp.Pin(at, menu.text)) is LearningResult.Done)
+        assertTrue(learning(LearningOp.Block(shown().indexOf("妳"), menu.text)) is LearningResult.Done)
+        assertEquals(listOf("你"), engines.userWords(UserWord.Kind.BLOCKED).map { it.text })
         engines.close()
     }
 
