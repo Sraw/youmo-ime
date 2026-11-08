@@ -94,22 +94,29 @@ class PunctuationMapUatTest {
             // made to map; S8 deletes it): on the views the face only
             val shown = { faceAndBubble(comma).let { if (canvas) it else it.take(1) } }
             val twice = { c: String -> if (canvas) listOf(c, c) else listOf(c) }
+            // the table read (till then the key shows and types its own mark: beforeTheTableIsRead...)
+            // the statuses at the start can flip punctuation off and on (the mapping emptied, then read again):
+            // the face drawn anew a frame later than the bubble asks; settled when both show the table's mark
+            until("the table read") { shown() == twice("，") }
+            // what those presses typed, the start of what follows
+            h.after(BUBBLE_GONE_MS)
+            val p = h.field.text.toString()
             // each press below is lifted, so typed: what goes in is checked with what showed
             assertEquals(what, twice("，"), shown())
-            until("the mark typed") { h.field.text.toString() == "，" }
+            until("the mark typed") { h.field.text.toString() == p + "，" }
             // a letter the engine leaves (the scripted one composes only a to z): typed as itself, the A of shift's
             h.tap(h.keyNamed("shift"))
             h.tap(h.key("A"))
-            until("A typed") { h.field.text.toString() == "，A" }
+            until("A typed") { h.field.text.toString() == p + "，A" }
             val half = if (on) "," else "，"
             assertEquals(what, twice(half), shown())
-            until("the mark typed") { h.field.text.toString() == "，A$half" }
+            until("the mark typed") { h.field.text.toString() == p + "，A$half" }
             // a Chinese word after it: the comma back to its mark
             h.tap(h.key("a"))
             runBlocking { fcitx.select(0) }
             until("the word typed") { h.field.text.endsWith("你好") }
             assertEquals(what, twice("，"), shown())
-            until("the mark typed") { h.field.text.toString() == "，A${half}你好，" }
+            until("the mark typed") { h.field.text.toString() == p + "，A${half}你好，" }
             h.close(); fcitx.stop()
         }
     }
