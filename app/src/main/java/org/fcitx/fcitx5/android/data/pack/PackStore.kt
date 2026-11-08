@@ -149,6 +149,9 @@ object PackStore {
         HostDaemon.restartIfRunning()
         // an import and a verify may both count: neither count lost
         mutableState.update { State(snapshot(), it.generation + 1) }
+        // the generation replaced, once the host is up on the new one (restartIfRunning waits for
+        // it) and the rest told to look again: a file of it opened only now would have been gone
+        shelf.sweep()
     }
 
     private fun snapshot() = PackKind.entries.associateWith { shelf.status(it) }

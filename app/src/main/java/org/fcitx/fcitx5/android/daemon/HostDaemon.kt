@@ -6,8 +6,11 @@ package org.fcitx.fcitx5.android.daemon
 
 import androidx.annotation.VisibleForTesting
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.HostInstance
 import org.fcitx.fcitx5.android.core.HostLifecycle
@@ -131,14 +134,38 @@ object HostDaemon {
 
     /**
      * fcitx restarted if it runs for some client (a resource pack imported: its engines made anew on
-     * the new files); not running, it reads them as it starts.
+     * the new files); not running, it reads them as it starts. One still starting may have read the
+     * old files: waited for, then restarted (a stop skips a host not ready, a start one not stopped:
+     * it was left on the old files). Returns once the new host is up, or [RESTART_WAIT_MS] passed:
+     * what the old one read may be deleted then. Blocks: not on the main thread (an import's worker).
      */
-    fun restartIfRunning(): Unit = lock.withLock {
-        if (testConnection == null && clients.isNotEmpty()) {
-            realFcitx.stop()
-            start()
+    fun restartIfRunning() {
+        if (testConnection != null) return
+        restartOnceStarted(realFcitx.lifecycle.stateFlow, RESTART_WAIT_MS) {
+            lock.withLock {
+                if (clients.isEmpty()) return@withLock false
+                realFcitx.stop()
+                start()
+                true
+            }
         }
     }
+
+    /**
+     * [restart] once [state] is past STARTING (waited for outside the lock: a client's connect on the
+     * main thread is not held up), then waited for the new host to be past STARTING too; each wait
+     * at most [waitMs]. [restart] says whether it restarted (false: no client, nothing running).
+     */
+    @VisibleForTesting
+    internal fun restartOnceStarted(state: StateFlow<HostLifecycle.State>, waitMs: Long, restart: () -> Boolean) {
+        fun started() = runBlocking {
+            withTimeoutOrNull(waitMs) { state.first { it != HostLifecycle.State.STARTING } }
+        } ?: Timber.w("fcitx still starting after %d ms", waitMs)
+        started()
+        if (restart()) started()
+    }
+
+    private const val RESTART_WAIT_MS = 10_000L
 
     /**
      * Restart fcitx instance while keep the clients connected

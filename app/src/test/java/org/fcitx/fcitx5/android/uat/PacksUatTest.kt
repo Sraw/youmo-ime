@@ -282,7 +282,8 @@ class PacksUatTest {
                 // as copied: nothing found
                 assertFalse(PackStore.verifyNow())
                 // a byte of the text pack's changed, its size not: what a start does not see
-                val file = File(shelf.dir(PackKind.TEXT)!!, "handwriting/test.txt")
+                val damaged = shelf.dir(PackKind.TEXT)!!
+                val file = File(damaged, "handwriting/test.txt")
                 file.writeBytes(file.readBytes().also { it[0] = (it[0].toInt() xor 1).toByte() })
                 assertTrue(PackStore.verifyNow())
                 h.idle()
@@ -295,6 +296,8 @@ class PacksUatTest {
                 assertTrue("$again", again is ImportResult.Imported)
                 h.idle()
                 assertNull(gate(h))
+                // the generation replaced deleted once the host is restarted on the new one
+                assertFalse(damaged.exists())
             }
         } finally {
             TestShelves.use()

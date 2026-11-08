@@ -72,7 +72,8 @@ sealed class ImportResult {
  * checking every byte against the signed manifest as it goes; only once all of it checks is the
  * staging directory renamed to a generation and `current` replaced (written beside, synced, renamed
  * over: one atomic step). Killed at any point before, the old pack stays in use; [load] deletes what
- * is left over (staging, older generations), at the next start.
+ * is left over (staging, older generations), at the next start. The generation replaced stays till
+ * [sweep]: the app's host, reading it, is restarted on the new one first.
  *
  * [trusted]: the raw Ed25519 public keys this build takes a pack signed by. [requirements]: what
  * it reads of each pack. [margin]: bytes kept free beyond a pack's size.
@@ -127,6 +128,19 @@ class PackShelf(
         if (manifest.kind != kind || manifest.files.any { File(gen, it.path).length() != it.size }) return PackStatus.Missing to null
         val status = judge(manifest)
         return status to gen.takeIf { status is PackStatus.Ready }
+    }
+
+    /**
+     * Deletes each pack's generations but the one in use: what an import replaced, once what read
+     * it has moved to the new one (the app: its host restarted on it). [load] does it at a start.
+     */
+    @Synchronized
+    fun sweep() {
+        for (kind in PackKind.entries) {
+            val dir = File(root, kind.id)
+            val current = File(dir, CURRENT).takeIf { it.isFile }?.readText()?.trim() ?: continue
+            dir.listFiles()?.forEach { if (it.name != CURRENT && it.name != current) it.deleteRecursively() }
+        }
     }
 
     /**
@@ -247,8 +261,8 @@ class PackShelf(
             pointer.renameOrFail(File(dir, CURRENT))
             syncDir(dir)
             state = state + (manifest.kind to (PackStatus.Ready(manifest) to gen))
-            // the old generation, mapped by whoever still uses it: its pages stay till they let go
-            dir.listFiles()?.forEach { if (it.name != CURRENT && it.name != gen.name) it.deleteRecursively() }
+            // the old generation kept: what reads it (the engine) is made anew on the new one first,
+            // then [sweep] deletes it; a process ended before then, [load] does
         } finally {
             if (staging.exists()) staging.deleteRecursively()
         }

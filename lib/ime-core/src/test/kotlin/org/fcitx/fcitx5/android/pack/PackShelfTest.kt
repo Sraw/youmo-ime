@@ -116,6 +116,7 @@ class PackShelfTest {
         assertTrue("$result", result is ImportResult.Imported)
         assertNotEquals(dir, shelf.dir(PackKind.TEXT))
         assertReady(shelf, PackKind.TEXT, 3, TEXT_FILES)
+        shelf.sweep()
         assertEquals(listOf(shelf.dir(PackKind.TEXT)!!.name), leftovers(PackKind.TEXT))
     }
 
@@ -158,8 +159,12 @@ class PackShelfTest {
         val result = shelf.take(text(version = 4, files = files))
         assertEquals(3, (result as ImportResult.Imported).replaced?.version)
         assertReady(shelf, PackKind.TEXT, 4, files)
+        // kept till swept: the app's host restarted on the new one first (review L3)
+        assertTrue(old.exists())
+        shelf.sweep()
         assertFalse(old.exists())
         assertEquals(1, leftovers(PackKind.TEXT).size)
+        assertReady(shelf, PackKind.TEXT, 4, files)
     }
 
     // a pack gone wrong taken back: the older one imported over the newer, the result saying what it replaced
