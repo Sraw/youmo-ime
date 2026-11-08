@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.scene.Op
+import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -415,10 +416,12 @@ class ZhuyinSceneGesturesTest {
     // left out (the engine's rule, ContentTest; here as the app draws it)
     @Test
     @Config(qualifiers = "w360dp-h740dp-port-440dpi")
-    fun aSmallPhonesCompactBackspaceKeepsBothItsIcons() {
+    fun aSmallPhonesCompactBackspaceLeavesOutItsDownIcon() {
+        // past the shortcuts' cap (060-render-p2 S4e: never smaller on its own, never another corner): the down
+        // one, the less swiped, left out; the swipe still works
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
-        assertEquals(3, harness(canvas = true, InputType.TYPE_CLASS_TEXT).use { h -> h.keyNamed("backspace").drawnIcons })
+        assertEquals(2, harness(canvas = true, InputType.TYPE_CLASS_TEXT).use { h -> h.keyNamed("backspace").drawnIcons })
     }
 
     // the same compact (the height setting's lowest, 20%, 34% on its side): the text 0.9, the marks smaller
@@ -542,7 +545,11 @@ class ZhuyinSceneGesturesTest {
             val sizes = listOf(false, true).map { canvas ->
                 harness(canvas, InputType.TYPE_CLASS_TEXT).use { h -> listOf("ㄅ", "ˇ", "ㄥ").map { h.key(it).textSize(it)!! } }
             }
-            sizes[0].zip(sizes[1]).forEach { (old, new) -> assertEquals("level $level: $sizes", old, new, SIZE_SLACK) }
+            // the scene's symbols one size, the view's or as much smaller as their class's cap (060-render-p2 S4e)
+            assertEquals("level $level: $sizes", 1, sizes[1].toSet().size)
+            sizes[0].zip(sizes[1]).forEach { (old, new) ->
+                assertTrue("level $level: $sizes", new <= old + SIZE_SLACK && new >= old * (1 - KeyMarkYield.MAX_CLASS_SHRINK) - SIZE_SLACK)
+            }
         }
     }
 

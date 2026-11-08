@@ -88,7 +88,7 @@ key y kind=letter a11y="y，6"
     shadow rect(401.88,18.38,465.13,133.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(401.88,18.38,465.13,130.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "y" 418.1,93.74 system 400 51.32 #ff37474f
-    icon redo 409,23,438,52 #ff7a858a
+    icon redo 409.5,23.63,436.89,51.01 #ff7a858a
     text "6" 440.82,43.37 system 700 23.8 #ff7a858a
   pressed
     +2 fill rect(401.88,18.38,465.13,130.63 r=10.5,10.5,10.5,10.5) #1f000000
@@ -164,7 +164,7 @@ key a kind=letter a11y="a，@"
     shadow rect(46.88,167.38,110.13,282.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(46.88,167.38,110.13,279.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "a" 63.1,242.74 system 400 51.32 #ff37474f
-    icon select-all 54,172,83,201 #ff7a858a
+    icon select-all 55.13,172.63,82.51,200.01 #ff7a858a
     text "@" 85.82,192.37 system 700 23.8 #ff7a858a
   pressed
     +2 fill rect(46.88,167.38,110.13,279.63 r=10.5,10.5,10.5,10.5) #1f000000
@@ -313,7 +313,7 @@ key z kind=letter a11y="z，'"
     shadow rect(125.88,316.38,189.13,431.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(125.88,316.38,189.13,428.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "z" 142.1,391.74 system 400 51.32 #ff37474f
-    icon undo 133,321,162,350 #ff7a858a
+    icon undo 133.88,321.63,161.26,349.01 #ff7a858a
     text "'" 164.82,341.37 system 700 23.8 #ff7a858a
   pressed
     +2 fill rect(125.88,316.38,189.13,428.63 r=10.5,10.5,10.5,10.5) #1f000000
@@ -329,7 +329,7 @@ key x kind=letter a11y="x，:"
     shadow rect(204.88,316.38,268.13,431.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(204.88,316.38,268.13,428.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "x" 221.1,391.74 system 400 51.32 #ff37474f
-    icon content-cut 212,321,241,350 #ff7a858a
+    icon content-cut 212.63,321.63,240.01,349.01 #ff7a858a
     text ":" 243.82,341.37 system 700 23.8 #ff7a858a
   pressed
     +2 fill rect(204.88,316.38,268.13,428.63 r=10.5,10.5,10.5,10.5) #1f000000
@@ -345,7 +345,7 @@ key c kind=letter a11y="c，\""
     shadow rect(283.88,316.38,346.13,431.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(283.88,316.38,346.13,428.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "c" 299.6,391.74 system 400 51.32 #ff37474f
-    icon content-copy 291,321,320,350 #ff7a858a
+    icon content-copy 291.38,321.63,318.76,349.01 #ff7a858a
     text "\"" 321.82,341.37 system 700 23.8 #ff7a858a
   pressed
     +2 fill rect(283.88,316.38,346.13,428.63 r=10.5,10.5,10.5,10.5) #1f000000
@@ -361,7 +361,7 @@ key v kind=letter a11y="v，?"
     shadow rect(361.88,316.38,425.13,431.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(361.88,316.38,425.13,428.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "v" 378.1,391.74 system 400 51.32 #ff37474f
-    icon content-paste 369,321,398,350 #ff7a858a
+    icon content-paste 370.13,321.63,397.51,349.01 #ff7a858a
     text "?" 400.82,341.37 system 700 23.8 #ff7a858a
   pressed
     +2 fill rect(361.88,316.38,425.13,428.63 r=10.5,10.5,10.5,10.5) #1f000000
@@ -420,8 +420,9 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
   normal
     shadow rect(676.88,316.38,779.63,431.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(676.88,316.38,779.63,428.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    icon backspace 698.64,350.63,757.86,409.85 #ff7a858a
-    icon delete-sweep 684,319,713,348 #ff7a858a
+    icon backspace 714.95,342.89,774.17,402.11 #ff7a858a
+    icon delete-sweep 685.13,319,712.51,346.39 #ff7a858a
+    icon restore 685.13,398.61,712.51,426 #ff7a858a
   pressed
     +2 fill rect(676.88,316.38,779.63,428.63 r=10.5,10.5,10.5,10.5) #1f000000
 key symbols kind=function role=symbols a11y="符"
@@ -478,7 +479,7 @@ key space kind=space role=space a11y="空格，拼音"
     shadow rect(275.88,465.38,504.13,580.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(275.88,465.38,504.13,577.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "拼音" 360.5,532.38 system 400 29.01 #ff37474f
-    icon cursor-move 283,470,312,499 #ff7a858a
+    icon cursor-move 283.5,470.63,310.89,498.01 #ff7a858a
   pressed
     +2 fill rect(275.88,465.38,504.13,577.63 r=10.5,10.5,10.5,10.5) #1f000000
 key period kind=function role=period a11y="。"

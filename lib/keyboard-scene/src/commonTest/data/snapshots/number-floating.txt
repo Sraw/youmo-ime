@@ -134,8 +134,8 @@ key space kind=function role=space a11y="a11y_key_space"
   normal
     shadow rect(676.88,167.38,779.63,282.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(676.88,167.38,779.63,279.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    icon space 698.64,201.63,757.86,260.85 #ff7a858a
-    icon cursor-move 684,170,713,199 #ff7a858a
+    icon space 698.64,200.01,757.86,259.23 #ff7a858a
+    icon cursor-move 685.13,170,712.51,197.39 #ff7a858a
   pressed
     +2 fill rect(676.88,167.38,779.63,279.63 r=10.5,10.5,10.5,10.5) #1f000000
 key * kind=function a11y="*"
@@ -203,8 +203,9 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
   normal
     shadow rect(676.88,316.38,779.63,431.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(676.88,316.38,779.63,428.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    icon backspace 698.64,350.63,757.86,409.85 #ff7a858a
-    icon delete-sweep 684,319,713,348 #ff7a858a
+    icon backspace 714.95,342.89,774.17,402.11 #ff7a858a
+    icon delete-sweep 685.13,319,712.51,346.39 #ff7a858a
+    icon restore 685.13,398.61,712.51,426 #ff7a858a
   pressed
     +2 fill rect(676.88,316.38,779.63,428.63 r=10.5,10.5,10.5,10.5) #1f000000
 key back kind=function role=back a11y="ABC"
