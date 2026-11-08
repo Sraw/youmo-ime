@@ -283,6 +283,32 @@ class PackShelfTest {
         assertSame(VerifyDue.NONE, shelf.due(PackKind.TEXT))
     }
 
+    // review r4 MEDIUM: FileNotFoundException for a file that is there (no descriptor left, EMFILE;
+    // not readable, EACCES) is no damage: only a file not there is
+    @Test
+    fun `a file there that cannot be opened now is no damage`() {
+        var failing = true
+        val shelf = PackShelf(root, listOf(packs.publicKey), needs, 0, openFile = { file ->
+            if (failing && file.name == "pinyin.data") {
+                throw java.io.FileNotFoundException("${file.path} (Too many open files)")
+            }
+            file.inputStream()
+        }).apply { load() }
+        shelf.take(text())
+        assertTrue(File(shelf.dir(PackKind.TEXT), "engine/pinyin.data").exists())
+        assertFalse(shelf.verify(PackKind.TEXT))
+        assertTrue(shelf.status(PackKind.TEXT) is PackStatus.Ready)
+        assertFalse(File(shelf.dir(PackKind.TEXT), PackShelf.DAMAGED).exists())
+        assertSame(VerifyDue.UNVERIFIED, shelf.due(PackKind.TEXT))
+        // the same pack again: copied anew, not taken for damaged nor for there
+        assertTrue(shelf.take(text()) is ImportResult.Imported)
+        // gone: damage
+        failing = false
+        File(shelf.dir(PackKind.TEXT), "engine/pinyin.data").delete()
+        assertTrue(shelf.verify(PackKind.TEXT))
+        assertTrue(shelf.status(PackKind.TEXT) is PackStatus.Damaged)
+    }
+
     @Test
     fun `a newer pack replaces the old one, which is deleted`() {
         val shelf = shelf()

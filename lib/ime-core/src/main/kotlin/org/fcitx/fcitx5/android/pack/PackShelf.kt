@@ -228,31 +228,40 @@ class PackShelf(
     private enum class Read { INTACT, DAMAGED, UNKNOWN }
 
     // each of [manifest]'s files in [gen], its size and SHA-256 as it says; one gone is damage, one
-    // that cannot be read (an I/O error) says nothing of what it holds
-    private fun read(kind: PackKind, manifest: PackManifest, gen: File, progress: (Long, Long) -> Unit): Read = try {
-        val buffer = ByteArray(BUFFER)
-        var done = 0L
-        val same = manifest.files.all { entry ->
-            val digest = MessageDigest.getInstance("SHA-256")
-            var size = 0L
-            openFile(File(gen, entry.path)).use { input ->
-                while (true) {
-                    val n = input.read(buffer)
-                    if (n < 0) break
-                    size += n
-                    done += n
-                    digest.update(buffer, 0, n)
-                    progress(done, manifest.size)
+    // that cannot be read (an I/O error) says nothing of what it holds. FileNotFoundException is not
+    // only a file gone: a file there it is also for one not readable (EACCES) or no descriptor left
+    // (EMFILE, "Too many open files"), which says nothing of the pack either
+    private fun read(kind: PackKind, manifest: PackManifest, gen: File, progress: (Long, Long) -> Unit): Read {
+        var file: File? = null
+        return try {
+            val buffer = ByteArray(BUFFER)
+            var done = 0L
+            val same = manifest.files.all { entry ->
+                val digest = MessageDigest.getInstance("SHA-256")
+                var size = 0L
+                openFile(File(gen, entry.path).also { file = it }).use { input ->
+                    while (true) {
+                        val n = input.read(buffer)
+                        if (n < 0) break
+                        size += n
+                        done += n
+                        digest.update(buffer, 0, n)
+                        progress(done, manifest.size)
+                    }
                 }
+                size == entry.size && PackManifest.hex(digest.digest()) == entry.sha256
             }
-            size == entry.size && PackManifest.hex(digest.digest()) == entry.sha256
+            if (same) Read.INTACT else Read.DAMAGED
+        } catch (e: FileNotFoundException) {
+            if (file?.exists() == false) Read.DAMAGED else unread(kind, e)
+        } catch (e: IOException) {
+            unread(kind, e)
         }
-        if (same) Read.INTACT else Read.DAMAGED
-    } catch (_: FileNotFoundException) {
-        Read.DAMAGED
-    } catch (e: IOException) {
+    }
+
+    private fun unread(kind: PackKind, e: IOException): Read {
         CoreLog.e("pack ${kind.id} not read through: ${e.javaClass.simpleName}")
-        Read.UNKNOWN
+        return Read.UNKNOWN
     }
 
     // now written in [gen] as when it was read through, and returned; not written (the storage

@@ -219,8 +219,9 @@ they stay: a pack carries no code.
   the process is there whenever the keyboard is). One changed or gone is `PackStatus.Damaged`: a
   `damaged` file written into its generation, so every later start reads it so at once, not used
   till imported again (the gate: 文字包已损坏，请重新导入; the page's row: vN 已损坏，请重新导入;
-  voice input's tip the same). A file that cannot be read for another reason (an I/O error) is
-  logged, nothing marked: read again at the next due. When the host fails on the text pack (an engine
+  voice input's tip the same). A file that cannot be read for another reason (an I/O error; one
+  there that cannot be opened now, no descriptor left or not readable, though Java says
+  FileNotFoundException for it too) is logged, nothing marked: read again at the next due. When the host fails on the text pack (an engine
   that cannot load its data, `EngineBridge.unloadable`; the host's start throwing, `KotlinHost`), the
   text pack is read through there and then (`PackStore.verifyAfterFailure`, once a generation a
   process): damaged, the keyboard says so, and the next start's gate is up instead of the same
