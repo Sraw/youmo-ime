@@ -12,6 +12,8 @@ import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.MarkContent
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
+import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
+import org.fcitx.fcitx5.android.scene.engine.TextMetrics
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
@@ -563,6 +565,34 @@ class ContentTest {
         near(room.width / 5.9, w.size, "shrunk to the room")
         near(room.left, w.x + 0.05 * w.size, "its ink's left the room's")
         near(1.0, w.scaleX, "both ways alike")
+    }
+
+    // rules B §8a: a label that fits its room across but whose ink stands out of it (centred by its advance, its
+    // ink off to the right: a fullwidth bracket's bearing, a box-drawing line past its advance) moved in the least
+    // way back into the room, its size kept
+    @Test
+    fun aLabelWhoseInkStandsOutOfItsRoomMovedBackIntoItRuleB8a() {
+        // the fake font, but a text's ink 0.4 of its advance in from the left and 0.3 past it on the right
+        val skewed = object : TextMeasurer {
+            override fun measure(text: String, font: String, weight: Int, size: Double): TextMetrics {
+                val m = FakeMeasurer.measure(text, font, weight, size)
+                return TextMetrics(m.advance, Box(m.advance * 0.4, m.ink.top, m.advance * 1.3, m.ink.bottom), m.top, m.bottom)
+            }
+        }
+        val l = LayoutReader.layout(
+            "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"10\">" +
+                "<row><key id=\"w\" label=\"ab\" width=\"1\"/></row></keyboard>",
+        ).ok()
+        val s = SceneBuilder(Fixtures.materialLight, Fixtures.portrait, skewed).build(l).ok()
+        val room = face(s, "w").let { Box(it.left + 2 * d, it.top, it.right - 2 * d, it.bottom) }
+        val w = texts(s, "w").single()
+        // two letters 1.2 of the size across: ink 0.9 of that wide, narrower than the room, so not shrunk
+        val advance = 2 * 0.6 * w.size
+        assertTrue(0.9 * advance < room.width, "fits across")
+        near(23 * d, w.size, "its size kept")
+        // centred by its advance its ink would end past the room's right; moved left till it ends there
+        assertTrue(room.centerX - advance / 2 + 1.3 * advance > room.right, "stood out")
+        near(room.right, w.x + 1.3 * advance, "its ink's right the room's")
     }
 
     @Test

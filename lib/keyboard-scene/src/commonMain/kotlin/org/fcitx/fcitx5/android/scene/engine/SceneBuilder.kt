@@ -303,15 +303,20 @@ class SceneBuilder(
     }
 
     // rules B §8a (060-render-p2 S6 review): after the classes' sizes, a label still wider than its key's room
-    // shrunk alone, both ways alike, to fit it (as a table's roots are): what is cut off is not shown, and what is
-    // shown is what the key types. Centred on the room across, its own middle kept up and down.
+    // shrunk alone, both ways alike, to fit it (as a table's roots are), centred on the room across; one that fits
+    // but whose ink stands out of it (a text centred by its advance, its ink off to one side: （#-_-)┯━┯) moved
+    // in the least way back into it. What is cut off is not shown, and what is shown is what the key types.
     private fun fitted(g: Drawn?, room: Box): Drawn? {
-        if (g == null || g.texts.isEmpty() || g.ink.width <= room.width || g.ink.width <= 0) return g
-        val s = room.width / g.ink.width
-        val w = g.ink.width * s
-        val h = g.ink.height * s
-        val cy = g.ink.centerY
-        return g.mapTo(Box(room.centerX - w / 2, cy - h / 2, room.centerX + w / 2, cy + h / 2), s)
+        if (g == null || g.texts.isEmpty() || g.ink.width <= 0) return g
+        if (g.ink.width > room.width) {
+            val s = room.width / g.ink.width
+            val h = g.ink.height * s
+            val cy = g.ink.centerY
+            return g.mapTo(Box(room.left, cy - h / 2, room.right, cy + h / 2), s)
+        }
+        if (g.ink.left >= room.left && g.ink.right <= room.right) return g
+        val left = g.ink.left.coerceIn(room.left, room.right - g.ink.width)
+        return g.mapTo(Box(left, g.ink.top, left + g.ink.width, g.ink.bottom), 1.0)
     }
 
     // a key as its class's member: a main character about its baseline, where its row's stand, and never moved off it
