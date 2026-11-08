@@ -57,9 +57,14 @@ class PackManifestTest {
         assertNotEquals(a.contentSha256, c.contentSha256)
         assertFalse(a.sameAs(c))
         assertFalse(a.sameAs(PackManifest.parse(packs.manifest(PackKind.TEXT, TestPacks.TEXT_FILES, version = 2))))
-        // the digest of one file, as the release listing computes it
+        // the digest of one file, as the release listing computes it (AssetPacksPluginTest holds the same hex)
         val one = PackManifest(PackKind.VOICE, 1, 1, listOf(PackManifest.Entry("voice/a", 1, "0".repeat(64))))
-        assertEquals(TestPacks.sha256("voice/a\t1\t${"0".repeat(64)}\n".toByteArray()), one.contentSha256)
+        assertEquals(TestPacks.sha256("format\t1\nvoice/a\t1\t${"0".repeat(64)}\n".toByteArray()), one.contentSha256)
+        assertEquals("22673f57195026c437f22687cb73a037475ed8f8f1a6d27980e4b389971da34e", one.contentSha256)
+        // the format is in it: the same files in another format are another pack
+        val other = PackManifest(PackKind.VOICE, 1, 2, one.files)
+        assertNotEquals(one.contentSha256, other.contentSha256)
+        assertFalse(one.sameAs(other))
     }
 
     @Test

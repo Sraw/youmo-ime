@@ -56,9 +56,11 @@ import java.util.zip.ZipOutputStream
  *   `app/pack-keys/release.pub` only, and fails to build without one; any other the test key's too.
  *   What each pack must be (format, oldest version) goes in as `PACK_<ID>_FORMAT`, `PACK_<ID>_MIN_VERSION`.
  * - `releaseBundles`: the release APK with the text pack (文字版), and with both (语音版), and
- *   `release-packs.json`, saying of each pack whether its content changed since the listing
- *   `-PpreviousPacks=<file>` (by its files' SHA-256s): an unchanged pack is not uploaded again.
- *   Only with the release key.
+ *   `release-packs.json`, saying of each pack whether its content changed since the last
+ *   release's listing (by its format and its files' SHA-256s): an unchanged pack is not uploaded
+ *   again. That listing is `app/packs-released.json` (the last release's `release-packs.json`,
+ *   committed after it), or `-PpreviousPacks=<file>`; with neither the task fails, unless
+ *   `-PfirstPackRelease` (the first release with packs). Only with the release key.
  *
  * Which asset paths each pack owns is the app's `PackKind`'s; [OWNED] repeats it, and a pack task
  * fails on a file it does not list.
@@ -176,6 +178,31 @@ class AssetPacksPlugin : Plugin<Project> {
             return old.contentSha256 != now.contentSha256 || old.version != now.version
         }
 
+        /**
+         * The app's `PackManifest.contentSha256`, repeated (build-logic does not see ime-core): `format<TAB>n\n`,
+         * then `path<TAB>size<TAB>sha256\n` a file, by path. The two tests hold one digest to the same hex.
+         */
+        fun contentSha256(format: Int, files: List<Triple<String, Long, String>>): String = MessageDigest.getInstance("SHA-256").run {
+            update("format\t$format\n".toByteArray())
+            files.sortedBy { it.first }.forEach { (path, size, sha) -> update("$path\t$size\t$sha\n".toByteArray()) }
+            hex(digest())
+        }
+
+        /** The listing [ReleaseBundlesTask] compares with: [previous]'s, or none for the first release with packs, said so. */
+        fun previousListing(previous: File?, firstRelease: Boolean): Map<String, Listing> = when {
+            previous != null && firstRelease ->
+                throw GradleException("-PfirstPackRelease, but there is a previous pack listing ($previous): a release after the first compares with it")
+            previous != null -> Listing.readAll(previous)
+            firstRelease -> emptyMap()
+            else -> throw GradleException(
+                "no previous pack listing: app/$RELEASED (the last release's release-packs.json) or -PpreviousPacks=<file>; " +
+                    "the first release with packs: -PfirstPackRelease",
+            )
+        }
+
+        /** The last release's `release-packs.json`, committed: what [ReleaseBundlesTask] compares with by default. */
+        const val RELEASED = "packs-released.json"
+
         fun jsonString(s: String) = "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
     }
 
@@ -248,7 +275,12 @@ class AssetPacksPlugin : Plugin<Project> {
                     voicePack.set(packs.getValue("voice").flatMap { it.outputDir })
                     dependsOn(packs.values)
                     versionName.set(variant.outputs.first().versionName)
-                    previous.set(target.providers.gradleProperty("previousPacks").map { root.file(it) })
+                    val released = target.layout.projectDirectory.file(RELEASED)
+                    previous.set(
+                        target.providers.gradleProperty("previousPacks").map { root.file(it) }
+                            .orElse(target.provider { released.takeIf { it.asFile.isFile } }),
+                    )
+                    firstRelease.set(target.providers.gradleProperty("firstPackRelease").map { it != "false" }.orElse(false))
                     releaseKeys.set(keysDir.file("release.pub"))
                     outputDir.set(target.layout.buildDirectory.dir("release-bundles"))
                 }
@@ -346,10 +378,7 @@ class AssetPacksPlugin : Plugin<Project> {
                 storedBytes(zip, "manifest.sig", signature)
                 sums.forEach { (path, file, s) -> storedFile(zip, path, file, s.first) }
             }
-            val content = MessageDigest.getInstance("SHA-256").run {
-                sums.forEach { (path, file, s) -> update("$path\t${file.length()}\t${s.second}\n".toByteArray()) }
-                hex(digest())
-            }
+            val content = contentSha256(format.get(), sums.map { (path, file, s) -> Triple(path, file.length(), s.second) })
             out.resolve("$name.json").writeText(
                 """
                 |{"pack": ${jsonString(id)}, "version": ${version.get()}, "format": ${format.get()},
@@ -386,6 +415,9 @@ class AssetPacksPlugin : Plugin<Project> {
         @get:PathSensitive(PathSensitivity.NONE)
         abstract val previous: RegularFileProperty
 
+        @get:Input
+        abstract val firstRelease: Property<Boolean>
+
         @get:InputFile
         @get:PathSensitive(PathSensitivity.NONE)
         abstract val releaseKeys: RegularFileProperty
@@ -395,6 +427,8 @@ class AssetPacksPlugin : Plugin<Project> {
 
         @TaskAction
         fun bundle() {
+            // before anything is made: a release that compared with nothing would call every pack changed
+            val before = previousListing(previous.orNull?.asFile, firstRelease.get())
             val apks = checkNotNull(loader.get().load(apkDir.get())) { "no release APK" }.elements.map { File(it.outputFile) }
             val apk = apks.singleOrNull() ?: throw GradleException("one APK expected (-PbuildABI=arm64-v8a), found ${apks.map { it.name }}")
             val packs = listOf("text" to textPack, "voice" to voicePack).map { (id, dir) ->
@@ -412,7 +446,6 @@ class AssetPacksPlugin : Plugin<Project> {
             bundle(out.resolve("youmo-$version-text.zip"), apk, apkName, listOf(text), README_TEXT)
             bundle(out.resolve("youmo-$version-voice.zip"), apk, apkName, listOf(text, voice), README_VOICE)
             packs.forEach { it.file.copyTo(out.resolve(it.file.name)) }
-            val before = previous.orNull?.asFile?.let(Listing::readAll).orEmpty()
             val lines = packs.map { p ->
                 val changed = changed(before[p.id], p)
                 "  {\"pack\": ${jsonString(p.id)}, \"version\": ${p.version}, \"format\": ${p.format}, \"file\": ${jsonString(p.file.name)}, " +

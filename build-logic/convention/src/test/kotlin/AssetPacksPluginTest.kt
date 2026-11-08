@@ -130,6 +130,40 @@ class AssetPacksPluginTest {
     }
 
     @Test
+    fun theContentDigestIsTheAppsAndHasTheFormatInIt() {
+        val one = listOf(Triple("voice/a", 1L, "0".repeat(64)))
+        // PackManifestTest holds the app's to the same hex
+        assertEquals("22673f57195026c437f22687cb73a037475ed8f8f1a6d27980e4b389971da34e", AssetPacksPlugin.contentSha256(1, one))
+        assertFalse(AssetPacksPlugin.contentSha256(1, one) == AssetPacksPlugin.contentSha256(2, one))
+        // and the listing beside a pack says it
+        val pack = pack(listOf(sources("engine/pinyin.data" to "pinyin")))
+        val sha = MessageDigest.getInstance("SHA-256").digest("pinyin".toByteArray()).joinToString("") { "%02x".format(it) }
+        assertEquals(
+            AssetPacksPlugin.contentSha256(1, listOf(Triple("engine/pinyin.data", 6L, sha))),
+            AssetPacksPlugin.Listing.read(pack.resolveSibling("youmo-text-v3.json")).contentSha256,
+        )
+    }
+
+    @Test
+    fun aReleaseComparesWithTheLastOnesListingOrSaysItIsTheFirst() {
+        val error = assertThrows(GradleException::class.java) { AssetPacksPlugin.previousListing(null, false) }
+        assertTrue(error.message, "firstPackRelease" in error.message.orEmpty() && AssetPacksPlugin.RELEASED in error.message.orEmpty())
+        assertEquals(emptyMap<String, AssetPacksPlugin.Listing>(), AssetPacksPlugin.previousListing(null, true))
+        val listing = folder.newFile("release-packs.json").apply {
+            writeText(
+                "{\"app\": \"0.6.0\", \"packs\": [\n" +
+                    "  {\"pack\": \"text\", \"version\": 1, \"format\": 1, \"file\": \"youmo-text-v1.youmopack\", \"size\": 3, \"sha256\": \"a\", \"contentSha256\": \"b\", \"changed\": true}\n]}\n",
+            )
+        }
+        val read = AssetPacksPlugin.previousListing(listing, false)
+        assertEquals(setOf("text"), read.keys)
+        assertEquals("b", read.getValue("text").contentSha256)
+        assertEquals(1, read.getValue("text").version)
+        // a listing there and the first release said: one of the two is a mistake
+        assertThrows(GradleException::class.java) { AssetPacksPlugin.previousListing(listing, true) }
+    }
+
+    @Test
     fun theCommittedTestKeyIsTestPubsAndTheReleaseKeyIsTheFormalOne() {
         val dir = File(System.getProperty("user.dir")).resolve("../../app/pack-keys").canonicalFile
         val test = AssetPacksPlugin.readKeys(dir.resolve("test.pub"))

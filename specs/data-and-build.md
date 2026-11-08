@@ -239,7 +239,12 @@ trap in [pitfalls.md](pitfalls.md#kotlin-ic-and-interface-delegation) before bui
   key (`youmo.packKey`, below) → install over the last
   release and type on it, on Android 10 too (the AVD `youmo29`, testing.md: a misreading's hint, the 快速输入 page with an entry) → GitHub release with the APK, the packs (`release-packs.json` says
   which changed: an unchanged one need not be uploaded again), the two bundles (文字版, 语音版) and `SHA256SUMS.txt`, notes in Chinese
-  and English saying which packs are new.
+  and English saying which packs are new → copy `app/build/release-bundles/release-packs.json` to
+  `app/packs-released.json` and commit it: the next release compares with it. `releaseBundles`
+  fails with no such listing (`app/packs-released.json`, or `-PpreviousPacks=<file>`), unless
+  given `-PfirstPackRelease` (the first release with packs, 0.6.0), which fails if there is one.
+  A pack's content is its format and its files (`contentSha256`, the app's `PackManifest` and the
+  plugin alike): either changed under the same `version` fails the task.
 - Test builds between releases go up as **draft** releases (the repository is public) and are
   deleted once a release supersedes them. Data releases are public and stay.
 - Package `io.github.sraw.youmo` (debug: `.debug` suffix), installable beside upstream Fcitx5.

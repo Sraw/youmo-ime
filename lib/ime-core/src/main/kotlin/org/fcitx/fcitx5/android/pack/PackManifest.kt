@@ -70,12 +70,15 @@ class PackManifest(
     val size: Long get() = files.sumOf { it.size }
 
     /**
-     * The files' digest, apart from how the zip was made: `path<TAB>size<TAB>sha256\n` a file, by
-     * path, SHA-256'd. Two packs with the same content have the same one; the release listing tells
-     * a changed pack by it.
+     * The content's digest, apart from how the zip was made: `format<TAB>n\n`, then
+     * `path<TAB>size<TAB>sha256\n` a file, by path, SHA-256'd. Two packs with the same content have
+     * the same one; the release listing tells a changed pack by it. The format is in it: a format
+     * changed over the same files is another pack, which needs another version. AssetPacksPlugin's
+     * `contentSha256` computes the same (both tests hold one digest to the same hex).
      */
     val contentSha256: String by lazy {
         val digest = MessageDigest.getInstance("SHA-256")
+        digest.update("format\t$format\n".toByteArray(Charsets.UTF_8))
         files.sortedBy { it.path }.forEach { digest.update("${it.path}\t${it.size}\t${it.sha256}\n".toByteArray(Charsets.UTF_8)) }
         hex(digest.digest())
     }
