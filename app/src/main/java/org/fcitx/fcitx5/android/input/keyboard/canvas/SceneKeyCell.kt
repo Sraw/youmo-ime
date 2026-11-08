@@ -85,6 +85,18 @@ open class SceneKeyCell(context: Context, private val theme: Theme, private val 
             invalidate()
         }
 
+    /**
+     * The keyboard's key height, px, this cell stands for (a settings cap): the key made at the keyboard's
+     * size and drawn shrunk to the cell, words, marks and all, so its marks are kept or given way as there
+     * and its label is the keyboard's times the cell's height over this (060-pending-decisions); 0: as the cell is.
+     */
+    var keyboardKeyHeight: Int = 0
+        set(value) {
+            if (field == value) return
+            field = value
+            dropScene()
+        }
+
     /** An outline in this colour along the key's face, its corners the face's (the key being edited); none if null. */
     var outline: Argb? = null
         set(value) {
@@ -129,7 +141,7 @@ open class SceneKeyCell(context: Context, private val theme: Theme, private val 
         val t = sceneTheme ?: return null.also { Timber.e("key cell: theme %s not converted; nothing drawn", theme.name) }
         // a grid's cell the text the size [attrs] gives it, not the keyboard's 紧凑 or floating scale (the cells'
         // key views never took either); a key cap as the keyboard is, its marks' corners as there
-        val env = SceneEnvs.of(this, look, theme.isDark, width, height, Input(), texts = Texts(), marks = marks)
+        val env = SceneEnvs.of(this, look, theme.isDark, (width / shrink).roundToInt(), (height / shrink).roundToInt(), Input(), texts = Texts(), marks = marks)
             .let { if (ownSize) it.copy(compact = false, floating = null) else it }
             .let { if (states.isEmpty()) it else it.copy(states = mapOf(KEY to states)) }
         val layout = Layout(
@@ -157,8 +169,14 @@ open class SceneKeyCell(context: Context, private val theme: Theme, private val 
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        val saved = canvas.save()
+        canvas.scale(shrink.toFloat(), shrink.toFloat())
         painter.draw(canvas, drawn())
+        canvas.restoreToCount(saved)
     }
+
+    // the drawing's scale: the cell's height over the keyboard key's it stands for, 1 where none
+    private val shrink: Double get() = if (keyboardKeyHeight <= 0 || height <= 0) 1.0 else height.toDouble() / keyboardKeyHeight
 
     /** What the cell draws: its key's ops, its label at [labelAlpha], its [outline] over the face. */
     @VisibleForTesting
@@ -169,7 +187,7 @@ open class SceneKeyCell(context: Context, private val theme: Theme, private val 
             else ops.map { if (it is Op.Text && it.text == k.label) it.copy(color = it.color.times(labelAlpha)) else it }
         }
         val line = outline ?: return ops
-        return ops + Op.Stroke(k.shape, OUTLINE_DP * resources.displayMetrics.density, line)
+        return ops + Op.Stroke(k.shape, OUTLINE_DP * resources.displayMetrics.density / shrink, line)
     }
 
     private fun Argb.times(a: Double) = Argb((value and RGB) or ((alpha * a).roundToInt() shl ALPHA_SHIFT))
@@ -182,7 +200,7 @@ open class SceneKeyCell(context: Context, private val theme: Theme, private val 
             getLocationInWindow(at)
             val f = keyNode?.shape?.bounds
             return if (f == null) Rect(at[0], at[1], at[0] + width, at[1] + height)
-            else Rect(at[0] + f.left.roundToInt(), at[1], at[0] + f.right.roundToInt(), at[1] + height)
+            else Rect(at[0] + (f.left * shrink).roundToInt(), at[1], at[0] + (f.right * shrink).roundToInt(), at[1] + height)
         }
 
     companion object {

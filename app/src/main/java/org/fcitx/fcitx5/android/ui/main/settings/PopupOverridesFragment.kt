@@ -164,10 +164,13 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                     // a function key of ime-core's not named here yet shows as it is called there, not a crash
                     val label = if (function) FunctionLabels[key.label]?.let(::getString) ?: key.label else key.label
                     val said = names.map { said(it) ?: "–" }.joinToString(" / ").takeIf { names.any { said(it) != null } }
-                    val marks = if (function) functionMarks(names) else charMarks(symbols.next(), key.name)
+                    val symbol = if (function) null else symbols.next()
+                    val marks = if (function) functionMarks(names) else charMarks(symbol, key.name)
                     // the engine's cap: a character key by its name, a function key by its own (its up and down)
                     val shortcut = KeyCaps.Shortcut(if (function) key.name.substringAfter('/').substringBeforeLast('.') else key.name, stored)
-                    add(KeyCaps.key(ctx, label, "", marked = names.any(stored::isSet), dimmed = false, marks = marks, said = said, shortcut = shortcut).apply {
+                    // the symbol the engine's cap draws where 标点位置 puts it (its alt), as the keyboard's key
+                    val hint = (symbol as? KeyCaps.Mark.Text)?.text.orEmpty()
+                    add(KeyCaps.key(ctx, label, hint, marked = names.any(stored::isSet), dimmed = false, marks = marks, said = said, shortcut = shortcut).apply {
                         setOnClickListener { editShortcuts(label, names) }
                     }, if (function) lParams(matchParent, ctx.dp(KeyHeight)) else keyParams(ctx, weight = 1f))
                 }

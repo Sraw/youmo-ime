@@ -21,6 +21,8 @@ import com.google.android.material.R as MaterialR
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
+import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightCap
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.scene.theme.Argb
@@ -49,8 +51,8 @@ object KeyCaps {
     private const val MARK_ICON_DP = 11
     private const val MARK_TEXT_WIDTH = 0.45f
 
-    // the cap's label, as the views' (20sp)
-    private const val CAP_TEXT_SIZE = 20.0
+    // the letters' rows (qwerty without its number row): a key's height the keys' over these
+    private const val KEY_ROWS = 4
 
     // a dimmed cap's label, as the views' (0.4)
     private const val DIMMED = 0.4
@@ -83,16 +85,27 @@ object KeyCaps {
                 label = SceneText.Literal(text),
                 alt = hint.takeIf { it.isNotEmpty() }?.let(SceneText::Literal),
                 kind = if (function) "function" else "letter",
-                textSize = CAP_TEXT_SIZE,
                 shortcut = shortcut?.name,
             )
             states = setOfNotNull(KeyState.Selected.takeIf { selected })
+            // the label the keyboard's, shrunk as the cap is to its key, its marks where they are there (060-pending-decisions)
+            keyboardKeyHeight = keyboardKeyHeight(ctx)
             // the symbol where 标点位置 puts it on the keyboard, a key with no shortcut too
             marks = SceneMarks.settings(
                 shortcut?.shortcuts ?: KeyShortcuts.Empty, AppPrefs.getInstance().keyboard.swipeLayers.getValue().layers, markSpots(),
                 shortcut?.charShortcuts ?: true, listOfNotNull(shortcut?.name),
             )
         }
+
+    /** A qwerty key's height on the keyboard as the height settings make it now, px (InputView, capped as there). */
+    fun keyboardKeyHeight(ctx: Context): Int {
+        val keyboard = AppPrefs.getInstance().keyboard
+        val landscape = ctx.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val percent = (if (landscape) keyboard.keyboardHeightPercentLandscape else keyboard.keyboardHeightPercent).getValue()
+        val screen = ctx.resources.displayMetrics.heightPixels
+        val bar = ctx.dp(KawaiiBarComponent.heightDp())
+        return KeyboardHeightCap.keysHeight(screen * percent / 100, screen, bar, 0) / KEY_ROWS
+    }
 
     fun label(ctx: Context, text: String, size: Float = 18f) = TextView(ctx).apply {
         this.text = text

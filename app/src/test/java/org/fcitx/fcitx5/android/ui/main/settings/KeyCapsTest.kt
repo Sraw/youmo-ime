@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.ui.main.settings
 import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.View
+import org.junit.Assert.assertTrue
 import android.widget.FrameLayout
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
@@ -136,6 +137,26 @@ class KeyCapsTest {
         val line = drawn.last() as Op.Stroke
         assertEquals(edited.keyNode!!.shape, line.shape)
         assertEquals(Argb(ThemeManager.activeTheme.accentKeyBackgroundColor), line.color)
+    }
+
+    // a cap is the keyboard's key made at its size and drawn shrunk to the cap (060-pending-decisions, the
+    // shortcut page's marks where the keyboard puts them): its ops the key's at the keyboard's height
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun theEnginesCapIsTheKeyboardsKeyShrunkToIt() {
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+        val k = KeyCaps.keyboardKeyHeight(ctx)
+        assertTrue("$k", k > H)
+        fun laid(v: View, w: Int, h: Int) = v.apply {
+            measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
+            layout(0, 0, w, h)
+        }
+        val cap = laid(KeyCaps.key(ctx, "W", "2", marked = false, dimmed = false), W, H).let { f ->
+            (0 until (f as FrameLayout).childCount).map(f::getChildAt).filterIsInstance<SceneKeyCell>().single()
+        }
+        assertEquals(k, cap.keyboardKeyHeight)
+        val key = laid(SceneKeyCell(ctx, ThemeManager.activeTheme).apply { attrs = cap.attrs; marks = cap.marks }, (W.toDouble() * k / H).roundToInt(), k) as SceneKeyCell
+        assertEquals(key.drawn(), cap.drawn())
     }
 
     private companion object {
