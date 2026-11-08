@@ -293,7 +293,7 @@ class SceneBuilder(
         members.forEachIndexed { n, i ->
             val c = keys[i].content
             val s = KeyMarkYield.onto(member(c), member(loose[i]), board, board.keys[n])
-            val glyph = c.glyphClass?.takeIf { c.yields }?.let { c.glyph?.let { g -> g.drawnAt(s.glyph.toBox(), board.scales.getValue(it.ordinal), g.grows(measurer)) } } ?: c.glyph
+            val glyph = c.glyphClass?.takeIf { c.yields }?.let { c.glyph?.let { g -> within(g.drawnAt(s.glyph.toBox(), board.scales.getValue(it.ordinal), g.grows(measurer)), c.room) } } ?: c.glyph
             out[i] = Settled(glyph, c.marks.mapIndexed { j, m -> s.marks[j]?.let { m.drawn.drawnAt(it.toBox(), board.markScale(mark(m)), m.drawn.grows(measurer)) } })
         }
         keys.forEachIndexed { i, k ->
@@ -313,28 +313,51 @@ class SceneBuilder(
     private fun fitted(c: KeyContent): KeyContent {
         val g = c.glyph
         if (g == null || g.texts.isEmpty() || g.ink.width <= 0) return c
-        val room = c.room
         val classed = c.yields && c.glyphClass != null
         val least = if (classed) 1.0 - KeyMarkYield.MAX_CLASS_SHRINK else 1.0
         val py = if (classed && c.glyphClass == GlyphClass.Main) c.baseline else g.ink.centerY
-        val fit = if (g.ink.width * least > room.width) {
-            val s = room.width / (g.ink.width * least)
-            val d = g.grows(measurer)?.at(s)
+        // wider than the room still (the class to take it in): its ink's middle the room's, so the class, smaller
+        // about it, leaves it within on both sides
+        val placed = within(alone(g, c.room, least, py), c.room)
+        return if (placed === g) c else KeyContent(placed, c.marks, c.room, c.glyphClass, c.baseline, c.yields, c.edge)
+    }
+
+    // [g] shrunk alone about (the room's middle, [py]) as far as its ink measured at [least] (its class's most:
+    // what the class's ask sees) is within [room]; as it is where it is so already
+    private fun alone(g: Drawn, room: Box, least: Double, py: Double): Drawn {
+        val grows = g.grows(measurer)
+        // shrunk by [s], its ink as drawn at that size (§8b)
+        fun shrunk(s: Double): Drawn {
+            val d = grows?.at(s)
             val w = g.ink.width * s + (d?.let { it.left + it.right } ?: 0.0)
             val top = py + (g.ink.top - py) * s - (d?.top ?: 0.0)
             val bottom = py + (g.ink.bottom - py) * s + (d?.bottom ?: 0.0)
-            val cx = room.centerX
-            g.drawnAt(Box(cx - w / 2, top, cx + w / 2, bottom), s, g.grows(measurer))
-        } else {
-            g
+            return g.drawnAt(Box(room.centerX - w / 2, top, room.centerX + w / 2, bottom), s, grows)
         }
-        val placed = if (fit.ink.left >= room.left && fit.ink.right <= room.right || fit.ink.width > room.width) {
-            fit
-        } else {
-            val left = fit.ink.left.coerceIn(room.left, room.right - fit.ink.width)
-            fit.mapTo(Box(left, fit.ink.top, left + fit.ink.width, fit.ink.bottom), 1.0)
+        fun fits(f: Drawn) = f.ink.width * least + (f.grows(measurer)?.at(least)?.let { it.left + it.right } ?: 0.0) <= room.width
+        // measured at the class's most, not scaled (§8b): a font's ink can be wider there than scaled
+        if (g.ink.width <= room.width || fits(g)) return g
+        val s = minOf(1.0, room.width / (g.ink.width * least))
+        val fit = shrunk(s)
+        if (fits(fit)) return fit
+        // the ink not linear in the size (a font's whole pixels, its hinting: by steps): the largest below that
+        // fits at the class's most, measured again each time
+        var lo = s * FIT_LEAST
+        var hi = s
+        repeat(FIT_STEPS) {
+            val m = (lo + hi) / 2
+            if (fits(shrunk(m))) lo = m else hi = m
         }
-        return if (placed === g) c else KeyContent(placed, c.marks, room, c.glyphClass, c.baseline, c.yields, c.edge)
+        return shrunk(lo)
+    }
+
+    // rules B §8a's last word: a label's ink as drawn at its class's size (§8b: not even about its middle) moved
+    // the least way back into its room where it stands out
+    // (as wide as the room to a rounding's worth: put in it whole; wider, which the class's ask leaves none: its middle the room's)
+    private fun within(g: Drawn, room: Box): Drawn {
+        if (g.texts.isEmpty() || (g.ink.left >= room.left && g.ink.right <= room.right)) return g
+        val left = if (g.ink.width > room.width + ROUNDING) room.centerX - g.ink.width / 2 else room.left.coerceAtLeast(minOf(g.ink.left, room.right - g.ink.width))
+        return g.mapTo(Box(left, g.ink.top, left + g.ink.width, g.ink.bottom), 1.0)
     }
 
     // a key as its class's member: a main character about its baseline, where its row's stand, and never moved off it
@@ -386,6 +409,13 @@ class SceneBuilder(
     }
 
     companion object {
+        // §8a: a label shrunk alone that does not fit as its size scaled says, searched for between this much of
+        // that and it, in so many halvings
+        private const val FIT_LEAST = 0.5
+        // a double's rounding over a box's width
+        private const val ROUNDING = 1e-6
+        private const val FIT_STEPS = 16
+
         /** KeyMarkYield's: a glyph and a mark this far apart at least. */
         const val GAP_DP = 1.0
 
