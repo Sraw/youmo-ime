@@ -195,7 +195,7 @@ they stay: a pack carries no code.
 - **Import** (`PackShelf` in ime-core, `PackStore`/`PackImports` in the app): the manifest's signature is
   checked first, then each file is copied into a new generation directory while its size and SHA-256 are
   checked, after a free-space check against the manifest's sizes; only when all are right is the
-  `current` pointer swapped atomically (rename). A pack already there at that version (the same
+  `current` pointer swapped atomically (rename; the pack's directory fsynced after each rename, so a power cut keeps them). A pack already there at that version (the same
   manifest) is not copied again if its files in use, read through then, still are it; else it is
   copied anew. An older version over a newer one is imported (a pack gone wrong taken back; it must
   still meet the app's `minVersion`), the result saying 已用 vX 替换了更新的 vN. A killed import leaves the old pack in use; the next start deletes what is not `current`.

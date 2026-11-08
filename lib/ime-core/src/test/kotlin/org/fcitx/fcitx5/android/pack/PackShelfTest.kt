@@ -78,6 +78,17 @@ class PackShelfTest {
         assertEquals(1, leftovers(PackKind.TEXT).size)
     }
 
+    // each rename's directory synced after it: the generation's, then `current`'s (review L8)
+    @Test
+    fun `an import syncs the pack's directory after each rename`() {
+        val synced = ArrayList<String>()
+        val shelf = PackShelf(root, listOf(packs.publicKey), needs, 0) { synced += it.name }.apply { load() }
+        shelf.take(text())
+        assertEquals(listOf(PackKind.TEXT.id, PackKind.TEXT.id), synced)
+        // a directory can be synced here (Linux, macOS), as on a phone
+        assertTrue(PackShelf.syncDirectory(root))
+    }
+
     @Test
     fun `the same pack again copies nothing`() {
         val shelf = shelf()

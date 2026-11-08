@@ -8,6 +8,8 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
+import java.nio.channels.FileChannel
+import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
 import java.util.zip.ZipException
 import java.util.zip.ZipInputStream
@@ -80,6 +82,8 @@ class PackShelf(
     private val trusted: List<ByteArray>,
     private val requirements: Map<PackKind, PackRequirement>,
     private val margin: Long = DEFAULT_MARGIN,
+    // a test's hook: which directories an import synced
+    private val syncDir: (File) -> Unit = ::syncDirectory,
 ) {
     init {
         require(trusted.isNotEmpty()) { "no trusted key" }
@@ -234,10 +238,14 @@ class PackShelf(
             File(staging, PackManifest.SIGNATURE).writeSynced(signature)
             val gen = File(dir, "g${System.currentTimeMillis()}-${System.nanoTime() % GEN_SPREAD}")
             staging.renameOrFail(gen)
+            // a rename is the directory's change: synced, or a power cut could leave `current`
+            // naming a generation whose rename was lost (then read as no pack: imported again)
+            syncDir(dir)
             val pointer = File(dir, "$CURRENT.tmp")
             pointer.writeSynced(gen.name.toByteArray())
             // the one step that changes which pack is used
             pointer.renameOrFail(File(dir, CURRENT))
+            syncDir(dir)
             state = state + (manifest.kind to (PackStatus.Ready(manifest) to gen))
             // the old generation, mapped by whoever still uses it: its pages stay till they let go
             dir.listFiles()?.forEach { if (it.name != CURRENT && it.name != gen.name) it.deleteRecursively() }
@@ -318,6 +326,19 @@ class PackShelf(
     }
 
     companion object {
+        /**
+         * [dir]'s entries synced to storage (a rename in it kept through a power cut): `fsync` on the
+         * directory opened read-only, as Linux (Android) allows. Where a directory cannot be opened so
+         * (Windows: no build runs there; a JVM that refuses it), nothing more can be done from Java:
+         * false, the rename then as safe as the file system's own ordering makes it.
+         */
+        fun syncDirectory(dir: File): Boolean = try {
+            FileChannel.open(dir.toPath(), StandardOpenOption.READ).use { it.force(true) }
+            true
+        } catch (_: IOException) {
+            false
+        }
+
         const val CURRENT = "current"
         private const val STAGING = ".staging-"
         private const val BUFFER = 1 shl 16
