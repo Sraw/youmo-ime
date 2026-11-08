@@ -295,6 +295,28 @@ class NineSceneGesturesTest {
         }
     }
 
+    // the digit keys' long press, written out here rather than read from T9Keyboard: the views' and the scene's
+    // (ninePopup / onePopup, nine.xml's `popup from="nine"`) alike
+    @Test
+    fun aDigitKeysLongPressIsItsCapitalsDigitLettersAndSymbols() {
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+        val app = PlaceholderStrings(RuntimeEnvironment.getApplication())
+        fun KeyDef.Popup?.said() = (this as KeyDef.Popup.Keyboard.Explicit).let { "${it.items.toList()} ${it.symbolsFrom} ${it.inRow} ${it.asIs}" }
+        fun sceneOf(k: T9Keyboard, id: String): KeyDef.Popup.Keyboard.Explicit? {
+            val canvas = KeyboardHarness.all(k.laidOut()).filterIsInstance<KeyboardCanvasView>().single()
+            return k.sceneKey(canvas.keyAt(id)!!)!!.def.popup!!.filterIsInstance<KeyDef.Popup.Keyboard.Explicit>().singleOrNull()
+        }
+        val pinyin2 = "[A, B, C, 2, a, b, c, @, !, \"] 7 3 false"
+        val shuangpin5 = "[J, K, L, :, 5, j, k, l, ;, #, (, )] 9 4 false"
+        val english1 = "[:, ;, \", (, ), @, &, /, *, ~] 10 -1 true"
+        assertEquals(pinyin2, T9Keyboard.ninePopup('2', "ABC", NineKeySymbols.STANDARD.symbols('2')).said())
+        assertEquals(shuangpin5, T9Keyboard.ninePopup('5', "JKL;", NineKeySymbols.STANDARD.symbols('5')).said())
+        assertEquals(english1, T9Keyboard.onePopup(true, NineKeySymbols.STANDARD).said())
+        assertEquals(pinyin2, sceneOf(T9Keyboard(app, ThemePreset.PixelLight), "2").said())
+        assertEquals(shuangpin5, sceneOf(T9Keyboard(app, ThemePreset.PixelLight, shuangpin = true), "5").said())
+        assertEquals(english1, sceneOf(T9Keyboard(app, ThemePreset.PixelLight, english = true), "1").said())
+    }
+
     // a view's key by the scene's id: its name, else the function key it is
     private fun idOf(def: KeyDef) = when (def) {
         is BackspaceKey -> "backspace"
