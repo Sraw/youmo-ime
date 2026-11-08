@@ -120,16 +120,18 @@ class SymbolsSceneGesturesTest {
             val layout = KeyboardHarness.find<PickerLayout>(h.inputView)!!
             val before = cellOf(layout, PickerLayout.GRID_SLOT)
             val w = layout.width * 7 / 10
-            // the slots' layout params set in one pass, laid out there in the next
-            repeat(3) {
-                layout.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(layout.height, View.MeasureSpec.EXACTLY))
-                layout.layout(layout.left, layout.top, layout.left + w, layout.top + layout.height)
-            }
+            // one pass at the new width: the views moved into the slots in it (layoutIn lays them out at once)
+            layout.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(layout.height, View.MeasureSpec.EXACTLY))
+            layout.layout(layout.left, layout.top, layout.left + w, layout.top + layout.height)
             for ((slot, view) in listOf(PickerLayout.CATEGORIES_SLOT to layout.side!!, PickerLayout.GRID_SLOT to layout.grid)) {
                 val cell = cellOf(layout, slot)
                 assertEquals(slot, cell, Rect(view.left, view.top, view.right, view.bottom))
             }
             assertTrue("$before", cellOf(layout, PickerLayout.GRID_SLOT).width() < before.width())
+            // as symbols.xml has them, whatever slot() says: the categories 18 of 100 across, the grid the 82 beside them
+            assertEquals(w * 0.18f, layout.side!!.width.toFloat(), w * 0.01f)
+            assertEquals(w * 0.82f, layout.grid.width.toFloat(), w * 0.01f)
+            assertEquals(layout.side!!.right, layout.grid.left)
         }
     }
 
