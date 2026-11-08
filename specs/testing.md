@@ -53,15 +53,13 @@ change to how keys are laid out or marked (not with `-PskipExhaustive`: the excl
 - A key on the keyboard is a `ShownKey` (060-render-p2 S3): `KeyboardHarness.key(label)`,
   `keysLabelled`, `keyNamed(id, copy)` (the scene's id, a view's theme name: `q`, `space`, a split
   row's second G copy 1), `describedKey(description)`, `keys()`; tap, press, long press, swipe, drag
-  take it, by its place in the window. Either drawing gives one, a key view's (`ViewShownKey`) or the
-  canvas's scene key (`SceneShownKey`), so a test written on it runs on both: the canvas draws the keys
-  by default; a test that sets `canvasKeyboard` false itself (`PrefsRule` puts it back after each
-  test) runs on the views. `keyWithId(R.id.button_*)` finds a key by its view's id, the scene's node's resource
+  take it, by its place in the window: the canvas's scene key (`SceneShownKey`). A keyboard made
+  alone (no input view) is read through `shownKeys()` once laid out (`laidOut()`, BoardKeys.kt). `keyWithId(R.id.button_*)` finds a key by its view's id, the scene's node's resource
   name; `drawn(text)`, `textSize(text)`, `drawnTexts` and `drawnIcons` read what is drawn on a key
   (a scene's text's box a guess from its size: compare places, not pixels). A popup's keys are
-  `popupChoices()` (`focused`, `cell`, `size`) and a menu's icons `shownIcons()`, either drawing.
-  `viewKey(label)` is the old `TextKeyView`, for a test of the view itself (S8 deletes both).
-  `ShownKeyTest` and `SceneSpeechTest` hold the two to each other.
+  `popupChoices()` (`focused`, `cell`, `size`) and a menu's icons `shownIcons()`. The tests that
+  compared the scene with the key views keep the scene's side since S8a deleted the views
+  (`*SceneGesturesTest`, `SceneTouchTest`, `SceneSpeechTest`).
 - New logic gets a test in the same change, in ime-core where the logic is.
 - Prefer fakes over mockk. `FakeEditor` (ime-core `testFixtures`) stands in for an
   `InputConnection` and is held to the real `BaseInputConnection` by a contract test.
@@ -184,8 +182,8 @@ decodes as the tool does.
 
 Roborazzi goldens (`app/src/test/screenshots/`) show the bar with its microphone and the space's
 voice hint: since 0.6.0 there is one build, and voice is everyone's default (the voice pack's absence
-is a notice, not a hidden button). `OldRenderBaselineTest` draws as the text build did, so
-`baseline-060` stays the old drawing's record.
+is a notice, not a hidden button). `app/src/test/baseline-060` is the old drawing's record (the key
+views, drawn as the text build did), kept for 060's P3; S8a deleted the views and the test that drew it.
 
 The resource packs in JVM tests: `TestShelves` (app test sources) makes tiny packs signed with the
 committed test key (`TestPacks`, ime-core testFixtures) and installs them through `PackStore.useShelf`;
@@ -241,13 +239,13 @@ a settings page, rotation, a field type, an upgrade) is tried on a device before
   runs against it as against debug (same key):
   `./gradlew :app:connectedBenchmarkAndroidTest -Pyoumo.testBuildType=benchmark
   -Pandroid.testInstrumentationRunnerArguments.class=org.fcitx.fcitx5.android.input.KeyboardPerfBaselineTest
-  -Pandroid.testInstrumentationRunnerArguments.perfRuns=20 -Pandroid.testInstrumentationRunnerArguments.perfCanvas=true`,
+  -Pandroid.testInstrumentationRunnerArguments.perfRuns=20`,
   its rows (`KeyboardPerf` in logcat) read with `adb logcat -d -s KeyboardPerf:I`: median, p90 and the
   mean of all samples, ms, and what each step allocated (`Debug.getRuntimeStat`'s
   `art.gc.bytes-allocated` and `art.gc.gc-count` read before and after it, the process's, a press's
-  shared by the keys of its run) as KiB and GCs. Two builds' (or the switch's two sides') numbers are
-  compared only from one emulator session, in at least three pairs, the order alternated (views first,
-  then canvas first, ...): a run's medians move by up to 30% from session to session, and neither
+  shared by the keys of its run) as KiB and GCs. Two builds' numbers are
+  compared only from one emulator session, in at least three pairs, the order alternated (one first,
+  then the other, ...): a run's medians move by up to 30% from session to session, and neither
   side should always be the one run on the emulator longer up. The canvas's gates are in specs/app.md.
   Systrace sections of the app: `adb shell atrace --async_start -c -b 32768
   -a io.github.sraw.youmo.bench view`, the test, then `atrace --async_dump` (a non-debuggable app's

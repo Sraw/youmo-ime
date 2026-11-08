@@ -311,13 +311,12 @@ is typed a key's swipe is a stroke; on the lift the path, in key widths both way
 sent as the engine's stroke key, `KeyAction.SymAction` of `Keyboard.strokeKey`; a shape it reads
 as none (up, up to the left) is dropped.
 
-The 060 redraw's first step (`input/keyboard/canvas/`, `AppPrefs.Internal.canvasKeyboard`, 开发者 →
-新绘制键盘, on by default since 060-render-p2 S7): `TextKeyboard` (qwerty.xml) and, since 060-render-p2 S4a, `GroupedKeyboard` (the 14
+The 060 redraw (`input/keyboard/canvas/`; the only drawing since 060-render-p2 S8a, which deleted the
+key views and the 开发者 → 新绘制键盘 switch, its stored key retired): `TextKeyboard` (qwerty.xml) and, since 060-render-p2 S4a, `GroupedKeyboard` (the 14
 and 18 keys: k14.xml, k18.xml, their bottom row grouped-bottom.xml), since S4b `NumberKeyboard` (number.xml,
 its seven pads by `when="pad=…"`) and, since S4c, `ZhuyinKeyboard`'s 大千
-(zhuyin.xml) and, since S4d, its 注音九键 (zhuyin-nine.xml) add a `KeyboardCanvasView` over their
-rows and make them INVISIBLE, still laid out (S8 deletes them) — the next paragraph but one says how a
-keyboard moves. The canvas draws the scene `lib/keyboard-scene` makes of its layout in the look converted by ime-core's
+(zhuyin.xml) and, since S4d, its 注音九键 (zhuyin-nine.xml) draw their keys with a `KeyboardCanvasView`,
+no view a key — the next paragraph but one says how a keyboard moves. The canvas draws the scene `lib/keyboard-scene` makes of its layout in the look converted by ime-core's
 `LookTheme` (a 3.0 single key's name a selector with what selectors read escaped in the key: `zhuyin/,` its comma
 key, `number/*` the star; `ScenePainter`: one `RenderNode` a key a face, both kept in the tree and a press only their alpha, since a node left out of a frame loses its recording; a
 software canvas, a screenshot's, gets the ops drawn straight); `TextKeyboard.scene` builds the
@@ -360,19 +359,17 @@ Systrace sections: `scene` (the view asking), in it `theme`, `env`, and the buil
 text` under them.
 
 The scene's keys take their touches themselves (060-render-p2 S1): `BaseKeyboard` intercepts every
-touch as the vivo workaround does and hands each finger (`TouchTarget`) to the `SceneKey` the scene's
+touch and hands each finger (`TouchTarget`) to the `SceneKey` the scene's
 `keyAt` names (`SceneTouch.find`), a key by its `KeyRef` (id, and which copy of a split row's G or V). A
 key's touch is `KeyGesture`, `CustomGestureView`'s state machine and timers taken out of the view, read
 from the corner of the key's cell as a view's was from its own (a finger in a row's blank end is left of
 it, as it was left of A's view). `BaseKeyboard.wire` gives a `KeyHandle` its sound, the space's and
 backspace's swipes, its press, long press, repeat, double tap, swipes (`KeySwipes`) and popups: the
-same wiring for a key view and for the `SceneKey` made of its node's `SceneKeyDef` (`drawKeysWithScene`), so a key does
-what its view did. Its press is shown by the canvas (`showPressed(KeyRef)`), a popup over it placed
+`SceneKey` made of its node's `SceneKeyDef` (`drawKeysWithScene`), so a key does what its view did
+before S8a. Its press is shown by the canvas (`showPressed(KeyRef)`), a popup over it placed
 at its face across and its cell down in the window (`popupBounds`), as a view's `bounds` were; glide
-typing reads its cell (`KeyPlace`). No touch reaches a key view while the canvas draws the keys
-(`SceneTouchTest`, `everyGestureAsOnTheViews*`); the views draw and take the touches again without a scene.
-TalkBack reads the canvas's `ExploreByTouchHelper` and no key view (INVISIBLE, none visible to a
-reader): a virtual node a key, all it says the scene's (ime-core's
+typing reads its cell (`KeyPlace`) (`SceneTouchTest`). Without a scene nothing is drawn and no key
+takes a touch (logged). TalkBack reads the canvas's `ExploreByTouchHelper`: a virtual node a key, all it says the scene's (ime-core's
 `SceneA11y.of`): its text the label, its description the scene's `a11y` (an `a11y_*` name the app's
 string; a letter "q, 1", label then corner), Shift's state (`a11y_state_shift_*`), the old view's
 resource name by role (`KeyNames.RESOURCES`: `button_space`, `button_caps`…, what UAT and
@@ -403,11 +400,11 @@ in their goldens; the view as large as the scene and `outset` round it for the s
 that much up and left of where the views' popup goes; the edit menu's lift, `MENU_LIFT_DP`, wherever
 the scenes are). A focus moved is the scene made again, the key
 in focus `Selected`; where it goes stays `PopupComponent`'s. The engine's entry points never throw
-(`Parsed`); what it could not make is logged (`Timber.w`) and not shown, never the views instead
-(they go in S8) and never a popup not drawn that a lift still types: the long press as one with no
+(`Parsed`); what it could not make is logged (`Timber.w`) and not shown, never a view instead,
+and never a popup not drawn that a lift still types: the long press as one with no
 popup (`unmade`, not in `showingContainerUi`); a focus it could not draw keeps the scene and the
-focus before. A menu's icon is a `SceneIcons` name, a drawable's id read back only as a menu gave it. A key view's popups stay views
-(`SwipePopupScreenshotTest`'s `canvas_*` beside the views' goldens). A scene's popup has a node
+focus before. A menu's icon is a `SceneIcons` name, a drawable's id read back only as a menu gave it. The symbol and emoji grids'
+cells' popups are scenes too since S8a (`SwipePopupScreenshotTest`'s `canvas_*` goldens). A scene's popup has a node
 a key for TalkBack (`PopupSceneView`'s `ExploreByTouchHelper`): its words, place, selected, enabled, its
 class the view's (a text's TextView, a menu icon's ImageView), read a piece at a time as the views'
 text was (`NodeReading`; not a TextView's line or page: one line, no page), and no click, as the views
@@ -488,8 +485,8 @@ password field's bar row, ten digits `sym:0`…`sym:9`, `face="none" margin="fal
 `action:` names, and `repeat(press, node)`, a key's repeat as the keyboard has it (表情搜索's ⌫ tells a hold
 from a tap: a hold clears the query and stops short of the field). `BaseKeyboard.sceneDrawsBase` (true by
 default) says whether the canvas draws the board's base under the keys (`KeyboardCanvasView.drawsBase`): the
-three small boards say no and sit on what their panel draws. `BaseKeyboard.showReturnView` and
-`showImageView` give a picker's own return and image keys (`PickerLayout`) without the board holding key views.
+three small boards say no and sit on what their panel draws. A picker's bottom row is a layout of
+its own (`PickerLayout`: symbols.xml in a panel, emoji.xml with 搜索, emoticon.xml without), its keys the scene's.
 `ExpandedCandidateLayout.Keyboard.showPages(up, down)` marks a page key `:disabled` where the list cannot turn
 (`BaseExpandedCandidateWindow`). `NumberRow`'s collapse swipe (`checkGesture`) is still its own, seen before
 the scene's touch; a swipe told as one cancels the keys' press.
@@ -497,7 +494,7 @@ the scene's touch; a swipe told as one cancels the keys' press.
 `SceneKeyCell` (`input/keyboard/canvas`) is one key drawn by the engine on its own: a scene of a one-key layout
 the view's size, in the keyboard's theme, its words `attrs`, its `states` and `marks`, no board under it.
 It takes the size its `attrs` give, never the keyboard's 紧凑 or floating text scale. The symbol and emoji grids'
-cells are these with the canvas on (`PickerGridAdapter`: label, kind letter, the grid's text size, a face and
+cells are these (`PickerGridAdapter`: label, kind letter, the grid's text size, a face and
 margin where the grid is bordered, its a11y and `contentDescription` the item, set again on every bind), and a
 popup over one is over its face (`SceneKeyCell.bounds`: the face across, rounded as
 `KeyboardCanvasView.popupBounds`). 按键字符和快捷键's caps (`KeyCaps`) are too: their marks from
@@ -892,7 +889,7 @@ value out of range is refused as the `ThemeLook` is made. `keys.overrides` maps 
 pressed face and label; a name no board here has (a later build's board) is read, kept and drawn
 by none. A key's style is its board's own name, then `*/` (roles only), then its kind's; each field
 falls through by itself (`KeyStyleResolver`). Every key a theme can reach has `KeyDef.name`, its
-keyboard the board (`BaseKeyboard.themeBoard`, `KeyView.themeKey`); `ThemeKeyNamesTest` holds the
+keyboard the board (`BaseKeyboard.themeBoard`, the scene key's id); `ThemeKeyNamesTest` holds the
 two to `KeyNames`.
 
 Reading an older json (`CustomThemeSerializer`, newest first: 3.0 ← 2.1 ← 2.0 ← 1.0): 2.1 → 3.0

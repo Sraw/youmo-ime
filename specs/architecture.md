@@ -82,9 +82,10 @@ first client and stops it after the last.
 
 ## A key, from the finger to the editor
 
-1. A `KeyView` (in a `BaseKeyboard`: `TextKeyboard`, `T9Keyboard`, `NumberKeyboard`) recognizes the
-   gesture (`KeyGestureRecognizer` in ime-core decides tap, swipe, long press, repeat) and emits a
-   `KeyAction` from its `KeyDef` (`KeyDefPreset.kt`).
+1. A `SceneKey` (a key of the scene a `KeyboardCanvasView` draws for a `BaseKeyboard`: `TextKeyboard`,
+   `T9Keyboard`, `NumberKeyboard`…) recognizes the gesture (`KeyGesture`; `KeyGestureRecognizer` in
+   ime-core decides tap, swipe, long press, repeat) and emits a `KeyAction` from its `KeyDef`
+   (`KeyDefPreset.kt`, looked up by the scene key's id).
 2. `CommonKeyActionListener` turns it into a call on the service: most become
    `service.postFcitxJob { sendKey(...) }`, onto the host thread.
 3. `KotlinHost.sendKey` calls `HostCore.sendKey` on the active input context, which runs the key
