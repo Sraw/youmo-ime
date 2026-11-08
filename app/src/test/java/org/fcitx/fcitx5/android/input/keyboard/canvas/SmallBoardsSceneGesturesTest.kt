@@ -25,6 +25,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -73,12 +74,12 @@ class SmallBoardsSceneGesturesTest {
                 for (c in "xiao") h.tap(keys.single { it.label == c.toString() })
                 out += "xiao: ${"😄" in h.texts(search)}"
                 h.tap(h.keys(search).single { it.description == "Backspace" })
-                out += "⌫: ${h.texts(search).take(3)} field '${h.field.text}'"
+                out += "⌫: query '${h.texts(search).first()}' field '${h.field.text}' engine ${h.sent()}"
                 // held: the query cleared, the field kept
                 h.press(h.keys(search).single { it.description == "Backspace" })
                 h.after(3000)
                 h.release()
-                out += "⌫ held: ${h.texts(search).take(3)} field '${h.field.text}' engine ${h.sent()}"
+                out += "⌫ held: query '${h.texts(search).first()}' field '${h.field.text}' engine ${h.sent()}"
                 h.tap(h.keys(search).single { it.label == h.service.getString(R.string.picker_back) })
                 out += "back: search ${KeyboardHarness.find<EmojiSearchUi>(h.inputView)?.let(h::shown) == true}"
                 out
@@ -87,7 +88,11 @@ class SmallBoardsSceneGesturesTest {
         // independently: 26 letters, 返回 and ⌫; xiao finds 😄; the field's ab kept, nothing typed into it nor deleted; 返回 closes the search
         assertEquals(28, out[0].removePrefix("keys [").removeSuffix("]").split(", ").size)
         assertEquals("xiao: true", out[1])
-        assertTrue(out.toString(), out.all { "field 'ab'" in it || !it.contains("field") })
+        // ⌫ takes the query's last letter; held, the query is cleared to its hint and stops there: the field's ab
+        // kept and nothing sent to the engine either time
+        val hint = RuntimeEnvironment.getApplication().getString(R.string.emoji_search_hint)
+        assertEquals("⌫: query 'xia' field 'ab' engine []", out[2])
+        assertEquals("⌫ held: query '$hint' field 'ab' engine []", out[3])
         assertTrue(out.toString(), out.last() == "back: search false")
     }
 

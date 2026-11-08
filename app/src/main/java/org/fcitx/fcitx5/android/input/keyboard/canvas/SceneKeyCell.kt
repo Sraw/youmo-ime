@@ -30,6 +30,7 @@ import org.fcitx.fcitx5.android.scene.layout.OnSplit
 import org.fcitx.fcitx5.android.scene.layout.Row
 import org.fcitx.fcitx5.android.scene.layout.RowSplit
 import timber.log.Timber
+import kotlin.math.roundToInt
 
 /**
  * One key drawn by the engine on its own (060-render-p2 S6): a scene of a board of that key only, its
@@ -137,13 +138,13 @@ open class SceneKeyCell(context: Context, private val theme: Theme) : CustomGest
 
     private val at = IntArray(2)
 
-    /** Where the key's face is, in the window: what a popup over it aligns with. */
+    /** Where the key's face is, in the window: what a popup over it aligns with (across its face, as [KeyboardCanvasView.popupBounds]). */
     val bounds: Rect
         get() {
             getLocationInWindow(at)
-            val b = keyNode?.bounds
-            return if (b == null) Rect(at[0], at[1], at[0] + width, at[1] + height)
-            else Rect(at[0] + b.left.toInt(), at[1], at[0] + b.right.toInt(), at[1] + height)
+            val f = keyNode?.shape?.bounds
+            return if (f == null) Rect(at[0], at[1], at[0] + width, at[1] + height)
+            else Rect(at[0] + f.left.roundToInt(), at[1], at[0] + f.right.roundToInt(), at[1] + height)
         }
 
     companion object {
