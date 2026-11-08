@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.view.View
 import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
@@ -69,10 +70,10 @@ class OwnFieldUatTest {
         .filterIsInstance<TextView>().filter { h.shown(it) }.map { it.text.toString() }.toList()
 
     // the grid binds only the rows on screen: scrolled down a row at a time till the key is among them
-    private fun scrolledTo(label: String): TextKeyView {
+    private fun scrolledTo(label: String): View {
         val grid = KeyboardHarness.find<PickerGridView>(h.inputView)!!
         repeat(30) {
-            KeyboardHarness.all(grid).filterIsInstance<TextKeyView>().firstOrNull { it.mainText.text.toString() == label }?.let { return it }
+            KeyboardHarness.cells(grid).firstOrNull { KeyboardHarness.cellText(it) == label }?.let { return it }
             grid.scrollBy(0, grid.height / 3)
             h.relayout()
         }

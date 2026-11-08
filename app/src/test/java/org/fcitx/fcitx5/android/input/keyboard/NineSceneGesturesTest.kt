@@ -174,7 +174,7 @@ class NineSceneGesturesTest {
     // the column, a native view, in the scene's slot: its box the slot's cell, over the canvas
     @Test
     fun theColumnSitsInTheScenesSlot() = harness(true, Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
-        val canvas = KeyboardHarness.all(h.keyboard).filterIsInstance<KeyboardCanvasView>().single()
+        val canvas = KeyboardHarness.boardCanvas(h.keyboard)!!
         val slot = canvas.scene!!.slots.single { it.id == "side" }.bounds
         val column = KeyboardHarness.all(h.keyboard).filterIsInstance<android.widget.ScrollView>().single()
         assertEquals(Math.round(slot.left).toInt(), column.left - canvas.left)

@@ -165,7 +165,9 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                     val label = if (function) FunctionLabels[key.label]?.let(::getString) ?: key.label else key.label
                     val said = names.map { said(it) ?: "–" }.joinToString(" / ").takeIf { names.any { said(it) != null } }
                     val marks = if (function) functionMarks(names) else charMarks(symbols.next(), key.name)
-                    add(KeyCaps.key(ctx, label, "", marked = names.any(stored::isSet), dimmed = false, marks = marks, said = said).apply {
+                    // the engine's cap: a character key by its name, a function key by its own (its up and down)
+                    val shortcut = KeyCaps.Shortcut(if (function) key.name.substringAfter('/').substringBeforeLast('.') else key.name, stored)
+                    add(KeyCaps.key(ctx, label, "", marked = names.any(stored::isSet), dimmed = false, marks = marks, said = said, shortcut = shortcut).apply {
                         setOnClickListener { editShortcuts(label, names) }
                     }, if (function) lParams(matchParent, ctx.dp(KeyHeight)) else keyParams(ctx, weight = 1f))
                 }
@@ -290,7 +292,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         val marked = custom != null || name?.let(shortcuts::isSet) == true
         val symbol = shown.firstOrNull()
         val marks = charMarks(symbol?.let(KeyCaps.Mark::Text), name)
-        return KeyCaps.key(ctx, label, symbol.orEmpty(), marked = marked, dimmed = shown.isEmpty(), state = state, marks = marks, said = name?.let(::said)).apply {
+        return KeyCaps.key(ctx, label, symbol.orEmpty(), marked = marked, dimmed = shown.isEmpty(), state = state, marks = marks, said = name?.let(::said), shortcut = name?.let { KeyCaps.Shortcut(it, shortcuts) }).apply {
             setOnClickListener { edit(label) }
         }
     }

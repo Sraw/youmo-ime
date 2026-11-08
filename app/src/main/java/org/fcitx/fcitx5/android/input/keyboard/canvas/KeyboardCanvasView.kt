@@ -138,6 +138,16 @@ class KeyboardCanvasView(
      */
     private val current: Scene? get() = built ?: if (failed) null else scene
 
+    /**
+     * Whether the board's own fill is drawn under the keys: not for a row or a column laid on what is
+     * under it (the bar's number row, 展开候选's column), whose old keys drew no keyboard under them.
+     */
+    var drawsBase = true
+        set(value) {
+            field = value
+            invalidateScene()
+        }
+
     /** The keys of the scene drawn last ([current]): not made again for what changed since (glide typing's, strokes'). */
     val shownKeys: List<KeyNode> get() = current?.keys.orEmpty()
 
@@ -180,7 +190,7 @@ class KeyboardCanvasView(
                 painted = drawn.shownLook
             }
             val old = faces
-            val under = s.under()
+            val under = s.under(drawsBase)
             if (repainted || under != drawnUnder) base = null
             drawnUnder = under
             built = s
@@ -548,6 +558,9 @@ class KeyboardCanvasView(
         val A11Y_STRINGS = mapOf(
             "a11y_key_shift" to org.fcitx.fcitx5.android.R.string.a11y_key_shift,
             "a11y_key_backspace" to org.fcitx.fcitx5.android.R.string.a11y_key_backspace,
+            // 展开候选's column (expanded-side.xml)
+            "a11y_candidates_prev_page" to org.fcitx.fcitx5.android.R.string.a11y_candidates_prev_page,
+            "a11y_candidates_next_page" to org.fcitx.fcitx5.android.R.string.a11y_candidates_next_page,
             // the number pad's space: no label (the typing keyboards' says the input method)
             "a11y_key_space" to org.fcitx.fcitx5.android.R.string.a11y_key_space,
             "a11y_key_switch_language" to org.fcitx.fcitx5.android.R.string.a11y_key_switch_language,
@@ -561,7 +574,7 @@ class KeyboardCanvasView(
 }
 
 // what is drawn under the keys: the board's base and the slots' faces (a slot's view drawn over it, its own)
-private fun Scene.under(): List<Op> = if (slots.all { it.ops.isEmpty() }) base else base + slots.flatMap { it.ops }
+private fun Scene.under(drawsBase: Boolean): List<Op> = (if (drawsBase) base else emptyList()).let { b -> if (slots.all { it.ops.isEmpty() }) b else b + slots.flatMap { it.ops } }
 
 /** Whether this is key [ref]: a split row's second copy ([KeyNode.copy] 1) is its own. */
 internal fun KeyNode.of(ref: KeyRef) = id == ref.id && (copy != 0) == ref.copy

@@ -8,6 +8,8 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
 import android.widget.ImageView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
+import org.fcitx.fcitx5.android.scene.Op
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
@@ -115,6 +117,27 @@ class KeyShortcutsPageScreenshotTest {
         }
         // the backspace's clear up and restore down, each its icon: no names cut short
         assertEquals(2, icons(key(st.s(R.string.fn_key_backspace))))
+    }
+
+    // the caps drawn by the engine where the canvas keyboard is on (060-render-p2 S6): the same marks as the
+    // views', read from each cap's scene: a's select all an icon, s none; ⌫'s clear up and restore down, two
+    private fun sceneIcons(v: View) = KeyboardHarness.all(v).filterIsInstance<SceneKeyCell>()
+        .sumOf { c -> c.keyNode?.ops(false).orEmpty().count { it is Op.Icon } }
+
+    @Test
+    fun theEnginesCapsWithTheirMarks() {
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+        open()
+        st.idle()
+        assertEquals(0, icons(key("a")))
+        assertEquals(1, sceneIcons(key("a")))
+        assertEquals(0, sceneIcons(key("s")))
+        // s's * in its corner, a text the engine draws
+        assertTrue(KeyboardHarness.all(key("s")).filterIsInstance<SceneKeyCell>().single().keyNode!!.ops(false).any { it is Op.Text && it.text == "*" })
+        capture("canvas_full")
+        tab(R.string.shortcut_page_function)
+        assertEquals(2, sceneIcons(key(st.s(R.string.fn_key_backspace))))
+        capture("canvas_function")
     }
 
     // the number keys draw no symbol (a digit alone): a shortcut there goes where one alone goes on

@@ -67,6 +67,9 @@ class SceneKeyDef(
         /** The long press of the key of [letters], made as it opens again (the user's keys as they are then). */
         fun groupPopup(letters: String, node: KeyNode): Popup.Keyboard? = null
 
+        /** What a hold of the key of [node] sends as it repeats, its press being [press]: the press again, but where the keyboard tells the two apart (the emoji search's ⌫). */
+        fun repeat(press: KeyAction, node: KeyNode): KeyAction = press
+
         /** The bubble over the key of [node] as it is pressed, over the face the layout gives it; null: the face's. */
         fun bubble(node: KeyNode): String? = null
         /** A menu item's words as shown for the layout's [label] (handwriting's `reading_off`: the settings' wording). */
@@ -88,7 +91,7 @@ class SceneKeyDef(
             val behaviors = buildSet {
                 act(b.press)?.let { add(Behavior.Press(it)) }
                 act(b.longPress)?.let { add(Behavior.LongPress(it)) }
-                if (b.repeat) act(b.press)?.let { add(Behavior.Repeat(it)) }
+                if (b.repeat) act(b.press)?.let { add(Behavior.Repeat(table.repeat(it, node))) }
                 act(b.swipe)?.let { add(Behavior.Swipe(it)) }
                 act(b.doubleTap)?.let { add(Behavior.DoubleTap(it)) }
             }
@@ -151,13 +154,16 @@ class SceneKeyDef(
             "KP_Equal" to KP_EQUAL,
         ) + (0..9).associate { "KP_$it" to FcitxKeyMapping.FcitxKey_KP_0 + it }
 
+        // the digits' own keysyms (XK_0…XK_9, their names the digits), not the keypad's: the number row's, as its keys sent them
+        private val DIGITS = ('0'..'9').associate { it.toString() to it.code }
+
         // the keysyms the layouts name (sym:), FcitxKeyMapping's by their names
         private val SYMS = mapOf(
             "BackSpace" to FcitxKeyMapping.FcitxKey_BackSpace,
             "space" to FcitxKeyMapping.FcitxKey_space,
             "Return" to FcitxKeyMapping.FcitxKey_Return,
             "Escape" to FcitxKeyMapping.FcitxKey_Escape,
-        ) + KEYPAD
+        ) + KEYPAD + DIGITS
 
         // the app's words (layout-1's bare actions), as the old keys did them (KeyDefPreset)
         private val COMMANDS: Map<String, KeyAction> = mapOf(

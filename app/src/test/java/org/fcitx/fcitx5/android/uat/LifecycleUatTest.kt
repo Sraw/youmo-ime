@@ -96,7 +96,7 @@ class LifecycleUatTest {
                 val want = (if (night) ThemeManager.prefs.darkModeTheme else ThemeManager.prefs.lightModeTheme).getValue()
                 assertEquals(want.name, ThemeManager.activeTheme.name)
                 // the keys in the theme: the canvas's scene painted in its look, or the views' theme
-                val canvas = KeyboardHarness.all(h.inputView).filterIsInstance<KeyboardCanvasView>().firstOrNull()
+                val canvas = KeyboardHarness.boardCanvas(h.inputView)
                 if (canvas != null) {
                     assertNotNull(canvas.scene)
                     assertEquals("the keys in the theme", ThemeManager.shownLook(want), canvas.paintedIn)

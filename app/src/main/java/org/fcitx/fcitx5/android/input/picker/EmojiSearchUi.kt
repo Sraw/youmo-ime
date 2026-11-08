@@ -22,6 +22,15 @@ import org.fcitx.fcitx5.android.input.keyboard.BackspaceKey
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
+import org.fcitx.fcitx5.android.input.keyboard.SceneKeyDef
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
+import org.fcitx.fcitx5.android.input.theme.ThemeLook
+import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.Input
+import org.fcitx.fcitx5.android.scene.engine.MarkSettings
+import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.input.theme.PressEffect
 import org.fcitx.fcitx5.android.utils.alpha
 import org.fcitx.fcitx5.android.utils.pressHighlightDrawable
@@ -36,7 +45,28 @@ import splitties.dimensions.dp
 @SuppressLint("ViewConstructor")
 class EmojiSearchUi(context: Context, private val theme: Theme) : LinearLayout(context) {
 
-    class Keyboard(context: Context, theme: Theme) : BaseKeyboard(context, theme, rows(context))
+    class Keyboard(context: Context, theme: Theme) : BaseKeyboard(context, theme, rows(context)) {
+
+        // 返回 in the app's words; no marks (no key of the search has a shortcut)
+        override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env =
+            SceneEnvs.of(this, look, theme.isDark, width, height, Input(), texts = Texts(back = context.getString(R.string.picker_back)), marks = NO_MARKS)
+
+        // laid on the search's own background (the keyboard's colour), as its views were
+        override val sceneDrawsBase: Boolean get() = false
+
+        // ⌫ held: told apart from a tap ([BACKSPACE]'s Repeat), so the panel clears the query and stops short of the field
+        override val sceneTable: SceneKeyDef.Table get() = SearchKeys
+
+        private object SearchKeys : SceneKeyDef.Table {
+            override fun repeat(press: KeyAction, node: KeyNode): KeyAction =
+                if (press is KeyAction.SymAction && press.sym == BACKSPACE) press.copy(states = REPEAT) else press
+        }
+
+        // last: the scene reads the keyboard's state
+        init {
+            drawKeysWithScene(LAYOUT)
+        }
+    }
 
     private class LetterKey(letter: String) : KeyDef(
         Appearance.Text(displayText = letter, textSize = 23f),
@@ -134,11 +164,18 @@ class EmojiSearchUi(context: Context, private val theme: Theme) : LinearLayout(c
         /** Its repeat told apart ([KeyState.Repeat]): a hold clears the query, then stops short of the field. */
         val BACKSPACE = KeySym(FcitxKeyMapping.FcitxKey_BackSpace)
 
+        private val REPEAT = KeyStates(KeyState.Virtual, KeyState.Repeat)
+
+        /** The search's letters drawn by the scene where the canvas is on (060-render-p2 S6). */
+        const val LAYOUT = "emoji-search"
+
+        private val NO_MARKS = MarkSettings(shortcuts = emptyMap())
+
         private val Backspace = KeyDef(
             BackspaceKey().appearance,
             setOf(
                 KeyDef.Behavior.Press(KeyAction.SymAction(BACKSPACE)),
-                KeyDef.Behavior.Repeat(KeyAction.SymAction(BACKSPACE, KeyStates(KeyState.Virtual, KeyState.Repeat)))
+                KeyDef.Behavior.Repeat(KeyAction.SymAction(BACKSPACE, REPEAT))
             )
         )
     }

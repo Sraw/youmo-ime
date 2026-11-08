@@ -526,12 +526,12 @@ class ToolbarUatTest {
         h.start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
         // androidengine switches a password to English (PR-03)
         h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
-        fun row() = KeyboardHarness.all(h.bar).filterIsInstance<TextKeyView>()
-            .filter { h.shown(it) }
-        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0"), row().map { it.mainText.text.toString() }.toList())
+        // the number row's keys, whichever draws them
+        fun row() = h.keys(KeyboardHarness.find<org.fcitx.fcitx5.android.input.bar.ui.idle.NumberRow>(h.bar)!!)
+        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0"), row().map { it.label })
         assertFalse(has(R.string.expand_toolbar))
         h.api.calls.clear()
-        for (d in listOf("1", "2", "3")) h.tap(row().first { it.mainText.text.toString() == d })
+        for (d in listOf("1", "2", "3")) h.tap(row().first { it.label == d })
         // each digit to the engine as its key, as English types a digit (EngineReplay: PR-03's 123)
         val sent = h.api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
             .map { Regex("sym=(\\d+)").find(it)?.groupValues?.get(1)?.toInt() }

@@ -102,7 +102,7 @@ class HandwritingSceneGesturesTest {
     @Test
     fun thePadIsInItsSlotAndWrittenOn() {
         harness(true).use { h ->
-            val canvas = KeyboardHarness.find<KeyboardCanvasView>(h.keyboard)!!
+            val canvas = KeyboardHarness.boardCanvas(h.keyboard)!!
             val pad = h.pad()
             assertEquals(padSlot(canvas), Rect(pad.left - canvas.left, pad.top - canvas.top, pad.right - canvas.left, pad.bottom - canvas.top))
             // over the canvas: drawn after it, its touches its own
@@ -123,7 +123,7 @@ class HandwritingSceneGesturesTest {
     fun thePadFollowsItsSlotAfterAResize() {
         harness(true).use { h ->
             val kb = KeyboardHarness.find<HandwritingKeyboard>(h.keyboard)!!
-            val canvas = KeyboardHarness.find<KeyboardCanvasView>(kb)!!
+            val canvas = KeyboardHarness.boardCanvas(kb)!!
             val before = padSlot(canvas)
             kb.relayoutAt(kb.width * 7 / 10, kb.height)
             val pad = h.pad()
@@ -248,7 +248,7 @@ class HandwritingSceneGesturesTest {
     fun thePadHiddenWhileTheSceneFails() {
         harness(true).use { h ->
             val kb = KeyboardHarness.find<HandwritingKeyboard>(h.keyboard)!!
-            val canvas = KeyboardHarness.find<KeyboardCanvasView>(kb)!!
+            val canvas = KeyboardHarness.boardCanvas(kb)!!
             assertEquals(View.VISIBLE, h.pad().visibility)
             KeyboardCanvasView::class.java.getDeclaredField("failed").apply { isAccessible = true }.setBoolean(canvas, true)
             kb.requestLayout()
@@ -314,7 +314,7 @@ class HandwritingSceneGesturesTest {
                 h.idle()
                 h.relayout()
                 if (canvas) {
-                    val node = KeyboardHarness.find<KeyboardCanvasView>(h.keyboard)!!.keyAt("reading")!!
+                    val node = KeyboardHarness.boardCanvas(h.keyboard)!!.keyAt("reading")!!
                     assertTrue(node.states.toString(), org.fcitx.fcitx5.android.scene.KeyState.On in node.states)
                 }
                 val on = h.keyNamed("reading").description
@@ -387,7 +387,7 @@ class HandwritingSceneGesturesTest {
     fun theLanguageKeyHiddenWhenTheSettingChanges() {
         prefs.set(AppPrefs.getInstance().keyboard.showLangSwitchKey, true)
         harness(true).use { h ->
-            val canvas = KeyboardHarness.find<KeyboardCanvasView>(h.keyboard)!!
+            val canvas = KeyboardHarness.boardCanvas(h.keyboard)!!
             assertTrue(canvas.scene!!.keys.any { it.id == "lang" })
             prefs.set(AppPrefs.getInstance().keyboard.showLangSwitchKey, false)
             h.idle()

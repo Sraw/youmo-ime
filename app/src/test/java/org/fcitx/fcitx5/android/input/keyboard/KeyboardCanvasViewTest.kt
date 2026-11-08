@@ -85,7 +85,7 @@ class KeyboardCanvasViewTest {
     }
 
     private fun KeyboardHarness.canvas(): KeyboardCanvasView? =
-        KeyboardHarness.all(inputView).filterIsInstance<KeyboardCanvasView>().firstOrNull()
+        KeyboardHarness.boardCanvas(inputView)
 
     private fun KeyboardHarness.keyView(name: String): KeyView =
         KeyboardHarness.all(inputView).filterIsInstance<KeyView>().first { it.themeKey == name && it.parent is View && (it.parent as View).parent is TextKeyboard }

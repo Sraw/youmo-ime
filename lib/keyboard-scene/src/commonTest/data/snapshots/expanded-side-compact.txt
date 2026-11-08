@@ -1,0 +1,54 @@
+scene 1080x468 no-preview no-popups
+base
+  fill rect(0,0,1080,468) #ffeceff1
+key page-up kind=function a11y="a11y_candidates_prev_page"
+  bounds 0,0,1080,117
+  shape rect(7.88,18.38,1072.13,98.63 r=10.5,10.5,10.5,10.5)
+  hit rect(0,0,1080,117)
+  anchor 540,58.5 up 0,-1
+  actions send="action:page-up"
+  normal
+    shadow rect(7.88,18.38,1072.13,101.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(7.88,18.38,1072.13,98.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    icon arrow-upward 508.5,27,571.5,90 #ff7a858a
+  pressed
+    +2 fill rect(7.88,18.38,1072.13,98.63 r=10.5,10.5,10.5,10.5) #1f000000
+key page-down kind=function a11y="a11y_candidates_next_page"
+  bounds 0,117,1080,234
+  shape rect(7.88,135.38,1072.13,215.63 r=10.5,10.5,10.5,10.5)
+  hit rect(0,117,1080,234)
+  anchor 540,175.5 up 0,-1
+  actions send="action:page-down"
+  normal
+    shadow rect(7.88,135.38,1072.13,218.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(7.88,135.38,1072.13,215.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    icon arrow-downward 508.5,144,571.5,207 #ff7a858a
+  pressed
+    +2 fill rect(7.88,135.38,1072.13,215.63 r=10.5,10.5,10.5,10.5) #1f000000
+key backspace kind=function role=backspace a11y="a11y_key_backspace"
+  bounds 0,234,1080,351
+  shape rect(7.88,252.38,1072.13,332.63 r=10.5,10.5,10.5,10.5)
+  hit rect(0,234,1080,351)
+  anchor 540,292.5 up 0,-1
+  actions repeat="true" send="sym:BackSpace" swipe-axis="both"
+  sound=delete
+  normal
+    shadow rect(7.88,252.38,1072.13,335.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(7.88,252.38,1072.13,332.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    icon backspace 508.5,261,571.5,324 #ff7a858a
+  pressed
+    +2 fill rect(7.88,252.38,1072.13,332.63 r=10.5,10.5,10.5,10.5) #1f000000
+key enter kind=enter role=enter a11y="换行"
+  bounds 0,351,1080,468
+  shape rect(7.88,369.38,1072.13,449.63 r=10.5,10.5,10.5,10.5)
+  hit rect(0,351,1080,468)
+  anchor 540,409.5 up 0,-1
+  actions send="sym:Return"
+  sound=return
+  menu "Emoji" icon=emoji do="picker:"
+  normal
+    shadow rect(7.88,369.38,1072.13,452.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(7.88,369.38,1072.13,449.63 r=10.5,10.5,10.5,10.5) #ff5cb5ab
+    icon enter 508.5,378,571.5,441 #ffffffff
+  pressed
+    +2 fill rect(7.88,369.38,1072.13,449.63 r=10.5,10.5,10.5,10.5) #1f000000

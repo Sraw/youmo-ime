@@ -366,7 +366,7 @@ object LayoutReader {
     private val ON_OFF = listOf("on", "off")
     private val POPUP_FROM = listOf("preset", "list", "none", "nine", "group")
     private val NUMBER_ARG = Regex("[0-9]{1,2}")
-    private val FAMILIES = listOf("letters", "zhuyin", "nine", "zhuyin-nine", "grouped", "number", "symbols", "handwriting")
+    private val FAMILIES = listOf("letters", "zhuyin", "nine", "zhuyin-nine", "grouped", "number", "symbols", "handwriting", "emoji-search", "expanded-side", "number-row")
     private val KINDS = listOf("letter", "function", "space", "enter")
     private val SLOT_KINDS = listOf("handwriting-pad", "nine-side", "handwriting-candidates", "symbol-categories", "symbol-grid")
     private val ACTIONS = listOf("send", "long-press", "swipe-up", "swipe-down", "double-tap")
@@ -387,7 +387,7 @@ object LayoutReader {
         // symbol, tone 1–5 (ˉ ˊ ˇ ˋ ˙), 注音九键's slot. A group's code is no action: the key's
         // letters= say it (060-render-v2 §15)
         // the longer name first: Kotlin/JS matches the first alternative that starts a match, then wants it whole
-        Regex("action:(zhuyin-slot|zhuyin|tone-[1-5])"),
+        Regex("action:(zhuyin-slot|zhuyin|tone-[1-5]|page-up|page-down)"),
         Regex("commit:.+"),
         Regex("code:U\\+[0-9A-F]{4,6}"),
         Regex("keypad:[0-9]"),

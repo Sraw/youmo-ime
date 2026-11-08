@@ -318,9 +318,11 @@ class SceneBuilder(
         val normal = k.geometry.getValue(k.states)
         val faces = k.looks.keys.associateWith { states ->
             val looks = k.parts.getValue(states)
-            paint.face(k.geometry.getValue(states), k.looks.getValue(states), KeyState.Pressed in states) +
+            val ops = paint.face(k.geometry.getValue(states), k.looks.getValue(states), KeyState.Pressed in states) +
                 listOfNotNull(s.glyph).flatMap { paint.content(it, looks) } +
                 s.marks.filterNotNull().flatMap { paint.content(it, looks) }
+            // a key that takes no press (展开候选's page that cannot turn, 060-render-p2 S6): faded as a blank is
+            if (KeyState.Disabled in states) ops.map { popups.faded(it, Popups.DISABLED_ALPHA) } else ops
         }
         return KeyNode(
             id = k.key.key.id,

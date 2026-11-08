@@ -124,6 +124,8 @@ object SceneIcons {
         "lock-open" to R.drawable.ic_baseline_lock_open_24,
         "emoji" to R.drawable.ic_baseline_tag_faces_24,
         "voice" to R.drawable.ic_baseline_keyboard_voice_24,
+        "arrow-upward" to R.drawable.ic_baseline_arrow_upward_24,
+        "arrow-downward" to R.drawable.ic_baseline_arrow_downward_24,
     ) + KeyCommand.entries.associate { SceneMarks.icon(it) to KeyShortcutLooks.of(it).icon }
 
     // the drawables named by id ([nameOf]): only these read back, so a name no menu gave (a theme's

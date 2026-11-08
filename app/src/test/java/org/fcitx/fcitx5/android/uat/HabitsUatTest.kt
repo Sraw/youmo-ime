@@ -83,7 +83,7 @@ class HabitsUatTest {
         KeyboardHarness().use { h ->
             h.start()
             h.emoji()
-            h.tap(KeyboardHarness.all(KeyboardHarness.find<PickerGridView>(h.inputView)!!).filterIsInstance<TextKeyView>().first { it.mainText.text.toString() == "😀" })
+            h.tap(KeyboardHarness.cells(KeyboardHarness.find<PickerGridView>(h.inputView)!!).first { KeyboardHarness.cellText(it) == "😀" })
             h.start()
             assertEquals(false, h.recentEmpty())
             h.start()

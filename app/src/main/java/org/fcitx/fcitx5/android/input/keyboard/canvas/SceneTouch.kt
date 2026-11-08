@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyPlace
 import org.fcitx.fcitx5.android.input.keyboard.TouchTarget
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.KeyState
 
 /**
  * A key the scene draws (060-render-p2 S1), as its keyboard wires it: what a key view was to its
@@ -160,9 +161,10 @@ class SceneTouch(
      * its hit area, outside its cell, as it was outside its view. The finger's own: a split row's
      * two copies may be one key ([find]), each finger in its own copy's cell.
      */
-    internal class Pointer(val key: SceneKey, val cell: Rect) : TouchTarget {
+    internal class Pointer(val key: SceneKey, val cell: Rect, private val disabled: Boolean = false) : TouchTarget {
         override val ref get() = key.ref
-        override val enabled get() = key.keyEnabled
+        // a key the scene shows `:disabled` (展开候选's page that cannot turn) takes no touch, as its view did not
+        override val enabled get() = key.keyEnabled && !disabled
 
         override fun send(event: MotionEvent, action: Int, pointerIndex: Int) {
             key.touch(cell, action, event.getX(pointerIndex), event.getY(pointerIndex), event.getPointerId(pointerIndex), event.eventTime)
@@ -180,6 +182,6 @@ class SceneTouch(
         val key = keyOf(node)?.takeIf(shown) ?: return null
         val cell = Rect().apply { set(node.bounds) }
         cell.offset(canvas.left, canvas.top)
-        return Pointer(key, cell)
+        return Pointer(key, cell, KeyState.Disabled in node.states)
     }
 }

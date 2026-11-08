@@ -71,7 +71,7 @@ class SceneSpeechTest {
         return KeyboardHarness(im = im).start(inputType = inputType, imeOptions = imeOptions, prefill = prefill)
     }
 
-    private fun KeyboardHarness.canvas(): KeyboardCanvasView = KeyboardHarness.all(inputView).filterIsInstance<KeyboardCanvasView>().first()
+    private fun KeyboardHarness.canvas(): KeyboardCanvasView = KeyboardHarness.boardCanvas(inputView)!!
 
     private fun KeyboardHarness.textKeyboard(): TextKeyboard = KeyboardHarness.all(inputView).filterIsInstance<TextKeyboard>().first()
 

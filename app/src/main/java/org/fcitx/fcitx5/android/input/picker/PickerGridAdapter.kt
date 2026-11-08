@@ -6,7 +6,9 @@ package org.fcitx.fcitx5.android.input.picker
 
 import android.annotation.SuppressLint
 import android.util.TypedValue
+import android.graphics.Rect
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.GridLayoutManager
@@ -26,10 +28,14 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyDef.Appearance.Border
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef.Appearance.Variant
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.popup.keyRef
 import org.fcitx.fcitx5.android.input.scene.KeyRef
+import org.fcitx.fcitx5.android.scene.layout.Face
+import org.fcitx.fcitx5.android.scene.layout.KeyAttrs
+import org.fcitx.fcitx5.android.scene.layout.Text
 import org.fcitx.fcitx5.android.utils.alpha
 import splitties.dimensions.dp
 
@@ -124,6 +130,8 @@ class PickerGridAdapter(
             gravity = Gravity.CENTER_VERTICAL
             setPaddingRelative(dp(12), 0, dp(12), 0)
             layoutParams = RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT, grid.headerHeight)
+        } else if (drawnByScene) SceneKeyCell(ctx, grid.theme).apply {
+            layoutParams = RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT, grid.rowHeight)
         } else TextKeyView(ctx, grid.theme, keyAppearance).apply {
             if (grid.density.autoScale) {
                 mainText.apply {
@@ -144,7 +152,7 @@ class PickerGridAdapter(
                 if (category.name != 0) holder.itemView.context.getString(category.name) else category.label
             return
         }
-        val key = holder.itemView as TextKeyView
+        val key = holder.itemView as CustomGestureView
         key.layoutParams.let { if (it.height != grid.rowHeight) key.layoutParams = it.apply { height = grid.rowHeight } }
         // recently used ones as they were picked, skin tone and all: no popup to pick again
         if (entry.category == 0) bindAsIs(key, entry.text) else bind(key, entry.text)
@@ -154,13 +162,33 @@ class PickerGridAdapter(
      * A symbol of two characters at a single's size reads as a bar across the panel's key: the
      * Chinese dash —— (two em dashes, drawn joined) and ellipsis …… are each two wide.
      */
-    private fun label(key: TextKeyView, text: String) {
-        key.mainText.text = text
+    private fun label(key: CustomGestureView, text: String) {
         val long = grid.density == PickerGridView.Density.Panel && text.codePointCount(0, text.length) > 1
-        key.mainText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, grid.density.textSize * if (long) LONG else 1f)
+        val size = grid.density.textSize * if (long) LONG else 1f
+        if (key is SceneKeyCell) {
+            // a scene of the one key (060-render-p2 S6): its text, its size, a face where the grid has borders
+            key.attrs = cellAttrs(text, size)
+            // what TalkBack reads, as the key view's text was
+            key.contentDescription = text
+            return
+        }
+        key as TextKeyView
+        key.mainText.text = text
+        key.mainText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, size)
     }
 
-    private fun bindAsIs(key: TextKeyView, item: String) = key.apply {
+    private fun cellAttrs(text: String, size: Float) = KeyAttrs(
+        label = Text.Literal(text),
+        kind = "letter",
+        textSize = size.toDouble(),
+        face = if (bordered) Face.Default else Face.None,
+        margin = bordered,
+        a11y = Text.Literal(text),
+    )
+
+    private val drawnByScene = SceneKeyCell.on
+
+    private fun bindAsIs(key: CustomGestureView, item: String) = key.apply {
         label(this, item)
         setOnClickListener { commit(item) }
         setOnLongClickListener(null)
@@ -168,19 +196,17 @@ class PickerGridAdapter(
         onGestureListener = null
     }
 
-    private fun bind(key: TextKeyView, item: String) = key.apply {
+    private fun bind(key: CustomGestureView, item: String) = key.apply {
         val transformed = transforms.getOrPut(item) { policy.transform(item) }
         label(this, transformed)
         setOnClickListener { commit(transformed) }
         setOnLongClickListener longClick@{ view ->
-            if (view !is KeyView) return@longClick false
             val popup = policy.popup(item) ?: return@longClick false
             showKeyboard(view, popup)
             false
         }
         swipeEnabled = true
         onGestureListener = OnGestureListener { view, event ->
-            view as KeyView
             when (event.type) {
                 CustomGestureView.GestureType.Down -> {
                     showPreview(view, item)
@@ -199,16 +225,20 @@ class PickerGridAdapter(
         keyActionListener.onKeyAction(CommitAction(text), Source.Keyboard)
     }
 
-    private fun showKeyboard(view: KeyView, popup: KeyDef.Popup.Keyboard) {
-        // the list may have scrolled since the key was laid out: where it is now
-        if (!popupOnKeyPress) view.updateBounds()
-        popupActionListener.onPopupAction(PopupAction.ShowKeyboardAction(view.keyRef, popup, view.bounds))
+    // where the key's face is now (the list may have scrolled since it was laid out)
+    private fun boundsOf(view: View): Rect = when (view) {
+        is SceneKeyCell -> view.bounds
+        is KeyView -> view.run { updateBounds(); bounds }
+        else -> error("not a key: $view")
     }
 
-    private fun showPreview(view: KeyView, item: String) {
+    private fun showKeyboard(view: View, popup: KeyDef.Popup.Keyboard) {
+        popupActionListener.onPopupAction(PopupAction.ShowKeyboardAction(view.keyRef, popup, boundsOf(view)))
+    }
+
+    private fun showPreview(view: View, item: String) {
         if (!popupOnKeyPress) return
-        view.updateBounds()
-        popupActionListener.onPopupAction(PopupAction.PreviewAction(view.keyRef, item, view.bounds))
+        popupActionListener.onPopupAction(PopupAction.PreviewAction(view.keyRef, item, boundsOf(view)))
     }
 
     private fun changeFocus(key: KeyRef, x: Float, y: Float): Boolean {

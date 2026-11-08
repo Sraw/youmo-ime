@@ -1,0 +1,55 @@
+scene 1080x702 board 219,0,1080,702 no-preview no-popups
+base
+  fill rect(0,0,1080,702) #ffeceff1
+slot side-buttons 0,0,219,702
+key page-up kind=function a11y="a11y_candidates_prev_page"
+  bounds 219,0,1080,176
+  shape rect(226.88,18.38,1072.13,157.63 r=10.5,10.5,10.5,10.5)
+  hit rect(219,0,1080,176)
+  anchor 649.5,88 up 0,-1
+  actions send="action:page-up"
+  normal
+    shadow rect(226.88,18.38,1072.13,160.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(226.88,18.38,1072.13,157.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    icon arrow-upward 618,56.5,681,119.5 #ff7a858a
+  pressed
+    +2 fill rect(226.88,18.38,1072.13,157.63 r=10.5,10.5,10.5,10.5) #1f000000
+key page-down kind=function a11y="a11y_candidates_next_page"
+  bounds 219,176,1080,351
+  shape rect(226.88,194.38,1072.13,332.63 r=10.5,10.5,10.5,10.5)
+  hit rect(219,176,1080,351)
+  anchor 649.5,263.5 up 0,-1
+  actions send="action:page-down"
+  normal
+    shadow rect(226.88,194.38,1072.13,335.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(226.88,194.38,1072.13,332.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    icon arrow-downward 618,232,681,295 #ff7a858a
+  pressed
+    +2 fill rect(226.88,194.38,1072.13,332.63 r=10.5,10.5,10.5,10.5) #1f000000
+key backspace kind=function role=backspace a11y="a11y_key_backspace"
+  bounds 219,351,1080,527
+  shape rect(226.88,369.38,1072.13,508.63 r=10.5,10.5,10.5,10.5)
+  hit rect(219,351,1080,527)
+  anchor 649.5,439 up 0,-1
+  actions repeat="true" send="sym:BackSpace" swipe-axis="both"
+  sound=delete
+  normal
+    shadow rect(226.88,369.38,1072.13,511.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(226.88,369.38,1072.13,508.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    icon backspace 618,407.5,681,470.5 #ff7a858a
+  pressed
+    +2 fill rect(226.88,369.38,1072.13,508.63 r=10.5,10.5,10.5,10.5) #1f000000
+key enter kind=enter role=enter a11y="换行"
+  bounds 219,527,1080,702
+  shape rect(226.88,545.38,1072.13,683.63 r=10.5,10.5,10.5,10.5)
+  hit rect(219,527,1080,702)
+  anchor 649.5,614.5 up 0,-1
+  actions send="sym:Return"
+  sound=return
+  menu "Emoji" icon=emoji do="picker:"
+  normal
+    shadow rect(226.88,545.38,1072.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(226.88,545.38,1072.13,683.63 r=10.5,10.5,10.5,10.5) #ff5cb5ab
+    icon enter 618,583,681,646 #ffffffff
+  pressed
+    +2 fill rect(226.88,545.38,1072.13,683.63 r=10.5,10.5,10.5,10.5) #1f000000

@@ -103,9 +103,8 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
                 addItemDecoration(newDivider())
                 addOnScrollListener(object : RecyclerView.OnScrollListener() {
                     override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                        pageUpBtn.isEnabled = firstFullyVisible() > 0
                         val count = this@BaseExpandedCandidateWindow.layoutManager.itemCount
-                        pageDnBtn.isEnabled = lastFullyVisible() < count - 1
+                        embeddedKeyboard.showPages(up = firstFullyVisible() > 0, down = lastFullyVisible() < count - 1)
                     }
                 })
             }

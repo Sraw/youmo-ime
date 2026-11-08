@@ -250,9 +250,9 @@ class LandscapeUatTest {
         val b = board()
         assertTrue("$b", onRight(b))
         h.capture("LandscapeUatTest/symbols_right")
-        val sym = KeyboardHarness.all(h.inputView).filterIsInstance<TextKeyView>()
-            .first { h.shown(it) && it.mainText.text.length == 1 && !it.mainText.text[0].isLetterOrDigit() }
-        val ch = sym.mainText.text.toString()
+        val sym = KeyboardHarness.cells(h.inputView)
+            .first { h.shown(it) && KeyboardHarness.cellText(it).let { t -> t.length == 1 && !t[0].isLetterOrDigit() } }
+        val ch = KeyboardHarness.cellText(sym)
         h.tap(sym)
         assertEquals(ch, h.field.text.toString())
         assertTrue(split())
@@ -265,9 +265,9 @@ class LandscapeUatTest {
         h.tap(h.described(h.service.getString(R.string.a11y_key_emoji)))
         val b = board()
         assertTrue("$b", onRight(b))
-        val emoji = KeyboardHarness.all(h.inputView).filterIsInstance<TextKeyView>()
-            .first { h.shown(it) && it.mainText.text.isNotEmpty() && it.mainText.text[0].code > 0x2000 && h.box(it).left >= b.left }
-        val e = emoji.mainText.text.toString()
+        val emoji = KeyboardHarness.cells(h.inputView)
+            .first { h.shown(it) && KeyboardHarness.cellText(it).let { t -> t.isNotEmpty() && t[0].code > 0x2000 } && h.box(it).left >= b.left }
+        val e = KeyboardHarness.cellText(emoji)
         h.tap(emoji)
         assertEquals(e, h.field.text.toString())
     }

@@ -115,3 +115,15 @@
 - **操作**：点「符」，按住第一个符号不放，看一眼再抬手。
 - **预期**：按住时符号上方出现和以前一样的气泡（旧画法）；抬手打出这个符号。
 - **JVM**：`PanelUatTest.aSymbolHeldShowsTheViewsBubble`（开关关着时，没有 id 的符号键弹的是 View 气泡，不是引擎的场景；抬手打出这个符号）；设备上不跑。
+
+### PAN-22 [P1] 表情搜索的字母键（设备）
+- **前提**：B0（`UAT_CANVAS=1` 时是新画法：表情搜索的字母键由引擎画，060-render-p2 S6）。
+- **操作**：点「表情」；点放大镜；点 x i a o；点 **返回**。
+- **预期**：字母键三行、和键盘一样的键面；打 xiao 时上面一排有 😄；返回后回到表情列表。
+- **JVM**：同 PAN-12（`PanelUatTest.emojiSearchByPinyin`）；两种画法同一手势同一结果见 `SmallBoardsSceneGesturesTest.emojiSearch`。
+
+### PAN-23 [P1] 符号面板的格子（设备）
+- **前提**：B0（`UAT_CANVAS=1` 时格子是各自一个单键场景，060-render-p2 S6）。
+- **操作**：点「符」；点格子里的「，」。
+- **预期**：格子里的符号键面和以前一样（白键、居中）；点后框里出现「，」。
+- **JVM**：`SmallBoardsSceneGesturesTest.symbolGrid`、`BoardCanvasCompareTest[symbol-grid]`。

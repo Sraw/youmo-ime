@@ -9,16 +9,25 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.text.InputType
+import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.ViewShownKey
+import org.fcitx.fcitx5.android.input.bar.ui.idle.NumberRow
+import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateLayout
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
+import org.fcitx.fcitx5.android.input.picker.EmojiSearchUi
+import org.fcitx.fcitx5.android.input.picker.PickerGridView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
@@ -55,7 +64,37 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
             arrayOf<Any>("zhuyin-nine", PinyinKeyboard.ZhuyinNine),
             arrayOf<Any>("nine", PinyinKeyboard.NineKeys),
             arrayOf<Any>("handwriting", PinyinKeyboard.Full),
-        ) + FIELDS.keys.map { arrayOf<Any>(it, PinyinKeyboard.Full) }
+        ) + FIELDS.keys.filter { it !in SMALL }.map { arrayOf<Any>(it, PinyinKeyboard.Full) } + SMALL.keys.map { arrayOf<Any>(it, PinyinKeyboard.Full) }
+
+        // the small boards of S6, each shown as a user would reach it, the view compared its own: 表情搜索's
+        // letters, 展开候选's column, the password field's number row, and the symbol grid's cells (each one key's scene)
+        private val SMALL: Map<String, (KeyboardHarness) -> View> = mapOf(
+            "emoji-search" to { h ->
+                h.tap(h.described(h.service.getString(R.string.a11y_key_emoji)))
+                h.tap(h.described(h.service.getString(R.string.emoji_search)))
+                KeyboardHarness.find<EmojiSearchUi.Keyboard>(h.inputView)!!
+            },
+            "expanded-side" to { h ->
+                h.api.candidates = Array(60) { CandidateWord("", "字$it", "") }
+                h.emit(HostEvent.Candidates(60, h.api.candidates.toList()))
+                h.tap(h.described(h.service.getString(R.string.expand_candidates_list)))
+                val side = KeyboardHarness.find<ExpandedCandidateLayout.Keyboard>(h.inputView)!!
+                // a page down: both pages turn, neither faded (the views fade theirs at the views' alpha, the
+                // scene at the engine's: SmallBoardsSceneGesturesTest and FaceTest hold the fading)
+                h.tap(h.keys(side).single { it.description == h.service.getString(R.string.a11y_candidates_next_page) })
+                h.after(1000)
+                side
+            },
+            "number-row" to { h ->
+                h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
+                KeyboardHarness.find<NumberRow>(h.inputView)!!
+            },
+            "symbol-grid" to { h ->
+                h.tap(h.key("符"))
+                h.relayout()
+                KeyboardHarness.find<PickerGridView>(h.inputView)!!
+            },
+        )
 
         // each number pad by the field that shows it (NumberPad.of): the full pad's a plain number field's
         private val FIELDS = mapOf(
@@ -66,6 +105,7 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
             "number-signed-decimal" to (InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED or InputType.TYPE_NUMBER_FLAG_DECIMAL),
             "number-phone" to InputType.TYPE_CLASS_PHONE,
             "number-datetime" to (InputType.TYPE_CLASS_DATETIME or InputType.TYPE_DATETIME_VARIATION_NORMAL),
+            "number-row" to (InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD),
         )
 
         // handwriting's board: shown for its input method (its punctuation as the views show it, full width)
@@ -85,7 +125,9 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
         // baseline where the views move ㄌ ㄏ ㄒ ㄗ down for their icons, the icons giving way in their corners
         // instead: 1.46% to 1.95% at the standard and compact heights, the rest of it as close as ever. With the
         // voice pack in (integ-060), the space's microphone a few pixels apart on the two adds up to 0.07%: 2.02% compact
-        private val DIFFERING_MORE = mapOf("zhuyin" to 0.021)
+        // the number row compact (S6): its digits stood on the engine's baseline, a pixel or two off the views'
+        // centred text in the 紧凑 height's shorter row, 1.73%
+        private val DIFFERING_MORE = mapOf("zhuyin" to 0.021, "number-row" to 0.018)
     }
 
     @get:Rule
@@ -149,11 +191,16 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
                     // past the keyboard's sliding in
                     h.after(1000)
                     h.relayout()
-                    val v = h.keyboard
+                    val small = SMALL[board]
+                    val v = small?.invoke(h)?.also { h.after(1000); h.relayout() } ?: h.keyboard
                     // the scene's side is the scene's: its canvas over the keyboard, every key one of its (review S4a #2)
-                    val canvases = KeyboardHarness.all(v).filterIsInstance<KeyboardCanvasView>().toList()
+                    // the shown ones: the bar's number row is made with the bar, hidden but for a password
+                    val canvases = KeyboardHarness.all(v).filterIsInstance<KeyboardCanvasView>().filter { it.isShown }.toList()
                     val keys = KeyboardHarness.keysOf(v)
-                    if (on) {
+                    if (board == "symbol-grid") {
+                        // no canvas: each cell its own key's scene, or a key view
+                        assertEquals(case.name, on, KeyboardHarness.all(v).any { it is SceneKeyCell })
+                    } else if (on) {
                         assertEquals(case.name, 1, canvases.size)
                         assertTrue(case.name, canvases.single().isShown)
                         assertTrue(case.name, keys.isNotEmpty() && keys.all { it is SceneShownKey })

@@ -61,6 +61,9 @@ class BuiltInLayouts(private val context: Context) : LayoutSource {
             "nine" to R.raw.scene_layout_nine,
             "handwriting" to R.raw.scene_layout_handwriting,
             "symbols" to R.raw.scene_layout_symbols,
+            "emoji-search" to R.raw.scene_layout_emoji_search,
+            "expanded-side" to R.raw.scene_layout_expanded_side,
+            "number-row" to R.raw.scene_layout_number_row,
         )
     }
 }

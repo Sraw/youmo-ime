@@ -859,6 +859,22 @@ class KeyboardHarness(
             else -> emptyList()
         }
 
+        /** The symbol grid's cells under [root], whichever draws them: a key view's, or one key's scene (060-render-p2 S6). */
+        fun cells(root: View): Sequence<View> = all(root).filter { it is TextKeyView || it is org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell }
+
+        /** What [cell] ([cells]) shows. */
+        fun cellText(cell: View): String = when (cell) {
+            is org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell -> cell.keyNode?.label.orEmpty()
+            else -> (cell as TextKeyView).mainText.text.toString()
+        }
+
+        /**
+         * The keys' canvas under [root]: not the bar's number row's (060-render-p2 S6), which is made with the bar and
+         * shown only for a password, and would otherwise be found first.
+         */
+        fun boardCanvas(root: View): KeyboardCanvasView? = all(root).filterIsInstance<KeyboardCanvasView>()
+            .firstOrNull { c -> generateSequence(c.parent) { it.parent }.none { it is org.fcitx.fcitx5.android.input.bar.ui.idle.NumberRow } }
+
         fun all(v: View): Sequence<View> = sequence {
             yield(v)
             if (v is ViewGroup) for (i in 0 until v.childCount) yieldAll(all(v.getChildAt(i)))

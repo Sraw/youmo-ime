@@ -7,8 +7,10 @@ package org.fcitx.fcitx5.android.ui.main.settings
 import android.content.Context
 import android.content.res.ColorStateList
 import android.content.res.Configuration
+import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
@@ -18,9 +20,16 @@ import androidx.annotation.DrawableRes
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.ViewCompat
 import com.google.android.material.R as MaterialR
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
+import org.fcitx.fcitx5.android.input.scene.SceneMarks
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.scene.KeyState
+import org.fcitx.fcitx5.android.scene.layout.KeyAttrs
+import org.fcitx.fcitx5.android.scene.layout.Text as SceneText
 import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
 import org.fcitx.fcitx5.android.input.keyboard.markSpots
 import org.fcitx.fcitx5.android.utils.styledColor
@@ -41,12 +50,49 @@ object KeyCaps {
     private const val MARK_ICON_DP = 11
     private const val MARK_TEXT_WIDTH = 0.45f
 
+    // the cap's label, as the views' (20sp)
+    private const val CAP_TEXT_SIZE = 20.0
+
     /** A key's face: [marked] outlined in the accent colour, [selected] filled with it */
     fun background(ctx: Context, marked: Boolean = false, radius: Int = 8, selected: Boolean = false) = GradientDrawable().apply {
         cornerRadius = ctx.dp(radius).toFloat()
         setColor(ctx.styledColor(if (selected) MaterialR.attr.colorPrimaryContainer else MaterialR.attr.colorSurfaceContainerHighest))
         if (marked) setStroke(ctx.dp(2), ctx.styledColor(android.R.attr.colorPrimary))
     }
+
+    /**
+     * A key's shortcut, for the engine to draw its marks: a character key's [name] (`full/a`) or a function
+     * key's (`space`, its up and down), as [shortcuts] (the page's, being edited) has them.
+     */
+    class Shortcut(val name: String, val shortcuts: KeyShortcuts, val charShortcuts: Boolean = true)
+
+    // the edited key's outline in the accent colour, over the engine's face
+    private fun outline(ctx: Context) = GradientDrawable().apply {
+        cornerRadius = ctx.dp(8).toFloat()
+        setColor(Color.TRANSPARENT)
+        setStroke(ctx.dp(2), ctx.styledColor(android.R.attr.colorPrimary))
+    }
+
+    private fun sceneKey(ctx: Context, text: String, hint: String, dimmed: Boolean, selected: Boolean, shortcut: Shortcut?) =
+        SceneKeyCell(ctx, ThemeManager.activeTheme).apply {
+            isClickable = false
+            isFocusable = false
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            val function = shortcut != null && '/' !in shortcut.name
+            attrs = KeyAttrs(
+                label = SceneText.Literal(text),
+                alt = hint.takeIf { it.isNotEmpty() }?.let(SceneText::Literal),
+                kind = if (function) "function" else "letter",
+                textSize = CAP_TEXT_SIZE,
+                shortcut = shortcut?.name,
+            )
+            states = setOfNotNull(KeyState.Selected.takeIf { selected }, KeyState.Disabled.takeIf { dimmed })
+            if (shortcut != null) {
+                marks = SceneMarks.settings(
+                    shortcut.shortcuts, AppPrefs.getInstance().keyboard.swipeLayers.getValue().layers, markSpots(), shortcut.charShortcuts, listOf(shortcut.name),
+                )
+            }
+        }
 
     fun label(ctx: Context, text: String, size: Float = 18f) = TextView(ctx).apply {
         this.text = text
@@ -82,16 +128,25 @@ object KeyCaps {
         state: String? = null,
         marks: KeyMarks.Placed<Mark>? = null,
         said: String? = null,
+        shortcut: Shortcut? = null,
     ) = FrameLayout(ctx).apply {
-        background = background(ctx, marked, selected = selected)
         isClickable = true
         isFocusable = true
-        foreground = ctx.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground)).run {
+        val ripple = ctx.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground)).run {
             getDrawable(0).also { recycle() }
         }
         contentDescription = listOfNotNull(text, hint, said).filter { it.isNotEmpty() }.joinToString(", ")
         ViewCompat.setStateDescription(this, state)
         isSelected = selected
+        if (SceneKeyCell.on) {
+            // drawn by the engine as the keyboard draws the key (060-render-p2 S6): its face in the keyboard's
+            // theme, its symbol and shortcut's marks placed by the engine; edited, outlined over it
+            foreground = if (!marked) ripple else LayerDrawable(listOfNotNull(ripple, outline(ctx)).toTypedArray())
+            add(sceneKey(ctx, text, hint, dimmed, selected, shortcut), lParams(matchParent, matchParent))
+            return@apply
+        }
+        background = background(ctx, marked, selected = selected)
+        foreground = ripple
         val label = label(ctx, text, 20f).apply { alpha = if (dimmed) 0.4f else 1f }
         if (marks != null) return@apply addMarked(ctx, label, marks)
         val small = TextView(ctx).apply {

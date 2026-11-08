@@ -211,7 +211,7 @@ class BarUatTest {
         val grid = h.texts(h.inputView)
         // a grid of them, past what the bar showed
         assertTrue(grid.toString(), "字20" in grid)
-        h.capture("BarUatTest/expanded")
+        h.captureBoard("BarUatTest/expanded")
         h.tap(h.text("字20").let { (it.parent as? View)?.takeIf { p -> p.hasOnClickListeners() } ?: it })
         assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("select(20") })
         // the engine moves on: no candidates, the grid gone

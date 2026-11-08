@@ -368,3 +368,18 @@ case("TB-49", needs="jvm:ClipboardSplitUatTest.piecesPickedBySweepingAcross")(la
 
 
 case("TB-50", needs="jvm:ClipboardOrderUatTest.entriesPastedFromThePanelMoveFirstWhenItCloses、ClipboardDaoTest.anUnpinnedEntryUsedComesFirstOfTheUnpinnedAPinnedOneStays")(lambda d: None)
+
+
+@case("TB-51", visual=True)
+def tb51(d):
+    d.type("nihao")
+    time.sleep(0.6)
+    ime(d, desc="展开候选词列表")
+    time.sleep(0.6)
+    d.shot("kb", "展开候选：右侧一列")
+    before = [n.text for n in d.screen().ime() if n.text]
+    ime(d, desc="更多候选词", after=0.8)
+    after = [n.text for n in d.screen().ime() if n.text]
+    check(before != after, f"翻页前后一样 {before[:6]}")
+    d.shot("kb", "下一页")
+    return f"翻页 {before[:3]} → {after[:3]}"

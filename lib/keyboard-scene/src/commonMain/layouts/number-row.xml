@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  密码框时栏上的数字行（NumberRow，060-render-p2 S6），板 number-row。一行 1…0，无键面、无间隙（face="none" margin="false"，
+  同旧的 Border.Off、margin=false），按下有气泡。数字发 sym:<数字>（同旧的 SymAction(KeySym(数字))，不是小键盘的）。
+  右滑收起由 NumberRow 自己在场景的触摸之前拦下（checkGesture）。板底不画：下面是栏的颜色。
+-->
+<keyboard xmlns="https://youmo-ime/layout/1" id="number-row" name="数字行" family="number-row" columns="10">
+  <defaults kind="letter" text-size="21" face="none" margin="false"/>
+  <row>
+    <key id="1" label="1" send="sym:1"/>
+    <key id="2" label="2" send="sym:2"/>
+    <key id="3" label="3" send="sym:3"/>
+    <key id="4" label="4" send="sym:4"/>
+    <key id="5" label="5" send="sym:5"/>
+    <key id="6" label="6" send="sym:6"/>
+    <key id="7" label="7" send="sym:7"/>
+    <key id="8" label="8" send="sym:8"/>
+    <key id="9" label="9" send="sym:9"/>
+    <key id="0" label="0" send="sym:0"/>
+  </row>
+</keyboard>

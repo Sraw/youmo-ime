@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  表情搜索的字母键（EmojiSearchUi.Keyboard，060-render-p2 S6），板 emoji-search。三行字母，键的动作交给面板（PickerWindow 的
+  EmojiSearchQuery）：字母键是 key:（HostKeyAction，面板按字母拼查询），按下有气泡，不弹长按键盘（popups="off"，旧 LetterKey 只有气泡）。
+  第三行：返回 15（emoji-search:off，字在 Shift 的位置，所以这一行和字母一样宽）、z…m、⌫ 15。
+  ⌫ 不写 role="backspace"：它只删查询，旁滑不选字段里的字（旧的 Backspace 键不是 BackspaceKey，没有选字滑动）；
+  按住连删时 App 给的动作带 Repeat 状态（EmojiSearchUi 的 sceneTable.repeat），面板据此清空查询而不删到字段里。
+  不画快捷角标：搜索键没有快捷键。
+-->
+<keyboard xmlns="https://youmo-ime/layout/1" id="emoji-search" name="表情搜索" family="emoji-search" columns="10" popups="off">
+  <defaults kind="letter" text-size="23"/>
+  <row>
+    <key id="q" label="q" send="q"/>
+    <key id="w" label="w" send="w"/>
+    <key id="e" label="e" send="e"/>
+    <key id="r" label="r" send="r"/>
+    <key id="t" label="t" send="t"/>
+    <key id="y" label="y" send="y"/>
+    <key id="u" label="u" send="u"/>
+    <key id="i" label="i" send="i"/>
+    <key id="o" label="o" send="o"/>
+    <key id="p" label="p" send="p"/>
+  </row>
+  <row>
+    <key id="a" label="a" send="a"/>
+    <key id="s" label="s" send="s"/>
+    <key id="d" label="d" send="d"/>
+    <key id="f" label="f" send="f"/>
+    <key id="g" label="g" send="g"/>
+    <key id="h" label="h" send="h"/>
+    <key id="j" label="j" send="j"/>
+    <key id="k" label="k" send="k"/>
+    <key id="l" label="l" send="l"/>
+  </row>
+  <row>
+    <key id="back" role="back" kind="function" width="1.5" label="{back}" text-size="16" text-style="bold" send="emoji-search:off"/>
+    <key id="z" label="z" send="z"/>
+    <key id="x" label="x" send="x"/>
+    <key id="c" label="c" send="c"/>
+    <key id="v" label="v" send="v"/>
+    <key id="b" label="b" send="b"/>
+    <key id="n" label="n" send="n"/>
+    <key id="m" label="m" send="m"/>
+    <key id="backspace" kind="function" width="1.5" icon="backspace" a11y="a11y_key_backspace" sound="delete" send="sym:BackSpace" repeat="true"/>
+  </row>
+</keyboard>

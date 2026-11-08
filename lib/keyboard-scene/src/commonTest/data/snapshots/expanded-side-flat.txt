@@ -1,0 +1,47 @@
+scene 1080x702 no-preview no-popups
+base
+  fill rect(0,0,1080,702) #ffeceff1
+key page-up kind=function a11y="a11y_candidates_prev_page"
+  bounds 0,0,1080,176
+  shape rect(7.88,18.38,1072.13,157.63)
+  hit rect(0,0,1080,176)
+  anchor 540,88 up 0,-1
+  actions send="action:page-up"
+  normal
+    icon arrow-upward 508.5,56.5,571.5,119.5 #ff7a858a
+  pressed
+    +0 fill rect(7.88,18.38,1072.13,157.63) #1f000000
+key page-down kind=function a11y="a11y_candidates_next_page"
+  bounds 0,176,1080,351
+  shape rect(7.88,194.38,1072.13,332.63)
+  hit rect(0,176,1080,351)
+  anchor 540,263.5 up 0,-1
+  actions send="action:page-down"
+  normal
+    icon arrow-downward 508.5,232,571.5,295 #ff7a858a
+  pressed
+    +0 fill rect(7.88,194.38,1072.13,332.63) #1f000000
+key backspace kind=function role=backspace a11y="a11y_key_backspace"
+  bounds 0,351,1080,527
+  shape rect(7.88,369.38,1072.13,508.63)
+  hit rect(0,351,1080,527)
+  anchor 540,439 up 0,-1
+  actions repeat="true" send="sym:BackSpace" swipe-axis="both"
+  sound=delete
+  normal
+    icon backspace 508.5,407.5,571.5,470.5 #ff7a858a
+  pressed
+    +0 fill rect(7.88,369.38,1072.13,508.63) #1f000000
+key enter kind=enter role=enter a11y="换行"
+  bounds 0,527,1080,702
+  shape rect(494.06,568.56,585.94,660.44 r=45.94,45.94,45.94,45.94)
+  hit rect(0,527,1080,702)
+  anchor 540,614.5 up 0,-1
+  actions send="sym:Return"
+  sound=return
+  menu "Emoji" icon=emoji do="picker:"
+  normal
+    fill rect(494.06,568.56,585.94,660.44 r=45.94,45.94,45.94,45.94) #ff5cb5ab
+    icon enter 508.5,583,571.5,646 #ffffffff
+  pressed
+    +1 fill rect(494.06,568.56,585.94,660.44 r=45.94,45.94,45.94,45.94) #1f000000

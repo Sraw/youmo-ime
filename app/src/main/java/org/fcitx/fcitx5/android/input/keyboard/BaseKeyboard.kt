@@ -12,6 +12,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.accessibility.AccessibilityEvent
 import androidx.annotation.CallSuper
+import androidx.annotation.DrawableRes
 import androidx.annotation.Keep
 import androidx.annotation.VisibleForTesting
 import androidx.constraintlayout.widget.ConstraintLayout
@@ -637,6 +638,7 @@ abstract class BaseKeyboard(
         val view = board.view(keyImages, ::sceneString, { node -> sceneKey(node) }) { onSceneBuilt(it) }
         releaseAllTouchTargets()
         spaceKeys.removeAll { it is SceneKey }
+        view.drawsBase = sceneDrawsBase
         canvas = view
         sceneKeys.byNodes(view, sceneTable) { old -> spaceKeys.remove(old) }
         keyRows.forEach { it.visibility = View.INVISIBLE }
@@ -656,6 +658,23 @@ abstract class BaseKeyboard(
      */
     protected open fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env =
         SceneEnvs.of(this, look, theme.isDark, width, height, Input(), marks = SceneBoard.marks(layout, charShortcutMarks))
+
+    /** Return's view shown as [appearance], while the views draw the keys (S8 deletes it with them); the scene's is the keyboard's env. */
+    protected fun showReturnView(appearance: ReturnKeyAppearance) {
+        if (canvas == null) findViewById<ImageKeyView>(R.id.button_return)?.showReturnAction(appearance)
+    }
+
+    /** The image key [id]'s view, while the views draw the keys, shown as [icon] and said as [description] (S8 deletes it with them). */
+    protected fun showImageView(id: Int, @DrawableRes icon: Int, description: String) {
+        if (canvas != null) return
+        findViewById<ImageKeyView>(id)?.apply {
+            img.setImageResource(icon)
+            contentDescription = description
+        }
+    }
+
+    /** Whether the canvas draws its board's fill under the keys ([KeyboardCanvasView.drawsBase]): a row or a column laid on its own background, not. */
+    protected open val sceneDrawsBase: Boolean get() = true
 
     /** A scene made anew for the canvas ([scene]; null, none drawn): what a keyboard places by it, placed again. */
     internal open fun onSceneBuilt(scene: Scene?) {}

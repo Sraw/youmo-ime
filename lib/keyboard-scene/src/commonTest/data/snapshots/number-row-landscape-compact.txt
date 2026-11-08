@@ -1,0 +1,113 @@
+scene 2340x367
+base
+  fill rect(0,0,2340,367) #ffeceff1
+key 1 kind=letter a11y="1"
+  bounds 0,0,234,367
+  shape rect(0,0,234,367 r=10.5,10.5,10.5,10.5)
+  hit rect(0,0,234,367)
+  anchor 117,183.5 up 0,-1
+  actions send="sym:1"
+  text label="1"
+  normal
+    text "1" 102.12,202.1 system 400 49.61 #ff37474f
+  pressed
+    +0 fill rect(0,0,234,367 r=10.5,10.5,10.5,10.5) #1f000000
+key 2 kind=letter a11y="2"
+  bounds 234,0,468,367
+  shape rect(234,0,468,367 r=10.5,10.5,10.5,10.5)
+  hit rect(234,0,468,367)
+  anchor 351,183.5 up 0,-1
+  actions send="sym:2"
+  text label="2"
+  normal
+    text "2" 336.12,202.1 system 400 49.61 #ff37474f
+  pressed
+    +0 fill rect(234,0,468,367 r=10.5,10.5,10.5,10.5) #1f000000
+key 3 kind=letter a11y="3"
+  bounds 468,0,702,367
+  shape rect(468,0,702,367 r=10.5,10.5,10.5,10.5)
+  hit rect(468,0,702,367)
+  anchor 585,183.5 up 0,-1
+  actions send="sym:3"
+  text label="3"
+  normal
+    text "3" 570.12,202.1 system 400 49.61 #ff37474f
+  pressed
+    +0 fill rect(468,0,702,367 r=10.5,10.5,10.5,10.5) #1f000000
+key 4 kind=letter a11y="4"
+  bounds 702,0,936,367
+  shape rect(702,0,936,367 r=10.5,10.5,10.5,10.5)
+  hit rect(702,0,936,367)
+  anchor 819,183.5 up 0,-1
+  actions send="sym:4"
+  text label="4"
+  normal
+    text "4" 804.12,202.1 system 400 49.61 #ff37474f
+  pressed
+    +0 fill rect(702,0,936,367 r=10.5,10.5,10.5,10.5) #1f000000
+key 5 kind=letter a11y="5"
+  bounds 936,0,1170,367
+  shape rect(936,0,1170,367 r=10.5,10.5,10.5,10.5)
+  hit rect(936,0,1170,367)
+  anchor 1053,183.5 up 0,-1
+  actions send="sym:5"
+  text label="5"
+  normal
+    text "5" 1038.12,202.1 system 400 49.61 #ff37474f
+  pressed
+    +0 fill rect(936,0,1170,367 r=10.5,10.5,10.5,10.5) #1f000000
+key 6 kind=letter a11y="6"
+  bounds 1170,0,1404,367
+  shape rect(1170,0,1404,367 r=10.5,10.5,10.5,10.5)
+  hit rect(1170,0,1404,367)
+  anchor 1287,183.5 up 0,-1
+  actions send="sym:6"
+  text label="6"
+  normal
+    text "6" 1272.12,202.1 system 400 49.61 #ff37474f
+  pressed
+    +0 fill rect(1170,0,1404,367 r=10.5,10.5,10.5,10.5) #1f000000
+key 7 kind=letter a11y="7"
+  bounds 1404,0,1638,367
+  shape rect(1404,0,1638,367 r=10.5,10.5,10.5,10.5)
+  hit rect(1404,0,1638,367)
+  anchor 1521,183.5 up 0,-1
+  actions send="sym:7"
+  text label="7"
+  normal
+    text "7" 1506.12,202.1 system 400 49.61 #ff37474f
+  pressed
+    +0 fill rect(1404,0,1638,367 r=10.5,10.5,10.5,10.5) #1f000000
+key 8 kind=letter a11y="8"
+  bounds 1638,0,1872,367
+  shape rect(1638,0,1872,367 r=10.5,10.5,10.5,10.5)
+  hit rect(1638,0,1872,367)
+  anchor 1755,183.5 up 0,-1
+  actions send="sym:8"
+  text label="8"
+  normal
+    text "8" 1740.12,202.1 system 400 49.61 #ff37474f
+  pressed
+    +0 fill rect(1638,0,1872,367 r=10.5,10.5,10.5,10.5) #1f000000
+key 9 kind=letter a11y="9"
+  bounds 1872,0,2106,367
+  shape rect(1872,0,2106,367 r=10.5,10.5,10.5,10.5)
+  hit rect(1872,0,2106,367)
+  anchor 1989,183.5 up 0,-1
+  actions send="sym:9"
+  text label="9"
+  normal
+    text "9" 1974.12,202.1 system 400 49.61 #ff37474f
+  pressed
+    +0 fill rect(1872,0,2106,367 r=10.5,10.5,10.5,10.5) #1f000000
+key 0 kind=letter a11y="0"
+  bounds 2106,0,2340,367
+  shape rect(2106,0,2340,367 r=10.5,10.5,10.5,10.5)
+  hit rect(2106,0,2340,367)
+  anchor 2223,183.5 up 0,-1
+  actions send="sym:0"
+  text label="0"
+  normal
+    text "0" 2208.12,202.1 system 400 49.61 #ff37474f
+  pressed
+    +0 fill rect(2106,0,2340,367 r=10.5,10.5,10.5,10.5) #1f000000

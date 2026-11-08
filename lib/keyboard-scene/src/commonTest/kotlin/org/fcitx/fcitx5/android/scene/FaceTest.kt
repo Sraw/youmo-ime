@@ -169,10 +169,22 @@ class FaceTest {
         ).ok()
         val lang = Fixtures.scene(e, theme = t).keys.first { it.id == "lang" }
         assertEquals(setOf(KeyState.On, KeyState.Disabled), lang.states)
-        assertTrue(lang.ops(false).any { it is Op.Fill && it.color == Argb(0xFF00FF00.toInt()) })
-        assertTrue(lang.ops(true).any { it is Op.Fill && it.color == Argb(0xFF00FF00.toInt()) }, "pressed keeps the others")
+        // its fill the style's, faded as it takes no press (S6)
+        val green = { op: Op -> op is Op.Fill && op.color.value and 0xFFFFFF == 0x00FF00 && (op.color.value ushr 24) < 0xFF }
+        assertTrue(lang.ops(false).any(green), "${lang.ops(false)}")
+        assertTrue(lang.ops(true).any(green), "pressed keeps the others")
         val shift = Fixtures.scene(Fixtures.portrait.copy(shift = org.fcitx.fcitx5.android.scene.engine.Shift.Lock)).keys.first { it.id == "shift" }
         assertEquals(setOf(KeyState.Locked), shift.states)
+    }
+
+    // a key the app says takes no press now: every op of its face faded, none drawn at full alpha as an enabled one is
+    @Test
+    fun aDisabledKeyIsFaded() {
+        val shown = Fixtures.scene(Fixtures.portrait).keys.first { it.id == "lang" }.ops(false)
+        val off = Fixtures.scene(Fixtures.portrait.copy(states = mapOf("lang" to setOf(KeyState.Disabled)))).keys.first { it.id == "lang" }.ops(false)
+        assertEquals(shown.size, off.size)
+        assertTrue(shown.any { it is Op.Fill && (it.color.value ushr 24) == 0xFF }, "$shown")
+        assertTrue(off.none { it is Op.Fill && (it.color.value ushr 24) == 0xFF }, "$off")
     }
 
     @Test

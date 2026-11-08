@@ -72,7 +72,7 @@ class SceneTouchTest {
     }
 
     private fun KeyboardHarness.canvas(): KeyboardCanvasView? =
-        KeyboardHarness.all(inputView).filterIsInstance<KeyboardCanvasView>().firstOrNull()
+        KeyboardHarness.boardCanvas(inputView)
 
     private fun KeyboardHarness.textKeyboard(): TextKeyboard = KeyboardHarness.all(inputView).filterIsInstance<TextKeyboard>().first()
 

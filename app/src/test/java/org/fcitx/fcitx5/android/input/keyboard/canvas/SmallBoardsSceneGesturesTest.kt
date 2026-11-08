@@ -1,0 +1,205 @@
+/*
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+ */
+package org.fcitx.fcitx5.android.input.keyboard.canvas
+
+import android.text.InputType
+import android.view.View
+import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.core.CandidateWord
+import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.bar.ui.idle.NumberRow
+import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateLayout
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardCanvasViewTest
+import org.fcitx.fcitx5.android.input.picker.EmojiSearchUi
+import org.fcitx.fcitx5.android.input.picker.PickerGridView
+import org.fcitx.fcitx5.android.scene.KeyState
+import org.fcitx.fcitx5.android.uat.PrefsRule
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+
+/**
+ * The small boards 060-render-p2 S6 moved to the scene (表情搜索's letters, 展开候选's column, the
+ * password field's number row, the symbol grid's cells): the same gestures on each drawing give the
+ * same output, and that output is what each key is for (the expected values written here, not read
+ * from either drawing).
+ */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(application = FcitxApplication::class, qualifiers = KeyboardCanvasViewTest.PORTRAIT)
+class SmallBoardsSceneGesturesTest {
+
+    @get:Rule
+    val prefs = PrefsRule()
+
+    private fun both(what: (Boolean) -> List<String>): List<String> {
+        val (views, scene) = listOf(false, true).map { on ->
+            prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, on)
+            what(on)
+        }
+        assertEquals(views.joinToString("\n"), scene.joinToString("\n"))
+        return scene
+    }
+
+    // whether [root] has a canvas shown: the scene draws it, or the views
+    private fun drawnByScene(root: View) = KeyboardHarness.all(root).any { it is KeyboardCanvasView && it.visibility == View.VISIBLE }
+
+    private fun KeyboardHarness.sent() = api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
+
+    @Test
+    fun emojiSearch() {
+        val out = both { on ->
+            KeyboardHarness().start().use { h ->
+                // text in the field before: a held ⌫ clears the query and stops there, never deleting into it
+                h.field.setText("ab")
+                h.field.setSelection(2)
+                h.idle()
+                h.tap(h.described(h.service.getString(R.string.a11y_key_emoji)))
+                h.tap(h.described(h.service.getString(R.string.emoji_search)))
+                val search = KeyboardHarness.find<EmojiSearchUi>(h.inputView)!!
+                assertEquals(on, drawnByScene(search))
+                val keys = h.keys(search)
+                val out = mutableListOf("keys ${keys.map { it.label ?: it.description }}")
+                for (c in "xiao") h.tap(keys.single { it.label == c.toString() })
+                out += "xiao: ${"😄" in h.texts(search)}"
+                h.tap(h.keys(search).single { it.description == "Backspace" })
+                out += "⌫: ${h.texts(search).take(3)} field '${h.field.text}'"
+                // held: the query cleared, the field kept
+                h.press(h.keys(search).single { it.description == "Backspace" })
+                h.after(3000)
+                h.release()
+                out += "⌫ held: ${h.texts(search).take(3)} field '${h.field.text}' engine ${h.sent()}"
+                h.tap(h.keys(search).single { it.label == h.service.getString(R.string.picker_back) })
+                out += "back: search ${KeyboardHarness.find<EmojiSearchUi>(h.inputView)?.let(h::shown) == true}"
+                out
+            }
+        }
+        // independently: 26 letters, 返回 and ⌫; xiao finds 😄; the field's ab kept, nothing typed into it nor deleted; 返回 closes the search
+        assertEquals(28, out[0].removePrefix("keys [").removeSuffix("]").split(", ").size)
+        assertEquals("xiao: true", out[1])
+        assertTrue(out.toString(), out.all { "field 'ab'" in it || !it.contains("field") })
+        assertTrue(out.toString(), out.last() == "back: search false")
+    }
+
+    @Test
+    fun expandedColumn() {
+        val out = both { on ->
+            KeyboardHarness().start().use { h ->
+                h.candidates(*Array(80) { "字$it" })
+                h.tap(h.described(h.service.getString(R.string.expand_candidates_list)))
+                val side = KeyboardHarness.find<ExpandedCandidateLayout.Keyboard>(h.inputView)!!
+                assertEquals(on, drawnByScene(side))
+                val up = { h.keys(side).single { it.description == h.service.getString(R.string.a11y_candidates_prev_page) } }
+                val down = { h.keys(side).single { it.description == h.service.getString(R.string.a11y_candidates_next_page) } }
+                val list = KeyboardHarness.find<ExpandedCandidateLayout>(h.inputView)!!.recyclerView
+                // the first candidate wholly in sight, as the list has it
+                val first = {
+                    val rv = list
+                    val at = (0 until rv.childCount).map(rv::getChildAt).filter { it.top >= 0 }.minOf(rv::getChildAdapterPosition)
+                    "字$at"
+                }
+                val out = mutableListOf("keys ${h.keys(side).map { it.description }}", "first ${first()}")
+                if (on) out += "up disabled ${KeyState.Disabled in KeyboardHarness.find<KeyboardCanvasView>(side)!!.keyAt("page-up")!!.states}"
+                // what the column sends to a finger (not a click: a screen reader's): none from a page that cannot
+                // turn, its view disabled, the scene's key :disabled and faded
+                val acts = mutableListOf<String>()
+                val was = side.keyActionListener
+                side.keyActionListener = org.fcitx.fcitx5.android.input.keyboard.KeyActionListener { a, src -> acts += a.toString(); was?.onKeyAction(a, src) }
+                h.press(up())
+                h.release()
+                out += "up at the top: first ${first()} sent $acts"
+                h.tap(down())
+                h.after(1000)
+                h.relayout()
+                val paged = first()
+                out += "down: moved ${paged != "字0"}"
+                h.tap(up())
+                h.after(1000)
+                h.relayout()
+                out += "up: first ${first()}"
+                h.api.calls.clear()
+                h.tap(h.keys(side).single { it.description == "Backspace" })
+                h.tap(h.keys(side).single { it.description?.startsWith("Enter") == true || it.resourceName == "button_return" || it.id == "enter" })
+                out += "sent ${h.sent().map { it.substringAfter("sym=").substringBefore(',') }}"
+                out.filterNot { it.startsWith("up disabled") }.also { if (on) assertTrue(out.toString(), "up disabled true" in out) }
+            }
+        }
+        // independently: a page down moves past 字0, a page up at the top does nothing and back again goes to 字0;
+        // ⌫ and Return reach the engine as BackSpace (0xff08) and Return (0xff0d)
+        assertEquals("first 字0", out[1])
+        assertEquals("up at the top: first 字0 sent []", out[2])
+        assertEquals("down: moved true", out[3])
+        assertEquals("up: first 字0", out[4])
+        assertEquals("sent [${0xff08}, ${0xff0d}]", out[5])
+    }
+
+    private fun KeyboardHarness.candidates(vararg words: String) {
+        api.candidates = Array(words.size) { CandidateWord("", words[it], "") }
+        emit(HostEvent.Candidates(words.size, api.candidates.toList()))
+    }
+
+    private fun password(h: KeyboardHarness) {
+        h.start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
+        h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
+    }
+
+    @Test
+    fun numberRow() {
+        val out = both { on ->
+            KeyboardHarness().use { h ->
+                password(h)
+                val row = KeyboardHarness.find<NumberRow>(h.inputView)!!
+                assertEquals(on, drawnByScene(row))
+                val keys = h.keys(row)
+                val out = mutableListOf("keys ${keys.map { it.label }}")
+                h.api.calls.clear()
+                h.tap(keys.single { it.label == "1" })
+                h.tap(keys.single { it.label == "0" })
+                out += "sent ${h.sent().map { it.substringAfter("sym=").substringBefore(',') }}"
+                // swiped right across it: collapsed, nothing typed
+                h.api.calls.clear()
+                val one = h.keys(row).single { it.label == "1" }
+                h.drag(one, one.bounds.exactCenterX() + row.width * 0.6f, one.bounds.exactCenterY())
+                out += "swiped: row ${h.shown(row)} sent ${h.sent()}"
+                out
+            }
+        }
+        // independently: XK_1 is 0x31, XK_0 0x30 (the digits' own, not the keypad's)
+        assertEquals("keys [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]", out[0])
+        assertEquals("sent [${0x31}, ${0x30}]", out[1])
+        assertEquals("swiped: row false sent []", out[2])
+    }
+
+    @Test
+    fun symbolGrid() {
+        val out = both { on ->
+            KeyboardHarness().start().use { h ->
+                h.tap(h.key("符"))
+                h.relayout()
+                val grid = KeyboardHarness.find<PickerGridView>(h.inputView)!!
+                assertEquals(on, KeyboardHarness.all(grid).any { it is SceneKeyCell })
+                val cells = KeyboardHarness.all(grid).filter { it is SceneKeyCell || it is org.fcitx.fcitx5.android.input.keyboard.TextKeyView }
+                    .filter(h::shown).toList()
+                val label = { v: View -> if (v is SceneKeyCell) v.keyNode?.label.orEmpty() else (v as org.fcitx.fcitx5.android.input.keyboard.TextKeyView).mainText.text.toString() }
+                val labels = cells.map(label)
+                val out = mutableListOf("cells ${labels.take(12)}")
+                val comma = cells.first { label(it) == "，" }
+                h.tap(comma)
+                out += "tap: field '${h.field.text}'"
+                out
+            }
+        }
+        // independently: a tap on ， commits ，
+        assertEquals("tap: field '，'", out[1])
+    }
+}

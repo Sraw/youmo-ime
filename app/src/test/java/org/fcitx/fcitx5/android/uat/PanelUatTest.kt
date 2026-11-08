@@ -58,10 +58,10 @@ class PanelUatTest {
         .filterIsInstance<TextView>().filter { h.shown(it) }.map { it.text.toString() }.toList()
 
     // the grid binds only the rows on screen: scrolled down a row at a time till the key is among them
-    private fun scrolledTo(label: String): TextKeyView {
+    private fun scrolledTo(label: String): View {
         val grid = KeyboardHarness.find<PickerGridView>(h.inputView)!!
         repeat(30) {
-            KeyboardHarness.all(grid).filterIsInstance<TextKeyView>().firstOrNull { it.mainText.text.toString() == label }?.let { return it }
+            KeyboardHarness.cells(grid).firstOrNull { KeyboardHarness.cellText(it) == label }?.let { return it }
             grid.scrollBy(0, grid.height / 3)
             h.relayout()
         }
@@ -175,8 +175,8 @@ class PanelUatTest {
         h.tap(h.key("符"))
         h.tap(textView("Recent"))
         val grid = KeyboardHarness.find<PickerGridView>(h.inputView)!!
-        val first = KeyboardHarness.all(grid).filterIsInstance<TextKeyView>().first { h.shown(it) && it.mainText.text.isNotEmpty() }
-        assertEquals("★", first.mainText.text.toString())
+        val first = KeyboardHarness.cells(grid).first { h.shown(it) && KeyboardHarness.cellText(it).isNotEmpty() }
+        assertEquals("★", KeyboardHarness.cellText(first))
     }
 
     @Test
@@ -227,7 +227,7 @@ class PanelUatTest {
         for (c in "xiao") h.tap(h.key(c.toString()))
         val row = { KeyboardHarness.find<EmojiSearchUi>(h.inputView)!!.let { ui -> h.texts(ui) } }
         assertTrue(row().toString(), "😄" in row())
-        h.capture("PanelUatTest/emoji_search_xiao")
+        h.captureBoard("PanelUatTest/emoji_search_xiao")
         val search = KeyboardHarness.find<EmojiSearchUi>(h.inputView)!!
         val backspace = KeyboardHarness.all(search).first { it.contentDescription == "Backspace" }
         repeat(4) { h.tap(backspace) }
@@ -240,8 +240,8 @@ class PanelUatTest {
         val tabs = KeyboardHarness.find<PickerLayout>(h.inputView)!!.tabsUi.root
         h.tap(tabs.getChildAt(0))
         val grid = KeyboardHarness.find<PickerGridView>(h.inputView)!!
-        val first = KeyboardHarness.all(grid).filterIsInstance<TextKeyView>().first { h.shown(it) && it.mainText.text.isNotEmpty() }
-        assertEquals("👍", first.mainText.text.toString())
+        val first = KeyboardHarness.cells(grid).first { h.shown(it) && KeyboardHarness.cellText(it).isNotEmpty() }
+        assertEquals("👍", KeyboardHarness.cellText(first))
     }
 
     @Test
@@ -272,7 +272,7 @@ class PanelUatTest {
         fun recent(): List<String> {
             h.tap(KeyboardHarness.find<PickerLayout>(h.inputView)!!.tabsUi.root.getChildAt(0))
             val grid = KeyboardHarness.find<PickerGridView>(h.inputView)!!
-            return KeyboardHarness.all(grid).filterIsInstance<TextKeyView>().filter { h.shown(it) }.map { it.mainText.text.toString() }.toList()
+            return KeyboardHarness.cells(grid).filter { h.shown(it) }.map(KeyboardHarness::cellText).toList()
         }
         open(); nature(); h.tap(scrolledTo("🐱"))
         h.tap(h.key("ABC"))

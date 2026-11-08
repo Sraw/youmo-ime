@@ -15,7 +15,6 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.BackspaceKey
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
-import org.fcitx.fcitx5.android.input.keyboard.ImageKeyView
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.keyboard.LayoutSwitchKey
@@ -26,7 +25,6 @@ import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
-import org.fcitx.fcitx5.android.input.keyboard.showReturnAction
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.scene.KeyState
@@ -72,11 +70,6 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
             name = SYMBOL_NAMES[symbol],
         )
 
-        val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
-
-        /** the symbol panel's lock, none in the emoji's */
-        val lock: ImageKeyView? by lazy { findViewById(R.id.button_panel_lock) }
-
         // as last shown: the scene's lock and Return too
         private var locked = false
         private var returnAppearance = ReturnKeyAppearance.Enter
@@ -84,16 +77,17 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
         fun showLocked(locked: Boolean) {
             this.locked = locked
             canvas?.invalidateScene()
-            lock?.apply {
-                img.setImageResource(if (locked) R.drawable.ic_baseline_lock_24 else R.drawable.ic_baseline_lock_open_24)
-                // what a tap does
-                contentDescription = context.getString(if (locked) R.string.picker_unlock else R.string.picker_lock)
-            }
+            // the symbol panel's lock, none in the emoji's; what a tap does said
+            showImageView(
+                R.id.button_panel_lock,
+                if (locked) R.drawable.ic_baseline_lock_24 else R.drawable.ic_baseline_lock_open_24,
+                context.getString(if (locked) R.string.picker_unlock else R.string.picker_lock),
+            )
         }
 
         override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
             returnAppearance = appearance
-            `return`.showReturnAction(appearance)
+            showReturnView(appearance)
             canvas?.invalidateScene()
         }
 

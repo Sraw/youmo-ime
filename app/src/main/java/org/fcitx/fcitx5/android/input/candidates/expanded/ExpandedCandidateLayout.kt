@@ -8,6 +8,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.Configuration
 import android.view.Gravity
+import android.view.View
 import androidx.constraintlayout.widget.ConstraintLayout
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
@@ -15,11 +16,21 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.BackspaceKey
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
-import org.fcitx.fcitx5.android.input.keyboard.ImageKeyView
 import org.fcitx.fcitx5.android.input.keyboard.ImageLayoutSwitchKey
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
+import org.fcitx.fcitx5.android.input.keyboard.SceneKeyDef
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
+import org.fcitx.fcitx5.android.input.theme.ThemeLook
+import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.KeyState
+import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.Input
+import org.fcitx.fcitx5.android.scene.engine.MarkSettings
+import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.input.keyboard.ReturnKey
-import org.fcitx.fcitx5.android.input.keyboard.showReturnAction
 import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import org.fcitx.fcitx5.android.utils.singleSideBorderDrawable
 import splitties.dimensions.dp
@@ -42,8 +53,15 @@ class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout
             const val UpBtnLabel = "U"
             const val DownBtnLabel = "D"
 
-            const val UpBtnId = 0xff55
-            const val DownBtnId = 0xff56
+            /** The pages' keys in expanded-side.xml (060-render-p2 S6): their ids, and what a tap on each sends. */
+            const val UP_KEY = "page-up"
+            const val DOWN_KEY = "page-down"
+
+            /** The column drawn by the scene where the canvas is on. */
+            const val LAYOUT = "expanded-side"
+
+            private const val UpBtnId = 0xff55
+            private const val DownBtnId = 0xff56
 
             val Layout: List<List<KeyDef>> = listOf(
                 listOf(
@@ -69,15 +87,57 @@ class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout
                 listOf(BackspaceKey(percentWidth = 1f, KeyDef.Appearance.Variant.Alternative)),
                 listOf(ReturnKey(percentWidth = 1f))
             )
+
+            private val PAGES = mapOf(UP_KEY to KeyAction.LayoutSwitchAction(UpBtnLabel), DOWN_KEY to KeyAction.LayoutSwitchAction(DownBtnLabel))
+            private val NO_MARKS = MarkSettings(shortcuts = emptyMap())
         }
 
-        val pageUpBtn: ImageKeyView by lazy { findViewById(UpBtnId) }
-        val pageDnBtn: ImageKeyView by lazy { findViewById(DownBtnId) }
-        val backspace: ImageKeyView by lazy { findViewById(R.id.button_backspace) }
-        val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
+        // the views' (the canvas off): S8 deletes them with the rows
+        private val pageUpView: View by lazy { findViewById(UpBtnId) }
+        private val pageDownView: View by lazy { findViewById(DownBtnId) }
+
+        private var returnAppearance = ReturnKeyAppearance.Enter
+        private var upEnabled = true
+        private var downEnabled = true
+
+        /** Whether a page up / down turns the list now: the key faded and taking no touch where not. */
+        fun showPages(up: Boolean, down: Boolean) {
+            if (up == upEnabled && down == downEnabled) return
+            upEnabled = up
+            downEnabled = down
+            canvas?.invalidateScene()
+            if (canvas == null) {
+                pageUpView.isEnabled = up
+                pageDownView.isEnabled = down
+            }
+        }
 
         override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
-            `return`.showReturnAction(appearance)
+            returnAppearance = appearance
+            canvas?.invalidateScene()
+            showReturnView(appearance)
+        }
+
+        override val sceneTable: SceneKeyDef.Table get() = Pages
+
+        private object Pages : SceneKeyDef.Table {
+            override fun action(name: String, node: KeyNode): KeyAction? = PAGES[name]
+        }
+
+        // laid on the panel's colour and its divider, not a keyboard's fill
+        override val sceneDrawsBase: Boolean get() = false
+
+        // Return, the pages that cannot turn `:disabled`; no marks (the column's keys reach no shortcut)
+        override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env {
+            val texts = Texts(returnLabel = returnAppearance.label(context).toString(), returnIcon = SceneIcons.returnName(returnAppearance.icon))
+            val env = SceneEnvs.of(this, look, theme.isDark, width, height, Input(), texts = texts, marks = NO_MARKS)
+            val disabled = listOfNotNull(UP_KEY.takeIf { !upEnabled }, DOWN_KEY.takeIf { !downEnabled })
+            return if (disabled.isEmpty()) env else env.copy(states = disabled.associateWith { setOf(KeyState.Disabled) })
+        }
+
+        // last: the scene reads the keyboard's state
+        init {
+            drawKeysWithScene(LAYOUT)
         }
     }
 
@@ -88,13 +148,7 @@ class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout
         isVerticalScrollBarEnabled = false
     }
 
-    var pageUpBtn: ImageKeyView
-    var pageDnBtn: ImageKeyView
-
-    val embeddedKeyboard = Keyboard(context, theme).also {
-        pageUpBtn = it.pageUpBtn
-        pageDnBtn = it.pageDnBtn
-    }
+    val embeddedKeyboard = Keyboard(context, theme)
 
     init {
         id = R.id.expanded_candidate_view
