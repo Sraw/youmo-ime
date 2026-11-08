@@ -170,8 +170,12 @@ class LetterCaseScreenshotTest {
         assertEquals(lower, typed(LetterCaseChoice.Upper, shift = false))
         assertEquals(upper, typed(LetterCaseChoice.Lower, shift = true))
         val fourteen = ImKeyboards.Chosen(pinyin = ImKeyboard.KEYS14)
-        assertEquals(typed(LetterCaseChoice.Shift, false, fourteen, "r1c1"), typed(LetterCaseChoice.Lower, false, fourteen, "r1c1"))
-        assertEquals(typed(LetterCaseChoice.Shift, false, KeyboardHarness.NINE_KEYS, "2"), typed(LetterCaseChoice.Lower, false, KeyboardHarness.NINE_KEYS, "2"))
+        val group = typed(LetterCaseChoice.Shift, false, fourteen, "r1c1")
+        val nine = typed(LetterCaseChoice.Shift, false, KeyboardHarness.NINE_KEYS, "2")
+        group.single()
+        nine.single()
+        assertEquals(group, typed(LetterCaseChoice.Lower, false, fourteen, "r1c1"))
+        assertEquals(nine, typed(LetterCaseChoice.Lower, false, KeyboardHarness.NINE_KEYS, "2"))
     }
 
     // 五笔's roots shown: z has none, its letter drawn as the setting says, read as following Shift has it

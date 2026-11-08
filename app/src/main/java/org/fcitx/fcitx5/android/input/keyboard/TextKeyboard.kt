@@ -249,7 +249,7 @@ class TextKeyboard(
             // the corners and a table's roots
             alts = alts(),
             // a letter with no root left empty: the engine shows it as {case:x} would (Expand's root)
-            other = SceneLetters.roots(table) { "" },
+            other = SceneLetters.roots(table),
             // the formats as they are: the engine fills their places (getString with no arguments formats nothing)
             a11yGrouped = context.getString(R.string.a11y_key_grouped),
             a11ySpace = context.getString(R.string.a11y_key_space_with_ime),

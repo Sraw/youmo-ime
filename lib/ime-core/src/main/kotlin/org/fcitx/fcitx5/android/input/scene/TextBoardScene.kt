@@ -83,9 +83,12 @@ object SceneLetters {
     fun alts(corner: (Char) -> String?): Map<String, String> =
         LETTERS.mapNotNull { c -> corner(c)?.let { c.toString() to it } }.toMap()
 
-    /** `root:x`'s, for Texts.other: none where [table] shows no roots. */
-    fun roots(table: TableKeyboard?, letter: (Char) -> String): Map<String, String> =
-        if (table?.labelled != true) emptyMap() else LETTERS.associate { c -> "root:$c" to (table.label(c) ?: letter(c)) }
+    /**
+     * `root:x`'s, for Texts.other: none where [table] shows no roots; "" for a letter with none, which the
+     * engine's `{root:x}` falls back on `{case:x}` for (the letter as 拼音键字母大小写 and Shift show it).
+     */
+    fun roots(table: TableKeyboard?): Map<String, String> =
+        if (table?.labelled != true) emptyMap() else LETTERS.associate { c -> "root:$c" to table.label(c).orEmpty() }
 }
 
 /** The marks' settings ([MarkSettings]) from the app's: the swipe layers, where marks go, the user's shortcuts. */
