@@ -31,6 +31,13 @@ class EnglishBlocks(private val dir: UserFiles?, private val onError: (IOExcepti
     fun block(texts: Collection<String>): List<String> =
         texts.filter { EnglishText.isWord(it) && words.add(it) }.also { if (it.isNotEmpty()) write() }
 
+    /**
+     * Blocks [shown] as written, the first form of it [known] has (review L1): as shown, its first
+     * letter small (The at a sentence's start: the), all small (THE in capitals: the); as shown for none.
+     */
+    fun blockShown(shown: String, known: (String) -> Boolean): List<String> =
+        block(listOf(sequenceOf(shown, shown.replaceFirstChar(Char::lowercaseChar), shown.lowercase()).firstOrNull(known) ?: shown))
+
     /** Offers each of [texts] again, as written: those that were blocked. */
     fun unblock(texts: Collection<String>): List<String> =
         texts.filter { words.remove(it) }.also { if (it.isNotEmpty()) write() }
