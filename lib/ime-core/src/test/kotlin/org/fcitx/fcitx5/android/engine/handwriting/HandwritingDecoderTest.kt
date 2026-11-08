@@ -254,7 +254,7 @@ class HandwritingDecoderTest {
     }
 
     // the user's one word, 淡话 (dan hua), past the dictionary's
-    private inner class OneWord(private val blocked: Int = -2) : UserWords {
+    private inner class OneWord(private val blocked: Int = -2, private val alsoBlocked: Int = -2) : UserWords {
         val id = data.vocabulary.size
         private val dan = 1
         private val hua = 2
@@ -270,7 +270,7 @@ class HandwritingDecoderTest {
         override fun text(word: Int) = "淡话"
         // blocked as read some other way (行 as hang, not xing): ink has no reading, so blocked anyhow
         override fun blocked(word: Int, node: Int) = false
-        override fun blockedAnyhow(word: Int) = word == blocked
+        override fun blockedAnyhow(word: Int) = word == blocked || word == alsoBlocked
     }
 
     @Test
@@ -293,6 +293,23 @@ class HandwritingDecoderTest {
         assertEquals(listOf("山"), blocking.decode(listOf(read("人", "山"))).sentences)
         // something to put in all the same
         assertEquals(listOf("人"), blocking.decode(listOf(read("人"))).sentences)
+    }
+
+    // 人 blocked, 天人 would show it again as its last: a character blocked is in no word either (review)
+    @Test
+    fun `a character blocked is in no word either`() {
+        val hua = data.wordIndex.find("话")
+        val blocking = handwritingDecoder(OneWord(blocked = hua))
+        val d = blocking.decode(listOf(read("淡", "谈", step = 0.3), read("话", "天")))
+        assertTrue(d.sentences.toString(), d.sentences.none { "话" in it })
+    }
+
+    // every reading of the ink blocked: the ink's best put in all the same, as arcsFrom does, not the rest (review M2)
+    @Test
+    fun `where every reading is blocked only the ink's best goes into a word`() {
+        val blocking = handwritingDecoder(OneWord(blocked = data.wordIndex.find("话"), alsoBlocked = data.wordIndex.find("天")))
+        val d = blocking.decode(listOf(read("淡", step = 0.3), read("天", "话")))
+        assertTrue(d.sentences.toString(), d.sentences.none { "话" in it })
     }
 
     @Test
