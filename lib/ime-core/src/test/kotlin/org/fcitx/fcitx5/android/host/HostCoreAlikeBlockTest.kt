@@ -39,19 +39,30 @@ class HostCoreAlikeBlockTest : EnginesFixture() {
 
     private val clock = VirtualHostClock(epochMillis = 1_800_000_000_000)
 
-    @Test
-    fun `a block on the second page takes the one shown alike and nothing else`() {
-        val engines = Engines(::load, MemoryFiles(), warmUps = inPlace, clock = clock)
+    private val log = mutableListOf<HostEvent>()
+
+    private fun core(engines: Engines): HostCore {
         val converter = ChineseConverterTest.converter(characters = mapOf("国" to "國"))
         val modules = ChineseModules(
             ModuleInputs(PunctuationProfile.parse(""), chttransEnabled = setOf(InputMethodCatalog.PINYIN), converter = { converter }),
         )
         val profile = Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "Default")
         val core = HostCore(EnginesHost(engines), clock, profile, firstRun = true, modules = modules::build)
+        core.events += HostEvents { log += it }
         core.activate(1)
         core.setCapabilities(Capability.PREEDIT or Capability.CLIENT_UNFOCUS_COMMIT)
         core.focus(true)
         "uzps".forEach { core.sendKey(Key(it.code), virtual = true) }
+        return core
+    }
+
+    private fun Engines.underCode() =
+        (learning(null, LearningOp.ListItems(LearningOp.Listed.TABLE_BLOCKS)) as LearningResult.Listed).items.map { it.text }
+
+    @Test
+    fun `a block on the second page takes the one shown alike and nothing else`() {
+        val engines = Engines(::load, MemoryFiles(), warmUps = inPlace, clock = clock)
+        val core = core(engines)
         core.offsetCandidatePage(1)
         val all = core.candidates(0, 30).map { it.text }
         val at = all.indexOf("國")
@@ -66,9 +77,28 @@ class HostCoreAlikeBlockTest : EnginesFixture() {
         assertFalse(core.actOnCandidate(at, EngineEvent.BLOCK, "甲"))
         val done = learning(LearningOp.Block(at, menu.text))
         assertTrue("$done $acts", done is LearningResult.Done)
-        val blocked = (engines.learning(null, LearningOp.ListItems(LearningOp.Listed.TABLE_BLOCKS)) as LearningResult.Listed).items.map { it.text }
+        val blocked = engines.underCode()
         assertEquals("$acts", setOf("国", "國"), blocked.toSet())
         assertEquals(2, blocked.size)
+        engines.close()
+    }
+
+    // the menu of a paged bar (pagingMode 1, the page's index: LearningOp.OnPage), as KotlinHost sends it
+    @Test
+    fun `a paged block takes the one shown alike too`() {
+        val engines = Engines(::load, MemoryFiles(), warmUps = inPlace, clock = clock)
+        val core = core(engines)
+        core.setCandidatePagingMode(1)
+        core.offsetCandidatePage(1)
+        val all = core.candidates(0, 30).map { it.text }
+        val page = log.filterIsInstance<HostEvent.Paged>().last().candidates.map { it.text }
+        val onPage = page.indexOf("國")
+        assertTrue("$all $page", onPage >= 0 && all.indexOf("國") >= 7)
+        val done = engines.learning(InputMethodCatalog.PINYIN, LearningOp.OnPage(LearningOp.Block(onPage, "国")), core::shownText) { event, index, text ->
+            core.actOnCandidate(index, event, text)
+        }
+        assertTrue("$done $page", done is LearningResult.Done)
+        assertEquals(listOf("国", "國"), engines.underCode().sorted())
         engines.close()
     }
 }

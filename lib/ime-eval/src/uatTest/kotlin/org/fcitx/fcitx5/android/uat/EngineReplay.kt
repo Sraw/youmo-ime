@@ -219,18 +219,11 @@ class EngineReplay(
     private var memoryClock = 1L
 
     /**
-     * A long press's [op] on a candidate, as the menu does it (KotlinHost.learning): its event sent
-     * only if the menu offers it on the candidate still shown (HostCore.triggerCandidateAction).
+     * A long press's [op] on a candidate, as the menu does it (KotlinHost.learning): each event sent
+     * only if the menu offers it on the candidate still shown (HostCore.actOnCandidate).
      */
-    fun learn(op: LearningOp): LearningResult {
-        val candidate = (op as? LearningOp.OnPage)?.op ?: op as? LearningOp.OnCandidate
-        return engines.learning(im, op) { event, _, _ ->
-            if (candidate == null || core.candidateActions(candidate.index).none { it.id == event }) return@learning false
-            core.triggerCandidateAction(candidate.index, event, candidate.text)
-            flush()
-            true
-        }.also { pause() }
-    }
+    fun learn(op: LearningOp): LearningResult =
+        engines.learning(im, op, core::shownText) { event, index, text -> core.actOnCandidate(index, event, text).also { flush() } }.also { pause() }
 
     /** A glide across the centres of [keys] on [layout] ([shift] on or not), as the keyboard hands it to the engine (UatEngines.glide). */
     fun glide(keys: String, layout: GlideLayout = GlideLayout.QWERTY, shift: Boolean = false) {
