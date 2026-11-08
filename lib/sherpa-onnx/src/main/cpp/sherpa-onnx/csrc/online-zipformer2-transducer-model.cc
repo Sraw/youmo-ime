@@ -43,17 +43,39 @@ OnlineZipformer2TransducerModel::OnlineZipformer2TransducerModel(
       joiner_sess_opts_(GetSessionOptions(config, "joiner")),
       config_(config),
       allocator_{} {
-  encoder_sess_ = std::make_unique<Ort::Session>(
-      env_, SHERPA_ONNX_TO_ORT_PATH(config.transducer.encoder), encoder_sess_opts_);
-  InitEncoder(nullptr, 0, encoder_sess_opts_);
+  // youmo: by path, as the app loads its resource pack's models
+  Load(config.transducer.encoder,
+       &OnlineZipformer2TransducerModel::InitEncoder, encoder_sess_opts_);
+  Load(config.transducer.decoder,
+       &OnlineZipformer2TransducerModel::InitDecoder, decoder_sess_opts_);
+  Load(config.transducer.joiner,
+       &OnlineZipformer2TransducerModel::InitJoiner, joiner_sess_opts_);
+}
 
-  decoder_sess_ = std::make_unique<Ort::Session>(
-      env_, SHERPA_ONNX_TO_ORT_PATH(config.transducer.decoder), decoder_sess_opts_);
-  InitDecoder(nullptr, 0, decoder_sess_opts_);
-
-  joiner_sess_ = std::make_unique<Ort::Session>(
-      env_, SHERPA_ONNX_TO_ORT_PATH(config.transducer.joiner), joiner_sess_opts_);
-  InitJoiner(nullptr, 0, joiner_sess_opts_);
+// youmo: an ORT-format model (".ort") at a path is mapped and used where it
+// lies, as one in the assets is (below): the app's voice models are a resource
+// pack's files (dev/design/060-asset-packs.md), 180 MB read onto the heap
+// otherwise. Any other model is read as upstream reads it. One that cannot be
+// mapped throws (MapFile), the recognizer not made: the app's voice input says
+// it cannot load, where SHERPA_ONNX_EXIT ended the keyboard's process.
+void OnlineZipformer2TransducerModel::Load(const std::string &filename,
+                                           Init init,
+                                           const Ort::SessionOptions &opts) {
+  if (!EndsWith(filename, ".ort")) {
+    auto buf = ReadFile(filename);
+    (this->*init)(buf.data(), buf.size(), opts);
+    return;
+  }
+  auto file = MapFile(filename);
+  Ort::SessionOptions mapped = opts.Clone();
+  mapped.AddConfigEntry("session.use_ort_model_bytes_directly", "1");
+  mapped.AddConfigEntry("session.use_ort_model_bytes_for_initializers", "1");
+  mapped.AddConfigEntry("session.disable_prepacking", "1");
+  void *data = file->data;
+  size_t length = file->size;
+  // kept before the session is made on it, so that it outlives the session
+  mapped_.push_back(std::move(file));
+  (this->*init)(data, length, mapped);
 }
 
 template <typename Manager>

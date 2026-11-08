@@ -47,6 +47,7 @@ class LayoutReaderTest {
         // a table's roots over the letter where it shows them
         assertEquals(Text.Binding("root", "q"), q.variants.single().attrs.label)
         assertEquals("q", q.attrs.actions["send"])
+        assertEquals("1", q.attrs.actions["swipe-up"])
         assertEquals("full/q", q.attrs.shortcut)
         val space = rows[3].cells.first { it.id == "space" } as Key
         assertEquals(Width.Fill, space.attrs.width)

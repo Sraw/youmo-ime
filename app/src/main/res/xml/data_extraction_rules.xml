@@ -3,9 +3,15 @@
      storage (device_root), not in files/. The clipboard history (databases/clbdb and its journals)
      stays on the phone, and the one made in device-protected storage (device_database) by a start
      before the first unlock: it holds clips marked sensitive, a password from a password manager say,
-     which the app's own export takes out (UserDataManager) and these rules cannot -->
+     which the app's own export takes out (UserDataManager) and these rules cannot. The resource packs
+     (PackStore, device_file packs/, some 300-500 MB) are over cloud backup's 25 MB, which would lose
+     the whole backup; a phone-to-phone transfer takes them, so the new phone need not import again
+     (their signatures are checked again when loaded) -->
 <data-extraction-rules>
     <cloud-backup>
+        <exclude
+            domain="device_file"
+            path="packs" />
         <exclude
             domain="device_root"
             path="usr" />

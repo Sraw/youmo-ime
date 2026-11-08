@@ -6,68 +6,48 @@ package org.fcitx.fcitx5.android.scene.rules
 
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks.Slot
 import kotlin.math.abs
-import kotlin.math.floor
 import kotlin.math.sqrt
 
 /**
  * Copied from ime-core's `input.keyboard.KeyMarkYield` for P1 (060-render-v2 §6), Float made Double (the
- * engine's numbers are the same on the JVM and in JS only so); P2 deletes that one.
+ * engine's numbers are the same on the JVM and in JS only so); S4e (060-render-p2) made it its own.
  *
  * How a key's main glyph (its letter, label or icon) and the marks in its slots ([KeyMarks]: its
  * symbol, its shortcuts) keep out of each other's way, measured by their ink, not their views: a view
  * is the line's height and advance, and on 大千's keys it met the icon where the glyphs did not,
  * moving symbols that touched nothing. Nothing moves while nothing meets.
  *
+ * A keyboard's glyphs come in classes ([board]: its main characters, its function keys' icons, their
+ * labels), and a class is one size: the user's 「同类型的键大小应该一样」. Marks are of two classes too
+ * (every symbol, every shortcut): no mark and no glyph is ever smaller on its own.
+ *
  * Every slot is worked out as the top right one, the key mirrored side for side or top for bottom
- * ([inFrame]). A mark gives way, the lightest first: out towards its corner within the room (a
- * corner's sideways or up, whichever clears in less; the edge's middle only up); then smaller about
- * its corner, to its least ([Mark.minScale]: a symbol 6 dp, an icon 7 dp, below which they are not
- * read); then, at its least, out into its inset, the least that clears, as far as the edge ([Edge]:
- * a quarter dp in from the face's sides and its border, `Content.MARK_EDGE_DP`, and its box's corner
- * within the face's rounded one); then into another corner; last, left out.
- * Why so: moving within the room costs nothing seen. Smaller keeps the mark where the theme put it,
- * its corner on the line its neighbours' share, so it comes before the inset, which moves that
- * corner; both stop where they would cost something (a mark no longer read; its ink at the face's
- * side, a quarter dp still between, half a device px or more at any density from 2; its box's corner
- * at the arc, which curves away from it both ways). Another corner is where the user no longer looks
- * for it; left out, it is gone. Every step goes as far as it must, no further, in px, not whole px:
- * whether a mark is drawn, or how big the letters are, never turns on how a dp rounds (a small
- * phone's ⌫, 2.75 px a dp, compact, had its two icons 0.5 px short at their least: one was left out,
- * before the inset step).
+ * ([inFrame]). A mark gives way, the lightest first, all within its own corner (a shortcut's corner
+ * is the swipe it stands for, so it never goes to another): out towards its corner within the room
+ * (a corner's sideways or up, whichever clears in less; the edge's middle only up); then out into its
+ * inset, the least that clears, as far as the edge ([Edge]: a quarter dp in from the face's sides and
+ * its border, `Content.MARK_EDGE_DP`, and its box's corner within the face's rounded one); then in
+ * along the arc, the least. Where a glyph may move ([Member.moves]: not a main character, whose row
+ * shares a baseline) it moves the least to clear what is left. Still meeting: the whole glyph class
+ * smaller, every glyph of it as much, the most any of its keys needs, but [MAX_CLASS_SHRINK] at most;
+ * then the whole mark class (every symbol, every shortcut, each about its corner) as much smaller, the
+ * most any key with one needs, to [MIN_MARK_SCALE]; a key whose marks still meet then has them left
+ * out, the most expendable first ([Mark.drop]: a function key's down shortcut, a shortcut, the symbol
+ * last; the swipe and the long press still work). The glyphs first: a letter 6% smaller reads as the
+ * same size, a mark 6% smaller beside its letter does not, and a mark is the lesser of the two.
+ * Every step goes as far as it must, no further, in px, not whole px: whether a mark is drawn, or how
+ * big the glyphs are, never turns on how a dp rounds.
  *
  * Into its inset, a mark moves on one axis, the one that parts it from what it meets: two boxes part
- * when they part on either, so a move on the other changes the key and parts nothing (in a rounded
- * corner it takes the box's corner out towards the arc besides). Of sideways and up, the less; where
- * both would do as well, which it takes turns on a hair, the mark's move as big either way (no move
- * between them parts it: it would have to go both ways, the move this rule has no use for). Where
- * neither alone clears, it goes as far as it can on the one with less left to go, and the glyph moves
- * or is smaller for the rest. It eats as little of its inset as clears: on a key, the marks a share of
- * theirs, the least that clears with the glyph moved; the glyph smaller only once they are at the edge,
- * by the least hundredth, and they then go out by what that hundredth still leaves; so a px more or
- * less of key moves a mark or the glyph by about that px, never a whole inset at once.
+ * when they part on either, so a move on the other changes the key and parts nothing. Of sideways and
+ * up, the less; where neither alone clears, it goes as far as it can on the one with less left to go.
+ * It eats as little of its inset as clears: on a key, the marks a share of theirs, the least that
+ * clears; so a px more or less of key moves a mark by about that px, never a whole inset at once.
  *
- * Marks meeting each other ([keptApart]): smaller together about their corners, all as much, then out
- * into their insets, all as far. A key's label or icon ([key]): the marks moved first, then it moves
- * itself (any way, the least), then the marks smaller, then out into their insets, then it is smaller
- * about its middle, a fifth at most ([MAX_LABEL_SHRINK]). A keyboard's letters ([letters]): they stay
- * where they are, a row's on one baseline at one size; the marks move, are smaller and go out into
- * their insets first; what still meets, every letter is as much smaller about its baseline, a quarter
- * at most ([MAX_LETTER_SHRINK]). The glyph gives way after its marks have given all they can: it is
- * what the key is; the letters more so, one size for the whole board, so that a px one key's mark
- * lacks would make every letter smaller.
+ * Marks meeting each other ([keptApart]): out into their insets, all as far; what that doesn't part
+ * is left out, the most expendable first.
  *
- * Nothing of that enough: the key's shortcuts are tried in its other free corners ([Mark.elsewhere],
- * all at once, a function key's two kept mirrored), each moved, smaller and out there as before; what
- * still meets the glyph or another mark is left out, the most expendable first ([Mark.drop]: a
- * function key's down shortcut, then a shortcut; the swipes still work), and the glyph gives way to
- * the rest only, as if it had never been there (no smaller for a mark not drawn). A symbol ([DROP_SYMBOL]) is
- * never left out (the long press's first, the user's to see): a shortcut meeting it goes instead, and
- * the glyph is as small as it goes ([MAX_LABEL_SHRINK], a letter's [MAX_LETTER_SHRINK]); were that
- * not enough, it is drawn over the glyph. Else whatever is drawn never meets anything else drawn on
- * its key; KeyMarksEverywhereUatTest walks every keyboard and finds no symbol over its glyph.
- *
- * ime-core's copy, the views', has no inset step (P2 deletes it); their insets, splitties' dp, were
- * whole px, cut down, which often left them the room the inset step now gives.
+ * ime-core's copy, the views', is the older rule (marks smaller, other corners); P2 deletes it.
  */
 object KeyMarkYield {
 
@@ -86,19 +66,8 @@ object KeyMarkYield {
             left < o.right + gap && o.left < right + gap && top < o.bottom + gap && o.top < bottom + gap
     }
 
-    /**
-     * A mark's [ink] in its [slot], no smaller than [minScale] of it; [drop], how soon it is left out
-     * where nothing else clears it (the higher the sooner; [DROP_SYMBOL] never); [elsewhere], the
-     * slots it is tried in before that, in turn, with its ink there (a key's marks that have them, as
-     * many each, moved together: [KeyMarks.elsewhere]).
-     */
-    data class Mark(
-        val ink: Ink, val slot: Slot, val minScale: Double = 1.0, val drop: Int = DROP_SHORTCUT,
-        val elsewhere: List<Pair<Slot, Ink>> = emptyList(),
-    ) {
-        // in its next slot elsewhere, the rest still to try
-        internal fun next(): Mark = copy(slot = elsewhere[0].first, ink = elsewhere[0].second, elsewhere = elsewhere.drop(1))
-    }
+    /** A mark's [ink] in its [slot]; [drop], how soon it is left out where nothing else clears it (the higher the sooner). */
+    data class Mark(val ink: Ink, val slot: Slot, val drop: Int = DROP_SHORTCUT)
 
     /** Where a key's glyph and marks end up: [glyph]'s new ink; each mark's in order, null for left out. */
     data class Settled(val glyph: Ink, val marks: List<Ink?>)
@@ -115,7 +84,43 @@ object KeyMarkYield {
             val left = slot.left == right
             return radii[if (slot.bottom) (if (left) 3 else 2) else (if (left) 0 else 1)]
         }
+
+        // the radius of [slot]'s frame's bottom right corner ([right]) or bottom left
+        internal fun bottomRadius(slot: Slot, right: Boolean): Double {
+            val left = slot.left == right
+            return radii[if (slot.bottom) (if (left) 0 else 1) else (if (left) 3 else 2)]
+        }
     }
+
+    /**
+     * A key of a class: its [glyph]'s ink, smaller about ([x], [y]) (a text's middle on its baseline, an
+     * icon's middle), whether it [moves] to clear its marks, its [marks], the [room] they move in, the
+     * [edge] they go no further out than.
+     */
+    data class Member(
+        val glyph: Ink,
+        val x: Double,
+        val y: Double,
+        val marks: List<Mark>,
+        val room: Ink,
+        val edge: Edge = Edge(room),
+        val moves: Boolean = true,
+        val glyphClass: Int = 0,
+    )
+
+    /** Every glyph of a class scaled by [scale] about its point; each key's [keys] settled. */
+    data class Group(val scale: Double, val keys: List<Settled>)
+
+    /**
+     * A board's keys settled ([board]): each glyph class's scale by its number, every symbol's and every
+     * shortcut's scale (each about its corner), each key's [keys].
+     */
+    data class Board(val scales: Map<Int, Double>, val symbol: Double, val shortcut: Double, val keys: List<Settled>) {
+        fun markScale(m: Mark): Double = if (m.drop == DROP_SYMBOL) symbol else shortcut
+    }
+
+    /** A key with no glyph (a space with no name, its marks still of their classes): meets nothing, never moves. */
+    val NO_GLYPH = Ink(Double.NaN, Double.NaN, Double.NaN, Double.NaN)
 
     const val DROP_SYMBOL = 1
     const val DROP_SHORTCUT = 2
@@ -123,42 +128,269 @@ object KeyMarkYield {
     /** A function key's down shortcut: the first left out, the up one the one swiped more. */
     const val DROP_DOWN_SHORTCUT = 3
 
-    /** A symbol no smaller than this: 6 dp, about the cap height of a phone's smallest notification text. */
-    const val MIN_SYMBOL_DP = 6.0
+    /**
+     * A class at most this much smaller (060-render-p2 S4e): the most a class needs where a mark eaten
+     * into its inset and along its arc still meets the glyph, on the keyboards swept, a 0.4% step
+     * from the size beside it reads as the same size; past it a mark is left out instead.
+     */
+    const val MAX_CLASS_SHRINK = 0.06
 
-    /** An icon no smaller than this: 7 dp, a Material icon's strokes still apart (at 6 the clipboard is a blot). */
-    const val MIN_ICON_DP = 7.0
+    /**
+     * A mark class (every symbol, every shortcut) no smaller than this (060-render-p2 S4e): an 8 dp icon
+     * at 7 dp, the old rule's least. The keyboards swept need 0.926 to 0.949 of the shortcuts at their
+     * height (a floating board's ⌫, at every density) and 0.875 or less only where they need much less
+     * (at three quarters of the height, as many keys need 0.85 as 0.875): past it a mark is left out.
+     */
+    const val MIN_MARK_SCALE = 0.875
 
-    /** A label or a key's icon a fifth smaller at most. */
-    const val MAX_LABEL_SHRINK = 0.2
+    /**
+     * How far past what its classes may give a key fades out of their need (060-render-p2 S4e): a key
+     * whose marks fit only at [MIN_MARK_SCALE] less this or smaller (or never) asks its classes for
+     * nothing, its marks left out; one between asks the less the nearer it is to that, so a class's
+     * scale moves with the keyboard's size and never jumps where a key stops being saved. As wide as
+     * keeps a class's growth back to its size, as a key fades, to about 2% a px of keyboard.
+     */
+    const val HOPELESS_BAND = 0.15
 
-    /** The letters a quarter smaller at most: their row, the keyboard's, the same size still. */
-    const val MAX_LETTER_SHRINK = 0.25
-
-    /** A mark of [dp] (a text's size, an icon's height) no smaller than [min] dp: as a scale of it. */
-    fun minScale(min: Double, dp: Double): Double = if (dp <= 0.0) 1.0 else (min / dp).coerceAtMost(1.0)
-
-    // the label's shrink tried in steps of a hundredth
-    private const val STEP = 0.01
-
-    // how finely a mark's way out into its inset is found, in px; the marks' share of theirs, to a thousandth
+    // how finely a class's scale is found; a mark's way out into its inset, in px; the marks' share of theirs
+    private const val SCALE_STEP = 0.001
     private const val OUT_PX = 0.001
     private const val SHARE_STEP = 0.001
 
     private val NO_RADII = listOf(0.0, 0.0, 0.0, 0.0)
 
     /**
-     * A key's [glyph] (a label, an icon) and its [marks], within [room] (its face, clear of the
-     * rounded edges), kept [gap] apart; the marks out as far as [edge] where nothing else keeps them
-     * (their insets eaten), [room] where none is given.
+     * A key's [glyph] (a label, an icon) and its [marks], within [room] (its face, clear of the rounded
+     * edges), kept [gap] apart; the marks out as far as [edge]: the key a class of its own.
      */
-    fun key(glyph: Ink, marks: List<Mark>, room: Ink, gap: Double, edge: Edge = Edge(room)): Settled {
-        val apart = keptApart(marks, edge)
-        val live = apart.filterNotNull()
-        val s = keyApart(glyph, live, room, gap, edge)
-        val settled = s.marks.iterator()
-        return Settled(s.glyph, apart.map { if (it == null) null else settled.next() })
+    fun key(glyph: Ink, marks: List<Mark>, room: Ink, gap: Double, edge: Edge = Edge(room)): Settled =
+        group(listOf(Member(glyph, mid(glyph), (glyph.top + glyph.bottom) / 2.0, marks, room, edge)), gap).keys[0]
+
+    /** A class's [keys] as [board] settles them, all of one glyph class: its scale, each key settled. */
+    fun group(keys: List<Member>, gap: Double): Group {
+        val b = board(keys.map { it.copy(glyphClass = 0) }, gap)
+        return Group(b.scales[0] ?: 1.0, b.keys)
     }
+
+    /**
+     * A board's [keys], every glyph class ([Member.glyphClass]) and every mark class (symbols, shortcuts)
+     * one size: in its corner first; then each glyph class smaller, the most any of its keys needs, to
+     * [MAX_CLASS_SHRINK]; then each mark class smaller, the most any key with one needs, to [minMark]
+     * (scaled about its corner); what still meets then left out, the most expendable first.
+     *
+     * A glyph's need is worked out with all its key's marks as large as they are kept apart from each
+     * other (down to [HOPELESS_BAND] below [minMark]), its glyph not moving (aside, if it moves);
+     * moving it is only for settling, to keep a mark that would else be left out. A mark class shrinks
+     * only for a key where it meets: symbols, shortcuts or both, each its own need.
+     */
+    fun board(drawn: List<Member>, gap: Double, minMark: Double = MIN_MARK_SCALE): Board {
+        // what a class needs is worked out with every glyph that moves as far from its marks' side as its room
+        // goes, there to stay: a class's size then moves with the room, never with how a glyph would move as
+        // its marks meet it (the least that clears them, near and far by turns); the glyphs then move the least
+        val keys = drawn.map { it.aside() }
+        val apart = keys.map { k -> keptApart(k.marks.map { it.within(k.edge) }, k.edge) }
+        val least = 1.0 - MAX_CLASS_SHRINK
+        val hopeless = minMark - HOPELESS_BAND
+        // each key as it is (most are: worked out once)
+        val asIs = keys.indices.map { k -> drawn[k].copy(moves = false).let { m -> place(m.glyph, apart[k].filterNotNull(), m, gap) } }
+        fun whole(k: Int) = asIs[k] != null && apart[k].all { it != null }
+        // a key's marks, those of [symbol] (or the shortcuts) [t] their size, the others [u]; a class at 0 left out
+        fun marksAt(k: Int, t: Double, u: Double = t, symbol: Boolean? = null): List<Mark?> = keptApart(
+            keys[k].marks.map { it to it.sizeIn(t, u, symbol) }.filter { it.second > 0.0 }.map { (m, s) -> m.scaled(s).within(keys[k].edge) },
+            keys[k].edge,
+        )
+        fun fit(k: Int, g: Ink, marks: List<Mark?>) = marks.all { it != null } && place(g, marks.filterNotNull(), keys[k], gap) != null
+        // the glyphs: with all of a key's marks ([only] the symbols: the shortcuts left out), as large as they
+        // are all kept apart (down to a band below [minMark]: none left out of it where they are kept apart a
+        // little smaller, so it never jumps); asked of the class all where they fit at [minMark] by the glyphs'
+        // least, the less the further below
+        val floor = if (minMark >= 1.0) minMark else hopeless
+        fun asks(k: Int, only: Boolean) = glyphAsks(
+            floor, minMark,
+            marks = { t -> if (only) marksAt(k, t, 0.0, symbol = true) else marksAt(k, t) },
+            fits = { s, marks -> fit(k, keys[k].at(s), marks) },
+        )
+        // a key with both: no more than its symbols alone ask, so they are not let go with the shortcuts
+        val asked = keys.indices.map { k ->
+            if (whole(k)) 1.0 else minOf(asks(k, false), asks(k, true))
+        }
+        val scales = keys.indices.groupBy { keys[it].glyphClass }.mapValues { (_, ks) -> ks.minOf { asked[it] } }
+        // the marks: of the class (or both) that meets, as much smaller as lets them
+        val markNeed = keys.indices.map { k ->
+            if (whole(k)) return@map 1.0 to 1.0
+            val g = keys[k].at(scales.getValue(keys[k].glyphClass))
+            markNeed(floor, minMark) { t, u, symbol -> fit(k, g, marksAt(k, t, u, symbol)) }
+        }
+        val symbol = markNeed.minOfOrNull { it.first } ?: 1.0
+        val shortcut = markNeed.minOfOrNull { it.second } ?: 1.0
+        val marksWhole = symbol == 1.0 && shortcut == 1.0
+        val settled = keys.indices.map { k ->
+            val key = keys[k]
+            if (marksWhole && whole(k) && scales.getValue(key.glyphClass) == 1.0) return@map asIs[k]!!
+            val sc = scales.getValue(key.glyphClass)
+            settle(drawn[k], drawn[k].at(sc), marksAt(k, symbol, shortcut, symbol = true), gap, key to key.at(sc))
+        }
+        return Board(scales, symbol, shortcut, settled)
+    }
+
+    /**
+     * [key] settled as [was] (the same key, its edges where they fell before they were put on whole
+     * pixels) settled in [board]: its glyph scaled as there and moved as far; a mark that stayed as it was
+     * where [key] has it (on its whole pixels), one only smaller as much smaller about its corner there,
+     * one that moved where it went there, its corners then within [key]'s arcs (half a px from them at most); what was left out there left out.
+     * Every choice is made on [was], whose geometry a px of keyboard moves by a px, never by a pixel's
+     * rounding: one size of keyboard, one picture.
+     */
+    fun onto(key: Member, was: Member, board: Board, settled: Settled): Settled {
+        val s = board.scales.getValue(key.glyphClass)
+        val g0 = was.at(s)
+        val glyph = key.at(s).moved(settled.glyph.left - g0.left, settled.glyph.top - g0.top)
+        val marks = key.marks.mapIndexed { i, m ->
+            settled.marks[i]?.let { c ->
+                val t = board.markScale(m)
+                if (t == 1.0 && c == was.marks[i].ink) return@let m.within(key.edge).ink
+                // only smaller there (and slid off the arc): as much smaller about its corner where [key] has it and
+                // slid as far, so a class nearing 1 nears the mark as it is
+                val w = was.marks[i].scaled(t)
+                val at = if (c == w.within(was.edge).ink) m.scaled(t).let { it.copy(ink = it.ink.moved(c.left - w.ink.left, c.top - w.ink.top)) } else m.copy(ink = c)
+                // its corners within the arcs of [key]'s face as rounded, whatever it is
+                at.within(key.edge).ink
+            }
+        }
+        return Settled(glyph, marks)
+    }
+
+    // this mark's size: [t] if of the class [symbol] (both if null), else [u]
+    private fun Mark.sizeIn(t: Double, u: Double, symbol: Boolean?) = if (symbol == null || (drop == DROP_SYMBOL) == symbol) t else u
+
+    // what a key asks of its glyph class with [marks] at a size: its need with them as large as they are
+    // kept apart, all of it where they [fits] at [minMark] by the glyphs' least, the less the further below
+    private fun glyphAsks(floor: Double, minMark: Double, marks: (Double) -> List<Mark?>, fits: (Double, List<Mark?>) -> Boolean): Double {
+        val least = 1.0 - MAX_CLASS_SHRINK
+        val live = marks(largest(floor) { t -> marks(t).all { it != null } }).filter { it != null }
+        val need = largest(least) { s -> fits(s, live) }
+        val saved = if (minMark >= 1.0) 1.0 else share(largest(minMark - HOPELESS_BAND) { t -> fits(least, marks(t)) }, minMark)
+        return 1.0 - (1.0 - need) * saved
+    }
+
+    // a key's need of the symbols and of the shortcuts: both alike, the least that fits; from there the
+    // symbols as large as fits, then the shortcuts (the more expendable) as large as fits with them, so a
+    // class that does not meet is its size. Each from a size that fits, so it moves as the room does (a
+    // class's choice of which gives way never flips it). Below [minMark], as both fade out of their need
+    // ([share]), each moves to what it needs alone (the other left out), all of it where both are past
+    // saving: a class still saved alone is never let go with the other. [fits] with the symbols [t] their
+    // size, the shortcuts [u] (both [t] if [symbol] is null; a class at 0 left out)
+    private fun markNeed(floor: Double, minMark: Double, fits: (Double, Double, Boolean?) -> Boolean): Pair<Double, Double> {
+        fun asked(t: Double) = if (t >= minMark) t else 1.0 - (1.0 - minMark) * share(t, minMark)
+        val both = largest(floor) { t -> fits(t, t, null) }
+        if (both == 1.0) return 1.0 to 1.0
+        val w = share(both, minMark)
+        val (symbol, shortcut) = if (w > 0.0) {
+            val s = largest(both) { t -> fits(t, both, true) }
+            asked(s) to asked(largest(both) { u -> fits(s, u, true) })
+        } else {
+            1.0 to 1.0
+        }
+        val symbolAlone = asked(largest(floor) { t -> fits(t, 0.0, true) })
+        val shortcutAlone = asked(largest(floor) { u -> fits(0.0, u, true) })
+        return (w * symbol + (1 - w) * symbolAlone) to (w * shortcut + (1 - w) * shortcutAlone)
+    }
+
+    // how much of its need a key whose marks fit at [t] asks: all at [minMark], none [HOPELESS_BAND] below it
+    private fun share(t: Double, minMark: Double) = ((t - (minMark - HOPELESS_BAND)) / HOPELESS_BAND).coerceIn(0.0, 1.0)
+
+    // the largest of [least] to 1 (to a thousandth) where [fits]; [least] where none
+    private fun largest(least: Double, fits: (Double) -> Boolean): Double {
+        if (fits(1.0)) return 1.0
+        if (least >= 1.0 || !fits(least)) return least
+        var lo = least
+        var hi = 1.0
+        while (hi - lo > SCALE_STEP) {
+            val m = (lo + hi) / 2.0
+            if (fits(m)) lo = m else hi = m
+        }
+        return lo
+    }
+
+    // this mark [t] its size, about its corner (an edge's middle: its top's middle)
+    private fun Mark.scaled(t: Double): Mark {
+        if (t == 1.0) return this
+        val f = ink.inFrame(slot)
+        val x = if (slot.centred) (f.left + f.right) / 2.0 else f.right
+        return copy(ink = f.scaled(t, x, f.top).inFrame(slot))
+    }
+
+    // [key] with its glyph at [glyph]: its [marks] placed, those still meeting it left out the most expendable first
+    // ([aside]: the key as its classes' needs were worked out, its glyph where it was then, where [glyph]
+    // moving the least does not clear the marks)
+    private fun settle(key: Member, glyph: Ink, marks: List<Mark?>, gap: Double, aside: Pair<Member, Ink>? = null): Settled {
+        val kept = marks.toMutableList()
+        while (true) {
+            val live = kept.filterNotNull()
+            val s = place(glyph, live, key, gap) ?: aside?.let { (m, g) -> place(g, live, m, gap) }
+            if (s != null) {
+                val each = s.marks.iterator()
+                return Settled(s.glyph, kept.map { if (it == null) null else each.next() })
+            }
+            // the most expendable of those still meeting where they go furthest (none: of all)
+            val far = maxOf(key.edge.face.width, key.edge.face.height)
+            val out = live.map { out(glyph, it, key.room, key.edge, gap, inward = far) }
+            val clash = out.indices.filter { i -> out[i].meets(glyph, gap) || out.indices.any { j -> j != i && out[j].meets(out[i], 0.0) } }
+            val worst = clash.ifEmpty { live.indices.toList() }.maxBy { live[it].drop }
+            kept[kept.indexOfFirst { it === live[worst] }] = null
+        }
+    }
+
+    // this mark with its box's corners within [edge]'s arcs (a short key's top mark can reach its bottom ones): moved
+    // in the least, sideways or up and down, where one is out of one as placed
+    private fun Mark.within(edge: Edge): Mark {
+        if (cornersIn(ink, edge)) return this
+        val f = edge.face
+        // towards the face's middle, no further than to it
+        val dx = (f.left + f.right - ink.left - ink.right) / 2.0
+        val dy = (f.top + f.bottom - ink.top - ink.bottom) / 2.0
+        return listOf(dx to 0.0, 0.0 to dy)
+            .filter { (x, y) -> cornersIn(ink.moved(x, y), edge) }
+            .map { (x, y) ->
+                // the least, in px
+                val most = abs(x) + abs(y)
+                leastIn(most) { d -> cornersIn(ink.moved(x * d / most, y * d / most), edge) }.let { d -> ink.moved(x * d / most, y * d / most) }
+            }
+            .minByOrNull { abs(it.left - ink.left) + abs(it.top - ink.top) }
+            ?.let { copy(ink = it) } ?: this
+    }
+
+    // whether [i]'s corners are all within [edge]'s arcs, less its line
+    private fun cornersIn(i: Ink, edge: Edge): Boolean {
+        val f = edge.face
+        val corners = listOf(Triple(i.left, i.top, 0), Triple(i.right, i.top, 1), Triple(i.right, i.bottom, 2), Triple(i.left, i.bottom, 3))
+        return corners.all { (x, y, n) ->
+            val r = edge.radii[n]
+            if (r <= edge.line) return@all true
+            val cx = if (n == 0 || n == 3) f.left + r else f.right - r
+            val cy = if (n < 2) f.top + r else f.bottom - r
+            val outX = if (n == 0 || n == 3) x < cx else x > cx
+            val outY = if (n < 2) y < cy else y > cy
+            !outX || !outY || sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy)) <= r - edge.line + 1e-9
+        }
+    }
+
+    // this key not moving, its glyph if it moves as far from its marks' side (all of them on one) as its room goes,
+    // smaller about that side
+    private fun Member.aside(): Member {
+        val still = copy(moves = false)
+        if (!moves || glyph.left.isNaN() || marks.isEmpty()) return still
+        // the room's side away from the marks; smaller about it, so it stays there
+        val side = when {
+            marks.all { it.slot.left } -> room.right
+            marks.all { it.slot.right } -> room.left
+            else -> return still
+        }
+        val dx = if (side == room.right) room.right - glyph.right else room.left - glyph.left
+        return still.copy(glyph = glyph.moved(dx, 0.0), x = side)
+    }
+
+    private fun Member.at(s: Double): Ink = if (s == 1.0) glyph else glyph.scaled(s, x, y)
 
     // the least of 0 to [whole] (to [step]) that [clears], [all] clearing at the whole of it
     private fun <T : Any> least(all: T, whole: Double, step: Double, clears: (Double) -> T?): T {
@@ -173,167 +405,43 @@ object KeyMarkYield {
         return best
     }
 
-    private fun keyApart(glyph: Ink, marks: List<Mark>, room: Ink, gap: Double, edge: Edge): Settled {
-        if (marks.none { it.ink.meets(glyph, gap) }) return Settled(glyph, marks.map { it.ink })
-        inPlace(glyph, marks, room, gap, edge)?.let { return it }
-        // a shortcut that would be left out tried elsewhere (where it meets no other mark), the glyph as it
-        // was: all the above again from there
-        val small = glyph.scaled(1.0 - MAX_LABEL_SHRINK, mid(glyph), (glyph.top + glyph.bottom) / 2.0)
-        val placed = marks.map { out(small, it, room, edge, gap) }
-        val stuck = placed.indices.any { i -> marks[i].elsewhere.isNotEmpty() && (placed[i].meets(small, 0.0) || placed.indices.any { j -> j != i && placed[j].meets(placed[i], 0.0) }) }
-        var moved = marks
-        while (stuck && moved.any { it.elsewhere.isNotEmpty() }) {
-            moved = moved.map { if (it.elsewhere.isEmpty()) it else it.next() }
-            if (allApart(moved.map { it.ink })) return keyApart(glyph, moved, room, gap, edge)
-        }
-        val (kept, placedKept) = dropped(small, marks) { out(small, it, room, edge, gap) }
-        // what is left out leaves the glyph its room: all the above again with the rest (fewer each time)
-        val rest = kept.filterNotNull()
-        if (rest.size == marks.size) return Settled(small, placedKept)
-        val again = keyApart(glyph, rest, room, gap, edge)
-        val each = again.marks.iterator()
-        return Settled(again.glyph, kept.map { if (it == null) null else each.next() })
-    }
+    // [glyph] and [marks] of [key] apart, each mark in its own corner: moved within the room, then out into its
+    // inset (the least share of it), then in along its arc (the least); the glyph moved where it [Member.moves];
+    // null where nothing clears, or where a mark's corners are not within [key]'s arcs (one taller than a short
+    // key's face less its arcs)
+    private fun place(glyph: Ink, marks: List<Mark>, key: Member, gap: Double): Settled? =
+        placed(glyph, marks, key, gap)?.takeIf { s -> s.marks.all { cornersIn(it!!, key.edge) } }
 
-    // [keyApart]'s steps with every mark in its own corner and kept; null where they leave it still meeting the glyph
-    private fun inPlace(glyph: Ink, marks: List<Mark>, room: Ink, gap: Double, edge: Edge): Settled? {
-        // the marks moved only, then smaller too: the glyph moved clear of them
-        for (shrink in listOf(false, true)) {
-            val placed = marks.map { into(glyph, it, room, edge, gap, if (shrink) it.minScale else 1.0) }
-            clearOf(glyph, placed, room, gap)?.let { return Settled(it, placed) }
+    private fun placed(glyph: Ink, marks: List<Mark>, key: Member, gap: Double): Settled? {
+        val room = key.room
+        val edge = key.edge
+        val inks = marks.map { it.ink }
+        if (marks.none { it.ink.meets(glyph, gap) } && allApart(inks)) return Settled(glyph, inks)
+        fun ok(p: List<Ink>): Settled? = when {
+            key.moves -> clearOf(glyph, p, room, gap)?.let { Settled(it, p) }
+            allApart(p) && p.none { it.meets(glyph, gap) } -> Settled(glyph, p)
+            else -> null
         }
-        // the marks, at their least, out into their insets, all by the least share of what each has that, the
-        // glyph moved as far as it goes, clears (from nothing, where the glyph's move alone stops clearing); then,
-        // their insets all eaten, the glyph smaller about its middle, the least that clears with a move
-        val cx = mid(glyph)
-        val cy = (glyph.top + glyph.bottom) / 2.0
-        var s = 1.0
-        while (s >= 1.0 - MAX_LABEL_SHRINK - STEP / 2) {
-            val small = glyph.scaled(s, cx, cy)
-            fun clears(share: Double) = marks.map { out(small, it, room, edge, gap, share) }.let { p -> clearOf(small, p, room, gap)?.let { Settled(it, p) } }
-            clears(1.0)?.let { return least(it, 1.0, SHARE_STEP, ::clears) }
-            s -= STEP
-        }
-        val small = glyph.scaled(1.0 - MAX_LABEL_SHRINK, cx, cy)
-        // the glyph at its least, a mark at its arc in along it, the least that clears (from nothing, where the
-        // glyph's shrink stops clearing), before it is tried in another corner or left out
+        ok(marks.map { out(glyph, it, room, edge, gap, 0.0) })?.let { return it }
+        fun share(f: Double) = ok(marks.map { out(glyph, it, room, edge, gap, f) })
+        share(1.0)?.let { return least(it, 1.0, SHARE_STEP, ::share) }
         val far = maxOf(edge.face.width, edge.face.height)
-        fun along(inward: Double) = marks.map { out(small, it, room, edge, gap, inward = inward) }.let { p -> clearOf(small, p, room, gap)?.let { Settled(it, p) } }
+        fun along(inward: Double) = ok(marks.map { out(glyph, it, room, edge, gap, inward = inward) })
         return along(far)?.let { least(it, far, OUT_PX, ::along) }
     }
 
-    /** A letter key's: its [letter]'s ink and [baseline], its [marks], the [room] they move in, the [edge] they go no further out than. */
-    data class LetterKey(val letter: Ink, val baseline: Double, val marks: List<Mark>, val room: Ink, val edge: Edge = Edge(room))
-
-    /** Every letter scaled by [scale] about its ink's middle on its baseline; each key's [keys] settled. */
-    data class Letters(val scale: Double, val keys: List<Settled>)
-
-    /** How a keyboard's letters, [keys], and their marks keep [gap] apart. */
-    fun letters(keys: List<LetterKey>, gap: Double): Letters {
-        val apart = keys.map { keptApart(it.marks, it.edge) }
-        // a shortcut that would need more than a quarter tried elsewhere first ([fitting])
-        val live = apart.mapIndexed { k, marks -> fitting(keys[k], marks.filterNotNull()) }
-        // what each letter would need, its marks as far in and small as they go; the most needed, for all,
-        // but a quarter at most: a shortcut that needs more is left out, its letter kept; a symbol is never
-        // left out, the letters a quarter smaller for it
-        val least = 1.0 - MAX_LETTER_SHRINK
-        val need = keys.flatMapIndexed { k, key ->
-            live[k].mapNotNull { m ->
-                val n = need(key, m, gap).scale
-                when {
-                    n >= least - STEP / 2 -> n
-                    m.drop == DROP_SYMBOL -> least
-                    else -> null
-                }
-            }
-        }.minOrNull() ?: 1.0
-        val scale = need.coerceAtLeast(1.0 - MAX_LETTER_SHRINK)
-        // each mark then only as far in and small as the letter, so much smaller, leaves it, the way [need] takes it
-        return Letters(scale, keys.mapIndexed { k, key ->
-            val letter = if (scale < 1.0) key.letter.scaled(scale, mid(key.letter), key.baseline) else key.letter
-            val settled = dropped(letter, live[k]) { m -> out(letter, m, key.room, key.edge, gap, up = need(key, m, gap).up) }.second.iterator()
-            Settled(letter, apart[k].map { if (it == null) null else settled.next() })
-        })
-    }
-
-    // the letter's scale [need]ed for a mark, and the axis it goes out on (null: nothing to choose)
-    private class Need(val scale: Double, val up: Boolean?)
-
-    // how much smaller [key]'s letter would be for [m], as far in and small as it goes: where neither axis
-    // alone parts them, out on the one that leaves the letter larger (the letter smaller about its baseline
-    // parts them on one axis too, so the other's move is wasted; which one is the letter's, not the px')
-    // Each scale counted in [STEP]s before they are compared, a tie up: half a px either way never swaps them.
-    // A mark that clears it (no smaller) goes the way it would for the letter its size, whatever size the letters
-    // are: the way is the key's, not the keyboard's (the letters' size changing never swaps it).
-    private fun need(key: LetterKey, m: Mark, gap: Double): Need {
-        fun at(up: Boolean) = letterScale(key.letter, out(key.letter, m, key.room, key.edge, gap, up = up), m.slot, gap, mid(key.letter), key.baseline)
-        if (!into(key.letter, m, key.room, key.edge, gap, m.minScale).meets(key.letter, gap)) {
-            return Need(1.0, if (m.ink.meets(key.letter, gap)) way(key.letter, m, key.room, key.edge, gap) else null)
-        }
-        val up = at(true)
-        val side = at(false)
-        return if (floor(side / STEP + 1e-9) > floor(up / STEP + 1e-9)) Need(side, false) else Need(up, true)
-    }
-
-    // [key]'s [marks], a movable one that would meet its letter even a quarter smaller (left out: touching is
-    // apart then, no gap) moved elsewhere with the others movable, the first place where none would and they
-    // are apart; as they were if none
-    private fun fitting(key: LetterKey, marks: List<Mark>): List<Mark> {
-        fun outOfReach(m: Mark) = need(key, m, 0.0).scale < 1.0 - MAX_LETTER_SHRINK - STEP / 2
-        if (marks.none { it.elsewhere.isNotEmpty() && outOfReach(it) }) return marks
-        var moved = marks
-        while (moved.any { it.elsewhere.isNotEmpty() }) {
-            moved = moved.map { if (it.elsewhere.isEmpty()) it else it.next() }
-            val fits = moved.none { m -> m !in marks && outOfReach(m) }
-            if (fits && allApart(moved.map { it.ink })) return moved
-        }
-        return marks
-    }
-
-    // [marks], each where [place] puts it, less those still meeting [glyph] (none: only each other) or each
-    // other: the movable ones first tried elsewhere, all at once (a function key's two stay mirrored), then
-    // the most expendable left out first; a symbol never, kept where it meets. The marks as they end up
-    // (moved, before [place]) and their inks
-    private fun dropped(glyph: Ink?, marks: List<Mark>, place: (Mark) -> Ink): Pair<List<Mark?>, List<Ink?>> {
-        val now = marks.toMutableList<Mark?>()
-        val out = marks.map(place).toMutableList<Ink?>()
-        while (true) {
-            val clash = out.indices.filter { i ->
-                val a = out[i] ?: return@filter false
-                glyph?.let { a.meets(it, 0.0) } == true || out.indices.any { j -> j != i && out[j]?.meets(a, 0.0) == true }
-            }
-            if (clash.isEmpty()) return now to out
-            val worst = clash.maxBy { marks[it].drop }
-            // the symbol alone still meeting: drawn as it is (the user's hard rule: a symbol is never left out)
-            if (marks[worst].drop <= DROP_SYMBOL) return now to out
-            if (now[worst]?.elsewhere.isNullOrEmpty()) {
-                out[worst] = null
-                now[worst] = null
-                continue
-            }
-            for (i in now.indices) {
-                val m = now[i]?.takeIf { it.elsewhere.isNotEmpty() } ?: continue
-                now[i] = m.next().also { out[i] = place(it) }
-            }
-        }
-    }
-
-    // [marks] apart from each other: those meeting smaller about their corners (an edge's middle, its
-    // middle), all as much, the least that parts them, no smaller than each's own; then, at their least,
-    // out into their insets towards [edge], all as far, the least that parts them; what that doesn't part
-    // left out, the most expendable first
+    // [marks] apart from each other: those meeting out into their insets towards [edge], all as far, the least
+    // that parts them; what that doesn't part left out, the most expendable first
     private fun keptApart(marks: List<Mark>, edge: Edge): List<Mark?> {
         val meeting = marks.indices.filter { i -> marks.indices.any { j -> j != i && marks[i].ink.meets(marks[j].ink, 0.0) } }
         if (meeting.isEmpty()) return marks
-        val least = meeting.minOf { marks[it].minScale }
-        var s = 1.0 - STEP
-        while (s >= least - STEP / 2) {
-            val small = marks.mapIndexed { i, m -> if (i in meeting) m.smaller(maxOf(s, m.minScale)) else m }
-            if (allApart(small.map { it.ink })) return small
-            s -= STEP
+        outwards(marks, meeting, edge)?.let { return it }
+        val now = marks.toMutableList<Mark?>()
+        while (true) {
+            val clash = now.indices.filter { i -> now[i] != null && now.indices.any { j -> j != i && now[j]?.ink?.meets(now[i]!!.ink, 0.0) == true } }
+            if (clash.isEmpty()) return now
+            now[clash.maxBy { marks[it].drop }] = null
         }
-        val smallest = marks.mapIndexed { i, m -> if (i in meeting) m.smaller(m.minScale) else m }
-        return outwards(smallest, meeting, edge) ?: dropped(null, marks) { it.ink }.first
     }
 
     // [marks]' [meeting] ones out into their insets, towards [edge], each as far as the others or as it can,
@@ -379,7 +487,12 @@ object KeyMarkYield {
     private fun sideRoom(m: Ink, slot: Slot, edge: Edge): Double {
         if (slot.centred) return 0.0
         val e = edge.face.inFrame(slot)
-        val least = maxOf(edge.floor, arcLeast(m.top - e.top, edge.radius(slot, right = true), edge.line))
+        // its bottom right corner too: a short key's top mark reaches its bottom arc
+        val least = maxOf(
+            edge.floor,
+            arcLeast(m.top - e.top, edge.radius(slot, right = true), edge.line),
+            arcLeast(e.bottom - m.bottom, edge.bottomRadius(slot, right = true), edge.line),
+        )
         return (e.right - m.right - least).coerceAtLeast(0.0)
     }
 
@@ -390,16 +503,6 @@ object KeyMarkYield {
         val across = r - a
         if (across >= reach) return Double.POSITIVE_INFINITY
         return r - sqrt(reach * reach - across * across)
-    }
-
-    // this mark [s] its size about its corner, its smallest the same as it was; so too where it is tried elsewhere
-    private fun Mark.smaller(s: Double): Mark =
-        copy(ink = smaller(ink, slot, s), minScale = minScale / s, elsewhere = elsewhere.map { (at, i) -> at to smaller(i, at, s) })
-
-    private fun smaller(ink: Ink, slot: Slot, s: Double): Ink {
-        val f = ink.inFrame(slot)
-        val x = if (slot.centred) mid(f) else f.right
-        return f.scaled(s, x, f.top).inFrame(slot)
     }
 
     private fun allApart(inks: List<Ink>): Boolean = inks.indices.all { i -> inks.indices.all { j -> j <= i || !inks[i].meets(inks[j], 0.0) } }
@@ -432,91 +535,36 @@ object KeyMarkYield {
         return i
     }
 
-    // [mark] out of [glyph]'s way, within [room] (and [edge]: a mark already out in its inset on one axis
-    // keeps its box's corner within the arc as it moves on the other): towards its corner, the least, then
-    // smaller to [minScale]
-    // ([prefer]: the way it goes where both would part them alone, up or sideways)
-    private fun into(glyph: Ink, mark: Mark, room: Ink, edge: Edge, gap: Double, minScale: Double, prefer: Boolean? = null): Ink {
+    // [mark] out of [glyph]'s way, the least, on one axis (two boxes part on either, so a move on the other
+    // changes the key and parts nothing): up (an edge's middle: only up) or sideways, as far as [room] goes
+    // and [share] of its inset past that, towards [edge]; short of it, in along its arc up to [inward] the
+    // least that lets it so far. Of the two, the one that clears with the less move; neither: the one with
+    // less still to go. A hair's meeting moves the mark a hair: a px more or less of key never moves it a
+    // whole width sideways
+    private fun out(glyph: Ink, mark: Mark, room: Ink, edge: Edge, gap: Double, share: Double = 1.0, inward: Double = 0.0): Ink {
         if (!mark.ink.meets(glyph, gap)) return mark.ink
-        val s = mark.slot
-        return corner(glyph.inFrame(s), mark.ink.inFrame(s), room.inFrame(s), gap, minScale, s, edge, prefer).inFrame(s)
-    }
-
-    // the way [into] takes [mark] out of [glyph]'s way, up (true) or sideways; where it takes both, the one
-    // with less still to go (as [out]), a tie up
-    private fun way(glyph: Ink, mark: Mark, room: Ink, edge: Edge, gap: Double): Boolean {
         val s = mark.slot
         val g = glyph.inFrame(s)
         val m = mark.ink.inFrame(s)
         val r = room.inFrame(s)
-        return way(g, m, r, gap, s, edge, null) ?: (s.centred || under(g, m, gap) - upRoomOf(m, r, s, edge) <= over(g, m, gap) - sideRoomOf(m, r, s, edge))
-    }
-
-    private fun over(glyph: Ink, mark: Ink, gap: Double) = glyph.right + gap - mark.left
-    private fun under(glyph: Ink, mark: Ink, gap: Double) = mark.bottom - (glyph.top - gap)
-    private fun sideRoomOf(mark: Ink, room: Ink, slot: Slot, edge: Edge) =
-        if (slot.centred) 0.0 else minOf(room.right - mark.right, sideRoom(mark, slot, edge)).coerceAtLeast(0.0)
-    private fun upRoomOf(mark: Ink, room: Ink, slot: Slot, edge: Edge) = minOf(mark.top - room.top, upRoom(mark, slot, edge)).coerceAtLeast(0.0)
-
-    // the way [corner] takes the top right [mark]: sideways (false) where that alone parts them and it is the
-    // less or up alone does not ([prefer] false: or up alone does too), up (true) where that alone does; null: both
-    private fun way(glyph: Ink, mark: Ink, room: Ink, gap: Double, slot: Slot, edge: Edge, prefer: Boolean?): Boolean? {
-        val over = over(glyph, mark, gap)
-        val under = under(glyph, mark, gap)
-        val sideways = !slot.centred && over <= sideRoomOf(mark, room, slot, edge)
-        val upFits = under <= upRoomOf(mark, room, slot, edge)
-        return when {
-            sideways && (!upFits || (prefer ?: (over > under)) == false) -> false
-            upFits -> true
-            else -> null
-        }
-    }
-
-    // the top right [mark] out of [glyph]'s way: right or up, whichever clears it in less ([Slot.centred]: up
-    // only); neither alone: into [room]'s corner, then smaller about its top right (top middle), to [minScale];
-    // no move past [edge]'s arc (within the room it never is: only a mark [keptApart] took out of it)
-    private fun corner(glyph: Ink, mark: Ink, room: Ink, gap: Double, minScale: Double, slot: Slot, edge: Edge, prefer: Boolean?): Ink {
-        val centred = slot.centred
-        when (way(glyph, mark, room, gap, slot, edge, prefer)) {
-            false -> return mark.moved(glyph.right + gap - mark.left, 0.0)
-            true -> return mark.moved(0.0, -(mark.bottom - (glyph.top - gap)))
-            null -> {}
-        }
-        val rightRoom = sideRoomOf(mark, room, slot, edge)
-        val up = mark.moved(0.0, -upRoomOf(mark, room, slot, edge))
-        val moved = up.moved(if (centred) 0.0 else minOf(rightRoom, sideRoom(up, slot, edge)).coerceAtLeast(0.0), 0.0)
-        val byLeft = if (centred) 0.0 else (moved.right - (glyph.right + gap)) / moved.width
-        val byBottom = (glyph.top - gap - moved.top) / moved.height
-        val scale = maxOf(byLeft, byBottom).coerceIn(minScale, 1.0)
-        val x = if (centred) mid(moved) else moved.right
-        return moved.scaled(scale, x, moved.top)
-    }
-
-    // [mark] as [into] puts it at its least within [room]; still meeting [glyph], out into its inset (no
-    // more than [share] of it) the least on the one axis that parts them, sideways or up, the less of the
-    // two (as [corner]); where neither does alone, as far as it goes on the one with less still to go ([up]:
-    // the one asked for), the glyph's move or shrink to do the rest (the other axis left: a move there parts nothing)
-    private fun out(glyph: Ink, mark: Mark, room: Ink, edge: Edge, gap: Double, share: Double = 1.0, up: Boolean? = null, inward: Double = 0.0): Ink {
-        val at = into(glyph, mark, room, edge, gap, mark.minScale, up)
-        if (!at.meets(glyph, gap)) return at
-        val s = mark.slot
-        val g = glyph.inFrame(s)
-        val m = at.inFrame(s)
         val over = g.right + gap - m.left
         val under = m.bottom - (g.top - gap)
-        val side = sideRoom(m, s, edge) * share
-        val upward = upRoom(m, s, edge) * share
-        val sideways = !s.centred && over <= side
-        val upFits = under <= upward
-        val moved = when {
-            up == true || s.centred -> upBy(m, s, edge, under, upward, inward)
-            up == false -> sideBy(m, s, edge, over, side, inward)
-            sideways && (over <= under || !upFits) -> m.moved(over, 0.0)
-            upFits -> m.moved(0.0, -under)
-            under - upward <= over - side -> upBy(m, s, edge, under, upward, inward)
-            else -> sideBy(m, s, edge, over, side, inward)
+        fun most(whole: Double, free: Double) = free + (whole - free).coerceAtLeast(0.0) * share
+        val upward = most(upRoom(m, s, edge), minOf(m.top - r.top, upRoom(m, s, edge)).coerceAtLeast(0.0))
+        val up = upBy(m, s, edge, under, upward, inward)
+        if (s.centred) return up.inFrame(s)
+        val sideRoom = sideRoom(m, s, edge)
+        val side = sideBy(m, s, edge, over, most(sideRoom, minOf(r.right - m.right, sideRoom).coerceAtLeast(0.0)), inward)
+        val upClears = !up.meets(g, gap)
+        val sideClears = !side.meets(g, gap)
+        fun moved(i: Ink) = abs(i.left - m.left) + abs(i.top - m.top)
+        val pick = when {
+            upClears && sideClears -> if (moved(side) < moved(up)) side else up
+            upClears -> up
+            sideClears -> side
+            else -> if (under - (m.top - up.top) <= over - (side.left - m.left)) up else side
         }
-        return moved.inFrame(s)
+        return pick.inFrame(s)
     }
 
     // the top right [m] up by [under], [upward] at most; short of it, in from its side up to [inward] (no further
@@ -556,16 +604,4 @@ object KeyMarkYield {
     }
 
     private fun mid(ink: Ink): Double = (ink.left + ink.right) / 2.0
-
-    // how much smaller [letter] about ([x], [y]) clears [mark] in [slot]: by the side facing it or its top
-    // (bottom), whichever needs less
-    private fun letterScale(letter: Ink, mark: Ink, slot: Slot, gap: Double, x: Double, y: Double): Double {
-        if (!letter.meets(mark, gap)) return 1.0
-        val l = letter.inFrame(slot)
-        val m = mark.inFrame(slot)
-        val o = Ink(x, y, x, y).inFrame(slot)
-        val byRight = if (!slot.centred && l.right > o.right) (m.left - gap - o.right) / (l.right - o.right) else 0.0
-        val byTop = if (l.top < o.top) (o.top - (m.bottom + gap)) / (o.top - l.top) else 0.0
-        return maxOf(byRight, byTop).coerceIn(0.0, 1.0)
-    }
 }

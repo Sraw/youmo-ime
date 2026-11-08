@@ -12,19 +12,13 @@ class ConstTest {
 
     @Test
     fun aReleaseOpensTheManualAtItsTag() {
-        assertEquals("$REPO/blob/v0.2.0/docs/README.md", manualUrl(REPO, "0.2.0", "text"))
+        assertEquals("$REPO/blob/v0.2.0/docs/README.md", manualUrl(REPO, "0.2.0"))
     }
 
     @Test
     fun aBuildBetweenReleasesOpensMainsManual() {
-        assertEquals("$REPO/blob/HEAD/docs/README.md", manualUrl(REPO, "0.1.0-5-gabc1234", "text"))
-        assertEquals("$REPO/blob/HEAD/docs/README.md", manualUrl(REPO, "0.1.0-untagged", "text"))
-    }
-
-    @Test
-    fun theVoiceBuildsReleaseOpensTheManualAtItsTagToo() {
-        assertEquals("$REPO/blob/v0.2.0/docs/README.md", manualUrl(REPO, "0.2.0-voice", "voice"))
-        assertEquals("$REPO/blob/HEAD/docs/README.md", manualUrl(REPO, "0.1.0-5-gabc1234-voice", "voice"))
+        assertEquals("$REPO/blob/HEAD/docs/README.md", manualUrl(REPO, "0.1.0-5-gabc1234"))
+        assertEquals("$REPO/blob/HEAD/docs/README.md", manualUrl(REPO, "0.1.0-untagged"))
     }
 
     private companion object {

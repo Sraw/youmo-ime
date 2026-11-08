@@ -10,19 +10,20 @@ compiled is not done.
 |---|---|---|---|
 | ime-core unit tests | `lib/ime-core/src/test` | `./gradlew :lib:ime-core:check` (tests + animal-sniffer + Kover floors) | every decision and the whole engine; milliseconds each |
 | Drawing engine tests | `lib/keyboard-scene/src/commonTest` | `./gradlew :lib:keyboard-scene:check` (the same tests on the JVM and in node, animal-sniffer, Kover floors 90/60) | parsing, cascade, placement, hit, marks; scene snapshots in `src/commonTest/data/snapshots`, written by `jvmTest -Psnapshots.record=true` and compared on both targets, so JVM and JS must agree |
-| App JVM tests | `app/src/test` | `./gradlew :app:testTextDebugUnitTest` | glue that needs Android types: Robolectric where the framework is reached |
-| App JVM tests at minSdk | `app/src/test` | `./gradlew :app:testTextDebugUnitTestAt29` | the same tests at SDK 29, Android 10, which must keep working (below) |
+| App JVM tests | `app/src/test` | `./gradlew :app:testDebugUnitTest` | glue that needs Android types: Robolectric where the framework is reached; the scene's wiring key by key against `app/src/test/resources/wiring/`, recorded from the old keys by `WIRING_RECORD=1 ./gradlew :app:testDebugUnitTest --tests '*SceneWiringTest' --tests '*NineSceneGesturesTest'` |
+| App JVM tests at minSdk | `app/src/test` | `./gradlew :app:testDebugUnitTestAt29` | the same tests at SDK 29, Android 10, which must keep working (below) |
 | Engine UAT replay | `lib/ime-eval/src/uatTest` | `./gradlew :lib:ime-eval:uatTest` (not in `check`) | the uat/ cases whose 预期 is what the engine types, through `Engines` with the app's own data: needs `:app`'s data tasks (minutes the first time), and a 2 GB heap; no network (its named keys are held to the host's `KeySyms`, which `KeySymsGoldenTest` holds to fcitx) |
 | Tools | `lib/ime-dict-tool/src/test`, `lib/ime-eval/src/test`, `build-logic/convention/src/test` | `:lib:ime-dict-tool:test`, `:lib:ime-eval:test`, `./gradlew -p build-logic test` | data compilation, the evaluation, build tasks |
 | Python tools | `lexicon/tools`, `lib/ime-eval/tools` | `python3 -m unittest discover -s lexicon/tools` (and `-s lib/ime-eval/tools`) | the lexicon and evaluation scripts |
 | Static | all Kotlin modules | `./gradlew detekt` | syntax rules (type resolution does not work here); findings frozen in `config/detekt/baseline-*.xml` |
 | Native host tests | `lib/sherpa-onnx/host-test.sh` | the script | sherpa-onnx's C++ helpers, compiled for the host |
-| Instrumented | `app/src/androidTest` | CI (`emulator` label / weekly); locally `connectedTextDebugAndroidTest` | the real host, engine and keyboard (`KotlinHost`, `TestHost`): `HostTest`, `SoftKeyboardTest`, `TypingHostActivityTest`, `NativeMatrixKernelTest`, `HostConfigTest`, `HostEnglishTest`, `HostPreeditTest`, `SetupActivityDeviceTest`, `FileUtilTest`; `EngineEvalRunner` is the device runner behind `run-on-device.sh` |
+| Instrumented | `app/src/androidTest` | CI (`emulator` label / weekly); locally `connectedDebugAndroidTest`, after the two packs are imported (`uat/tools/uat.py packs`; CI's emulator job does the same) | the real host, engine and keyboard (`KotlinHost`, `TestHost`): `HostTest`, `SoftKeyboardTest`, `TypingHostActivityTest`, `NativeMatrixKernelTest`, `HostConfigTest`, `HostEnglishTest`, `HostPreeditTest`, `SetupActivityDeviceTest`, `FileUtilTest`; `EngineEvalRunner` is the device runner behind `run-on-device.sh` |
 | Evaluation | `lib/ime-eval` | see below | ranking: whether the first candidate is the sentence meant |
 | On a device | the Android emulator (arm64) or a phone | by hand / scripts | what a user sees: layout, gestures, rotation, upgrade |
 
-Minimum before a commit: `./gradlew :lib:ime-core:check :app:testTextDebugUnitTest :app:testTextDebugUnitTestAt29 detekt`, plus
-the tool or build-logic tests if those changed. Unit tests need no NDK or CMake.
+Minimum before a commit: `./gradlew :lib:keyboard-scene:check :lib:ime-core:check :app:testDebugUnitTest :app:testDebugUnitTestAt29 :app:lintDebug detekt --continue`,
+and `cd uat/tools && python3 -m unittest test_uat` when `uat/` changed, plus
+the tool or build-logic tests (`./gradlew -p build-logic test`) if those changed. Unit tests need no NDK or CMake.
 
 The app's test tasks run two test JVMs at once (`maxParallelForks`, `-PtestForks=<n>` for another
 count; `1` to rule out one test's state reaching another), each a fresh one every 40 classes. A test
@@ -66,12 +67,11 @@ change to how keys are laid out or marked (not with `-PskipExhaustive`: the excl
   byte golden, the upgrade tests, `RecordStore`, `CodedIndex`, `DictionaryFile`.
 - `unitTests.isReturnDefaultValues = false` on purpose: a JVM test that reaches an android.jar stub
   fails loudly. Anything needing the framework runs under Robolectric.
-- Android 10 (API 29, minSdk) must keep working. Every text debug Robolectric test runs at SDK 29 and 35
+- Android 10 (API 29, minSdk) must keep working. Every debug Robolectric test runs at SDK 29 and 35
   (`robolectric.properties`), one SDK a task and a JVM (`robolectric.enabledSdks`): the 35s in
-  `testTextDebugUnitTest`, the 29s in `testTextDebugUnitTestAt29`, every test drawing natively there
+  `testDebugUnitTest`, the 29s in `testDebugUnitTestAt29`, every test drawing natively there
   (one sandbox a JVM: Robolectric's native runtime goes into the first sandbox's class loader only).
-  The normal tasks enable 30 to 36 alone, so a pin outside 29..36 runs nowhere, unreported. The voice
-  flavour's JVM tests run at 35 only; it is at 29 on the emulator (below). `RobolectricSdks` fails
+  The normal tasks enable 30 to 36 alone, so a pin outside 29..36 runs nowhere, unreported. `RobolectricSdks` fails
   if 29 leaves `robolectric.properties` (the At29 task would pass with nothing left in it).
   Screenshots and the theme maker's testdata are compared at 35 alone (`SCREENSHOT_SDK`); at 29 a
   capture still lays out and draws. A test of behaviour that only exists from some level on pins
@@ -175,10 +175,19 @@ wins (McNemar, Bonferroni-corrected), learning must bring back what was typed, a
 `run-on-device.sh` runs a set through the APK's own engine on a device, for checking that the app
 decodes as the tool does.
 
-Roborazzi goldens (`app/src/test/screenshots/`) are compared in the text flavor only, since the voice
-build's bar adds a microphone. `app/build.gradle.kts` turns record, compare and verify off for every
-`testVoice*` task, which makes `captureRoboImage` a no-op there; every other assertion still runs. A
-voice case that is about how the microphone looks would need its own golden in a voice-only directory.
+Roborazzi goldens (`app/src/test/screenshots/`) show the bar with its microphone and the space's
+voice hint: since 0.6.0 there is one build, and voice is everyone's default (the voice pack's absence
+is a notice, not a hidden button). `OldRenderBaselineTest` draws as the text build did, so
+`baseline-060` stays the old drawing's record.
+
+The resource packs in JVM tests: `TestShelves` (app test sources) makes tiny packs signed with the
+committed test key (`TestPacks`, ime-core testFixtures) and installs them through `PackStore.useShelf`;
+`KeyboardHarness` installs both, so a keyboard test sees the keyboard, not the gate. A test of the
+gate or the voice pack's notice takes one away (`TestShelves.use(text = false)`, `PacksUatTest`). The
+import's checks (signature, a file's hash, format, space, a killed import, the same pack again, voice
+before text) are `PackShelfTest`'s in ime-core, on real zips in a temporary directory. Engine-data
+tests (`TablesSettingsUatTest`, `:lib:ime-eval:uatTest`) read the build's generated data as before:
+the packs are made from those same directories.
 
 Every app JVM test runs with 编码行 = 嵌入 (`OneDefaultPreferencesShadow`), not the floating strip a new install gets: this keeps 0.5.0's goldens and geometry. A test of the floating strip sets it itself and puts it back.
 
@@ -199,19 +208,19 @@ a settings page, rotation, a field type, an upgrade) is tried on a device before
   android-36 google_apis **arm64-v8a**, native under Hypervisor.framework, 1080x2340 at 440 dpi with
   three-button nav as redroid had (the scripts' coordinates hold), booted headless from a snapshot
   read-only in ~5 s, so every boot is a clean device and two run at once (2.6-3.9 GB resident each).
-  It runs the release's own ABI (build `-PbuildABI=arm64-v8a`), the arm64 voice build included, and
+  It runs the release's own ABI (build `-PbuildABI=arm64-v8a`), voice included, and
   has its own kernel: the hardware keyboard (a uinput one, `uat/tools/emu-keyboard.sh`) is tested on
   the same device as the rest; a uinput keyboard is still made nowhere but an emulator. Install,
   `ime enable` / `ime set` the service, drive it with `adb shell input tap/swipe` at measured key
   coordinates, read the field back, screenshot the bar. Scripted, that is `uat/tools/uat.py`
   (below); `uat/tools/avd.sh` makes the AVD and its snapshot `clean`. Root via `adb root`.
   Voice (UAT 12) is said with clips made by `uat/tools/voice-clips.py` (Kokoro, offline, into
-  `dev/uat-out/voice-clips/`, not in git), played by the voice debug build's clip microphone:
+  `dev/uat-out/voice-clips/`, not in git), played by the debug build's clip microphone (the voice pack imported):
   `VoiceClipMic` stands in for what `VoiceListener` reads from the AudioRecord (still opened,
   started and released; the permission still checked), a window at a time at the microphone's
   pace, the queued clips and pauses in order, then a faint noise (never exact zero) till the talk
   ends, so the endpoint, the live text and the level run as on a phone. The shell drives it
-  through `VoiceClipProvider` (voiceDebug source set only, shell or root uid only): `content write`
+  through `VoiceClipProvider` (debug source set only, shell or root uid only): `content write`
   a clip into the app's files, `content call --method queue --arg a.wav,800,b.wav` (on, clear,
   state too); `Device.say` does both. It is reached only under `BuildConfig.DEBUG`, so R8 drops it
   from a release. What it cannot test, left to a phone and a person: a real microphone and its
@@ -220,10 +229,10 @@ a settings page, rotation, a field type, an upgrade) is tried on a device before
 - Performance numbers are taken on the **benchmark** build type, not debug: release's R8, not
   debuggable (a debuggable app runs its code interpreted and JIT'd differently, its frames up to
   twice as slow and noisier), signed with the debug key, id `io.github.sraw.youmo.bench`, with debug's
-  typing host (`TypingHostActivity`); the text flavor only (`textBenchmark`: the voice build's models are
-  no part of what is timed, and its variant is not set up), no unit tests of its own. Instrumentation
+  typing host (`TypingHostActivity`) and its pack provider (import the text pack as for debug: it trusts
+  the test key as debug does), no unit tests of its own. Instrumentation
   runs against it as against debug (same key):
-  `./gradlew :app:connectedTextBenchmarkAndroidTest -Pyoumo.testBuildType=benchmark
+  `./gradlew :app:connectedBenchmarkAndroidTest -Pyoumo.testBuildType=benchmark
   -Pandroid.testInstrumentationRunnerArguments.class=org.fcitx.fcitx5.android.input.KeyboardPerfBaselineTest
   -Pandroid.testInstrumentationRunnerArguments.perfRuns=20 -Pandroid.testInstrumentationRunnerArguments.perfCanvas=true`,
   its rows (`KeyboardPerf` in logcat) read with `adb logcat -d -s KeyboardPerf:I`: median, p90 and the
@@ -260,10 +269,12 @@ the case files hold no results. `uat/README.md` has the format, the baselines an
 The runner, `uat/tools/uat.py`: `up` / `down` (two emulators, emulator-5554 and emulator-5556, from the
 AVD's snapshot), `run [--areas] [--ids] [--devices]` (`UAT_BUILD=release`: on the signed arm64
 release APK, the debug package uninstalled first and installed back only for the cases that type into
-its `TypingHostActivity`), `mark` (a visual case after its sheet is seen). One
+its `TypingHostActivity`; `UAT_CANVAS=1`: every case on 060's new drawing, internal.canvasKeyboard written into the cleared
+app's prefs before it starts, by `run-as` on the debug build and as root on the release, and checked once it is up: a
+case whose prefs lost it is blocked), `mark` (a visual case after its sheet is seen). One
 script per case file (`uat/scripts/<file>.py`; handwriting's strokes in `hw_strokes.py`); a case in a
 .md with no script is reported blocked (没有脚本), never left out; a case whose `needs=` names another
-place (the voice build, a release by hand, a real phone, the JVM) is listed as 在别处跑, not counted
+place (a run without the voice pack, a release by hand, a real phone, the JVM) is listed as 在别处跑, not counted
 as skipped. The UI is read back by a resident `Dumper.java`, which waits for the screen to settle, so
 the runner polls for what it waits on rather than sleeping; visual cases go on contact sheets, reviewed
 per `uat/tools/sheet-review.md`. The debug build's `TypingHostActivity` is the native field for what the
@@ -317,7 +328,7 @@ differ; the format's key names; the icons' vector paths). The layout test also w
 the page's `<script type="application/json" id="youmo-layout">` / `id="youmo-icons"` blocks, so
 the page needs no build. Each test compares its file with
 the repo's and fails on a difference;
-`./gradlew :app:testTextDebugUnitTest --tests '*ThemeMakerRulesTest' --tests '*ThemeMakerLayoutTest' -PupdateThemeMaker`
+`./gradlew :app:testDebugUnitTest --tests '*ThemeMakerRulesTest' --tests '*ThemeMakerLayoutTest' -PupdateThemeMaker`
 writes them again, and the page's own test then shows what it must follow.
 
 The four phones, their short names (`label`, the select's) and the phones named as examples

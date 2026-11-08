@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.ui.main.settings.AddressSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.BackupFragment
+import org.fcitx.fcitx5.android.ui.main.settings.behavior.PacksFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.ClipboardSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.HardwareKeyboardFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.KeysSettingsFragment
@@ -80,6 +81,9 @@ object SettingsIndex {
             Target(SettingsRoute.Backup, BackupFragment.EXPORT_USER_DATA_KEY)))
         add(Entry(context.getString(BackupFragment.IMPORT_USER_DATA), "", backup,
             Target(SettingsRoute.Backup, BackupFragment.IMPORT_USER_DATA_KEY)))
+        page(R.string.packs, SettingsRoute.Packs)
+        add(Entry(context.getString(R.string.pack_import), context.getString(R.string.pack_import_summary), listOf(context.getString(R.string.packs)),
+            Target(SettingsRoute.Packs, PacksFragment.IMPORT_KEY)))
         page(R.string.about, SettingsRoute.About)
     }
 

@@ -48,6 +48,10 @@ object KeyNames {
         "domain" to "button_domain",
     )
 
-    /** The keys whose views had a name of their board's own (`board/key`), over [RESOURCES]: the number pad's space. */
-    val BOARD_RESOURCES: Map<String, String> = mapOf("number/space" to "button_mini_space")
+    /** The keys whose views had a name of their board's own (`board/key`), over [RESOURCES]: the number pad's space, handwriting's 注, the symbol panel's lock. */
+    val BOARD_RESOURCES: Map<String, String> = mapOf(
+        "number/space" to "button_mini_space",
+        "handwriting/reading" to "button_reading",
+        "symbols/lock" to "button_panel_lock",
+    )
 }

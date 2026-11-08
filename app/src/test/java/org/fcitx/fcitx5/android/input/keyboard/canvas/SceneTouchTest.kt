@@ -264,7 +264,7 @@ class SceneTouchTest {
             val shown = both { h, on ->
                 val space = h.keyView("space")
                 if (!on) return@both space.longPressFeedbackEnabled
-                val scene = checkNotNull(h.textKeyboard().sceneKeyOf(space))
+                val scene = checkNotNull(h.textKeyboard().let { kb -> kb.sceneKey(checkNotNull(h.canvas()?.keyAt("space"))) })
                 assertEquals(behavior.name, space.longPressFeedbackEnabled, scene.keyGesture.longPressFeedbackEnabled)
                 scene.keyGesture.longPressFeedbackEnabled
             }
@@ -284,10 +284,9 @@ class SceneTouchTest {
             val c = checkNotNull(h.canvas())
             val gs = h.views("g")
             assertEquals(2, gs.size)
-            val g = checkNotNull(kb.sceneKeyOf(gs[0]))
-            val keys = KeyboardHarness.all(kb).filterIsInstance<KeyView>().mapNotNull { kb.sceneKeyOf(it) }
-                .filter { it.ref != KeyRef.scene("g", 1) }.toList()
-            val touch = SceneTouch(c, keys) { true }
+            val g = checkNotNull(kb.sceneKey(checkNotNull(c.keyAt("g"))))
+            // each node's key its first copy's: g's two copies one key
+            val touch = SceneTouch(c, keyFor = { n -> c.keyAt(n.id)?.let(kb::sceneKey) }, shown = { true })
             val origin = h.box(kb)
             val at = gs.map { v -> h.box(v).let { it.exactCenterX() - origin.left to it.exactCenterY() - origin.top } }
             val pointers = at.map { (x, y) -> checkNotNull(touch.find(x, y)) }
@@ -312,7 +311,7 @@ class SceneTouchTest {
         prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         KeyboardHarness(im = KeyboardHarness.PINYIN).start().use { h ->
             val kb = h.textKeyboard()
-            val q = checkNotNull(kb.sceneKeyOf(h.keyView("q")))
+            val q = checkNotNull(kb.sceneKey(checkNotNull(h.canvas()?.keyAt("q"))))
             assertNotNull(q.bounds)
             assertNull(SceneKey(KeyRef.scene("gone", 0), q.def, checkNotNull(h.canvas()), kb).bounds)
         }

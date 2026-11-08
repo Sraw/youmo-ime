@@ -3,11 +3,11 @@ name: Unit Tests
 # JVM unit tests, the lexicon tools' Python tests, and the C++ tests of our sherpa-onnx changes,
 # built with the host's compiler (lib/sherpa-onnx/host-test.sh).
 # Deliberately separate from the build workflow:
-#   - no NDK (the task graph for `:app:testTextDebugUnitTest` contains no native tasks)
+#   - no NDK (the task graph for `:app:testDebugUnitTest` contains no native tasks)
 #   - single OS
 # so it gates every push.
-# Four jobs side by side, each on a runner of its own (one in a row took 30 minutes): the plain JVM
-# modules and the tools, the app's tests at SDK 35, the same at 29, the voice flavour. The app's
+# Three jobs side by side, each on a runner of its own (one in a row took 30 minutes): the plain JVM
+# modules and the tools, the app's tests at SDK 35, the same at 29. The app's
 # KeyMarksEverywhereUatTest (half an app run's time) is left out of the app jobs (-PskipExhaustive)
 # and run by key_marks.yml, when the keys' code changes and weekly.
 #
@@ -172,14 +172,13 @@ jobs:
           cmake: "true"
           robolectric: robolectric-35
 
-      # text debug only: the voice flavour's own code is tested by the voice job and the voice tests
-      # in ime-core. The screenshot tests compare against app/src/test/screenshots
+      # debug only (one APK since 0.6.0, voice input in it). The screenshot tests compare against app/src/test/screenshots
       # (roborazzi.test.verify in gradle.properties); goldens are recorded on JDK 21 locally.
       # One ABI: a build of all four links resources once per split, and the unit tests need one.
       - name: Run app unit tests
         env:
           BUILD_ABI: x86_64
-        run: ./gradlew --build-cache -PskipExhaustive :app:testTextDebugUnitTest :app:koverLogTextDebug
+        run: ./gradlew --build-cache -PskipExhaustive :app:testDebugUnitTest :app:koverLogDebug
 
       - name: Upload heap dumps
         if: failure()
@@ -210,8 +209,8 @@ jobs:
         with:
           name: unit-test-report-app
           path: |
-            app/build/reports/tests/testTextDebugUnitTest/
-            app/build/test-results/testTextDebugUnitTest/
+            app/build/reports/tests/testDebugUnitTest/
+            app/build/test-results/testDebugUnitTest/
           retention-days: 14
 
   # Android 10 (minSdk 29) must keep working: every app Robolectric test again at SDK 29, a task of
@@ -233,11 +232,11 @@ jobs:
           cmake: "true"
           robolectric: robolectric-29
 
-      # text debug, as above; one ABI
+      # debug, as above; one ABI
       - name: Run app unit tests at SDK 29
         env:
           BUILD_ABI: x86_64
-        run: ./gradlew --build-cache -PskipExhaustive :app:testTextDebugUnitTestAt29
+        run: ./gradlew --build-cache -PskipExhaustive :app:testDebugUnitTestAt29
 
       - name: Upload heap dumps
         if: failure()
@@ -259,55 +258,6 @@ jobs:
         with:
           name: unit-test-report-29
           path: |
-            app/build/reports/tests/testTextDebugUnitTestAt29/
-            app/build/test-results/testTextDebugUnitTestAt29/
-          retention-days: 14
-
-  # no other job sees the voice flavour on a push: its own code (src/voice), whose VoiceFeature the
-  # text stub has to match, the unit tests' sources against it, and the voice-only tests
-  # (VoiceKeyboardUatTest, VoiceHoldUatTest); the shared tests already ran on the text flavour
-  voice:
-    name: Voice flavour
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - name: Fetch source code
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          submodules: false
-
-      - name: Set up the build
-        uses: ./.github/actions/setup-build
-        with:
-          cmake: "true"
-          robolectric: robolectric-35-voice
-
-      - name: Compile the voice flavour and run its own tests
-        env:
-          BUILD_ABI: x86_64
-        run: ./gradlew --build-cache :app:testVoiceDebugUnitTest --tests '*Voice*'
-
-      - name: Upload heap dumps
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: test-oom-voice
-          path: app/build/test-oom/
-          if-no-files-found: ignore
-          compression-level: 6
-          retention-days: 3
-
-      - name: Annotate test failures
-        if: failure()
-        run: python3 .github/scripts/annotate_test_failures.py
-
-      - name: Upload test report
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: unit-test-report-voice
-          path: |
-            app/build/reports/tests/testVoiceDebugUnitTest/
-            app/build/test-results/testVoiceDebugUnitTest/
+            app/build/reports/tests/testDebugUnitTestAt29/
+            app/build/test-results/testDebugUnitTestAt29/
           retention-days: 14

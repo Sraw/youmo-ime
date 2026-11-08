@@ -5,6 +5,7 @@ import io
 import json
 import os
 import re
+import subprocess
 import tempfile
 import threading
 import time
@@ -348,8 +349,8 @@ class JvmTest(unittest.TestCase):
         self.assertEqual(("阻塞", "没有 @Uat 测试"), rec["HW-09"])
         self.assertEqual(["HW-09", "KB-22"], list(rec))
 
-    def test_a_test_failing_in_one_flavor_fails_whichever_is_read_last(self):
-        # the failing flavor read first, then last: the worse result counts either way
+    def test_a_test_failing_at_one_sdk_fails_whichever_is_read_last(self):
+        # the failing run (SDK 35's or 29's) read first, then last: the worse result counts either way
         for failing in ("text", "voice"):
             for flavor in ("text", "voice"):
                 failure = f'<failure message="{failing} only">x</failure>' if flavor == failing else ""
@@ -358,6 +359,26 @@ class JvmTest(unittest.TestCase):
             for order in (("text", "voice"), ("voice", "text")):
                 results = uat.junit_results([os.path.join(self.tmp.name, f"{failing}-first", f) for f in order])
                 self.assertEqual(("失败", 1.0, f"{failing} only"), results[("org.x.KeysTest", "bar")], (failing, order))
+
+    def test_the_packs_state_is_read_off_the_providers_bundle(self):
+        d = mock.MagicMock()
+        d.sh.return_value = "Result: Bundle[{result=imported:text:v1, voice=missing, text=v1}]\n"
+        self.assertEqual({"text": "v1", "voice": "missing"}, uat.packs_state(d))
+        d.sh.return_value = "Result: Bundle[{text=needs-update:v1, voice=v2}]\n"
+        self.assertEqual({"text": "needs-update:v1", "voice": "v2"}, uat.packs_state(d))
+
+    def test_the_packs_a_run_imports_are_the_newest_the_build_listed(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(uat, "PACKS", tmp):
+            for pid, v, t in (("text", 1, 1), ("text", 2, 2), ("voice", 1, 1)):
+                with open(os.path.join(tmp, f"youmo-{pid}-v{v}.json"), "w") as f:
+                    json.dump({"pack": pid, "version": v, "file": f"youmo-{pid}-v{v}.youmopack"}, f)
+                os.utime(os.path.join(tmp, f"youmo-{pid}-v{v}.json"), (t, t))
+            files = uat.pack_files()
+            self.assertEqual(2, files["text"][1])
+            self.assertTrue(files["text"][0].endswith("youmo-text-v2.youmopack"))
+            self.assertEqual(["text"], list(uat.pack_files(voice=False)))
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(uat, "PACKS", tmp), self.assertRaises(SystemExit):
+            uat.pack_files()
 
     def test_an_empty_failure_message_is_no_message(self):
         self.write("e/TEST-org.x.A.xml", '<testsuite><testcase name="a" classname="org.x.A"><failure message=""/></testcase></testsuite>')
@@ -389,14 +410,14 @@ class JvmTest(unittest.TestCase):
 
     def test_a_jvm_case_runs_elsewhere_on_a_device(self):
         c = case("KB-22", "jvm:KeyboardUatTest")
-        state, why = c.unmet(SimpleNamespace(flavor="text"))
+        state, why = c.unmet(SimpleNamespace(voice=False))
         self.assertIs(uat.Elsewhere, state)
         self.assertTrue(why.startswith("JVM"))
 
     def test_a_scripted_release_case_runs_only_in_a_release_run(self):
         # the big-lexicon cases (WD-14d, 14h, TBL-12c; user 2026-10-30): out of the everyday run, in the release's
         c = case("WD-14d", "release,scripted:x")
-        device = SimpleNamespace(flavor="text")
+        device = SimpleNamespace(voice=False)
         self.assertEqual("release", uat.place(c.needs))
         self.assertIs(uat.Elsewhere, c.unmet(device)[0])
         was = uat.BUILD
@@ -410,13 +431,13 @@ class JvmTest(unittest.TestCase):
         finally:
             uat.BUILD = was
 
-    def test_a_voice_case_on_the_text_build_is_reported_as_voice_where_place_puts_it(self):
-        # the voice reason, as place() files it under voice (F4263); the voice build runs it
+    def test_a_voice_case_without_the_voice_pack_is_reported_as_voice_where_place_puts_it(self):
+        # the voice reason, as place() files it under voice (F4263); a run with the voice pack runs it
         c = case("VO-01", "voice:x")
-        state, why = c.unmet(SimpleNamespace(flavor="text"))
+        state, why = c.unmet(SimpleNamespace(voice=False))
         self.assertEqual((uat.Elsewhere, "voice"), (state, uat.place(c.needs)))
         self.assertTrue(why.startswith(uat.ELSEWHERE["voice"]), why)
-        self.assertIsNone(c.unmet(SimpleNamespace(flavor="voice")))
+        self.assertIsNone(c.unmet(SimpleNamespace(voice=True)))
 
     def test_sdk_versions_sort_as_numbers_a_pre_release_before_its_release(self):
         self.assertEqual("36.1.0", max(["9.0.0", "36.1.0", "36.0.0"], key=uat.version_key))
@@ -578,7 +599,7 @@ class UpTest(unittest.TestCase):
 
     def test_run_refuses_another_avds_emulator_before_installing(self):
         self.put("avd", "dsapp")
-        a = SimpleNamespace(areas=None, ids="ST-48", devices="5556", flavor="text")
+        a = SimpleNamespace(areas=None, ids="ST-48", devices="5556", no_voice=False)
         with mock.patch.object(uat, "install", mock.MagicMock()) as install, \
                 self.assertRaises(SystemExit) as e:
             uat.cmd_run(a)
@@ -699,6 +720,85 @@ class PlugTest(unittest.TestCase):
             uat.plug(d, "B0")
         self.assertEqual([], self.enabled(d))
         sleep.assert_not_called()
+
+
+class CanvasOnTest(unittest.TestCase):
+    def test_the_debug_build_writes_as_the_app(self):
+        cmd = uat.canvas_on_cmd("debug")
+        self.assertIn(f"run-as {uat.PKG} sh -c '", cmd)
+        self.assertIn('canvas_keyboard', cmd)
+        self.assertNotIn("chown", cmd)
+        self.assertTrue(cmd.startswith(f"am force-stop {uat.PKG};"))
+
+    def prefs_after(self, before):
+        with tempfile.TemporaryDirectory() as d:
+            f = "shared_prefs/p.xml"
+            if before is not None:
+                os.makedirs(os.path.join(d, "shared_prefs"))
+                with open(os.path.join(d, f), "w") as out:
+                    out.write(before)
+            subprocess.run(["sh", "-c", uat.canvas_prefs_script(f)], cwd=d, check=True)
+            with open(os.path.join(d, f)) as got:
+                return got.read()
+
+    def test_the_canvas_turned_on_keeps_what_the_packs_import_wrote(self):
+        packs = ("<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n<map>\n"
+                 '    <string name="packs_seen">text</string>\n'
+                 '    <boolean name="canvas_keyboard" value="false" />\n</map>\n')
+        after = self.prefs_after(packs)
+        self.assertIn('<string name="packs_seen">text</string>', after)
+        self.assertEqual(1, after.count("canvas_keyboard"))
+        self.assertIn(uat.CANVAS_SET, after)
+        for before in (None, "", "<map />"):
+            after = self.prefs_after(before)
+            self.assertIn(uat.CANVAS_SET, after)
+            self.assertTrue(after.startswith("<map>") and after.rstrip().endswith("</map>"), after)
+
+    def test_the_canvas_goes_on_after_the_clear_and_the_packs_before_the_input_method(self):
+        calls = []
+        d = mock.Mock()
+        with mock.patch.object(uat, "CANVAS", True), \
+                mock.patch.object(uat, "clear_keeping_packs", lambda d: calls.append("clear")), \
+                mock.patch.object(uat, "canvas_on", lambda d: calls.append("canvas_on")), \
+                mock.patch.object(uat, "ensure_ime", lambda d: calls.append("ime")), \
+                mock.patch.object(uat, "canvas_check", lambda d: calls.append("check")), \
+                mock.patch.object(uat, "plug", lambda d, b: (_ for _ in ()).throw(uat.Blocked("stop"))):
+            with self.assertRaises(uat.Blocked):
+                uat.reset(d, "B0", "text")
+        self.assertEqual(["clear", "canvas_on", "ime", "check"], calls)
+
+    def test_the_release_build_writes_as_root_with_the_apps_owner_and_context(self):
+        cmd = uat.canvas_on_cmd("release")
+        self.assertNotIn("run-as", cmd)
+        for part in ("chown -R $u:$u", "chmod 660", "chcon -R"):
+            self.assertIn(part, cmd)
+
+    def test_a_release_waits_for_the_prefs_to_settle_before_the_force_stop(self):
+        cmd = uat.canvas_on_cmd("release")
+        self.assertLess(cmd.index("cksum"), cmd.index("am force-stop"))
+        with tempfile.TemporaryDirectory() as d:
+            f = os.path.join(d, "p.xml")
+            # nothing there, then a file written once: each settles at the first look
+            for _ in range(2):
+                start = time.monotonic()
+                subprocess.run(["sh", "-c", uat.prefs_settled_script(f)], check=True)
+                self.assertLess(time.monotonic() - start, 2)
+                with open(f, "w") as out:
+                    out.write("<map></map>")
+            # still being written: waited for till it stops
+            writer = subprocess.Popen(["sh", "-c", f"for i in 1 2 3 4 5 6; do echo $i >> {f}; sleep 0.3; done"])
+            subprocess.run(["sh", "-c", uat.prefs_settled_script(f)], check=True)
+            with open(f) as got:
+                self.assertTrue(got.read().rstrip().endswith("6"), "returned before the writes ended")
+            writer.wait()
+
+    def test_the_canvas_off_after_the_app_started_blocks_the_case(self):
+        d = mock.Mock()
+        d.sh.return_value = "<map><boolean name=\"canvas_keyboard\" value=\"false\" /></map>"
+        with self.assertRaises(uat.Blocked):
+            uat.canvas_check(d)
+        d.sh.return_value = "<map><boolean name=\"canvas_keyboard\" value=\"true\" /></map>"
+        uat.canvas_check(d)
 
 
 if __name__ == "__main__":

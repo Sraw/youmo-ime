@@ -3,8 +3,6 @@
  * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
  */
 
-import com.android.build.api.dsl.ApplicationExtension
-import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import org.gradle.api.DefaultTask
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -21,8 +19,6 @@ import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
-import org.gradle.kotlin.dsl.configure
-import org.gradle.kotlin.dsl.getByType
 import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.register
 import org.gradle.work.DisableCachingByDefault
@@ -33,9 +29,9 @@ import java.nio.file.Files
 import javax.inject.Inject
 
 /**
- * What the voice builds (the `voice` flavor of the `speech` dimension) add to the text ones: the
- * speech recognizer and its models, none of them in a text build, which asks for no microphone
- * either.
+ * Voice input: the speech recognizer, in every build, and its models, the voice pack's
+ * (AssetPacksPlugin): none of them in the APK. Without the voice pack imported, voice input asks
+ * for it; the microphone is asked for at the first use only.
  *
  * - sherpa-onnx (k2-fsa, Apache-2.0), the recognizer: the :lib:sherpa-onnx module, built from
  *   source, ours to change.
@@ -57,15 +53,14 @@ import javax.inject.Inject
  * by the release `voice-models-*` of this fork (its manifest.txt says how): the recognizer uses it
  * where it lies in the APK, mapped, rather than reading it onto the heap (lib/sherpa-onnx README).
  *
- * Downloaded once, SHA-256 checked (DownloadTask), into the voice variants'
- * assets under `voice/`, uncompressed: mapped, as the recognizer and the tagger load them.
+ * Downloaded once, SHA-256 checked (DownloadTask), into `voice/` for the voice pack: mapped where
+ * the pack's import put them, as the recognizer and the tagger load them.
  */
 class VoiceDataPlugin : Plugin<Project> {
 
     companion object {
-        /** the app's flavor dimension, text or voice, and the flavor of the voice builds */
-        const val DIMENSION = "speech"
-        const val FLAVOR = "voice"
+        /** what makes the voice pack's files */
+        const val COPY_TASK = "copyVoiceModels"
         internal const val MODEL_NAME = "sherpa-onnx-x-asr-zipformer-transducer-zh-en-punct-int8-2026-06-03"
         private const val MODEL_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/$MODEL_NAME.tar.bz2"
         private const val MODEL_SHA256 = "5d02c36d7b44e886b7c8f0d8e051f8713acab96c264bb6ef9e718be39a6a2224"
@@ -108,7 +103,6 @@ class VoiceDataPlugin : Plugin<Project> {
         // its downloadEngineWords and its tool make the hotwords, whichever plugin the build script names first
         target.pluginManager.apply(EngineDataPlugin::class.java)
         val downloadsDir = target.rootProject.layout.projectDirectory.dir(".gradle/engine-downloads/voice")
-        val components = target.extensions.getByType<ApplicationAndroidComponentsExtension>()
 
         val modelArchive = target.tasks.register<DownloadTask>("downloadVoiceModel") {
             url.set(MODEL_URL)
@@ -145,7 +139,7 @@ class VoiceDataPlugin : Plugin<Project> {
             outputFile.set(target.layout.buildDirectory.file("generated/voice-hotwords/hotwords.txt"))
         }
         val localDir = target.providers.gradleProperty(LOCAL_PROPERTY)
-        val assets = target.tasks.register<CopyVoiceModels>("copyVoiceModels") {
+        target.tasks.register<CopyVoiceModels>(COPY_TASK) {
             if (localDir.isPresent) {
                 local.set(target.layout.projectDirectory.dir(localDir.get()))
             } else {
@@ -157,16 +151,7 @@ class VoiceDataPlugin : Plugin<Project> {
             outputDir.set(target.layout.buildDirectory.dir("generated/voice-assets"))
         }
 
-        // the flavor's configuration exists once the build script has declared the flavors
-        target.configurations.matching { it.name == "${FLAVOR}Implementation" }.configureEach {
-            dependencies.add(target.dependencies.project(mapOf("path" to ":lib:sherpa-onnx")))
-        }
-        target.extensions.configure<ApplicationExtension> {
-            androidResources.noCompress += listOf(".onnx", ".ort")
-        }
-        components.onVariants(components.selector().withFlavor(DIMENSION to FLAVOR)) { variant ->
-            variant.sources.assets?.addGeneratedSourceDirectory(assets, CopyVoiceModels::outputDir)
-        }
+        target.dependencies.add("implementation", target.dependencies.project(mapOf("path" to ":lib:sherpa-onnx")))
     }
 
     /** The pack's words as the recognizer's hotwords, a line each: the dict tool's `hotwords`, so the app's rule spells them. */

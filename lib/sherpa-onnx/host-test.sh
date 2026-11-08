@@ -47,3 +47,7 @@ g++ -std=c++17 -O1 -I "$src" -I $ssp -I $gtest/googletest/include \
   "$csrc/bbpe.cc" "$csrc/base64-decode.cc" "$csrc/file-utils.cc" "$csrc/log.cc" \
   $ssp/ssentencepiece/csrc/ssentencepiece.cc libgtest.a -lpthread -o blocked-phrases-test
 ./blocked-phrases-test
+
+g++ -std=c++17 -O1 -I "$src" -I $gtest/googletest/include \
+  "$csrc/mapped-file-test.cc" "$csrc/mapped-file.cc" libgtest.a -lpthread -o mapped-file-test
+./mapped-file-test

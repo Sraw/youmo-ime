@@ -41,13 +41,14 @@ import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.daemon.HostDaemon
+import org.fcitx.fcitx5.android.data.pack.TestShelves
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.HostEvent
-import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
+import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
@@ -106,6 +107,9 @@ class KeyboardHarness(
     init {
         // -PcanvasKeyboard: the canvas draws the keys (060-render-p2 S3), where the test did not choose
         CanvasRun.begin()
+        // both resource packs there, as on a user's phone: without the text pack the keyboard is a
+        // prompt to import it (PackGateView); a test of that, or of voice input's, puts its own
+        TestShelves.use()
         keyboards?.let(::setKeyboards)
         codeRowWas?.let { ThemeManager.prefs.codeRow.setValue(codeRow) }
         val connection = host?.let { HarnessConnection(scope, it) } ?: FakeHostConnection(scope, api)
@@ -450,7 +454,8 @@ class KeyboardHarness(
 
     /** The popup's keys up now (a long press's choices), not the keyboard's own labels. */
     fun popupKeys(): List<TextView> = all(inputView).filterIsInstance<AutoScaleTextView>()
-        .filter { shown(it) && generateSequence(it as View) { p -> p.parent as? View }.none { p -> p is KeyView } }
+        // a key's texts, and the nine keys' column's items (a keyboard's own), are no popup's
+        .filter { shown(it) && generateSequence(it as View) { p -> p.parent as? View }.none { p -> p is KeyView || p is BaseKeyboard } }
         .toList()
 
     /**
@@ -703,10 +708,8 @@ class KeyboardHarness(
         return Touch(width / 2f + dx * dp, height / 2f + dy * dp, ms)
     }
 
-    /** The nine keys' key for [digit] (its small digit), or the column's punctuation key. */
-    fun nineKey(digit: String): AltTextKeyView =
-        all(inputView).filterIsInstance<AltTextKeyView>()
-            .firstOrNull { shown(it) && it.altText.text.toString() == digit } ?: error("no key $digit in ${texts()}")
+    /** The nine keys' key for [digit] (its small digit), or the column's punctuation key, whichever draws it. */
+    fun nineKey(digit: String): ShownKey = keys().firstOrNull { it.alt == digit } ?: error("no key $digit in ${texts()}")
 
     /**
      * Every text shown under [v] (visible ones only), depth first: a canvas's keys' labels, corners and

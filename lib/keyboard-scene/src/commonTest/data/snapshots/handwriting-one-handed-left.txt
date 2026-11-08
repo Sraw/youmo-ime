@@ -15,9 +15,9 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
   normal
     shadow rect(739.88,18.38,853.12,124.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(739.88,18.38,853.12,121.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    icon backspace 776.75,38.5,839.75,101.5 #ff7a858a
-    icon delete-sweep 745.13,21,774.13,50 #ff7a858a
-    icon restore 745.13,90,774.13,119 #ff7a858a
+    icon backspace 776.68,38.5,839.68,101.5 #ff7a858a
+    icon delete-sweep 744.97,23.63,773.97,52.63 #ff7a858a
+    icon restore 744.97,87.9,773.97,116.9 #ff7a858a
   pressed
     +2 fill rect(739.88,18.38,853.12,121.63 r=10.5,10.5,10.5,10.5) #1f000000
 key comma kind=function role=comma a11y="，"
@@ -25,9 +25,9 @@ key comma kind=function role=comma a11y="，"
   shape rect(739.88,158.38,853.12,262.63 r=10.5,10.5,10.5,10.5)
   hit rect(732,140,861,281)
   anchor 796.5,210.5 up 0,-1
-  actions send=","
+  actions preview="off" send=","
   text label="，"
-  popup from=list as-is="true"
+  popup from=list
     item "？"
     item "！"
     item "："
@@ -47,7 +47,7 @@ key period kind=function role=period a11y="。"
   shape rect(739.88,299.38,853.12,402.63 r=10.5,10.5,10.5,10.5)
   hit rect(732,281,861,421)
   anchor 796.5,351 up 0,-1
-  actions send="."
+  actions preview="off" send="."
   text label="。"
   popup from=none
   normal
@@ -91,7 +91,7 @@ key numbers kind=function role=numbers a11y="123"
   shape rect(136.88,580.38,242.13,683.63 r=10.5,10.5,10.5,10.5)
   hit rect(129,562,250,702)
   anchor 189.5,632 up 0,-1
-  actions send="layout:Number"
+  actions long-press="unicode" send="layout:Number"
   text label="123"
   shortcut="numbers"
   normal

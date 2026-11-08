@@ -9,7 +9,7 @@ user, and every setting, is in [`docs/`](../docs/README.md).
 |---|---|
 | [architecture.md](architecture.md) | any change: the modules, the processes and threads, a key's way from the screen to the editor |
 | [engine.md](engine.md) | touching `lib/ime-core/.../engine`: pinyin, tables, English, learning, ranking, the data files |
-| [app.md](app.md) | touching `app`: the service, the keyboard views, settings, persistence, the two flavors |
+| [app.md](app.md) | touching `app`: the service, the keyboard views, settings, persistence, the resource packs' side |
 | [data-and-build.md](data-and-build.md) | touching `build-logic`, a data release, `lexicon/`, native code, versions, CI |
 | [testing.md](testing.md) | finishing any change: which tests, the evaluation, trying it on a device |
 | [conventions.md](conventions.md) | writing code, comments, commits; adding a setting; product rules that are decided |
@@ -25,8 +25,9 @@ user, and every setting, is in [`docs/`](../docs/README.md).
   English) are this project's own engine in Kotlin, also in `lib/ime-core`. No native fcitx is left.
 - Ranking: an n-gram decoder over a word lattice, two small sentence models (4M, 25M) reranking its
   best sentences, and what the user typed. All on the phone; the app has no network permission.
-- Two builds (the `speech` flavor dimension): `text` and `voice` (offline voice input, X-ASR on
-  sherpa-onnx). Released for arm64-v8a.
+- One APK; the dictionaries and models are two resource packs the user imports: the text pack, and
+  the optional voice pack (offline voice input, X-ASR on sherpa-onnx) ([data-and-build.md](data-and-build.md#resource-packs)).
+  Released for arm64-v8a.
 - Data (language model, new words, English, sentence models) is built outside the app and pinned
   by SHA-256 to this repository's GitHub releases; the build fetches and compiles it.
 

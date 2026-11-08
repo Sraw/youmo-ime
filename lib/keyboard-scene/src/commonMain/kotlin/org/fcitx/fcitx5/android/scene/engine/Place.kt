@@ -59,7 +59,11 @@ object Place {
         env: Env,
         board: Box = Box(0.0, 0.0, env.width, env.height),
         warnings: Problems = Problems(),
+        snap: Boolean = true,
     ): Parsed<List<Placed>> {
+        // [snap] false: the edges where they fall, what the marks' yields are worked out on (SceneBuilder)
+        val row = rowEdge(snap)
+        val side = sideEdge(snap, board)
         val p = Problems()
         val total = rows.sumOf { it.height }
         val unit = board.width / columns
@@ -68,7 +72,7 @@ object Place {
         var y = board.top
         rows.forEachIndexed { r, row ->
             y = if (r == rows.lastIndex) board.bottom else y + board.height * row.height / total
-            bottoms += if (r == rows.lastIndex) y else pixel(y)
+            bottoms += if (r == rows.lastIndex) y else row(y)
         }
         val out = ArrayList<Placed>()
         val kept = ArrayList<Kept>()
@@ -92,7 +96,7 @@ object Place {
                 val n = item.rows
                 val bottom = if (n > 1) span(n, r, i, widths.size, bottoms, row.line, p) else bottoms[r]
                 if (n > 1 && width !is Width.Units) p.add(row.line, "an item across rows needs a width in units, not fill")
-                val cell = Box(edge(x, board), top, edge(x + w, board), bottom)
+                val cell = Box(side(x), top, side(x + w), bottom)
                 if (n > 1) kept += Kept(if (i == 0) Side.Left else Side.Right, cell.left, cell.right, minOf(r + n - 1, rows.lastIndex), x, x + w)
                 x += w
                 Triple(item, copy, cell)
@@ -114,6 +118,10 @@ object Place {
     // half a pixel off and rounded the other way (a letter a pixel higher, an edge blurred); the
     // board's own edges stay where they are (a one-handed board's, a split's, may be between pixels)
     private fun pixel(v: Double): Double = floor(v + HALF)
+
+    private fun rowEdge(snap: Boolean): (Double) -> Double = if (snap) ::pixel else { v -> v }
+
+    private fun sideEdge(snap: Boolean, board: Box): (Double) -> Double = if (snap) { x -> edge(x, board) } else { x -> x }
 
     private fun edge(x: Double, board: Box): Double = if (abs(x - board.left) < EPSILON || abs(x - board.right) < EPSILON) x else pixel(x)
 

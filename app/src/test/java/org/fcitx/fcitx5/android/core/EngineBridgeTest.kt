@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.data.replaceDirectory
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession
+import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.learn.control.BackupOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
@@ -377,6 +378,25 @@ class EngineBridgeTest {
     class Made {
 
         private val bridge = EngineBridge()
+
+        /**
+         * A fresh install has no files/engine: nothing made it, so the learning record could not be
+         * opened (ENOENT) and what was learned lived in memory only, gone with the next host. Made now.
+         */
+        @Test
+        fun aFreshInstallsLearningIsKeptWhenTheHostIsMadeAnew() {
+            val dir = checkNotNull(bridge.userDir())
+            dir.deleteRecursively()
+            try {
+                assertTrue(bridge.engines.addEnglishWord("youmoword"))
+                bridge.close()
+                assertTrue(File(dir, LearnLog.FILE).isFile)
+                assertTrue(bridge.engines.englishWords().any { it.text == "youmoword" })
+            } finally {
+                bridge.close()
+                dir.deleteRecursively()
+            }
+        }
         /** Taken, it says so: an Ink key goes out for what is shown. */
         @Test
         fun handwritingThatLoadsTakesTheInk() {
@@ -417,6 +437,40 @@ class EngineBridgeTest {
             } finally {
                 bridge.unloadable.clear()
                 EngineState.syllablesState.value = EngineState.SyllableState()
+            }
+        }
+
+        /**
+         * Review M-2: an engine that cannot load its text pack's file (one damaged since it was last
+         * read through, its size the same) has the pack read through there: found damaged, the
+         * keyboard says 已损坏 (the gate's words), not 引擎无法加载, and the pack is marked so.
+         */
+        @Test
+        fun anEngineThatCannotLoadADamagedTextPackSaysItIsDamaged() {
+            val shelf = org.fcitx.fcitx5.android.data.pack.TestShelves.shelf(org.fcitx.fcitx5.android.pack.PackKind.TEXT)
+            val said = ArrayList<String>()
+            val restart = org.fcitx.fcitx5.android.data.pack.PackStore.restartHost
+            val restarted = java.util.concurrent.CountDownLatch(1)
+            org.fcitx.fcitx5.android.data.pack.PackStore.restartHost = { restarted.countDown(); true }
+            bridge.unloadable.clear()
+            try {
+                org.fcitx.fcitx5.android.data.pack.PackStore.useShelf(shelf)
+                EngineNotices.sayer = EngineNotices.Sayer { message, _ -> said += message; true }
+                val file = File(shelf.dir(org.fcitx.fcitx5.android.pack.PackKind.TEXT)!!, "handwriting/test.txt")
+                file.writeBytes(file.readBytes().also { it[0] = (it[0].toInt() xor 1).toByte() })
+                assertThrows(DataFormatException::class.java) {
+                    bridge.unloadable.call(InputMethodCatalog.PINYIN) { throw DataFormatException("not pinyin data") }
+                }
+                org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+                assertEquals(listOf(appContext.getString(org.fcitx.fcitx5.android.R.string.pack_text_damaged)), said)
+                assertTrue(org.fcitx.fcitx5.android.data.pack.PackStore.status(org.fcitx.fcitx5.android.pack.PackKind.TEXT) is org.fcitx.fcitx5.android.pack.PackStatus.Damaged)
+                // the host restarted (off this thread): its engines no longer on the damaged files
+                assertTrue(restarted.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            } finally {
+                org.fcitx.fcitx5.android.data.pack.PackStore.restartHost = restart
+                EngineNotices.sayer = null
+                bridge.unloadable.clear()
+                org.fcitx.fcitx5.android.data.pack.TestShelves.use()
             }
         }
 

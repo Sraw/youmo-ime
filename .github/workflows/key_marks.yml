@@ -67,9 +67,9 @@ jobs:
       matrix:
         include:
           - sdk: 35
-            task: testTextDebugUnitTest
+            task: testDebugUnitTest
           - sdk: 29
-            task: testTextDebugUnitTestAt29
+            task: testDebugUnitTestAt29
     timeout-minutes: 30
     steps:
       - name: Fetch source code

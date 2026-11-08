@@ -9,6 +9,9 @@ import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.RecentlyUsed
+import org.fcitx.fcitx5.android.data.pack.AppData
+import org.fcitx.fcitx5.android.data.pack.PackStore
+import org.fcitx.fcitx5.android.data.pack.PackUnavailableException
 import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
 import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
@@ -38,15 +41,14 @@ import org.fcitx.fcitx5.android.host.EngineHost
 import org.fcitx.fcitx5.android.input.address.AddressStore
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.popup.EmojiModifier
+import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.utils.Const
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.toast
 import timber.log.Timber
 import java.io.File
-import java.io.FileInputStream
 import java.io.IOException
 import java.nio.ByteBuffer
-import java.nio.channels.FileChannel
 import java.util.concurrent.Executor
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
@@ -174,10 +176,12 @@ class EngineBridge {
      * [userDir], put back before the engine makes it anew: a user-data import killed between its
      * two renames left the engine's files only in engine.old. Null if it cannot be, the engine then
      * learning in memory: an engine/ made anew would have the next import delete engine.old, the
-     * only copy of them.
+     * only copy of them. Made if it is not there: nothing else makes it, and on a fresh install the
+     * learning record could not be opened (ENOENT), so what was learned lived in memory only.
      */
     internal fun restored(userDir: File): File? = try {
         restoreDirectory(userDir)
+        if (!userDir.isDirectory && !userDir.mkdirs()) throw IOException("cannot make $userDir")
         userDir
     } catch (e: IOException) {
         Timber.e(e, "engine user data cannot be put back: what is learned is kept in memory only")
@@ -199,8 +203,16 @@ class EngineBridge {
     // what cannot load is not loaded again on every key: the keys go to the app, the user told once
     internal val unloadable = Unloadable { im, e ->
         Timber.e("%s cannot load (%s): not called again till the engine is reloaded", im, e.javaClass.name)
-        // said on the keyboard (§3: not a toast, which Android 13 drops)
-        EngineNotices.failed(R.string.engine_unloadable)
+        // said on the keyboard (§3: not a toast, which Android 13 drops); a pack missing is told as such,
+        // one damaged since it was last read through too (read through now, on this thread: review M-2)
+        val pack = generateSequence(e) { it.cause }.take(MAX_CAUSES).filterIsInstance<PackUnavailableException>().firstOrNull()
+        EngineNotices.failed(
+            when {
+                pack != null -> R.string.pack_text_needed_short
+                PackStore.verifyAfterFailure(PackKind.TEXT, e) -> R.string.pack_text_damaged
+                else -> R.string.engine_unloadable
+            },
+        )
     }
 
     /**
@@ -341,11 +353,10 @@ class EngineBridge {
         }
     }
 
-    // mapped where it lies in the APK (stored uncompressed): nothing copied, and pages the OS may
-    // drop. Signed with the APK, so the checksums need not be read through.
-    internal fun asset(path: String): ByteBuffer = appContext.assets.openFd(path).use { fd ->
-        FileInputStream(fd.fileDescriptor).channel.use { it.map(FileChannel.MapMode.READ_ONLY, fd.startOffset, fd.length) }
-    }
+    // mapped where it lies (AppData: a resource pack's file, or the APK's asset stored uncompressed):
+    // nothing copied, and pages the OS may drop. Checked as it was imported (or signed with the APK),
+    // so the checksums need not be read through.
+    internal fun asset(path: String): ByteBuffer = AppData.map(path)
 
     /**
      * The Kotlin host's port ([EngineHost]): [answer] of the engine's snapshot. What the engine
@@ -522,6 +533,8 @@ class EngineBridge {
 
         // the host's input methods (the native androidengine's), but English, which is keyboard-us's
         private const val ENGINE = "engine-"
+        // a chain of causes looked down this far for a pack missing (initCause may loop one back)
+        private const val MAX_CAUSES = 16
         private const val MS_PER_MINUTE = 60_000L
         private const val IDLE_SECONDS = 30L
         private const val LIBIME_DICTIONARY = "user.dict"

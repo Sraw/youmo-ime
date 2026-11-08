@@ -10,11 +10,14 @@ import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineNotices
 import org.fcitx.fcitx5.android.core.EngineState
+import org.fcitx.fcitx5.android.data.pack.AppData
+import org.fcitx.fcitx5.android.data.pack.PackStore
+import org.fcitx.fcitx5.android.data.pack.PackUnavailableException
 import org.fcitx.fcitx5.android.engine.handwriting.InkNet
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.handwriting.InkRecognizer
 import org.fcitx.fcitx5.android.handwriting.OrtModel
-import org.fcitx.fcitx5.android.utils.appContext
+import org.fcitx.fcitx5.android.pack.PackKind
 import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -25,7 +28,7 @@ import java.util.concurrent.Executors
 /**
  * The handwriting recognizer, run on a thread of its own ([worker]), its readings handed on on
  * the main thread ([main]). [shared] is the app's: its two models (the character's image and its
- * path), mapped from the APK, are opened as the keyboard is first shown ([warmUp]), and kept. Of a
+ * path), mapped from the text pack, are opened as the keyboard is first shown ([warmUp]), and kept. Of a
  * piece's reads, a newer one makes those still waiting stale: they are skipped. An earlier piece's
  * last read is not: it is what that piece shows, and commits. A read of a piece the engine ended
  * ([ended], the latest) is dropped.
@@ -117,9 +120,16 @@ class HandwritingRecognition internal constructor(
                 Executors.newSingleThreadExecutor { Thread(it, "handwriting").apply { isDaemon = true } },
                 Executor { main.post(it) },
                 { EngineState.handwritingEnded.value },
-                LoadingReader(AssetRecognizer::open, AssetRecognizer::told),
+                LoadingReader(AssetRecognizer::open, AssetRecognizer::told, ::textPack),
             )
         }
+
+        /**
+         * What the recognizer's files are of: the text pack's directory, a new one at each import of
+         * it; not PackStore's generation, which an import of the voice pack counts up too (the
+         * recognizer let go and loaded again for nothing, one that cannot load told again).
+         */
+        internal fun textPack(): Any? = PackStore.dir(PackKind.TEXT)
     }
 }
 
@@ -128,10 +138,17 @@ class HandwritingRecognition internal constructor(
  * loaded (its library, its files) is not tried again at every stroke: the pad draws on with nothing
  * read, and the user is [told] once. [open] adds what it opens to the list it is given, closed if
  * the recognizer is of no use.
+ *
+ * Its files are the text pack's: without the pack (PackUnavailableException, the keyboard under its
+ * gate) it is not loaded, but neither given up nor told: the gate says what is missing. Whatever
+ * was loaded or given up is of the pack [pack] says (HandwritingRecognition.textPack: its
+ * directory): once that changes (the text pack imported), it is let go and loaded anew from the
+ * new pack at the next read.
  */
 internal class LoadingReader(
     private val open: (opened: MutableList<AutoCloseable>) -> InkRecognizer,
     private val told: () -> Unit,
+    private val pack: () -> Any? = { null },
 ) : HandwritingRecognition.Reader {
 
     private val models = ArrayList<AutoCloseable>()
@@ -140,7 +157,11 @@ internal class LoadingReader(
     @Volatile
     private var broken = false
 
-    override val loadable: Boolean get() = !broken
+    // the pack what is loaded (or was given up) is of; NotLoaded till the first load
+    @Volatile
+    private var of: Any? = NotLoaded
+
+    override val loadable: Boolean get() = !broken || pack() != of
 
     override fun load() {
         loaded()
@@ -160,10 +181,22 @@ internal class LoadingReader(
     }
 
     private fun loaded(): InkRecognizer? {
+        val now = pack()
+        if (now != of) {
+            // a pack imported since: what was loaded maps the old one's files, what was given up may load now
+            if (of !== NotLoaded) letGo()
+            broken = false
+            of = now
+        }
         if (broken) return null
         recognizer?.let { return it }
         return try {
             open(models).also { recognizer = it }
+        } catch (e: PackUnavailableException) {
+            // no text pack (yet): nothing to tell, the keyboard's gate says it; tried again at the next read
+            Timber.i("handwriting: %s", e.message)
+            letGo()
+            null
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
             // a file missing (IOException) or not the recognizer's (IllegalArgumentException), a model this
             // onnxruntime refuses (IllegalStateException: one a newer one wrote); one opened before is of no use
@@ -175,24 +208,28 @@ internal class LoadingReader(
     }
 
     private fun cannotLoad(e: Throwable): Nothing? {
-        Timber.e(e, "handwriting cannot load: not tried again till the app restarts")
+        Timber.e(e, "handwriting cannot load: not tried again till the app restarts or a pack is imported")
         broken = true
         // of no use from now on, whether it failed loading or reading (a LinkageError): not held open for the process
+        letGo()
+        told()
+        return null
+    }
+
+    private fun letGo() {
         recognizer = null
         // closing is native too, and may throw after a LinkageError: the rest closed and the user told all the same
         models.forEach { model -> runCatching { model.close() }.onFailure { Timber.w(it, "handwriting model close") } }
         models.clear()
-        told()
-        return null
     }
 }
 
-/** The recognizer of the app's assets: its models opened and its files read as it loads. */
+/** The recognizer of the text pack's files (AppData): its models opened and its files read as it loads. */
 private object AssetRecognizer {
 
     fun open(opened: MutableList<AutoCloseable>): InkRecognizer = InkRecognizer(
         net("char_image", opened), net("char_path", opened),
-        chars = appContext.assets.open("$DIR/chars.txt").use { it.readBytes().toString(Charsets.UTF_8) },
+        chars = AppData.open("$DIR/chars.txt").use { it.readBytes().toString(Charsets.UTF_8) },
         prior = prior(),
     )
 
@@ -202,13 +239,13 @@ private object AssetRecognizer {
 
     // opened at once, not at its first run: one onnxruntime refuses is found as the recognizer loads
     private fun net(name: String, opened: MutableList<AutoCloseable>): InkNet {
-        val model = OrtModel.open(appContext.assets, "$DIR/$name.ort", THREADS).also(opened::add)
+        val model = OrtModel.open(AppData.map("$DIR/$name.ort"), THREADS).also(opened::add)
         return InkNet { x, shape -> model.run(x, shape).values }
     }
 
     // each character's log frequency, float32 little-endian
     private fun prior(): FloatArray {
-        val b = ByteBuffer.wrap(appContext.assets.open("$DIR/prior.data").use { it.readBytes() }).order(ByteOrder.LITTLE_ENDIAN)
+        val b = ByteBuffer.wrap(AppData.open("$DIR/prior.data").use { it.readBytes() }).order(ByteOrder.LITTLE_ENDIAN)
         return FloatArray(b.remaining() / Float.SIZE_BYTES) { b.getFloat() }
     }
 
@@ -217,3 +254,6 @@ private object AssetRecognizer {
     // a character's two models are some 20 ms a run on one desktop core: two of the phone's
     private const val THREADS = 2
 }
+
+// LoadingReader's pack before its first load: none read yet, nothing to let go
+private object NotLoaded

@@ -43,12 +43,10 @@ import org.fcitx.fcitx5.android.input.theme.KeyKind
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.input.theme.LookDefaults
 import org.fcitx.fcitx5.android.input.theme.Palette
-import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.uat.PrefsRule
-import org.junit.Assume.assumeFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -132,8 +130,7 @@ class ThemeMakerLayoutTest {
 
     @Test
     fun theLayoutsAndIconsThePageDraws() {
-        // the page draws the text build's bar; the voice build's has a microphone more
-        assumeFalse(VoiceFeature.AVAILABLE)
+        // the bar as every build has it, its microphone too
         val icons = sortedSetOf<String>()
         val views = shots().map { measure(it, icons) }
         val layout = buildString {

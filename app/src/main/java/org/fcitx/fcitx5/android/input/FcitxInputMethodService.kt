@@ -75,6 +75,7 @@ import org.fcitx.fcitx5.android.core.toSpannedString
 import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.InputFeedbacks
+import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
@@ -106,6 +107,8 @@ import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
 import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
 import org.fcitx.fcitx5.android.input.learning.UndoChip
 import org.fcitx.fcitx5.android.input.shortcut.ClearedText
+import org.fcitx.fcitx5.android.pack.PackKind
+import org.fcitx.fcitx5.android.pack.PackStatus
 import org.fcitx.fcitx5.android.input.voice.VoiceCommit
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.fcitx.fcitx5.android.utils.Locales
@@ -320,10 +323,21 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private val keyboardHeightPrefs = listOf(prefs.keyboard.keyboardHeightPercent, prefs.keyboard.keyboardHeightPercentLandscape)
 
+    // whether the keyboard was made under PackGateView: made anew when the text pack's readiness changes
+    private var gateBuilt = false
+
+    // whether it was made with the voice pack: the space's hold to talk, its microphone badge, with it only
+    private var voiceBuilt = false
+
     private fun replaceInputView(theme: Theme, start: Boolean = false): InputView {
         compactBuilt = keyboardCompact()
         readingBuilt = EngineState.candidateReading.value
         val newInputView = InputView(this, fcitx, theme)
+        // no text pack (or not one this app reads): the keyboard cannot type, and says so over all of it
+        val text = PackStore.status(PackKind.TEXT)
+        gateBuilt = text !is PackStatus.Ready
+        voiceBuilt = PackStore.ready(PackKind.VOICE)
+        if (gateBuilt) newInputView.overKeys(PackGateView(this, theme, text), underBar = false)
         setInputView(newInputView)
         inputDeviceMgr.setInputView(newInputView)
         inputView = newInputView
@@ -381,6 +395,30 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         finishComposing()
         postFcitxJob { focusOutIn() }
         if (currentInputEditorInfo?.isTypeNull() == false) tellContext()
+    }
+
+    /**
+     * The app bound and its field focused again in a fcitx started anew under them (a pack imported,
+     * PackStore), as [onBindInput] and [onStartInput] did in the one before: the input context made
+     * (activate), the field's capabilities, the focus that picks the input method (without them the
+     * space reads （不可用） till another app), then its text before the cursor. Queued: the jobs wait
+     * for the new fcitx to be ready.
+     */
+    private fun refocus() {
+        val binding = currentInputBinding ?: return
+        val uid = binding.uid
+        val pkgName = pkgNameCache.forUid(uid)
+        val info = currentInputEditorInfo
+        val field = currentInputStarted && info != null && !info.isTypeNull()
+        val flags = capabilityFlags
+        postFcitxJob {
+            activate(uid, pkgName)
+            if (field) {
+                setCapFlags(flags)
+                focus(true)
+            }
+        }
+        if (field) tellContext()
     }
 
     // what the views were last made for, to tell the handle's move from a theme's change
@@ -457,6 +495,21 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             EngineState.candidateReading.collect {
                 if (inputView == null || it == readingBuilt) return@collect
                 rebuilding(ViewRebuild.READING)
+                replaceInputView(ThemeManager.activeTheme, start = true)
+            }
+        }
+        // a pack imported (or gone): fcitx was restarted on the new files (PackStore), and has no
+        // focused context; a pack's readiness changed, the keyboard made anew, with or without
+        // the gate over it, holding the space to talk or not
+        lifecycleScope.launch {
+            var generation = PackStore.state.value.generation
+            PackStore.state.collect {
+                if (it.generation != generation) {
+                    generation = it.generation
+                    refocus()
+                }
+                if (inputView == null || (it.ready(PackKind.TEXT) != gateBuilt && it.ready(PackKind.VOICE) == voiceBuilt)) return@collect
+                rebuilding(ViewRebuild.SETTING)
                 replaceInputView(ThemeManager.activeTheme, start = true)
             }
         }

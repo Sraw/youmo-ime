@@ -1,6 +1,6 @@
 # sherpa-onnx, vendored
 
-The speech recognizer of the voice builds: [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)
+The speech recognizer of voice input (its models are the voice pack's): [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)
 (k2-fsa, Apache-2.0, `src/main/cpp/LICENSE`), built from source by this module instead of taken as
 upstream's AAR, so that it is ours to change.
 
@@ -13,9 +13,9 @@ upstream's AAR, so that it is ours to change.
   speech synthesis. CMake downloads onnxruntime's Android libraries and the small dependencies
   (kaldi-native-fbank, kaldi-decoder, simple-sentencepiece, eigen, json), each SHA-256 checked by
   its `cmake/*.cmake`. kaldi-decoder brings kaldifst and openfst with it, kaldi-native-fbank kissfft.
-  Each of them is credited on the app's licences page (`VoiceFeature.credits` in `app/src/voice`):
-  a dependency added or updated here is changed there too. Only the app's `voice` flavor depends
-  on the module.
+  Each of them is credited on the app's licences page (`VoiceFeature.credits`, app `input/voice/`):
+  a dependency added or updated here is changed there too. The app depends on the module
+  (one APK since 0.6.0; without the voice pack it is never loaded).
 
 ## What we changed
 
@@ -47,7 +47,11 @@ Each change is made to both recognizers, the offline (`OfflineRecognizer`) and t
   (`VoiceDataPlugin`); converted for x86 they give the evaluation sets' error rates exactly, and on
   arm64 (onnxruntime 1.28 under qemu, as Neoverse N1 and N2) the ARM files' outputs equal the ONNX
   models', prepacked or not. Streaming (`online-zipformer2-transducer-model.cc`), each of the
-  three models has its own options, so each mapped one gets a copy of its own.
+  three models has its own options, so each mapped one gets a copy of its own. Loaded by path (a
+  resource pack's file, 0.6.0), an `.ort` model is mapped the same way (`mapped-file.cc`); one that
+  cannot be mapped throws, and `OnlineRecognizer_newFromFile` (under `SafeJNI`) hands Java a
+  `RuntimeException`, which voice input catches (it says it cannot load), where `SHERPA_ONNX_EXIT`
+  ended the keyboard's process.
 
 Each change is marked `youmo` in the source, except the deletions under "What we removed". Their C++ unit tests run on this machine with
 `lib/sherpa-onnx/host-test.sh`; the app's `VoiceEngineTest` covers them through the JNI.

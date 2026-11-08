@@ -111,7 +111,7 @@ class IdleUi(
         }
     }
 
-    /** Voice input, in a voice build only (VoiceFeature): by default beside the emoji, as on Sogou's bar */
+    /** Voice input (VoiceFeature; without the voice pack it says so): by default beside the emoji, as on Sogou's bar */
     val voiceButton = buttons.getValue(ToolbarButton.Voice)
 
     /** Whether [button] is where the user sees it: pinned at the right, or on the toolbar while it is out. */

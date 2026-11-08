@@ -11,7 +11,7 @@
 # Keep JNI interface
 -keep class org.fcitx.fcitx5.android.core.* { *; }
 
-# sherpa-onnx's JNI (voice builds, lib/sherpa-onnx) reads its config classes' fields by name
+# sherpa-onnx's JNI (voice input, lib/sherpa-onnx) reads its config classes' fields by name
 -keep class com.k2fsa.sherpa.onnx.** { *; }
 
 # Keep dependency magic

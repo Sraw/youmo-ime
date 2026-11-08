@@ -11,7 +11,7 @@ an ime-core class with a test.
 | `core/` | The host's Android side: `KotlinHost` (the `HostApi` over ime-core's `HostCore`, its lifecycle and config files, [host.md](host.md#the-apps-side-kotlinhost)), `HostDispatcher` (the host thread and clock), `HostResources` (`AppHostStrings`, the host's texts from app resources), `HostApi` (suspend calls into the host; its `eventFlow`, the host's own `HostEvent`s out of it), `EngineBridge` (ime-core's `Engines` with their Android side: assets, user dir, saves; the host's `EngineHost`), `SubtypeManager`, `InputMethodNames`, `NativeMatrixKernel`; the Android-free DTOs of the same package (`KeySym`, `KeyStates`, `CandidateWord`, `InputMethodEntry`, `FormattedText`) are in ime-core, their `KeyEvent` conversions here (`KeySymEvents.kt`, `KeyStateEvents.kt`) |
 | `daemon/` | `HostDaemon`: the one fcitx instance, shared by connections (`HostConnection`) |
 | `input/` | The `InputMethodService` (`FcitxInputMethodService`), `InputView`, and what the keyboard shows: `bar/` (the candidate bar / toolbar, `KawaiiBarComponent`), `candidates/` (horizontal bar, expanded grid, floating window for physical keyboards), `keyboard/` (`TextKeyboard`, `T9Keyboard`, `NumberKeyboard`, `KeyDef`/`KeyDefPreset`, `KeyView`, `CommonKeyActionListener`), `picker/` (symbols, emoji), `popup/` (key previews, long-press keyboards), `clipboard/` (the history panel; 「切词」, `ClipboardChunksWindow`, shows ime-core's `ClipboardChunks` pieces, picked by tap or by a sideways sweep (ime-core's `SwipePick`), Chinese split by `HostApi.wordBoundaries`; the history at scale measured by `ClipboardScale`, JVM and device: on redroid at 10 000 entries opening ~30 ms, clearing ~0.2 s, a backup ~0.2 s; at 100 000 opening ~0.1 s, a page half way down ~0.35 s, clearing ~1.5 s, a backup ~2 s), `editing/` (text editing panel, `InputConnectionEditor`), `status/` (the "more" panel), `preedit/`, `broadcast/`, `wm/` (`InputWindowManager`), `handwriting/`, `floating/` (the floating keyboard), `dialog/`, `editorinfo/` (the `EditorInfo` inspector), `learning/` (a candidate's long-press menu worded by the app from the engine's `LearningResult.Menu`, `CandidateLearningMenu`; the undo chip, `UndoChip`, the keyboard's one notice: see [Notices](#notices)) |
-| `data/` | File-backed managers: `prefs/` (`AppPrefs`, the managed preference framework), `theme/`, `clipboard/` (Room), `pinyin/` (imported dictionaries, custom phrases; sources are `<name>.txt.gz[.disable]`, named through `SourceNames`; `MergedDictionary` compiles the dictionaries turned on into `merged.ymd` on one `dictionary-compile` thread, keyed by a stamp of the sources, the base data and a compiler revision; the engine maps the file, uses a stale one until the new one is made, and is reloaded through `made`. An older build's plain `.txt` is work by itself (`SourceNames.unconverted`: `current()`, `pending()`, `mergedWords` count it): the next compile gzips it first (`Step.CONVERT`, the progress's first share, 正在转换 on the 词库 page, the idle bar's 正在升级词库格式) through `<name>.txt.gz.convert.tmp`, and is an upgrade (UPGRADE) only by what it finds: a text converted or not, a v1 `merged.ymd` dropped, or `.merged.upgrading` (written before the first conversion or the drop, deleted when a non-import compile ends, so a kill in between is still an upgrade at the next start); never by files' times. A text that cannot be read, or a `.gz` that is not gzip or is cut short, is skipped and listed in `.merged.unreadable` (the page: 读不了 / 文件损坏，可能不全, delete and import again; a damaged `.gz` keeps what was read before the damage); a text whose gzip cannot be written (the disk full) stays as it is, listed in `.merged.unwritten` (the page: 没转换成, free space and reopen). A text converted whose delete is refused is listed in `.merged.left`: not converted again while its `.gz` of the same state is there (its words are in it); each compile tries its delete again (no reconversion, no UPGRADE) and drops the entry once it is gone, or once that `.gz` is (deleted outside the page, or a restore left only the other state), the text then converted like any other. The entry is the text's name on, length and mtime (`leftKey`), so a turn keeps it. Listed files are skipped at each start and reload till they change; only a `.merged.left` text leaves `pending()` false, an unreadable or unwritten one keeps it true (its words are owed). Opening the 词库 page (`retry`) clears `.merged.unwritten` and `.merged.unreadable` (but a damaged `.gz`'s entry), never `.merged.left`. Imported words are missing until it ends. `turn`/`delete` resolve a dictionary by name under the sources lock, never the `File` the page listed, and act on all its files together: `turn` renames a text and its `.gz` both (the text turned back if the `.gz`'s rename is refused), `delete` deletes the text first and keeps the `.gz` if that is refused, so the two never split), `punctuation/`, `quickphrase/` (`QuickPhraseManager`: the user's quick input, `mine.mb` and `mine.used` read, changed and written whole under one lock, the settings page and the keyboard both writing; backups take `data/quickphrase.d` as a followed directory), `UserDataManager` (backup/restore) |
+| `data/` | File-backed managers: `pack/` (the resource packs: `PackStore` the installed shelf and its state, `PackImports` an import from the picker in the app's scope with its progress and results, `AppData` every data file's door, a pack's file or the APK's asset; data-and-build.md#resource-packs), `prefs/` (`AppPrefs`, the managed preference framework), `theme/`, `clipboard/` (Room), `pinyin/` (imported dictionaries, custom phrases; sources are `<name>.txt.gz[.disable]`, named through `SourceNames`; `MergedDictionary` compiles the dictionaries turned on into `merged.ymd` on one `dictionary-compile` thread, keyed by a stamp of the sources, the base data and a compiler revision; the engine maps the file, uses a stale one until the new one is made, and is reloaded through `made`. An older build's plain `.txt` is work by itself (`SourceNames.unconverted`: `current()`, `pending()`, `mergedWords` count it): the next compile gzips it first (`Step.CONVERT`, the progress's first share, 正在转换 on the 词库 page, the idle bar's 正在升级词库格式) through `<name>.txt.gz.convert.tmp`, and is an upgrade (UPGRADE) only by what it finds: a text converted or not, a v1 `merged.ymd` dropped, or `.merged.upgrading` (written before the first conversion or the drop, deleted when a non-import compile ends, so a kill in between is still an upgrade at the next start); never by files' times. A text that cannot be read, or a `.gz` that is not gzip or is cut short, is skipped and listed in `.merged.unreadable` (the page: 读不了 / 文件损坏，可能不全, delete and import again; a damaged `.gz` keeps what was read before the damage); a text whose gzip cannot be written (the disk full) stays as it is, listed in `.merged.unwritten` (the page: 没转换成, free space and reopen). A text converted whose delete is refused is listed in `.merged.left`: not converted again while its `.gz` of the same state is there (its words are in it); each compile tries its delete again (no reconversion, no UPGRADE) and drops the entry once it is gone, or once that `.gz` is (deleted outside the page, or a restore left only the other state), the text then converted like any other. The entry is the text's name on, length and mtime (`leftKey`), so a turn keeps it. Listed files are skipped at each start and reload till they change; only a `.merged.left` text leaves `pending()` false, an unreadable or unwritten one keeps it true (its words are owed). Opening the 词库 page (`retry`) clears `.merged.unwritten` and `.merged.unreadable` (but a damaged `.gz`'s entry), never `.merged.left`. Imported words are missing until it ends. `turn`/`delete` resolve a dictionary by name under the sources lock, never the `File` the page listed, and act on all its files together: `turn` renames a text and its `.gz` both (the text turned back if the `.gz`'s rename is refused), `delete` deletes the text first and keeps the `.gz` if that is refused, so the two never split), `punctuation/`, `quickphrase/` (`QuickPhraseManager`: the user's quick input, `mine.mb` and `mine.used` read, changed and written whole under one lock, the settings page and the keyboard both writing; backups take `data/quickphrase.d` as a followed directory), `UserDataManager` (backup/restore) |
 | `ui/` | Settings: `main/` (`MainActivity`, `MainFragment` = the home page, `settings/` pages and `SettingsRoute`, `settings/search/`), `setup/` (the first-run wizard), `common/` |
 | `utils/` | Small helpers (`AppUtil`, `Const`, extensions) |
 
@@ -28,7 +28,7 @@ autofill, decided by `IdleUiPolicy`; the sum is read off the field when what the
 ends with `=`, worked out by `Calculation` in ime-core, and dropped as the cursor leaves the `=`) or candidates (`KawaiiBarStateMachine`,
 `ExpandButtonStateMachine` in ime-core). Its buttons besides the menu key are the user's
 (`internal.toolbarButtons`, one string): `ToolbarConfig` in ime-core parses it (empty is the v0.4
-bar) and, given the situation (voice build and not a password, chttrans offered, one-handed
+bar) and, given the situation (not a password, chttrans offered, one-handed
 offered, the input method with keyboards to pick from: `KeyboardPicker` through `PanelActions.chooseKeyboard`, the ⋯ panel's 键盘 too) and how many fit at the right, says which go on the opened toolbar (⋯ fixed at its end,
 the right's overflow before it) and which at the right; `IdleUi.arrange` places them, again as the
 bar's width changes. The ⋯ panel's own actions live in `PanelActions`, called by
@@ -366,7 +366,7 @@ key's touch is `KeyGesture`, `CustomGestureView`'s state machine and timers take
 from the corner of the key's cell as a view's was from its own (a finger in a row's blank end is left of
 it, as it was left of A's view). `BaseKeyboard.wire` gives a `KeyHandle` its sound, the space's and
 backspace's swipes, its press, long press, repeat, double tap, swipes (`KeySwipes`) and popups: the
-same wiring for a key view and for the `SceneKey` made of its `KeyDef` (`drawKeysOn`), so a key does
+same wiring for a key view and for the `SceneKey` made of its node's `SceneKeyDef` (`drawKeysWithScene`), so a key does
 what its view did. Its press is shown by the canvas (`showPressed(KeyRef)`), a popup over it placed
 at its face across and its cell down in the window (`popupBounds`), as a view's `bounds` were; glide
 typing reads its cell (`KeyPlace`). No touch reaches a key view while the canvas draws the keys
@@ -430,8 +430,7 @@ first, and where it has none or it does not read, one step back to the app's own
 `sceneEnv` (its `Input`, texts, marks; `GroupedKeyboard` through `TextBoardState`) and calls
 `invalidateScene()` on every change of what the keys show (punctuation, address keys, the language key,
 Return, the input method; a keyboard kept while another was shown is told the punctuation as it is now
-when `KeyboardWindow.attachLayout` attaches it again, `PunctuationComponent.mapping`). What a key does: the 26 keys still wire each scene key as its view was
-(`refOf`, U4 A, till S5); a keyboard moved wires each from its node (U4 B; the keys and the touch that
+when `KeyboardWindow.attachLayout` attaches it again, `PunctuationComponent.mapping`). What a key does: a keyboard moved wires each scene key from its node (U4 B; the keys and the touch that
 finds them are `SceneKeys`, a node's key kept while it does the same): ime-core's `SceneBehavior.of`
 reads press, long press, repeat, swipe, double tap, bubble, long-press popup, menu, sound and axes from
 the layout (the bubble's corner what a swipe types, or, on a letter key with a shortcut and no swipe of its
@@ -996,7 +995,7 @@ learning.
 
 ## Permissions and privacy
 
-The app asks for `VIBRATE`, and the voice build for `RECORD_AUDIO`; nothing else. The build fails
+The app asks for `VIBRATE` and `RECORD_AUDIO` (the latter at runtime, on first voice use only); nothing else. The build fails
 if the merged manifest asks for anything more (`PermissionCheckTask` in `build-logic`), so a
 dependency cannot add one unnoticed: if a feature needs a new permission, that is a product
 decision for the owner, then the allowlist and `PRIVACY.md` change together. No network
@@ -1012,16 +1011,22 @@ remembering text goes through it. One exception: in an email's or a URL's field 
 an address's end there, and keeps nothing of it (not even to compare: `AddressLearning` holds no text
 of a field not learned from).
 
-## The two flavors
+## Voice and the voice pack
 
-`speech` dimension: `text` and `voice`. Main code reaches voice only through `VoiceFeature`
-(`AVAILABLE`, `credits`, `hold` for the space, `tap` for the bar's microphone and the `Voice` key shortcut), defined in both source sets with the same
-signatures; the text one is empty. `VoiceDataPlugin` adds the recognizer and models to the voice
-build only; `RECORD_AUDIO` is in `app/src/voice/AndroidManifest.xml`. An input method cannot ask for
-a permission itself, so `VoicePermissionActivity` asks and closes. Voice decisions (number
+0.6.0 has one APK (the `speech` flavors are gone, dev/design/060-asset-packs.md): voice's code is in
+main, its models in the voice pack. The keyboard reaches voice through `VoiceFeature` (`credits`,
+`hold` for the space, `tap` for the bar's microphone and the `Voice` key shortcut). Each first asks
+`PackStore.status(VOICE)`: without a usable pack a notice says 语音输入需要导入语音包 (or which version)
+and a tap opens the 资源包 page; then the permission. An input method cannot ask for
+a permission itself, so `VoicePermissionActivity` asks and closes; it is asked on first use only.
+The microphone is on the bar for everyone (no longer per build), and is what asks for the pack. The
+space's hold is voice by default, but only with the voice pack ready (`SpaceLongPressBehavior.talks`'s
+`voiceReady`, and `spaceLongPressTakesTouch`): without it holding the space does nothing, as 0.5.x's
+text build: no notice, no microphone badge, a slow drag's cursor not taken (user's decision,
+2026-11-08: a hold is no place to advertise a pack). The keyboard is made anew when the voice pack's
+readiness changes, for the badge. A value the user set is left as it is. Voice decisions (number
 normalisation, reranking hypotheses with the pinyin model, blocked words, hotwords, the hold's and
-the tap's presses, what is typed as it is said) are in ime-core's `input/voice/` and tested there. `:app:compileVoiceDebugUnitTestKotlin`
-in CI keeps the voice source set compiling.
+the tap's presses, what is typed as it is said) are in ime-core's `input/voice/` and tested there.
 
 ### Voice: the start
 
@@ -1075,7 +1080,7 @@ in CI keeps the voice source set compiling.
   hidden, takes it away (not finished in place) before its connection goes; a drop, a give-up or nothing to type
   takes it away, in the same field only. A preedit of fcitx's in the field meanwhile (another finger) stops typing as
   it is said till it is gone (`voiceOwnsComposing`): the engine's text is never finished in place by voice.
-- One talk is a `VoiceSession` (app/src/voice), whatever starts and stops it: the listener, what is composed and
+- One talk is a `VoiceSession` (app `input/voice/`), whatever starts and stops it: the listener, what is composed and
   typed, the 15 s give-up, the end mark, `finish` (stopped: the tail, then the rest typed through fcitx), `cut`,
   `drop`, `typeNow`. `VoiceHoldSession` adds the held finger (`VoiceHold`'s cancel zone, the lift);
   `VoiceTapOverlay` adds the tap's: what each press does is `VoiceTap` (ime-core): the microphone, the mask or a
@@ -1169,7 +1174,7 @@ in CI keeps the voice source set compiling.
   process starts finds none ready and makes one after `startRecording()` (some tens of ms, the
   record's buffer holding what is said meanwhile); from the second press on the last one is reused.
   Not made when the voice key shows (0.5.x's prepareVadSoon): that would need a hook in the main
-  code and the text flavor for a cost the record's buffer already absorbs.
+  code for a cost the record's buffer already absorbs.
 
   Measured by `lib/ime-core/src/test/resources/voice/quiet_eval.py` (Gain2 → the 060 streaming models with the app's
   endpoints, silero per window; aishell 0–39, ascend 0–39, Kokoro's English phrases, the q44 clips,

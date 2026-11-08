@@ -70,8 +70,8 @@ eval_cli() { memwait; locked youmo-core-gradle.lock run_gradle :lib:ime-eval:run
 eval_cli parity-check "$seqs"
 
 if [[ $build == 1 ]]; then
-    gradle :app:assembleTextDebug 2>&1 | tail -5
-    apk=$(ls -t "$repo"/app/build/outputs/apk/text/debug/*x86_64*.apk | grep -v unsigned | head -1)
+    gradle :app:assembleDebug 2>&1 | tail -5
+    apk=$(ls -t "$repo"/app/build/outputs/apk/debug/*x86_64*.apk | grep -v unsigned | head -1)
     cp "$apk" "$out/kotlin.apk"
 fi
 

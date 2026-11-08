@@ -37,7 +37,6 @@ import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.input.keyboard.VoiceEndMark
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.EmojiModifier
-import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.utils.DeviceUtil
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.vibrator
@@ -229,20 +228,17 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 listOf(Level(R.string.level_short, 200), Level(R.string.level_medium, 300), Level(R.string.level_long, 450))
             )
         }
-        // voice input, in a build that has it, as Sogou's long press on the space
+        // voice input, as Sogou's long press on the space (without the voice pack, it asks for it)
         val spaceKeyLongPressBehavior = enumList(
             R.string.space_long_press_behavior,
             "space_long_press_behavior",
-            if (VoiceFeature.AVAILABLE) SpaceLongPressBehavior.Voice else SpaceLongPressBehavior.None,
-            entryValues = SpaceLongPressBehavior.entries.filter { it != SpaceLongPressBehavior.Voice || VoiceFeature.AVAILABLE }
+            SpaceLongPressBehavior.Voice,
         )
-        // what voice types (a voice build's; a text build keeps them unseen, at their defaults)
-        val voicePolish = voiceOnly { switch(R.string.voice_polish, "voice_polish", true, R.string.voice_polish_summary) }
-        val voiceEndMark = voiceOnly { enumList(R.string.voice_end_mark, "voice_end_mark", VoiceEndMark.Auto) }
+        // what voice types
+        val voicePolish = switch(R.string.voice_polish, "voice_polish", true, R.string.voice_polish_summary)
+        val voiceEndMark = enumList(R.string.voice_end_mark, "voice_end_mark", VoiceEndMark.Auto)
         val spaceSwipeMoveCursor =
             switch(R.string.space_swipe_move_cursor, "space_swipe_move_cursor", true)
-        private fun <T> voiceOnly(block: () -> T): T = if (VoiceFeature.AVAILABLE) block() else hidden(block = block)
-
         // set on an input method's page or the shared one, with no UI here: not hidden { }, which would put them back to their defaults
         private fun bool(key: String, defaultValue: Boolean) =
             ManagedPreference.PBool(sharedPreferences, key, defaultValue).apply { register() }

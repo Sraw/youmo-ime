@@ -44,7 +44,7 @@ body:
     id: app_version
     attributes:
       label: 应用版本 / App Version
-      description: 设置首页右上角菜单 → 关于，以及是文字版还是语音版。 / Settings, top-right menu → About, and whether it is the text or the voice build.
+      description: 设置首页右上角菜单 → 关于，以及 设置 → 资源包 里两个包的版本（没导入的写"未导入"）。 / Settings, top-right menu → About, and the two packs' versions under Settings → Resource packs ("not imported" if one is not).
       placeholder: 0.1.0 voice
     validations:
       required: true

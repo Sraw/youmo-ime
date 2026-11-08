@@ -77,7 +77,6 @@ import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.preedit.PreeditComponent
 import org.fcitx.fcitx5.android.input.status.PanelActions
 import org.fcitx.fcitx5.android.input.status.StatusAreaWindow
-import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.utils.AppUtil
@@ -559,7 +558,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private fun arrangeButtons() {
         val situation = ToolbarConfig.Situation(
             // nothing said out loud goes into a password
-            voice = VoiceFeature.AVAILABLE && !service.inPasswordField,
+            voice = !service.inPasswordField,
             tradSimp = tradSimpEntry() != null,
             oneHanded = panelActions.oneHandedOffered,
             keyboards = panelActions.keyboardsOffered,

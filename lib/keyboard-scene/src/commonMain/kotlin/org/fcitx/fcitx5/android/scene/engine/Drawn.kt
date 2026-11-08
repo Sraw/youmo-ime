@@ -21,10 +21,13 @@ data class PlacedIcon(val name: String, val box: Box, val part: Part)
  */
 data class Drawn(val texts: List<PlacedText>, val icons: List<PlacedIcon>, val ink: Box) {
 
-    /** Moved and scaled so its ink is [target]'s (KeyView: scaled from its corner, then moved). */
-    fun mapTo(target: Box): Drawn {
+    /**
+     * Moved and scaled so its ink is [target]'s (KeyView: scaled from its corner, then moved); by [scale]
+     * where it is known (a class's, the same to the last bit for every key of it), else by the inks' ratio.
+     */
+    fun mapTo(target: Box, scale: Double? = null): Drawn {
         if (target == ink) return this
-        val s = when {
+        val s = scale ?: when {
             ink.width > 0 -> target.width / ink.width
             ink.height > 0 -> target.height / ink.height
             else -> 1.0

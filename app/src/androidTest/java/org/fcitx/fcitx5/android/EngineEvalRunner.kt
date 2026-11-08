@@ -34,7 +34,7 @@ import java.io.File
  * and is skipped unless asked for, since one run takes minutes. lib/ime-eval/run-on-device.sh
  * drives it and pulls eval/<evalSet>-<evalIme>.tsv from the app's external files dir.
  *
- * It types on the app's own data on this device, which installTextDebug keeps: words and
+ * It types on the app's own data on this device, which installDebug keeps: words and
  * frequencies learned there change the candidates. Its scores compare across devices, over time
  * or with `:lib:ime-eval`'s baselines only when run on an app with no data of its own: a fresh
  * emulator, or the app's data cleared first (`adb shell pm clear`). So it stops where the app has

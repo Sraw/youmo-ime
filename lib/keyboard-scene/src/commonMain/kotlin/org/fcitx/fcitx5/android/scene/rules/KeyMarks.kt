@@ -21,8 +21,8 @@ package org.fcitx.fcitx5.android.scene.rules
  * 底部 is under the letter for the symbol, the bottom edge's middle for the shortcut. Landscape's and
  * 紧凑's keys are too low for either ([onKeys]): the symbol's 底部 there is the top right (the bottom
  * right where the shortcuts are), the shortcut's the first corner of [LowOrder] the symbol's place is
- * not. A shortcut that still has no room on its key is tried in the key's other free corners
- * ([elsewhere]) before it is left out.
+ * not. A shortcut that still has no room on its key gives way in its own corner, then is left out
+ * (KeyMarkYield; the views' KeyView tries the key's other free corners first).
  *
  * A function key has no symbol: its up shortcut in the chosen slot, its down one in that slot mirrored
  * top for bottom ([placeFunction]); one alone in the chosen slot.
@@ -74,24 +74,6 @@ object KeyMarks {
         val symbol = if (s.symbol != At.Bottom) s.symbol else if (s.shortcut == At.TopRight) At.BottomRight else At.TopRight
         val shortcut = if (s.shortcut != At.Bottom) s.shortcut else LowOrder.first { it != symbol }
         return Spots(symbol, shortcut)
-    }
-
-    /**
-     * Where a key's shortcut marks, in [slots] (a function key's up one, then its down one mirrored; or
-     * one alone), are tried in turn when they have no room there, before one is left out: each a slot
-     * for each, the first in a corner of [LowOrder]'s order, a function key's down one in that corner
-     * mirrored, the up one on the side (top or bottom) it is on now; none in [taken] (its symbol's
-     * slot) or where they are now.
-     */
-    fun elsewhere(slots: List<Slot>, taken: Collection<Slot>): List<List<Slot>> {
-        if (slots.isEmpty() || slots.size > 2) return emptyList()
-        return LowOrder.mapNotNull { it.corner }
-            .map { if (slots.size == 1) listOf(it) else listOf(it, it.mirrored) }
-            .filter { alt -> alt.none { it in taken || it in slots } }
-            // of the same two corners, the pair keeping the up mark on the side (top or bottom) it is
-            // drawn on now, as the user's setting put it; never both orders, and the corners' order kept
-            .groupBy { it.toSet() }.values
-            .map { same -> same.firstOrNull { it[0].bottom == slots[0].bottom } ?: same[0] }
     }
 
     /** A shortcut's slot at [at] as [onKeys] gave it; null for none drawn. */

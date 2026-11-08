@@ -290,7 +290,7 @@ def pr34(d):
 case("PR-12", needs="jvm:BackupUatTest.aSensitiveClipboardEntryIsNotBackedUp")(lambda d: None)
 
 
-case("PR-13", needs="release:要同一版本的语音版正式包，覆盖安装文字版")(lambda d: None)
+case("PR-13", needs="release:要同一版本的正式包覆盖安装，再导入语音包")(lambda d: None)
 
 
 case("PR-10a", needs="jvm:BackupUatTest.a032BackupOverAnImportOfTheNameOff")(lambda d: None)

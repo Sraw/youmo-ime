@@ -14,7 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The home page is one flat list in the order decided (2026-10-18), each row opening its page.
+ * The home page is one flat list in the order decided (2026-10-18; 资源包 last, 0.6.0), each row opening its page.
  * The data is as old as the day its release was made: an old tree built today is warned of too.
  */
 class MainFragmentTest {
@@ -25,7 +25,7 @@ class MainFragmentTest {
             listOf(
                 R.string.input_methods, R.string.shared_input, R.string.word_packs, R.string.theme_and_size,
                 R.string.virtual_keyboard, R.string.section_sound_and_vibration, R.string.clipboard_and_emoji,
-                R.string.hardware_keyboard, R.string.user_data,
+                R.string.hardware_keyboard, R.string.user_data, R.string.packs,
             ),
             MainFragment.HOME.map { it.title },
         )
@@ -33,7 +33,7 @@ class MainFragmentTest {
             listOf(
                 SettingsRoute.InputMethodList, SettingsRoute.SharedInput, SettingsRoute.PinyinDict(""), SettingsRoute.Theme,
                 SettingsRoute.Keys, SettingsRoute.SoundAndVibration, SettingsRoute.Clipboard,
-                SettingsRoute.HardwareKeyboard, SettingsRoute.Backup,
+                SettingsRoute.HardwareKeyboard, SettingsRoute.Backup, SettingsRoute.Packs,
             ),
             MainFragment.HOME.map { it.route },
         )

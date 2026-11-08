@@ -174,6 +174,34 @@ class HandwritingRecognitionTest {
         assertTrue(model.closed)
     }
 
+    /** Given up on one pack's files: a pack imported since (its generation) is loaded, and what the old one opened let go. */
+    @Test
+    fun aRecognizerGivenUpIsLoadedAgainOnceAPackIsImported() {
+        var generation = 0
+        var opens = 0
+        var told = 0
+        val model = Model()
+        val net = InkNet { _, _ -> floatArrayOf(0f) }
+        val loading = LoadingReader({ opened ->
+            opens++
+            if (generation == 0) throw IOException("chars.txt missing")
+            opened += model
+            InkRecognizer(net, net, "一", floatArrayOf(0f))
+        }, { told++ }) { generation }
+        loading.load()
+        assertFalse(loading.loadable)
+        generation = 1
+        assertTrue(loading.loadable)
+        assertEquals(listOf("一"), loading.read(strokes(1))?.texts)
+        assertEquals(2, opens)
+        assertEquals(1, told)
+        // another import: the loaded one let go, the new pack's loaded
+        generation = 2
+        assertEquals(listOf("一"), loading.read(strokes(1))?.texts)
+        assertTrue(model.closed)
+        assertEquals(3, opens)
+    }
+
     /** Closing is native too: one that throws as it closes leaves the rest closed and the user told. */
     @Test
     fun aModelThatThrowsAsItClosesStillLeavesTheRestClosed() {

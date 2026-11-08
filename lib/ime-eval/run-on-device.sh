@@ -14,7 +14,16 @@ PKG=${FCITX_PKG:-io.github.sraw.youmo.debug}
 OUT=${3:-$HERE/build/eval}
 
 cd "$REPO"
-[ "${INSTALL:-1}" = 0 ] || ./gradlew :app:installTextDebug :app:installTextDebugAndroidTest --offline -q
+if [ "${INSTALL:-1}" != 0 ]; then
+    ./gradlew :app:installDebug :app:installDebugAndroidTest :app:packs --offline -q
+    # the engine's data is the text pack's, imported as uat.py's `packs` does (debug builds trust its test key)
+    uri=content://$PKG.uat.packs
+    for f in "$REPO"/app/build/packs/youmo-text-v*.youmopack; do
+        n=$(basename "$f")
+        adb shell content write --uri "$uri/$n" < "$f"
+        adb shell content call --uri "$uri" --method import --arg "$n" | grep -Eq 'result=(imported|already)' || { echo "the text pack was not imported: $n" >&2; exit 1; }
+    done
+fi
 # the runner starts its own engine in the app's process; if fcitx were the active keyboard, its
 # service would hold a second engine there, on the same data files. So another enabled keyboard
 # takes over for the run, and the user's is put back after it

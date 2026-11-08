@@ -41,6 +41,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.scene.KeyRef
+import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.input.scene.SceneLetters
 import org.fcitx.fcitx5.android.input.scene.TextBoardState
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
@@ -288,9 +289,8 @@ class TextKeyboard private constructor(
         confirm.mainText.text = context.getString(R.string.key_confirm)
         showLookUpKey()
         showConfirmKey()
-        // 060's redraw while it is made: the keys drawn by the scene engine, each wired as its view was
-        // (U4 A till qwerty.xml says what they do), by its theme name and which of its name it is (a split row's G)
-        drawKeysWithScene(LAYOUT) { v -> v.themeKey?.let { name -> keyViews[name]?.indexOf(v)?.takeIf { it >= 0 }?.let { KeyRef.scene(name, it) } } }
+        // 060's redraw while it is made: the keys drawn by the scene engine, each wired as qwerty.xml's node says (U4 B)
+        drawKeysWithScene(LAYOUT)
     }
 
     // what the keys show now, as the scene engine's environment: the screen's and the settings' as every
@@ -467,10 +467,13 @@ class TextKeyboard private constructor(
     }
 
     // glide typing (滑行输入) where the input method reads one; a stroke (笔画筛选) in pinyin's and 双拼's
-    // the letters where the scene places them while the canvas draws the keys (drawKeysWith): the scene's keys
-    private val sceneLetters: List<Pair<Char, KeyPlace>> by lazy { letterKeys.map { (c, v) -> c to (sceneKeyOf(v) ?: v) } }
+    // the letters where the scene places them while the canvas draws the keys: each letter node of the scene by
+    // its (id, copy), a split row's second G its copy 1
+    private fun sceneLetters(): List<Pair<Char, KeyPlace>> = canvas?.shownKeys.orEmpty()
+        .filter { it.id.length == 1 && it.id[0] in 'a'..'z' }
+        .map { it.id[0] to scenePlace(it.id, it.copy == 1) }
 
-    override val glide = glideInput(letters = { if (canvas != null) sceneLetters else letterKeys }, enabled = { glides }, filters = { InputMethodCatalog.filtersByStrokes(imeName) }) { path, layout ->
+    override val glide = glideInput(letters = { if (canvas != null) sceneLetters() else letterKeys }, enabled = { glides }, filters = { InputMethodCatalog.filtersByStrokes(imeName) }) { path, layout ->
         onAction(KeyAction.GlideAction(Glide(path, layout, shift = capsState == CapsState.Once, capsLock = capsState == CapsState.Lock)))
         // as a letter typed: Shift-once used up in any input method, as a tap uses it up (only English reads it)
         if (capsState == CapsState.Once) switchCapsState()
@@ -584,6 +587,14 @@ class TextKeyboard private constructor(
     }
 
     private fun transformPopupPreview(key: KeyRef, c: String) = previewOf(c, key, ::transformAlphabet, ::transformPunctuation)
+
+    // a letter's bubble shows its letter whatever its face (Shift's case, a table's roots), as its view's did;
+    // a getter: the keys are wired in init, before this class's properties are
+    override val sceneTable: SceneKeyDef.Table get() = LetterBubbles
+
+    private object LetterBubbles : SceneKeyDef.Table {
+        override fun bubble(node: KeyNode) = node.id.takeIf { it.length == 1 && it[0] in 'a'..'z' }
+    }
 
     override fun onPopupAction(action: PopupAction) {
         val newAction = when (action) {
@@ -740,10 +751,13 @@ class TextKeyboard private constructor(
     // changed it: one thing, drawn in its corner too (updatePunctuationKeys); none when the user
     // turned its long press off
     override fun swipeText(def: KeyDef): SwipeChoice =
-        SwipeChoice.of((def.appearance as? KeyDef.Appearance.AltText)?.let(::swipeOverride))
+        SwipeChoice.of(if (def is SceneKeyDef) swipeOverride(def.behavior.id) else (def.appearance as? KeyDef.Appearance.AltText)?.let(::swipeOverride))
 
-    private fun swipeOverride(def: KeyDef.Appearance.AltText): String? {
-        val letter = def.displayText.takeIf { it.length == 1 && it[0].isLetter() }?.lowercase() ?: return null
+    private fun swipeOverride(def: KeyDef.Appearance.AltText): String? = swipeOverride(def.displayText)
+
+    // [key]'s, a letter's (Q or the scene's q)
+    private fun swipeOverride(key: String): String? {
+        val letter = key.takeIf { it.length == 1 && it[0].isLetter() }?.lowercase() ?: return null
         // under Shift the long press shows the upper-case label's list (onPopupAction): so does the swipe
         return PopupOverridesCache.user.current.swipeOf(letter, transformAlphabet(letter))
     }

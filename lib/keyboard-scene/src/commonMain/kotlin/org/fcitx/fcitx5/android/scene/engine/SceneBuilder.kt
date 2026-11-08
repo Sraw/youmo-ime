@@ -27,7 +27,6 @@ import org.fcitx.fcitx5.android.scene.theme.KeyLook
 import org.fcitx.fcitx5.android.scene.theme.Selector
 import org.fcitx.fcitx5.android.scene.theme.TextLook
 import org.fcitx.fcitx5.android.scene.theme.Theme
-import kotlin.math.abs
 
 /**
  * A layout and a theme in an environment, made a [Scene] (060-render-v2 §6): the board placed in the
@@ -134,8 +133,21 @@ class SceneBuilder(
         val styled = phases.section("cascade.of") { keyed.map { (_, k) -> styled(layout.id, k) } }
         val shaped = phases.section("faces") { keyed.mapIndexed { i, (p, k) -> shaped(p, k, styled[i]) } }
         val keys = phases.section("content") { keyed.mapIndexed { i, (p, k) -> prepare(p, k, styled[i], shaped[i]) } }
+        // the same keys with their edges where they fall, not on whole pixels: what the marks' yields are
+        // worked out on (060-render-p2 S4e), so a pixel's rounding never turns a choice; drawn on the above
+        val loose = phases.section("loose") {
+            val cells = Place.rows(rows, layout.columns, layout.onSplit, env, board, Problems(), snap = false).getOr { return Parsed.Failed(it) }
+                .filter { it.item is ExpandedKey }
+            keyed.mapIndexed { i, (_, k) ->
+                // a key with no marks has nothing to choose: as drawn
+                if (keys[i].content.marks.isEmpty()) return@mapIndexed keys[i].content
+                val cell = cells[i].cell
+                val g = Faces.of(cell, styled[i].looks.getValue(styled[i].states), k.attrs.face ?: Face.Default, k.attrs.margin ?: true, env.flat && k.attrs.face != Face.Keep, env.density)
+                content.of(k, cell, g.content, Looks(styled[i].parts.getValue(styled[i].states)), g, snap = false)
+            }
+        }
         val nodes = phases.section("paint") {
-            val settled = settle(keys)
+            val settled = settle(keys, loose)
             keys.mapIndexed { i, k -> node(k, settled[i]) }
         }
         val slots = placed.mapNotNull { p ->
@@ -269,46 +281,37 @@ class SceneBuilder(
         }
     }
 
-    // rules B §7: the letters' marks kept apart together (one size for all the letters), the other keys' each
-    private fun settle(keys: List<Prepared>): List<Settled> {
+    // rules B §7, 060-render-p2 S4e: each class's glyphs one size (KeyMarkYield.board), their marks kept apart
+    // from them; a key of no class (no glyph, a table's roots in lines) as placed, its marks of their classes
+    private fun settle(keys: List<Prepared>, loose: List<KeyContent>): List<Settled> {
         val gap = GAP_DP * env.density
+        // a key with no glyph but marks (a space with no name) too, and one whose glyph stays as placed (a
+        // table's roots in lines) as one with none: its marks are of their classes
+        val members = keys.indices.filter { keys[it].content.let { c -> (c.yields && c.glyphClass != null) || c.marks.isNotEmpty() } }
+        val board = KeyMarkYield.board(members.map { member(loose[it]) }, gap)
         val out = arrayOfNulls<Settled>(keys.size)
-        val letters = keys.indices.filter { keys[it].content.letter && keys[it].content.glyph != null }
-        val group = KeyMarkYield.letters(
-            letters.map { i ->
-                val c = keys[i].content
-                KeyMarkYield.LetterKey(c.glyph!!.ink.toInk(), c.baseline, c.marks.map(::mark), c.room.toInk(), c.edge)
-            },
-            gap,
-        )
-        letters.forEachIndexed { n, i -> out[i] = settled(keys[i].content, group.keys[n]) }
+        members.forEachIndexed { n, i ->
+            val c = keys[i].content
+            val s = KeyMarkYield.onto(member(c), member(loose[i]), board, board.keys[n])
+            val glyph = c.glyphClass?.takeIf { c.yields }?.let { c.glyph?.mapTo(s.glyph.toBox(), board.scales.getValue(it.ordinal)) } ?: c.glyph
+            out[i] = Settled(glyph, c.marks.mapIndexed { j, m -> s.marks[j]?.let { m.drawn.mapTo(it.toBox(), board.markScale(mark(m))) } })
+        }
         keys.forEachIndexed { i, k ->
-            if (out[i] != null) return@forEachIndexed
-            val c = k.content
-            out[i] = if (c.glyph == null || c.marks.isEmpty() || !c.yields) {
-                Settled(c.glyph, c.marks.map { it.drawn })
-            } else {
-                settled(c, KeyMarkYield.key(c.glyph.ink.toInk(), c.marks.map(::mark), c.room.toInk(), gap, c.edge))
-            }
+            if (out[i] == null) out[i] = Settled(k.content.glyph, k.content.marks.map { it.drawn })
         }
         return out.map { it!! }
     }
 
-    private fun mark(m: MarkDrawn) =
-        KeyMarkYield.Mark(m.drawn.ink.toInk(), m.slot, m.minScale, m.drop, m.elsewhere.map { (slot, d) -> slot to d.ink.toInk() })
-
-    // a settled glyph and marks drawn where their inks went: a mark from whichever of its places it settled nearest
-    private fun settled(c: KeyContent, s: KeyMarkYield.Settled): Settled {
-        val glyph = c.glyph?.mapTo(s.glyph.toBox())
-        val marks = c.marks.mapIndexed { i, m ->
-            val ink = s.marks[i]?.toBox() ?: return@mapIndexed null
-            val from = (listOf(m.drawn) + m.elsewhere.map { it.second }).minBy { distance(it.ink, ink) }
-            from.mapTo(ink)
-        }
-        return Settled(glyph, marks)
+    // a key as its class's member: a main character about its baseline, where its row's stand, and never moved off it
+    private fun member(c: KeyContent): KeyMarkYield.Member {
+        val cls = c.glyphClass?.takeIf { c.yields } ?: return KeyMarkYield.Member(KeyMarkYield.NO_GLYPH, 0.0, 0.0, c.marks.map(::mark), c.room.toInk(), c.edge, glyphClass = -1)
+        val ink = c.glyph!!.ink.toInk()
+        val main = cls == GlyphClass.Main
+        val y = if (main) c.baseline else (ink.top + ink.bottom) / 2
+        return KeyMarkYield.Member(ink, (ink.left + ink.right) / 2, y, c.marks.map(::mark), c.room.toInk(), c.edge, moves = !main, glyphClass = cls.ordinal)
     }
 
-    private fun distance(a: Box, b: Box) = abs(a.centerX - b.centerX) + abs(a.centerY - b.centerY)
+    private fun mark(m: MarkDrawn) = KeyMarkYield.Mark(m.drawn.ink.toInk(), m.slot, m.drop)
 
     private fun node(k: Prepared, s: Settled): KeyNode {
         val cell = k.placed.cell

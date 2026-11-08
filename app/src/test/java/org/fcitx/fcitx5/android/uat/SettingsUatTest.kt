@@ -91,7 +91,7 @@ class SettingsUatTest {
     @Uat("ST-01", "ST-33")
     fun theHomePage() {
         val prefs = preferences((page as PreferenceFragmentCompat).preferenceScreen)
-        // no group titles: ten rows, each with what is behind it
+        // no group titles: eleven rows, each with what is behind it
         assertEquals(MainFragment.HOME.map { s(it.title) } + s(R.string.app_language), prefs.map { it.title.toString() })
         assertTrue(prefs.all { !it.summary.isNullOrEmpty() })
         // 🔍 and ? on the bar, the rest under ⋮

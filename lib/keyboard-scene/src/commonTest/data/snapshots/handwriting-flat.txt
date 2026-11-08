@@ -22,9 +22,9 @@ key comma kind=function role=comma a11y="，"
   shape rect(925.88,158.38,1072.13,262.63)
   hit rect(918,140,1080,281)
   anchor 999,210.5 up 0,-1
-  actions send=","
+  actions preview="off" send=","
   text label="，"
-  popup from=list as-is="true"
+  popup from=list
     item "？"
     item "！"
     item "："
@@ -42,7 +42,7 @@ key period kind=function role=period a11y="。"
   shape rect(925.88,299.38,1072.13,402.63)
   hit rect(918,281,1080,421)
   anchor 999,351 up 0,-1
-  actions send="."
+  actions preview="off" send="."
   text label="。"
   popup from=none
   normal
@@ -80,7 +80,7 @@ key numbers kind=function role=numbers a11y="123"
   shape rect(169.88,580.38,305.13,683.63)
   hit rect(162,562,313,702)
   anchor 237.5,632 up 0,-1
-  actions send="layout:Number"
+  actions long-press="unicode" send="layout:Number"
   text label="123"
   shortcut="numbers"
   normal

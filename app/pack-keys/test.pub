@@ -1,0 +1,3 @@
+# The test key's public half (test-ed25519.pem beside it, committed on purpose): debug builds and
+# the tests trust it, a release build never does (AssetPacksPlugin).
+02FVPxAbApzuvozq7cQSHWSYMO3BkTbmq2FJghOZOxk=

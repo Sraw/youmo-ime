@@ -109,6 +109,8 @@ class MainFragment : PaddingPreferenceFragment() {
             Row(R.string.hardware_keyboard, R.string.home_hardware_summary, R.drawable.ic_baseline_keyboard_24, SettingsRoute.HardwareKeyboard),
             // the whole of the user's data in and out, as one file
             Row(R.string.user_data, R.string.home_backup_summary, R.drawable.ic_baseline_save_24, SettingsRoute.Backup),
+            // the dictionaries and models, imported (060-asset-packs)
+            Row(R.string.packs, R.string.home_packs_summary, R.drawable.ic_baseline_library_books_24, SettingsRoute.Packs),
         )
     }
 }

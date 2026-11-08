@@ -247,7 +247,7 @@
 - **JVM**：`HostCasesUatTest.backspaceInTheMiddleOfThePinyin`（点 shi 后退格三下：拼音 ni wo zui xi huan de、光标在 ni 后，空格「你我最喜欢的」）；设备上不跑。
 
 ### PY-41 [P1] 空格键左右滑动移动拼音里的光标，长拼音跟着滚动
-- **前提**：B0，**按键 → 划动空格键以移动光标** 开着（默认）；语音版先把 **长按空格** 设为"无"（它默认是语音输入，长按后手指归语音）。
+- **前提**：B0，**按键 → 划动空格键以移动光标** 开着（默认）；先把 **长按空格** 设为"无"（它默认是语音输入，长按后手指归语音）。
 - **操作**：点一串很长的拼音，例如 w o x i a n g z h i d a o j i n t i a n w a n s h a n g w o m e n q u n a l i c h i f a n；按住空格键不松手，用约 4 秒、很慢地（每秒不到一个键宽）往左拖大约三分之一个屏宽。
 - **预期**：开始拖以后（哪怕过了长按的时间才动）拼音行里的光标一格一格往前移，不弹出长按菜单，框里的光标不动；光标走到行的左边缘外时，这一行自动往右滚，光标一直看得见。用手指在拼音行上左右拖，也能滚动这一行。
 - **JVM**：`KeyboardUatTest.aSlowSpaceDragMovesThePinyinCursorAndTheRowFollowsIt`（空格慢拖（过了长按时间才动）发 ←、不弹长按、框里不动，拼音行随引擎的光标滚动，手指拖行也滚；光标在拼音里怎么走是引擎的（HostCasesUatTest））；设备上不跑。

@@ -28,7 +28,7 @@ class ManagedPreferenceCategoryTest {
     private lateinit var ctx: Context
     private lateinit var sp: SharedPreferences
 
-    // a text build's: Voice is not offered
+    // a list that does not offer every value (as 0.5.x's text build did not offer Voice)
     private class Sample(sp: SharedPreferences) : ManagedPreferenceCategory(R.string.virtual_keyboard, sp) {
         val behavior = enumList(
             R.string.space_long_press_behavior,
@@ -59,14 +59,14 @@ class ManagedPreferenceCategoryTest {
 
     @Test
     fun aValueTheListDoesNotOfferReadsAndShowsAsTheDefault() {
-        // a voice build's, carried over by a backup or by the text build installed over it
+        // a value the list does not offer, carried over by a backup or another build
         sp.edit { putString("behavior", SpaceLongPressBehavior.Voice.name) }
         val sample = Sample(sp)
         assertEquals(SpaceLongPressBehavior.None, sample.behavior.getValue())
         val list = shown(sample)
         assertEquals(SpaceLongPressBehavior.None.name, list.value)
         assertEquals(placeholder(R.string.space_behavior_none), list.entry.toString())
-        // shown, not written over: the voice build installed again reads Voice
+        // shown, not written over: a build that offers it again reads Voice
         assertEquals(SpaceLongPressBehavior.Voice.name, sp.getString("behavior", null))
     }
 
@@ -74,7 +74,7 @@ class ManagedPreferenceCategoryTest {
     fun theDefaultPickedOverAValueTheListDoesNotOfferIsStored() {
         sp.edit { putString("behavior", SpaceLongPressBehavior.Voice.name) }
         shown(Sample(sp)).choose(SpaceLongPressBehavior.None.name)
-        // the user's None, which the voice build installed again keeps
+        // the user's None, which a build that offers Voice keeps
         assertEquals(SpaceLongPressBehavior.None.name, sp.getString("behavior", null))
     }
 

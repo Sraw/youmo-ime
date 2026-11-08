@@ -19,7 +19,7 @@ enum class ToolbarButton(val key: String) {
     More("more"),
     Emoji("emoji"),
 
-    /** In a voice build only, and never in a password field: nothing said out loud goes into one */
+    /** Never in a password field: nothing said out loud goes into one */
     Voice("voice"),
     Hide("hide"),
 
@@ -87,7 +87,7 @@ data class ToolbarConfig(val items: List<Item>) {
 
     /** What the keyboard is in, for the buttons that are of use only in some. */
     data class Situation(
-        /** a voice build, not in a password field */
+        /** not in a password field (0.5.x: and a voice build) */
         val voice: Boolean,
         /** the input method has chttrans's 简繁 */
         val tradSimp: Boolean,

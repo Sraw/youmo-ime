@@ -11,9 +11,12 @@
         android:name="${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
         tools:node="remove" />
 
-    <!-- no permission but this one and the voice build's RECORD_AUDIO, none for the network above
-         all: any other merged in from a dependency fails the build (AndroidAppConventionPlugin) -->
+    <!-- no permission but these, none for the network above all: any other merged in from a
+         dependency fails the build (AndroidAppConventionPlugin) -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- voice input, recognized on the phone: nothing heard leaves it. Asked for at the first use,
+         and only with the voice pack imported (VoiceFeature) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <!-- other input methods visible on Android 11+ (the IME switcher, the setup's list) -->
     <queries>
@@ -144,6 +147,14 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
+        <!-- an input method cannot ask for a permission itself: this asks, and closes -->
+        <activity
+            android:name=".input.voice.VoicePermissionActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
         <!-- true only in a test build (-PbuildProfileable=true): simpleperf from the shell -->
         <profileable
             android:shell="${profileableShell}"

@@ -16,6 +16,7 @@ set(sources
   homophone-replacer.cc
   hypothesis.cc
   lodr-fst.cc
+  mapped-file.cc
   math.cc
   offline-ctc-fst-decoder-config.cc
   offline-lm-config.cc

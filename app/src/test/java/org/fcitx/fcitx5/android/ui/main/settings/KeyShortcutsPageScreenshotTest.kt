@@ -23,7 +23,6 @@ import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
-import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.uat.SettingsHarness
 import org.junit.After
@@ -182,11 +181,11 @@ class KeyShortcutsPageScreenshotTest {
         KeyboardHarness.all(letter.window!!.decorView).filterIsInstance<TextView>()
             .first { it.text.toString() == st.s(R.string.shortcut_change) }.performClick()
         st.idle()
-        // voice input only in the build with it; quick input after the clipboard
+        // voice input among them; quick input after the clipboard
         val commands = KeyboardHarness.all((ShadowDialog.getLatestDialog() as AlertDialog).window!!.decorView)
             .filterIsInstance<TextView>().map { it.text.toString() }.toList()
         assertTrue(commands.toString(), st.s(R.string.shortcut_paste) in commands)
-        assertEquals(commands.toString(), VoiceFeature.AVAILABLE, st.s(R.string.shortcut_voice) in commands)
+        assertTrue(commands.toString(), st.s(R.string.shortcut_voice) in commands)
         assertEquals(commands.toString(), commands.indexOf(st.s(R.string.shortcut_clipboard)) + 1, commands.indexOf(st.s(R.string.quick_phrases)))
         captureScreen("dialog_commands")
         (ShadowDialog.getLatestDialog() as AlertDialog).dismiss()

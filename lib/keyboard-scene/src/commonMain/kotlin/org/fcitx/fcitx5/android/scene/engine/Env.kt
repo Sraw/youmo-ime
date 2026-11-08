@@ -147,6 +147,8 @@ data class Texts(
     val returnIcon: String = "enter",
     /** The key a table's code is confirmed by, in Return's place (key_confirm: 确定, OK in English). */
     val confirm: String = "确定",
+    /** The symbol panel's way back to the keys (picker_back: 返回, Back in English). */
+    val back: String = "返回",
     val keepUppercase: Boolean = false,
     val alts: Map<String, String>? = null,
     val punctuation: Map<String, String> = emptyMap(),

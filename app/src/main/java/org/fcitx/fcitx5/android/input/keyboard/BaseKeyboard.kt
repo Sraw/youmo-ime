@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.InputFeedbacks
+import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.BoardImages
@@ -49,6 +50,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTouch
 import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.input.popup.PopupAction
@@ -57,7 +59,7 @@ import org.fcitx.fcitx5.android.input.popup.PopupKeyboardUi
 import org.fcitx.fcitx5.android.input.popup.keyRef
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
-import org.fcitx.fcitx5.android.input.voice.VoiceFeature
+import org.fcitx.fcitx5.android.pack.PackKind
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.above
 import splitties.views.dsl.constraintlayout.below
@@ -95,8 +97,6 @@ abstract class BaseKeyboard(
     private val spaceSwipeMoveCursor = prefs.keyboard.spaceSwipeMoveCursor
     private val spaceKeys = mutableListOf<KeyHandle>()
 
-    // each key's view and its def, as made: the scene's keys wired from them ([drawKeysOn])
-    private val wired = mutableListOf<Pair<KeyView, KeyDef>>()
 
     /** Holding the space talks here ([updateSpaceBadges]): the microphone on it. Before init, which sets it. */
     protected var holdsToTalk = false
@@ -317,12 +317,12 @@ abstract class BaseKeyboard(
 
     // holding the space to talk: a microphone on every keyboard's space says so, or no one would know
     private fun updateSpaceBadges(behavior: SpaceLongPressBehavior) {
-        val voice = behavior.talks(VoiceFeature.AVAILABLE, inPasswordField)
+        val voice = behavior.talks(PackStore.ready(PackKind.VOICE), inPasswordField)
         holdsToTalk = voice
         canvas?.invalidateScene()
         val icon = if (voice) R.drawable.ic_baseline_keyboard_voice_24 else null
         // a long press that does nothing here buzzes for nothing either
-        val takes = spaceLongPressTakesTouch(behavior, VoiceFeature.AVAILABLE, inPasswordField)
+        val takes = spaceLongPressTakesTouch(behavior, PackStore.ready(PackKind.VOICE), inPasswordField)
         spaceKeys.forEach {
             (it as? TextKeyView)?.showBadge(icon)
             it.keyGesture.longPressFeedbackEnabled = takes
@@ -384,7 +384,6 @@ abstract class BaseKeyboard(
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             }
             wire(this, def, this)
-            wired += this to def
         }
     }
 
@@ -418,8 +417,8 @@ abstract class BaseKeyboard(
     private fun wireSpace(key: KeyHandle) {
         val g = key.keyGesture
         spaceKeys.add(key)
-        // as updateSpaceBadges sets it: a key wired after it ran (the scene's, drawKeysOn) buzzes for nothing otherwise
-        g.longPressFeedbackEnabled = spaceLongPressTakesTouch(spaceLongPress.getValue(), VoiceFeature.AVAILABLE, inPasswordField)
+        // as updateSpaceBadges sets it: a key wired after it ran (the scene's, SceneKeys.byNodes) buzzes for nothing otherwise
+        g.longPressFeedbackEnabled = spaceLongPressTakesTouch(spaceLongPress.getValue(), PackStore.ready(PackKind.VOICE), inPasswordField)
         g.swipeEnabled = spaceSwipeMoveCursor.getValue()
         g.swipeRepeatEnabled = true
         g.swipeThresholdX = selectionSwipeThreshold
@@ -484,7 +483,7 @@ abstract class BaseKeyboard(
                 // hold to talk follows the finger that holds the space
                 is KeyDef.Behavior.LongPress -> key.onLongClick { k ->
                     val action = it.action
-                    if (action is KeyAction.SpaceLongPressAction && !spaceLongPressTakesTouch(spaceLongPress.getValue(), VoiceFeature.AVAILABLE, inPasswordField)) {
+                    if (action is KeyAction.SpaceLongPressAction && !spaceLongPressTakesTouch(spaceLongPress.getValue(), PackStore.ready(PackKind.VOICE), inPasswordField)) {
                         // nothing to do: not taken, or a slow drag on the space, its first step past the delay, moved no cursor (PY-41)
                         false
                     } else {
@@ -539,9 +538,9 @@ abstract class BaseKeyboard(
                 key.gestureListener = { k, event ->
                     if (popupOnKeyPress) {
                         when (event.type) {
-                            GestureType.Down -> k.bounds?.let { onPopupAction(PopupAction.PreviewAction(k.ref, popup.content, it)) }
+                            GestureType.Down -> k.bounds?.let { onPopupAction(PopupAction.PreviewAction(k.ref, bubbleOf(k, popup), it)) }
                             GestureType.Move -> {
-                                onPopupAction(swipes.preview(k, def, event.totalY, popup))
+                                onPopupAction(swipes.preview(k, def, event.totalY, popup, bubbleOf(k, popup)))
                             }
                             GestureType.Up -> {
                                 onPopupAction(PopupAction.DismissAction(k.ref))
@@ -557,7 +556,7 @@ abstract class BaseKeyboard(
                 key.gestureListener = { k, event ->
                     if (popupOnKeyPress) {
                         when (event.type) {
-                            GestureType.Down -> k.bounds?.let { onPopupAction(PopupAction.PreviewAction(k.ref, popup.content, it)) }
+                            GestureType.Down -> k.bounds?.let { onPopupAction(PopupAction.PreviewAction(k.ref, bubbleOf(k, popup), it)) }
                             GestureType.Up -> {
                                 onPopupAction(PopupAction.DismissAction(k.ref))
                             }
@@ -570,6 +569,9 @@ abstract class BaseKeyboard(
             }
         }
     }
+
+    // what a key's bubble shows: a scene key's as the scene has it now (SceneKey.bubble), else its def's
+    private fun bubbleOf(k: KeyHandle, popup: KeyDef.Popup.Preview) = (k as? SceneKey)?.bubble ?: popup.content
 
     // a long press's popup (a menu, a keyboard), its cell focused as the finger moves and picked as it lifts
     private fun choosesFromPopup(key: KeyHandle) {
@@ -602,12 +604,12 @@ abstract class BaseKeyboard(
     /**
      * The keys drawn by the scene engine over this keyboard's own ([KeyboardCanvasView]), their views
      * not drawn then: the touches handed to the scene's keys ([sceneKeys]) as vivo's workaround hands
-     * them to the views ([routesTouches]). Null: the keys draw themselves. Set by [drawKeysOn].
+     * them to the views ([routesTouches]). Null: the keys draw themselves. Set by [drawKeysWithScene].
      */
     protected var canvas: KeyboardCanvasView? = null
         private set
 
-    // the scene's keys ([drawKeysOn], [drawKeysWithScene]) and what a touch on the canvas finds
+    // the scene's keys ([drawKeysWithScene]) and what a touch on the canvas finds
     private val sceneKeys = SceneKeys(this) { key, def -> wire(key, def, null) }
 
     /**
@@ -623,25 +625,20 @@ abstract class BaseKeyboard(
      * [BuiltInLayouts.has]); else the views go on drawing them, as they always did. A layout that
      * does not read ([SceneLayouts.of], logged there) draws nothing: never the views again (U8,
      * they go in S8). Called last in a keyboard's init: the scene reads its state ([sceneEnv]).
-     * Each key wired as its view was where [refOf] says which (U4 A: the 26 keys, till their layout
-     * says what they do), else as its layout's node says ([SceneKeyDef], [sceneTable] the keyboard's
-     * own words: U4 B). The rows of views stay laid out, not drawn, not touched, not read out (S8
-     * deletes them). Whether the canvas is put over the keyboard.
+     * Each key wired as its layout's node says ([SceneKeyDef], [sceneTable] the keyboard's own words:
+     * U4 B). The rows of views stay laid out, not drawn, not touched, not read out (S8 deletes them).
+     * Whether the canvas is put over the keyboard.
      */
-    protected fun drawKeysWithScene(layoutName: String, refOf: ((KeyView) -> KeyRef?)? = null): Boolean {
+    protected fun drawKeysWithScene(layoutName: String): Boolean {
         if (!AppPrefs.getInstance().internal.canvasKeyboard.getValue() || !BuiltInLayouts.has(layoutName)) return false
         val layout = SceneLayouts.of(context, layoutName)
         val board = SceneBoard(context, theme, layout) { look, read, width, height -> sceneEnv(look, read, width, height) }
         sceneBoard = board
-        val view = board.view(keyImages) { node -> sceneKey(node) }
-        if (refOf != null) {
-            drawKeysOn(view, refOf)
-        } else {
-            releaseAllTouchTargets()
-            spaceKeys.removeAll { it is SceneKey }
-            canvas = view
-            sceneKeys.byNodes(view, sceneTable) { old -> spaceKeys.remove(old) }
-        }
+        val view = board.view(keyImages, ::sceneString, { node -> sceneKey(node) }) { onSceneBuilt(it) }
+        releaseAllTouchTargets()
+        spaceKeys.removeAll { it is SceneKey }
+        canvas = view
+        sceneKeys.byNodes(view, sceneTable) { old -> spaceKeys.remove(old) }
         keyRows.forEach { it.visibility = View.INVISIBLE }
         add(view, lParams(0, 0) {
             topOfParent()
@@ -660,33 +657,22 @@ abstract class BaseKeyboard(
     protected open fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env =
         SceneEnvs.of(this, look, theme.isDark, width, height, Input(), marks = SceneBoard.marks(layout, charShortcutMarks))
 
+    /** A scene made anew for the canvas ([scene]; null, none drawn): what a keyboard places by it, placed again. */
+    internal open fun onSceneBuilt(scene: Scene?) {}
+    /** The keyboard's own words for a string its layout names ([KeyboardCanvasView.Host.string]): null, the app's shared ones. */
+    protected open fun sceneString(name: String): String? = null
+
     /** The keyboard's own words for its layout's keys (U4 B): its `action:` placeholders, its composed long presses. */
     protected open val sceneTable: SceneKeyDef.Table = object : SceneKeyDef.Table {}
 
-    /**
-     * The keys drawn by [view] from now on, or by their own views again (null): each key the scene
-     * draws, [refOf] its view's ([KeyRef.scene]; null, none), wired as its view was and touched where
-     * the scene places it (060-render-p2 S1). A key hidden takes no touch, as its view says till its
-     * layout does (S4).
-     */
-    protected fun drawKeysOn(view: KeyboardCanvasView?, refOf: (KeyView) -> KeyRef? = { null }) {
-        releaseAllTouchTargets()
-        spaceKeys.removeAll { it is SceneKey }
-        canvas = view
-        if (view == null) sceneKeys.none() else sceneKeys.byViews(view, wired, refOf)
-    }
-
-    /** The scene's key wired as [view] was ([drawKeysOn]); null while the views draw the keys. */
-    internal fun sceneKeyOf(view: KeyView): SceneKey? = sceneKeys.of(view)
-
-    /** Where the scene drawn last has its key [id] (its first copy) in this keyboard, as a key's place is (glide typing's, strokes'): nowhere while the views draw the keys. */
-    protected fun scenePlace(id: String): KeyPlace = KeyPlace { _, out ->
+    /** Where the scene drawn last has its key [id] (its second [copy], a split row's) in this keyboard, as a key's place is (glide typing's, strokes'): nowhere while the views draw the keys. */
+    protected fun scenePlace(id: String, copy: Boolean = false): KeyPlace = KeyPlace { _, out ->
         val c = canvas
-        if (c != null && c.cell(KeyRef(id), out)) out.offset(c.left, c.top) else out.setEmpty()
+        if (c != null && c.cell(KeyRef(id, copy), out)) out.offset(c.left, c.top) else out.setEmpty()
     }
 
     /** The key wired for the scene's [node] ([SceneTouch.keyOf]): what a screen reader's actions on it do; null while the views draw the keys. */
-    protected fun sceneKey(node: KeyNode): SceneKey? = sceneKeys.of(node)
+    internal fun sceneKey(node: KeyNode): SceneKey? = sceneKeys.of(node)
 
     // the keys' views take touches as the keyboard hands them: vivo's workaround, or keys drawn by the canvas
     private val routesTouches get() = vivoKeypressWorkaround || canvas != null
@@ -923,11 +909,11 @@ private object KeyPointer {
 
 /**
  * Whether the space's long press, set to [behavior], takes the touch from its swipe: not when it does
- * nothing, as None does, and Voice where it does not talk ([SpaceLongPressBehavior.talks]).
+ * nothing, as None does, and Voice where it does not talk ([SpaceLongPressBehavior.talks]: no voice pack, a password).
  */
-internal fun spaceLongPressTakesTouch(behavior: SpaceLongPressBehavior, voiceAvailable: Boolean, inPasswordField: Boolean) = when (behavior) {
+internal fun spaceLongPressTakesTouch(behavior: SpaceLongPressBehavior, voiceReady: Boolean, inPasswordField: Boolean) = when (behavior) {
     SpaceLongPressBehavior.None -> false
-    SpaceLongPressBehavior.Voice -> behavior.talks(voiceAvailable, inPasswordField)
+    SpaceLongPressBehavior.Voice -> behavior.talks(voiceReady, inPasswordField)
     else -> true
 }
 

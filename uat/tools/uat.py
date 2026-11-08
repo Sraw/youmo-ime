@@ -5,8 +5,11 @@
                                    from its snapshot "clean", read-only: every up a clean device
   uat.py emu-up | emu-down         the same on 5554 (the first)
   uat.py up --count N|auto          N emulators (auto: as many as memory allows) on free even ports
-  uat.py run [--areas 14,06] [--ids ST-01,PY-02] [--devices 5554,5556|auto] [--flavor text|voice]
-                                   auto: start as many as memory allows, split the run, bring them down
+  uat.py run [--areas 14,06] [--ids ST-01,PY-02] [--devices 5554,5556|auto] [--no-voice]
+                                   auto: start as many as memory allows, split the run, bring them down;
+                                   the resource packs (app/build/packs: ./gradlew :app:packs) imported
+                                   first, the voice pack too unless --no-voice
+  uat.py packs [--port P] [--no-voice]  the packs imported into the app on emulator-P (installed)
   uat.py mark <run> <id> 通过|失败 [note]
   uat.py list [--areas …]          the registered cases, their group and kind
 
@@ -17,8 +20,11 @@ am/pm/ime/settings drive the device. The devices are emulators (AVD youmo, andro
 arm64-v8a: the release ABI, native on Apple silicon; uat/tools/avd.sh makes it; UAT_AVD=youmo29 an
 Android 10 one, minSdk, without the test page's browser), VMs with their own
 kernel: root over `adb root`, and 17 实体键盘's USB keyboard a uinput one (uat/tools/emu-keyboard.sh),
-which is never made anywhere else. The voice cases' microphone is the voice debug build's clip microphone
+which is never made anywhere else. The voice cases' microphone is the debug build's clip microphone
 (`Device.say`: VoiceClipProvider plays dev/uat-out/voice-clips/ in place of the AudioRecord's samples).
+The resource packs (dev/design/060-asset-packs.md) are imported once a device, through the debug
+build's shell-only import (PackImportProvider: the same checks as the 资源包 page's); the reset
+between cases keeps them (`reset`), a release run imports them through the file picker.
 Output is kept short on purpose (counts and paths): an agent reading it re-reads its context.
 """
 import argparse
@@ -64,6 +70,8 @@ os.environ.setdefault("ADB_MDNS", "0")
 # are the two of a run; a worktree may start its own on another even port up to 5584 (uat.py up --port)
 AVD = os.environ.get("UAT_AVD", "youmo")
 SNAPSHOT = "clean"   # the AVD's state after uat/tools/avd.sh: zh-CN, three-button nav, the WebView shell
+# UAT_CANVAS=1: every case on 060's new drawing (internal.canvasKeyboard, canvas_on)
+CANVAS = os.environ.get("UAT_CANVAS") == "1"
 # the default pair; any number runs (--devices 5554,5556,5558,… or auto: device_count from free memory)
 PORTS = ("5554", "5556")
 
@@ -252,11 +260,11 @@ class Elsewhere(Exception):
 # needs kinds that name where a case runs instead, in place()'s order; unmet, tally and counts_line
 # read it too. (There was an "emu" kind while the runs were on redroid: the hardware keyboard needs the
 # emulator's own kernel; every device is an emulator now)
-ELSEWHERE = {"jvm": "JVM", "release": "发版时", "manual": "真机或手工", "voice": "语音版"}
+ELSEWHERE = {"jvm": "JVM", "release": "发版时", "manual": "真机或手工", "voice": "语音"}
 # when a case of an ELSEWHERE kind runs on this device and build after all (a kind not here never does).
 # release,scripted: scripted but too long for every run (a big lexicon), so only in a release's own run
 # (UAT_BUILD=release)
-RUNS_HERE = {"voice": lambda d, kinds: d.flavor == "voice",
+RUNS_HERE = {"voice": lambda d, kinds: d.voice,
              "release": lambda d, kinds: "scripted" in kinds and BUILD == "release"}
 # what a case in the .md with no script is registered as: tally reports each
 NO_SCRIPT = "block:没有脚本"
@@ -289,7 +297,8 @@ class Case:
             if k not in kinds or RUNS_HERE.get(k, lambda d, kinds: False)(d, kinds):
                 continue
             if k == "voice":
-                return Elsewhere, f"{ELSEWHERE[k]}：文字版没有语音输入（--flavor voice 装语音版再跑）"
+                why = "正式包没有录音片段麦克风" if BUILD == "release" else "这次没导入语音包（--no-voice）"
+                return Elsewhere, f"{ELSEWHERE[k]}：{why}"
             if k == "release":
                 where = "发版时脚本跑（UAT_BUILD=release）" if "scripted" in kinds else "发版时手动"
                 return Elsewhere, f"{where}：{why}"
@@ -532,9 +541,10 @@ def build_dumper():
 
 
 class Device:
-    def __init__(self, port, run=None, flavor="text"):
+    def __init__(self, port, run=None, voice=True):
         self.port = str(port)
-        self.flavor = flavor   # the build under test (--flavor): voice-only cases, SET-01's reinstall
+        # the voice pack imported, the clip microphone there (a debug build): the voice cases run here
+        self.voice = voice and BUILD == "debug"
         self.serial = f"emulator-{self.port}"
         self._clips_in = set()   # the clips Device.say has written into the app's files
         self.run = run
@@ -630,7 +640,7 @@ class Device:
                     r = subprocess.run(["adb", "-s", self.serial, "shell", f"content write --uri {CLIP_URI}/{c}.wav"],
                                        stdin=src, capture_output=True, text=True, timeout=60)
                 if r.returncode or "Exception" in r.stdout + r.stderr:
-                    raise Blocked(f"片段麦克风写不进 {c}.wav（语音版 debug 包？）：{(r.stdout + r.stderr).strip()[:120]}")
+                    raise Blocked(f"片段麦克风写不进 {c}.wav（debug 包？）：{(r.stdout + r.stderr).strip()[:120]}")
                 self._clips_in.add(c)
         arg = ",".join(str(int(c)) if isinstance(c, (int, float)) else f"{c}.wav" for c in parts)
         if alongside:
@@ -648,7 +658,7 @@ class Device:
         out = self.sh(f"content call --uri {CLIP_URI} --method {method}" + (f" --arg '{arg}'" if arg is not None else ""))
         m = re.search(r"state=(.*?)}", out)
         if not m:
-            raise Blocked(f"片段麦克风不应答（语音版 debug 包？）：{out.strip()[:120]}")
+            raise Blocked(f"片段麦克风不应答（debug 包？）：{out.strip()[:120]}")
         return m.group(1)
 
     def clip_mic(self):
@@ -1724,20 +1734,45 @@ def add_im(d, name):
         raise Blocked(f"添加「{name}」后输入法页是 {s.texts()[:8]}")
 
 
+def clear_keeping_packs(d):
+    """the app's data cleared as `pm clear` clears it, but for the resource packs (files/packs in
+    its device-protected storage): imported once a device, not ~3 s a case again. A debug build's own
+    shell (run-as) deletes the rest; the input method disabled first, so the system does not start
+    it again halfway (ensure_ime turns it back on). A release build is not debuggable: pm clear,
+    then the packs through the file picker"""
+    if BUILD == "release":
+        d.sh(f"pm clear {PKG}")
+        import_packs_ui(d)
+        return
+    d.sh(f"ime disable {IME}; am force-stop {PKG}; pm revoke {PKG} android.permission.RECORD_AUDIO 2>/dev/null; "
+         f"rm -rf /sdcard/Android/data/{PKG}/* 2>/dev/null")
+    out = d.sh(f"run-as {PKG} sh -c " + shlex.quote(
+        f"find /data/user/0/{PKG} -mindepth 1 -maxdepth 1 -exec rm -rf {{}} + ; "
+        f"cd /data/user_de/0/{PKG} && find . -mindepth 1 -maxdepth 1 ! -name files -exec rm -rf {{}} + ; "
+        f"cd files 2>/dev/null && find . -mindepth 1 -maxdepth 1 ! -name packs -exec rm -rf {{}} + ; echo cleared"))
+    if "cleared" not in out:
+        raise Blocked(f"run-as 清数据失败：{out.strip()[:120]}")
+
+
 def reset(d, base, page):
-    """the app as freshly installed, then the baseline"""
-    d.sh(f"pm clear {PKG}; settings put system accelerometer_rotation 0; "
+    """the app as freshly installed (but for the resource packs), then the baseline"""
+    clear_keeping_packs(d)
+    d.sh("settings put system accelerometer_rotation 0; "
          "settings put system user_rotation 0; wm size reset; cmd uimode night no")
     d.rot = 0
+    if CANVAS:
+        canvas_on(d)
     ensure_ime(d)
+    if CANVAS:
+        canvas_check(d)
     d._keys = None
     if not base.startswith("B0"):
         raise Blocked(f"unknown baseline {base}")
     plug(d, base)
-    # the voice build: the microphone allowed (pm clear took it back), on every baseline (B0-语音 is
-    # B0 there; VO-01 revokes it itself). The text build has no such permission: refused, no harm
+    # the microphone allowed (the clear took it back), on every baseline (B0-语音 is B0 there; VO-01
+    # revokes it itself)
     d.sh(f"pm grant {PKG} android.permission.RECORD_AUDIO 2>/dev/null")
-    if d.flavor == "voice":
+    if d.voice:
         d.clip_mic()   # what the talks hear: Device.say's clips (the emulator runs with no audio)
     d.open_page("text")   # the engine's first load is waited for on the letters
     ime_ready(d)
@@ -1762,6 +1797,58 @@ def reset(d, base, page):
         d.open_page(page)
     elif base not in ("B0", "B0-实体", "B0-语音"):
         raise Blocked(f"unknown baseline {base}")
+
+
+# internal.canvasKeyboard on in the app's prefs (its key, canvas_keyboard)
+CANVAS_SET = 'name="canvas_keyboard" value="true"'
+
+
+def canvas_prefs_script(f):
+    """the shell script turning canvas_keyboard on in the prefs file f, the rest of it kept (what the
+    packs' import wrote there): none, or `<map />`, made a map; the key's old value taken out; written
+    through a copy (portable sed, no -i)"""
+    return (f"mkdir -p shared_prefs; f={f}; [ -s $f ] || printf '<map></map>' > $f; "
+            "sed -e 's#<map */>#<map></map>#' -e 's#<boolean name=\"canvas_keyboard\" value=\"[a-z]*\" */>##' "
+            "-e 's#</map>#<boolean name=\"canvas_keyboard\" value=\"true\" /></map>#' $f > $f.new && mv $f.new $f")
+
+
+def prefs_settled_script(path, tries=10):
+    """the shell script waiting (up to tries x 0.5 s) for the prefs file at path to read the same
+    twice running: what the app still writes with apply() lands before a force-stop drops it. A file
+    there is none of reads the same (nothing pending to wait for)"""
+    return (f"i=0; while [ $i -lt {tries} ]; do a=$(cksum {path} 2>/dev/null); sleep 0.5; "
+            f"[ \"$a\" = \"$(cksum {path} 2>/dev/null)\" ] && break; i=$((i+1)); done")
+
+
+def canvas_on_cmd(build=None):
+    """the shell command turning the canvas on in the cleared app's prefs, after the packs are in
+    (their import's prefs kept: [canvas_prefs_script]): as the app (run-as, the debug build's: its
+    owner and SELinux context its own), else as root, given the data dir's owner and context"""
+    build = build or BUILD
+    f = f"shared_prefs/{PKG}_preferences.xml"
+    write = shlex.quote(canvas_prefs_script(f))
+    if build == "debug":
+        return f"am force-stop {PKG}; run-as {PKG} sh -c {write}"
+    dd = f"/data/data/{PKG}"
+    # a release ran the app to import the packs through its page (import_packs_ui): what it still
+    # writes asynchronously settled first, or the force-stop loses it
+    return (f"{prefs_settled_script(f'{dd}/{f}')}; am force-stop {PKG}; cd {dd} && sh -c {write}; u=$(stat -c %u {dd}); chown -R $u:$u {dd}/shared_prefs; "
+            f"chmod 660 {dd}/{f}; chcon -R $(ls -dZ {dd} | cut -d' ' -f1) {dd}/shared_prefs")
+
+
+def canvas_on(d):
+    """UAT_CANVAS=1: internal.canvasKeyboard on in the cleared app's prefs (060's new drawing; the
+    developer page's switch), after clear_keeping_packs (a release's packs imported) and before the
+    input method starts ([canvas_on_cmd])"""
+    d.sh(canvas_on_cmd())
+
+
+def canvas_check(d):
+    """the canvas still on once the app is up, or Blocked: a case meant for the new drawing never runs on the old"""
+    f = f"shared_prefs/{PKG}_preferences.xml"
+    read = d.sh(f"run-as {PKG} cat {f}" if BUILD == "debug" else f"cat /data/data/{PKG}/{f}")
+    if CANVAS_SET not in read:
+        raise Blocked(f"UAT_CANVAS=1 但 canvas_keyboard 没有打开：{read.strip()[:200]}")
 
 
 def plug(d, base):
@@ -2011,11 +2098,11 @@ def open_host(d, **extras):
             u.unhost = True
             d.after_case.append(u)
         if not d.sh(f"pm path {HOST_PKG}").strip():
-            dp = os.path.join(REPO, "app/build/outputs/apk/text/debug")
+            dp = os.path.join(REPO, "app/build/outputs/apk/debug")
             apks = sorted((os.path.join(dp, f) for f in (os.listdir(dp) if os.path.isdir(dp) else [])
                            if ABI in f and f.endswith(".apk")), key=os.path.getmtime)
             if not apks:
-                raise Blocked(f"正式包跑时要 debug 包当测试宿主：BUILD_ABI={ABI} ./gradlew :app:assembleTextDebug")
+                raise Blocked(f"正式包跑时要 debug 包当测试宿主：BUILD_ABI={ABI} ./gradlew :app:assembleDebug")
             d.adb("install", "-r", apks[-1], check=True, timeout=600)
         d.sh(f"ime disable {HOST_PKG}/org.fcitx.fcitx5.android.input.FcitxInputMethodService")
         ensure_ime(d)
@@ -2185,7 +2272,7 @@ class Scheduler:
     remaining state-changing cases from the tail of a group in progress (each needs a reset anyway).
     The heavy cases come after all of it, one at a time, each once no other device runs anything"""
 
-    def __init__(self, cases, run, ports, flavor="text"):
+    def __init__(self, cases, run, ports, voice=True):
         groups = {}
         for c in cases:
             if not c.heavy or not c.heavy_here():
@@ -2198,7 +2285,7 @@ class Scheduler:
         self.active = []
         self.busy = set()   # the ports running a group now
         self.lock = threading.Condition()
-        self.run, self.ports, self.flavor = run, ports, flavor
+        self.run, self.ports, self.voice = run, ports, voice
 
     def next_group(self, port=None):
         with self.lock:
@@ -2237,7 +2324,7 @@ class Scheduler:
             return g.pop(0) if g else None
 
     def device_loop(self, port):
-        d = Device(port, self.run, self.flavor)
+        d = Device(port, self.run, self.voice)
         try:
             if not d.start_dumper():
                 d.stop_dumper()   # falls back to `uiautomator dump`, ~2 s a read
@@ -2424,13 +2511,13 @@ def table(results):
     return lines
 
 
-def write_results(run, cases, version, ports, wall, sheets, flavor="text"):
+def write_results(run, cases, version, ports, wall, sheets, voice=True):
     p = os.path.join(UAT, "runs", f"{run.name}.md")
     dev = (f"- 设备：Android 模拟器（AVD {AVD}，android-36 google_apis {ABI}），1080×2340，"
            f"440 dpi，简体中文；{len(ports)} 台（{', '.join('emulator-' + p for p in ports)}）；"
            f"实体键盘是 uat/tools/emu-keyboard.sh 的 uinput USB 键盘")
     lines = [f"# {run.name}", "", dev,
-             f"- 包：{'语音版' if flavor == 'voice' else '文字版'} {ABI} {BUILD}（{PKG}）{version}",
+             f"- 包：{ABI} {BUILD}（{PKG}）{version}，{'文字包和语音包' if voice and BUILD == 'debug' else '文字包'}",
              # the ids of a short rerun say which rows are new; a whole run is just its count
              f"- 跑法：`uat/tools/uat.py run`（最近一次跑 {sum(1 for i in run.ids if run.results.get(i, ('',))[0] != '在别处跑')} 条"
              f"{'：' + ', '.join(run.ids) if len(run.ids) <= 12 else ''}，用时 {wall:.0f} s）；"
@@ -2664,15 +2751,15 @@ def up(port="5556"):
 
 
 
-def install(d, flavor="text"):
+def install(d, voice=True):
     # UAT_APK_REPO: another checkout's build under this one's cases (the voice cases need a debug
     # build's clip microphone: R15 has none)
     apk_repo = os.environ.get("UAT_APK_REPO", REPO)
-    apks = sorted((os.path.join(dp, f) for dp in [os.path.join(apk_repo, f"app/build/outputs/apk/{flavor}/{BUILD}")]
+    apks = sorted((os.path.join(dp, f) for dp in [os.path.join(apk_repo, f"app/build/outputs/apk/{BUILD}")]
                    if os.path.isdir(dp) for f in os.listdir(dp) if ABI in f and f.endswith(".apk") and not f.endswith("-unsigned.apk")),
                   key=os.path.getmtime)
     if not apks:
-        msg = f"no {flavor} {BUILD} {ABI} APK: BUILD_ABI={ABI} ./gradlew :app:assemble{flavor.capitalize()}{BUILD.capitalize()}"
+        msg = f"no {BUILD} {ABI} APK: BUILD_ABI={ABI} ./gradlew :app:assemble{BUILD.capitalize()}"
         if BUILD == "release":
             msg += " (signed: the release key's environment set; an -unsigned.apk does not install)"
         if d.case:   # inside a case (SET-01): that case is blocked, the run goes on
@@ -2694,6 +2781,79 @@ def install(d, flavor="text"):
     if on_device != [h.hexdigest()]:
         d.adb("install", "-r", apks[-1], check=True, timeout=600)
     d.sh(f"ime enable {IME}; ime set {IME}")
+    import_packs(d, voice)
+
+
+PACKS = os.path.join(REPO, "app/build/packs")   # :app:packs (AssetPacksPlugin)
+PACK_URI = f"content://{PKG}.uat.packs"
+
+
+def pack_files(voice=True):
+    """{id: (the newest .youmopack the build made, its version)} of the packs a run imports"""
+    out = {}
+    for pid in ("text", "voice") if voice else ("text",):
+        listings = sorted((f for f in (os.listdir(PACKS) if os.path.isdir(PACKS) else [])
+                           if f.startswith(f"youmo-{pid}-v") and f.endswith(".json")),
+                          key=lambda f: os.path.getmtime(os.path.join(PACKS, f)))
+        if not listings:
+            sys.exit(f"no {pid} pack in app/build/packs: ./gradlew :app:packs")
+        meta = json.load(open(os.path.join(PACKS, listings[-1])))
+        out[pid] = (os.path.join(PACKS, meta["file"]), meta["version"])
+    return out
+
+
+def packs_state(d):
+    """{id: "v1" | "missing" | "needs-update:v1" | …} as the app has them (a debug build's PackImportProvider)"""
+    out = d.sh(f"content call --uri {PACK_URI} --method state")
+    return dict(re.findall(r"\b(text|voice)=([\w:-]+)", out))
+
+
+def import_packs(d, voice=True):
+    """the packs a run needs imported, once a device: those there at the build's version are kept
+    (an import of the same pack again is a no-op the app tells apart, but costs a copy over adb)"""
+    files = pack_files(voice)
+    if BUILD == "release":
+        import_packs_ui(d, files)
+        return
+    state = packs_state(d)
+    for pid, (path, ver) in files.items():
+        if state.get(pid) == f"v{ver}":
+            continue
+        name = os.path.basename(path)
+        with open(path, "rb") as src:
+            w = subprocess.run(["adb", "-s", d.serial, "shell", "content", "write", "--uri", f"{PACK_URI}/{name}"],
+                               stdin=src, capture_output=True, text=True, timeout=600)
+        if w.returncode != 0:
+            sys.exit(f"{d.serial}: {name} not written in: {(w.stderr or w.stdout).strip()[:200]}")
+        out = d.sh(f"content call --uri {PACK_URI} --method import --arg {name}")
+        if not re.search(r"result=(imported|already):", out):
+            sys.exit(f"{d.serial}: {name} not imported: {out.strip()[:200]}")
+        print(f"{d.serial}: {name} imported", flush=True)
+
+
+def import_packs_ui(d, files=None):
+    """a release build's packs (signed with the release key: the build's `youmo.packKey`) through the
+    资源包 page and the file picker, as a user imports them; the text pack alone (a release run has no
+    voice cases). Pushed to 下载 once"""
+    files = files or pack_files(voice=False)
+    path, ver = files["text"]
+    name = os.path.basename(path)
+    if not d.sh(f"ls /sdcard/Download/{name} 2>/dev/null").strip():
+        d.adb("push", path, f"/sdcard/Download/{name}", check=True, timeout=600)
+    home(d, "资源包")
+    d.tap_text("导入资源包", after=0.5)
+    in_picker(d)
+    if "documentsui" not in d.top_activity():
+        raise Blocked(f"导入资源包没出文件选择：{d.top_activity()}")
+    if d.screen().find(text="近期的文件"):
+        d.tap((77, 148), 1.0)
+        d.tap_text("下载", scroll=False, after=2.0)
+    d.tap_text(name, scroll=False, after=1.0)
+    s = d.wait(lambda x: x if x.find(contains="导入结果") or x.find(contains=f"已导入") else None,
+               timeout=180, step=1.0, what="导入结果")
+    if not s.find(contains="文字包"):
+        raise Blocked(f"文字包没导入：{s.texts()[:6]}")
+    d.back(0.5)
 
 
 
@@ -2788,7 +2948,7 @@ def run_on(a, cases, ports):
             sys.exit(f"{d.serial} is not up (uat.py up --port {p})")
         ours(d)
         need_root(d)   # one started by hand
-        install(d, a.flavor)
+        install(d, not a.no_voice)
         d.adb("reverse", "tcp:8000", f"tcp:{HTTP_PORT}", check=True)
     ver = version(Device(ports[0]))
     name = f"{datetime.date.today().isoformat()}-emulator-{ver}"
@@ -2799,7 +2959,7 @@ def run_on(a, cases, ports):
     server = start_server()
     t0 = time.time()
     try:
-        sch = Scheduler(cases, run, ports, a.flavor)
+        sch = Scheduler(cases, run, ports, not a.no_voice)
         threads = [threading.Thread(target=sch.device_loop, args=(p,)) for p in ports]
         for t in threads:
             t.start()
@@ -2813,7 +2973,7 @@ def run_on(a, cases, ports):
         if c.id not in run.results:
             run.record(c, "阻塞", "没跑到（设备停了）", "-", 0)
     sheets = build_sheets(run, cases)
-    p = write_results(run, cases, ver, ports, wall, sheets, a.flavor)
+    p = write_results(run, cases, ver, ports, wall, sheets, not a.no_voice)
     counts = {}
     for cid in run.ids:
         st = run.results[cid][0]
@@ -2917,8 +3077,8 @@ def junit_results(dirs):
                 state = "跳过" if tc.find("skipped") is not None else ("失败" if bad is not None else "通过")
                 msg = ((bad.get("message") or "").splitlines() or [""])[0][:200] if bad is not None else ""
                 key = (tc.get("classname"), tc.get("name"))
-                # the same test in both flavors' results: the worse counts (a text-only failure must
-                # not be hidden by the voice run read after it)
+                # the same test in two results (SDK 35's and 29's): the worse counts (a failure
+                # at one must not be hidden by the other read after it)
                 if key not in out or WORSE.index(state) < WORSE.index(out[key][0]):
                     out[key] = (state, float(tc.get("time") or 0), msg)
     return out
@@ -2950,8 +3110,8 @@ def jvm_record(found, results, expected=()):
 
 def cmd_jvm(a):
     """the cases the app's and ime-core's JVM tests assert, recorded as a run of their own"""
-    roots = [os.path.join(REPO, p) for p in ("app/src/test", "app/src/testText", "app/src/testVoice", "lib/ime-core/src/test",
-                                                "lib/ime-eval/src/uatTest")]
+    # one APK since 0.6.0: the speech flavors' testText and testVoice are gone
+    roots = [os.path.join(REPO, p) for p in ("app/src/test", "lib/ime-core/src/test", "lib/ime-eval/src/uatTest")]
     dirs = [os.path.join(REPO, p) for p in a.results.split(",")]
     load_scripts()
     expected = [c.id for c in CASES.values() if place(c.needs) == "jvm"]
@@ -3053,7 +3213,10 @@ def main():
     r.add_argument("--areas")
     r.add_argument("--ids")
     r.add_argument("--devices", default=",".join(PORTS))
-    r.add_argument("--flavor", default="text", choices=["text", "voice"])
+    r.add_argument("--no-voice", action="store_true", help="the voice pack not imported: the voice cases elsewhere")
+    pk = sub.add_parser("packs")
+    pk.add_argument("--port", default=PORTS[1])
+    pk.add_argument("--no-voice", action="store_true")
     l = sub.add_parser("list")
     l.add_argument("--areas")
     for n in ("up", "down"):
@@ -3069,7 +3232,7 @@ def main():
     f = sub.add_parser("flakes")
     f.add_argument("runs", nargs="*")
     j = sub.add_parser("jvm")
-    j.add_argument("--results", default="app/build/test-results/testTextDebugUnitTest,app/build/test-results/testVoiceDebugUnitTest,"
+    j.add_argument("--results", default="app/build/test-results/testDebugUnitTest,app/build/test-results/testDebugUnitTestAt29,"
                                          "lib/ime-core/build/test-results/test,"
                                          "lib/ime-eval/build/test-results/uatTest")
     sub.add_parser("counts")
@@ -3081,6 +3244,10 @@ def main():
         for c in sorted(CASES.values(), key=lambda c: (c.group, c.order(), c.id)):
             print(c.group, c.id, {0: "read", 1: "learn-clean", 2: "learn", 3: "mutate"}[c.order()],
                   "visual" if c.visual else "", c.needs or "")
+    elif a.cmd == "packs":
+        d = Device(emu_port(a.port))
+        install(d, not a.no_voice)
+        print(packs_state(d))
     elif a.cmd == "up" and a.count:
         print("up: " + ",".join(up_many(auto_ports(a.count))))
     elif a.cmd == "up":
