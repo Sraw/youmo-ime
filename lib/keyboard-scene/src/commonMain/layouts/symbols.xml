@@ -14,7 +14,7 @@
     <key id="back" role="back" kind="function" width="15" label="{back}" text-size="16" text-style="bold" send="panel-back"/>
     <key id="lock" role="lock" kind="function" width="12" icon="{lock-icon}" a11y="a11y_key_panel_lock" send="panel-lock"/>
     <key id="numbers" role="numbers" kind="letter" class="alt-text" width="12" icon="number-pad" a11y="a11y_key_numbers" send="layout:Number"/>
-    <key id="space" role="space" kind="space" face="special" width="fill" text-size="13" a11y="a11y_key_space" sound="space" send="sym:space"
+    <key id="space" role="space" kind="space" face="special" width="fill" text-size="13" a11y="a11y_key_space" badge="{hold-badge}" sound="space" send="sym:space"
          long-press="space-long-press" swipe-axis="both" shortcut="space"/>
     <key id="backspace" role="backspace" kind="function" width="15" icon="backspace" a11y="a11y_key_backspace"
          sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both" shortcut="backspace"/>
