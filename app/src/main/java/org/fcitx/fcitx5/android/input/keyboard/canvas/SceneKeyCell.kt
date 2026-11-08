@@ -97,6 +97,20 @@ open class SceneKeyCell(context: Context, private val theme: Theme, private val 
             dropScene()
         }
 
+    /**
+     * The keyboard whose key this cell is (a settings cap, 060-render-p2 S7a): its [Board.layout] made at the
+     * keys' size there ([Board.width] × [Board.height], KeyboardArea) and the key of [Board.shortcut] drawn
+     * shrunk to the cell, so its label, its marks kept and given way are the keyboard's own; [attrs] unused. Null: [attrs]'s key alone.
+     */
+    data class Board(val layout: String, val shortcut: String, val width: Int, val height: Int)
+
+    var board: Board? = null
+        set(value) {
+            if (field == value) return
+            field = value
+            dropScene()
+        }
+
     /** An outline in this colour along the key's face, its corners the face's (the key being edited); none if null. */
     var outline: Argb? = null
         set(value) {
@@ -135,10 +149,11 @@ open class SceneKeyCell(context: Context, private val theme: Theme, private val 
         }
 
     /** The cell's key in [scene]. */
-    val keyNode: KeyNode? get() = scene?.keys?.firstOrNull()
+    val keyNode: KeyNode? get() = scene?.keys?.let { keys -> board?.let { b -> keys.firstOrNull { it.shortcut == b.shortcut && it.copy == 0 } } ?: keys.firstOrNull() }
 
     private fun build(): Scene? {
         val t = sceneTheme ?: return null.also { Timber.e("key cell: theme %s not converted; nothing drawn", theme.name) }
+        board?.let { return onBoard(t, it) }
         // a grid's cell the text the size [attrs] gives it, not the keyboard's 紧凑 or floating scale (the cells'
         // key views never took either); a key cap as the keyboard is, its marks' corners as there
         val env = SceneEnvs.of(this, look, theme.isDark, (width / shrink).roundToInt(), (height / shrink).roundToInt(), Input(), texts = Texts(), marks = marks)
@@ -156,6 +171,16 @@ open class SceneKeyCell(context: Context, private val theme: Theme, private val 
         }
     }
 
+    // the whole keyboard of [b], as it is docked (the marks the page's)
+    private fun onBoard(t: org.fcitx.fcitx5.android.scene.theme.Theme, b: Board): Scene? {
+        val layout = SceneLayouts.of(context, b.layout) ?: return null
+        val env = SceneEnvs.of(this, look, theme.isDark, b.width, b.height, Input(), texts = Texts(), marks = marks)
+        return when (val s = SceneBuilder(t, env, measurer, cascades = SceneThemes.cascades(t)).build(layout.layout, layout.fragments)) {
+            is Parsed.Ok -> s.value.also { v -> if (v.keys.none { it.shortcut == b.shortcut }) Timber.e("key cell: no key of %s on %s", b.shortcut, b.layout) }
+            is Parsed.Failed -> null.also { Timber.e("key cell: no scene of %s: %s; nothing drawn", b.layout, s.problems) }
+        }
+    }
+
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         invalidate()
@@ -170,13 +195,22 @@ open class SceneKeyCell(context: Context, private val theme: Theme, private val 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val saved = canvas.save()
+        // a board's key: its face centred in the cell
+        if (board != null) keyNode?.bounds?.let { k ->
+            canvas.translate(((width - k.width * shrink) / 2 - k.left * shrink).toFloat(), ((height - k.height * shrink) / 2 - k.top * shrink).toFloat())
+        }
         canvas.scale(shrink.toFloat(), shrink.toFloat())
         painter.draw(canvas, drawn())
         canvas.restoreToCount(saved)
     }
 
     // the drawing's scale: the cell's height over the keyboard key's it stands for, 1 where none
-    private val shrink: Double get() = if (keyboardKeyHeight <= 0 || height <= 0) 1.0 else height.toDouble() / keyboardKeyHeight
+    // (a board's key: the whole key within the cell)
+    private val shrink: Double
+        get() {
+            if (board != null) return keyNode?.bounds?.takeIf { it.hasSize }?.let { minOf(width / it.width, height / it.height) } ?: 1.0
+            return if (keyboardKeyHeight <= 0 || height <= 0) 1.0 else height.toDouble() / keyboardKeyHeight
+        }
 
     /** What the cell draws: its key's ops, its label at [labelAlpha], its [outline] over the face. */
     @VisibleForTesting

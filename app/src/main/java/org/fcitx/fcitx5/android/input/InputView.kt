@@ -8,7 +8,6 @@ package org.fcitx.fcitx5.android.input
 import android.annotation.SuppressLint
 import android.content.res.Configuration
 import android.graphics.Color
-import android.graphics.Point
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
 import android.graphics.Rect
@@ -67,7 +66,7 @@ import org.fcitx.fcitx5.android.input.floating.FloatingHandoff
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.floating.FloatingPlacer
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
-import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightCap
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase.DisplayMetrics
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase.RealSize
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
@@ -88,7 +87,6 @@ import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
 import org.fcitx.fcitx5.android.utils.unset
-import org.fcitx.fcitx5.android.utils.windowManager
 import org.mechdancer.dependency.DynamicScope
 import org.mechdancer.dependency.UniqueComponent
 import org.mechdancer.dependency.manager.wrapToUniqueComponent
@@ -324,45 +322,11 @@ class InputView(
         keyboardHeightPercentBase,
     )
 
-    private val keyboardHeightPx: Int
-        get() {
-            val baseType = keyboardHeightPercentBase.getValue()
-            val base = when (baseType) {
-                DisplayMetrics -> resources.displayMetrics.heightPixels
-                RealSize -> Point().also {
-                    @Suppress("DEPRECATION")
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                        context.display
-                    } else {
-                        context.windowManager.defaultDisplay
-                    }.getRealSize(it)
-                }.y
-            }
-            val percent = when (resources.configuration.orientation) {
-                Configuration.ORIENTATION_LANDSCAPE -> keyboardHeightPercentLandscape
-                else -> keyboardHeightPercent
-            }.getValue()
-            Timber.d("keyboardHeightPx get(): baseType=${baseType}, base=${base}, percent=${percent}")
-            return base * percent / 100
-        }
+    private val keyboardHeightPx: Int get() = KeyboardArea.requestedHeight(context)
 
-    private val keyboardSidePaddingPx: Int
-        get() {
-            val value = when (resources.configuration.orientation) {
-                Configuration.ORIENTATION_LANDSCAPE -> keyboardSidePaddingLandscape
-                else -> keyboardSidePadding
-            }.getValue()
-            return dp(value)
-        }
+    private val keyboardSidePaddingPx: Int get() = KeyboardArea.sidePadding(context)
 
-    private val keyboardBottomPaddingPx: Int
-        get() {
-            val value = when (resources.configuration.orientation) {
-                Configuration.ORIENTATION_LANDSCAPE -> keyboardBottomPaddingLandscape
-                else -> keyboardBottomPadding
-            }.getValue()
-            return dp(value)
-        }
+    private val keyboardBottomPaddingPx: Int get() = KeyboardArea.bottomPadding(context)
 
     @Keep
     private val onKeyboardSizeChangeListener = ManagedPreferenceProvider.OnChangeListener { key ->
@@ -553,13 +517,7 @@ class InputView(
             // A docked handle (始终显示悬浮条) is added to the keyboard, the keys keeping their height,
             // but counted in the cap: where it binds, the cap wins (the user, 2026-10-22)
             val handle = if (floatingHandle != null) dp(FloatingHandle.HEIGHT_DP) else 0
-            KeyboardHeightCap.keysHeight(
-                keyboardHeightPx,
-                resources.displayMetrics.heightPixels,
-                dp(KawaiiBarComponent.heightDp() + codeRowDp),
-                keyboardBottomPaddingPx,
-                handleHeight = handle,
-            )
+            KeyboardArea.keysHeight(context, codeRowDp, handle)
         }
         val bottomPadding = if (floating) 0 else keyboardBottomPaddingPx
         oneHandedPlaced = placement != null && !TextKeyboard.splits(context)

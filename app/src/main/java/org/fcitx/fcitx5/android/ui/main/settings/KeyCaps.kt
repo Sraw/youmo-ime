@@ -22,9 +22,15 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
-import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightCap
+import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
+import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
@@ -66,9 +72,10 @@ object KeyCaps {
 
     /**
      * A key's shortcut, for the engine to draw its marks: a character key's [name] (`full/a`) or a function
-     * key's (`space`, its up and down), as [shortcuts] (the page's, being edited) has them.
+     * key's (`space`, its up and down), as [shortcuts] (the page's, being edited) has them; [layout] the board it is
+     * drawn on, its form's ([board]) where null.
      */
-    class Shortcut(val name: String, val shortcuts: KeyShortcuts, val charShortcuts: Boolean = true)
+    class Shortcut(val name: String, val shortcuts: KeyShortcuts, val charShortcuts: Boolean = true, val layout: String? = null)
 
     // the edited key outlined along the engine's face, in the keyboard theme's accent (as light or dark as the
     // face it is on, whatever the settings' own theme); dimmed (its long press off), its words faded alone, the
@@ -88,24 +95,47 @@ object KeyCaps {
                 shortcut = shortcut?.name,
             )
             states = setOfNotNull(KeyState.Selected.takeIf { selected })
-            // the label the keyboard's, shrunk as the cap is to its key, its marks where they are there (060-pending-decisions)
+            // the label the keyboard's, shrunk as the cap is to its key, its marks where they are there (060-pending-decisions);
+            // a shortcut's key the keyboard's very key, made on its board at the keys' size, every key of the board
+            // with its marks, as a mark class is sized over them all (060-render-p2 S7a)
             keyboardKeyHeight = keyboardKeyHeight(ctx)
+            board = shortcut?.let { if (it.layout != null) board(ctx, it.name, it.layout) else board(ctx, it.name) }
+            val names = board?.let { b -> SceneLayouts.of(ctx, b.layout)?.let(SceneBoard::names) } ?: listOfNotNull(shortcut?.name)
             // the symbol where 标点位置 puts it on the keyboard, a key with no shortcut too
             marks = SceneMarks.settings(
                 shortcut?.shortcuts ?: KeyShortcuts.Empty, AppPrefs.getInstance().keyboard.swipeLayers.getValue().layers, markSpots(),
-                shortcut?.charShortcuts ?: true, listOfNotNull(shortcut?.name),
+                shortcut?.charShortcuts ?: true, names,
             )
         }
 
-    /** A qwerty key's height on the keyboard as the height settings make it now, px (InputView, capped as there). */
-    fun keyboardKeyHeight(ctx: Context): Int {
-        val keyboard = AppPrefs.getInstance().keyboard
-        val landscape = ctx.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val percent = (if (landscape) keyboard.keyboardHeightPercentLandscape else keyboard.keyboardHeightPercent).getValue()
-        val screen = ctx.resources.displayMetrics.heightPixels
-        val bar = ctx.dp(KawaiiBarComponent.heightDp())
-        return KeyboardHeightCap.keysHeight(screen * percent / 100, screen, bar, 0) / KEY_ROWS
+    /** A qwerty key's height on the keyboard as the height settings make it now, px (InputView's keys' area, [KeyboardArea]). */
+    fun keyboardKeyHeight(ctx: Context): Int =
+        KeyboardArea.keysHeight(ctx, CodeRowHeight.keyboardDp(ImKeyboards.Layout.TEXT, KawaiiBarComponent.codeRowFloats())) / KEY_ROWS
+
+    /**
+     * The keyboard the key of [shortcut] (a shortcut page's name: `full/a`, `zyfull/1`, a function key's `space`) is on,
+     * at its keys' size as InputView makes it (KeyboardArea: the height settings, the bar, the board's code row, the
+     * paddings, the cap): [layout] the board, a function key's qwerty's unless given.
+     */
+    fun board(ctx: Context, shortcut: String, layout: String = BOARDS[shortcut.substringBefore('/', "")]?.first ?: KeyNames.QWERTY): SceneKeyCell.Board {
+        val codeRow = CODE_ROWS[layout] ?: ImKeyboards.Layout.TEXT
+        val code = CodeRowHeight.keyboardDp(codeRow, KawaiiBarComponent.codeRowFloats())
+        return SceneKeyCell.Board(layout, shortcut, KeyboardArea.keysWidth(ctx), KeyboardArea.keysHeight(ctx, code))
     }
+
+    // a shortcut page's form: its board and the code row that board has
+    private val BOARDS = mapOf(
+        KeyShortcutPreset.FULL to (KeyNames.QWERTY to ImKeyboards.Layout.TEXT),
+        KeyShortcutPreset.NINE to (KeyNames.NINE to ImKeyboards.Layout.PINYIN_NINE),
+        KeyShortcutPreset.GROUPED14 to (KeyNames.K14 to ImKeyboards.Layout.PINYIN14),
+        KeyShortcutPreset.GROUPED18 to (KeyNames.K18 to ImKeyboards.Layout.PINYIN18),
+        KeyShortcutPreset.ZHUYIN_NINE to (KeyNames.ZHUYIN_NINE to ImKeyboards.Layout.ZHUYIN_NINE),
+        KeyShortcutPreset.ZHUYIN_FULL to (KeyNames.ZHUYIN to ImKeyboards.Layout.ZHUYIN_FULL),
+        KeyShortcutPreset.NUMBER to (KeyNames.NUMBER to ImKeyboards.Layout.TEXT),
+    )
+
+    // each board's code row (handwriting's too, a function key's board of its own)
+    private val CODE_ROWS = BOARDS.values.toMap() + (KeyNames.HANDWRITING to ImKeyboards.Layout.HANDWRITING)
 
     fun label(ctx: Context, text: String, size: Float = 18f) = TextView(ctx).apply {
         this.text = text
