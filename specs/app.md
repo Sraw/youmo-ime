@@ -313,10 +313,12 @@ as none (up, up to the left) is dropped.
 
 The 060 redraw's first step (`input/keyboard/canvas/`, `AppPrefs.Internal.canvasKeyboard`, 开发者 →
 新绘制键盘, off): `TextKeyboard` (qwerty.xml) and, since 060-render-p2 S4a, `GroupedKeyboard` (the 14
-and 18 keys: k14.xml, k18.xml, their bottom row grouped-bottom.xml) add a `KeyboardCanvasView` over their
+and 18 keys: k14.xml, k18.xml, their bottom row grouped-bottom.xml) and, since S4c, `ZhuyinKeyboard`'s 大千
+(zhuyin.xml; 注音九键 still its views till S4d) add a `KeyboardCanvasView` over their
 rows and make them INVISIBLE, still laid out (S8 deletes them) — the next paragraph but one says how a
 keyboard moves. The canvas draws the scene `lib/keyboard-scene` makes of its layout in the look converted by ime-core's
-`LookTheme` (`ScenePainter`: one `RenderNode` a key a face, both kept in the tree and a press only their alpha, since a node left out of a frame loses its recording; a
+`LookTheme` (a 3.0 single key's name a selector with what selectors read escaped in the key: `zhuyin/,` its comma
+key, `number/*` the star; `ScenePainter`: one `RenderNode` a key a face, both kept in the tree and a press only their alpha, since a node left out of a frame loses its recording; a
 software canvas, a screenshot's, gets the ops drawn straight); `TextKeyboard.scene` builds the
 `Env` from its state (`TextBoardState`, `SceneMarks`, the texts) through `SceneEnvs.of`, which adds
 what every keyboard's has alike (size, density, landscape, compact, floating's text scale in the input
@@ -428,10 +430,13 @@ Return, the input method). What a key does: the 26 keys still wire each scene ke
 (`refOf`, U4 A, till S5); a keyboard moved wires each from its node (U4 B; the keys and the touch that
 finds them are `SceneKeys`, a node's key kept while it does the same): ime-core's `SceneBehavior.of`
 reads press, long press, repeat, swipe, double tap, bubble, long-press popup, menu, sound and axes from
-the layout, and `SceneKeyDef` makes the `KeyDef` the old wiring takes (the `action:` table: `sym:`
+the layout (the bubble's corner what a swipe types, or, on a letter key with a shortcut and no swipe of its
+own, its own face, so the bubble names the shortcut as it is swiped to: 大千's symbols' `AltPreview(c, c)`), and `SceneKeyDef` makes the `KeyDef` the old wiring takes (the `action:` table: `sym:`
 keysyms by name, `layout:`, `picker:` (alone, the page shown last), `commit:`, `code:U+…`, `keypad:`,
 `caps`, `shortcut:`, `reading`, `emoji-search:`, the bare words `lang`, `ime-picker`, `quickphrase`,
-`unicode`, `space-long-press`…; `action:<name>` the keyboard's `sceneTable`, zhuyin's in S4d; anything
+`unicode`, `space-long-press`…; `action:<name>` the keyboard's `sceneTable`: 大千's `action:zhuyin` the
+code of the symbol the key shows and `action:tone-1`…`tone-5` a tone's (`ZhuyinKeyboard.placeholder`, which
+reads the nine's groups, tones and `zhuyin-slot` too for S4d); anything
 else logged and doing nothing: `code:` a scalar value (U+10FFFF at most, no surrogate), `layout:` a name,
 `emoji-search:` on or off, the reader and `SceneAction.of` the same test; a `send=` that reads as nothing
 is no tap, not its group's code). A key that does the same in a scene made anew keeps its `SceneKey`.

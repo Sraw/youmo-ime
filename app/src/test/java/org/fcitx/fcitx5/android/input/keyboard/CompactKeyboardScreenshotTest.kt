@@ -78,7 +78,9 @@ class CompactKeyboardScreenshotTest {
         Board("zhuyin_full", keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_FULL)),
     )
 
-    private fun shoot(orientation: String, boards: List<Board> = this.boards) {
+    // [board]: a keyboard moved to the scene its own golden where the canvas draws it (captureBoard, 060-render-p2
+    // S4c: the 注音 ones; the rest wait for S7)
+    private fun shoot(orientation: String, boards: List<Board> = this.boards, board: Boolean = false) {
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
         // the 注音 keyboards' 简繁 hint: not said, and its "told" put back for the tests after (KeyboardPickerUatTest)
@@ -91,7 +93,8 @@ class CompactKeyboardScreenshotTest {
                     h.idle()
                     h.relayout()
                 }
-                h.capture("CompactKeyboardScreenshotTest/${b.name}_$orientation")
+                val path = "CompactKeyboardScreenshotTest/${b.name}_$orientation"
+                if (board) h.captureBoard(path) else h.capture(path)
                 EngineState.tableKeyboardState.value = null
             }
         }
@@ -147,10 +150,10 @@ class CompactKeyboardScreenshotTest {
     @Test
     @Uat("ST-51")
     @Config(qualifiers = "w360dp-h740dp-port-440dpi")
-    fun zhuyinOnASmallPhoneUpright() = shoot("small_port", zhuyin)
+    fun zhuyinOnASmallPhoneUpright() = shoot("small_port", zhuyin, board = true)
 
     @Test
     @Uat("ST-51")
     @Config(qualifiers = "w740dp-h360dp-land-440dpi")
-    fun zhuyinOnASmallPhoneTurned() = shoot("small_land", zhuyin)
+    fun zhuyinOnASmallPhoneTurned() = shoot("small_land", zhuyin, board = true)
 }

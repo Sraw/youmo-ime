@@ -49,6 +49,7 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
             arrayOf<Any>("qwerty", PinyinKeyboard.Full),
             arrayOf<Any>("k14", PinyinKeyboard.Keys14),
             arrayOf<Any>("k18", PinyinKeyboard.Keys18),
+            arrayOf<Any>("zhuyin", PinyinKeyboard.ZhuyinFull),
         )
 
         // the same phone on its side: 851 dp wide, wider than the 600 split starts from
@@ -74,6 +75,8 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
     @Test
     fun sideBySide() {
         prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, pinyinKeyboard)
+        // 注音's 简繁 hint not said: no notice over the keys
+        prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
         val keyboard = AppPrefs.getInstance().keyboard
         val cases = listOf(
             Case("pixel-light", ThemePreset.PixelLight),

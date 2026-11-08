@@ -144,6 +144,26 @@ class ZhuyinKeyboardTest {
         assertEquals(tap, ZhuyinKeyboard.resolve(tap, KeyActionListener.Source.Keyboard, nine = true))
     }
 
+    // the layouts' action: words (060-render-p2 U4 B): what each sends on a key showing its label, 大千's and 注音九键's
+    @Test
+    fun theLayoutsPlaceholdersAreTheKeyboardsCodes() {
+        fun full(name: String, label: String?) = ZhuyinKeyboard.placeholder(name, label, nine = false)
+        fun nine(name: String, label: String?) = ZhuyinKeyboard.placeholder(name, label, nine = true)
+        assertEquals(sym(Keyboard.zhuyinKey('ㄅ')), full("zhuyin", "ㄅ"))
+        assertEquals(sym(Keyboard.zhuyinKey('ㄩ')), full("zhuyin", "ㄩ"))
+        // a tone by its number whatever the face; ˙ the fifth
+        (1..ZhuyinKeys.TONES).forEach { assertEquals(sym(Keyboard.zhuyinTone(it)), full("tone-$it", "x")) }
+        (1..ZhuyinKeys.TONES).forEach { assertEquals(sym(Keyboard.zhuyinNineTone(it)), nine("tone-$it", null)) }
+        // a group's code by the symbols it shows
+        ZhuyinKeys.GROUP_SYMBOLS.forEachIndexed { g, symbols -> assertEquals(sym(Keyboard.zhuyinNineKey(g)), nine("zhuyin", symbols)) }
+        assertEquals(ZhuyinKeyboard.slotAction(typing = false), nine("zhuyin-slot", ZhuyinKeyboard.PUNCTUATION))
+        // nothing for what is no symbol, no tone, no group, no word of theirs
+        listOf(full("zhuyin", "a"), full("zhuyin", "ㄅㄉ"), full("zhuyin", null), full("tone-0", "ˉ"), full("tone-6", "ˉ"), full("tone-", "ˉ"),
+            full("zhuyin-slot", "，"), full("group", "ㄅ"), nine("zhuyin", "ㄅ"), nine("zhuyin", "ㄉㄅㄚ")).forEach { assertEquals(null, it) }
+        assertEquals("zhuyin", ZhuyinKeyboard.layoutOf(nine = false))
+        assertEquals("zhuyin-nine", ZhuyinKeyboard.layoutOf(nine = true))
+    }
+
     @After
     fun noSyllables() {
         EngineState.syllablesState.value = EngineState.SyllableState()

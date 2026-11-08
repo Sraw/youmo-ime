@@ -14,11 +14,13 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
@@ -76,27 +78,39 @@ class ZhuyinShortcutsUatTest {
         h.field.setText("one two")
         h.idle()
         // ㄇ on a: select all, its icon drawn; ㄋ on s: none
-        val m = h.faced("ㄇ")
-        assertEquals(1, icons(m))
-        assertEquals(0, icons(h.faced("ㄋ")))
-        for (face in listOf("ㄏ", "ㄌ", "ㄒ", "ㄈ", "ㄗ")) assertEquals(face, 1, icons(h.faced(face)))
+        val m = h.key("ㄇ")
+        assertEquals(1, m.drawnIcons)
+        assertEquals(0, h.key("ㄋ").drawnIcons)
+        for (face in listOf("ㄏ", "ㄌ", "ㄒ", "ㄈ", "ㄗ")) assertEquals(face, 1, h.key(face).drawnIcons)
         // at the standard height only symbols whose ink meets their icon's give way: the icon into
         // its corner first (ㄇ's and ㄈ's enough), then the symbol down a little (ㄌ under the
-        // scissors the most), none smaller; ㄋ, no icon, and the rest as they were
-        val moved = KeyboardHarness.all(h.keyboard).filterIsInstance<TextKeyView>()
-            .filter { it.mainText.run { translationX != 0f || translationY != 0f || scaleX != 1f } }
-        assertEquals(setOf("ㄌ", "ㄏ", "ㄒ", "ㄗ"), moved.map { it.mainText.text.toString() }.toSet())
-        for (k in moved) k.mainText.run {
-            assertEquals(0f, translationX, 0f)
-            assertTrue("$text ${translationY}", translationY > 0f && translationY < k.height / 4f)
-            assertEquals(1f, scaleX, 0f)
+        // scissors the most), none smaller; ㄋ, no icon, and the rest as they were: told by the
+        // symbol's top against its row's highest, whichever draws the keys
+        val symbols = h.keys().filter { k -> k.label.singleOrNull()?.let { it in ZhuyinKeys.SYMBOLS || it in ZhuyinKeys.MARKS } == true }
+        val size = symbols.map { it.textSize(it.label) }.toSet()
+        assertEquals(size.toString(), 1, size.size)
+        val moved = symbols.groupBy { it.bounds.top }.values.flatMap { row ->
+            val top = row.minOf { it.drawn(it.label)!!.top }
+            row.map { it to it.drawn(it.label)!!.top - top }.filter { it.second > 0.5f }
         }
-        h.capture("ZhuyinShortcutsUatTest/dachen")
+        // drawn by the scene, each a px and a half lower and ㄇ ㄈ less than a dp down: the engine's gap and
+        // icon inset exact, the views' cut to whole px (060-render-p2 §5.3, S3's 字母让位的取整差)
+        val dp = h.keyboard.resources.displayMetrics.density
+        val yielding = setOf("ㄌ", "ㄏ", "ㄒ", "ㄗ")
+        val canvas = KeyboardHarness.all(h.keyboard).any { it is KeyboardCanvasView && it.visibility == View.VISIBLE }
+        if (canvas) {
+            assertTrue(moved.toString(), moved.map { it.first.label }.containsAll(yielding))
+            for ((k, down) in moved) if (k.label !in yielding) assertTrue("${k.label} $down", k.label in setOf("ㄇ", "ㄈ") && down < dp)
+        } else {
+            assertEquals(yielding, moved.map { it.first.label }.toSet())
+        }
+        for ((k, down) in moved) assertTrue("${k.label} $down", down < k.height / 4f)
+        h.captureBoard("ZhuyinShortcutsUatTest/dachen")
         h.swipe(m, 0f, -m.height * 1.3f)
         h.idle()
         assertEquals(0 to 7, h.field.selectionStart to h.field.selectionEnd)
         // ㄋ has none: up types it, as a tap
-        val n = h.faced("ㄋ")
+        val n = h.key("ㄋ")
         val typed = h.sent().size
         h.swipe(n, 0f, -n.height * 1.3f)
         h.idle()

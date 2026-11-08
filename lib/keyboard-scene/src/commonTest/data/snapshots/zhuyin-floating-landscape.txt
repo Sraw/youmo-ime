@@ -34,7 +34,7 @@ key 3 kind=letter a11y="ˇ"
   shape rect(207.88,10.5,293.13,79.5 r=10.5,10.5,10.5,10.5)
   hit rect(200,0,301,90)
   anchor 250.5,45 up 0,-1
-  actions send="action:zhuyin"
+  actions send="action:tone-3"
   text label="ˇ"
   shortcut="zyfull/3"
   normal
@@ -48,7 +48,7 @@ key 4 kind=letter a11y="ˋ"
   shape rect(308.88,10.5,393.13,79.5 r=10.5,10.5,10.5,10.5)
   hit rect(301,0,401,90)
   anchor 351,45 up 0,-1
-  actions send="action:zhuyin"
+  actions send="action:tone-4"
   text label="ˋ"
   shortcut="zyfull/4"
   normal
@@ -76,7 +76,7 @@ key 6 kind=letter a11y="ˊ"
   shape rect(508.88,10.5,593.13,79.5 r=10.5,10.5,10.5,10.5)
   hit rect(501,0,601,90)
   anchor 551,45 up 0,-1
-  actions send="action:zhuyin"
+  actions send="action:tone-2"
   text label="ˊ"
   shortcut="zyfull/6"
   normal
@@ -90,7 +90,7 @@ key 7 kind=letter a11y="˙"
   shape rect(608.88,10.5,694.13,79.5 r=10.5,10.5,10.5,10.5)
   hit rect(601,0,702,90)
   anchor 651.5,45 up 0,-1
-  actions send="action:zhuyin"
+  actions send="action:tone-5"
   text label="˙"
   shortcut="zyfull/7"
   normal

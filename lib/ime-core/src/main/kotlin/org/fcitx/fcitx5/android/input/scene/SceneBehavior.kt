@@ -98,7 +98,8 @@ sealed interface SceneAction {
  *
  * The bubble and the long press's keys follow the old keys' (KeyDefPreset): a key that types (a
  * letter's or a group's face, the comma, the full stop, an address's key) shows a bubble of what
- * it types, with its corner where it swipes one; a function key (分词, 符, 123, ⌫) shows none. A
+ * it types, with its corner where it swipes one (a letter that swipes none but to its shortcut, its
+ * face again: the bubble shows the shortcut swiped to); a function key (分词, 符, 123, ⌫) shows none. A
  * key that types one character and names no long press offers its character's preset (SymbolKey's).
  */
 data class SceneBehavior(
@@ -118,7 +119,7 @@ data class SceneBehavior(
     val bothWays: Boolean,
     val shortcut: String?,
 ) {
-    /** The bubble over the key pressed: [content], and the [corner] a swipe types (AltPreview's) or null. */
+    /** The bubble over the key pressed: [content], and the [corner] a swipe types (AltPreview's: a letter's swiped to its shortcut alone, [content]) or null. */
     data class Bubble(val content: String, val corner: String?)
 
     /** The keys a long press offers. */
@@ -156,7 +157,7 @@ data class SceneBehavior(
             val press = if (send != null) SceneAction.of(send) else node.letters?.group?.let(SceneAction::Group)
             val swipe = a["swipe-up"]?.let(SceneAction::of)
             val typing = node.role in TYPING_ROLES || (node.kind == "letter" && !node.label.isNullOrEmpty())
-            val bubble = if (!typing) null else Bubble(content(node, press), swipe?.let(::typed))
+            val bubble = if (!typing) null else content(node, press).let { Bubble(it, cornerOf(node, swipe, it)) }
             return SceneBehavior(
                 id = node.id,
                 role = node.role,
@@ -172,6 +173,14 @@ data class SceneBehavior(
                 bothWays = a["swipe-axis"] == "both",
                 shortcut = node.shortcut,
             )
+        }
+
+        // what a swipe types; a letter key that swipes nothing of its own but has a shortcut, its own face, so the
+        // bubble shows the shortcut as it is swiped to (大千's symbols' AltPreview(c, c), 060-render-p2 S4c)
+        private fun cornerOf(node: KeyNode, swipe: SceneAction?, content: String): String? = when {
+            swipe != null -> typed(swipe)
+            node.kind == "letter" && node.shortcut != null -> content
+            else -> null
         }
 
         // a letter's or a group's face; the comma's and an address's key's what it types (the comma's
