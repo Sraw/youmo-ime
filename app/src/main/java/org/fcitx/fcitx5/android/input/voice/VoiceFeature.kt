@@ -9,21 +9,31 @@ import android.content.Context
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.EngineNotices
+import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.input.InputView
+import org.fcitx.fcitx5.android.pack.PackKind
+import org.fcitx.fcitx5.android.pack.PackStatus
+import org.fcitx.fcitx5.android.utils.AppUtil
 
-/** A voice build's: holding the space and tapping the bar's microphone talk (the text flavor's do nothing). */
+/**
+ * Voice input: holding the space and tapping the bar's microphone talk. Offered in every build;
+ * its models are the voice pack's, which is optional: without it (or with one this app does not
+ * read) a talk asks for it instead. The microphone is asked for at the first talk.
+ */
 object VoiceFeature {
     class Credit(val title: String, val licence: String, val url: String)
 
-    const val AVAILABLE = true
-
     /**
      * Hold to talk: the long press on space has fired, its finger ([pointer]) still down; what is
-     * said is [commit]ted once it lifts. Without the microphone permission, asks for it instead.
+     * said is [commit]ted once it lifts. Without the voice pack, says so; without the microphone
+     * permission, asks for it instead.
      */
     fun hold(inputView: InputView, pointer: Int, commit: (String) -> Unit) {
         // a talk going on already (tapped, then the space held): that one goes on
         if (inputView.hold != null) return
+        // a hold is no place to open a page: said on the keyboard only
+        if (!packReady(inputView.context, open = false)) return
         if (!permitted(inputView.context)) return
         VoiceHoldOverlay(inputView, pointer, commit).begin()
     }
@@ -32,16 +42,30 @@ object VoiceFeature {
      * Tap to talk: the bar's microphone (or a key's shortcut) tapped. Stops the talk going on, or
      * starts one, its mask over the keys; what is said is [commit]ted (the settled part as it is
      * said: the session's own). Not in a password field, nor while a hold is still being
-     * recognized. Without the microphone permission, asks for it instead.
+     * recognized. Without the voice pack, opens the 资源包 page; without the microphone permission,
+     * asks for it instead.
      */
     fun tap(inputView: InputView, commit: (String) -> Unit) {
         when (val going = inputView.hold) {
             is VoiceTapOverlay -> going.micTapped()
-            null -> if (!inputView.service.inPasswordField && permitted(inputView.context)) {
+            null -> if (!inputView.service.inPasswordField && packReady(inputView.context, open = true) && permitted(inputView.context)) {
                 VoiceTapOverlay(inputView, commit).begin()
             }
             else -> {}
         }
+    }
+
+    // the voice pack there, one this app reads; else said on the keyboard, and the packs' page opened if [open]
+    private fun packReady(context: Context, open: Boolean): Boolean {
+        val status = PackStore.status(PackKind.VOICE)
+        if (status is PackStatus.Ready) return true
+        if (status is PackStatus.NeedsUpdate) {
+            EngineNotices.tip(context.getString(R.string.pack_voice_needed_update, status.needed.minVersion))
+        } else {
+            EngineNotices.tip(context.getString(R.string.pack_voice_needed))
+        }
+        if (open) AppUtil.launchMainToPacks(context)
+        return false
     }
 
     // the microphone allowed; else the asking page opened

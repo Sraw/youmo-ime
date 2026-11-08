@@ -28,7 +28,6 @@ import org.fcitx.fcitx5.android.input.bar.ToolbarConfig
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
-import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.ui.common.DynamicListAdapter
 import org.fcitx.fcitx5.android.ui.main.ClipboardEditActivity
 import org.fcitx.fcitx5.android.ui.main.MainActivity
@@ -551,7 +550,7 @@ class ToolbarUatTest {
 
     private val toolbarButtons get() = AppPrefs.getInstance().internal.toolbarButtons
 
-    // every button's situation: the voice build's microphone, one-handed and the keyboards' choice there
+    // every button's situation: the microphone, one-handed and the keyboards' choice there
     private val everywhere = ToolbarConfig.Situation(voice = true, tradSimp = false, oneHanded = true, keyboards = true)
 
     // where [button] is on the toolbar buttons page
@@ -598,8 +597,8 @@ class ToolbarUatTest {
             config.layout(everywhere)
         )
         h.start()
-        // the theme there before the toolbar is opened, the undo not even then; the voice build's microphone as ever
-        val pinned = listOfNotNull(R.string.theme, R.string.a11y_key_emoji, R.string.voice_input.takeIf { VoiceFeature.AVAILABLE }, R.string.hide_keyboard)
+        // the theme there before the toolbar is opened, the undo not even then; the microphone as ever
+        val pinned = listOf(R.string.theme, R.string.a11y_key_emoji, R.string.voice_input, R.string.hide_keyboard)
         assertEquals(pinned.map(::s), barButtons())
         expand()
         assertEquals((listOf(R.string.redo, R.string.text_editing, R.string.clipboard, R.string.quick_phrases, R.string.status_area) + pinned).map(::s), barButtons())
@@ -608,11 +607,11 @@ class ToolbarUatTest {
     @Test
     @Uat("TB-42")
     fun theToolbarButtonsPageResetsAndKeepsTheVoice() {
-        // a voice build's microphone moved first: a text build's edit leaves it there
+        // the microphone moved first: an edit leaves it there
         prefs.set(toolbarButtons, "undo,|,voice,emoji,hide")
         SettingsHarness().use { st ->
             val adapter = page(st)
-            assertEquals(VoiceFeature.AVAILABLE, adapter.entries.any { it is ToolbarConfig.Item.Button && it.button == ToolbarButton.Voice })
+            assertTrue(adapter.entries.any { it is ToolbarConfig.Item.Button && it.button == ToolbarButton.Voice })
             val emoji = adapter.indexOf(ToolbarButton.Emoji)
             adapter.swapItem(emoji, emoji + 1)
             st.idle()
@@ -631,22 +630,7 @@ class ToolbarUatTest {
             (st.page as ToolbarButtonsFragment).reset()
             st.idle()
             assertEquals("", toolbarButtons.getValue())
-            assertEquals(ToolbarConfig.DEFAULT.items.filter { VoiceFeature.AVAILABLE || (it as? ToolbarConfig.Item.Button)?.button != ToolbarButton.Voice }, adapter.entries)
-        }
-        if (VoiceFeature.AVAILABLE) return
-        // a text build's microphone after the emoji: still after it once the emoji is moved and then unchecked
-        prefs.set(toolbarButtons, "undo,|,emoji,voice,hide")
-        SettingsHarness().use { st ->
-            val adapter = page(st)
-            val hide = adapter.indexOf(ToolbarButton.Hide)
-            adapter.swapItem(hide, adapter.indexOf(ToolbarButton.Emoji))
-            st.idle()
-            val emoji = adapter.indexOf(ToolbarButton.Emoji)
-            adapter.updateItem(emoji, ToolbarConfig.Item.Button(ToolbarButton.Emoji, shown = false))
-            st.idle()
-            val items = ToolbarConfig.parse(toolbarButtons.getValue()).items
-            val at = items.indexOfFirst { it is ToolbarConfig.Item.Button && it.button == ToolbarButton.Emoji }
-            assertEquals(items.toString(), ToolbarButton.Voice, (items.getOrNull(at + 1) as? ToolbarConfig.Item.Button)?.button)
+            assertEquals(ToolbarConfig.DEFAULT.items, adapter.entries)
         }
     }
 

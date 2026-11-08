@@ -203,7 +203,7 @@ class KeyboardUatTest {
     @Test
     @Uat("PY-41")
     fun aSlowSpaceDragMovesThePinyinCursorAndTheRowFollowsIt() {
-        // set, not left at the default: the voice build's is voice input, whose hold takes the finger
+        // set, not left at the default: the default is voice input, whose hold takes the finger
         // past the long press (spaceLongPressTakesTouch), so the drag would never reach the cursor
         val behavior = AppPrefs.getInstance().keyboard.spaceKeyLongPressBehavior
         val was = behavior.getValue()
@@ -448,7 +448,7 @@ class KeyboardUatTest {
     @Test
     @Uat("KB-38")
     fun holdingTheSpaceSetToNothingIsOneSpace() {
-        // set, not left at the default: the voice build's default is voice input
+        // set, not left at the default: the default is voice input
         val behavior = AppPrefs.getInstance().keyboard.spaceKeyLongPressBehavior
         val was = behavior.getValue()
         behavior.setValue(SpaceLongPressBehavior.None)

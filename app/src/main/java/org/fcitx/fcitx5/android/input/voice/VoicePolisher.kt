@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
-import android.content.res.AssetManager
+import org.fcitx.fcitx5.android.data.pack.AppData
 import org.fcitx.fcitx5.android.handwriting.OrtModel
 import org.json.JSONArray
 import org.json.JSONObject
@@ -45,12 +45,12 @@ class VoicePolisher private constructor(
         // two of the phone's cores: some 70 ms a step on a Snapdragon 845 (060-voice-tagger.md §3)
         private const val THREADS = 2
 
-        /** Read in from [assets]; off the main thread. */
-        fun open(assets: AssetManager): VoicePolisher {
-            val json = JSONObject(assets.open("$DIR/polish-tagger.json").bufferedReader().use { it.readText() })
+        /** Read in from the voice pack (AppData); off the main thread. */
+        fun open(): VoicePolisher {
+            val json = JSONObject(AppData.open("$DIR/polish-tagger.json").bufferedReader().use { it.readText() })
             val vocab = VoicePolishVocab(json.getJSONArray("vocab").strings(), json.getLong("cls"), json.getLong("sep"), json.getLong("unk"))
             val tags = VoicePolishTags(json.getJSONArray("ops").strings(), json.getJSONArray("after").strings())
-            return VoicePolisher(OrtModel.open(assets, "$DIR/polish-tagger.ort", THREADS), vocab, tags)
+            return VoicePolisher(OrtModel.open(AppData.map("$DIR/polish-tagger.ort"), THREADS), vocab, tags)
         }
 
         private fun JSONArray.strings() = List(length()) { getString(it) }

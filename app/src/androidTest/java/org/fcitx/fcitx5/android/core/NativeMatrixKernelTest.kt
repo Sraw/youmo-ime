@@ -20,7 +20,7 @@ import kotlin.math.abs
  * lib/ime-eval use: a slip in its row or column tails would only rank worse on the phone.
  * CI runs it on an x86_64 emulator only (emulator_test.yml), so on the SSE build: the arm64 one the
  * phones have, NEON and fused multiply-add, is covered only when it is run on an arm64 device by hand
- * (`./gradlew :app:connectedTextDebugAndroidTest
+ * (`./gradlew :app:connectedDebugAndroidTest
  * -Pandroid.testInstrumentationRunnerArguments.class=org.fcitx.fcitx5.android.core.NativeMatrixKernelTest`).
  */
 class NativeMatrixKernelTest {

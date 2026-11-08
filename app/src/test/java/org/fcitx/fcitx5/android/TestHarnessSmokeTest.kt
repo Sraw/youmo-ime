@@ -96,7 +96,7 @@ class TestHarnessSmokeTest {
      */
     /**
      * Plain JUnit, so it runs in both tasks whatever the SDKs: with 29 gone from `robolectric.properties`,
-     * testTextDebugUnitTestAt29 would filter every Robolectric test out and still pass.
+     * testDebugUnitTestAt29 would filter every Robolectric test out and still pass.
      */
     class RobolectricSdks {
         @Test

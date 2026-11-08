@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.input.voice
 
 import android.annotation.SuppressLint
-import android.content.res.AssetManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.AudioTimestamp
@@ -44,7 +43,6 @@ import kotlin.math.sqrt
  * Used from the main thread.
  */
 class VoiceListener(
-    private val assets: AssetManager,
     private val events: Events,
     /** the user's words to listen for and blocked (VoiceHotwords.ofUser), asked for as the models load */
     private val hotwords: suspend () -> VoiceHotwords.Words,
@@ -129,17 +127,17 @@ class VoiceListener(
     override fun load() {
         // the opening's VAD made beside the models: none, or failing, it is made or done without then
         // (an Error too, not only an Exception: on this scope it would end the process)
-        scope.launch(Dispatchers.IO) { VoiceEngine.prepareVad(assets) { Timber.w(it, "voice vad") } }
+        scope.launch(Dispatchers.IO) { VoiceEngine.prepareVad { Timber.w(it, "voice vad") } }
         scope.launch {
             // asked for while the models load, not after: the engine may be busy a while
             val user = async { userHotwords() }
             val loaded = try {
-                VoiceEngine.acquire(assets)
+                VoiceEngine.acquire()
             } catch (e: CancellationException) {
                 throw e
             } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
-                // an Error too (its library not loading, memory running out); a model missing from
-                // the assets is no exception: sherpa-onnx ends the process (file-utils.cc)
+                // an Error too (its library not loading, memory running out); the voice pack gone
+                // (PackUnavailableException), or a file of it (sherpa-onnx's config check, an exception)
                 Timber.w(e, "voice model")
                 user.cancel()
                 ready.cancel()
@@ -314,7 +312,7 @@ class VoiceListener(
         // on: the record's 2 s buffer holds the first words meanwhile; none (its model failing): all kept
         VoiceOpening.run(
             start = { record.startRecording() },
-            load = { VoiceEngine.takeVad(assets) },
+            load = { VoiceEngine.takeVad() },
             use = { listen(record, opening, it) },
             stop = {
                 try {

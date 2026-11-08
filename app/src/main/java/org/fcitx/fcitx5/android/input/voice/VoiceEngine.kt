@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
-import android.content.res.AssetManager
 import android.os.Handler
 import android.os.Looper
 import com.k2fsa.sherpa.onnx.FeatureConfig
@@ -25,6 +24,7 @@ import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withTimeoutOrNull
 import org.fcitx.fcitx5.android.daemon.HostConnection
+import org.fcitx.fcitx5.android.data.pack.AppData
 import timber.log.Timber
 
 /**
@@ -73,10 +73,14 @@ object VoiceEngine {
         }
     }
 
-    /** The models, read in if they are not; on a worker thread. [release] when done with them. */
-    fun acquire(assets: AssetManager): Models = synchronized(lock) {
+    /**
+     * The models, read in if they are not, from the voice pack (AppData: PackUnavailableException
+     * without it); on a worker thread. [release] when done with them.
+     */
+    fun acquire(): Models = synchronized(lock) {
         main.removeCallbacks(letGo)
-        val loaded = models ?: Models(OnlineRecognizer(assets, config()), polisher(assets)).also { models = it }
+        // the pack's files by their paths: sherpa-onnx maps the .ort ones (lib/sherpa-onnx README)
+        val loaded = models ?: Models(OnlineRecognizer(null, config()), polisher()).also { models = it }
         users++
         loaded
     }
@@ -88,8 +92,8 @@ object VoiceEngine {
 
     // voice input without the polish rather than none
     @Suppress("TooGenericExceptionCaught")
-    private fun polisher(assets: AssetManager): VoicePolisher? = try {
-        VoicePolisher.open(assets)
+    private fun polisher(): VoicePolisher? = try {
+        VoicePolisher.open()
     } catch (e: Exception) {
         Timber.w(e, "voice polish tagger")
         null
@@ -163,7 +167,7 @@ object VoiceEngine {
     private val spareVad = VoiceSpare<Vad> { it.release() }
 
     /** One for this microphone opening: the spare if there is one, else made now. */
-    fun takeVad(assets: AssetManager): Vad = spareVad.take() ?: vad(assets)
+    fun takeVad(): Vad = spareVad.take() ?: vad()
 
     /** [vad], done with, kept for the next opening (its state cleared) or let go if one is kept. */
     fun offerVad(vad: Vad) {
@@ -186,18 +190,18 @@ object VoiceEngine {
     }
 
     /** A spare VAD made, if there is none; off the main thread. A failure, an Error too, is [failed]'s. */
-    fun prepareVad(assets: AssetManager, failed: (Throwable) -> Unit) {
-        spareVad.tryBuild({ vad(assets) }, failed)
+    fun prepareVad(failed: (Throwable) -> Unit) {
+        spareVad.tryBuild({ vad() }, failed)
     }
 
     /**
      * silero VAD for one microphone opening (VoiceQuiet): the threshold that kept the soft speech
      * measured (0.2; 0.5 lost half of it at -58 dBFS), segments as sherpa-onnx's defaults.
      */
-    private fun vad(assets: AssetManager) = Vad(
-        assets,
+    private fun vad() = Vad(
+        null,
         VadModelConfig(
-            sileroVadModelConfig = SileroVadModelConfig(model = "$DIR/silero_vad.onnx", threshold = VAD_THRESHOLD, windowSize = WINDOW),
+            sileroVadModelConfig = SileroVadModelConfig(model = path("silero_vad.onnx"), threshold = VAD_THRESHOLD, windowSize = WINDOW),
             sampleRate = SAMPLE_RATE,
             numThreads = 1,
         ),
@@ -205,25 +209,28 @@ object VoiceEngine {
 
     private const val VAD_THRESHOLD = 0.2f
 
+    // a voice pack file's path; without the pack, PackUnavailableException
+    private fun path(name: String) = AppData.file("$DIR/$name").path
+
     private fun config() = OnlineRecognizerConfig(
         featConfig = FeatureConfig(sampleRate = SAMPLE_RATE, featureDim = 80),
         modelConfig = OnlineModelConfig(
             transducer = OnlineTransducerModelConfig(
-                encoder = "$DIR/encoder.ort",
-                decoder = "$DIR/decoder.ort",
-                joiner = "$DIR/joiner.ort",
+                encoder = path("encoder.ort"),
+                decoder = path("decoder.ort"),
+                joiner = path("joiner.ort"),
             ),
-            tokens = "$DIR/tokens.txt",
+            tokens = path("tokens.txt"),
             numThreads = THREADS,
             modelingUnit = "bpe",
-            bpeVocab = "$DIR/bpe.vocab",
+            bpeVocab = path("bpe.vocab"),
         ),
         // a segment ends where its rules say (sherpa-onnx's defaults), its hypotheses carried over (lib/sherpa-onnx README)
         enableEndpoint = true,
         // hotwords and the n-best need the beam search
         decodingMethod = "modified_beam_search",
         maxActivePaths = BEAM,
-        hotwordsFile = "$DIR/hotwords.txt",
+        hotwordsFile = path("hotwords.txt"),
         hotwordsScore = VoiceHotwords.SCORE,
     )
 }

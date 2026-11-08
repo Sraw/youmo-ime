@@ -24,6 +24,8 @@ import org.fcitx.fcitx5.android.data.theme.ThemeMonet
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.bar.ToolbarButton
+import org.fcitx.fcitx5.android.input.bar.ToolbarConfig
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -82,6 +84,13 @@ class OldRenderBaselineTest {
         // the 注音 keyboards' 简繁 hint not said; no clipboard entry in the bar
         prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
         prefs.set(AppPrefs.getInstance().clipboard.clipboardSuggestion, false)
+        // drawn as the text build was when the set was kept (0.6.0 has one build, voice input in
+        // it): no microphone on the bar, none on the space
+        prefs.set(AppPrefs.getInstance().keyboard.spaceKeyLongPressBehavior, SpaceLongPressBehavior.None)
+        val noVoice = ToolbarConfig.DEFAULT.items.map {
+            if (it is ToolbarConfig.Item.Button && it.button == ToolbarButton.Voice) ToolbarConfig.Item.Button(it.button, shown = false) else it
+        }
+        prefs.set(AppPrefs.getInstance().internal.toolbarButtons, ToolbarConfig(noVoice).serialize())
         org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.lastEntry = null
         ThemeAssets.clear()
         // decoded at once on this thread: each picture has its images in

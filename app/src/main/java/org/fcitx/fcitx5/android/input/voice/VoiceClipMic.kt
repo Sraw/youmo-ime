@@ -10,7 +10,7 @@ import java.nio.ByteOrder
 
 /**
  * The debug build's clip microphone, for the device UAT (uat.py Device.say): clips queued from the
- * shell (VoiceClipProvider, the voiceDebug source set) are what [VoiceListener] reads in place of
+ * shell (VoiceClipProvider, the debug source set) are what [VoiceListener] reads in place of
  * the AudioRecord's samples, at the microphone's pace, then a faint noise till the talk ends. The
  * AudioRecord is still opened, started and released as ever. Reached only under BuildConfig.DEBUG,
  * so R8 drops it from a release build.

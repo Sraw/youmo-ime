@@ -123,7 +123,6 @@ class VoiceSession(
     fun begin() {
         service.watchVoice(::taken)
         listener = (listening?.invoke(events) ?: VoiceListener(
-            service.assets,
             events,
             hotwords = { VoiceEngine.userHotwords(fcitx, habits = AppPrefs.getInstance().internal.useHabits.getValue()) },
             language = VoiceEngine.language(fcitx),

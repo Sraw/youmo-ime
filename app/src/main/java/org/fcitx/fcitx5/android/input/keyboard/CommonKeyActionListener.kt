@@ -217,7 +217,7 @@ class CommonKeyActionListener :
                         }
                         SpaceLongPressBehavior.ShowPicker -> showInputMethodPicker()
                         // hold to talk: the keyboard stays, the key's finger followed till it lifts
-                        SpaceLongPressBehavior.Voice -> if (behavior.talks(VoiceFeature.AVAILABLE, service.inPasswordField)) {
+                        SpaceLongPressBehavior.Voice -> if (behavior.talks(service.inPasswordField)) {
                             VoiceFeature.hold(inputView, action.pointer) { text ->
                                 listener.onKeyAction(KeyAction.CommitAction(text), KeyActionListener.Source.Keyboard)
                             }

@@ -17,7 +17,7 @@ import org.robolectric.annotation.Config
 /**
  * [ClipboardScale] on the JVM: 100 entries by default, a smoke run beside the other tests; the sizes to
  * measure in `CLIPBOARD_BENCH`, comma separated (`CLIPBOARD_BENCH=10000,100000 ./gradlew
- * :app:testTextDebugUnitTest --tests '*ClipboardScaleBenchmark'`), the times in the test's standard
+ * :app:testDebugUnitTest --tests '*ClipboardScaleBenchmark'`), the times in the test's standard
  * output (its XML report). The device's: ClipboardScaleDeviceBenchmark.
  */
 @RunWith(RobolectricTestRunner::class)

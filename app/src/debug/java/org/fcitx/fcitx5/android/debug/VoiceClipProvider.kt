@@ -26,8 +26,7 @@ import java.io.File
  *     adb shell content call --uri content://<package>.voiceclip --method clear
  *
  * A queue's names are files in files/voiceclips/ (16 MB at most), its numbers pauses in ms (to
- * 60 s); from it on every talk hears the clips, not the microphone, till cleared. The voice debug
- * build only.
+ * 60 s); from it on every talk hears the clips, not the microphone, till cleared. Debug builds only.
  */
 class VoiceClipProvider : ContentProvider() {
 

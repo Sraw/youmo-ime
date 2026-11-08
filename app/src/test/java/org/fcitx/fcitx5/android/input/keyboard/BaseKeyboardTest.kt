@@ -149,7 +149,7 @@ class BaseKeyboardTest {
     @Test
     @Config(application = FcitxApplication::class)
     fun holdingTheSpaceSaysWhichFingerHoldsIt() {
-        // one that does something: the text build's default does nothing and takes no touch
+        // one that does something, whatever the default (voice input: its hold takes the finger)
         val behavior = AppPrefs.getInstance().keyboard.spaceKeyLongPressBehavior
         val was = behavior.getValue()
         behavior.setValue(SpaceLongPressBehavior.Enumerate)
@@ -204,14 +204,13 @@ class BaseKeyboardTest {
         assertEquals("é", SwipeChoice.of("é").preview("1"))
     }
 
-    // PY-41: the text build's space long press does nothing, yet took the touch from a slow drag
+    // PY-41: a space long press that does nothing (None) took the touch from a slow drag
     @Test
     fun aSpaceLongPressThatDoesNothingLeavesTheSwipeBe() {
-        assertFalse(spaceLongPressTakesTouch(SpaceLongPressBehavior.None, voiceAvailable = true, inPasswordField = false))
-        assertTrue(spaceLongPressTakesTouch(SpaceLongPressBehavior.Enumerate, voiceAvailable = true, inPasswordField = false))
-        assertTrue(spaceLongPressTakesTouch(SpaceLongPressBehavior.Voice, voiceAvailable = true, inPasswordField = false))
-        assertFalse("no talking in a password", spaceLongPressTakesTouch(SpaceLongPressBehavior.Voice, voiceAvailable = true, inPasswordField = true))
-        assertFalse("no voice in this build", spaceLongPressTakesTouch(SpaceLongPressBehavior.Voice, voiceAvailable = false, inPasswordField = false))
+        assertFalse(spaceLongPressTakesTouch(SpaceLongPressBehavior.None, inPasswordField = false))
+        assertTrue(spaceLongPressTakesTouch(SpaceLongPressBehavior.Enumerate, inPasswordField = false))
+        assertTrue(spaceLongPressTakesTouch(SpaceLongPressBehavior.Voice, inPasswordField = false))
+        assertFalse("no talking in a password", spaceLongPressTakesTouch(SpaceLongPressBehavior.Voice, inPasswordField = true))
     }
 
     // PY-41, as the key sees it: the long press the timer calls declines, sends nothing and does not buzz

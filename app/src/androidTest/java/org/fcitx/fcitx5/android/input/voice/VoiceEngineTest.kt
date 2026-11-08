@@ -17,13 +17,12 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * The models as packaged, through the streaming recognizer as the listener uses it, on a recording
+ * The models as packaged (the voice pack, imported on the device first), through the streaming recognizer as the listener uses it, on a recording
  * in place of the microphone (an emulator has none): the sherpa-onnx test sentence, twice, with
  * silence around, a window at a time, segments closed where the endpoint rules say.
  */
 class VoiceEngineTest {
 
-    private val app = InstrumentationRegistry.getInstrumentation().targetContext
     private val test = InstrumentationRegistry.getInstrumentation().context
 
     @Test
@@ -41,7 +40,7 @@ class VoiceEngineTest {
 
     @Test
     fun theUsersWordsAreListenedFor() {
-        // the pack's hotwords read from the assets, the user's put in for each stretch: 早上, said,
+        // the pack's hotwords read from the voice pack, the user's put in for each stretch: 早上, said,
         // scored the higher for the bonus. (It was 开饭 made of the first stretch's 开放, but with
         // a beam of 16 the search keeps 开放 heard, rightly. Not 开放 either: the pack has 开放时间,
         // and a hotword ending where a longer one goes on takes the search back to the start of
@@ -79,7 +78,7 @@ class VoiceEngineTest {
     @Test
     fun theBlockInTheSearchTakesTheWordWhereverItIs() {
         val blocked = VoiceHotwords.Words(hotwords = "", blocked = "开 放")
-        val recognizer = VoiceEngine.acquire(app.assets).recognizer
+        val recognizer = VoiceEngine.acquire().recognizer
         try {
             val text = result(recognizer, VoiceEngine.stream(recognizer, blocked), wav("zh.wav")).text
             assertTrue(text, "开放" !in text)
@@ -93,7 +92,7 @@ class VoiceEngineTest {
     fun theBlockInTheSearchTakesAWordWithinTheSentenceToo() {
         // 早上, not where the sentence starts: its tokens there are blocked as at the start
         val blocked = VoiceHotwords.Words(hotwords = "", blocked = "早 上")
-        val recognizer = VoiceEngine.acquire(app.assets).recognizer
+        val recognizer = VoiceEngine.acquire().recognizer
         try {
             val text = result(recognizer, VoiceEngine.stream(recognizer, blocked), wav("zh.wav")).text
             assertTrue(text, "早上" !in text)
@@ -105,7 +104,7 @@ class VoiceEngineTest {
 
     @Test
     fun theBeamsOtherHypothesesComeBackBestFirst() {
-        val recognizer = VoiceEngine.acquire(app.assets).recognizer
+        val recognizer = VoiceEngine.acquire().recognizer
         try {
             val result = result(recognizer, VoiceEngine.stream(recognizer, VoiceHotwords.Words.NONE), wav("zh.wav"))
             assertTrue(result.nbest.toList().toString(), result.nbest.size > 1)
@@ -120,7 +119,7 @@ class VoiceEngineTest {
     @Test
     fun theLanguageModelPicksAmongWhatWasHeardAlike() {
         val samples = wav("zh.wav")
-        val recognizer = VoiceEngine.acquire(app.assets).recognizer
+        val recognizer = VoiceEngine.acquire().recognizer
         try {
             val heard = result(recognizer, VoiceEngine.stream(recognizer, VoiceHotwords.Words.NONE), samples)
             val candidates = VoiceRerank.candidates(
@@ -148,7 +147,7 @@ class VoiceEngineTest {
     }
 
     private fun topScore(words: VoiceHotwords.Words): Float {
-        val recognizer = VoiceEngine.acquire(app.assets).recognizer
+        val recognizer = VoiceEngine.acquire().recognizer
         try {
             return result(recognizer, VoiceEngine.stream(recognizer, words), wav("zh.wav")).nbestScores[0]
         } finally {
@@ -158,7 +157,7 @@ class VoiceEngineTest {
 
     // split: TextWords.boundaries in place of the engine's
     private fun hear(hotwords: VoiceHotwords.Words, split: (String) -> IntArray = { IntArray(0) }): List<String> {
-        val recognizer = VoiceEngine.acquire(app.assets).recognizer
+        val recognizer = VoiceEngine.acquire().recognizer
         try {
             val segments = segments(recognizer, VoiceEngine.stream(recognizer, hotwords), wav("zh.wav"))
             return runBlocking { segments.map { VoiceEngine.choose(it, hotwords, language(split)) } }

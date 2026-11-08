@@ -25,7 +25,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * UAT cases of the voice build's keyboard (uat/12): where holding the space talks. No microphone
+ * UAT cases of the keyboard with the voice pack (uat/12): where holding the space talks. No microphone
  * here (the permission not granted): a hold that would talk asks for it, which is how it shows.
  */
 @RunWith(RobolectricTestRunner::class)
