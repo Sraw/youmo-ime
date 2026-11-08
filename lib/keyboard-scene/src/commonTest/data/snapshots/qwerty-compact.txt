@@ -6,7 +6,7 @@ key q kind=letter a11y="q，1"
   shape rect(7.88,18.38,100.13,98.63 r=10.5,10.5,10.5,10.5)
   hit rect(0,0,108,117)
   anchor 54,58.5 up 0,-1
-  actions send="Q" swipe-up="1"
+  actions send="q" swipe-up="1"
   text label="q" alt="1" alt-raw="{alt:q}"
   shortcut="full/q"
   normal
@@ -21,7 +21,7 @@ key w kind=letter a11y="w，2"
   shape rect(115.88,18.38,208.13,98.63 r=10.5,10.5,10.5,10.5)
   hit rect(108,0,216,117)
   anchor 162,58.5 up 0,-1
-  actions send="W" swipe-up="2"
+  actions send="w" swipe-up="2"
   text label="w" alt="2" alt-raw="{alt:w}"
   shortcut="full/w"
   normal
@@ -36,7 +36,7 @@ key e kind=letter a11y="e，3"
   shape rect(223.88,18.38,316.13,98.63 r=10.5,10.5,10.5,10.5)
   hit rect(216,0,324,117)
   anchor 270,58.5 up 0,-1
-  actions send="E" swipe-up="3"
+  actions send="e" swipe-up="3"
   text label="e" alt="3" alt-raw="{alt:e}"
   shortcut="full/e"
   normal
@@ -51,7 +51,7 @@ key r kind=letter a11y="r，4"
   shape rect(331.88,18.38,424.13,98.63 r=10.5,10.5,10.5,10.5)
   hit rect(324,0,432,117)
   anchor 378,58.5 up 0,-1
-  actions send="R" swipe-up="4"
+  actions send="r" swipe-up="4"
   text label="r" alt="4" alt-raw="{alt:r}"
   shortcut="full/r"
   normal
@@ -66,7 +66,7 @@ key t kind=letter a11y="t，5"
   shape rect(439.88,18.38,532.13,98.63 r=10.5,10.5,10.5,10.5)
   hit rect(432,0,540,117)
   anchor 486,58.5 up 0,-1
-  actions send="T" swipe-up="5"
+  actions send="t" swipe-up="5"
   text label="t" alt="5" alt-raw="{alt:t}"
   shortcut="full/t"
   normal
@@ -81,7 +81,7 @@ key y kind=letter a11y="y，6"
   shape rect(547.88,18.38,640.13,98.63 r=10.5,10.5,10.5,10.5)
   hit rect(540,0,648,117)
   anchor 594,58.5 up 0,-1
-  actions send="Y" swipe-up="6"
+  actions send="y" swipe-up="6"
   text label="y" alt="6" alt-raw="{alt:y}"
   shortcut="full/y"
   normal
@@ -97,7 +97,7 @@ key u kind=letter a11y="u，7"
   shape rect(655.88,18.38,748.13,98.63 r=10.5,10.5,10.5,10.5)
   hit rect(648,0,756,117)
   anchor 702,58.5 up 0,-1
-  actions send="U" swipe-up="7"
+  actions send="u" swipe-up="7"
   text label="u" alt="7" alt-raw="{alt:u}"
   shortcut="full/u"
   normal
@@ -112,7 +112,7 @@ key i kind=letter a11y="i，8"
   shape rect(763.88,18.38,856.13,98.63 r=10.5,10.5,10.5,10.5)
   hit rect(756,0,864,117)
   anchor 810,58.5 up 0,-1
-  actions send="I" swipe-up="8"
+  actions send="i" swipe-up="8"
   text label="i" alt="8" alt-raw="{alt:i}"
   shortcut="full/i"
   normal
@@ -127,7 +127,7 @@ key o kind=letter a11y="o，9"
   shape rect(871.88,18.38,964.13,98.63 r=10.5,10.5,10.5,10.5)
   hit rect(864,0,972,117)
   anchor 918,58.5 up 0,-1
-  actions send="O" swipe-up="9"
+  actions send="o" swipe-up="9"
   text label="o" alt="9" alt-raw="{alt:o}"
   shortcut="full/o"
   normal
@@ -142,7 +142,7 @@ key p kind=letter a11y="p，0"
   shape rect(979.88,18.38,1072.13,98.63 r=10.5,10.5,10.5,10.5)
   hit rect(972,0,1080,117)
   anchor 1026,58.5 up 0,-1
-  actions send="P" swipe-up="0"
+  actions send="p" swipe-up="0"
   text label="p" alt="0" alt-raw="{alt:p}"
   shortcut="full/p"
   normal
@@ -157,7 +157,7 @@ key a kind=letter a11y="a，@"
   shape rect(61.88,135.38,154.13,215.63 r=10.5,10.5,10.5,10.5)
   hit rect(0,117,162,234)
   anchor 108,175.5 up 0,-1
-  actions send="A" swipe-up="@"
+  actions send="a" swipe-up="@"
   text label="a" alt="@" alt-raw="{alt:a}"
   shortcut="full/a"
   normal
@@ -173,7 +173,7 @@ key s kind=letter a11y="s，*"
   shape rect(169.88,135.38,262.13,215.63 r=10.5,10.5,10.5,10.5)
   hit rect(162,117,270,234)
   anchor 216,175.5 up 0,-1
-  actions send="S" swipe-up="*"
+  actions send="s" swipe-up="*"
   text label="s" alt="*" alt-raw="{alt:s}"
   shortcut="full/s"
   normal
@@ -188,7 +188,7 @@ key d kind=letter a11y="d，+"
   shape rect(277.88,135.38,370.13,215.63 r=10.5,10.5,10.5,10.5)
   hit rect(270,117,378,234)
   anchor 324,175.5 up 0,-1
-  actions send="D" swipe-up="+"
+  actions send="d" swipe-up="+"
   text label="d" alt="+" alt-raw="{alt:d}"
   shortcut="full/d"
   normal
@@ -203,7 +203,7 @@ key f kind=letter a11y="f，-"
   shape rect(385.88,135.38,478.13,215.63 r=10.5,10.5,10.5,10.5)
   hit rect(378,117,486,234)
   anchor 432,175.5 up 0,-1
-  actions send="F" swipe-up="-"
+  actions send="f" swipe-up="-"
   text label="f" alt="-" alt-raw="{alt:f}"
   shortcut="full/f"
   normal
@@ -218,7 +218,7 @@ key g kind=letter a11y="g，="
   shape rect(493.88,135.38,586.13,215.63 r=10.5,10.5,10.5,10.5)
   hit rect(486,117,594,234)
   anchor 540,175.5 up 0,-1
-  actions send="G" swipe-up="="
+  actions send="g" swipe-up="="
   text label="g" alt="=" alt-raw="{alt:g}"
   shortcut="full/g"
   normal
@@ -233,7 +233,7 @@ key h kind=letter a11y="h，/"
   shape rect(601.88,135.38,694.13,215.63 r=10.5,10.5,10.5,10.5)
   hit rect(594,117,702,234)
   anchor 648,175.5 up 0,-1
-  actions send="H" swipe-up="/"
+  actions send="h" swipe-up="/"
   text label="h" alt="/" alt-raw="{alt:h}"
   shortcut="full/h"
   normal
@@ -248,7 +248,7 @@ key j kind=letter a11y="j，#"
   shape rect(709.88,135.38,802.13,215.63 r=10.5,10.5,10.5,10.5)
   hit rect(702,117,810,234)
   anchor 756,175.5 up 0,-1
-  actions send="J" swipe-up="#"
+  actions send="j" swipe-up="#"
   text label="j" alt="#" alt-raw="{alt:j}"
   shortcut="full/j"
   normal
@@ -263,7 +263,7 @@ key k kind=letter a11y="k，("
   shape rect(817.88,135.38,910.13,215.63 r=10.5,10.5,10.5,10.5)
   hit rect(810,117,918,234)
   anchor 864,175.5 up 0,-1
-  actions send="K" swipe-up="("
+  actions send="k" swipe-up="("
   text label="k" alt="(" alt-raw="{alt:k}"
   shortcut="full/k"
   normal
@@ -278,7 +278,7 @@ key l kind=letter a11y="l，)"
   shape rect(925.88,135.38,1018.13,215.63 r=10.5,10.5,10.5,10.5)
   hit rect(918,117,1080,234)
   anchor 972,175.5 up 0,-1
-  actions send="L" swipe-up=")"
+  actions send="l" swipe-up=")"
   text label="l" alt=")" alt-raw="{alt:l}"
   shortcut="full/l"
   normal
@@ -306,7 +306,7 @@ key z kind=letter a11y="z，'"
   shape rect(169.88,252.38,262.13,332.63 r=10.5,10.5,10.5,10.5)
   hit rect(162,234,270,351)
   anchor 216,292.5 up 0,-1
-  actions send="Z" swipe-up="'"
+  actions send="z" swipe-up="'"
   text label="z" alt="'" alt-raw="{alt:z}"
   shortcut="full/z"
   normal
@@ -322,7 +322,7 @@ key x kind=letter a11y="x，:"
   shape rect(277.88,252.38,370.13,332.63 r=10.5,10.5,10.5,10.5)
   hit rect(270,234,378,351)
   anchor 324,292.5 up 0,-1
-  actions send="X" swipe-up=":"
+  actions send="x" swipe-up=":"
   text label="x" alt=":" alt-raw="{alt:x}"
   shortcut="full/x"
   normal
@@ -338,7 +338,7 @@ key c kind=letter a11y="c，\""
   shape rect(385.88,252.38,478.13,332.63 r=10.5,10.5,10.5,10.5)
   hit rect(378,234,486,351)
   anchor 432,292.5 up 0,-1
-  actions send="C" swipe-up="\""
+  actions send="c" swipe-up="\""
   text label="c" alt="\"" alt-raw="{alt:c}"
   shortcut="full/c"
   normal
@@ -354,7 +354,7 @@ key v kind=letter a11y="v，?"
   shape rect(493.88,252.38,586.13,332.63 r=10.5,10.5,10.5,10.5)
   hit rect(486,234,594,351)
   anchor 540,292.5 up 0,-1
-  actions send="V" swipe-up="?"
+  actions send="v" swipe-up="?"
   text label="v" alt="?" alt-raw="{alt:v}"
   shortcut="full/v"
   normal
@@ -370,7 +370,7 @@ key b kind=letter a11y="b，!"
   shape rect(601.88,252.38,694.13,332.63 r=10.5,10.5,10.5,10.5)
   hit rect(594,234,702,351)
   anchor 648,292.5 up 0,-1
-  actions send="B" swipe-up="!"
+  actions send="b" swipe-up="!"
   text label="b" alt="!" alt-raw="{alt:b}"
   shortcut="full/b"
   normal
@@ -385,7 +385,7 @@ key n kind=letter a11y="n，~"
   shape rect(709.88,252.38,802.13,332.63 r=10.5,10.5,10.5,10.5)
   hit rect(702,234,810,351)
   anchor 756,292.5 up 0,-1
-  actions send="N" swipe-up="~"
+  actions send="n" swipe-up="~"
   text label="n" alt="~" alt-raw="{alt:n}"
   shortcut="full/n"
   normal
@@ -400,7 +400,7 @@ key m kind=letter a11y="m，\\"
   shape rect(817.88,252.38,910.13,332.63 r=10.5,10.5,10.5,10.5)
   hit rect(810,234,918,351)
   anchor 864,292.5 up 0,-1
-  actions send="M" swipe-up="\\"
+  actions send="m" swipe-up="\\"
   text label="m" alt="\\" alt-raw="{alt:m}"
   shortcut="full/m"
   normal
