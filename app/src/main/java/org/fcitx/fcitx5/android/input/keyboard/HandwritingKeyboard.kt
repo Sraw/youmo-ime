@@ -262,6 +262,77 @@ class HandwritingKeyboard(
 
     private val padHit = Rect()
 
+    // where each finger down went while the scene draws the keys: the pad's ids, the keys' ids, in order
+    private val padFingers = mutableListOf<Int>()
+    private val keyFingers = mutableListOf<Int>()
+
+    /**
+     * Each finger to what it came down on, where the scene draws the keys: on the pad the pad's, else
+     * the keys' (the scene's routing): a stroke written while ⌫ is held, ⌫ tapped while a stroke is
+     * being written. The views' keyboard gave a touch to whatever its first finger was on.
+     */
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (canvas == null) return super.dispatchTouchEvent(ev)
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
+                    padFingers.clear()
+                    keyFingers.clear()
+                }
+                val i = ev.actionIndex
+                val id = ev.getPointerId(i)
+                padView.getHitRect(padHit)
+                val onPad = padView.isVisible && padHit.contains(ev.getX(i).toInt(), ev.getY(i).toInt())
+                val to = if (onPad) padFingers else keyFingers
+                to += id
+                send(ev, to, onPad, if (to.size == 1) MotionEvent.ACTION_DOWN else MotionEvent.ACTION_POINTER_DOWN, id)
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (padFingers.isNotEmpty()) send(ev, padFingers, true, MotionEvent.ACTION_MOVE, -1)
+                if (keyFingers.isNotEmpty()) send(ev, keyFingers, false, MotionEvent.ACTION_MOVE, -1)
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
+                val id = ev.getPointerId(ev.actionIndex)
+                val onPad = id in padFingers
+                val from = if (onPad) padFingers else keyFingers
+                if (id in from) {
+                    send(ev, from, onPad, if (from.size == 1) MotionEvent.ACTION_UP else MotionEvent.ACTION_POINTER_UP, id)
+                    from -= id
+                }
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                if (padFingers.isNotEmpty()) send(ev, padFingers, true, MotionEvent.ACTION_CANCEL, -1)
+                if (keyFingers.isNotEmpty()) send(ev, keyFingers, false, MotionEvent.ACTION_CANCEL, -1)
+                padFingers.clear()
+                keyFingers.clear()
+            }
+        }
+        return true
+    }
+
+    // [ev] with only the fingers [ids] (in their order), [action] on finger [id]'s index among them: to the pad in
+    // its own pixels, or to the keys (the keyboard's own dispatch, the scene's routing)
+    private fun send(ev: MotionEvent, ids: List<Int>, toPad: Boolean, action: Int, id: Int) {
+        val props = Array(ids.size) { MotionEvent.PointerProperties() }
+        val coords = Array(ids.size) { MotionEvent.PointerCoords() }
+        ids.forEachIndexed { n, pid ->
+            val i = ev.findPointerIndex(pid)
+            ev.getPointerProperties(i, props[n])
+            ev.getPointerCoords(i, coords[n])
+            if (toPad) {
+                coords[n].x -= padView.left
+                coords[n].y -= padView.top
+            }
+        }
+        val at = ids.indexOf(id).coerceAtLeast(0)
+        val e = MotionEvent.obtain(
+            ev.downTime, ev.eventTime, action or (at shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), ids.size, props, coords,
+            ev.metaState, ev.buttonState, ev.xPrecision, ev.yPrecision, ev.deviceId, ev.edgeFlags, ev.source, ev.flags,
+        )
+        if (toPad) padView.dispatchTouchEvent(e) else super.dispatchTouchEvent(e)
+        e.recycle()
+    }
+
     // the vivo workaround takes every touch for a key: the pad's are the pad's
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         padView.getHitRect(padHit)

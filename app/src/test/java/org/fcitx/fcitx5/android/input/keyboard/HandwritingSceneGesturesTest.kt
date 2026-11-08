@@ -127,6 +127,85 @@ class HandwritingSceneGesturesTest {
         }
     }
 
+    // two fingers at once, each to what it came down on: [fingers]' points in the input view's pixels, sent there
+    private class Fingers(private val h: KeyboardHarness) {
+        private val down = android.os.SystemClock.uptimeMillis()
+        private val at = linkedMapOf<Int, Pair<Float, Float>>()
+
+        fun at(v: View, fx: Float, fy: Float): Pair<Float, Float> {
+            val o = IntArray(2).also(v::getLocationInWindow)
+            val r = IntArray(2).also(h.inputView::getLocationInWindow)
+            return (o[0] - r[0] + v.width * fx) to (o[1] - r[1] + v.height * fy)
+        }
+
+        fun at(k: org.fcitx.fcitx5.android.input.ShownKey): Pair<Float, Float> {
+            val r = IntArray(2).also(h.inputView::getLocationInWindow)
+            return (k.bounds.exactCenterX() - r[0]) to (k.bounds.exactCenterY() - r[1])
+        }
+
+        fun down(id: Int, p: Pair<Float, Float>) {
+            at[id] = p
+            send(if (at.size == 1) android.view.MotionEvent.ACTION_DOWN else android.view.MotionEvent.ACTION_POINTER_DOWN, id)
+        }
+
+        fun move(id: Int, p: Pair<Float, Float>) {
+            at[id] = p
+            send(android.view.MotionEvent.ACTION_MOVE, id)
+        }
+
+        fun up(id: Int) {
+            send(if (at.size == 1) android.view.MotionEvent.ACTION_UP else android.view.MotionEvent.ACTION_POINTER_UP, id)
+            at.remove(id)
+        }
+
+        private fun send(action: Int, id: Int) {
+            val ids = at.keys.toList()
+            val props = Array(ids.size) { android.view.MotionEvent.PointerProperties().apply { this.id = ids[it]; toolType = android.view.MotionEvent.TOOL_TYPE_FINGER } }
+            val coords = Array(ids.size) { android.view.MotionEvent.PointerCoords().apply { x = at[ids[it]]!!.first; y = at[ids[it]]!!.second } }
+            h.advance(16)
+            val e = android.view.MotionEvent.obtain(down, android.os.SystemClock.uptimeMillis(),
+                action or (ids.indexOf(id) shl android.view.MotionEvent.ACTION_POINTER_INDEX_SHIFT), ids.size, props, coords, 0, 0, 1f, 1f, 0, 0, 0, 0)
+            h.inputView.dispatchTouchEvent(e)
+            e.recycle()
+            h.idle()
+        }
+    }
+
+    // a stroke being written, ⌫ tapped with another finger: ⌫ the engine's (no stroke finished to take back), the stroke the pad's
+    @Test
+    fun backspaceTappedWhileAStrokeIsWritten() {
+        harness(true).use { h ->
+            val pad = h.pad()
+            val f = Fingers(h)
+            h.api.calls.clear()
+            f.down(0, f.at(pad, 0.3f, 0.3f))
+            f.move(0, f.at(pad, 0.5f, 0.4f))
+            f.down(1, f.at(h.keyNamed("backspace")))
+            f.up(1)
+            f.move(0, f.at(pad, 0.7f, 0.5f))
+            f.up(0)
+            assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey(sym=65288,") })
+            assertEquals(1, pad.pad.strokes.size)
+        }
+    }
+
+    // ⌫ held, a stroke written with another finger: the stroke the pad's, ⌫'s tap (on its lift) then takes it back
+    @Test
+    fun aStrokeWrittenWhileBackspaceIsHeld() {
+        harness(true).use { h ->
+            val pad = h.pad()
+            val f = Fingers(h)
+            f.down(0, f.at(h.keyNamed("backspace")))
+            f.down(1, f.at(pad, 0.3f, 0.3f))
+            f.move(1, f.at(pad, 0.5f, 0.4f))
+            f.move(1, f.at(pad, 0.7f, 0.5f))
+            f.up(1)
+            assertEquals(1, pad.pad.strokes.size)
+            f.up(0)
+            assertEquals(0, pad.pad.strokes.size)
+        }
+    }
+
     // ，。 as they type: with Chinese punctuation on, full width; off (the mapping empty), what is typed is half width
     @Test
     fun commaAndFullStopShownAsTheyType() {
