@@ -151,6 +151,11 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         return KeyMarks.place(symbol, shortcut, spots.symbol, spots.shortcut, landscape, keyboardCompact())
     }
 
+    private fun captionWidth(ctx: Context, page: KeyShortcutPages.Page): Int {
+        val paint = KeyCaps.label(ctx, "", CAPTION_SP).paint
+        return page.rows.maxOf { paint.measureText(functionLabel(it.first().label)) }.toInt() + ctx.dp(CAPTION_GAP_DP)
+    }
+
     // a function key of ime-core's not named here yet shows as it is called there, not a crash
     private fun functionLabel(name: String) = FunctionLabels[name]?.let(::getString) ?: name
 
@@ -160,10 +165,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         val function = page.form == KeyShortcuts.FUNCTION
         val symbols = symbolsOf(page).iterator()
         // a function key's name beside its engine-drawn cap, on one line: as wide as the widest name on the page
-        val captionWidth = if (function && SceneKeyCell.on) {
-            val paint = KeyCaps.label(ctx, "", CAPTION_SP).paint
-            page.rows.maxOf { paint.measureText(functionLabel(it.first().label)) }.toInt() + ctx.dp(CAPTION_GAP_DP)
-        } else 0
+        val captionWidth = if (function && SceneKeyCell.on) captionWidth(ctx, page) else 0
         page.rows.forEach { row ->
             val keys = if (function) row.take(1) else row
             with(content) { add(ctx.horizontalLayout {
@@ -180,7 +182,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                     val hint = (symbol as? KeyCaps.Mark.Text)?.text.orEmpty()
                     // the engine draws a function key's very face (space blank, the comma a ,): its name beside it, so
                     // the page says which key it is (the views' caps carry the name on their face)
-                    val caption = function && SceneKeyCell.on
+                    val caption = captionWidth > 0
                     if (caption) add(KeyCaps.label(ctx, label, CAPTION_SP).apply {
                         gravity = Gravity.CENTER_VERTICAL or Gravity.START
                         maxLines = 1
