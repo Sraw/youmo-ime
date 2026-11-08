@@ -56,7 +56,7 @@
     <key id="symbols" role="symbols" kind="function" width="16" label="符" text-size="16" text-style="bold"
          send="layout:Symbol" long-press="quickphrase" shortcut="symbols"/>
     <key id="numbers" role="numbers" kind="function" width="14" label="123" text-size="16" text-style="bold"
-         send="layout:Number" shortcut="numbers"/>
+         send="layout:Number" long-press="unicode" shortcut="numbers"/>
     <key id="space" role="space" kind="space" face="special" width="fill" label="{ime-name}" text-size="13"
          badge="{hold-badge}" sound="space" send="sym:space" long-press="space-long-press" swipe-axis="both" shortcut="space"/>
     <key id="lang" role="lang" kind="letter" class="alt-text" width="10" icon="language" a11y="a11y_key_switch_language"

@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.text.InputType
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -31,7 +32,8 @@ import org.robolectric.annotation.GraphicsMode
 /**
  * The 26 keys drawn by the scene, wired from qwerty.xml's nodes (060-render-p2 U4 B), do what the
  * views' KeyDef (TextKeyboard.Layout) says, key by key, in each of its forms: pinyin, English, 双拼 with
- * `;`, a table's (五笔 with its roots and 拼, 仓颉 with its `*`), an address field's keys. A letter's
+ * `;`, a table's (五笔 with its roots and 拼, 仓颉 with its `*`), an address field's keys: shortcut, swipe axes,
+ * actions, popups, sound, space/backspace and enabled (confirm's sound Return, as an exception). A letter's
  * press and long press are its letter in either case (TextKeyboard sends and shows them as Shift has
  * them); its bubble its letter too, whatever its face (a table's roots: TextKeyboard.sceneBubble).
  */
@@ -63,13 +65,20 @@ class TextSceneWiringTest {
             val old = TextKeyboard.Layout.flatten().associateBy { it.name }
             for (node in scene.keys) {
                 val was = old[node.id] ?: error("$form ${node.id}: no view's key")
-                val now = k.sceneKey(node)!!.def
+                val now = k.sceneKey(node)!!.def as SceneKeyDef
                 val at = "$form ${node.id}"
                 val letter = node.id.length == 1 && node.id[0] in 'a'..'z'
                 assertEquals(at, was.shortcut, now.shortcut)
                 assertEquals(at, was.swipesBothWays, now.swipesBothWays)
                 assertEquals(at, actions(was, letter), actions(now, letter))
                 assertEquals(at, popups(was, letter), popups(now, letter))
+                // confirm (a table's 确认 while composing) sounds as Return does, its view as a letter did
+                // its sound, its space's and backspace's sideways swipe, and whether it takes a touch (a blank view
+                // took none): as its view's
+                assertEquals(at, if (node.id == "confirm") InputFeedbacks.SoundEffect.Return else was.appearance.soundEffect, now.sound)
+                assertEquals(at, was is SpaceKey, now.isSpace)
+                assertEquals(at, was is BackspaceKey, now.isBackspace)
+                assertEquals(at, was !is BlankKey, k.sceneKey(node)!!.keyEnabled)
             }
             EngineState.syllablesState.value = EngineState.SyllableState()
             scene.keys.map { it.id }.toSet()

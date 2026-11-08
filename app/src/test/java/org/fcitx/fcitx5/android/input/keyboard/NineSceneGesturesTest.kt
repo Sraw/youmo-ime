@@ -248,9 +248,10 @@ class NineSceneGesturesTest {
         }
     }
 
-    // each key wired from nine.xml's node (U4 B) as the views' KeyDef has it, in each of the four: sound, shortcut,
+    // each key wired from nine.xml's node (U4 B) as the views' KeyDef has it, in each of the four: shortcut,
     // both ways' swipe, what a tap, a hold, a swipe, a double tap and a long press do, its bubble, its long press's
-    // keys (`popup from="nine"`) and its menu
+    // keys (`popup from="nine"`) and its menu, sound, space/backspace, enabled; 123's long press (unicode, every
+    // board's) the one exception
     @Test
     fun eachKeyIsWiredAsItsViewWas() {
         prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
@@ -276,12 +277,20 @@ class NineSceneGesturesTest {
             assertEquals(name, old.keys, shown.map { it.id }.toSet())
             for (node in shown) {
                 val was = old.getValue(node.id)
-                val now = k.sceneKey(node)!!.def
+                val now = k.sceneKey(node)!!.def as SceneKeyDef
                 val at = "$name ${node.id}"
                 assertEquals(at, was.shortcut, now.shortcut)
                 assertEquals(at, was.swipesBothWays, now.swipesBothWays)
-                assertEquals(at, actions(was), actions(now))
+                // 123's long press is every board's (unicode): the old 九宫格 view had none
+                val long = if (node.id == "numbers") setOf("long ${KeyAction.UnicodeAction}") else emptySet()
+                assertEquals(at, actions(was) + long, actions(now))
                 assertEquals(at, popups(was), popups(now))
+                // its sound, its space's and backspace's sideways swipe, and whether it takes a touch (a blank view
+                // took none): as its view's
+                assertEquals(at, was.appearance.soundEffect, now.sound)
+                assertEquals(at, was is SpaceKey, now.isSpace)
+                assertEquals(at, was is BackspaceKey, now.isBackspace)
+                assertEquals(at, was !is BlankKey, k.sceneKey(node)!!.keyEnabled)
             }
         }
     }
