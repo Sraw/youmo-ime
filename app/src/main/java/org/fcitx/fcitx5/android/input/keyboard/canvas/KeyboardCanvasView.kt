@@ -103,6 +103,9 @@ class KeyboardCanvasView(
     private var painter: ScenePainter? = null
     private var painted: ThemeLook? = null
     private var built: Scene? = null
+
+    // what is drawn under the keys of [built] ([under]), made once a scene: compared and drawn each frame
+    private var drawnUnder: List<Op> = emptyList()
     private var builtFor = 0 to 0
     private var dirty = true
     private var failed = false
@@ -171,7 +174,9 @@ class KeyboardCanvasView(
                 painted = drawn.shownLook
             }
             val old = faces
-            if (repainted || s.under != built?.under) base = null
+            val under = s.under()
+            if (repainted || under != drawnUnder) base = null
+            drawnUnder = under
             built = s
             var said: MutableList<Int>? = null
             var worded: MutableList<Int>? = null
@@ -242,7 +247,7 @@ class KeyboardCanvasView(
     // what shows the picture recorded again, where it is now (the frame about to be drawn draws it)
     private fun dropPictures() {
         var any = false
-        if (built?.under?.let(CanvasFrame::showsPicture) == true) {
+        if (built != null && CanvasFrame.showsPicture(drawnUnder)) {
             base = null
             any = true
         }
@@ -266,11 +271,11 @@ class KeyboardCanvasView(
         if (!canvas.isHardwareAccelerated) {
             // a software canvas (a bitmap's: screenshots) draws no RenderNode, keeps nothing to record again
             painter.missed = false
-            painter.draw(canvas, s.under)
+            painter.draw(canvas, drawnUnder)
             faces.forEach { painter.draw(canvas, it.node.ops(it.down)) }
             return
         }
-        canvas.drawRenderNode(base.live() ?: record("base", Box(0.0, 0.0, width.toDouble(), height.toDouble()), s.under).also { base = it })
+        canvas.drawRenderNode(base.live() ?: record("base", Box(0.0, 0.0, width.toDouble(), height.toDouble()), drawnUnder).also { base = it })
         for (f in faces) {
             val shown = CanvasFrame.faces(f.down, f.normal.live() != null, f.pressed.live() != null)
             // by index: no iterator for each key in each frame
@@ -549,7 +554,7 @@ class KeyboardCanvasView(
 }
 
 // what is drawn under the keys: the board's base and the slots' faces (a slot's view drawn over it, its own)
-private val Scene.under: List<Op> get() = if (slots.all { it.ops.isEmpty() }) base else base + slots.flatMap { it.ops }
+private fun Scene.under(): List<Op> = if (slots.all { it.ops.isEmpty() }) base else base + slots.flatMap { it.ops }
 
 /** Whether this is key [ref]: a split row's second copy ([KeyNode.copy] 1) is its own. */
 internal fun KeyNode.of(ref: KeyRef) = id == ref.id && (copy != 0) == ref.copy
