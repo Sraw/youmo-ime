@@ -149,7 +149,8 @@ open class SceneKeyCell(context: Context, private val theme: Theme, private val 
         }
 
     /** The cell's key in [scene]. */
-    val keyNode: KeyNode? get() = scene?.keys?.let { keys -> board?.let { b -> keys.firstOrNull { it.shortcut == b.shortcut && it.copy == 0 } } ?: keys.firstOrNull() }
+    // a board's key by its shortcut, none where the board has no such key (logged in onBoard; nothing drawn, no other key in its stead)
+    val keyNode: KeyNode? get() = scene?.keys?.let { keys -> board?.let { b -> keys.firstOrNull { it.shortcut == b.shortcut && it.copy == 0 } } ?: keys.firstOrNull().takeIf { board == null } }
 
     private fun build(): Scene? {
         val t = sceneTheme ?: return null.also { Timber.e("key cell: theme %s not converted; nothing drawn", theme.name) }

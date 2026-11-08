@@ -117,6 +117,29 @@ class KeyShortcutsPageScreenshotTest {
         assertEquals(3, sceneIcons(key(st.s(R.string.fn_key_backspace))))
     }
 
+    // every cap on every tab the key asked for, found on its board (重输 and 0 on the nine keys', 分词 on 14 键's):
+    // none a stand-in drawn in its stead (S7a: they were qwerty's q)
+    @Test
+    fun everyCapIsTheKeyItNames() {
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+        open()
+        st.idle()
+        var caps = 0
+        for (title in listOf(
+            R.string.shortcut_page_full, R.string.shortcut_page_nine, R.string.shortcut_page_g14, R.string.shortcut_page_g18,
+            R.string.shortcut_page_zyfull, R.string.shortcut_page_number, R.string.shortcut_page_function,
+        )) {
+            if (title != R.string.shortcut_page_full) tab(title)
+            st.idle()
+            for (c in KeyboardHarness.all(decor).filterIsInstance<SceneKeyCell>()) {
+                val b = c.board ?: continue
+                assertEquals("$title: ${b.shortcut} on ${b.layout}", b.shortcut, c.keyNode?.shortcut)
+                caps++
+            }
+        }
+        assertTrue(caps.toString(), caps > 40)
+    }
+
     // the caps drawn by the engine where the canvas keyboard is on (060-render-p2 S6): the same marks as the
     // views', read from each cap's scene: a's select all an icon, s none; ⌫'s clear up and restore down, two
     private fun sceneIcons(v: View) = KeyboardHarness.all(v).filterIsInstance<SceneKeyCell>()

@@ -120,7 +120,7 @@ object KeyCaps {
      * at its keys' size as InputView makes it (KeyboardArea: the height settings, the bar, the board's code row, the
      * paddings, the cap): [layout] the board, a function key's qwerty's unless given.
      */
-    fun board(ctx: Context, shortcut: String, layout: String = BOARDS[shortcut.substringBefore('/', "")]?.first ?: KeyNames.QWERTY): SceneKeyCell.Board {
+    fun board(ctx: Context, shortcut: String, layout: String = BOARDS[shortcut.substringBefore('/', "")]?.first ?: FUNCTION_BOARDS[shortcut] ?: KeyNames.QWERTY): SceneKeyCell.Board {
         val codeRow = CODE_ROWS[layout] ?: ImKeyboards.Layout.TEXT
         val code = CodeRowHeight.keyboardDp(codeRow, KawaiiBarComponent.codeRowFloats())
         // the letters' corners as the keyboard draws them (TextKeyboard.alts: the long presses' firsts, the user's
@@ -140,6 +140,9 @@ object KeyCaps {
         KeyShortcutPreset.ZHUYIN_FULL to (KeyNames.ZHUYIN to ImKeyboards.Layout.ZHUYIN_FULL),
         KeyShortcutPreset.NUMBER to (KeyNames.NUMBER to ImKeyboards.Layout.TEXT),
     )
+
+    // the function keys qwerty has not: the board each is on (九键's 重输 and 0, 14/18 键's 分词)
+    private val FUNCTION_BOARDS = mapOf("retype" to KeyNames.NINE, "zero" to KeyNames.NINE, "separator" to KeyNames.K14)
 
     // each board's code row (handwriting's too, a function key's board of its own)
     private val CODE_ROWS = BOARDS.values.toMap() + (KeyNames.HANDWRITING to ImKeyboards.Layout.HANDWRITING)

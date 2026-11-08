@@ -26,6 +26,7 @@ import com.google.android.material.R as MaterialR
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.popup.PopupEditor
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.input.keyboard.GroupedKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
@@ -170,9 +171,16 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                     val shortcut = KeyCaps.Shortcut(if (function) key.name.substringAfter('/').substringBeforeLast('.') else key.name, stored)
                     // the symbol the engine's cap draws where 标点位置 puts it (its alt), as the keyboard's key
                     val hint = (symbol as? KeyCaps.Mark.Text)?.text.orEmpty()
+                    // the engine draws a function key's very face (space blank, the comma a ,): its name beside it, so
+                    // the page says which key it is (the views' caps carry the name on their face)
+                    val caption = function && SceneKeyCell.on
+                    if (caption) add(KeyCaps.label(ctx, label, 16f).apply {
+                        gravity = Gravity.CENTER_VERTICAL or Gravity.START
+                        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                    }, lParams(ctx.dp(CAPTION_DP), ctx.dp(KeyHeight)))
                     add(KeyCaps.key(ctx, label, hint, marked = names.any(stored::isSet), dimmed = false, marks = marks, said = said, shortcut = shortcut).apply {
                         setOnClickListener { editShortcuts(label, names) }
-                    }, if (function) lParams(matchParent, ctx.dp(KeyHeight)) else keyParams(ctx, weight = 1f))
+                    }, if (caption) lParams(0, ctx.dp(KeyHeight)) { weight = 1f } else if (function) lParams(matchParent, ctx.dp(KeyHeight)) else keyParams(ctx, weight = 1f))
                 }
                 if (!function) weightSum = page.rows.maxOf { it.size }.toFloat()
             }, lParams(matchParent) { topMargin = ctx.dp(6) }) }
@@ -500,6 +508,9 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             KeyShortcuts.FUNCTION -> R.string.shortcut_page_function
             else -> error("no title for the shortcut page ${page.form}")
         }
+
+        // a function key's name beside its engine-drawn cap
+        private const val CAPTION_DP = 120
 
         // the function keys' names on the page ([KeyShortcutPages.FUNCTION_KEYS])
         internal val FunctionLabels = mapOf(
