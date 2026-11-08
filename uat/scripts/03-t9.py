@@ -158,10 +158,24 @@ def t960(d):
     tones = sorted((n for n in kb.walk() if n.clickable and n.texts() and n.texts()[0] in "ˉˊˇˋ"), key=lambda n: n.c[1])
     check([n.texts()[0] for n in tones] == list("ˉˊˇˋ"), f"左列 {[n.texts() for n in tones]}")
     slot = k.get("，")
-    check(slot is not None and "~" in k, f"键 {sorted(k)[:40]}")
+    # the right column found by its scene ids: the old drawing has none, and shows ? ! ~ half-width though it
+    # types them full-width (the old bug), so this case fails there plainly, never skipped
+    if not any(n.key for n in kb.walk()):
+        check(False, "T9-60 需要新绘制键盘（开发者 → 新绘制键盘）")
+    # ? ! ~ by their places: each face as punctuation maps it (060-render-p2 §5.3)
+    face = {n.key: n.texts()[0] for n in kb.walk() if n.key in ("r2c5", "r3c5", "r4c5") and n.texts()}
+    check(slot is not None and len(face) == 3, f"键 {sorted(k)[:40]}，右列 {face}")
     # a tone with nothing typed types nothing
     d.tap(k["ˉ"], after=0.6)
     check(d.preedit() == "" and d.field_text() == "", f"没打字时点 ˉ：码行「{d.preedit()}」，框里「{d.field_text()}」")
+    # what each shows is what it types (the user's 「显示和输出一致」): ？ ！ ～ with Chinese punctuation
+    for key in ("r2c5", "r3c5", "r4c5"):
+        before = d.field_text() or ""
+        d.tap(k[key], after=0.6)
+        got = d.field_text() or ""
+        check(got == before + face[key], f"点 {key}「{face[key]}」：框里「{before}」变成「{got}」")
+    d.bksp(3)
+    check((d.field_text() or "") == "", f"删掉 ？！～ 后框里「{d.field_text()}」")
     d.taps([k[x] for x in ("ㄇㄋㄜ", "ㄔㄘㄣㄧ", "ˇ", "ㄏㄒㄠㄡ", "ㄏㄒㄠㄡ", "ˇ")], gap=0.35, after=0.6)
     c = d.cands()
     s = d.screen()
@@ -169,7 +183,7 @@ def t960(d):
     faces = [n.texts()[0] for n in d.need_keyboard().walk() if n.clickable and n.texts()]
     check(code == "ㄋㄧˇ ㄏㄠˇ", f"码行「{code}」")
     check(first(c) == "你好", f"候选 {c[:4]}")
-    check("分词" in faces and "~" in faces, f"打字时的键 {faces}")
+    check("分词" in faces and face["r4c5"] in faces, f"打字时的键 {faces}")
     check(strip[:1] == ["ㄋㄧ"] and "ㄇㄧ" in strip and not any(ch.isascii() and ch.isalpha() for x in strip for ch in x), f"音节条 {strip}")
     d.syllable_tap("ㄇㄧ", s)
     taken = d.preedit()

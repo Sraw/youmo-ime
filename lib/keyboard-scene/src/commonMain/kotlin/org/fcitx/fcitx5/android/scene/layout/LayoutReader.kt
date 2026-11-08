@@ -295,6 +295,8 @@ object LayoutReader {
             listOfNotNull(
                 a.oneOf("swipe-axis", listOf("vertical", "both"))?.let { "swipe-axis" to it },
                 a.boolean("repeat")?.let { "repeat" to it.toString() },
+                // the bubble as it is pressed, where its kind says otherwise: on a function key (注音九键's tones, ? ! ~), off a letter key (its slot)
+                a.oneOf("preview", ON_OFF)?.let { "preview" to it },
             ),
         shortcut = a.matching("shortcut", SHORTCUT, "a shortcut name"),
         mark = a.boolean("mark"),

@@ -254,7 +254,8 @@ class SceneBuilder(
 
     private fun prepare(placed: Placed, key: ExpandedKey, styled: Styled, geometry: Map<Set<KeyState>, FaceGeometry>): Prepared {
         val looksNow = Looks(styled.parts.getValue(styled.states))
-        val drawn = content.of(key, placed.cell, geometry.getValue(styled.states).content, looksNow)
+        val g = geometry.getValue(styled.states)
+        val drawn = content.of(key, placed.cell, g.content, looksNow, g)
         return Prepared(placed, key, styled.states, styled.looks, styled.parts, geometry, drawn)
     }
 
@@ -276,7 +277,7 @@ class SceneBuilder(
         val group = KeyMarkYield.letters(
             letters.map { i ->
                 val c = keys[i].content
-                KeyMarkYield.LetterKey(c.glyph!!.ink.toInk(), c.baseline, c.marks.map(::mark), c.room.toInk())
+                KeyMarkYield.LetterKey(c.glyph!!.ink.toInk(), c.baseline, c.marks.map(::mark), c.room.toInk(), c.edge)
             },
             gap,
         )
@@ -287,7 +288,7 @@ class SceneBuilder(
             out[i] = if (c.glyph == null || c.marks.isEmpty() || !c.yields) {
                 Settled(c.glyph, c.marks.map { it.drawn })
             } else {
-                settled(c, KeyMarkYield.key(c.glyph.ink.toInk(), c.marks.map(::mark), c.room.toInk(), gap))
+                settled(c, KeyMarkYield.key(c.glyph.ink.toInk(), c.marks.map(::mark), c.room.toInk(), gap, c.edge))
             }
         }
         return out.map { it!! }

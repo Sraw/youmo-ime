@@ -138,6 +138,22 @@ class LookThemeTest {
         assertEquals("zhuyin//", LookTheme.selector("zhuyin//"))
     }
 
+    // 注音九键's 3.0 single keys by their place in its grid (zhuyin-nine/r1c1: a tone, r1c2 a group, r4c4 the
+    // slot, r2c5 ?; ⌫ by its role), selected as the keys of those ids (060-render-p2 S4d, step 6)
+    @Test
+    fun zhuyinNinesSingleKeysAreTheKeysOfTheirPlaces() {
+        val slice = NineSlice("/data/themes/t/key.png", Insets(1, 2, 3, 4), 2)
+        val names = listOf("r1c1", "r1c2", "r4c4", "r2c5", "backspace")
+        val base = LookDefaults.look(palette(SceneData.theme("material-light.xml")))
+        val look = base.copy(keys = base.keys.copy(overrides = names.associate { "zhuyin-nine/$it" to KeyOverride(KeyFill.Image(slice), null, KeyLabel.Hide) }))
+        val layout = (LayoutReader.layout(SceneData.read("zhuyin-nine.xml")) as Parsed.Ok).value
+        val bottom = (LayoutReader.fragment(SceneData.read("grouped-bottom.xml")) as Parsed.Ok).value
+        val built = SceneBuilder(theme(LookTheme.xml(look, "T", false)), SceneData.portrait, SceneData.measurer).build(layout, mapOf("grouped-bottom" to bottom))
+        val scene = (built as Parsed.Ok).value
+        for (id in names) assertTrue(id, key(scene, id).ops(false).any { it is Op.NineSlice })
+        for (id in listOf("r2c1", "r1c3", "r3c5", "comma")) assertTrue(id, key(scene, id).ops(false).none { it is Op.NineSlice })
+    }
+
     // 3.0's single keys of the number pad (060-render-p2 S4b): number/* , . : each selects the one key of
     // that id and no other (number/* unescaped was every key of the pad, a comma the selector's list)
     @Test

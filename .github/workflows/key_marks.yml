@@ -90,6 +90,16 @@ jobs:
           BUILD_ABI: x86_64
         run: ./gradlew --build-cache :app:${{ matrix.task }} --tests '*.KeyMarksEverywhereUatTest'
 
+      - name: Upload heap dumps
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-oom-${{ matrix.sdk }}
+          path: app/build/test-oom/
+          if-no-files-found: ignore
+          compression-level: 6
+          retention-days: 3
+
       - name: Annotate test failures
         if: failure()
         run: python3 .github/scripts/annotate_test_failures.py

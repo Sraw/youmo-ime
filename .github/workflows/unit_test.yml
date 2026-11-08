@@ -180,6 +180,16 @@ jobs:
           BUILD_ABI: x86_64
         run: ./gradlew --build-cache -PskipExhaustive :app:testDebugUnitTest :app:koverLogDebug
 
+      - name: Upload heap dumps
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-oom-app
+          path: app/build/test-oom/
+          if-no-files-found: ignore
+          compression-level: 6
+          retention-days: 3
+
       # what a changed look drew: <name>_actual.png and _compare.png beside the golden
       - name: Upload screenshot differences
         if: failure()
@@ -227,6 +237,16 @@ jobs:
         env:
           BUILD_ABI: x86_64
         run: ./gradlew --build-cache -PskipExhaustive :app:testDebugUnitTestAt29
+
+      - name: Upload heap dumps
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-oom-29
+          path: app/build/test-oom/
+          if-no-files-found: ignore
+          compression-level: 6
+          retention-days: 3
 
       - name: Annotate test failures
         if: failure()

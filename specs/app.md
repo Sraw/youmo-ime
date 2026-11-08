@@ -315,7 +315,7 @@ The 060 redraw's first step (`input/keyboard/canvas/`, `AppPrefs.Internal.canvas
 新绘制键盘, off): `TextKeyboard` (qwerty.xml) and, since 060-render-p2 S4a, `GroupedKeyboard` (the 14
 and 18 keys: k14.xml, k18.xml, their bottom row grouped-bottom.xml), since S4b `NumberKeyboard` (number.xml,
 its seven pads by `when="pad=…"`) and, since S4c, `ZhuyinKeyboard`'s 大千
-(zhuyin.xml; 注音九键 still its views till S4d) add a `KeyboardCanvasView` over their
+(zhuyin.xml) and, since S4d, its 注音九键 (zhuyin-nine.xml) add a `KeyboardCanvasView` over their
 rows and make them INVISIBLE, still laid out (S8 deletes them) — the next paragraph but one says how a
 keyboard moves. The canvas draws the scene `lib/keyboard-scene` makes of its layout in the look converted by ime-core's
 `LookTheme` (a 3.0 single key's name a selector with what selectors read escaped in the key: `zhuyin/,` its comma
@@ -327,8 +327,10 @@ method only, dark, flat; one-handed and dock FULL, InputView having placed the k
 which each of its show functions calls. It is made again only when what it is made of changed: the
 same theme, layout and measurer (by identity: `SceneThemes`, `SceneLayouts` keep theirs a process)
 and an equal `Env` return the last scene, which the view then neither records nor tells TalkBack
-again. `composing` reaches the `Input` only with a table (qwerty.xml asks it of nothing else), so
-pinyin's first key and its committed word make no scene; in a field with an action, Return's label
+again. `composing` reaches the `Input` only with a table (qwerty.xml asks it of nothing else) and on
+注音九键, its slot's typing (`ZhuyinKeyboard.typing`: the engine's, or a group or symbol just sent to pinyin, not a
+tone; `showTyping` calls `invalidateScene()`; zhuyin-nine.xml's `r4c4` variant), so
+pinyin's first key and its committed word make no scene elsewhere; in a field with an action, Return's label
 changing with the composing (Done to Enter) still does. `AndroidTextMeasurer` keeps the last 512
 texts it measured (text, font, weight, size), so a scene made again measures only what is new.
 The theme's styles matched to a key (`Cascade.of`) are kept by target, a key no selector names
@@ -427,17 +429,25 @@ first, and where it has none or it does not read, one step back to the app's own
 (the U8 fallback, the kept scenes, the marks' settings) for any keyboard; the keyboard gives its state as
 `sceneEnv` (its `Input`, texts, marks; `GroupedKeyboard` through `TextBoardState`) and calls
 `invalidateScene()` on every change of what the keys show (punctuation, address keys, the language key,
-Return, the input method). What a key does: the 26 keys still wire each scene key as its view was
+Return, the input method; a keyboard kept while another was shown is told the punctuation as it is now
+when `KeyboardWindow.attachLayout` attaches it again, `PunctuationComponent.mapping`). What a key does: the 26 keys still wire each scene key as its view was
 (`refOf`, U4 A, till S5); a keyboard moved wires each from its node (U4 B; the keys and the touch that
 finds them are `SceneKeys`, a node's key kept while it does the same): ime-core's `SceneBehavior.of`
 reads press, long press, repeat, swipe, double tap, bubble, long-press popup, menu, sound and axes from
 the layout (the bubble's corner what a swipe types, or, on a letter key with a shortcut and no swipe of its
-own, its own face, so the bubble names the shortcut as it is swiped to: 大千's symbols' `AltPreview(c, c)`), and `SceneKeyDef` makes the `KeyDef` the old wiring takes (the `action:` table: `sym:`
+own, its own face, so the bubble names the shortcut as it is swiped to: 大千's symbols' `AltPreview(c, c)`; a key's
+`preview="on|off"` over its kind, which gives letters and typing roles one: 注音九键's tones and `{punct:?}` `{punct:!}`
+`{punct:~}` theirs though function keys, its slot none though a letter, as their views; the key's word over its
+`<defaults>`, the board's `preview="off"` the last, `SceneKeyDef.onBoard`; what types and bubbles is what offers
+its character's preset long press where none is written; a bubble shown as punctuation maps it, as the key's face
+and what it types: `ZhuyinKeyboard.onPopupAction`, as `GroupedKeyboard`'s), and `SceneKeyDef` makes the `KeyDef` the old wiring takes (the `action:` table: `sym:`
 keysyms by name, `layout:`, `picker:` (alone, the page shown last), `commit:`, `code:U+…`, `keypad:`,
 `caps`, `shortcut:`, `reading`, `emoji-search:`, the bare words `lang`, `ime-picker`, `quickphrase`,
 `unicode`, `space-long-press`…; `action:<name>` the keyboard's `sceneTable`: 大千's `action:zhuyin` the
 code of the symbol the key shows and `action:tone-1`…`tone-5` a tone's (`ZhuyinKeyboard.placeholder`, which
-reads the nine's groups, tones and `zhuyin-slot` too for S4d); anything
+reads 注音九键's too: a group's code by the symbols it shows, its tones, `zhuyin-slot` the separator while typing and
+the comma key else; its groups write no `letters=` but `<popup from="group"/>`, their symbols the long press,
+`sceneTable.popup`); anything
 else logged and doing nothing: `code:` a scalar value (U+10FFFF at most, no surrogate), `layout:` a name,
 `emoji-search:` on or off, the reader and `SceneAction.of` the same test; a `send=` that reads as nothing
 is no tap, not its group's code). A key that does the same in a scene made anew keeps its `SceneKey`.

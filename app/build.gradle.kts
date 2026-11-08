@@ -1,3 +1,7 @@
+import java.time.Duration
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
 plugins {
     id("org.fcitx.fcitx5.android.app-convention")
     id("org.fcitx.fcitx5.android.native-app-convention")
@@ -37,6 +41,32 @@ fun Test.unitTestSettings() {
         "-Djdk.attach.allowAttachSelf=true", "-XX:+EnableDynamicAgentLoading",
         "-Dsun.tools.attach.attachTimeout=60000",
     )
+    // a test JVM out of memory ends there, its heap written for the cause (build/test-oom/<task>/java_pid<n>.hprof):
+    // once (060 P2 S4c's gate) one ran out in ThemeMakerLayoutTest and the next class and spun in GC for
+    // 17 min, nothing left to find why; five runs since (at 3 GB, at 1 GB, under full CPU load) never did.
+    // A dir a task (both run at once in the gate), in it a dir a run, named when it starts (not when configured: the
+    // configuration cache would keep one name). The same task runs again soon after (a full run with the canvas, then
+    // the gate): the newest two runs' dirs kept, so the run after an OOM does not take its dump with it; CI keeps a failed run's
+    val oom = layout.buildDirectory.dir("test-oom/$name").get().asFile
+    val gcLog = project.hasProperty("testGcLog")
+    var run: File? = null
+    doFirst {
+        val dir = File(oom, LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")))
+        dir.mkdirs()
+        run = dir
+        oom.listFiles { f -> f.isDirectory }.orEmpty().sortedByDescending { it.lastModified() }.drop(2).forEach { it.deleteRecursively() }
+        // the dumps of before, loose in the task's dir
+        oom.listFiles { f -> f.name.endsWith(".hprof") }?.forEach { it.delete() }
+    }
+    jvmArgs("-XX:+ExitOnOutOfMemoryError", "-XX:+HeapDumpOnOutOfMemoryError")
+    jvmArgumentProviders.add(CommandLineArgumentProvider {
+        val dir = run ?: error("the run's dump dir not made (doFirst)")
+        // -PtestGcLog: the test JVM's GC a line a collection, the heap left after each, for a leak's trend
+        listOf("-XX:HeapDumpPath=${dir.path}/") + if (gcLog) listOf("-Xlog:gc:file=${dir.path}/gc-%p.log:uptime") else emptyList()
+    })
+    // a run that hangs (that one spun in GC with no end) stops: the longest gate, both tasks and lint, took 12 min
+    // here, and CI's one fork at a time 14 min
+    timeout.set(Duration.ofMinutes(40))
     val test = this
     // the byte-buddy-agent on the test's own classpath: the version mockk resolved to
     jvmArgumentProviders.add(CommandLineArgumentProvider {

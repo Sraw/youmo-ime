@@ -236,8 +236,8 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
     shadow rect(925.88,252.38,1072.13,335.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(925.88,252.38,1072.13,332.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
     icon backspace 967.5,261,1030.5,324 #ff7a858a
-    icon delete-sweep 930,254,951,275 #ff7a858a
-    icon restore 930,309,951,330 #ff7a858a
+    icon delete-sweep 931,255,952,276 #ff7a858a
+    icon restore 931,309,952,330 #ff7a858a
   pressed
     +2 fill rect(925.88,252.38,1072.13,332.63 r=10.5,10.5,10.5,10.5) #1f000000
 key symbols kind=function role=symbols a11y="符"
@@ -294,7 +294,7 @@ key space kind=space role=space a11y="空格，拼音"
     shadow rect(374.88,369.38,694.13,452.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(374.88,369.38,694.13,449.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "拼音" 503.5,421.02 system 400 30.71 #ff37474f
-    icon cursor-move 379,371,400,392 #ff7a858a
+    icon cursor-move 380,372,401,393 #ff7a858a
   pressed
     +2 fill rect(374.88,369.38,694.13,449.63 r=10.5,10.5,10.5,10.5) #1f000000
 key period kind=function role=period a11y="。"

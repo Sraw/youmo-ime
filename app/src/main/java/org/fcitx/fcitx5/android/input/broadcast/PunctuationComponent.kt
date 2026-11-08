@@ -23,7 +23,9 @@ class PunctuationComponent :
     private val imeScope by manager.imeScope()
     private val broadcaster: InputBroadcaster by manager.must()
 
-    private var mapping: Map<String, String> = emptyMap()
+    /** The mapping last loaded: a keyboard attached again takes it (KeyboardWindow.attachLayout). */
+    var mapping: Map<String, String> = emptyMap()
+        private set
 
     // an older update still loading would otherwise overwrite a newer one's mapping
     private var update: Job? = null

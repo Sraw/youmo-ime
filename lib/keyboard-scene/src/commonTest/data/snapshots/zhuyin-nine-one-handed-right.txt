@@ -7,7 +7,7 @@ key r1c1 kind=function a11y="ˉ"
   shape rect(226.88,18.38,332.13,121.63 r=10.5,10.5,10.5,10.5)
   hit rect(219,0,340,140)
   anchor 279.5,70 up 0,-1
-  actions send="action:tone-1" swipe-up="action:tone-5"
+  actions preview="on" send="action:tone-1" swipe-up="action:tone-5"
   text label="ˉ"
   popup from=list
     item "˙" send="action:tone-5"
@@ -82,7 +82,7 @@ key r2c1 kind=function a11y="ˊ"
   shape rect(226.88,158.38,332.13,262.63 r=10.5,10.5,10.5,10.5)
   hit rect(219,140,340,281)
   anchor 279.5,210.5 up 0,-1
-  actions send="action:tone-2"
+  actions preview="on" send="action:tone-2"
   text label="ˊ"
   normal
     shadow rect(226.88,158.38,332.13,265.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
@@ -135,17 +135,17 @@ key r2c4 kind=letter a11y="ㄔㄘㄣㄧ"
     text "ㄔㄘㄣㄧ" 761.5,228.22 system 400 47.25 #ff37474f
   pressed
     +2 fill rect(760.88,158.38,951.13,262.63 r=10.5,10.5,10.5,10.5) #1f000000
-key r2c5 kind=function a11y="?"
+key r2c5 kind=function a11y="？"
   bounds 959,140,1080,281
   shape rect(966.88,158.38,1072.13,262.63 r=10.5,10.5,10.5,10.5)
   hit rect(959,140,1080,281)
   anchor 1019.5,210.5 up 0,-1
-  actions send="?"
-  text label="?"
+  actions preview="on" send="?"
+  text label="？"
   normal
     shadow rect(966.88,158.38,1072.13,265.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(966.88,158.38,1072.13,262.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    text "?" 1001.39,233.14 system 400 60.38 #ff7a858a
+    text "？" 989.31,233.14 system 400 60.38 #ff7a858a
   pressed
     +2 fill rect(966.88,158.38,1072.13,262.63 r=10.5,10.5,10.5,10.5) #1f000000
 key r3c1 kind=function a11y="ˇ"
@@ -153,7 +153,7 @@ key r3c1 kind=function a11y="ˇ"
   shape rect(226.88,299.38,332.13,402.63 r=10.5,10.5,10.5,10.5)
   hit rect(219,281,340,421)
   anchor 279.5,351 up 0,-1
-  actions send="action:tone-3"
+  actions preview="on" send="action:tone-3"
   text label="ˇ"
   normal
     shadow rect(226.88,299.38,332.13,405.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
@@ -206,17 +206,17 @@ key r3c4 kind=letter a11y="ㄕㄙㄤㄨ"
     text "ㄕㄙㄤㄨ" 761.5,368.72 system 400 47.25 #ff37474f
   pressed
     +2 fill rect(760.88,299.38,951.13,402.63 r=10.5,10.5,10.5,10.5) #1f000000
-key r3c5 kind=function a11y="!"
+key r3c5 kind=function a11y="！"
   bounds 959,281,1080,421
   shape rect(966.88,299.38,1072.13,402.63 r=10.5,10.5,10.5,10.5)
   hit rect(959,281,1080,421)
   anchor 1019.5,351 up 0,-1
-  actions send="!"
-  text label="!"
+  actions preview="on" send="!"
+  text label="！"
   normal
     shadow rect(966.88,299.38,1072.13,405.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(966.88,299.38,1072.13,402.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    text "!" 1001.39,373.64 system 400 60.38 #ff7a858a
+    text "！" 989.31,373.64 system 400 60.38 #ff7a858a
   pressed
     +2 fill rect(966.88,299.38,1072.13,402.63 r=10.5,10.5,10.5,10.5) #1f000000
 key r4c1 kind=function a11y="ˋ"
@@ -224,7 +224,7 @@ key r4c1 kind=function a11y="ˋ"
   shape rect(226.88,439.38,332.13,543.63 r=10.5,10.5,10.5,10.5)
   hit rect(219,421,340,562)
   anchor 279.5,491.5 up 0,-1
-  actions send="action:tone-4"
+  actions preview="on" send="action:tone-4"
   text label="ˋ"
   normal
     shadow rect(226.88,439.38,332.13,546.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
@@ -267,7 +267,7 @@ key r4c4 kind=letter a11y="，"
   shape rect(760.88,439.38,951.13,543.63 r=10.5,10.5,10.5,10.5)
   hit rect(753,421,959,562)
   anchor 856,491.5 up 0,-1
-  actions send="action:zhuyin-slot"
+  actions preview="off" send="action:zhuyin-slot"
   text label="，"
   popup from=list as-is="true"
     item "。"
@@ -282,17 +282,17 @@ key r4c4 kind=letter a11y="，"
     text "，" 832.38,509.22 system 400 47.25 #ff37474f
   pressed
     +2 fill rect(760.88,439.38,951.13,543.63 r=10.5,10.5,10.5,10.5) #1f000000
-key r4c5 kind=function a11y="~"
+key r4c5 kind=function a11y="～"
   bounds 959,421,1080,562
   shape rect(966.88,439.38,1072.13,543.63 r=10.5,10.5,10.5,10.5)
   hit rect(959,421,1080,562)
   anchor 1019.5,491.5 up 0,-1
-  actions send="~"
-  text label="~"
+  actions preview="on" send="~"
+  text label="～"
   normal
     shadow rect(966.88,439.38,1072.13,546.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(966.88,439.38,1072.13,543.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    text "~" 1001.39,514.14 system 400 60.38 #ff7a858a
+    text "～" 989.31,514.14 system 400 60.38 #ff7a858a
   pressed
     +2 fill rect(966.88,439.38,1072.13,543.63 r=10.5,10.5,10.5,10.5) #1f000000
 key symbols kind=function role=symbols a11y="符"
@@ -349,7 +349,7 @@ key space kind=space role=space a11y="空格，注音"
     shadow rect(519.88,580.38,771.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(519.88,580.38,771.13,683.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "注音" 611,644.8 system 400 34.13 #ff37474f
-    icon cursor-move 526,585,555,614 #ff7a858a
+    icon cursor-move 527,585,556,614 #ff7a858a
   pressed
     +2 fill rect(519.88,580.38,771.13,683.63 r=10.5,10.5,10.5,10.5) #1f000000
 key period kind=function role=period a11y="。"

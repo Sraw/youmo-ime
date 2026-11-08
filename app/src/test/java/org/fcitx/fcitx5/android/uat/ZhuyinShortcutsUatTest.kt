@@ -5,8 +5,6 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.view.View
-import android.view.ViewGroup
-import android.widget.ImageView
 import com.google.android.material.chip.Chip
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
@@ -20,7 +18,6 @@ import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
-import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
@@ -61,16 +58,6 @@ class ZhuyinShortcutsUatTest {
     private fun harness(keyboard: ImKeyboard): KeyboardHarness {
         prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
         return KeyboardHarness(ThemePreset.PixelLight, keyboards = ImKeyboards.Chosen(pinyin = keyboard)).also { made = it }.start()
-    }
-
-    private fun KeyboardHarness.faced(face: String): TextKeyView =
-        KeyboardHarness.all(keyboard).filterIsInstance<TextKeyView>().first { it.mainText.text.toString() == face }
-
-    // the key's marks: icons drawn in its corners
-    private fun icons(v: View): Int = when (v) {
-        is ImageView -> if (v.visibility == View.VISIBLE && v.drawable != null) 1 else 0
-        is ViewGroup -> (0 until v.childCount).sumOf { icons(v.getChildAt(it)) }
-        else -> 0
     }
 
     @Test
@@ -141,13 +128,17 @@ class ZhuyinShortcutsUatTest {
     @Uat("T9-61")
     fun zhuyinNinesGroupsHaveNoneUntilOneIsSet() {
         var h = harness(ImKeyboard.ZHUYIN_NINE)
-        assertEquals("no preset", 0, icons(h.faced("ㄅㄉㄚ")))
+        // no group's, nor a tone's or the slot's: nothing but their own faces (⌫'s icons its own shortcuts)
+        val bare = h.keys().filter { it.id?.matches(Regex("r[1-4]c[1-4]")) == true }
+        assertEquals(16, bare.size)
+        for (k in bare) assertEquals(k.id, 0 to listOf(k.label), k.drawnIcons to k.drawnTexts)
         h.close()
         prefs.set(AppPrefs.getInstance().internal.keyShortcuts, KeyShortcuts.Empty.with("zy9/1", KeyShortcut.Text("你好")).serialize())
         h = harness(ImKeyboard.ZHUYIN_NINE)
         assertTrue(h.texts().toString(), "你好" in h.texts())
-        h.capture("ZhuyinShortcutsUatTest/nine_text")
-        val group = h.faced("ㄅㄉㄚ")
+        assertEquals(listOf("ㄅㄉㄚ", "你好"), h.key("ㄅㄉㄚ").drawnTexts)
+        h.captureBoard("ZhuyinShortcutsUatTest/nine_text")
+        val group = h.key("ㄅㄉㄚ")
         h.swipe(group, 0f, -group.height * 1.3f)
         h.idle()
         assertEquals("你好", h.field.text.toString())
