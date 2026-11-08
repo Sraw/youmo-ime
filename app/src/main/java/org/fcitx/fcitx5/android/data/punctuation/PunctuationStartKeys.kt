@@ -89,7 +89,9 @@ object PunctuationStartKeys {
         if (header.size != 2 || header[0] != VERSION) return null
         val entries = lines.drop(1).filter { it.isNotEmpty() }
         if (header[1].toIntOrNull() != entries.size || entries.any { '\t' !in it }) return null
-        return entries.associate { it.substringBefore('\t') to it.substringAfter('\t') }
+        val keys = entries.associate { it.substringBefore('\t') to it.substringAfter('\t') }
+        // a torn last line: its mark lost
+        return keys.takeIf { it.all { (k, v) -> k.isNotEmpty() && v.isNotEmpty() } }
     }
 
     /** [load] at once, for a test that starts the keyboard with no service start before it. */

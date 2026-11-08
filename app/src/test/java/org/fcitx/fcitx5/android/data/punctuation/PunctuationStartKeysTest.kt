@@ -42,7 +42,7 @@ class PunctuationStartKeysTest {
     fun anEmptyTornOrOtherFileIsNoneKept() {
         PunctuationStartKeys.write(ctx, mapOf("," to "、", "." to "。"))
         val whole = file.readText()
-        for (bad in listOf("", whole.substring(0, whole.lastIndexOf(',')), whole.replaceFirst("v1", "v9"), "，\n")) {
+        for (bad in listOf("", whole.substring(0, whole.lastIndexOf(',')), whole.replaceFirst("v1", "v9"), "，\n", "v1\t2\n,\t、\n.", "v1\t2\n,\t、\n.\t")) {
             file.writeText(bad)
             assertNull("<$bad>", readBack())
         }
