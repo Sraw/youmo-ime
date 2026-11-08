@@ -27,7 +27,7 @@ object KeyNames {
      * node of a key gives as its id (060-render-p2 S3), so UAT (`uat.py keys()`, `SoftKeyboardTest`)
      * finds a key the scene draws by the name it found its view by. Only the roles whose views had
      * one; Shift's and Return's were named for what they did (caps, return). Published as the views'
-     * were: never renamed. The number pad's space (`button_mini_space`) is S4's, with that board.
+     * were: never renamed. A board's key whose view had a name of its own: [BOARD_RESOURCES].
      */
     val RESOURCES: Map<String, String> = mapOf(
         "shift" to "button_caps",
@@ -47,4 +47,7 @@ object KeyNames {
         "dot" to "button_dot",
         "domain" to "button_domain",
     )
+
+    /** The keys whose views had a name of their board's own (`board/key`), over [RESOURCES]: the number pad's space. */
+    val BOARD_RESOURCES: Map<String, String> = mapOf("number/space" to "button_mini_space")
 }

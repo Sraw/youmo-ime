@@ -256,8 +256,8 @@ internal class PopupBuilder(
         label = label,
     )
 
-    // drawn [alpha] of itself (theme 3.0 faded the cell's view as a whole; here each layer)
-    private fun faded(op: Op, alpha: Double): Op {
+    // drawn [alpha] of itself (theme 3.0 faded the cell's view as a whole; here each layer); a board's blank too
+    internal fun faded(op: Op, alpha: Double): Op {
         fun Argb.of() = Argb((value and RGB) or ((this.alpha * alpha).roundToInt() shl ALPHA_SHIFT))
         return when (op) {
             is Op.Fill -> op.copy(color = op.color.of())

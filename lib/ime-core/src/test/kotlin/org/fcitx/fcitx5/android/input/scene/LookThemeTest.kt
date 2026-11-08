@@ -154,6 +154,25 @@ class LookThemeTest {
         for (id in listOf("r2c1", "r1c3", "r3c5", "comma")) assertTrue(id, key(scene, id).ops(false).none { it is Op.NineSlice })
     }
 
+    // 3.0's single keys of the number pad (060-render-p2 S4b): number/* , . : each selects the one key of
+    // that id and no other (number/* unescaped was every key of the pad, a comma the selector's list)
+    @Test
+    fun theNumberPadsSingleKeysAreThoseKeysAlone() {
+        val slice = NineSlice("/data/themes/t/key.png", Insets(1, 2, 3, 4), 2)
+        val base = LookDefaults.look(palette(SceneData.theme("material-light.xml")))
+        val layout = (LayoutReader.layout(SceneData.read("number.xml")) as Parsed.Ok).value
+        // : is the date and time pad's, the others the full pad's
+        for ((id, pad) in listOf("*" to "full", "," to "full", "." to "full", ":" to "datetime")) {
+            val look = base.copy(keys = base.keys.copy(overrides = mapOf("number/$id" to KeyOverride(KeyFill.Image(slice), null, KeyLabel.Hide))))
+            val env = SceneData.portrait.copy(input = SceneData.portrait.input.copy(pad = pad))
+            val built = SceneBuilder(theme(LookTheme.xml(look, "T", false)), env, SceneData.measurer).build(layout, emptyMap())
+            val scene = (built as Parsed.Ok).value
+            val imaged = scene.keys.filter { k -> k.ops(false).any { it is Op.NineSlice } }.map { it.id }
+            assertEquals("number/$id", listOf(id), imaged)
+            assertTrue(id, key(scene, id).ops(false).none { it is Op.Text })
+        }
+    }
+
     // two images of one name in two folders stay two: the second numbered, in the theme written and the app's lookup alike
     @Test
     fun filesOfOneNameInTwoFoldersKeptApart() {

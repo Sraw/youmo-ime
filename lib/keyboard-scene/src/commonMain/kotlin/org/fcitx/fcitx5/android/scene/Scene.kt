@@ -15,7 +15,8 @@ import org.fcitx.fcitx5.android.scene.theme.Argb
  * [base] is drawn first (the keyboard's own fill), then the slots' faces, then each key's face for
  * its states. [board] is where the keys are: the whole of it, or one-handed or split at a side
  * (rules D §2), the rest a `side-buttons` slot. [preview] and [popups]: whether its keys pop up a
- * preview, a long press's keyboard or menu (the layout's; the number pad's do not). [warnings]: what
+ * preview, a long press's keyboard (the layout's; the number pad's do not); a menu written on a key
+ * pops up all the same (the number pad's Return's, rules C 疑问 8). [warnings]: what
  * the layout asked that this environment could not give and was done another way (a split row of
  * other than nine or ten keys, scaled).
  */

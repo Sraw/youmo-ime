@@ -56,6 +56,7 @@ class SceneBoard(
         return KeyboardCanvasView(context, images, object : KeyboardCanvasView.Host {
             override fun scene(width: Int, height: Int) = drawn(look, width, height)
             override fun key(node: KeyNode) = key(node)
+            override val board get() = layout?.id
         })
     }
 

@@ -29,6 +29,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.fcitx.fcitx5.android.scene.Scene
+import org.fcitx.fcitx5.android.input.scene.SceneBehavior
+import org.junit.Assert.assertSame
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -52,6 +55,8 @@ class SceneKeyDefTest {
 
     private fun sym(code: Int) = KeyAction.SymAction(KeySym(code), KeyStates.Virtual)
 
+    private fun keypad(code: Int) = KeyAction.SymAction(KeySym(code), NumLockState)
+
     @Test
     fun eachWordIsTheActionTheOldKeysHad() {
         val placeholders = mapOf("zhuyin" to KeyAction.CommitAction("ㄅ"))
@@ -59,7 +64,13 @@ class SceneKeyDefTest {
             SceneAction.Key("'") to KeyAction.HostKeyAction("'"),
             SceneAction.Sym("BackSpace") to sym(FcitxKeyMapping.FcitxKey_BackSpace),
             SceneAction.Sym("Return") to sym(FcitxKeyMapping.FcitxKey_Return),
-            SceneAction.Sym("KP_Add") to sym(FcitxKeyMapping.FcitxKey_KP_Add),
+            // the number pad's: the keypad's with NumLock, as its NumPadKeys sent them
+            SceneAction.Sym("KP_Add") to keypad(FcitxKeyMapping.FcitxKey_KP_Add),
+            SceneAction.Sym("KP_0") to keypad(FcitxKeyMapping.FcitxKey_KP_0),
+            SceneAction.Sym("KP_9") to keypad(FcitxKeyMapping.FcitxKey_KP_9),
+            SceneAction.Sym("KP_Separator") to keypad(0xffac),
+            SceneAction.Sym("KP_Equal") to keypad(0xffbd),
+            SceneAction.Sym("KP_Decimal") to keypad(FcitxKeyMapping.FcitxKey_KP_Decimal),
             SceneAction.Layout("Symbol") to KeyAction.LayoutSwitchAction("Symbol"),
             SceneAction.Picker(null) to KeyAction.PickerSwitchAction(),
             SceneAction.Picker("Emoji") to KeyAction.PickerSwitchAction(PickerWindow.Key.Emoji),
@@ -87,6 +98,23 @@ class SceneKeyDefTest {
             SceneAction.Group("qw"),
         )
         none.forEach { assertNull("$it", SceneKeyDef.action(it) { name -> placeholders[name] }) }
+    }
+
+    // a board that pops up no preview nor a long press's keys (number.xml's preview="off" popups="off"): its
+    // keys none of those, a menu written on a key its own still (rules C 疑问 8: the number pad's Return)
+    @Test
+    fun aBoardsPopupsOffTakeTheBubbleAndTheLongPressNotTheMenu() {
+        fun board(preview: Boolean, popups: Boolean) = Scene(1.0, 1.0, emptyList(), emptyList(), emptyList(), preview = preview, popups = popups)
+        val all = nodes().values.map(SceneBehavior::of)
+        // the 14 keys' have each: a letter's bubble and long press, Return's menu
+        assertTrue(all.any { it.bubble != null } && all.any { it.popup != null } && all.any { it.menu.isNotEmpty() })
+        for (b in all) {
+            assertSame(b, SceneKeyDef.onBoard(b, null))
+            assertSame(b, SceneKeyDef.onBoard(b, board(true, true)))
+            assertEquals(b.copy(bubble = null, popup = null), SceneKeyDef.onBoard(b, board(false, false)))
+            assertEquals(b.copy(bubble = null), SceneKeyDef.onBoard(b, board(false, true)))
+            assertEquals(b.copy(popup = null), SceneKeyDef.onBoard(b, board(true, false)))
+        }
     }
 
     // the 14 keys' nodes, from the canvas a GroupedKeyboard draws with the switch on

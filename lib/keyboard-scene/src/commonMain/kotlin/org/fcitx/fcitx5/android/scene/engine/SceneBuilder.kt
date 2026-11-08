@@ -142,9 +142,12 @@ class SceneBuilder(
             val s = (p.item as? ExpandedSlot)?.slot ?: return@mapNotNull null
             SlotNode(s.kind, s.id, p.cell, surface(layout.id, s.id, s.look, s.classes, s.face, p.cell, slot = true))
         }
+        // a key's place the board has no key for (the number pads'): a key that takes no press, `:disabled`
+        // and faded as theme 3.0's disabled blank view was (its whole view at android:disabledAlpha)
         val blanks = placed.flatMap { p ->
             val g = (p.item as? ExpandedGap)?.gap ?: return@flatMap emptyList()
-            surface(layout.id, g.id, g.look, g.classes, Face.Default, p.cell, slot = false)
+            surface(layout.id, g.id, g.look, g.classes, Face.Default, p.cell, slot = false, states = setOf(KeyState.Disabled.xml))
+                .map { popups.faded(it, Popups.DISABLED_ALPHA) }
         }
         val whole = Box(0.0, 0.0, env.width, env.height)
         val side = sideRoom(board, whole)?.let { SlotNode(SIDE_BUTTONS, null, it) }
@@ -181,10 +184,19 @@ class SceneBuilder(
 
     // a key's face where a slot or a blank place is given a look: never pressed, `keep` block on flat keys too;
     // a slot is not one of its board's every key (`handwriting/*`), but by its own name and look, as theme 3.0 drew the pad
-    private fun surface(board: String, id: String?, look: String?, classes: List<String>, face: Face, cell: Box, slot: Boolean): List<Op> {
+    private fun surface(
+        board: String,
+        id: String?,
+        look: String?,
+        classes: List<String>,
+        face: Face,
+        cell: Box,
+        slot: Boolean,
+        states: Set<String> = emptySet(),
+    ): List<Op> {
         if (look == null || face == Face.None) return emptyList()
         val c = if (face == Face.Keep) unflat else cascade
-        val l = KeyLook(c.of(Selector.Target("key", board, id, null, setOf(look) + classes, slot = slot)), theme)
+        val l = KeyLook(c.of(Selector.Target("key", board, id, null, setOf(look) + classes, states, slot = slot)), theme)
         return paint.face(Faces.of(cell, l, face, true, env.flat && face != Face.Keep, env.density), l, false)
     }
 

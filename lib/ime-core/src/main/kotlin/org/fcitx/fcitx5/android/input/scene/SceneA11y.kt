@@ -67,10 +67,13 @@ object SceneA11y {
     }
 
     /** All a screen reader is told of [key], the app's strings by name from [string]. */
-    fun of(key: KeyNode, string: (String) -> String?): KeySpeech = KeySpeech(
+    fun of(key: KeyNode, string: (String) -> String?): KeySpeech = of(key, null, string)
+
+    /** [of] a key of [board] (its layout's id): its resource name may be its board's ([KeyNames.BOARD_RESOURCES]). */
+    fun of(key: KeyNode, board: String?, string: (String) -> String?): KeySpeech = KeySpeech(
         text = key.label.orEmpty(),
         description = spoken(key.a11y, key.label, string),
-        resourceName = key.role?.let(KeyNames.RESOURCES::get),
+        resourceName = board?.let { KeyNames.BOARD_RESOURCES["$it/${key.id}"] } ?: key.role?.let(KeyNames.RESOURCES::get),
         state = state(key.role, key.states)?.let { string(it) ?: it },
         alt = key.alt?.takeIf { it.isNotEmpty() },
         id = key.id,

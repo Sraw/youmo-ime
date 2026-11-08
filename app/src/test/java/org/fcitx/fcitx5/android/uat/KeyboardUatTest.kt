@@ -59,7 +59,7 @@ class KeyboardUatTest {
         assertEquals(listOf("+", "1", "2", "3", "/", "-", "4", "5", "6", "*", "7", "8", "9", "ABC", ",", "!?#", "0", "=", "."), rows)
         // space, ⌫ and ↵ are image keys
         space(h); h.describedKey("Backspace")
-        h.capture("KeyboardUatTest/number_pad")
+        h.captureBoard("KeyboardUatTest/number_pad")
         h.tap(h.key("4"))
         h.tap(h.key("2"))
         assertEquals(

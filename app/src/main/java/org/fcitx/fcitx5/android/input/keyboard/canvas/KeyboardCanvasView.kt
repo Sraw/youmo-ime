@@ -78,6 +78,9 @@ class KeyboardCanvasView(
 
         /** The key wired for [node] (its touch, [SceneTouch.keyOf]): what a screen reader's click and long click on its node do; null, none. */
         fun key(node: KeyNode): SceneKey?
+
+        /** Its layout's id (a key's resource name may be its board's: [SceneA11y.of]); null for none. */
+        val board: String? get() = null
     }
 
     // a key's two faces, recorded once each when first drawn; kept across scenes where they are the same.
@@ -455,7 +458,7 @@ class KeyboardCanvasView(
                 node.setBoundsInParent(Rect())
                 return
             }
-            val said = SceneA11y.of(k, ::stringNamed)
+            val said = SceneA11y.of(k, host.board, ::stringNamed)
             node.text = said.text
             node.contentDescription = said.description
             node.className = SceneA11y.CLASS_NAME
@@ -515,6 +518,8 @@ class KeyboardCanvasView(
         val A11Y_STRINGS = mapOf(
             "a11y_key_shift" to org.fcitx.fcitx5.android.R.string.a11y_key_shift,
             "a11y_key_backspace" to org.fcitx.fcitx5.android.R.string.a11y_key_backspace,
+            // the number pad's space: no label (the typing keyboards' says the input method)
+            "a11y_key_space" to org.fcitx.fcitx5.android.R.string.a11y_key_space,
             "a11y_key_switch_language" to org.fcitx.fcitx5.android.R.string.a11y_key_switch_language,
             "a11y_key_separator" to org.fcitx.fcitx5.android.R.string.a11y_key_separator,
             SceneA11y.SHIFT_ONCE to org.fcitx.fcitx5.android.R.string.a11y_state_shift_once,
