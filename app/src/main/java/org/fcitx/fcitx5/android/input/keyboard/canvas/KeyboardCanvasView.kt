@@ -168,7 +168,7 @@ class KeyboardCanvasView(
                 painted = drawn.shownLook
             }
             val old = faces
-            if (repainted || s.base != built?.base) base = null
+            if (repainted || s.under != built?.under) base = null
             built = s
             var said: MutableList<Int>? = null
             faces = s.keys.mapIndexed { i, k ->
@@ -235,7 +235,7 @@ class KeyboardCanvasView(
     // what shows the picture recorded again, where it is now (the frame about to be drawn draws it)
     private fun dropPictures() {
         var any = false
-        if (built?.base?.let(CanvasFrame::showsPicture) == true) {
+        if (built?.under?.let(CanvasFrame::showsPicture) == true) {
             base = null
             any = true
         }
@@ -259,11 +259,11 @@ class KeyboardCanvasView(
         if (!canvas.isHardwareAccelerated) {
             // a software canvas (a bitmap's: screenshots) draws no RenderNode, keeps nothing to record again
             painter.missed = false
-            painter.draw(canvas, s.base)
+            painter.draw(canvas, s.under)
             faces.forEach { painter.draw(canvas, it.node.ops(it.down)) }
             return
         }
-        canvas.drawRenderNode(base.live() ?: record("base", Box(0.0, 0.0, width.toDouble(), height.toDouble()), s.base).also { base = it })
+        canvas.drawRenderNode(base.live() ?: record("base", Box(0.0, 0.0, width.toDouble(), height.toDouble()), s.under).also { base = it })
         for (f in faces) {
             val shown = CanvasFrame.faces(f.down, f.normal.live() != null, f.pressed.live() != null)
             // by index: no iterator for each key in each frame
@@ -336,6 +336,16 @@ class KeyboardCanvasView(
     fun cell(ref: KeyRef, out: Rect): Boolean {
         val k = current?.keys?.firstOrNull { it.of(ref) } ?: return false
         out.set(k.bounds)
+        return true
+    }
+
+    /**
+     * Slot [id]'s cell in this view, into [out], as the scene drawn last has it: where the keyboard puts
+     * its own view (the handwriting pad, 060-render-p2 S5b); false where the scene has no such slot.
+     */
+    fun slot(id: String, out: Rect): Boolean {
+        val s = current?.slots?.firstOrNull { it.id == id } ?: return false
+        out.set(s.bounds)
         return true
     }
 
@@ -504,7 +514,12 @@ class KeyboardCanvasView(
     private val resourcePackage: String by lazy { resources.getResourcePackageName(org.fcitx.fcitx5.android.R.id.keyboard_view) }
 
     // the layout's names of the app's strings (a11y_key_shift…): the ones its keys name, looked up by name
-    private fun stringNamed(name: String): String? = A11Y_STRINGS[name]?.let(context::getString)
+    private fun stringNamed(name: String): String? = when (name) {
+        // handwriting's 注 as its view said it (SceneA11y.onOrOff)
+        "a11y_key_reading_on" -> context.getString(org.fcitx.fcitx5.android.R.string.hw_reading_key_on, context.getString(org.fcitx.fcitx5.android.R.string.im_candidate_reading))
+        "a11y_key_reading_off" -> context.getString(org.fcitx.fcitx5.android.R.string.hw_reading_key_off, context.getString(org.fcitx.fcitx5.android.R.string.im_candidate_reading))
+        else -> A11Y_STRINGS[name]?.let(context::getString)
+    }
 
     private companion object {
         const val NANOS_A_MS = 1e6
@@ -527,6 +542,9 @@ class KeyboardCanvasView(
         )
     }
 }
+
+// what is drawn under the keys: the board's base and the slots' faces (a slot's view drawn over it, its own)
+private val Scene.under: List<Op> get() = if (slots.all { it.ops.isEmpty() }) base else base + slots.flatMap { it.ops }
 
 /** Whether this is key [ref]: a split row's second copy ([KeyNode.copy] 1) is its own. */
 internal fun KeyNode.of(ref: KeyRef) = id == ref.id && (copy != 0) == ref.copy

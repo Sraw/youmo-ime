@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   手写（HandwritingKeyboard，rules C §8），板 handwriting（没有位置键名，键按角色）。手写板是跨四行的 slot，宽 85，
-  按字母键面画、平铺也画块（face="keep"）、不画按下；给它一个名字 pad，主题能写 handwriting/pad（rules C 疑问 2 的回答）。
-  右列各 15：⌫、，、。、注；，。显示固定全角（rules C 疑问 4，照现在写）。注 键开着时（状态 :on）字色是强调色，主题写。
+  按字母键面画、平铺也画块（face="keep"）、不画按下；，。没有气泡（preview="off"，同旧 View），长按的标点作为按键发给输入法（同旧 View，不写 as-is）；给它一个名字 pad，主题能写 handwriting/pad（rules C 疑问 2 的回答）。
+  右列各 15：⌫、，、。、注；，。按标点映射显示（{punct:,}），和发出去的一致（rules C 疑问 4，060-render-p2 §5.3 S5b 故意不同；旧 View 固定显示全角）。注 键开着时（状态 :on）字色是强调色，主题写。
   第 5 行：符 15、123 14（无长按）、空格、语言键 10、回车 15。
 -->
 <keyboard xmlns="https://youmo-ime/layout/1" id="handwriting" name="手写" family="handwriting" columns="100">
@@ -13,14 +13,14 @@
          sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both" shortcut="backspace"/>
   </row>
   <row>
-    <key id="comma" role="comma" label="，" send=",">
-      <popup from="list" as-is="true">
+    <key id="comma" role="comma" label="{punct:,}" preview="off" send=",">
+      <popup from="list">
         <item text="？"/><item text="！"/><item text="："/><item text="；"/><item text="、"/><item text="…"/><item text="“"/><item text="”"/>
       </popup>
     </key>
   </row>
   <row>
-    <key id="period" role="period" label="。" send=".">
+    <key id="period" role="period" label="{punct:.}" preview="off" send=".">
       <popup from="none"/>
     </key>
   </row>

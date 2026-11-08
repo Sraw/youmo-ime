@@ -65,6 +65,9 @@ class SceneKeyDef(
 
         /** The long press of the key of [letters], made as it opens again (the user's keys as they are then). */
         fun groupPopup(letters: String, node: KeyNode): Popup.Keyboard? = null
+
+        /** A menu item's words as shown for the layout's [label] (handwriting's `reading_off`: the settings' wording). */
+        fun menuLabel(label: String): String = label
     }
 
     companion object {
@@ -115,7 +118,7 @@ class SceneKeyDef(
             }
             if (b.menu.isNotEmpty()) {
                 val items = b.menu.mapNotNull { m ->
-                    act(m.action)?.let { Popup.Menu.Item(m.label, m.icon?.let(SceneIcons::of) ?: 0, it) }
+                    act(m.action)?.let { Popup.Menu.Item(table.menuLabel(m.label), m.icon?.let(SceneIcons::of) ?: 0, it) }
                 }
                 add(Popup.Menu(items.toTypedArray()))
             }

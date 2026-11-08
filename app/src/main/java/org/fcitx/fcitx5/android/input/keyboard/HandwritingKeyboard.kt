@@ -33,11 +33,20 @@ import org.fcitx.fcitx5.android.input.handwriting.HandwritingPadView
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
 import org.fcitx.fcitx5.android.input.handwriting.InkPad
 import org.fcitx.fcitx5.android.input.handwriting.ReadingToggle
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.theme.KeyFaceGeometry
 import org.fcitx.fcitx5.android.input.theme.KeyKind
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.input.theme.KeyStyleResolver
+import org.fcitx.fcitx5.android.input.theme.ThemeLook
+import org.fcitx.fcitx5.android.scene.KeyState
+import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.Input
+import org.fcitx.fcitx5.android.scene.engine.Texts
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.constraintlayout.leftOfParent
@@ -98,6 +107,8 @@ class HandwritingKeyboard(
             name = "reading",
         )
 
+        private val READING_ON = mapOf("reading" to setOf(KeyState.On))
+
         private val READING_NAMES = mapOf(
             ReadingStyle.OFF to R.string.im_candidate_reading_off,
             ReadingStyle.PINYIN to R.string.im_candidate_reading_pinyin,
@@ -106,6 +117,17 @@ class HandwritingKeyboard(
 
         // the pad's rows: those the keys on its right make
         private const val PAD_ROWS = 4
+
+        /** The layout its keys are drawn from where the canvas is on (lib/keyboard-scene's handwriting.xml), the pad its slot [PAD_SLOT]. */
+        internal const val LAYOUT = KeyNames.HANDWRITING
+        internal const val PAD_SLOT = "pad"
+
+        // 注's long press as handwriting.xml names its items: the settings' words
+        private val MENU_LABELS = mapOf(
+            "reading_off" to R.string.im_candidate_reading_off,
+            "reading_pinyin" to R.string.im_candidate_reading_pinyin,
+            "reading_zhuyin" to R.string.im_candidate_reading_zhuyin,
+        )
 
         fun layout(context: Context): List<List<KeyDef>> = listOf(
             listOf(spacer(), BackspaceKey(SIDE)),
@@ -133,6 +155,7 @@ class HandwritingKeyboard(
     @Keep
     private val showLangSwitchKeyListener = ManagedPreference.OnChangeListener<Boolean> { _, v ->
         lang.isVisible = v
+        canvas?.invalidateScene()
     }
 
     private val padView = HandwritingPadView(
@@ -140,12 +163,15 @@ class HandwritingKeyboard(
         onRead = ::read,
         pause = { AppPrefs.getInstance().keyboard.handwritingPause.getValue().millis },
         onFinish = ::finish,
-    ).apply {
-        // a letter key's face (its image among the keyboard's), drawn on flat keys too as before 3.0; nothing pressed (it is written on)
+    )
+
+    // the pad's face as a letter key's (its image among the keyboard's), drawn on flat keys too as before 3.0; nothing
+    // pressed (it is written on). Where the canvas is on, the scene draws it (the slot's face, handwriting.xml's face="keep")
+    private fun drawPadAsKey() {
         val keys = ThemeManager.shownLook(theme).keys
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val density = resources.displayMetrics.density
-        drawAsKey(
+        padView.drawAsKey(
             theme, KeyStyleResolver.resolve(keys, null, null, KeyKind.Letter), KeyKind.Letter, keyImages,
             { w, h -> KeyFaceGeometry.of(w, h, KeyKind.Letter, keys, landscape, density, true, KeyFaceGeometry.Border.On) },
             press = false,
@@ -170,6 +196,20 @@ class HandwritingKeyboard(
         }
         lang.isVisible = showLangSwitchKey.getValue()
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
+        // last: the scene reads the keyboard's state (060's redraw: the keys drawn by the scene engine where the canvas is
+        // on); the pad over the canvas, in its slot (onLayout)
+        if (drawKeysWithScene(LAYOUT)) padView.bringToFront() else drawPadAsKey()
+    }
+
+    private val padSlot = Rect()
+
+    // the pad where the scene has its slot: the scene's cells, not the rows of views under it
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        val c = canvas ?: return
+        if (!c.slot(PAD_SLOT, padSlot)) return
+        padSlot.offset(c.left, c.top)
+        padView.layout(padSlot.left, padSlot.top, padSlot.right, padSlot.bottom)
     }
 
     private var scope: CoroutineScope? = null
@@ -242,6 +282,8 @@ class HandwritingKeyboard(
     // 注 as 候选词注音 is: the accent's colour on, TalkBack told which (the style last used kept by FcitxInputMethodService)
     private fun showReading(style: ReadingStyle) {
         val on = style != ReadingStyle.OFF
+        readingOn = on
+        canvas?.invalidateScene()
         readingKey.mainText.setTextColor(if (on) theme.accentKeyBackgroundColor else theme.altKeyTextColor)
         val name = context.getString(R.string.im_candidate_reading)
         readingKey.contentDescription = context.getString(if (on) R.string.hw_reading_key_on else R.string.hw_reading_key_off, name)
@@ -269,10 +311,46 @@ class HandwritingKeyboard(
     }
 
     override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
+        returnAppearance = appearance
         `return`.showReturnAction(appearance)
+        canvas?.invalidateScene()
     }
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         showInputMethodName(space, ime)
+        canvas?.invalidateScene()
+    }
+
+    // ，and 。 as punctuation maps them: the views showed them full width whatever was typed; the scene
+    // shows what they type ({punct:,}: 显示和输出一致, 060-render-p2 §5.3 S5b)
+    private var punctuationMapping: Map<String, String> = emptyMap()
+
+    override fun onPunctuationUpdate(mapping: Map<String, String>) {
+        punctuationMapping = mapping
+        canvas?.invalidateScene()
+    }
+
+    // what the scene's keys show as last told
+    private var returnAppearance = ReturnKeyAppearance.Enter
+    private var readingOn = false
+
+    // what the keys show now as the scene engine's environment (handwriting.xml's when= and bindings): the
+    // language key, the space's name and microphone, Return's label and icon, ，。 as typed, 注 on or off
+    override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env {
+        val input = Input(langKey = showLangSwitchKey.getValue(), holdVoice = holdsToTalk)
+        val texts = Texts(
+            imeName = shownImeName.orEmpty(),
+            returnLabel = returnAppearance.label(context).toString(),
+            returnIcon = SceneIcons.returnName(returnAppearance.icon),
+            punctuation = punctuationMapping,
+            a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
+        )
+        val env = SceneEnvs.of(this, look, theme.isDark, width, height, input, texts = texts, marks = SceneBoard.marks(layout, charShortcutMarks))
+        return if (readingOn) env.copy(states = READING_ON) else env
+    }
+
+    // a getter: asked in init (drawKeysWithScene), before this class's own properties are made
+    override val sceneTable: SceneKeyDef.Table get() = object : SceneKeyDef.Table {
+        override fun menuLabel(label: String): String = MENU_LABELS[label]?.let(context::getString) ?: label
     }
 }

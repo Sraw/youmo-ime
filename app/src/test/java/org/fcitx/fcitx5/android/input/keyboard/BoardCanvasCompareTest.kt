@@ -53,6 +53,7 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
             arrayOf<Any>("k18", PinyinKeyboard.Keys18),
             arrayOf<Any>("zhuyin", PinyinKeyboard.ZhuyinFull),
             arrayOf<Any>("zhuyin-nine", PinyinKeyboard.ZhuyinNine),
+            arrayOf<Any>("handwriting", PinyinKeyboard.Full),
         ) + FIELDS.keys.map { arrayOf<Any>(it, PinyinKeyboard.Full) }
 
         // each number pad by the field that shows it (NumberPad.of): the full pad's a plain number field's
@@ -65,6 +66,12 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
             "number-phone" to InputType.TYPE_CLASS_PHONE,
             "number-datetime" to (InputType.TYPE_CLASS_DATETIME or InputType.TYPE_DATETIME_VARIATION_NORMAL),
         )
+
+        // handwriting's board: shown for its input method (its punctuation as the views show it, full width)
+        private val HANDWRITING = org.fcitx.fcitx5.android.core.InputMethodEntry(
+            org.fcitx.fcitx5.android.engine.InputMethodCatalog.HANDWRITING, "手写", "", "", "写", "zh_CN", "androidengine", false,
+        )
+        private val CHINESE_PUNCTUATION = mapOf("," to "，", "." to "。")
 
         // the same phone on its side: 851 dp wide, wider than the 600 split starts from
         private const val LANDSCAPE = "w851dp-h393dp-land-440dpi"
@@ -122,7 +129,16 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
         val shots = try {
             listOf(false, true).map { on ->
                 prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, on)
-                KeyboardHarness(case.theme).start(FIELDS[board] ?: InputType.TYPE_CLASS_TEXT).use { h ->
+                val harness = if (board == "handwriting") {
+                    KeyboardHarness(case.theme, im = HANDWRITING).apply {
+                        api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, HANDWRITING)
+                        api.enabledIme = api.availableIme
+                    }
+                } else {
+                    KeyboardHarness(case.theme)
+                }
+                harness.start(FIELDS[board] ?: InputType.TYPE_CLASS_TEXT).use { h ->
+                    KeyboardHarness.find<HandwritingKeyboard>(h.keyboard)?.onPunctuationUpdate(CHINESE_PUNCTUATION)
                     // past the keyboard's sliding in
                     h.after(1000)
                     h.relayout()

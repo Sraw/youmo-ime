@@ -24,9 +24,9 @@ key comma kind=function role=comma a11y="，"
   shape rect(676.88,137.38,779.63,219.63 r=10.5,10.5,10.5,10.5)
   hit rect(669,119,787.5,238)
   anchor 728.25,178.5 up 0,-1
-  actions send=","
+  actions preview="off" send=","
   text label="，"
-  popup from=list as-is="true"
+  popup from=list
     item "？"
     item "！"
     item "："
@@ -46,7 +46,7 @@ key period kind=function role=period a11y="。"
   shape rect(676.88,256.38,779.63,339.63 r=10.5,10.5,10.5,10.5)
   hit rect(669,238,787.5,358)
   anchor 728.25,298 up 0,-1
-  actions send="."
+  actions preview="off" send="."
   text label="。"
   popup from=none
   normal
