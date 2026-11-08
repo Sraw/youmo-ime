@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.engine.learn.control.MenuItem
 import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.fcitx.fcitx5.android.engine.platform.UserFiles
 import org.fcitx.fcitx5.android.engine.session.Offer
+import org.fcitx.fcitx5.android.engine.user.WordListFiles
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -141,6 +142,22 @@ class EnginesEnglishBlockTest : EnginesFixture() {
             assertFalse(dir.dir(RestoreStash.DIR).exists())
             assertEquals(setOf("the", "hello"), e.blocked().map { it.text }.toSet())
             assertFalse("hello" in e.typed("hel"))
+        }
+    }
+
+    // review R2: the user's text export, imported again, English's blocks in it (`!@en the`)
+    @Test
+    fun aBlockedWordGoesThroughTheTextExportAndBack() {
+        val lines = engines().use { e ->
+            e.typed("th")
+            e.onEvent(ENGLISH, EngineEvent.BLOCK, 1)
+            e.exportWords()
+        }
+        assertTrue(lines.toString(), WordListFiles.ENGLISH_BLOCK_MARK + "the" in lines)
+        engines().use { e ->
+            assertEquals(1, e.importWords(lines.asSequence()).blocked)
+            assertEquals(listOf(the), e.blocked())
+            assertFalse("the" in e.typed("th"))
         }
     }
 

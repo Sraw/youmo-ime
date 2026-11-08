@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
+import org.fcitx.fcitx5.android.engine.english.EnglishText
 import org.fcitx.fcitx5.android.engine.learn.Han
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.learn.Row
@@ -31,6 +32,8 @@ internal class WordImport(
     private val dropSessions: () -> Unit,
     private val owned: (Map<Entry, Float>) -> Int,
     private val imports: (String, List<ImportedWords.Incoming>, (String, String) -> Boolean) -> Int,
+    /** English's words blocked ([WordListFiles.ENGLISH_BLOCK_MARK]): how many newly. */
+    private val blockEnglish: (List<String>) -> Int = { 0 },
 ) {
 
     /**
@@ -47,7 +50,8 @@ internal class WordImport(
         val incoming = ArrayList<Pair<Entry, Double?>>()
         for ((i, line) in list.read.withIndex()) {
             val pinyin = line.pinyin ?: guessed[line.text]
-            val entry = pinyin?.let { WordLists.entry(line.text, it) }
+            // a blocked emoji's syllables are not one a code point (WordLists.blockedEntry)
+            val entry = pinyin?.let { if (line.blocked) WordLists.blockedEntry(line.text, it) else WordLists.entry(line.text, it) }
             when {
                 entry == null -> unread++
                 line.blocked -> block += entry
@@ -65,6 +69,10 @@ internal class WordImport(
             blocked = blockAll(block.toList())
             dropSessions()
         }
+        if (list.english.isNotEmpty()) {
+            blocked += blockEnglish(list.english)
+            dropSessions()
+        }
         val batch = incoming.filter { it.first !in block }.map { (e, count) -> ImportedWords.Incoming(e.text, e.spelled(), count) }
         val imported = if (batch.isEmpty()) 0 else imports(file, batch, kept())
         if (imported > 0) dropSessions()
@@ -72,7 +80,7 @@ internal class WordImport(
     }
 
     // a list's lines as read: the words ([read], each with its line's count), the learned of an export, whether it is the user's own
-    private class ListRead(val read: List<WordLists.Line>, val counts: List<Double?>, val learn: Map<Entry, Float>, val unread: Int, val own: Boolean)
+    private class ListRead(val read: List<WordLists.Line>, val counts: List<Double?>, val learn: Map<Entry, Float>, val unread: Int, val own: Boolean, val english: List<String>)
 
     private fun readList(lines: Sequence<String>): ListRead {
         val learn = LinkedHashMap<Entry, Float>()
@@ -84,11 +92,17 @@ internal class WordImport(
         var own = false
         val read = ArrayList<WordLists.Line>()
         val counts = ArrayList<Double?>()
+        val english = ArrayList<String>()
         for (raw in lines) {
             val line = raw.trimStart().removePrefix("\uFEFF")
             if (export == null) {
                 export = WordListFiles.exportMark(raw)
                 own = WordListFiles.exportMark(raw, old = true) == true
+            }
+            if (line.startsWith(WordListFiles.ENGLISH_BLOCK_MARK)) {
+                val word = line.removePrefix(WordListFiles.ENGLISH_BLOCK_MARK).trim()
+                if (EnglishText.isWord(word)) english += word else unread++
+                continue
             }
             if (!line.startsWith(WordListFiles.LEARNED_MARK)) {
                 WordLists.line(raw)?.let {
@@ -102,7 +116,7 @@ internal class WordImport(
             val entry = word?.pinyin?.let { WordLists.entry(word.text, it) }
             if (export != true || entry == null || word.blocked) unread++ else learn[entry] = learnedCount(rest)
         }
-        return ListRead(read, counts, learn, unread, own)
+        return ListRead(read, counts, learn, unread, own, english)
     }
 
     // the words an import leaves as they are (U-101): the dictionary's (in any reading: a list's misreading of

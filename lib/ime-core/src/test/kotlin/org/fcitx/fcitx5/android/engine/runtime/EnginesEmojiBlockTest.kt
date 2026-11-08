@@ -97,4 +97,19 @@ class EnginesEmojiBlockTest : EnginesFixture() {
             assertEquals(emptyList<Any>(), e.userWords())
         }
     }
+
+    // review R2: the user's text export, imported again: the reading as blocked, not split among the code points
+    @Test
+    fun twoCodePointEmojiTextExportImportRoundTrip() {
+        val lines = Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+            val at = e.typed("hao").indexOf("👍🏻")
+            e.learning(PINYIN, LearningOp.Block(at, "👍🏻")) as LearningResult.Done
+            e.exportWords()
+        }
+        Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+            assertEquals(1, e.importWords(lines.asSequence()).blocked)
+            assertFalse("👍🏻" in e.typed("hao"))
+            assertEquals(listOf(UserWord("👍🏻", "hao", UserWord.Kind.BLOCKED)), e.userWords())
+        }
+    }
 }

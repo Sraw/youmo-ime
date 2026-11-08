@@ -31,7 +31,7 @@ class WordLists(private val dir: UserFiles?, private val onError: (IOException) 
     private val unread = HashSet<String>()
     private val added = read(ADDED)
     // an emoji blocked in its word's reading has as many syllables as that word, not as its code points (blockedEntry)
-    private val blocked = read(BLOCKED) { line -> splitValues(line).takeIf { it.size in 2..3 }?.let { blockedEntry(it[0], it[1]) } }
+    private val blocked = read(BLOCKED) { line -> splitValues(line).takeIf { it.size == 2 || it.size == 3 && it[2].toFloatOrNull() != null }?.let { blockedEntry(it[0], it[1]) } }
 
     val addedWords: List<Entry> get() = added.toList()
     val blockedWords: List<Entry> get() = blocked.toList()
@@ -213,7 +213,8 @@ class WordLists(private val dir: UserFiles?, private val onError: (IOException) 
         fun blockedEntry(text: String, pinyin: String): Entry? {
             val word = text.trim()
             val chars = word.codePointCount(0, word.length)
-            if (word.isEmpty() || word.codePoints().anyMatch(Han::isHan)) return entry(text, pinyin)
+            // only a text of no Han, letter or digit (an emoji): a word's are a syllable each
+            if (word.isEmpty() || word.codePoints().anyMatch { Han.isHan(it) || Character.isLetterOrDigit(it) }) return entry(text, pinyin)
             val ids = pieces(pinyin.lowercase()).map { Syllables.id(WordText.spelling(it)) }
             return if (ids.isNotEmpty() && ids.none { it < 0 } && ids.size != chars) Entry(word, ids.toIntArray()) else entry(text, pinyin)
         }

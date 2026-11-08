@@ -59,7 +59,7 @@ internal class UserLexicon(
     val wordImport by lazy(LazyThreadSafetyMode.NONE) {
         WordImport(
             assets = assets, lists = lists, user = ::user, addWords = ::add, blockAll = ::blockAll,
-            dropSessions = dropSessions, owned = owned, imports = imports,
+            dropSessions = dropSessions, owned = owned, imports = imports, blockEnglish = { englishBlocks.block(it).size },
         )
     }
 
@@ -155,7 +155,7 @@ internal class UserLexicon(
     }
 
     fun blockWord(text: String, pinyin: String): Boolean {
-        val entry = WordLists.blockedEntry(text, pinyin) ?: return false
+        val entry = WordLists.entry(text, pinyin) ?: return false
         blockAll(listOf(entry))
         dropSessions()
         return true
@@ -284,7 +284,8 @@ internal class UserLexicon(
     fun exportWords(): List<String> = userWords().map {
         val line = "${it.text} ${Syllables.apostrophed(it.pinyin)}"
         when (it.kind) {
-            UserWord.Kind.BLOCKED -> "!$line"
+            // English's, no reading: marked so, a line of letters alone reading as pinyin
+            UserWord.Kind.BLOCKED -> if (it.pinyin.isEmpty()) WordListFiles.ENGLISH_BLOCK_MARK + it.text else "!$line"
             // its count after it, for its place: read back only from an export (importWords)
             UserWord.Kind.LEARNED -> "${WordListFiles.LEARNED_MARK} $line ${it.count}"
             UserWord.Kind.ADDED -> line
