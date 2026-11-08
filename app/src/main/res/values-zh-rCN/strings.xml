@@ -1091,6 +1091,7 @@
     <string name="pack_import_busy">正在导入，请稍候</string>
     <string name="pack_import_results">导入</string>
     <string name="pack_imported">%1$s：已导入 v%2$d</string>
+    <string name="pack_imported_older">%1$s：已用 v%2$d 替换了更新的 v%3$d</string>
     <string name="pack_already_there">%1$s：v%2$d 已经导入过，没有变化</string>
     <string name="pack_not_a_pack">%1$s 不是幽默输入法的资源包</string>
     <string name="pack_bad_signature">%1$s：签名不对。不是给这个应用发布的资源包，或者文件已损坏，请重新下载。</string>

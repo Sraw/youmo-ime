@@ -1091,6 +1091,7 @@
     <string name="pack_import_busy">正在匯入，請稍候</string>
     <string name="pack_import_results">匯入</string>
     <string name="pack_imported">%1$s：已匯入 v%2$d</string>
+    <string name="pack_imported_older">%1$s：已用 v%2$d 取代了更新的 v%3$d</string>
     <string name="pack_already_there">%1$s：v%2$d 已經匯入過，沒有變化</string>
     <string name="pack_not_a_pack">%1$s 不是幽默輸入法的資源包</string>
     <string name="pack_bad_signature">%1$s：簽章不對。不是給這個應用程式發布的資源包，或者檔案已損壞，請重新下載。</string>

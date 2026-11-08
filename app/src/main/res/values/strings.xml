@@ -1117,6 +1117,7 @@
     <string name="pack_import_busy">An import is under way</string>
     <string name="pack_import_results">Import</string>
     <string name="pack_imported">%1$s: imported v%2$d</string>
+    <string name="pack_imported_older">%1$s: v%2$d imported in place of the newer v%3$d</string>
     <string name="pack_already_there">%1$s: v%2$d is imported already, nothing changed</string>
     <string name="pack_not_a_pack">%1$s is not a Youmo IME resource pack</string>
     <string name="pack_bad_signature">%1$s: the signature does not match. It is not a pack released for this app, or it is damaged; download it again.</string>

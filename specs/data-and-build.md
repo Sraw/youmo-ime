@@ -197,7 +197,8 @@ they stay: a pack carries no code.
   checked, after a free-space check against the manifest's sizes; only when all are right is the
   `current` pointer swapped atomically (rename). A pack already there at that version (the same
   manifest) is not copied again if its files in use, read through then, still are it; else it is
-  copied anew. A killed import leaves the old pack in use; the next start deletes what is not `current`.
+  copied anew. An older version over a newer one is imported (a pack gone wrong taken back; it must
+  still meet the app's `minVersion`), the result saying 已用 vX 替换了更新的 vN. A killed import leaves the old pack in use; the next start deletes what is not `current`.
   The user's file is never deleted; the results say they may delete it.
 - **Storage.** Device-protected (`createDeviceProtectedStorageContext().filesDir/packs`), so Direct Boot
   reads it before the first unlock, and an upgrade keeps it. Excluded from cloud and key/value backup

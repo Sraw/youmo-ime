@@ -151,6 +151,18 @@ class PackShelfTest {
         assertEquals(1, leftovers(PackKind.TEXT).size)
     }
 
+    // a pack gone wrong taken back: the older one imported over the newer, the result saying what it replaced
+    @Test
+    fun `an older pack is imported over a newer one`() {
+        val shelf = shelf()
+        shelf.take(text(version = 4))
+        val result = shelf.take(text(version = 3, files = TEXT_FILES + ("engine/english.data" to "en".toByteArray())))
+        assertTrue("$result", result is ImportResult.Imported)
+        assertEquals(4, (result as ImportResult.Imported).replaced?.version)
+        assertEquals(3, result.manifest.version)
+        assertReady(shelf, PackKind.TEXT, 3, TEXT_FILES)
+    }
+
     @Test
     fun `a voice pack first, then the text pack, each its own`() {
         val shelf = shelf()

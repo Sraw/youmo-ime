@@ -202,6 +202,13 @@ class PacksUatTest {
             assertEquals(st.s(R.string.pack_imported, st.s(R.string.pack_text), 1), lines[0])
             assertEquals(st.s(R.string.pack_not_a_pack, "photo.jpg"), lines[1])
             assertTrue(lines[2], lines[2].startsWith(st.s(R.string.pack_no_space, "big.youmopack", "", "").substringBefore("：").substringBefore(":")))
+            // an older version over a newer one: imported, and said so; over an older one, as any import
+            val v1 = org.fcitx.fcitx5.android.pack.PackManifest.parse(manifest)
+            val v3 = org.fcitx.fcitx5.android.pack.PackManifest.parse(TestShelves.packs.manifest(PackKind.TEXT, mapOf("handwriting/test.txt" to "y".toByteArray()), version = 3))
+            assertEquals(st.s(R.string.pack_imported_older, st.s(R.string.pack_text), 1, 3), PackImports.describe(app, PackImports.Outcome("a", ImportResult.Imported(v1, v3))))
+            assertEquals(st.s(R.string.pack_imported, st.s(R.string.pack_text), 3), PackImports.describe(app, PackImports.Outcome("a", ImportResult.Imported(v3, v1))))
+            // the same version copied anew (one damaged, mended): imported, nothing newer replaced
+            assertEquals(st.s(R.string.pack_imported, st.s(R.string.pack_text), 1), PackImports.describe(app, PackImports.Outcome("a", ImportResult.Imported(v1, v1))))
             // all imported: the results say the files may be deleted now (the app never deletes them)
             val good = outcomes.take(1)
             PackImports.finished(good)

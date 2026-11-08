@@ -117,7 +117,10 @@ object PackImports {
     fun describe(context: Context, outcome: Outcome): String {
         val file = outcome.file
         return when (val result = outcome.result) {
-            is ImportResult.Imported -> context.getString(R.string.pack_imported, name(context, result.manifest.kind), result.manifest.version)
+            // an older one over a newer is allowed (a pack gone wrong taken back), and said
+            is ImportResult.Imported -> result.replaced?.takeIf { it.version > result.manifest.version }?.let {
+                context.getString(R.string.pack_imported_older, name(context, result.manifest.kind), result.manifest.version, it.version)
+            } ?: context.getString(R.string.pack_imported, name(context, result.manifest.kind), result.manifest.version)
             is ImportResult.AlreadyThere -> context.getString(R.string.pack_already_there, name(context, result.manifest.kind), result.manifest.version)
             is ImportResult.Refused -> when (val why = result.why) {
                 is Refusal.NotAPack -> context.getString(R.string.pack_not_a_pack, file)
