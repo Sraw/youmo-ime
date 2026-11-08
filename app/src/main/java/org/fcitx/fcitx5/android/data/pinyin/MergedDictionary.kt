@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.pack.AppData
 import org.fcitx.fcitx5.android.data.pack.PackStore
+import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.data.pinyin.dict.SourceNames
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.data.DataFile
@@ -181,14 +182,21 @@ object MergedDictionary {
     @Volatile
     var base: () -> Base? = { packBase() }
 
-    // read once a pack: the text pack imported anew (PackStore's generation) is read again
+    // read once a text pack: by its directory (a generation of its own each import), not
+    // PackStore's generation, which a voice import counts up too, and which is counted only after
+    // the new text pack is in place: a read between the two kept the new pack's base under the old count
     @Volatile
-    private var readBase: Pair<Int, Base?>? = null
+    private var readBase: Pair<File?, Base?>? = null
 
-    private fun packBase(): Base? {
-        val generation = PackStore.state.value.generation
-        readBase?.let { (read, base) -> if (read == generation) return base }
-        return assetBase().also { readBase = generation to it }
+    /** Reads the text pack's base: a test's hook, to count the reads. */
+    @VisibleForTesting
+    internal var readPackBase: () -> Base? = { assetBase() }
+
+    @VisibleForTesting
+    internal fun packBase(): Base? {
+        val dir = PackStore.dir(PackKind.TEXT)
+        readBase?.let { (read, base) -> if (read == dir) return base }
+        return readPackBase().also { readBase = dir to it }
     }
 
     private fun mapped(): ByteBuffer = AppData.map(InputMethodCatalog.PINYIN_DATA)
@@ -625,5 +633,6 @@ object MergedDictionary {
         queued.set(false)
         working.value = null
         told = {}
+        readBase = null
     }
 }

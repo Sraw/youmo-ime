@@ -7,15 +7,20 @@ package org.fcitx.fcitx5.android.data.pinyin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.fcitx.fcitx5.android.data.pack.PackStore
+import org.fcitx.fcitx5.android.data.pack.TestShelves
 import org.fcitx.fcitx5.android.data.pinyin.dict.SourceNames
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
+import org.fcitx.fcitx5.android.pack.ImportResult
+import org.fcitx.fcitx5.android.pack.PackKind
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
@@ -331,6 +336,32 @@ class MergedDictionaryTest {
         assertTrue(made > 0)
         assertNotNull(DictionaryFile.open(JvmFile(dest)))
         assertEquals(2, MergedDictionary.current(dictionaries).file!!.size)
+    }
+
+    // the text pack's base read once a text pack: again when another is imported, even before
+    // PackStore counts it; not when the voice pack is (review M6)
+    @Test
+    fun theTextPacksBaseIsReadOnceATextPack() {
+        val reading = MergedDictionary.readPackBase
+        var reads = 0
+        MergedDictionary.readPackBase = { reads++; MergedDictionary.Base("read $reads") { { _, _ -> false } } }
+        try {
+            val shelf = TestShelves.use(text = true, voice = false)
+            val first = MergedDictionary.packBase()
+            assertSame(first, MergedDictionary.packBase())
+            assertEquals(1, reads)
+            // the voice pack beside it, PackStore's count up: the same text pack, not read again
+            assertTrue(shelf.import(TestShelves.pack(PackKind.VOICE).inputStream()) is ImportResult.Imported)
+            PackStore.useShelf(shelf)
+            assertSame(first, MergedDictionary.packBase())
+            assertEquals(1, reads)
+            // another text pack, PackStore not told yet: read again
+            assertTrue(shelf.import(TestShelves.pack(PackKind.TEXT, version = 2).inputStream()) is ImportResult.Imported)
+            assertEquals("read 2", MergedDictionary.packBase()?.fingerprint)
+        } finally {
+            MergedDictionary.readPackBase = reading
+            TestShelves.use()
+        }
     }
 
     // a file of another base dictionary (an update's) is used meanwhile, said stale, till its compile is in
