@@ -67,7 +67,15 @@ object KeyMarkYield {
     }
 
     /** A mark's [ink] in its [slot]; [drop], how soon it is left out where nothing else clears it (the higher the sooner). */
-    data class Mark(val ink: Ink, val slot: Slot, val drop: Int = DROP_SHORTCUT)
+    data class Mark(val ink: Ink, val slot: Slot, val drop: Int = DROP_SHORTCUT, val grows: Grows? = null)
+
+    /**
+     * How much more a glyph's or mark's ink is at a scale than its ink scaled (each side, out positive): its
+     * text measured again at the size drawn, a font's ink no linear function of its size (whole pixels, hinting).
+     */
+    fun interface Grows {
+        fun at(s: Double): Ink
+    }
 
     /** Where a key's glyph and marks end up: [glyph]'s new ink; each mark's in order, null for left out. */
     data class Settled(val glyph: Ink, val marks: List<Ink?>)
@@ -106,6 +114,7 @@ object KeyMarkYield {
         val edge: Edge = Edge(room),
         val moves: Boolean = true,
         val glyphClass: Int = 0,
+        val grows: Grows? = null,
     )
 
     /** Every glyph of a class scaled by [scale] about its point; each key's [keys] settled. */
@@ -321,7 +330,7 @@ object KeyMarkYield {
         if (t == 1.0) return this
         val f = ink.inFrame(slot)
         val x = if (slot.centred) (f.left + f.right) / 2.0 else f.right
-        return copy(ink = f.scaled(t, x, f.top).inFrame(slot))
+        return copy(ink = f.scaled(t, x, f.top).inFrame(slot).grown(grows, t))
     }
 
     // [key] with its glyph at [glyph]: its [marks] placed, those still meeting it left out the most expendable first
@@ -394,7 +403,11 @@ object KeyMarkYield {
         return still.copy(glyph = glyph.moved(dx, 0.0), x = side)
     }
 
-    private fun Member.at(s: Double): Ink = if (s == 1.0) glyph else glyph.scaled(s, x, y)
+    private fun Member.at(s: Double): Ink = if (s == 1.0) glyph else glyph.scaled(s, x, y).grown(grows, s)
+
+    // [g] as drawn at [s]: out on each side by what [grows] has
+    private fun Ink.grown(grows: Grows?, s: Double): Ink =
+        grows?.at(s)?.let { d -> Ink(left - d.left, top - d.top, right + d.right, bottom + d.bottom) } ?: this
 
     // the least of 0 to [whole] (to [step]) that [clears], [all] clearing at the whole of it
     private fun <T : Any> least(all: T, whole: Double, step: Double, clears: (Double) -> T?): T {
