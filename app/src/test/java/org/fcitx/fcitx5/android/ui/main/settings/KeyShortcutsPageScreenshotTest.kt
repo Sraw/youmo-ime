@@ -148,7 +148,7 @@ class KeyShortcutsPageScreenshotTest {
         capture("number_bottom")
         // the 14 keys' corners drawn too, under their letters there
         tab(R.string.shortcut_page_g14)
-        assertTrue(KeyboardHarness.all(key("QW")).any { it is TextView && it.text.toString() == "1" })
+        assertTrue(KeyboardHarness.all(key("QW")).filterIsInstance<SceneKeyCell>().any { c -> c.keyNode?.ops(false).orEmpty().any { it is Op.Text && it.text == "1" } })
         capture("keys14_bottom")
     }
 

@@ -108,10 +108,10 @@ class ThemeLookScreenshotTest {
             shots?.let { save(h, h.inputView, File(it, "$name.png")) }
             // ⌫ held: its own pressed colour, not its face darkened
             if (golden && theme.name.startsWith("each_key") && board.name == "full") {
-                val backspace = KeyboardHarness.all(h.inputView).filterIsInstance<KeyView>().first { it.themeKey == "backspace" && h.shown(it) }
-                backspace.isPressed = true
+                // a finger down on it, whichever draws it (the field is empty: lifted, nothing deleted)
+                h.press(h.keyNamed("backspace"))
                 h.capture("ThemeLookScreenshotTest/${name}_backspace_down", h.inputView)
-                backspace.isPressed = false
+                h.release()
             }
         }
     }

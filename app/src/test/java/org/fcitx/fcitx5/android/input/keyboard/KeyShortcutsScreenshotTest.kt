@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import android.view.View
-import android.widget.ImageView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -94,10 +93,8 @@ class KeyShortcutsScreenshotTest {
     fun theEditMenuOverTheSpace() {
         KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN).use { h ->
             h.start()
-            // the icons up outside the keys: the bar's, then the menu's cells as well
-            fun icons() = KeyboardHarness.all(h.inputView).count { v ->
-                v is ImageView && h.shown(v) && generateSequence(v.parent as? View) { it.parent as? View }.none { it is KeyView }
-            }
+            // the icons up outside the keys: the bar's, then the menu's cells as well, whichever draws them
+            fun icons() = h.shownIcons().size
             val before = icons()
             val space = h.inputView.findViewById<View>(R.id.button_space)
             val finger = h.finger(space, h.at(space))
