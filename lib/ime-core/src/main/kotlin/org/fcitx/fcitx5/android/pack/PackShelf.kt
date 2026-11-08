@@ -105,6 +105,8 @@ class PackShelf(
     private val requirements: Map<PackKind, PackRequirement>,
     private val margin: Long = DEFAULT_MARGIN,
     private val clock: () -> Long = System::currentTimeMillis,
+    // a test's hook: a verify's files read, before it says what it found (an import may come between)
+    private val afterRead: (PackKind) -> Unit = {},
     // a test's hook: how a file in use is opened to be read through (one failing as a disk does)
     private val openFile: (File) -> InputStream = { it.inputStream() },
     // a test's hook: which directories an import synced
@@ -207,6 +209,7 @@ class PackShelf(
         val gen = held.dir
         if (status !is PackStatus.Ready || gen == null) return false
         val read = read(kind, status.manifest, gen)
+        afterRead(kind)
         synchronized(this) {
             // an import came between: what was read is no longer what is used
             if (state.getValue(kind).dir != gen) return false

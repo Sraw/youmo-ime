@@ -207,6 +207,45 @@ class PackShelfTest {
         assertSame(VerifyDue.NONE, shelf().due(PackKind.TEXT))
     }
 
+    // review L-1: an import while a verify reads (the hook holds it between its read and its word):
+    // what it read is no longer used, the new pack neither marked damaged nor verified
+    @Test
+    fun `a verify whose pack is replaced as it reads leaves the new pack as it is`() {
+        val reached = java.util.concurrent.CountDownLatch(1)
+        val go = java.util.concurrent.CountDownLatch(1)
+        val shelf = PackShelf(root, listOf(packs.publicKey), needs, 0, afterRead = {
+            reached.countDown()
+            go.await()
+        }).apply { load() }
+        shelf.take(text())
+        val old = shelf.dir(PackKind.TEXT)!!
+        damage(shelf, PackKind.TEXT, "engine/pinyin.data")
+        var found: Boolean? = null
+        val verify = Thread { found = shelf.verify(PackKind.TEXT) }.apply { start() }
+        assertTrue(reached.await(5, java.util.concurrent.TimeUnit.SECONDS))
+        val files = TEXT_FILES + ("engine/english.data" to "en".toByteArray())
+        assertTrue(shelf.take(text(version = 4, files = files)) is ImportResult.Imported)
+        go.countDown()
+        verify.join(5000)
+        assertEquals(false, found)
+        assertReady(shelf, PackKind.TEXT, 4, files)
+        assertSame(VerifyDue.UNVERIFIED, shelf.due(PackKind.TEXT))
+        assertFalse(File(old, PackShelf.DAMAGED).exists())
+        assertReady(PackShelf(root, listOf(packs.publicKey), needs, 0).apply { load() }, PackKind.TEXT, 4, files)
+        // nor marked verified, read as it was
+        lateinit var intact: PackShelf
+        var imported = false
+        intact = PackShelf(root, listOf(packs.publicKey), needs, 0, afterRead = {
+            if (!imported) {
+                imported = true
+                assertTrue(intact.take(text(version = 5)) is ImportResult.Imported)
+            }
+        }).apply { load() }
+        assertFalse(intact.verify(PackKind.TEXT))
+        assertEquals(5, (intact.status(PackKind.TEXT) as PackStatus.Ready).manifest.version)
+        assertSame(VerifyDue.UNVERIFIED, intact.due(PackKind.TEXT))
+    }
+
     // review L-3: a file gone is damage; one the disk cannot read now says nothing of the pack
     @Test
     fun `a file that cannot be read now is neither damage nor verified`() {
