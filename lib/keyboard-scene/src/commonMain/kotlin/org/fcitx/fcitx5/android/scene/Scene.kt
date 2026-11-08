@@ -99,6 +99,9 @@ class KeyNode(
     val letters: Letters? = null,
     /** A tap on it leans to the letter it fell nearest ([Key.leans][org.fcitx.fcitx5.android.scene.layout.Key.leans]). */
     val lean: Boolean = false,
+    /** Its layout's say over its face (`face=`) and its gap (`margin=`): what an exporter of the layout (the theme maker's) passes on. */
+    val face: org.fcitx.fcitx5.android.scene.layout.Face = org.fcitx.fcitx5.android.scene.layout.Face.Default,
+    val margin: Boolean = true,
 ) {
     /** What a backend draws for it: [faces] in its [states], pressed or not. */
     fun ops(pressed: Boolean): List<Op> = faces.getValue(if (pressed) states + KeyState.Pressed else states)

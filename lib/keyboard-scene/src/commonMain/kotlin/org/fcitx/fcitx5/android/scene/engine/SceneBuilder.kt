@@ -347,6 +347,8 @@ class SceneBuilder(
             shortcut = k.key.attrs.shortcut,
             letters = k.key.key.letters,
             lean = k.key.key.leans,
+            face = k.key.attrs.face ?: Face.Default,
+            margin = k.key.attrs.margin ?: true,
         )
     }
 

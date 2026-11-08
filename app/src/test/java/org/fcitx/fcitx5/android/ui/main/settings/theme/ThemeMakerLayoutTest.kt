@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings.theme
 
+import android.graphics.Paint
 import android.graphics.PorterDuffColorFilter
 import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
@@ -36,7 +37,15 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.keyboard.T9Keyboard
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.themeKind
+import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.Op
+import org.fcitx.fcitx5.android.scene.Shape
+import org.fcitx.fcitx5.android.scene.layout.Face
 import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.fcitx.fcitx5.android.input.preedit.FloatingCodeStrip
 import org.fcitx.fcitx5.android.input.theme.KeyKind
@@ -61,7 +70,7 @@ import kotlin.math.roundToInt
  * contract: data files the theme maker page reads (youmo-layout.json, youmo-icons.json and its blocks).
  * What the theme maker's preview draws, measured on the real keyboard (`youmo-layout`), and the
  * icons it draws with (`youmo-icons`): each phone, orientation, board, mode and state the page
- * offers, every key's cell (its whole cell, the gap not taken off: the page takes the theme's off),
+ * offers, every key's cell (a canvas's keys read off its scene, 060-render-p2 S7; a key view's off the view) (its whole cell, the gap not taken off: the page takes the theme's off),
  * kind and theme name, every text, icon and fill, and which colour of the palette each is drawn in
  * (read off a keyboard made with a probe theme whose colours are all different). Written into
  * `web/theme-maker/test/testdata/youmo-layout.json` and `youmo-icons.json`, and into the page's two
@@ -223,6 +232,11 @@ class ThemeMakerLayoutTest {
                 add(JsonPrimitive(dp(ys.max() - ys.min())))
             }
         }
+        // a box in px given in the window
+        fun box(left: Double, top: Double, w: Double, h: Double) = buildJsonArray {
+            add(JsonPrimitive(dp(left - origin[0]))); add(JsonPrimitive(dp(top - origin[1])))
+            add(JsonPrimitive(dp(w))); add(JsonPrimitive(dp(h)))
+        }
         fun top(v: View) = IntArray(2).also { v.getLocationInWindow(it) }[1] - origin[1]
         fun left(v: View) = IntArray(2).also { v.getLocationInWindow(it) }[0] - origin[0]
     }
@@ -279,6 +293,24 @@ class ThemeMakerLayoutTest {
             when {
                 v === picture -> items += buildJsonObject { put("t", "base"); put("r", s.rect(v)) }
                 v is KeyView -> if (whole && !spacer(v)) items += key(v)
+                v is KeyboardCanvasView -> v.scene?.keys?.forEach { items += sceneKey(v, it) }
+                v is SceneKeyCell -> if (whole) v.keyNode?.let { items += sceneKey(v, it) }
+                v is PopupSceneView -> v.scene?.let { sc ->
+                    val at = IntArray(2).also(v::getLocationInWindow)
+                    val x0 = at[0] + v.outset.left.toDouble()
+                    val y0 = at[1] + v.outset.top.toDouble()
+                    for (op in sc.base + sc.keys.flatMap { it.ops(false) }) when (op) {
+                        is Op.Fill -> items += buildJsonObject {
+                            val b = op.shape.bounds
+                            put("t", "fill"); put("p", "popup")
+                            put("r", s.box(x0 + b.left, y0 + b.top, b.right - b.left, b.bottom - b.top))
+                            putColor(op.color.value)
+                            ((op.shape as? Shape.Rect)?.radii?.firstOrNull() ?: 0.0).takeIf { it > 0 }?.let { put("rad", s.dp(it)) }
+                        }
+                        is Op.Text -> items += sceneText(op, x0, y0).withPart("popup").let { JsonObject(mapOf("t" to JsonPrimitive("text")) + it) }
+                        else -> Unit
+                    }
+                }
                 v === column -> {
                     items += buildJsonObject {
                         put("t", "key"); put("r", s.rect(v)); put("k", KeyKind.Function.id); put("n", "$board/side")
@@ -365,6 +397,60 @@ class ThemeMakerLayoutTest {
                 k.themeKey?.let { put("n", "$board/$it") }
                 put("b", k.def.border.name.lowercase())
                 put("m", k.def.margin)
+                if (labels.isNotEmpty()) put("l", JsonArray(labels))
+                if (glyphs.isNotEmpty()) put("i", JsonArray(glyphs))
+            }
+        }
+
+        // a key the canvas draws, as its scene has it: its cell, kind, name, face and gap, and the texts
+        // and icons it draws now (a text's box by the font's extent and the text's advance, its x where its line starts)
+        // a text the scene draws, (x0, y0) its scene's origin in the window
+        private fun sceneText(op: Op.Text, x0: Double, y0: Double) = buildJsonObject {
+            val paint = Paint().apply {
+                textSize = op.size.toFloat()
+                textScaleX = op.scaleX.toFloat()
+                isFakeBoldText = op.weight >= BOLD
+            }
+            val fm = paint.fontMetrics
+            put("r", s.box(x0 + op.x, y0 + op.baseline + fm.top, paint.measureText(op.text).toDouble(), (fm.bottom - fm.top).toDouble()))
+            put("s", op.text)
+            put("z", s.dp(op.size))
+            putColor(op.color.value)
+            if (op.weight >= BOLD) put("w", BOLD)
+            put("y", s.dp(y0 + op.baseline - s.origin[1]))
+            put("al", "l"); put("x", s.dp(x0 + op.x - s.origin[0]))
+        }
+
+        private fun sceneKey(canvas: View, k: KeyNode): JsonObject {
+            val at = IntArray(2).also(canvas::getLocationInWindow)
+            val x0 = at[0].toDouble()
+            val y0 = at[1].toDouble()
+            val labels = mutableListOf<JsonElement>()
+            val glyphs = mutableListOf<JsonElement>()
+            for (op in k.ops(false)) when (op) {
+                is Op.Text -> labels += JsonObject(sceneText(op, x0, y0) + ("role" to JsonPrimitive(when (op.text) { k.label -> "main"; k.alt -> "hint"; else -> "mark" })))
+                is Op.Icon -> {
+                    val res = SceneIcons.of(op.name) ?: continue
+                    val name = canvas.resources.getResourceEntryName(res)
+                    icons += name
+                    glyphs += buildJsonObject {
+                        put("t", "icon")
+                        put("r", s.box(x0 + op.box.left, y0 + op.box.top, op.box.right - op.box.left, op.box.bottom - op.box.top))
+                        put("i", name)
+                        putColor(op.tint.value)
+                        op.rotation.roundToInt().takeIf { it % 360 != 0 }?.let { put("rot", it) }
+                    }
+                }
+                else -> Unit
+            }
+            return buildJsonObject {
+                put("t", "key")
+                put("r", s.box(x0 + k.bounds.left, y0 + k.bounds.top, k.bounds.right - k.bounds.left, k.bounds.bottom - k.bounds.top))
+                put("k", k.kind)
+                // a name the page knows (its board's positions, a role): what a theme names a key by
+                if (k.id in KeyNames.ROLES || KeyNames.POSITIONS[board]?.contains(k.id) == true) put("n", "$board/${k.id}")
+                put("b", when (k.face) { Face.Default -> "default"; Face.Special -> "special"; Face.Keep -> "on"; Face.None -> "off" })
+                put("m", k.margin)
                 if (labels.isNotEmpty()) put("l", JsonArray(labels))
                 if (glyphs.isNotEmpty()) put("i", JsonArray(glyphs))
             }
