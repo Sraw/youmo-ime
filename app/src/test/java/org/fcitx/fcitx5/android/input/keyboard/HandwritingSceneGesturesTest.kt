@@ -244,6 +244,14 @@ class HandwritingSceneGesturesTest {
         assertEquals(said[0], said[1])
     }
 
+    // 注 found by its view's name (button_reading) on either drawing: uat and TalkBack's tools look it up by it
+    @Test
+    fun readingKeyByItsViewsName() {
+        for (canvas in listOf(false, true)) {
+            harness(canvas).use { h -> assertEquals("canvas $canvas", "button_reading", h.keyNamed("reading").resourceName) }
+        }
+    }
+
     // 注's long press on the scene: each style in the settings' words, the one picked set
     @Test
     fun readingsMenuAsTheSettingsWordIt() {

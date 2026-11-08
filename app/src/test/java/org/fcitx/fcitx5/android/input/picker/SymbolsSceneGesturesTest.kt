@@ -64,10 +64,21 @@ class SymbolsSceneGesturesTest {
         val out = mutableListOf("keys $ids")
         for (id in ids) {
             panel(canvas).use { h ->
+                val k = h.rowKeys().single { it.id == id }
+                // what TalkBack reads (a text view's text where it has no description), and its view's name
+                out += "$id said: ${k.description ?: k.label} as ${k.resourceName}"
                 h.api.calls.clear()
-                h.tap(h.rowKeys().single { it.id == id })
+                h.tap(k)
                 h.idle()
                 out += "$id tap: " + h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") } +
+                    " field ${h.field.text} panel ${KeyboardHarness.find<PickerLayout>(h.inputView)?.isAttachedToWindow == true}"
+            }
+            // held: its long press's keys or menu, what reaches the engine
+            panel(canvas).use { h ->
+                h.api.calls.clear()
+                out += "$id long press: " + h.longPress(h.rowKeys().single { it.id == id })
+                h.idle()
+                out += "$id long press sent: " + h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") } +
                     " field ${h.field.text} panel ${KeyboardHarness.find<PickerLayout>(h.inputView)?.isAttachedToWindow == true}"
             }
         }
