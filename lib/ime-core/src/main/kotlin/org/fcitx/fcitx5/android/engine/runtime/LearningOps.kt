@@ -171,11 +171,7 @@ internal class LearningOps(
 
     private fun onCandidate(im: String, asShown: LearningOp.OnCandidate, shown: (String) -> String, act: (Int, Int) -> Boolean): LearningResult {
         val s = session(im) ?: return LearningResult.Unavailable
-        // the list changed since the menu showed: another candidate is at the index now. One shown
-        // converted (國家 for 国家) is the engine's text from here on: what is blocked, deleted, pinned
-        val text = s.candidates(asShown.index, 1).firstOrNull()?.text ?: return LearningResult.Unavailable
-        if (text != asShown.text && shown(text) != asShown.text) return LearningResult.Unavailable
-        val op = asShown.at(asShown.index, text)
+        val op = engines(s, asShown, shown) ?: return LearningResult.Unavailable
         val offers = s.offers(op.index)
         val event = { offer: Offer, e: Int ->
             acted { offer in offers && act(e, op.index) }?.let { LearningResult.Done(it) } ?: LearningResult.Unavailable
@@ -199,6 +195,14 @@ internal class LearningOps(
             }
             is LearningOp.Report -> LearningResult.Text(report(im, s))
         }
+    }
+
+    // [asShown] as the engine has it, or null where the list changed since the menu showed (another
+    // candidate at the index now). One shown converted (國家 for 国家) is the engine's text from here
+    // on: what is blocked, deleted, pinned
+    private fun engines(s: Session, asShown: LearningOp.OnCandidate, shown: (String) -> String): LearningOp.OnCandidate? {
+        val text = s.candidates(asShown.index, 1).firstOrNull()?.text ?: return null
+        return asShown.at(asShown.index, text).takeIf { text == asShown.text || shown(text) == asShown.text }
     }
 
     // [whole]: the whole phrase (U-73) [op] is the rest of, "" for a word
