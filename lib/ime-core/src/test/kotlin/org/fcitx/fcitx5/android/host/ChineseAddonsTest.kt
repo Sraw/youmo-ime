@@ -166,6 +166,19 @@ class ChineseAddonsTest {
     }
 
     @Test
+    fun `focused anew the keys typing themselves are told whatever was told, the option changed tells (060-render-p2 S7a)`() {
+        pipeline.focusIn(ic)
+        assertEquals("focused: told, though nothing changed", listOf(setOf<String>()), asTyped)
+        pipeline.commit(ic, "a")
+        assertEquals("the option off: nothing new", 1, asTyped.size)
+        punctuation.setConfig(punctuation.config.copy(halfWidthAfterLatinOrNumber = true))
+        assertEquals("the option on, after a letter", setOf(",", "."), asTyped.last())
+        pipeline.focusIn(ic)
+        assertEquals("focused again: told again", 3, asTyped.size)
+        assertEquals(setOf(",", "."), asTyped.last())
+    }
+
+    @Test
     fun `the option off tells nothing after a letter`() {
         pipeline.commit(ic, "a")
         assertEquals(listOf<Set<String>>(), asTyped)

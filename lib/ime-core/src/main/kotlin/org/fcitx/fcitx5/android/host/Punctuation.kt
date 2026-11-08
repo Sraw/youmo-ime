@@ -49,8 +49,10 @@ class Punctuation(
 
     private val stateProperty = IcProperty { State() }
 
-    // the marks last told through [asTyped]
+    // the marks last told through [asTyped], and the context they were told for: one focused anew is told
+    // whatever was told before (another context's state, or the keyboard's of an earlier host)
     private var told: Set<String> = emptySet()
+    private var focused: InputContext? = null
 
     var profile: PunctuationProfile = profile
         private set
@@ -77,6 +79,8 @@ class Punctuation(
     fun setConfig(config: PunctuationConfig) {
         this.config = config
         save(config)
+        // "half width after a letter or number" may have turned: the keyboard shown anew
+        focused?.let(::tell)
     }
 
     /**
@@ -88,9 +92,9 @@ class Punctuation(
         enabled && state(ic).lastIsEngOrDigit != 0 && config.halfWidthAfterLatinOrNumber && dontConvertWhenEn(unicode)
 
     // the marks [typesAsItself] now, told when they change
-    private fun tell(ic: InputContext) {
+    private fun tell(ic: InputContext, always: Boolean = false) {
         val now = AS_TYPED.filter { typesAsItself(ic, it.code) }.mapTo(HashSet()) { it.toString() }
-        if (now == told) return
+        if (now == told && !always) return
         told = now
         asTyped(ic, now)
     }
@@ -100,7 +104,7 @@ class Punctuation(
         if (enabled == config.enabled) return
         setConfig(config.copy(enabled = enabled))
         action.updateOn(ic)
-        tell(ic)
+        if (ic !== focused) tell(ic)
     }
 
     /** `inWhiteList` (`:434-436`): the context's input method put the toggle in its status area. */
@@ -128,6 +132,16 @@ class Punctuation(
             s.notConverted = 0
             s.lastPuncStack.clear()
             tell(ic)
+        }
+
+        // focused (an app's field, a context switched to): told whatever was told last
+        override fun onFocusIn(ic: InputContext) {
+            focused = ic
+            tell(ic, always = true)
+        }
+
+        override fun onFocusOut(ic: InputContext) {
+            if (focused === ic) focused = null
         }
     }
 
