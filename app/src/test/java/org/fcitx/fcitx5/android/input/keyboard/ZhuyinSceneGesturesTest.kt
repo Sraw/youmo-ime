@@ -9,9 +9,12 @@ import android.view.View
 import android.widget.EditText
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.core.InputMethodEntry
+import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.UNICODE
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -23,6 +26,7 @@ import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -47,10 +51,15 @@ class ZhuyinSceneGesturesTest {
     @get:Rule
     val prefs = PrefsRule()
 
-    private fun harness(canvas: Boolean, inputType: Int): KeyboardHarness {
+    @After
+    fun noSyllables() {
+        EngineState.syllablesState.value = EngineState.SyllableState()
+    }
+
+    private fun harness(canvas: Boolean, inputType: Int, board: PinyinKeyboard = PinyinKeyboard.ZhuyinFull): KeyboardHarness {
         prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, canvas)
         prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
-        prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard.ZhuyinFull)
+        prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, board)
         val prefill = { e: EditText ->
             e.setText(TEXT)
             e.setSelection(TEXT.length)
@@ -69,9 +78,10 @@ class ZhuyinSceneGesturesTest {
         inputType: Int = InputType.TYPE_CLASS_TEXT,
         shown: Set<String> = emptySet(),
         hidden: Set<String> = emptySet(),
-    ): List<String> = harness(canvas, inputType).use { h ->
+        board: PinyinKeyboard = PinyinKeyboard.ZhuyinFull,
+    ): List<String> = harness(canvas, inputType, board).use { h ->
         val ids = h.keys().mapNotNull { it.id }.filter { it !in SWITCHING }
-        assertTrue(ids.toString(), ids.size >= MOST_KEYS_AT_LEAST)
+        assertTrue(ids.toString(), ids.size >= if (board == PinyinKeyboard.ZhuyinNine) NINE_KEYS_AT_LEAST else MOST_KEYS_AT_LEAST)
         assertTrue("canvas $canvas: $ids", ids.containsAll(shown) && ids.none { it in hidden })
         val out = mutableListOf<String>()
         fun sent(what: String) {
@@ -142,9 +152,14 @@ class ZhuyinSceneGesturesTest {
     // how many times ⌫ held deleted, by whether the scene drew the keys
     private val heldDeletes = mutableMapOf<Boolean, Int>()
 
-    private fun assertSame(inputType: Int = InputType.TYPE_CLASS_TEXT, shown: Set<String> = emptySet(), hidden: Set<String> = emptySet()): List<String> {
-        val views = gestures(false, inputType, shown, hidden)
-        val scene = gestures(true, inputType, shown, hidden)
+    private fun assertSame(
+        inputType: Int = InputType.TYPE_CLASS_TEXT,
+        shown: Set<String> = emptySet(),
+        hidden: Set<String> = emptySet(),
+        board: PinyinKeyboard = PinyinKeyboard.ZhuyinFull,
+    ): List<String> {
+        val views = gestures(false, inputType, shown, hidden, board)
+        val scene = gestures(true, inputType, shown, hidden, board)
         // the field after ⌫ held as long as it deleted: compared by what it deleted
         fun same(out: List<String>) = out.map { it.replace(Regex("the field .* shorter by them"), "the field shorter by them") }
         assertEquals(same(views).joinToString("\n"), same(scene).joinToString("\n"))
@@ -160,6 +175,170 @@ class ZhuyinSceneGesturesTest {
         assertTrue(scene.toString(), "q pressed: [ㄆ]" in scene && "q swiping: [ㄆ]" in scene)
         assertTrue(scene.toString(), scene.any { it.startsWith("a swiping: [") && "ㄇ" !in it && it != "a swiping: []" })
         assertTrue(scene.toString(), scene.any { it.startsWith("a up: []") && it.endsWith("|0,${TEXT.length + 1}") })
+    }
+
+    // 注音九键 (060-render-p2 S4d): every group (its bubble its symbols, its shortcut's name as it is swiped; its
+    // long press each symbol), tone (its bubble; ˉ's swipe and long press ˙), ? ! ~ (bubble, preset), the slot
+    // (no bubble, its comma, its punctuation), ⌫ and the bottom row
+    @Test
+    fun nineEveryKeyAsItsView() {
+        val scene = assertSame(shown = NINE_SHOWN, board = PinyinKeyboard.ZhuyinNine)
+        // what was compared is what the keys do: a group's bubble, a tone's, ? offering its preset, the slot none
+        for (line in listOf("r1c2 pressed: [ㄅㄉㄚ]", "r1c1 pressed: [ˉ]", "r2c1 swiping: [ˊ]", "r2c5 pressed: [?]", "r4c4 pressed: []")) {
+            assertTrue(line + "\n" + scene.joinToString("\n"), line in scene)
+        }
+        assertTrue(scene.toString(), scene.any { it.startsWith("r1c2 long press: [") && "ㄅ" in it && "ㄉ" in it && "ㄚ" in it })
+        assertTrue(scene.toString(), scene.any { it.startsWith("r2c5 long press: [") && "¿" in it })
+    }
+
+    @Test
+    fun nineEveryKeyAsItsViewCompact() {
+        prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
+        prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
+        assertTrue(keyboardCompact())
+        assertSame(shown = NINE_SHOWN, board = PinyinKeyboard.ZhuyinNine)
+    }
+
+    // the nine's address fields' keys, its grid as it was
+    @Test
+    fun nineAddressFieldsKeys() {
+        val nine = PinyinKeyboard.ZhuyinNine
+        assertSame(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI, setOf("slash", "dot", "domain", "r4c4"), setOf("at", "comma", "period"), nine)
+        assertSame(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, setOf("at", "dot", "domain", "r4c4"), setOf("slash", "comma", "period"), nine)
+    }
+
+    // the slot (C6.7–C6.9), whichever draws it: the comma as punctuation maps it, 分词 while typing (the engine
+    // telling, or a group sent to pinyin before it tells; a tone none, a group sent to another input method
+    // none); its tap the separator while typing, the comma else
+    @Test
+    fun nineSlotAsTheEngineAndTheKeysTell() {
+        val shown = listOf(false, true).map { canvas ->
+            harness(canvas, InputType.TYPE_CLASS_TEXT, PinyinKeyboard.ZhuyinNine).use { h ->
+                val kb = KeyboardHarness.find<ZhuyinKeyboard>(h.keyboard)!!
+                val out = mutableListOf<String>()
+                fun slot(what: String) {
+                    h.idle()
+                    out += "$what: ${h.keyNamed("r4c4").label} " + h.api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
+                    h.api.calls.clear()
+                }
+                fun tap(id: String) = h.tap(h.keyNamed(id))
+                h.api.calls.clear()
+                kb.onPunctuationUpdate(emptyMap())
+                slot("half-width")
+                kb.onPunctuationUpdate(mapOf("," to "，"))
+                slot("mapped")
+                // the slot's is the face that changes, beside ㄖㄥㄩ: not ~ in the side column
+                fun others() = h.keys().filter { it.id != "r4c4" }.map { "${it.id} ${it.label}" }
+                val idle = others()
+                tap("r4c4")
+                slot("tapped")
+                EngineState.syllablesState.value = EngineState.SyllableState(im = InputMethodCatalog.PINYIN)
+                tap("r3c1")
+                slot("a tone")
+                tap("r4c3")
+                slot("a group")
+                assertEquals("canvas $canvas", idle, others())
+                tap("r4c4")
+                slot("tapped typing")
+                EngineState.syllablesState.value = EngineState.SyllableState(im = InputMethodCatalog.PINYIN, composing = true)
+                slot("the engine typing")
+                EngineState.syllablesState.value = EngineState.SyllableState(im = InputMethodCatalog.PINYIN, composing = false)
+                slot("the engine done")
+                EngineState.syllablesState.value = EngineState.SyllableState(im = InputMethodCatalog.PINYIN, composing = true)
+                kb.onPunctuationUpdate(emptyMap())
+                slot("half-width typing")
+                EngineState.syllablesState.value = EngineState.SyllableState(im = InputMethodCatalog.T9)
+                slot("another input method")
+                tap("r1c2")
+                slot("a group to it")
+                out
+            }
+        }
+        assertEquals(shown[0].joinToString("\n"), shown[1].joinToString("\n"))
+        val sep = UNICODE + Keyboard.zhuyinNineTone(0)
+        val expected = listOf(
+            "half-width: ,", "mapped: ，", "tapped: ，", "a tone: ，", "a group: 分词", "tapped typing: 分词", "the engine typing: 分词",
+            "the engine done: ，", "half-width typing: 分词", "another input method: ,", "a group to it: ,",
+        )
+        assertEquals(expected, shown[1].map { it.substringBefore(" [") })
+        assertTrue(shown[1][2], "sendKey(sym=44," in shown[1][2])
+        assertTrue(shown[1][5], "sendKey(sym=$sep," in shown[1][5])
+    }
+
+    // ? ! ~ shown as punctuation maps them, as they are typed (060-render-p2 §5.3, rules C 疑问 5): the views
+    // showed them half-width; each types the same either way, the bubble its character as the comma's
+    @Test
+    fun nineQuestionMarkShownAsItIsTyped() {
+        val mapping = mapOf("?" to "？", "!" to "！", "~" to "～", "," to "，", "." to "。")
+        val shown = listOf(false, true).map { canvas ->
+            harness(canvas, InputType.TYPE_CLASS_TEXT, PinyinKeyboard.ZhuyinNine).use { h ->
+                KeyboardHarness.find<ZhuyinKeyboard>(h.keyboard)!!.onPunctuationUpdate(mapping)
+                h.idle()
+                listOf("r2c5", "r3c5", "r4c5").map { id ->
+                    h.api.calls.clear()
+                    h.tap(h.keyNamed(id))
+                    "$id ${h.keyNamed(id).label} " + h.api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
+                }
+            }
+        }
+        assertEquals(listOf("?", "!", "~"), shown[0].map { it.split(' ')[1] })
+        assertEquals(listOf("？", "！", "～"), shown[1].map { it.split(' ')[1] })
+        // each typed as itself, the input method mapping it
+        assertEquals(shown[0].map { it.substringAfter('[') }, shown[1].map { it.substringAfter('[') })
+        listOf("?", "!", "~").forEachIndexed { i, c -> assertTrue(shown[1][i], "key=$c," in shown[1][i]) }
+    }
+
+    // a group's long press picks its symbol, ˉ's ˙, each sent as its code (C6.3, C6.5), whichever draws
+    @Test
+    fun nineLongPressesSymbolOrToneIsSentAsItsCode() {
+        val sent = listOf(false, true).map { canvas ->
+            harness(canvas, InputType.TYPE_CLASS_TEXT, PinyinKeyboard.ZhuyinNine).use { h ->
+                listOf("r1c2" to "ㄚ", "r3c3" to "ㄡ", "r1c1" to "˙").map { (id, pick) ->
+                    h.api.calls.clear()
+                    h.longPress(h.keyNamed(id), pick)
+                    "$id $pick " + h.api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
+                }
+            }
+        }
+        assertEquals(sent[0], sent[1])
+        val codes = listOf(Keyboard.zhuyinNineSymbol('ㄚ'), Keyboard.zhuyinNineSymbol('ㄡ'), Keyboard.zhuyinNineTone(5))
+        sent[1].zip(codes).forEach { (s, c) -> assertTrue(s, "sym=${UNICODE + c}," in s) }
+    }
+
+    // 注音九键 as shown (C6.1–C6.4, C6.11): the tones down the left, three groups a row, ⌫ ? ! ~ down the right, the
+    // slot after ㄖㄥㄩ; each key named by its place, a group's shortcut zy9/1…zy9/11; the sizes as the views'
+    // (groups 18, tones 20, ? ! ~ 23) at each height
+    @Test
+    fun nineOnTheKeysAsShown() {
+        val keyboard = AppPrefs.getInstance().keyboard
+        for (level in listOf(KeyboardHeightLevels.COMPACT, KeyboardHeightLevels.ALL.size - 1)) {
+            val heights = KeyboardHeightLevels.ALL[level]
+            prefs.set(keyboard.keyboardHeightPercent, heights.portrait)
+            prefs.set(keyboard.keyboardHeightPercentLandscape, heights.landscape)
+            val shown = listOf(false, true).map { canvas ->
+                harness(canvas, InputType.TYPE_CLASS_TEXT, PinyinKeyboard.ZhuyinNine).use { h ->
+                    val grid = h.keys().filter { it.id == "backspace" || it.id?.matches(Regex("r[1-4]c[1-5]")) == true }
+                    assertEquals("canvas $canvas", 20, grid.size)
+                    val rows = grid.groupBy { it.bounds.top }.toSortedMap().values.map { r -> r.sortedBy { it.bounds.left }.joinToString(" ") { "${it.id}=${it.label}" } }
+                    if (canvas) {
+                        ZhuyinKeys.GROUP_SYMBOLS.forEachIndexed { g, symbols ->
+                            assertEquals(ZhuyinShortcutNames.nineKey("${g + 1}"), (h.key(symbols) as SceneShownKey).node.shortcut)
+                        }
+                    }
+                    val slot = h.keyNamed("r4c4")
+                    rows + listOf("ㄅㄉㄚ", "ˇ", "?").map { "$it ${h.key(it).textSize(it)}" } + "slot ${slot.textSize(slot.label)}"
+                }
+            }
+            assertEquals("level $level", shown[0].take(4), shown[1].take(4))
+            shown[0].drop(4).zip(shown[1].drop(4)).forEach { (old, new) ->
+                assertEquals("level $level: $shown", old.substringAfterLast(' ').toFloat(), new.substringAfterLast(' ').toFloat(), SIZE_SLACK)
+            }
+            assertEquals(
+                listOf("r1c1=ˉ r1c2=ㄅㄉㄚ r1c3=ㄍㄐㄞ r1c4=ㄓㄗㄢㄦ backspace=", "r2c1=ˊ r2c2=ㄆㄊㄛ r2c3=ㄎㄑㄟ r2c4=ㄔㄘㄣㄧ r2c5=?"),
+                shown[1].take(2),
+            )
+            assertEquals("r4c1=ˋ r4c2=ㄈㄌㄝ r4c3=ㄖㄥㄩ r4c4=, r4c5=~", shown[1][3])
+        }
     }
 
     // a 360 dp phone compact (20%, 34% on its side: CompactKeyboardScreenshotTest's zhuyin_full_small_port): ⌫'s face 16 dp
@@ -303,6 +482,12 @@ class ZhuyinSceneGesturesTest {
 
         // 41 symbols and tones, ⌫ and the bottom row: a key missing on one side is caught by the ids compared
         const val MOST_KEYS_AT_LEAST = 45
+
+        // 注音九键's keys that must be among those compared: a tone, a group, the slot, ?, ⌫, the bottom row's
+        val NINE_SHOWN = setOf("r1c1", "r1c2", "r4c4", "r2c5", "backspace", "comma", "space", "enter")
+
+        // 注音九键: its 4×5 grid but r1c5 (⌫ by its role) and the bottom row's comma, space, full stop and Return
+        const val NINE_KEYS_AT_LEAST = 23
 
         // a sideways move short of the key's side, of its width
         const val NUDGED = 0.3f

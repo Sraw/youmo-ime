@@ -50,6 +50,7 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
             arrayOf<Any>("k14", PinyinKeyboard.Keys14),
             arrayOf<Any>("k18", PinyinKeyboard.Keys18),
             arrayOf<Any>("zhuyin", PinyinKeyboard.ZhuyinFull),
+            arrayOf<Any>("zhuyin-nine", PinyinKeyboard.ZhuyinNine),
         )
 
         // the same phone on its side: 851 dp wide, wider than the 600 split starts from

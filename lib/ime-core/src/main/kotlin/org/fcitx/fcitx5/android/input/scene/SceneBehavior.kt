@@ -100,6 +100,7 @@ sealed interface SceneAction {
  * letter's or a group's face, the comma, the full stop, an address's key) shows a bubble of what
  * it types, with its corner where it swipes one (a letter that swipes none but to its shortcut, its
  * face again: the bubble shows the shortcut swiped to); a function key (分词, 符, 123, ⌫) shows none. A
+ * key's `preview="on|off"` says otherwise (注音九键's tones and ? ! ~ show theirs, its slot none). A
  * key that types one character and names no long press offers its character's preset (SymbolKey's).
  */
 data class SceneBehavior(
@@ -156,7 +157,12 @@ data class SceneBehavior(
             val send = a["send"]
             val press = if (send != null) SceneAction.of(send) else node.letters?.group?.let(SceneAction::Group)
             val swipe = a["swipe-up"]?.let(SceneAction::of)
-            val typing = node.role in TYPING_ROLES || (node.kind == "letter" && !node.label.isNullOrEmpty())
+            // preview= on a key over what its kind says (注音九键's tones and ? ! ~ show theirs, its slot none, as their views)
+            val typing = when (a["preview"]) {
+                "on" -> true
+                "off" -> false
+                else -> node.role in TYPING_ROLES || (node.kind == "letter" && !node.label.isNullOrEmpty())
+            }
             val bubble = if (!typing) null else content(node, press).let { Bubble(it, cornerOf(node, swipe, it)) }
             return SceneBehavior(
                 id = node.id,

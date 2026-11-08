@@ -158,7 +158,9 @@ def t960(d):
     tones = sorted((n for n in kb.walk() if n.clickable and n.texts() and n.texts()[0] in "ˉˊˇˋ"), key=lambda n: n.c[1])
     check([n.texts()[0] for n in tones] == list("ˉˊˇˋ"), f"左列 {[n.texts() for n in tones]}")
     slot = k.get("，")
-    check(slot is not None and "~" in k, f"键 {sorted(k)[:40]}")
+    # ~ as punctuation maps it on the canvas (～, 060-render-p2 §5.3), half-width on the views
+    tilde = {"~", "～"}
+    check(slot is not None and tilde & set(k), f"键 {sorted(k)[:40]}")
     # a tone with nothing typed types nothing
     d.tap(k["ˉ"], after=0.6)
     check(d.preedit() == "" and d.field_text() == "", f"没打字时点 ˉ：码行「{d.preedit()}」，框里「{d.field_text()}」")
@@ -169,7 +171,7 @@ def t960(d):
     faces = [n.texts()[0] for n in d.need_keyboard().walk() if n.clickable and n.texts()]
     check(code == "ㄋㄧˇ ㄏㄠˇ", f"码行「{code}」")
     check(first(c) == "你好", f"候选 {c[:4]}")
-    check("分词" in faces and "~" in faces, f"打字时的键 {faces}")
+    check("分词" in faces and tilde & set(faces), f"打字时的键 {faces}")
     check(strip[:1] == ["ㄋㄧ"] and "ㄇㄧ" in strip and not any(ch.isascii() and ch.isalpha() for x in strip for ch in x), f"音节条 {strip}")
     d.syllable_tap("ㄇㄧ", s)
     taken = d.preedit()

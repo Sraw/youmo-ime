@@ -126,6 +126,19 @@ class LayoutReaderTest {
         assertNull(LayoutReader.action("emoji-search:"))
     }
 
+    // a key's preview= (060-render-p2 S4d: 注音九键's tones and ? ! ~ on, its slot off) read with its actions,
+    // on or off and nothing else
+    @Test
+    fun aKeysPreviewIsOnOrOff() {
+        val nine = Forms.layout("zhuyin-nine").parts.filterIsInstance<Row>().flatMap { it.cells }.filterIsInstance<Key>().associateBy { it.id }
+        assertEquals("on", nine.getValue("r1c1").attrs.actions["preview"])
+        assertEquals("on", nine.getValue("r2c5").attrs.actions["preview"])
+        assertEquals("off", nine.getValue("r4c4").attrs.actions["preview"])
+        assertNull(nine.getValue("r1c2").attrs.actions["preview"])
+        val p = problems(board("<row><key id=\"a\" label=\"a\" preview=\"maybe\"/></row>"))
+        assertTrue(p.single().contains("preview"), "$p")
+    }
+
     // 060-render-v2 §15: a key's letters as one group, the key's own (no variant's, no default's), row
     // by row as they sit on the key; a tap leaning to where it fell unless lean="off"
     @Test

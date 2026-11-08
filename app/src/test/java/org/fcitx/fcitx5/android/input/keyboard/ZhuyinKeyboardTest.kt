@@ -4,16 +4,12 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import android.view.View
-import android.view.ViewGroup
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
-import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.junit.After
@@ -22,7 +18,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
@@ -100,26 +95,6 @@ class ZhuyinKeyboardTest {
         assertEquals(KeyAction.SymAction(KeySym(','.code), KeyStates.Virtual), ZhuyinKeyboard.slotAction(typing = false))
     }
 
-    private fun faces(v: View): List<String> = when (v) {
-        is TextKeyView -> listOf(v.mainText.text.toString())
-        is ViewGroup -> (0 until v.childCount).flatMap { faces(v.getChildAt(it)) }
-        else -> emptyList()
-    }
-
-    // the face that changes is the slot's, beside ㄖㄥㄩ: not ~ in the side column (as it was once the tones came in)
-    @Test
-    fun whileTypingTheSlotBesideTheLastGroupShowsTheSeparator() {
-        val keyboard = ZhuyinKeyboard(RuntimeEnvironment.getApplication(), ThemePreset.PixelDark, nine = true)
-        val idle = faces(keyboard)
-        keyboard.showTyping(true)
-        val typing = faces(keyboard)
-        assertEquals(idle.indexOf("ㄖㄥㄩ") + 1, typing.indexOf(ZhuyinKeyboard.SEPARATOR))
-        assertEquals(ZhuyinKeyboard.PUNCTUATION, idle[idle.indexOf("ㄖㄥㄩ") + 1])
-        assertEquals(idle.filter { it != ZhuyinKeyboard.PUNCTUATION }, typing.filter { it != ZhuyinKeyboard.SEPARATOR && it != ZhuyinKeyboard.PUNCTUATION })
-        keyboard.showTyping(false)
-        assertEquals(idle, faces(keyboard))
-    }
-
     @Test
     fun aGroupOrSymbolMakesTheSlotTheSeparatorATapOfATone() {
         assertEquals(true, ZhuyinKeyboard.typesSymbol(sym(Keyboard.zhuyinNineKey(0))))
@@ -167,61 +142,5 @@ class ZhuyinKeyboardTest {
     @After
     fun noSyllables() {
         EngineState.syllablesState.value = EngineState.SyllableState()
-    }
-
-    private fun ZhuyinKeyboard.keyFaced(face: String): TextKeyView = keys(this).first { it.mainText.text.toString() == face }
-
-    private fun keys(v: View): List<TextKeyView> = when (v) {
-        is TextKeyView -> listOf(v)
-        is ViewGroup -> (0 until v.childCount).flatMap { keys(v.getChildAt(it)) }
-        else -> emptyList()
-    }
-
-    private fun nine(sent: MutableList<KeyAction>) =
-        ZhuyinKeyboard(RuntimeEnvironment.getApplication(), ThemePreset.PixelDark, nine = true).apply {
-            keyActionListener = KeyActionListener { action, _ -> sent += action }
-        }
-
-    @Test
-    fun theSlotTypesACommaThenRightAfterAGroupTheSeparator() {
-        EngineState.syllablesState.value = EngineState.SyllableState(im = InputMethodCatalog.PINYIN)
-        val sent = ArrayList<KeyAction>()
-        val keyboard = nine(sent)
-        val slot = keyboard.keyFaced(ZhuyinKeyboard.PUNCTUATION)
-        slot.performClick()
-        // a tone with nothing typed: still the comma
-        keyboard.keyFaced("ˇ").performClick()
-        slot.performClick()
-        // a group: 分词 before the engine tells
-        keyboard.keyFaced("ㄖㄥㄩ").performClick()
-        assertEquals(ZhuyinKeyboard.SEPARATOR, slot.mainText.text.toString())
-        slot.performClick()
-        val comma = ZhuyinKeyboard.slotAction(typing = false)
-        assertEquals(listOf(comma, sym(Keyboard.zhuyinNineTone(3)), comma, sym(Keyboard.zhuyinNineKey(ZhuyinKeys.GROUPS - 1)), sym(Keyboard.zhuyinNineTone(0))), sent)
-    }
-
-    @Test
-    fun aGroupSentToAnotherInputMethodLeavesTheSlotTheComma() {
-        // the engine's last word from another input method: it would never say pinyin is done
-        EngineState.syllablesState.value = EngineState.SyllableState(im = InputMethodCatalog.T9)
-        val sent = ArrayList<KeyAction>()
-        val keyboard = nine(sent)
-        val slot = keyboard.keyFaced(ZhuyinKeyboard.PUNCTUATION)
-        keyboard.keyFaced("ㄖㄥㄩ").performClick()
-        assertEquals(ZhuyinKeyboard.PUNCTUATION, slot.mainText.text.toString())
-    }
-
-    @Test
-    fun theSlotsCommaIsTheBottomRowsAsPunctuationMapsIt() {
-        val keyboard = nine(ArrayList())
-        val slot = keyboard.keyFaced(ZhuyinKeyboard.PUNCTUATION)
-        // half-width punctuation: a comma unmapped
-        keyboard.onPunctuationUpdate(emptyMap())
-        assertEquals(",", slot.mainText.text.toString())
-        keyboard.showTyping(true)
-        keyboard.onPunctuationUpdate(mapOf("," to "，"))
-        assertEquals(ZhuyinKeyboard.SEPARATOR, slot.mainText.text.toString())
-        keyboard.showTyping(false)
-        assertEquals("，", slot.mainText.text.toString())
     }
 }

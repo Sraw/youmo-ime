@@ -53,10 +53,10 @@ import org.fcitx.fcitx5.android.scene.engine.Texts
  * A symbol key's swipe reaches its shortcut ([ZhuyinShortcutNames]: 大千's by QWERTY place, the groups' by
  * their place); the tones (ˉ swipes to ˙) and the slot have none, as the nine keys' 1.
  *
- * Where the canvas is on, a keyboard moved to the scene ([layoutOf]: 大千's zhuyin.xml, 060-render-p2 S4c;
- * 注音九键's zhuyin-nine.xml once the app has it, S4d) is drawn and wired from its layout: what its keys
- * send is the layout's `action:` placeholders, each this keyboard's ([placeholder]), and what the bottom
- * row shows its state ([sceneEnv]), drawn again as it changes.
+ * Where the canvas is on, both are drawn by the scene ([layoutOf]: 大千's zhuyin.xml, 060-render-p2 S4c;
+ * 注音九键's zhuyin-nine.xml, S4d) and wired from their layouts: what their keys send is the layouts'
+ * `action:` placeholders, each this keyboard's ([placeholder]), a group's long press its symbols
+ * ([groupPopup]), and what the slot and the bottom row show their state ([sceneEnv]), drawn again as it changes.
  */
 @SuppressLint("ViewConstructor")
 class ZhuyinKeyboard(
@@ -139,6 +139,13 @@ class ZhuyinKeyboard(
         }
 
         private const val TONE = "tone-"
+
+        /**
+         * 注音九键's group's long press (its layout's `popup from="group"`): each symbol the key shows
+         * (a group's label is its symbols), as its view's ([nineLayout]); null where it shows none.
+         */
+        internal fun groupPopup(label: String?): KeyDef.Popup.Keyboard? =
+            label?.ifEmpty { null }?.map { it.toString() }?.let { KeyDef.Popup.Keyboard.Explicit(it.toTypedArray()) }
 
         /** The 分词 key's face while something is typed; else [PUNCTUATION]'s first, which it types. */
         internal const val SEPARATOR = "分词"
@@ -289,6 +296,7 @@ class ZhuyinKeyboard(
         if (now == typing) return
         typing = now
         slot?.mainText?.text = if (now) SEPARATOR else comma
+        canvas?.invalidateScene()
     }
 
     override fun onAction(action: KeyAction, source: KeyActionListener.Source) {
@@ -315,16 +323,20 @@ class ZhuyinKeyboard(
         canvas?.invalidateScene()
     }
 
-    // a symbol's or a tone's code (the layout's action:zhuyin, action:tone-N) by what its key shows
+    // a symbol's or a tone's code (the layout's action:zhuyin, action:tone-N) by what its key shows; 注音九键's
+    // group's long press its symbols
     override val sceneTable = object : SceneKeyDef.Table {
         override fun action(name: String, node: KeyNode): KeyAction? = placeholder(name, node.label, nine)
+        override fun popup(from: String, node: KeyNode): KeyDef.Popup.Keyboard? = if (nine && from == "group") groupPopup(node.label) else null
     }
 
     // what the bottom row shows now (grouped-bottom.xml's when= and bindings, as the grouped keyboards'): an
     // address's keys, the language key, the space's input method and microphone, Return, the comma and the
-    // full stop as punctuation maps them
+    // full stop as punctuation maps them; 注音九键's slot 分词 while typing (its `when="composing"`), ? ! ~ as mapped
     override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env {
         val state = TextBoardState(address = address, langKey = showLangSwitchKey.getValue(), holdVoice = holdsToTalk)
+        // TextBoardState's composing is a table's alone (its 确定): the slot's said here (typing is the nine's alone)
+        val input = state.input().copy(composing = typing)
         val texts = Texts(
             imeName = shownImeName.orEmpty(),
             comma = mapped(","),
@@ -336,11 +348,11 @@ class ZhuyinKeyboard(
             // the format as it is: the engine fills its place (getString with no arguments formats nothing)
             a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
         )
-        return SceneEnvs.of(this, look, theme.isDark, width, height, input = state.input(), texts = texts, marks = SceneBoard.marks(layout, charShortcutMarks))
+        return SceneEnvs.of(this, look, theme.isDark, width, height, input = input, texts = texts, marks = SceneBoard.marks(layout, charShortcutMarks))
     }
 
     // last: the scene reads the state above (060's redraw: the keys drawn by the scene engine where the canvas
-    // is on and the app has the layout; 注音九键's views till S4d moves it)
+    // is on, 大千's and 注音九键's alike)
     init {
         drawKeysWithScene(layoutOf(nine))
     }

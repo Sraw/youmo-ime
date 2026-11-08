@@ -151,6 +151,40 @@ class SceneBehaviorTest {
         assertEquals(Bubble(",", null), k.getValue("comma").bubble)
     }
 
+    // 注音九键 (060-render-p2 S4d) as its views: a group types by the table, its bubble its face both ways, its
+    // long press the app's (from="group", no letters=); the tones and ? ! ~ show their bubble though function
+    // keys (preview="on"), ? ! ~ offering their presets (SymbolKey's); the slot none though a letter key (preview="off")
+    @Test
+    fun zhuyinNinesKeysBubbleAsTheirViews() {
+        val k = keys("zhuyin-nine").mapValues { SceneBehavior.of(it.value) }
+        val g = k.getValue("r1c2")
+        assertEquals(SceneAction.Placeholder("zhuyin"), g.press)
+        assertEquals(Bubble("ㄅㄉㄚ", "ㄅㄉㄚ"), g.bubble)
+        assertEquals(SceneBehavior.LongPopup.Composed("group"), g.popup)
+        assertEquals("zy9/1", g.shortcut)
+        val tone = k.getValue("r1c1")
+        assertEquals(Bubble("ˉ", null), tone.bubble)
+        assertEquals(SceneAction.Placeholder("tone-5"), tone.swipe)
+        assertEquals(SceneBehavior.LongPopup.Listed(listOf("˙"), false), tone.popup)
+        for ((id, mark) in listOf("r2c1" to "ˊ", "r3c1" to "ˇ", "r4c1" to "ˋ")) {
+            assertEquals(Bubble(mark, null), k.getValue(id).bubble)
+            assertNull(k.getValue(id).popup)
+        }
+        for ((id, c) in listOf("r2c5" to "?", "r3c5" to "!", "r4c5" to "~")) {
+            assertEquals(Bubble(c, null), k.getValue(id).bubble)
+            assertEquals(SceneBehavior.LongPopup.Preset(c, true), k.getValue(id).popup)
+            assertEquals(SceneAction.Key(c), k.getValue(id).press)
+        }
+        val slot = k.getValue("r4c4")
+        assertNull(slot.bubble)
+        assertEquals(SceneAction.Placeholder("zhuyin-slot"), slot.press)
+        assertEquals(SceneBehavior.LongPopup.Listed(listOf("。", "？", "！", "、", "：", "；"), true), slot.popup)
+        // preview= over the kind's either way; unwritten, the kind's
+        assertNull(SceneBehavior.of(node("<key id=\"a\" label=\"A\" preview=\"off\" send=\"a\"/>")).bubble)
+        assertEquals(Bubble("+", null), SceneBehavior.of(node("<key id=\"a\" kind=\"function\" label=\"+\" preview=\"on\" send=\"+\"/>")).bubble)
+        assertNull(SceneBehavior.of(node("<key id=\"a\" kind=\"function\" label=\"+\" send=\"+\"/>")).bubble)
+    }
+
     private fun node(key: String): KeyNode {
         val text = "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"grouped\" columns=\"10\"><defaults kind=\"letter\"/><row>$key</row></keyboard>"
         val l = (LayoutReader.layout(text) as Parsed.Ok).value
