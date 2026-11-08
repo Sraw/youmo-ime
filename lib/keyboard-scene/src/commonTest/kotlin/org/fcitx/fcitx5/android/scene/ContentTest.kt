@@ -209,7 +209,7 @@ class ContentTest {
         // icon's whole px: a px of it, 2.2% of a 46 px one), and every shortcut and ⌫ icon within its face's
         // arcs (060-render-p2 S4e)
         val boards = listOf("qwerty", "k14", "k18", "zhuyin").map { it to false } + ("zhuyin-nine" to true)
-        for (d in listOf(2.0, 2.75, 3.5)) for ((board, compact) in boards) sweepSmoothly(d, board, Forms.floating.copy(compact = compact))
+        for (d in listOf(1.5, 2.0, 2.75, 3.5)) for ((board, compact) in boards) sweepSmoothly(d, board, Forms.floating.copy(compact = compact))
     }
 
     @Test
@@ -218,7 +218,7 @@ class ContentTest {
         // text (small compact k18 near 55%: 21 px of face, 36 px of text) the text gives a px for each px of
         // face: up to 3.5% a px there, only ever smaller (060-render-p2 S4e)
         val small = Forms.compact.copy(width = 990.0 * 2.625 / 2.75, height = 407.0 * 2.625 / 2.75)
-        for (d in listOf(2.0, 2.75, 3.5)) for (form in listOf(Forms.compact, small)) for (board in listOf("qwerty", "k14", "k18")) sweepSmoothly(d, board, form)
+        for (d in listOf(1.5, 2.0, 2.75, 3.5)) for (form in listOf(Forms.compact, small)) for (board in listOf("qwerty", "k14", "k18")) sweepSmoothly(d, board, form)
     }
 
     private fun sweepSmoothly(d: Double, board: String, form: Env) {
@@ -231,7 +231,7 @@ class ContentTest {
             val at = "at $d, ${form.width} ${if (form.compact) "compact " else ""}$board $h px"
             sc.keys.forEach { iconsWithinArcs(it, at) }
             val sizes = sc.keys.flatMap { key -> key.ops(false).mapNotNull { op -> sized(key, op) } }.toMap()
-            last?.let { was -> sizes.forEach { (id, v) -> was[id]?.let { o -> smallStep(id, o.first, v, at) } } }
+            last?.let { was -> sizes.forEach { (id, v) -> was[id]?.let { o -> smallStep(id, o.first, v, d, at) } } }
             last = sizes
             h -= 1.0
         }
@@ -256,6 +256,23 @@ class ContentTest {
         val full = texts(Forms.scene("qwerty", Forms.env("qwerty", Forms.floating)), "j").last().size
         assertTrue(j < full - 0.1, "the symbols smaller: $j of $full")
         assertEquals(j, g, 1e-9, "g's as j's")
+    }
+
+    @Test
+    fun aCompactZhuyinsIconsKeepWithinTheArcsHalfAPxAtATime() {
+        // compact and small compact zhuyin and zhuyin nine at every density, from their height down to 55%
+        // half a px at a time (between whole px of keyboard too): every icon within the arcs (060-render-p2 S4e)
+        val small = Forms.compact.copy(width = 990.0 * 2.625 / 2.75, height = 407.0 * 2.625 / 2.75)
+        for (d in listOf(1.5, 2.0, 2.75, 3.5)) for (form in listOf(Forms.compact, small)) for (board in listOf("zhuyin", "zhuyin-nine")) halfPxWithinArcs(d, board, form)
+    }
+
+    private fun halfPxWithinArcs(d: Double, board: String, form: Env) {
+        val k = d / Forms.DENSITY
+        val top = form.height * k
+        generateSequence(top) { it - 0.5 }.takeWhile { it >= top * 0.55 }.forEach { h ->
+            val e = Forms.env(board, form.copy(width = form.width * k, height = h, density = d))
+            Forms.scene(board, e).keys.forEach { iconsWithinArcs(it, "at $d, ${form.width} $board $h px") }
+        }
     }
 
     @Test
@@ -284,16 +301,18 @@ class ContentTest {
         }
     }
 
-    // at most 2% from [o] to [v], or a px for an icon (whole px); a glyph taller than its face more, up to
-    // 3.5%, only smaller (the face's px it gives; growing, as a key fades out of its class's need, 2% still)
-    private fun smallStep(id: String, o: Double, v: Pair<Double, Boolean>, at: String) {
+    // a px of keyboard, at [d] px a dp: at most 0.04 / d from [o] to [v] (2% at 2 px a dp: the less a px is
+    // of a dp, the less it moves), or a px for an icon (whole px); a glyph taller than its face more, up to
+    // 0.07 / d, only smaller (the face's px it gives; growing, as a key fades out of its class's need, as any)
+    private fun smallStep(id: String, o: Double, v: Pair<Double, Boolean>, d: Double, at: String) {
         val (now, tall) = v
-        if (tall && o - now > 0.02 * o) {
-            assertTrue(o - now <= 0.035 * o + 1e-6, "$id $o to $now, taller than its face, $at")
+        val most = 0.04 / d
+        if (tall && o - now > most * o) {
+            assertTrue(o - now <= 0.07 / d * o + 1e-6, "$id $o to $now, taller than its face, $at")
             return
         }
         val slack = if (" I " in id) 1.0 + 1e-6 else 0.0
-        assertTrue(abs(now - o) <= maxOf(0.02 * o, slack) + 1e-6, "$id $o to $now $at")
+        assertTrue(abs(now - o) <= maxOf(most * o, slack) + 1e-6, "$id $o to $now $at")
     }
 
     // [key]'s shortcut and ⌫ icons' box corners within its face's rounded ones (less the border); how many against them

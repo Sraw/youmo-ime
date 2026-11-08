@@ -194,27 +194,27 @@ object KeyMarkYield {
         // each key as it is (most are: worked out once)
         val asIs = keys.indices.map { k -> drawn[k].copy(moves = false).let { m -> place(m.glyph, apart[k].filterNotNull(), m, gap) } }
         fun whole(k: Int) = asIs[k] != null && apart[k].all { it != null }
-        // a key's marks, those of [symbol] (or the shortcuts) [t] their size, the others [u]
+        // a key's marks, those of [symbol] (or the shortcuts) [t] their size, the others [u]; a class at 0 left out
         fun marksAt(k: Int, t: Double, u: Double = t, symbol: Boolean? = null): List<Mark?> = keptApart(
-            keys[k].marks.map { m -> m.scaled(if (symbol == null || (m.drop == DROP_SYMBOL) == symbol) t else u).within(keys[k].edge) },
+            keys[k].marks.map { it to it.sizeIn(t, u, symbol) }.filter { it.second > 0.0 }.map { (m, s) -> m.scaled(s).within(keys[k].edge) },
             keys[k].edge,
         )
         fun fit(k: Int, g: Ink, marks: List<Mark?>) = marks.all { it != null } && place(g, marks.filterNotNull(), keys[k], gap) != null
-        // the glyphs: with all of a key's marks, as large as they are all kept apart (down to a band below
-        // [minMark]: none left out of it where they are kept apart a little smaller, so it never jumps)
+        // the glyphs: with all of a key's marks ([only] the symbols: the shortcuts left out), as large as they
+        // are all kept apart (down to a band below [minMark]: none left out of it where they are kept apart a
+        // little smaller, so it never jumps); asked of the class all where they fit at [minMark] by the glyphs'
+        // least, the less the further below
         val floor = if (minMark >= 1.0) minMark else hopeless
-        val apartAt = keys.indices.map { k -> largest(floor) { t -> marksAt(k, t).all { it != null } } }
-        val need = keys.indices.map { k ->
-            if (whole(k)) return@map 1.0
-            val live = marksAt(k, apartAt[k]).filterNotNull()
-            largest(least) { s -> place(keys[k].at(s), live, keys[k], gap) != null }
+        fun asks(k: Int, only: Boolean) = glyphAsks(
+            floor, minMark,
+            marks = { t -> if (only) marksAt(k, t, 0.0, symbol = true) else marksAt(k, t) },
+            fits = { s, marks -> fit(k, keys[k].at(s), marks) },
+        )
+        // a key with both: no more than its symbols alone ask, so they are not let go with the shortcuts
+        val asked = keys.indices.map { k ->
+            if (whole(k)) 1.0 else minOf(asks(k, false), asks(k, true))
         }
-        // how much of its need a key asks: all where its marks fit at [minMark] by the glyphs' least, the less
-        // the further below
-        val saved = keys.indices.map { k ->
-            if (whole(k) || minMark >= 1.0) 1.0 else share(largest(hopeless) { t -> fit(k, keys[k].at(least), marksAt(k, t)) }, minMark)
-        }
-        val scales = keys.indices.groupBy { keys[it].glyphClass }.mapValues { (_, ks) -> ks.minOf { 1.0 - (1.0 - need[it]) * saved[it] } }
+        val scales = keys.indices.groupBy { keys[it].glyphClass }.mapValues { (_, ks) -> ks.minOf { asked[it] } }
         // the marks: of the class (or both) that meets, as much smaller as lets them
         val markNeed = keys.indices.map { k ->
             if (whole(k)) return@map 1.0 to 1.0
@@ -260,19 +260,40 @@ object KeyMarkYield {
         return Settled(glyph, marks)
     }
 
+    // this mark's size: [t] if of the class [symbol] (both if null), else [u]
+    private fun Mark.sizeIn(t: Double, u: Double, symbol: Boolean?) = if (symbol == null || (drop == DROP_SYMBOL) == symbol) t else u
+
+    // what a key asks of its glyph class with [marks] at a size: its need with them as large as they are
+    // kept apart, all of it where they [fits] at [minMark] by the glyphs' least, the less the further below
+    private fun glyphAsks(floor: Double, minMark: Double, marks: (Double) -> List<Mark?>, fits: (Double, List<Mark?>) -> Boolean): Double {
+        val least = 1.0 - MAX_CLASS_SHRINK
+        val live = marks(largest(floor) { t -> marks(t).all { it != null } }).filter { it != null }
+        val need = largest(least) { s -> fits(s, live) }
+        val saved = if (minMark >= 1.0) 1.0 else share(largest(minMark - HOPELESS_BAND) { t -> fits(least, marks(t)) }, minMark)
+        return 1.0 - (1.0 - need) * saved
+    }
+
     // a key's need of the symbols and of the shortcuts: both alike, the least that fits; from there the
     // symbols as large as fits, then the shortcuts (the more expendable) as large as fits with them, so a
     // class that does not meet is its size. Each from a size that fits, so it moves as the room does (a
-    // class's choice of which gives way never flips it). [fits] with the symbols [t] their size, the
-    // shortcuts [u] (both [t] if [symbol] is null)
+    // class's choice of which gives way never flips it). Below [minMark], as both fade out of their need
+    // ([share]), each moves to what it needs alone (the other left out), all of it where both are past
+    // saving: a class still saved alone is never let go with the other. [fits] with the symbols [t] their
+    // size, the shortcuts [u] (both [t] if [symbol] is null; a class at 0 left out)
     private fun markNeed(floor: Double, minMark: Double, fits: (Double, Double, Boolean?) -> Boolean): Pair<Double, Double> {
         fun asked(t: Double) = if (t >= minMark) t else 1.0 - (1.0 - minMark) * share(t, minMark)
         val both = largest(floor) { t -> fits(t, t, null) }
         if (both == 1.0) return 1.0 to 1.0
-        if (!fits(both, both, null)) return asked(both) to asked(both)
-        val symbol = largest(both) { t -> fits(t, both, true) }
-        val shortcut = largest(both) { u -> fits(symbol, u, true) }
-        return asked(symbol) to asked(shortcut)
+        val w = if (fits(both, both, null)) share(both, minMark) else 0.0
+        val (symbol, shortcut) = if (w > 0.0) {
+            val s = largest(both) { t -> fits(t, both, true) }
+            asked(s) to asked(largest(both) { u -> fits(s, u, true) })
+        } else {
+            1.0 to 1.0
+        }
+        val symbolAlone = asked(largest(floor) { t -> fits(t, 0.0, true) })
+        val shortcutAlone = asked(largest(floor) { u -> fits(0.0, u, true) })
+        return (w * symbol + (1 - w) * symbolAlone) to (w * shortcut + (1 - w) * shortcutAlone)
     }
 
     // how much of its need a key whose marks fit at [t] asks: all at [minMark], none [HOPELESS_BAND] below it
@@ -359,13 +380,14 @@ object KeyMarkYield {
     private fun Member.aside(): Member {
         val still = copy(moves = false)
         if (!moves || glyph.left.isNaN() || marks.isEmpty()) return still
-        val dx = when {
-            marks.all { it.slot.left } -> room.right - glyph.right
-            marks.all { it.slot.right } -> room.left - glyph.left
+        // the room's side away from the marks; smaller about it, so it stays there
+        val side = when {
+            marks.all { it.slot.left } -> room.right
+            marks.all { it.slot.right } -> room.left
             else -> return still
         }
-        // smaller about the side it went to, so it stays there
-        return still.copy(glyph = glyph.moved(dx, 0.0), x = if (dx > 0) room.right else room.left)
+        val dx = if (side == room.right) room.right - glyph.right else room.left - glyph.left
+        return still.copy(glyph = glyph.moved(dx, 0.0), x = side)
     }
 
     private fun Member.at(s: Double): Ink = if (s == 1.0) glyph else glyph.scaled(s, x, y)

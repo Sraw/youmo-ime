@@ -300,6 +300,7 @@ class KeyMarkYieldTest {
             val k = Key(24 * d, 15 * d, d, 4.0)
             val gap = 1.0 * d
             var last: Ink? = null
+            var scale: Double? = null
             var along = 0
             var gone = false
             var top = k.room.top + k.size + gap
@@ -307,6 +308,10 @@ class KeyMarkYieldTest {
                 val glyph = Ink(k.room.left, top, k.room.right, k.room.bottom)
                 val g = KeyMarkYield.group(listOf(k.letter(glyph, listOf(k.mark(Slot.TopLeft)))), gap)
                 val at = "at $d, the glyph's top at $top"
+                // a tenth of a px of the glyph's top a step, the glyph smaller about its middle: no more than
+                // that tenth over its half height (1.03% at 2 px a dp), never a jump
+                scale?.let { assertTrue(abs(g.scale - it) <= 0.1 / ((glyph.bottom - glyph.top) / 2) + 1e-3, "the class's step $at: $it to ${g.scale}") }
+                scale = g.scale
                 val m = g.keys[0].marks[0]
                 if (m == null) {
                     // the class asking the less of it the further past saving it (060-render-p2 S4e)
@@ -340,6 +345,30 @@ class KeyMarkYieldTest {
             val b = KeyMarkYield.board(listOf(short, stacked(d, 40.0).second), 1.0 * d)
             assertTrue(b.symbol < 1.0, "the symbols smaller at $d: ${b.symbol}")
             assertEquals(1.0, b.shortcut, "the shortcuts their size at $d")
+        }
+    }
+
+    @Test
+    fun aClassStillSavedAloneIsNotLetGoWithTheOther() {
+        // the review's probe: 2 px a dp, a 60 by 80 key, a symbol top right and a shortcut top left, a glyph
+        // under both growing leftwards 0.05 px at a time: the symbols' class a little smaller each step, never
+        // a jump; the symbol left out only where it is so alone too (060-render-p2 S4e)
+        val d = 2.0
+        val k = Key(60.0, 80.0, d)
+        for (r in listOf(43.0, 44.0, 45.0, 46.0, 47.0)) {
+            var was: Double? = null
+            var l = 19.0
+            while (l >= 12.0) {
+                val g = Ink(l, 2.0, r, 78.0)
+                val symbol = k.mark(Slot.TopRight, KeyMarkYield.DROP_SYMBOL)
+                fun board(marks: List<Mark>) = KeyMarkYield.board(listOf(Member(g, (l + r) / 2, 78.0, marks, k.room, k.edge, moves = false)), 1.0 * d)
+                val b = board(listOf(symbol, k.mark(Slot.TopLeft)))
+                val at = "at R $r, L $l"
+                was?.let { assertTrue(abs(b.symbol - it) <= 0.01, "the symbols' step $at: $it to ${b.symbol}") }
+                if (b.keys[0].marks[0] == null) assertNull(board(listOf(symbol)).keys[0].marks[0], "the symbol left out, alone kept $at")
+                was = b.symbol
+                l -= 0.05
+            }
         }
     }
 
