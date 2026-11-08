@@ -41,6 +41,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.scene.KeyRef
+import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.input.scene.SceneLetters
 import org.fcitx.fcitx5.android.input.scene.TextBoardState
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
@@ -585,12 +586,14 @@ class TextKeyboard private constructor(
         }
     }
 
-    private fun transformPopupPreview(key: KeyRef, c: String) = previewOf(sceneBubble(key, c), key, ::transformAlphabet, ::transformPunctuation)
+    private fun transformPopupPreview(key: KeyRef, c: String) = previewOf(c, key, ::transformAlphabet, ::transformPunctuation)
 
-    // a scene letter's bubble shows its letter whatever its face (Shift's case, a table's roots), as its view's did
-    private fun sceneBubble(key: KeyRef, content: String): String {
-        val letter = key.id.takeIf { key.isScene && it.length == 1 && it[0] in 'a'..'z' } ?: return content
-        return if (content == canvas?.keyAt(key.id, if (key.copy) 1 else 0)?.label) letter else content
+    // a letter's bubble shows its letter whatever its face (Shift's case, a table's roots), as its view's did;
+    // a getter: the keys are wired in init, before this class's properties are
+    override val sceneTable: SceneKeyDef.Table get() = LetterBubbles
+
+    private object LetterBubbles : SceneKeyDef.Table {
+        override fun bubble(node: KeyNode) = node.id.takeIf { it.length == 1 && it[0] in 'a'..'z' }
     }
 
     override fun onPopupAction(action: PopupAction) {

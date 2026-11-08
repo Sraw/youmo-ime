@@ -62,7 +62,12 @@ internal class SceneKeys(private val keyboard: View, private val wire: (SceneKey
         val ref = KeyRef.scene(node.id, node.copy)
         // as its board pops up: the number pad's no preview, no long press's keys
         val b = SceneKeyDef.onBoard(SceneBehavior.of(node), view.scene)
-        byNode[ref]?.takeIf { it.first == b }?.let { return it.second }
+        // a node that differs in its bubble's content alone (Shift's case, a face redrawn) keeps its key, the bubble told
+        byNode[ref]?.takeIf { it.first.sansBubble() == b.sansBubble() }?.let { (_, key) ->
+            key.bubble = SceneKeyDef.bubbleOf(b, node, table)
+            byNode[ref] = b to key
+            return key
+        }
         // the key it was: its timers stopped (a repeat, a long press pending), as a key's are when its touch is taken
         byNode[ref]?.second?.let { old ->
             old.keyGesture.cancelGestures()
@@ -74,6 +79,8 @@ internal class SceneKeys(private val keyboard: View, private val wire: (SceneKey
             byNode[ref] = b to it
         }
     }
+
+    private fun SceneBehavior.sansBubble() = copy(bubble = bubble?.copy(content = ""))
 
     /** The key wired as [view] was ([byViews]). */
     fun of(view: KeyView): SceneKey? = byView[view]

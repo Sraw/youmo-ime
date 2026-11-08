@@ -539,9 +539,9 @@ abstract class BaseKeyboard(
                 key.gestureListener = { k, event ->
                     if (popupOnKeyPress) {
                         when (event.type) {
-                            GestureType.Down -> k.bounds?.let { onPopupAction(PopupAction.PreviewAction(k.ref, popup.content, it)) }
+                            GestureType.Down -> k.bounds?.let { onPopupAction(PopupAction.PreviewAction(k.ref, bubbleOf(k, popup), it)) }
                             GestureType.Move -> {
-                                onPopupAction(swipes.preview(k, def, event.totalY, popup))
+                                onPopupAction(swipes.preview(k, def, event.totalY, popup, bubbleOf(k, popup)))
                             }
                             GestureType.Up -> {
                                 onPopupAction(PopupAction.DismissAction(k.ref))
@@ -557,7 +557,7 @@ abstract class BaseKeyboard(
                 key.gestureListener = { k, event ->
                     if (popupOnKeyPress) {
                         when (event.type) {
-                            GestureType.Down -> k.bounds?.let { onPopupAction(PopupAction.PreviewAction(k.ref, popup.content, it)) }
+                            GestureType.Down -> k.bounds?.let { onPopupAction(PopupAction.PreviewAction(k.ref, bubbleOf(k, popup), it)) }
                             GestureType.Up -> {
                                 onPopupAction(PopupAction.DismissAction(k.ref))
                             }
@@ -570,6 +570,9 @@ abstract class BaseKeyboard(
             }
         }
     }
+
+    // what a key's bubble shows: a scene key's as the scene has it now (SceneKey.bubble), else its def's
+    private fun bubbleOf(k: KeyHandle, popup: KeyDef.Popup.Preview) = (k as? SceneKey)?.bubble ?: popup.content
 
     // a long press's popup (a menu, a keyboard), its cell focused as the finger moves and picked as it lifts
     private fun choosesFromPopup(key: KeyHandle) {

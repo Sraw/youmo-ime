@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -164,6 +165,27 @@ class TextSceneWiringTest {
             assertTrue(g.label, g.label?.lowercase() != "g")
             h.press(g)
             assertEquals(listOf("g"), h.popupChoices().map { it.text.lowercase() })
+            h.release()
+        }
+    }
+
+    // Shift redraws the letters' faces in capitals: each keeps its key (its bubble's content told it, SceneKeys.nodeKey),
+    // not one made anew, and its bubble shows the capital
+    @Test
+    fun shiftKeepsTheLettersKeys() {
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+        KeyboardHarness(im = KeyboardHarness.ENGLISH).start().use { h ->
+            val k = KeyboardHarness.all(h.keyboard).filterIsInstance<TextKeyboard>().single()
+            val canvas = KeyboardHarness.all(k).filterIsInstance<KeyboardCanvasView>().single()
+            val before = k.sceneKey(canvas.keyAt("q")!!)!!
+            h.press(h.keys().single { it.id == "shift" })
+            h.release()
+            h.idle()
+            val q = h.keys().single { it.id == "q" }
+            assertEquals("Q", q.label)
+            assertSame(before, k.sceneKey(canvas.keyAt("q")!!))
+            h.press(q)
+            assertEquals(listOf("Q"), h.popupChoices().map { it.text })
             h.release()
         }
     }

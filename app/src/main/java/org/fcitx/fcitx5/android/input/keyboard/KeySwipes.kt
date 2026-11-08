@@ -84,11 +84,11 @@ internal class KeySwipes(
     }
 
     /** What the preview of [key] of [def] shows, swiped [totalY]: its [popup]'s own content, or what the swipe reaches. */
-    fun preview(key: KeyHandle, def: KeyDef, totalY: Int, popup: KeyDef.Popup.AltPreview): PopupAction.PreviewUpdateAction =
+    fun preview(key: KeyHandle, def: KeyDef, totalY: Int, popup: KeyDef.Popup.AltPreview, content: String = popup.content): PopupAction.PreviewUpdateAction =
         when (val preview = KeySwipe.preview(swipeKey(def), swipeLayers, totalY, keyboard.inPasswordField)) {
             KeySwipe.Preview.Symbol -> PopupAction.PreviewUpdateAction(key.ref, keyboard.swipeText(def).preview(popup.alternative))
             is KeySwipe.Preview.Shortcut -> PopupAction.PreviewUpdateAction(key.ref, shortcutLabel(preview.shortcut), words = true)
-            KeySwipe.Preview.Own -> PopupAction.PreviewUpdateAction(key.ref, popup.content)
+            KeySwipe.Preview.Own -> PopupAction.PreviewUpdateAction(key.ref, content)
         }
 
     /** What the preview shows of [shortcut]: a command's name, a text as it is (fitted to the bubble by [org.fcitx.fcitx5.android.input.popup.PopupComponent]). */

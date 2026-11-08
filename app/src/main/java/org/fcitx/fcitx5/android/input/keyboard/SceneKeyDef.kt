@@ -66,6 +66,9 @@ class SceneKeyDef(
 
         /** The long press of the key of [letters], made as it opens again (the user's keys as they are then). */
         fun groupPopup(letters: String, node: KeyNode): Popup.Keyboard? = null
+
+        /** The bubble over the key of [node] as it is pressed, over the face the layout gives it; null: the face's. */
+        fun bubble(node: KeyNode): String? = null
     }
 
     companion object {
@@ -102,9 +105,15 @@ class SceneKeyDef(
             else -> b.copy(bubble = b.bubble.takeIf { board.preview }, popup = b.popup.takeIf { board.popups })
         }
 
+        /** What [b]'s bubble shows over the key of [node]: [table]'s, else its face's; null with no bubble. */
+        fun bubbleOf(b: SceneBehavior, node: KeyNode, table: Table): String? = b.bubble?.let { table.bubble(node) ?: it.content }
+
         // its bubble, long press and menu: each as the old keys' KeyDef had it
         private fun popupsOf(b: SceneBehavior, node: KeyNode, table: Table, act: (SceneAction?) -> KeyAction?): List<Popup> = buildList {
-            b.bubble?.let { add(it.corner?.let { c -> Popup.AltPreview(it.content, c) } ?: Popup.Preview(it.content)) }
+            b.bubble?.let {
+                val content = bubbleOf(b, node, table)!!
+                add(it.corner?.let { c -> Popup.AltPreview(content, c) } ?: Popup.Preview(content))
+            }
             when (val p = b.popup) {
                 is SceneBehavior.LongPopup.Preset -> add(Popup.Keyboard.Preset(p.label, p.transformPunctuation))
                 is SceneBehavior.LongPopup.Listed -> add(Popup.Keyboard.Explicit(p.items.toTypedArray(), asIs = p.asIs))

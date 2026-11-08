@@ -36,6 +36,9 @@ class SceneKey(
     private val keyboard: View,
 ) : KeyHandle, KeyPlace {
 
+    /** Its bubble's content as the scene has it now, over its [def]'s: a node redrawn so keeps its key (SceneKeys). */
+    var bubble: String? = null
+
     override val keyGesture = KeyGesture(this, ViewConfiguration.get(keyboard.context).scaledTouchSlop.toFloat())
 
     // the cell of the finger stepping on it now ([SceneTouch.Pointer.send]): its size the touch's, the
