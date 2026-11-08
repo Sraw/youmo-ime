@@ -686,7 +686,7 @@ abstract class BaseKeyboard(
     }
 
     /** The key wired for the scene's [node] ([SceneTouch.keyOf]): what a screen reader's actions on it do; null while the views draw the keys. */
-    protected fun sceneKey(node: KeyNode): SceneKey? = sceneKeys.of(node)
+    internal fun sceneKey(node: KeyNode): SceneKey? = sceneKeys.of(node)
 
     // the keys' views take touches as the keyboard hands them: vivo's workaround, or keys drawn by the canvas
     private val routesTouches get() = vivoKeypressWorkaround || canvas != null

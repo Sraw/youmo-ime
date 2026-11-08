@@ -3,13 +3,13 @@
   九键（T9Keyboard：拼音 T9、英文 T9English、双拼 T9Shuangpin/T9ShuangpinPlain，rules C §2），一块板 nine，差别在 when= 和
   App 给的 {nine-letters:N}（拼音读用户的 t9_letters、双拼固定 NINE_SP，5 为 JKL; 或 JKL；英文跟 Shift 大小写，引擎按输入法定大小写）。
   宽度为行宽的百分之几：左列 16、数字键 22、右列 18。左列是跨三行的 slot（原生滚动列表），画功能键面，平铺也画块（face="keep"），
-  不画按下；它下面不再有占位键，第 2、3 行从它右边排起。数字键的长按是组合式的（大写 + 数字 + 小写 + t9_symbols），App 按 from="nine" 拼。
+  不画按下；它下面不再有占位键，第 2、3 行从它右边排起。数字键的长按是组合式的（大写 + 数字 + 小写 + t9_symbols），App 按 from="nine" 拼；1 没有气泡（preview="off"，旧 KeyDef 也没有）。
 -->
 <keyboard xmlns="https://youmo-ime/layout/1" id="nine" name="九键" family="nine" columns="100">
   <defaults kind="letter" text-size="20" width="22"/>
   <row>
     <slot id="side" kind="nine-side" width="16" rows="3" look="function" face="keep"/>
-    <key id="1" label="，。？！" text-size="16" alt="1" send="1" swipe-up="keypad:1" shortcut="t9/1">
+    <key id="1" label="，。？！" text-size="16" alt="1" preview="off" send="1" swipe-up="keypad:1" shortcut="t9/1">
       <!-- 1 键随输入中变（T9Keyboard.kt:672,683-687）：第一个成立的 variant 盖上去 -->
       <variant when="ime=english composing" label="'"/>
       <variant when="ime=english" label=".,?!"/>
@@ -64,7 +64,7 @@
     <key id="enter" role="enter" kind="enter" face="special" width="18" icon="{return-icon}" a11y="{return}"
          sound="return" send="sym:Return" shortcut="return">
       <menu>
-        <item label="emoji" icon="emoji" do="picker:Emoji"/>
+        <item label="Emoji" icon="emoji" do="picker:"/>
       </menu>
     </key>
   </row>

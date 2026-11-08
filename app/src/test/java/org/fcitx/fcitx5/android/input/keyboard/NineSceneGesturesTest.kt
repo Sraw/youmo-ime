@@ -11,10 +11,12 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.uat.PrefsRule
+import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -22,6 +24,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -29,7 +32,7 @@ import org.robolectric.annotation.GraphicsMode
  * The nine keys drawn by the scene (060-render-p2 S5a, nine.xml) do what their views did, in each of
  * the four (九键拼音, English's, 双拼's with and without `;`): every key's face and what it is read as, its
  * bubble as it is pressed, its tap, its swipe down, its long press, what reaches the engine and the field;
- * 1 as what is typed has it (分词 while the engine says so). Each key is wired as its view was (U4 A).
+ * 1 as what is typed has it (分词 while the engine says so). Each key is wired from its node (U4 B).
  * The column is a native view over the scene's slot `side`, in its box, its items the same either way.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -178,6 +181,76 @@ class NineSceneGesturesTest {
         val parent = column.parent as android.view.ViewGroup
         assertTrue("the column over the canvas", parent.indexOfChild(column) > parent.indexOfChild(canvas))
     }
+
+    // each key wired from nine.xml's node (U4 B) as the views' KeyDef has it, in each of the four: sound, shortcut,
+    // both ways' swipe, what a tap, a hold, a swipe, a double tap and a long press do, its bubble, its long press's
+    // keys (`popup from="nine"`) and its menu
+    @Test
+    fun eachKeyIsWiredAsItsViewWas() {
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+        val app = PlaceholderStrings(RuntimeEnvironment.getApplication())
+        val letters = NineKeyLetters.STANDARD
+        val variants = mapOf(
+            "pinyin" to { T9Keyboard(app, ThemePreset.PixelLight, letters) },
+            "english" to { T9Keyboard(app, ThemePreset.PixelLight, letters, english = true) },
+            "shuangpin" to { T9Keyboard(app, ThemePreset.PixelLight, shuangpin = true) },
+            "shuangpin plain" to { T9Keyboard(app, ThemePreset.PixelLight, shuangpin = true, semicolon = false) },
+        )
+        val olds = mapOf(
+            "pinyin" to T9Keyboard.layout(letters),
+            "english" to T9Keyboard.layout(letters, english = true),
+            "shuangpin" to T9Keyboard.layout(NineKeyLetters.STANDARD, shuangpin = true),
+            "shuangpin plain" to T9Keyboard.layout(NineKeyLetters.STANDARD, shuangpin = true, semicolon = false),
+        )
+        for ((name, make) in variants) {
+            val k = make().laidOut()
+            val canvas = KeyboardHarness.all(k).filterIsInstance<KeyboardCanvasView>().single()
+            val old = olds.getValue(name).flatten().filter { it.name != "side" && it.behaviors.isNotEmpty() }.associateBy { idOf(it) }
+            val shown = canvas.scene!!.keys
+            assertEquals(name, old.keys, shown.map { it.id }.toSet())
+            for (node in shown) {
+                val was = old.getValue(node.id)
+                val now = k.sceneKey(node)!!.def
+                val at = "$name ${node.id}"
+                assertEquals(at, was.shortcut, now.shortcut)
+                assertEquals(at, was.swipesBothWays, now.swipesBothWays)
+                assertEquals(at, actions(was), actions(now))
+                assertEquals(at, popups(was), popups(now))
+            }
+        }
+    }
+
+    // a view's key by the scene's id: its name, else the function key it is
+    private fun idOf(def: KeyDef) = when (def) {
+        is BackspaceKey -> "backspace"
+        is CapsKey -> "shift"
+        is SpaceKey -> "space"
+        is LanguageKey -> "lang"
+        is ReturnKey -> "enter"
+        is LayoutSwitchKey -> if ((def.appearance as KeyDef.Appearance.Text).displayText == "符") "symbols" else "numbers"
+        else -> def.name ?: "?"
+    }
+
+    private fun actions(def: KeyDef) = def.behaviors.map {
+        when (it) {
+            is KeyDef.Behavior.Press -> "press ${it.action}"
+            is KeyDef.Behavior.LongPress -> "long ${it.action}"
+            is KeyDef.Behavior.Repeat -> "repeat ${it.action}"
+            is KeyDef.Behavior.Swipe -> "swipe ${it.action}"
+            is KeyDef.Behavior.DoubleTap -> "double ${it.action}"
+        }
+    }.toSet()
+
+    private fun popups(def: KeyDef) = def.popup.orEmpty().map { p ->
+        when (p) {
+            is KeyDef.Popup.AltPreview -> "bubble ${p.content} ${p.alternative}"
+            is KeyDef.Popup.Preview -> "bubble ${p.content}"
+            is KeyDef.Popup.Keyboard.Explicit -> "keys ${p.items.toList()} ${p.symbolsFrom} ${p.asIs} ${p.inRow}"
+            is KeyDef.Popup.Keyboard.Preset -> "preset $p"
+            is KeyDef.Popup.Menu -> "menu " + p.items.map { "${it.label} ${it.icon} ${it.action}" }
+            else -> "$p"
+        }
+    }.toSet()
 
     private companion object {
         val SHUANGPIN = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)

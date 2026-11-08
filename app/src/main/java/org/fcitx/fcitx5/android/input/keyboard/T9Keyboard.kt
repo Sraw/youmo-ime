@@ -63,6 +63,7 @@ import org.fcitx.fcitx5.android.input.theme.KeyKind
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.input.theme.KeyStyleResolver
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
+import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.engine.Texts
@@ -516,7 +517,22 @@ class T9Keyboard(
         letters.letters(d).map { it.lowercaseChar() to digitKeys.getValue(d) }
     }
 
-    private val sceneLetters: List<Pair<Char, KeyPlace>> by lazy { letterKeys.map { (c, v) -> c to (sceneKeyOf(v) ?: v) } }
+    // each letter where the scene draws its digit's key (nine.xml's key N)
+    private val sceneLetters: List<Pair<Char, KeyPlace>> = ('2'..'9').flatMap { d ->
+        scenePlace(d.toString()).let { at -> letters.letters(d).map { it.lowercaseChar() to at } }
+    }
+
+    // a digit key's long press (nine.xml's `popup from="nine"`): its letters' capitals, the digit, its letters and
+    // its symbols, 1's symbols alone, as the views' (digitKey, layoutOf)
+    private val ninePopups: Map<String, KeyDef.Popup.Keyboard> by lazy {
+        layout(letters, symbols, english, shuangpin, semicolon).flatten().mapNotNull { def ->
+            def.popup?.filterIsInstance<KeyDef.Popup.Keyboard>()?.singleOrNull()?.let { p -> def.name?.let { it to p } }
+        }.toMap()
+    }
+
+    override val sceneTable = object : SceneKeyDef.Table {
+        override fun popup(from: String, node: KeyNode): KeyDef.Popup.Keyboard? = if (from == "nine") ninePopups[node.id] else null
+    }
 
     // glide typing (滑行输入) over the digit keys, read as full pinyin's letters, and a stroke drawn
     // over them (笔画筛选) in pinyin's and 双拼's; English's never glides, its keys being no full
@@ -907,7 +923,7 @@ class T9Keyboard(
     // last: the scene reads the state above (060's redraw: the keys drawn by the scene engine where the
     // canvas is on, each wired as its view was, by its theme name; the column a native view in its slot)
     init {
-        if (drawKeysWithScene(LAYOUT) { v -> v.themeKey?.takeIf { it != SIDE_KEY }?.let { KeyRef.scene(it, 0) } }) {
+        if (drawKeysWithScene(LAYOUT)) {
             // the slot's face is the scene's: the column draws only its items
             column.background = null
             column.bringToFront()
