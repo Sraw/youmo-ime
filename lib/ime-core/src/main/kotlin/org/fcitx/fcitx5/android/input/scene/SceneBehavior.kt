@@ -4,7 +4,9 @@
  */
 package org.fcitx.fcitx5.android.input.scene
 
+import org.fcitx.fcitx5.android.core.CoreLog
 import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 
 /**
  * One of a layout's actions (layout-1's words, LayoutReader's ACTION_PATTERNS) read as what it does
@@ -61,29 +63,30 @@ sealed interface SceneAction {
     companion object {
         private val NAMED = Regex("([a-z-]+):(.*)")
 
-        /** [raw] read; null for nothing the vocabulary has (the reader lets none through). */
+        /** [raw] read; null for nothing the vocabulary has (logged: the reader lets none through). */
         fun of(raw: String): SceneAction? {
             if (raw.isNotEmpty() && raw.codePointCount(0, raw.length) == 1) return Key(raw)
             val m = NAMED.matchEntire(raw)
             if (m == null) return if (raw == "caps") Caps(false) else if (raw == "reading") Reading(null) else Command(raw)
             val (kind, arg) = m.destructured
-            return when (kind) {
-                "sym" -> Sym(arg)
-                "layout" -> Layout(arg)
-                "picker" -> Picker(arg.ifEmpty { null })
-                "commit" -> Commit(arg)
-                "code" -> arg.takeIf { it.startsWith("U+") }?.substring(2)?.toIntOrNull(HEX)?.let(::Code)
-                "keypad" -> arg.toIntOrNull()?.takeIf { it in 0..9 }?.let(::Keypad)
-                "caps" -> if (arg == "lock") Caps(true) else null
-                "shortcut" -> Shortcut(arg)
-                "reading" -> Reading(arg.ifEmpty { null })
-                "emoji-search" -> EmojiSearch(arg)
-                "action" -> Placeholder(arg)
-                else -> null
-            }
+            return named(raw, kind, arg).also { if (it == null) CoreLog.e("scene action: \"$raw\" is none the app has") }
         }
 
-        private const val HEX = 16
+        private fun named(raw: String, kind: String, arg: String): SceneAction? = when (kind) {
+            "sym" -> Sym(arg)
+            "layout" -> arg.ifEmpty { null }?.let(::Layout)
+            "picker" -> Picker(arg.ifEmpty { null })
+            "commit" -> Commit(arg)
+            // a scalar value: U+10FFFF at most, no surrogate (the reader's own test)
+            "code" -> LayoutReader.codePoint(raw)?.let(::Code)
+            "keypad" -> arg.toIntOrNull()?.takeIf { it in 0..9 }?.let(::Keypad)
+            "caps" -> if (arg == "lock") Caps(true) else null
+            "shortcut" -> Shortcut(arg)
+            "reading" -> Reading(arg.ifEmpty { null })
+            "emoji-search" -> arg.takeIf { it == "on" || it == "off" }?.let(::EmojiSearch)
+            "action" -> Placeholder(arg)
+            else -> null
+        }
     }
 }
 
@@ -148,7 +151,9 @@ data class SceneBehavior(
 
         fun of(node: KeyNode): SceneBehavior {
             val a = node.actions
-            val press = a["send"]?.let(SceneAction::of) ?: node.letters?.group?.let(SceneAction::Group)
+            // a send= written is the tap, letters or not: one that reads as nothing is nothing (logged), not the group's code
+            val send = a["send"]
+            val press = if (send != null) SceneAction.of(send) else node.letters?.group?.let(SceneAction::Group)
             val swipe = a["swipe-up"]?.let(SceneAction::of)
             val typing = node.role in TYPING_ROLES || (node.kind == "letter" && !node.label.isNullOrEmpty())
             val bubble = if (!typing) null else Bubble(content(node, press), swipe?.let(::typed))

@@ -40,6 +40,7 @@ import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
+import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
@@ -618,17 +619,19 @@ abstract class BaseKeyboard(
 
     /**
      * The keys drawn by the scene of the layout [layoutName] from now on, where the canvas is on
-     * (internal.canvasKeyboard) and the layout is one the app draws ([SceneLayouts.of]); else the
-     * views go on drawing them, as they always did. Called last in a keyboard's init: the scene
-     * reads its state ([sceneEnv]). Each key wired as its view was where [refOf] says which (U4 A:
-     * the 26 keys, till their layout says what they do), else as its layout's node says ([SceneKeyDef],
-     * [sceneTable] the keyboard's own words: U4 B). The rows of views stay laid out, not drawn, not
-     * touched, not read out (S8 deletes them). Whether the scene draws them.
+     * (internal.canvasKeyboard) and the keyboard is moved there (the app has its layout,
+     * [BuiltInLayouts.has]); else the views go on drawing them, as they always did. A layout that
+     * does not read ([SceneLayouts.of], logged there) draws nothing: never the views again (U8,
+     * they go in S8). Called last in a keyboard's init: the scene reads its state ([sceneEnv]).
+     * Each key wired as its view was where [refOf] says which (U4 A: the 26 keys, till their layout
+     * says what they do), else as its layout's node says ([SceneKeyDef], [sceneTable] the keyboard's
+     * own words: U4 B). The rows of views stay laid out, not drawn, not touched, not read out (S8
+     * deletes them). Whether the canvas is put over the keyboard.
      */
     protected fun drawKeysWithScene(layoutName: String, refOf: ((KeyView) -> KeyRef?)? = null): Boolean {
-        if (!AppPrefs.getInstance().internal.canvasKeyboard.getValue()) return false
-        val layout = SceneLayouts.of(context, layoutName) ?: return false
-        val board = SceneBoard(context, theme, layout) { look, width, height -> sceneEnv(look, layout, width, height) }
+        if (!AppPrefs.getInstance().internal.canvasKeyboard.getValue() || !BuiltInLayouts.has(layoutName)) return false
+        val layout = SceneLayouts.of(context, layoutName)
+        val board = SceneBoard(context, theme, layout) { look, read, width, height -> sceneEnv(look, read, width, height) }
         sceneBoard = board
         val view = board.view(keyImages) { node -> sceneKey(node) }
         if (refOf != null) {

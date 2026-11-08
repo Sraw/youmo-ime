@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.KeyStates
@@ -11,8 +12,10 @@ import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.LayoutSource
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
@@ -136,28 +139,111 @@ class SceneKeyDefTest {
         assertEquals(KeyAction.HostKeyAction("'"), k.getValue("apostrophe").behaviors.filterIsInstance<KeyDef.Behavior.Press>().single().action)
     }
 
-    // the layouts are read once a process from their source; one that does not read is none (the views draw)
-    @Test
-    fun aLayoutReadOnceAndOneThatDoesNotReadIsNone() {
-        val builtIn = SceneLayouts.source
+    // a source of layouts that counts what it is asked for: [text] its layouts, [key] what they are kept under
+    private class Counted(override val key: String, val text: (String) -> String?) : LayoutSource {
+        val asked = mutableListOf<String>()
+
+        override fun text(id: String): String? = text.invoke(id).also { asked += id }
+    }
+
+    private fun sources(source: LayoutSource, fallback: LayoutSource, check: () -> Unit) {
+        val (s, f) = SceneLayouts.source to SceneLayouts.fallback
         try {
-            for (id in listOf("qwerty", "k14", "k18")) assertNotNull(id, SceneLayouts.of(context, id))
-            assertEquals(setOf("grouped-bottom"), SceneLayouts.of(context, "k14")!!.fragments.keys)
-            val read = mutableListOf<String>()
-            SceneLayouts.source = { LayoutSource { id -> read += id; if (id == "k14") "<keyboard/>" else null } }
-            assertNull(SceneLayouts.of(context, "k14"))
-            assertNull(SceneLayouts.of(context, "k14"))
-            assertNull(SceneLayouts.of(context, "nine"))
-            assertEquals(listOf("k14", "nine"), read)
-            // a source that throws: none, too
-            SceneLayouts.source = { LayoutSource { error("no file") } }
-            assertNull(SceneLayouts.of(context, "k18"))
-            // a keyboard whose layout did not read is drawn by its views
-            prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
-            val keyboard = GroupedKeyboard(context, ThemePreset.PixelLight).laidOut()
-            assertTrue(KeyboardHarness.all(keyboard).none { it is KeyboardCanvasView })
+            SceneLayouts.source = { source }
+            SceneLayouts.fallback = { fallback }
+            check()
         } finally {
-            SceneLayouts.source = builtIn
+            SceneLayouts.source = s
+            SceneLayouts.fallback = f
         }
+    }
+
+    // the layouts are read once a process from each source, by the source's key and the layout's id; one
+    // the source has none of, or that does not read, is the app's own (one step back); neither: none
+    @Test
+    fun aLayoutReadOnceFromEachSourceTheAppsOwnWhereTheSourcesDoesNotRead() {
+        for (id in listOf("qwerty", "k14", "k18")) assertNotNull(id, SceneLayouts.of(context, id))
+        assertEquals(setOf("grouped-bottom"), SceneLayouts.of(context, "k14")!!.fragments.keys)
+        val builtIn = BuiltInLayouts(context)
+        val app = Counted(BuiltInLayouts.KEY, builtIn::text)
+        val pack = Counted("pack") { id -> if (id == "k14") "<keyboard/>" else builtIn.text(id) }
+        sources(pack, app) {
+            // the pack's k14 does not read: the app's, read once each
+            val k14 = SceneLayouts.of(context, "k14")!!
+            assertTrue(k14.layout.parts.isNotEmpty())
+            assertEquals(k14, SceneLayouts.of(context, "k14"))
+            assertEquals(listOf("k14"), pack.asked)
+            assertEquals(listOf("k14", "grouped-bottom"), app.asked)
+            // the pack's k18: its own
+            assertNotNull(SceneLayouts.of(context, "k18"))
+            assertEquals(listOf("k14", "k18", "grouped-bottom"), pack.asked)
+            assertEquals(listOf("k14", "grouped-bottom"), app.asked)
+            // neither has it
+            assertNull(SceneLayouts.of(context, "nine"))
+            assertNull(SceneLayouts.of(context, "nine"))
+            assertEquals(listOf("k14", "k18", "grouped-bottom", "nine"), pack.asked)
+            assertEquals(listOf("k14", "grouped-bottom", "nine"), app.asked)
+            // the pack's read again, the app's kept (P3: a theme pack changed)
+            SceneLayouts.invalidate("pack")
+            SceneLayouts.of(context, "k14")
+            SceneLayouts.of(context, "k18")
+            assertEquals(listOf("k14", "k18", "grouped-bottom", "nine", "k14", "k18", "grouped-bottom"), pack.asked)
+            assertEquals(listOf("k14", "grouped-bottom", "nine"), app.asked)
+            // all of them read again
+            SceneLayouts.invalidate()
+            SceneLayouts.of(context, "k14")
+            assertEquals(listOf("k14", "grouped-bottom", "nine", "k14", "grouped-bottom"), app.asked)
+        }
+        // a source that throws: none from it; the app's own the one step back, its own key's no step at all
+        sources(LayoutSource { error("no file") }, app) { assertNotNull(SceneLayouts.of(context, "k18")) }
+        sources(Counted(BuiltInLayouts.KEY) { error("no file") }, Counted(BuiltInLayouts.KEY, builtIn::text)) { assertNull(SceneLayouts.of(context, "k18")) }
+        assertTrue(BuiltInLayouts.has("k14") && BuiltInLayouts.has("qwerty") && !BuiltInLayouts.has("nine"))
+    }
+
+    // a keyboard moved to the scene (the app has its layout) whose layout does not read draws nothing with
+    // the canvas on: the canvas over it, not one key, no view of a key shown (U8; review S4a #1), logged once
+    @Test
+    fun aMovedKeyboardWhoseLayoutDoesNotReadDrawsNothing() {
+        val logged = mutableListOf<String>()
+        val tree = object : timber.log.Timber.Tree() {
+            override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
+                if (priority == android.util.Log.ERROR) logged += message
+            }
+        }
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+        timber.log.Timber.plant(tree)
+        try {
+            sources(Counted("pack") { "<keyboard/>" }, Counted(BuiltInLayouts.KEY) { "<keyboard/>" }) {
+                val keyboards = listOf(
+                    GroupedKeyboard(context, ThemePreset.PixelLight).laidOut(),
+                    GroupedKeyboard(context, ThemePreset.PixelLight, NineKeyLetters.G18).laidOut(),
+                    TextKeyboard(context, ThemePreset.PixelLight).laidOut(),
+                    // made again: read once all the same
+                    TextKeyboard(context, ThemePreset.PixelLight).laidOut(),
+                )
+                for (k in keyboards) {
+                    val canvas = KeyboardHarness.all(k).filterIsInstance<KeyboardCanvasView>().single()
+                    assertEquals(View.VISIBLE, canvas.visibility)
+                    assertTrue(KeyboardHarness.keysOf(k).isEmpty())
+                    assertTrue(KeyboardHarness.all(k).filterIsInstance<KeyView>().none { it.isShown })
+                }
+                // each layout's two readings, logged once a process
+                assertEquals(logged.toString(), 2 * 3, logged.count { it.startsWith("scene layout") })
+            }
+        } finally {
+            timber.log.Timber.uproot(tree)
+        }
+    }
+
+    // a keyboard not moved yet (the app has no layout of its id): its views draw, the canvas on or not
+    @Test
+    fun aKeyboardNotMovedIsDrawnByItsViews() {
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+        val unmoved = object : BaseKeyboard(context, ThemePreset.PixelLight, emptyList()) {
+            val scene = drawKeysWithScene("nine")
+            val moved = drawKeysWithScene("qwerty")
+        }.laidOut()
+        assertEquals(false, unmoved.scene)
+        assertEquals(true, unmoved.moved)
     }
 }

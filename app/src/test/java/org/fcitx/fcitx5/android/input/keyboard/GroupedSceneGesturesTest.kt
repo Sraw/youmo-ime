@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import android.text.InputType
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.InputMethodEntry
@@ -50,16 +51,22 @@ class GroupedSceneGesturesTest {
 
     // what a finger does on each key: the keys that put another keyboard up (符, 123, the globe) left to
     // GroupedKeyboardTest's bottom-row cases, as they would take the rest away
-    private fun gestures(canvas: Boolean, im: InputMethodEntry): List<String> {
+    // in a field of [inputType], text in it and the cursor at its end (what ⌫ and space's swipes act on)
+    private fun gestures(canvas: Boolean, im: InputMethodEntry, inputType: Int = InputType.TYPE_CLASS_TEXT): List<String> {
         prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, canvas)
-        return KeyboardHarness(ThemePreset.PixelLight, im).start().use { h ->
+        val prefill = { e: android.widget.EditText ->
+            e.setText(TEXT)
+            e.setSelection(TEXT.length)
+        }
+        return KeyboardHarness(ThemePreset.PixelLight, im).start(inputType, prefill = prefill).use { h ->
             h.relayout()
             assertEquals(canvas, KeyboardHarness.all(h.keyboard).any { it is KeyboardCanvasView && it.visibility == android.view.View.VISIBLE })
             val ids = h.keys().mapNotNull { it.id }.filter { it !in SWITCHING }
             assertTrue(ids.toString(), ids.size >= MOST_KEYS_AT_LEAST)
             val out = mutableListOf<String>()
             fun sent(what: String) {
-                out += "$what: " + h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") }
+                out += "$what: " + h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") } +
+                    " field ${h.field.text}|${h.field.selectionStart},${h.field.selectionEnd}"
                 h.api.calls.clear()
             }
             for (id in ids) {
@@ -71,18 +78,33 @@ class GroupedSceneGesturesTest {
                 sent("$id up")
                 h.swipe(k(), 0f, k().bounds.height().toFloat())
                 sent("$id down")
-                if (id != "space" && id != "backspace") {
+                if (id == "space" || id == "backspace") {
+                    // sideways: the cursor moved, or the text before it selected to delete
+                    h.swipe(k(), -k().bounds.width() * 2f, 0f)
+                    sent("$id left")
+                    h.swipe(k(), k().bounds.width() * 2f, 0f)
+                    sent("$id right")
+                }
+                if (id != "backspace") {
                     out += "$id long press: " + h.longPress(k())
                     sent("$id long press")
                 }
             }
+            // ⌫ held: deletes over and over, as many either way
+            val held = h.field.text.length
+            h.press(h.keyNamed("backspace"))
+            h.after(HOLD_MS)
+            h.release()
+            val deletes = h.api.calls.count { it.startsWith("sendKey") }
+            assertTrue("canvas $canvas: $deletes deletes", deletes >= MIN_REPEATS)
+            sent("backspace held $deletes from $held")
             out
         }
     }
 
-    private fun assertSame(im: InputMethodEntry) {
-        val views = gestures(false, im)
-        val scene = gestures(true, im)
+    private fun assertSame(im: InputMethodEntry, inputType: Int = InputType.TYPE_CLASS_TEXT) {
+        val views = gestures(false, im, inputType)
+        val scene = gestures(true, im, inputType)
         assertEquals(views.joinToString("\n"), scene.joinToString("\n"))
     }
 
@@ -106,6 +128,25 @@ class GroupedSceneGesturesTest {
         assertSame(shuangpin)
     }
 
+    // 双拼's 18 keys under a scheme of no `;` (Name18Plain): L alone
+    @Test
+    fun shuangpinsEighteenKeysPlain() {
+        prefs.set(AppPrefs.getInstance().keyboard.shuangpinKeyboard, org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard.Keys18)
+        EngineState.shuangpinScheme = ShuangpinScheme.ZIRANMA
+        assertSame(shuangpin)
+    }
+
+    // an address field's keys: .com and @ for the separator and the rest, their long presses (the domains)
+    @Test
+    fun theFourteenAndEighteenKeysInAnAddressField() {
+        for (keys in listOf(org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard.Keys14, org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard.Keys18)) {
+            prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, keys)
+            for (type in listOf(InputType.TYPE_TEXT_VARIATION_URI, InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)) {
+                assertSame(KeyboardHarness.PINYIN, InputType.TYPE_CLASS_TEXT or type)
+            }
+        }
+    }
+
     @Test
     fun shuangpinsFourteenKeys() {
         prefs.set(AppPrefs.getInstance().keyboard.shuangpinKeyboard, org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard.Keys14)
@@ -117,5 +158,11 @@ class GroupedSceneGesturesTest {
 
         // the groups and the bottom row: a key missing on one side is caught by the ids compared
         const val MOST_KEYS_AT_LEAST = 18
+
+        const val TEXT = "hello world, again"
+
+        // ⌫ held this long repeats: some deletes at least, the same count each side
+        const val HOLD_MS = 1500L
+        const val MIN_REPEATS = 3
     }
 }

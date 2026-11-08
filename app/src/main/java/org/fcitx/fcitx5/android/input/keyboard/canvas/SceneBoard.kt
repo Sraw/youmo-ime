@@ -34,14 +34,15 @@ import org.fcitx.fcitx5.android.scene.theme.Theme as SceneTheme
  * (U8), and the scenes and measurers kept a process. A keyboard gives its layout and what its keys
  * show now as the engine's environment ([env]: SceneEnvs.of with its own Input, texts and marks),
  * and asks for a new scene ([KeyboardCanvasView.invalidateScene]) whenever any of that changes.
- * BaseKeyboard.drawKeysWithScene puts one over a keyboard.
+ * BaseKeyboard.drawKeysWithScene puts one over a keyboard. A [layout] that did not read (null) draws
+ * nothing: no scene, no key (SceneLayouts logged it).
  */
 class SceneBoard(
     private val context: Context,
     private val theme: Theme,
-    val layout: SceneLayout,
-    /** What the keys show now, in [look] at [width] × [height]: the keyboard's state as the engine's environment. */
-    private val env: (look: ThemeLook, width: Int, height: Int) -> Env,
+    val layout: SceneLayout?,
+    /** What the keys of [layout] show now, in [look] at [width] × [height]: the keyboard's state as the engine's environment. */
+    private val env: (look: ThemeLook, layout: SceneLayout, width: Int, height: Int) -> Env,
 ) {
 
     /** The scenes the engine made for this keyboard: a test's count of what was not kept. */
@@ -62,6 +63,7 @@ class SceneBoard(
     // draws nothing and logs it). Never the views again: they go in S8
     // The fallback's the built-in theme's whole: its look, its fonts, its measurer, as it draws itself
     private fun drawn(look: ThemeLook, width: Int, height: Int): KeyboardCanvasView.Drawn? {
+        if (layout == null) return null
         drawn(theme, look, width, height)?.let { return it }
         val builtIn = if (theme.isDark) ThemePreset.PixelDark else ThemePreset.PixelLight
         if (builtIn.name == theme.name) return null
@@ -71,14 +73,15 @@ class SceneBoard(
     }
 
     private fun drawn(of: Theme, look: ThemeLook, width: Int, height: Int): KeyboardCanvasView.Drawn? {
+        val layout = layout ?: return null
         val sceneTheme = SceneTrace.section("theme") { SceneThemes.of(look, of.name, of.isDark) } ?: return null
         val measurer = measurer(look)
-        return scene(sceneTheme, look, measurer, width, height)?.let { KeyboardCanvasView.Drawn(it, look, measurer.fonts) }
+        return scene(layout, sceneTheme, look, measurer, width, height)?.let { KeyboardCanvasView.Drawn(it, look, measurer.fonts) }
     }
 
     // the scene of [sceneTheme] ([look]'s): the last kept for the same values, or made; null, the engine refused it
-    private fun scene(sceneTheme: SceneTheme, look: ThemeLook, measurer: TextMeasurer, width: Int, height: Int): Scene? {
-        val env = SceneTrace.section("env") { env(look, width, height) }
+    private fun scene(layout: SceneLayout, sceneTheme: SceneTheme, look: ThemeLook, measurer: TextMeasurer, width: Int, height: Int): Scene? {
+        val env = SceneTrace.section("env") { env(look, layout, width, height) }
         // the same values make the same scene: one asked again for nothing that shows (the first key typed,
         // the word committed: Return's look unchanged) is the last one, not made again in the frame
         scenesKept.lastOrNull { it.theme === sceneTheme && it.layout === layout && it.measurer === measurer && it.env == env }?.let { return it.scene }

@@ -16,6 +16,9 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.SceneShownKey
+import org.fcitx.fcitx5.android.input.ViewShownKey
+import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -107,6 +110,16 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
                     h.after(1000)
                     h.relayout()
                     val v = h.keyboard
+                    // the scene's side is the scene's: its canvas over the keyboard, every key one of its (review S4a #2)
+                    val canvases = KeyboardHarness.all(v).filterIsInstance<KeyboardCanvasView>().toList()
+                    val keys = KeyboardHarness.keysOf(v)
+                    if (on) {
+                        assertEquals(case.name, 1, canvases.size)
+                        assertTrue(case.name, canvases.single().isShown)
+                        assertTrue(case.name, keys.isNotEmpty() && keys.all { it is SceneShownKey })
+                    } else {
+                        assertTrue(case.name, canvases.isEmpty() && keys.isNotEmpty() && keys.all { it is ViewShownKey })
+                    }
                     Bitmap.createBitmap(v.width, v.height, Bitmap.Config.ARGB_8888).also { v.draw(Canvas(it)) }
                 }
             }
@@ -114,10 +127,15 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
             if (case.qualifiers != null) RuntimeEnvironment.setQualifiers(KeyboardCanvasViewTest.PORTRAIT)
             undo.asReversed().forEach { it() }
         }
-        save(case.name, shots)
-        val (old, new) = shots
-        assertEquals(case.name, old.width to old.height, new.width to new.height)
-        return differing(old, new, CHANNEL_SLACK).toDouble() / (old.width * old.height)
+        // the shots let go of at once: 9 cases × 2 a board, kept, ran the full suite's heap out (ThemeMakerLayoutTest's OOM)
+        try {
+            save(case.name, shots)
+            val (old, new) = shots
+            assertEquals(case.name, old.width to old.height, new.width to new.height)
+            return differing(old, new, CHANNEL_SLACK).toDouble() / (old.width * old.height)
+        } finally {
+            shots.forEach(Bitmap::recycle)
+        }
     }
 
     private fun save(name: String, shots: List<Bitmap>) {
@@ -137,6 +155,7 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
         val file = File("build/outputs/canvas-compare/$board-$name.png")
         file.parentFile!!.mkdirs()
         file.outputStream().use { out.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        out.recycle()
         assertTrue(file.length() > 0)
     }
 

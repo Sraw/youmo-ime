@@ -112,6 +112,18 @@ class LayoutReaderTest {
         assertNull(LayoutReader.action("action:anything"))
         // a group's code is its letters=, no action (060-render-v2 §15)
         assertNull(LayoutReader.action("action:group"))
+        // code: a Unicode scalar value, U+10FFFF at most and no surrogate (review S4a)
+        for (ok in listOf("code:U+0000", "code:U+D7FF", "code:U+E000", "code:U+10FFFF")) assertEquals(ok, LayoutReader.action(ok))
+        for (bad in listOf("code:U+110000", "code:U+FFFFFF", "code:U+D800", "code:U+DBFF", "code:U+DC00", "code:U+DFFF", "code:U+12", "code:U+d800")) {
+            assertNull(LayoutReader.action(bad), bad)
+        }
+        assertEquals(0x10FFFF, LayoutReader.codePoint("code:U+10FFFF"))
+        assertNull(LayoutReader.codePoint("code:U+DFFF"))
+        // a layout named; emoji search on or off and nothing else
+        assertNull(LayoutReader.action("layout:"))
+        assertEquals("emoji-search:off", LayoutReader.action("emoji-search:off"))
+        assertNull(LayoutReader.action("emoji-search:maybe"))
+        assertNull(LayoutReader.action("emoji-search:"))
     }
 
     // 060-render-v2 §15: a key's letters as one group, the key's own (no variant's, no default's), row

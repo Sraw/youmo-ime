@@ -22,6 +22,9 @@ import timber.log.Timber
  */
 fun interface LayoutSource {
     fun text(id: String): String?
+
+    /** What the layouts read from it are kept under, with their ids ([SceneLayouts.invalidate]): each source its own. */
+    val key: String get() = javaClass.name
 }
 
 /**
@@ -34,7 +37,14 @@ class BuiltInLayouts(private val context: Context) : LayoutSource {
     override fun text(id: String): String? =
         RAW[id]?.let { res -> context.resources.openRawResource(res).use { it.readBytes().decodeToString() } }
 
+    override val key: String get() = KEY
+
     companion object {
+        const val KEY = "built-in"
+
+        /** Whether the keyboard of the layout [id] is moved to the scene: the app has its layout (060-render-p2 S4). */
+        fun has(id: String): Boolean = id in RAW
+
         // named, not looked up by name (Resources.getIdentifier): the build keeps what is used
         val RAW: Map<String, Int> = mapOf(
             "qwerty" to R.raw.scene_layout_qwerty,
@@ -49,14 +59,23 @@ class BuiltInLayouts(private val context: Context) : LayoutSource {
 class SceneLayout(val id: String, val layout: Layout, val fragments: Map<String, Fragment>)
 
 /**
- * The keyboards' layouts read from [source], each once a process (main thread): one that did not
- * read, too (null, logged once). A keyboard whose layout this has ([of] not null) is drawn by the
- * canvas where it is on (060-render-p2 S4); one with none still by its views.
+ * The keyboards' layouts, each read once a process from each source (main thread), one that did not
+ * read too (logged once): [source]'s, and where it has none or it does not read, the app's own
+ * ([BuiltInLayouts]; P3, a theme pack's first). A keyboard whose layout the app has is drawn by the
+ * canvas where it is on (060-render-p2 S4): one whose layout does not read, nothing drawn, logged
+ * (never its views again, U8); one whose layout the app has not, by its views still.
  */
 object SceneLayouts {
-    private val read = HashMap<String, SceneLayout?>()
+    private sealed interface Read {
+        class Ok(val layout: SceneLayout) : Read
 
-    /** Where the layouts come from: the app's ([BuiltInLayouts]); a test's own. Set, those read are read again. */
+        data object Unread : Read
+    }
+
+    // by the source's key and the layout's id
+    private val read = HashMap<Pair<String, String>, Read>()
+
+    /** Where the layouts come from first: the app's ([BuiltInLayouts]); a test's own. Set, those read are read again. */
     @VisibleForTesting
     var source: (Context) -> LayoutSource = ::BuiltInLayouts
         set(value) {
@@ -64,12 +83,33 @@ object SceneLayouts {
             read.clear()
         }
 
-    /** The layout [id], its fragments with it; null where there is none or it did not read. */
+    /** Where a layout [source] has none of, or one that does not read, comes from: the app's own; a test's. */
+    @VisibleForTesting
+    var fallback: (Context) -> LayoutSource = ::BuiltInLayouts
+        set(value) {
+            field = value
+            read.clear()
+        }
+
+    /** The layout [id], its fragments with it: [source]'s, else [fallback]'s (the one step back); null where neither reads. */
     fun of(context: Context, id: String): SceneLayout? {
-        // getOrPut would read one that did not read again each time (its null is no entry to it)
-        if (id in read) return read[id]
-        return load(source(context.applicationContext ?: context), id).also { read[id] = it }
+        val app = context.applicationContext ?: context
+        val first = source(app)
+        readFrom(first, id)?.let { return it }
+        val then = fallback(app)
+        return if (then.key == first.key) null else readFrom(then, id)
     }
+
+    /** The layouts read from the source of [key] (all of them where null) read again when next asked for: P3, a theme pack changed. */
+    fun invalidate(key: String? = null) {
+        if (key == null) read.clear() else read.keys.removeAll { it.first == key }
+    }
+
+    private fun readFrom(source: LayoutSource, id: String): SceneLayout? =
+        when (val r = read.getOrPut(source.key to id) { load(source, id)?.let(Read::Ok) ?: Read.Unread }) {
+            is Read.Ok -> r.layout
+            Read.Unread -> null
+        }
 
     private fun load(source: LayoutSource, id: String): SceneLayout? {
         val text = runCatching { source.text(id) }.onFailure { Timber.e(it, "scene layout %s unread", id) }.getOrNull() ?: return null

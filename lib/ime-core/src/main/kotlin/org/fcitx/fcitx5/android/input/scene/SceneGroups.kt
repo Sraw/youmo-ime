@@ -33,6 +33,21 @@ object SceneGroups {
     fun leaning(layout: Layout, fragments: Map<String, Fragment> = emptyMap()): Set<String> =
         keys(layout, fragments).filter(Key::leans).mapNotNull { it.letters?.group }.toSet()
 
+    /**
+     * The groups whose tap leans on [letters]' keyboard as built in, its layout gone by or none read:
+     * the 14 keys' groups of two letters, the 18 keys' none.
+     */
+    fun builtInLeaning(letters: NineKeyLetters): Set<String> =
+        if (letters == NineKeyLetters.G14) letters.tag().split(',').filter { it.length >= 2 }.toSet() else emptySet()
+
+    /**
+     * The groups whose tap leans on [letters]' keyboard: its [layout]'s ([leaning]) where its groups are
+     * the keyboard's; a layout of other groups is gone by ([mismatch]), and so is its lean=, as is one
+     * not read (null): [builtInLeaning].
+     */
+    fun leaningOf(letters: NineKeyLetters, layout: Layout?, fragments: Map<String, Fragment> = emptyMap()): Set<String> =
+        if (layout == null || mismatch(of(layout, fragments), letters) != null) builtInLeaning(letters) else leaning(layout, fragments)
+
     // [layout]'s keys row by row as written, an included fragment's where it is included
     private fun keys(layout: Layout, fragments: Map<String, Fragment>): List<Key> = layout.parts.flatMap { part ->
         when (part) {

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.scene
 
+import org.fcitx.fcitx5.android.core.CoreLog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.scene.SceneBehavior.Bubble
@@ -57,9 +58,55 @@ class SceneBehaviorTest {
             "action:zhuyin" to SceneAction.Placeholder("zhuyin"),
         )
         words.forEach { (raw, action) -> assertEquals(raw, action, SceneAction.of(raw)) }
-        for (none in listOf("code:FF0C", "code:U+XYZ", "keypad:12", "keypad:x", "caps:once", "launch:rockets")) {
-            assertNull(none, SceneAction.of(none))
+        val nones = listOf(
+            "code:FF0C", "code:U+XYZ", "code:U+110000", "code:U+D800", "code:U+DFFF", "keypad:12", "keypad:x", "caps:once",
+            "launch:rockets", "layout:", "emoji-search:maybe", "emoji-search:",
+        )
+        val logged = mutableListOf<String>()
+        val sink = CoreLog.errorSink
+        CoreLog.errorSink = { logged += it }
+        try {
+            for (none in nones) {
+                assertNull(none, SceneAction.of(none))
+                // logged, each
+                assertTrue(none, logged.removeLast().contains("\"$none\""))
+                // the reader takes none of them either: the two agree
+                assertNull(none, LayoutReader.action(none))
+            }
+        } finally {
+            CoreLog.errorSink = sink
         }
+        assertEquals(SceneAction.Code(0x10FFFF), SceneAction.of("code:U+10FFFF"))
+    }
+
+    // every form the reader takes is an action the app reads (one of each of layout-1's patterns, the
+    // edges of each): none it lets through reads as nothing
+    @Test
+    fun everyWordTheReaderTakesIsAnAction() {
+        val forms = listOf(
+            "q", ":", "😀", "sym:BackSpace", "sym:", "picker:", "picker:Emoji", "shortcut:copy", "shortcut:", "reading:", "reading:pinyin",
+            "layout:Symbol", "layout:a", "emoji-search:on", "emoji-search:off", "action:zhuyin", "action:zhuyin-slot", "action:tone-1",
+            "action:tone-5", "commit:.com", "commit::", "code:U+0000", "code:U+FF0C", "code:U+F0104", "code:U+10FFFF", "keypad:0",
+            "keypad:9", "caps", "caps:lock", "lang", "ime-picker", "quickphrase", "unicode", "panel-back", "panel-lock",
+            "space-long-press", "reading", "begin-selection-swipe", "delete-selection", "move-selection", "lookup",
+        )
+        for (form in forms) {
+            assertEquals(form, form, LayoutReader.action(form))
+            assertTrue(form, SceneAction.of(form) != null)
+        }
+    }
+
+    // a send= written that reads as nothing is nothing (logged), not the group's code its letters= would give
+    @Test
+    fun aSendWrittenThatReadsAsNothingIsNoGroupsCode() {
+        val n = keys("k14").getValue("r1c1")
+        val bad = KeyNode(
+            id = n.id, copy = n.copy, kind = n.kind, role = n.role, shape = n.shape, bounds = n.bounds, hit = n.hit, anchor = n.anchor,
+            up = n.up, states = n.states, faces = n.faces, a11y = n.a11y, actions = n.actions + ("send" to "launch:rockets"),
+            letters = n.letters, lean = n.lean,
+        )
+        assertNull(SceneBehavior.of(bad).press)
+        assertEquals(SceneAction.Group("qw"), SceneBehavior.of(n).press)
     }
 
     @Test
@@ -157,6 +204,26 @@ class SceneBehaviorTest {
         // the engine has places for the 14 keys' codes alone (Keyboard.TAPS): G18's go as codes (P3)
         assertTrue(NineKeyLetters.G14.tag().split(',').all { Keyboard.placesTaps(NineKeyLetters.G14.key(it[0])) })
         assertTrue(NineKeyLetters.G18.tag().split(',').none { Keyboard.placesTaps(NineKeyLetters.G18.key(it[0])) })
+    }
+
+    // which groups lean on a keyboard: the views' as they always were (G14's two-letter groups, G18's none);
+    // the scene's by its layout's lean=, its groups the keyboard's; a layout of other groups gone by, lean= and all
+    @Test
+    fun aKeyboardsLeaningGroupsAreItsLayoutsWhereTheSceneDrawsItAndItsGroupsAreTheKeyboards() {
+        val twos = NineKeyLetters.G14.tag().split(',').filter { it.length >= 2 }.toSet()
+        assertEquals(twos, SceneGroups.builtInLeaning(NineKeyLetters.G14))
+        assertEquals(emptySet<String>(), SceneGroups.builtInLeaning(NineKeyLetters.G18))
+        assertEquals(emptySet<String>(), SceneGroups.builtInLeaning(NineKeyLetters.NINE_SP))
+        assertEquals(twos, SceneGroups.leaningOf(NineKeyLetters.G14, null))
+        val frags = mapOf("grouped-bottom" to bottom)
+        val offK14 = (LayoutReader.layout(SceneData.read("k14.xml").replace("letters=\"qw\"", "letters=\"qw\" lean=\"off\"")) as Parsed.Ok).value
+        assertEquals(twos - "qw", SceneGroups.leaningOf(NineKeyLetters.G14, offK14, frags))
+        // the 14 keys' layout on the 18 keys' keyboard: G18 kept, and its leaning
+        assertEquals(emptySet<String>(), SceneGroups.leaningOf(NineKeyLetters.G18, layout("k14"), frags))
+        // other groups (a 17-key layout's): the 14 keys' leaning as built in, not the layout's lean="off"
+        val other = (LayoutReader.layout(SceneData.read("k14.xml").replace("letters=\"bn\"", "letters=\"bn\" lean=\"off\"").replace("letters=\"m\"", "letters=\"mz\"")) as Parsed.Ok).value
+        assertTrue(SceneGroups.mismatch(SceneGroups.of(other, frags), NineKeyLetters.G14) != null)
+        assertEquals(twos, SceneGroups.leaningOf(NineKeyLetters.G14, other, frags))
     }
 
     @Test

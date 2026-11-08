@@ -26,10 +26,10 @@ import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
-import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.popup.PopupOverridesCache
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
@@ -338,22 +338,20 @@ class GroupedKeyboard(
         node.actions["swipe-up"]?.let(SceneAction::of)?.let(SceneBehavior::typed).orEmpty()
 
     /**
-     * The engine's groups as the layout writes them (060-render-v2 §15): its keys' letters=, collected
-     * (SceneGroups) and held to [letters], what the engine reads this keyboard's codes and record by.
-     * Any other grouping the engine has none of yet (P3): logged, and [letters] gone by.
+     * The groups the layout writes (060-render-v2 §15: its keys' letters=, collected by SceneGroups) held
+     * to [letters], what the engine reads this keyboard's codes and record by: any other grouping the
+     * engine has none of yet (P3) logged, [letters] gone by all the same (its codes, its taps' lean).
      */
-    private val groups: NineKeyLetters by lazy {
-        val layout = sceneBoard?.layout ?: return@lazy letters
-        val written = SceneGroups.of(layout.layout, layout.fragments)
-        SceneGroups.mismatch(written, letters)?.let { Timber.e("scene layout %s: %s", layout.id, it); letters }
-            ?: SceneGroups.letters(written) ?: letters
+    private fun checkGroups() {
+        val layout = sceneBoard?.layout ?: return
+        SceneGroups.mismatch(SceneGroups.of(layout.layout, layout.fragments), letters)?.let { Timber.e("scene layout %s: %s", layout.id, it) }
     }
 
     // a group key's (letters=) code and long press (060-render-v2 §15): the code of the engine's group its
     // first letter is in, sent as [wire] has it (a tap's place added by [pressed]); its letters around its
     // corner, made again as it opens ([onPopupAction])
     override val sceneTable = object : SceneKeyDef.Table {
-        override fun group(letters: String, node: KeyNode): KeyAction = code(groups.key(letters[0]), wire)
+        override fun group(letters: String, node: KeyNode): KeyAction = code(this@GroupedKeyboard.letters.key(letters[0]), wire)
 
         override fun groupPopup(letters: String, node: KeyNode): KeyDef.Popup.Keyboard =
             longPressOf(shown(letters), cornerOf(node), ::symbolsOf)
@@ -396,12 +394,11 @@ class GroupedKeyboard(
     // a swipe's, L and M as the code alone
     override fun pressed(clickAt: Float, action: KeyAction): KeyAction = tapped(action, clickAt, letters, leaning)
 
-    // the groups whose taps lean (按落点加权), as the layout writes them whichever draws the keys (its
-    // keys' lean=, 060-render-v2 §15); a layout unread: none (logged)
+    // the groups whose taps lean (按落点加权): the layout's lean=, whichever draws the keys, its groups the
+    // keyboard's (060-render-v2 §15); a layout of other groups, or none read: as built in (SceneGroups.leaningOf)
     private val leaning: Set<String> by lazy {
         val layout = sceneBoard?.layout ?: SceneLayouts.of(context, layoutOf(letters))
-        layout?.let { SceneGroups.leaning(it.layout, it.fragments) }
-            ?: emptySet<String>().also { Timber.e("no layout %s: no tap leans", layoutOf(letters)) }
+        SceneGroups.leaningOf(letters, layout?.layout, layout?.fragments.orEmpty())
     }
 
     // Return as last shown: its icon on the scene's key too
@@ -452,5 +449,6 @@ class GroupedKeyboard(
     init {
         describeGroups()
         drawKeysWithScene(layoutOf(letters))
+        checkGroups()
     }
 }

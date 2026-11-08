@@ -327,7 +327,22 @@ object LayoutReader {
     }
 
     /** [raw] where it is a word of the action vocabulary (layout-1.xsd's `action`). */
-    fun action(raw: String): String? = raw.takeIf { a -> ACTION_PATTERNS.any { it.matches(a) } }
+    fun action(raw: String): String? = raw.takeIf { a -> ACTION_PATTERNS.any { it.matches(a) } && (!a.startsWith("code:") || codePoint(a) != null) }
+
+    /**
+     * The code point of a `code:U+…` action: a Unicode scalar value, U+10FFFF at most and no surrogate
+     * (a half of a pair is no character to send); null for any other.
+     */
+    fun codePoint(raw: String): Int? = raw.removePrefix("code:").takeIf { it.startsWith("U+") && it.length in CODE_DIGITS }
+        ?.substring(2)?.takeIf { d -> d.all { it in '0'..'9' || it in 'A'..'F' } }?.toInt(HEX)
+        ?.takeIf { it <= MAX_CODE_POINT && it !in SURROGATES }
+
+    private const val HEX = 16
+    private const val MAX_CODE_POINT = 0x10FFFF
+    private val SURROGATES = 0xD800..0xDFFF
+
+    // "U+" and 4 to 6 hex digits
+    private val CODE_DIGITS = 6..8
 
     // a board may be 100 columns: the boards but the letters give widths in hundredths of the row (rules C)
     private const val MAX_UNITS = 100.0
@@ -362,7 +377,10 @@ object LayoutReader {
     private val ACTION_PATTERNS = listOf(
         // one character, sent to the engine as typed: `:` too (the 18 keys' M swipes it, HostKeyAction(":"))
         Regex("\\S"),
-        Regex("(sym|layout|picker|shortcut|reading|emoji-search):[A-Za-z0-9_.-]*"),
+        Regex("(sym|picker|shortcut|reading):[A-Za-z0-9_.-]*"),
+        // a layout named; emoji search on or off, as the app has it (KeyAction.EmojiSearchAction)
+        Regex("layout:[A-Za-z0-9_.-]+"),
+        Regex("emoji-search:(on|off)"),
         // what the app does that is no key: a table of the app's says (060-render-p2 U4): a zhuyin
         // symbol, tone 1–5 (ˉ ˊ ˇ ˋ ˙), 注音九键's slot. A group's code is no action: the key's
         // letters= say it (060-render-v2 §15)

@@ -50,7 +50,8 @@ internal class SceneKeys(private val keyboard: View, private val wire: (SceneKey
 
     /**
      * The keys of [view], each made as the scene first has its node, wired as the node says with
-     * [table] the keyboard's own words ([SceneKeyDef]); [replaced] told of a key a node no longer does as.
+     * [table] the keyboard's own words ([SceneKeyDef]); [replaced] told of a key a node no longer does as
+     * (its gestures cancelled). The keys of nodes gone from the scene are kept (060-render-p2: a to-do).
      */
     fun byNodes(view: KeyboardCanvasView, table: SceneKeyDef.Table, replaced: (SceneKey) -> Unit) {
         none()
@@ -61,7 +62,11 @@ internal class SceneKeys(private val keyboard: View, private val wire: (SceneKey
         val ref = KeyRef.scene(node.id, node.copy)
         val b = SceneBehavior.of(node)
         byNode[ref]?.takeIf { it.first == b }?.let { return it.second }
-        byNode[ref]?.second?.let(replaced)
+        // the key it was: its timers stopped (a repeat, a long press pending), as a key's are when its touch is taken
+        byNode[ref]?.second?.let { old ->
+            old.keyGesture.cancelGestures()
+            replaced(old)
+        }
         val def = SceneKeyDef.of(b, node, table)
         return SceneKey(ref, def, view, keyboard).also {
             wire(it, def)

@@ -411,11 +411,15 @@ harness reads its keys, which is in focus, its cells and text sizes, and a menu'
 (`KeyboardHarness.popupChoices`/`sceneChoices`/`shownIcons`).
 
 How a keyboard is drawn by the scene (060-render-p2 S4: the 14/18 keys first, S4b–S5 the rest the same way):
-`BaseKeyboard.drawKeysWithScene(layout id)`, last in its init, does it where the switch is on and
-`SceneLayouts.of(context, id)` has the layout (else the views draw, as before). The layouts are read
-through a `LayoutSource` by id (`BuiltInLayouts`: `lib/keyboard-scene/src/commonMain/layouts/<id>.xml`,
+`BaseKeyboard.drawKeysWithScene(layout id)`, last in its init, does it where the switch is on and the
+keyboard is moved (the app has its layout, `BuiltInLayouts.has`; a keyboard not moved yet is drawn by its
+views). A moved keyboard whose layout does not read still gets the canvas, its views' rows invisible, and
+draws nothing (logged once; never the views again, U8: `SceneKeyDefTest.aMovedKeyboardWhoseLayoutDoesNotReadDrawsNothing`).
+The layouts are read through a `LayoutSource` by id (`BuiltInLayouts`: `lib/keyboard-scene/src/commonMain/layouts/<id>.xml`,
 copied by the build as raw resources `scene_layout_<id>`, `-` made `_`; P3 a theme pack's first), each
-once a process with the fragments it includes; ids stay as the theme format names the boards (`k14/r1c1`,
+once a process with the fragments it includes, kept by the source's key and the id: `SceneLayouts.source`'s
+first, and where it has none or it does not read, one step back to the app's own (`fallback`);
+`invalidate(key)` has a source's read again (P3, on a theme change); ids stay as the theme format names the boards (`k14/r1c1`,
 `ThemeKeyNamesTest.aSceneLayoutsKeysAreItsBoardsNames`). `SceneBoard` makes the canvas view and its scenes
 (the U8 fallback, the kept scenes, the marks' settings) for any keyboard; the keyboard gives its state as
 `sceneEnv` (its `Input`, texts, marks; `GroupedKeyboard` through `TextBoardState`) and calls
@@ -428,7 +432,9 @@ the layout, and `SceneKeyDef` makes the `KeyDef` the old wiring takes (the `acti
 keysyms by name, `layout:`, `picker:` (alone, the page shown last), `commit:`, `code:U+…`, `keypad:`,
 `caps`, `shortcut:`, `reading`, `emoji-search:`, the bare words `lang`, `ime-picker`, `quickphrase`,
 `unicode`, `space-long-press`…; `action:<name>` the keyboard's `sceneTable`, zhuyin's in S4d; anything
-else logged and doing nothing). A key that does the same in a scene made anew keeps its `SceneKey`.
+else logged and doing nothing: `code:` a scalar value (U+10FFFF at most, no surrogate), `layout:` a name,
+`emoji-search:` on or off, the reader and `SceneAction.of` the same test; a `send=` that reads as nothing
+is no tap, not its group's code). A key that does the same in a scene made anew keeps its `SceneKey`.
 A group key writes its letters (`letters="qw"`, 060-render-v2 §15): its tap is its group's code (the
 keyboard's `sceneTable.group`, as `wire` sends it, its place added by `pressed`), its long press with no
 `popup` written (or `from="group"`) the letters' row the views' was (`sceneTable.groupPopup`). The
@@ -439,7 +445,8 @@ kept, so codes, learning and `wire` never change by a layout (`SceneBehaviorTest
 where a tap leans and, P3, where the default label draws; the built-ins write their labels (`QW`, one
 word centred), so no label is drawn by the rows yet. Whether a tap leans (按落点加权) is the layout's:
 a group of two letters or more without `lean="off"` (`SceneGroups.leaning`, read whichever draws the
-keys), the 18 keys writing `lean="off"`; the engine places taps of G14's codes alone (`Keyboard.placesTaps`),
+keys), the 18 keys writing `lean="off"`; a layout whose groups are not the keyboard's, or none read, leans
+as built in (`SceneGroups.leaningOf`: G14's two-letter groups); the engine places taps of G14's codes alone (`Keyboard.placesTaps`),
 so 双拼's 14 keys (sent as `shuangpin14Key`) and any 18 keys send the code only, as before.
 
 What the scene is given, so it draws what the views would: qwerty.xml is
