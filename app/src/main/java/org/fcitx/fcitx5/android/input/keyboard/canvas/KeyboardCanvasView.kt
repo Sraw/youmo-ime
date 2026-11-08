@@ -86,8 +86,8 @@ class KeyboardCanvasView(
     // a key's two faces, recorded once each when first drawn; kept across scenes where they are the same.
     // Whether it is shown pressed ([down]) and the state a screen reader is told ([state]: Shift's,
     // SceneA11y.state) go with it: a scene made again for a key typed looks up nothing by a name made
-    // for it, a frame neither
-    private class Faces(val node: KeyNode, val state: String?) {
+    // for it, a frame neither; its words ([said]: 注's and the lock's change with their state) told too when they change
+    private class Faces(val node: KeyNode, val state: String?, val said: String?) {
         var normal: RenderNode? = null
         var pressed: RenderNode? = null
         var down = false
@@ -171,8 +171,9 @@ class KeyboardCanvasView(
             if (repainted || s.under != built?.under) base = null
             built = s
             var said: MutableList<Int>? = null
+            var worded: MutableList<Int>? = null
             faces = s.keys.mapIndexed { i, k ->
-                val f = Faces(k, SceneA11y.state(k.role, k.states))
+                val f = Faces(k, SceneA11y.state(k.role, k.states), SceneA11y.of(k, ::stringNamed).description)
                 // the key in the last scene: at the same place in it mostly (a scene made again has the same keys)
                 val was = old.getOrNull(i)?.takeIf { it.of(k) } ?: old.firstOrNull { it.of(k) }
                 if (was != null) {
@@ -184,6 +185,8 @@ class KeyboardCanvasView(
                     f.down = was.down
                     // its state changed (Shift once, locked): told below
                     if (was.state != f.state) (said ?: ArrayList<Int>().also { said = it }) += i
+                    // its words changed (注 on, the lock shut: what a tap does): told as a view's new description is
+                    if (was.said != f.said) (worded ?: ArrayList<Int>().also { worded = it }) += i
                 }
                 // a key gone with the scene is pressed no more: nothing carries it
                 f
@@ -193,6 +196,7 @@ class KeyboardCanvasView(
             // a key's state changed told to a screen reader as a view's state description is: on the
             // key's node, which TalkBack reads out when it has focus
             said?.forEach { speech.invalidateVirtualView(it, AccessibilityEventCompat.CONTENT_CHANGE_TYPE_STATE_DESCRIPTION) }
+            worded?.forEach { speech.invalidateVirtualView(it, AccessibilityEventCompat.CONTENT_CHANGE_TYPE_CONTENT_DESCRIPTION) }
             return s
         }
 

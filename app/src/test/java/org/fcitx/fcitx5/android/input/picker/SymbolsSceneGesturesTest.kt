@@ -14,6 +14,13 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyboardCanvasViewTest
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.set
 import org.fcitx.fcitx5.android.uat.PrefsRule
+import android.view.ViewGroup
+import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityManager
+import androidx.core.view.AccessibilityDelegateCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityEventCompat
+import org.robolectric.Shadows.shadowOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -111,6 +118,35 @@ class SymbolsSceneGesturesTest {
                 assertEquals(slot, cell, Rect(view.left, view.top, view.right, view.bottom))
             }
             assertTrue("$before", cellOf(layout, PickerLayout.GRID_SLOT).width() < before.width())
+        }
+    }
+
+    // the events [canvas] sends that say a node's words changed (a view's new contentDescription), as [under] passes them up
+    private fun wordsTold(under: ViewGroup, canvas: KeyboardCanvasView): MutableList<AccessibilityEvent> {
+        val events = mutableListOf<AccessibilityEvent>()
+        ViewCompat.setAccessibilityDelegate(under, object : AccessibilityDelegateCompat() {
+            override fun onRequestSendAccessibilityEvent(host: ViewGroup, child: View, event: AccessibilityEvent): Boolean {
+                if (child === canvas && event.contentChangeTypes and AccessibilityEventCompat.CONTENT_CHANGE_TYPE_CONTENT_DESCRIPTION != 0) {
+                    events += AccessibilityEvent.obtain(event)
+                }
+                return false
+            }
+        })
+        shadowOf(canvas.context.getSystemService(AccessibilityManager::class.java)).setEnabled(true)
+        return events
+    }
+
+    // the lock shut: TalkBack told its node's words changed (what a tap does now), as its view's new description was
+    @Test
+    fun theLocksNewWordsToldToAScreenReader() {
+        panel(true).use { h ->
+            val kb = KeyboardHarness.find<PickerLayout>(h.inputView)!!.embeddedKeyboard
+            val canvas = KeyboardHarness.find<KeyboardCanvasView>(kb)!!
+            canvas.scene
+            val told = wordsTold(kb, canvas)
+            kb.showLocked(true)
+            canvas.scene
+            assertEquals(told.toString(), 1, told.size)
         }
     }
 
