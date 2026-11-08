@@ -30,7 +30,11 @@ that leaves a preference, a file or a static set where the next test in its JVM 
 in some orders: `KeyboardHarness.close` puts back what a harness test may change, and a test
 that moves the floating keyboard puts its place back in its own teardown (`FloatingUatTest`, `FloatingCodeStripUatTest`, `FloatingPlacerTest`,
 `FloatingControllerTest`; `KeyboardHarness.close` cannot, `FloatingUatTest` reads the place a closed
-harness left), and a screenshot of the floating keyboard pins the place it is drawn at. `-PskipExhaustive` leaves out `KeyMarksEverywhereUatTest` (every key
+harness left), and a screenshot of the floating keyboard pins the place it is drawn at. Memory the same way: a JVM runs 40 classes in one 3 GB heap, so a harness's
+close lets go of every Android object it made (the input method's window, its field's activity, a
+`SettingsHarness`'s MainActivity destroyed: one alive keeps its views in the main thread's GapWorker
+list for the rest of the JVM), held by `HarnessLeakTest`; an OOM ends the JVM and leaves its heap in
+`app/build/test-oom/<task>/<run>/` (the newest two runs kept; `-PtestGcLog` writes the GC's log beside it). `-PskipExhaustive` leaves out `KeyMarksEverywhereUatTest` (every key
 of every keyboard, every pair of mark places; half an app run's time): CI's app jobs do, and
 `key_marks.yml` runs it alone, at 35 and 29, when the keys' code changes and weekly. Run it locally after a
 change to how keys are laid out or marked (not with `-PskipExhaustive`: the exclusion wins over `--tests`).
