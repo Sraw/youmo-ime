@@ -102,6 +102,8 @@ public class Dumper {
         attr(sb, "package", n.getPackageName());
         attr(sb, "checked", String.valueOf(n.isChecked()));
         attr(sb, "focused", String.valueOf(n.isFocused()));
+        // the screen reader's focus (TalkBack's frame): what a touch explored (AX cases)
+        attr(sb, "a11y-focused", String.valueOf(n.isAccessibilityFocused()));
         attr(sb, "selected", String.valueOf(n.isSelected()));
         attr(sb, "clickable", String.valueOf(n.isClickable()));
         attr(sb, "enabled", String.valueOf(n.isEnabled()));

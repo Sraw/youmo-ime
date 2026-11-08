@@ -616,6 +616,14 @@ class UpTest(unittest.TestCase):
         self.assertFalse([c for c in self.calls() if c in ("root", "shell whoami") or c.startswith("reverse")])
 
 
+class RunNameTest(unittest.TestCase):
+    def test_another_avd_has_its_own_record(self):
+        import datetime
+        day = datetime.date(2026, 11, 8)
+        self.assertEqual(uat.run_name(day, "0.5.2-1-gabc", "youmo"), "2026-11-08-emulator-0.5.2-1-gabc")
+        self.assertEqual(uat.run_name(day, "0.5.2-1-gabc", "youmo29"), "2026-11-08-emulator-0.5.2-1-gabc-youmo29")
+
+
 class ResultsFileTest(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
@@ -694,6 +702,39 @@ class ClipMicTest(unittest.TestCase):
         d.clip_mic()
         self.assertEqual(["state", "clear", "on"], [re.search(r"--method (\w+)", c).group(1) for c in d.calls])
         self.assertEqual({"a"}, d._clips_in)
+
+
+class ScreenBackTest(unittest.TestCase):
+    def device(self, out):
+        d = uat.Device.__new__(uat.Device)
+        d.calls, d.rot, d._keys, d._kb_at, d.port = [], 1, "keys", "at", 5574
+
+        def sh(cmd):
+            d.calls.append(cmd)
+            return out if cmd.startswith("wm size;") else ""
+        d.sh = sh
+        return d
+
+    def test_a_case_left_resized_puts_the_screen_back(self):
+        d = self.device("Physical size: 1080x2340\nOverride size: 2340x1080\nPhysical density: 440\n")
+        uat.screen_back(d)
+        self.assertEqual("wm size reset; wm density reset", d.calls[-1])
+        self.assertEqual((0, None, None), (d.rot, d._keys, d._kb_at))
+
+    def test_the_devices_own_screen_is_left_alone(self):
+        d = self.device("Physical size: 1080x2340\nPhysical density: 440\n")
+        uat.screen_back(d)
+        self.assertEqual(1, len(d.calls))
+
+    def test_run_case_puts_the_screen_back_however_the_case_ends(self):
+        d = self.device("Physical size: 1080x2340\nOverride density: 320\n")
+        def fn(_):
+            raise uat.Fail("x")
+        c = SimpleNamespace(id="X-1", visual=False, fn=fn, unmet=lambda d: None)
+        run = SimpleNamespace(started=lambda *a: None, record=lambda *a: None)
+        with mock.patch.object(uat, "stepped", lambda d, e: str(e)):
+            uat.run_case(d, c, run)
+        self.assertIn("wm size reset; wm density reset", d.calls)
 
 
 class PlugTest(unittest.TestCase):

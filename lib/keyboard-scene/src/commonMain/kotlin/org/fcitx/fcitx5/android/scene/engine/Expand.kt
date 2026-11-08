@@ -140,7 +140,7 @@ object Expand {
      * TalkBack reads the description, not the name drawn); a group key's letters one by one in
      * capitals (a key with letters=), a `;` kept (GroupedKeyboard's "Q W", "L ;": TalkBack read the face "QW" as a word),
      * any other label as it is (Rime, Fn, ABC); then the alt as shown ([Texts.a11yGrouped]'s
-     * a11y_key_grouped: "Q W, 1", "ABC, 2", in Chinese with a full-width comma).
+     * a11y_key_grouped: "Q W, 1", "ABC, 2"; in Chinese "Q W，1", "ABC，2", on every keyboard that passes it).
      */
     fun spoken(attrs: KeyAttrs, group: Boolean, label: String?, alt: String?, texts: Texts): String {
         if (attrs.role == SPACE && !label.isNullOrEmpty()) return texts.a11ySpace.replace(ARG1, label)

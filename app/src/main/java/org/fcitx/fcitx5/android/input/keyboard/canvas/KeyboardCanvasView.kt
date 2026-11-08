@@ -7,7 +7,9 @@ package org.fcitx.fcitx5.android.input.keyboard.canvas
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Matrix
 import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.RenderNode
 import android.os.Bundle
 import android.os.SystemClock
@@ -477,6 +479,26 @@ class KeyboardCanvasView(
      * ([SceneKey.click], [SceneKey.longClick]: what the end of a tap, the long press's moment call),
      * as a view's performClick and performLongClick were.
      */
+    /**
+     * A key's place on screen through every transform above this view: ExploreByTouchHelper puts a node's
+     * parent bounds at the view's place on screen unscaled, so in the theme page's half-size preview
+     * (ThemeFragment) TalkBack framed and found the keys at twice their size, the right half missing.
+     */
+    private fun onScreen(left: Double, top: Double, right: Double, bottom: Double): Rect {
+        val m = Matrix()
+        var v: View = this
+        while (true) {
+            val p = v.parent as? View ?: break
+            m.postConcat(v.matrix)
+            m.postTranslate((v.left - p.scrollX).toFloat(), (v.top - p.scrollY).toFloat())
+            v = p
+        }
+        val at = IntArray(2).also(v::getLocationOnScreen)
+        m.postTranslate(at[0].toFloat(), at[1].toFloat())
+        val r = RectF(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat()).also(m::mapRect)
+        return Rect(r.left.roundToInt(), r.top.roundToInt(), r.right.roundToInt(), r.bottom.roundToInt())
+    }
+
     private inner class Speech : ExploreByTouchHelper(this) {
         override fun getVirtualViewAt(x: Float, y: Float): Int {
             val s = current ?: return INVALID_ID
@@ -505,6 +527,7 @@ class KeyboardCanvasView(
             val b = k.bounds
             @Suppress("DEPRECATION")
             node.setBoundsInParent(Rect(b.left.roundToInt(), b.top.roundToInt(), b.right.roundToInt(), b.bottom.roundToInt()))
+            node.setBoundsInScreen(onScreen(b.left, b.top, b.right, b.bottom))
             said.resourceName?.let { node.viewIdResourceName = "$resourcePackage:id/$it" }
             node.stateDescription = said.state
             node.extras.putString(SceneA11y.EXTRA_KEY, said.id)

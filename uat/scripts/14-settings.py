@@ -1,6 +1,7 @@
 """uat/14-settings.md. The .md is the source of truth; each function follows its case's
 前提/操作/预期."""
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -598,3 +599,28 @@ case("ST-64", needs="release:要上一版（0.5.x）的包覆盖安装；方法�
 
 
 case("ST-65", needs="jvm:PacksUatTest.aPackDamagedSinceItsImportIsSaidSoAndImportedAgainMended")(lambda d: None)
+
+
+@case("ST-66", base="B0-设置")
+def st66(d):
+    out = []
+    for tab, last in (("大小与样式", "禁用动画"), ("主题", None)):
+        appearance_tab(d, tab)
+        for _ in range(12):
+            if not d.scroll():
+                break
+        s = d.screen()
+        # the navigation bar's window (its nodes are not in the dump): the accessibility service's list
+        nav = re.search(r"title=(?:导航栏|Navigation bar)[^\n]*?bounds=Rect\(\d+, (\d+)", d.sh("dumpsys accessibility"))
+        if not nav:
+            raise Blocked("没有导航栏")
+        top = int(nav.group(1))
+        if last:
+            r = d.row(last, s)
+            check(r is not None, f"滚到底看不到「{last}」")
+            bottom = r.b[3]
+        else:   # the theme list: its lowest item
+            bottom = max(n.b[3] for n in s.app() if n.clickable and n.pkg == PKG)
+        check(bottom <= top + 2, f"{tab}：最后一行底 {bottom} 在导航栏顶 {top} 下面")
+        out.append(f"{tab} 最后一行底 {bottom} ≤ 导航栏顶 {top}")
+    return "；".join(out)

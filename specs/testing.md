@@ -21,6 +21,14 @@ compiled is not done.
 | Evaluation | `lib/ime-eval` | see below | ranking: whether the first candidate is the sentence meant |
 | On a device | the Android emulator (arm64) or a phone | by hand / scripts | what a user sees: layout, gestures, rotation, upgrade |
 
+Instrumented tests one at a time, or again and again on one emulator: `connectedDebugAndroidTest` uninstalls the app when
+it ends, and the imported packs with it, so install once and run through `am instrument` instead:
+`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`, `adb install -r -t -g` both APKs, `uat/tools/uat.py packs --port <port>`, then
+`adb shell am instrument -w -e class org.fcitx.fcitx5.android.input.SoftKeyboardTest#<test> io.github.sraw.youmo.debug.test/androidx.test.runner.AndroidJUnitRunner`
+(`OK (1 test)` on a pass). Kill uat's Dumper first (`adb shell pkill -f Dumper`): it holds the one UiAutomation. `am instrument`
+force-stops the package, and with it the input method's service; `SoftKeyboardTest` binds it again before each run (its
+`@Before`), as without that the field's show request failed on API 36 and no keyboard came up.
+
 Minimum before a commit: `./gradlew :lib:keyboard-scene:check :lib:ime-core:check :app:testDebugUnitTest :app:testDebugUnitTestAt29 :app:lintDebug detekt --continue`,
 and `cd uat/tools && python3 -m unittest test_uat` when `uat/` changed, plus
 the tool or build-logic tests (`./gradlew -p build-logic test`) if those changed. Unit tests need no NDK or CMake.

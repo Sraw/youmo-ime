@@ -416,7 +416,7 @@ def _load_scripts(areas, files):
 # ---------------------------------------------------------------- one device
 
 class Node:
-    __slots__ = ("text", "desc", "rid", "cls", "pkg", "b", "checked", "focused", "selected",
+    __slots__ = ("text", "desc", "rid", "cls", "pkg", "b", "checked", "focused", "a11y", "selected",
                  "clickable", "parent", "kids", "enabled", "scrollable", "wtype", "key", "alt")
 
     def __init__(self, e, parent):
@@ -431,6 +431,7 @@ class Node:
         self.b = (x0, y0, x1, y1)
         self.checked = e.get("checked") == "true"
         self.focused = e.get("focused") == "true"
+        self.a11y = e.get("a11y-focused") == "true"
         self.selected = e.get("selected") == "true"
         self.clickable = e.get("clickable") == "true"
         self.enabled = e.get("enabled") == "true"
@@ -974,10 +975,14 @@ class Device:
             return False
         n = max(lists, key=lambda n: (n.b[2] - n.b[0]) * (n.b[3] - n.b[1]))
         x0, y0, x1, y1 = n.b
-        before = s.texts()
+        # the texts and where they are: the list's end can move by its bottom padding (the navigation
+        # bar's) with no new text, and a row that came up from under the bar has moved (ST-26)
+        def seen(s):
+            return [(n.text, n.b) for n in s.app() if n.text]
+        before = seen(s)
         a, b = (x1 // 2, y0 + (y1 - y0) * 3 // 4), (x1 // 2, y0 + (y1 - y0) // 5)
         self.swipe(b if up else a, a if up else b, 400, after=0.6)
-        moved = self.screen().texts() != before
+        moved = seen(self.screen()) != before
         if moved:
             self._scrolled, self._at_top = not up, False
         return moved
@@ -1926,7 +1931,8 @@ def sym_char(d, ch):
             d.tap(n.c, 0.6)
         for _ in range(4):
             s = d.screen()
-            m = next((m for m in s.ime() if m.text == ch and m.c[0] > 200 and PANEL_TOP < m.c[1] < PANEL_BOTTOM), None)
+            # a cell drawn by the canvas (S5) has its symbol as words, not as a view's text
+            m = next((m for m in s.ime() if (m.text or m.desc) == ch and m.c[0] > 200 and PANEL_TOP < m.c[1] < PANEL_BOTTOM), None)
             if m:
                 d.tap(m.c, 0.9)
                 d._keys = None
@@ -2183,6 +2189,17 @@ def stepped(d, e):
     return f"「{d._step}」这一步：{e}" if getattr(d, "_step", None) else str(e)
 
 
+def screen_back(d):
+    """The display's size and density as the device's own once a case ends: a case left in landscape (rotate's
+    wm size 2340x1080) or at another density failed the next ones on the device that need no reset (PR-10, ST-26)"""
+    out = d.sh("wm size; wm density")
+    if "Override" in out:
+        d.sh("wm size reset; wm density reset")
+        d.rot = 0
+        d._keys = None
+        d._kb_at = None
+
+
 def run_case(d, c, run):
     d.case = c
     d._step = None
@@ -2211,6 +2228,10 @@ def run_case(d, c, run):
             undo()
         except Exception:   # a cleanup that failed leaves the next reset to it
             pass
+    try:
+        screen_back(d)
+    except Exception:   # the next case's reset does it
+        pass
     run.record(c, state, seen, d.port, time.time() - t0)
     return state
 
@@ -2840,6 +2861,12 @@ def start_server():
     return p
 
 
+def run_name(day, ver, avd):
+    """the run's record: another AVD's run (UAT_AVD=youmo29) its own, or the same day's runs of one
+    build on two AVDs read and wrote each other's results"""
+    return f"{day.isoformat()}-emulator-{ver}" + ("" if avd == "youmo" else f"-{avd}")
+
+
 def cmd_run(a):
     # every script loaded (the sheets and the results file show all cases of the run), these run
     load_scripts()
@@ -2899,7 +2926,7 @@ def run_on(a, cases, ports):
         install(d, not a.no_voice)
         d.adb("reverse", "tcp:8000", f"tcp:{HTTP_PORT}", check=True)
     ver = version(Device(ports[0]))
-    name = f"{datetime.date.today().isoformat()}-emulator-{ver}"
+    name = run_name(datetime.date.today(), ver, AVD)
     run = Run(name, [c.id for c in cases])
     # a case since removed from the scripts leaves the record, or its last row comes back each run
     for cid in [k for k in run.results if k not in CASES]:

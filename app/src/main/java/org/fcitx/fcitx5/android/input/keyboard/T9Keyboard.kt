@@ -909,6 +909,7 @@ class T9Keyboard(
             returnLabel = returnAppearance.label(context).toString(),
             returnIcon = SceneIcons.returnName(returnAppearance.icon),
             nineLetters = ('2'..'9').associate { d -> d.toString() to digitKeys.getValue(d).mainText.text.toString() },
+            a11yGrouped = context.getString(R.string.a11y_key_grouped),
             a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
         )
         val caps = when {

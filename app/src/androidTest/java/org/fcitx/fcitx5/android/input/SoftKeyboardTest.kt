@@ -8,6 +8,7 @@ import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Rect
 import android.os.Build
+import android.os.Process
 import android.os.SystemClock
 import android.view.InputDevice
 import android.view.MotionEvent
@@ -73,12 +74,12 @@ class SoftKeyboardTest {
     private fun string(id: Int, vararg args: Any): String = context.getString(id, *args)
 
     private fun launch(action: Int? = null, inputMethod: String, nineKeys: Boolean = false) {
-        // pinyin's nine keys are its keyboard (I1), chosen before the keyboard is made; put back in tearDown
-        if (nineKeys) {
-            val keyboard = AppPrefs.getInstance().keyboard.pinyinKeyboard
-            if (pinyinKeyboardWas == null) pinyinKeyboardWas = keyboard.getValue()
-            keyboard.setValue(PinyinKeyboard.NineKeys)
-        }
+        // pinyin's nine keys are its keyboard (I1), chosen before the keyboard is made; put back in tearDown. The
+        // full keyboard set as plainly, whatever an earlier run left: once the pref was found left at NineKeys after a
+        // class run on API 36 (its put-back lost), and every later pinyin test met the nine keys
+        val keyboard = AppPrefs.getInstance().keyboard.pinyinKeyboard
+        if (pinyinKeyboardWas == null) pinyinKeyboardWas = keyboard.getValue()
+        keyboard.setValue(if (nineKeys) PinyinKeyboard.NineKeys else PinyinKeyboard.Full)
         // lives in the debug app (see app/src/debug), next to the input method
         val intent = Intent(context, TypingHostActivity::class.java)
         action?.let { intent.putExtra(TypingHostActivity.EXTRA_ACTION, it) }
@@ -111,8 +112,26 @@ class SoftKeyboardTest {
 
     @Before
     fun selectThisInputMethod() {
+        // bound anew in this process before the host asks for the keyboard: am instrument force-stops this package,
+        // which kills the input method's service, and `ime set` on the one already chosen binds nothing anew -- the
+        // system may leave it unbound, and a field focused then has its show request fail (ImeTracker onFailed at
+        // PHASE_SERVER_UPDATE_CLIENT_VISIBILITY): no keyboard, no keys to find (API 36; API 29 bound it again in time).
+        // Disabled and enabled again, it is unbound and bound once more; once, while it runs in no process of this run
+        // (a test after the first finds it up: a second disable would race the old service's record going away)
         shell("ime enable $imeId")
         shell("ime set $imeId")
+        if (running()) return
+        shell("ime disable $imeId")
+        shell("ime enable $imeId")
+        shell("ime set $imeId")
+        val deadline = SystemClock.uptimeMillis() + 30_000
+        while (!running() && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(200)
+        assertTrue("input method running in this process", running())
+    }
+
+    // the input method's service up in this process (the system's record of it, with this process's pid)
+    private fun running(): Boolean = shell("dumpsys activity services $imePkg").let {
+        FcitxInputMethodService::class.java.name in it && " ${Process.myPid()}:$imePkg" in it.replace("{", " ").replace("/", " ")
     }
 
     @After

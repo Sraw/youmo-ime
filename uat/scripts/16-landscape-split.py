@@ -13,7 +13,8 @@ def kb_keys(d, s=None):
     out = []
     for n in kb.walk():
         if n.clickable:
-            out.append((n.desc or ([m.text for m in n.walk() if m.text] or [""])[0], n.b))
+            # a canvas key's node has its label as text and "w，2" as words: the label, as a view's text was
+            out.append((n.text or n.desc or ([m.text for m in n.walk() if m.text] or [""])[0], n.b))
     return out
 
 

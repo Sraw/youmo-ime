@@ -30,6 +30,7 @@
 | [17-hardware-keyboard.md](17-hardware-keyboard.md) | 实体键盘 |
 | [18-lifecycle.md](18-lifecycle.md) | 转屏、切换应用、换输入框、引擎重启这些时刻 |
 | [19-motion-notices.md](19-motion-notices.md) | 提示条（位置、替换、配色）、始终显示悬浮条、候选字号 |
+| [20-accessibility.md](20-accessibility.md) | 读屏：开着 TalkBack 探索触摸每个键盘、表情/颜文字/符号面板的格子、长按候选的菜单（读的话、节点框、焦点） |
 | [fixtures/](fixtures/) | 测试页 `fields.html` 和导入用的词表 |
 
 大词库用例（WD-14d、14h、TBL-12c 发版时用发布包脚本跑，平时不跑；发版时手动跑的 WD-14r、14v、TBL-12d 也要；14i、14s 等搬到 JVM 的用 fixtures 里的 big-words.txt 或小词表，不要它）要雾凇拼音（[rime-frost](https://github.com/gaboolic/rime-frost/releases)）发布的
