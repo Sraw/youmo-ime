@@ -82,6 +82,22 @@ class PacksUatTest {
             h.idle()
             assertTrue(h.api.calls.toString(), h.api.calls.none { it.startsWith("sendKey") })
             assertTrue(openedPacks(opened()))
+            // its button: the system's keyboard picker, not the page (the gate covers the bar's ways out)
+            val switch = KeyboardHarness.all(gate).first { (it as? android.widget.TextView)?.text == h.service.getString(R.string.pack_gate_switch) }
+            assertTrue(h.shown(switch))
+            var picked = 0
+            val pick = PackGateView.pickInputMethod
+            PackGateView.pickInputMethod = { picked++ }
+            try {
+                h.api.calls.clear()
+                h.tap(switch)
+                h.idle()
+            } finally {
+                PackGateView.pickInputMethod = pick
+            }
+            assertEquals(1, picked)
+            assertNull(opened())
+            assertTrue(h.api.calls.toString(), h.api.calls.none { it.startsWith("sendKey") })
             // imported: the keyboard again, and the app bound and its field focused again in fcitx,
             // which the import restarted (without it the space read （不可用） on a device till another app)
             (h.service.onCreateInputMethodInterface() as android.view.inputmethod.InputMethod)

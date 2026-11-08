@@ -164,7 +164,7 @@ with the system's picker (several at once); the app keeps no network permission.
 
 | Pack | Holds (asset paths, `PackKind`) | Without it |
 |---|---|---|
-| `text` (文字包) | `engine/pinyin.data`, `english.data`, `sentence-model*`, `stroke.data`, `table/`, `handwriting/` | the keyboard is `PackGateView`: 需要导入文字包, a tap opens the page |
+| `text` (文字包) | `engine/pinyin.data`, `english.data`, `sentence-model*`, `stroke.data`, `table/`, `handwriting/` | the keyboard is `PackGateView`: 需要导入文字包, a tap opens the page, its 切换输入法 button the system's keyboard picker |
 | `voice` (语音包) | `voice/` (recognizer, VAD, hotwords, polish tagger) | the microphone and the space's hold say 语音输入需要导入语音包; a tap opens the page |
 
 What stays in the APK (assets 6.7 MB of a 21 MB release APK; 0.6.0's text pack is 311 MB, the voice pack 185 MB): what the

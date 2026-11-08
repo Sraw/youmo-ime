@@ -1131,6 +1131,7 @@
     <string name="pack_text_needed_update">The text pack needs updating to v%1$d</string>
     <string name="pack_text_needed_app">The text pack v%1$d is for a newer app: update Youmo IME</string>
     <string name="pack_gate_hint">Tap here to open Resource packs</string>
+    <string name="pack_gate_switch">Switch keyboard</string>
     <string name="pack_text_needed_short">The text pack is needed: Settings → Resource packs</string>
     <string name="pack_voice_needed">Voice input needs the voice pack: Settings → Resource packs</string>
     <string name="pack_voice_needed_update">Voice input needs the voice pack updated to v%1$d: Settings → Resource packs</string>

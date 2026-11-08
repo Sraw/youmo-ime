@@ -1105,6 +1105,7 @@
     <string name="pack_text_needed_update">文字包需要更新到 v%1$d</string>
     <string name="pack_text_needed_app">文字包 v%1$d 是给更新版应用的：请更新幽默输入法</string>
     <string name="pack_gate_hint">点这里打开「资源包」</string>
+    <string name="pack_gate_switch">切换输入法</string>
     <string name="pack_text_needed_short">需要导入文字包：设置 → 资源包</string>
     <string name="pack_voice_needed">语音输入需要导入语音包：设置 → 资源包</string>
     <string name="pack_voice_needed_update">语音输入需要把语音包更新到 v%1$d：设置 → 资源包</string>
