@@ -88,6 +88,7 @@ class PunctuationMapUatTest {
             h.service.postFcitxJob { activate(1, "org.example.app") }
             h.start()
             val what = "canvas $canvas, option $on"
+            settle()
             val comma = { h.keyWithId(R.id.button_comma)!! }
             // the views' bubble shows the key's own character, mapped or not (the old drawing's, never
             // made to map; S8 deletes it): on the views the face only
@@ -137,6 +138,7 @@ class PunctuationMapUatTest {
         h = KeyboardHarness(host = fcitx)
         h.service.postFcitxJob { activate(1, "org.example.app") }
         h.start()
+        settle()
         val comma = { h.keyWithId(R.id.button_comma)!! }
         var typed = ""
         val press = { want: String ->
@@ -161,6 +163,11 @@ class PunctuationMapUatTest {
     }
 
     // the key's face and the bubble it shows pressed
+    // the start's statuses delivered before the first press: the host's thread asked till its work is done, each
+    // turn's events then handed to the main thread (else, under load, the status turning off and on again at the
+    // start came during a press: its bubble , between a face and a typed mark)
+    private fun settle() = repeat(3) { runBlocking { fcitx.isEmpty() }; h.idle() }
+
     private fun faceAndBubble(key: () -> org.fcitx.fcitx5.android.input.ShownKey): List<String> {
         h.after(BUBBLE_GONE_MS)
         val k = key()
