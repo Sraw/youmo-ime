@@ -27,7 +27,6 @@ import org.fcitx.fcitx5.android.scene.theme.KeyLook
 import org.fcitx.fcitx5.android.scene.theme.Selector
 import org.fcitx.fcitx5.android.scene.theme.TextLook
 import org.fcitx.fcitx5.android.scene.theme.Theme
-import kotlin.math.abs
 
 /**
  * A layout and a theme in an environment, made a [Scene] (060-render-v2 §6): the board placed in the
@@ -269,46 +268,40 @@ class SceneBuilder(
         }
     }
 
-    // rules B §7: the letters' marks kept apart together (one size for all the letters), the other keys' each
+    // rules B §7, 060-render-p2 S4e: each class's glyphs one size (KeyMarkYield.group), their marks kept apart
+    // from them; a key of no class (no glyph, a table's roots in lines) as placed
     private fun settle(keys: List<Prepared>): List<Settled> {
         val gap = GAP_DP * env.density
         val out = arrayOfNulls<Settled>(keys.size)
-        val letters = keys.indices.filter { keys[it].content.letter && keys[it].content.glyph != null }
-        val group = KeyMarkYield.letters(
-            letters.map { i ->
-                val c = keys[i].content
-                KeyMarkYield.LetterKey(c.glyph!!.ink.toInk(), c.baseline, c.marks.map(::mark), c.room.toInk(), c.edge)
-            },
-            gap,
-        )
-        letters.forEachIndexed { n, i -> out[i] = settled(keys[i].content, group.keys[n]) }
+        for ((_, members) in keys.indices.filter { keys[it].content.glyphClass != null && keys[it].content.yields }.groupBy { keys[it].content.glyphClass }) {
+            val group = KeyMarkYield.group(
+                members.map { i ->
+                    val c = keys[i].content
+                    val ink = c.glyph!!.ink.toInk()
+                    // a main character about its baseline, where its row's stand, and never moved off it
+                    val main = c.glyphClass == GlyphClass.Main
+                    val y = if (main) c.baseline else (ink.top + ink.bottom) / 2
+                    KeyMarkYield.Member(ink, (ink.left + ink.right) / 2, y, c.marks.map(::mark), c.room.toInk(), c.edge, moves = !main)
+                },
+                gap,
+            )
+            members.forEachIndexed { n, i -> out[i] = settled(keys[i].content, group.keys[n], group.scale) }
+        }
         keys.forEachIndexed { i, k ->
-            if (out[i] != null) return@forEachIndexed
-            val c = k.content
-            out[i] = if (c.glyph == null || c.marks.isEmpty() || !c.yields) {
-                Settled(c.glyph, c.marks.map { it.drawn })
-            } else {
-                settled(c, KeyMarkYield.key(c.glyph.ink.toInk(), c.marks.map(::mark), c.room.toInk(), gap, c.edge))
-            }
+            if (out[i] == null) out[i] = Settled(k.content.glyph, k.content.marks.map { it.drawn })
         }
         return out.map { it!! }
     }
 
-    private fun mark(m: MarkDrawn) =
-        KeyMarkYield.Mark(m.drawn.ink.toInk(), m.slot, m.minScale, m.drop, m.elsewhere.map { (slot, d) -> slot to d.ink.toInk() })
+    private fun mark(m: MarkDrawn) = KeyMarkYield.Mark(m.drawn.ink.toInk(), m.slot, m.drop)
 
-    // a settled glyph and marks drawn where their inks went: a mark from whichever of its places it settled nearest
-    private fun settled(c: KeyContent, s: KeyMarkYield.Settled): Settled {
-        val glyph = c.glyph?.mapTo(s.glyph.toBox())
-        val marks = c.marks.mapIndexed { i, m ->
-            val ink = s.marks[i]?.toBox() ?: return@mapIndexed null
-            val from = (listOf(m.drawn) + m.elsewhere.map { it.second }).minBy { distance(it.ink, ink) }
-            from.mapTo(ink)
-        }
+    // a settled glyph, its class's [scale], and marks drawn where their inks went
+    private fun settled(c: KeyContent, s: KeyMarkYield.Settled, scale: Double): Settled {
+        val glyph = c.glyph?.mapTo(s.glyph.toBox(), scale)
+        val marks = c.marks.mapIndexed { i, m -> s.marks[i]?.let { m.drawn.mapTo(it.toBox()) } }
         return Settled(glyph, marks)
     }
 
-    private fun distance(a: Box, b: Box) = abs(a.centerX - b.centerX) + abs(a.centerY - b.centerY)
 
     private fun node(k: Prepared, s: Settled): KeyNode {
         val cell = k.placed.cell

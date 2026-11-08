@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.scene.engine.MarkContent
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
+import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import kotlin.math.abs
@@ -99,33 +100,23 @@ class ContentTest {
     }
 
     @Test
-    fun aShortBackspaceKeepsBothItsIconsOneOverTheOther() {
-        // 注音大千 on a 360 dp phone at 440 dpi, compact at 20%: a ⌫ face 43.5 px tall. Its 8 dp icons 1 dp
-        // in are 38 px apart, at their least (7 dp) 38.5 tall together: they eat into their insets, half a px
-        // between them, rather than one is left out for half a px
+    fun aShortBackspaceLeavesOutItsDownIconRatherThanDrawingEitherSmaller() {
+        // 注音大千 on a 360 dp phone at 440 dpi, compact at 20%: a ⌫ face 43.5 px tall. Its two 8 dp icons, 22 px
+        // each, need 44 with nothing between them even with their insets eaten to a quarter dp: neither is drawn
+        // smaller (060-render-p2 S4e), the down one, the less swiped, is left out
         val d = 2.75
         val small = Forms.env("zhuyin", Fixtures.compact.copy(width = 990.0, height = 407.0, density = d))
         val s = Forms.scene("zhuyin", small)
-        val f = face(s, "backspace")
-        near(43.5, f.height, "the face")
+        near(43.5, face(s, "backspace").height, "the face")
         val icons = icons(s, "backspace").associate { it.name to it.box }
-        assertEquals(setOf("backspace", "delete-sweep", "restore"), icons.keys)
-        val glyph = icons.getValue("backspace")
-        val up = icons.getValue("delete-sweep")
-        val down = icons.getValue("restore")
-        assertTrue(up.right < glyph.left && down.right < glyph.left, "both left of ⌫: $up $down $glyph")
-        assertTrue(up.bottom <= down.top + 0.01, "one over the other: $up $down")
-        near(7 * d, up.height, "up at its least")
-        near(7 * d, down.height, "down at its least")
-        // into their insets the least: half a px between them, a quarter each, still 0.75 dp and more in
-        near(f.top + 1 * d - 0.25, up.top, "up a quarter px up")
-        near(f.bottom - 1 * d + 0.25, down.bottom, "down a quarter px down")
+        assertEquals(setOf("backspace", "delete-sweep"), icons.keys)
+        near(floor(8 * d + 0.5), icons.getValue("delete-sweep").height, "up its size")
     }
 
     @Test
     fun twoIconsOneOverTheOtherAreLeftOutOnlyWhereTheirInsetsEatenStillDoNotPartThem() {
         // whatever the density and the keyboard's size, a ⌫'s two icons are both drawn wherever they fit at
-        // their least (7 dp each) with their insets eaten to a quarter dp, their boxes' outer corners within
+        // their size (8 dp each, whole px) with their insets eaten to a quarter dp, their boxes' outer corners within
         // the face's rounded ones; one left out only where not
         // the theme's 4 dp corners, and square ones (where the quarter dp is what stops them)
         val floor = 0.25
@@ -147,12 +138,13 @@ class ContentTest {
             // how near the top (the bottom) an icon's corner comes within the arc, its side as placed (whole px in)
             val a = floor(f.left + Content.SHORTCUT_SIDE_COMPACT_DP * d) - f.left
             val arc = if (a >= r) 0.0 else r - sqrt(r * r - (r - a) * (r - a))
-            val fits = f.height - 2 * maxOf(floor * d, arc) >= 2 * 7 * d - 0.01
+            val icon = floor(Content.SHORTCUT_ICON_COMPACT_DP * d + 0.5)
+            val fits = f.height - 2 * maxOf(floor * d, arc) >= 2 * icon - 0.01
             val names = icons(s, "backspace").map { it.name }.toSet()
             val at = "at $d, $wDp × $hDp dp, a face ${f.height} px, corners $r px"
             val up = icons(s, "backspace").first { it.name == "delete-sweep" }.box
             if (fits) {
-                if (f.height - 2 * Content.SHORTCUT_EDGE_COMPACT_DP * d < 2 * 7 * d - 0.01) squeezed++
+                if (f.height - 2 * Content.SHORTCUT_EDGE_COMPACT_DP * d < 2 * icon - 0.01) squeezed++
                 assertEquals(setOf("backspace", "delete-sweep", "restore"), names, at)
                 val down = icons(s, "backspace").first { it.name == "restore" }.box
                 assertTrue(up.bottom <= down.top + 0.01, "apart $at: $up $down")
@@ -164,8 +156,9 @@ class ContentTest {
                 assertEquals(setOf("backspace", "delete-sweep"), names, at)
             }
         }
-        // the sweep met all three: kept as they were, kept by eating their insets, one left out
-        assertTrue(squeezed >= 20 && left >= 20, "squeezed $squeezed, left out $left")
+        // the sweep met both: kept, one left out (kept by eating their insets: the window is a dp and a half
+        // of face, which this grid's steps miss with 8 dp icons; KeyMarkYieldTest has it)
+        assertTrue(grid.size - left >= 20 && left >= 20, "kept ${grid.size - left} (squeezed $squeezed), left out $left")
     }
 
     @Test
@@ -249,18 +242,16 @@ class ContentTest {
 
     @Test
     fun aBorderKeepsTheIconsOffIt() {
-        // the small phone's ⌫ as above, its face square: with no border its icons eat a quarter px of their
-        // 1 dp insets; with a 1 dp border (all of the inset) they eat none of it, so one is left out rather than
-        // drawn on the line; a few px taller, both kept as the room has them, off the border
+        // the small phone's ⌫ as above, its face square, a 1 dp border (all of the inset): the icons eat none of
+        // it, so one is left out rather than drawn on the line; taller, both kept as the room has them, off the border
         val d = 2.75
         fun theme(border: String) = ThemeReader.theme(
             testData("material-light.xml").replace("</theme>", "<style select=\"key\" radius=\"0dp\" border=\"$border\"/>\n</theme>"),
         ).ok()
         fun scene(border: String, height: Double) =
             Forms.scene("zhuyin", Forms.env("zhuyin", Fixtures.compact.copy(width = 990.0, height = height, density = d)), theme(border))
-        assertEquals(setOf("backspace", "delete-sweep", "restore"), icons(scene("none", 407.0), "backspace").map { it.name }.toSet(), "no border")
         assertEquals(setOf("backspace", "delete-sweep"), icons(scene("1dp #ff112233", 407.0), "backspace").map { it.name }.toSet(), "a 1 dp border")
-        val tall = scene("1dp #ff112233", 420.0)
+        val tall = scene("1dp #ff112233", 440.0)
         val f = face(tall, "backspace")
         val icons = icons(tall, "backspace").associate { it.name to it.box }
         assertEquals(setOf("backspace", "delete-sweep", "restore"), icons.keys, "taller, a 1 dp border: ${f.height}")
@@ -269,26 +260,17 @@ class ContentTest {
     }
 
     @Test
-    fun aFloatingNineKeysBackspaceEatsOnlyItsSideInsetsWhereOnlyThatParts() {
-        // 注音九宫 floating at 2.75 and 3.5 px a dp: ⌫'s icon right of its two left icons, a fraction of a px too
-        // wide for them at their least. They go out sideways that fraction; their tops (bottoms) stay where they
-        // were, for a move up (down) parts nothing beside the icon; the icon its size
+    fun aFloatingNineKeysBackspaceLeavesItsIconsOutPastTheIconsCap() {
+        // 注音九宫 floating at 2.75 and 3.5 px a dp: ⌫'s two left icons, their size (S4e: never smaller), need its
+        // icon about a tenth smaller, past the icons' cap: every icon of the board as small as the cap lets it,
+        // and ⌫'s two left out (the swipes still work)
         for (d in listOf(2.75, 3.5)) {
             val k = d / Forms.DENSITY
             val e = Forms.env("zhuyin-nine", Forms.floating.copy(width = Forms.floating.width * k, height = Forms.floating.height * k, density = d))
             val s = Forms.scene("zhuyin-nine", e)
-            val f = face(s, "backspace")
             val icons = icons(s, "backspace").associate { it.name to it.box }
-            val glyph = icons.getValue("backspace")
-            val up = icons.getValue("delete-sweep")
-            val down = icons.getValue("restore")
-            val at = "at $d"
-            near(24 * d, glyph.width, "the icon its size $at")
-            near(floor(f.top + Content.SHORTCUT_EDGE_COMPACT_DP * d), up.top, "up's top where it was $at")
-            near(ceil(f.bottom - Content.SHORTCUT_EDGE_COMPACT_DP * d), down.bottom, "down's bottom where it was $at")
-            assertTrue(up.right + 1.0 * d <= glyph.left + 0.01 && down.right + 1.0 * d <= glyph.left + 0.01, "a dp from the icon $at: $up $glyph")
-            val side = up.left - f.left
-            assertTrue(side < Content.SHORTCUT_SIDE_COMPACT_DP * d - 0.01 && side > 1.0 * d, "a fraction of its side inset eaten $at: $side")
+            assertEquals(setOf("backspace"), icons.keys, "at $d")
+            near(24 * d * (1 - KeyMarkYield.MAX_CLASS_SHRINK), icons.getValue("backspace").width, "the icon at the cap at $d")
         }
     }
 
@@ -359,7 +341,8 @@ class ContentTest {
     @Test
     fun theLabelAboveASymbolBelowCentresToTheSymbolsExtent() {
         // M2: the symbol's TextView stood by the font's extent (1.05 of its size above the baseline), not its ink
-        val s = Fixtures.scene(env.copy(marks = MarkSettings(symbolAt = KeyMarks.At.Bottom)))
+        // no shortcuts: nothing meets, so the letters are their size
+        val s = Fixtures.scene(env.copy(marks = MarkSettings(symbolAt = KeyMarks.At.Bottom, charShortcuts = false)))
         val f = face(s, "q")
         val one = texts(s, "q").first { it.text == "1" }
         val symbolTop = one.baseline - 1.05 * one.size
@@ -428,9 +411,10 @@ class ContentTest {
         val sizes = s.keys.filter { it.kind == "letter" && it.role == null }.map { k ->
             k.ops(false).filterIsInstance<Op.Text>().first { it.text == k.id }.size
         }.toSet()
+        // one class, one scale: the same size to the last bit
         assertEquals(1, sizes.size, "$sizes")
         assertTrue(sizes.single() < 23 * d, "${sizes.single()}")
-        assertTrue(sizes.single() >= 23 * d * 0.75 - 0.01, "a quarter smaller at most")
+        assertTrue(sizes.single() >= 23 * d * (1 - KeyMarkYield.MAX_CLASS_SHRINK) - 0.01, "the class's cap at most")
     }
 
     // a table's roots over the letters (TextKeyboard): `when=roots`, `{root:x}`; the letter in the corner

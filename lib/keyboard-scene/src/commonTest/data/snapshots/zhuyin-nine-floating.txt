@@ -71,9 +71,7 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
   normal
     shadow rect(684.88,18.38,779.63,103.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(684.88,18.38,779.63,100.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    icon backspace 711.2,28,774.2,91 #ff7a858a
-    icon delete-sweep 690.13,21,708.58,39.45 #ff7a858a
-    icon restore 690.13,79.55,708.58,98 #ff7a858a
+    icon backspace 702.64,29.89,761.86,89.11 #ff7a858a
   pressed
     +2 fill rect(684.88,18.38,779.63,100.63 r=10.5,10.5,10.5,10.5) #1f000000
 key r2c1 kind=function a11y="ˊ"
@@ -375,7 +373,7 @@ key lang kind=letter role=lang a11y="a11y_key_switch_language"
   normal
     shadow rect(598.88,495.38,661.13,580.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(598.88,495.38,661.13,577.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    icon language 598.5,505,661.5,568 #ff7a858a
+    icon language 600.39,506.89,659.61,566.11 #ff7a858a
   pressed
     +2 fill rect(598.88,495.38,661.13,577.63 r=10.5,10.5,10.5,10.5) #1f000000
 key enter kind=enter role=enter a11y="换行"
@@ -389,6 +387,6 @@ key enter kind=enter role=enter a11y="换行"
   normal
     shadow rect(676.88,495.38,779.63,580.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(676.88,495.38,779.63,577.63 r=10.5,10.5,10.5,10.5) #ff5cb5ab
-    icon enter 696.75,505,759.75,568 #ffffffff
+    icon enter 698.64,506.89,757.86,566.11 #ffffffff
   pressed
     +2 fill rect(676.88,495.38,779.63,577.63 r=10.5,10.5,10.5,10.5) #1f000000

@@ -25,7 +25,7 @@ key lock kind=function role=lock a11y="picker_lock"
   normal
     shadow rect(125.88,465.38,205.13,580.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(125.88,465.38,205.13,577.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    icon lock-open 134,490,197,553 #ff7a858a
+    icon lock-open 135.89,491.89,195.11,551.11 #ff7a858a
   pressed
     +2 fill rect(125.88,465.38,205.13,577.63 r=10.5,10.5,10.5,10.5) #1f000000
 key numbers kind=letter role=numbers a11y="a11y_key_numbers"
@@ -37,7 +37,7 @@ key numbers kind=letter role=numbers a11y="a11y_key_numbers"
   normal
     shadow rect(220.88,465.38,299.13,580.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(220.88,465.38,299.13,577.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    icon number-pad 228.5,490,291.5,553 #ff7a858a
+    icon number-pad 230.39,491.89,289.61,551.11 #ff7a858a
   pressed
     +2 fill rect(220.88,465.38,299.13,577.63 r=10.5,10.5,10.5,10.5) #1f000000
 key space kind=space role=space a11y="a11y_key_space"
@@ -63,9 +63,8 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
   normal
     shadow rect(558.88,465.38,661.13,580.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(558.88,465.38,661.13,577.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    icon backspace 578.5,490,641.5,553 #ff7a858a
-    icon delete-sweep 564.13,468,583.5,487.38 #ff7a858a
-    icon restore 564.13,555.63,583.5,575 #ff7a858a
+    icon backspace 580.39,499.63,639.61,558.85 #ff7a858a
+    icon delete-sweep 566,468,595,497 #ff7a858a
   pressed
     +2 fill rect(558.88,465.38,661.13,577.63 r=10.5,10.5,10.5,10.5) #1f000000
 key enter kind=enter role=enter a11y="换行"
@@ -79,6 +78,6 @@ key enter kind=enter role=enter a11y="换行"
   normal
     shadow rect(676.88,465.38,779.63,580.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(676.88,465.38,779.63,577.63 r=10.5,10.5,10.5,10.5) #ff5cb5ab
-    icon enter 696.75,490,759.75,553 #ffffffff
+    icon enter 698.64,491.89,757.86,551.11 #ffffffff
   pressed
     +2 fill rect(676.88,465.38,779.63,577.63 r=10.5,10.5,10.5,10.5) #1f000000

@@ -16,10 +16,18 @@ import kotlin.math.ceil
 import kotlin.math.floor
 
 /**
- * A mark as placed before any yields ([KeyMarkYield.Mark] of it), and where it would be elsewhere;
- * [top] its box's (a text's by the font's extent, as its TextView stood: the label under it centres to it).
+ * A mark as placed before any yields ([KeyMarkYield.Mark] of it); [top] its box's (a text's by the
+ * font's extent, as its TextView stood: the label under it centres to it).
  */
-class MarkDrawn(val drawn: Drawn, val slot: Slot, val minScale: Double, val drop: Int, val elsewhere: List<Pair<Slot, Drawn>>, val top: Double)
+class MarkDrawn(val drawn: Drawn, val slot: Slot, val drop: Int, val top: Double)
+
+/**
+ * The classes a keyboard's glyphs are one size in (060-render-p2 S4e, KeyMarkYield.group): [Main], what
+ * a key types (a letter, a 注音 symbol, a 九键 group, a digit, a punctuation; a function key's single
+ * mark too, which it types); [Icon], a key's icon (⌫ ⇧ ⏎ 🌐, an icon over a label); [Label], a
+ * function key's word (123, 符号, the space's name, an input method's badge and name).
+ */
+enum class GlyphClass { Main, Icon, Label }
 
 /**
  * A key's [glyph] (label, icon, badge; null: none) and [marks], before they yield to each other;
@@ -27,7 +35,7 @@ class MarkDrawn(val drawn: Drawn, val slot: Slot, val minScale: Double, val drop
  * a styled text, so nothing gave way to it).
  */
 class KeyContent(
-    val glyph: Drawn?, val marks: List<MarkDrawn>, val room: Box, val letter: Boolean, val baseline: Double, val yields: Boolean = true,
+    val glyph: Drawn?, val marks: List<MarkDrawn>, val room: Box, val glyphClass: GlyphClass?, val baseline: Double, val yields: Boolean = true,
     /** How far out the marks go, their insets eaten, where nothing else keeps them all ([MARK_EDGE_DP] in from the face's sides, arcs and border). */
     val edge: KeyMarkYield.Edge = KeyMarkYield.Edge(room.toInk()),
 )
@@ -81,12 +89,20 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         val cy = if (below != null) (content.top + below.top) / 2 else content.centerY
         val glyph = glyph(badge, measured, label, icon, roots, content, cy)
         val room = content.inset(ROOM_H_DP * d, ROOM_V_DP * d, ROOM_H_DP * d, ROOM_V_DP * d)
-        val letter = key.attrs.alt != null && label != null && icon == null && badge == null && !lines
+        // by the key's kind (a layout's or a theme's own keys fall in by theirs) and what it shows: a function
+        // key's single mark (, . / ˇ) is what it types, its single word (符 拼) a word
+        val glyphClass = when {
+            glyph == null || lines -> null
+            icon != null -> GlyphClass.Icon
+            badge != null -> GlyphClass.Label
+            key.kind !in FUNCTION_KINDS || label?.text?.let(::typed) == true -> GlyphClass.Main
+            else -> GlyphClass.Label
+        }
         // the face's corners where it is what the content is in (a bar's or a circle's are not: its box's then)
         val radii = face?.pressed?.takeIf { it.box == content }?.radii ?: Shape.NO_RADII
         val line = face?.border ?: 0.0
         val edge = KeyMarkYield.Edge(content.toInk(), radii, MARK_EDGE_DP * d + line, line)
-        return KeyContent(glyph, marks, room, letter, glyph?.texts?.firstOrNull()?.baseline ?: 0.0, yields = !lines, edge = edge)
+        return KeyContent(glyph, marks, room, glyphClass, glyph?.texts?.firstOrNull()?.baseline ?: 0.0, yields = !lines, edge = edge)
     }
 
     // the key's one thing in the middle: its badge and label, its label over its icon, its roots, its label, its icon
@@ -150,18 +166,17 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
             val shortcutSlot = shortcut?.let { KeyMarks.shortcutSlot(KeyMarks.onKeys(m.symbolAt, m.shortcutAt, env.landscape, env.compact).shortcut) }
                 ?.takeIf { it != symbolSlot }
             return listOfNotNull(
-                shortcutSlot?.let { shortcutMark(shortcut, it, listOfNotNull(symbolSlot), KeyMarkYield.DROP_SHORTCUT, 0, listOf(it), cell, content, looks) },
+                shortcutSlot?.let { shortcutMark(shortcut, it, KeyMarkYield.DROP_SHORTCUT, cell, content, looks) },
                 symbolSlot?.let { symbolMark(symbol, it, content, looks) },
             )
         }
         val up = m.shortcuts["$name:up"]
         val down = m.shortcuts["$name:down"]
         val placed = KeyMarks.placeFunction(up, down, m.upOn, m.downOn, m.symbolAt, m.shortcutAt, env.landscape, env.compact)
-        val slots = placed.at.keys.toList()
         // up's first, down's second where both are (placeFunction's order)
         return placed.at.entries.mapIndexed { i, (slot, mark) ->
             val drop = if (i == 1) KeyMarkYield.DROP_DOWN_SHORTCUT else KeyMarkYield.DROP_SHORTCUT
-            shortcutMark(mark, slot, emptyList(), drop, i, slots, cell, content, looks)
+            shortcutMark(mark, slot, drop, cell, content, looks)
         }
     }
 
@@ -172,34 +187,28 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         val vPad = if (slot == Slot.Below) BELOW_DP * d else 0.0
         val box = slotBox(slot, measured.box.width, measured.box.height, content, SYMBOL_SIDE_DP * d, vPad)
         val drawn = measured.inBox(box, Part.Mark)
-        return MarkDrawn(drawn, slot, KeyMarkYield.minScale(KeyMarkYield.MIN_SYMBOL_DP, sizeDp), KeyMarkYield.DROP_SYMBOL, emptyList(), box.top)
+        return MarkDrawn(drawn, slot, KeyMarkYield.DROP_SYMBOL, box.top)
     }
 
-    // a shortcut's mark, the [index]th of its key's [slots] (KeyMarks.elsewhere tries them together)
-    private fun shortcutMark(
-        mark: MarkContent, slot: Slot, taken: List<Slot>, drop: Int, index: Int, slots: List<Slot>, cell: Box, content: Box, looks: Looks,
-    ): MarkDrawn {
+    // a shortcut's mark in [slot]
+    private fun shortcutMark(mark: MarkContent, slot: Slot, drop: Int, cell: Box, content: Box, looks: Looks): MarkDrawn {
         val compact = env.compact
         val h = (if (compact) SHORTCUT_SIDE_COMPACT_DP else SHORTCUT_SIDE_DP) * d
         val v = (if (compact) SHORTCUT_EDGE_COMPACT_DP else SHORTCUT_EDGE_DP) * d
-        val (drawnAt, minScale) = when (mark) {
+        val drawn = when (mark) {
             is MarkContent.Icon -> {
                 val dp = if (compact) SHORTCUT_ICON_COMPACT_DP else SHORTCUT_ICON_DP
-                val f = { at: Slot -> Drawn.of(PlacedIcon(mark.name, laidOut(slotBox(at, dp * d, dp * d, content, h, v)), Part.Shortcut)) }
-                f to KeyMarkYield.minScale(KeyMarkYield.MIN_ICON_DP, dp)
+                Drawn.of(PlacedIcon(mark.name, laidOut(slotBox(slot, dp * d, dp * d, content, h, v)), Part.Shortcut))
             }
             is MarkContent.Text -> {
                 val sizeDp = SHORTCUT_TEXT_DP * textScale
                 val m = Measured(mark.text, measurer.measure(mark.text, looks.shortcut.font, looks.shortcut.weight, sizeDp * d), sizeDp * d, looks.shortcut.font, looks.shortcut.weight)
                     .squeezed(SHORTCUT_TEXT_SHARE * cell.width)
-                val f = { at: Slot -> m.inBox(slotBox(at, m.box.width, m.box.height, content, h, v), Part.Shortcut) }
-                f to KeyMarkYield.minScale(KeyMarkYield.MIN_SYMBOL_DP, sizeDp)
+                m.inBox(slotBox(slot, m.box.width, m.box.height, content, h, v), Part.Shortcut)
             }
         }
-        val elsewhere = KeyMarks.elsewhere(slots, taken).map { alt -> alt[index] to drawnAt(alt[index]) }
-        val drawn = drawnAt(slot)
         // a shortcut is never under the label (KeyMarks.Slot.Below): its top centres nothing
-        return MarkDrawn(drawn, slot, minScale, drop, elsewhere, drawn.ink.top)
+        return MarkDrawn(drawn, slot, drop, drawn.ink.top)
     }
 
     // where a view of [b] was laid out: its corner on the pixel it starts in, its size whole pixels (a
@@ -267,7 +276,7 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
 
         /**
          * A mark no nearer its face's side than this, its inset eaten (KeyMarkYield, before the glyph is
-         * smaller or the mark goes elsewhere): a quarter dp of the face's colour still round its ink, half
+         * smaller or the mark left out): a quarter dp of the face's colour still round its ink, half
          * a device px or more at any density from 2 (an icon's strokes further in, its box's own margin).
          */
         const val MARK_EDGE_DP = 0.25
@@ -279,11 +288,18 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         const val ROOTS_INSET_DP = 6.0
 
         private const val ROOT = "root"
+
+        /** The kinds of a function key: its label a [GlyphClass.Label] but a single character. */
+        private val FUNCTION_KINDS = setOf("function", "enter", "space")
         private const val HALF_PX = 0.5
 
         /** ImageTextKeyView's: the label's and the icon's distance from the bottom and the top, portrait and landscape. */
         private val PORTRAIT_PADS = 4.0 to 8.0
         private val LANDSCAPE_PADS = 2.0 to 4.0
+
+        /** Whether a function key's label [s] is a character it types: one, not a letter of a word (a mark, ˇ). */
+        private fun typed(s: String): Boolean =
+            s.length == 1 && (!s[0].isLetter() || s[0].category == CharCategory.MODIFIER_LETTER)
 
         /** How many code points [s] is: one is centred by its ink. */
         fun codePoints(s: String): Int {
