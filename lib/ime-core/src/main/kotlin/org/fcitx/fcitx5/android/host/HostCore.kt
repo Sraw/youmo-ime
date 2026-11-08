@@ -451,7 +451,8 @@ class HostCore(
      * width off (it is not saved). What the app keeps for its next start, to draw the keys before the host is up.
      */
     fun startPunctuationKeys(): Map<String, String> =
-        modules.punctuation?.keys(InputMethodCatalog.listed(currentInputMethod())?.chinese == true).orEmpty()
+        // a new host's first context takes the group's first input method (InputContexts), not the one now on
+        modules.punctuation?.keys(contexts.group.inputMethods.firstOrNull()?.let { InputMethodCatalog.listed(it)?.chinese } == true).orEmpty()
 
     /** [block]'s changes as one event: the status, however often changed in it, sent once at its end. */
     fun <T> batch(block: () -> T): T = pipeline.batch(block)

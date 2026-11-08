@@ -111,6 +111,24 @@ class ChineseModulesHostTest {
         assertEquals(emptyMap<String, String>(), log.filterIsInstance<HostEvent.StatusArea>().last().punctuation)
     }
 
+    // what a new host starts with (its first context on the group's first input method), whatever this one's
+    // context is on now: English, full width on, punctuation off (S7a round 4)
+    @Test
+    fun `the start keys are a new host's, not the current context's`() {
+        // before any context: the input method a new host's first one takes
+        val started = core.punctuationKeys()
+        assertEquals(mapOf("." to "。", "," to "，"), started)
+        open()
+        core.activateAction(core.statusArea().first { it.name == "fullwidth" }.id)
+        core.toggle()
+        assertEquals(ImGroup.KEYBOARD_US, core.currentInputMethod())
+        assertEquals(started, core.startPunctuationKeys())
+        core.toggle()
+        core.activateAction(core.statusArea().first { it.name == "punctuation" }.id)
+        core.toggle()
+        assertEquals(emptyMap<String, String>(), core.startPunctuationKeys())
+    }
+
     // full width with the status, in the same event, on a Chinese input method only (S7a)
     @Test
     fun `full width goes out with the status`() {
