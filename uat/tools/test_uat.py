@@ -696,6 +696,39 @@ class ClipMicTest(unittest.TestCase):
         self.assertEqual({"a"}, d._clips_in)
 
 
+class ScreenBackTest(unittest.TestCase):
+    def device(self, out):
+        d = uat.Device.__new__(uat.Device)
+        d.calls, d.rot, d._keys, d._kb_at, d.port = [], 1, "keys", "at", 5574
+
+        def sh(cmd):
+            d.calls.append(cmd)
+            return out if cmd.startswith("wm size;") else ""
+        d.sh = sh
+        return d
+
+    def test_a_case_left_resized_puts_the_screen_back(self):
+        d = self.device("Physical size: 1080x2340\nOverride size: 2340x1080\nPhysical density: 440\n")
+        uat.screen_back(d)
+        self.assertEqual("wm size reset; wm density reset", d.calls[-1])
+        self.assertEqual((0, None, None), (d.rot, d._keys, d._kb_at))
+
+    def test_the_devices_own_screen_is_left_alone(self):
+        d = self.device("Physical size: 1080x2340\nPhysical density: 440\n")
+        uat.screen_back(d)
+        self.assertEqual(1, len(d.calls))
+
+    def test_run_case_puts_the_screen_back_however_the_case_ends(self):
+        d = self.device("Physical size: 1080x2340\nOverride density: 320\n")
+        def fn(_):
+            raise uat.Fail("x")
+        c = SimpleNamespace(id="X-1", visual=False, fn=fn, unmet=lambda d: None)
+        run = SimpleNamespace(started=lambda *a: None, record=lambda *a: None)
+        with mock.patch.object(uat, "stepped", lambda d, e: str(e)):
+            uat.run_case(d, c, run)
+        self.assertIn("wm size reset; wm density reset", d.calls)
+
+
 class PlugTest(unittest.TestCase):
     def device(self, plugged, nav_on):
         d = mock.Mock()

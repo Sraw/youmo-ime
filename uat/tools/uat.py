@@ -2187,6 +2187,17 @@ def stepped(d, e):
     return f"「{d._step}」这一步：{e}" if getattr(d, "_step", None) else str(e)
 
 
+def screen_back(d):
+    """The display's size and density as the device's own once a case ends: a case left in landscape (rotate's
+    wm size 2340x1080) or at another density failed the next ones on the device that need no reset (PR-10, ST-26)"""
+    out = d.sh("wm size; wm density")
+    if "Override" in out:
+        d.sh("wm size reset; wm density reset")
+        d.rot = 0
+        d._keys = None
+        d._kb_at = None
+
+
 def run_case(d, c, run):
     d.case = c
     d._step = None
@@ -2215,6 +2226,10 @@ def run_case(d, c, run):
             undo()
         except Exception:   # a cleanup that failed leaves the next reset to it
             pass
+    try:
+        screen_back(d)
+    except Exception:   # the next case's reset does it
+        pass
     run.record(c, state, seen, d.port, time.time() - t0)
     return state
 
