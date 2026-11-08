@@ -2162,9 +2162,11 @@ class Run:
             end = time.time()
             start = end - secs
             self.active.pop(dev, None)
-            # what the other device ran while this one did: two emulators share the host's CPU
+            # what the other device ran while this one did: two emulators share the host's CPU. One still running
+            # there ran beside this one's end, started even in the same clock tick (s == end: time.time()'s
+            # resolution, two calls a microsecond apart; test_rerun_keeps_first_failure failed on it)
             beside = [x[1] for x in self.spans if x[0] != dev and x[2] < end and x[3] > start] + \
-                     [cid for p, (cid, s) in self.active.items() if p != dev and s < end]
+                     [cid for p, (cid, s) in self.active.items() if p != dev and s <= end]
             self.spans.append([dev, c.id, start, end])
             att = self.prev.pop(c.id, []) + [{"at": datetime.datetime.now().isoformat(timespec="seconds"),
                                               "dev": dev, "state": state, "seen": seen,

@@ -65,6 +65,14 @@ class AttemptsTest(unittest.TestCase):
             run.record(self.case("EN-04"), "通过", "", "5557", 1)
         self.assertEqual([a["state"] for a in run.results["EN-04"][4]], ["阻塞", "通过"])
 
+    def test_beside_one_started_in_the_same_clock_tick(self):
+        # time.time() the same for both calls (its resolution): the one still running there is beside
+        run = uat.Run("t", ["T9-02", "TBL-12c"])
+        with mock.patch.object(uat.time, "time", lambda: 1000.0), contextlib.redirect_stdout(io.StringIO()):
+            run.started("5556", "TBL-12c")
+            run.record(self.case("T9-02"), "失败", "x", "5557", 3)
+        self.assertEqual(run.results["T9-02"][4][0]["beside"], ["TBL-12c"])
+
     def test_no_overlap_not_beside(self):
         run = uat.Run("n", ["A-1", "B-1"])
         with contextlib.redirect_stdout(io.StringIO()):
