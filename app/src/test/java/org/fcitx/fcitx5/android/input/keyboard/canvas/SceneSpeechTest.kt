@@ -252,6 +252,27 @@ class SceneSpeechTest {
         assertEquals("q, 1", node)
     }
 
+    /** A scaled parent (the theme page's half-size preview) puts the keys where they are drawn, not where they would be unscaled. */
+    @Test
+    fun aKeyIsOnScreenWhereAScaledParentDrawsIt() {
+        harness(true).use { h ->
+            val c = h.canvas()
+            val parent = c.parent as View
+            val at = IntArray(2).also(parent::getLocationOnScreen)
+            val inside = IntArray(2).also(c::getLocationOnScreen).let { (it[0] - at[0]) to (it[1] - at[1]) }
+            parent.pivotX = 0f
+            parent.pivotY = 0f
+            parent.scaleX = 0.5f
+            parent.scaleY = 0.5f
+            val k = c.scene!!.keys.last { it.id == "p" || it.id == "return" }
+            val r = android.graphics.Rect()
+            c.accessibilityNodeProvider!!.createAccessibilityNodeInfo(c.scene!!.keys.indexOf(k))!!.getBoundsInScreen(r)
+            assertEquals((at[0] + (inside.first + k.bounds.left) / 2).toFloat(), r.left.toFloat(), 1f)
+            assertEquals((at[1] + (inside.second + k.bounds.top) / 2).toFloat(), r.top.toFloat(), 1f)
+            assertEquals((k.bounds.width / 2).toFloat(), r.width().toFloat(), 1f)
+        }
+    }
+
     // what a reader hears of a click: the clicked or long-clicked event of the key, a tap's, the reader's own
     // click's and long click's, the same with either drawing (U6's "TalkBack reads it as before")
     @Test
