@@ -869,11 +869,14 @@ class KeyboardHarness(
         }
 
         /**
-         * The keys' canvas under [root]: not the bar's number row's (060-render-p2 S6), which is made with the bar and
-         * shown only for a password, and would otherwise be found first.
+         * The keys' canvas under [root]: one a keyboard board draws its keys on (its nearest [BaseKeyboard] the
+         * board), not the bar's number row's (060-render-p2 S6), which is made with the bar and shown only for a
+         * password, and would otherwise be found first.
          */
-        fun boardCanvas(root: View): KeyboardCanvasView? = all(root).filterIsInstance<KeyboardCanvasView>()
-            .firstOrNull { c -> generateSequence(c.parent) { it.parent }.none { it is org.fcitx.fcitx5.android.input.bar.ui.idle.NumberRow } }
+        fun boardCanvas(root: View): KeyboardCanvasView? = all(root).filterIsInstance<KeyboardCanvasView>().firstOrNull { c ->
+            val board = generateSequence(c.parent) { it.parent }.firstOrNull { it is BaseKeyboard }
+            board != null && board !is org.fcitx.fcitx5.android.input.bar.ui.idle.NumberRow
+        }
 
         fun all(v: View): Sequence<View> = sequence {
             yield(v)
