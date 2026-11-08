@@ -1799,6 +1799,14 @@ def canvas_prefs_script(f):
             "-e 's#</map>#<boolean name=\"canvas_keyboard\" value=\"true\" /></map>#' $f > $f.new && mv $f.new $f")
 
 
+def prefs_settled_script(path, tries=10):
+    """the shell script waiting (up to tries x 0.5 s) for the prefs file at path to read the same
+    twice running: what the app still writes with apply() lands before a force-stop drops it. A file
+    there is none of reads the same (nothing pending to wait for)"""
+    return (f"i=0; while [ $i -lt {tries} ]; do a=$(cksum {path} 2>/dev/null); sleep 0.5; "
+            f"[ \"$a\" = \"$(cksum {path} 2>/dev/null)\" ] && break; i=$((i+1)); done")
+
+
 def canvas_on_cmd(build=None):
     """the shell command turning the canvas on in the cleared app's prefs, after the packs are in
     (their import's prefs kept: [canvas_prefs_script]): as the app (run-as, the debug build's: its
@@ -1809,7 +1817,9 @@ def canvas_on_cmd(build=None):
     if build == "debug":
         return f"am force-stop {PKG}; run-as {PKG} sh -c {write}"
     dd = f"/data/data/{PKG}"
-    return (f"am force-stop {PKG}; cd {dd} && sh -c {write}; u=$(stat -c %u {dd}); chown -R $u:$u {dd}/shared_prefs; "
+    # a release ran the app to import the packs through its page (import_packs_ui): what it still
+    # writes asynchronously settled first, or the force-stop loses it
+    return (f"{prefs_settled_script(f'{dd}/{f}')}; am force-stop {PKG}; cd {dd} && sh -c {write}; u=$(stat -c %u {dd}); chown -R $u:$u {dd}/shared_prefs; "
             f"chmod 660 {dd}/{f}; chcon -R $(ls -dZ {dd} | cut -d' ' -f1) {dd}/shared_prefs")
 
 

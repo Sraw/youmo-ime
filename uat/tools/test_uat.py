@@ -773,6 +773,25 @@ class CanvasOnTest(unittest.TestCase):
         for part in ("chown -R $u:$u", "chmod 660", "chcon -R"):
             self.assertIn(part, cmd)
 
+    def test_a_release_waits_for_the_prefs_to_settle_before_the_force_stop(self):
+        cmd = uat.canvas_on_cmd("release")
+        self.assertLess(cmd.index("cksum"), cmd.index("am force-stop"))
+        with tempfile.TemporaryDirectory() as d:
+            f = os.path.join(d, "p.xml")
+            # nothing there, then a file written once: each settles at the first look
+            for _ in range(2):
+                start = time.monotonic()
+                subprocess.run(["sh", "-c", uat.prefs_settled_script(f)], check=True)
+                self.assertLess(time.monotonic() - start, 2)
+                with open(f, "w") as out:
+                    out.write("<map></map>")
+            # still being written: waited for till it stops
+            writer = subprocess.Popen(["sh", "-c", f"for i in 1 2 3 4 5 6; do echo $i >> {f}; sleep 0.3; done"])
+            subprocess.run(["sh", "-c", uat.prefs_settled_script(f)], check=True)
+            with open(f) as got:
+                self.assertTrue(got.read().rstrip().endswith("6"), "returned before the writes ended")
+            writer.wait()
+
     def test_the_canvas_off_after_the_app_started_blocks_the_case(self):
         d = mock.Mock()
         d.sh.return_value = "<map><boolean name=\"canvas_keyboard\" value=\"false\" /></map>"
