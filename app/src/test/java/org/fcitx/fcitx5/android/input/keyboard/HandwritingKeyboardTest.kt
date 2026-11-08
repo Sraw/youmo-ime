@@ -30,6 +30,7 @@ import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognitionTest.Que
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognitionTest.Reader
 import org.fcitx.fcitx5.android.input.handwriting.InkPad
 import org.fcitx.fcitx5.android.input.handwriting.LoadingReader
+import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -280,7 +281,7 @@ class HandwritingKeyboardTest {
             AppData.open("handwriting/test.txt").close()
             opens++
             InkRecognizer(net, net, "一", floatArrayOf(0f))
-        }, { told++ }) { PackStore.state.value.generation }
+        }, { told++ }, HandwritingRecognition::textPack)
         val recognition = HandwritingRecognition(worker, main, { -1 }, loading)
         TestShelves.use(text = false, voice = true)
         try {
@@ -297,6 +298,54 @@ class HandwritingKeyboardTest {
             assertEquals(1, opens)
             assertEquals(0, told)
         } finally {
+            TestShelves.use()
+        }
+    }
+
+    /**
+     * Given up on the text pack's files (they cannot load): an import of the voice pack leaves it
+     * given up, not loaded again and told again (it followed PackStore's generation, which the
+     * voice pack counts up too: review L-4); one of the text pack loads it anew.
+     */
+    @Test
+    fun aRecognizerGivenUpIsNotTriedAgainForTheVoicePack() {
+        var told = 0
+        var opens = 0
+        val net = InkNet { _, _ -> floatArrayOf(0f) }
+        var loads = false
+        val loading = LoadingReader({ _ ->
+            opens++
+            if (!loads) throw java.io.IOException("chars.txt missing")
+            InkRecognizer(net, net, "一", floatArrayOf(0f))
+        }, { told++ }, HandwritingRecognition::textPack)
+        val recognition = HandwritingRecognition(worker, main, { -1 }, loading)
+        val restart = PackStore.restartHost
+        PackStore.restartHost = { true }
+        TestShelves.use(text = true, voice = false)
+        try {
+            val keyboard = keyboard(recognition)
+            runAll()
+            keyboard.pad().stroke()
+            runAll()
+            assertEquals(1, opens)
+            assertEquals(1, told)
+            val generation = PackStore.state.value.generation
+            kotlinx.coroutines.runBlocking { PackStore.import(TestShelves.pack(PackKind.VOICE).inputStream()) }
+            assertEquals(generation + 1, PackStore.state.value.generation)
+            keyboard.pad().stroke()
+            runAll()
+            assertEquals(1, opens)
+            assertEquals(1, told)
+            // the text pack imported: loaded anew from it
+            loads = true
+            kotlinx.coroutines.runBlocking { PackStore.import(TestShelves.pack(PackKind.TEXT, version = 2).inputStream()) }
+            keyboard.pad().stroke()
+            runAll()
+            assertEquals(2, opens)
+            assertEquals(listOf("一"), delivered)
+            assertEquals(1, told)
+        } finally {
+            PackStore.restartHost = restart
             TestShelves.use()
         }
     }

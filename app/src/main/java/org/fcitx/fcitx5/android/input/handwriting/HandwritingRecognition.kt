@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.engine.handwriting.InkNet
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.handwriting.InkRecognizer
 import org.fcitx.fcitx5.android.handwriting.OrtModel
+import org.fcitx.fcitx5.android.pack.PackKind
 import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -119,9 +120,16 @@ class HandwritingRecognition internal constructor(
                 Executors.newSingleThreadExecutor { Thread(it, "handwriting").apply { isDaemon = true } },
                 Executor { main.post(it) },
                 { EngineState.handwritingEnded.value },
-                LoadingReader(AssetRecognizer::open, AssetRecognizer::told) { PackStore.state.value.generation },
+                LoadingReader(AssetRecognizer::open, AssetRecognizer::told, ::textPack),
             )
         }
+
+        /**
+         * What the recognizer's files are of: the text pack's directory, a new one at each import of
+         * it; not PackStore's generation, which an import of the voice pack counts up too (the
+         * recognizer let go and loaded again for nothing, one that cannot load told again).
+         */
+        internal fun textPack(): Any? = PackStore.dir(PackKind.TEXT)
     }
 }
 
@@ -133,13 +141,14 @@ class HandwritingRecognition internal constructor(
  *
  * Its files are the text pack's: without the pack (PackUnavailableException, the keyboard under its
  * gate) it is not loaded, but neither given up nor told: the gate says what is missing. Whatever
- * was loaded or given up is of the packs of [generation] (PackStore's, counted up by an import):
- * once that changes, it is let go and loaded anew from the new pack at the next read.
+ * was loaded or given up is of the pack [pack] says (HandwritingRecognition.textPack: its
+ * directory): once that changes (the text pack imported), it is let go and loaded anew from the
+ * new pack at the next read.
  */
 internal class LoadingReader(
     private val open: (opened: MutableList<AutoCloseable>) -> InkRecognizer,
     private val told: () -> Unit,
-    private val generation: () -> Int = { 0 },
+    private val pack: () -> Any? = { null },
 ) : HandwritingRecognition.Reader {
 
     private val models = ArrayList<AutoCloseable>()
@@ -148,11 +157,11 @@ internal class LoadingReader(
     @Volatile
     private var broken = false
 
-    // the packs' generation what is loaded (or was given up) is of; null till the first load
+    // the pack what is loaded (or was given up) is of; NotLoaded till the first load
     @Volatile
-    private var of: Int? = null
+    private var of: Any? = NotLoaded
 
-    override val loadable: Boolean get() = !broken || generation() != of
+    override val loadable: Boolean get() = !broken || pack() != of
 
     override fun load() {
         loaded()
@@ -172,10 +181,10 @@ internal class LoadingReader(
     }
 
     private fun loaded(): InkRecognizer? {
-        val now = generation()
+        val now = pack()
         if (now != of) {
             // a pack imported since: what was loaded maps the old one's files, what was given up may load now
-            if (of != null) letGo()
+            if (of !== NotLoaded) letGo()
             broken = false
             of = now
         }
@@ -245,3 +254,6 @@ private object AssetRecognizer {
     // a character's two models are some 20 ms a run on one desktop core: two of the phone's
     private const val THREADS = 2
 }
+
+// LoadingReader's pack before its first load: none read yet, nothing to let go
+private object NotLoaded
