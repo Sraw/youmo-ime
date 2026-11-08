@@ -18,6 +18,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /** uat/04-panels.md's number pads of a field's own type (NumberPad): the keys each field gets, and the keyboard after it. */
 @RunWith(RobolectricTestRunner::class)
@@ -65,21 +67,30 @@ class FieldPadUatTest {
         // press, types nothing, has nothing for TalkBack (a blank view disabled and not read, the canvas's no node)
         val shown = h.keys()
         assertTrue(shown.toString(), shown.none { !it.enabled && (it.label.isNotEmpty() || it.description != null) })
-        val blanks = blankPlaces(shown)
-        // the bottom row's right two side by side, one stretch: six, as wide as the seven blank keys
-        assertEquals(blanks.toString(), 6, blanks.size)
-        val wide = h.keyboard.width * (4 * SIDE + BOTTOM_EDGE * 2 + BOTTOM_MIDDLE)
-        assertEquals(blanks.toString(), wide, blanks.sumOf { it.width() }.toFloat(), blanks.size.toFloat())
+        val stretches = blankPlaces(shown)
+        // the bottom row's right two side by side make one stretch (no key between): split where the
+        // middle one ends, the seven places of the seven blank keys
+        val width = h.keyboard.width
+        val blanks = stretches.flatMap { r ->
+            if (abs(r.width() - width * (BOTTOM_MIDDLE + BOTTOM_EDGE)) > 2) return@flatMap listOf(r)
+            val middle = r.left + (width * BOTTOM_MIDDLE).roundToInt()
+            listOf(Rect(r.left, r.top, middle, r.bottom), Rect(middle, r.top, r.right, r.bottom))
+        }
+        assertEquals(stretches.toString(), 7, blanks.size)
+        val wide = listOf(SIDE, SIDE, SIDE, SIDE, BOTTOM_EDGE, BOTTOM_MIDDLE, BOTTOM_EDGE)
+        val shares = blanks.map { it.width().toFloat() / width }.sorted()
+        for ((want, got) in wide.sorted().zip(shares)) assertEquals("$blanks", want, got, 2f / width)
         h.api.calls.clear()
         val before = h.field.text.toString()
+        // each place tapped once: nothing sent, nothing typed
         for (at in blanks) {
             h.press(object : ShownKey by shown.first() {
                 override val bounds get() = at
             })
             h.release()
+            assertEquals("$at", emptyList<String>(), h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") })
+            assertEquals("$at", before, h.field.text.toString())
         }
-        assertEquals(emptyList<String>(), h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") })
-        assertEquals(before, h.field.text.toString())
     }
 
     // along each row's middle, the stretches no key that takes a press covers (wider than a key's gap): a

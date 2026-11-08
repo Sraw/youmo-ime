@@ -632,7 +632,7 @@ in the IME): register a USB keyboard with `/system/bin/uinput` (JSON `register`,
 reads `Generic.kl`/`Generic.kcm`) and `sendevent` to its `/dev/input/eventN` as root.
 
 A number's, a phone's or a date's field opens a number pad of its own (`NumberPad.of(EditorTraits.number)`:
-the keys beside the digits blank (`BlankKey`: no press, nothing for TalkBack) where the field takes none, a plain number
+the keys beside the digits blank (`BlankKey`: no press, nothing for TalkBack; on the canvas a `<gap look>` of number.xml, drawn faded as `:disabled`, no node) where the field takes none, a plain number
 field's the whole pad, a PIN's the digits alone; `FieldPad` in `KeyboardWindow` maps the 123 key and
 `Unchanged` to that pad within the field; a pad is never remembered, so the next text field gets its letters).
 

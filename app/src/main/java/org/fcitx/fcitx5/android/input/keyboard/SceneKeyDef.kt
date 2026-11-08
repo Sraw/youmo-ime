@@ -125,14 +125,11 @@ class SceneKeyDef(
         private const val KP_SEPARATOR = 0xffac
         private const val KP_EQUAL = 0xffbd
 
-        // the keysyms the layouts name (sym:), FcitxKeyMapping's by their names; a keypad's (KP_) sent
-        // with NumLock on, as the number pad's keys were (NumPadKey): the input method types its digit or
-        // sign, not a punctuation of its own (，for ,). A typing keyboard's corner digit is keypad: (no NumLock)
-        private val SYMS = mapOf(
-            "BackSpace" to FcitxKeyMapping.FcitxKey_BackSpace,
-            "space" to FcitxKeyMapping.FcitxKey_space,
-            "Return" to FcitxKeyMapping.FcitxKey_Return,
-            "Escape" to FcitxKeyMapping.FcitxKey_Escape,
+        // the keypad's keysyms the layouts name (sym:), sent with NumLock on as the number pad's keys were
+        // (NumPadKey): the input method types its digit or sign, not a punctuation of its own (，for ,).
+        // Only these: a name is not looked at for its KP_ (xsd README 7). A typing keyboard's corner digit
+        // is keypad: (no NumLock)
+        private val KEYPAD = mapOf(
             "KP_Add" to FcitxKeyMapping.FcitxKey_KP_Add,
             "KP_Subtract" to FcitxKeyMapping.FcitxKey_KP_Subtract,
             "KP_Multiply" to FcitxKeyMapping.FcitxKey_KP_Multiply,
@@ -141,6 +138,14 @@ class SceneKeyDef(
             "KP_Separator" to KP_SEPARATOR,
             "KP_Equal" to KP_EQUAL,
         ) + (0..9).associate { "KP_$it" to FcitxKeyMapping.FcitxKey_KP_0 + it }
+
+        // the keysyms the layouts name (sym:), FcitxKeyMapping's by their names
+        private val SYMS = mapOf(
+            "BackSpace" to FcitxKeyMapping.FcitxKey_BackSpace,
+            "space" to FcitxKeyMapping.FcitxKey_space,
+            "Return" to FcitxKeyMapping.FcitxKey_Return,
+            "Escape" to FcitxKeyMapping.FcitxKey_Escape,
+        ) + KEYPAD
 
         // the app's words (layout-1's bare actions), as the old keys did them (KeyDefPreset)
         private val COMMANDS: Map<String, KeyAction> = mapOf(
@@ -163,7 +168,7 @@ class SceneKeyDef(
          */
         fun action(a: SceneAction, placeholder: (String) -> KeyAction?): KeyAction? = when (a) {
             is SceneAction.Key -> KeyAction.HostKeyAction(a.text)
-            is SceneAction.Sym -> SYMS[a.name]?.let { KeyAction.SymAction(KeySym(it), if (a.name.startsWith("KP_")) NumLockState else KeyStates.Virtual) }
+            is SceneAction.Sym -> SYMS[a.name]?.let { KeyAction.SymAction(KeySym(it), if (a.name in KEYPAD) NumLockState else KeyStates.Virtual) }
             is SceneAction.Layout -> KeyAction.LayoutSwitchAction(a.name)
             is SceneAction.Picker -> picker(a.name)
             is SceneAction.Commit -> KeyAction.CommitAction(a.text)

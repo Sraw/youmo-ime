@@ -73,7 +73,7 @@ object SceneA11y {
     fun of(key: KeyNode, board: String?, string: (String) -> String?): KeySpeech = KeySpeech(
         text = key.label.orEmpty(),
         description = spoken(key.a11y, key.label, string),
-        resourceName = KeyNames.BOARD_RESOURCES["$board/${key.id}"] ?: key.role?.let(KeyNames.RESOURCES::get),
+        resourceName = board?.let { KeyNames.BOARD_RESOURCES["$it/${key.id}"] } ?: key.role?.let(KeyNames.RESOURCES::get),
         state = state(key.role, key.states)?.let { string(it) ?: it },
         alt = key.alt?.takeIf { it.isNotEmpty() },
         id = key.id,
