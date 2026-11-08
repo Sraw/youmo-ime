@@ -543,6 +543,10 @@ class HostCore(
         updatePanel(ic)
     }
 
+    override fun punctuationAsTyped(ic: InputContext, marks: Set<String>) {
+        if (ic === contexts.active) emit(HostEvent.PunctuationAsTyped(marks))
+    }
+
     override fun updateStatusArea(ic: InputContext) {
         if (ic !== contexts.active) return
         statusDirty = true

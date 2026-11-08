@@ -52,6 +52,9 @@ interface HostServices {
     /** [ic]'s status area changed: sent again, once, at the end of the event (`updateUserInterface(StatusArea)`). */
     fun updateStatusArea(ic: InputContext)
 
+    /** The punctuation keys of [ic] that now type their own character ([Punctuation.typesAsItself]) changed. */
+    fun punctuationAsTyped(ic: InputContext, marks: Set<String>) {}
+
     /** [text] through the output filters (`Instance::outputFilter`), as the frontend shows it. */
     fun filterOutput(ic: InputContext, text: String): String
 }

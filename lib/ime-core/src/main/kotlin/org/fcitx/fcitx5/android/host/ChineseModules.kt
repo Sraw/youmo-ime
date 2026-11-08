@@ -54,9 +54,11 @@ class ChineseModules(private val inputs: ModuleInputs, private val strings: Host
         statusArea = StatusArea(services::updateStatusArea)
         // registration order gives the status ids 1..: punctuation, fullwidth, chttrans here (fcitx
         // loads them in name order, chttrans first); the ids only need to be stable within a run
-        punctuation = Punctuation(inputs.punctuationProfile, inputs.punctuationConfig, statusArea, tip) {
-            services.persistConf(ModuleConfigs.PUNCTUATION)
-        }
+        punctuation = Punctuation(
+            inputs.punctuationProfile, inputs.punctuationConfig, statusArea, tip,
+            save = { services.persistConf(ModuleConfigs.PUNCTUATION) },
+            asTyped = services::punctuationAsTyped,
+        )
         fullWidth = FullWidth(statusArea) { ic, text -> services.commit(ic, text) }
         chttrans = Chttrans(
             inputs.chttransEnabled, statusArea, services::inputMethod, { InputMethodCatalog.listed(it)?.language },
