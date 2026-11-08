@@ -115,7 +115,7 @@ key space kind=function role=space a11y="a11y_key_space"
   sound=space shortcut="space"
   normal
     icon space 967.5,232,1030.5,295 #ff7a858a
-    icon cursor-move 932,199,961,228 #ff7a858a
+    icon cursor-move 933,199,962,228 #ff7a858a
   pressed
     +0 fill rect(925.88,194.38,1072.13,332.63) #1f000000
 key * kind=function a11y="*"
@@ -174,8 +174,8 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
   sound=delete shortcut="backspace"
   normal
     icon backspace 967.5,407.5,1030.5,470.5 #ff7a858a
-    icon delete-sweep 932,374,961,403 #ff7a858a
-    icon restore 932,474,961,503 #ff7a858a
+    icon delete-sweep 933,374,962,403 #ff7a858a
+    icon restore 933,474,962,503 #ff7a858a
   pressed
     +0 fill rect(925.88,369.38,1072.13,508.63) #1f000000
 key back kind=function role=back a11y="ABC"

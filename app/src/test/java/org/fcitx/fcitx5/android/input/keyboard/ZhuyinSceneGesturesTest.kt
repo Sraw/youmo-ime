@@ -163,14 +163,14 @@ class ZhuyinSceneGesturesTest {
     }
 
     // a 360 dp phone compact (20%, 34% on its side: CompactKeyboardScreenshotTest's zhuyin_full_small_port): ⌫'s face 16 dp
-    // tall, its two shortcut icons kept one over the other at their least as its view's were, none left out
+    // tall, its two shortcut icons kept one over the other at their least, their insets eaten half a px, none
+    // left out (the engine's rule, ContentTest; here as the app draws it)
     @Test
     @Config(qualifiers = "w360dp-h740dp-port-440dpi")
-    fun aSmallPhonesCompactBackspaceKeepsBothItsIconsAsItsView() {
+    fun aSmallPhonesCompactBackspaceKeepsBothItsIcons() {
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
-        val icons = listOf(false, true).map { canvas -> harness(canvas, InputType.TYPE_CLASS_TEXT).use { h -> h.keyNamed("backspace").drawnIcons } }
-        assertEquals(listOf(3, 3), icons)
+        assertEquals(3, harness(canvas = true, InputType.TYPE_CLASS_TEXT).use { h -> h.keyNamed("backspace").drawnIcons })
     }
 
     // the same compact (the height setting's lowest, 20%, 34% on its side): the text 0.9, the marks smaller

@@ -82,9 +82,9 @@ class ContentTest {
         val redo = icons(s, "y").single()
         assertEquals("redo", redo.name)
         val f = face(s, "y")
-        // as its ImageView was laid out: from the pixel its margins (whole pixels, rounded down) reach, whole pixels wide
-        near(kotlin.math.floor(f.left + kotlin.math.floor(3 * d)), redo.box.left)
-        near(kotlin.math.floor(f.top + kotlin.math.floor(2 * d)), redo.box.top)
+        // as its ImageView was laid out: from the pixel its margins reach, whole pixels wide
+        near(kotlin.math.floor(f.left + 3 * d), redo.box.left)
+        near(kotlin.math.floor(f.top + 2 * d), redo.box.top)
         near(kotlin.math.floor(11 * d + 0.5), redo.box.width)
         val backspace = icons(s, "backspace").map { it.name }
         assertEquals(listOf("backspace", "delete-sweep", "restore").sorted(), backspace.sorted())
@@ -94,10 +94,10 @@ class ContentTest {
     }
 
     @Test
-    fun aShortBackspaceKeepsBothItsIconsOneOverTheOtherAsItsViewDid() {
+    fun aShortBackspaceKeepsBothItsIconsOneOverTheOther() {
         // 注音大千 on a 360 dp phone at 440 dpi, compact at 20%: a ⌫ face 43.5 px tall. Its 8 dp icons 1 dp
-        // in, as their views' margins were (2 px, not 2.75), are 39 px apart: both fit at their least (7 dp:
-        // 38.5 px), as the views drew them; 2.75 px in, 38, one was left out
+        // in are 38 px apart, at their least (7 dp) 38.5 tall together: they eat into their insets, half a px
+        // between them, rather than one is left out for half a px
         val d = 2.75
         val small = Forms.env("zhuyin", Fixtures.compact.copy(width = 990.0, height = 407.0, density = d))
         val s = Forms.scene("zhuyin", small)
@@ -109,10 +109,47 @@ class ContentTest {
         val up = icons.getValue("delete-sweep")
         val down = icons.getValue("restore")
         assertTrue(up.right < glyph.left && down.right < glyph.left, "both left of ⌫: $up $down $glyph")
-        assertTrue(up.bottom <= down.top, "one over the other: $up $down")
-        near(kotlin.math.floor(f.top + kotlin.math.floor(1 * d)), up.top, "up's 1 dp from the top, in whole px")
-        near(kotlin.math.floor(f.left + kotlin.math.floor(2 * d)), up.left, "2 dp from the side, in whole px")
-        assertTrue(up.height >= 7 * d - 0.01 && down.height >= 7 * d - 0.01, "no smaller than 7 dp: $up $down")
+        assertTrue(up.bottom <= down.top + 0.01, "one over the other: $up $down")
+        near(7 * d, up.height, "up at its least")
+        near(7 * d, down.height, "down at its least")
+        // into their insets the least: half a px between them, a quarter each, still 0.75 dp and more in
+        near(f.top + 1 * d - 0.25, up.top, "up a quarter px up")
+        near(f.bottom - 1 * d + 0.25, down.bottom, "down a quarter px down")
+    }
+
+    @Test
+    fun twoIconsOneOverTheOtherAreLeftOutOnlyWhereTheirInsetsEatenStillDoNotPartThem() {
+        // whatever the density and the keyboard's size, a ⌫'s two icons are both drawn wherever they fit at
+        // their least (7 dp each) with their insets eaten to a quarter dp; one left out only where not
+        val floor = 0.25
+        var squeezed = 0
+        var left = 0
+        val grid = listOf(2.0, 2.625, 2.75, 3.0, 3.5).flatMap { d ->
+            listOf(320.0, 360.0, 393.0, 411.0, 600.0).flatMap { w -> listOf(130.0, 140.0, 141.0, 142.0, 143.0, 145.0, 147.0, 148.0, 160.0, 200.0).map { Triple(d, w, it) } }
+        }
+        for ((d, wDp, hDp) in grid) {
+            val e = Forms.env("zhuyin", Fixtures.compact.copy(width = wDp * d, height = hDp * d, density = d))
+            val s = Forms.scene("zhuyin", e)
+            val f = face(s, "backspace")
+            val content = f.height
+            val fits = content - 2 * floor * d >= 2 * 7 * d - 0.01
+            val names = icons(s, "backspace").map { it.name }.toSet()
+            val at = "at $d, $wDp × $hDp dp, a face ${f.height} px"
+            if (fits) {
+                if (content - 2 * Content.SHORTCUT_EDGE_COMPACT_DP * d < 2 * 7 * d - 0.01) squeezed++
+                assertEquals(setOf("backspace", "delete-sweep", "restore"), names, at)
+                val up = icons(s, "backspace").first { it.name == "delete-sweep" }.box
+                val down = icons(s, "backspace").first { it.name == "restore" }.box
+                assertTrue(up.bottom <= down.top + 0.01, "apart $at: $up $down")
+                assertTrue(up.top >= f.top + floor * d - 0.01, "up in its face $at: $up")
+                assertTrue(down.bottom <= f.bottom - floor * d + 0.01, "down in its face $at: $down")
+            } else {
+                left++
+                assertEquals(setOf("backspace", "delete-sweep"), names, at)
+            }
+        }
+        // the sweep met all three: kept as they were, kept by eating their insets, one left out
+        assertTrue(squeezed >= 10 && left >= 10, "squeezed $squeezed, left out $left")
     }
 
     @Test

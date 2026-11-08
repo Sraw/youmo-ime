@@ -25,7 +25,11 @@ class MarkDrawn(val drawn: Drawn, val slot: Slot, val minScale: Double, val drop
  * where it [yields] not, they stay as placed (a table's roots in lines: theme 3.0 measured no ink of
  * a styled text, so nothing gave way to it).
  */
-class KeyContent(val glyph: Drawn?, val marks: List<MarkDrawn>, val room: Box, val letter: Boolean, val baseline: Double, val yields: Boolean = true)
+class KeyContent(
+    val glyph: Drawn?, val marks: List<MarkDrawn>, val room: Box, val letter: Boolean, val baseline: Double, val yields: Boolean = true,
+    /** How far out the marks go, their insets eaten, where nothing else keeps them all ([MARK_EDGE_DP] in). */
+    val edge: Box = room,
+)
 
 /** What a key's content is drawn in, as the theme has it in its normal state: one per part. */
 /** A key's parts' looks, each cascaded when asked: most keys have no badge, many no mark. */
@@ -77,7 +81,8 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         val glyph = glyph(badge, measured, label, icon, roots, content, cy)
         val room = content.inset(ROOM_H_DP * d, ROOM_V_DP * d, ROOM_H_DP * d, ROOM_V_DP * d)
         val letter = key.attrs.alt != null && label != null && icon == null && badge == null && !lines
-        return KeyContent(glyph, marks, room, letter, glyph?.texts?.firstOrNull()?.baseline ?: 0.0, yields = !lines)
+        val edge = content.inset(MARK_EDGE_DP * d, MARK_EDGE_DP * d, MARK_EDGE_DP * d, MARK_EDGE_DP * d)
+        return KeyContent(glyph, marks, room, letter, glyph?.texts?.firstOrNull()?.baseline ?: 0.0, yields = !lines, edge = edge)
     }
 
     // the key's one thing in the middle: its badge and label, its label over its icon, its roots, its label, its icon
@@ -171,10 +176,8 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         mark: MarkContent, slot: Slot, taken: List<Slot>, drop: Int, index: Int, slots: List<Slot>, cell: Box, content: Box, looks: Looks,
     ): MarkDrawn {
         val compact = env.compact
-        // in whole px, as its view's margins were (splitties' dp, rounded down): at 2.75 a compact 1 dp is
-        // 2 px, and a ⌫'s two icons on a short face, 39 px apart not 38, both still fit (at their least, 38.5)
-        val h = Popups.px(if (compact) SHORTCUT_SIDE_COMPACT_DP else SHORTCUT_SIDE_DP, d)
-        val v = Popups.px(if (compact) SHORTCUT_EDGE_COMPACT_DP else SHORTCUT_EDGE_DP, d)
+        val h = (if (compact) SHORTCUT_SIDE_COMPACT_DP else SHORTCUT_SIDE_DP) * d
+        val v = (if (compact) SHORTCUT_EDGE_COMPACT_DP else SHORTCUT_EDGE_DP) * d
         val (drawnAt, minScale) = when (mark) {
             is MarkContent.Icon -> {
                 val dp = if (compact) SHORTCUT_ICON_COMPACT_DP else SHORTCUT_ICON_DP
@@ -257,6 +260,13 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         const val SHORTCUT_EDGE_COMPACT_DP = 1.0
         const val ROOM_H_DP = 2.0
         const val ROOM_V_DP = 1.0
+
+        /**
+         * A mark no nearer its face's side than this, its inset eaten (KeyMarkYield, before the glyph is
+         * smaller or the mark goes elsewhere): a quarter dp of the face's colour still round its ink, half
+         * a device px or more at any density from 2 (an icon's strokes further in, its box's own margin).
+         */
+        const val MARK_EDGE_DP = 0.25
 
         /** A table's roots in two lines: each at this of the size (TextKeyboard's ROOTS_TEXT_SCALE). */
         const val ROOTS_LINES_SCALE = 0.55
