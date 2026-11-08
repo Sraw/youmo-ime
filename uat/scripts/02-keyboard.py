@@ -1,7 +1,7 @@
 """uat/02-keyboard.md. The .md is the source of truth; each function follows its case's 前提/操作/预期."""
 import time
 
-from uat import case, check, has
+from uat import case, check, choose, has, home
 
 
 @case("KB-01")
@@ -100,8 +100,14 @@ case("KB-28", needs="jvm:PairsUatTest.backspaceRightAfterDeletesThePair")(lambda
 case("KB-30", needs="jvm:KeyboardUatTest.aKeyHeldShowsItLarger")(lambda d: None)
 
 
-@case("KB-31", page="chat", visual=True)
+@case("KB-31", base="B0-设置", mutates=True, visual=True)
 def kb31(d):
+    # the reserved row is the embedded code row's; the default (floating, ST-48) has none
+    home(d, "外观")
+    d.tap_text("大小与样式", scroll=False, after=1.0)
+    choose(d, "编码行", "嵌在键盘里")
+    d.open_page("chat")
+
     def where(s):
         f = d.field(s)
         kb = s.find(rid="keyboard_view", where="ime")
