@@ -145,6 +145,10 @@ class PackShelf(
         ImportResult.Refused(e.why)
     } catch (e: IOException) {
         ImportResult.Refused(Refusal.Unreadable(e.message ?: e.javaClass.simpleName))
+    } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
+        // the zip itself malformed past what ZipException covers: an entry's name not UTF-8 is
+        // ZipInputStream's IllegalArgumentException, which crashed the app's scope (and process)
+        ImportResult.Refused(Refusal.NotAPack(e.message ?: e.javaClass.simpleName))
     }
 
     private class Refused(val why: Refusal, cause: Throwable? = null) : Exception(cause)

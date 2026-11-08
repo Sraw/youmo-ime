@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.pack
 
 import java.io.ByteArrayOutputStream
+import java.nio.charset.Charset
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.MessageDigest
@@ -46,7 +47,8 @@ class TestPacks(val keys: KeyPair = KeyPairGenerator.getInstance("Ed25519").gene
 
     /**
      * A pack's bytes: [manifest] (made of [files] if not given), its signature (or [signature]),
-     * then [entries] (the files themselves if not given).
+     * then [entries] (the files themselves if not given), their names written in [charset] (a zip's
+     * are UTF-8; ISO 8859-1 writes a name's byte 0xFF as is, which UTF-8 cannot read).
      */
     fun pack(
         kind: PackKind,
@@ -56,9 +58,10 @@ class TestPacks(val keys: KeyPair = KeyPairGenerator.getInstance("Ed25519").gene
         manifest: ByteArray = manifest(kind, files, version, format),
         signature: ByteArray = sign(manifest),
         entries: Map<String, ByteArray> = files,
+        charset: Charset = Charsets.UTF_8,
     ): ByteArray {
         val out = ByteArrayOutputStream()
-        ZipOutputStream(out).use { zip ->
+        ZipOutputStream(out, charset).use { zip ->
             stored(zip, PackManifest.NAME, manifest)
             stored(zip, PackManifest.SIGNATURE, signature)
             entries.forEach { (path, bytes) -> stored(zip, path, bytes) }

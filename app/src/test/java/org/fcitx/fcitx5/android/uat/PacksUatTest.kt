@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.uat
 
 import android.content.Intent
 import androidx.preference.PreferenceFragmentCompat
+import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -191,6 +192,28 @@ class PacksUatTest {
             val shown = KeyboardHarness.all(dialog.window!!.decorView).filterIsInstance<android.widget.TextView>().joinToString("\n") { it.text }
             assertTrue(shown, st.s(R.string.pack_import_done_hint) in shown)
             assertFalse(shown, st.s(R.string.pack_unchanged_hint) in shown)
+        }
+    }
+
+    @Test
+    fun aFileWhoseImportThrowsIsItsOwnOutcomeAndTheFilesAfterItImportAllTheSame() {
+        val app = RuntimeEnvironment.getApplication()
+        val manifest = org.fcitx.fcitx5.android.pack.PackManifest.parse(TestShelves.packs.manifest(PackKind.VOICE, mapOf("voice/test.txt" to "x".toByteArray())))
+        val importer = PackImports.importer
+        PackImports.importer = { _, uri, _ ->
+            // what escaped an import (a malformed zip's IllegalArgumentException) crashed the app's scope
+            if (uri.lastPathSegment == "bad.youmopack") throw IllegalArgumentException("MALFORMED")
+            ImportResult.Imported(manifest, null)
+        }
+        try {
+            val uris = listOf("bad.youmopack", "youmo-voice-v1.youmopack").map { android.net.Uri.parse("file:///sdcard/$it") }
+            val outcomes = ArrayList<PackImports.Outcome>()
+            runBlocking { PackImports.importAll(app.contentResolver, uris, outcomes) }
+            assertEquals(listOf("bad.youmopack", "youmo-voice-v1.youmopack"), outcomes.map { it.file })
+            assertTrue((outcomes[0].result as ImportResult.Refused).why is Refusal.Unreadable)
+            assertTrue(outcomes[1].result is ImportResult.Imported)
+        } finally {
+            PackImports.importer = importer
         }
     }
 

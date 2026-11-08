@@ -4,10 +4,12 @@
  */
 package org.fcitx.fcitx5.android.data.pack
 
+import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.text.format.Formatter
 import androidx.annotation.VisibleForTesting
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,6 +21,7 @@ import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.pack.PackStatus
 import org.fcitx.fcitx5.android.pack.Refusal
 import org.fcitx.fcitx5.android.utils.queryFileName
+import timber.log.Timber
 
 /**
  * The files the user picked on the 资源包 page, imported one after another on the app's scope: a
@@ -37,6 +40,11 @@ object PackImports {
     private val done = MutableStateFlow<List<Outcome>?>(null)
     val results: StateFlow<List<Outcome>?> = done.asStateFlow()
 
+    /** What imports a file: [PackStore]'s; a test's that throws, to see the files after it imported all the same. */
+    @VisibleForTesting
+    internal var importer: suspend (ContentResolver, Uri, (Long, Long) -> Unit) -> ImportResult =
+        { resolver, uri, progress -> PackStore.import(resolver, uri, progress) }
+
     /** [uris] imported in turn; false (nothing started) if an import is under way. */
     fun start(context: Context, uris: List<Uri>): Boolean {
         if (runningNow.value != null || uris.isEmpty()) return false
@@ -45,21 +53,37 @@ object PackImports {
         FcitxApplication.getInstance().coroutineScope.launch {
             val outcomes = ArrayList<Outcome>()
             try {
-                for (uri in uris) {
-                    val name = resolver.queryFileName(uri) ?: uri.lastPathSegment.orEmpty()
-                    runningNow.value = Running(name, 0)
-                    val result = PackStore.import(resolver, uri) { copied, total ->
-                        val percent = if (total > 0) (copied * PERCENT / total).toInt() else 0
-                        if (runningNow.value?.percent != percent) runningNow.value = Running(name, percent)
-                    }
-                    outcomes += Outcome(name, result)
-                }
+                importAll(resolver, uris, outcomes)
             } finally {
                 done.value = outcomes
                 runningNow.value = null
             }
         }
         return true
+    }
+
+    /** [uris] imported in turn, each one's outcome added to [outcomes]: one that throws is its own, the rest imported all the same. */
+    @VisibleForTesting
+    internal suspend fun importAll(resolver: ContentResolver, uris: List<Uri>, outcomes: MutableList<Outcome>) {
+        for (uri in uris) outcomes += importOne(resolver, uri)
+    }
+
+    private suspend fun importOne(resolver: ContentResolver, uri: Uri): Outcome {
+        var name = uri.lastPathSegment.orEmpty()
+        val result = try {
+            name = resolver.queryFileName(uri) ?: name
+            runningNow.value = Running(name, 0)
+            importer(resolver, uri) { copied, total ->
+                val percent = if (total > 0) (copied * PERCENT / total).toInt() else 0
+                if (runningNow.value?.percent != percent) runningNow.value = Running(name, percent)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+            Timber.w(e, "pack import")
+            ImportResult.Refused(Refusal.Unreadable(e.message ?: e.javaClass.simpleName))
+        }
+        return Outcome(name, result)
     }
 
     /** Tests: [outcomes] as an import's, for the page to show. */

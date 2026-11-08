@@ -194,6 +194,23 @@ class PackShelfTest {
     }
 
     @Test
+    fun `an entry name that is not UTF-8 is no pack, not a crash`() {
+        val shelf = shelf()
+        // ZipInputStream reads names as UTF-8 and throws IllegalArgumentException on a malformed one:
+        // it escaped the import and took the app's process with it. The first entry, and a file's
+        val bad = String(byteArrayOf(0xff.toByte(), 'a'.code.toByte()), Charsets.ISO_8859_1)
+        val out = java.io.ByteArrayOutputStream()
+        java.util.zip.ZipOutputStream(out, Charsets.ISO_8859_1).use { TestPacks.stored(it, bad, byteArrayOf(1)) }
+        shelf.take(out.toByteArray()).refused<Refusal.NotAPack>()
+        val files = TEXT_FILES + ("engine/table/$bad" to byteArrayOf(1))
+        shelf.take(packs.pack(PackKind.TEXT, TEXT_FILES, 3, 2, entries = files, charset = Charsets.ISO_8859_1)).refused<Refusal.NotAPack>()
+        assertSame(PackStatus.Missing, shelf.status(PackKind.TEXT))
+        assertEquals(emptyList<String>(), leftovers(PackKind.TEXT))
+        // and the shelf takes a good pack after them
+        assertTrue(shelf.take(text()) is ImportResult.Imported)
+    }
+
+    @Test
     fun `a pack of another format or too old a version is refused, saying what is needed`() {
         val shelf = shelf()
         val older = shelf.take(text(format = 1)).refused<Refusal.Incompatible>()
