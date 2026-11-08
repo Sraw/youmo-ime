@@ -224,7 +224,8 @@ they stay: a pack carries no code.
   FileNotFoundException for it too) is logged, nothing marked: read again at the next due. When the host fails on the text pack (an engine
   that cannot load its data, `EngineBridge.unloadable`; the host's start throwing, `KotlinHost`), the
   text pack is read through there and then (`PackStore.verifyAfterFailure`, once a generation a
-  process): damaged, the keyboard says so, and the next start's gate is up instead of the same
+  process, and not for one read through in the last 10 minutes or since the process started: a
+  crash loop does not read hundreds of MB at each start): damaged, the keyboard says so, and the next start's gate is up instead of the same
   failure, or the same crash, at each start. Voice input's failures are not hooked so (its own tip).
   JVM tests do not start the background pass (`youmo.packs.verify=off`); PacksUatTest runs its pass.
 - **Reading** (`AppData`): every asset path the engine, handwriting and voice open goes through it, to

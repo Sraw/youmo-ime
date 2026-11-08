@@ -129,6 +129,9 @@ class PackShelf(
     /** The directory of [kind]'s files if it is [PackStatus.Ready], else null. */
     fun dir(kind: PackKind): File? = state.getValue(kind).dir
 
+    /** When [kind]'s pack in use was last read through and found as signed (epoch ms), null if not since its import. */
+    fun verifiedAt(kind: PackKind): Long? = state.getValue(kind).verifiedAt
+
     /**
      * Whether [kind]'s pack in use is to be read through: once after its import (the copy was
      * checked as it was written, not as it was kept), then every [VERIFY_EVERY_MS]. A pack not

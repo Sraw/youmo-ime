@@ -8,6 +8,8 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.os.BatteryManager
+import android.os.Process
+import android.os.SystemClock
 import android.util.Base64
 import androidx.annotation.VisibleForTesting
 import kotlinx.coroutines.Dispatchers
@@ -168,12 +170,19 @@ object PackStore {
      * its files read through now, on the caller's thread (the host's), before the keyboard asks
      * for them again, so a pack damaged since its last read is [PackStatus.Damaged] (the gate, not
      * an engine failing at each start, a process ending at each start). Not for a pack missing
-     * ([PackUnavailableException]); once a generation a process. The host is not restarted: it is
-     * the caller; what reads the pack looks again by [state]. True if found damaged.
+     * ([PackUnavailableException]); once a generation a process; nor for one read through in the
+     * last [RECENTLY_MS] or since this process started ([processStartedAt]): a start failing at
+     * each start (a crash loop) does not read hundreds of MB at each. The host is not restarted:
+     * it is the caller; what reads the pack looks again by [state]. True if found damaged.
      */
     fun verifyAfterFailure(kind: PackKind, e: Throwable): Boolean {
         if (generateSequence(e) { it.cause }.take(MAX_CAUSES).any { it is PackUnavailableException }) return false
         val gen = shelf.dir(kind) ?: return false
+        val verifiedAt = shelf.verifiedAt(kind)
+        if (verifiedAt != null && (System.currentTimeMillis() - verifiedAt in 0..RECENTLY_MS || verifiedAt >= processStartedAt())) {
+            Timber.i("resource pack %s read through lately: not again after the host failed", kind.id)
+            return false
+        }
         if (!synchronized(readAfterFailure) { readAfterFailure.add(gen) }) return false
         val damaged = try {
             shelf.verify(kind)
@@ -185,6 +194,12 @@ object PackStore {
         Timber.w("resource pack %s damaged, found after the host failed on it", kind.id)
         mutableState.update { State(snapshot(), it.generation + 1) }
         return true
+    }
+
+    /** Tests: when this process started, epoch ms (as the clock reads now: the boot's elapsed time the base). */
+    @VisibleForTesting
+    var processStartedAt: () -> Long = {
+        System.currentTimeMillis() - (SystemClock.elapsedRealtime() - Process.getStartElapsedRealtime())
     }
 
     private fun charging(): Boolean =
@@ -272,4 +287,5 @@ object PackStore {
     private const val VERIFY_AFTER_MS = 30_000L
     private const val CHARGING_POLL_MS = 15L * 60 * 1000
     private const val MAX_CAUSES = 8
+    private const val RECENTLY_MS = 10L * 60 * 1000
 }

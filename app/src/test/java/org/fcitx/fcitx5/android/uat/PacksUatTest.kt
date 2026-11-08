@@ -397,14 +397,19 @@ class PacksUatTest {
     fun theHostFailingOnTheTextPackReadsItThroughOnce() {
         val root = Files.createTempDirectory("packs").toFile()
         try {
-            val shelf = shelfAt(root)
+            // its files not readable at first (no descriptor left): read, nothing found nor marked
+            var unreadable = true
+            val shelf = PackShelf(root, listOf(TestShelves.packs.publicKey), TestShelves.requirements, openFile = { file ->
+                if (unreadable) throw java.io.IOException("EMFILE") else file.inputStream()
+            }).apply { load() }
             assertTrue(shelf.import(TestShelves.pack(PackKind.TEXT).inputStream()) is ImportResult.Imported)
             PackStore.useShelf(shelf)
             val failure = java.io.IOException("Map failed")
-            // intact: nothing found
             assertFalse(PackStore.verifyAfterFailure(PackKind.TEXT, failure))
-            damage(shelf, PackKind.TEXT)
+            assertNull(shelf.verifiedAt(PackKind.TEXT))
             // that generation read through once this process: not again at each failure
+            unreadable = false
+            damage(shelf, PackKind.TEXT)
             assertFalse(PackStore.verifyAfterFailure(PackKind.TEXT, failure))
             assertTrue(PackStore.ready(PackKind.TEXT))
             // imported again (damaged after): read through, found so, the state counted up
@@ -419,6 +424,51 @@ class PacksUatTest {
             // no pack in use now: nothing to read
             assertFalse(PackStore.verifyAfterFailure(PackKind.TEXT, failure))
         } finally {
+            TestShelves.use()
+            root.deleteRecursively()
+        }
+    }
+
+    /**
+     * Review r4 LOW-1: read through in the last 10 minutes, or since this process started, the pack
+     * is not read again after a failure (a crash loop reading 311 MB at each start); older than
+     * both, it is.
+     */
+    @Test
+    fun aPackReadThroughLatelyIsNotReadAgainAfterAFailure() {
+        val root = Files.createTempDirectory("packs").toFile()
+        val started = PackStore.processStartedAt
+        val real = System.currentTimeMillis()
+        try {
+            val shelf = shelfAt(root)
+            assertTrue(shelf.import(TestShelves.pack(PackKind.TEXT).inputStream()) is ImportResult.Imported)
+            PackStore.useShelf(shelf)
+            val failure = java.io.IOException("Map failed")
+            // just read through, the process started long before: within 10 minutes
+            PackStore.processStartedAt = { real - 60 * 60 * 1000L }
+            assertFalse(shelf.verify(PackKind.TEXT))
+            damage(shelf, PackKind.TEXT)
+            assertFalse(PackStore.verifyAfterFailure(PackKind.TEXT, failure))
+            assertTrue(PackStore.ready(PackKind.TEXT))
+            // read 5 minutes ago (the mark as a start reads it), before the process started 2 minutes
+            // ago: within 10 minutes all the same
+            File(shelf.dir(PackKind.TEXT)!!, PackShelf.VERIFIED).writeText("${real - 5 * 60 * 1000L}")
+            PackStore.useShelf(shelfAt(root))
+            PackStore.processStartedAt = { real - 2 * 60 * 1000L }
+            assertFalse(PackStore.verifyAfterFailure(PackKind.TEXT, failure))
+            assertTrue(PackStore.ready(PackKind.TEXT))
+            // read 20 minutes ago (the mark as a start reads it), after the process started 30 minutes ago
+            File(shelf.dir(PackKind.TEXT)!!, PackShelf.VERIFIED).writeText("${real - 20 * 60 * 1000L}")
+            PackStore.useShelf(shelfAt(root))
+            PackStore.processStartedAt = { real - 30 * 60 * 1000L }
+            assertFalse(PackStore.verifyAfterFailure(PackKind.TEXT, failure))
+            assertTrue(PackStore.ready(PackKind.TEXT))
+            // read 20 minutes ago, before the process started (5 minutes ago): read again, found
+            PackStore.processStartedAt = { real - 5 * 60 * 1000L }
+            assertTrue(PackStore.verifyAfterFailure(PackKind.TEXT, failure))
+            assertTrue(PackStore.status(PackKind.TEXT) is PackStatus.Damaged)
+        } finally {
+            PackStore.processStartedAt = started
             TestShelves.use()
             root.deleteRecursively()
         }
