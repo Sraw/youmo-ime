@@ -777,6 +777,12 @@ class T9Keyboard(
 
     private var previewing: Previewing? = null
 
+    // a pressed letter's bubble: English's as Shift has it (what it types), pinyin's as its face (拼音键字母大小写)
+    private fun previewCase(letter: Char): String = LetterCaseRule.shown(
+        letter.toString(),
+        if (english) runUpper else LetterCaseRule.upper(letterCase.case, Shift.None, shiftless = true),
+    )
+
     // the digit key gone down last
     private var pressed: Pressed? = null
 
@@ -790,7 +796,7 @@ class T9Keyboard(
                 pressed = digit?.let { Pressed(it, now) }
                 // 九键双拼 has no 连按: a key's preview is its letters
                 val letter = digit?.takeUnless { shuangpin }?.let { multiTap.peek(it, letters.letters(it), now) }
-                previewing = letter?.let { Previewing(action.key, action.content, if (english) LetterCaseRule.shown(it.toString(), runUpper) else LetterCaseRule.shown(it.toString(), LetterCaseRule.upper(letterCase.case, Shift.None, shiftless = true))) }
+                previewing = letter?.let { Previewing(action.key, action.content, previewCase(it)) }
                 previewing?.let { action.copy(content = it.letter) }
             }
             // back from the digit a swipe shows

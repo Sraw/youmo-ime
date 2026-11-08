@@ -10,6 +10,7 @@ import android.graphics.Canvas
 import android.graphics.Rect
 import android.view.View
 import androidx.annotation.VisibleForTesting
+import kotlin.math.roundToInt
 import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -20,9 +21,9 @@ import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Input
+import org.fcitx.fcitx5.android.scene.engine.LetterCase
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
-import org.fcitx.fcitx5.android.scene.engine.LetterCase
 import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.layout.Key
 import org.fcitx.fcitx5.android.scene.layout.KeyAttrs
@@ -32,7 +33,6 @@ import org.fcitx.fcitx5.android.scene.layout.Row
 import org.fcitx.fcitx5.android.scene.layout.RowSplit
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import timber.log.Timber
-import kotlin.math.roundToInt
 
 /**
  * One key drawn by the engine on its own (060-render-p2 S6): a scene of a board of that key only, its
