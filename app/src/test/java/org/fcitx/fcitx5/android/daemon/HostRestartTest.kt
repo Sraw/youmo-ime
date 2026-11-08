@@ -12,6 +12,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 
@@ -35,12 +36,15 @@ class HostRestartTest {
         val state = MutableStateFlow(State.STARTING)
         val restarts = AtomicInteger()
         val done = CountDownLatch(1)
+        val up = AtomicBoolean()
         thread {
-            HostDaemon.restartOnceStarted(state, 10_000) {
-                restarts.incrementAndGet()
-                state.value = State.STARTING
-                true
-            }
+            up.set(
+                HostDaemon.restartOnceStarted(state, 10_000) {
+                    restarts.incrementAndGet()
+                    state.value = State.STARTING
+                    true
+                },
+            )
             done.countDown()
         }
         // not while it starts: a stop would skip it, a start too
@@ -53,33 +57,49 @@ class HostRestartTest {
         state.value = State.READY
         assertTrue(done.await(5, TimeUnit.SECONDS))
         assertEquals(1, restarts.get())
+        assertTrue(up.get())
     }
 
     @Test(timeout = 20_000)
     fun aHostReadyIsRestartedAtOnceAndNoneRunningIsNotWaitedFor() {
         val state = MutableStateFlow(State.READY)
         var restarts = 0
-        HostDaemon.restartOnceStarted(state, 10_000) {
-            restarts++
-            true
-        }
+        assertTrue(
+            HostDaemon.restartOnceStarted(state, 10_000) {
+                restarts++
+                true
+            },
+        )
         assertEquals(1, restarts)
-        // no client: nothing restarted, nothing waited for
+        // no client: nothing restarted, nothing waited for; nothing reads the old files
         val stopped = MutableStateFlow(State.STOPPED)
-        HostDaemon.restartOnceStarted(stopped, 10_000) { false }
+        assertTrue(HostDaemon.restartOnceStarted(stopped, 10_000) { false })
     }
 
-    // a host that never gets past starting: restarted all the same after the wait, and not waited for past it
+    // a host that never gets past starting: not waited for past the wait, not restarted (a stop
+    // would skip it), and false: what it reads is not known, the old pack not to be deleted (review L-2)
     @Test(timeout = 20_000)
-    fun aHostStuckStartingIsWaitedForNoLongerThanTheWait() {
+    fun aHostStuckStartingIsWaitedForNoLongerThanTheWaitAndSaidNotUp() {
         val state = MutableStateFlow(State.STARTING)
         var restarts = 0
         val started = System.nanoTime()
-        HostDaemon.restartOnceStarted(state, 100) {
-            restarts++
-            true
-        }
-        assertEquals(1, restarts)
+        assertFalse(
+            HostDaemon.restartOnceStarted(state, 100) {
+                restarts++
+                true
+            },
+        )
+        assertEquals(0, restarts)
         assertTrue(System.nanoTime() - started < TimeUnit.SECONDS.toNanos(5))
+        // restarted, the new one stuck starting: false too
+        val ready = MutableStateFlow(State.READY)
+        assertFalse(
+            HostDaemon.restartOnceStarted(ready, 100) {
+                restarts++
+                ready.value = State.STARTING
+                true
+            },
+        )
+        assertEquals(1, restarts)
     }
 }

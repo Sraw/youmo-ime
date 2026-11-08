@@ -136,12 +136,14 @@ object HostDaemon {
      * fcitx restarted if it runs for some client (a resource pack imported: its engines made anew on
      * the new files); not running, it reads them as it starts. One still starting may have read the
      * old files: waited for, then restarted (a stop skips a host not ready, a start one not stopped:
-     * it was left on the old files). Returns once the new host is up, or [RESTART_WAIT_MS] passed:
-     * what the old one read may be deleted then. Blocks: not on the main thread (an import's worker).
+     * it was left on the old files). True once the new host is up (or none runs): what the old one
+     * read may be deleted then. False if a host stayed STARTING past [RESTART_WAIT_MS] (before the
+     * restart, or after it): it may still read the old files, left for the next start to delete.
+     * Blocks: not on the main thread (an import's worker).
      */
-    fun restartIfRunning() {
-        if (testConnection != null) return
-        restartOnceStarted(realFcitx.lifecycle.stateFlow, RESTART_WAIT_MS) {
+    fun restartIfRunning(): Boolean {
+        if (testConnection != null) return true
+        return restartOnceStarted(realFcitx.lifecycle.stateFlow, RESTART_WAIT_MS) {
             lock.withLock {
                 if (clients.isEmpty()) return@withLock false
                 realFcitx.stop()
@@ -155,14 +157,23 @@ object HostDaemon {
      * [restart] once [state] is past STARTING (waited for outside the lock: a client's connect on the
      * main thread is not held up), then waited for the new host to be past STARTING too; each wait
      * at most [waitMs]. [restart] says whether it restarted (false: no client, nothing running).
+     * False if either wait ran out (a warning logged; not restarted if the first did): the host
+     * still starting, on what files is not known.
      */
     @VisibleForTesting
-    internal fun restartOnceStarted(state: StateFlow<HostLifecycle.State>, waitMs: Long, restart: () -> Boolean) {
+    internal fun restartOnceStarted(state: StateFlow<HostLifecycle.State>, waitMs: Long, restart: () -> Boolean): Boolean {
         fun started() = runBlocking {
             withTimeoutOrNull(waitMs) { state.first { it != HostLifecycle.State.STARTING } }
-        } ?: Timber.w("fcitx still starting after %d ms", waitMs)
-        started()
-        if (restart()) started()
+        } != null
+        if (!started()) {
+            Timber.w("fcitx still starting after %d ms: not restarted", waitMs)
+            return false
+        }
+        if (restart() && !started()) {
+            Timber.w("fcitx restarted, still starting after %d ms", waitMs)
+            return false
+        }
+        return true
     }
 
     private const val RESTART_WAIT_MS = 10_000L

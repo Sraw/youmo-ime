@@ -141,17 +141,22 @@ object PackStore {
         }
     }
 
+    /** Tests: what restarts the host after a change ([HostDaemon.restartIfRunning]); true once it is up anew. */
+    @VisibleForTesting
+    var restartHost: () -> Boolean = HostDaemon::restartIfRunning
+
     // the engine made anew on the new files; whatever reads them looks again (AppData's generation)
     private fun changed() {
         // the host restarted first: its engines (mapped on the old pack, or not made without one)
         // made anew. The state after it, so what the keyboard queues on it (its field focused again)
         // waits for the new host, not the one going
-        HostDaemon.restartIfRunning()
+        val restarted = restartHost()
         // an import and a verify may both count: neither count lost
         mutableState.update { State(snapshot(), it.generation + 1) }
         // the generation replaced, once the host is up on the new one (restartIfRunning waits for
-        // it) and the rest told to look again: a file of it opened only now would have been gone
-        shelf.sweep()
+        // it) and the rest told to look again: a file of it opened only now would have been gone.
+        // A host not up anew in time may still read it: left for the next start's load
+        if (restarted) shelf.sweep()
     }
 
     private fun snapshot() = PackKind.entries.associateWith { shelf.status(it) }

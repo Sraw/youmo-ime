@@ -304,6 +304,35 @@ class PacksUatTest {
         }
     }
 
+    // a shelf of its own, on [root] (a restart: another on the same root)
+    private fun shelfAt(root: File) =
+        PackShelf(root, listOf(TestShelves.packs.publicKey), TestShelves.requirements).apply { load() }
+
+    /**
+     * Review L-2: the host not up anew in time (still starting, on what files is not known): the
+     * pack it replaced is not deleted under it, but by the next start's load.
+     */
+    @Test
+    fun aPackReplacedWhileTheHostIsNotUpAnewIsDeletedByTheNextStart() {
+        val restart = PackStore.restartHost
+        PackStore.restartHost = { false }
+        val root = Files.createTempDirectory("packs").toFile()
+        try {
+            val shelf = shelfAt(root)
+            assertTrue(shelf.import(TestShelves.pack(PackKind.TEXT).inputStream()) is ImportResult.Imported)
+            PackStore.useShelf(shelf)
+            val old = shelf.dir(PackKind.TEXT)!!
+            assertTrue(runBlocking { PackStore.import(TestShelves.pack(PackKind.TEXT, version = 2).inputStream()) } is ImportResult.Imported)
+            assertTrue(old.isDirectory)
+            shelfAt(root)
+            assertFalse(old.exists())
+        } finally {
+            PackStore.restartHost = restart
+            TestShelves.use()
+            root.deleteRecursively()
+        }
+    }
+
     @Test
     fun theStatusAPackRowSaysForEachState() {
         val app = RuntimeEnvironment.getApplication()

@@ -200,7 +200,9 @@ they stay: a pack carries no code.
   copied anew. An older version over a newer one is imported (a pack gone wrong taken back; it must
   still meet the app's `minVersion`), the result saying 已用 vX 替换了更新的 vN. The generation replaced is deleted only once the host is up
   on the new one (`HostDaemon.restartIfRunning` waits for it, and for a host still starting before
-  restarting it: that one may have read the old files), then `PackShelf.sweep`. A killed import leaves the old pack in use; the next start deletes what is not `current`.
+  restarting it: that one may have read the old files), then `PackShelf.sweep`; a host still starting
+  after 10 s (before or after the restart) is not known to have left them: not deleted then, left
+  for the next start's load. A killed import leaves the old pack in use; the next start deletes what is not `current`.
   The user's file is never deleted; the results say they may delete it.
 - **Storage.** Device-protected (`createDeviceProtectedStorageContext().filesDir/packs`), so Direct Boot
   reads it before the first unlock, and an upgrade keeps it. Excluded from cloud and key/value backup
