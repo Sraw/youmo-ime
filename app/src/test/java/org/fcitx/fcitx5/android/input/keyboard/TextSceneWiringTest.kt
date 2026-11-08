@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
@@ -113,6 +114,86 @@ class TextSceneWiringTest {
         assertTrue(url.toString(), url.containsAll(listOf("slash", "dot", "domain")))
         val email = compare("email", KeyboardHarness.ENGLISH, inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
         assertTrue(email.toString(), "at" in email)
+    }
+
+    // the user's long press of q: its swipe types its first (TextKeyboard.swipeText reads the scene key's letter),
+    // not the layout's built-in 1
+    @Test
+    fun aLettersSwipeIsTheUsersFirst() {
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+        prefs.set(AppPrefs.getInstance().internal.popupOverrides, "q ⒜ 1")
+        KeyboardHarness(im = KeyboardHarness.ENGLISH).start().use { h ->
+            val q = h.keys().single { it.id == "q" }
+            h.swipe(q, 0f, q.bounds.height().toFloat())
+            h.idle()
+            assertTrue(h.api.calls.toString(), h.api.calls.any { "⒜" in it } && h.api.calls.none { "(1" in it || "\"1\"" in it })
+        }
+    }
+
+    // a table's roots on the letters' faces: a letter pressed shows its letter in its bubble, as its view's did, not its roots
+    @Test
+    fun aLetterUnderItsRootsShowsItsLetter() {
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+        KeyboardHarness(im = entry(InputMethodCatalog.WUBI, "五笔")).start().use { h ->
+            EngineState.tableKeyboardState.value = TableKeyboard(InputMethodCatalog.WUBI, emptySet(), false, KeyLabels.NAMES, TableRoots.WUBI86)
+            h.idle()
+            h.relayout()
+            val g = h.keys().single { it.id == "g" }
+            assertTrue(g.label, g.label?.lowercase() != "g")
+            h.press(g)
+            assertEquals(listOf("g"), h.popupChoices().map { it.text.lowercase() })
+            h.release()
+        }
+    }
+
+    // a glide read where the scene draws the letters, the views (laid out under it, not drawn) moved off them:
+    // the letters' centres the engine gets, in key widths, as far apart as the keys shown
+    @Test
+    fun aGlideIsReadOnTheSceneWhereverTheViewsAre() {
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+        prefs.set(AppPrefs.getInstance().keyboard.glideTyping, true)
+        KeyboardHarness(im = KeyboardHarness.PINYIN).start().use { h ->
+            KeyboardHarness.all(h.keyboard).filterIsInstance<KeyView>().forEach { it.offsetLeftAndRight(it.left / 3) }
+            val keys = "qpzm".map { h.key("$it") }
+            val first = keys.first().bounds
+            h.drag(keys.first(), first.exactCenterX(), first.exactCenterY(), steps = 0, lift = false)
+            for (k in keys.drop(1)) h.move(k.bounds.exactCenterX(), k.bounds.exactCenterY())
+            h.move(keys.last().bounds.exactCenterX(), keys.last().bounds.exactCenterY(), steps = 1, lift = true)
+            val layout = h.api.glides.single().layout
+            val q = layout.centre('q')
+            for ((i, c) in "pzm".withIndex()) {
+                val k = keys[i + 1].bounds
+                val read = layout.centre(c)
+                assertEquals("$c x", (k.exactCenterX() - first.exactCenterX()) / first.width(), read.first - q.first, 0.02f)
+                assertEquals("$c y", (k.exactCenterY() - first.exactCenterY()) / first.width(), (read.second - q.second) * GlideTouch.unitY(first.height().toFloat()) / first.width(), 0.02f)
+            }
+        }
+    }
+
+    // split, G and V on both halves: a glide reads each of their copies where the scene draws it
+    @Test
+    @Config(qualifiers = "w800dp-h360dp-land")
+    fun aSplitGlideReadsBothCopiesOfG() {
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+        prefs.set(AppPrefs.getInstance().keyboard.glideTyping, true)
+        prefs.set(ThemeManager.prefs.splitKeyboard, SplitKeyboardMode.Always)
+        KeyboardHarness(im = KeyboardHarness.PINYIN).start().use { h ->
+            val q = h.keys().single { it.id == "q" }
+            val gs = h.keys().filter { it.id == "g" }
+            assertEquals(2, gs.size)
+            val first = q.bounds
+            h.drag(q, first.exactCenterX(), first.exactCenterY(), steps = 0, lift = false)
+            h.move(gs[0].bounds.exactCenterX(), gs[0].bounds.exactCenterY())
+            h.move(gs[1].bounds.exactCenterX(), gs[1].bounds.exactCenterY(), steps = 1, lift = true)
+            val layout = h.api.glides.single().layout
+            val at = layout.centre('q')
+            val unitY = GlideTouch.unitY(first.height().toFloat())
+            for (g in gs) {
+                val x = at.first + (g.bounds.exactCenterX() - first.exactCenterX()) / first.width()
+                val y = at.second + (g.bounds.exactCenterY() - first.exactCenterY()) / unitY
+                assertEquals("g at ${g.bounds}", 0f, layout.distance('g', x, y), 0.02f)
+            }
+        }
     }
 
     // a letter's in either case: TextKeyboard sends it as Shift has it

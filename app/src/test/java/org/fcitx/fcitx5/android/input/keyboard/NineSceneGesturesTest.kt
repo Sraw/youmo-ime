@@ -6,14 +6,17 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
@@ -180,6 +183,69 @@ class NineSceneGesturesTest {
         assertEquals(Math.round(slot.bottom).toInt(), column.bottom - canvas.top)
         val parent = column.parent as android.view.ViewGroup
         assertTrue("the column over the canvas", parent.indexOfChild(column) > parent.indexOfChild(canvas))
+    }
+
+    // Return's look told alone (nothing typed changes): the scene drawn anew, its key read as the field's action
+    @Test
+    fun returnsLookAloneIsDrawn() = harness(true, Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
+        val t9 = KeyboardHarness.all(h.keyboard).filterIsInstance<T9Keyboard>().single()
+        val search = ReturnKeyAppearance(R.drawable.ic_baseline_search_24, R.string.a11y_key_action_search)
+        assertTrue(h.keys().single { it.id == "enter" }.description != search.label(h.keyboard.context))
+        t9.onReturnDrawableUpdate(search)
+        h.idle()
+        assertEquals(search.label(h.keyboard.context), h.keys().single { it.id == "enter" }.description)
+    }
+
+    // typing told alone (Return's look as it was): 1 drawn anew as 分词, and back
+    @Test
+    fun typingAloneRedrawsOne() = harness(true, Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
+        val t9 = KeyboardHarness.all(h.keyboard).filterIsInstance<T9Keyboard>().single()
+        t9.show(EngineState.T9State(composing = true, syllables = listOf("a")))
+        h.idle()
+        assertEquals("分词", h.nineKey("1").label)
+        t9.show(EngineState.T9State())
+        h.idle()
+        assertTrue(h.nineKey("1").label, h.nineKey("1").label != "分词")
+    }
+
+    // a glide read where the scene draws the digit keys, not where their views (laid out, not drawn) are: the
+    // letters' centres the engine gets, in key widths, as far apart as the keys shown, in each of the keyboard's forms
+    @Test
+    fun aGlideIsReadWhereTheSceneDrawsTheKeys() {
+        assertGlidesOnTheScene("docked")
+        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        assertGlidesOnTheScene("floating")
+        prefs.set(ThemeManager.prefs.floatingKeyboard, false)
+        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
+        assertGlidesOnTheScene("one-handed")
+    }
+
+    // the views, laid out under the scene where it draws the same keys in every form above, moved off it: the
+    // glide still read where the scene draws the keys (the views are never where a glide is read)
+    @Test
+    fun aGlideIsReadOnTheSceneWhereverTheViewsAre() = assertGlidesOnTheScene("views moved") { h ->
+        KeyboardHarness.all(h.keyboard).filterIsInstance<KeyView>().forEach { it.offsetLeftAndRight(it.left / 3) }
+    }
+
+    private fun assertGlidesOnTheScene(form: String, before: (KeyboardHarness) -> Unit = {}) {
+        prefs.set(AppPrefs.getInstance().keyboard.glideTyping, true)
+        harness(true, Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
+            before(h)
+            val keys = "2639".map { h.nineKey("$it") }
+            val first = keys.first().bounds
+            h.drag(keys.first(), first.exactCenterX(), first.exactCenterY(), steps = 0, lift = false)
+            for (k in keys.drop(1)) h.move(k.bounds.exactCenterX(), k.bounds.exactCenterY())
+            h.move(keys.last().bounds.exactCenterX(), keys.last().bounds.exactCenterY(), steps = 1, lift = true)
+            val layout = h.api.glides.single().layout
+            val a = layout.centre('a')
+            for ((c, i) in listOf('m' to 1, 'd' to 2, 'w' to 3)) {
+                val k = keys[i].bounds
+                val shown = (k.exactCenterX() - first.exactCenterX()) / first.width() to (k.exactCenterY() - first.exactCenterY()) / first.width()
+                val read = layout.centre(c).let { (it.first - a.first) to (it.second - a.second) * GlideTouch.unitY(first.height().toFloat()) / first.width() }
+                assertEquals("$form $c x", shown.first, read.first, 0.02f)
+                assertEquals("$form $c y", shown.second, read.second, 0.02f)
+            }
+        }
     }
 
     // each key wired from nine.xml's node (U4 B) as the views' KeyDef has it, in each of the four: sound, shortcut,
