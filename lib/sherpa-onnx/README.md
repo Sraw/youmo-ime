@@ -47,7 +47,11 @@ Each change is made to both recognizers, the offline (`OfflineRecognizer`) and t
   (`VoiceDataPlugin`); converted for x86 they give the evaluation sets' error rates exactly, and on
   arm64 (onnxruntime 1.28 under qemu, as Neoverse N1 and N2) the ARM files' outputs equal the ONNX
   models', prepacked or not. Streaming (`online-zipformer2-transducer-model.cc`), each of the
-  three models has its own options, so each mapped one gets a copy of its own.
+  three models has its own options, so each mapped one gets a copy of its own. Loaded by path (a
+  resource pack's file, 0.6.0), an `.ort` model is mapped the same way (`mapped-file.cc`); one that
+  cannot be mapped throws, and `OnlineRecognizer_newFromFile` (under `SafeJNI`) hands Java a
+  `RuntimeException`, which voice input catches (it says it cannot load), where `SHERPA_ONNX_EXIT`
+  ended the keyboard's process.
 
 Each change is marked `youmo` in the source, except the deletions under "What we removed". Their C++ unit tests run on this machine with
 `lib/sherpa-onnx/host-test.sh`; the app's `VoiceEngineTest` covers them through the JNI.

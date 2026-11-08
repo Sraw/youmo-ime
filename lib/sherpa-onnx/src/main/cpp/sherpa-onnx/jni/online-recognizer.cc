@@ -253,9 +253,13 @@ JNIEXPORT jlong JNICALL Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_newFromFile(
     return 0;
   }
 
-  auto recognizer = new sherpa_onnx::OnlineRecognizer(config);
-
-  return (jlong)recognizer;
+  // youmo: what the model's making throws (a resource pack's model that cannot
+  // be mapped, MapFile) is a Java RuntimeException, caught by voice input; out
+  // of here uncaught it ended the process
+  return SafeJNI(
+      env, "OnlineRecognizer_newFromFile",
+      [&]() -> jlong { return (jlong) new sherpa_onnx::OnlineRecognizer(config); },
+      (jlong)0);
 }
 
 SHERPA_ONNX_EXTERN_C

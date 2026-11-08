@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "onnxruntime_cxx_api.h"  // NOLINT
+#include "sherpa-onnx/csrc/mapped-file.h"
 #include "sherpa-onnx/csrc/online-model-config.h"
 #include "sherpa-onnx/csrc/online-transducer-model.h"
 
@@ -85,16 +86,6 @@ class OnlineZipformer2TransducerModel : public OnlineTransducerModel {
             const Ort::SessionOptions &opts);
 
  private:
-  // youmo: a model file mapped (MAP_PRIVATE, read only), unmapped when freed
-  struct MappedFile {
-    void *data = nullptr;
-    size_t size = 0;
-    MappedFile() = default;
-    MappedFile(const MappedFile &) = delete;
-    MappedFile &operator=(const MappedFile &) = delete;
-    ~MappedFile();
-  };
-
   Ort::Env env_;
   Ort::SessionOptions encoder_sess_opts_;
   Ort::SessionOptions decoder_sess_opts_;

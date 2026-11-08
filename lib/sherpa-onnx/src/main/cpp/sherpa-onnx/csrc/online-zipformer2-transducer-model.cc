@@ -4,11 +4,6 @@
 
 #include "sherpa-onnx/csrc/online-zipformer2-transducer-model.h"
 
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -57,14 +52,12 @@ OnlineZipformer2TransducerModel::OnlineZipformer2TransducerModel(
        &OnlineZipformer2TransducerModel::InitJoiner, joiner_sess_opts_);
 }
 
-OnlineZipformer2TransducerModel::MappedFile::~MappedFile() {
-  if (data) munmap(data, size);
-}
-
 // youmo: an ORT-format model (".ort") at a path is mapped and used where it
 // lies, as one in the assets is (below): the app's voice models are a resource
 // pack's files (dev/design/060-asset-packs.md), 180 MB read onto the heap
-// otherwise. Any other model is read as upstream reads it.
+// otherwise. Any other model is read as upstream reads it. One that cannot be
+// mapped throws (MapFile), the recognizer not made: the app's voice input says
+// it cannot load, where SHERPA_ONNX_EXIT ended the keyboard's process.
 void OnlineZipformer2TransducerModel::Load(const std::string &filename,
                                            Init init,
                                            const Ort::SessionOptions &opts) {
@@ -73,19 +66,7 @@ void OnlineZipformer2TransducerModel::Load(const std::string &filename,
     (this->*init)(buf.data(), buf.size(), opts);
     return;
   }
-  auto file = std::make_unique<MappedFile>();
-  int fd = open(filename.c_str(), O_RDONLY | O_CLOEXEC);
-  struct stat st {};
-  if (fd >= 0 && fstat(fd, &st) == 0 && st.st_size > 0) {
-    file->size = static_cast<size_t>(st.st_size);
-    void *data = mmap(nullptr, file->size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (data != MAP_FAILED) file->data = data;
-  }
-  if (fd >= 0) close(fd);
-  if (!file->data) {
-    SHERPA_ONNX_LOGE("Cannot map '%s'", filename.c_str());
-    SHERPA_ONNX_EXIT(-1);
-  }
+  auto file = MapFile(filename);
   Ort::SessionOptions mapped = opts.Clone();
   mapped.AddConfigEntry("session.use_ort_model_bytes_directly", "1");
   mapped.AddConfigEntry("session.use_ort_model_bytes_for_initializers", "1");
