@@ -472,14 +472,6 @@ class KeyboardCanvasView(
     override fun dispatchHoverEvent(event: MotionEvent): Boolean = speech.dispatchHoverEvent(event) || super.dispatchHoverEvent(event)
 
     /**
-     * A screen reader's keys: one virtual node a key of the scene drawn last, all it is told the
-     * scene's ([SceneA11y.of]: its words, the old view's resource name, Shift's state, its corner in
-     * the extras, U6), what it can do its scene key's ([Host.key]), so TalkBack reads and works the
-     * keys as it did the views with none of them. A click or long click on a node is the key's own
-     * ([SceneKey.click], [SceneKey.longClick]: what the end of a tap, the long press's moment call),
-     * as a view's performClick and performLongClick were.
-     */
-    /**
      * A key's place on screen through every transform above this view: ExploreByTouchHelper puts a node's
      * parent bounds at the view's place on screen unscaled, so in the theme page's half-size preview
      * (ThemeFragment) TalkBack framed and found the keys at twice their size, the right half missing.
@@ -498,6 +490,15 @@ class KeyboardCanvasView(
         val r = RectF(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat()).also(m::mapRect)
         return Rect(r.left.roundToInt(), r.top.roundToInt(), r.right.roundToInt(), r.bottom.roundToInt())
     }
+
+    /**
+     * A screen reader's keys: one virtual node a key of the scene drawn last, all it is told the
+     * scene's ([SceneA11y.of]: its words, the old view's resource name, Shift's state, its corner in
+     * the extras, U6), what it can do its scene key's ([Host.key]), so TalkBack reads and works the
+     * keys as it did the views with none of them. A click or long click on a node is the key's own
+     * ([SceneKey.click], [SceneKey.longClick]: what the end of a tap, the long press's moment call),
+     * as a view's performClick and performLongClick were.
+     */
     private inner class Speech : ExploreByTouchHelper(this) {
         override fun getVirtualViewAt(x: Float, y: Float): Int {
             val s = current ?: return INVALID_ID
