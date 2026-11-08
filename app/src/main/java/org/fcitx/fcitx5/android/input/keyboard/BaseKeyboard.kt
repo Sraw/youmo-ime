@@ -679,10 +679,10 @@ abstract class BaseKeyboard(
     /** The scene's key wired as [view] was ([drawKeysOn]); null while the views draw the keys. */
     internal fun sceneKeyOf(view: KeyView): SceneKey? = sceneKeys.of(view)
 
-    /** Where the scene drawn last has its key [id] (its first copy) in this keyboard, as a key's place is (glide typing's, strokes'): nowhere while the views draw the keys. */
-    protected fun scenePlace(id: String): KeyPlace = KeyPlace { _, out ->
+    /** Where the scene drawn last has its key [id] (its second [copy], a split row's) in this keyboard, as a key's place is (glide typing's, strokes'): nowhere while the views draw the keys. */
+    protected fun scenePlace(id: String, copy: Boolean = false): KeyPlace = KeyPlace { _, out ->
         val c = canvas
-        if (c != null && c.cell(KeyRef(id), out)) out.offset(c.left, c.top) else out.setEmpty()
+        if (c != null && c.cell(KeyRef(id, copy), out)) out.offset(c.left, c.top) else out.setEmpty()
     }
 
     /** The key wired for the scene's [node] ([SceneTouch.keyOf]): what a screen reader's actions on it do; null while the views draw the keys. */
