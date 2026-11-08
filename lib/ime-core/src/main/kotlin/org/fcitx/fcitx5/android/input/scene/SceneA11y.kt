@@ -29,6 +29,9 @@ data class KeySpeech(
 object SceneA11y {
     private val RESOURCE = Regex("a11y_[a-z0-9_]+")
 
+    // the keys said with their state in their words ([onOrOff])
+    private val TOGGLES = setOf("reading", "lock")
+
     /** The node's extra holding the key's corner ([KeySpeech.alt]): UAT's (Dumper's `alt`), TalkBack reads no extras. */
     const val EXTRA_ALT = "youmo.alt"
 
@@ -67,12 +70,12 @@ object SceneA11y {
     }
 
     /**
-     * [key]'s a11y, a toggle's (handwriting's 注, role `reading`) with its state in it as the views
+     * [key]'s a11y, a toggle's (handwriting's 注, role `reading`; the symbol panel's lock, `lock`) with its state in it as the views
      * said it (`a11y_key_reading_on`, `…_off`: "候选词注音，已开"), no state description of its own.
      */
     private fun onOrOff(key: KeyNode): String = when {
-        key.role != "reading" || !RESOURCE.matches(key.a11y) -> key.a11y
-        KeyState.On in key.states -> key.a11y + "_on"
+        key.role !in TOGGLES || !RESOURCE.matches(key.a11y) -> key.a11y
+        KeyState.On in key.states || KeyState.Locked in key.states -> key.a11y + "_on"
         else -> key.a11y + "_off"
     }
 

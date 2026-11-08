@@ -99,7 +99,7 @@ class PanelUatTest {
         h.tap(h.key("符"))
         val all = listOf("Common", "Chinese", "ASCII", "Brackets", "Arrows", "Math", "Numbering", "Shapes", "Full width")
         assertEquals(all, categories())
-        h.capture("PanelUatTest/symbols")
+        h.captureBoard("PanelUatTest/symbols")
         h.tap(KeyboardHarness.all(h.inputView).filterIsInstance<TextView>().first { h.shown(it) && it.text == "Chinese" })
         h.tap(scrolledTo("《"))
         assertEquals("《", h.field.text.toString())
@@ -157,7 +157,7 @@ class PanelUatTest {
     fun lockedPanelStaysForSeveral() {
         h.start()
         h.tap(h.key("符"))
-        h.tap(h.described(h.service.getString(R.string.picker_lock)))
+        h.tap(h.describedKey(h.service.getString(R.string.picker_lock)))
         h.tap(textView("Arrows"))
         for (s in listOf("→", "←", "↑")) h.tap(scrolledTo(s))
         assertEquals("→←↑", h.field.text.toString())
@@ -184,7 +184,7 @@ class PanelUatTest {
     fun panelsNumbersKeyAndBack() {
         h.start()
         h.tap(h.key("符"))
-        h.tap(h.described(h.service.getString(R.string.a11y_key_number_pad)))
+        h.tap(h.describedKey(h.service.getString(R.string.a11y_key_number_pad)))
         assertTrue(h.texts().toString(), "!?#" in h.texts())
         h.tap(h.key("ABC"))
         h.tap(h.key("符"))

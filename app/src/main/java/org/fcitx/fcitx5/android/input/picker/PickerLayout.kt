@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.picker
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Typeface
+import android.graphics.Rect
 import androidx.constraintlayout.widget.ConstraintLayout
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
@@ -21,8 +22,17 @@ import org.fcitx.fcitx5.android.input.keyboard.ReturnKey
 import org.fcitx.fcitx5.android.input.keyboard.SYMBOL_NAMES
 import org.fcitx.fcitx5.android.input.keyboard.SpaceKey
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.keyboard.showReturnAction
 import org.fcitx.fcitx5.android.input.theme.KeyNames
+import org.fcitx.fcitx5.android.input.theme.ThemeLook
+import org.fcitx.fcitx5.android.scene.KeyState
+import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.Input
+import org.fcitx.fcitx5.android.scene.engine.MarkSettings
+import org.fcitx.fcitx5.android.scene.engine.Texts
 import splitties.views.dsl.constraintlayout.above
 import splitties.views.dsl.constraintlayout.after
 import splitties.views.dsl.constraintlayout.below
@@ -44,7 +54,7 @@ import splitties.views.dsl.core.add
 class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef, density: PickerGridView.Density, panel: Boolean, searchKey: KeyDef? = null) :
     ConstraintLayout(context) {
 
-    class Keyboard(context: Context, theme: Theme, keys: List<KeyDef>, board: String? = null) :
+    class Keyboard(context: Context, theme: Theme, keys: List<KeyDef>, board: String? = null, sceneLayout: String? = null) :
         BaseKeyboard(context, theme, listOf(keys), themeBoard = board) {
 
         class PunctuationKey(val symbol: String) : KeyDef(
@@ -65,7 +75,13 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
         /** the symbol panel's lock, none in the emoji's */
         val lock: ImageKeyView? by lazy { findViewById(R.id.button_panel_lock) }
 
+        // as last shown: the scene's lock and Return too
+        private var locked = false
+        private var returnAppearance = ReturnKeyAppearance.Enter
+
         fun showLocked(locked: Boolean) {
+            this.locked = locked
+            canvas?.invalidateScene()
             lock?.apply {
                 img.setImageResource(if (locked) R.drawable.ic_baseline_lock_24 else R.drawable.ic_baseline_lock_open_24)
                 // what a tap does
@@ -74,7 +90,42 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
         }
 
         override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
+            returnAppearance = appearance
             `return`.showReturnAction(appearance)
+            canvas?.invalidateScene()
+        }
+
+        /** Whether the scene draws the keys (symbols.xml, 060-render-p2 S5c): the panel's views then go in its slots ([slot]). */
+        val drawnByScene: Boolean get() = canvas != null
+
+        /** Slot [id]'s cell in this keyboard's parent, into [out], as the scene has it; false while the views draw the keys. */
+        fun slot(id: String, out: Rect): Boolean {
+            val c = canvas ?: return false
+            if (!c.slot(id, out)) return false
+            out.offset(left + c.left, top + c.top)
+            return true
+        }
+
+        // the lock (its icon, :locked), Return, 返回 in the app's words, the space's microphone where holding it talks
+        override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env {
+            val texts = Texts(
+                returnLabel = returnAppearance.label(context).toString(),
+                returnIcon = SceneIcons.returnName(returnAppearance.icon),
+                back = context.getString(R.string.picker_back),
+            )
+            // no marks: a panel's swipes reach no shortcut (BaseKeyboard's shortcuts off), as its views drew none
+            val env = SceneEnvs.of(this, look, theme.isDark, width, height, Input(holdVoice = holdsToTalk), texts = texts, marks = NO_MARKS)
+            return if (locked) env.copy(states = LOCKED) else env
+        }
+
+        // last: the scene reads the keyboard's state
+        init {
+            if (sceneLayout != null) drawKeysWithScene(sceneLayout)
+        }
+
+        private companion object {
+            val LOCKED = mapOf("lock" to setOf(KeyState.Locked))
+            val NO_MARKS = MarkSettings(shortcuts = emptyMap())
         }
     }
 
@@ -82,6 +133,9 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
     val embeddedKeyboard = Keyboard(
         context, theme, if (panel) panelKeys(context, switchKey) else listKeys(switchKey, searchKey),
         if (panel) KeyNames.SYMBOLS else KeyNames.EMOJI,
+        // the symbol panel drawn by the scene where the canvas is on: its keys, the categories' and the grid's slots
+        // (the emoji's row is S6's)
+        if (panel) KeyNames.SYMBOLS else null,
     )
 
     val grid = PickerGridView(context, theme, density)
@@ -97,6 +151,43 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
         private set
 
     init {
+        if (embeddedKeyboard.drawnByScene) {
+            // the scene's board is the whole panel (symbols.xml): the keyboard under it all, the categories
+            // and the grid over it, each in its slot (onLayout)
+            add(embeddedKeyboard, lParams(matchConstraints, matchConstraints) { centerInParent() })
+            side?.let { add(it, lParams(matchConstraints, matchConstraints) { topOfParent(); startOfParent() }) }
+            add(grid, lParams(matchConstraints, matchConstraints) { topOfParent(); startOfParent() })
+        } else {
+            addViews()
+        }
+    }
+
+    private val slotCell = Rect()
+
+    // the categories and the grid in the scene's slots, not where the constraints put them
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        if (!embeddedKeyboard.drawnByScene) return
+        side?.let { if (embeddedKeyboard.slot(CATEGORIES_SLOT, slotCell)) it.layoutIn(slotCell) }
+        if (embeddedKeyboard.slot(GRID_SLOT, slotCell)) grid.layoutIn(slotCell)
+    }
+
+    // the view's place set to [r] (its size and margins from the top start): laid out there in the next pass.
+    // Set only when it changed, so the passes settle; never measured or laid out by hand here, which the
+    // constraints undid in the next pass and the RecyclerView asked for again, without end
+    private fun android.view.View.layoutIn(r: Rect) {
+        val p = layoutParams as LayoutParams
+        val size = p.width == r.width() && p.height == r.height()
+        if (size && p.leftMargin == r.left && p.topMargin == r.top) return
+        p.width = r.width()
+        p.height = r.height()
+        p.leftMargin = r.left
+        p.topMargin = r.top
+        p.marginStart = r.left
+        layoutParams = p
+    }
+
+    private fun addViews() {
         if (side != null) {
             add(side, lParams {
                 topOfParent()
@@ -136,6 +227,10 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
 
     companion object {
         private const val SIDE_WIDTH = 0.18f
+
+        /** symbols.xml's slots: the categories at the side, the grid beside them. */
+        internal const val CATEGORIES_SLOT = "categories"
+        internal const val GRID_SLOT = "grid"
 
         // the emoji's search in place of the comma, which the letters have a step away
         internal fun listKeys(switchKey: KeyDef, searchKey: KeyDef?) = listOf(

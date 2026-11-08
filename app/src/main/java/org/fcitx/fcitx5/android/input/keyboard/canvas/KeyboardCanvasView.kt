@@ -518,6 +518,9 @@ class KeyboardCanvasView(
         // handwriting's 注 as its view said it (SceneA11y.onOrOff)
         "a11y_key_reading_on" -> context.getString(org.fcitx.fcitx5.android.R.string.hw_reading_key_on, context.getString(org.fcitx.fcitx5.android.R.string.im_candidate_reading))
         "a11y_key_reading_off" -> context.getString(org.fcitx.fcitx5.android.R.string.hw_reading_key_off, context.getString(org.fcitx.fcitx5.android.R.string.im_candidate_reading))
+        // the symbol panel's lock: what a tap does, as its view said
+        "a11y_key_panel_lock_on" -> context.getString(org.fcitx.fcitx5.android.R.string.picker_unlock)
+        "a11y_key_panel_lock_off" -> context.getString(org.fcitx.fcitx5.android.R.string.picker_lock)
         else -> A11Y_STRINGS[name]?.let(context::getString)
     }
 
@@ -537,6 +540,8 @@ class KeyboardCanvasView(
             "a11y_key_space" to org.fcitx.fcitx5.android.R.string.a11y_key_space,
             "a11y_key_switch_language" to org.fcitx.fcitx5.android.R.string.a11y_key_switch_language,
             "a11y_key_separator" to org.fcitx.fcitx5.android.R.string.a11y_key_separator,
+            // the symbol panel's way to the number pad
+            "a11y_key_numbers" to org.fcitx.fcitx5.android.R.string.a11y_key_number_pad,
             SceneA11y.SHIFT_ONCE to org.fcitx.fcitx5.android.R.string.a11y_state_shift_once,
             SceneA11y.CAPS_LOCK to org.fcitx.fcitx5.android.R.string.a11y_state_caps_lock,
         )
