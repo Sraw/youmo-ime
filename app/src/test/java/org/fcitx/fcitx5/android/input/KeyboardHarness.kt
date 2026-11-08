@@ -33,6 +33,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.comparesScreenshots
 import org.fcitx.fcitx5.android.core.FakeHostApi
@@ -801,7 +802,7 @@ class KeyboardHarness(
         override fun <T> runImmediately(block: suspend HostApi.() -> T): T = runBlocking { block(host) }
         // as the daemon's: a host not up yet (a test pressing before it starts) does it once it is
         override suspend fun <T> runOnReady(block: suspend HostApi.() -> T): T =
-            if (host is org.fcitx.fcitx5.android.core.KotlinHost) host.lifecycle.whenReady { host.block() } else block(host)
+            if (host is org.fcitx.fcitx5.android.core.KotlinHost) withTimeout(READY_TIMEOUT_MS) { host.lifecycle.whenReady { host.block() } } else block(host)
         override fun runIfReady(block: suspend HostApi.() -> Unit) {
             if (host.isReady) lifecycleScope.launch { block(host) }
         }
@@ -809,6 +810,9 @@ class KeyboardHarness(
 
     companion object {
         
+        // a host never up fails the test, not hangs it
+        private const val READY_TIMEOUT_MS = 30_000L
+
         val PINYIN = InputMethodEntry(InputMethodCatalog.PINYIN, "拼音", "", "", "拼", "zh_CN", "androidengine", false)
         val ENGLISH = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "", "En", "en", "androidengine", false)
 
