@@ -113,9 +113,10 @@ class ViewShownKey(val view: KeyView) : ShownKey {
 
     override fun textSize(text: String): Float? = textViews().firstOrNull { it.text.toString() == text }?.textSize
 
+    // a mark its key left out for want of room is there, see-through (KeyView.settle)
     override val drawnIcons: Int
         get() = KeyboardHarness.all(view).filterIsInstance<ImageView>()
-            .count { v -> generateSequence(v as View) { it.parent as? View }.takeWhile { it !== view }.all { it.visibility == View.VISIBLE } }
+            .count { v -> generateSequence(v as View) { it.parent as? View }.takeWhile { it !== view }.all { it.visibility == View.VISIBLE && it.alpha > 0f } }
 
     override val drawnTexts: List<String> get() = textViews().map { it.text.toString() }.filter { it.isNotEmpty() }.toList()
 

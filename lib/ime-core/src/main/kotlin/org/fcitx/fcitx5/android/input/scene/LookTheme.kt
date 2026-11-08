@@ -194,6 +194,7 @@ object LookTheme {
         return name.substring(0, slash + 1) + key
     }
 
+    // the space is escaped only to be safe: KeyNames.parse takes no whitespace in a key's name, so none reaches here
     private const val SELECTOR_CHARS = ",.:[* \\"
 
     private fun escape(s: String) = s.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;")

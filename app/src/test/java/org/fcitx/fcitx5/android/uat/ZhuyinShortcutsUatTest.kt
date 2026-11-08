@@ -17,12 +17,14 @@ import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -105,6 +107,12 @@ class ZhuyinShortcutsUatTest {
             assertEquals(yielding, moved.map { it.first.label }.toSet())
         }
         for ((k, down) in moved) assertTrue("${k.label} $down", down < k.height / 4f)
+        // none sideways nor smaller: each symbol as far in from its key's left as on the keys with no shortcut
+        // (below), the scene's text at its full width
+        val inFrom = symbols.associate { it.label to it.drawn(it.label)!!.left - it.bounds.left }
+        if (canvas) {
+            for (k in symbols) assertEquals(k.label, 1.0, (k as SceneShownKey).node.ops(false).filterIsInstance<Op.Text>().single { it.text == k.label }.scaleX, 0.0)
+        }
         h.captureBoard("ZhuyinShortcutsUatTest/dachen")
         h.swipe(m, 0f, -m.height * 1.3f)
         h.idle()
@@ -117,6 +125,14 @@ class ZhuyinShortcutsUatTest {
         assertEquals(h.api.calls.toString(), typed + 1, h.sent().size)
         assertTrue(h.sent().last(), h.sent().last().startsWith("sendKey(sym=${UNICODE + Keyboard.zhuyinKey('ㄋ')},"))
         assertEquals(0 to 7, h.field.selectionStart to h.field.selectionEnd)
+        h.close()
+        // none on 大千's letters' places, their presets too
+        prefs.set(AppPrefs.getInstance().internal.keyShortcuts, KeyShortcuts.Empty.cleared(('a'..'z').map { "zyfull/$it" }).serialize())
+        val bare = harness(ImKeyboard.ZHUYIN_FULL)
+        assertEquals(0, bare.key("ㄇ").drawnIcons)
+        val bareFrom = bare.keys().filter { k -> k.label in inFrom }.associate { it.label to it.drawn(it.label)!!.left - it.bounds.left }
+        assertEquals(inFrom.keys, bareFrom.keys)
+        for ((label, x) in inFrom) assertEquals(label, bareFrom.getValue(label), x, 0.01f)
     }
 
     private fun KeyboardHarness.sent() = api.calls.filter { it.startsWith("sendKey") && "up=false" in it }

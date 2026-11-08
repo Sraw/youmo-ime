@@ -28,6 +28,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowDialog
+import kotlin.math.abs
 import org.robolectric.annotation.GraphicsMode
 
 /**
@@ -77,12 +79,26 @@ class ZhuyinSceneGesturesTest {
                 " field ${h.field.text}|${h.field.selectionStart},${h.field.selectionEnd}"
             h.api.calls.clear()
         }
+        // the language key held (left out of the keys below: its tap puts another keyboard up): the input method picker
+        h.after(BUBBLE_GONE_MS)
+        out += "lang long press: " + h.longPress(h.keyNamed("lang"))
+        h.idle()
+        val picker = ShadowDialog.getLatestDialog()
+        // the picker, by its title: held as long as a tap, the key would switch input methods (one enabled: a prompt to add more)
+        val title = h.keyboard.context.getString(org.fcitx.fcitx5.android.R.string.choose_input_method)
+        val titled = picker?.window?.decorView?.let { d -> KeyboardHarness.all(d).filterIsInstance<android.widget.TextView>().any { it.text.toString() == title } }
+        assertTrue("canvas $canvas: the picker shown", picker?.isShowing == true && titled == true)
+        sent("lang long press")
+        picker?.dismiss()
+        h.idle()
         // what the bubble over the key shows
         fun bubble() = h.popupChoices().map { it.text }
         for (id in ids) {
             val k = { h.keyNamed(id) }
             // the last key's bubble gone
             h.after(BUBBLE_GONE_MS)
+            // what TalkBack reads: its description, or where it has none (the comma's and full stop's views) its text
+            out += "$id said: " + (k().description?.takeIf { it.isNotEmpty() } ?: k().label)
             h.press(k())
             out += "$id pressed: " + bubble()
             h.release()
@@ -95,33 +111,44 @@ class ZhuyinSceneGesturesTest {
             sent("$id up")
             h.swipe(k(), 0f, k().bounds.height().toFloat())
             sent("$id down")
-            if (id == "space" || id == "backspace") {
-                // sideways: the cursor moved, or the text before it selected to delete
-                h.swipe(k(), -k().bounds.width() * 2f, 0f)
-                sent("$id left")
-                h.swipe(k(), k().bounds.width() * 2f, 0f)
-                sent("$id right")
-            }
+            // sideways: space's the cursor moved, ⌫'s the text before it selected to delete, a symbol's
+            // or a tone's nothing but itself typed (its swipes are up and down)
+            h.swipe(k(), -k().bounds.width() * 2f, 0f)
+            sent("$id left")
+            h.swipe(k(), k().bounds.width() * 2f, 0f)
+            sent("$id right")
+            // a little sideways, still on the key: a symbol typed as tapped, space's cursor a step
+            h.swipe(k(), k().bounds.width() * NUDGED, 0f)
+            sent("$id nudged")
             if (id != "backspace") {
                 out += "$id long press: " + h.longPress(k())
                 sent("$id long press")
             }
         }
-        // ⌫ held: deletes over and over, as many either way
+        // ⌫ held: deletes over and over, as many either way give or take one (how many depends on where in a
+        // frame the hold began, which the steps above move: at SDK 29 the scene's came one short, 24 to 25)
         val held = h.field.text.length
         h.press(h.keyNamed("backspace"))
         h.after(HOLD_MS)
         h.release()
-        val deletes = h.api.calls.count { it.startsWith("sendKey") }
-        assertTrue("canvas $canvas: $deletes deletes", deletes >= MIN_REPEATS)
-        sent("backspace held $deletes from $held")
+        val deletes = h.api.calls.filter { it.startsWith("sendKey") }
+        assertTrue("canvas $canvas: ${deletes.size} deletes", deletes.size >= MIN_REPEATS)
+        out += "backspace held: ${deletes.distinct()}, the field ${h.field.text} shorter by them: ${held - h.field.text.length == deletes.size}"
+        heldDeletes[canvas] = deletes.size
+        h.api.calls.clear()
         out
     }
+
+    // how many times ⌫ held deleted, by whether the scene drew the keys
+    private val heldDeletes = mutableMapOf<Boolean, Int>()
 
     private fun assertSame(inputType: Int = InputType.TYPE_CLASS_TEXT, shown: Set<String> = emptySet(), hidden: Set<String> = emptySet()): List<String> {
         val views = gestures(false, inputType, shown, hidden)
         val scene = gestures(true, inputType, shown, hidden)
-        assertEquals(views.joinToString("\n"), scene.joinToString("\n"))
+        // the field after ⌫ held as long as it deleted: compared by what it deleted
+        fun same(out: List<String>) = out.map { it.replace(Regex("the field .* shorter by them"), "the field shorter by them") }
+        assertEquals(same(views).joinToString("\n"), same(scene).joinToString("\n"))
+        assertTrue("⌫ held: $heldDeletes", abs(heldDeletes.getValue(false) - heldDeletes.getValue(true)) <= 1)
         return scene
     }
 
@@ -133,6 +160,26 @@ class ZhuyinSceneGesturesTest {
         assertTrue(scene.toString(), "q pressed: [ㄆ]" in scene && "q swiping: [ㄆ]" in scene)
         assertTrue(scene.toString(), scene.any { it.startsWith("a swiping: [") && "ㄇ" !in it && it != "a swiping: []" })
         assertTrue(scene.toString(), scene.any { it.startsWith("a up: []") && it.endsWith("|0,${TEXT.length + 1}") })
+    }
+
+    // a 360 dp phone compact (20%, 34% on its side: CompactKeyboardScreenshotTest's zhuyin_full_small_port): ⌫'s face 16 dp
+    // tall, its two shortcut icons kept one over the other at their least as its view's were, none left out
+    @Test
+    @Config(qualifiers = "w360dp-h740dp-port-440dpi")
+    fun aSmallPhonesCompactBackspaceKeepsBothItsIconsAsItsView() {
+        prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
+        prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
+        val icons = listOf(false, true).map { canvas -> harness(canvas, InputType.TYPE_CLASS_TEXT).use { h -> h.keyNamed("backspace").drawnIcons } }
+        assertEquals(listOf(3, 3), icons)
+    }
+
+    // the same compact (the height setting's lowest, 20%, 34% on its side): the text 0.9, the marks smaller
+    @Test
+    fun everyKeyAsItsViewCompact() {
+        prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
+        prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
+        assertTrue(keyboardCompact())
+        assertSame(shown = setOf("q", "3", "7", "/", "comma", "period", "space", "enter"))
     }
 
     // 大千 as shown, whichever draws it: each symbol and tone on its QWERTY place (its theme name, zhuyin/q),
@@ -256,6 +303,9 @@ class ZhuyinSceneGesturesTest {
 
         // 41 symbols and tones, ⌫ and the bottom row: a key missing on one side is caught by the ids compared
         const val MOST_KEYS_AT_LEAST = 45
+
+        // a sideways move short of the key's side, of its width
+        const val NUDGED = 0.3f
 
         const val TEXT = "hello world, again"
 
