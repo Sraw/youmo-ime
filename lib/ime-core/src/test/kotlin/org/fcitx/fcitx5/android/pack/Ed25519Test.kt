@@ -102,4 +102,34 @@ class Ed25519Test {
         val negativeZero = ByteArray(32).also { it[0] = 1; it[31] = 0x80.toByte() }
         assertFalse(Ed25519.verify(negativeZero, hex(message), hex(signature)))
     }
+
+    /**
+     * The identity as a public key: [k]A is the identity whatever k, so (R, S) with R = [S]B
+     * verifies any message. R: RFC 8032 test 1's public key, [a]B; S: its secret scalar a, mod L.
+     * Its canonical encoding verifies; written otherwise (y = p + 1, or x = 0 marked negative) it is
+     * refused, as RFC 8032 says: a check left out would take them (review L1: M5, M17).
+     */
+    @Test
+    fun `the identity written otherwise than canonically is refused`() {
+        val seed = hex("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60")
+        val h = java.security.MessageDigest.getInstance("SHA-512").digest(seed)
+        val clamped = h.copyOf(32).also {
+            it[0] = (it[0].toInt() and 248).toByte()
+            it[31] = ((it[31].toInt() and 127) or 64).toByte()
+        }
+        val l = BigInteger.ONE.shiftLeft(252).add(BigInteger("27742317777372353535851937790883648493"))
+        val a = BigInteger(1, clamped.reversedArray()).mod(l)
+        val sLe = a.toByteArray().reversedArray().copyOf(32)
+        val signature = hex(vectors[0].first) + sLe
+        val message = "any message".toByteArray()
+        // y = 1, x = 0: the identity as RFC 8032 writes it
+        val identity = ByteArray(32).also { it[0] = 1 }
+        assertTrue(Ed25519.verify(identity, message, signature))
+        // y = p + 1 (not below p): the same point's y, unreduced
+        val unreduced = ByteArray(32) { 0xff.toByte() }.also { it[0] = 0xee.toByte(); it[31] = 0x7f }
+        assertFalse(Ed25519.verify(unreduced, message, signature))
+        // x = 0 with its sign bit set
+        val negativeZero = ByteArray(32).also { it[0] = 1; it[31] = 0x80.toByte() }
+        assertFalse(Ed25519.verify(negativeZero, message, signature))
+    }
 }

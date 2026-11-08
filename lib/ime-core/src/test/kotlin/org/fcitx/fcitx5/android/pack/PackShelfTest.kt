@@ -250,6 +250,66 @@ class PackShelfTest {
         assertEquals(emptyList<String>(), leftovers(PackKind.TEXT))
     }
 
+    // a file listed once, in the zip twice (the same bytes both times): the zip writer refuses a
+    // name twice, so the second is written under a name of the same length and patched (review L1: M1)
+    @Test
+    fun `a file twice in the zip is refused`() {
+        val shelf = shelf()
+        val twin = "engine/table/wbx.datb"
+        val bytes = packs.pack(PackKind.TEXT, TEXT_FILES, 3, 2, entries = TEXT_FILES + (twin to TEXT_FILES.getValue("engine/table/wbx.data")))
+        val from = twin.toByteArray()
+        val to = "engine/table/wbx.data".toByteArray()
+        var patched = 0
+        var i = 0
+        while (i <= bytes.size - from.size) {
+            if ((from.indices).all { bytes[i + it] == from[it] }) {
+                to.copyInto(bytes, i)
+                patched++
+            }
+            i++
+        }
+        assertEquals("the local header's name and the central directory's", 2, patched)
+        assertEquals("engine/table/wbx.data", shelf.take(bytes).refused<Refusal.BadFile>().path)
+        assertSame(PackStatus.Missing, shelf.status(PackKind.TEXT))
+    }
+
+    // a file longer than listed is refused as its bytes pass the size, not after all of them are
+    // written: the copy never holds more than the pack's size (review L1: M2)
+    @Test
+    fun `a file longer than listed is refused before it is written past its size`() {
+        val shelf = shelf()
+        val longer = TEXT_FILES + ("handwriting/chars.txt" to ByteArray(1 shl 20))
+        var most = 0L
+        var total = 0L
+        val result = shelf.import(ByteArrayInputStream(packs.pack(PackKind.TEXT, TEXT_FILES, 3, 2, entries = longer))) { copied, of ->
+            most = maxOf(most, copied)
+            total = of
+        }
+        assertEquals("handwriting/chars.txt", result.refused<Refusal.BadFile>().path)
+        assertTrue("$most > $total", most <= total)
+    }
+
+    // the manifest and its signature first, by name: the right bytes under other names, or the two
+    // the other way round, are no pack (review L1: M10)
+    @Test
+    fun `the manifest and its signature must be the first two entries by name`() {
+        val shelf = shelf()
+        val manifest = packs.manifest(PackKind.TEXT, TEXT_FILES, 3, 2)
+        val signature = packs.sign(manifest)
+        fun zip(vararg entries: Pair<String, ByteArray>): ByteArray {
+            val out = java.io.ByteArrayOutputStream()
+            java.util.zip.ZipOutputStream(out).use { z -> entries.forEach { (name, bytes) -> TestPacks.stored(z, name, bytes) } }
+            return out.toByteArray()
+        }
+        val files = TEXT_FILES.map { it.key to it.value }.toTypedArray()
+        // as built: imported (the helper makes good packs)
+        assertTrue(shelf.take(zip(PackManifest.NAME to manifest, PackManifest.SIGNATURE to signature, *files)) is ImportResult.Imported)
+        val other = shelf()
+        other.take(zip("pack.json" to manifest, PackManifest.SIGNATURE to signature, *files)).refused<Refusal.NotAPack>()
+        other.take(zip(PackManifest.NAME to manifest, "pack.sig" to signature, *files)).refused<Refusal.NotAPack>()
+        other.take(zip(PackManifest.SIGNATURE to signature, PackManifest.NAME to manifest, *files)).refused<Refusal.NotAPack>()
+    }
+
     @Test
     fun `a manifest naming a path not its pack's, or an unsafe one, is no pack`() {
         val shelf = shelf()
