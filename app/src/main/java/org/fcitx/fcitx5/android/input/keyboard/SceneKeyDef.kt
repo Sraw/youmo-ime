@@ -172,13 +172,16 @@ class SceneKeyDef(
             "lookup" to KeyAction.SymAction(KeySym(UNICODE + Keyboard.LOOKUP), KeyStates.Virtual),
         )
 
+        // a letter's scancode is its capital's (ScancodeMapping knows those alone): the keyboard sends it in Shift's case
+        private fun scancodeOf(text: String): Int =
+            ScancodeMapping.charToScancode(text[0].let { c -> if (text.length == 1 && c in 'a'..'z') c.uppercaseChar() else c })
+
         /**
          * The app's action for the layout's [a] (the `action:` table, 060-render-p2 U4 B), [placeholder]
          * the keyboard's own `action:<name>`; null for what the app has none of (logged: the key does nothing).
          */
         fun action(a: SceneAction, placeholder: (String) -> KeyAction?): KeyAction? = when (a) {
-            // a letter's scancode is its capital's (ScancodeMapping knows those alone): the keyboard sends it in Shift's case
-            is SceneAction.Key -> KeyAction.HostKeyAction(a.text, ScancodeMapping.charToScancode(a.text[0].let { c -> if (a.text.length == 1 && c in 'a'..'z') c.uppercaseChar() else c }))
+            is SceneAction.Key -> KeyAction.HostKeyAction(a.text, scancodeOf(a.text))
             is SceneAction.Sym -> SYMS[a.name]?.let { KeyAction.SymAction(KeySym(it), if (a.name in KEYPAD) NumLockState else KeyStates.Virtual) }
             is SceneAction.Layout -> KeyAction.LayoutSwitchAction(a.name)
             is SceneAction.Picker -> picker(a.name)
