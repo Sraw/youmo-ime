@@ -41,8 +41,8 @@ class GlideSession(
     private val readings: Int = READINGS,
     /** A word of the other readings committed though [session] holds it back, and the first it showed (asked only if wanted): for learning to record. */
     private val heldBack: (GlideReading, first: () -> String) -> Unit = { _, _ -> },
-    /** Blocks another reading's word as [session] would its own; none offered without. */
-    private val blockOther: ((GlideReading) -> Unit)? = null,
+    /** The block of another reading's word as [session] would block its own; null where it cannot be blocked (not offered), none without. */
+    private val blockOther: ((GlideReading) -> (() -> Unit)?)? = null,
     private val read: (Glide, limit: Int) -> List<GlideReading>,
 ) : Session by session {
 
@@ -76,7 +76,7 @@ class GlideSession(
             is Action.Forget -> pressed(action.index) { action.copy(index = it) }
             is Action.Pin -> pressed(action.index) { action.copy(index = it) }
             is Action.Unpin -> pressed(action.index) { action.copy(index = it) }
-            is Action.Block -> others(action.index)?.let(::blockOther) ?: pressed(action.index) { action.copy(index = it) }
+            is Action.Block -> others(action.index)?.let(::blockOtherReading) ?: pressed(action.index) { action.copy(index = it) }
             else -> session.apply(action)
         }
         wrote(action, s)
@@ -162,10 +162,10 @@ class GlideSession(
 
     private fun typing(s: Snapshot) = s.preedit.isNotEmpty() && !s.predicting
 
-    private fun blockOther(reading: GlideReading): Snapshot {
-        val block = blockOther ?: return unchanged()
+    private fun blockOtherReading(reading: GlideReading): Snapshot {
         if (!session.learning) return unchanged()
-        block(reading)
+        val block = blockOther?.invoke(reading) ?: return unchanged()
+        block()
         others = others - reading
         return unchanged()
     }
@@ -204,7 +204,7 @@ class GlideSession(
     // another reading's word may be blocked, where [session] learns (not in a password field)
     override fun offers(index: Int): Set<Offer> = when {
         others(index) == null -> session.offers(inner(index))
-        blockOther != null && session.learning -> setOf(Offer.BLOCK)
+        session.learning && others(index)?.let { blockOther?.invoke(it) } != null -> setOf(Offer.BLOCK)
         else -> emptySet()
     }
 
