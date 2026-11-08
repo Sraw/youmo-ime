@@ -252,6 +252,23 @@ class HandwritingSceneGesturesTest {
         }
     }
 
+    // ，held and ？ picked: what reaches the engine and the field the same on either drawing
+    @Test
+    fun aPickFromTheCommasLongPressAsItsView() {
+        val sent = listOf(false, true).map { canvas ->
+            harness(canvas).use { h ->
+                val choices = h.longPress(h.keyNamed("comma"))
+                assertTrue("canvas $canvas: $choices", "？" in choices)
+                h.api.calls.clear()
+                h.longPress(h.keyNamed("comma"), pick = "？")
+                h.idle()
+                h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") } + "field ${h.field.text}"
+            }
+        }
+        assertTrue(sent[0].toString(), sent[0].size > 1)
+        assertEquals(sent[0], sent[1])
+    }
+
     // 注's long press on the scene: each style in the settings' words, the one picked set
     @Test
     fun readingsMenuAsTheSettingsWordIt() {
