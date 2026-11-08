@@ -25,8 +25,8 @@ import org.fcitx.fcitx5.android.scene.KeyNode
 
 /**
  * A key the scene draws (060-render-p2 S1), as its keyboard wires it: what a key view was to its
- * touch, without the view. Its [def] is the old key's, so it does what the view did (the plan's
- * U4 A, until each keyboard's layout says it, S4/S5); its place is the scene's, as drawn last.
+ * touch, without the view. Its [def] is made from its layout's node ([SceneKeyDef], the plan's U4 B),
+ * doing what the view did; its place is the scene's, as drawn last.
  */
 class SceneKey(
     override val ref: KeyRef,
@@ -35,6 +35,9 @@ class SceneKey(
     /** The keyboard: what buzzes, whose window the timers live as long as. */
     private val keyboard: View,
 ) : KeyHandle, KeyPlace {
+
+    /** Its bubble's content as the scene has it now, over its [def]'s: a node redrawn so keeps its key (SceneKeys). */
+    var bubble: String? = null
 
     override val keyGesture = KeyGesture(this, ViewConfiguration.get(keyboard.context).scaledTouchSlop.toFloat())
 
@@ -146,23 +149,10 @@ class SceneKey(
  */
 class SceneTouch(
     private val canvas: KeyboardCanvasView,
-    /** The key wired for a node of the scene ([keyOf]): one of a list of keys' by its ref, or made from the node (060-render-p2 S4, U4 B). */
+    /** The key wired for a node of the scene ([keyOf]), made from the node (060-render-p2 U4 B). */
     private val keyFor: (KeyNode) -> SceneKey?,
     private val shown: (SceneKey) -> Boolean,
 ) {
-    /**
-     * [keys], each wired as a key view was (U4 A): a node's the one of its ref, a split row's second
-     * copy with no key of its own the first's, as its view was.
-     */
-    constructor(canvas: KeyboardCanvasView, keys: List<SceneKey>, shown: (SceneKey) -> Boolean) :
-        this(canvas, keyFor = byRef(keys), shown = shown)
-
-    private companion object {
-        fun byRef(keys: List<SceneKey>): (KeyNode) -> SceneKey? {
-            val byRef = keys.associateBy { it.ref }
-            return { node -> byRef[KeyRef.scene(node.id, node.copy)] ?: byRef[KeyRef(node.id)] }
-        }
-    }
 
     /**
      * A finger's key, and its cell in the keyboard as the finger went down: the touch's coordinates

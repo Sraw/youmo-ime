@@ -4,10 +4,9 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.graphics.Rect
 import android.text.InputType
-import android.view.View
 import android.widget.TextView
-import androidx.core.view.ViewCompat
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -20,7 +19,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
+import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.T9Keyboard
@@ -75,27 +74,20 @@ class T9UatTest {
     private val KeyboardHarness.keys get() = api.calls.filter { it.startsWith("sendKey") || it.startsWith("select") }
 
     /** The long press's popup: the texts of the popup's cells, as they are laid out (rows top to bottom). */
-    private fun KeyboardHarness.popup(): List<String> = texts(inputView).let { all ->
-        // the popup is drawn over the keyboard: the texts after the keyboard's own
-        all.drop(texts(keyboard).size)
-    }
+    private fun KeyboardHarness.popup(): List<String> = popupChoices().map { it.text }
 
-    /** The popup's cell showing [label], the last such text (the popup is above the keys in the tree). */
-    private fun KeyboardHarness.cell(label: String): View =
-        KeyboardHarness.all(inputView).filter { shown(it) && it is TextView && it.text.toString() == label }.last()
+    /** The popup's cell showing [label] (its frame, the text drawn centred in it), whichever draws the popup. */
+    private fun KeyboardHarness.cell(label: String): Rect =
+        popupChoices().lastOrNull { it.text == label }?.cell ?: error("no $label in the popup: ${popup()}")
 
     /**
      * The offset in dp from the popup's cell the finger starts on (the key's digit) to its cell
      * [label]: the popup moves its focus by how far the finger goes, not by where it is.
      */
-    private fun KeyboardHarness.offsetTo(key: View, label: String): Pair<Float, Float> {
+    private fun KeyboardHarness.offsetTo(key: ShownKey, label: String): Pair<Float, Float> {
         // a cell's frame: its text is drawn centred in it, not laid out to its size
-        fun centre(text: String): Pair<Float, Float> {
-            val c = cell(text).parent as View
-            val at = IntArray(2).also(c::getLocationInWindow)
-            return at[0] + c.width / 2f to at[1] + c.height / 2f
-        }
-        val from = centre((key as AltTextKeyView).altText.text.toString())
+        fun centre(text: String): Pair<Float, Float> = cell(text).let { it.exactCenterX() to it.exactCenterY() }
+        val from = centre(key.alt.orEmpty())
         val to = centre(label)
         // the focus moves a key for less than a key's width of finger (PopupFocus.STEP)
         val step = PopupFocus.STEP / service.resources.displayMetrics.density
@@ -103,7 +95,7 @@ class T9UatTest {
     }
 
     /** A long press on [key], held, the finger then moved onto the popup's [label] (null: not moved) and let go. */
-    private fun KeyboardHarness.longPressTo(key: View, label: String?) {
+    private fun KeyboardHarness.longPressTo(key: ShownKey, label: String?) {
         val f = finger(key, at(key))
         advance(700)
         // the popup counts from where the finger is at its first move
@@ -115,7 +107,7 @@ class T9UatTest {
     }
 
     /** Held till its popup shows, the popup's texts read, then let go below the key, out of the popup: nothing chosen. */
-    private fun KeyboardHarness.popupOf(key: View): List<String> {
+    private fun KeyboardHarness.popupOf(key: ShownKey): List<String> {
         val f = finger(key, at(key))
         advance(700)
         val shown = popup()
@@ -220,7 +212,7 @@ class T9UatTest {
     }
 
     // past the key's swipe threshold (36 dp) straight down, as a finger swipes
-    private fun KeyboardHarness.swipedDown(key: View) = touch(key, at(key), at(key, dy = 25f, ms = 30), at(key, dy = 50f, ms = 30))
+    private fun KeyboardHarness.swipedDown(key: ShownKey) = touch(key, at(key), at(key, dy = 25f, ms = 30), at(key, dy = 50f, ms = 30))
 
     @Test
     @Uat("T9-22")
@@ -279,7 +271,7 @@ class T9UatTest {
         // let go out of it: nothing
         assertEquals("", h.field.text.toString())
         assertEquals(emptyList<String>(), h.sent())
-        h.capture("T9UatTest/popup_2")
+        h.captureBoard("T9UatTest/popup_2")
         typing(true, "ni")
         h.api.calls.clear()
         h.longPressTo(h.nineKey("2"), "!")
@@ -424,14 +416,14 @@ class T9UatTest {
         val five = h.nineKey("5")
         val f = h.finger(five, h.at(five))
         h.advance(700)
-        val cell = (h.cell("j").parent as View).width
+        val cell = h.cell("j").width()
         // far narrower than the nine keys' key
         assertTrue("cell $cell key ${five.width}", cell * 2 < five.width)
-        h.capture("T9UatTest/popup_5")
+        h.captureBoard("T9UatTest/popup_5")
         f.up(h.at(five))
         assertEquals("5", h.field.text.toString())
         // a finger moved: about half a finger right, then far left
-        fun slide(key: View, dx: Float, dy: Float = 0f, from: KeyboardHarness.Touch = h.at(key)) {
+        fun slide(key: ShownKey, dx: Float, dy: Float = 0f, from: KeyboardHarness.Touch = h.at(key)) {
             val g = h.finger(key, from)
             h.advance(700)
             g.move(from)

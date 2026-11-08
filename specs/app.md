@@ -366,7 +366,7 @@ key's touch is `KeyGesture`, `CustomGestureView`'s state machine and timers take
 from the corner of the key's cell as a view's was from its own (a finger in a row's blank end is left of
 it, as it was left of A's view). `BaseKeyboard.wire` gives a `KeyHandle` its sound, the space's and
 backspace's swipes, its press, long press, repeat, double tap, swipes (`KeySwipes`) and popups: the
-same wiring for a key view and for the `SceneKey` made of its `KeyDef` (`drawKeysOn`), so a key does
+same wiring for a key view and for the `SceneKey` made of its node's `SceneKeyDef` (`drawKeysWithScene`), so a key does
 what its view did. Its press is shown by the canvas (`showPressed(KeyRef)`), a popup over it placed
 at its face across and its cell down in the window (`popupBounds`), as a view's `bounds` were; glide
 typing reads its cell (`KeyPlace`). No touch reaches a key view while the canvas draws the keys
@@ -430,8 +430,7 @@ first, and where it has none or it does not read, one step back to the app's own
 `sceneEnv` (its `Input`, texts, marks; `GroupedKeyboard` through `TextBoardState`) and calls
 `invalidateScene()` on every change of what the keys show (punctuation, address keys, the language key,
 Return, the input method; a keyboard kept while another was shown is told the punctuation as it is now
-when `KeyboardWindow.attachLayout` attaches it again, `PunctuationComponent.mapping`). What a key does: the 26 keys still wire each scene key as its view was
-(`refOf`, U4 A, till S5); a keyboard moved wires each from its node (U4 B; the keys and the touch that
+when `KeyboardWindow.attachLayout` attaches it again, `PunctuationComponent.mapping`). What a key does: a keyboard moved wires each scene key from its node (U4 B; the keys and the touch that
 finds them are `SceneKeys`, a node's key kept while it does the same): ime-core's `SceneBehavior.of`
 reads press, long press, repeat, swipe, double tap, bubble, long-press popup, menu, sound and axes from
 the layout (the bubble's corner what a swipe types, or, on a letter key with a shortcut and no swipe of its

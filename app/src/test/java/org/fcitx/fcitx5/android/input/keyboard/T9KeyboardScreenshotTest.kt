@@ -43,6 +43,6 @@ class T9KeyboardScreenshotTest {
         // pinyin's own keyboard: its name on the space, no 中/英 (I1)
         assertTrue("space names the input method: $labels", "Pinyin" in labels)
         assertTrue("中/英" !in labels)
-        h.capture("T9KeyboardScreenshotTest/$name")
+        h.captureBoard("T9KeyboardScreenshotTest/$name")
     }
 }

@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
+import org.fcitx.fcitx5.android.core.ScancodeMapping
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
@@ -65,6 +66,9 @@ class SceneKeyDef(
 
         /** The long press of the key of [letters], made as it opens again (the user's keys as they are then). */
         fun groupPopup(letters: String, node: KeyNode): Popup.Keyboard? = null
+
+        /** The bubble over the key of [node] as it is pressed, over the face the layout gives it; null: the face's. */
+        fun bubble(node: KeyNode): String? = null
     }
 
     companion object {
@@ -101,9 +105,15 @@ class SceneKeyDef(
             else -> b.copy(bubble = b.bubble.takeIf { board.preview }, popup = b.popup.takeIf { board.popups })
         }
 
+        /** What [b]'s bubble shows over the key of [node]: [table]'s, else its face's; null with no bubble. */
+        fun bubbleOf(b: SceneBehavior, node: KeyNode, table: Table): String? = b.bubble?.let { table.bubble(node) ?: it.content }
+
         // its bubble, long press and menu: each as the old keys' KeyDef had it
         private fun popupsOf(b: SceneBehavior, node: KeyNode, table: Table, act: (SceneAction?) -> KeyAction?): List<Popup> = buildList {
-            b.bubble?.let { add(it.corner?.let { c -> Popup.AltPreview(it.content, c) } ?: Popup.Preview(it.content)) }
+            b.bubble?.let {
+                val content = bubbleOf(b, node, table)!!
+                add(it.corner?.let { c -> Popup.AltPreview(content, c) } ?: Popup.Preview(content))
+            }
             when (val p = b.popup) {
                 is SceneBehavior.LongPopup.Preset -> add(Popup.Keyboard.Preset(p.label, p.transformPunctuation))
                 is SceneBehavior.LongPopup.Listed -> add(Popup.Keyboard.Explicit(p.items.toTypedArray(), asIs = p.asIs))
@@ -162,12 +172,16 @@ class SceneKeyDef(
             "lookup" to KeyAction.SymAction(KeySym(UNICODE + Keyboard.LOOKUP), KeyStates.Virtual),
         )
 
+        // a letter's scancode is its capital's (ScancodeMapping knows those alone): the keyboard sends it in Shift's case
+        private fun scancodeOf(text: String): Int =
+            ScancodeMapping.charToScancode(text[0].let { c -> if (text.length == 1 && c in 'a'..'z') c.uppercaseChar() else c })
+
         /**
          * The app's action for the layout's [a] (the `action:` table, 060-render-p2 U4 B), [placeholder]
          * the keyboard's own `action:<name>`; null for what the app has none of (logged: the key does nothing).
          */
         fun action(a: SceneAction, placeholder: (String) -> KeyAction?): KeyAction? = when (a) {
-            is SceneAction.Key -> KeyAction.HostKeyAction(a.text)
+            is SceneAction.Key -> KeyAction.HostKeyAction(a.text, scancodeOf(a.text))
             is SceneAction.Sym -> SYMS[a.name]?.let { KeyAction.SymAction(KeySym(it), if (a.name in KEYPAD) NumLockState else KeyStates.Virtual) }
             is SceneAction.Layout -> KeyAction.LayoutSwitchAction(a.name)
             is SceneAction.Picker -> picker(a.name)

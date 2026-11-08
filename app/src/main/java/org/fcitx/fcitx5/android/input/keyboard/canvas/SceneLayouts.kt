@@ -58,6 +58,7 @@ class BuiltInLayouts(private val context: Context) : LayoutSource {
             "zhuyin-nine" to R.raw.scene_layout_zhuyin_nine,
             "grouped-bottom" to R.raw.scene_layout_grouped_bottom,
             "number" to R.raw.scene_layout_number,
+            "nine" to R.raw.scene_layout_nine,
         )
     }
 }

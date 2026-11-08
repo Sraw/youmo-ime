@@ -100,6 +100,17 @@ class SceneKeyDefTest {
         none.forEach { assertNull("$it", SceneKeyDef.action(it) { name -> placeholders[name] }) }
     }
 
+    // qwerty.xml's letters send lowercase; each keeps its letter's scancode (Linux KEY_Q 16, KEY_A 30, KEY_M 50),
+    // ScancodeMapping knowing capitals alone
+    @Test
+    fun aLowercaseSendKeepsItsLettersScancode() {
+        mapOf("q" to 16, "Q" to 16, "a" to 30, "m" to 50).forEach { (send, code) ->
+            val a = SceneKeyDef.action(SceneAction.Key(send)) { null } as KeyAction.HostKeyAction
+            assertEquals(send, send, a.act)
+            assertEquals(send, code, a.code)
+        }
+    }
+
     // a board that pops up no preview nor a long press's keys (number.xml's preview="off" popups="off"): its
     // keys none of those, a menu written on a key its own still (rules C 疑问 8: the number pad's Return)
     @Test
@@ -220,25 +231,25 @@ class SceneKeyDefTest {
             assertEquals(listOf("k14", "k18", "grouped-bottom"), pack.asked)
             assertEquals(listOf("k14", "grouped-bottom"), app.asked)
             // neither has it
-            assertNull(SceneLayouts.of(context, "nine"))
-            assertNull(SceneLayouts.of(context, "nine"))
-            assertEquals(listOf("k14", "k18", "grouped-bottom", "nine"), pack.asked)
-            assertEquals(listOf("k14", "grouped-bottom", "nine"), app.asked)
+            assertNull(SceneLayouts.of(context, "not-moved"))
+            assertNull(SceneLayouts.of(context, "not-moved"))
+            assertEquals(listOf("k14", "k18", "grouped-bottom", "not-moved"), pack.asked)
+            assertEquals(listOf("k14", "grouped-bottom", "not-moved"), app.asked)
             // the pack's read again, the app's kept (P3: a theme pack changed)
             SceneLayouts.invalidate("pack")
             SceneLayouts.of(context, "k14")
             SceneLayouts.of(context, "k18")
-            assertEquals(listOf("k14", "k18", "grouped-bottom", "nine", "k14", "k18", "grouped-bottom"), pack.asked)
-            assertEquals(listOf("k14", "grouped-bottom", "nine"), app.asked)
+            assertEquals(listOf("k14", "k18", "grouped-bottom", "not-moved", "k14", "k18", "grouped-bottom"), pack.asked)
+            assertEquals(listOf("k14", "grouped-bottom", "not-moved"), app.asked)
             // all of them read again
             SceneLayouts.invalidate()
             SceneLayouts.of(context, "k14")
-            assertEquals(listOf("k14", "grouped-bottom", "nine", "k14", "grouped-bottom"), app.asked)
+            assertEquals(listOf("k14", "grouped-bottom", "not-moved", "k14", "grouped-bottom"), app.asked)
         }
         // a source that throws: none from it; the app's own the one step back, its own key's no step at all
         sources(Counted("throws") { error("no file") }, app) { assertNotNull(SceneLayouts.of(context, "k18")) }
         sources(Counted(BuiltInLayouts.KEY) { error("no file") }, Counted(BuiltInLayouts.KEY, builtIn::text)) { assertNull(SceneLayouts.of(context, "k18")) }
-        assertTrue(BuiltInLayouts.has("k14") && BuiltInLayouts.has("qwerty") && !BuiltInLayouts.has("nine"))
+        assertTrue(BuiltInLayouts.has("k14") && BuiltInLayouts.has("qwerty") && !BuiltInLayouts.has("not-moved"))
     }
 
     // a keyboard moved to the scene (the app has its layout) whose layout does not read draws nothing with
@@ -285,7 +296,7 @@ class SceneKeyDefTest {
     fun aKeyboardNotMovedIsDrawnByItsViews() {
         prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         val unmoved = object : BaseKeyboard(context, ThemePreset.PixelLight, emptyList()) {
-            val scene = drawKeysWithScene("nine")
+            val scene = drawKeysWithScene("not-moved")
             val moved = drawKeysWithScene("qwerty")
         }.laidOut()
         assertEquals(false, unmoved.scene)

@@ -66,7 +66,7 @@ class ShuangpinKeyboardScreenshotTest {
             assertEquals(density * CodeRowHeight.STRIP_DP, h.box(h.inputView.findViewById<View>(R.id.code_row_text)).height().toFloat(), 1f)
             val strip = h.inputView.findViewById<SyllableStrip>(R.id.code_row_syllables)
             assertTrue("the column owns the syllables on the letters", strip.owned)
-            h.capture("ShuangpinKeyboardScreenshotTest/nine_light")
+            h.captureBoard("ShuangpinKeyboardScreenshotTest/nine_light")
             h.tap(h.key("123"))
             assertFalse("123 leaves the syllables to the row", strip.owned)
         }

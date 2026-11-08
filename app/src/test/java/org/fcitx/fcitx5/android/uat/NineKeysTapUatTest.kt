@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
@@ -173,14 +174,14 @@ class NineKeysTapUatTest {
         KeyboardHarness.all(inputView).filterIsInstance<TextView>().last { shown(it) && it.text.toString() == text }
 
     // a long press on [key], the finger moved onto the popup's [label] and let go
-    private fun KeyboardHarness.longPressTo(key: View, label: String) {
+    private fun KeyboardHarness.longPressTo(key: ShownKey, label: String) {
         val f = finger(key, at(key))
         advance(700)
         f.move(at(key))
-        val cell = KeyboardHarness.all(inputView).filter { shown(it) && it is TextView && it.text.toString() == label }.last().parent as View
-        fun centre(v: View) = IntArray(2).also(v::getLocationInWindow).let { it[0] + v.width / 2f to it[1] + v.height / 2f }
-        val from = centre(KeyboardHarness.all(inputView).filter { shown(it) && it is TextView && it.text.toString() == "4" }.last().parent as View)
-        val to = centre(cell)
+        // the popup's cells, whichever draws it: from the digit's (where the finger starts) to [label]'s
+        fun centre(text: String) = popupChoices().last { it.text == text }.cell.let { it.exactCenterX() to it.exactCenterY() }
+        val from = centre("4")
+        val to = centre(label)
         val step = org.fcitx.fcitx5.android.input.popup.PopupFocus.STEP / service.resources.displayMetrics.density
         val p = at(key, (to.first - from.first) * step, (to.second - from.second) * step)
         f.move(p)

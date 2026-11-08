@@ -9,7 +9,7 @@ key 1 kind=letter a11y="，。？！，1"
   shape rect(381.88,10.5,881.13,81.5 r=10.5,10.5,10.5,10.5)
   hit rect(374,0,889,92)
   anchor 631.5,46 up 0,-1
-  actions send="1" swipe-up="keypad:1"
+  actions preview="off" send="1" swipe-up="keypad:1"
   text label="，。？！" alt="1"
   shortcut="t9/1"
   popup from=nine
@@ -210,7 +210,7 @@ key numbers kind=function role=numbers a11y="123"
   shape rect(381.88,285.5,694.13,356.5 r=10.5,10.5,10.5,10.5)
   hit rect(374,275,702,367)
   anchor 538,321 up 0,-1
-  actions send="layout:Number"
+  actions long-press="unicode" send="layout:Number"
   text label="123"
   shortcut="numbers"
   normal
@@ -254,7 +254,7 @@ key enter kind=enter role=enter a11y="换行"
   anchor 2129.5,321 up 0,-1
   actions send="sym:Return"
   sound=return shortcut="return"
-  menu "emoji" icon=emoji do="picker:Emoji"
+  menu "Emoji" icon=emoji do="picker:"
   normal
     shadow rect(1926.88,285.5,2332.13,359.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1926.88,285.5,2332.13,356.5 r=10.5,10.5,10.5,10.5) #ff5cb5ab

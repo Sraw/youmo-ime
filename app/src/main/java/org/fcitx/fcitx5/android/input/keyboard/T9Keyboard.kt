@@ -11,13 +11,17 @@ import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.StateListDrawable
 import android.os.SystemClock
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.annotation.Keep
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.children
 import androidx.core.view.isVisible
@@ -44,22 +48,36 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
+import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.scene.KeyRef
+import org.fcitx.fcitx5.android.input.scene.TextBoardState
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.theme.KeyFaceGeometry
 import org.fcitx.fcitx5.android.input.theme.KeyKind
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.input.theme.KeyStyleResolver
+import org.fcitx.fcitx5.android.input.theme.ThemeLook
+import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.Scene
+import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.Shift
+import org.fcitx.fcitx5.android.scene.engine.Texts
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.constraintlayout.leftOfParent
+import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.add
 import splitties.views.existingOrNewId
 import splitties.views.imageResource
+import kotlin.math.roundToInt
 
 /**
  * Pinyin on nine keys (九键), laid out as 搜狗 does: a column on the left offering what the first
@@ -131,6 +149,12 @@ class T9Keyboard(
 
         // the column's name in a theme (KeyNames.NINE)
         private const val SIDE_KEY = "side"
+
+        /** A column item's text size, in dp, before a long syllable is drawn smaller to fit. */
+        internal const val ITEM_TEXT_DP = 16f
+
+        /** The nine keys' layout for the scene engine (060-render-p2 S5a), every variant's. */
+        const val LAYOUT = "nine"
         private const val RIGHT = 0.18f
 
         private const val DIGIT = (1f - SIDE - RIGHT) / 3
@@ -239,6 +263,35 @@ class T9Keyboard(
         /** A digit as a keypad's, as the number keyboard's: typed, or its candidate picked while typing (EngineEvent.KEYPAD). */
         private fun keypad(digit: Char) = KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_KP_0 + (digit - '0')), KeyStates.Virtual)
 
+        /**
+         * Digit key [digit]'s long press (the views' and nine.xml's `popup from="nine"`): a row of its
+         * [letters]' capitals, the digit, its letters (A B C 2 a b c), the digit under the finger; its
+         * [symbols] in rows above.
+         */
+        internal fun ninePopup(digit: Char, letters: String, symbols: List<String>) = KeyDef.Popup.Keyboard.Explicit(
+            // ;'s capital is : (九键双拼's JKL;), as Shift gives it: no second ;
+            letters.map { if (it == ';') ":" else it.uppercase() }.toTypedArray() + digit.toString() +
+                letters.lowercase().map { it.toString() } + symbols.filter { it != ":" || ';' !in letters },
+            symbolsFrom = 1 + 2 * letters.length,
+            inRow = letters.length,
+        )
+
+        /**
+         * 1's long press: its symbols alone, none set apart: it has no letters; typed as they are, not
+         * through the engine, where . would be 。 English's its own, none of them full width. Null with none.
+         */
+        internal fun onePopup(english: Boolean, symbols: NineKeySymbols) =
+            (if (english) ENGLISH_ONE_SYMBOLS else symbols.symbols('1')).takeIf { it.isNotEmpty() }?.let {
+                KeyDef.Popup.Keyboard.Explicit(it.toTypedArray(), asIs = true)
+            }
+
+        /** The letters on digit key [d] (2 to 9), as [layout] puts them. */
+        internal fun lettersOn(d: Char, letters: NineKeyLetters, english: Boolean, shuangpin: Boolean, semicolon: Boolean) = when {
+            shuangpin -> NineKeyLetters.NINE_SP.letters(NineKeyLetters.NINE_SP.codes[d - '2']).uppercase().let { if (semicolon) it else it.replace(";", "") }
+            english -> letters.letters(d).lowercase()
+            else -> letters.letters(d).uppercase()
+        }
+
         private fun digitKey(digit: Char, letters: String, symbols: List<String>) = KeyDef(
             KeyDef.Appearance.AltText(displayText = letters, altText = digit.toString(), textSize = 20f, percentWidth = DIGIT),
             setOf(
@@ -247,15 +300,7 @@ class T9Keyboard(
             ),
             arrayOf(
                 KeyDef.Popup.AltPreview(letters, digit.toString()),
-                // a row of its letters' capitals, the digit, its letters (A B C 2 a b c), the digit
-                // under the finger; its symbols in rows above
-                KeyDef.Popup.Keyboard.Explicit(
-                    // ;'s capital is : (九键双拼's JKL;), as Shift gives it: no second ;
-                    letters.map { if (it == ';') ":" else it.uppercase() }.toTypedArray() + digit.toString() +
-                        letters.lowercase().map { it.toString() } + symbols.filter { it != ":" || ';' !in letters },
-                    symbolsFrom = 1 + 2 * letters.length,
-                    inRow = letters.length,
-                ),
+                ninePopup(digit, letters, symbols),
             ),
             name = digit.toString(),
             shortcut = KeyShortcuts.charKey(KeyShortcutPreset.NINE, digit.toString()),
@@ -400,11 +445,7 @@ class T9Keyboard(
             shuangpin: Boolean = false,
             semicolon: Boolean = true,
         ): List<List<KeyDef>> {
-            fun on(d: Char) = when {
-                shuangpin -> NineKeyLetters.NINE_SP.letters(NineKeyLetters.NINE_SP.codes[d - '2']).uppercase().let { if (semicolon) it else it.replace(";", "") }
-                english -> letters.letters(d).lowercase()
-                else -> letters.letters(d).uppercase()
-            }
+            fun on(d: Char) = lettersOn(d, letters, english, shuangpin, semicolon)
             return layoutOf(::on, symbols, english)
         }
 
@@ -417,11 +458,7 @@ class T9Keyboard(
                         KeyDef.Behavior.Press(KeyAction.HostKeyAction("1")),
                         KeyDef.Behavior.Swipe(keypad('1')),
                     ),
-                    // its symbols alone, none set apart: it has no letters; typed as they are, not
-                    // through the engine, where . would be 。 English's its own, none of them full width
-                    (if (english) ENGLISH_ONE_SYMBOLS else symbols.symbols('1')).takeIf { it.isNotEmpty() }?.let {
-                        arrayOf(KeyDef.Popup.Keyboard.Explicit(it.toTypedArray(), asIs = true))
-                    },
+                    onePopup(english, symbols)?.let { arrayOf(it) },
                     name = "1",
                     // a character key, as the digits are: its swipe types 1 as ever
                     shortcut = KeyShortcuts.charKey(KeyShortcutPreset.NINE, "1"),
@@ -496,13 +533,29 @@ class T9Keyboard(
         letters.letters(d).map { it.lowercaseChar() to digitKeys.getValue(d) }
     }
 
+    // each letter where the scene draws its digit's key (nine.xml's key N)
+    private val sceneLetters: List<Pair<Char, KeyPlace>> = ('2'..'9').flatMap { d ->
+        scenePlace(d.toString()).let { at -> letters.letters(d).map { it.lowercaseChar() to at } }
+    }
+
+    // a digit key's long press (nine.xml's `popup from="nine"`), as the views' (ninePopup, onePopup)
+    private val ninePopups: Map<String, KeyDef.Popup.Keyboard> by lazy {
+        ('2'..'9').associate { d -> "$d" to ninePopup(d, lettersOn(d, letters, english, shuangpin, semicolon), symbols.symbols(d)) } +
+            listOfNotNull(onePopup(english, symbols)?.let { "1" to it })
+    }
+
+    override val sceneTable = object : SceneKeyDef.Table {
+        override fun popup(from: String, node: KeyNode): KeyDef.Popup.Keyboard? = if (from == "nine") ninePopups[node.id] else null
+    }
+
     // glide typing (滑行输入) over the digit keys, read as full pinyin's letters, and a stroke drawn
     // over them (笔画筛选) in pinyin's and 双拼's; English's never glides, its keys being no full
     // keyboard's, nor 双拼's, which reads no letters glided
     override val glide: GlideInput? = if (english) {
         null
     } else {
-        glideInput(letters = { letterKeys }, down = GlideGesture.NINE_KEYS_DOWN, enabled = { !shuangpin }, filters = { InputMethodCatalog.filtersByStrokes(imeName) }) { path, layout ->
+        // the keys where the scene draws them (their centres, GlideGesture's) when it does, else their views
+        glideInput(letters = { if (canvas != null) sceneLetters else letterKeys }, down = GlideGesture.NINE_KEYS_DOWN, enabled = { !shuangpin }, filters = { InputMethodCatalog.filtersByStrokes(imeName) }) { path, layout ->
             // a glide ends a run of presses: a key pressed soon after it is a press of its own, not 连按's next letter
             multiTap.reset()
             onAction(KeyAction.GlideAction(Glide(path, layout)))
@@ -544,6 +597,7 @@ class T9Keyboard(
     // the language key as the user has it
     private fun showLanguageKey() {
         lang.isVisible = showLangSwitchKey.getValue()
+        canvas?.invalidateScene()
     }
 
     private val items = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
@@ -639,6 +693,7 @@ class T9Keyboard(
     }
 
     override fun onDetachedFromWindow() {
+        columnPlacer.removeCallbacksAndMessages(null)
         scope?.cancel()
         scope = null
         super.onDetachedFromWindow()
@@ -679,6 +734,7 @@ class T9Keyboard(
             if (view.isVisible) view.text = labels[i]
         }
         column.scrollTo(0, 0)
+        if (state.composing != was) canvas?.invalidateScene()
     }
 
     private fun oneLabel(composing: Boolean) = when {
@@ -687,8 +743,12 @@ class T9Keyboard(
         else -> ONE
     }
 
-    private fun item(i: Int) = TextView(context).apply {
-        textSize = 16f
+    // one line, in dp as the keys' text is: a syllable longer than the column (shuang, zhuang on a
+    // narrow one) is drawn smaller to fit, not wrapped onto a second line the cell cuts off (A7)
+    private fun item(i: Int) = AutoScaleTextView(context).apply {
+        setTextSize(TypedValue.COMPLEX_UNIT_DIP, ITEM_TEXT_DP)
+        scaleMode = AutoScaleTextView.Mode.Proportional
+        isSingleLine = true
         gravity = Gravity.CENTER
         setTextColor(theme.altKeyTextColor)
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, itemHeight.takeIf { it > 0 } ?: dp(40))
@@ -775,6 +835,7 @@ class T9Keyboard(
             val on = letters.letters(d)
             digitKeys[d]?.mainText?.text = if (shift.upper) on.uppercase() else on.lowercase()
         }
+        canvas?.invalidateScene()
     }
 
     /**
@@ -798,7 +859,8 @@ class T9Keyboard(
     override fun onPopupAction(action: PopupAction) {
         val shown = when (action) {
             is PopupAction.PreviewAction -> {
-                val digit = digitOf[action.key.viewId]
+                // a key view's by its id; the scene's by its id there, the digit (nine.xml)
+                val digit = digitOf[action.key.viewId] ?: action.key.id.singleOrNull()?.takeIf { action.key.isScene && it in digitKeys }
                 val now = SystemClock.uptimeMillis()
                 pressed = digit?.let { Pressed(it, now) }
                 // 九键双拼 has no 连按: a key's preview is its letters
@@ -818,8 +880,13 @@ class T9Keyboard(
         addState(intArrayOf(android.R.attr.state_pressed), ColorDrawable(theme.keyPressHighlightColor))
     }
 
+    // Return as last shown: its icon on the scene's key too
+    private var returnAppearance = ReturnKeyAppearance.Enter
+
     override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
+        returnAppearance = appearance
         `return`.showReturnAction(appearance)
+        canvas?.invalidateScene()
     }
 
     // the input method shown, for whether a stroke is drawn (笔画筛选)
@@ -828,5 +895,63 @@ class T9Keyboard(
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         imeName = ime.uniqueName
         showInputMethodName(space, ime)
+        canvas?.invalidateScene()
+    }
+
+    // what the keys show now (nine.xml's when= and bindings): English's or not, 1 as what the engine
+    // says is typed ([oneLabel]), each digit's letters as its view has them (the user's, 双拼's, Shift's
+    // case), Shift, the language key, the space's input method, Return
+    override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env {
+        val state = TextBoardState(langKey = showLangSwitchKey.getValue(), holdVoice = holdsToTalk)
+        val input = state.input().copy(ime = if (english) "english" else state.input().ime, composing = columnState.composing)
+        val texts = Texts(
+            imeName = shownImeName.orEmpty(),
+            returnLabel = returnAppearance.label(context).toString(),
+            returnIcon = SceneIcons.returnName(returnAppearance.icon),
+            nineLetters = ('2'..'9').associate { d -> d.toString() to digitKeys.getValue(d).mainText.text.toString() },
+            a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
+        )
+        val caps = when {
+            !english -> Shift.None
+            else -> when (shift.caps) {
+                AutoCaps.Caps.NONE -> Shift.None
+                AutoCaps.Caps.ONCE -> Shift.Once
+                AutoCaps.Caps.LOCK -> Shift.Lock
+            }
+        }
+        return SceneEnvs.of(this, look, theme.isDark, width, height, input = input, shift = caps, texts = texts, marks = SceneBoard.marks(layout, charShortcutMarks))
+    }
+
+    // each scene made anew: the column placed where it has the slot, after this frame (a layout pass, not one in a
+    // draw); on the main looper, not View.post, which holds it till the keyboard is attached. Dropped as it is detached
+    private val columnPlacer = Handler(Looper.getMainLooper())
+
+    override fun onSceneBuilt(scene: Scene?) {
+        columnPlacer.post { placeColumn(scene) }
+    }
+
+    // the column in the scene's slot `side` (nine.xml), over the canvas: placed where [scene] has it; hidden with no scene
+    private fun placeColumn(scene: Scene?) {
+        val box = scene?.slots?.firstOrNull { it.id == SIDE_KEY }?.bounds
+        column.visibility = if (box == null) View.GONE else View.VISIBLE
+        if (box == null) return
+        val lp = column.layoutParams as ConstraintLayout.LayoutParams
+        val at = listOf(box.left.roundToInt(), box.top.roundToInt(), box.right.roundToInt(), box.bottom.roundToInt())
+        // laid out there already: no layout again
+        if (listOf(lp.leftMargin, lp.topMargin, lp.leftMargin + lp.width, lp.topMargin + lp.height) == at) return
+        column.layoutParams = lParams(at[2] - at[0], at[3] - at[1]) {
+            topOfParent(at[1])
+            leftOfParent(at[0])
+        }
+    }
+
+    // last: the scene reads the state above (060's redraw: the keys drawn by the scene engine where the
+    // canvas is on, each wired as its view was, by its theme name; the column a native view in its slot)
+    init {
+        if (drawKeysWithScene(LAYOUT)) {
+            // the slot's face is the scene's: the column draws only its items
+            column.background = null
+            column.bringToFront()
+        }
     }
 }

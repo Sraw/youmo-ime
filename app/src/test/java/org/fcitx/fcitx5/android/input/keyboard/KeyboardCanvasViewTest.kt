@@ -447,12 +447,7 @@ class KeyboardCanvasViewTest {
             h.api.inputMethodEntryCached = KeyboardHarness.PINYIN
             h.emit(HostEvent.InputMethodChanged(KeyboardHarness.PINYIN))
             check("pinyin")
-            // a key hidden since the scene was drawn: its place finds nothing till the next frame's
-            val shift = c.keyAt("shift")!!
-            h.keyView("shift").visibility = View.INVISIBLE
-            assertSame(shift, c.keyAt(shift.anchor.x.toFloat(), shift.anchor.y.toFloat()))
-            assertFalse("a hidden key took the touch", c.press("shift"))
-            assertFalse(c.shownPressed("shift"))
+            // (a view hidden no longer hides its key: the 26 keys are wired from qwerty.xml's nodes, U4 B, the layout says what is shown)
         } finally {
             told(null)
         }
