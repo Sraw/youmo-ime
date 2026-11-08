@@ -105,8 +105,6 @@ class KeyboardHarness(
     private val codeRowWas = ThemeManager.prefs.codeRow.getValue().takeIf { it != codeRow }
 
     init {
-        // -PcanvasKeyboard: the canvas draws the keys (060-render-p2 S3), where the test did not choose
-        CanvasRun.begin()
         // both resource packs there, as on a user's phone: without the text pack the keyboard is a
         // prompt to import it (PackGateView); a test of that, or of voice input's, puts its own
         TestShelves.use()
@@ -133,7 +131,6 @@ class KeyboardHarness(
         } catch (e: Throwable) {
             keyboardsWere?.let(::setKeyboards)
             codeRowWas?.let(ThemeManager.prefs.codeRow::setValue)
-            CanvasRun.end()
             HostDaemon.testConnection = null
             scope.cancel()
             throw e
@@ -794,7 +791,6 @@ class KeyboardHarness(
         activities.clear()
         keyboardsWere?.let(::setKeyboards)
         codeRowWas?.let(ThemeManager.prefs.codeRow::setValue)
-        CanvasRun.end()
         HostDaemon.testConnection = null
         scope.cancel()
     }
@@ -809,7 +805,7 @@ class KeyboardHarness(
     }
 
     companion object {
-        /** Every harness's keys drawn by the canvas but where a test chose (`-PcanvasKeyboard`, app/build.gradle.kts). */
+        
         val PINYIN = InputMethodEntry(InputMethodCatalog.PINYIN, "拼音", "", "", "拼", "zh_CN", "androidengine", false)
         val ENGLISH = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "", "En", "en", "androidengine", false)
 

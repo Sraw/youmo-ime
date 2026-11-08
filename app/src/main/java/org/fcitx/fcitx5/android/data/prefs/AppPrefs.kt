@@ -66,7 +66,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          * 060's redraw, while it is made (P1): the 26 keys drawn by the scene engine (KeyboardCanvasView)
          * over TextKeyboard's own keys, which still do the work. Off, nothing of it is made.
          */
-        val canvasKeyboard = bool("canvas_keyboard", false)
+        val canvasKeyboard = bool("canvas_keyboard", true)
 
         /** [org.fcitx.fcitx5.android.ui.main.AppLanguage]'s tag, read where appcompat cannot know it yet */
         val appLanguage = string("app_language", "")
