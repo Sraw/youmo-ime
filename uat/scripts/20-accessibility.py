@@ -69,7 +69,7 @@ def ax03(d):
 
 @case("AX-04", base="B0-九键")
 def ax04(d):
-    return explore(d, want=["ABC, 2"])
+    return explore(d, want=["ABC，2"])
 
 
 @case("AX-05", base="B0-注音全键盘")

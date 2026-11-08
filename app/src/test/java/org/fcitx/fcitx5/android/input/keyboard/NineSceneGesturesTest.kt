@@ -140,6 +140,14 @@ class NineSceneGesturesTest {
         assertTrue(scene.first(), "5=JKL/5" in scene.first())
     }
 
+    // a digit's letters and digit read with the app's a11y_key_grouped, as qwerty's q，1 is: in Chinese a full-width
+    // comma (once the scene's built-in English ", " was read on the nine keys only)
+    @Test
+    @Config(qualifiers = "zh-rCN-" + KeyboardCanvasViewTest.PORTRAIT)
+    fun aDigitIsReadWithTheAppsSeparator() = harness(true, Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
+        assertEquals("ABC，2", h.keys().single { it.id == "2" }.description)
+    }
+
     // 连按 on: 5 pressed again soon previews its next letter (its preview found by the scene key's id as by its view's)
     @Test
     fun aDigitPressedAgainPreviewsItsNextLetter() {
