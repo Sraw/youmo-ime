@@ -8,6 +8,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.text.InputType
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
@@ -35,7 +36,8 @@ import java.io.File
  * Each keyboard moved to the scene (060-render-p2 S4 step 7), the views' keys and the scene's side by
  * side in nine looks: for the eye (build/outputs/canvas-compare/<board>-<look>.png), and close enough
  * pixel for pixel (what differs: specs/app.md, the canvas; 060-render-p2 §5.3). A keyboard moved
- * adds its row to [boards].
+ * adds its row to [boards]; the number pads' rows are `number-<pad>`, each shown by a field of its own
+ * ([FIELDS]).
  */
 @RunWith(ParameterizedRobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -49,6 +51,17 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
             arrayOf<Any>("qwerty", PinyinKeyboard.Full),
             arrayOf<Any>("k14", PinyinKeyboard.Keys14),
             arrayOf<Any>("k18", PinyinKeyboard.Keys18),
+        ) + FIELDS.keys.map { arrayOf<Any>(it, PinyinKeyboard.Full) }
+
+        // each number pad by the field that shows it (NumberPad.of): the full pad's a plain number field's
+        private val FIELDS = mapOf(
+            "number-full" to InputType.TYPE_CLASS_NUMBER,
+            "number-digits" to (InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD),
+            "number-signed" to (InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED),
+            "number-decimal" to (InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL),
+            "number-signed-decimal" to (InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED or InputType.TYPE_NUMBER_FLAG_DECIMAL),
+            "number-phone" to InputType.TYPE_CLASS_PHONE,
+            "number-datetime" to (InputType.TYPE_CLASS_DATETIME or InputType.TYPE_DATETIME_VARIATION_NORMAL),
         )
 
         // the same phone on its side: 851 dp wide, wider than the 600 split starts from
@@ -105,7 +118,7 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
         val shots = try {
             listOf(false, true).map { on ->
                 prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, on)
-                KeyboardHarness(case.theme).start().use { h ->
+                KeyboardHarness(case.theme).start(FIELDS[board] ?: InputType.TYPE_CLASS_TEXT).use { h ->
                     // past the keyboard's sliding in
                     h.after(1000)
                     h.relayout()

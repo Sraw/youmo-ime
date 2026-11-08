@@ -5,11 +5,11 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.text.InputType
-import android.view.View
+import android.graphics.Rect
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
+import org.fcitx.fcitx5.android.input.ShownKey
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -61,12 +61,50 @@ class FieldPadUatTest {
         val keys = keys(InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD)
         assertTrue(keys.toString(), keys.containsAll(digits))
         assertTrue(keys.toString(), listOf("+", "-", "*", "/", ".", ",", "=").none { it in keys })
-        // the blank keys in their places: no press, nothing for TalkBack
-        val blank = KeyboardHarness.all(h.keyboard).filterIsInstance<TextKeyView>()
-            .filter { !it.isEnabled && it.importantForAccessibility == View.IMPORTANT_FOR_ACCESSIBILITY_NO }.toList()
-        // three left of the digits, one right of 3, three in the bottom row
-        assertEquals(7, blank.size)
-        assertTrue(blank.all { it.mainText.text.isEmpty() })
+        // the blank places: three left of the digits, one right of 3, three in the bottom row; each takes no
+        // press, types nothing, has nothing for TalkBack (a blank view disabled and not read, the canvas's no node)
+        val shown = h.keys()
+        assertTrue(shown.toString(), shown.none { !it.enabled && (it.label.isNotEmpty() || it.description != null) })
+        val blanks = blankPlaces(shown)
+        // the bottom row's right two side by side, one stretch: six, as wide as the seven blank keys
+        assertEquals(blanks.toString(), 6, blanks.size)
+        val wide = h.keyboard.width * (4 * SIDE + BOTTOM_EDGE * 2 + BOTTOM_MIDDLE)
+        assertEquals(blanks.toString(), wide, blanks.sumOf { it.width() }.toFloat(), blanks.size.toFloat())
+        h.api.calls.clear()
+        val before = h.field.text.toString()
+        for (at in blanks) {
+            h.press(object : ShownKey by shown.first() {
+                override val bounds get() = at
+            })
+            h.release()
+        }
+        assertEquals(emptyList<String>(), h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") })
+        assertEquals(before, h.field.text.toString())
+    }
+
+    // along each row's middle, the stretches no key that takes a press covers (wider than a key's gap): a
+    // place of the pad's blank, as its view or the canvas's gap
+    private fun blankPlaces(shown: List<ShownKey>): List<Rect> {
+        val keys = shown.filter { it.enabled }
+        val width = h.keyboard.width
+        val rows = keys.map { it.bounds.top to it.bounds.bottom }.distinct()
+        return rows.flatMap { (top, bottom) ->
+            val y = (top + bottom) / 2
+            val left = IntArray(2).also(h.keyboard::getLocationInWindow)[0]
+            val free = (left until left + width).map { x -> keys.none { it.bounds.contains(x, y) } }
+            // runs of free pixels
+            buildList {
+                var start = -1
+                for (i in 0..free.size) {
+                    if (i < free.size && free[i]) {
+                        if (start < 0) start = i
+                    } else if (start >= 0) {
+                        if (i - start > width / BLANK_AT_LEAST) add(Rect(left + start, top, left + i, bottom))
+                        start = -1
+                    }
+                }
+            }
+        }
     }
 
     @Test
@@ -100,5 +138,15 @@ class FieldPadUatTest {
         h.start()
         h.tap(h.key("123"))
         assertTrue(h.texts().toString(), "=" in h.texts() && "#" !in h.texts())
+    }
+
+    private companion object {
+        // a stretch this share of the width at least is a place, not the gap between two keys
+        const val BLANK_AT_LEAST = 20
+
+        // NumberKeyboard's widths: the side column's, the bottom row's ends beside ABC and Return, its middle
+        const val SIDE = 0.15f
+        const val BOTTOM_EDGE = 0.1f
+        const val BOTTOM_MIDDLE = 0.13333f
     }
 }

@@ -205,7 +205,7 @@ class LandscapeUatTest {
         val a = arrow()!!
         assertEquals(h.service.getString(R.string.split_dock_move_left), a.contentDescription)
         assertTrue(h.box(a).right <= b.left)
-        h.capture("LandscapeUatTest/numbers_right")
+        h.captureBoard("LandscapeUatTest/numbers_right")
     }
 
     @Test

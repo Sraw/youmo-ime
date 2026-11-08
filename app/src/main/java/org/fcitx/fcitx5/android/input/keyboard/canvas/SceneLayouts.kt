@@ -55,6 +55,7 @@ class BuiltInLayouts(private val context: Context) : LayoutSource {
             "k14" to R.raw.scene_layout_k14,
             "k18" to R.raw.scene_layout_k18,
             "grouped-bottom" to R.raw.scene_layout_grouped_bottom,
+            "number" to R.raw.scene_layout_number,
         )
     }
 }

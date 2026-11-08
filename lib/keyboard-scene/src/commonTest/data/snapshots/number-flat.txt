@@ -17,7 +17,7 @@ key 1 kind=letter a11y="1"
   shape rect(169.88,18.38,406.13,157.63)
   hit rect(162,0,414,176)
   anchor 288,88 up 0,-1
-  actions send="keypad:1"
+  actions send="sym:KP_1"
   text label="1"
   shortcut="num/1"
   normal
@@ -29,7 +29,7 @@ key 2 kind=letter a11y="2"
   shape rect(421.88,18.38,658.13,157.63)
   hit rect(414,0,666,176)
   anchor 540,88 up 0,-1
-  actions send="keypad:2"
+  actions send="sym:KP_2"
   text label="2"
   shortcut="num/2"
   normal
@@ -41,7 +41,7 @@ key 3 kind=letter a11y="3"
   shape rect(673.88,18.38,910.13,157.63)
   hit rect(666,0,918,176)
   anchor 792,88 up 0,-1
-  actions send="keypad:3"
+  actions send="sym:KP_3"
   text label="3"
   shortcut="num/3"
   normal
@@ -75,7 +75,7 @@ key 4 kind=letter a11y="4"
   shape rect(169.88,194.38,406.13,332.63)
   hit rect(162,176,414,351)
   anchor 288,263.5 up 0,-1
-  actions send="keypad:4"
+  actions send="sym:KP_4"
   text label="4"
   shortcut="num/4"
   normal
@@ -87,7 +87,7 @@ key 5 kind=letter a11y="5"
   shape rect(421.88,194.38,658.13,332.63)
   hit rect(414,176,666,351)
   anchor 540,263.5 up 0,-1
-  actions send="keypad:5"
+  actions send="sym:KP_5"
   text label="5"
   shortcut="num/5"
   normal
@@ -99,7 +99,7 @@ key 6 kind=letter a11y="6"
   shape rect(673.88,194.38,910.13,332.63)
   hit rect(666,176,918,351)
   anchor 792,263.5 up 0,-1
-  actions send="keypad:6"
+  actions send="sym:KP_6"
   text label="6"
   shortcut="num/6"
   normal
@@ -112,7 +112,7 @@ key space kind=function role=space a11y="a11y_key_space"
   hit rect(918,176,1080,351)
   anchor 999,263.5 up 0,-1
   actions send="sym:space" swipe-axis="both"
-  shortcut="space"
+  sound=space shortcut="space"
   normal
     icon space 967.5,232,1030.5,295 #ff7a858a
     icon cursor-move 933,199,962,228 #ff7a858a
@@ -134,7 +134,7 @@ key 7 kind=letter a11y="7"
   shape rect(169.88,369.38,406.13,508.63)
   hit rect(162,351,414,527)
   anchor 288,439 up 0,-1
-  actions send="keypad:7"
+  actions send="sym:KP_7"
   text label="7"
   shortcut="num/7"
   normal
@@ -146,7 +146,7 @@ key 8 kind=letter a11y="8"
   shape rect(421.88,369.38,658.13,508.63)
   hit rect(414,351,666,527)
   anchor 540,439 up 0,-1
-  actions send="keypad:8"
+  actions send="sym:KP_8"
   text label="8"
   shortcut="num/8"
   normal
@@ -158,7 +158,7 @@ key 9 kind=letter a11y="9"
   shape rect(673.88,369.38,910.13,508.63)
   hit rect(666,351,918,527)
   anchor 792,439 up 0,-1
-  actions send="keypad:9"
+  actions send="sym:KP_9"
   text label="9"
   shortcut="num/9"
   normal
@@ -207,6 +207,7 @@ key symbols kind=letter role=symbols a11y="!?#"
   anchor 342,614.5 up 0,-1
   actions send="layout:Symbol"
   text label="!?#"
+  shortcut="symbols"
   normal
     text "!?#" 302,630.25 system 700 42 #ff7a858a
   pressed
@@ -216,7 +217,7 @@ key 0 kind=letter a11y="0"
   shape rect(421.88,545.38,658.13,683.63)
   hit rect(414,527,666,702)
   anchor 540,614.5 up 0,-1
-  actions send="keypad:0"
+  actions send="sym:KP_0"
   text label="0"
   shortcut="num/0"
   normal
@@ -252,6 +253,7 @@ key enter kind=enter role=enter a11y="换行"
   anchor 999,614.5 up 0,-1
   actions send="sym:Return"
   sound=return shortcut="return"
+  menu "Emoji" icon=emoji do="picker:"
   normal
     fill rect(953.06,568.56,1044.94,660.44 r=45.94,45.94,45.94,45.94) #ff5cb5ab
     icon enter 967.5,583,1030.5,646 #ffffffff

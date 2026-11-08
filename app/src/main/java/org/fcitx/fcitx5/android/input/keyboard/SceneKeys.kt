@@ -60,7 +60,8 @@ internal class SceneKeys(private val keyboard: View, private val wire: (SceneKey
 
     private fun nodeKey(view: KeyboardCanvasView, node: KeyNode, table: SceneKeyDef.Table, replaced: (SceneKey) -> Unit): SceneKey {
         val ref = KeyRef.scene(node.id, node.copy)
-        val b = SceneBehavior.of(node)
+        // as its board pops up: the number pad's no preview, no long press's keys
+        val b = SceneKeyDef.onBoard(SceneBehavior.of(node), view.scene)
         byNode[ref]?.takeIf { it.first == b }?.let { return it.second }
         // the key it was: its timers stopped (a repeat, a long press pending), as a key's are when its touch is taken
         byNode[ref]?.second?.let { old ->

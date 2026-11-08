@@ -449,6 +449,18 @@ keys), the 18 keys writing `lean="off"`; a layout whose groups are not the keybo
 as built in (`SceneGroups.leaningOf`: G14's two-letter groups); the engine places taps of G14's codes alone (`Keyboard.placesTaps`),
 so 双拼's 14 keys (sent as `shuangpin14Key`) and any 18 keys send the code only, as before.
 
+The number keyboard (S4b) is one layout, `number.xml`, for all seven pads: `NumberKeyboard` gives its
+`NumberPad` as `Input.pad` (`full`, `signed-decimal`…) and the keys beside the digits are chosen by
+`when="pad=…"`; one id, `number`, as the theme names the board (P3 styles `number/<key>`), each pad's
+own `NumberKeyboard` drawing it. Its digits and `+ - * / , = .` are `sym:KP_…`: the `action:` table sends
+every `KP_` keysym with NumLock (`NumLockState`), as `NumPadKey` did (`keypad:`, a typing keyboard's
+corner digit, stays Virtual). The board's `preview="off" popups="off"` are applied to each key
+(`SceneKeyDef.onBoard`): no bubble, no long press's keyboard, but a menu written on a key pops up, so
+Return offers Emoji as on every other keyboard (the views swallowed it: rules C 疑问 8, fixed on the
+canvas alone, `NumberSceneGesturesTest`). A place a pad has no key for is a `<gap look>`: drawn
+`:disabled`, faded to `Popups.DISABLED_ALPHA` op by op as the blank key's view was as a whole, no touch,
+no node. The space is still `button_mini_space` to TalkBack (`KeyNames.BOARD_RESOURCES`, read by board).
+
 What the scene is given, so it draws what the views would: qwerty.xml is
 `lib/keyboard-scene/src/commonMain/layouts/qwerty.xml`, the one file the app copies and the engine's
 tests read. A letter's corner is `{alt:x}`, the app's `Texts.alts` (`SceneLetters.alts` of
@@ -486,6 +498,7 @@ moved a row, its pictures in `build/outputs/canvas-compare`; the share of pixels
 anti-aliasing, each under 1.5%: qwerty PixelLight 0.27%, MaterialLight 0.26%, NordLight 0.27%, PixelDark
 0.26%, MaterialDark 0.26%, AMOLED black 0.27%, compact height 0.20%, landscape 0.10%, landscape
 split 0.16%; the 14 keys 0.10–0.17%, the 18 keys 0.11–0.14%, both 0.01% landscape and 0.05–0.07% split;
+the seven number pads (`number-<pad>`, each by its field) 0.46% compact, 0.01–0.20% the rest;
 the grouped goldens' `canvas_` siblings 0.13–0.36% from the views', all in the bottom row and ⌫): the engine puts row and key edges on whole pixels as Android laid
 the views out (rows 176, 175, 176, 175 px of a 702 px board; this fixed the bottom row a pixel up and
 Return's blurred top edge), and a shortcut's icon from the pixel its margins reach, its size whole

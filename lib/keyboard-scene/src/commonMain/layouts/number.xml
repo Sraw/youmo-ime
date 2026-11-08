@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  数字键盘（NumberKeyboard：Number 及字段的 6 种 pad，rules C §7），板 number，一个文件七种 pad，按 pad= 条件（NumberPad.of）。
+  数字键盘（NumberKeyboard：Number 及字段的 6 种 pad，rules C §7），板 number，一个文件七种 pad，按 pad= 条件（NumberPad.of），
+  七个键盘都是这一块板、这一个 id（主题的样式按 number/<键> 选，P3）。
   宽度为行宽的百分之几：左列 15、数字平分、右列 15；第 4 行 ABC 15、底0 10、!?# 13.333、0 23.334、底1 13.333、底2 10、回车 15。
   pad 没有键的位置是空白键：画键面、不收触摸、读屏跳过（<gap look="function">），数字在各 pad 的位置不变。
   底行中间那格（FULL 的 =、SIGNED 的 -、PHONE 的 )）现在是 AltForeground，归字母键（kind="letter" class="alt-text"），空着时也一样。
   同一个符号在不同 pad 里在不同位置（- 在 FULL 是左列、PHONE 是角、SIGNED 是底中），id 可以重复，只要每处都有 when=，引擎查
-  显示出来的不重复。+ - * / , = . 发小键盘键（输入法不改成全角），# ( ) : 原样提交。不弹预览、长按键盘和长按菜单（popups="off"，
-  回车的 Emoji 菜单也没有，rules C 疑问 8）。
+  显示出来的不重复。数字和 + - * / , = . 是小键盘的键（sym:KP_…，App 带 NumLock 发，同 NumPadKey；输入法不改成全角），
+  # ( ) : 原样提交。不弹预览、长按键盘（preview="off" popups="off"）；回车长按的 Emoji 菜单照常（rules C 疑问 8：旧画法把它
+  一起吞了，P0 定新画法修掉，060-render-p2 §5.3）。
 -->
 <keyboard xmlns="https://youmo-ime/layout/1" id="number" name="数字" family="number" columns="100" preview="off" popups="off">
   <defaults kind="letter" width="15"/>
@@ -14,9 +16,9 @@
     <key id="+" kind="function" width="15" label="+" text-size="23" send="sym:KP_Add" when="pad=full|phone"/>
     <key id="-" kind="function" width="15" label="-" text-size="23" send="sym:KP_Subtract" when="pad=datetime"/>
     <gap width="15" look="function" when="pad=digits|signed|decimal|signed-decimal"/>
-    <key id="1" width="fill" label="1" text-size="30" send="keypad:1" shortcut="num/1"/>
-    <key id="2" width="fill" label="2" text-size="30" send="keypad:2" shortcut="num/2"/>
-    <key id="3" width="fill" label="3" text-size="30" send="keypad:3" shortcut="num/3"/>
+    <key id="1" width="fill" label="1" text-size="30" send="sym:KP_1" shortcut="num/1"/>
+    <key id="2" width="fill" label="2" text-size="30" send="sym:KP_2" shortcut="num/2"/>
+    <key id="3" width="fill" label="3" text-size="30" send="sym:KP_3" shortcut="num/3"/>
     <key id="/" kind="function" width="15" label="/" text-size="23" send="sym:KP_Divide" when="pad=full"/>
     <key id="-" kind="function" width="15" label="-" text-size="23" send="sym:KP_Subtract" when="pad=phone"/>
     <gap width="15" look="function" when="pad=digits|signed|decimal|signed-decimal|datetime"/>
@@ -26,19 +28,19 @@
     <key id="*" kind="function" width="15" label="*" text-size="23" send="sym:KP_Multiply" when="pad=phone"/>
     <key id="/" kind="function" width="15" label="/" text-size="23" send="sym:KP_Divide" when="pad=datetime"/>
     <gap width="15" look="function" when="pad=digits|signed|decimal|signed-decimal"/>
-    <key id="4" width="fill" label="4" text-size="30" send="keypad:4" shortcut="num/4"/>
-    <key id="5" width="fill" label="5" text-size="30" send="keypad:5" shortcut="num/5"/>
-    <key id="6" width="fill" label="6" text-size="30" send="keypad:6" shortcut="num/6"/>
-    <key id="space" role="space" kind="function" width="15" icon="space" a11y="a11y_key_space" send="sym:space" swipe-axis="both" shortcut="space"/>
+    <key id="4" width="fill" label="4" text-size="30" send="sym:KP_4" shortcut="num/4"/>
+    <key id="5" width="fill" label="5" text-size="30" send="sym:KP_5" shortcut="num/5"/>
+    <key id="6" width="fill" label="6" text-size="30" send="sym:KP_6" shortcut="num/6"/>
+    <key id="space" role="space" kind="function" width="15" icon="space" a11y="a11y_key_space" sound="space" send="sym:space" swipe-axis="both" shortcut="space"/>
   </row>
   <row>
     <key id="*" kind="function" width="15" label="*" text-size="23" send="sym:KP_Multiply" when="pad=full"/>
     <key id="#" kind="function" width="15" label="#" text-size="23" send="commit:#" when="pad=phone"/>
     <key id=":" kind="function" width="15" label=":" text-size="23" send="commit::" when="pad=datetime"/>
     <gap width="15" look="function" when="pad=digits|signed|decimal|signed-decimal"/>
-    <key id="7" width="fill" label="7" text-size="30" send="keypad:7" shortcut="num/7"/>
-    <key id="8" width="fill" label="8" text-size="30" send="keypad:8" shortcut="num/8"/>
-    <key id="9" width="fill" label="9" text-size="30" send="keypad:9" shortcut="num/9"/>
+    <key id="7" width="fill" label="7" text-size="30" send="sym:KP_7" shortcut="num/7"/>
+    <key id="8" width="fill" label="8" text-size="30" send="sym:KP_8" shortcut="num/8"/>
+    <key id="9" width="fill" label="9" text-size="30" send="sym:KP_9" shortcut="num/9"/>
     <key id="backspace" role="backspace" kind="function" width="15" icon="backspace" a11y="a11y_key_backspace"
          sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both" shortcut="backspace"/>
   </row>
@@ -47,8 +49,8 @@
     <key id="," kind="function" width="10" label="," text-size="23" send="sym:KP_Separator" when="pad=full"/>
     <key id="(" kind="function" width="10" label="(" text-size="23" send="commit:(" when="pad=phone"/>
     <gap width="10" look="function" when="pad=digits|signed|decimal|signed-decimal|datetime"/>
-    <key id="symbols" role="symbols" kind="letter" class="alt-text" width="13.333" label="!?#" text-size="16" text-style="bold" send="layout:Symbol"/>
-    <key id="0" width="23.334" label="0" text-size="30" send="keypad:0" shortcut="num/0"/>
+    <key id="symbols" role="symbols" kind="letter" class="alt-text" width="13.333" label="!?#" text-size="16" text-style="bold" send="layout:Symbol" shortcut="symbols"/>
+    <key id="0" width="23.334" label="0" text-size="30" send="sym:KP_0" shortcut="num/0"/>
     <key id="=" kind="letter" class="alt-text" width="13.333" label="=" text-size="23" send="sym:KP_Equal" when="pad=full"/>
     <key id="-" kind="letter" class="alt-text" width="13.333" label="-" text-size="23" send="sym:KP_Subtract" when="pad=signed|signed-decimal"/>
     <key id=")" kind="letter" class="alt-text" width="13.333" label=")" text-size="23" send="commit:)" when="pad=phone"/>
@@ -57,6 +59,10 @@
     <key id="," kind="function" width="10" label="," text-size="23" send="sym:KP_Separator" when="pad=phone"/>
     <gap width="10" look="function" when="pad=digits|signed"/>
     <key id="enter" role="enter" kind="enter" face="special" width="15" icon="{return-icon}" a11y="{return}"
-         sound="return" send="sym:Return" shortcut="return"/>
+         sound="return" send="sym:Return" shortcut="return">
+      <menu>
+        <item label="Emoji" icon="emoji" do="picker:"/>
+      </menu>
+    </key>
   </row>
 </keyboard>

@@ -105,7 +105,7 @@ class ThemeKeyNamesTest {
     // layout's id the board, its keys' ids the keys a theme's override selects (k14/r1c1, qwerty/q)
     @Test
     fun aSceneLayoutsKeysAreItsBoardsNames() {
-        val drawn = mapOf("qwerty" to "qwerty", "k14" to "k14", "k18" to "k18")
+        val drawn = mapOf("qwerty" to "qwerty", "k14" to "k14", "k18" to "k18", "number" to "number")
         for ((id, board) in drawn) {
             val layout = SceneLayouts.of(context, id) ?: error("no layout $id")
             assertEquals(board, layout.layout.id)

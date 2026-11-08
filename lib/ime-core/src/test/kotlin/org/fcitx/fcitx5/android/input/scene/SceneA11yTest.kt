@@ -66,6 +66,15 @@ class SceneA11yTest {
         assertNull("符 had none", s.speech("symbols").resourceName)
     }
 
+    // the number pad's space had a name of its own (MiniSpaceKey): its board's, over its role's
+    @Test
+    fun aBoardsOwnNameOverTheRoles() {
+        val space = scene().keys.first { it.id == "space" }
+        assertEquals("button_mini_space", SceneA11y.of(space, "number", strings::get).resourceName)
+        assertEquals("button_space", SceneA11y.of(space, "qwerty", strings::get).resourceName)
+        assertEquals("button_space", SceneA11y.of(space, strings::get).resourceName)
+    }
+
     @Test
     fun shiftsStateAsTheViewsSaidIt() {
         assertNull(scene().speech("shift").state)
