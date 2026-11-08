@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
@@ -203,8 +204,14 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     // a punctuation key while what it types is not known (a first install, the host not up): held back, a tap felt
     // once, as no face could show what it would type (060-render-p2 S7a)
+    // the last run's keys read after this keyboard was made (the service's read on its thread, slower): taken now
+    private fun known(): Boolean {
+        if (!punctuation.known) punctuation.update(PunctuationStartKeys.known)
+        return punctuation.known
+    }
+
     private fun heldBack(action: KeyAction): Boolean {
-        if (punctuation.known) return false
+        if (known()) return false
         val c = when (action) {
             is KeyAction.HostKeyAction -> action.act.singleOrNull()?.code
             is KeyAction.SymAction -> action.sym.sym
@@ -234,7 +241,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         val shown = popup.listener
         // nor its bubble
         PopupActionListener { a ->
-            if (punctuation.known || a !is PopupAction.PreviewAction || a.content.singleOrNull()?.code?.let(::isAsciiMark) != true) shown.onPopupAction(a)
+            if (a !is PopupAction.PreviewAction || known() || a.content.singleOrNull()?.code?.let(::isAsciiMark) != true) shown.onPopupAction(a)
         }
     }
 

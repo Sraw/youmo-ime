@@ -379,6 +379,8 @@ class InputView(
         // the punctuation keys as the last run's host started with them, till this one says (its status, or the
         // replay below): none kept, they are held back (PunctuationComponent.known)
         punctuation.update(PunctuationStartKeys.known)
+        // the service's read on its thread done after this view was made: taken then, unless the host said first
+        viewScope.launch { PunctuationStartKeys.keys.collect { if (!punctuation.known) punctuation.update(it) } }
         windowManager.addEssentialWindow(symbolPicker)
         windowManager.addEssentialWindow(emojiPicker)
         windowManager.addEssentialWindow(emoticonPicker)

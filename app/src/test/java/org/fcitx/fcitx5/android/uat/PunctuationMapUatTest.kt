@@ -167,6 +167,25 @@ class PunctuationMapUatTest {
         assertEquals(listOf("、", "、", "、"), listOf(face, bubble, h.field.text.toString()))
     }
 
+    // the service's read done after the keyboard was made (its thread slower): a press then takes the keys read,
+    // not held back till the host is up (S7a round 4)
+    @Test
+    fun theLastRunsKeysReadAfterTheKeyboardStillCount() {
+        fcitx = keyboardBeforeTheHost(kept = false)
+        PunctuationStartKeys.loadNow(appContext)
+        assertEquals("the first run's file gone with forget", null, PunctuationStartKeys.known)
+        PunctuationStartKeys.write(appContext, mapOf("," to "、"))
+        val k = h.keyWithId(R.id.button_comma)!!
+        h.press(k)
+        val bubble = h.popupChoices().map { it.text }
+        h.release()
+        fcitx.start()
+        until("the press typed") { h.field.text.isNotEmpty() }
+        assertEquals(listOf("、"), bubble)
+        assertEquals("、", h.field.text.toString())
+        assertEquals("、", h.keyWithId(R.id.button_comma)!!.label)
+    }
+
     // none kept (a first install): the comma pressed before the host is up neither types nor bubbles, as no face
     // could show what it would type; once the host is up it types its mark
     @Test
