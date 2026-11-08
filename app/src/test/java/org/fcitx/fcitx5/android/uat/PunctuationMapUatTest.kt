@@ -5,10 +5,12 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.view.View
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.KotlinHost
 import org.fcitx.fcitx5.android.core.ScriptedEngine
 import org.fcitx.fcitx5.android.core.startedHost
@@ -92,8 +94,6 @@ class PunctuationMapUatTest {
             // made to map; S8 deletes it): on the views the face only
             val shown = { faceAndBubble(comma).let { if (canvas) it else it.take(1) } }
             val twice = { c: String -> if (canvas) listOf(c, c) else listOf(c) }
-            // the table is loaded off the main thread (PunctuationComponent): till then the bubble has no mapping
-            h.after(TABLE_LOADED_MS)
             // each press below is lifted, so typed: what goes in is checked with what showed
             assertEquals(what, twice("，"), shown())
             until("the mark typed") { h.field.text.toString() == "，" }
@@ -114,6 +114,34 @@ class PunctuationMapUatTest {
         }
     }
 
+    // the table read off the main thread (PunctuationComponent) and not read yet: the comma's face, bubble and
+    // what it types alike all the while, then alike as the table has it
+    @Test
+    fun beforeTheTableIsReadTheCommaShowsAndTypesAlike() {
+        fcitx = startedHost(ScriptedEngine(home))
+        runBlocking { fcitx.setPunctuationMap("zh_CN", listOf(PunctuationMapEntry(",", "、", ""))) }
+        val read = CompletableDeferred<Unit>()
+        val slow = object : HostApi by fcitx {
+            override suspend fun punctuationMap(lang: String): List<PunctuationMapEntry> {
+                read.await()
+                return fcitx.punctuationMap(lang)
+            }
+        }
+        h = KeyboardHarness(host = slow)
+        h.service.postFcitxJob { activate(1, "org.example.app") }
+        h.start()
+        val comma = { h.keyWithId(R.id.button_comma)!! }
+        val before = faceAndBubble(comma)
+        assertEquals(before.toString(), 1, before.toSet().size)
+        until("the mark typed") { h.field.text.isNotEmpty() }
+        assertEquals(before.first(), h.field.text.toString())
+        read.complete(Unit)
+        until("the table read") { comma().label == "、" }
+        assertEquals(listOf("、", "、"), faceAndBubble(comma))
+        until("the mark typed") { h.field.text.length == 2 }
+        assertEquals(before.first() + "、", h.field.text.toString())
+    }
+
     // the key's face and the bubble it shows pressed
     private fun faceAndBubble(key: () -> org.fcitx.fcitx5.android.input.ShownKey): List<String> {
         h.after(BUBBLE_GONE_MS)
@@ -126,6 +154,5 @@ class PunctuationMapUatTest {
 
     private companion object {
         const val BUBBLE_GONE_MS = 1000L
-        const val TABLE_LOADED_MS = 3000L
     }
 }

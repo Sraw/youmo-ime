@@ -43,6 +43,13 @@ class PunctuationComponent :
 
     fun transform(p: String) = mapping.getOrDefault(p, p)
 
+    /**
+     * Whether the table is not read yet (the keyboard up before the first status, or a status's table still
+     * loading): the keys show their own characters till then, and type them as they show them
+     * (CommonKeyActionListener), the face, the bubble and what goes in alike (显示和输出一致).
+     */
+    val reading: Boolean get() = update?.isActive != false
+
     fun updatePunctuationMapping(entries: List<StatusEntry>) {
         enabled = entries.any {
             // TODO: A better way to check if punctuation mapping is enabled
