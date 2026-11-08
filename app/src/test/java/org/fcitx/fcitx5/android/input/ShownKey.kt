@@ -194,17 +194,18 @@ class SceneShownKey(val canvas: KeyboardCanvasView, override val id: String, ove
         val symbolText = alt
         var symbol: String? = null
         val shortcuts = mutableListOf<String>()
-        for (op in node.ops(false)) {
-            when (op) {
-                is Op.Icon -> place(op.box.centerX, op.box.centerY)?.let(shortcuts::add)
-                is Op.Text -> {
-                    if (op.text == label) continue
+        val ops = node.ops(false)
+        // in drawing order: the icons and texts as they come
+        for (op in ops) {
+            val at = when (op) {
+                is Op.Icon -> place(op.box.centerX, op.box.centerY)
+                is Op.Text -> if (op.text == label) null else {
                     val wide = op.text.sumOf { if (it.code < 0x2E80) WIDE else 1.0 }
-                    val at = place(op.x + op.size * op.scaleX * wide / 2, op.baseline - op.size * INK / 2) ?: continue
-                    if (op.text == symbolText && symbol == null) symbol = at else shortcuts += at
+                    place(op.x + op.size * op.scaleX * wide / 2, op.baseline - op.size * INK / 2)
                 }
-                else -> {}
-            }
+                else -> null
+            } ?: continue
+            if (op is Op.Text && op.text == symbolText && symbol == null) symbol = at else shortcuts += at
         }
         return MarkPlaces(symbol, shortcuts)
     }

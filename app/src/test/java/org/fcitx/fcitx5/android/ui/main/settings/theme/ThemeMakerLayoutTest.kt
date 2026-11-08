@@ -295,22 +295,7 @@ class ThemeMakerLayoutTest {
                 v is KeyView -> if (whole && !spacer(v)) items += key(v)
                 v is KeyboardCanvasView -> v.scene?.keys?.forEach { items += sceneKey(v, it) }
                 v is SceneKeyCell -> if (whole) v.keyNode?.let { items += sceneKey(v, it) }
-                v is PopupSceneView -> v.scene?.let { sc ->
-                    val at = IntArray(2).also(v::getLocationInWindow)
-                    val x0 = at[0] + v.outset.left.toDouble()
-                    val y0 = at[1] + v.outset.top.toDouble()
-                    for (op in sc.base + sc.keys.flatMap { it.ops(false) }) when (op) {
-                        is Op.Fill -> items += buildJsonObject {
-                            val b = op.shape.bounds
-                            put("t", "fill"); put("p", "popup")
-                            put("r", s.box(x0 + b.left, y0 + b.top, b.right - b.left, b.bottom - b.top))
-                            putColor(op.color.value)
-                            ((op.shape as? Shape.Rect)?.radii?.firstOrNull() ?: 0.0).takeIf { it > 0 }?.let { put("rad", s.dp(it)) }
-                        }
-                        is Op.Text -> items += sceneText(op, x0, y0).withPart("popup").let { JsonObject(mapOf("t" to JsonPrimitive("text")) + it) }
-                        else -> Unit
-                    }
-                }
+                v is PopupSceneView -> popupScene(v)
                 v === column -> {
                     items += buildJsonObject {
                         put("t", "key"); put("r", s.rect(v)); put("k", KeyKind.Function.id); put("n", "$board/side")
@@ -322,6 +307,25 @@ class ThemeMakerLayoutTest {
                     if (whole) own(v, p)
                     children(v, p)
                 }
+            }
+        }
+
+        // a long press's popup the canvas draws: its fills and texts, as the views' were
+        private fun popupScene(v: PopupSceneView) {
+            val sc = v.scene ?: return
+            val at = IntArray(2).also(v::getLocationInWindow)
+            val x0 = at[0] + v.outset.left.toDouble()
+            val y0 = at[1] + v.outset.top.toDouble()
+            for (op in sc.base + sc.keys.flatMap { it.ops(false) }) when (op) {
+                is Op.Fill -> items += buildJsonObject {
+                    val b = op.shape.bounds
+                    put("t", "fill"); put("p", "popup")
+                    put("r", s.box(x0 + b.left, y0 + b.top, b.right - b.left, b.bottom - b.top))
+                    putColor(op.color.value)
+                    ((op.shape as? Shape.Rect)?.radii?.firstOrNull() ?: 0.0).takeIf { it > 0 }?.let { put("rad", s.dp(it)) }
+                }
+                is Op.Text -> items += JsonObject(mapOf("t" to JsonPrimitive("text")) + sceneText(op, x0, y0).withPart("popup"))
+                else -> Unit
             }
         }
 
