@@ -238,10 +238,11 @@ class CompactKeyboardUatTest {
         assertTrue(letters.size.toString(), letters.size >= 26)
         for (k in letters) {
             val letter = ink(k, k.label)
+            // the letters one size whether or not the symbol stays
+            assertEquals(k.label, letters[0].size(), k.size(), 0.001f)
             if (dropped && k.alt !in k.drawnTexts) continue
             val symbol = ink(k, k.alt!!)
             assertFalse("${k.label}: $letter, ${k.alt}: $symbol", RectF.intersects(letter, symbol))
-            assertEquals(k.label, letters[0].size(), k.size(), 0.001f)
         }
         for ((_, row) in letters.groupBy { it.bounds.top }) {
             assertEquals(row.joinToString { it.label }, 1, row.map { it.drawn(it.label)!!.bottom }.distinct().size)

@@ -184,6 +184,9 @@ class KeyMarksEverywhereUatTest {
     // side times how much smaller still it must be to stay; 0 where it stays (it fits)
     private fun short(k: SceneShownKey, symbol: String, d: List<Pair<String, RectF>>, drawn: Op.Text?, slot: KeyMarks.Slot?, shortcutAt: KeyMarks.At, compact: Boolean, least: Boolean, slack: Double = 0.0): Float {
         val label = d.firstOrNull { it.first == "label" }?.second
+        // a symbol left out, and none drawn on the board to size it by: nothing to show it could not fit
+        // (an infinite shortfall would pass whatever the engine did)
+        assertTrue("${k.label.ifEmpty { k.description }}: symbol $symbol left out, no symbol drawn on the board to measure it by", drawn != null)
         if (drawn == null || slot == null || label == null) return Float.POSITIVE_INFINITY
         val dp = FcitxApplication.getInstance().resources.displayMetrics.density.toDouble()
         // its size before its class is scaled (Content.symbolMark: 10.67 dp, the theme's mark scale 1); floating, the
