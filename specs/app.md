@@ -312,7 +312,7 @@ sent as the engine's stroke key, `KeyAction.SymAction` of `Keyboard.strokeKey`; 
 as none (up, up to the left) is dropped.
 
 The 060 redraw's first step (`input/keyboard/canvas/`, `AppPrefs.Internal.canvasKeyboard`, 开发者 →
-新绘制键盘, off): `TextKeyboard` (qwerty.xml) and, since 060-render-p2 S4a, `GroupedKeyboard` (the 14
+新绘制键盘, on by default since 060-render-p2 S7): `TextKeyboard` (qwerty.xml) and, since 060-render-p2 S4a, `GroupedKeyboard` (the 14
 and 18 keys: k14.xml, k18.xml, their bottom row grouped-bottom.xml), since S4b `NumberKeyboard` (number.xml,
 its seven pads by `when="pad=…"`) and, since S4c, `ZhuyinKeyboard`'s 大千
 (zhuyin.xml) and, since S4d, its 注音九键 (zhuyin-nine.xml) add a `KeyboardCanvasView` over their
