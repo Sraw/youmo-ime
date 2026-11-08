@@ -171,6 +171,9 @@ class BaseKeyboardTest {
         val workaround = AppPrefs.getInstance().advanced.vivoKeypressWorkaround
         val was = workaround.getValue()
         workaround.setValue(true)
+        // the key views' own dispatch (a disabled view, its pressed state): the views' path, which S8
+        // deletes with this test: on the canvas a view set disabled by hand is no state the scene has (060-pending-decisions)
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, false)
         try {
             val keyboard = keyboard(mutableListOf()).apply {
                 measure(exactly(1080), exactly(800))
