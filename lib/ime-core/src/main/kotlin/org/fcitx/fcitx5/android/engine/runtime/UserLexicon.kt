@@ -146,7 +146,7 @@ internal class UserLexicon(
     /** [added] and [blocked] (text, pinyin) put on the lists at once, as a restore merges them: one write of each, the sessions dropped once. */
     fun addListed(added: Collection<Pair<String, String>>, blocked: Collection<Pair<String, String>>) {
         val add = added.mapNotNull { (text, pinyin) -> WordLists.entry(text, pinyin) }
-        val block = blocked.mapNotNull { (text, pinyin) -> WordLists.entry(text, pinyin) }
+        val block = blocked.mapNotNull { (text, pinyin) -> WordLists.blockedEntry(text, pinyin) }
         // English's, no pinyin: a backup's of an older build has none
         englishBlocks.block(blocked.filter { it.second.isEmpty() }.map { it.first })
         if (add.isNotEmpty()) add(add)
@@ -155,7 +155,7 @@ internal class UserLexicon(
     }
 
     fun blockWord(text: String, pinyin: String): Boolean {
-        val entry = WordLists.entry(text, pinyin) ?: return false
+        val entry = WordLists.blockedEntry(text, pinyin) ?: return false
         blockAll(listOf(entry))
         dropSessions()
         return true
@@ -252,7 +252,7 @@ internal class UserLexicon(
     }
 
     // as listed: one syllable a space, so read back as it was, not split again
-    private fun UserWord.entry() = WordText.entry(text, Syllables.apostrophed(pinyin))
+    private fun UserWord.entry() = if (kind == UserWord.Kind.BLOCKED) WordLists.blockedEntry(text, Syllables.apostrophed(pinyin)) else WordText.entry(text, Syllables.apostrophed(pinyin))
 
     /** [word] as its list keeps it: what a removal taken back puts back ([reAdd], [reBlock]). */
     fun entryOf(word: UserWord): Entry? = word.entry()

@@ -5,6 +5,8 @@
 package org.fcitx.fcitx5.android.engine.user
 
 import org.fcitx.fcitx5.android.engine.data.escapeValue
+import org.fcitx.fcitx5.android.engine.data.splitValues
+import org.fcitx.fcitx5.android.engine.learn.Han
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.platform.UserFiles
 import org.fcitx.fcitx5.android.engine.platform.write
@@ -28,7 +30,8 @@ class WordLists(private val dir: UserFiles?, private val onError: (IOException) 
     // the lists whose file did not read: what is in memory is not all of them, so not written over them
     private val unread = HashSet<String>()
     private val added = read(ADDED)
-    private val blocked = read(BLOCKED)
+    // an emoji blocked in its word's reading has as many syllables as that word, not as its code points (blockedEntry)
+    private val blocked = read(BLOCKED) { line -> splitValues(line).takeIf { it.size in 2..3 }?.let { blockedEntry(it[0], it[1]) } }
 
     val addedWords: List<Entry> get() = added.toList()
     val blockedWords: List<Entry> get() = blocked.toList()
@@ -74,11 +77,11 @@ class WordLists(private val dir: UserFiles?, private val onError: (IOException) 
         blocked.forEach { model.block(it) }
     }
 
-    private fun read(name: String): LinkedHashSet<Entry> {
+    private fun read(name: String, entry: (String) -> Entry? = WordText::dictionaryEntry): LinkedHashSet<Entry> {
         val file = dir?.file(name) ?: return LinkedHashSet()
         return try {
             if (!file.taken()) LinkedHashSet() else file.input().bufferedReader().useLines { lines ->
-                lines.mapNotNull { WordText.dictionaryEntry(it) }.toCollection(LinkedHashSet())
+                lines.mapNotNull(entry).toCollection(LinkedHashSet())
             }
         } catch (e: IOException) {
             onError(e)
@@ -200,6 +203,19 @@ class WordLists(private val dir: UserFiles?, private val onError: (IOException) 
             if (word.isEmpty() || parts.isEmpty()) return null
             val syllables = if (parts.size == chars) parts else split(parts.joinToString(""), chars) ?: return null
             return WordText.entry(word, syllables.joinToString("'"))
+        }
+
+        /**
+         * A blocked [text] read as [pinyin]: as [entry], but a text with no Han in it (an emoji
+         * blocked in its word's reading, U-82: 👍🏻 hao, 😃 ha'ha) read as the syllables given,
+         * whatever its code points: [entry] would take none, or split the reading among them.
+         */
+        fun blockedEntry(text: String, pinyin: String): Entry? {
+            val word = text.trim()
+            val chars = word.codePointCount(0, word.length)
+            if (word.isEmpty() || word.codePoints().anyMatch(Han::isHan)) return entry(text, pinyin)
+            val ids = pieces(pinyin.lowercase()).map { Syllables.id(WordText.spelling(it)) }
+            return if (ids.isNotEmpty() && ids.none { it < 0 } && ids.size != chars) Entry(word, ids.toIntArray()) else entry(text, pinyin)
         }
 
         // [pinyin]'s syllables, or runs of them, ü as v
