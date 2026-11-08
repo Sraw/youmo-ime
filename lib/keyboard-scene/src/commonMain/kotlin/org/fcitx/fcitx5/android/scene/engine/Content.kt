@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.scene.engine
 
 import org.fcitx.fcitx5.android.scene.Box
+import org.fcitx.fcitx5.android.scene.Shape
 import org.fcitx.fcitx5.android.scene.layout.Text
 import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
@@ -27,8 +28,8 @@ class MarkDrawn(val drawn: Drawn, val slot: Slot, val minScale: Double, val drop
  */
 class KeyContent(
     val glyph: Drawn?, val marks: List<MarkDrawn>, val room: Box, val letter: Boolean, val baseline: Double, val yields: Boolean = true,
-    /** How far out the marks go, their insets eaten, where nothing else keeps them all ([MARK_EDGE_DP] in). */
-    val edge: Box = room,
+    /** How far out the marks go, their insets eaten, where nothing else keeps them all ([MARK_EDGE_DP] in from the face's sides, arcs and border). */
+    val edge: KeyMarkYield.Edge = KeyMarkYield.Edge(room.toInk()),
 )
 
 /** What a key's content is drawn in, as the theme has it in its normal state: one per part. */
@@ -62,7 +63,7 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
     private val d = env.density
     private val textScale = KeyTextScale.of(env.compact, env.floating)
 
-    fun of(key: ExpandedKey, cell: Box, content: Box, looks: Looks): KeyContent {
+    fun of(key: ExpandedKey, cell: Box, content: Box, looks: Looks, face: FaceGeometry? = null): KeyContent {
         val compactScale = if (env.compact) key.attrs.compactTextScale ?: 1.0 else 1.0
         val hidden = looks.label.hidden
         val marks = marks(key, cell, content, looks, hidden)
@@ -81,7 +82,10 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         val glyph = glyph(badge, measured, label, icon, roots, content, cy)
         val room = content.inset(ROOM_H_DP * d, ROOM_V_DP * d, ROOM_H_DP * d, ROOM_V_DP * d)
         val letter = key.attrs.alt != null && label != null && icon == null && badge == null && !lines
-        val edge = content.inset(MARK_EDGE_DP * d, MARK_EDGE_DP * d, MARK_EDGE_DP * d, MARK_EDGE_DP * d)
+        // the face's corners where it is what the content is in (a bar's or a circle's are not: its box's then)
+        val radii = face?.pressed?.takeIf { it.box == content }?.radii ?: Shape.NO_RADII
+        val line = face?.border ?: 0.0
+        val edge = KeyMarkYield.Edge(content.toInk(), radii, MARK_EDGE_DP * d + line, line)
         return KeyContent(glyph, marks, room, letter, glyph?.texts?.firstOrNull()?.baseline ?: 0.0, yields = !lines, edge = edge)
     }
 

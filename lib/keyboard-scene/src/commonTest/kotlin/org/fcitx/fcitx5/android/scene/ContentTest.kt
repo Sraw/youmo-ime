@@ -16,6 +16,9 @@ import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
+import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -120,36 +123,136 @@ class ContentTest {
     @Test
     fun twoIconsOneOverTheOtherAreLeftOutOnlyWhereTheirInsetsEatenStillDoNotPartThem() {
         // whatever the density and the keyboard's size, a ⌫'s two icons are both drawn wherever they fit at
-        // their least (7 dp each) with their insets eaten to a quarter dp; one left out only where not
+        // their least (7 dp each) with their insets eaten to a quarter dp, their boxes' outer corners within
+        // the face's rounded ones; one left out only where not
+        // the theme's 4 dp corners, and square ones (where the quarter dp is what stops them)
         val floor = 0.25
         var squeezed = 0
         var left = 0
-        val grid = listOf(2.0, 2.625, 2.75, 3.0, 3.5).flatMap { d ->
-            listOf(320.0, 360.0, 393.0, 411.0, 600.0).flatMap { w -> listOf(130.0, 140.0, 141.0, 142.0, 143.0, 145.0, 147.0, 148.0, 160.0, 200.0).map { Triple(d, w, it) } }
+        val square = ThemeReader.theme(testData("material-light.xml").replace("</theme>", "<style select=\"key\" radius=\"0dp\"/>\n</theme>")).ok()
+        val grid = listOf(Fixtures.materialLight, square).flatMap { t ->
+            listOf(2.0, 2.625, 2.75, 3.0, 3.5).flatMap { d ->
+                listOf(320.0, 360.0, 393.0, 411.0, 600.0).flatMap { w -> listOf(130.0, 140.0, 141.0, 142.0, 143.0, 145.0, 147.0, 148.0, 160.0, 200.0).map { Triple(t, d, w to it) } }
+            }
         }
-        for ((d, wDp, hDp) in grid) {
+        for ((theme, d, size) in grid) {
+            val (wDp, hDp) = size
             val e = Forms.env("zhuyin", Fixtures.compact.copy(width = wDp * d, height = hDp * d, density = d))
-            val s = Forms.scene("zhuyin", e)
-            val f = face(s, "backspace")
-            val content = f.height
-            val fits = content - 2 * floor * d >= 2 * 7 * d - 0.01
+            val s = Forms.scene("zhuyin", e, theme)
+            val shape = s.keys.first { it.id == "backspace" }.shape as Shape.Rect
+            val f = shape.box
+            val r = shape.radii.first()
+            // how near the top (the bottom) an icon's corner comes within the arc, its side as placed (whole px in)
+            val a = floor(f.left + Content.SHORTCUT_SIDE_COMPACT_DP * d) - f.left
+            val arc = if (a >= r) 0.0 else r - sqrt(r * r - (r - a) * (r - a))
+            val fits = f.height - 2 * maxOf(floor * d, arc) >= 2 * 7 * d - 0.01
             val names = icons(s, "backspace").map { it.name }.toSet()
-            val at = "at $d, $wDp × $hDp dp, a face ${f.height} px"
+            val at = "at $d, $wDp × $hDp dp, a face ${f.height} px, corners $r px"
+            val up = icons(s, "backspace").first { it.name == "delete-sweep" }.box
             if (fits) {
-                if (content - 2 * Content.SHORTCUT_EDGE_COMPACT_DP * d < 2 * 7 * d - 0.01) squeezed++
+                if (f.height - 2 * Content.SHORTCUT_EDGE_COMPACT_DP * d < 2 * 7 * d - 0.01) squeezed++
                 assertEquals(setOf("backspace", "delete-sweep", "restore"), names, at)
-                val up = icons(s, "backspace").first { it.name == "delete-sweep" }.box
                 val down = icons(s, "backspace").first { it.name == "restore" }.box
                 assertTrue(up.bottom <= down.top + 0.01, "apart $at: $up $down")
-                assertTrue(up.top >= f.top + floor * d - 0.01, "up in its face $at: $up")
-                assertTrue(down.bottom <= f.bottom - floor * d + 0.01, "down in its face $at: $down")
+                near(f.left + a, up.left, "its side as reckoned $at")
+                assertTrue(up.top >= f.top + floor * d - 0.01 && up.top >= f.top + arc - 0.01, "up in its face $at: $up")
+                assertTrue(down.bottom <= f.bottom - floor * d + 0.01 && down.bottom <= f.bottom - arc + 0.01, "down in its face $at: $down")
             } else {
                 left++
                 assertEquals(setOf("backspace", "delete-sweep"), names, at)
             }
         }
         // the sweep met all three: kept as they were, kept by eating their insets, one left out
-        assertTrue(squeezed >= 10 && left >= 10, "squeezed $squeezed, left out $left")
+        assertTrue(squeezed >= 20 && left >= 20, "squeezed $squeezed, left out $left")
+    }
+
+    @Test
+    fun theLettersOfAShortFloatingBoardAreSmallerOnlyOnceTheirIconsHaveEatenTheirInsets() {
+        // a floating board three quarters its height: the top left icons eat their insets before every letter is
+        // smaller (0.942 to 0.953 of the letters with no shortcuts drawn at 2 to 3.5 px a dp; 0.911 to 0.922
+        // were the icons kept to their rooms)
+        for (d in listOf(2.0, 2.625, 2.75, 3.0, 3.5)) {
+            val k = d / Forms.DENSITY
+            val form = Forms.floating.copy(width = Forms.floating.width * k, height = Forms.floating.height * k * 0.75, density = d, compact = true)
+            fun size(e: Env) = texts(Forms.scene("qwerty", Forms.env("qwerty", e)), "q").maxOf { it.size }
+            val ratio = size(form) / size(form.copy(marks = form.marks.copy(charShortcuts = false)))
+            assertTrue(ratio > 0.935 && ratio < 1.0, "at $d the letters $ratio of their size")
+        }
+    }
+
+    @Test
+    fun aBorderKeepsTheIconsOffIt() {
+        // the small phone's ⌫ as above, its face square: with no border its icons eat a quarter px of their
+        // 1 dp insets; with a 1 dp border (all of the inset) they eat none of it, so one is left out rather than
+        // drawn on the line; a few px taller, both kept as the room has them, off the border
+        val d = 2.75
+        fun theme(border: String) = ThemeReader.theme(
+            testData("material-light.xml").replace("</theme>", "<style select=\"key\" radius=\"0dp\" border=\"$border\"/>\n</theme>"),
+        ).ok()
+        fun scene(border: String, height: Double) =
+            Forms.scene("zhuyin", Forms.env("zhuyin", Fixtures.compact.copy(width = 990.0, height = height, density = d)), theme(border))
+        assertEquals(setOf("backspace", "delete-sweep", "restore"), icons(scene("none", 407.0), "backspace").map { it.name }.toSet(), "no border")
+        assertEquals(setOf("backspace", "delete-sweep"), icons(scene("1dp #ff112233", 407.0), "backspace").map { it.name }.toSet(), "a 1 dp border")
+        val tall = scene("1dp #ff112233", 420.0)
+        val f = face(tall, "backspace")
+        val icons = icons(tall, "backspace").associate { it.name to it.box }
+        assertEquals(setOf("backspace", "delete-sweep", "restore"), icons.keys, "taller, a 1 dp border: ${f.height}")
+        assertTrue(icons.getValue("delete-sweep").top >= f.top + 1 * d - 0.01, "up off the border: ${icons.getValue("delete-sweep")} $f")
+        assertTrue(icons.getValue("restore").bottom <= f.bottom - 1 * d + 0.01, "down off the border: ${icons.getValue("restore")} $f")
+    }
+
+    @Test
+    fun aFloatingNineKeysBackspaceEatsOnlyItsSideInsetsWhereOnlyThatParts() {
+        // 注音九宫 floating at 2.75 and 3.5 px a dp: ⌫'s icon right of its two left icons, a fraction of a px too
+        // wide for them at their least. They go out sideways that fraction; their tops (bottoms) stay where they
+        // were, for a move up (down) parts nothing beside the icon; the icon its size
+        for (d in listOf(2.75, 3.5)) {
+            val k = d / Forms.DENSITY
+            val e = Forms.env("zhuyin-nine", Forms.floating.copy(width = Forms.floating.width * k, height = Forms.floating.height * k, density = d))
+            val s = Forms.scene("zhuyin-nine", e)
+            val f = face(s, "backspace")
+            val icons = icons(s, "backspace").associate { it.name to it.box }
+            val glyph = icons.getValue("backspace")
+            val up = icons.getValue("delete-sweep")
+            val down = icons.getValue("restore")
+            val at = "at $d"
+            near(24 * d, glyph.width, "the icon its size $at")
+            near(floor(f.top + Content.SHORTCUT_EDGE_COMPACT_DP * d), up.top, "up's top where it was $at")
+            near(ceil(f.bottom - Content.SHORTCUT_EDGE_COMPACT_DP * d), down.bottom, "down's bottom where it was $at")
+            assertTrue(up.right + 1.0 * d <= glyph.left + 0.01 && down.right + 1.0 * d <= glyph.left + 0.01, "a dp from the icon $at: $up $glyph")
+            val side = up.left - f.left
+            assertTrue(side < Content.SHORTCUT_SIDE_COMPACT_DP * d - 0.01 && side > 1.0 * d, "a fraction of its side inset eaten $at: $side")
+        }
+    }
+
+    @Test
+    fun aBackspacesIconsMoveWithItsFaceAPxAtATimeNeverAWholeInsetAtOnce() {
+        // the face a px shorter at a time, from where the icons sit as they were to where one is left out:
+        // each kept icon and the glyph move no more than that px (the insets eaten a share at a time)
+        for (d in listOf(2.0, 2.625, 2.75, 3.0, 3.5)) {
+            var last: Map<String, Box>? = null
+            var lastH = 0.0
+            var px = 0
+            while (px < 40) {
+                val h = 150.0 * d - px
+                val e = Forms.env("zhuyin", Fixtures.compact.copy(width = 360.0 * d, height = h, density = d))
+                val s = Forms.scene("zhuyin", e)
+                val f = face(s, "backspace")
+                val now = icons(s, "backspace").associate { it.name to it.box.moved(-f.left, -f.top) }
+                val was = last
+                if (was != null && was.keys == now.keys) {
+                    val step = abs(lastH - f.height)
+                    for ((name, b) in now) {
+                        val o = was.getValue(name)
+                        val moved = maxOf(abs(b.left - o.left), abs(b.top - o.top), abs(b.right - o.right), abs(b.bottom - o.bottom))
+                        assertTrue(moved <= step + 0.01, "at $d, the face ${f.height} px, $name moved $moved for $step: $o to $b")
+                    }
+                }
+                last = now
+                lastH = f.height
+                px++
+            }
+        }
     }
 
     @Test
