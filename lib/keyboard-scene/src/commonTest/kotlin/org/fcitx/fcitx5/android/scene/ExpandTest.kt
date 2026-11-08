@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Expand
 import org.fcitx.fcitx5.android.scene.engine.ExpandedKey
 import org.fcitx.fcitx5.android.scene.engine.Input
+import org.fcitx.fcitx5.android.scene.engine.LetterCase
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
@@ -159,5 +160,44 @@ class ExpandTest {
                 "<row><key id=\"a\" label=\"a\" when=\"split\"/></row></keyboard>",
         ).ok()
         assertTrue(Expand.rows(l, emptyMap(), env).problems().single().message.contains("nothing shown"))
+    }
+
+    @Test
+    fun letterCaseSettingCasesTheLetterFacesOnly() {
+        val lower = env.copy(texts = Texts(letterCase = LetterCase.Lower))
+        val upper = env.copy(texts = Texts(letterCase = LetterCase.Upper))
+        val q = Text.Binding("case", "q")
+        assertEquals("q", Expand.text(q, lower.copy(shift = Shift.Lock)))
+        assertEquals("q", Expand.text(q, lower.copy(texts = lower.texts.copy(keepUppercase = true))))
+        assertEquals("Q", Expand.text(q, upper))
+        // 14/18 键: capitals following Shift (none there), as before; the setting over them
+        assertEquals("QW", Expand.text(Text.Binding("group", "qw"), env))
+        assertEquals("qw", Expand.text(Text.Binding("group", "qw"), lower))
+        assertEquals("l;", Expand.text(Text.Binding("group", "l;"), lower))
+        // 九键 pinyin: capitals, or the setting's
+        assertEquals("ABC", Expand.text(Text.Binding("nine-letters", "2"), env))
+        assertEquals("abc", Expand.text(Text.Binding("nine-letters", "2"), lower))
+        // the punctuation a case binding may carry is as it was
+        assertEquals(",", Expand.text(Text.Binding("case", ","), upper))
+    }
+
+    @Test
+    fun aScreenReaderHearsTheLetterAsFollowingShiftShowsIt() {
+        val l = LayoutReader.layout(
+            """
+            <keyboard xmlns="${LayoutReader.NAMESPACE}" id="t" name="t" family="symbols" columns="10">
+              <row><key id="q" label="{case:q}"/><key id="g" label="{group:qw}" letters="qw" alt="1"/></row>
+            </keyboard>
+            """.trimIndent(),
+        ).ok()
+        fun keys(e: Env) = Expand.rows(l, emptyMap(), e).ok()[0].items.map { it as ExpandedKey }
+        val shown = keys(env)
+        listOf(LetterCase.Lower, LetterCase.Upper).forEach { c ->
+            val k = keys(env.copy(texts = env.texts.copy(letterCase = c)))
+            assertEquals(shown.map { it.a11y }, k.map { it.a11y }, "$c")
+        }
+        assertEquals("Q", keys(env.copy(texts = env.texts.copy(letterCase = LetterCase.Upper)))[0].label)
+        assertEquals("q", shown[0].a11y)
+        assertEquals("Q W, 1", shown[1].a11y)
     }
 }

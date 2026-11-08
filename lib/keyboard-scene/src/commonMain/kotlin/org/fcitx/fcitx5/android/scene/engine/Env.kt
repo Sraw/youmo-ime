@@ -150,6 +150,8 @@ data class Texts(
     /** The symbol panel's way back to the keys (picker_back: 返回, Back in English). */
     val back: String = "返回",
     val keepUppercase: Boolean = false,
+    /** 拼音键字母大小写 as it holds for this input method (LetterCaseRule.forIme: English's always [LetterCase.Shift]). */
+    val letterCase: LetterCase = LetterCase.Shift,
     val alts: Map<String, String>? = null,
     val punctuation: Map<String, String> = emptyMap(),
     /** The nine keys' letters, by digit (t9_letters, or 双拼's NINE_SP): lower case, the binding cases them. */
