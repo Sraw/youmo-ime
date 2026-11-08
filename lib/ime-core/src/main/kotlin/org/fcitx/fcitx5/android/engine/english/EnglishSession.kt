@@ -422,7 +422,14 @@ class EnglishSession(
         return learning && blocks != null && EnglishText.isWord(word) && !(input.isNotEmpty() && word == typed())
     }
 
-    private fun block(index: Int): Snapshot = shownWithout(candidates.getOrNull(index)?.takeIf { blockable(index) }?.also { checkNotNull(blocks).block(listOf(it)) })
+    private fun block(index: Int): Snapshot = shownWithout(candidates.getOrNull(index)?.takeIf { blockable(index) }?.also { checkNotNull(blocks).block(listOf(written(it))) })
+
+    // [shown] as written, the data's or the user's, not as the input's case shows it (review L1): The
+    // at a sentence's start the's, THE typed in capitals the's, US US
+    private fun written(shown: String): String {
+        val known = { w: String -> (data?.id(w) ?: -1) >= 0 || user.count(w) > 0f }
+        return sequenceOf(shown, shown.replaceFirstChar(Char::lowercaseChar), shown.lowercase()).firstOrNull(known) ?: shown
+    }
 
     private fun forget(index: Int): Snapshot = shownWithout(candidates.getOrNull(index)?.let(::learnedAs)?.also(user::forget))
 

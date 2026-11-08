@@ -182,7 +182,9 @@ class EnglishSessionTest {
         assertEquals(listOf("I'm"), session.apply(Action.Block(0)).candidates)
         assertEquals(listOf("don't"), blocks.blocked)
         assertEquals(listOf("I'm"), next())
-        blocks.unblock(listOf("DON'T"))
+        // unblocked as written (EnglishBlocks): DON'T is not what was blocked
+        assertEquals(emptyList<String>(), blocks.unblock(listOf("DON'T")))
+        blocks.unblock(listOf("don't"))
         assertEquals(listOf("don't", "I'm"), next())
         // where nothing is learned (a password), nothing is blocked
         session.learning = false

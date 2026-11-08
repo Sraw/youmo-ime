@@ -215,16 +215,17 @@ internal class LearningOps(
         val before = lexicon.blockedOf(op.text).toSet()
         // English's words have a list of their own (no reading)
         val english = lexicon.englishBlocks
-        val englishBefore = english.has(op.text)
+        // as written, which the shown text need not be (The for the; EnglishBlocks)
+        val englishBefore = english.blocked.toSet()
         var blocked = emptyList<Entry>()
-        var englishBlocked = false
+        var englishBlocked = emptyList<String>()
         val token = acted(inverse = {
             lexicon.unblock(blocked)
-            if (englishBlocked) english.unblock(listOf(op.text))
+            english.unblock(englishBlocked)
         }) {
             act().also {
                 blocked = lexicon.blockedOf(op.text).filter { it !in before }
-                englishBlocked = !englishBefore && english.has(op.text)
+                englishBlocked = english.blocked.filter { it !in englishBefore }
             }
         } ?: return LearningResult.Unavailable
         return LearningResult.Done(token)
