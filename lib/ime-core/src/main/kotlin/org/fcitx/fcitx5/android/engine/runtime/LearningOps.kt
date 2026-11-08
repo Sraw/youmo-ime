@@ -135,10 +135,14 @@ internal class LearningOps(
         fun entries(kind: UserWord.Kind) = words.filter { it.kind == kind }.mapNotNull(lexicon::entryOf)
         val added = lexicon.addedPlaces(entries(UserWord.Kind.ADDED))
         val blocked = entries(UserWord.Kind.BLOCKED)
+        // English's, no reading to them (review M1): those blocked now blocked again on an undo
+        val english = lexicon.englishBlocks
+        val englishBlocked = words.filter { it.kind == UserWord.Kind.BLOCKED && it.pinyin.isEmpty() && english.has(it.text) }.map { it.text }
         val forgets = tableForgets()
         val token = control.undoable(inverse = {
             lexicon.reAdd(added)
             lexicon.reBlock(blocked)
+            english.block(englishBlocked)
             dropSessions()
         }) { lexicon.removeWords(words) }
         // what the tables' logs forgot of them stays forgotten: no undo rather than half of one. A table not

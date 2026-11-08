@@ -64,8 +64,12 @@ class EnginesEmojiBlockTest : EnginesFixture() {
             val at = e.typed("hao").indexOf("👍🏻")
             e.learning(PINYIN, LearningOp.Block(at, "👍🏻")) as LearningResult.Done
             val listed = e.userWords().single()
-            e.removeWord(listed)
+            val done = e.learning(null, LearningOp.RemoveWords(listOf(listed))) as LearningResult.Done
             assertTrue("👍🏻" in e.typed("hao"))
+            // review M1: the unblock taken back blocks it again
+            e.learning(null, LearningOp.Undo(done.undo))
+            assertFalse("👍🏻" in e.typed("hao"))
+            assertEquals(listOf(listed), e.userWords())
         }
     }
 

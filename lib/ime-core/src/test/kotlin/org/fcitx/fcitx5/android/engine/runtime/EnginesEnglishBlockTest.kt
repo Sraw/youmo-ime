@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog.ENGLISH
 import org.fcitx.fcitx5.android.engine.english.EnglishBlocks
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
+import org.fcitx.fcitx5.android.engine.learn.backup.RestoreStash
 import org.fcitx.fcitx5.android.engine.learn.control.BackupOp
 import org.fcitx.fcitx5.android.engine.learn.control.BackupResult
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
@@ -94,6 +95,52 @@ class EnginesEnglishBlockTest : EnginesFixture() {
             assertFalse(e.glided("the") == "the ")
             e.removeWord(the)
             assertEquals("the ", e.glided("the"))
+        }
+    }
+
+    @Test
+    fun anUnblockInTheSettingsIsUndone() {
+        engines().use { e ->
+            e.typed("th")
+            e.onEvent(ENGLISH, EngineEvent.BLOCK, 1)
+            val done = e.learning(null, LearningOp.RemoveWords(listOf(the))) as LearningResult.Done
+            assertEquals(emptyList<UserWord>(), e.blocked())
+            e.learning(null, LearningOp.Undo(done.undo))
+            assertEquals(listOf(the), e.blocked())
+        }
+    }
+
+    // review: a restore reverted gives back the phone's English blocks as they were
+    @Test
+    fun aRevertAfterARestoreKeepsThePhonesBlockedWords() {
+        val bytes = engines().use { e ->
+            checkNotNull(e.backup(BackupOp.Copy).bytes)
+        }
+        engines().use { e ->
+            e.typed("th")
+            e.onEvent(ENGLISH, EngineEvent.BLOCK, 1)
+            e.backup(BackupOp.Restore(bytes))
+            assertEquals(listOf(the), e.blocked())
+            e.backup(BackupOp.Revert)
+            assertEquals(listOf(the), e.blocked())
+        }
+    }
+
+    // review H2: a zip restored while the engine was stopped (UserDataManager's stash): the phone's and the backup's both kept
+    @Test
+    fun aStashedBackupsBlockedWordsAreMergedWithThePhones() {
+        val dir = MemoryFiles()
+        engines(dir).use { e ->
+            e.typed("th")
+            e.onEvent(ENGLISH, EngineEvent.BLOCK, 1)
+            assertEquals(listOf(the), e.blocked())
+        }
+        val stash = dir.dir(RestoreStash.DIR).dir("1000").apply { mkdirs() }
+        EnglishBlocks(stash).block(listOf("hello"))
+        engines(dir).use { e ->
+            assertFalse(dir.dir(RestoreStash.DIR).exists())
+            assertEquals(setOf("the", "hello"), e.blocked().map { it.text }.toSet())
+            assertFalse("hello" in e.typed("hel"))
         }
     }
 
