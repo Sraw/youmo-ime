@@ -70,8 +70,10 @@ os.environ.setdefault("ADB_MDNS", "0")
 # are the two of a run; a worktree may start its own on another even port up to 5584 (uat.py up --port)
 AVD = os.environ.get("UAT_AVD", "youmo")
 SNAPSHOT = "clean"   # the AVD's state after uat/tools/avd.sh: zh-CN, three-button nav, the WebView shell
-# UAT_CANVAS=1: every case on 060's new drawing (internal.canvasKeyboard, canvas_on)
-CANVAS = os.environ.get("UAT_CANVAS") == "1"
+# UAT_CANVAS is gone: the canvas (060's new drawing) is the app's default since 060-render-p2 S7, so
+# a cleared app already draws with it; a command still setting it is told so rather than passed silently
+if "UAT_CANVAS" in os.environ:
+    print("UAT_CANVAS 已不用：新画法是默认，清掉数据的应用本来就用它（060-render-p2 S7）", file=sys.stderr)
 # the default pair; any number runs (--devices 5554,5556,5558,… or auto: device_count from free memory)
 PORTS = ("5554", "5556")
 
@@ -1760,11 +1762,7 @@ def reset(d, base, page):
     d.sh("settings put system accelerometer_rotation 0; "
          "settings put system user_rotation 0; wm size reset; cmd uimode night no")
     d.rot = 0
-    if CANVAS:
-        canvas_on(d)
     ensure_ime(d)
-    if CANVAS:
-        canvas_check(d)
     d._keys = None
     if not base.startswith("B0"):
         raise Blocked(f"unknown baseline {base}")
@@ -1797,58 +1795,6 @@ def reset(d, base, page):
         d.open_page(page)
     elif base not in ("B0", "B0-实体", "B0-语音"):
         raise Blocked(f"unknown baseline {base}")
-
-
-# internal.canvasKeyboard on in the app's prefs (its key, canvas_keyboard)
-CANVAS_SET = 'name="canvas_keyboard" value="true"'
-
-
-def canvas_prefs_script(f):
-    """the shell script turning canvas_keyboard on in the prefs file f, the rest of it kept (what the
-    packs' import wrote there): none, or `<map />`, made a map; the key's old value taken out; written
-    through a copy (portable sed, no -i)"""
-    return (f"mkdir -p shared_prefs; f={f}; [ -s $f ] || printf '<map></map>' > $f; "
-            "sed -e 's#<map */>#<map></map>#' -e 's#<boolean name=\"canvas_keyboard\" value=\"[a-z]*\" */>##' "
-            "-e 's#</map>#<boolean name=\"canvas_keyboard\" value=\"true\" /></map>#' $f > $f.new && mv $f.new $f")
-
-
-def prefs_settled_script(path, tries=10):
-    """the shell script waiting (up to tries x 0.5 s) for the prefs file at path to read the same
-    twice running: what the app still writes with apply() lands before a force-stop drops it. A file
-    there is none of reads the same (nothing pending to wait for)"""
-    return (f"i=0; while [ $i -lt {tries} ]; do a=$(cksum {path} 2>/dev/null); sleep 0.5; "
-            f"[ \"$a\" = \"$(cksum {path} 2>/dev/null)\" ] && break; i=$((i+1)); done")
-
-
-def canvas_on_cmd(build=None):
-    """the shell command turning the canvas on in the cleared app's prefs, after the packs are in
-    (their import's prefs kept: [canvas_prefs_script]): as the app (run-as, the debug build's: its
-    owner and SELinux context its own), else as root, given the data dir's owner and context"""
-    build = build or BUILD
-    f = f"shared_prefs/{PKG}_preferences.xml"
-    write = shlex.quote(canvas_prefs_script(f))
-    if build == "debug":
-        return f"am force-stop {PKG}; run-as {PKG} sh -c {write}"
-    dd = f"/data/data/{PKG}"
-    # a release ran the app to import the packs through its page (import_packs_ui): what it still
-    # writes asynchronously settled first, or the force-stop loses it
-    return (f"{prefs_settled_script(f'{dd}/{f}')}; am force-stop {PKG}; cd {dd} && sh -c {write}; u=$(stat -c %u {dd}); chown -R $u:$u {dd}/shared_prefs; "
-            f"chmod 660 {dd}/{f}; chcon -R $(ls -dZ {dd} | cut -d' ' -f1) {dd}/shared_prefs")
-
-
-def canvas_on(d):
-    """UAT_CANVAS=1: internal.canvasKeyboard on in the cleared app's prefs (060's new drawing; the
-    developer page's switch), after clear_keeping_packs (a release's packs imported) and before the
-    input method starts ([canvas_on_cmd])"""
-    d.sh(canvas_on_cmd())
-
-
-def canvas_check(d):
-    """the canvas still on once the app is up, or Blocked: a case meant for the new drawing never runs on the old"""
-    f = f"shared_prefs/{PKG}_preferences.xml"
-    read = d.sh(f"run-as {PKG} cat {f}" if BUILD == "debug" else f"cat /data/data/{PKG}/{f}")
-    if CANVAS_SET not in read:
-        raise Blocked(f"UAT_CANVAS=1 但 canvas_keyboard 没有打开：{read.strip()[:200]}")
 
 
 def plug(d, base):

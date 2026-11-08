@@ -291,7 +291,7 @@
 - **JVM**：`ClipboardOrderUatTest.entriesPastedFromThePanelMoveFirstWhenItCloses`；`ClipboardDaoTest.anUnpinnedEntryUsedComesFirstOfTheUnpinnedAPinnedOneStays`（置顶的不动，上限按最久没用过的清）；设备上不跑。
 
 ### TB-51 [P1] 展开候选右侧一列（设备）
-- **前提**：B0（`UAT_CANVAS=1` 时右侧一列由引擎画，060-render-p2 S6）。
+- **前提**：B0（右侧一列由引擎画，060-render-p2 S6）。
 - **操作**：打 nihao；点候选栏右边的展开；看右侧一列；点下页。
 - **预期**：右侧从上到下是上页、下页、⌫、回车；在最上面时上页淡出；点下页后列表翻到后面的候选。
 - **JVM**：`SmallBoardsSceneGesturesTest.expandedColumn`、`BarUatTest.expandedCandidatesGridSelects`、`BoardCanvasCompareTest[expanded-side]`。

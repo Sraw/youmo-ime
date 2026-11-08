@@ -46,10 +46,9 @@ change to how keys are laid out or marked (not with `-PskipExhaustive`: the excl
   `keysLabelled`, `keyNamed(id, copy)` (the scene's id, a view's theme name: `q`, `space`, a split
   row's second G copy 1), `describedKey(description)`, `keys()`; tap, press, long press, swipe, drag
   take it, by its place in the window. Either drawing gives one, a key view's (`ViewShownKey`) or the
-  canvas's scene key (`SceneShownKey`), so a test written on it runs on both: `-PcanvasKeyboard` runs
-  every harness with the canvas drawing the keys but where a test set `canvasKeyboard` itself
-  (`PrefsRule`, which puts the switch back after each test; `CanvasRun`, beside the harness, keeps
-  what it was). `keyWithId(R.id.button_*)` finds a key by its view's id, the scene's node's resource
+  canvas's scene key (`SceneShownKey`), so a test written on it runs on both: the canvas draws the keys
+  by default; a test that sets `canvasKeyboard` false itself (`PrefsRule` puts it back after each
+  test) runs on the views. `keyWithId(R.id.button_*)` finds a key by its view's id, the scene's node's resource
   name; `drawn(text)`, `textSize(text)`, `drawnTexts` and `drawnIcons` read what is drawn on a key
   (a scene's text's box a guess from its size: compare places, not pixels). A popup's keys are
   `popupChoices()` (`focused`, `cell`, `size`) and a menu's icons `shownIcons()`, either drawing.
@@ -269,9 +268,7 @@ the case files hold no results. `uat/README.md` has the format, the baselines an
 The runner, `uat/tools/uat.py`: `up` / `down` (two emulators, emulator-5554 and emulator-5556, from the
 AVD's snapshot), `run [--areas] [--ids] [--devices]` (`UAT_BUILD=release`: on the signed arm64
 release APK, the debug package uninstalled first and installed back only for the cases that type into
-its `TypingHostActivity`; `UAT_CANVAS=1`: every case on 060's new drawing, internal.canvasKeyboard written into the cleared
-app's prefs before it starts, by `run-as` on the debug build and as root on the release, and checked once it is up: a
-case whose prefs lost it is blocked), `mark` (a visual case after its sheet is seen). One
+its `TypingHostActivity`; the canvas is the app's default, so no switch is written), `mark` (a visual case after its sheet is seen). One
 script per case file (`uat/scripts/<file>.py`; handwriting's strokes in `hw_strokes.py`); a case in a
 .md with no script is reported blocked (没有脚本), never left out; a case whose `needs=` names another
 place (a run without the voice pack, a release by hand, a real phone, the JVM) is listed as 在别处跑, not counted

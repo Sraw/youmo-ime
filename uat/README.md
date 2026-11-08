@@ -251,8 +251,7 @@ uat/tools/uat.py down; uat/tools/uat.py down --port 5554   # 用完关掉
 `run --devices 5558`。adb 37 的 mDNS 在这台机器的局域网上会让 adb 服务几秒就崩（`ADB_MDNS=0` 关掉；运行器和
 `uat/tools/avd.sh` 自己设，别的地方先起的 adb 服务要带上它）。
 
-开新画法跑（060 重绘）：命令前加 `UAT_CANVAS=1`。每条用例清掉数据后、应用启动前，把开发者页的「新画法」开关
-（`canvas_keyboard`）写进应用的设置（debug 包用 `run-as`，发布包用 root），应用起来后再读一次，没开就记为阻塞。
+新画法（060 重绘）从 S7 起是默认，清掉数据的应用本来就用它；原来的 `UAT_CANVAS=1` 已去掉，还带着它跑只会提示一句。
 
 测发布包（正式版发版前）：先 `BUILD_ABI=arm64-v8a ./gradlew :app:assembleRelease :app:packs`（要签名密钥，没有就只出
 `-unsigned.apk`，装不上），再在命令前加 `UAT_BUILD=release`：装 `io.github.sraw.youmo`，设备上的 debug 包先卸掉
