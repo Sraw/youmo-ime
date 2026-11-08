@@ -284,7 +284,7 @@ object KeyMarkYield {
         fun asked(t: Double) = if (t >= minMark) t else 1.0 - (1.0 - minMark) * share(t, minMark)
         val both = largest(floor) { t -> fits(t, t, null) }
         if (both == 1.0) return 1.0 to 1.0
-        val w = if (fits(both, both, null)) share(both, minMark) else 0.0
+        val w = share(both, minMark)
         val (symbol, shortcut) = if (w > 0.0) {
             val s = largest(both) { t -> fits(t, both, true) }
             asked(s) to asked(largest(both) { u -> fits(s, u, true) })

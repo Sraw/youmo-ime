@@ -308,9 +308,9 @@ class KeyMarkYieldTest {
                 val glyph = Ink(k.room.left, top, k.room.right, k.room.bottom)
                 val g = KeyMarkYield.group(listOf(k.letter(glyph, listOf(k.mark(Slot.TopLeft)))), gap)
                 val at = "at $d, the glyph's top at $top"
-                // a tenth of a px of the glyph's top a step, the glyph smaller about its middle: no more than
-                // that tenth over its half height (1.03% at 2 px a dp), never a jump
-                scale?.let { assertTrue(abs(g.scale - it) <= 0.1 / ((glyph.bottom - glyph.top) / 2) + 1e-3, "the class's step $at: $it to ${g.scale}") }
+                // a tenth of a px of the glyph's top a step, the glyph smaller about its bottom: no more than
+                // about that tenth over its height, never a jump
+                scale?.let { assertTrue(abs(g.scale - it) <= 0.1 / (glyph.bottom - glyph.top) * 1.25 + 1e-3, "the class's step $at: $it to ${g.scale}") }
                 scale = g.scale
                 val m = g.keys[0].marks[0]
                 if (m == null) {
