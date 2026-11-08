@@ -69,29 +69,34 @@ class HandwritingSceneGesturesTest {
         val ids = harness(canvas).use { h -> h.keys().filter { it.enabled }.mapNotNull { it.id } }
         val out = mutableListOf("keys $ids")
         for (id in ids) {
-            harness(canvas).use { h ->
-                fun sent(what: String) {
-                    out += "$what: " + h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") } +
-                        " field ${h.field.text}"
-                    h.api.calls.clear()
-                }
-                h.api.calls.clear()
-                h.tap(h.keyNamed(id))
-                h.idle()
-                sent("$id tap")
+            // tapped, then held, each in a keyboard of its own: 符 and 123 put another keyboard up
+            for (held in listOf(false, true)) {
                 // 注's menu: the views' a list the harness does not read, the scene's below ([readingsMenuAsTheSettingsWordIt])
-                if (id != "symbols" && id != "numbers" && id != "reading") {
-                    out += "$id long press: " + h.longPress(h.keyNamed(id))
-                    sent("$id long press")
+                if (held && (id == "symbols" || id == "reading")) continue
+                harness(canvas).use { h ->
+                    h.api.calls.clear()
+                    if (held) {
+                        out += "$id long press: " + h.longPress(h.keyNamed(id))
+                    } else {
+                        h.tap(h.keyNamed(id))
+                    }
+                    h.idle()
+                    out += "$id ${if (held) "long press sent" else "tap"}: " +
+                        h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") || it.startsWith("triggerUnicode") } +
+                        " field ${h.field.text}"
                 }
             }
         }
         return out
     }
 
+    // the one difference meant (060-render-p2 §5.3, C 疑问 3): 123 held is Unicode input, as on every board; its view had no long press
     @Test
     fun everyKeyAsItsView() {
-        assertEquals(gestures(false).joinToString("\n"), gestures(true).joinToString("\n"))
+        val views = gestures(false)
+        val unicode = views.map { if (it.startsWith("numbers long press sent: []")) it.replaceFirst("[]", "[triggerUnicode()]") else it }
+        assertTrue(views.toString(), views.any { it.startsWith("numbers long press sent: []") })
+        assertEquals(unicode.joinToString("\n"), gestures(true).joinToString("\n"))
     }
 
     @Test

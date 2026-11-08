@@ -3,7 +3,7 @@
   手写（HandwritingKeyboard，rules C §8），板 handwriting（没有位置键名，键按角色）。手写板是跨四行的 slot，宽 85，
   按字母键面画、平铺也画块（face="keep"）、不画按下；，。没有气泡（preview="off"，同旧 View），长按的标点作为按键发给输入法（同旧 View，不写 as-is）；给它一个名字 pad，主题能写 handwriting/pad（rules C 疑问 2 的回答）。
   右列各 15：⌫、，、。、注；，。按标点映射显示（{punct:,}），和发出去的一致（rules C 疑问 4，060-render-p2 §5.3 S5b 故意不同；旧 View 固定显示全角）。注 键开着时（状态 :on）字色是强调色，主题写。
-  第 5 行：符 15、123 14（无长按）、空格、语言键 10、回车 15。
+  第 5 行：符 15、123 14（长按 Unicode，每块板一样；旧 View 无长按，060-render-p2 §5.3 C 疑问 3）、空格、语言键 10、回车 15。
 -->
 <keyboard xmlns="https://youmo-ime/layout/1" id="handwriting" name="手写" family="handwriting" columns="100">
   <defaults kind="function" width="15" text-size="20"/>
@@ -37,7 +37,7 @@
     <key id="symbols" role="symbols" kind="function" width="15" label="符" text-size="16" text-style="bold"
          send="layout:Symbol" long-press="quickphrase" shortcut="symbols"/>
     <key id="numbers" role="numbers" kind="function" width="14" label="123" text-size="16" text-style="bold"
-         send="layout:Number" shortcut="numbers"/>
+         send="layout:Number" long-press="unicode" shortcut="numbers"/>
     <key id="space" role="space" kind="space" face="special" width="fill" label="{ime-name}" text-size="13"
          badge="{hold-badge}" sound="space" send="sym:space" long-press="space-long-press" swipe-axis="both" shortcut="space"/>
     <key id="lang" role="lang" kind="letter" class="alt-text" width="10" icon="language" a11y="a11y_key_switch_language"
