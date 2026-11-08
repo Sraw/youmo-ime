@@ -1,3 +1,5 @@
+import java.time.Duration
+
 plugins {
     id("org.fcitx.fcitx5.android.app-convention")
     id("org.fcitx.fcitx5.android.native-app-convention")
@@ -36,12 +38,19 @@ fun Test.unitTestSettings() {
         "-Djdk.attach.allowAttachSelf=true", "-XX:+EnableDynamicAgentLoading",
         "-Dsun.tools.attach.attachTimeout=60000",
     )
-    // a test JVM out of memory ends there, its heap written for the cause (build/test-oom/java_pid<n>.hprof):
+    // a test JVM out of memory ends there, its heap written for the cause (build/test-oom/<task>/java_pid<n>.hprof):
     // once (060 P2 S4c's gate) one ran out in ThemeMakerLayoutTest and the next class and spun in GC for
-    // 17 min, nothing left to find why; five runs since (at 3 GB, at 1 GB, under full CPU load) never did
-    val oom = layout.buildDirectory.dir("test-oom").get().asFile
+    // 17 min, nothing left to find why; five runs since (at 3 GB, at 1 GB, under full CPU load) never did.
+    // A dir a task (both run at once in the gate), last run's dumps gone first (3 GB each); CI keeps a failed run's
+    val oom = layout.buildDirectory.dir("test-oom/$name").get().asFile
     jvmArgs("-XX:+ExitOnOutOfMemoryError", "-XX:+HeapDumpOnOutOfMemoryError", "-XX:HeapDumpPath=${oom.path}")
-    doFirst { oom.mkdirs() }
+    doFirst {
+        oom.mkdirs()
+        oom.listFiles { f -> f.name.endsWith(".hprof") }?.forEach { it.delete() }
+    }
+    // a run that hangs (that one spun in GC with no end) stops: the longest gate, both tasks and lint, took 12 min
+    // here, and CI's one fork at a time 14 min
+    timeout.set(Duration.ofMinutes(40))
     val test = this
     // the byte-buddy-agent on the test's own classpath: the version mockk resolved to
     jvmArgumentProviders.add(CommandLineArgumentProvider {
