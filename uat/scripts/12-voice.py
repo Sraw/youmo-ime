@@ -640,4 +640,4 @@ def vo28(d):
     return "发出「我们走吧」一次，聊天框已清空"
 
 
-case("VO-34", needs="jvm:PacksUatTest.withoutTheVoicePackTheMicrophoneAsksForItAndTheSpaceSaysSo")(lambda d: None)
+case("VO-34", needs="jvm:PacksUatTest.withoutTheVoicePackTheMicrophoneAsksForItAndTheSpaceDoesNothing")(lambda d: None)

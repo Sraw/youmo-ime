@@ -125,25 +125,26 @@ class PacksUatTest {
 
     @Test
     @Uat("VO-34")
-    fun withoutTheVoicePackTheMicrophoneAsksForItAndTheSpaceSaysSo() {
+    fun withoutTheVoicePackTheMicrophoneAsksForItAndTheSpaceDoesNothing() {
         KeyboardHarness().use { h ->
             h.start()
             TestShelves.use(text = true, voice = false)
             h.idle()
             assertNull("the keyboard types without the voice pack", gate(h))
+            // holding the space (voice input, the default): nothing, as 0.5.x's text build; no notice, nothing opened
+            val space = KeyboardHarness.all(h.inputView).first { h.shown(it) && it.contentDescription?.startsWith("Space") == true }
+            val f = h.finger(space, h.at(space))
+            h.advance(700)
+            f.up(h.at(space))
+            h.idle()
+            assertEquals(emptyList<String>(), h.noticeTexts())
+            assertNull(opened())
             // the bar's microphone: the notice says which pack, and the page opens; no permission asked
             val mic = KeyboardHarness.all(h.inputView).first { h.shown(it) && it.contentDescription == h.service.getString(R.string.voice_input) }
             h.tap(mic)
             h.idle()
             assertEquals(listOf(h.service.getString(R.string.pack_voice_needed)), h.noticeTexts())
             assertTrue(openedPacks(opened()))
-            // holding the space: said, nothing opened (a hold is not a tap to go somewhere)
-            val space = KeyboardHarness.all(h.inputView).first { h.shown(it) && it.contentDescription?.startsWith("Space") == true }
-            val f = h.finger(space, h.at(space))
-            h.advance(700)
-            f.up(h.at(space))
-            h.idle()
-            assertNull(opened())
         }
     }
 

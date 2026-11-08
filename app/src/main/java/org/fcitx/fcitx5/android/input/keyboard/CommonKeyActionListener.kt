@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.daemon.launchOnReady
+import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
@@ -44,6 +45,7 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
+import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.utils.switchToNextIME
 import org.mechdancer.dependency.Dependent
 import org.mechdancer.dependency.UniqueComponent
@@ -217,7 +219,7 @@ class CommonKeyActionListener :
                         }
                         SpaceLongPressBehavior.ShowPicker -> showInputMethodPicker()
                         // hold to talk: the keyboard stays, the key's finger followed till it lifts
-                        SpaceLongPressBehavior.Voice -> if (behavior.talks(service.inPasswordField)) {
+                        SpaceLongPressBehavior.Voice -> if (behavior.talks(PackStore.ready(PackKind.VOICE), service.inPasswordField)) {
                             VoiceFeature.hold(inputView, action.pointer) { text ->
                                 listener.onKeyAction(KeyAction.CommitAction(text), KeyActionListener.Source.Keyboard)
                             }

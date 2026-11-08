@@ -1004,10 +1004,15 @@ of a field not learned from).
 0.6.0 has one APK (the `speech` flavors are gone, dev/design/060-asset-packs.md): voice's code is in
 main, its models in the voice pack. The keyboard reaches voice through `VoiceFeature` (`credits`,
 `hold` for the space, `tap` for the bar's microphone and the `Voice` key shortcut). Each first asks
-`PackStore.status(VOICE)`: without a usable pack a notice says 语音输入需要导入语音包 (or which version),
-a tap opens the 资源包 page and a hold does not; then the permission. An input method cannot ask for
+`PackStore.status(VOICE)`: without a usable pack a notice says 语音输入需要导入语音包 (or which version)
+and a tap opens the 资源包 page; then the permission. An input method cannot ask for
 a permission itself, so `VoicePermissionActivity` asks and closes; it is asked on first use only.
-The microphone is on the bar and the space's hold is voice for everyone (no longer per build). Voice decisions (number
+The microphone is on the bar for everyone (no longer per build), and is what asks for the pack. The
+space's hold is voice by default, but only with the voice pack ready (`SpaceLongPressBehavior.talks`'s
+`voiceReady`, and `spaceLongPressTakesTouch`): without it holding the space does nothing, as 0.5.x's
+text build: no notice, no microphone badge, a slow drag's cursor not taken (user's decision,
+2026-11-08: a hold is no place to advertise a pack). The keyboard is made anew when the voice pack's
+readiness changes, for the badge. A value the user set is left as it is. Voice decisions (number
 normalisation, reranking hypotheses with the pinyin model, blocked words, hotwords, the hold's and
 the tap's presses, what is typed as it is said) are in ime-core's `input/voice/` and tested there.
 

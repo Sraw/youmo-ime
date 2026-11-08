@@ -326,6 +326,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     // whether the keyboard was made under PackGateView: made anew when the text pack's readiness changes
     private var gateBuilt = false
 
+    // whether it was made with the voice pack: the space's hold to talk, its microphone badge, with it only
+    private var voiceBuilt = false
+
     private fun replaceInputView(theme: Theme, start: Boolean = false): InputView {
         compactBuilt = keyboardCompact()
         readingBuilt = EngineState.candidateReading.value
@@ -333,6 +336,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // no text pack (or not one this app reads): the keyboard cannot type, and says so over all of it
         val text = PackStore.status(PackKind.TEXT)
         gateBuilt = text !is PackStatus.Ready
+        voiceBuilt = PackStore.ready(PackKind.VOICE)
         if (gateBuilt) newInputView.overKeys(PackGateView(this, theme, text), underBar = false)
         setInputView(newInputView)
         inputDeviceMgr.setInputView(newInputView)
@@ -495,8 +499,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             }
         }
         // a pack imported (or gone): fcitx was restarted on the new files (PackStore), and has no
-        // focused context; the text pack's readiness changed, the keyboard made anew, with or without
-        // the gate over it
+        // focused context; a pack's readiness changed, the keyboard made anew, with or without
+        // the gate over it, holding the space to talk or not
         lifecycleScope.launch {
             var generation = PackStore.state.value.generation
             PackStore.state.collect {
@@ -504,7 +508,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     generation = it.generation
                     refocus()
                 }
-                if (inputView == null || it.ready(PackKind.TEXT) != gateBuilt) return@collect
+                if (inputView == null || (it.ready(PackKind.TEXT) != gateBuilt && it.ready(PackKind.VOICE) == voiceBuilt)) return@collect
                 rebuilding(ViewRebuild.SETTING)
                 replaceInputView(ThemeManager.activeTheme, start = true)
             }

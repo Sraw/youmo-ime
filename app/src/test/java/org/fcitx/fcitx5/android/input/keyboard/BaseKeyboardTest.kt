@@ -207,10 +207,12 @@ class BaseKeyboardTest {
     // PY-41: a space long press that does nothing (None) took the touch from a slow drag
     @Test
     fun aSpaceLongPressThatDoesNothingLeavesTheSwipeBe() {
-        assertFalse(spaceLongPressTakesTouch(SpaceLongPressBehavior.None, inPasswordField = false))
-        assertTrue(spaceLongPressTakesTouch(SpaceLongPressBehavior.Enumerate, inPasswordField = false))
-        assertTrue(spaceLongPressTakesTouch(SpaceLongPressBehavior.Voice, inPasswordField = false))
-        assertFalse("no talking in a password", spaceLongPressTakesTouch(SpaceLongPressBehavior.Voice, inPasswordField = true))
+        assertFalse(spaceLongPressTakesTouch(SpaceLongPressBehavior.None, voiceReady = true, inPasswordField = false))
+        assertTrue(spaceLongPressTakesTouch(SpaceLongPressBehavior.Enumerate, voiceReady = true, inPasswordField = false))
+        assertTrue(spaceLongPressTakesTouch(SpaceLongPressBehavior.Voice, voiceReady = true, inPasswordField = false))
+        assertFalse("no talking in a password", spaceLongPressTakesTouch(SpaceLongPressBehavior.Voice, voiceReady = true, inPasswordField = true))
+        assertFalse("no voice pack", spaceLongPressTakesTouch(SpaceLongPressBehavior.Voice, voiceReady = false, inPasswordField = false))
+        assertTrue("another behaviour needs no pack", spaceLongPressTakesTouch(SpaceLongPressBehavior.Enumerate, voiceReady = false, inPasswordField = false))
     }
 
     // PY-41, as the key sees it: the long press the timer calls declines, sends nothing and does not buzz

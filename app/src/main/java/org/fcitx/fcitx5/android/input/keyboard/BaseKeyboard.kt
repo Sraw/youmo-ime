@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.InputFeedbacks
+import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.BoardImages
@@ -57,6 +58,7 @@ import org.fcitx.fcitx5.android.input.popup.PopupKeyboardUi
 import org.fcitx.fcitx5.android.input.popup.keyRef
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
+import org.fcitx.fcitx5.android.pack.PackKind
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.above
 import splitties.views.dsl.constraintlayout.below
@@ -316,12 +318,12 @@ abstract class BaseKeyboard(
 
     // holding the space to talk: a microphone on every keyboard's space says so, or no one would know
     private fun updateSpaceBadges(behavior: SpaceLongPressBehavior) {
-        val voice = behavior.talks(inPasswordField)
+        val voice = behavior.talks(PackStore.ready(PackKind.VOICE), inPasswordField)
         holdsToTalk = voice
         canvas?.invalidateScene()
         val icon = if (voice) R.drawable.ic_baseline_keyboard_voice_24 else null
         // a long press that does nothing here buzzes for nothing either
-        val takes = spaceLongPressTakesTouch(behavior, inPasswordField)
+        val takes = spaceLongPressTakesTouch(behavior, PackStore.ready(PackKind.VOICE), inPasswordField)
         spaceKeys.forEach {
             (it as? TextKeyView)?.showBadge(icon)
             it.keyGesture.longPressFeedbackEnabled = takes
@@ -418,7 +420,7 @@ abstract class BaseKeyboard(
         val g = key.keyGesture
         spaceKeys.add(key)
         // as updateSpaceBadges sets it: a key wired after it ran (the scene's, drawKeysOn) buzzes for nothing otherwise
-        g.longPressFeedbackEnabled = spaceLongPressTakesTouch(spaceLongPress.getValue(), inPasswordField)
+        g.longPressFeedbackEnabled = spaceLongPressTakesTouch(spaceLongPress.getValue(), PackStore.ready(PackKind.VOICE), inPasswordField)
         g.swipeEnabled = spaceSwipeMoveCursor.getValue()
         g.swipeRepeatEnabled = true
         g.swipeThresholdX = selectionSwipeThreshold
@@ -483,7 +485,7 @@ abstract class BaseKeyboard(
                 // hold to talk follows the finger that holds the space
                 is KeyDef.Behavior.LongPress -> key.onLongClick { k ->
                     val action = it.action
-                    if (action is KeyAction.SpaceLongPressAction && !spaceLongPressTakesTouch(spaceLongPress.getValue(), inPasswordField)) {
+                    if (action is KeyAction.SpaceLongPressAction && !spaceLongPressTakesTouch(spaceLongPress.getValue(), PackStore.ready(PackKind.VOICE), inPasswordField)) {
                         // nothing to do: not taken, or a slow drag on the space, its first step past the delay, moved no cursor (PY-41)
                         false
                     } else {
@@ -922,11 +924,11 @@ private object KeyPointer {
 
 /**
  * Whether the space's long press, set to [behavior], takes the touch from its swipe: not when it does
- * nothing, as None does, and Voice where it does not talk ([SpaceLongPressBehavior.talks]).
+ * nothing, as None does, and Voice where it does not talk ([SpaceLongPressBehavior.talks]: no voice pack, a password).
  */
-internal fun spaceLongPressTakesTouch(behavior: SpaceLongPressBehavior, inPasswordField: Boolean) = when (behavior) {
+internal fun spaceLongPressTakesTouch(behavior: SpaceLongPressBehavior, voiceReady: Boolean, inPasswordField: Boolean) = when (behavior) {
     SpaceLongPressBehavior.None -> false
-    SpaceLongPressBehavior.Voice -> behavior.talks(inPasswordField)
+    SpaceLongPressBehavior.Voice -> behavior.talks(voiceReady, inPasswordField)
     else -> true
 }
 

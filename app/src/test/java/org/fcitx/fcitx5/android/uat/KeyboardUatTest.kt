@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.KeyStates
+import org.fcitx.fcitx5.android.data.pack.TestShelves
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
@@ -215,8 +216,26 @@ class KeyboardUatTest {
         }
     }
 
-    private fun slowSpaceDrag() {
+    // PY-41 with the default left as it is, voice input, but no voice pack: its hold does nothing then,
+    // as 0.5.x's text build's did, and takes no finger from the drag
+    @Test
+    @Uat("PY-41")
+    fun withoutTheVoicePackTheDefaultHoldLeavesTheSlowDragItsCursor() {
+        val behavior = AppPrefs.getInstance().keyboard.spaceKeyLongPressBehavior
+        assertEquals(SpaceLongPressBehavior.Voice, behavior.getValue())
+        try {
+            slowSpaceDrag { h ->
+                TestShelves.use(text = true, voice = false)
+                h.idle()
+            }
+        } finally {
+            TestShelves.use()
+        }
+    }
+
+    private fun slowSpaceDrag(before: (KeyboardHarness) -> Unit = {}) {
         val h = harness().start()
+        before(h)
         val pinyin = "woxiangzhidaojintianwanshangwomenqunalichifan".repeat(2)
         fun cursorAt(at: Int) {
             h.api.inputPanelCached = HostEvent.InputPanel(FormattedText(arrayOf(pinyin), intArrayOf(0), at), FormattedText.Empty, FormattedText.Empty)
