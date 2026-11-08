@@ -198,7 +198,13 @@ class HandwritingKeyboard(
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
         // last: the scene reads the keyboard's state (060's redraw: the keys drawn by the scene engine where the canvas is
         // on); the pad over the canvas, in its slot (onLayout)
-        if (drawKeysWithScene(LAYOUT)) padView.bringToFront() else drawPadAsKey()
+        if (drawKeysWithScene(LAYOUT)) {
+            padView.bringToFront()
+            // the canvas at another size (one-handed, split, another height): the pad to the slot of the scene at that size
+            canvas?.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> post { requestLayout() } }
+        } else {
+            drawPadAsKey()
+        }
     }
 
     private val padSlot = Rect()

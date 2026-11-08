@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardCanvasViewTest
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.set
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -76,11 +77,40 @@ class SymbolsSceneGesturesTest {
             val layout = KeyboardHarness.find<PickerLayout>(h.inputView)!!
             val kb = layout.embeddedKeyboard
             for ((slot, view) in listOf(PickerLayout.CATEGORIES_SLOT to layout.side!!, PickerLayout.GRID_SLOT to layout.grid)) {
-                val cell = Rect().also { assertTrue(slot, kb.slot(slot, it)) }
-                assertEquals(slot, cell, Rect(view.left, view.top, view.right, view.bottom))
+                assertEquals(slot, cellOf(layout, slot), Rect(view.left, view.top, view.right, view.bottom))
                 // over the canvas: its touches its own
                 assertTrue(slot, layout.indexOfChild(view) > layout.indexOfChild(kb))
             }
+        }
+    }
+
+    // the scene's own slot at the canvas's size now, in the panel's pixels
+    private fun cellOf(layout: PickerLayout, slot: String): Rect {
+        val kb = layout.embeddedKeyboard
+        val canvas = KeyboardHarness.find<KeyboardCanvasView>(kb)!!
+        return Rect().apply {
+            set(canvas.scene!!.slots.single { it.id == slot }.bounds)
+            offset(kb.left + canvas.left, kb.top + canvas.top)
+        }
+    }
+
+    // narrower (one-handed, split): the categories and the grid follow the slots of the scene at the new size
+    @Test
+    fun theCategoriesAndTheGridFollowTheirSlotsAfterAResize() {
+        panel(true).use { h ->
+            val layout = KeyboardHarness.find<PickerLayout>(h.inputView)!!
+            val before = cellOf(layout, PickerLayout.GRID_SLOT)
+            val w = layout.width * 7 / 10
+            // the slots' layout params set in one pass, laid out there in the next
+            repeat(3) {
+                layout.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(layout.height, View.MeasureSpec.EXACTLY))
+                layout.layout(layout.left, layout.top, layout.left + w, layout.top + layout.height)
+            }
+            for ((slot, view) in listOf(PickerLayout.CATEGORIES_SLOT to layout.side!!, PickerLayout.GRID_SLOT to layout.grid)) {
+                val cell = cellOf(layout, slot)
+                assertEquals(slot, cell, Rect(view.left, view.top, view.right, view.bottom))
+            }
+            assertTrue("$before", cellOf(layout, PickerLayout.GRID_SLOT).width() < before.width())
         }
     }
 

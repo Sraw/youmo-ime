@@ -8,6 +8,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Typeface
 import android.graphics.Rect
+import android.view.View
 import androidx.constraintlayout.widget.ConstraintLayout
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
@@ -41,6 +42,7 @@ import splitties.views.dsl.constraintlayout.centerHorizontally
 import splitties.views.dsl.constraintlayout.centerInParent
 import splitties.views.dsl.constraintlayout.endOfParent
 import splitties.views.dsl.constraintlayout.lParams
+import splitties.views.dsl.constraintlayout.leftOfParent
 import splitties.views.dsl.constraintlayout.matchConstraints
 import splitties.views.dsl.constraintlayout.startOfParent
 import splitties.views.dsl.constraintlayout.topOfParent
@@ -120,7 +122,10 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
 
         // last: the scene reads the keyboard's state
         init {
-            if (sceneLayout != null) drawKeysWithScene(sceneLayout)
+            // the canvas at another size (one-handed, split, another height): the panel's views to the slots of the scene at that size
+            if (sceneLayout != null && drawKeysWithScene(sceneLayout)) {
+                canvas?.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> post { (parent as? View)?.requestLayout() } }
+            }
         }
 
         private companion object {
@@ -155,8 +160,8 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
             // the scene's board is the whole panel (symbols.xml): the keyboard under it all, the categories
             // and the grid over it, each in its slot (onLayout)
             add(embeddedKeyboard, lParams(matchConstraints, matchConstraints) { centerInParent() })
-            side?.let { add(it, lParams(matchConstraints, matchConstraints) { topOfParent(); startOfParent() }) }
-            add(grid, lParams(matchConstraints, matchConstraints) { topOfParent(); startOfParent() })
+            side?.let { add(it, lParams(matchConstraints, matchConstraints) { topOfParent(); leftOfParent() }) }
+            add(grid, lParams(matchConstraints, matchConstraints) { topOfParent(); leftOfParent() })
         } else {
             addViews()
         }
@@ -172,19 +177,21 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
         if (embeddedKeyboard.slot(GRID_SLOT, slotCell)) grid.layoutIn(slotCell)
     }
 
-    // the view's place set to [r] (its size and margins from the top start): laid out there in the next pass.
-    // Set only when it changed, so the passes settle; never measured or laid out by hand here, which the
-    // constraints undid in the next pass and the RecyclerView asked for again, without end
-    private fun android.view.View.layoutIn(r: Rect) {
+    // the view at [r]: its constraints the slot's from the parent's left and top (absolute: not mirrored
+    // right to left, as the scene's cells are not), and laid out there at once, so a size changed (one-handed,
+    // split, another height) moves it in this pass. Done only when it moved, so the passes settle: at [r]
+    // already the constraints put it nowhere else, and the RecyclerView is not asked to lay out again
+    private fun View.layoutIn(r: Rect) {
         val p = layoutParams as LayoutParams
-        val size = p.width == r.width() && p.height == r.height()
-        if (size && p.leftMargin == r.left && p.topMargin == r.top) return
-        p.width = r.width()
-        p.height = r.height()
-        p.leftMargin = r.left
-        p.topMargin = r.top
-        p.marginStart = r.left
-        layoutParams = p
+        val placed = left == r.left && top == r.top && width == r.width() && height == r.height()
+        val kept = p.width == r.width() && p.height == r.height() && p.leftMargin == r.left && p.topMargin == r.top
+        if (placed && kept) return
+        layoutParams = lParams(r.width(), r.height()) {
+            leftOfParent(r.left)
+            topOfParent(r.top)
+        }
+        measure(MeasureSpec.makeMeasureSpec(r.width(), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(r.height(), MeasureSpec.EXACTLY))
+        layout(r.left, r.top, r.right, r.bottom)
     }
 
     private fun addViews() {

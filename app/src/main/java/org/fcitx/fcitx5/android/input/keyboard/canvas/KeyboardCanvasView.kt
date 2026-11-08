@@ -340,11 +340,12 @@ class KeyboardCanvasView(
     }
 
     /**
-     * Slot [id]'s cell in this view, into [out], as the scene drawn last has it: where the keyboard puts
-     * its own view (the handwriting pad, 060-render-p2 S5b); false where the scene has no such slot.
+     * Slot [id]'s cell in this view, into [out], as the scene at the view's size now has it (made
+     * again if the size changed: one-handed, split, another height): where the keyboard puts its own
+     * view (the handwriting pad, 060-render-p2 S5b); false where the scene has no such slot, or none.
      */
     fun slot(id: String, out: Rect): Boolean {
-        val s = current?.slots?.firstOrNull { it.id == id } ?: return false
+        val s = scene?.slots?.firstOrNull { it.id == id } ?: return false
         out.set(s.bounds)
         return true
     }

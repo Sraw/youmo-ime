@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPadView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.set
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -96,15 +97,33 @@ class HandwritingSceneGesturesTest {
     fun thePadIsInItsSlotAndWrittenOn() {
         harness(true).use { h ->
             val canvas = KeyboardHarness.find<KeyboardCanvasView>(h.keyboard)!!
-            val slot = Rect().also { assertTrue(canvas.slot(HandwritingKeyboard.PAD_SLOT, it)) }
             val pad = h.pad()
-            assertEquals("$slot", slot, Rect(pad.left - canvas.left, pad.top - canvas.top, pad.right - canvas.left, pad.bottom - canvas.top))
+            assertEquals(padSlot(canvas), Rect(pad.left - canvas.left, pad.top - canvas.top, pad.right - canvas.left, pad.bottom - canvas.top))
             // over the canvas: drawn after it, its touches its own
             val kb = KeyboardHarness.find<HandwritingKeyboard>(h.keyboard)!!
             assertTrue("${kb.indexOfChild(pad)} ${kb.indexOfChild(canvas)}", kb.indexOfChild(pad) > kb.indexOfChild(canvas))
             assertTrue(pad.width > h.keyboard.width / 2)
             // the slot's face is the scene's (a letter key's), drawn under the pad
             assertTrue(canvas.scene!!.slots.single { it.id == HandwritingKeyboard.PAD_SLOT }.ops.isNotEmpty())
+        }
+    }
+
+    // the scene's own slot at the canvas's size now, not through the keyboard's way to it
+    private fun padSlot(canvas: KeyboardCanvasView): Rect =
+        Rect().apply { set(canvas.scene!!.slots.single { it.id == HandwritingKeyboard.PAD_SLOT }.bounds) }
+
+    // narrower (one-handed, split): the pad follows the slot of the scene at the new size, off the keys beside it
+    @Test
+    fun thePadFollowsItsSlotAfterAResize() {
+        harness(true).use { h ->
+            val kb = KeyboardHarness.find<HandwritingKeyboard>(h.keyboard)!!
+            val canvas = KeyboardHarness.find<KeyboardCanvasView>(kb)!!
+            val before = padSlot(canvas)
+            kb.relayoutAt(kb.width * 7 / 10, kb.height)
+            val pad = h.pad()
+            val after = padSlot(canvas)
+            assertTrue("$before $after", after.width() < before.width())
+            assertEquals(after, Rect(pad.left - canvas.left, pad.top - canvas.top, pad.right - canvas.left, pad.bottom - canvas.top))
         }
     }
 
@@ -172,6 +191,11 @@ class HandwritingSceneGesturesTest {
                 assertTrue("canvas $canvas", h.keys().none { it.id == "lang" && it.enabled && !it.bounds.isEmpty })
             }
         }
+    }
+
+    private fun View.relayoutAt(w: Int, h: Int) {
+        measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
+        layout(left, top, left + w, top + h)
     }
 
     private companion object {
