@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.SceneText
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
+import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.junit.Assert.assertEquals
@@ -109,6 +110,32 @@ class LookThemeTest {
         assertTrue(w.ops(false).filterIsInstance<Op.Text>().none { it.text == "w" })
         assertTrue(w.ops(false).any { it is Op.NineSlice })
         assertTrue(key(scene, "space").ops(false).any { it is Op.NineSlice })
+    }
+
+    // 3.0's single keys by their names (KeyNames): 大千's , . ; / - selected as the keys of those ids, a
+    // selector's comma not read as the list's (060-render-p2 S4 step 6)
+    @Test
+    fun aSingleKeyOfAnyNameIsTheKeyOfThatId() {
+        val slice = NineSlice("/data/themes/t/key.png", Insets(1, 2, 3, 4), 2)
+        val names = listOf(",", ".", ";", "/", "-", "q")
+        val base = LookDefaults.look(palette(SceneData.theme("material-light.xml")))
+        val look = base.copy(keys = base.keys.copy(overrides = names.associate { "zhuyin/$it" to KeyOverride(KeyFill.Image(slice), null, KeyLabel.Hide) }))
+        val layout = (LayoutReader.layout(SceneData.read("zhuyin.xml")) as Parsed.Ok).value
+        val bottom = (LayoutReader.fragment(SceneData.read("grouped-bottom.xml")) as Parsed.Ok).value
+        val built = SceneBuilder(theme(LookTheme.xml(look, "T", false)), SceneData.portrait, SceneData.measurer).build(layout, mapOf("grouped-bottom" to bottom))
+        val scene = (built as Parsed.Ok).value
+        for (id in names) {
+            val k = key(scene, id)
+            assertTrue(id, k.ops(false).any { it is Op.NineSlice })
+            assertTrue(id, k.ops(false).none { it is Op.Text })
+        }
+        // the others their kind's: the comma of the bottom row (its id "comma") too
+        for (id in listOf("w", "comma", "period")) assertTrue(id, key(scene, id).ops(false).none { it is Op.NineSlice })
+        // number/* the pad's star, not every key of the pad; a role and a plain key as written
+        assertEquals("number/\\*", LookTheme.selector("number/*"))
+        assertEquals("*/space", LookTheme.selector("*/space"))
+        assertEquals("zhuyin/q", LookTheme.selector("zhuyin/q"))
+        assertEquals("zhuyin//", LookTheme.selector("zhuyin//"))
     }
 
     // two images of one name in two folders stay two: the second numbered, in the theme written and the app's lookup alike
