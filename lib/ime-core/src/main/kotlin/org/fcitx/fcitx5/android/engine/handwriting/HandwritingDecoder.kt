@@ -241,6 +241,13 @@ class HandwritingDecoder(
         searched = positions
         searchStart = start
         searchArcs = arcs
+        // a character blocked is in no word either (人 blocked, 天人 would show it again as its last),
+        // but where every reading is, the ink's best alone, as above (review M2): once a position, not a path through it (review R2 L6)
+        shut = Array(minOf(positions.size - start, MAX_WORD)) { k ->
+            val texts = positions[start + k].texts
+            val all = BooleanArray(texts.size) { blocked(index.find(texts[it])) }
+            if (all.all { it }) BooleanArray(texts.size) { it != 0 } else all
+        }
         foundTexts.clear()
         extend(start, dictionary.root, user?.root ?: -1, user?.mergedWords?.root ?: -1, StringBuilder(), 0.0)
         return arcs
@@ -288,6 +295,9 @@ class HandwritingDecoder(
     // two dictionary readings share one id, whose reading is the last typed)
     private var searched: List<InkReading> = emptyList()
     private var searchStart = 0
+
+    // per position from [searchStart], the readings left out of a word (arcsFrom)
+    private var shut: Array<BooleanArray> = emptyArray()
     private var searchArcs = ArrayList<Arc>()
     private val foundTexts = HashMap<String, Pair<Int, Float>>()
 
@@ -301,9 +311,10 @@ class HandwritingDecoder(
         if (at == searched.size || at - searchStart == MAX_WORD) return
         val p = searched[at]
         val map = readings()
+        val shut = shut[at - searchStart]
         for (i in 0 until minOf(alternatives, p.texts.size)) {
             val c = p.texts[i]
-            val syllables = map[c.codePointAt(0)] ?: continue
+            val syllables = map[c.codePointAt(0)]?.takeUnless { shut[i] } ?: continue
             val scored = ink + inkWeight * p.scores[i]
             text.append(c)
             for (s in syllables) {

@@ -366,6 +366,7 @@
     <string name="learning_kind_keys14">拼音 14 鍵</string>
     <string name="learning_kind_table">碼表</string>
     <string name="learning_kind_handwriting">手寫</string>
+    <string name="learning_kind_strokes">筆畫查字</string>
     <string name="learning_clear_learned">清空學到的</string>
     <string name="learning_clear_learned_summary">學到的順序和次數；你的詞、固定、封鎖都留下</string>
     <string name="learning_clear_learned_message">清掉：\n· 各處學到的順序、改選和使用次數，只上屏過一次的記錄\n· 前後搭配和學到的聯想\n· 英文的次數和排序\n· 表情和符號面板的「最近」\n\n留下：\n· 手動加的詞、固定、封鎖、不再聯想、英文裡不再自動改的詞\n· 你的詞（次數清零，仍是你的詞）\n· 匯入的詞（回到沒用過的樣子）\n· 碼表調頻學到的順序（到碼表設定裡恢復）\n\n自訂短語、快速輸入不在這裡清，到它們自己的頁裡刪。這次安裝存的自動備份一併刪掉，清空以後不能再「退回還原前」；以前裝的、拷來的備份不動，還原它們會帶回清掉的。</string>
@@ -394,6 +395,7 @@
     <string name="word_text">詞</string>
     <string name="word_pinyin">拼音，如 you mo（留空自動填）</string>
     <string name="word_pinyin_invalid">拼音和詞對不上：每個字一個音節</string>
+    <string name="english_block_detail">英文 · 全小寫的詞不分大小寫封鎖</string>
     <plurals name="word_typed_times">
         <item quantity="other">%1$s · 打過 %2$d 次</item>
     </plurals>

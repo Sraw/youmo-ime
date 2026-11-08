@@ -270,14 +270,10 @@ class KotlinHost(
     private fun HostCore.inkKey(piece: Action.Ink) = bridge.sendInk(piece, inputMethodEntryCached.uniqueName) { sendVirtual(Keyboard.INK, piece) }
 
     override suspend fun learning(op: LearningOp) = onHost {
-        val candidate = (op as? LearningOp.OnPage)?.op ?: op as? LearningOp.OnCandidate
-        bridge.learning(op, inputMethodEntryCached.uniqueName) act@{ event ->
-            // as the menu sends it: asked first, at the index the list has (Fcitx.learning)
-            if (candidate == null) return@act false
-            if (candidateActions(candidate.index).none { it.id == event }) return@act false
-            triggerCandidateAction(candidate.index, event, candidate.text)
-            true
-        }.also { (_, again) -> if (again) sendVirtual(Keyboard.AGAIN) }.first
+        // 繁體: the menu names the candidate as shown, converted; the engine has it simplified. Each
+        // act names its candidate by its index of all and the engine's text (HostCore.actOnCandidate)
+        bridge.learning(op, inputMethodEntryCached.uniqueName, ::shownText) { event, index, text -> actOnCandidate(index, event, text) }
+            .also { (_, again) -> if (again) sendVirtual(Keyboard.AGAIN) }.first
     }
 
     override suspend fun offerGlide(glide: Glide) = onHost {

@@ -4,7 +4,9 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
+import org.fcitx.fcitx5.android.engine.english.EnglishBlocks
 import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
+import org.fcitx.fcitx5.android.engine.learn.Han
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
@@ -58,7 +60,7 @@ internal class UserLexicon(
     val wordImport by lazy(LazyThreadSafetyMode.NONE) {
         WordImport(
             assets = assets, lists = lists, user = ::user, addWords = ::add, blockAll = ::blockAll,
-            dropSessions = dropSessions, owned = owned, imports = imports,
+            dropSessions = dropSessions, owned = owned, imports = imports, blockEnglish = { englishBlocks.block(it).size },
         )
     }
 
@@ -94,6 +96,9 @@ internal class UserLexicon(
     // in the user directory with the log, in memory without one
     private val lists by lazy(LazyThreadSafetyMode.NONE) { WordLists(userDir, onError) }
 
+    /** English's blocked words, a list of its own (no reading): shown and unblocked among pinyin's, no pinyin to them. */
+    val englishBlocks by lazy(LazyThreadSafetyMode.NONE) { EnglishBlocks(userDir, onError) }
+
     private fun Entry.word(kind: UserWord.Kind, count: Float = 0f) =
         UserWord(text, spelled(), kind, count)
 
@@ -102,13 +107,13 @@ internal class UserLexicon(
     fun userWords(kind: UserWord.Kind): List<UserWord> = when (kind) {
         UserWord.Kind.ADDED -> lists.addedWords.map { it.word(kind) }
         UserWord.Kind.LEARNED -> user().ownWords().sortedByDescending { it.second }.map { (entry, count) -> entry.word(kind, count) }
-        UserWord.Kind.BLOCKED -> lists.blockedWords.map { it.word(kind) }
+        UserWord.Kind.BLOCKED -> lists.blockedWords.map { it.word(kind) } + englishBlocks.blocked.map { UserWord(it, "", kind) }
     }
 
     fun userWordCounts(): Map<UserWord.Kind, Int> = mapOf(
         UserWord.Kind.ADDED to lists.addedWords.size,
         UserWord.Kind.LEARNED to user().ownWords().size,
-        UserWord.Kind.BLOCKED to lists.blockedWords.size,
+        UserWord.Kind.BLOCKED to lists.blockedWords.size + englishBlocks.blocked.size,
     )
 
     /**
@@ -142,7 +147,9 @@ internal class UserLexicon(
     /** [added] and [blocked] (text, pinyin) put on the lists at once, as a restore merges them: one write of each, the sessions dropped once. */
     fun addListed(added: Collection<Pair<String, String>>, blocked: Collection<Pair<String, String>>) {
         val add = added.mapNotNull { (text, pinyin) -> WordLists.entry(text, pinyin) }
-        val block = blocked.mapNotNull { (text, pinyin) -> WordLists.entry(text, pinyin) }
+        val block = blocked.mapNotNull { (text, pinyin) -> WordLists.blockedEntry(text, pinyin) }
+        // English's, no pinyin: a backup's of an older build has none
+        englishBlocks.block(blocked.filter { it.second.isEmpty() }.map { it.first })
         if (add.isNotEmpty()) add(add)
         if (block.isNotEmpty()) blockAll(block)
         dropSessions()
@@ -180,6 +187,7 @@ internal class UserLexicon(
             forgotten(learned)
         }
         byKind[UserWord.Kind.BLOCKED]?.let { unblock(it.filterNotNull()) }
+        englishBlocks.unblock(words.filter { it.kind == UserWord.Kind.BLOCKED && it.pinyin.isEmpty() }.map { it.text })
         dropSessions()
     }
 
@@ -245,7 +253,7 @@ internal class UserLexicon(
     }
 
     // as listed: one syllable a space, so read back as it was, not split again
-    private fun UserWord.entry() = WordText.entry(text, Syllables.apostrophed(pinyin))
+    private fun UserWord.entry() = if (kind == UserWord.Kind.BLOCKED) WordLists.blockedEntry(text, Syllables.apostrophed(pinyin)) else WordText.entry(text, Syllables.apostrophed(pinyin))
 
     /** [word] as its list keeps it: what a removal taken back puts back ([reAdd], [reBlock]). */
     fun entryOf(word: UserWord): Entry? = word.entry()
@@ -277,7 +285,8 @@ internal class UserLexicon(
     fun exportWords(): List<String> = userWords().map {
         val line = "${it.text} ${Syllables.apostrophed(it.pinyin)}"
         when (it.kind) {
-            UserWord.Kind.BLOCKED -> "!$line"
+            // English's, no reading: marked so, a line of letters alone reading as pinyin
+            UserWord.Kind.BLOCKED -> if (it.pinyin.isEmpty()) WordListFiles.ENGLISH_BLOCK_MARK + it.text else "!$line"
             // its count after it, for its place: read back only from an export (importWords)
             UserWord.Kind.LEARNED -> "${WordListFiles.LEARNED_MARK} $line ${it.count}"
             UserWord.Kind.ADDED -> line
@@ -318,7 +327,10 @@ internal class UserLexicon(
      * A word blocked, for a table. Not a character: blocked in pinyin under one reading (了 liao),
      * a table, which has no readings, would lose it under all.
      */
-    fun isBlockedWord(text: String): Boolean = text.codePointCount(0, text.length) >= 2 && text in blockedTexts()
+    // a word: of Han or of ASCII letters and digits (a Latin word blocked in pinyin, hidden in a table
+    // too); an emoji blocked in its word's reading is no table's word to hide (review R2 L5, R3)
+    fun isBlockedWord(text: String): Boolean =
+        text.codePointCount(0, text.length) >= 2 && (Han.any(text) || text.any { it.code < ASCII_END && it.isLetterOrDigit() }) && text in blockedTexts()
 
     /** The user's words read again if the dictionaries are no longer as they were [before] ([UserAdditions.drop]): see [Engines.reload]. */
     fun reloadDictionaries(before: String) {
@@ -367,6 +379,7 @@ internal class UserLexicon(
     fun clearLists() {
         lists.removeAll(lists.addedWords)
         lists.unblockAll(lists.blockedWords)
+        englishBlocks.unblock(englishBlocks.blocked)
         blockedTexts = null
         dropUser()
         dropSessions()
@@ -383,3 +396,6 @@ internal class UserLexicon(
         lists.blockedWords.forEach { model.block(it) }
     }
 }
+
+// below it, ASCII
+private const val ASCII_END = 0x80

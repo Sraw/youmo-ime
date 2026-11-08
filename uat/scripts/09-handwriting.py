@@ -7,7 +7,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from hw_strokes import STROKES  # noqa: E402
 
-from uat import Blocked, case, check  # noqa: E402
+from uat import Blocked, block_candidate, case, check  # noqa: E402
 
 
 def pad(d):
@@ -110,3 +110,24 @@ case("HW-29", needs="jvm:HandwritingUatTest.aHeldCharactersCardThenItsButtonsAnd
 
 
 case("HW-30", needs="jvm:HandwritingUatTest.copyPutsTheCharacterAloneOnTheClipboardAndCommitIsATap")(lambda d: None)
+
+
+@case("HW-31", base="B0-手写", mutates="learn")
+def hw31(d):
+    d.wait(lambda *_: d.screen().find(desc="手写板", where="ime"), 10, what="书写板")
+    write(d, "天")
+    first = d.long_pick("天")
+    d.shot("full", "写「天」，长按「天」的菜单")
+    check("屏蔽" in first, "长按「天」的菜单里没有屏蔽")
+    # closed by the confirmation's 取消: back would hide the keyboard
+    d.tap_text("屏蔽", where="all", scroll=False, after=0.6)
+    d.tap_text("取消", where="all", scroll=False, after=0.6)
+    write(d, "人")
+    c = d.cands()
+    check("人" in c, f"写「天人」的候选 {c[:6]}")
+    block_candidate(d, "人", "接着写「人」，长按「人」的菜单")
+    time.sleep(1.5)
+    after = d.cands()
+    d.shot("kb", "屏蔽「人」后")
+    check("人" not in after, f"屏蔽后候选还有「人」：{after[:6]}")
+    return f"「天」「人」的菜单都有屏蔽；屏蔽后候选 {after[:4]}（设置里恢复由 JVM 管）"

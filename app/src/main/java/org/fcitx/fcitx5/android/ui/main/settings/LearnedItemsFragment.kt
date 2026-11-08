@@ -20,6 +20,8 @@ import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.learn.control.ListedItem
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.stroke.StrokeLookup
+import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import org.fcitx.fcitx5.android.utils.lazyRoute
@@ -115,8 +117,11 @@ class LearnedItemsFragment : PaddingPreferenceFragment() {
          * draw them blank, TalkBack reads nothing) as their letters, `bn ui`;
          * any other kind's as stored.
          */
-        fun keys(code: Code): String =
-            Kinds.keysTag(code.kind)?.let { NineKeyLetters.grouped(it) }?.shown(code.keys) ?: code.keys
+        fun keys(code: Code): String = if (code.kind == STROKES) Strokes.shown(code.keys)
+            else Kinds.keysTag(code.kind)?.let { NineKeyLetters.grouped(it) }?.shown(code.keys) ?: code.keys
+
+        // a character blocked under the strokes typed (笔画查字), filed as a table's block is
+        private val STROKES = Kinds.table(StrokeLookup.BLOCK_TABLE)
 
         fun title(what: LearningOp.Listed) = when (what) {
             LearningOp.Listed.PINS -> R.string.my_words_pinned
@@ -138,6 +143,7 @@ class LearnedItemsFragment : PaddingPreferenceFragment() {
         fun kind(code: Code) = when {
             code.kind == Kinds.FULL -> R.string.learning_kind_full
             code.kind == Kinds.HANDWRITING -> R.string.learning_kind_handwriting
+            code.kind == STROKES -> R.string.learning_kind_strokes
             code.kind.startsWith(Kinds.shuangpin("")) -> R.string.learning_kind_shuangpin
             // the keyboard from the kind's tag; its scheme said by [label]
             Kinds.isShuangpin(code.kind) -> when (Kinds.keysTag(code.kind)) {

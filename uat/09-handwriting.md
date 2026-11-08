@@ -138,3 +138,10 @@
 - **操作**：写「银」「行」，长按「行」，点 **复制**；在别的地方粘贴；再长按「行」，点 **上屏**。
 - **预期**：复制后菜单关上，剪贴板里只有「行」，框里「银行」还带下划线，什么都没上屏；点上屏和直接点候选「行」一样，上屏「银行」。
 - **JVM**：`HandwritingUatTest.copyPutsTheCharacterAloneOnTheClipboardAndCommitIsATap`（剪贴板「行」、不 select 不发键、组字留着；上屏是 select）；设备上不跑。
+
+### HW-31 [P0] 连写几个字，每个字都能屏蔽
+<!-- learning: U-82 -->
+- **前提**：B0-手写。
+- **操作**：写「天」，长按候选里的「天」看菜单；再接着写「人」（不上屏），长按候选里的「人」看菜单，选 **屏蔽**，确认；然后在 **屏蔽的词** 里恢复「人」，再写一遍「人」。
+- **预期**：两次菜单里都有 **屏蔽**（屏蔽的是候选上显示的那个字：连写时候选栏显示的是最后一个字的几种可能，前面的字在它是最后一个时一样能长按屏蔽）；屏蔽后候选里不再有「人」，写的字换成别的读法；屏蔽的词里列着「人」；恢复后又写得出「人」。
+- **JVM**：`HandwritingEngineUatTest.eachCharacterWrittenIsBlockedFromTheKeyboard`（:lib:ime-eval:uatTest，真数据：写「天」「人」，屏蔽「人」后「天人」这个词也不再把「人」带出来）、`HandwritingSessionTest`「a long press on what may follow or on a candidate forgets what was learned of it or blocks it」「a character blocked then unblocked comes back when what is written is read again」。设备上跑过（2026-11-08，emulator-5574）。

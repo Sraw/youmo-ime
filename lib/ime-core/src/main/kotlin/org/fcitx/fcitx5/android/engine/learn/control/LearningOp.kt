@@ -22,8 +22,8 @@ sealed class LearningOp {
         abstract val index: Int
         abstract val text: String
 
-        /** The same at another [index]. */
-        abstract fun at(index: Int): OnCandidate
+        /** The same at another [index], or of another [text] (the engine's of one the host shows converted: 繁體). */
+        abstract fun at(index: Int, text: String = this.text): OnCandidate
     }
 
     /**
@@ -34,22 +34,22 @@ sealed class LearningOp {
 
     /** What the long press offers ([LearningResult.Menu]). */
     data class Menu(override val index: Int, override val text: String) : OnCandidate() {
-        override fun at(index: Int) = copy(index = index)
+        override fun at(index: Int, text: String) = copy(index = index, text = text)
     }
 
     /** 删除 (the user's own words, U-82 D13) or 忘掉学到的 (the dictionary's): one act, everything learned of the text forgotten (U-84). */
     data class Delete(override val index: Int, override val text: String) : OnCandidate() {
-        override fun at(index: Int) = copy(index = index)
+        override fun at(index: Int, text: String) = copy(index = index, text = text)
     }
 
     /** 屏蔽, after the confirmation the menu's [LearningResult.Menu.scope] words. */
     data class Block(override val index: Int, override val text: String) : OnCandidate() {
-        override fun at(index: Int) = copy(index = index)
+        override fun at(index: Int, text: String) = copy(index = index, text = text)
     }
 
     /** 固定首位 under the keys typed (U-83), in place of what was pinned there. */
     data class Pin(override val index: Int, override val text: String) : OnCandidate() {
-        override fun at(index: Int) = copy(index = index)
+        override fun at(index: Int, text: String) = copy(index = index, text = text)
     }
 
     /**
@@ -57,17 +57,17 @@ sealed class LearningOp {
      * (a pinned word, a custom phrase or a built-in date) tells the engine which is meant.
      */
     data class Unpin(override val index: Int, override val text: String) : OnCandidate() {
-        override fun at(index: Int) = copy(index = index)
+        override fun at(index: Int, text: String) = copy(index = index, text = text)
     }
 
     /** 不再联想 (U-72): a prediction no longer offered after the word before it. */
     data class NoPredict(override val index: Int, override val text: String) : OnCandidate() {
-        override fun at(index: Int) = copy(index = index)
+        override fun at(index: Int, text: String) = copy(index = index, text = text)
     }
 
     /** 复制给开发者 (U-81, D26): the candidates of these keys, their tiers and uses, none of the text before ([LearningResult.Text]). */
     data class Report(override val index: Int, override val text: String) : OnCandidate() {
-        override fun at(index: Int) = copy(index = index)
+        override fun at(index: Int, text: String) = copy(index = index, text = text)
     }
 
     /** The act [token] named ([LearningResult.Done.undo]) taken back, as though never done: the chip's 撤销. */

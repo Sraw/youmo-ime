@@ -175,6 +175,27 @@
 - **预期**：确认框写明范围（以后打字、手写、语音、联想都不再出现「是」）；之后候选里没有「是」。（测完在 **词库与短语 → 用户词库 → 屏蔽的词** 里恢复，或重置。）
 - **JVM**：`CandidateMenuUatTest.blockingAWordSaysWhereAndAsksFirst`（菜单、确认框写明范围（R.string.learning_block_everywhere）、确认后发出屏蔽；之后候选里没有「是」是引擎的事（学习的测试））；设备上不跑。
 
+### PY-114 [P0] 屏蔽一个整句候选，组成它的字照常出
+<!-- learning: U-82 -->
+- **前提**：B0。
+- **操作**：点 a z h i，找到几个字拼成的候选「啊之」（不是词库里的一个词），长按，看菜单；选 **屏蔽**，确认；清空，再点 a z h i；再分别点 a、z h i；然后在 **词库与短语 → 用户词库 → 屏蔽的词** 里恢复「啊之」，再点 a z h i。
+- **预期**：菜单里有 **屏蔽**；屏蔽后 a z h i 下没有「啊之」，a 下有「啊」，z h i 下有「之」；屏蔽的词里列着「啊之 a zhi」；恢复后 a z h i 下又有「啊之」。双拼、九键打同样的拼音一样。
+- **JVM**：`EnginesUserWordsTest.aSentenceBlockedFromTheKeyboardIsNeverOfferedAgainTillUnblocked`（菜单有屏蔽，屏蔽、撤销、再屏蔽，组成它的字照常出，存进用户目录，在设置里恢复后又出）、`aSentenceIsBlockedOnEveryPinyinKeyboard`（双拼、九键）、`aSentenceIsBlockedAtItsReadingAlone`（只屏蔽这个读音）；菜单写成的字见 PY-29。设备上跑过（2026-11-08，emulator-5574）。
+
+### PY-115 [P1] 表情、拆字、笔画查字、滑行的其他读法也能屏蔽
+<!-- learning: U-82 U-28 -->
+- **前提**：B0；表情候选、拆字开着；滑行那一步先打开 **滑行输入**。
+- **操作**：点 d i a n z a n，长按候选里的表情 👍；点 u n v z i，长按「好」；点 u h s 后长按查出的一个字；打开滑行，划 n-i-h-a-o，长按第二个候选（另一种读法的词）。每个都选 **屏蔽**、确认，再打一次同样的键看；表情屏蔽后重启输入法（杀掉进程再弹出键盘），再点 d i a n z a n；最后在 **屏蔽的词**（笔画查字的在页顶"码表里按码屏蔽的"里，写着"笔画查字"）里逐个恢复，再打一次。
+- **预期**：四个菜单里都有 **屏蔽**；笔画查字的确认写"打这串码不再出现"，多打一笔、打拼音还出这个字；其余写"以后打字……都不再出现"。屏蔽后同样的键不再出它，表情重启输入法后也不出（👍🏻 这种码位比音节多的表情也一样），恢复后又出。
+- **JVM**：`EnginesEmojiBlockTest`（码位和音节数对不上的表情：重启、设置里恢复、撤销、备份往返）、`AsideBlockUatTest.anEmojiAndACharacterByStrokesAreBlockedFromTheKeyboard`（:lib:ime-eval:uatTest，真数据，经宿主的长按动作）、`EnginesAsideBlockTest`（表情、拆字）、`EnginesStrokeBlockTest`、`EnginesGlideBlockTest`。设备上跑过（2026-11-08，emulator-5574）。
+
+### PY-116 [P1] 繁體下长按候选能屏蔽
+<!-- learning: U-82 -->
+- **前提**：B0；在状态面板（⋯）里切到 **繁體**。
+- **操作**：点 g u o j i a，长按「國家」，选 **屏蔽**、确认；清空再点 g u o j i a；切回 **简体** 再点一次。
+- **预期**：菜单里有 **屏蔽**，能用；屏蔽后繁體下 guojia 不再出「國家」（词库里另有一个本来就是繁体的「國家」，显示一样，一起屏蔽），简体下不再出「国家」（屏蔽记的是原文「国家」）。
+- **JVM**：`EnginesConvertedMenuTest`（菜单、屏蔽、撤销按引擎里的简体做，显示一样的候选一起屏蔽、删除，固定只管按的那个；宿主经 `HostCore.shownText` 把转换函数传给 `Engines.learning`）。设备上跑过（2026-11-08，emulator-5574；修之前菜单里没有屏蔽）。
+
 ### PY-31 [P1] 固定首位，再取消固定
 <!-- learning: U-83 -->
 - **前提**：B0。

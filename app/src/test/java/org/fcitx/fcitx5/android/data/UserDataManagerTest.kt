@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardDatabase
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.clipboard.importedClipboardMarker
 import org.fcitx.fcitx5.android.data.quickphrase.QuickPhraseManager
+import org.fcitx.fcitx5.android.engine.english.EnglishBlocks
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.learn.backup.Backups
 import org.fcitx.fcitx5.android.engine.learn.backup.RestoreStash
@@ -296,6 +297,7 @@ class UserDataManagerTest {
         File(phone.engine, LearnLog.FILE).writeText("the phone's")
         File(phone.engine, OLD_MARKER).writeText("the phone's")
         File(phone.engine, WordLists.ADDED).writeText("the phone's")
+        File(phone.engine, EnglishBlocks.FILE).writeText("the phone's")
         File(phone.engine, "${Backups.DIR}/auto-1.fxlb").writeText("the phone's")
         File(phone.engine, "wubi.user").writeText("the phone's")
         val backup = zip(
@@ -303,16 +305,19 @@ class UserDataManagerTest {
             RestoreStash.BACKUP to "the backup's learning",
             "engine/${OLD_MARKER}" to "the backup's",
             "engine/${WordLists.ADDED}" to "the backup's",
+            "engine/${EnglishBlocks.FILE}" to "the backup's English",
             "engine/wubi.user" to "the backup's table",
         )
         UserDataManager.import(backup, phone).getOrThrow()
         // review-DE-design D-M3: every old log the phone's, a changed one reading to the record as words removed
-        for (name in listOf(LearnLog.FILE, OLD_MARKER, WordLists.ADDED, "${Backups.DIR}/auto-1.fxlb", "wubi.user")) {
+        for (name in listOf(LearnLog.FILE, OLD_MARKER, WordLists.ADDED, EnglishBlocks.FILE, "${Backups.DIR}/auto-1.fxlb", "wubi.user")) {
             assertEquals(name, "the phone's", File(phone.engine, name).readText())
         }
         val stash = stashes(phone).single()
         assertEquals("the backup's learning", File(stash, RestoreStash.BACKUP).readText())
         assertEquals("the backup's", File(stash, WordLists.ADDED).readText())
+        // review H2: English's blocked words merged as pinyin's, not laid over the phone's
+        assertEquals("the backup's English", File(stash, EnglishBlocks.FILE).readText())
         assertEquals("the backup's table", File(stash, "wubi.user").readText())
         // D-S5: a second import before the engine merged the first: both left, in the order made
         UserDataManager.import(zip(BuildConfig.APPLICATION_ID, RestoreStash.BACKUP to "the second's"), phone).getOrThrow()

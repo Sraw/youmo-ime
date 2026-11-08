@@ -201,8 +201,13 @@ class Engines(
      * press's event for the candidate at an index, as it always did, so it shows the list left
      * (the addon's; by default the keyboard's here).
      */
-    fun learning(im: String?, op: LearningOp, act: (event: Int, index: Int) -> Boolean = { event, index -> pressShown(im, event, index) }): LearningResult =
-        checked { learner.apply(im, op, act) }
+    fun learning(
+        im: String?,
+        op: LearningOp,
+        /** A candidate's text as the host shows it (繁體: chttrans converts the list), which the op names. */
+        shown: (String) -> String = { it },
+        act: (event: Int, index: Int, text: String) -> Boolean = { event, index, _ -> pressShown(im, event, index) },
+    ): LearningResult = checked { learner.apply(im, op, shown, act) }
 
     // the long press's event for the keyboard [im] shows; false with none made, where a pair would
     // make one just to take it

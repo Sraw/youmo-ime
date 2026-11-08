@@ -2,7 +2,7 @@
 前提/操作/预期."""
 import time
 
-from uat import (Blocked, case, check, first, grouped_keys)
+from uat import (PKG, Blocked, block_candidate, case, check, first, grouped_keys, open_url, script)
 
 
 # ---------------------------------------------------------------- 打字
@@ -330,3 +330,101 @@ case("PY-112", needs="jvm:ZhuyinShortcutsUatTest.dachensKeysTakeTheFullKeyboards
 
 
 case("PY-113", needs="jvm:EnginesReadingsTest.eachCandidateIsReadAsTyped、EnginesReadingsTest.aCharacterOfTwoReadingsIsReadAsTypedThroughFullPinyinsWrappers、StrokeFilterTest.readingsAndLookupsOfAKeptCandidateAreOfItsOwnPlace")(lambda d: None)
+
+
+@case("PY-114", mutates="learn")
+def py114(d):
+    d.type("azhi")
+    c = d.cands()
+    check("啊之" in c, f"a z h i 的候选 {c[:8]}")
+    block_candidate(d, "啊之", "长按「啊之」的菜单")
+    d.clear()
+    d.type("azhi")
+    again = d.cands()
+    check("啊之" not in again, f"屏蔽后 a z h i 还有「啊之」：{again[:8]}")
+    d.clear()
+    d.type("a")
+    a = d.cands()
+    d.clear()
+    d.type("zhi")
+    z = d.cands()
+    d.clear()
+    check("啊" in a and "之" in z, f"a {a[:6]}，zhi {z[:6]}")
+    return f"屏蔽前 {c[:4]}，屏蔽后 {again[:4]}；a 有「啊」、zhi 有「之」（设置里恢复由 JVM 管）"
+
+
+@case("PY-115", mutates="learn")
+def py115(d):
+    d.type("dianzan")
+    c = d.cands()
+    emoji = "👍"
+    if emoji not in c:
+        raise Blocked(f"dianzan 的候选里没有 👍：{c[:8]}")
+    block_candidate(d, emoji, f"长按表情「{emoji}」的菜单")
+    d.clear()
+    d.type("dianzan")
+    after = d.cands()
+    check(emoji not in after, f"屏蔽后 dianzan 还有「{emoji}」：{after[:8]}")
+    d.clear()
+    # review H1: kept over a restart of the input method (the line read back from words.blocked)
+    restart_ime(d)
+    d.type("dianzan")
+    restarted = d.cands(timeout=30)
+    check(emoji not in restarted, f"重启输入法后 dianzan 又有「{emoji}」：{restarted[:8]}")
+    d.clear()
+    d.type("uhs")
+    u = d.cands()
+    check(d.preedit().startswith("u"), f"打了 uhs，编码行是「{d.preedit()}」")
+    ch = u[0].split()[0]
+    menu = block_candidate(d, u[0], f"长按笔画查字「{ch}」的菜单")
+    check(any("这串码" in t for t in menu), "笔画查字的确认没写「打这串码不再出现」")
+    d.clear()
+    d.type("uhs")
+    u2 = [x.split()[0] for x in d.cands() if x]
+    d.clear()
+    check(ch not in u2, f"屏蔽后 uhs 还有「{ch}」：{u2[:8]}")
+    return f"表情「{emoji}」屏蔽后 dianzan {after[:4]}，重启输入法后 {restarted[:4]}；uhs「{ch}」屏蔽后 {u2[:4]}（拆字、滑行的其他读法由 JVM 管）"
+
+
+# the input method's process killed and brought back, as a phone's restart would: what was learned read from its files
+def restart_ime(d):
+    pid = d.sh(f"pidof {PKG}").strip()
+    if not pid:
+        raise Blocked("输入法进程没在跑")
+    d.root(f"kill -9 {pid}")
+    time.sleep(1.0)
+    open_url(d, "text")
+    for _ in range(30):
+        if d.screen().find(rid="keyboard_view", where="ime") and "不可用" not in d.im_label():
+            return
+        time.sleep(1.0)
+    raise Blocked("重启后键盘没起来")
+
+
+@case("PY-116", mutates=True)
+def py116(d):
+    tb = script("05-toolbar")
+    # the keyboard up, the bar showing its tools: nothing typed
+    d.type("a")
+    d.clear()
+    trad = tb.status_toggle(d, "简体")
+    try:
+        d.type("guojia")
+        c = d.cands(timeout=30)
+        check("國家" in c, f"繁體下 guojia 的候选 {c[:6]}")
+        menu = block_candidate(d, "國家", "繁體下长按「國家」的菜单")
+        check(any("屏蔽" in t for t in menu), f"繁體候选的菜单里没有屏蔽：{menu}")
+        d.clear()
+        d.type("guojia")
+        after = d.cands()
+        d.clear()
+        # the list may have two that show as 國家 (国家, and the dictionary's own traditional 國家): the one pressed goes
+        check("國家" not in after, f"屏蔽后繁體下 guojia 还出「國家」：{c[:6]} → {after[:6]}")
+    finally:
+        d.clear()
+        tb.status_toggle(d, trad)
+    d.type("guojia")
+    simp = d.cands()
+    d.clear()
+    check("国家" not in simp, f"屏蔽「國家」后简体下 guojia 还有「国家」：{simp[:6]}")
+    return f"切到「{trad}」：长按「國家」菜单 {menu}；屏蔽后繁體 {after[:4]}，简体 {simp[:4]}"

@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.fcitx.fcitx5.android.engine.platform.UserFiles
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFiles
+import org.fcitx.fcitx5.android.engine.platform.write
 import org.fcitx.fcitx5.android.engine.user.UserFixtures.entry
 import org.fcitx.fcitx5.android.engine.user.UserFixtures.inTrie
 import org.fcitx.fcitx5.android.engine.user.UserFixtures.model
@@ -201,5 +202,20 @@ class WordListsTest {
     private companion object {
         // the longest word whose pinyin, run together, is split
         const val WORD = 32
+    }
+
+    // an emoji blocked in its word's reading: its syllables, not one a code point (review H1, R2)
+    @Test
+    fun aBlockedEmojiReadsAsItsWordWhateverItsCodePoints() {
+        assertEquals("hao", WordLists.blockedEntry("👍🏻", "hao")?.spelled())
+        assertEquals("ni hao", WordLists.blockedEntry("😃", "ni'hao")?.spelled())
+        // a letter not ASCII is no word's (ℹ️, review R3): read so too
+        assertEquals("xin", WordLists.blockedEntry("ℹ️", "xin")?.spelled())
+        // a text of letters or digits as any word: a syllable a character, or none
+        assertNull(WordLists.blockedEntry("abc", "a'o"))
+        // a file's line read so, its cost a number or none
+        val dir = MemoryFiles()
+        dir.file(WordLists.BLOCKED).write("👍🏻 hao\n😃 ni'hao 0\n👌 hao x\nℹ️ xin\n".toByteArray())
+        assertEquals(listOf("👍🏻", "😃", "ℹ️"), WordLists(dir).blockedWords.map { it.text })
     }
 }

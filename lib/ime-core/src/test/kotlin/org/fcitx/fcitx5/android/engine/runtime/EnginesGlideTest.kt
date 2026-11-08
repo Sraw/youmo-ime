@@ -15,6 +15,11 @@ import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
+import org.fcitx.fcitx5.android.engine.learn.Code
+import org.fcitx.fcitx5.android.engine.learn.Kinds
+import org.fcitx.fcitx5.android.engine.learn.control.BlockScope
+import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
+import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.fcitx.fcitx5.android.engine.session.Action
@@ -210,6 +215,27 @@ class EnginesGlideTest : EnginesFixture() {
         engines.onEvent(WUBI, EngineEvent.RESET, 0)
         assertTrue(engines.blockWord("你好", "ni'hao"))
         assertEquals("你好", engines.glided(WUBI, "vbgf").candidates.first())
+    }
+
+    // review L4: another reading's word of a table's glide blocked under its code, as the table blocks its own
+    @Test
+    fun aTableGlidesOtherReadingIsBlockedUnderItsCode() {
+        val engines = Engines({ if (it == "${InputMethodCatalog.TABLE_DIR}/wbx.data") ByteBuffer.wrap(wubiWord) else load(it) }, MemoryFiles(), warmUps = inPlace)
+            .apply { settings = wubiShown }
+        val shown = engines.glided(WUBI, "vbgf").candidates
+        val at = shown.indexOf("好")
+        assertTrue(shown.toString(), at > 0)
+        val menu = engines.learning(WUBI, LearningOp.Menu(at, "好")) as LearningResult.Menu
+        assertEquals(BlockScope.UNDER_CODE, menu.scope)
+        val done = engines.learning(WUBI, LearningOp.Block(at, "好")) as LearningResult.Done
+        val listed = (engines.learning(null, LearningOp.ListItems(LearningOp.Listed.TABLE_BLOCKS)) as LearningResult.Listed).items
+        assertEquals(listOf(Code(Kinds.table(WUBI), "vbg") to "好"), listed.map { it.code to it.text })
+        engines.onEvent(WUBI, EngineEvent.RESET, 0)
+        assertFalse("好" in engines.type(WUBI, "vbg").candidates)
+        engines.learning(WUBI, LearningOp.Undo(done.undo))
+        engines.onEvent(WUBI, EngineEvent.RESET, 0)
+        assertTrue("好" in engines.type(WUBI, "vbg").candidates)
+        engines.close()
     }
 
     // 五笔 with 你 and 拟 at one code, 你 the likelier

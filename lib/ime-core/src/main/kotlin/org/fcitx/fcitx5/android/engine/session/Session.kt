@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
+import org.fcitx.fcitx5.android.engine.learn.control.BlockScope
 import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.engine.reading.WordReading
 
@@ -79,6 +80,13 @@ interface Session {
      * readings and the card of one go by it (CandidateReadings.ordered, CharCard). Null for any other.
      */
     fun lookedUp(index: Int): String? = null
+
+    /**
+     * Where a block of the candidate at [index] reaches, where this session says, not its input
+     * method (review H3): a character by strokes under them alone, one a table looked up by pinyin
+     * everywhere (pinyin's word); null for the input method's rule (a table's under its code).
+     */
+    fun blockScope(index: Int): BlockScope? = null
 
     /**
      * What was learned changed under the input (a long press taken back, a clear): the candidates

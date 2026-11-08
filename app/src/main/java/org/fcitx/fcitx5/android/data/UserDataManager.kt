@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.clipboard.importedClipboardMarker
 import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.engine.english.EnglishBlocks
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.learn.backup.Backups
 import org.fcitx.fcitx5.android.engine.learn.backup.RestoreStash
@@ -461,12 +462,12 @@ object UserDataManager {
     // the files of the phone's learning: kept over a backup's, as the backup's learning is merged into them
     private val PHONES = setOf(
         LearnLog.FILE, LearnLog.FILE + RecordStore.UNREADABLE, OLD_MARKER, "$OLD_MARKER.new",
-        OLD_PINS_MOVED, WordLists.ADDED, WordLists.BLOCKED, OLD_PINYIN, Engines.TABLE_LOGS_READ,
+        OLD_PINS_MOVED, WordLists.ADDED, WordLists.BLOCKED, EnglishBlocks.FILE, OLD_PINYIN, Engines.TABLE_LOGS_READ,
     )
 
     // of a backup's engine directory, what is its learning, with its old logs: merged by the engine at its next start; the
     // mark that its record has its tables' old logs read in, so the stash's are not read again
-    private val STASHED = listOf(LearnLog.FILE, WordLists.ADDED, WordLists.BLOCKED, Engines.TABLE_LOGS_READ)
+    private val STASHED = listOf(LearnLog.FILE, WordLists.ADDED, WordLists.BLOCKED, EnglishBlocks.FILE, Engines.TABLE_LOGS_READ)
 
     // in fcitx's data, beside the settings (punctuation.conf, androidengine.conf, ..., in the config's own
     // directory): the custom phrases, the quick phrases (fcitx's PkgData data/quickphrase.d) and the

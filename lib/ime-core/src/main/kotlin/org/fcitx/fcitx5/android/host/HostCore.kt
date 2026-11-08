@@ -362,6 +362,23 @@ class HostCore(
         if (shows(ic, word, text)) list.triggerAction(word, id)
     }
 
+    /**
+     * The engine's long-press act ([org.fcitx.fcitx5.android.engine.runtime.Engines.learning]'s):
+     * [id] on the candidate at [index] of all, the engine's own, if it shows [text] (the engine's,
+     * shown as this context converts it: 国家 as 國家) and offers [id]. Of all, not of the page:
+     * an act takes the list back to its first page, and another candidate would be at a page's
+     * index after it (review R3). Whether it was done.
+     */
+    fun actOnCandidate(index: Int, id: Int, text: String): Boolean = pipeline.batch act@{
+        val ic = contexts.active ?: return@act false
+        val list = ic.panel.candidateList ?: return@act false
+        val word = (if (list.bulk) list.candidateFromAll(index) else null) ?: return@act false
+        // an empty text is no check here: the engine always names one
+        if (text.isEmpty() || shown(ic, word) != filterOutput(ic, text) || list.actions(word).none { it.id == id }) return@act false
+        list.triggerAction(word, id)
+        true
+    }
+
     // `candidateAt` (`:220-231`): on the page when paging, else among all of a bulk list
     private fun candidateAt(list: CandidateList, index: Int) =
         if (pagingMode == 0 && list.bulk) list.candidateFromAll(index) else list.candidate(index)
@@ -617,6 +634,9 @@ class HostCore(
         val readings = word.readings.takeIf { it.size == text.codePointCount(0, text.length) }.orEmpty()
         return CandidateEntry(if (label.isEmpty()) "" else filterOutput(ic, label), text, filterOutput(ic, word.comment), readings = readings)
     }
+
+    /** [text] as the active context shows a candidate of it: filtered (繁體: chttrans), the long press's menu naming it so. */
+    fun shownText(text: String): String = contexts.active?.let { filterOutput(it, text) } ?: text
 
     // `shows` (`androidfrontend.cpp:303-307`): the word the user tapped, by the text sent for it,
     // filtered (traditional, say); an empty text (a key's pick) is not checked

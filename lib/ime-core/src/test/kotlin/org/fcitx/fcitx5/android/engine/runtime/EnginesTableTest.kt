@@ -213,6 +213,62 @@ class EnginesTableTest {
         assertTrue(codes.toString(), codes.none { it.kind == Kinds.table("engine-wubi") })
     }
 
+    // a character looked up by pinyin in 五笔 is blocked as full pinyin blocks it, and comes back unblocked
+    @Test
+    fun whatIsLookedUpByPinyinIsBlockedAsFullPinyinBlocksIt() {
+        Engines(::load, MemoryFiles()).use { engines ->
+            fun lookedUp(): List<String> {
+                engines.type("engine-wubi", "zni")
+                return engines.candidates("engine-wubi", 0, 9).map { it.text }
+            }
+            val at = lookedUp().indexOf("你")
+            assertTrue(Offer.BLOCK in engines.offers("engine-wubi", at))
+            assertFalse(Offer.PIN in engines.offers("engine-wubi", at))
+            engines.onEvent("engine-wubi", EngineEvent.BLOCK, at)
+            engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
+            assertFalse("你" in lookedUp())
+            engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
+            val blocked = engines.userWords(UserWord.Kind.BLOCKED).single()
+            assertEquals("你", blocked.text)
+            engines.removeWord(blocked)
+            assertTrue("你" in lookedUp())
+        }
+    }
+
+    // review H3: the menu says what a block of it does: pinyin's word, blocked everywhere, as the list of blocked words shows it
+    @Test
+    fun whatIsLookedUpByPinyinSaysItIsBlockedEverywhere() {
+        Engines(::load, MemoryFiles()).use { engines ->
+            fun lookedUp(): List<String> {
+                engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
+                engines.type("engine-wubi", "zni")
+                return engines.candidates("engine-wubi", 0, 9).map { it.text }
+            }
+            val at = lookedUp().indexOf("你")
+            val menu = engines.learning("engine-wubi", LearningOp.Menu(at, "你")) as LearningResult.Menu
+            assertEquals(BlockScope.EVERYWHERE, menu.scope)
+            val done = engines.learning("engine-wubi", LearningOp.Block(at, "你")) as LearningResult.Done
+            // a pinyin word blocked (its reading), none under the table's code
+            assertEquals(listOf(UserWord("你", "ni", UserWord.Kind.BLOCKED)), engines.userWords(UserWord.Kind.BLOCKED))
+            val tableBlocks = engines.learning(null, LearningOp.ListItems(LearningOp.Listed.TABLE_BLOCKS)) as LearningResult.Listed
+            assertEquals(emptyList<Any>(), tableBlocks.items)
+            engines.learning("engine-wubi", LearningOp.Undo(done.undo))
+            assertTrue("你" in lookedUp())
+        }
+    }
+
+    // and what the table's code typed has, under that code alone
+    @Test
+    fun whatIsTypedByTheCodeSaysItIsBlockedUnderIt() {
+        Engines(::load, MemoryFiles()).use { engines ->
+            engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
+            engines.type("engine-wubi", "wqv")
+            val text = engines.candidates("engine-wubi", 0, 1).first().text
+            val menu = engines.learning("engine-wubi", LearningOp.Menu(0, text)) as LearningResult.Menu
+            assertEquals(BlockScope.UNDER_CODE, menu.scope)
+        }
+    }
+
     // U-93 (review-int M3): 不用我的输入习惯 holds in a table's lookup by pinyin too: nothing learned, nor 删除 offered of what was
     @Test
     fun aLookUpByPinyinWithHabitsOffLearnsNothingAndForgetsNothing() {

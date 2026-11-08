@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
 import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.session.Action
+import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -163,6 +164,31 @@ class EnglishSessionTest {
         val private = session().apply { learning = false }
         private.apply(Action.Context("I fed the "))
         assertEquals("cut", private.type("cit").candidates.first())
+    }
+
+    // what may come next blocked from a long press: not predicted, till unblocked (the settings')
+    @Test
+    fun aPredictionBlockedIsNotPredictedTillUnblocked() {
+        val blocks = EnglishBlocks(null)
+        val session = EnglishSession(data, blocks = blocks)
+        fun next(): List<String> {
+            session.apply(Action.Reset)
+            session.apply(Action.Context(""))
+            session.type("i")
+            return session.apply(Action.Key(' ')).candidates
+        }
+        assertEquals(listOf("don't", "I'm"), next())
+        assertEquals(setOf(Offer.BLOCK), session.offers(0))
+        assertEquals(listOf("I'm"), session.apply(Action.Block(0)).candidates)
+        assertEquals(listOf("don't"), blocks.blocked)
+        assertEquals(listOf("I'm"), next())
+        // unblocked as written (EnglishBlocks): DON'T is not what was blocked
+        assertEquals(emptyList<String>(), blocks.unblock(listOf("DON'T")))
+        blocks.unblock(listOf("don't"))
+        assertEquals(listOf("don't", "I'm"), next())
+        // where nothing is learned (a password), nothing is blocked
+        session.learning = false
+        assertEquals(emptySet<Offer>(), session.offers(0))
     }
 
     @Test

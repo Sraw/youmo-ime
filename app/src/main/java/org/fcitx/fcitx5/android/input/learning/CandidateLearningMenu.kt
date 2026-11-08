@@ -50,7 +50,8 @@ class CandidateLearningMenu(
     fun linesOf(menu: LearningResult, index: Int, text: String, paged: Boolean): List<Line>? {
         if (menu !is LearningResult.Menu || menu.items.isEmpty()) return null
         return LearningMenu.rows(menu).map { row ->
-            val op = LearningMenu.op(row, index, text, paged)
+            // the engine's text (國家 shown, 国家 its): what the act names, checked by the engine
+            val op = LearningMenu.op(row, index, menu.text, paged)
             when {
                 op == null -> Line(context.getString(R.string.learning_why)) { why(menu.why, index, text, paged) }
                 // the confirmation never where the finger that picked the row still is (C18: a slow
@@ -72,7 +73,7 @@ class CandidateLearningMenu(
         val menu = fcitx.runOnReady { learning(LearningMenu.onCandidate(LearningOp.Menu(index, text), paged)) }
         if (menu !is LearningResult.Menu) return false
         val row = LearningMenu.rows(menu).firstOrNull { it == Row.DELETE || it == Row.FORGET } ?: return false
-        val op = LearningMenu.op(row, index, text, paged) ?: return false
+        val op = LearningMenu.op(row, index, menu.text, paged) ?: return false
         act(op, row, text)
         return true
     }

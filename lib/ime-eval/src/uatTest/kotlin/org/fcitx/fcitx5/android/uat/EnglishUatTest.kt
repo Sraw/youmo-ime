@@ -170,4 +170,22 @@ class EnglishUatTest {
             expectText("abc hello, ")
         }
     }
+
+    @Test
+    @Uat("EN-27")
+    fun aWordBlockedIsNoLongerCompletedNorCorrectedTo() = with(english()) {
+        type("th")
+        val at = page.indexOf("the")
+        assertTrue("th $page", at > 0)
+        val done = learn(org.fcitx.fcitx5.android.engine.learn.control.LearningOp.Block(at, "the"))
+        assertTrue("$done", done is org.fcitx.fcitx5.android.engine.learn.control.LearningResult.Done)
+        backspace(2)
+        type("th")
+        assertTrue("th after $page", "the" !in page)
+        backspace(2)
+        type("thw")
+        space()
+        // corrected still, to the next likeliest (they), never to the word blocked
+        assertTrue("thw corrected to $text", text != "the ")
+    }
 }

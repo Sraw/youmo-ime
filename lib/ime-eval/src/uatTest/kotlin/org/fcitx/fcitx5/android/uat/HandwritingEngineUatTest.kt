@@ -271,4 +271,16 @@ class HandwritingEngineUatTest {
             assertEquals(listOf("tóu"), engines.candidates(InputMethodCatalog.HANDWRITING, 0, 1).single().readings)
         }
     }
+
+    @Test
+    @Uat("HW-31")
+    fun eachCharacterWrittenIsBlockedFromTheKeyboard() = with(replay()) {
+        write("天", "夫")
+        write("人", "入", "大")
+        val at = page.indexOf("人")
+        assertTrue("$page", at >= 0)
+        val done = learn(org.fcitx.fcitx5.android.engine.learn.control.LearningOp.Block(at, "人"))
+        assertTrue("$done", done is org.fcitx.fcitx5.android.engine.learn.control.LearningResult.Done)
+        assertTrue("after $page", "人" !in page)
+    }
 }

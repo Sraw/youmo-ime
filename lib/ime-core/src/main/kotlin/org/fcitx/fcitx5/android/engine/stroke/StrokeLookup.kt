@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.stroke
 
+import org.fcitx.fcitx5.android.engine.learn.control.BlockScope
 import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.engine.reading.WordReading
 import org.fcitx.fcitx5.android.engine.session.Action
@@ -31,6 +32,10 @@ import org.fcitx.fcitx5.android.engine.session.Snapshot
  * pinyin to go on after: by default as the app's text ([Action.Context]); a PinyinSession's
  * `follow` keeps what it committed before too, whatever wraps either session. The keys of a
  * lookup a letter ended are handed to [retype], by default typed into the pinyin a key at a time.
+ *
+ * A character found may be blocked under the strokes typed alone ([blockUnder], the learning
+ * record's, as a table blocks under its code: [BLOCK_TABLE]); those [blockedUnder] the strokes are
+ * not found. None blocked here without, nor where nothing is learned.
  */
 class StrokeLookup(
     private val pinyin: Session,
@@ -43,6 +48,8 @@ class StrokeLookup(
         val typed = keys.map { pinyin.apply(Action.Key(it)) }
         typed.last().copy(commit = typed.joinToString("") { it.commit })
     },
+    private val blockedUnder: (strokes: String) -> Set<String> = { emptySet() },
+    private val blockUnder: ((strokes: String, text: String) -> Unit)? = null,
 ) : Session {
 
     private var looking = false
@@ -98,6 +105,7 @@ class StrokeLookup(
             // the preedit is the key, then a stroke a character
             is Action.Cursor -> moved(action.at.coerceAtLeast(1) - 1)
             is Action.Step -> moved(action.applyTo(cursor, input.length))
+            is Action.Block -> block(action.index)
             // nothing learned, nothing to offer: as it was
             else -> snapshot()
         }
@@ -106,7 +114,15 @@ class StrokeLookup(
         if (!looking) pinyin.candidates(from, count)
         else found.page(from, count).map { Choice(it, reading(it)) }
 
-    override fun offers(index: Int): Set<Offer> = if (looking) emptySet() else pinyin.offers(index)
+    override fun offers(index: Int): Set<Offer> = if (!looking) pinyin.offers(index) else if (blockable(index)) setOf(Offer.BLOCK) else emptySet()
+
+    private fun blockable(index: Int) = learning && blockUnder != null && input.isNotEmpty() && found[index] != null
+
+    private fun block(index: Int): Snapshot {
+        if (!blockable(index)) return snapshot()
+        checkNotNull(blockUnder).invoke(input.toString(), checkNotNull(found[index]))
+        return lookUp()
+    }
 
     override fun why(index: Int): Why? = if (looking) null else pinyin.why(index)
 
@@ -114,6 +130,8 @@ class StrokeLookup(
     override fun readingOf(index: Int): List<WordReading>? = if (looking) null else pinyin.readingOf(index)
 
     // a character found by its strokes, nothing typed before it (the lookup starts only then)
+    override fun blockScope(index: Int): BlockScope? = if (!looking) pinyin.blockScope(index) else if (found[index] != null) BlockScope.UNDER_CODE else null
+
     override fun lookedUp(index: Int): String? = if (looking) found[index]?.let { "" } else pinyin.lookedUp(index)
 
     override fun reread(): Snapshot? = if (looking) null else pinyin.reread()
@@ -142,7 +160,8 @@ class StrokeLookup(
 
     private inline fun lookUp(change: () -> Unit = {}): Snapshot {
         change()
-        found = Found(strokes()?.find(input.toString()).orEmpty().filterNot(blocked).iterator())
+        val under = blockedUnder(input.toString())
+        found = Found(strokes()?.find(input.toString()).orEmpty().filterNot { blocked(it) || it in under }.iterator())
         pager.reset()
         return snapshot()
     }
@@ -199,6 +218,8 @@ class StrokeLookup(
             hints = shown.map(reading),
             total = found.size,
             first = pager.from,
+            // a long press's 屏蔽 goes by the host's candidate actions, which a list not actionable has none of
+            actionable = shown.isNotEmpty(),
         )
     }
 
@@ -228,6 +249,9 @@ class StrokeLookup(
     companion object {
         /** The key that starts a lookup. */
         const val KEY = 'u'
+
+        /** The learning record's table a character is blocked under strokes in ([Kinds.table]; no table is named so). */
+        const val BLOCK_TABLE = "strokes"
         const val DEFAULT_PAGE_SIZE = 5
     }
 }

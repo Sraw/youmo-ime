@@ -27,6 +27,12 @@ object WordListFiles {
      */
     const val LEARNED_MARK = "~"
 
+    /**
+     * Before an English word blocked in the user's export (`!@en the`): it has no reading, and a
+     * line of letters alone reads as pinyin (WordLists.line). The import blocks it in English's list.
+     */
+    const val ENGLISH_BLOCK_MARK = "!@en "
+
     /** The first lines of an export: [EXPORT_MARK], then [header], the translated one. */
     fun exportHead(header: String) = "$EXPORT_MARK\n$header\n"
 

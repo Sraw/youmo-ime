@@ -59,6 +59,11 @@ class UserModel(
         /** How it reads, a space between its syllables, as the learning record files it ([Syllables.spelled]). */
         fun spelled(): String = Syllables.spelled(syllables)
 
+        companion object {
+            /** A sentence of [words] as one entry, [text] read as their syllables in turn: blocked whole. */
+            fun of(text: String, words: List<Entry>) = Entry(text, words.flatMap { it.syllables.asList() }.toIntArray())
+        }
+
         /** How it reads, `'` between its syllables, as the lists show it ([Syllables.apostrophed]). */
         fun apostrophed(): String = Syllables.apostrophed(syllables)
     }
@@ -720,6 +725,7 @@ class UserModel(
      */
     fun block(entry: Entry): Boolean {
         if (entry in blockedEntries) return true
+        blockedTextSet = null
         // its id first: one given it now (an imported word's) while it is blocked would be blocked twice, by id() too
         val id = known(entry)
         blockedEntries += entry
@@ -729,9 +735,21 @@ class UserModel(
         return true
     }
 
+    // the texts of [blockedEntries], for a sentence's to be asked of first
+    private var blockedTextSet: Set<String>? = null
+
+    /** Whether some reading of [text] is [block]ed. */
+    fun blocksText(text: String): Boolean =
+        text in (blockedTextSet ?: blockedEntries.mapTo(HashSet()) { it.text }.also { blockedTextSet = it })
+
+    /** Whether the sentence [text] is [block]ed whole as [words] (asked only if some reading of it is) read it: no id stands for it. */
+    fun blocksSentence(text: String, words: () -> List<Entry>?): Boolean =
+        blocksText(text) && words()?.let { Entry.of(text, it) in blockedEntries } == true
+
     /** Offers [entry] again, if [block]ed. */
     fun unblock(entry: Entry) {
         if (!blockedEntries.remove(entry)) return
+        blockedTextSet = null
         changes++
         val id = known(entry)
         if (id != NO_WORD) resolveBlock(entry, id, add = false)

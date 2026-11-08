@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.engine.learn.Habits
 import org.fcitx.fcitx5.android.engine.learn.KeyedRows
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.learn.Word
+import org.fcitx.fcitx5.android.engine.learn.control.BlockScope
 import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.engine.reading.WordReading
 import org.fcitx.fcitx5.android.engine.session.Session
@@ -328,6 +329,9 @@ class TableSession(
 
     // a pinyin lookup's words read as typed; a code's by their text
     override fun readingOf(index: Int): List<WordReading>? = if (lookingUp) lookUp!!.readingOf(index) else null
+
+    // looked up by pinyin: blocked as pinyin blocks it (PinyinLookUp), everywhere; a prediction's as pinyin's too
+    override fun blockScope(index: Int): BlockScope? = if (lookingUp) BlockScope.EVERYWHERE else null
 
     // what was learned read as it is now (an undo, a prediction turned off), the record's read live
     override fun reread(): Snapshot? = when {

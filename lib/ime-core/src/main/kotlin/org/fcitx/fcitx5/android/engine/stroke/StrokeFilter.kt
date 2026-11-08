@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.stroke
 
+import org.fcitx.fcitx5.android.engine.learn.control.BlockScope
 import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.engine.reading.WordReading
 import org.fcitx.fcitx5.android.engine.session.Action
@@ -89,6 +90,8 @@ class StrokeFilter(
     override fun readingOf(index: Int): List<WordReading>? = if (!filtering) session.readingOf(index) else keptAt(index)?.let { session.readingOf(it.index) }
 
     override fun why(index: Int): Why? = if (!filtering) session.why(index) else keptAt(index)?.let { session.why(it.index) }
+
+    override fun blockScope(index: Int): BlockScope? = if (!filtering) session.blockScope(index) else keptAt(index)?.let { session.blockScope(it.index) }
 
     override fun lookedUp(index: Int): String? = if (!filtering) session.lookedUp(index) else keptAt(index)?.let { session.lookedUp(it.index) }
 
