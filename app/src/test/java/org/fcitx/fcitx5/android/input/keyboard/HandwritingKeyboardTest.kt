@@ -16,14 +16,20 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.KeySym
+import org.fcitx.fcitx5.android.data.pack.AppData
+import org.fcitx.fcitx5.android.data.pack.PackStore
+import org.fcitx.fcitx5.android.data.pack.TestShelves
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.engine.handwriting.InkNet
+import org.fcitx.fcitx5.android.engine.handwriting.InkRecognizer
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPadView
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognitionTest.Queue
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognitionTest.Reader
 import org.fcitx.fcitx5.android.input.handwriting.InkPad
+import org.fcitx.fcitx5.android.input.handwriting.LoadingReader
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -55,9 +61,11 @@ class HandwritingKeyboardTest {
     private val readings = ArrayList<ReadingStyle>()
 
     // in a window, as on a phone: a held key is dropped once the keyboard is not
-    private fun keyboard() = HandwritingKeyboard(
+    private val delivered = ArrayList<String>()
+
+    private fun keyboard(recognition: HandwritingRecognition = this.recognition) = HandwritingKeyboard(
         PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark,
-        deliver = { _, _ -> }, finished = { finished += it }, recognition = recognition, setReading = { readings += it },
+        deliver = { reading, _ -> delivered += reading.texts }, finished = { finished += it }, recognition = recognition, setReading = { readings += it },
     ).also {
         it.keyActionListener = KeyActionListener { action, _ -> sent += action }
         Robolectric.buildActivity(Activity::class.java).setup().get().setContentView(it)
@@ -255,6 +263,42 @@ class HandwritingKeyboardTest {
         val bottom = IntArray(2).also(reading::getLocationInWindow)
         assertEquals(top[1].toFloat(), pad[1].toFloat(), 1f)
         assertEquals((bottom[1] + reading.height).toFloat(), (pad[1] + keyboard.pad().height).toFloat(), 1f)
+    }
+
+    /**
+     * Shown under the gate, before the text pack is there: its warm-up and strokes find no pack. That
+     * gave the recognizer up for the process (handwriting dead after the import) and told the user
+     * it could not load; now neither: once the pack is imported a stroke is read.
+     */
+    @Test
+    fun aRecognizerShownBeforeTheTextPackReadsOnceItIsImported() {
+        var told = 0
+        var opens = 0
+        val net = InkNet { _, _ -> floatArrayOf(0f) }
+        val loading = LoadingReader({ _ ->
+            // the recognizer's files, as AssetRecognizer reads them: the text pack's
+            AppData.open("handwriting/test.txt").close()
+            opens++
+            InkRecognizer(net, net, "一", floatArrayOf(0f))
+        }, { told++ }) { PackStore.state.value.generation }
+        val recognition = HandwritingRecognition(worker, main, { -1 }, loading)
+        TestShelves.use(text = false, voice = true)
+        try {
+            val keyboard = keyboard(recognition)
+            runAll()
+            keyboard.pad().stroke()
+            runAll()
+            assertEquals(emptyList<String>(), delivered)
+            assertEquals(0, opens)
+            TestShelves.use()
+            keyboard.pad().stroke()
+            runAll()
+            assertEquals(listOf("一"), delivered)
+            assertEquals(1, opens)
+            assertEquals(0, told)
+        } finally {
+            TestShelves.use()
+        }
     }
 
     @Test

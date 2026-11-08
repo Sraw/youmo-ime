@@ -11,6 +11,8 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineNotices
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.data.pack.AppData
+import org.fcitx.fcitx5.android.data.pack.PackStore
+import org.fcitx.fcitx5.android.data.pack.PackUnavailableException
 import org.fcitx.fcitx5.android.engine.handwriting.InkNet
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.handwriting.InkRecognizer
@@ -117,7 +119,7 @@ class HandwritingRecognition internal constructor(
                 Executors.newSingleThreadExecutor { Thread(it, "handwriting").apply { isDaemon = true } },
                 Executor { main.post(it) },
                 { EngineState.handwritingEnded.value },
-                LoadingReader(AssetRecognizer::open, AssetRecognizer::told),
+                LoadingReader(AssetRecognizer::open, AssetRecognizer::told) { PackStore.state.value.generation },
             )
         }
     }
@@ -128,10 +130,16 @@ class HandwritingRecognition internal constructor(
  * loaded (its library, its files) is not tried again at every stroke: the pad draws on with nothing
  * read, and the user is [told] once. [open] adds what it opens to the list it is given, closed if
  * the recognizer is of no use.
+ *
+ * Its files are the text pack's: without the pack (PackUnavailableException, the keyboard under its
+ * gate) it is not loaded, but neither given up nor told: the gate says what is missing. Whatever
+ * was loaded or given up is of the packs of [generation] (PackStore's, counted up by an import):
+ * once that changes, it is let go and loaded anew from the new pack at the next read.
  */
 internal class LoadingReader(
     private val open: (opened: MutableList<AutoCloseable>) -> InkRecognizer,
     private val told: () -> Unit,
+    private val generation: () -> Int = { 0 },
 ) : HandwritingRecognition.Reader {
 
     private val models = ArrayList<AutoCloseable>()
@@ -140,7 +148,11 @@ internal class LoadingReader(
     @Volatile
     private var broken = false
 
-    override val loadable: Boolean get() = !broken
+    // the packs' generation what is loaded (or was given up) is of; null till the first load
+    @Volatile
+    private var of: Int? = null
+
+    override val loadable: Boolean get() = !broken || generation() != of
 
     override fun load() {
         loaded()
@@ -160,10 +172,22 @@ internal class LoadingReader(
     }
 
     private fun loaded(): InkRecognizer? {
+        val now = generation()
+        if (now != of) {
+            // a pack imported since: what was loaded maps the old one's files, what was given up may load now
+            if (of != null) letGo()
+            broken = false
+            of = now
+        }
         if (broken) return null
         recognizer?.let { return it }
         return try {
             open(models).also { recognizer = it }
+        } catch (e: PackUnavailableException) {
+            // no text pack (yet): nothing to tell, the keyboard's gate says it; tried again at the next read
+            Timber.i("handwriting: %s", e.message)
+            letGo()
+            null
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
             // a file missing (IOException) or not the recognizer's (IllegalArgumentException), a model this
             // onnxruntime refuses (IllegalStateException: one a newer one wrote); one opened before is of no use
@@ -175,15 +199,19 @@ internal class LoadingReader(
     }
 
     private fun cannotLoad(e: Throwable): Nothing? {
-        Timber.e(e, "handwriting cannot load: not tried again till the app restarts")
+        Timber.e(e, "handwriting cannot load: not tried again till the app restarts or a pack is imported")
         broken = true
         // of no use from now on, whether it failed loading or reading (a LinkageError): not held open for the process
+        letGo()
+        told()
+        return null
+    }
+
+    private fun letGo() {
         recognizer = null
         // closing is native too, and may throw after a LinkageError: the rest closed and the user told all the same
         models.forEach { model -> runCatching { model.close() }.onFailure { Timber.w(it, "handwriting model close") } }
         models.clear()
-        told()
-        return null
     }
 }
 

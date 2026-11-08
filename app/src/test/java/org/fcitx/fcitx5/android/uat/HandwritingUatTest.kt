@@ -77,8 +77,20 @@ class HandwritingUatTest {
         api.enabledIme = api.availableIme
     }
 
+    // the app's recognizer is native, not on the JVM: loaded for real it fails, and since a pack's
+    // generation (counted up by each test's shelf) lets it be tried again, says 无法加载 in whichever
+    // test shows the pad, its notice racing the one asserted. Swapped for one that reads nothing.
+    private val reader = HandwritingRecognition.shared.reader.also {
+        HandwritingRecognition.shared.reader = object : HandwritingRecognition.Reader {
+            override val loadable = false
+            override fun load() = Unit
+            override fun read(strokes: List<FloatArray>): InkReading? = null
+        }
+    }
+
     @After
     fun close() {
+        HandwritingRecognition.shared.reader = reader
         h.close()
         EngineState.candidateReadingState.value = ReadingStyle.OFF
         AppPrefs.getInstance().internal.lastCandidateReading.setValue("")
