@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.ui.main.DeveloperFragment
 import org.fcitx.fcitx5.android.ui.main.LicensesFragment
 import org.fcitx.fcitx5.android.ui.main.MainFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.BackupFragment
+import org.fcitx.fcitx5.android.ui.main.settings.behavior.PacksFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.HardwareKeyboardFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.ClipboardSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.KeysSettingsFragment
@@ -71,6 +72,10 @@ sealed class SettingsRoute : Parcelable {
 
     @Serializable
     data object Backup : SettingsRoute()
+
+    /** The resource packs: what is imported, and the import (PacksFragment). */
+    @Serializable
+    data object Packs : SettingsRoute()
 
     @Serializable
     data object Developer : SettingsRoute()
@@ -182,6 +187,9 @@ sealed class SettingsRoute : Parcelable {
             }
             fragment<BackupFragment, Backup> {
                 label = ctx.getString(R.string.user_data)
+            }
+            fragment<PacksFragment, Packs> {
+                label = ctx.getString(R.string.packs)
             }
             fragment<DeveloperFragment, Developer> {
                 label = ctx.getString(R.string.developer)

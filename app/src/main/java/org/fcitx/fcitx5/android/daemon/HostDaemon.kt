@@ -130,6 +130,17 @@ object HostDaemon {
     }
 
     /**
+     * fcitx restarted if it runs for some client (a resource pack imported: its engines made anew on
+     * the new files); not running, it reads them as it starts.
+     */
+    fun restartIfRunning(): Unit = lock.withLock {
+        if (testConnection == null && clients.isNotEmpty()) {
+            realFcitx.stop()
+            start()
+        }
+    }
+
+    /**
      * Restart fcitx instance while keep the clients connected
      */
     fun restartFcitx() = lock.withLock {

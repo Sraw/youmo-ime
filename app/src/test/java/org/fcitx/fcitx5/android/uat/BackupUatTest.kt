@@ -33,7 +33,6 @@ import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.input.address.AddressBook
 import org.fcitx.fcitx5.android.input.address.AddressLists
 import org.fcitx.fcitx5.android.input.address.AddressStore
-import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
@@ -129,9 +128,8 @@ class BackupUatTest {
         val info = appContext.packageManager.getPackageInfo(appContext.packageName, PackageManager.GET_PERMISSIONS)
         val asked = info.requestedPermissions.orEmpty().toList()
         assertFalse("$asked", Manifest.permission.INTERNET in asked)
-        // vibration only; the voice build adds RECORD_AUDIO from its flavor's manifest
-        val voice = if (VoiceFeature.AVAILABLE) listOf(Manifest.permission.RECORD_AUDIO) else emptyList()
-        assertEquals((listOf(Manifest.permission.VIBRATE) + voice).sorted(), asked.sorted())
+        // vibration, and the microphone for voice input (asked for at its first use)
+        assertEquals(listOf(Manifest.permission.VIBRATE, Manifest.permission.RECORD_AUDIO).sorted(), asked.sorted())
     }
 
     @Test
@@ -143,7 +141,7 @@ class BackupUatTest {
             Manifest.permission.POST_NOTIFICATIONS, Manifest.permission.READ_CONTACTS, Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE,
             Manifest.permission.CAMERA,
-        ) + if (VoiceFeature.AVAILABLE) emptyList() else listOf(Manifest.permission.RECORD_AUDIO)
+        )
         assertTrue("$asked", none.none { it in asked })
     }
 

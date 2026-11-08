@@ -37,10 +37,14 @@ object AppUtil {
      * the user taps it, and a content over the limit is refused (MainActivity).
      */
     fun isLaunchRoute(route: SettingsRoute) = when (route) {
-        SettingsRoute.Keys, SettingsRoute.InputMethodList, SettingsRoute.Theme,
+        SettingsRoute.Keys, SettingsRoute.InputMethodList, SettingsRoute.Theme, SettingsRoute.Packs,
         is SettingsRoute.InputMethodConfig, is SettingsRoute.QuickPhrase -> true
         else -> false
     }
+
+    /** The resource packs' page: from the keyboard without the text pack, voice input without the voice pack. */
+    fun launchMainToPacks(context: Context) =
+        launchMainToDest(context, SettingsRoute.Packs)
 
     fun launchMainToKeyboard(context: Context) =
         launchMainToDest(context, SettingsRoute.Keys)

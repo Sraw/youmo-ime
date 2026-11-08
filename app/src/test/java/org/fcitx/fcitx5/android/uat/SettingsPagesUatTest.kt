@@ -43,13 +43,13 @@ import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
-import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.ui.main.settings.PinyinCustomPhraseFragment
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.ui.main.settings.UserWordsFragment
 import org.fcitx.fcitx5.android.until as waitUntil
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -338,9 +338,9 @@ class SettingsPagesUatTest {
         until("listed") { preferences((page as PreferenceFragmentCompat).preferenceScreen ?: return@until false).size > 3 }
         val prefs = preferences((page as PreferenceFragmentCompat).preferenceScreen)
         val libri = prefs.firstOrNull { it.title == "LibriSpeech" }
-        // the voice build credits it; the text build has no voice model, nor the entry
-        assertEquals(VoiceFeature.AVAILABLE, libri != null)
-        if (libri == null) return
+        // credited in every build: the voice input is (its models the voice pack's)
+        assertNotNull(libri)
+        libri!!
         assertEquals("CC-BY-4.0", libri.summary.toString())
         libri.performClick()
         idle()

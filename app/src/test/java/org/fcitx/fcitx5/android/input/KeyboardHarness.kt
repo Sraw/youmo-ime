@@ -41,6 +41,7 @@ import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.daemon.HostDaemon
+import org.fcitx.fcitx5.android.data.pack.TestShelves
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -103,6 +104,9 @@ class KeyboardHarness(
     init {
         // -PcanvasKeyboard: the canvas draws the keys (060-render-p2 S3), where the test did not choose
         CanvasRun.begin()
+        // both resource packs there, as on a user's phone: without the text pack the keyboard is a
+        // prompt to import it (PackGateView); a test of that, or of voice input's, puts its own
+        TestShelves.use()
         keyboards?.let(::setKeyboards)
         codeRowWas?.let { ThemeManager.prefs.codeRow.setValue(codeRow) }
         val connection = host?.let { HarnessConnection(scope, it) } ?: FakeHostConnection(scope, api)

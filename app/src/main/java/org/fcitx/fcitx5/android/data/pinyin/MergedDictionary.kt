@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.fcitx.fcitx5.android.daemon.HostDaemon
+import org.fcitx.fcitx5.android.data.pack.AppData
+import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.pinyin.dict.SourceNames
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.data.DataFile
@@ -20,7 +22,6 @@ import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.fcitx.fcitx5.android.engine.runtime.BackgroundWork
 import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
-import org.fcitx.fcitx5.android.utils.appContext
 import timber.log.Timber
 import java.io.EOFException
 import java.io.File
@@ -29,7 +30,6 @@ import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.nio.ByteBuffer
-import java.nio.channels.FileChannel
 import java.security.MessageDigest
 import java.util.Collections
 import java.util.concurrent.CancellationException
@@ -175,17 +175,23 @@ object MergedDictionary {
     class Base(val fingerprint: String, val has: () -> (String, IntArray) -> Boolean)
 
     /**
-     * The pinyin data typing reads, mapped from the app's assets: a word it has is kept out of the
-     * merged file's trie, offered from the base alone; none in a test (no assets).
+     * The pinyin data typing reads, the text pack's (AppData): a word it has is kept out of the
+     * merged file's trie, offered from the base alone; none without the pack, nor in a test.
      */
     @Volatile
-    var base: () -> Base? = { assetBase }
+    var base: () -> Base? = { packBase() }
 
-    private val assetBase by lazy { assetBase() }
+    // read once a pack: the text pack imported anew (PackStore's generation) is read again
+    @Volatile
+    private var readBase: Pair<Int, Base?>? = null
 
-    private fun mapped(): ByteBuffer = appContext.assets.openFd(InputMethodCatalog.PINYIN_DATA).use { fd ->
-        FileInputStream(fd.fileDescriptor).channel.use { it.map(FileChannel.MapMode.READ_ONLY, fd.startOffset, fd.length) }
+    private fun packBase(): Base? {
+        val generation = PackStore.state.value.generation
+        readBase?.let { (read, base) -> if (read == generation) return base }
+        return assetBase().also { readBase = generation to it }
     }
+
+    private fun mapped(): ByteBuffer = AppData.map(InputMethodCatalog.PINYIN_DATA)
 
     // its length and a CRC of its ends (the header, the last section's tail): another build's data
     // of the same length is told apart without reading its 100 MB through

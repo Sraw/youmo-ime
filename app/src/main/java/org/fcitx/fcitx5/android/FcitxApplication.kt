@@ -27,6 +27,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.fcitx.fcitx5.android.core.HostConfigDir
 import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
+import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.importedUserDataMarker
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -158,6 +159,11 @@ class FcitxApplication : Application() {
         deleteNotificationChannels(notificationManager, sharedPrefs)
         thread(name = "native-data-cleanup", priority = Thread.MIN_PRIORITY) {
             deleteNativeData(createDeviceProtectedStorageContext().dataDir)
+        }
+        // the resource packs read (an import killed midway cleaned up, the signatures checked) before
+        // the keyboard first asks: it would wait on this on the main thread
+        thread(name = "packs-load") {
+            runCatching { PackStore.warmUp() }.onFailure { Timber.e(it, "resource packs not read") }
         }
         if (!isDirectBootMode) {
             AppPrefs.getInstance().syncToDeviceEncryptedStorage()

@@ -10,11 +10,11 @@ import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineNotices
 import org.fcitx.fcitx5.android.core.EngineState
+import org.fcitx.fcitx5.android.data.pack.AppData
 import org.fcitx.fcitx5.android.engine.handwriting.InkNet
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.handwriting.InkRecognizer
 import org.fcitx.fcitx5.android.handwriting.OrtModel
-import org.fcitx.fcitx5.android.utils.appContext
 import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -25,7 +25,7 @@ import java.util.concurrent.Executors
 /**
  * The handwriting recognizer, run on a thread of its own ([worker]), its readings handed on on
  * the main thread ([main]). [shared] is the app's: its two models (the character's image and its
- * path), mapped from the APK, are opened as the keyboard is first shown ([warmUp]), and kept. Of a
+ * path), mapped from the text pack, are opened as the keyboard is first shown ([warmUp]), and kept. Of a
  * piece's reads, a newer one makes those still waiting stale: they are skipped. An earlier piece's
  * last read is not: it is what that piece shows, and commits. A read of a piece the engine ended
  * ([ended], the latest) is dropped.
@@ -187,12 +187,12 @@ internal class LoadingReader(
     }
 }
 
-/** The recognizer of the app's assets: its models opened and its files read as it loads. */
+/** The recognizer of the text pack's files (AppData): its models opened and its files read as it loads. */
 private object AssetRecognizer {
 
     fun open(opened: MutableList<AutoCloseable>): InkRecognizer = InkRecognizer(
         net("char_image", opened), net("char_path", opened),
-        chars = appContext.assets.open("$DIR/chars.txt").use { it.readBytes().toString(Charsets.UTF_8) },
+        chars = AppData.open("$DIR/chars.txt").use { it.readBytes().toString(Charsets.UTF_8) },
         prior = prior(),
     )
 
@@ -202,13 +202,13 @@ private object AssetRecognizer {
 
     // opened at once, not at its first run: one onnxruntime refuses is found as the recognizer loads
     private fun net(name: String, opened: MutableList<AutoCloseable>): InkNet {
-        val model = OrtModel.open(appContext.assets, "$DIR/$name.ort", THREADS).also(opened::add)
+        val model = OrtModel.open(AppData.map("$DIR/$name.ort"), THREADS).also(opened::add)
         return InkNet { x, shape -> model.run(x, shape).values }
     }
 
     // each character's log frequency, float32 little-endian
     private fun prior(): FloatArray {
-        val b = ByteBuffer.wrap(appContext.assets.open("$DIR/prior.data").use { it.readBytes() }).order(ByteOrder.LITTLE_ENDIAN)
+        val b = ByteBuffer.wrap(AppData.open("$DIR/prior.data").use { it.readBytes() }).order(ByteOrder.LITTLE_ENDIAN)
         return FloatArray(b.remaining() / Float.SIZE_BYTES) { b.getFloat() }
     }
 
