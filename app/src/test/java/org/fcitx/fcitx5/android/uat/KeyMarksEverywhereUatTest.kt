@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.keyboard.canvas.AndroidTextMeasurer
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
+import org.fcitx.fcitx5.android.scene.engine.TextMetrics
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Shape
@@ -203,16 +204,7 @@ class KeyMarksEverywhereUatTest {
         }
         val size = if (least) nominal * KeyMarkYield.MIN_MARK_SCALE else drawn.size
         fun stays(f: Double): Boolean {
-            val m = measurer.measure(symbol, drawn.font, drawn.weight, size * f)
-            val w = m.ink.right - m.ink.left
-            val h = m.bottom - m.top
-            val x = when {
-                slot.left -> face.left + SYMBOL_SIDE_DP * dp
-                slot.right -> face.right - SYMBOL_SIDE_DP * dp - w
-                else -> (face.left + face.right) / 2 - w / 2
-            }
-            val y = if (slot.bottom) face.bottom - (if (slot == KeyMarks.Slot.Below) BELOW_DP * dp else 0.0) - h else face.top
-            val ink = KeyMarkYield.Ink(x, y + m.ink.top - m.top, x + w, y + m.ink.bottom - m.top)
+            val ink = symbolInk(measurer.measure(symbol, drawn.font, drawn.weight, size * f), face, slot, dp)
             val glyph = KeyMarkYield.Ink(label.left.toDouble(), label.top.toDouble(), label.right.toDouble(), label.bottom.toDouble())
             val member = KeyMarkYield.Member(glyph, (glyph.left + glyph.right) / 2, glyph.bottom, listOf(KeyMarkYield.Mark(ink, slot, KeyMarkYield.DROP_SYMBOL)) + others, room, edge, moves = false)
             // the label its class's size, as drawn: no smaller for this key alone
@@ -225,6 +217,19 @@ class KeyMarksEverywhereUatTest {
         while (hi - lo > 1e-3) ((lo + hi) / 2).let { if (stays(it)) lo = it else hi = it }
         val m = measurer.measure(symbol, drawn.font, drawn.weight, size).ink
         return ((1 - lo) * maxOf(m.right - m.left, m.bottom - m.top)).toFloat()
+    }
+
+    // a symbol measured [m] where Content places it in its [slot] on [face]
+    private fun symbolInk(m: TextMetrics, face: Box, slot: KeyMarks.Slot, dp: Double): KeyMarkYield.Ink {
+        val w = m.ink.right - m.ink.left
+        val h = m.bottom - m.top
+        val x = when {
+            slot.left -> face.left + SYMBOL_SIDE_DP * dp
+            slot.right -> face.right - SYMBOL_SIDE_DP * dp - w
+            else -> (face.left + face.right) / 2 - w / 2
+        }
+        val y = if (slot.bottom) face.bottom - (if (slot == KeyMarks.Slot.Below) BELOW_DP * dp else 0.0) - h else face.top
+        return KeyMarkYield.Ink(x, y + m.ink.top - m.top, x + w, y + m.ink.bottom - m.top)
     }
 
     // what [k] draws, none over another; its symbol never left out where 标点位置 draws one
