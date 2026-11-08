@@ -92,6 +92,9 @@ class KeyboardHarness(
 ) : AutoCloseable {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    // the fields' activities, destroyed at [close]
+    private val activities = mutableListOf<org.robolectric.android.controller.ActivityController<Activity>>()
     val api = FakeHostApi().apply { inputMethodEntryCached = im }
     private val controller: ServiceController<FcitxInputMethodService>
     val service: FcitxInputMethodService
@@ -168,7 +171,7 @@ class KeyboardHarness(
         fieldId: Int = 0,
         prefill: (EditText) -> Unit = {},
     ): KeyboardHarness {
-        val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+        val activity = Robolectric.buildActivity(Activity::class.java).setup().also { activities += it }.get()
         field = EditText(activity).also {
             it.inputType = inputType
             it.imeOptions = imeOptions
@@ -781,6 +784,11 @@ class KeyboardHarness(
             addressCounts.setValue("")
             rememberedAddresses.setValue("")
         }
+        // the field's activity destroyed: ActivityThread's list (mActivities) holds every one not destroyed till the
+        // test ends, and with it its window, views and themes, the theme's a quarter MB each in Robolectric's
+        // registry (NATIVE_THEME9_REGISTRY): ThemeMakerLayoutTest's two hundred harnesses in one test, 250 MB
+        activities.forEach { it.close() }
+        activities.clear()
         keyboardsWere?.let(::setKeyboards)
         codeRowWas?.let(ThemeManager.prefs.codeRow::setValue)
         CanvasRun.end()

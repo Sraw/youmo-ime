@@ -52,10 +52,11 @@ class SettingsHarness(
     // put back at close: a keyboard harness still open beside this one keeps its own (TB-18)
     private val before = HostDaemon.testConnection
 
-    private val controller by lazy {
+    private val lazyController = lazy {
         HostDaemon.testConnection = { FakeHostConnection(scope, api, host) }
         Robolectric.buildActivity(MainActivity::class.java, intent).setup().also { idle() }
     }
+    private val controller by lazyController
 
     val activity: MainActivity get() = controller.get()
 
@@ -135,6 +136,16 @@ class SettingsHarness(
     }
 
     override fun close() {
+        // the activity destroyed, its views off the window: else its RecyclerViews stay in GapWorker's list, a
+        // ThreadLocal of the main thread, which lives the whole test JVM (every class of a fork). Through their
+        // window's ViewRootImpl they held each view that ever asked to be drawn on the next frame
+        // (InvalidateOnAnimationRunnable, posted once and never run on the paused looper): the theme page's
+        // previews, rebuilt on each theme preference ThemeMakerLayoutTest set, 78 000 views a window, three
+        // windows a full run's 3 GB out (S4c's gate, the heap dump of 2026-11-07)
+        if (lazyController.isInitialized()) {
+            controller.close()
+            idle()
+        }
         HostDaemon.testConnection = before
         scope.cancel()
     }
