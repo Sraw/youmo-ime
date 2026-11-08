@@ -60,9 +60,11 @@ class KeyCapsTest {
         // a text drawn from its left: its middle, its width about its size a character
         fun middle(t: Op.Text) = t.x + t.size * t.scaleX * 0.3 * t.text.length
         val below = symbol.baseline > letter.baseline
-        val side = middle(symbol) - SIZE / 2.0
+        // the ops at the keyboard key's size the cap stands for (SceneKeyCell.keyboardKeyHeight)
+        val w = cell.scene!!.width
+        val side = middle(symbol) - w / 2.0
         return when {
-            below && kotlin.math.abs(side) < SIZE / 10.0 -> At.Under
+            below && kotlin.math.abs(side) < w / 10.0 -> At.Under
             below && side > 0 -> At.BottomRight
             below -> At.BottomLeft
             side > 0 -> At.TopRight
