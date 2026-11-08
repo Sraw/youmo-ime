@@ -158,6 +158,10 @@ def t960(d):
     tones = sorted((n for n in kb.walk() if n.clickable and n.texts() and n.texts()[0] in "ˉˊˇˋ"), key=lambda n: n.c[1])
     check([n.texts()[0] for n in tones] == list("ˉˊˇˋ"), f"左列 {[n.texts() for n in tones]}")
     slot = k.get("，")
+    # the right column found by its scene ids: the old drawing has none, and shows ? ! ~ half-width though it
+    # types them full-width (the old bug), so this case fails there plainly, never skipped
+    if not any(n.key for n in kb.walk()):
+        check(False, "T9-60 需要新绘制键盘（开发者 → 新绘制键盘）")
     # ? ! ~ by their places: each face as punctuation maps it (060-render-p2 §5.3)
     face = {n.key: n.texts()[0] for n in kb.walk() if n.key in ("r2c5", "r3c5", "r4c5") and n.texts()}
     check(slot is not None and len(face) == 3, f"键 {sorted(k)[:40]}，右列 {face}")
