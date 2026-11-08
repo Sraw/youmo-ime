@@ -7,6 +7,10 @@ package org.fcitx.fcitx5.android.engine.runtime
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
+import org.fcitx.fcitx5.android.engine.learn.control.BlockScope
+import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
+import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
+import org.fcitx.fcitx5.android.engine.learn.control.MenuItem
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.user.WordListFiles
 import org.junit.Assert.assertEquals
@@ -69,6 +73,77 @@ class EnginesUserWordsTest {
             again.removeWord(blocked)
             assertEquals(listOf("你", "拟"), again.type(InputMethodCatalog.PINYIN, "ni").candidates)
             assertEquals(emptyList<UserWord>(), again.userWords())
+        }
+    }
+
+    // 啊之 (a zhi) the user reported: a sentence of words, no word itself, blocked as the whole of it
+    @Test
+    fun aSentenceBlockedFromTheKeyboardIsNeverOfferedAgainTillUnblocked() {
+        val dir = MemoryFiles()
+        val blocked = UserWord("你好", "ni hao", UserWord.Kind.BLOCKED)
+        Engines(::load, dir).use { engines ->
+            val shown = engines.type(InputMethodCatalog.PINYIN, "nihao").candidates
+            assertEquals("你好", shown.first())
+            val menu = engines.learning(InputMethodCatalog.PINYIN, LearningOp.Menu(0, "你好")) as LearningResult.Menu
+            assertEquals(listOf(MenuItem.BLOCK, MenuItem.PIN, MenuItem.WHY), menu.items)
+            assertEquals(BlockScope.EVERYWHERE, menu.scope)
+            // blocked, and the block taken back by its undo, then blocked again
+            val done = engines.learning(InputMethodCatalog.PINYIN, LearningOp.Block(0, "你好")) as LearningResult.Done
+            assertFalse("你好" in engines.candidates(InputMethodCatalog.PINYIN, 0, 10).map { it.text })
+            engines.learning(InputMethodCatalog.PINYIN, LearningOp.Undo(done.undo))
+            assertEquals(emptyList<UserWord>(), engines.userWords())
+            engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
+            assertEquals("你好", engines.type(InputMethodCatalog.PINYIN, "nihao").candidates.first())
+            val after = engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.BLOCK, 0).candidates
+            assertFalse(after.toString(), "你好" in after)
+            // its words are not: each still offered alone
+            assertTrue(after.toString(), "你" in after)
+            engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
+            assertEquals(listOf(blocked), engines.userWords())
+            assertEquals(listOf("你", "拟"), engines.type(InputMethodCatalog.PINYIN, "ni").candidates)
+            engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
+            assertEquals(listOf("好"), engines.type(InputMethodCatalog.PINYIN, "hao").candidates)
+            engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
+        }
+        // kept in the user directory
+        Engines(::load, dir).use { again ->
+            assertFalse("你好" in again.type(InputMethodCatalog.PINYIN, "nihao").candidates)
+            again.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
+            again.removeWord(blocked)
+            assertEquals("你好", again.type(InputMethodCatalog.PINYIN, "nihao").candidates.first())
+            assertEquals(emptyList<UserWord>(), again.userWords())
+        }
+    }
+
+    // the same in 双拼 and on the nine keys: the sentence as it reads, the keys' readings alike
+    @Test
+    fun aSentenceIsBlockedOnEveryPinyinKeyboard() {
+        for ((im, keys) in listOf(InputMethodCatalog.SHUANGPIN to "nihk", InputMethodCatalog.T9 to "64426")) {
+            Engines(::load, MemoryFiles()).use { engines ->
+                assertEquals(im, "你好", engines.type(im, keys).candidates.first())
+                assertTrue(im, Offer.BLOCK in engines.offers(im, 0))
+                assertFalse(im, "你好" in engines.onEvent(im, EngineEvent.BLOCK, 0).candidates)
+                engines.onEvent(im, EngineEvent.RESET, 0)
+                assertFalse(im, "你好" in engines.type(im, keys).candidates)
+                engines.onEvent(im, EngineEvent.RESET, 0)
+                engines.removeWord(engines.userWords().single())
+                assertEquals(im, "你好", engines.type(im, keys).candidates.first())
+            }
+        }
+    }
+
+    // blocked as it reads: 行好 blocked at xing hao is still offered at hang hao
+    @Test
+    fun aSentenceIsBlockedAtItsReadingAlone() {
+        Engines(::load, MemoryFiles()).use { engines ->
+            val at = engines.type(InputMethodCatalog.PINYIN, "xinghao").candidates.indexOf("行好")
+            assertTrue(at >= 0)
+            engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.BLOCK, at)
+            engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
+            assertEquals(listOf(UserWord("行好", "xing hao", UserWord.Kind.BLOCKED)), engines.userWords())
+            assertFalse("行好" in engines.type(InputMethodCatalog.PINYIN, "xinghao").candidates)
+            engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
+            assertTrue("行好" in engines.type(InputMethodCatalog.PINYIN, "hanghao").candidates)
         }
     }
 

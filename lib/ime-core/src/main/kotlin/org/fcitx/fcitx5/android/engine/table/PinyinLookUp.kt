@@ -107,7 +107,7 @@ internal class PinyinLookUp(
             ends.left(action)
         }
         // not offered (see offers)
-        is Action.Pin, is Action.Unpin, is Action.Block -> lookedUp ?: idle()
+        is Action.Pin, is Action.Unpin -> lookedUp ?: idle()
         is Action.Cursor, is Action.Step -> if (keys.isNotEmpty()) fromPinyin(pinyin.apply(action)) else idle()
         // the key alone: nothing to pick, and space drops it
         is Action.Select -> if (keys.isNotEmpty()) fromPinyin(pinyin.apply(action)) else {
@@ -198,7 +198,8 @@ internal class PinyinLookUp(
 
     override fun candidates(from: Int, count: Int): List<Choice> = pinyin.candidates(from, count).map { Choice(it.text, codeOf(it.text).orEmpty()) }
 
-    override fun offers(index: Int): Set<Offer> = pinyin.offers(index).intersect(setOf(Offer.FORGET))
+    // blocked as pinyin blocks it, the keys being pinyin's; not pinned, the pin being the table's code's
+    override fun offers(index: Int): Set<Offer> = pinyin.offers(index).intersect(setOf(Offer.FORGET, Offer.BLOCK))
 
     override fun why(index: Int): Why? = pinyin.why(index)
 

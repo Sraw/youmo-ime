@@ -213,6 +213,28 @@ class EnginesTableTest {
         assertTrue(codes.toString(), codes.none { it.kind == Kinds.table("engine-wubi") })
     }
 
+    // a character looked up by pinyin in 五笔 is blocked as full pinyin blocks it, and comes back unblocked
+    @Test
+    fun whatIsLookedUpByPinyinIsBlockedAsFullPinyinBlocksIt() {
+        Engines(::load, MemoryFiles()).use { engines ->
+            fun lookedUp(): List<String> {
+                engines.type("engine-wubi", "zni")
+                return engines.candidates("engine-wubi", 0, 9).map { it.text }
+            }
+            val at = lookedUp().indexOf("你")
+            assertTrue(Offer.BLOCK in engines.offers("engine-wubi", at))
+            assertFalse(Offer.PIN in engines.offers("engine-wubi", at))
+            engines.onEvent("engine-wubi", EngineEvent.BLOCK, at)
+            engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
+            assertFalse("你" in lookedUp())
+            engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
+            val blocked = engines.userWords(UserWord.Kind.BLOCKED).single()
+            assertEquals("你", blocked.text)
+            engines.removeWord(blocked)
+            assertTrue("你" in lookedUp())
+        }
+    }
+
     // U-93 (review-int M3): 不用我的输入习惯 holds in a table's lookup by pinyin too: nothing learned, nor 删除 offered of what was
     @Test
     fun aLookUpByPinyinWithHabitsOffLearnsNothingAndForgetsNothing() {

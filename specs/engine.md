@@ -378,7 +378,7 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
 `LearningOp.MenuItem`s and `LearningMenu.rows` into the rows shown: `DELETE` (删除 on the user's or an
 imported word, 忘掉学到的 on a dictionary's: what was learned of its text, everywhere), `BLOCK` (屏蔽,
 its scope stated first: everywhere, or for a table under the code typed alone; into the block list,
-which the settings can undo; it unpins the text everywhere), `PIN` (固定首位: first under the keys of
+which the settings can undo; it unpins the text everywhere; a sentence of several words, 啊之 at a zhi, is blocked whole as it reads, its text and syllables one entry (`WordLists`, `UserModel.blockedEntries`) that no id stands for, which `PinyinSession.place` leaves out (`UserModel.blocksSentence`), its words offered alone still; `PinyinLookUp` offers pinyin's block, not its pin), `PIN` (固定首位: first under the keys of
 its own span, in the learning record; the custom phrases are untouched; not for handwriting), `UNPIN`,
 `DELETE_PHRASE` (从自定义词组中删除, on a custom phrase: `PhraseBook.remove`, a built-in one turned off,
 no undo), `NO_PREDICT` (不再联想, on a 联想), `WHY` (为什么排在这; not for English, nor a phrase alone). Each has conditions (`PinyinSession.forgettable/pinnable/blockable`), and none

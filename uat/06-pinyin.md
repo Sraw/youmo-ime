@@ -175,6 +175,13 @@
 - **预期**：确认框写明范围（以后打字、手写、语音、联想都不再出现「是」）；之后候选里没有「是」。（测完在 **词库与短语 → 用户词库 → 屏蔽的词** 里恢复，或重置。）
 - **JVM**：`CandidateMenuUatTest.blockingAWordSaysWhereAndAsksFirst`（菜单、确认框写明范围（R.string.learning_block_everywhere）、确认后发出屏蔽；之后候选里没有「是」是引擎的事（学习的测试））；设备上不跑。
 
+### PY-114 [P0] 屏蔽一个整句候选，组成它的字照常出
+<!-- learning: U-82 -->
+- **前提**：B0。
+- **操作**：点 a z h i，找到几个字拼成的候选「啊之」（不是词库里的一个词），长按，看菜单；选 **屏蔽**，确认；清空，再点 a z h i；再分别点 a、z h i；然后在 **词库与短语 → 用户词库 → 屏蔽的词** 里恢复「啊之」，再点 a z h i。
+- **预期**：菜单里有 **屏蔽**；屏蔽后 a z h i 下没有「啊之」，a 下有「啊」，z h i 下有「之」；屏蔽的词里列着「啊之 a zhi」；恢复后 a z h i 下又有「啊之」。双拼、九键打同样的拼音一样。
+- **JVM**：`EnginesUserWordsTest.aSentenceBlockedFromTheKeyboardIsNeverOfferedAgainTillUnblocked`（菜单有屏蔽，屏蔽、撤销、再屏蔽，组成它的字照常出，存进用户目录，在设置里恢复后又出）、`aSentenceIsBlockedOnEveryPinyinKeyboard`（双拼、九键）、`aSentenceIsBlockedAtItsReadingAlone`（只屏蔽这个读音）；菜单写成的字见 PY-29。设备上待跑。
+
 ### PY-31 [P1] 固定首位，再取消固定
 <!-- learning: U-83 -->
 - **前提**：B0。

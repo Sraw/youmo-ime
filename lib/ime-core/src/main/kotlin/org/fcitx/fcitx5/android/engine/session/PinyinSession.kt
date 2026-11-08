@@ -594,14 +594,14 @@ class PinyinSession(
         return snapshot()
     }
 
-    // a word, not a sentence of them: blocking every word of one would block common ones; and not
-    // where nothing is to be kept, as the word blocked is
-    private fun blockable(c: Candidate) = learning && block != null && user != null && entries(c)?.size == 1
+    // a word, or a sentence of them blocked whole (啊之): blocking each of its words would block common
+    // ones; not text kept as typed, nor where nothing is to be kept, as the word blocked is
+    private fun blockable(c: Candidate) = learning && block != null && user != null && entries(c) != null
 
     private fun block(index: Int): Snapshot {
         val c = candidates.getOrNull(index)
-        val word = if (user == null || c == null) null else entries(c)?.singleOrNull()
-        if (word == null || block == null || !learning) return snapshot()
+        val word = c?.takeIf { user != null && learning }?.let(::entries)?.let { it.singleOrNull() ?: Entry.of(c.text, it) }
+        if (word == null || block == null) return snapshot()
         block.invoke(word)
         if (before() == word) dropContext()
         decoder.reset()
@@ -612,9 +612,9 @@ class PinyinSession(
      * How each word of [c], of the input read last, reads; null if some is text kept as typed.
      * A prediction read no input: its likeliest reading.
      */
-    private fun entries(c: Candidate): List<Entry>? {
+    private fun entries(c: Candidate, graph: SyllableGraph? = lastRead.decoded?.graph): List<Entry>? {
         if (predicting) return predictions.entryOf(c)?.let(::listOf)
-        val graph = lastRead.decoded?.graph ?: return null
+        graph ?: return null
         var from = graph.start
         return c.words.indices.map { i ->
             val word = c.words[i]
@@ -859,7 +859,8 @@ class PinyinSession(
         // a phrase is text, no word: nothing to learn, and what follows it reads after nothing; so are
         // the emoji and the characters by their parts, placed before the phrases so each is where its order says
         val asText = { text: String -> Candidate(text, rest, 0f, intArrayOf(NO_WORD), intArrayOf(rest)) }
-        val ordered = habitOrder.order(decoded.graph, (decoded.sentences + decoded.words).distinctBy { it.text }, decoded.sentences, decoded.levels, pageSize)
+        // a sentence the user blocked whole as it reads (its words blocked one by one are the decoder's to leave out)
+        val ordered = habitOrder.order(decoded.graph, (decoded.sentences + decoded.words).distinctBy { it.text }.filterNot { c -> c.words.size > 1 && user?.blocksSentence(c.text) { entries(c, decoded.graph) } == true }, decoded.sentences, decoded.levels, pageSize)
         val read = ordered.list
         // a phrase of order k a place down where a pin leads: the pin stays first (U-83)
         val withPhrases = { list: List<Candidate> ->
