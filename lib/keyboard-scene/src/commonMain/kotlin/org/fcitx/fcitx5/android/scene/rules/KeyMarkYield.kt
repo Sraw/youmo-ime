@@ -276,6 +276,17 @@ object KeyMarkYield {
         return Settled(glyph, marks.indices.map { i -> shown.indexOf(i).takeIf { it >= 0 }?.let { apart[it]?.ink } })
     }
 
+    /**
+     * [key] as [onto] settled it ([settled]), its glyph then moved to [glyph] (back within its room, rules B §8a):
+     * as it was where no mark kept meets the glyph there; else the marks kept, as large as [board] has them, placed
+     * again about the glyph where it is now, the glyph not moving, those still meeting it left out (060-render-p2 S7a).
+     */
+    fun again(key: Member, glyph: Ink, board: Board, settled: Settled, gap: Double): Settled {
+        if (settled.marks.none { it != null && it.meets(glyph, gap) }) return settled.copy(glyph = glyph)
+        val marks = key.marks.mapIndexed { i, m -> settled.marks[i]?.let { m.scaled(board.markScale(m)).within(key.edge) } }
+        return settle(key.copy(moves = false), glyph, marks, gap)
+    }
+
     // this mark's size: [t] if of the class [symbol] (both if null), else [u]
     private fun Mark.sizeIn(t: Double, u: Double, symbol: Boolean?) = if (symbol == null || (drop == DROP_SYMBOL) == symbol) t else u
 

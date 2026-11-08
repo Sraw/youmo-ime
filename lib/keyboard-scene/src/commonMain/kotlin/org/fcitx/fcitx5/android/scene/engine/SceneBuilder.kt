@@ -132,7 +132,7 @@ class SceneBuilder(
         val keyed = placed.mapNotNull { p -> (p.item as? ExpandedKey)?.let { p to it } }
         val styled = phases.section("cascade.of") { keyed.map { (_, k) -> styled(layout.id, k) } }
         val shaped = phases.section("faces") { keyed.mapIndexed { i, (p, k) -> shaped(p, k, styled[i]) } }
-        val keys = phases.section("content") { keyed.mapIndexed { i, (p, k) -> prepare(p, k, styled[i], shaped[i]) } }
+        val keys = phases.section("content") { keyed.mapIndexed { i, (p, k) -> prepare(p, k, styled[i], shaped[i], warnings) } }
         // the same keys with their edges where they fall, not on whole pixels: what the marks' yields are
         // worked out on (060-render-p2 S4e), so a pixel's rounding never turns a choice; drawn on the above
         val loose = phases.section("loose") {
@@ -264,10 +264,10 @@ class SceneBuilder(
         return styled.looks.mapValues { (_, look) -> Faces.of(placed.cell, look, face, margin, flat, env.density) }
     }
 
-    private fun prepare(placed: Placed, key: ExpandedKey, styled: Styled, geometry: Map<Set<KeyState>, FaceGeometry>): Prepared {
+    private fun prepare(placed: Placed, key: ExpandedKey, styled: Styled, geometry: Map<Set<KeyState>, FaceGeometry>, warnings: Problems): Prepared {
         val looksNow = Looks(styled.parts.getValue(styled.states))
         val g = geometry.getValue(styled.states)
-        val drawn = fitted(content.of(key, placed.cell, g.content, looksNow, g))
+        val drawn = fitted(content.of(key, placed.cell, g.content, looksNow, g), warnings)
         return Prepared(placed, key, styled.states, styled.looks, styled.parts, geometry, drawn)
     }
 
@@ -292,8 +292,11 @@ class SceneBuilder(
         val out = arrayOfNulls<Settled>(keys.size)
         members.forEachIndexed { n, i ->
             val c = keys[i].content
-            val s = KeyMarkYield.onto(member(c), member(loose[i]), board, board.keys[n])
-            val glyph = c.glyphClass?.takeIf { c.yields }?.let { c.glyph?.let { g -> within(g.drawnAt(s.glyph.toBox(), board.scales.getValue(it.ordinal), g.grows(measurer)), c.room) } } ?: c.glyph
+            val onto = KeyMarkYield.onto(member(c), member(loose[i]), board, board.keys[n])
+            val drawn = c.glyphClass?.takeIf { c.yields }?.let { c.glyph?.drawnAt(onto.glyph.toBox(), board.scales.getValue(it.ordinal), c.glyph.grows(measurer)) }
+            val glyph = drawn?.let { within(it, c.room) } ?: c.glyph
+            // moved back within its room: its marks placed again where one it kept meets it there
+            val s = if (drawn != null && glyph !== drawn) KeyMarkYield.again(member(c), glyph!!.ink.toInk(), board, onto, gap) else onto
             out[i] = Settled(glyph, c.marks.mapIndexed { j, m -> s.marks[j]?.let { m.drawn.drawnAt(it.toBox(), board.markScale(mark(m)), m.drawn.grows(measurer)) } })
         }
         keys.forEachIndexed { i, k ->
@@ -310,7 +313,7 @@ class SceneBuilder(
     // size drawn (§8b). One that fits but whose ink stands out of the room (a text centred by its advance, its
     // ink off to one side: （#-_-)┯━┯) moved the least way back into it. What is cut off is not shown, and what
     // is shown is what the key types.
-    private fun fitted(c: KeyContent): KeyContent {
+    private fun fitted(c: KeyContent, warnings: Problems? = null): KeyContent {
         val g = c.glyph
         if (g == null || g.texts.isEmpty() || g.ink.width <= 0) return c
         val classed = c.yields && c.glyphClass != null
@@ -318,13 +321,14 @@ class SceneBuilder(
         val py = if (classed && c.glyphClass == GlyphClass.Main) c.baseline else g.ink.centerY
         // wider than the room still (the class to take it in): its ink's middle the room's, so the class, smaller
         // about it, leaves it within on both sides
-        val placed = within(alone(g, c.room, least, py), c.room)
+        val placed = within(alone(g, c.room, least, py, warnings), c.room)
         return if (placed === g) c else KeyContent(placed, c.marks, c.room, c.glyphClass, c.baseline, c.yields, c.edge)
     }
 
     // [g] shrunk alone about (the room's middle, [py]) as far as its ink measured at [least] (its class's most:
-    // what the class's ask sees) is within [room]; as it is where it is so already
-    private fun alone(g: Drawn, room: Box, least: Double, py: Double): Drawn {
+    // what the class's ask sees) is within [room]; as it is where it is so already. Not within it even at
+    // [FIT_LEAST] of the first guess (a font's ink that grows as it shrinks): that size, and a warning in [warnings]
+    private fun alone(g: Drawn, room: Box, least: Double, py: Double, warnings: Problems? = null): Drawn {
         val grows = g.grows(measurer)
         // shrunk by [s], its ink as drawn at that size (§8b)
         fun shrunk(s: Double): Drawn {
@@ -348,7 +352,9 @@ class SceneBuilder(
             val m = (lo + hi) / 2
             if (fits(shrunk(m))) lo = m else hi = m
         }
-        return shrunk(lo)
+        val out = shrunk(lo)
+        if (!fits(out)) warnings?.add(0, "label ${g.texts.joinToString("") { it.text }} not within its room at its least size (rules B §8a)")
+        return out
     }
 
     // rules B §8a's last word: a label's ink as drawn at its class's size (§8b: not even about its middle) moved

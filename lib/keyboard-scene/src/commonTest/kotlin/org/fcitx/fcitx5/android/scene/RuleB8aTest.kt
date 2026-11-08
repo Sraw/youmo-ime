@@ -188,7 +188,6 @@ class RuleB8aTest {
     fun aLabelShrunkToItsRoomHasTheMarksOfOneThatWideRuleB8a() {
         // q's label four q's: past the class's cap, shrunk alone to its room (the letters at the cap)
         fun board(attrs: String) = LayoutReader.layout(Fixtures.qwertySource.replace("label=\"{case:q}\"", "label=\"qqqq\"$attrs")).ok()
-        val low = env.copy(height = 400.0)
         // the fake font, but the four q's line as tall at any size: placed on one baseline whatever their size, so
         // the two keys' glyphs differ in nothing but how they came to their size
         val tall = FakeMeasurer.measure("qqqq", "system", 400, 23 * d)
@@ -199,21 +198,44 @@ class RuleB8aTest {
                 return TextMetrics(f.advance, f.ink, tall.top, tall.bottom)
             }
         }
-        fun scene(l: org.fcitx.fcitx5.android.scene.layout.Layout) = SceneBuilder(Fixtures.materialLight, low, m).build(l).ok()
-        val wide = scene(board(""))
-        val q = texts(wide, "q").single { it.text == "qqqq" }
-        val room = face(wide, "q").let { it.width - 4 * d }
-        // the fake font: four Latin letters 2.4 of the size across, ink 0.05 of it in from each side
-        near(room, 2.3 * q.size, "shrunk to the room")
-        // the same label as large as the layout gives it as makes it that size at the class's cap (the letters'
-        // class there as here): never shrunk alone
-        val dp = (q.size / d / (1 - KeyMarkYield.MAX_CLASS_SHRINK)).toString().let { it.take(it.indexOf('.') + 10) }
-        val asWide = scene(board(" text-size=\"$dp\""))
-        near(q.size, texts(asWide, "q").single { it.text == "qqqq" }.size, "as large")
         // to a thousandth of a px (the size written to nine places)
         fun r(v: Double) = kotlin.math.round(v * 1000) / 1000
         fun mark(s: Scene) = texts(s, "q").filter { it.text != "qqqq" }.map { it.copy(x = r(it.x), baseline = r(it.baseline), size = r(it.size)) }
-        assertEquals(1, mark(wide).size, "a symbol")
-        assertEquals(mark(asWide), mark(wide))
+        for (height in listOf(240.0, 300.0, 360.0, 400.0, 500.0)) {
+            val low = env.copy(height = height)
+            fun scene(l: org.fcitx.fcitx5.android.scene.layout.Layout) = SceneBuilder(Fixtures.materialLight, low, m).build(l).ok()
+            val wide = scene(board(""))
+            val q = texts(wide, "q").single { it.text == "qqqq" }
+            val room = face(wide, "q").let { it.width - 4 * d }
+            // the fake font: four Latin letters 2.4 of the size across, ink 0.05 of it in from each side
+            near(room, 2.3 * q.size, "shrunk to the room at $height")
+            // the same label as large as the layout gives it as makes it that size at the class's cap (the letters'
+            // class there as here): never shrunk alone
+            val dp = (q.size / d / (1 - KeyMarkYield.MAX_CLASS_SHRINK)).toString().let { it.take(it.indexOf('.') + 10) }
+            val asWide = scene(board(" text-size=\"$dp\""))
+            near(q.size, texts(asWide, "q").single { it.text == "qqqq" }.size, "as large at $height")
+            // the two keys alike at every height; at 320 and lower the symbol too crowded on both, dropped on both
+            assertEquals(mark(asWide), mark(wide), "at $height")
+            if (height >= 360) assertEquals(1, mark(wide).size, "a symbol at $height")
+        }
+    }
+
+    // a label whose ink never comes within its room however small (a font's that does not shrink): drawn at the
+    // least the search reaches, and said in the scene's warnings
+    @Test
+    fun aLabelNeverWithinItsRoomIsAWarningRuleB8a() {
+        val board = LayoutReader.layout(Fixtures.qwertySource.replace("label=\"{case:q}\"", "label=\"qqqq\"")).ok()
+        val m = object : TextMeasurer {
+            override fun measure(text: String, font: String, weight: Int, size: Double): TextMetrics {
+                val f = FakeMeasurer.measure(text, font, weight, size)
+                if (text != "qqqq") return f
+                // as wide as the whole board at any size
+                return TextMetrics(env.width, Box(0.0, f.ink.top, env.width, f.ink.bottom), f.top, f.bottom)
+            }
+        }
+        val scene = SceneBuilder(Fixtures.materialLight, env, m).build(board).ok()
+        assertTrue(scene.warnings.any { "qqqq" in it.message }, "${scene.warnings}")
+        val fine = SceneBuilder(Fixtures.materialLight, env, FakeMeasurer).build(board).ok()
+        assertTrue(fine.warnings.none { "qqqq" in it.message }, "${fine.warnings}")
     }
 }

@@ -56,6 +56,29 @@ class KeyMarkYieldTest {
     // a glyph as tall as the key, over the top right icon's room by [over] dp
     private fun tall(k: Key, over: Double) = Ink(k.room.left, -k.h / 8, k.room.right - k.size - 1.0 * k.d + over * k.d, k.h * 9 / 8)
 
+    // a glyph moved back within its room after the yield (SceneBuilder's within, rules B §8a, 060-render-p2 S7a): its
+    // marks as they were where none meets it there; else placed again about it, none meeting it, the glyph unmoved
+    @Test
+    fun aGlyphMovedBackIntoItsRoomHasItsMarksPlacedAgain() {
+        for (d in densities) {
+            val k = Key(30 * d, 40 * d, d, 4.0)
+            val marks = listOf(k.mark(Slot.TopRight, KeyMarkYield.DROP_SYMBOL), k.mark(Slot.BottomLeft))
+            val member = k.letter(k.glyph(10 * d, 10 * d), marks)
+            val board = KeyMarkYield.board(listOf(member), 1.0 * d)
+            val settled = board.keys.single()
+            assertEquals(marks.map { it.ink }, settled.marks, "kept at $d")
+            // moved a little: none meets it, the marks as they were
+            val little = settled.glyph.moved(1.0 * d, 0.0)
+            assertEquals(settled.copy(glyph = little), KeyMarkYield.again(member, little, board, settled, 1.0 * d), "a little at $d")
+            // moved up into the top right symbol's corner: it gives way (or is left out), never meets the glyph
+            val far = Ink(k.room.right - 14 * d, k.room.top, k.room.right, k.room.top + 10 * d)
+            val again = KeyMarkYield.again(member, far, board, settled, 1.0 * d)
+            assertEquals(far, again.glyph, "unmoved at $d")
+            assertTrue(again.marks.filterNotNull().none { it.meets(far, 1.0 * d) }, "none meets at $d: ${again.marks}")
+            assertEquals(marks[1].ink, again.marks[1], "the bottom left as it was at $d")
+        }
+    }
+
     @Test
     fun nothingMovesWhileNothingMeets() {
         for (d in densities) {
