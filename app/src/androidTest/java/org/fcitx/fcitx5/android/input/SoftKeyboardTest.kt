@@ -552,6 +552,9 @@ class SoftKeyboardTest {
         /** What the device and fcitx had before, put back after the class. */
         var originalDeviceIme: String? = null
         var wasEnabled = false
+        // the system's list as it was: selectThisInputMethod's disable and enable move this input method to its end
+        // and drop its subtypes there, which `ime disable` alone does not put back
+        var enabledIms: String? = null
         var spellChecker: String? = null
         // whether rememberDeviceIme got as far as turning it off: JUnit runs @AfterClass after a failed @BeforeClass too
         var spellCheckerOff = false
@@ -571,7 +574,8 @@ class SoftKeyboardTest {
             originalDeviceIme = shell("settings get secure default_input_method").takeIf { it.isNotEmpty() && it != "null" }
             // "pkg/.Short;subtype:pkg/full.Name" -- compared as components, subtypes dropped
             val self = ComponentName.unflattenFromString(imeId)
-            wasEnabled = shell("settings get secure enabled_input_methods").split(':')
+            enabledIms = shell("settings get secure enabled_input_methods").takeIf { it.isNotEmpty() && it != "null" }
+            wasEnabled = enabledIms.orEmpty().split(':')
                 .any { ComponentName.unflattenFromString(it.substringBefore(';')) == self }
             // the system's spell checker (on in AOSP images, as redroid) underlines "ab", and a tap
             // on it opens its suggestions over the field, which takes the next tap on a key
@@ -625,7 +629,9 @@ class SoftKeyboardTest {
                 // the record goes before onDestroy has run on this process's main thread
                 instrumentation.waitForIdleSync()
             } finally {
-                // also where this app is the device's input method (returned above) or a restore failed
+                // also where this app is the device's input method (returned above) or a restore failed; no spaces
+                // in it, and executeShellCommand passes no shell, so unquoted
+                enabledIms?.let { shell("settings put secure enabled_input_methods $it") }
                 if (spellCheckerOff) {
                     if (spellChecker == null) shell("settings delete secure spell_checker_enabled")
                     else shell("settings put secure spell_checker_enabled $spellChecker")
