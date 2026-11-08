@@ -517,6 +517,7 @@ key confirm kind=enter role=confirm a11y="确定"
   actions send="sym:Return"
   text label="确定"
   sound=return shortcut="return"
+  menu "Emoji" icon=emoji do="picker:"
   normal
     shadow rect(925.88,545.38,1072.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(925.88,545.38,1072.13,683.63 r=10.5,10.5,10.5,10.5) #ff5cb5ab

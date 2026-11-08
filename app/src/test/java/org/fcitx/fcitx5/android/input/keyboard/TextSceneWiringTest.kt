@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 import android.text.InputType
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.InputFeedbacks
+import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -26,6 +27,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -61,8 +63,15 @@ class TextSceneWiringTest {
             h.idle()
             h.relayout()
             val k = KeyboardHarness.all(h.keyboard).filterIsInstance<TextKeyboard>().single()
+            // a code typed: a table's keyboard shows 确定 (confirm) in Return's place
+            if (composing) {
+                k.onReturnDrawableUpdate(ReturnKeyAppearance.Enter.copy(composing = true))
+                h.relayout()
+            }
             val scene = KeyboardHarness.all(k).filterIsInstance<KeyboardCanvasView>().single().scene!!
             val old = TextKeyboard.Layout.flatten().associateBy { it.name }
+            val wasLines = mutableListOf<String>()
+            val nowLines = mutableListOf<String>()
             for (node in scene.keys) {
                 val was = old[node.id] ?: error("$form ${node.id}: no view's key")
                 val now = k.sceneKey(node)!!.def as SceneKeyDef
@@ -79,7 +88,11 @@ class TextSceneWiringTest {
                 assertEquals(at, was is SpaceKey, now.isSpace)
                 assertEquals(at, was is BackspaceKey, now.isBackspace)
                 assertEquals(at, was !is BlankKey, k.sceneKey(node)!!.keyEnabled)
+                val sound = if (node.id == "confirm") InputFeedbacks.SoundEffect.Return else was.appearance.soundEffect
+                wasLines += WiringSnapshot.line(node.id, was.shortcut, was.swipesBothWays, actions(was, letter), popups(was, letter), sound, was is SpaceKey, was is BackspaceKey, was !is BlankKey)
+                nowLines += WiringSnapshot.line(node.id, now.shortcut, now.swipesBothWays, actions(now, letter), popups(now, letter), now.sound, now.isSpace, now.isBackspace, k.sceneKey(node)!!.keyEnabled)
             }
+            WiringSnapshot.check("qwerty-${form.replace(' ', '-')}", wasLines, nowLines)
             EngineState.syllablesState.value = EngineState.SyllableState()
             scene.keys.map { it.id }.toSet()
         }
@@ -108,7 +121,7 @@ class TextSceneWiringTest {
         val ids = compare("wubi", entry(InputMethodCatalog.WUBI, "五笔"), TableKeyboard(InputMethodCatalog.WUBI, emptySet(), false, KeyLabels.NAMES, TableRoots.WUBI86))
         assertTrue(ids.toString(), "lookup" in ids)
         val on = compare("wubi on", entry(InputMethodCatalog.WUBI, "五笔"), TableKeyboard(InputMethodCatalog.WUBI, emptySet(), true, KeyLabels.NAMES, TableRoots.WUBI86), composing = true)
-        assertTrue(on.toString(), "lookup-on" in on)
+        assertTrue(on.toString(), "lookup-on" in on && "confirm" in on)
     }
 
     @Test
@@ -224,7 +237,7 @@ class TextSceneWiringTest {
             is KeyDef.Popup.Preview -> "bubble ${p.content}"
             is KeyDef.Popup.Keyboard.Explicit -> "keys ${p.items.toList()} ${p.symbolsFrom} ${p.asIs} ${p.inRow}"
             is KeyDef.Popup.Keyboard.Preset -> "preset ${if (letter) p.label.lowercase() else p.label} ${p.transformPunctuation}"
-            is KeyDef.Popup.Menu -> "menu " + p.items.map { "${it.label} ${it.icon} ${it.action}" }
+            is KeyDef.Popup.Menu -> "menu " + p.items.map { "${it.label} ${RuntimeEnvironment.getApplication().resources.getResourceEntryName(it.icon)} ${it.action}" }
             else -> "$p"
         }
     }.toSet()

@@ -96,6 +96,10 @@
       </menu>
     </key>
     <key id="confirm" role="confirm" kind="enter" face="keep" width="1.5" label="{confirm}" text-size="16" text-style="bold"
-         sound="return" send="sym:Return" shortcut="return" when="composing table"/>
+         sound="return" send="sym:Return" shortcut="return" when="composing table">
+      <menu>
+        <item label="Emoji" icon="emoji" do="picker:"/>
+      </menu>
+    </key>
   </row>
 </keyboard>

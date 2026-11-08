@@ -275,6 +275,8 @@ class NineSceneGesturesTest {
             val old = olds.getValue(name).flatten().filter { it.name != "side" && it.behaviors.isNotEmpty() }.associateBy { idOf(it) }
             val shown = canvas.scene!!.keys
             assertEquals(name, old.keys, shown.map { it.id }.toSet())
+            val wasLines = mutableListOf<String>()
+            val nowLines = mutableListOf<String>()
             for (node in shown) {
                 val was = old.getValue(node.id)
                 val now = k.sceneKey(node)!!.def as SceneKeyDef
@@ -291,7 +293,10 @@ class NineSceneGesturesTest {
                 assertEquals(at, was is SpaceKey, now.isSpace)
                 assertEquals(at, was is BackspaceKey, now.isBackspace)
                 assertEquals(at, was !is BlankKey, k.sceneKey(node)!!.keyEnabled)
+                wasLines += WiringSnapshot.line(node.id, was.shortcut, was.swipesBothWays, actions(was) + long, popups(was), was.appearance.soundEffect, was is SpaceKey, was is BackspaceKey, was !is BlankKey)
+                nowLines += WiringSnapshot.line(node.id, now.shortcut, now.swipesBothWays, actions(now), popups(now), now.sound, now.isSpace, now.isBackspace, k.sceneKey(node)!!.keyEnabled)
             }
+            WiringSnapshot.check("nine-${name.replace(' ', '-')}", wasLines, nowLines)
         }
     }
 
@@ -344,7 +349,7 @@ class NineSceneGesturesTest {
             is KeyDef.Popup.Preview -> "bubble ${p.content}"
             is KeyDef.Popup.Keyboard.Explicit -> "keys ${p.items.toList()} ${p.symbolsFrom} ${p.asIs} ${p.inRow}"
             is KeyDef.Popup.Keyboard.Preset -> "preset $p"
-            is KeyDef.Popup.Menu -> "menu " + p.items.map { "${it.label} ${it.icon} ${it.action}" }
+            is KeyDef.Popup.Menu -> "menu " + p.items.map { "${it.label} ${RuntimeEnvironment.getApplication().resources.getResourceEntryName(it.icon)} ${it.action}" }
             else -> "$p"
         }
     }.toSet()
