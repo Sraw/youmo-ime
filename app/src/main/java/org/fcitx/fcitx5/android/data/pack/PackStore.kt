@@ -96,12 +96,21 @@ object PackStore {
     }
 
     /**
+     * Whether [verifyInBackground] runs: not in the JVM tests (app/build.gradle.kts sets
+     * `youmo.packs.verify=off`), where a thread reading packs 30 s after a test's start would land
+     * in another's; PacksUatTest calls [verifyDue] itself.
+     */
+    @VisibleForTesting
+    var verifiesInBackground = System.getProperty("youmo.packs.verify") != "off"
+
+    /**
      * The packs in use read through ([PackShelf.verify]: a start reads their sizes only), on a
      * thread of the lowest priority, [VERIFY_AFTER_MS] after the start: not competing with the
      * keyboard's first look. One found damaged is not used (the keyboard's gate, the page say
      * 已损坏，请重新导入), the engine made anew without it.
      */
     fun verifyInBackground() {
+        if (!verifiesInBackground) return
         thread(name = "packs-verify", priority = Thread.MIN_PRIORITY, isDaemon = true) {
             Thread.sleep(VERIFY_AFTER_MS)
             runCatching { verifyNow() }.onFailure { Timber.e(it, "resource packs not verified") }

@@ -63,6 +63,8 @@ fun Test.unitTestSettings() {
     // the keys drawn by the canvas in every harness but where a test chose (060-render-p2 S3: KeyboardHarness):
     // -PcanvasKeyboard, the tests written on ShownKey run on the new drawing
     systemProperty("youmo.canvasKeyboard", project.hasProperty("canvasKeyboard").toString())
+    // the packs not read through 30 s into a test (PackStore.verifiesInBackground): PacksUatTest does it itself
+    systemProperty("youmo.packs.verify", "off")
     inputs.files(fileTree("src/test/baseline-060")).withPropertyName("oldRenderBaseline")
         .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
 }

@@ -352,6 +352,12 @@ class PacksUatTest {
         }
     }
 
+    /** Review L-5: no pass of its own in the JVM tests (one landing 30 s on in another test); the tests above call it. */
+    @Test
+    fun thePacksAreNotReadThroughInTheBackgroundInTheseTests() {
+        assertFalse(PackStore.verifiesInBackground)
+    }
+
     @Test
     fun theStatusAPackRowSaysForEachState() {
         val app = RuntimeEnvironment.getApplication()

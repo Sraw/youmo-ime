@@ -212,6 +212,7 @@ they stay: a pack carries no code.
   thread of the lowest priority reads each pack in use through (`PackStore.verifyInBackground`,
   `PackShelf.verify`): one changed is `PackStatus.Damaged`, not used till imported again (the gate:
   文字包已损坏，请重新导入; the page's row: vN 已损坏，请重新导入; voice input's tip the same).
+  JVM tests do not start the background pass (`youmo.packs.verify=off`); PacksUatTest runs its pass.
 - **Reading** (`AppData`): every asset path the engine, handwriting and voice open goes through it, to
   the pack's file if a pack owns the path, else to the APK's asset; `.data`, `.safetensors` and `.ort`
   are memory-mapped from the file. When a pack changes, `PackStore.state` bumps a generation and the
