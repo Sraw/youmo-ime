@@ -209,11 +209,13 @@ class WordListsTest {
     fun aBlockedEmojiReadsAsItsWordWhateverItsCodePoints() {
         assertEquals("hao", WordLists.blockedEntry("👍🏻", "hao")?.spelled())
         assertEquals("ni hao", WordLists.blockedEntry("😃", "ni'hao")?.spelled())
+        // a letter not ASCII is no word's (ℹ️, review R3): read so too
+        assertEquals("xin", WordLists.blockedEntry("ℹ️", "xin")?.spelled())
         // a text of letters or digits as any word: a syllable a character, or none
         assertNull(WordLists.blockedEntry("abc", "a'o"))
         // a file's line read so, its cost a number or none
         val dir = MemoryFiles()
-        dir.file(WordLists.BLOCKED).write("👍🏻 hao\n😃 ni'hao 0\n👌 hao x\n".toByteArray())
-        assertEquals(listOf("👍🏻", "😃"), WordLists(dir).blockedWords.map { it.text })
+        dir.file(WordLists.BLOCKED).write("👍🏻 hao\n😃 ni'hao 0\n👌 hao x\nℹ️ xin\n".toByteArray())
+        assertEquals(listOf("👍🏻", "😃", "ℹ️"), WordLists(dir).blockedWords.map { it.text })
     }
 }

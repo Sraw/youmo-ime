@@ -304,6 +304,15 @@ class HandwritingDecoderTest {
         assertTrue(d.sentences.toString(), d.sentences.none { "话" in it })
     }
 
+    // review R3: every reading of the second position blocked, its best (话) still makes 谈话 there,
+    // as arcsFrom keeps it alone: not a position nothing reads
+    @Test
+    fun `every reading blocked the best still makes a word`() {
+        val blocking = handwritingDecoder(OneWord(blocked = data.wordIndex.find("话"), alsoBlocked = data.wordIndex.find("天")))
+        val d = blocking.decode(listOf(read("淡", "谈", step = 0.3), read("话", "天")))
+        assertTrue(d.endings.toString(), d.endings.any { it.words?.map { w -> w.text } == listOf("谈话") })
+    }
+
     // every reading of the ink blocked: the ink's best put in all the same, as arcsFrom does, not the rest (review M2)
     @Test
     fun `where every reading is blocked only the ink's best goes into a word`() {

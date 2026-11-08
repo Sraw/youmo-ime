@@ -71,10 +71,12 @@ class TableRegistryTest : EnginesFixture() {
         val lexicon = UserLexicon(userDir = null, onError = {}, additions = { null }, assets = assets, forgetInTables = {}, dropSessions = {})
         val registry = wired(now, assets, lexicon)
         val shared = registry.shared(registry.table(WUBI), WUBI)
-        lexicon.addListed(emptyList(), listOf("👍🏻" to "hao", "你好" to "ni hao"))
+        lexicon.addListed(emptyList(), listOf("👍🏻" to "hao", "你好" to "ni hao", "ao" to "a o"))
         assertTrue(lexicon.isBlocked("👍🏻"))
         assertFalse(shared.blocked("👍🏻"))
         assertTrue(shared.blocked("你好"))
+        // a Latin word blocked in pinyin is hidden in a table too, as before (review R3)
+        assertTrue(shared.blocked("ao"))
     }
 
     // D8 / TBL-12: 一二's vava is 七上八下's alone, which commits itself; 你好's wqvb the table has nothing under

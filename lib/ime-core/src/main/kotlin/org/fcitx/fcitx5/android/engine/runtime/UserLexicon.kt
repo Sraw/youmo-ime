@@ -327,7 +327,10 @@ internal class UserLexicon(
      * A word blocked, for a table. Not a character: blocked in pinyin under one reading (了 liao),
      * a table, which has no readings, would lose it under all.
      */
-    fun isBlockedWord(text: String): Boolean = text.codePointCount(0, text.length) >= 2 && Han.any(text) && text in blockedTexts()
+    // a word: of Han or of ASCII letters and digits (a Latin word blocked in pinyin, hidden in a table
+    // too); an emoji blocked in its word's reading is no table's word to hide (review R2 L5, R3)
+    fun isBlockedWord(text: String): Boolean =
+        text.codePointCount(0, text.length) >= 2 && (Han.any(text) || text.any { it.code < ASCII_END && it.isLetterOrDigit() }) && text in blockedTexts()
 
     /** The user's words read again if the dictionaries are no longer as they were [before] ([UserAdditions.drop]): see [Engines.reload]. */
     fun reloadDictionaries(before: String) {
@@ -393,3 +396,6 @@ internal class UserLexicon(
         lists.blockedWords.forEach { model.block(it) }
     }
 }
+
+// below it, ASCII
+private const val ASCII_END = 0x80
