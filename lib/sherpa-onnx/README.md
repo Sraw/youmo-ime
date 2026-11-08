@@ -1,6 +1,6 @@
 # sherpa-onnx, vendored
 
-The speech recognizer of the voice builds: [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)
+The speech recognizer of voice input (its models are the voice pack's): [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)
 (k2-fsa, Apache-2.0, `src/main/cpp/LICENSE`), built from source by this module instead of taken as
 upstream's AAR, so that it is ours to change.
 
@@ -13,9 +13,9 @@ upstream's AAR, so that it is ours to change.
   speech synthesis. CMake downloads onnxruntime's Android libraries and the small dependencies
   (kaldi-native-fbank, kaldi-decoder, simple-sentencepiece, eigen, json), each SHA-256 checked by
   its `cmake/*.cmake`. kaldi-decoder brings kaldifst and openfst with it, kaldi-native-fbank kissfft.
-  Each of them is credited on the app's licences page (`VoiceFeature.credits` in `app/src/voice`):
-  a dependency added or updated here is changed there too. Only the app's `voice` flavor depends
-  on the module.
+  Each of them is credited on the app's licences page (`VoiceFeature.credits`, app `input/voice/`):
+  a dependency added or updated here is changed there too. The app depends on the module
+  (one APK since 0.6.0; without the voice pack it is never loaded).
 
 ## What we changed
 

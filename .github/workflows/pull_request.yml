@@ -70,72 +70,22 @@ jobs:
             .gradle/engine-downloads/onnxruntime-android-*.zip
           key: handwriting-downloads-${{ hashFiles('build-logic/convention/src/main/kotlin/HandwritingDataPlugin.kt', 'lib/handwriting/build.gradle.kts') }}
 
-      - name: Build Release APK
-        run: ./gradlew --build-cache :app:assembleTextRelease
-
-      - name: Upload app
-        uses: actions/upload-artifact@v7
-        with:
-          name: app
-          path: app/build/outputs/apk/*/release/
-
-  # the voice build: its own code (src/voice) and sherpa-onnx's native build with our changes,
-  # through R8. One OS and one ABI, as neither changes what it checks
-  build_voice:
-    runs-on: ubuntu-24.04
-    # emulator_test's cap, whose voice run builds the same native code for one ABI and runs the tests
-    # too: a hung build does not hold the runner for the 6-hour default
-    timeout-minutes: 60
-    env:
-      BUILD_ABI: arm64-v8a
-    steps:
-      - name: Fetch source code
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          submodules: false
-
-      - name: Setup Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: "temurin"
-          java-version: "21"
-
-      - name: Setup Android environment
-        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
-
-      - name: Install build dependencies
-        run: |
-          cmake=$(sed -n 's/.*defaultCMake = "\([^"]*\)".*/\1/p' build-logic/convention/src/main/kotlin/Versions.kt)
-          sdkmanager --install "cmake;${cmake:?no defaultCMake in Versions.kt}"
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
-
-      - name: Cache engine data downloads
-        uses: actions/cache@v6
-        with:
-          path: |
-            .gradle/engine-downloads
-            !.gradle/engine-downloads/voice
-            !.gradle/engine-downloads/handwriting
-            !.gradle/engine-downloads/onnxruntime-android-*.zip
-          key: engine-downloads-${{ hashFiles('build-logic/convention/src/main/kotlin/EngineDataPlugin.kt') }}
-
-      - name: Cache handwriting downloads
-        uses: actions/cache@v6
-        with:
-          path: |
-            .gradle/engine-downloads/handwriting
-            .gradle/engine-downloads/onnxruntime-android-*.zip
-          key: handwriting-downloads-${{ hashFiles('build-logic/convention/src/main/kotlin/HandwritingDataPlugin.kt', 'lib/handwriting/build.gradle.kts') }}
-
-      # the recognizer's model and the VAD, keyed on VoiceDataPlugin, which names them
+      # the recognizer's model and the VAD (the voice pack's), keyed on VoiceDataPlugin, which names them
       - name: Cache voice model downloads
         uses: actions/cache@v6
         with:
           path: .gradle/engine-downloads/voice
           key: voice-downloads-${{ hashFiles('build-logic/convention/src/main/kotlin/VoiceDataPlugin.kt') }}
 
-      - name: Build Voice Release APK
-        run: ./gradlew --build-cache :app:assembleVoiceRelease
+      # the one APK (voice code and sherpa-onnx's native build included, through R8) and the two
+      # resource packs, signed here with the committed test key: no release key on CI
+      - name: Build Release APK and packs
+        run: ./gradlew --build-cache :app:assembleRelease :app:packs
+
+      - name: Upload app
+        uses: actions/upload-artifact@v7
+        with:
+          name: app
+          path: |
+            app/build/outputs/apk/release/
+            app/build/packs/

@@ -130,9 +130,8 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
         target.extensions.configure<ApplicationAndroidComponentsExtension> {
             // Check the merged manifest in its own path, so no APK or bundle is built without it
             onVariants { v ->
-                val permitted = PermissionCheckTask.allowedFor(v.productFlavors)
                 val permissionCheck = target.tasks.register<PermissionCheckTask>("checkPermissions${v.name.capitalized()}") {
-                    allowed.set(permitted)
+                    allowed.set(PermissionCheckTask.ALLOWED)
                 }
                 v.artifacts.use(permissionCheck)
                     .wiredWithFiles(PermissionCheckTask::mergedManifest, PermissionCheckTask::checkedManifest)
@@ -179,7 +178,7 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
         @get:PathSensitive(PathSensitivity.NONE)
         abstract val mergedManifest: RegularFileProperty
 
-        /** What the variant may ask for: [allowedFor] its flavors. */
+        /** What the build may ask for: [ALLOWED]. */
         @get:Input
         abstract val allowed: SetProperty<String>
 
@@ -208,15 +207,10 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
             private val PERMISSION_TAGS = listOf("uses-permission", "uses-permission-sdk-23")
 
             /**
-             * Key feedback for every build; the microphone for the voice build's voice input alone:
-             * the text build must not gain it from a dependency either (PRIVACY.md).
+             * Key feedback; the microphone for voice input, asked for at its first use only (and
+             * only with the voice pack imported, VoiceFeature). Nothing else, the network above all (PRIVACY.md).
              */
-            fun allowedFor(flavors: List<Pair<String, String>>): Set<String> =
-                if ((VoiceDataPlugin.DIMENSION to VoiceDataPlugin.FLAVOR) in flavors) {
-                    setOf("android.permission.VIBRATE", "android.permission.RECORD_AUDIO")
-                } else {
-                    setOf("android.permission.VIBRATE")
-                }
+            val ALLOWED = setOf("android.permission.VIBRATE", "android.permission.RECORD_AUDIO")
         }
     }
 

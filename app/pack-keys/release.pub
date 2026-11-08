@@ -1,0 +1,5 @@
+# The keys a release build trusts a resource pack's signature by (AssetPacksPlugin): Ed25519, the
+# raw 32-byte public key in base64, one a line. Keys are rotated by adding the new one here first
+# (a release then takes packs signed by either), signing with it, and dropping the old one a
+# release or more later. The private key is never in the repository (local.properties' youmo.packKey).
+94BvBlMfb9Yf7lNR80R1094DbWXppJFct5+iT9F4eDk=

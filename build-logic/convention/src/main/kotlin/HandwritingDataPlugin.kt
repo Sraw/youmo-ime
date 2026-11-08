@@ -4,25 +4,25 @@
  */
 
 import com.android.build.api.dsl.ApplicationExtension
-import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.configure
-import org.gradle.kotlin.dsl.getByType
 import org.gradle.kotlin.dsl.register
 
 /**
- * Handwriting, in both builds: the recognizers' runtime (:lib:handwriting, onnxruntime and a JNI to
+ * Handwriting: the recognizers' runtime (:lib:handwriting, onnxruntime and a JNI to
  * it) and the release `handwriting-models-*` of this fork (its manifest.txt says what each file
  * is and how it was made). Of its files the single character's are taken: two ORT-format models
  * (its image, its path), the characters they tell apart, and their frequencies. Left out: a line's
  * and an overlay's models, as the app writes a character at a time, and the character bigram, as
  * the characters are read as a sentence with the pinyin model. Downloaded once, SHA-256 checked,
- * into the assets under `handwriting/`, uncompressed: the models are mapped where they lie.
+ * extracted as `handwriting/` for the text pack (AssetPacksPlugin), not the APK: the models are
+ * mapped where the pack's import put them.
  */
 class HandwritingDataPlugin : Plugin<Project> {
 
     companion object {
+        const val EXTRACT_TASK = "extractHandwritingModels"
         private const val RELEASE = "handwriting-models-20261015b"
         private const val URL = "https://github.com/Sraw/youmo-ime/releases/download/$RELEASE/handwriting-models.tar.zst"
         private const val SHA256 = "940e746a2a68822b87aa683e3832541f38e7c36202602dd8445b4b72d26689b9"
@@ -36,8 +36,8 @@ class HandwritingDataPlugin : Plugin<Project> {
             sha256.set(SHA256)
             outputFile.set(downloadsDir.file("$RELEASE.tar.zst"))
         }
-        // the archive is handwriting/ and its files: the assets as they are
-        val assets = target.tasks.register<ExtractTask>("extractHandwritingModels") {
+        // the archive is handwriting/ and its files: the pack's as they are
+        target.tasks.register<ExtractTask>(EXTRACT_TASK) {
             this.archive.set(archive.flatMap { it.outputFile })
             members.set(FILES.map { "handwriting/$it" })
             cmake.set(target.sdkCmake)
@@ -45,13 +45,8 @@ class HandwritingDataPlugin : Plugin<Project> {
         }
         target.dependencies.add("implementation", target.dependencies.project(mapOf("path" to ":lib:handwriting")))
         target.extensions.configure<ApplicationExtension> {
-            androidResources.noCompress += listOf(".ort", ".data")
-            // sherpa-onnx's in a voice build: the same file, from the same SHA-256 checked archive (lib/handwriting checks the pins)
+            // sherpa-onnx's: the same file, from the same SHA-256 checked archive (lib/handwriting checks the pins)
             packaging.jniLibs.pickFirsts += "**/libonnxruntime.so"
-        }
-        val components = target.extensions.getByType<ApplicationAndroidComponentsExtension>()
-        components.onVariants { variant ->
-            variant.sources.assets?.addGeneratedSourceDirectory(assets, ExtractTask::outputDir)
         }
     }
 }

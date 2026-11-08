@@ -80,7 +80,21 @@ class OnlineZipformer2TransducerModel : public OnlineTransducerModel {
             const Ort::SessionOptions &opts);
 #endif
 
+  // youmo: a model file by its path; an ORT-format one mapped and used in place
+  void Load(const std::string &filename, Init init,
+            const Ort::SessionOptions &opts);
+
  private:
+  // youmo: a model file mapped (MAP_PRIVATE, read only), unmapped when freed
+  struct MappedFile {
+    void *data = nullptr;
+    size_t size = 0;
+    MappedFile() = default;
+    MappedFile(const MappedFile &) = delete;
+    MappedFile &operator=(const MappedFile &) = delete;
+    ~MappedFile();
+  };
+
   Ort::Env env_;
   Ort::SessionOptions encoder_sess_opts_;
   Ort::SessionOptions decoder_sess_opts_;
@@ -94,6 +108,9 @@ class OnlineZipformer2TransducerModel : public OnlineTransducerModel {
   using Asset = std::unique_ptr<AAsset, void (*)(AAsset *)>;
   std::vector<Asset> assets_;
 #endif
+  // youmo: the model files mapped by their paths (a resource pack's), before
+  // the sessions for the same reason
+  std::vector<std::unique_ptr<MappedFile>> mapped_;
 
   std::unique_ptr<Ort::Session> encoder_sess_;
   std::unique_ptr<Ort::Session> decoder_sess_;

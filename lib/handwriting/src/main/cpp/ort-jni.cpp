@@ -4,12 +4,11 @@
  */
 
 // OrtModel's native half: one ORT-format model of one input, floats or int64s (the voice polish
-// tagger's character ids), and float outputs, used where it lies in the APK. The asset stays open, mapped (stored uncompressed), as long as the
-// session; onnxruntime reads the weights in place. Prepacking would copy them, and crashes on bytes
-// used in place (lib/sherpa-onnx README), so it is off.
+// tagger's character ids), and float outputs, used where it lies: the model file mapped (a resource
+// pack's, OrtModel.open), the mapping held by OrtModel as long as the session; onnxruntime reads the
+// weights in place. Prepacking would copy them, and crashes on bytes used in place (lib/sherpa-onnx
+// README), so it is off.
 
-#include <android/asset_manager.h>
-#include <android/asset_manager_jni.h>
 #include <jni.h>
 
 #include <cstdint>
@@ -27,23 +26,19 @@ Ort::Env &env() {
     return e;
 }
 
-using Asset = std::unique_ptr<AAsset, decltype(&AAsset_close)>;
-
 void raise(JNIEnv *jni, const char *cls, const std::string &what) {
     jclass c = jni->FindClass(cls);
     if (c) jni->ThrowNew(c, what.c_str());
 }
 
 struct Model {
-    // declared before the session, so closed after it
-    Asset asset;
     Ort::Session session;
     std::string input;
     ONNXTensorElementDataType inputType;
     std::vector<std::string> outputs;
 
-    Model(Asset &&a, const void *data, size_t size, const Ort::SessionOptions &opts)
-            : asset(std::move(a)), session(env(), data, size, opts) {
+    Model(const void *data, size_t size, const Ort::SessionOptions &opts)
+            : session(env(), data, size, opts) {
         Ort::AllocatorWithDefaultOptions alloc;
         if (session.GetInputCount() != 1) throw std::invalid_argument("not one input");
         input = session.GetInputNameAllocated(0, alloc).get();
@@ -103,22 +98,16 @@ jfloatArray outputOf(JNIEnv *jni, std::vector<Ort::Value> &out, size_t i, jlongA
 
 extern "C" JNIEXPORT jlong JNICALL
 Java_org_fcitx_fcitx5_android_handwriting_OrtModel_nativeOpen(
-        JNIEnv *jni, jclass, jobject jassets, jstring jpath, jint threads) {
-    AAssetManager *assets = AAssetManager_fromJava(jni, jassets);
-    const char *path = jni->GetStringUTFChars(jpath, nullptr);
-    // its OutOfMemoryError pending
-    if (!path) return 0;
+        JNIEnv *jni, jclass, jobject jbytes, jint threads) {
+    // a direct buffer (a mapped file): its bytes stay where they are, OrtModel holding it till closed
+    const void *data = jni->GetDirectBufferAddress(jbytes);
+    jlong capacity = jni->GetDirectBufferCapacity(jbytes);
+    if (!data || capacity <= 0) {
+        raise(jni, "java/lang/IllegalArgumentException", "not a direct buffer with a model in it");
+        return 0;
+    }
     // a C++ exception crossing JNI would abort the process: every one becomes Java's
     try {
-        std::string name(path);
-        jni->ReleaseStringUTFChars(jpath, path);
-        path = nullptr;
-        Asset asset(assets ? AAssetManager_open(assets, name.c_str(), AASSET_MODE_BUFFER) : nullptr, AAsset_close);
-        const void *data = asset ? AAsset_getBuffer(asset.get()) : nullptr;
-        if (!data) {
-            raise(jni, "java/io/FileNotFoundException", "cannot map asset " + name);
-            return 0;
-        }
         Ort::SessionOptions opts;
         opts.SetIntraOpNumThreads(threads);
         opts.SetInterOpNumThreads(1);
@@ -130,11 +119,8 @@ Java_org_fcitx_fcitx5_android_handwriting_OrtModel_nativeOpen(
         opts.AddConfigEntry("session.use_ort_model_bytes_directly", "1");
         opts.AddConfigEntry("session.use_ort_model_bytes_for_initializers", "1");
         opts.AddConfigEntry("session.disable_prepacking", "1");
-        size_t size = AAsset_getLength(asset.get());
-        // closed with the Model, or with whichever of them is left on a throw
-        return reinterpret_cast<jlong>(new Model(std::move(asset), data, size, opts));
+        return reinterpret_cast<jlong>(new Model(data, static_cast<size_t>(capacity), opts));
     } catch (const std::exception &e) {
-        if (path) jni->ReleaseStringUTFChars(jpath, path);
         raise(jni, "java/lang/IllegalStateException", e.what());
         return 0;
     }

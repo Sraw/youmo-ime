@@ -283,7 +283,7 @@ class EngineDataPlugin : Plugin<Project> {
             dictionaries.from(lexicon.file("latin.words"))
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-assets"))
         }
-        val english = target.tasks.register<CompileEnglishData>(ENGLISH_TASK) {
+        target.tasks.register<CompileEnglishData>(ENGLISH_TASK) {
             classpath.from(tool)
             toolCode.set(fingerprint.flatMap { it.outputFile })
             this.lm.set(englishLm.flatMap { it.outputDir.file(ENGLISH_FILE) })
@@ -332,7 +332,7 @@ class EngineDataPlugin : Plugin<Project> {
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-opencc"))
         }
         val tableRuns = target.gradle.sharedServices.registerIfAbsent("engineTableRuns", TableRuns::class.java)
-        val tables = target.tasks.register<CompileTables>(TABLES_TASK) {
+        target.tasks.register<CompileTables>(TABLES_TASK) {
             classpath.from(tool)
             toolCode.set(fingerprint.flatMap { it.outputFile })
             tables.from(TABLE.files.map { name -> table.flatMap { it.outputDir.file(name) } })
@@ -346,7 +346,7 @@ class EngineDataPlugin : Plugin<Project> {
         val models = MODELS.entries.mapIndexed { i, (name, sha) ->
             registerDownload(target, "downloadSentenceModel$i", Download(MODEL_URL + name, sha, "sentence-models/$name"), downloadsDir)
         }
-        val model = target.tasks.register<CopyModels>(MODEL_TASK) {
+        target.tasks.register<CopyModels>(MODEL_TASK) {
             files.from(models.map { task -> task.flatMap { it.outputFile } })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-models"))
         }
@@ -362,15 +362,13 @@ class EngineDataPlugin : Plugin<Project> {
             defaultConfig.buildConfigField("String", "SENTENCE_MODELS", "\"$MODELS_RELEASE\"")
             defaultConfig.buildConfigField("String", "ENGLISH_DATA", "\"$ENGLISH_RELEASE\"")
         }
+        // in the APK: the small data its code changes with. The pinyin data, English, the tables and
+        // strokes and the sentence models are the text pack's (AssetPacksPlugin), not the APK's
         components.onVariants { variant ->
-            variant.sources.assets?.addGeneratedSourceDirectory(compile, CompileEngineData::outputDir)
-            variant.sources.assets?.addGeneratedSourceDirectory(english, CompileEnglishData::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(emoji, CompileEmojiData::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(chaizi, CompileChaiziData::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(charInfo, CompileCharInfo::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(opencc, CompileOpenccData::outputDir)
-            variant.sources.assets?.addGeneratedSourceDirectory(tables, CompileTables::outputDir)
-            variant.sources.assets?.addGeneratedSourceDirectory(model, CopyModels::outputDir)
         }
     }
 

@@ -52,6 +52,10 @@ gradlePlugin {
             id = "org.fcitx.fcitx5.android.unit-test-resources"
             implementationClass = "UnitTestResourcesPlugin"
         }
+        register("assetPacks") {
+            id = "org.fcitx.fcitx5.android.asset-packs"
+            implementationClass = "AssetPacksPlugin"
+        }
         register("nativeAppConvention") {
             id = "org.fcitx.fcitx5.android.native-app-convention"
             implementationClass = "NativeAppConventionPlugin"

@@ -4,11 +4,11 @@
  */
 
 /*
- * sherpa-onnx (k2-fsa, Apache-2.0), the speech recognizer of the voice builds, built from source
+ * sherpa-onnx (k2-fsa, Apache-2.0), the speech recognizer of voice input, built from source
  * (src/main/cpp: upstream v1.13.8 and our commits on it, see README.md) rather than taken as
  * upstream's AAR: the recognizer is ours to change. Its CMake downloads onnxruntime's Android
- * libraries and its few small dependencies, SHA-256 checked. Only the app's voice flavor depends
- * on it, so a text build never compiles it.
+ * libraries and its few small dependencies, SHA-256 checked. The app depends on it (one APK
+ * since 0.6.0; its models are the voice pack's).
  */
 plugins {
     id("org.fcitx.fcitx5.android.lib-convention")

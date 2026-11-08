@@ -5,6 +5,7 @@ plugins {
     id("org.fcitx.fcitx5.android.engine-data")
     id("org.fcitx.fcitx5.android.voice-data")
     id("org.fcitx.fcitx5.android.handwriting-data")
+    id("org.fcitx.fcitx5.android.asset-packs")
     id("org.fcitx.fcitx5.android.unit-test-resources")
     alias(libs.plugins.kotlin.parcelize)
     alias(libs.plugins.kotlin.serialization)
@@ -13,7 +14,7 @@ plugins {
     alias(libs.plugins.roborazzi)
 }
 
-// What every app unit test task runs with, AGP's (testOptions.unitTests.all) and testTextDebugUnitTestAt29
+// What every app unit test task runs with, AGP's (testOptions.unitTests.all) and testDebugUnitTestAt29
 fun Test.unitTestSettings() {
     maxHeapSize = "3g"
     forkEvery = 40
@@ -111,23 +112,9 @@ android {
     // `-Pyoumo.testBuildType=benchmark`: the instrumented tests against the benchmark build
     testBuildType = providers.gradleProperty("youmo.testBuildType").getOrElse("debug")
 
-    // Everything runs on the phone, with no network permission at all. Two builds, text or voice:
-    // voice adds RECORD_AUDIO and the speech recognizer with its ~180 MB of models
-    // (VoiceDataPlugin), for those who want them; text, the default, has neither.
-    flavorDimensions += listOf(VoiceDataPlugin.DIMENSION)
-    productFlavors {
-        create("text") {
-            dimension = VoiceDataPlugin.DIMENSION
-            isDefault = true
-            buildConfigField("boolean", "VOICE", "false")
-        }
-        create(VoiceDataPlugin.FLAVOR) {
-            dimension = VoiceDataPlugin.DIMENSION
-            // the help reads a release's version less this (Const.manualUrl)
-            versionNameSuffix = "-${VoiceDataPlugin.FLAVOR}"
-            buildConfigField("boolean", "VOICE", "true")
-        }
-    }
+    // Everything runs on the phone, with no network permission at all. One APK: the big data (the
+    // engine's, handwriting's, voice's) is in the resource packs the user imports (AssetPacksPlugin);
+    // voice input works once the voice pack is there, the microphone asked for at its first use.
 
     androidResources {
         // Android 13's per-app languages are xml/locales_config.xml, AppLanguage's: generated, they
@@ -181,7 +168,7 @@ android {
             // with the themes' (ThemeMakerLayoutTest's 55 measured views) 4 GB ran out too, ThemeMakerLayoutTest
             // thrashing 8 minutes first: a new JVM every 40 classes, what is kept dropped with it (80 ran
             // out again once feat/051's popups were merged; the test alone takes 8 s and little heap)
-            // unitTestSettings (top of this file): testTextDebugUnitTestAt29 gets the same
+            // unitTestSettings (top of this file): testDebugUnitTestAt29 gets the same
             all { it.unitTestSettings() }
         }
     }
@@ -199,16 +186,6 @@ android {
     }
 }
 
-// Screenshots are compared in the text flavor only: the voice build's bar has a microphone, so
-// every golden would differ. Its unit tests still run every assertion, captureRoboImage a no-op
-// with record, compare and verify all off (Roborazzi's plugin sets them from roborazzi.test.*;
-// this doFirst, added at configuration, runs after the plugin's own).
-tasks.withType<Test>().matching { it.name.startsWith("testVoice") }.configureEach {
-    doFirst {
-        listOf("record", "compare", "verify").forEach { systemProperty("roborazzi.test.$it", "false") }
-    }
-}
-
 // TablesSettingsUatTest runs the real engine on build/generated's pinyin and table blobs. Nothing
 // else of a unit test run builds them, so a fresh checkout (CI) had none and the test's lookups
 // failed quietly; as inputs they are built first and key the test task's cache entry.
@@ -220,16 +197,16 @@ tasks.withType<Test>().matching { it.name.endsWith("UnitTest") || it.name.endsWi
 // Android 10 (minSdk 29) must keep working, so every Robolectric test runs at 29 as well as 35
 // (robolectric.properties lists both): 0.5.1 shipped a cast and a call Android 10-12 lack, which
 // the tests at 35 alone ran past. One SDK a JVM: robolectric.enabledSdks puts 29 in a task of its
-// own, :app:testTextDebugUnitTestAt29, the same classes and settings (both SDKs in one JVM ran out
+// own, :app:testDebugUnitTestAt29, the same classes and settings (both SDKs in one JVM ran out
 // of its 3 GB, and broke the native SQLite and android-all's zip filesystem across the sandboxes).
 // (a pin outside 29..36 then runs in neither, unreported)
 tasks.withType<Test>().matching { it.name.endsWith("UnitTest") }.configureEach {
     systemProperty("robolectric.enabledSdks", "30,31,32,33,34,35,36")
 }
-tasks.register<Test>("testTextDebugUnitTestAt29") {
+tasks.register<Test>("testDebugUnitTestAt29") {
     group = "verification"
-    description = "The text debug unit tests at SDK 29 (minSdk) alone"
-    val base = tasks.named<Test>("testTextDebugUnitTest").get()
+    description = "The debug unit tests at SDK 29 (minSdk) alone"
+    val base = tasks.named<Test>("testDebugUnitTest").get()
     testClassesDirs = base.testClassesDirs
     classpath = base.classpath
     unitTestSettings()
