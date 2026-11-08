@@ -362,6 +362,23 @@ class HostCore(
         if (shows(ic, word, text)) list.triggerAction(word, id)
     }
 
+    /**
+     * The engine's long-press act ([org.fcitx.fcitx5.android.engine.runtime.Engines.learning]'s):
+     * [id] on the candidate at [index] of all, the engine's own, if it shows [text] (the engine's,
+     * shown as this context converts it: 国家 as 國家) and offers [id]. Of all, not of the page:
+     * an act takes the list back to its first page, and another candidate would be at a page's
+     * index after it (review R3). Whether it was done.
+     */
+    fun actOnCandidate(index: Int, id: Int, text: String): Boolean = pipeline.batch act@{
+        val ic = contexts.active ?: return@act false
+        val list = ic.panel.candidateList ?: return@act false
+        val word = (if (list.bulk) list.candidateFromAll(index) else null) ?: return@act false
+        // an empty text is no check here: the engine always names one
+        if (text.isEmpty() || shown(ic, word) != filterOutput(ic, text) || list.actions(word).none { it.id == id }) return@act false
+        list.triggerAction(word, id)
+        true
+    }
+
     // `candidateAt` (`:220-231`): on the page when paging, else among all of a bulk list
     private fun candidateAt(list: CandidateList, index: Int) =
         if (pagingMode == 0 && list.bulk) list.candidateFromAll(index) else list.candidate(index)

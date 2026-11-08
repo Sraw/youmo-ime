@@ -70,10 +70,11 @@ internal class LearningOps(
 
     /**
      * Does [op] in [im], the input method in use (null where none is: the settings); [act] has the
-     * host send the long press's event (an [EngineEvent]) for the candidate at an index.
+     * host send the long press's event (an [EngineEvent]) for the candidate at an index of all,
+     * the engine's text there given: the host does nothing (false) where it does not show that.
      */
     // [shown]: a candidate's text as the host shows it (繁體: chttrans's output filter), the menu's text that
-    fun apply(im: String?, op: LearningOp, shown: (String) -> String = { it }, act: (event: Int, index: Int) -> Boolean): LearningResult = when (op) {
+    fun apply(im: String?, op: LearningOp, shown: (String) -> String = { it }, act: (event: Int, index: Int, text: String) -> Boolean): LearningResult = when (op) {
         // the backups' own (stream D): listed, restored, made
         is BackupOp -> backup(op)
         is LearningOp.OnCandidate -> im?.let { onCandidate(it, op, shown, act) } ?: LearningResult.Unavailable
@@ -169,12 +170,12 @@ internal class LearningOps(
         return token.takeIf { did }
     }
 
-    private fun onCandidate(im: String, asShown: LearningOp.OnCandidate, shown: (String) -> String, act: (Int, Int) -> Boolean): LearningResult {
+    private fun onCandidate(im: String, asShown: LearningOp.OnCandidate, shown: (String) -> String, act: (Int, Int, String) -> Boolean): LearningResult {
         val s = session(im) ?: return LearningResult.Unavailable
         val op = engines(s, asShown, shown) ?: return LearningResult.Unavailable
         val offers = s.offers(op.index)
         val event = { offer: Offer, e: Int ->
-            acted { offer in offers && act(e, op.index) }?.let { LearningResult.Done(it) } ?: LearningResult.Unavailable
+            acted { offer in offers && act(e, op.index, op.text) }?.let { LearningResult.Done(it) } ?: LearningResult.Unavailable
         }
         return when (op) {
             // the engine's text, which the menu's acts come back with (engines)
@@ -184,7 +185,7 @@ internal class LearningOps(
             is LearningOp.Pin -> event(Offer.PIN, EngineEvent.PIN)
             // a phrase's file holds it, not the learning record: no undo
             is LearningOp.Unpin -> if (Offer.DELETE_PHRASE in offers) {
-                if (act(EngineEvent.UNPIN, op.index)) LearningResult.Done(LearningResult.NO_UNDO) else LearningResult.Unavailable
+                if (act(EngineEvent.UNPIN, op.index, op.text)) LearningResult.Done(LearningResult.NO_UNDO) else LearningResult.Unavailable
             } else {
                 event(Offer.UNPIN, EngineEvent.UNPIN)
             }
@@ -208,45 +209,53 @@ internal class LearningOps(
         return asShown.at(asShown.index, text).takeIf { text == asShown.text || asked && shown(text) == asShown.text }
     }
 
-    // the other candidates of the list shown as [text] is, where the host converts one of them (國家: 国家 and a
-    // dictionary's own 國家): what is blocked or deleted is gone as shown, not left in its other
-    // form (review R2). Their texts, the engine's
-    private fun alike(s: Session, text: String, shown: (String) -> String): List<String> {
-        val asShown = shown(text)
-        // the pressed one may be the dictionary's own 國家, 国家 the one converted: either way round
-        return s.candidates(0, ALIKE_SCAN).map { it.text }.filter { it != text && shown(it) == asShown }.distinct()
+    // the candidates of the list shown as [text] is, where the host converts one of them (國家: 国家 and
+    // a dictionary's own 國家): what is blocked or deleted is gone as shown, not left in its other
+    // form (review R2). Each at its index of all, the engine's text: [text]'s own among them. One
+    // look at the list; with nothing converted, none but it
+    private fun alike(s: Session, op: LearningOp.OnCandidate, shown: (String) -> String): List<IndexedValue<String>> {
+        val pressed = IndexedValue(op.index, op.text)
+        val asShown = shown(op.text)
+        val list = s.candidates(0, ALIKE_SCAN).map { it.text }
+        if (asShown == op.text && list.all { shown(it) == it }) return listOf(pressed)
+        val others = list.withIndex().filter { (i, t) -> i != op.index && t != op.text && shown(t) == asShown }
+        return listOf(pressed) + others
     }
 
-    private fun deleteAlike(im: String, s: Session, op: LearningOp.Delete, shown: (String) -> String, act: (Int, Int) -> Boolean): LearningResult {
-        val also = alike(s, op.text, shown)
-        return delete(op.text, also, s.why(op.index)?.whole.orEmpty()) {
-            act(EngineEvent.FORGET, op.index).also { if (it) actOn(im, also, Offer.FORGET, EngineEvent.FORGET, act) }
+    private fun deleteAlike(im: String, s: Session, op: LearningOp.Delete, shown: (String) -> String, act: (Int, Int, String) -> Boolean): LearningResult {
+        val all = alike(s, op, shown)
+        return delete(all.map { it.value }, s.why(op.index)?.whole.orEmpty()) { actOn(im, all, Offer.FORGET, EngineEvent.FORGET, act) }
+    }
+
+    private fun blockAlike(im: String, s: Session, op: LearningOp.Block, shown: (String) -> String, act: (Int, Int, String) -> Boolean): LearningResult {
+        val all = alike(s, op, shown)
+        return block(all.map { it.value }) { actOn(im, all, Offer.BLOCK, EngineEvent.BLOCK, act).isNotEmpty() }
+    }
+
+    // [event] on each of [words] still where the list had it, the last first (an act takes one off
+    // the list, those before it where they were); the pressed one ([words]' first) must be done, the
+    // others where they are. The texts done
+    private fun actOn(im: String, words: List<IndexedValue<String>>, offer: Offer, event: Int, act: (Int, Int, String) -> Boolean): List<String> {
+        val done = ArrayList<String>()
+        for ((at, t) in words.sortedByDescending { it.index }) {
+            val s = session(im) ?: break
+            if (offer in s.offers(at) && act(event, at, t)) done += t
         }
+        return if (words.first().value in done) done else done.also { it.clear() }
     }
 
-    private fun blockAlike(im: String, s: Session, op: LearningOp.Block, shown: (String) -> String, act: (Int, Int) -> Boolean): LearningResult {
-        val also = alike(s, op.text, shown)
-        return block(listOf(op.text) + also) {
-            act(EngineEvent.BLOCK, op.index).also { if (it) actOn(im, also, Offer.BLOCK, EngineEvent.BLOCK, act) }
-        }
-    }
-
-    // [event] on each of [texts] where it is in the list now, the list as the last act left it
-    private fun actOn(im: String, texts: List<String>, offer: Offer, event: Int, act: (Int, Int) -> Boolean) {
-        for (t in texts) {
-            val s = session(im) ?: return
-            val at = s.candidates(0, ALIKE_SCAN).indexOfFirst { it.text == t }
-            if (at >= 0 && offer in s.offers(at)) act(event, at)
-        }
-    }
-
-    // [whole]: the whole phrase (U-73) [text] is the rest of, "" for a word; [also]: the words shown alike, deleted with it
-    private fun delete(text: String, also: List<String>, whole: String, act: () -> Boolean): LearningResult {
-        // a word added by hand comes off the list with it (Engines.changed): put back if taken back.
-        // Not for a whole phrase, which takes no word with it, the rest's nor its own (U-73)
-        val added = if (whole.isEmpty()) lexicon.addedPlaces((listOf(text) + also).flatMap { lexicon.addedOf(it) }) else emptyList()
+    // [whole]: the whole phrase (U-73) [texts]' first is the rest of, "" for a word; [texts]: it and
+    // the words shown alike; [act] the texts deleted, none where the first was not
+    private fun delete(texts: List<String>, whole: String, act: () -> List<String>): LearningResult {
+        // a word added by hand comes off the list with it (Engines.changed): put back if taken back,
+        // of those deleted only. Not for a whole phrase, which takes no word with it, the rest's nor its own (U-73)
+        val added = if (whole.isEmpty()) lexicon.addedPlaces(texts.flatMap { lexicon.addedOf(it) }) else emptyList()
         val forgets = tableForgets()
-        val token = acted(inverse = { lexicon.reAdd(added) }, act) ?: return LearningResult.Unavailable
+        var done = emptyList<String>()
+        val token = acted(inverse = { lexicon.reAdd(added.filter { it.value.text in done }) }) {
+            done = act()
+            done.isNotEmpty()
+        } ?: return LearningResult.Unavailable
         // what the tables' own logs forgot (a phrase they saved, theirs or shared with pinyin) no
         // rewrite of the learning record brings back: no chip, rather than one that half undoes;
         // what a table learned is in the record (stream C), and comes back. A table not loaded this run

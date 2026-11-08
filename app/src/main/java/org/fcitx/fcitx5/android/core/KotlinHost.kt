@@ -268,23 +268,10 @@ class KotlinHost(
     private fun HostCore.inkKey(piece: Action.Ink) = bridge.sendInk(piece, inputMethodEntryCached.uniqueName) { sendVirtual(Keyboard.INK, piece) }
 
     override suspend fun learning(op: LearningOp) = onHost {
-        val candidate = (op as? LearningOp.OnPage)?.op ?: op as? LearningOp.OnCandidate
-        // 繁體: the menu names the candidate as shown, converted; the engine has it simplified
-        // the engine's index is of all candidates, the core's of the page an OnPage op names: apart by
-        // what the first act, always the pressed one's, tells
-        var offset: Int? = null
-        bridge.learning(op, inputMethodEntryCached.uniqueName, ::shownText) act@{ event, all ->
-            // as the menu sends it: asked first, at the index the list has (Fcitx.learning); the
-            // engine may act on others too (国家 with the 國家 pressed, under 繁體), each at its index now
-            if (candidate == null) return@act false
-            val first = offset == null
-            val index = all - (offset ?: (all - candidate.index).also { offset = it })
-            if (candidateActions(index).none { it.id == event }) return@act false
-            // the op names the engine's text (国家); the core checks it against the list as shown (國家).
-            // Another candidate the engine found itself goes unchecked (an empty text)
-            triggerCandidateAction(index, event, if (first) shownText(candidate.text) else "")
-            true
-        }.also { (_, again) -> if (again) sendVirtual(Keyboard.AGAIN) }.first
+        // 繁體: the menu names the candidate as shown, converted; the engine has it simplified. Each
+        // act names its candidate by its index of all and the engine's text (HostCore.actOnCandidate)
+        bridge.learning(op, inputMethodEntryCached.uniqueName, ::shownText) { event, index, text -> actOnCandidate(index, event, text) }
+            .also { (_, again) -> if (again) sendVirtual(Keyboard.AGAIN) }.first
     }
 
     override suspend fun offerGlide(glide: Glide) = onHost {

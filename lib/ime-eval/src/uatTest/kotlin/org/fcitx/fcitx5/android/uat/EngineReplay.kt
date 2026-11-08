@@ -224,7 +224,7 @@ class EngineReplay(
      */
     fun learn(op: LearningOp): LearningResult {
         val candidate = (op as? LearningOp.OnPage)?.op ?: op as? LearningOp.OnCandidate
-        return engines.learning(im, op) { event, _ ->
+        return engines.learning(im, op) { event, _, _ ->
             if (candidate == null || core.candidateActions(candidate.index).none { it.id == event }) return@learning false
             core.triggerCandidateAction(candidate.index, event, candidate.text)
             flush()
