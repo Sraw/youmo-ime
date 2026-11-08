@@ -21,6 +21,7 @@ import androidx.core.view.AccessibilityDelegateCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityEventCompat
 import org.robolectric.Shadows.shadowOf
+import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -147,6 +148,19 @@ class SymbolsSceneGesturesTest {
             kb.showLocked(true)
             canvas.scene
             assertEquals(told.toString(), 1, told.size)
+        }
+    }
+
+    // the field's action changed while the panel is up (onReturnDrawableUpdate): Return said as the new one
+    @Test
+    fun returnAsTheFieldsActionWhenItChanges() {
+        panel(true).use { h ->
+            val kb = KeyboardHarness.find<PickerLayout>(h.inputView)!!.embeddedKeyboard
+            val before = h.rowKeys().map { it.description }
+            kb.onReturnDrawableUpdate(ReturnKeyAppearance(R.drawable.ic_baseline_search_24, R.string.a11y_key_enter, customLabel = "前往搜索"))
+            h.idle()
+            val after = h.rowKeys().map { it.description }
+            assertTrue("$before $after", "前往搜索" !in before.toString() && "前往搜索" in after.toString())
         }
     }
 

@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.set
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.After
+import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -269,6 +270,32 @@ class HandwritingSceneGesturesTest {
             harness(canvas).use { h ->
                 assertTrue("canvas $canvas", h.keys().none { it.id == "lang" && it.enabled && !it.bounds.isEmpty })
             }
+        }
+    }
+
+    // the setting turned off while the keyboard is up: the scene made again without the language key
+    @Test
+    fun theLanguageKeyHiddenWhenTheSettingChanges() {
+        prefs.set(AppPrefs.getInstance().keyboard.showLangSwitchKey, true)
+        harness(true).use { h ->
+            val canvas = KeyboardHarness.find<KeyboardCanvasView>(h.keyboard)!!
+            assertTrue(canvas.scene!!.keys.any { it.id == "lang" })
+            prefs.set(AppPrefs.getInstance().keyboard.showLangSwitchKey, false)
+            h.idle()
+            assertTrue(canvas.scene!!.keys.none { it.id == "lang" && it.bounds.right > it.bounds.left })
+        }
+    }
+
+    // the field's action changed while the keyboard is up (onReturnDrawableUpdate): Return said as the new one
+    @Test
+    fun returnAsTheFieldsActionWhenItChanges() {
+        harness(true).use { h ->
+            val kb = KeyboardHarness.find<HandwritingKeyboard>(h.keyboard)!!
+            val before = h.keys().map { it.description }
+            kb.onReturnDrawableUpdate(ReturnKeyAppearance(R.drawable.ic_baseline_search_24, R.string.a11y_key_enter, customLabel = "前往搜索"))
+            h.idle()
+            val after = h.keys().map { it.description }
+            assertTrue("$before $after", "前往搜索" !in before.toString() && "前往搜索" in after.toString())
         }
     }
 
