@@ -37,6 +37,7 @@ import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 import java.util.Properties
 import java.util.zip.CRC32
+import java.time.LocalDateTime
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -92,8 +93,12 @@ class AssetPacksPlugin : Plugin<Project> {
         // a raw Ed25519 key as X.509's SubjectPublicKeyInfo: this prefix, then the 32 bytes
         private val X509_PREFIX = byteArrayOf(0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00)
 
-        // entries' time: the same inputs, the same bytes
-        private const val ZIP_TIME = 315532800000L
+        // entries' time: the same inputs, the same bytes. A local time, as a zip keeps it: an
+        // instant (1980-01-01 UTC) was the build machine's time zone's local time, other bytes in
+        // another zone, and before 1980 west of UTC. Not 1980-01-01 00:00 itself: ZipEntry takes
+        // that DOS time for "before 1980" and adds an extended-time field of the zone's instant
+        // (Gradle's reproducible archives use 1980-02-01 for the same reason)
+        private val ZIP_TIME: LocalDateTime = LocalDateTime.of(1980, 2, 1, 0, 0)
 
         fun publicKey(raw: ByteArray) = KeyFactory.getInstance("Ed25519").generatePublic(X509EncodedKeySpec(X509_PREFIX + raw))
 
@@ -137,7 +142,7 @@ class AssetPacksPlugin : Plugin<Project> {
             entry.size = size
             entry.compressedSize = size
             entry.crc = crc
-            entry.time = ZIP_TIME
+            entry.timeLocal = ZIP_TIME
             zip.putNextEntry(entry)
             write(zip)
             zip.closeEntry()

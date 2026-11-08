@@ -16,7 +16,9 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.security.KeyPairGenerator
 import java.security.MessageDigest
+import java.time.LocalDateTime
 import java.util.Base64
+import java.util.TimeZone
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 
@@ -94,6 +96,29 @@ class AssetPacksPluginTest {
         val a = sources("engine/pinyin.data" to "pinyin")
         val first = pack(listOf(a), keys = keys).readBytes()
         assertArrayEquals(first, pack(listOf(a), keys = keys).readBytes())
+    }
+
+    // in any time zone: east and west of UTC (an instant was each zone's own local time), no extended-time field
+    @Test
+    fun theSameFilesMakeTheSameBytesInAnyTimeZone() {
+        val keys = keyFiles()
+        val a = sources("engine/pinyin.data" to "pinyin")
+        val zone = TimeZone.getDefault()
+        try {
+            val made = listOf("Asia/Shanghai", "America/Los_Angeles", "UTC").map {
+                TimeZone.setDefault(TimeZone.getTimeZone(it))
+                pack(listOf(a), keys = keys).readBytes()
+            }
+            made.drop(1).forEach { assertArrayEquals(made[0], it) }
+            ZipFile(pack(listOf(a), keys = keys)).use { zip ->
+                zip.entries().toList().forEach { entry ->
+                    assertEquals(LocalDateTime.of(1980, 2, 1, 0, 0), entry.timeLocal)
+                    assertEquals(null, entry.extra)
+                }
+            }
+        } finally {
+            TimeZone.setDefault(zone)
+        }
     }
 
     @Test
