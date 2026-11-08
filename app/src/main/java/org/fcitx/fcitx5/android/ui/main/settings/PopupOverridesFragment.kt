@@ -151,19 +151,26 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         return KeyMarks.place(symbol, shortcut, spots.symbol, spots.shortcut, landscape, keyboardCompact())
     }
 
+    // a function key of ime-core's not named here yet shows as it is called there, not a crash
+    private fun functionLabel(name: String) = FunctionLabels[name]?.let(::getString) ?: name
+
     /** A tab other than the full keyboard's: its keys in their rows, a tap editing the shortcut alone. */
     private fun shortcutPage(ctx: Context, page: KeyShortcutPages.Page) {
         val stored = shortcuts
         val function = page.form == KeyShortcuts.FUNCTION
         val symbols = symbolsOf(page).iterator()
+        // a function key's name beside its engine-drawn cap, on one line: as wide as the widest name on the page
+        val captionWidth = if (function && SceneKeyCell.on) {
+            val paint = KeyCaps.label(ctx, "", CAPTION_SP).paint
+            page.rows.maxOf { paint.measureText(functionLabel(it.first().label)) }.toInt() + ctx.dp(CAPTION_GAP_DP)
+        } else 0
         page.rows.forEach { row ->
             val keys = if (function) row.take(1) else row
             with(content) { add(ctx.horizontalLayout {
                 gravity = if (page.leftAligned) Gravity.START else Gravity.CENTER_HORIZONTAL
                 keys.forEach { key ->
                     val names = if (function) row.map { it.name } else listOf(key.name)
-                    // a function key of ime-core's not named here yet shows as it is called there, not a crash
-                    val label = if (function) FunctionLabels[key.label]?.let(::getString) ?: key.label else key.label
+                    val label = if (function) functionLabel(key.label) else key.label
                     val said = names.map { said(it) ?: "–" }.joinToString(" / ").takeIf { names.any { said(it) != null } }
                     val symbol = if (function) null else symbols.next()
                     val marks = if (function) functionMarks(names) else charMarks(symbol, key.name)
@@ -174,10 +181,11 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                     // the engine draws a function key's very face (space blank, the comma a ,): its name beside it, so
                     // the page says which key it is (the views' caps carry the name on their face)
                     val caption = function && SceneKeyCell.on
-                    if (caption) add(KeyCaps.label(ctx, label, 16f).apply {
+                    if (caption) add(KeyCaps.label(ctx, label, CAPTION_SP).apply {
                         gravity = Gravity.CENTER_VERTICAL or Gravity.START
+                        maxLines = 1
                         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-                    }, lParams(ctx.dp(CAPTION_DP), ctx.dp(KeyHeight)))
+                    }, lParams(captionWidth, ctx.dp(KeyHeight)))
                     add(KeyCaps.key(ctx, label, hint, marked = names.any(stored::isSet), dimmed = false, marks = marks, said = said, shortcut = shortcut).apply {
                         setOnClickListener { editShortcuts(label, names) }
                     }, if (caption) lParams(0, ctx.dp(KeyHeight)) { weight = 1f } else if (function) lParams(matchParent, ctx.dp(KeyHeight)) else keyParams(ctx, weight = 1f))
@@ -509,8 +517,9 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             else -> error("no title for the shortcut page ${page.form}")
         }
 
-        // a function key's name beside its engine-drawn cap
-        private const val CAPTION_DP = 120
+        // a function key's name beside its engine-drawn cap: its size, and the room after the widest
+        private const val CAPTION_SP = 16f
+        private const val CAPTION_GAP_DP = 12
 
         // the function keys' names on the page ([KeyShortcutPages.FUNCTION_KEYS])
         internal val FunctionLabels = mapOf(
