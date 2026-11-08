@@ -140,6 +140,19 @@ class KeyShortcutsPageScreenshotTest {
         capture("canvas_function")
     }
 
+    // the settings at night, the keyboard's theme as it is: the caps' faces, words and the edited one's outline the
+    // keyboard theme's, as light or dark as on the keyboard, whatever the page's own (S6 review); b's words faded alone
+    @Test
+    @Config(qualifiers = "zh-rCN-w393dp-h851dp-port-night-440dpi")
+    fun theEnginesCapsInTheKeyboardsThemeAtNight() {
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+        open()
+        st.idle()
+        val b = KeyboardHarness.all(key("b")).filterIsInstance<SceneKeyCell>().single()
+        assertEquals(0.4, b.labelAlpha, 0.0)
+        capture("canvas_full_night")
+    }
+
     // the number keys draw no symbol (a digit alone): a shortcut there goes where one alone goes on
     // the keyboard, under the digit with 标点位置 下方, never into the corner a symbol would have left
     @Test
