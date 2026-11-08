@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.data.replaceDirectory
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession
+import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.learn.control.BackupOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
@@ -377,6 +378,25 @@ class EngineBridgeTest {
     class Made {
 
         private val bridge = EngineBridge()
+
+        /**
+         * A fresh install has no files/engine: nothing made it, so the learning record could not be
+         * opened (ENOENT) and what was learned lived in memory only, gone with the next host. Made now.
+         */
+        @Test
+        fun aFreshInstallsLearningIsKeptWhenTheHostIsMadeAnew() {
+            val dir = checkNotNull(bridge.userDir())
+            dir.deleteRecursively()
+            try {
+                assertTrue(bridge.engines.addEnglishWord("youmoword"))
+                bridge.close()
+                assertTrue(File(dir, LearnLog.FILE).isFile)
+                assertTrue(bridge.engines.englishWords().any { it.text == "youmoword" })
+            } finally {
+                bridge.close()
+                dir.deleteRecursively()
+            }
+        }
         /** Taken, it says so: an Ink key goes out for what is shown. */
         @Test
         fun handwritingThatLoadsTakesTheInk() {

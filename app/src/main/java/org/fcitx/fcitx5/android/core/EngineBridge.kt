@@ -174,10 +174,12 @@ class EngineBridge {
      * [userDir], put back before the engine makes it anew: a user-data import killed between its
      * two renames left the engine's files only in engine.old. Null if it cannot be, the engine then
      * learning in memory: an engine/ made anew would have the next import delete engine.old, the
-     * only copy of them.
+     * only copy of them. Made if it is not there: nothing else makes it, and on a fresh install the
+     * learning record could not be opened (ENOENT), so what was learned lived in memory only.
      */
     internal fun restored(userDir: File): File? = try {
         restoreDirectory(userDir)
+        if (!userDir.isDirectory && !userDir.mkdirs()) throw IOException("cannot make $userDir")
         userDir
     } catch (e: IOException) {
         Timber.e(e, "engine user data cannot be put back: what is learned is kept in memory only")
