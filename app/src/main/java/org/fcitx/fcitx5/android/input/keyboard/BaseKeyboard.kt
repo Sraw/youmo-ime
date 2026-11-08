@@ -235,6 +235,9 @@ abstract class BaseKeyboard(
         override fun onPopupAction(action: PopupAction) = this@BaseKeyboard.onPopupAction(action)
         override fun onPopupChangeFocus(key: KeyRef, x: Float, y: Float) = this@BaseKeyboard.onPopupChangeFocus(key, x, y)
         override fun onPopupTrigger(key: KeyRef, cancelled: Boolean) = this@BaseKeyboard.onPopupTrigger(key, cancelled)
+        override fun marksChanged() {
+            canvas?.invalidateScene()
+        }
     })
 
     protected val keyRows: List<ConstraintLayout>

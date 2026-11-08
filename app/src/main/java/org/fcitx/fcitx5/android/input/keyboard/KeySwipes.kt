@@ -46,6 +46,9 @@ internal class KeySwipes(
         fun onPopupAction(action: PopupAction)
         fun onPopupChangeFocus(key: KeyRef, x: Float, y: Float): Boolean
         fun onPopupTrigger(key: KeyRef, cancelled: Boolean): Boolean
+
+        /** The marks' settings changed with the keyboard up: a scene drawing the keys makes its marks again. */
+        fun marksChanged()
     }
 
     private val prefs = AppPrefs.getInstance()
@@ -153,6 +156,7 @@ internal class KeySwipes(
      * whose keyboard places them again as it attaches.
      */
     fun showMarks() {
+        keyboard.marksChanged()
         val layers = swipeLayers
         val spots = markSpots()
         val compact = keyboardCompact()

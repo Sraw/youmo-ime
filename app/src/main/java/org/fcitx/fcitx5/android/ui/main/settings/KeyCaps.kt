@@ -87,11 +87,11 @@ object KeyCaps {
                 shortcut = shortcut?.name,
             )
             states = setOfNotNull(KeyState.Selected.takeIf { selected }, KeyState.Disabled.takeIf { dimmed })
-            if (shortcut != null) {
-                marks = SceneMarks.settings(
-                    shortcut.shortcuts, AppPrefs.getInstance().keyboard.swipeLayers.getValue().layers, markSpots(), shortcut.charShortcuts, listOf(shortcut.name),
-                )
-            }
+            // the symbol where 标点位置 puts it on the keyboard, a key with no shortcut too
+            marks = SceneMarks.settings(
+                shortcut?.shortcuts ?: KeyShortcuts.Empty, AppPrefs.getInstance().keyboard.swipeLayers.getValue().layers, markSpots(),
+                shortcut?.charShortcuts ?: true, listOfNotNull(shortcut?.name),
+            )
         }
 
     fun label(ctx: Context, text: String, size: Float = 18f) = TextView(ctx).apply {
