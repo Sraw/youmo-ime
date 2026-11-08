@@ -63,7 +63,9 @@ os.environ.setdefault("ADB_MDNS", "0")
 # the devices: emulators of one AVD, each on its console port (serial emulator-<port>). 5554 and 5556
 # are the two of a run; a worktree may start its own on another even port up to 5584 (uat.py up --port)
 AVD = os.environ.get("UAT_AVD", "youmo")
-SNAPSHOT = "clean"   # the AVD's state after uat/tools/avd.sh: zh-CN, three-button nav, the WebView shell
+SNAPSHOT = "clean"
+# UAT_CANVAS=1: every case on 060's new drawing (internal.canvasKeyboard, canvas_on)
+CANVAS = os.environ.get("UAT_CANVAS") == "1"   # the AVD's state after uat/tools/avd.sh: zh-CN, three-button nav, the WebView shell
 # the default pair; any number runs (--devices 5554,5556,5558,… or auto: device_count from free memory)
 PORTS = ("5554", "5556")
 
@@ -1716,6 +1718,8 @@ def reset(d, base, page):
     d.sh(f"pm clear {PKG}; settings put system accelerometer_rotation 0; "
          "settings put system user_rotation 0; wm size reset; cmd uimode night no")
     d.rot = 0
+    if CANVAS:
+        canvas_on(d)
     ensure_ime(d)
     d._keys = None
     if not base.startswith("B0"):
@@ -1749,6 +1753,17 @@ def reset(d, base, page):
         d.open_page(page)
     elif base not in ("B0", "B0-实体", "B0-语音"):
         raise Blocked(f"unknown baseline {base}")
+
+
+def canvas_on(d):
+    """UAT_CANVAS=1: internal.canvasKeyboard on in the cleared app's prefs (060's new drawing; the
+    developer page's switch), written as root before the app first starts"""
+    dd = f"/data/data/{PKG}"
+    f = f"{dd}/shared_prefs/{PKG}_preferences.xml"
+    d.sh(f"am force-stop {PKG}; mkdir -p {dd}/shared_prefs; "
+         f"echo \"<?xml version='1.0' encoding='utf-8' standalone='yes' ?><map>"
+         f"<boolean name=\\\"canvas_keyboard\\\" value=\\\"true\\\" /></map>\" > {f}; "
+         f"u=$(stat -c %u {dd}); chown -R $u:$u {dd}/shared_prefs; chmod 660 {f}; chcon -R $(ls -dZ {dd} | cut -d' ' -f1) {dd}/shared_prefs")
 
 
 def plug(d, base):
