@@ -4,6 +4,9 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings
 
+import org.fcitx.fcitx5.android.input.scene.SceneLetters
+import org.fcitx.fcitx5.android.input.popup.PopupPreset
+import org.fcitx.fcitx5.android.input.popup.PopupOverridesCache
 import android.content.Context
 import android.content.res.ColorStateList
 import android.content.res.Configuration
@@ -120,7 +123,11 @@ object KeyCaps {
     fun board(ctx: Context, shortcut: String, layout: String = BOARDS[shortcut.substringBefore('/', "")]?.first ?: KeyNames.QWERTY): SceneKeyCell.Board {
         val codeRow = CODE_ROWS[layout] ?: ImKeyboards.Layout.TEXT
         val code = CodeRowHeight.keyboardDp(codeRow, KawaiiBarComponent.codeRowFloats())
-        return SceneKeyCell.Board(layout, shortcut, KeyboardArea.keysWidth(ctx), KeyboardArea.keysHeight(ctx, code))
+        // the letters' corners as the keyboard draws them (TextKeyboard.alts: the long presses' firsts, the user's
+        // overrides; none with 标点位置 无): without them no symbol is drawn, nor does one take a mark's room
+        val alts = if (markSpots().symbol == KeyMarks.At.None) emptyMap() else
+            SceneLetters.alts { c -> c.toString().let { PopupOverridesCache.user.current.resolve(it, PopupPreset[it])?.firstOrNull() } }
+        return SceneKeyCell.Board(layout, shortcut, KeyboardArea.keysWidth(ctx), KeyboardArea.keysHeight(ctx, code), alts)
     }
 
     // a shortcut page's form: its board and the code row that board has

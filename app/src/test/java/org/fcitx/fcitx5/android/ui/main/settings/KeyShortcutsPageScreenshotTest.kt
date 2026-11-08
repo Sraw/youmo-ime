@@ -113,8 +113,8 @@ class KeyShortcutsPageScreenshotTest {
             tab(title)
             capture(name)
         }
-        // the backspace's clear up and restore down, each its icon: no names cut short
-        assertEquals(2, sceneIcons(key(st.s(R.string.fn_key_backspace))))
+        // the backspace's clear up and restore down, each its icon, beside its own (the keyboard's very key, S7a): no names cut short
+        assertEquals(3, sceneIcons(key(st.s(R.string.fn_key_backspace))))
     }
 
     // the caps drawn by the engine where the canvas keyboard is on (060-render-p2 S6): the same marks as the
@@ -133,7 +133,7 @@ class KeyShortcutsPageScreenshotTest {
         assertTrue(KeyboardHarness.all(key("s")).filterIsInstance<SceneKeyCell>().single().keyNode!!.ops(false).any { it is Op.Text && it.text == "*" })
         capture("canvas_full")
         tab(R.string.shortcut_page_function)
-        assertEquals(2, sceneIcons(key(st.s(R.string.fn_key_backspace))))
+        assertEquals(3, sceneIcons(key(st.s(R.string.fn_key_backspace))))
         capture("canvas_function")
     }
 
