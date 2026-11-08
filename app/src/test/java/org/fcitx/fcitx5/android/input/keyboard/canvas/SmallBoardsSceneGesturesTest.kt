@@ -70,6 +70,12 @@ class SmallBoardsSceneGesturesTest {
                 h.field.setSelection(2)
                 h.idle()
                 h.tap(h.described(h.service.getString(R.string.a11y_key_emoji)))
+                // the bar's 表情 opens the panel last shown: on the 颜文字, its own 表情 key back to the emoji
+                h.relayout()
+                if (h.keys().none { it.label == ":-)" }) {
+                    h.tap(h.keys().first { it.description == h.service.getString(R.string.a11y_key_emoji) })
+                    h.relayout()
+                }
                 h.tap(h.described(h.service.getString(R.string.emoji_search)))
                 val search = KeyboardHarness.find<EmojiSearchUi>(h.inputView)!!
                 assertEquals(on, drawnByScene(search))
