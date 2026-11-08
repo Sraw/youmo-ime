@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.scene.rules
 
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks.Slot
 import kotlin.math.abs
+import kotlin.math.floor
 import kotlin.math.sqrt
 
 /**
@@ -159,13 +160,12 @@ object KeyMarkYield {
         return Settled(s.glyph, apart.map { if (it == null) null else settled.next() })
     }
 
-    // [key]'s, [marks] apart from each other
-    // the least share (to a thousandth) that [clears], [all] clearing at the whole of it
-    private fun leastShare(all: Settled, clears: (Double) -> Settled?): Settled {
+    // the least of 0 to [whole] (to [step]) that [clears], [all] clearing at the whole of it
+    private fun <T : Any> least(all: T, whole: Double, step: Double, clears: (Double) -> T?): T {
         var lo = 0.0
-        var hi = 1.0
+        var hi = whole
         var best = all
-        while (hi - lo > SHARE_STEP) {
+        while (hi - lo > step) {
             val mid = (lo + hi) / 2.0
             val c = clears(mid)
             if (c != null) { hi = mid; best = c } else lo = mid
@@ -175,26 +175,10 @@ object KeyMarkYield {
 
     private fun keyApart(glyph: Ink, marks: List<Mark>, room: Ink, gap: Double, edge: Edge): Settled {
         if (marks.none { it.ink.meets(glyph, gap) }) return Settled(glyph, marks.map { it.ink })
-        // the marks moved only, then smaller too: the glyph moved clear of them
-        for (shrink in listOf(false, true)) {
-            val placed = marks.map { into(glyph, it, room, gap, if (shrink) it.minScale else 1.0) }
-            clearOf(glyph, placed, room, gap)?.let { return Settled(it, placed) }
-        }
-        // the marks, at their least, out into their insets, all by the least share of what each has that, the
-        // glyph moved as far as it goes, clears (from nothing, where the glyph's move alone stops clearing); then,
-        // their insets all eaten, the glyph smaller about its middle, the least that clears with a move
-        val cx = (glyph.left + glyph.right) / 2.0
-        val cy = (glyph.top + glyph.bottom) / 2.0
-        var s = 1.0
-        while (s >= 1.0 - MAX_LABEL_SHRINK - STEP / 2) {
-            val small = glyph.scaled(s, cx, cy)
-            fun clears(share: Double) = marks.map { out(small, it, room, edge, gap, share) }.let { p -> clearOf(small, p, room, gap)?.let { Settled(it, p) } }
-            clears(1.0)?.let { return leastShare(it, ::clears) }
-            s -= STEP
-        }
-        val small = glyph.scaled(1.0 - MAX_LABEL_SHRINK, cx, cy)
+        inPlace(glyph, marks, room, gap, edge)?.let { return it }
         // a shortcut that would be left out tried elsewhere (where it meets no other mark), the glyph as it
         // was: all the above again from there
+        val small = glyph.scaled(1.0 - MAX_LABEL_SHRINK, mid(glyph), (glyph.top + glyph.bottom) / 2.0)
         val placed = marks.map { out(small, it, room, edge, gap) }
         val stuck = placed.indices.any { i -> marks[i].elsewhere.isNotEmpty() && (placed[i].meets(small, 0.0) || placed.indices.any { j -> j != i && placed[j].meets(placed[i], 0.0) }) }
         var moved = marks
@@ -209,6 +193,33 @@ object KeyMarkYield {
         val again = keyApart(glyph, rest, room, gap, edge)
         val each = again.marks.iterator()
         return Settled(again.glyph, kept.map { if (it == null) null else each.next() })
+    }
+
+    // [keyApart]'s steps with every mark in its own corner and kept; null where they leave it still meeting the glyph
+    private fun inPlace(glyph: Ink, marks: List<Mark>, room: Ink, gap: Double, edge: Edge): Settled? {
+        // the marks moved only, then smaller too: the glyph moved clear of them
+        for (shrink in listOf(false, true)) {
+            val placed = marks.map { into(glyph, it, room, edge, gap, if (shrink) it.minScale else 1.0) }
+            clearOf(glyph, placed, room, gap)?.let { return Settled(it, placed) }
+        }
+        // the marks, at their least, out into their insets, all by the least share of what each has that, the
+        // glyph moved as far as it goes, clears (from nothing, where the glyph's move alone stops clearing); then,
+        // their insets all eaten, the glyph smaller about its middle, the least that clears with a move
+        val cx = mid(glyph)
+        val cy = (glyph.top + glyph.bottom) / 2.0
+        var s = 1.0
+        while (s >= 1.0 - MAX_LABEL_SHRINK - STEP / 2) {
+            val small = glyph.scaled(s, cx, cy)
+            fun clears(share: Double) = marks.map { out(small, it, room, edge, gap, share) }.let { p -> clearOf(small, p, room, gap)?.let { Settled(it, p) } }
+            clears(1.0)?.let { return least(it, 1.0, SHARE_STEP, ::clears) }
+            s -= STEP
+        }
+        val small = glyph.scaled(1.0 - MAX_LABEL_SHRINK, cx, cy)
+        // the glyph at its least, a mark at its arc in along it, the least that clears (from nothing, where the
+        // glyph's shrink stops clearing), before it is tried in another corner or left out
+        val far = maxOf(edge.face.width, edge.face.height)
+        fun along(inward: Double) = marks.map { out(small, it, room, edge, gap, inward = inward) }.let { p -> clearOf(small, p, room, gap)?.let { Settled(it, p) } }
+        return along(far)?.let { least(it, far, OUT_PX, ::along) }
     }
 
     /** A letter key's: its [letter]'s ink and [baseline], its [marks], the [room] they move in, the [edge] they go no further out than. */
@@ -228,7 +239,7 @@ object KeyMarkYield {
         val least = 1.0 - MAX_LETTER_SHRINK
         val need = keys.flatMapIndexed { k, key ->
             live[k].mapNotNull { m ->
-                val n = need(key, m, gap)
+                val n = need(key, m, gap).scale
                 when {
                     n >= least - STEP / 2 -> n
                     m.drop == DROP_SYMBOL -> least
@@ -237,26 +248,38 @@ object KeyMarkYield {
             }
         }.minOrNull() ?: 1.0
         val scale = need.coerceAtLeast(1.0 - MAX_LETTER_SHRINK)
-        // each mark then only as far in and small as the letter, so much smaller, leaves it
+        // each mark then only as far in and small as the letter, so much smaller, leaves it, the way [need] takes it
         return Letters(scale, keys.mapIndexed { k, key ->
             val letter = if (scale < 1.0) key.letter.scaled(scale, mid(key.letter), key.baseline) else key.letter
-            val settled = dropped(letter, live[k]) { out(letter, it, key.room, key.edge, gap) }.second.iterator()
+            val settled = dropped(letter, live[k]) { m -> out(letter, m, key.room, key.edge, gap, up = need(key, m, gap).up) }.second.iterator()
             Settled(letter, apart[k].map { if (it == null) null else settled.next() })
         })
     }
 
+    // the letter's scale [need]ed for a mark, and the axis it goes out on (null: nothing to choose)
+    private class Need(val scale: Double, val up: Boolean?)
+
     // how much smaller [key]'s letter would be for [m], as far in and small as it goes: where neither axis
     // alone parts them, out on the one that leaves the letter larger (the letter smaller about its baseline
     // parts them on one axis too, so the other's move is wasted; which one is the letter's, not the px')
-    private fun need(key: LetterKey, m: Mark, gap: Double): Double = listOf(true, false).maxOf { up ->
-        letterScale(key.letter, out(key.letter, m, key.room, key.edge, gap, up = up), m.slot, gap, mid(key.letter), key.baseline)
+    // Each scale counted in [STEP]s before they are compared, a tie up: half a px either way never swaps them.
+    // A mark that clears it (no smaller) goes the way it would for the letter its size, whatever size the letters
+    // are: the way is the key's, not the keyboard's (the letters' size changing never swaps it).
+    private fun need(key: LetterKey, m: Mark, gap: Double): Need {
+        fun at(up: Boolean) = letterScale(key.letter, out(key.letter, m, key.room, key.edge, gap, up = up), m.slot, gap, mid(key.letter), key.baseline)
+        if (!into(key.letter, m, key.room, key.edge, gap, m.minScale).meets(key.letter, gap)) {
+            return Need(1.0, if (m.ink.meets(key.letter, gap)) way(key.letter, m, key.room, key.edge, gap) else null)
+        }
+        val up = at(true)
+        val side = at(false)
+        return if (floor(side / STEP + 1e-9) > floor(up / STEP + 1e-9)) Need(side, false) else Need(up, true)
     }
 
     // [key]'s [marks], a movable one that would meet its letter even a quarter smaller (left out: touching is
     // apart then, no gap) moved elsewhere with the others movable, the first place where none would and they
     // are apart; as they were if none
     private fun fitting(key: LetterKey, marks: List<Mark>): List<Mark> {
-        fun outOfReach(m: Mark) = need(key, m, 0.0) < 1.0 - MAX_LETTER_SHRINK - STEP / 2
+        fun outOfReach(m: Mark) = need(key, m, 0.0).scale < 1.0 - MAX_LETTER_SHRINK - STEP / 2
         if (marks.none { it.elsewhere.isNotEmpty() && outOfReach(it) }) return marks
         var moved = marks
         while (moved.any { it.elsewhere.isNotEmpty() }) {
@@ -409,25 +432,59 @@ object KeyMarkYield {
         return i
     }
 
-    // [mark] out of [glyph]'s way, within [room]: towards its corner, the least, then smaller to [minScale]
-    private fun into(glyph: Ink, mark: Mark, room: Ink, gap: Double, minScale: Double): Ink {
+    // [mark] out of [glyph]'s way, within [room] (and [edge]: a mark already out in its inset on one axis
+    // keeps its box's corner within the arc as it moves on the other): towards its corner, the least, then
+    // smaller to [minScale]
+    // ([prefer]: the way it goes where both would part them alone, up or sideways)
+    private fun into(glyph: Ink, mark: Mark, room: Ink, edge: Edge, gap: Double, minScale: Double, prefer: Boolean? = null): Ink {
         if (!mark.ink.meets(glyph, gap)) return mark.ink
         val s = mark.slot
-        return corner(glyph.inFrame(s), mark.ink.inFrame(s), room.inFrame(s), gap, minScale, s.centred).inFrame(s)
+        return corner(glyph.inFrame(s), mark.ink.inFrame(s), room.inFrame(s), gap, minScale, s, edge, prefer).inFrame(s)
     }
 
-    // the top right [mark] out of [glyph]'s way: right or up, whichever clears it in less ([centred]: up
-    // only); neither alone: into [room]'s corner, then smaller about its top right (top middle), to [minScale]
-    private fun corner(glyph: Ink, mark: Ink, room: Ink, gap: Double, minScale: Double, centred: Boolean): Ink {
-        val over = glyph.right + gap - mark.left
-        val under = mark.bottom - (glyph.top - gap)
-        val rightRoom = if (centred) 0.0 else (room.right - mark.right).coerceAtLeast(0.0)
-        val upRoom = (mark.top - room.top).coerceAtLeast(0.0)
-        val sideways = !centred && over <= rightRoom
-        val upFits = under <= upRoom
-        if (sideways && (over <= under || !upFits)) return mark.moved(over, 0.0)
-        if (upFits) return mark.moved(0.0, -under)
-        val moved = mark.moved(rightRoom, -upRoom)
+    // the way [into] takes [mark] out of [glyph]'s way, up (true) or sideways; where it takes both, the one
+    // with less still to go (as [out]), a tie up
+    private fun way(glyph: Ink, mark: Mark, room: Ink, edge: Edge, gap: Double): Boolean {
+        val s = mark.slot
+        val g = glyph.inFrame(s)
+        val m = mark.ink.inFrame(s)
+        val r = room.inFrame(s)
+        return way(g, m, r, gap, s, edge, null) ?: (s.centred || under(g, m, gap) - upRoomOf(m, r, s, edge) <= over(g, m, gap) - sideRoomOf(m, r, s, edge))
+    }
+
+    private fun over(glyph: Ink, mark: Ink, gap: Double) = glyph.right + gap - mark.left
+    private fun under(glyph: Ink, mark: Ink, gap: Double) = mark.bottom - (glyph.top - gap)
+    private fun sideRoomOf(mark: Ink, room: Ink, slot: Slot, edge: Edge) =
+        if (slot.centred) 0.0 else minOf(room.right - mark.right, sideRoom(mark, slot, edge)).coerceAtLeast(0.0)
+    private fun upRoomOf(mark: Ink, room: Ink, slot: Slot, edge: Edge) = minOf(mark.top - room.top, upRoom(mark, slot, edge)).coerceAtLeast(0.0)
+
+    // the way [corner] takes the top right [mark]: sideways (false) where that alone parts them and it is the
+    // less or up alone does not ([prefer] false: or up alone does too), up (true) where that alone does; null: both
+    private fun way(glyph: Ink, mark: Ink, room: Ink, gap: Double, slot: Slot, edge: Edge, prefer: Boolean?): Boolean? {
+        val over = over(glyph, mark, gap)
+        val under = under(glyph, mark, gap)
+        val sideways = !slot.centred && over <= sideRoomOf(mark, room, slot, edge)
+        val upFits = under <= upRoomOf(mark, room, slot, edge)
+        return when {
+            sideways && (!upFits || (prefer ?: (over > under)) == false) -> false
+            upFits -> true
+            else -> null
+        }
+    }
+
+    // the top right [mark] out of [glyph]'s way: right or up, whichever clears it in less ([Slot.centred]: up
+    // only); neither alone: into [room]'s corner, then smaller about its top right (top middle), to [minScale];
+    // no move past [edge]'s arc (within the room it never is: only a mark [keptApart] took out of it)
+    private fun corner(glyph: Ink, mark: Ink, room: Ink, gap: Double, minScale: Double, slot: Slot, edge: Edge, prefer: Boolean?): Ink {
+        val centred = slot.centred
+        when (way(glyph, mark, room, gap, slot, edge, prefer)) {
+            false -> return mark.moved(glyph.right + gap - mark.left, 0.0)
+            true -> return mark.moved(0.0, -(mark.bottom - (glyph.top - gap)))
+            null -> {}
+        }
+        val rightRoom = sideRoomOf(mark, room, slot, edge)
+        val up = mark.moved(0.0, -upRoomOf(mark, room, slot, edge))
+        val moved = up.moved(if (centred) 0.0 else minOf(rightRoom, sideRoom(up, slot, edge)).coerceAtLeast(0.0), 0.0)
         val byLeft = if (centred) 0.0 else (moved.right - (glyph.right + gap)) / moved.width
         val byBottom = (glyph.top - gap - moved.top) / moved.height
         val scale = maxOf(byLeft, byBottom).coerceIn(minScale, 1.0)
@@ -439,8 +496,8 @@ object KeyMarkYield {
     // more than [share] of it) the least on the one axis that parts them, sideways or up, the less of the
     // two (as [corner]); where neither does alone, as far as it goes on the one with less still to go ([up]:
     // the one asked for), the glyph's move or shrink to do the rest (the other axis left: a move there parts nothing)
-    private fun out(glyph: Ink, mark: Mark, room: Ink, edge: Edge, gap: Double, share: Double = 1.0, up: Boolean? = null): Ink {
-        val at = into(glyph, mark, room, gap, mark.minScale)
+    private fun out(glyph: Ink, mark: Mark, room: Ink, edge: Edge, gap: Double, share: Double = 1.0, up: Boolean? = null, inward: Double = 0.0): Ink {
+        val at = into(glyph, mark, room, edge, gap, mark.minScale, up)
         if (!at.meets(glyph, gap)) return at
         val s = mark.slot
         val g = glyph.inFrame(s)
@@ -452,12 +509,50 @@ object KeyMarkYield {
         val sideways = !s.centred && over <= side
         val upFits = under <= upward
         val moved = when {
+            up == true || s.centred -> upBy(m, s, edge, under, upward, inward)
+            up == false -> sideBy(m, s, edge, over, side, inward)
             sideways && (over <= under || !upFits) -> m.moved(over, 0.0)
             upFits -> m.moved(0.0, -under)
-            s.centred || (up ?: (under - upward <= over - side)) -> m.moved(0.0, -upward)
-            else -> m.moved(side, 0.0)
+            under - upward <= over - side -> upBy(m, s, edge, under, upward, inward)
+            else -> sideBy(m, s, edge, over, side, inward)
         }
         return moved.inFrame(s)
+    }
+
+    // the top right [m] up by [under], [upward] at most; short of it, in from its side up to [inward] (no further
+    // than the arc gives more for) the least that lets it up so far, else as far as that lets it
+    private fun upBy(m: Ink, slot: Slot, edge: Edge, under: Double, upward: Double, inward: Double): Ink {
+        if (under <= upward) return m.moved(0.0, -under)
+        val e = edge.face.inFrame(slot)
+        val most = if (slot.centred) 0.0 else minOf(inward, edge.radius(slot, right = true) - (e.right - m.right)).coerceAtLeast(0.0)
+        if (most <= 0.0) return m.moved(0.0, -upward)
+        val x = leastIn(most) { x -> upRoom(m.moved(-x, 0.0), slot, edge) >= under }
+        val i = m.moved(-x, 0.0)
+        return i.moved(0.0, -minOf(under, upRoom(i, slot, edge)))
+    }
+
+    // the top right [m] sideways by [over], [side] at most; short of it, in from its top (down) as [upBy]
+    private fun sideBy(m: Ink, slot: Slot, edge: Edge, over: Double, side: Double, inward: Double): Ink {
+        if (over <= side) return m.moved(over, 0.0)
+        val e = edge.face.inFrame(slot)
+        val most = minOf(inward, edge.radius(slot, right = true) - (m.top - e.top)).coerceAtLeast(0.0)
+        if (most <= 0.0) return m.moved(side, 0.0)
+        val y = leastIn(most) { y -> sideRoom(m.moved(0.0, y), slot, edge) >= over }
+        val i = m.moved(0.0, y)
+        return i.moved(minOf(over, sideRoom(i, slot, edge)), 0.0)
+    }
+
+    // the least of 0 to [most] (to [OUT_PX]) where [ok]; [most] where none is
+    private fun leastIn(most: Double, ok: (Double) -> Boolean): Double {
+        if (ok(0.0)) return 0.0
+        if (!ok(most)) return most
+        var lo = 0.0
+        var hi = most
+        while (hi - lo > OUT_PX) {
+            val d = (lo + hi) / 2.0
+            if (ok(d)) hi = d else lo = d
+        }
+        return hi
     }
 
     private fun mid(ink: Ink): Double = (ink.left + ink.right) / 2.0

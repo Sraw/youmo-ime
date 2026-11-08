@@ -255,6 +255,64 @@ class KeyMarkYieldTest {
     }
 
     @Test
+    fun aMarkFurtherInThanItsRoomsCornerKeepsItsCornerWithinTheArcAsItGoesToTheCorner() {
+        // the floating handwriting ⌫'s icons: 8 dp, 3 dp from the side (further in than the room's 2), a face
+        // 14.5 dp tall rounded 4 dp (and 6); also lower in the room, at its side or a dp in: the glyph over them
+        // by a quarter dp to three dp either way: up and on to the side into the room's corner, the box's
+        // corner never out of the arc it went towards (where the room's corner is past it: 6 dp corners)
+        val overs = listOf(0.25, 0.5, 1.0, 2.0, 3.0).let { o -> o.flatMap { x -> o.map { y -> x to y } } }
+        var against = 0
+        for (d in listOf(2.0, 2.625, 2.75, 3.0, 3.5)) for (r in listOf(4.0, 6.0)) for ((x, y) in listOf(3.0 to 1.0, 3.0 to 3.0, 2.0 to 3.0, 2.5 to 2.0)) {
+            val k = Key(30 * d, 14.5 * d, d, r)
+            val mark = Mark(Ink(x * d, y * d, (x + 8) * d, (y + 8) * d), Slot.TopLeft, k.least, KeyMarkYield.DROP_SHORTCUT, emptyList())
+            against += overs.sumOf { (overX, overY) ->
+                val glyph = Ink(mark.ink.right + 1.0 * d - overX * d, mark.ink.bottom + 1.0 * d - overY * d, k.room.right, k.h)
+                val s = KeyMarkYield.key(glyph, listOf(mark), k.room, 1.0 * d, k.edge)
+                withinArcs(k, List(4) { r }, s, "at $d, r $r, from ($x, $y) dp, $overX × $overY dp over")
+            }
+        }
+        assertTrue(against >= 10, "against the arc: $against")
+    }
+
+    @Test
+    fun aMarkStillMeetingTheGlyphAtItsLeastGoesInAlongTheArcBeforeItIsLeftOut() {
+        // a top left icon in a corner rounded 4 dp, a glyph the room's width under it, its top a tenth of a px
+        // higher at a time: the icon up, then the glyph smaller to its least; still over it, the icon in along
+        // the arc (up as it goes in), the least, a little further each time, never a jump, till the arc gives
+        // no more and it is left out (for good)
+        for (d in listOf(2.0, 2.625, 2.75, 3.0, 3.5)) {
+            val k = Key(24 * d, 15 * d, d, 4.0)
+            val gap = 1.0 * d
+            var last: Ink? = null
+            var along = 0
+            var gone = false
+            var top = k.room.top + k.least * k.size + gap
+            while (top > k.room.top + k.least * k.size + gap - 3 * d) {
+                val glyph = Ink(k.room.left, top, k.room.right, k.room.bottom)
+                val s = KeyMarkYield.key(glyph, listOf(k.mark(Slot.TopLeft)), k.room, gap, k.edge)
+                val at = "at $d, the glyph's top at $top"
+                val m = s.marks[0]
+                if (m == null) {
+                    assertEquals(glyph, s.glyph, "left out, the glyph its own $at")
+                    gone = true
+                } else {
+                    assertTrue(!gone, "left out, then kept again $at")
+                    withinArcs(k, List(4) { 4.0 }, s, at)
+                    last?.let { o -> assertTrue(maxOf(abs(m.left - o.left), abs(m.top - o.top)) <= 0.5, "no jump $at: $o to $m") }
+                    if (m.left > k.room.left + 1e-6) {
+                        near(glyph.height * (1.0 - 0.2), s.glyph.height, "in along the arc, the glyph at its least $at")
+                        assertTrue(m.top < k.room.top, "up as it goes in $at: $m")
+                        along++
+                    }
+                    last = m
+                }
+                top -= 0.1
+            }
+            assertTrue(along >= 2 && gone, "in along the arc ($along), then left out, at $d")
+        }
+    }
+
+    @Test
     fun aMarkAndItsGlyphMoveAPxAtATimeAsTheGlyphGrows() {
         // the glyph a px wider at a time, from clear of the icon to the icon at the edge and the glyph smaller:
         // neither moves more than a px (and the glyph's own hundredth), its inset eaten a share at a time
@@ -314,6 +372,22 @@ class KeyMarkYieldTest {
             val icon = assertNotNull(eaten.keys[0].marks[0], "kept $at")
             near(k.room.top, icon.top, "the icon not up $at")
             assertTrue(icon.left < k.room.left && inside(icon, k.bound), "the icon out to its left $at: $icon")
+        }
+    }
+
+    @Test
+    fun aLettersIconGoesUpWhereAsideLeavesTheLettersLessThanAWholeStepLarger() {
+        // as above, the letter's left 5.3 dp in: up leaves the letters 0.900 of their size, aside 0.904, the same
+        // whole percent; counted in percents, a tie goes up (a few thousandths either way never swap the way)
+        for (d in listOf(2.0, 2.625, 2.75, 3.0, 3.5)) {
+            val k = Key(70 * d, 20 * d, d)
+            val letter = Ink(5.3 * d, 7.25 * d, 66.75 * d, 17.25 * d)
+            val key = KeyMarkYield.LetterKey(letter, letter.bottom, listOf(k.mark(Slot.TopLeft)), k.room, k.edge)
+            val eaten = KeyMarkYield.letters(listOf(key), 1.0 * d)
+            assertTrue(abs(eaten.scale - 0.9) < 0.001, "the letters at 0.900 at $d: ${eaten.scale}")
+            val icon = assertNotNull(eaten.keys[0].marks[0], "kept at $d")
+            near(k.room.left, icon.left, "the icon not aside at $d")
+            assertTrue(icon.top < k.room.top - 0.01, "the icon up at $d: $icon")
         }
     }
 

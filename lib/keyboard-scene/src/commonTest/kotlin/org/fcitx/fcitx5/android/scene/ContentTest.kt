@@ -32,6 +32,8 @@ class ContentTest {
 
     private fun ops(s: Scene, id: String, pressed: Boolean = false) = s.keys.first { it.id == id }.ops(pressed)
 
+    private val movingIcons = setOf("delete-sweep", "restore", "select-all", "content-copy", "content-paste", "content-cut", "undo", "redo")
+
     private fun texts(s: Scene, id: String) = ops(s, id).filterIsInstance<Op.Text>()
 
     private fun icons(s: Scene, id: String) = ops(s, id).filterIsInstance<Op.Icon>()
@@ -164,6 +166,71 @@ class ContentTest {
         }
         // the sweep met all three: kept as they were, kept by eating their insets, one left out
         assertTrue(squeezed >= 20 && left >= 20, "squeezed $squeezed, left out $left")
+    }
+
+    @Test
+    fun aFloatingBoardsIconsKeepTheirCornersWithinTheFacesArcs() {
+        // floating (and floating compact) boards from their height down to 55% of it, a px or two either way,
+        // at every density: every shortcut's and ⌫'s icon's box, where it moved for its key's glyph, keeps its
+        // corners within the face's rounded ones (less the border); some against them
+        val heights = listOf(1.0, 0.9, 0.8, 0.7, 0.65, 0.6, 0.55).flatMap { part -> listOf(0.0, 1.0, 2.0).map { px -> part to px } }
+        var against = 0
+        for (d in listOf(2.0, 2.625, 2.75, 3.0, 3.5)) for (compact in listOf(false, true)) for (board in listOf("qwerty", "k14", "zhuyin", "zhuyin-nine", "handwriting")) {
+            val k = d / Forms.DENSITY
+            against += heights.sumOf { (part, px) ->
+                val e = Forms.floating.copy(width = Forms.floating.width * k, height = Forms.floating.height * k * part - px, density = d, compact = compact)
+                val at = "at $d, ${if (compact) "compact " else ""}$board $part of its height less $px px"
+                Forms.scene(board, Forms.env(board, e)).keys.sumOf { iconsWithinArcs(it, at) }
+            }
+        }
+        assertTrue(against >= 10, "against the arcs: $against")
+    }
+
+    // [key]'s shortcut and ⌫ icons' box corners within its face's rounded ones (less the border); how many against them
+    private fun iconsWithinArcs(key: KeyNode, at: String): Int {
+        val shape = key.shape as? Shape.Rect ?: return 0
+        val f = shape.box
+        val line = key.ops(false).filterIsInstance<Op.Stroke>().firstOrNull()?.width ?: 0.0
+        var against = 0
+        for (icon in key.ops(false).filterIsInstance<Op.Icon>().filter { it.name in movingIcons }) {
+            val b = icon.box
+            val corners = listOf(
+                Triple(shape.radii[0], f.left + shape.radii[0] - b.left, f.top + shape.radii[0] - b.top),
+                Triple(shape.radii[1], b.right - (f.right - shape.radii[1]), f.top + shape.radii[1] - b.top),
+                Triple(shape.radii[2], b.right - (f.right - shape.radii[2]), b.bottom - (f.bottom - shape.radii[2])),
+                Triple(shape.radii[3], f.left + shape.radii[3] - b.left, b.bottom - (f.bottom - shape.radii[3])),
+            )
+            for ((r, x, y) in corners.filter { (r, x, y) -> r > line && x > 0.0 && y > 0.0 }) {
+                val out = sqrt(x * x + y * y) - (r - line)
+                assertTrue(out <= 0.01, "within the arc $at, ${key.id}'s ${icon.name}: $b in $f, corners $r: $out px out")
+                if (out > -0.05) against++
+            }
+        }
+        return against
+    }
+
+    @Test
+    fun aLettersSymbolGoesUpOrAsideOnceAsTheBoardGetsShorter() {
+        // floating qwerty at 2 px a dp a px shorter at a time, v's face 54 px down to 48 (51 and 52 by turns,
+        // the rows' rounding): '?' goes up out of v's way, then aside, and never back; the way is v's at its
+        // size, not the letters' as they get smaller
+        val d = 2.0
+        val k = d / Forms.DENSITY
+        val heights = mutableSetOf<Double>()
+        var last: Double? = null
+        var turns = 0
+        var h = 330.8
+        while (h >= 298.8) {
+            val s = Forms.scene("qwerty", Forms.env("qwerty", Forms.floating.copy(width = Forms.floating.width * k, height = h, density = d)))
+            val f = face(s, "v")
+            heights += f.height
+            val x = texts(s, "v").first { it.text == "?" }.x - f.left
+            last?.let { if (abs(x - it) > 1.5) turns++ }
+            last = x
+            h -= 1.0
+        }
+        assertTrue(heights.min() <= 48.0 && heights.max() >= 54.0, "v's face 48 to 54 px: $heights")
+        assertEquals(1, turns, "'?' up, then aside, once")
     }
 
     @Test
