@@ -62,9 +62,9 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
   normal
     shadow rect(653.88,18.38,779.63,133.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(653.88,18.38,779.63,130.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    icon backspace 690.75,43,753.75,106 #ff7a858a
-    icon delete-sweep 659.13,21,688.13,50 #ff7a858a
-    icon restore 659.13,99,688.13,128 #ff7a858a
+    icon backspace 690.63,43,753.63,106 #ff7a858a
+    icon delete-sweep 658.88,23.63,687.88,52.63 #ff7a858a
+    icon restore 658.88,96.5,687.88,125.5 #ff7a858a
   pressed
     +2 fill rect(653.88,18.38,779.63,130.63 r=10.5,10.5,10.5,10.5) #1f000000
 key 4 kind=letter a11y="GHI，4"

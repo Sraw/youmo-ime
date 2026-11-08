@@ -80,6 +80,12 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
         // a channel off by this little is anti-aliasing; this share of the pixels so, at most
         private const val CHANNEL_SLACK = 24
         private const val MOST_DIFFERING = 0.015
+
+        // 大千 alone, by the new rules (060-render-p2 S4e, §5.3): its symbols one class, never moved off their row's
+        // baseline where the views move ㄌ ㄏ ㄒ ㄗ down for their icons, the icons giving way in their corners
+        // instead: 1.46% to 1.95% at the standard and compact heights, the rest of it as close as ever. With the
+        // voice pack in (integ-060), the space's microphone a few pixels apart on the two adds up to 0.07%: 2.02% compact
+        private val DIFFERING_MORE = mapOf("zhuyin" to 0.021)
     }
 
     @get:Rule
@@ -117,7 +123,7 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
         val shares = cases.associate { it.name to differingShare(it) }
         val told = shares.entries.joinToString("\n") { (name, share) -> "$board $name ${"%.2f".format(share * 100)}%" }
         File("build/outputs/canvas-compare/$board-shares.txt").apply { parentFile!!.mkdirs() }.writeText(told + "\n")
-        assertTrue(told, shares.values.all { it < MOST_DIFFERING })
+        assertTrue(told, shares.values.all { it < (DIFFERING_MORE[board] ?: MOST_DIFFERING) })
     }
 
     // the share of the pixels that differ between the views' keys and the scene's: a channel off by more

@@ -89,7 +89,7 @@ key y kind=letter a11y="y，6"
     shadow rect(558.88,10.5,654.13,124.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(558.88,10.5,654.13,121.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "y" 588.39,88.64 system 400 60.38 #ff37474f
-    icon redo 566,14.75,595,43.75 #ff7a858a
+    icon redo 567,14.88,596,43.88 #ff7a858a
     text "6" 627.38,39.9 system 700 28 #ff7a858a
   pressed
     +2 fill rect(558.88,10.5,654.13,121.5 r=10.5,10.5,10.5,10.5) #1f000000
@@ -165,7 +165,7 @@ key a kind=letter a11y="a，@"
     shadow rect(62.88,142.5,157.13,257.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(62.88,142.5,157.13,254.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "a" 91.89,221.14 system 400 60.38 #ff37474f
-    icon select-all 70,147,99,176 #ff7a858a
+    icon select-all 70.88,147.13,99.88,176.13 #ff7a858a
     text "@" 130.38,171.9 system 700 28 #ff7a858a
   pressed
     +2 fill rect(62.88,142.5,157.13,254.5 r=10.5,10.5,10.5,10.5) #1f000000
@@ -314,7 +314,7 @@ key z kind=letter a11y="z，'"
     shadow rect(172.88,275.5,268.13,389.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(172.88,275.5,268.13,386.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "z" 202.39,353.64 system 400 60.38 #ff37474f
-    icon undo 180,279.75,209,308.75 #ff7a858a
+    icon undo 181.13,279.38,210.13,308.38 #ff7a858a
     text "'" 241.38,304.9 system 700 28 #ff7a858a
   pressed
     +2 fill rect(172.88,275.5,268.13,386.5 r=10.5,10.5,10.5,10.5) #1f000000
@@ -330,7 +330,7 @@ key x kind=letter a11y="x，:"
     shadow rect(283.88,275.5,378.13,389.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(283.88,275.5,378.13,386.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "x" 312.89,353.64 system 400 60.38 #ff37474f
-    icon content-cut 291,279.75,320,308.75 #ff7a858a
+    icon content-cut 291.38,279.38,320.38,308.38 #ff7a858a
     text ":" 351.38,304.9 system 700 28 #ff7a858a
   pressed
     +2 fill rect(283.88,275.5,378.13,386.5 r=10.5,10.5,10.5,10.5) #1f000000
@@ -346,7 +346,7 @@ key c kind=letter a11y="c，\""
     shadow rect(393.88,275.5,488.13,389.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(393.88,275.5,488.13,386.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "c" 422.89,353.64 system 400 60.38 #ff37474f
-    icon content-copy 401,279.75,430,308.75 #ff7a858a
+    icon content-copy 401.63,279.38,430.63,308.38 #ff7a858a
     text "\"" 461.38,304.9 system 700 28 #ff7a858a
   pressed
     +2 fill rect(393.88,275.5,488.13,386.5 r=10.5,10.5,10.5,10.5) #1f000000
@@ -362,7 +362,7 @@ key v kind=letter a11y="v，?"
     shadow rect(503.88,275.5,598.13,389.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(503.88,275.5,598.13,386.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "v" 532.89,353.64 system 400 60.38 #ff37474f
-    icon content-paste 511,279.75,540,308.75 #ff7a858a
+    icon content-paste 511.88,279.38,540.88,308.38 #ff7a858a
     text "?" 571.38,304.9 system 700 28 #ff7a858a
   pressed
     +2 fill rect(503.88,275.5,598.13,386.5 r=10.5,10.5,10.5,10.5) #1f000000
