@@ -207,7 +207,7 @@ class SceneKeyDefTest {
         val logged = mutableListOf<String>()
         val tree = object : timber.log.Timber.Tree() {
             override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
-                if (priority == android.util.Log.ERROR) logged += message
+                if (priority >= android.util.Log.WARN) logged += message
             }
         }
         prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
@@ -220,6 +220,8 @@ class SceneKeyDefTest {
                     TextKeyboard(context, ThemePreset.PixelLight).laidOut(),
                     // made again: read once all the same
                     TextKeyboard(context, ThemePreset.PixelLight).laidOut(),
+                    // a theme not the built-in: no scene is no theme's fault, the built-in's not tried (no warning)
+                    TextKeyboard(context, ThemePreset.MaterialLight).laidOut(),
                 )
                 for (k in keyboards) {
                     val canvas = KeyboardHarness.all(k).filterIsInstance<KeyboardCanvasView>().single()
@@ -227,8 +229,10 @@ class SceneKeyDefTest {
                     assertTrue(KeyboardHarness.keysOf(k).isEmpty())
                     assertTrue(KeyboardHarness.all(k).filterIsInstance<KeyView>().none { it.isShown })
                 }
-                // each layout's two readings, logged once a process
+                // each layout's two readings, logged once a process (the canvas's own "no scene" a keyboard aside);
+                // no theme blamed, no built-in theme tried for it
                 assertEquals(logged.toString(), 2 * 3, logged.count { it.startsWith("scene layout") })
+                assertTrue(logged.toString(), logged.none { "of theme" in it })
             }
         } finally {
             timber.log.Timber.uproot(tree)

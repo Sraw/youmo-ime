@@ -91,13 +91,11 @@ object SceneLayouts {
             read.clear()
         }
 
-    /** The layout [id], its fragments with it: [source]'s, else [fallback]'s (the one step back); null where neither reads. */
+    /** The layout [id], its fragments with it: [source]'s, else [fallback]'s (the one step back; a source of the same key not read again); null where neither reads. */
     fun of(context: Context, id: String): SceneLayout? {
         val app = context.applicationContext ?: context
         val first = source(app)
-        readFrom(first, id)?.let { return it }
-        val then = fallback(app)
-        return if (then.key == first.key) null else readFrom(then, id)
+        return readFrom(first, id) ?: readFrom(fallback(app), id)
     }
 
     /** The layouts read from the source of [key] (all of them where null) read again when next asked for: P3, a theme pack changed. */
