@@ -345,4 +345,4 @@
 - **前提**：B0（debug 包，导入了两个包）；用 `adb shell run-as` 把文字包里某个文件改掉一个字节（大小不变）。
 - **操作**：强行停止应用，再弹出键盘，等半分钟以上；收起再弹出键盘；打开 **资源包** 页；再导入同一个文字包。
 - **预期**：导入后第一次启动会把文件完整核对一遍（导入后还没启动过的话，就是这次）；核对过的包 30 天内不再核对，到期后只在充电时核对（要在核对前改坏，就先清掉 `verified`：改坏后用 `run-as` 删掉该代目录里的 `verified` 文件）。刚启动时键盘照常（启动只核对大小，大小不对直接算损坏）；半分钟后后台核对完，键盘换成提示「文字包已损坏，请重新导入」，资源包页文字包那一行写「v1 已损坏，请重新导入」，语音包照常。再强行停止、再弹出键盘：一弹出就是这个提示（损坏已记在代目录的 `damaged` 文件里）。再导入同一个文字包时重新复制（结果说「已导入 v1」，不说「已经导入过」），键盘恢复。
-- **JVM**：`PacksUatTest.aPackDamagedSinceItsImportIsSaidSoAndImportedAgainMended`（核对、提示、页上的状态、再导入修好）、`aPackFoundDamagedIsStillSoAfterARestartTillImportedAgain`（重启后仍是已损坏、再导入后正常）、`aPackReadThroughA30DaysAgoWaitsForTheCharger`、`theHostFailingOnTheTextPackReadsItThroughOnce`；ime-core `PackShelfTest`（同一版再导入时先核对、核对出损坏后记下不用、文件大小不对也算损坏、30 天与时钟回拨）。
+- **JVM**：`PacksUatTest.aPackDamagedSinceItsImportIsSaidSoAndImportedAgainMended`（核对、提示、页上的状态、再导入修好）、`aPackFoundDamagedIsStillSoAfterARestartTillImportedAgain`（重启后仍是已损坏、再导入后正常）、`aPackReadThroughA30DaysAgoWaitsForTheCharger`、`theHostFailingOnTheTextPackReadsItThroughOnce`；ime-core `PackShelfTest`（同一版再导入时先核对、核对出损坏后记下不用、文件大小不对也算损坏、读不了不算损坏、30 天与时钟回拨）。

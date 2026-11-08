@@ -196,8 +196,8 @@ they stay: a pack carries no code.
   checked first, then each file is copied into a new generation directory while its size and SHA-256 are
   checked, after a free-space check against the manifest's sizes; only when all are right is the
   `current` pointer swapped atomically (rename; the pack's directory fsynced after each rename, so a power cut keeps them). A pack already there at that version (the same
-  manifest) is not copied again if its files in use, read through then, still are it; else it is
-  copied anew. An older version over a newer one is imported (a pack gone wrong taken back; it must
+  manifest) is not copied again if its files in use, read through then, still are it; else (one
+  changed, gone, or not readable now) it is copied anew. An older version over a newer one is imported (a pack gone wrong taken back; it must
   still meet the app's `minVersion`), the result saying 已用 vX 替换了更新的 vN. The generation replaced is deleted only once the host is up
   on the new one (`HostDaemon.restartIfRunning` waits for it, and for a host still starting before
   restarting it: that one may have read the old files), then `PackShelf.sweep`; a host still starting
@@ -216,11 +216,11 @@ they stay: a pack carries no code.
   seconds after the start a thread of the lowest priority does what is due
   (`PackStore.verifyInBackground`); the 30-day one waits for the phone to be charging
   (`BatteryManager.isCharging`, looked at every 15 minutes while the process lives; no JobScheduler:
-  the process is there whenever the keyboard is). One changed is `PackStatus.Damaged`: a
+  the process is there whenever the keyboard is). One changed or gone is `PackStatus.Damaged`: a
   `damaged` file written into its generation, so every later start reads it so at once, not used
   till imported again (the gate: 文字包已损坏，请重新导入; the page's row: vN 已损坏，请重新导入;
-  voice input's tip the same).
-  When the host fails on the text pack (an engine
+  voice input's tip the same). A file that cannot be read for another reason (an I/O error) is
+  logged, nothing marked: read again at the next due. When the host fails on the text pack (an engine
   that cannot load its data, `EngineBridge.unloadable`; the host's start throwing, `KotlinHost`), the
   text pack is read through there and then (`PackStore.verifyAfterFailure`, once a generation a
   process): damaged, the keyboard says so, and the next start's gate is up instead of the same

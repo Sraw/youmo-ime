@@ -207,6 +207,25 @@ class PackShelfTest {
         assertSame(VerifyDue.NONE, shelf().due(PackKind.TEXT))
     }
 
+    // review L-3: a file gone is damage; one the disk cannot read now says nothing of the pack
+    @Test
+    fun `a file that cannot be read now is neither damage nor verified`() {
+        var failing = true
+        val shelf = PackShelf(root, listOf(packs.publicKey), needs, 0, openFile = { file ->
+            if (failing && file.name == "pinyin.data") throw IOException("EIO") else file.inputStream()
+        }).apply { load() }
+        shelf.take(text())
+        assertFalse(shelf.verify(PackKind.TEXT))
+        assertTrue(shelf.status(PackKind.TEXT) is PackStatus.Ready)
+        assertSame(VerifyDue.UNVERIFIED, shelf.due(PackKind.TEXT))
+        assertFalse(File(shelf.dir(PackKind.TEXT), PackShelf.DAMAGED).exists())
+        // the same pack again, unreadable: copied anew, not taken for there
+        assertTrue(shelf.take(text()) is ImportResult.Imported)
+        failing = false
+        assertFalse(shelf.verify(PackKind.TEXT))
+        assertSame(VerifyDue.NONE, shelf.due(PackKind.TEXT))
+    }
+
     @Test
     fun `a newer pack replaces the old one, which is deleted`() {
         val shelf = shelf()

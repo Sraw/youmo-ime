@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.pack
 
 import org.fcitx.fcitx5.android.core.CoreLog
 import java.io.File
+import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
@@ -104,6 +105,8 @@ class PackShelf(
     private val requirements: Map<PackKind, PackRequirement>,
     private val margin: Long = DEFAULT_MARGIN,
     private val clock: () -> Long = System::currentTimeMillis,
+    // a test's hook: how a file in use is opened to be read through (one failing as a disk does)
+    private val openFile: (File) -> InputStream = { it.inputStream() },
     // a test's hook: which directories an import synced
     private val syncDir: (File) -> Unit = ::syncDirectory,
 ) {
@@ -193,7 +196,8 @@ class PackShelf(
      * Reads [kind]'s files in use through, against its manifest: what [load] does not (sizes
      * only). One found changed is [PackStatus.Damaged] from then on (its generation marked, the
      * next start reads it so), till imported again; true then. Found as signed, it is marked
-     * verified ([due]).
+     * verified ([due]). A file that cannot be read for another reason than its absence (an I/O
+     * error) says nothing of the pack: logged, nothing marked, read again at the next due.
      * Long (a pack's hundreds of MB), so not under the shelf's lock: an import meanwhile (its
      * files replaced, the old ones deleted) leaves the new pack as it is.
      */
@@ -202,7 +206,7 @@ class PackShelf(
         val status = held.status
         val gen = held.dir
         if (status !is PackStatus.Ready || gen == null) return false
-        val read = read(status.manifest, gen)
+        val read = read(kind, status.manifest, gen)
         synchronized(this) {
             // an import came between: what was read is no longer what is used
             if (state.getValue(kind).dir != gen) return false
@@ -212,20 +216,22 @@ class PackShelf(
                     mark(gen, DAMAGED, "damaged".toByteArray())
                     state = state + (kind to Held(PackStatus.Damaged(status.manifest)))
                 }
+                Read.UNKNOWN -> Unit
             }
         }
         return read == Read.DAMAGED
     }
 
-    private enum class Read { INTACT, DAMAGED }
+    private enum class Read { INTACT, DAMAGED, UNKNOWN }
 
-    // each of [manifest]'s files in [gen], its size and SHA-256 as it says; one unreadable is not
-    private fun read(manifest: PackManifest, gen: File): Read = try {
+    // each of [manifest]'s files in [gen], its size and SHA-256 as it says; one gone is damage, one
+    // that cannot be read (an I/O error) says nothing of what it holds
+    private fun read(kind: PackKind, manifest: PackManifest, gen: File): Read = try {
         val buffer = ByteArray(BUFFER)
         val same = manifest.files.all { entry ->
             val digest = MessageDigest.getInstance("SHA-256")
             var size = 0L
-            File(gen, entry.path).inputStream().use { input ->
+            openFile(File(gen, entry.path)).use { input ->
                 while (true) {
                     val n = input.read(buffer)
                     if (n < 0) break
@@ -236,8 +242,11 @@ class PackShelf(
             size == entry.size && PackManifest.hex(digest.digest()) == entry.sha256
         }
         if (same) Read.INTACT else Read.DAMAGED
-    } catch (_: IOException) {
+    } catch (_: FileNotFoundException) {
         Read.DAMAGED
+    } catch (e: IOException) {
+        CoreLog.e("pack ${kind.id} not read through: ${e.javaClass.simpleName}")
+        Read.UNKNOWN
     }
 
     // now written in [gen] as when it was read through, and returned; not written (the storage
@@ -314,11 +323,12 @@ class PackShelf(
             PackStatus.Missing -> null
         }
         // the same pack: nothing to copy, if what is in use still is it (its files read through
-        // again: a start reads only their sizes); else copied anew, the import mending it
+        // again: a start reads only their sizes); else copied anew, the import mending it. One
+        // that cannot be read now is copied anew too: the user asked for it
         if (before is PackStatus.Ready && before.manifest.sameAs(manifest)) {
             val held = state.getValue(manifest.kind)
             val gen = held.dir
-            if (gen != null && read(before.manifest, gen) == Read.INTACT) {
+            if (gen != null && read(manifest.kind, before.manifest, gen) == Read.INTACT) {
                 state = state + (manifest.kind to held.copy(verifiedAt = markVerified(gen)))
                 return ImportResult.AlreadyThere(manifest)
             }
