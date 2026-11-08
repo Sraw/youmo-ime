@@ -11,6 +11,7 @@ import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.StateListDrawable
 import android.os.SystemClock
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -44,6 +45,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
+import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
@@ -131,6 +133,9 @@ class T9Keyboard(
 
         // the column's name in a theme (KeyNames.NINE)
         private const val SIDE_KEY = "side"
+
+        /** A column item's text size, in dp, before a long syllable is drawn smaller to fit. */
+        internal const val ITEM_TEXT_DP = 16f
         private const val RIGHT = 0.18f
 
         private const val DIGIT = (1f - SIDE - RIGHT) / 3
@@ -687,8 +692,12 @@ class T9Keyboard(
         else -> ONE
     }
 
-    private fun item(i: Int) = TextView(context).apply {
-        textSize = 16f
+    // one line, in dp as the keys' text is: a syllable longer than the column (shuang, zhuang on a
+    // narrow one) is drawn smaller to fit, not wrapped onto a second line the cell cuts off (A7)
+    private fun item(i: Int) = AutoScaleTextView(context).apply {
+        setTextSize(TypedValue.COMPLEX_UNIT_DIP, ITEM_TEXT_DP)
+        scaleMode = AutoScaleTextView.Mode.Proportional
+        isSingleLine = true
         gravity = Gravity.CENTER
         setTextColor(theme.altKeyTextColor)
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, itemHeight.takeIf { it > 0 } ?: dp(40))
