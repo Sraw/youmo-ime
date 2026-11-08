@@ -73,10 +73,10 @@ class BoardCanvasCompareTest(private val board: String, private val pinyinKeyboa
         private const val CHANNEL_SLACK = 24
         private const val MOST_DIFFERING = 0.015
 
-        // 大千 by the new rules (060-render-p2 S4e, §5.3): its symbols one class, never moved off their row's
-        // baseline (the views moved ㄌ ㄏ ㄒ ㄗ down for their icons), the icons giving way in their corners, at
-        // the compact height every symbol 6% smaller (the views shrank only the keys that met)
-        private val DIFFERING_MORE = mapOf("zhuyin" to 0.025)
+        // 大千 alone, by the new rules (060-render-p2 S4e, §5.3): its symbols one class, never moved off their row's
+        // baseline where the views move ㄌ ㄏ ㄒ ㄗ down for their icons, the icons giving way in their corners
+        // instead: 1.46% to 1.95% at the standard and compact heights, the rest of it as close as ever
+        private val DIFFERING_MORE = mapOf("zhuyin" to 0.02)
     }
 
     @get:Rule

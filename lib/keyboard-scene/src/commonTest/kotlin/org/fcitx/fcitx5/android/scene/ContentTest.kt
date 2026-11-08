@@ -207,7 +207,7 @@ class ContentTest {
 
     @Test
     fun aLettersSymbolGoesUpOrAsideOnceAsTheBoardGetsShorter() {
-        // floating qwerty at 2 px a dp a px shorter at a time, v's face 54 px down to 48 (51 and 52 by turns,
+        // floating qwerty at 2 px a dp a px shorter at a time, v's face 63 px down to 47 (51 and 52 by turns,
         // the rows' rounding): '?' goes up out of v's way, then aside, and never back; the way is v's at its
         // size, not the letters' as they get smaller
         val d = 2.0
@@ -215,7 +215,7 @@ class ContentTest {
         val heights = mutableSetOf<Double>()
         var last: Double? = null
         var turns = 0
-        var h = 330.8
+        var h = 360.8
         while (h >= 298.8) {
             val s = Forms.scene("qwerty", Forms.env("qwerty", Forms.floating.copy(width = Forms.floating.width * k, height = h, density = d)))
             val f = face(s, "v")
@@ -413,16 +413,21 @@ class ContentTest {
 
     @Test
     fun crowdedLettersShrinkTogetherRuleB7Yield() {
-        // a key so short its symbol meets its letter: every letter the same smaller size
-        val e: Env = env.copy(width = 540.0, height = 240.0)
-        val s = Fixtures.scene(e)
-        val sizes = s.keys.filter { it.kind == "letter" && it.role == null }.map { k ->
-            k.ops(false).filterIsInstance<Op.Text>().first { it.text == k.id }.size
-        }.toSet()
-        // one class, one scale: the same size to the last bit
-        assertEquals(1, sizes.size, "$sizes")
-        assertTrue(sizes.single() < 23 * d, "${sizes.single()}")
-        assertTrue(sizes.single() >= 23 * d * (1 - KeyMarkYield.MAX_CLASS_SHRINK) - 0.01, "the class's cap at most")
+        // shorter and shorter keys: every letter one size at each height, the class's cap at most; so short its
+        // symbols meet their letters past what the classes give, the letters their size and those symbols left
+        // out rather than every letter smaller for none (060-render-p2 S4e)
+        for (h in 240..400 step 8) {
+            val s = Fixtures.scene(env.copy(width = 540.0, height = h.toDouble()))
+            val letters = s.keys.filter { it.kind == "letter" && it.role == null }
+            val sizes = letters.map { k -> k.ops(false).filterIsInstance<Op.Text>().first { it.text == k.id }.size }.toSet()
+            // one class, one scale: the same size to the last bit
+            assertEquals(1, sizes.size, "at $h: $sizes")
+            assertTrue(sizes.single() >= 23 * d * (1 - KeyMarkYield.MAX_CLASS_SHRINK) - 0.01, "the class's cap at most at $h")
+            if (h == 240) {
+                near(23 * d, sizes.single())
+                assertTrue(letters.any { k -> k.ops(false).filterIsInstance<Op.Text>().size == 1 }, "a symbol left out")
+            }
+        }
     }
 
     // a table's roots over the letters (TextKeyboard): `when=roots`, `{root:x}`; the letter in the corner

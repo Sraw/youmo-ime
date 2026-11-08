@@ -143,6 +143,14 @@ object KeyMarkYield {
      */
     const val MIN_MARK_SCALE = 0.875
 
+    /**
+     * How far past what its classes may give a key fades out of their need (060-render-p2 S4e): a key
+     * whose marks fit only at [MIN_MARK_SCALE] less this or smaller (or never) asks its classes for
+     * nothing, its marks left out; one between asks the less the nearer it is to that, so a class's
+     * scale moves with the keyboard's size and never jumps where a key stops being saved.
+     */
+    const val HOPELESS_BAND = 0.075
+
     // how finely a class's scale is found; a mark's way out into its inset, in px; the marks' share of theirs
     private const val SCALE_STEP = 0.001
     private const val OUT_PX = 0.001
@@ -184,13 +192,20 @@ object KeyMarkYield {
             val live = apart[k].filterNotNull()
             if (asIs[k] != null) 1.0 else largest(least) { s -> place(keys[k].at(s), live, keys[k], gap) != null }
         }
-        val scales = keys.indices.groupBy { keys[it].glyphClass }.mapValues { (_, ks) -> ks.minOf { need[it] } }
         // the marks: all of a key's kept, as much smaller as lets them
         fun marksAt(k: Int, t: Double): List<Mark?> = keptApart(keys[k].marks.map { it.scaled(t).within(keys[k].edge) }, keys[k].edge)
+        fun marksFit(k: Int, g: Ink, t: Double) = marksAt(k, t).let { m -> m.all { it != null } && place(g, m.filterNotNull(), keys[k], gap) != null }
+        // how much of its need a key asks: all where its marks fit at [minMark], none where only [HOPELESS_BAND] below or never
+        val hopeless = minMark - HOPELESS_BAND
+        val saved = keys.indices.map { k ->
+            if (asIs[k] != null || minMark >= 1.0) 1.0 else share(largest(hopeless) { t -> marksFit(k, keys[k].at(least), t) }, minMark)
+        }
+        val scales = keys.indices.groupBy { keys[it].glyphClass }.mapValues { (_, ks) -> ks.minOf { 1.0 - (1.0 - need[it]) * saved[it] } }
         val markNeed = keys.indices.map { k ->
             if (whole(k)) return@map 1.0
             val g = keys[k].at(scales.getValue(keys[k].glyphClass))
-            largest(minMark) { t -> marksAt(k, t).let { m -> m.all { it != null } && place(g, m.filterNotNull(), keys[k], gap) != null } }
+            val t = largest(if (minMark >= 1.0) minMark else hopeless) { t -> marksFit(k, g, t) }
+            if (t >= minMark) t else 1.0 - (1.0 - minMark) * share(t, minMark)
         }
         fun markScale(symbol: Boolean) =
             keys.indices.filter { k -> keys[k].marks.any { (it.drop == DROP_SYMBOL) == symbol } }.minOfOrNull { markNeed[it] } ?: 1.0
@@ -209,8 +224,8 @@ object KeyMarkYield {
     /**
      * [key] settled as [was] (the same key, its edges where they fell before they were put on whole
      * pixels) settled in [board]: its glyph scaled as there and moved as far; a mark that stayed as it was
-     * where [key] has it (on its whole pixels), one that moved or is smaller where it went there, its
-     * corners then within [key]'s arcs (half a px from them at most); what was left out there left out.
+     * where [key] has it (on its whole pixels), one only smaller as much smaller about its corner there,
+     * one that moved where it went there, its corners then within [key]'s arcs (half a px from them at most); what was left out there left out.
      * Every choice is made on [was], whose geometry a px of keyboard moves by a px, never by a pixel's
      * rounding: one size of keyboard, one picture.
      */
@@ -220,11 +235,19 @@ object KeyMarkYield {
         val glyph = key.at(s).moved(settled.glyph.left - g0.left, settled.glyph.top - g0.top)
         val marks = key.marks.mapIndexed { i, m ->
             settled.marks[i]?.let { c ->
-                if (board.markScale(m) == 1.0 && c == was.marks[i].ink) m.ink else m.copy(ink = c).within(key.edge).ink
+                val t = board.markScale(m)
+                if (t == 1.0 && c == was.marks[i].ink) return@let m.ink
+                // only smaller there (and slid off the arc): as much smaller about its corner where [key] has it and
+                // slid as far, so a class nearing 1 nears the mark as it is
+                val w = was.marks[i].scaled(t)
+                if (c == w.within(was.edge).ink) m.scaled(t).ink.moved(c.left - w.ink.left, c.top - w.ink.top) else m.copy(ink = c).within(key.edge).ink
             }
         }
         return Settled(glyph, marks)
     }
+
+    // how much of its need a key whose marks fit at [t] asks: all at [minMark], none [HOPELESS_BAND] below it
+    private fun share(t: Double, minMark: Double) = ((t - (minMark - HOPELESS_BAND)) / HOPELESS_BAND).coerceIn(0.0, 1.0)
 
     // the largest of [least] to 1 (to a thousandth) where [fits]; [least] where none
     private fun largest(least: Double, fits: (Double) -> Boolean): Double {

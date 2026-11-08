@@ -93,7 +93,9 @@ class ZhuyinShortcutsUatTest {
         }
         for ((k, down) in moved) assertTrue("${k.label} $down", down < k.height / 4f)
         // none sideways: each symbol as far in from its key's left as on the keys with no shortcut (below), the
-        // scene's text at its full width; the scene's told by its centre, its class a size for all (S4e), within a px
+        // scene's text at its full width. The scene's told by its middle: its class is one size for every key
+        // (S4e) and may be smaller where the shortcuts are drawn than with none, which moves a glyph's left in but
+        // not its middle; within a px, the scene placing its text on its edges before they are rounded
         val inFrom = symbols.associate { it.label to it.drawn(it.label)!!.let { r -> if (canvas) r.centerX() else r.left } - it.bounds.left }
         if (canvas) {
             for (k in symbols) assertEquals(k.label, 1.0, (k as SceneShownKey).node.ops(false).filterIsInstance<Op.Text>().single { it.text == k.label }.scaleX, 0.0)
