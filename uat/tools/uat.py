@@ -974,10 +974,14 @@ class Device:
             return False
         n = max(lists, key=lambda n: (n.b[2] - n.b[0]) * (n.b[3] - n.b[1]))
         x0, y0, x1, y1 = n.b
-        before = s.texts()
+        # the texts and where they are: the list's end can move by its bottom padding (the navigation
+        # bar's) with no new text, and a row that came up from under the bar has moved (ST-26)
+        def seen(s):
+            return [(n.text, n.b) for n in s.app() if n.text]
+        before = seen(s)
         a, b = (x1 // 2, y0 + (y1 - y0) * 3 // 4), (x1 // 2, y0 + (y1 - y0) // 5)
         self.swipe(b if up else a, a if up else b, 400, after=0.6)
-        moved = self.screen().texts() != before
+        moved = seen(self.screen()) != before
         if moved:
             self._scrolled, self._at_top = not up, False
         return moved
@@ -1926,7 +1930,8 @@ def sym_char(d, ch):
             d.tap(n.c, 0.6)
         for _ in range(4):
             s = d.screen()
-            m = next((m for m in s.ime() if m.text == ch and m.c[0] > 200 and PANEL_TOP < m.c[1] < PANEL_BOTTOM), None)
+            # a cell drawn by the canvas (S5) has its symbol as words, not as a view's text
+            m = next((m for m in s.ime() if (m.text or m.desc) == ch and m.c[0] > 200 and PANEL_TOP < m.c[1] < PANEL_BOTTOM), None)
             if m:
                 d.tap(m.c, 0.9)
                 d._keys = None
