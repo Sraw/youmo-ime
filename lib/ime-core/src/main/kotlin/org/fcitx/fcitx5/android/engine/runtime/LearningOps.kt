@@ -179,18 +179,8 @@ internal class LearningOps(
         return when (op) {
             // the engine's text, which the menu's acts come back with (engines)
             is LearningOp.Menu -> menu(im, s, op)
-            is LearningOp.Delete -> if (Offer.FORGET in offers) {
-                val also = alike(s, op.text, shown)
-                delete(op.text, also, s.why(op.index)?.whole.orEmpty()) { act(EngineEvent.FORGET, op.index).also { if (it) actOn(im, also, Offer.FORGET, EngineEvent.FORGET, act) } }
-            } else {
-                LearningResult.Unavailable
-            }
-            is LearningOp.Block -> if (Offer.BLOCK in offers) {
-                val also = alike(s, op.text, shown)
-                block(listOf(op.text) + also) { act(EngineEvent.BLOCK, op.index).also { if (it) actOn(im, also, Offer.BLOCK, EngineEvent.BLOCK, act) } }
-            } else {
-                LearningResult.Unavailable
-            }
+            is LearningOp.Delete -> if (Offer.FORGET in offers) deleteAlike(im, s, op, shown, act) else LearningResult.Unavailable
+            is LearningOp.Block -> if (Offer.BLOCK in offers) blockAlike(im, s, op, shown, act) else LearningResult.Unavailable
             is LearningOp.Pin -> event(Offer.PIN, EngineEvent.PIN)
             // a phrase's file holds it, not the learning record: no undo
             is LearningOp.Unpin -> if (Offer.DELETE_PHRASE in offers) {
@@ -225,6 +215,20 @@ internal class LearningOps(
         val asShown = shown(text)
         if (asShown == text) return emptyList()
         return s.candidates(0, ALIKE_SCAN).map { it.text }.filter { it != text && shown(it) == asShown }.distinct()
+    }
+
+    private fun deleteAlike(im: String, s: Session, op: LearningOp.Delete, shown: (String) -> String, act: (Int, Int) -> Boolean): LearningResult {
+        val also = alike(s, op.text, shown)
+        return delete(op.text, also, s.why(op.index)?.whole.orEmpty()) {
+            act(EngineEvent.FORGET, op.index).also { if (it) actOn(im, also, Offer.FORGET, EngineEvent.FORGET, act) }
+        }
+    }
+
+    private fun blockAlike(im: String, s: Session, op: LearningOp.Block, shown: (String) -> String, act: (Int, Int) -> Boolean): LearningResult {
+        val also = alike(s, op.text, shown)
+        return block(listOf(op.text) + also) {
+            act(EngineEvent.BLOCK, op.index).also { if (it) actOn(im, also, Offer.BLOCK, EngineEvent.BLOCK, act) }
+        }
     }
 
     // [event] on each of [texts] where it is in the list now, the list as the last act left it
