@@ -1,7 +1,7 @@
 """uat/01-setup.md. The .md is the source of truth; each function follows its case's 前提/操作/预期."""
 import time
 
-from uat import IME, PKG, Blocked, case, check, in_picker, install
+from uat import IME, PKG, Blocked, case, check, import_packs, in_picker, install
 
 
 @case("SET-01", base="B0", mutates=True)
@@ -15,7 +15,7 @@ def set01(d):
     d.sh(f"pm uninstall {PKG}")
     out = d.sh("pm install -r /data/local/tmp/uat-youmo.apk")
     if "Success" not in out:
-        install(d, d.flavor)   # the host's APK back: the rest of the run needs the app on the device
+        install(d, d.voice)   # the host's APK back and its packs: the rest of the run needs them
         raise Blocked(f"重装失败：{out.strip()}")
     d.sh("ime set com.android.inputmethod.latin/.LatinIME")
     d.sh(f"am start -W -n {PKG}/org.fcitx.fcitx5.android.ui.main.MainActivity")
@@ -80,13 +80,18 @@ def set01(d):
     cur = d.sh("settings get secure default_input_method").strip()
     check(cur == IME, f"系统当前输入法是 {cur}")
     d.open_page("text")
-    # a fresh install loads its data first: the space key reads （不可用） for a while
+    # a fresh install has no resource packs: the keyboard asks for the text pack, then types once
+    # it is imported (as through the 资源包 page: the debug build's import, the same checks)
+    d.step("没有文字包时键盘上提示导入")
+    d.wait(lambda x: x.find(contains="需要导入文字包", where="ime"), 20, what="键盘上的「需要导入文字包」")
+    import_packs(d, d.voice)
+    # then it loads its data: the space key reads （不可用） for a while
     end = time.time() + 60
     while "拼音" not in d.im_label() and time.time() < end:
         time.sleep(1.0)
     lab = d.im_label()
     check("拼音" in lab, f"空格键上是「{lab}」")
-    return "向导两步，完成后是设置首页；弹出的是幽默输入法（拼音）"
+    return "向导两步，完成后是设置首页；键盘先提示导入文字包，导入后是幽默输入法（拼音）"
 
 
 case("SET-02", needs="jvm:SettingsMenuUatTest.enabledAndSelectedTheAppOpensOnItsHomePage")(lambda d: None)

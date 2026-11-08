@@ -6,12 +6,11 @@
 |---|---|---|
 | `lib/ime-core` | plain JVM (`java-library`), no Android on the classpath | The engine (`engine/`: pinyin, tables, English, strokes, phrases, learning, ranking, data formats, the runtime, `engine/runtime`, that makes their sessions), the input method framework (`host/`: fcitx5's instance, key pipeline, input contexts and the modules the app uses, ported to Kotlin; [host.md](host.md)), the keyboard's decisions (`input/`: cursor and composing tracking, key and gesture policies, bar state machines, voice decisions, field policy), `core/` (`CoreLog`, `FcitxUtils`, `FormattedText`), `ui/search/SettingsSearch` and `utils/EventStateMachine`. Tested in milliseconds. |
 | `app` | Android application | The `InputMethodService`, the keyboard's views and windows, the settings UI, file-backed managers (clipboard, themes, dictionaries, backups), `core/`: `KotlinHost` (the `HostApi` over ime-core's host, on one thread), `EngineBridge` (the engines' Android side). No native code of its own. |
-| `app/src/text`, `app/src/voice` | flavor source sets (`speech` dimension) | Each defines `VoiceFeature` with the same signatures; only `voice` has voice input, sherpa-onnx and `RECORD_AUDIO`. |
 | `lib/keyboard-scene` | Kotlin Multiplatform (JVM + JS/node), no dependency but the standard library | The keyboard's drawing engine of the redraw (`dev/design/060-render-v2.md`, phase P1): reads layout format 1 and theme format 4 (its own XML reader, problems as values with lines), expands, places rows, cascades the theme, places labels and marks through a `TextMeasurer` the platform gives, and returns a `Scene` of keys (shape, hit, anchor, up, ops per state). The app uses it behind a hidden developer switch (`AppPrefs.Internal.canvasKeyboard`, off): the 26 keys (`TextKeyboard`) drawn by `input/keyboard/canvas/KeyboardCanvasView` from qwerty.xml (`src/commonMain/layouts/`, the engine's tests reading the same file; copied into the app's raw resources at build time; corners `{alt:x}` and a table's roots `{root:x}` the app fills), falling back to the old views drawing the keys when there is no scene and the theme 3.0 look converted to format 4 (ime-core's `input/scene/LookTheme`; `TextBoardState` and `SceneMarks` turn the keyboard's state into the scene's `Input` and marks). The old key views stay, not drawn, doing the work: `BaseKeyboard` hands each touch to the one the scene's hit areas name, as the vivo workaround hands them. `scene/rules/` holds copies of ime-core's `KeyMarks`, `KeyMarkYield`, `KeyTextScale`, `SplitKeyboard` and `KeyNames` (Double for Float) that P2 deletes from ime-core. |
 | `lib/ime-eval` | JVM CLI | Typing simulated over test sets; top-1 accuracy, predictions, English, learning. Never shipped. |
 | `lib/ime-dict-tool` | JVM CLI | Compiles text sources into the engine's data files (pinyin, tables, strokes, English), mixes models, packs word packs, finds new words. Runs on the build host only. |
-| `lib/sherpa-onnx` | native | The speech recognizer, vendored and built from source; voice build only. |
-| `lib/handwriting` | Android library, native | The handwriting recognizers' runtime: onnxruntime (the very file sherpa-onnx links, so a voice build packs one) and a small JNI to it, `OrtModel`, which runs an ORT-format model mapped from the APK; and `libyoumo-matrix`, the sentence models' kernel, without onnxruntime. Both builds. |
+| `lib/sherpa-onnx` | native | The speech recognizer, vendored and built from source; its models are the voice pack's. |
+| `lib/handwriting` | Android library, native | The handwriting recognizers' runtime: onnxruntime (the very file sherpa-onnx links, so the APK packs one) and a small JNI to it, `OrtModel`, which runs an ORT-format model mapped from its file (the text pack's); and `libyoumo-matrix`, the sentence models' kernel, without onnxruntime. |
 | `codegen` | annotation processing | Generates the app's key and scancode mapping tables. |
 | `build-logic` | included build | Gradle convention plugins: Android conventions, data download and compile, voice data, permission check, version from tags, detekt. |
 | `lexicon/` | data | The curated new words, removed and corrected readings, misreadings, Latin words: decisions kept in the repository. |
@@ -69,7 +68,7 @@ One process. Inside it:
   for the tables (`TableRegistry`). A session
   made meanwhile waits for them: `EngineAssets.pinyinData` and the word indexes are synchronized
   lazies.
-- **Voice** (voice build): the microphone reader on an IO thread, the streaming recognizer and the polish
+- **Voice** (with the voice pack): the microphone reader on an IO thread, the streaming recognizer and the polish
   tagger on one thread of their own (`VoiceListener`'s `decoder`), handed the audio through a channel.
 - **`handwriting`** (`HandwritingRecognition`): the handwriting recognizers, one read at a time; a
   read made stale by a newer stroke is skipped. Its reading goes to the engine as a host job: a key
@@ -144,9 +143,9 @@ pinyin and 双拼, not input methods: their sessions `T9`, `PINYIN_KEYS18`, `PIN
 with and the data files' names: fixed, read by `host/` and `input/`, which never name `Engines`.
 `Engines` (`engine/runtime`) makes each session at first use (`SessionFactory`), and is the one door to the
 learning record (`LearningFacade`), the user's words (`LexiconFacade`) and the field typed in (`FieldContext`). `EngineAssets` loads the data
-from the APK's assets: `engine/pinyin.data`, `engine/table/<name>.data`, `engine/english.data`,
-`engine/stroke.data`, `engine/emoji.data`, `engine/chaizi.data` and the two `.safetensors` models. They are stored uncompressed in the APK
-(`noCompress`) and memory-mapped in place (`EngineBridge.asset`), so the language model (about
+through `AppData` (the text pack's files; a few small ones are the APK's assets, data-and-build.md#resource-packs): `engine/pinyin.data`, `engine/table/<name>.data`, `engine/english.data`,
+`engine/stroke.data`, `engine/emoji.data`, `engine/chaizi.data` and the two `.safetensors` models. They are stored uncompressed and
+memory-mapped in place (`EngineBridge.asset`, `AppData.map`), so the language model (about
 156 MB of `pinyin.data`) costs no heap. `TableRegistry` loads tables on demand; `UserLexicon`
 owns the user's words (learned, added, blocked, imported dictionaries, custom phrases) shared
 across every input method.
@@ -162,7 +161,7 @@ gives the router the page size and English suggestions and the engines the rest 
 
 | What | Where | Written by |
 |---|---|---|
-| Engine data (read-only) | APK assets, memory-mapped | build (`EngineDataPlugin`, `VoiceDataPlugin`, `HandwritingDataPlugin`: the handwriting models, `.ort`/`.data` uncompressed, both builds) |
+| Engine data (read-only) | the resource packs, `files/packs/` in device-protected storage (`PackStore`: generation directories and a `current` pointer per pack), memory-mapped; a few small files in APK assets | the user's import (`PackShelf`); made by the build (`AssetPacksPlugin` from `EngineDataPlugin`, `VoiceDataPlugin`, `HandwritingDataPlugin`) |
 | fcitx's built-in data (the zh_CN punctuation table, quick phrase's emoji and LaTeX tables, `charselectdata`) | APK assets under `pkgdata/`, read from assets (`charselectdata` whole into the heap the first time Unicode input is opened, the tables parsed; `KotlinHost.BUILT_IN`; sources and SHA-256 in `app/src/main/host-assets.md`) | repository |
 | What the engine learned | `files/engine/` (`EngineBridge.userDir`): pinyin's user log, each table's and English's, the word lists (added, blocked) | engine: append-only logs (`RecordStore`), lists written whole |
 | fcitx config | `files/host-config/` (`ConfigHome.DIR`, `HostConfigDir`): the profile, `conf/*.conf` incl. the input methods' options. Up to 0.4 it was `config/` on the external files dir (or `files/config` at a start without one); the first start that can moves that in once (`ConfigHome.settle`: copied, read back, renamed in, then the old deleted), so a cleaner emptying `Android/data` or a start without the external storage no longer resets 通用输入 | the host (`ConfigWriter`) |

@@ -25,7 +25,7 @@
 
 ## 幽默输入法
 
-**完全离线**的 Android 中文输入法：拼音、九键、双拼、五笔等码表、手写、英文，语音版还能离线语音输入。
+**完全离线**的 Android 中文输入法：拼音、九键、双拼、五笔等码表、手写、英文，导入语音包后还能离线语音输入。
 不申请网络权限，打的字、说的话都不会离开手机。
 
 > 从 [fcitx5-android](https://github.com/fcitx5-android/fcitx5-android) 分出；[Fcitx5](https://github.com/fcitx/fcitx5) 框架已用 Kotlin 重写进本项目，
@@ -46,7 +46,7 @@
 - **表情和小工具**：候选里给出对应的表情，表情面板按拼音搜索；快速输入存自己的常用语，什么都没打时点一下上屏；u 开头按部件拆字，算式后打 = 出结果，rq/sj/xq 出日期时间。
 - **横屏分体、单手、悬浮键盘，实体键盘**：横屏时字母键分成左右两半；键盘可以缩到一边单手打，或变成能拖动的小窗；接实体键盘时候选显示在光标旁。
 - **边打边学**：记住你选的词和顺序，常用的排到前面；上屏过几次的整段话，打出开头就接着给出剩下的；能导入搜狗等输入法的词库；长按候选可以删除、固定、屏蔽，做错了马上撤销；学到的东西自动备份，换手机能恢复。
-- **离线语音**（语音版）：按住空格说话，可以中英混说，自动加标点；带口音的普通话也能识别。说完马上松手也不丢最后一个字，小声说也听得出。目前只支持普通话和英语，还不支持方言。
+- **离线语音**（要导入语音包）：按住空格说话，可以中英混说，自动加标点；带口音的普通话也能识别。说完马上松手也不丢最后一个字，小声说也听得出。目前只支持普通话和英语，还不支持方言。
 
 每项功能和设置的详细说明见[使用说明](docs/README.md)。
 
@@ -65,8 +65,8 @@
 
 ### 下载
 
-到 [Releases](https://github.com/Sraw/youmo-ime/releases/latest) 下载最新版：文字版约 320 MB，语音版约 470 MB（多申请录音权限）。
-需要 Android 10 以上的 arm64 手机。模型和词库都在安装包里，所以包比较大。持续更新中，词库每月更新一次。
+到 [Releases](https://github.com/Sraw/youmo-ime/releases/latest) 下载最新版：文字版（安装包 + 文字包）约 330 MB，语音版（再加语音包）约 520 MB。
+需要 Android 10 以上的 arm64 手机。安装包约 21 MB，模型和词库在资源包里，装好后在 **设置 → 资源包** 导入（见[安装与上手](docs/getting-started.md)）；资源包没有新版本时，升级只要下安装包。持续更新中，词库每月更新一次。
 
 ### 下一步计划
 
@@ -96,7 +96,7 @@
 *幽默 (yōumò) means humor.*
 
 An Android Chinese input method that runs **entirely offline**: pinyin, nine keys, shuangpin, Wubi and other code tables, handwriting,
-English, and offline voice input in the voice build. It asks for no network permission; what you type and say never leaves the phone.
+English, and offline voice input once the voice pack is imported. It asks for no network permission; what you type and say never leaves the phone.
 
 > Branched off [fcitx5-android](https://github.com/fcitx5-android/fcitx5-android); the [Fcitx5](https://github.com/fcitx/fcitx5) framework is ported to Kotlin here,
 > with its config files kept for the settings; the pinyin engine, language models and sentence models are its own. Not affiliated with Fcitx5, never merged upstream; report issues [here](https://github.com/Sraw/youmo-ime/issues).
@@ -115,7 +115,7 @@ English, and offline voice input in the voice build. It asks for no network perm
 - **Themes, swipe shortcuts, an edit menu**: themes imported and exported as `.theme` files (picture, colours, key shapes, font); a shortcut on any key's swipe up or down; swipe up on the space bar for select all, copy, paste and undo, up on backspace to clear, down to bring it back.
 - **Emoji and small tools**: emoji among the candidates, the emoji panel searched by pinyin; quick input keeps your own phrases, a tap types one when nothing is typed; characters typed by their parts (u…), sums worked out after =, the date and time from rq/sj/xq.
 - **Split, one-handed and floating keyboards, physical keyboards**: in landscape the letters split in two halves; the keyboard shrinks to one side or floats as a small window you drag; with a physical keyboard, candidates show by the cursor.
-- **Offline voice** (voice build): hold the space bar to talk, Mandarin and English mixed, punctuation added; accented Mandarin understood too; letting go right after the last word keeps it, and quiet speech is heard. No dialects yet.
+- **Offline voice** (with the voice pack): hold the space bar to talk, Mandarin and English mixed, punctuation added; accented Mandarin understood too; letting go right after the last word keeps it, and quiet speech is heard. No dialects yet.
 - **Learns as you type**: your words and the order you pick them in, the common ones first; a passage typed whole a few times is offered on as you type its start; imported dictionaries (Sogou and others); long-press a candidate to delete, pin or block it, with an undo; what it learned is backed up on its own and can be restored on a new phone.
 
 The [user's manual](docs/README.md) (in Chinese) covers every feature and setting.
@@ -135,8 +135,8 @@ The new keyboards on the chat set (only sentences whose keys spell one reading, 
 
 ### Download
 
-The latest from [Releases](https://github.com/Sraw/youmo-ime/releases/latest): text build about 320 MB, voice build about 470 MB (asks for the microphone too).
-Needs an arm64 phone on Android 10 or later. The models and dictionary are inside the APK, hence its size. Actively updated; the dictionary gets new words every month.
+The latest from [Releases](https://github.com/Sraw/youmo-ime/releases/latest): the text bundle (the APK and the text pack) about 330 MB, the voice bundle (and the voice pack) about 520 MB.
+Needs an arm64 phone on Android 10 or later. The APK is about 21 MB; the models and dictionary are in the resource packs, imported under **Settings → Resource packs** after installing; when no pack has a new version, an upgrade is the APK alone. Actively updated; the dictionary gets new words every month.
 
 ### Next
 

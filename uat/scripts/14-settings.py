@@ -580,3 +580,18 @@ case("ST-55", needs="jvm:ThemeFilesManagerTest.aThemeWhosePictureOrFontIsGoneIsN
 case("ST-56", needs="manual:主题制作网页 0.6.0 起提供；在电脑浏览器上手工跑（要一个和内置主题同名的主题文件）")(lambda d: None)
 case("ST-57", needs="manual:分屏下主题页预览和键盘同时要毛玻璃图")(lambda d: None)
 case("ST-58", needs="manual:要一个平铺大圆角主题文件（从 from-app.theme 改出来，见用例），键角、边框、间距、候选栏要人眼看")(lambda d: None)
+
+
+case("ST-60", needs="jvm:PacksUatTest.withoutTheTextPackTheKeyboardAsksForItAndATapOpensThePage")(lambda d: None)
+
+
+case("ST-61", needs="jvm:PacksUatTest.aTextPackTooOldSaysWhichVersionIsNeeded")(lambda d: None)
+
+
+case("ST-62", needs="jvm:PacksUatTest.thePageListsEachPacksStateAndWhatItIsFor")(lambda d: None)
+
+
+case("ST-63", needs="release,scripted:发布包每次重置都经文件选择器导入文字包（import_packs_ui）；结果的说法在 JVM 上：PacksUatTest.eachFilesOutcomeIsToldAndTheUserMayDeleteTheirFiles")(lambda d: None)
+
+
+case("ST-64", needs="release:要上一版（0.5.x）的包覆盖安装；方法见 dev/design/060-asset-packs.md 的实现记录")(lambda d: None)

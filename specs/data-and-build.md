@@ -4,10 +4,10 @@
 
 | What | Command |
 |---|---|
-| Text build, debug | `./gradlew :app:assembleTextDebug` |
-| Voice build, debug | `./gradlew :app:assembleVoiceDebug` |
+| The APK, debug | `./gradlew :app:assembleDebug` |
+| The two resource packs (below) | `./gradlew :app:packs` → `app/build/packs/` |
 | One ABI only (much faster) | add `-PbuildABI=arm64-v8a` (phones) (also an arm64 emulator) or `-PbuildABI=x86_64` (an x86_64 emulator, redroid) |
-| Release, both builds, as shipped | `./gradlew :app:assembleTextRelease :app:assembleVoiceRelease -PbuildABI=arm64-v8a` |
+| Release as shipped: the APK, the packs signed with the release key, the two bundles and the pack listing | `./gradlew :app:releaseBundles -PbuildABI=arm64-v8a` (with `youmo.packKey` set) |
 | A test build for profiling (simpleperf from the shell on an unrooted phone; never a release) | add `-PbuildProfileable=true` |
 | Engine data alone | `./gradlew :app:compileEngineData` (and `:app:compileEnglishData`, `:app:copySentenceModels`) |
 | Build-logic's own tests | `./gradlew -p build-logic test` |
@@ -42,8 +42,9 @@ BUILDING.md's 5 GB counts the Gradle daemon beside it) and three table compiles 
 | `AndroidAppConventionPlugin` | app defaults (SDKs, version from tags, signing from env/properties, R8), and `PermissionCheckTask`: fails the build if the merged manifest asks for a permission not on its allowlist |
 | `AndroidLib…`, `AndroidBase…` | library and shared Android defaults |
 | `EngineDataPlugin` | downloads (SHA-256 pinned) and compiles the engine's data into generated assets, stored uncompressed (see below) |
-| `VoiceDataPlugin` | voice build only: the recognizer's models, the polish tagger (from `youmo.voiceModelDir`, which an APK build needs for now: the pinned release is the offline model), hotword list |
-| `HandwritingDataPlugin` | both builds: `:lib:handwriting` (onnxruntime, `pickFirst` with sherpa-onnx's identical copy) and the handwriting models |
+| `AssetPacksPlugin` | the resource packs (below): `packTextPack`, `packVoicePack` (`packs` both), `releaseBundles`; the trusted public keys into `BuildConfig.PACK_KEYS` |
+| `VoiceDataPlugin` | the voice pack's files: the recognizer's models, the polish tagger (from `youmo.voiceModelDir`, which an APK build needs for now: the pinned release is the offline model), hotword list |
+| `HandwritingDataPlugin` | `:lib:handwriting` (onnxruntime, `pickFirst` with sherpa-onnx's identical copy) and the handwriting models (the text pack's) |
 | `BuildMetadataPlugin` | build time and git hash into `BuildConfig` (the data release names are `EngineDataPlugin`'s fields) |
 | `DetektConventionPlugin` | detekt on every Kotlin module, one config, a baseline per module |
 | `ToolFingerprint` | hashes the classes the dict tool's `main` reaches, so the data task re-runs only when code that makes data changes, not on every ime-core edit |
@@ -61,7 +62,7 @@ engine data again (a few minutes). Expected.
 Nothing big is made in an app build. Each part is made by a release-time job, published as a public
 GitHub release of this repository, and pinned in `EngineDataPlugin` by tag and SHA-256:
 
-| Part | Release | Made by | In the APK as |
+| Part | Release | Made by | In the text pack (or voice pack, or APK) as |
 |---|---|---|---|
 | Pinyin language model (libime's, mixed with chat-like pages of FineWeb-2 and a CommonCrawl crawl) | `engine-data-*` (`LM_RELEASE`) | `lib/ime-dict-tool/engine-data.sh` on a rented 16-core machine, ~1 h, ~100 GB down | compiled with libime's dictionary into `engine/pinyin.data` |
 | New words (curated `lexicon/add.tsv`, packed for that model) | `words-*` (`WORDS_RELEASE`) | `ime-dict-tool pack --lexicon lexicon/add.tsv` | the `new` layer of `pinyin.data` |
@@ -120,9 +121,10 @@ Decided by the owner (2026-10-15), for every model the app ships, the ones to co
     the release's `manifest.txt` gives both: int8 cost nothing measurable so far (handwriting on
     CASIA: 91.44% → 91.43%, the models 121 → 43 MB). Another layer than a convolution stays float
     only where int8 of it was measured to cost accuracy or time, and the manifest says so.
-- **Mapped from the file, never loaded.** A model or data file is stored uncompressed in the APK
-  (`noCompress`) and memory-mapped where it lies, so its weights are clean file pages the system can
-  drop and read again, not the app's heap. ORT models: the asset opened `AASSET_MODE_BUFFER`, the
+- **Mapped from the file, never loaded.** A model or data file is stored uncompressed (in its
+  pack, which is copied as files into the app's storage; in the APK `noCompress`) and memory-mapped
+  where it lies, so its weights are clean file pages the system can
+  drop and read again, not the app's heap. ORT models: the file mapped (`AppData.map`), the
   session made from those bytes with `session.use_ort_model_bytes_directly` and
   `session.use_ort_model_bytes_for_initializers`, and `session.disable_prepacking`, as prepacking
   copies weights to the heap (`OrtModel`, lib/sherpa-onnx's README); `.data` and `.safetensors`
@@ -154,13 +156,67 @@ The curated decisions: `add.tsv` (new words with readings), `reject.tsv` (never 
 `misreadings.tsv`, `tones.tsv` (words whose tones the downloaded lists get wrong), `latin.words`. See `lexicon/README.md` for how a candidate is judged and how a
 batch is curated. A word in either list is never put before a curator again.
 
+## Resource packs
+
+Decided by the owner for 0.6.0 (dev/design/060-asset-packs.md): the APK carries no dictionary or
+model. They are two packs the user imports on the 资源包 page (`PacksFragment`), from files picked
+with the system's picker (several at once); the app keeps no network permission.
+
+| Pack | Holds (asset paths, `PackKind`) | Without it |
+|---|---|---|
+| `text` (文字包) | `engine/pinyin.data`, `english.data`, `sentence-model*`, `stroke.data`, `table/`, `handwriting/` | the keyboard is `PackGateView`: 需要导入文字包, a tap opens the page |
+| `voice` (语音包) | `voice/` (recognizer, VAD, hotwords, polish tagger) | the microphone and the space's hold say 语音输入需要导入语音包; a tap opens the page |
+
+What stays in the APK (assets 6.7 MB of a 21 MB release APK; 0.6.0's text pack is 311 MB, the voice pack 185 MB): what the
+app reads with no pack or is small and belongs to no input method's data: `engine/emoji.data` (the emoji panel), `chaizi.data`,
+`charinfo.data` (a character's card), `opencc-s2tw.data` (traditional output), `learn/` (OpenCC's tables), the host's
+`pkgdata` (punctuation, quick phrases, `charselectdata` for Unicode input). Moving them would gain under 7 MB and make the
+emoji panel, symbols and Unicode input need the text pack too. The native libraries (onnxruntime 25 MB of them) are code, so
+they stay: a pack carries no code.
+
+- **Format.** A `.youmopack` is a zip, every entry STORED: `manifest.json` first (`PackManifest`: pack,
+  version, format, signing key's name, each file's path, size, SHA-256), `manifest.sig` (64 bytes,
+  Ed25519 over the manifest's bytes) second, then the files. The build writes the same bytes from the
+  same inputs (entry order and times fixed) and a `.json` listing beside each pack.
+- **Versions apart from the app** (`app/packs.properties`): a pack's `version` is raised when its content
+  changes (`releaseBundles` fails a changed pack under the same version), `format` when the code can no
+  longer read the older data, and the app's `minVersion` when it needs data only a newer pack has. The
+  app refuses another format and says which pack and version it needs; a pack below `minVersion` stays
+  installed but unused (需要更新到 vN), one above what the app knows says 需要更新应用.
+- **Signing.** Ed25519, pure Kotlin in ime-core (`Ed25519`, RFC 8032 vectors); the build signs with the
+  JDK's. The APK trusts the keys in `BuildConfig.PACK_KEYS`: a release build `app/pack-keys/release.pub`'s
+  only, and fails to build without one; debug builds and tests the committed test key
+  (`test-ed25519.pem`, `test.pub`) too. Several keys may be listed, for a key change: old and new packs
+  both load. The release key's private half is never in the repo: its path is `youmo.packKey` in
+  local.properties (or `YOUMO_PACK_KEY`); without it `:app:packs` signs with the test key, which release
+  builds refuse.
+- **Import** (`PackShelf` in ime-core, `PackStore`/`PackImports` in the app): the manifest's signature is
+  checked first, then each file is copied into a new generation directory while its size and SHA-256 are
+  checked, after a free-space check against the manifest's sizes; only when all are right is the
+  `current` pointer swapped atomically (rename). A pack already there at that version is not copied
+  again. A killed import leaves the old pack in use; the next start deletes what is not `current`.
+  The user's file is never deleted; the results say they may delete it.
+- **Storage.** Device-protected (`createDeviceProtectedStorageContext().filesDir/packs`), so Direct Boot
+  reads it before the first unlock, and an upgrade keeps it. Excluded from cloud and key/value backup
+  (over 25 MB); a device transfer carries it. Loading checks the signature and each file's size, not
+  every hash (that would read hundreds of MB at each start).
+- **Reading** (`AppData`): every asset path the engine, handwriting and voice open goes through it, to
+  the pack's file if a pack owns the path, else to the APK's asset; `.data`, `.safetensors` and `.ort`
+  are memory-mapped from the file. When a pack changes, `PackStore.state` bumps a generation and the
+  service makes the keyboard and engine anew.
+- **Tests.** JVM tests use `TestShelves` (a shelf of tiny test-key packs, `PackStore.useShelf`;
+  `KeyboardHarness` installs both), and engine-data tests read the build's generated directories as
+  before. Devices: the debug build's `PackImportProvider` (shell or root only) takes `content write` +
+  `content call import`, as `uat/tools/uat.py packs` and CI's emulator job do; a release UAT imports
+  through the picker.
+
 ## Native code
 
 The app has no native code of its own; the fcitx host is Kotlin ([host.md](host.md)).
 `lib/handwriting` builds `libyoumo-handwriting` (linked to onnxruntime, loaded only when
 handwriting is used) and `libyoumo-matrix` (`matrix-kernel.cpp`, the sentence models' kernel,
 `-O3` even in debug, no onnxruntime); `NativeMatrixKernel.loaded` falls back to
-`MatrixKernel.JVM` when it does not load. `lib/sherpa-onnx` builds the recognizer (voice build).
+`MatrixKernel.JVM` when it does not load. `lib/sherpa-onnx` builds the recognizer (its models are the voice pack's).
 The APK's `.so` files are those, onnxruntime's and `libc++_shared`. Host tests for native helpers:
 `lib/sherpa-onnx/host-test.sh` (CI runs it).
 
@@ -176,11 +232,14 @@ trap in [pitfalls.md](pitfalls.md#kotlin-ic-and-interface-delegation) before bui
 - `versionCode = baseVersionCode × 10 + ABI id`, and `baseVersionCode` follows from
   `Versions.baseVersionName` (`versionCodeOf`: 12 at 0.1.0, 1 more a patch, 100 a minor, 10,000 a
   major; minor and patch below 100). Raise `baseVersionName` for each release.
-- A release: bump versions → commit → `git tag -a vX.Y.Z` → build both release APKs for arm64-v8a
-  signed with the release key (kept outside the repo; `signKeyFile`/`signKeyAlias`/`signKeyPwd` in
-  `~/.gradle/gradle.properties` or `SIGN_KEY_*` env; unsigned if absent) → install over the last
-  release and type on it, on Android 10 too (the AVD `youmo29`, testing.md: a misreading's hint, the 快速输入 page with an entry) → GitHub release with both APKs and `SHA256SUMS.txt`, notes in Chinese
-  and English.
+- A release: bump versions (and a pack's `version` in `app/packs.properties` if its content
+  changed) → commit → `git tag -a vX.Y.Z` → `./gradlew :app:releaseBundles -PbuildABI=arm64-v8a`
+  with the APK signed with the release key (kept outside the repo; `signKeyFile`/`signKeyAlias`/`signKeyPwd` in
+  `~/.gradle/gradle.properties` or `SIGN_KEY_*` env; unsigned if absent) and the packs with the pack
+  key (`youmo.packKey`, below) → install over the last
+  release and type on it, on Android 10 too (the AVD `youmo29`, testing.md: a misreading's hint, the 快速输入 page with an entry) → GitHub release with the APK, the packs (`release-packs.json` says
+  which changed: an unchanged one need not be uploaded again), the two bundles (文字版, 语音版) and `SHA256SUMS.txt`, notes in Chinese
+  and English saying which packs are new.
 - Test builds between releases go up as **draft** releases (the repository is public) and are
   deleted once a release supersedes them. Data releases are public and stay.
 - Package `io.github.sraw.youmo` (debug: `.debug` suffix), installable beside upstream Fcitx5.
@@ -189,8 +248,8 @@ trap in [pitfalls.md](pitfalls.md#kotlin-ic-and-interface-delegation) before bui
 
 | Workflow | When | Runs |
 |---|---|---|
-| `unit_test.yml` | push, PR | four jobs side by side (setup in `.github/actions/setup-build`): `:lib:ime-core:check`, dict-tool and eval tests, build-logic tests, `:app:testTextDebugUnitTest` and the same at SDK 29 (a job each, `-PskipExhaustive`, two test JVMs at once), the voice flavour (a job), sherpa-onnx's host tests, Python tool tests (`lexicon/tools`, `lib/ime-eval/tools`), detekt, Kover reports, test failures annotated |
+| `unit_test.yml` | push, PR | four jobs side by side (setup in `.github/actions/setup-build`): `:lib:ime-core:check`, dict-tool and eval tests, build-logic tests, `:app:testDebugUnitTest` and the same at SDK 29 (a job each, `-PskipExhaustive`, two test JVMs at once), sherpa-onnx's host tests, Python tool tests (`lexicon/tools`, `lib/ime-eval/tools`), detekt, Kover reports, test failures annotated |
 | `key_marks.yml` | push, PR changing the keys' marks or drawing (its `paths`); Tue 03:37; on demand | `KeyMarksEverywhereUatTest` alone at SDK 35 and 29, which the app jobs above leave out (half their time) |
-| `pull_request.yml` | PR | `assembleTextRelease` and `assembleVoiceRelease` on Ubuntu (unsigned) |
+| `pull_request.yml` | PR | `assembleRelease` and `packs` on Ubuntu (the APK unsigned, the packs with the test key) |
 | `engine_downloads.yml` | push to main changing `EngineDataPlugin.kt`, `HandwritingDataPlugin.kt`, `lib/handwriting/build.gradle.kts` or the workflow; Mon/Thu 04:41; on demand | the engine data's download tasks alone (the handwriting models and onnxruntime too, a cache of their own), saving the `engine-downloads-*` cache a new pull request's build reads |
-| `emulator_test.yml` | weekly, and PRs labelled `emulator` | instrumented tests (`HostTest`, `SoftKeyboardTest` …) for Text and Voice on API 35 and API 29 (minSdk) emulators |
+| `emulator_test.yml` | weekly, and PRs labelled `emulator` | instrumented tests (`HostTest`, `SoftKeyboardTest`, `VoiceEngineTest` …) on API 35 and API 29 (minSdk) emulators, the two packs imported first through `PackImportProvider` |

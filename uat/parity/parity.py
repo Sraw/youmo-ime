@@ -514,7 +514,7 @@ class Recorder:
 
     def __init__(self, im):
         self.steps, self.im = [], im
-        self.flavor, self.after_case = "text", []
+        self.voice, self.after_case = False, []
 
     def type(self, keys, after=None):
         for chunk in keys.split(" "):

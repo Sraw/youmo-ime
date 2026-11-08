@@ -1,4 +1,4 @@
-"""uat/12-voice.md (语音输入, the voice build): `uat.py run --flavor voice`. What is "said" is a clip of
+"""uat/12-voice.md (语音输入, with the voice pack: uat.py run imports it unless --no-voice). What is "said" is a clip of
 uat/tools/voice-clips.py read by the voice debug build in place of the microphone (Device.say, the
 clip microphone: VoiceClipMic). The .md is the source of truth."""
 import json
@@ -10,7 +10,7 @@ import time
 from uat import CLIPS, OUT, PKG, Blocked, Fail, case, check, script
 
 LISTEN, HEARD_NOTHING, PREPARING, SILENT = "正在听…", "没有听清", "准备中…", "麦克风没有声音"
-EV = "voice:语音只在语音版跑（--flavor voice）"
+EV = "voice:语音要导入语音包和 debug 包的片段麦克风（uat.py run 默认导入；--no-voice 时不跑）"
 
 
 
@@ -638,3 +638,6 @@ def vo28(d):
     sent = sum((n.text or "").count("我们走吧") for n in s.app() if n.cls != "EditText")
     check(sent == 1 and not plain(box), f"聊天记录里「我们走吧」{sent} 次，聊天框「{box}」")
     return "发出「我们走吧」一次，聊天框已清空"
+
+
+case("VO-34", needs="jvm:PacksUatTest.withoutTheVoicePackTheMicrophoneAsksForItAndTheSpaceSaysSo")(lambda d: None)

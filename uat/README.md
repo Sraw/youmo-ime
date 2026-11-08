@@ -22,7 +22,7 @@
 | [09-handwriting.md](09-handwriting.md) | 手写 |
 | [10-tables.md](10-tables.md) | 五笔、二笔、仓颉、自然码、五笔拼音 |
 | [11-quick-unicode.md](11-quick-unicode.md) | 快速输入、Unicode 输入 |
-| [12-voice.md](12-voice.md) | 语音输入（语音版） |
+| [12-voice.md](12-voice.md) | 语音输入（要语音包） |
 | [13-words.md](13-words.md) | 词库页、用户词库、屏蔽词、导入导出、导入词库、导入的词、清空学到的、自定义短语 |
 | [14-settings.md](14-settings.md) | 设置首页、通用输入、外观、按键、声音与振动、剪贴板与表情、实体键盘、界面语言、开发者、关于 |
 | [15-privacy-backup.md](15-privacy-backup.md) | 隐私与权限、密码框和无痕、不用我的输入习惯、清掉最近、备份与恢复（含学到的合并、退回、自动备份） |
@@ -68,7 +68,7 @@
 
 **B0（默认状态，竖屏）**
 1. 设备系统语言为简体中文，竖屏，没有接实体键盘。
-2. 装的是要测的那一版文字版（语音的测试用语音版），并且是"重置"后的状态（见下）：默认设置、
+2. 装的是要测的那一版，导入了文字包（语音的测试还要语音包），并且是"重置"后的状态（见下）：默认设置、
    默认的两个输入法（拼音、英文，拼音在前）、没有学到或添加的词、剪贴板历史为空。
 3. 幽默输入法已启用并设为当前键盘。
 4. 浏览器里打开了测试页（见下），点了「普通文本」框，屏幕键盘已弹出，当前输入法是拼音，键盘上方是工具栏。
@@ -90,15 +90,30 @@
 
 ### 重置
 
-把应用恢复成刚装好的样子（不用卸载重装）：
+把应用恢复成刚装好、导入过资源包的样子（不用卸载重装）。资源包（文字包约 311 MB、语音包约 184 MB，
+`./gradlew :app:packs` 打在 `app/build/packs/`）每台设备只导入一次：
 
 ```sh
-adb shell pm clear io.github.sraw.youmo.debug   # 测发布包时去掉 .debug，下同
-adb shell ime enable io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.input.FcitxInputMethodService
-adb shell ime set io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.input.FcitxInputMethodService
+uat/tools/uat.py packs --port 5554    # 装 debug 包并导入两个包（已是这一版的跳过）；--no-voice 只导文字包
 ```
 
-`pm clear` 删掉应用的全部数据（设置、词、剪贴板、主题）。之后第一次弹出键盘时引擎要准备数据，
+它走 debug 包里只认 shell 的导入口（`PackImportProvider`，`content://<包名>.uat.packs`）：`content write` 把包写进 App 的缓存，
+`content call --method import` 交给和「资源包」页同一个 `PackStore.import`（签名、每个文件的 SHA-256、格式号都照查），
+`--method state` 查每个包的状态。debug 包信任仓库里的测试密钥和正式密钥。
+
+重置时不能用 `pm clear`：它连资源包一起删，每条用例再导一次要多好几秒。debug 包可以 `run-as`，运行器就先停掉输入法、
+`am force-stop`、收回录音权限，再用 App 自己的身份删掉数据目录里除 `files/packs` 以外的一切（设置、词、剪贴板、主题），
+效果和 `pm clear` 一样，只留下资源包：
+
+```sh
+P=io.github.sraw.youmo.debug; IME=$P/org.fcitx.fcitx5.android.input.FcitxInputMethodService
+adb shell "ime disable $IME; am force-stop $P"
+adb shell "run-as $P sh -c 'find /data/user/0/$P -mindepth 1 -maxdepth 1 -exec rm -rf {} + ; cd /data/user_de/0/$P && find . -mindepth 1 -maxdepth 1 ! -name files -exec rm -rf {} + ; cd files && find . -mindepth 1 -maxdepth 1 ! -name packs -exec rm -rf {} +'"
+adb shell "ime enable $IME; ime set $IME"
+```
+
+发布包不能 `run-as`：`UAT_BUILD=release` 时仍 `pm clear`，再从「资源包」页经系统文件选择器导入文字包（用发布密钥签的包，
+`local.properties` 有 `youmo.packKey` 时 `:app:packs` 打出的就是）。之后第一次弹出键盘时引擎要准备数据，
 等候选能出来再开始。测"第一次打开"向导的那几条要真正卸载重装，前提里会写。
 
 ### 测试页
@@ -147,7 +162,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 | 大部分 | 真机或 Android 模拟器（arm64-v8a 镜像，装的就是发布用的 arm64 包；Apple 芯片上原生跑）。发版前至少在一台真机上跑一遍 P0；语音的 VO-23、VO-24、VO-26 也在真机上照「操作」跑（时间戳、开麦前的全零、真实的小声，片段麦克风测不到） |
 | 实体键盘（17） | 真机接蓝牙或 USB 键盘；或者模拟器加一个 uinput 键盘（见 [17-hardware-keyboard.md](17-hardware-keyboard.md) 开头）。模拟器有自己的内核，和别的用例同一台设备上跑；**只在模拟器里造虚拟键盘**（容器类设备如 redroid 和宿主机共用内核，造出来的键盘宿主机也会收到） |
 | 横屏与分体（16） | 屏幕横过来宽度不少于 600 dp 的手机或平板，模拟器也行 |
-| 语音（12） | 真机，有麦克风，装语音版；arm64 语音版 debug 包也能在模拟器上跑（片段麦克风，见「实体键盘和语音」） |
+| 语音（12） | 真机，有麦克风，导入语音包；arm64 debug 包导入语音包后也能在模拟器上跑（片段麦克风，见「实体键盘和语音」） |
 
 模拟器快照里装了浏览器"WebView Browser Tester"（`org.chromium.webview_shell`），测试页在它里面打开（`am start -a android.intent.action.VIEW -d <地址> -n org.chromium.webview_shell/.WebViewBrowserActivity`）。
 
@@ -158,7 +173,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 | 类 | 在哪 | 写法 | 例子 |
 |---|---|---|---|
 | 引擎 | ime-core 单测（小数据、毫秒级）或 `:lib:ime-eval:uatTest`（真数据：EngineReplay 只有引擎，HostReplay 加 Kotlin 宿主的标点、简繁、快速输入、面板、虚拟时钟，ParityReplay 对设备录的序列） | `needs="jvm:<测试类>.<方法>"`，`.md` 加 **JVM** 行 | 整句、学习排序、标点、快速输入、九键连按 |
-| 界面 | `:app:testTextDebugUnitTest` 的 Robolectric + Roborazzi（`uat/*UatTest`、`KeyboardHarness`、`*KeyboardScreenshotTest`） | 同上 | 键盘样子、状态面板、设置页、词库页、横屏/分体 |
+| 界面 | `:app:testDebugUnitTest` 的 Robolectric + Roborazzi（`uat/*UatTest`、`KeyboardHarness`、`*KeyboardScreenshotTest`） | 同上 | 键盘样子、状态面板、设置页、词库页、横屏/分体 |
 | 只能在设备上 | 模拟器 | 不写 `needs=` | 真窗口和 insets、系统界面（向导、输入法选择框、导航栏、TalkBack）、麦克风、真实体键盘、安装/升级/降级、杀进程、转屏和切应用、锁屏、内存和堆 |
 | 冒烟 | 模拟器，另有 JVM 断言 | 不写 `needs=`，`.md` 有 **JVM** 行并写"设备上留作冒烟" | 每区一条胶水最重的 |
 
@@ -189,15 +204,15 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 
 | `needs=` | 在哪跑 | 例子 |
 |---|---|---|
-| `voice:…` | 语音版（`--flavor voice`） | 12 语音 |
+| `voice:…` | 导入了语音包的 debug 包（默认就是；`--no-voice` 时、发布包上在别处跑：发布包没有片段麦克风） | 12 语音 |
 | `release:…` | 发版时手动（要上一版正式包或两个版本的包） | PR-13、PR-14、PR-30、PR-35、PR-36、PR-37、PR-38、PR-41、PR-43、TBL-12d、TBL-33、TBL-43、WD-14r、WD-14v、QU-20 |
 | `release,scripted:…` | 发版时用发布包脚本跑（`UAT_BUILD=release` 时脚本照跑，平时不跑；要雾凇拼音，一条三四分钟） | WD-14d、WD-14h、TBL-12c |
 | `manual:…` | 真机或手工 | HK-03a、HK-03b、HK-30、HK-33、MN-13、SET-11、ST-56、ST-57、ST-58、QU-24 |
-| `jvm:<测试>` | JVM 上的测试（`:app:testTextDebugUnitTest` 的 Robolectric，`:lib:ime-eval:uatTest` 的引擎回放，语音的 `:app:testVoiceDebugUnitTest`，`:lib:ime-core:test`），`uat.py jvm` 记录 | T9-01、PAN-09、ST-01、MN-20 |
+| `jvm:<测试>` | JVM 上的测试（`:app:testDebugUnitTest`、`:app:testDebugUnitTestAt29` 的 Robolectric，`:lib:ime-eval:uatTest` 的引擎回放，`:lib:ime-core:test`），`uat.py jvm` 记录 | T9-01、PAN-09、ST-01、MN-20 |
 
 `skip:…`／`block:…` 只留给别的原因，记"跳过"／"阻塞"。
 
-现在共 655 条（P0 117、P1 503、P2 35）：模拟器上跑 53 条（其中 24 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 602 条（JVM 562、发版时 18、真机或手工 10、语音版 12）。
+现在共 664 条（P0 122、P1 507、P2 35）：模拟器上跑 53 条（其中 24 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 611 条（JVM 568、发版时 20、真机或手工 10、语音 13）。
 
 （2026-11 从 redroid 搬到模拟器时 `needs=` 改了两处：原来的 `emu:` 去掉，实体键盘用例不再单独跑；`release,redroid:` 改名 `release,scripted:`，意思不变：发版时脚本跑。）
 
@@ -217,7 +232,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 停掉占用的服务或用 `UAT_HTTP_PORT=<端口>` 换一个。
 
 ```sh
-BUILD_ABI=arm64-v8a ./gradlew :app:assembleTextDebug   # 没有 debug 包时（运行器只要 arm64-v8a）
+BUILD_ABI=arm64-v8a ./gradlew :app:assembleDebug :app:packs   # 没有 debug 包或资源包时（运行器只要 arm64-v8a）
 uat/tools/uat.py up --port 5554             # 第一台 emulator-5554；不带 --port 是第二台 5556
 uat/tools/uat.py up
 uat/tools/uat.py run [--areas 14,06] [--ids PY-01,ST-02] [--devices 5554,5556]
@@ -236,7 +251,7 @@ uat/tools/uat.py down; uat/tools/uat.py down --port 5554   # 用完关掉
 `run --devices 5558`。adb 37 的 mDNS 在这台机器的局域网上会让 adb 服务几秒就崩（`ADB_MDNS=0` 关掉；运行器和
 `uat/tools/avd.sh` 自己设，别的地方先起的 adb 服务要带上它）。
 
-测发布包（正式版发版前）：先 `BUILD_ABI=arm64-v8a ./gradlew :app:assembleTextRelease`（要签名密钥，没有就只出
+测发布包（正式版发版前）：先 `BUILD_ABI=arm64-v8a ./gradlew :app:assembleRelease :app:packs`（要签名密钥，没有就只出
 `-unsigned.apk`，装不上），再在命令前加 `UAT_BUILD=release`：装 `io.github.sraw.youmo`，设备上的 debug 包先卸掉
 （两个都在时系统的输入法列表有两个幽默输入法）。脚本若调 `open_host`（现在没有用例这样做），它在那一条里临时装上
 debug 包（要先有 arm64-v8a debug 包），只当宿主应用、把它自己的输入法停用，这条结束就卸掉，所以别的用例（SET-01 的向导）
@@ -251,9 +266,9 @@ debug 包（要先有 arm64-v8a debug 包），只当宿主应用、把它自己
 .md 里写明。
 
 ```sh
-./gradlew :app:testTextDebugUnitTest :app:testVoiceDebugUnitTest :lib:ime-core:test :lib:ime-eval:uatTest
+./gradlew :app:testDebugUnitTest :app:testDebugUnitTestAt29 :lib:ime-core:test :lib:ime-eval:uatTest
                                                  # 四个都要跑：jvm 读这四处的结果；截图默认就比对（gradle.properties 的 roborazzi.test.verify）
-./gradlew :app:testTextDebugUnitTest --tests '*UatTest' -Proborazzi.test.record=true -Proborazzi.test.verify=false   # 改了样子后重录
+./gradlew :app:testDebugUnitTest --tests '*UatTest' -Proborazzi.test.record=true -Proborazzi.test.verify=false   # 改了样子后重录
 uat/tools/uat.py jvm                             # 读 JUnit 结果，按编号写 runs/<日期>-jvm-<版本>.md
 ```
 
@@ -265,20 +280,19 @@ uat/tools/uat.py jvm                             # 读 JUnit 结果，按编号�
 ## 实体键盘和语音
 
 实体键盘（17）的用例和别的用例一起跑：基线 `B0-实体` 用 `uat/tools/emu-keyboard.sh` 插上一个 uinput USB 键盘，
-别的基线拔掉。语音（12）要语音版：`--flavor` 要和装的包一致，运行器把它传给用例，文字版上语音用例单列为"在别处跑"。
-语音片段（`uat/tools/voice-clips.py` 合成，在 `dev/uat-out/voice-clips/`，不进 git）由语音版 debug 包的「片段麦克风」
+别的基线拔掉。语音（12）要导入语音包（运行器默认导入；`--no-voice` 只导文字包，语音用例单列为"在别处跑"）。
+语音片段（`uat/tools/voice-clips.py` 合成，在 `dev/uat-out/voice-clips/`，不进 git）由 debug 包的「片段麦克风」
 （`VoiceClipMic`）当作麦克风读到的声音（`Device.say`）：先 `content write` 写进 App 的 files，再
 `content call --uri content://<包名>.voiceclip --method queue --arg a.wav,800,b.wav` 排队（数字是停顿毫秒；`on` 打开但不排、
 `clear` 清空并关掉、`state` 查询），只认 shell 或 root 的 uid。按实时速度送，放完送很轻的底噪直到这次说话结束。
 模拟器用 `-audio none`（不能 `-no-audio`：那会去掉麦克风，片段麦克风照样要打开的 AudioRecord 会失败）。release 包里没有这段代码。`emu-up`/`emu-down` 还在，等于 `up/down --port 5554`。
 
 ```sh
-BUILD_ABI=arm64-v8a ./gradlew :app:assembleVoiceDebug   # 语音版
-uat/tools/uat.py run --devices 5554 --flavor voice --areas 12
+uat/tools/uat.py run --devices 5554 --areas 12
 ```
 
 - **分组**：同一基线（和同一页面）的用例是一组，基线只到一次。组里先跑不改状态的，再跑只因上屏而学词的，
-  最后跑改设置、改词的；改过状态的用例之后、下一条之前才重置（`pm clear` 再到基线）。要"没学过词"的用例
+  最后跑改设置、改词的；改过状态的用例之后、下一条之前才重置（清掉资源包以外的数据，见「重置」，再到基线）。要"没学过词"的用例
   （`clean=True`）前面若有上屏过的，也先重置。不改状态的用例之间只做软重置（清空框、回到拼音、收起工具栏）。
   （2026-10-22 量过用快照代替 `pm clear`：杀进程再解包要 9–18 s 且越杀越慢（系统对反复崩溃的服务推迟重启），
   `pm clear` 后解包 7–18 s、有一次键盘没起来；`pm clear` 本身 B0 约 8 s，没有稳定的收益，所以不用快照。）

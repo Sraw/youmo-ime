@@ -6,12 +6,14 @@
 
 幽默输入法不收集任何数据，也不上传给我们或任何第三方。
 
-幽默输入法不申请网络权限，无法联网，也不发通知。它有两个版本：
+幽默输入法不申请网络权限，无法联网，也不发通知。它申请两个权限：
 
-- **文字版**（默认）：只申请振动权限，用于按键振动。
-- **语音版**：多申请一个录音权限，只在你按住说话时录音；语音在手机上识别，录音不保存、不发送。
+- **振动**：用于按键振动。
+- **录音**：只在你第一次用语音输入时才问；只在你说话时录音，语音在手机上识别，录音不保存、不发送。
 
-两个版本都是：
+词典和模型在你自己导入的资源包里（设置 → 资源包）：应用只读你在文件选择器里选的那几个文件，检查签名后复制到自己的目录，不删也不改原文件。
+
+此外：
 
 - 拼音解码、两个句子模型都在手机上运行。
 - 你输入的内容、学到的词和词频、剪贴板记录、设置，都只存在手机上这个应用自己的目录里。
@@ -26,13 +28,16 @@
 
 Youmo IME collects no data, and uploads none to us or to anyone else.
 
-Youmo IME asks for no network permission and cannot go online; it posts no notifications either. There are two builds:
+Youmo IME asks for no network permission and cannot go online; it posts no notifications either. It asks for two permissions:
 
-- **Text** (the default): asks only to vibrate, for key feedback.
-- **Voice**: asks for the microphone as well, used only while you hold to talk; speech is recognized on the phone, and the
-  recording is neither kept nor sent.
+- **Vibrate**: for key feedback.
+- **Microphone**: asked for only when you first use voice input; used only while you talk; speech is recognized on the phone,
+  and the recording is neither kept nor sent.
 
-In both:
+The dictionaries and models are in the resource packs you import yourself (Settings → Resource packs): the app reads only the
+files you pick in the file picker, checks their signature and copies them into its own directory, never deleting or changing yours.
+
+Also:
 
 - Pinyin decoding and both sentence models run on the phone.
 - What you type, the words and frequencies it learns, the clipboard history and the settings stay in the app's own directories on the phone.
