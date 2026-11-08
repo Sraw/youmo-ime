@@ -207,6 +207,24 @@ class HandwritingSceneGesturesTest {
         }
     }
 
+    // no scene (060-render-p2 U8): nothing of the keyboard shown, the pad neither; a scene again, the pad again
+    @Test
+    fun thePadHiddenWhileTheSceneFails() {
+        harness(true).use { h ->
+            val kb = KeyboardHarness.find<HandwritingKeyboard>(h.keyboard)!!
+            val canvas = KeyboardHarness.find<KeyboardCanvasView>(kb)!!
+            assertEquals(View.VISIBLE, h.pad().visibility)
+            KeyboardCanvasView::class.java.getDeclaredField("failed").apply { isAccessible = true }.setBoolean(canvas, true)
+            kb.requestLayout()
+            h.relayout()
+            assertEquals(View.INVISIBLE, h.pad().visibility)
+            canvas.invalidateScene()
+            kb.requestLayout()
+            h.relayout()
+            assertEquals(View.VISIBLE, h.pad().visibility)
+        }
+    }
+
     // ，。 as they type: with Chinese punctuation on, full width; off (the mapping empty), what is typed is half width
     @Test
     fun commaAndFullStopShownAsTheyType() {

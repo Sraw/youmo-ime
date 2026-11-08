@@ -12,6 +12,7 @@ import android.view.MotionEvent
 import android.view.View
 import androidx.annotation.Keep
 import androidx.annotation.VisibleForTesting
+import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -213,7 +214,10 @@ class HandwritingKeyboard(
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         val c = canvas ?: return
-        if (!c.slot(PAD_SLOT, padSlot)) return
+        val placed = c.slot(PAD_SLOT, padSlot)
+        // no scene (none even of the built-in theme, 060-render-p2 U8): nothing of the keyboard shown, the pad neither
+        padView.isInvisible = !placed
+        if (!placed) return
         padSlot.offset(c.left, c.top)
         padView.layout(padSlot.left, padSlot.top, padSlot.right, padSlot.bottom)
     }
