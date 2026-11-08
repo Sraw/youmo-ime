@@ -193,8 +193,8 @@
 <!-- learning: U-82 -->
 - **前提**：B0；在状态面板（⋯）里切到 **繁體**。
 - **操作**：点 g u o j i a，长按「國家」，选 **屏蔽**、确认；清空再点 g u o j i a；切回 **简体** 再点一次。
-- **预期**：菜单里有 **屏蔽**，能用；屏蔽后繁體下按的那个「國家」不再出（词库里另有一个本来就是繁体的「國家」，转换后也显示成「國家」，它照旧出），简体下不再出「国家」（屏蔽记的是原文「国家」）。
-- **JVM**：`EnginesConvertedMenuTest.aCandidateShownConvertedIsBlockedAsTheEngineHasIt`（菜单、屏蔽、撤销按引擎里的简体做；宿主经 `HostCore.shownText` 把转换函数传给 `Engines.learning`）。设备上跑过（2026-11-08，emulator-5574；修之前菜单里没有屏蔽）。
+- **预期**：菜单里有 **屏蔽**，能用；屏蔽后繁體下 guojia 不再出「國家」（词库里另有一个本来就是繁体的「國家」，显示一样，一起屏蔽），简体下不再出「国家」（屏蔽记的是原文「国家」）。
+- **JVM**：`EnginesConvertedMenuTest`（菜单、屏蔽、撤销按引擎里的简体做，显示一样的候选一起屏蔽、删除，固定只管按的那个；宿主经 `HostCore.shownText` 把转换函数传给 `Engines.learning`）。设备上跑过（2026-11-08，emulator-5574；修之前菜单里没有屏蔽）。
 
 ### PY-31 [P1] 固定首位，再取消固定
 <!-- learning: U-83 -->

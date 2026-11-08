@@ -177,9 +177,20 @@ internal class LearningOps(
             acted { offer in offers && act(e, op.index) }?.let { LearningResult.Done(it) } ?: LearningResult.Unavailable
         }
         return when (op) {
-            is LearningOp.Menu -> menu(im, s, op).copy(text = asShown.text)
-            is LearningOp.Delete -> if (Offer.FORGET in offers) delete(op, s.why(op.index)?.whole.orEmpty()) { act(EngineEvent.FORGET, op.index) } else LearningResult.Unavailable
-            is LearningOp.Block -> if (Offer.BLOCK in offers) block(op) { act(EngineEvent.BLOCK, op.index) } else LearningResult.Unavailable
+            // the engine's text, which the menu's acts come back with (engines)
+            is LearningOp.Menu -> menu(im, s, op)
+            is LearningOp.Delete -> if (Offer.FORGET in offers) {
+                val also = alike(s, op.text, shown)
+                delete(op.text, also, s.why(op.index)?.whole.orEmpty()) { act(EngineEvent.FORGET, op.index).also { if (it) actOn(im, also, Offer.FORGET, EngineEvent.FORGET, act) } }
+            } else {
+                LearningResult.Unavailable
+            }
+            is LearningOp.Block -> if (Offer.BLOCK in offers) {
+                val also = alike(s, op.text, shown)
+                block(listOf(op.text) + also) { act(EngineEvent.BLOCK, op.index).also { if (it) actOn(im, also, Offer.BLOCK, EngineEvent.BLOCK, act) } }
+            } else {
+                LearningResult.Unavailable
+            }
             is LearningOp.Pin -> event(Offer.PIN, EngineEvent.PIN)
             // a phrase's file holds it, not the learning record: no undo
             is LearningOp.Unpin -> if (Offer.DELETE_PHRASE in offers) {
@@ -198,18 +209,38 @@ internal class LearningOps(
     }
 
     // [asShown] as the engine has it, or null where the list changed since the menu showed (another
-    // candidate at the index now). One shown converted (國家 for 国家) is the engine's text from here
-    // on: what is blocked, deleted, pinned
+    // candidate at the index now). The menu and the report are asked with the text as shown (國家 for
+    // 国家); an act comes back with the menu's text, the engine's, and must be it: another candidate
+    // shown alike (a dictionary's own 國家) is not the one the menu was for
     private fun engines(s: Session, asShown: LearningOp.OnCandidate, shown: (String) -> String): LearningOp.OnCandidate? {
         val text = s.candidates(asShown.index, 1).firstOrNull()?.text ?: return null
-        return asShown.at(asShown.index, text).takeIf { text == asShown.text || shown(text) == asShown.text }
+        val asked = asShown is LearningOp.Menu || asShown is LearningOp.Report
+        return asShown.at(asShown.index, text).takeIf { text == asShown.text || asked && shown(text) == asShown.text }
     }
 
-    // [whole]: the whole phrase (U-73) [op] is the rest of, "" for a word
-    private fun delete(op: LearningOp.Delete, whole: String, act: () -> Boolean): LearningResult {
+    // the other candidates of the list shown as [text] is where the host converts it (國家: 国家 and a
+    // dictionary's own 國家): what is blocked or deleted is gone as shown, not left in its other
+    // form (review R2). Their texts, the engine's
+    private fun alike(s: Session, text: String, shown: (String) -> String): List<String> {
+        val asShown = shown(text)
+        if (asShown == text) return emptyList()
+        return s.candidates(0, ALIKE_SCAN).map { it.text }.filter { it != text && shown(it) == asShown }.distinct()
+    }
+
+    // [event] on each of [texts] where it is in the list now, the list as the last act left it
+    private fun actOn(im: String, texts: List<String>, offer: Offer, event: Int, act: (Int, Int) -> Boolean) {
+        for (t in texts) {
+            val s = session(im) ?: return
+            val at = s.candidates(0, ALIKE_SCAN).indexOfFirst { it.text == t }
+            if (at >= 0 && offer in s.offers(at)) act(event, at)
+        }
+    }
+
+    // [whole]: the whole phrase (U-73) [text] is the rest of, "" for a word; [also]: the words shown alike, deleted with it
+    private fun delete(text: String, also: List<String>, whole: String, act: () -> Boolean): LearningResult {
         // a word added by hand comes off the list with it (Engines.changed): put back if taken back.
         // Not for a whole phrase, which takes no word with it, the rest's nor its own (U-73)
-        val added = if (whole.isEmpty()) lexicon.addedPlaces(lexicon.addedOf(op.text)) else emptyList()
+        val added = if (whole.isEmpty()) lexicon.addedPlaces((listOf(text) + also).flatMap { lexicon.addedOf(it) }) else emptyList()
         val forgets = tableForgets()
         val token = acted(inverse = { lexicon.reAdd(added) }, act) ?: return LearningResult.Unavailable
         // what the tables' own logs forgot (a phrase they saved, theirs or shared with pinyin) no
@@ -219,8 +250,8 @@ internal class LearningOps(
         return LearningResult.Done(if (tableForgets() != forgets) LearningResult.NO_UNDO else token)
     }
 
-    private fun block(op: LearningOp.Block, act: () -> Boolean): LearningResult {
-        val before = lexicon.blockedOf(op.text).toSet()
+    private fun block(texts: List<String>, act: () -> Boolean): LearningResult {
+        val before = texts.flatMap { lexicon.blockedOf(it) }.toSet()
         // English's words have a list of their own (no reading)
         val english = lexicon.englishBlocks
         // as written, which the shown text need not be (The for the; EnglishBlocks)
@@ -232,7 +263,7 @@ internal class LearningOps(
             english.unblock(englishBlocked)
         }) {
             act().also {
-                blocked = lexicon.blockedOf(op.text).filter { it !in before }
+                blocked = texts.flatMap { lexicon.blockedOf(it) }.filter { it !in before }
                 englishBlocked = english.blocked.filter { it !in englishBefore }
             }
         } ?: return LearningResult.Unavailable
@@ -341,5 +372,8 @@ internal class LearningOps(
     private companion object {
         // as many as a page or two show: enough to see where the word went
         const val REPORTED = 20
+
+        // how far the list is looked through for a word shown alike: past any page the menu is on
+        const val ALIKE_SCAN = 200
     }
 }

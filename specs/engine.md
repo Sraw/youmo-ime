@@ -374,7 +374,7 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
 
 ### Long press on a candidate
 
-`Session.offers(index)` says what a long press may do (an op names its candidate by index and text, as shown: a list the host shows converted, 繁體 by chttrans, names it so, and `Engines.learning`'s `shown`, `HostCore.shownText` from `KotlinHost`, matches it to the engine's text, which every act then uses: the simplified word is what is blocked, deleted or pinned); `LearningOps.menu` turns that into the
+`Session.offers(index)` says what a long press may do (an op names its candidate by index and text, as shown: a list the host shows converted, 繁體 by chttrans, names it so, and `Engines.learning`'s `shown`, `HostCore.shownText` from `KotlinHost`, matches it to the engine's text for the menu (and the report); the menu answers with the engine's text, and an act must name that, else `Unavailable` (the list changed under the menu to another candidate shown alike). The simplified word is what is blocked, deleted or pinned, and a block or delete of a converted one takes every candidate of the list shown alike too (a dictionary's own 國家), undone together; a pin only the pressed one); `LearningOps.menu` turns that into the
 `LearningOp.MenuItem`s and `LearningMenu.rows` into the rows shown: `DELETE` (删除 on the user's or an
 imported word, 忘掉学到的 on a dictionary's: what was learned of its text, everywhere), `BLOCK` (屏蔽,
 its scope stated first: everywhere, or for a table under the code typed alone; into the block list,

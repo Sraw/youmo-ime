@@ -419,7 +419,7 @@ def py116(d):
         after = d.cands()
         d.clear()
         # the list may have two that show as 國家 (国家, and the dictionary's own traditional 國家): the one pressed goes
-        check(after.count("國家") < c.count("國家"), f"屏蔽后繁體下 guojia 的「國家」没少：{c[:6]} → {after[:6]}")
+        check("國家" not in after, f"屏蔽后繁體下 guojia 还出「國家」：{c[:6]} → {after[:6]}")
     finally:
         d.clear()
         tb.status_toggle(d, trad)
