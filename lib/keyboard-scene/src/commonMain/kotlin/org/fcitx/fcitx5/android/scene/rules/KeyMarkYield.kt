@@ -222,15 +222,9 @@ object KeyMarkYield {
             fits = { s, marks -> fit(k, keys[k].at(s), marks) },
         )
         // a key with both: no more than its symbols alone ask, so they are not let go with the shortcuts
-        // rules B §8a: and each glyph within its room across, the class as much smaller as its widest needs, to
-        // [MAX_CLASS_SHRINK] with the rest (what is wider still shrunk alone before: SceneBuilder.fitted)
-        fun across(k: Int): Double {
-            val g = keys[k].glyph
-            if (!keys[k].across || g.left.isNaN() || g.width <= keys[k].room.width) return 1.0
-            return largest(least) { s -> keys[k].at(s).width <= keys[k].room.width }
-        }
+        // rules B §8a: and each glyph within its room across
         val asked = keys.indices.map { k ->
-            minOf(if (whole(k)) 1.0 else minOf(asks(k, false), asks(k, true)), across(k))
+            minOf(if (whole(k)) 1.0 else minOf(asks(k, false), asks(k, true)), keys[k].across())
         }
         val scales = keys.indices.groupBy { keys[it].glyphClass }.mapValues { (_, ks) -> ks.minOf { asked[it] } }
         // the marks: of the class (or both) that meets, as much smaller as lets them
@@ -410,6 +404,13 @@ object KeyMarkYield {
         }
         val dx = if (side == room.right) room.right - glyph.right else room.left - glyph.left
         return still.copy(glyph = glyph.moved(dx, 0.0), x = side)
+    }
+
+    // rules B §8a: what a label wider than its room asks of its class, the class as much smaller as its widest
+    // needs, to [MAX_CLASS_SHRINK] with the rest (what is wider still shrunk alone before: SceneBuilder.fitted)
+    private fun Member.across(): Double {
+        if (!across || glyph.left.isNaN() || glyph.width <= room.width) return 1.0
+        return largest(1.0 - MAX_CLASS_SHRINK) { s -> at(s).width <= room.width }
     }
 
     private fun Member.at(s: Double): Ink = if (s == 1.0) glyph else glyph.scaled(s, x, y).grown(grows, s)
