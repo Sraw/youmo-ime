@@ -176,7 +176,10 @@ object Expand {
     private fun binding(name: String, arg: String, env: Env): String {
         val texts = env.texts
         return when (name) {
-            "case" -> LetterCaseRule.shown(arg, LetterCaseRule.upper(texts.letterCase, env.shift, keepUppercase = texts.keepUppercase))
+            "case" -> cased(arg, env)
+            // a table's root over its letter; a letter with none its letter as `{case:x}` shows it (so a screen
+            // reader's text, read under 跟随 Shift, is the same whatever 拼音键字母大小写 draws)
+            "root" -> texts.other["root:$arg"]?.takeIf { it.isNotEmpty() } ?: cased(arg, env)
             // a 14/18 键 key's letters: capitals with no Shift to follow, unless the setting says otherwise
             "group" -> LetterCaseRule.shown(arg, LetterCaseRule.upper(texts.letterCase, env.shift, shiftless = true))
             "alt" -> texts.alts?.get(arg).orEmpty()
@@ -191,6 +194,9 @@ object Expand {
             else -> texts.other[if (arg.isEmpty()) name else "$name:$arg"].orEmpty()
         }
     }
+
+    private fun cased(letter: String, env: Env): String =
+        LetterCaseRule.shown(letter, LetterCaseRule.upper(env.texts.letterCase, env.shift, keepUppercase = env.texts.keepUppercase))
 
     // rules C §2: pinyin's and 双拼's in capitals (or as 拼音键字母大小写 says); English's as Shift has them, small without
     private fun nineLetters(letters: String, env: Env): String =

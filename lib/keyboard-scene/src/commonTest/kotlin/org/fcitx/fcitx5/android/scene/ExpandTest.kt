@@ -177,6 +177,10 @@ class ExpandTest {
         // 九键 pinyin: capitals, or the setting's
         assertEquals("ABC", Expand.text(Text.Binding("nine-letters", "2"), env))
         assertEquals("abc", Expand.text(Text.Binding("nine-letters", "2"), lower))
+        // a table's letter with no root: its letter as {case:x}; one with its root as given
+        assertEquals("Z", Expand.text(Text.Binding("root", "z"), upper))
+        assertEquals("z", Expand.text(Text.Binding("root", "z"), upper.copy(texts = upper.texts.copy(letterCase = LetterCase.Shift))))
+        assertEquals("王", Expand.text(Text.Binding("root", "g"), upper.copy(texts = upper.texts.copy(other = mapOf("root:g" to "王")))))
         // the punctuation a case binding may carry is as it was
         assertEquals(",", Expand.text(Text.Binding("case", ","), upper))
     }
