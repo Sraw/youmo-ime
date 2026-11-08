@@ -66,7 +66,7 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
         private set
 
     // where across the key the finger came down, 0 its left edge and 1 its right: nearest what was
-    // aimed at, a lift is dragged off it. The key's width, its margins too (KeyView's hMargin)
+    // aimed at, a lift is dragged off it. The key's width, its margins too (its cell's)
     private var downAt = Float.NaN
 
     /**
@@ -169,8 +169,7 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
      * pixels, finger [pointerId]'s, at [eventTime]: what the key's own onTouchEvent did with it.
      */
     fun onTouch(action: Int, x: Float, y: Float, pointerId: Int, eventTime: Long): Boolean {
-        // Refreshed here rather than in onSizeChanged: KeyView overrides that without calling
-        // super, so a hook there silently never runs and every move looks like it left the key.
+        // Refreshed per touch: the key's size changes with the scene's (another height, one-handed)
         recognizer.viewWidth = key.keyWidth
         recognizer.viewHeight = key.keyHeight
         // longPressDelay is a live preference; the timers below read it per touch, so the

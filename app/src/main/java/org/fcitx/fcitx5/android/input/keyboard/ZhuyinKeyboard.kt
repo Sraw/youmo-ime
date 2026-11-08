@@ -8,7 +8,6 @@ import android.annotation.SuppressLint
 import android.content.Context
 import androidx.annotation.Keep
 import androidx.annotation.VisibleForTesting
-import androidx.core.view.isVisible
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -54,7 +53,7 @@ import org.fcitx.fcitx5.android.scene.engine.Texts
  * A symbol key's swipe reaches its shortcut ([ZhuyinShortcutNames]: 大千's by QWERTY place, the groups' by
  * their place); the tones (ˉ swipes to ˙) and the slot have none, as the nine keys' 1.
  *
- * Where the canvas is on, both are drawn by the scene ([layoutOf]: 大千's zhuyin.xml, 060-render-p2 S4c;
+ * Both are drawn by the scene ([layoutOf]: 大千's zhuyin.xml, 060-render-p2 S4c;
  * 注音九键's zhuyin-nine.xml, S4d) and wired from their layouts: what their keys send is the layouts'
  * `action:` placeholders, each this keyboard's ([placeholder]), a group's long press its symbols
  * ([groupPopup]), and what the slot and the bottom row show their state ([sceneEnv]), drawn again as it changes.
@@ -122,7 +121,7 @@ class ZhuyinKeyboard(
             if (r == 3) keys + BackspaceKey(0.15f) else keys
         } + listOf(GroupedKeyboard.bottomRow())
 
-        /** The layout the keys of [nine] or 大千 are drawn from where the canvas is on (lib/keyboard-scene's zhuyin.xml, zhuyin-nine.xml), named as the theme names the board. */
+        /** The layout the keys of [nine] or 大千 are drawn from (lib/keyboard-scene's zhuyin.xml, zhuyin-nine.xml), named as the theme names the board. */
         internal fun layoutOf(nine: Boolean): String = if (nine) KeyNames.ZHUYIN_NINE else KeyNames.ZHUYIN
 
         /**
@@ -222,15 +221,10 @@ class ZhuyinKeyboard(
         }
     }
 
-    private val space: TextKeyView by lazy { findViewById(R.id.button_space) }
-    private val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
-    private val lang: ImageKeyView by lazy { findViewById(R.id.button_lang) }
-
     // as the grouped keyboards' (whose bottom row this is)
     override var address: AddressKeys = AddressKeys.NONE
         set(value) {
             field = value
-            showAddressKeys()
             canvas?.invalidateScene()
         }
 
@@ -242,12 +236,10 @@ class ZhuyinKeyboard(
     }
 
     private fun showLanguageKey() {
-        lang.isVisible = showLangSwitchKey.getValue()
         canvas?.invalidateScene()
     }
 
     init {
-        showAddressKeys()
         showLanguageKey()
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
     }
@@ -257,12 +249,6 @@ class ZhuyinKeyboard(
 
     override fun onPunctuationUpdate(mapping: Map<String, String>) {
         punctuationMapping = mapping
-        listOf(R.id.button_comma to ",", R.id.button_period to ".").forEach { (id, p) ->
-            findViewById<TextKeyView>(id).mainText.text = mapped(p)
-        }
-        // the slot's comma the same: ，or, as the bottom row's
-        comma = mapped(",")
-        if (!typing) slot?.mainText?.text = comma
         canvas?.invalidateScene()
     }
 
@@ -279,13 +265,6 @@ class ZhuyinKeyboard(
 
     // something typed, as the engine last told
     private var typing = false
-
-    // the slot's face when nothing is typed: the comma it types, as punctuation maps it
-    private var comma = PUNCTUATION
-
-    private val slot: TextKeyView? by lazy {
-        if (!nine) null else keyRows[SLOT_ROW].getChildAt(SLOT_COLUMN) as TextKeyView
-    }
 
     private var scope: CoroutineScope? = null
 
@@ -309,7 +288,6 @@ class ZhuyinKeyboard(
     internal fun showTyping(now: Boolean) {
         if (now == typing) return
         typing = now
-        slot?.mainText?.text = if (now) SEPARATOR else comma
         canvas?.invalidateScene()
     }
 
@@ -328,12 +306,11 @@ class ZhuyinKeyboard(
 
     override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
         returnAppearance = appearance
-        `return`.showReturnAction(appearance)
         canvas?.invalidateScene()
     }
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
-        showInputMethodName(space, ime)
+        showInputMethodName(ime)
         canvas?.invalidateScene()
     }
 
@@ -365,8 +342,7 @@ class ZhuyinKeyboard(
         return SceneEnvs.of(this, look, theme.isDark, width, height, input = input, texts = texts, marks = SceneBoard.marks(layout, charShortcutMarks))
     }
 
-    // last: the scene reads the state above (060's redraw: the keys drawn by the scene engine where the canvas
-    // is on, 大千's and 注音九键's alike)
+    // last: the scene reads the state above (the keys drawn by the scene engine, 大千's and 注音九键's alike)
     init {
         drawKeysWithScene(layoutOf(nine))
     }

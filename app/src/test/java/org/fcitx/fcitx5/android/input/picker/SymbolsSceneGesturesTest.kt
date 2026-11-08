@@ -45,25 +45,24 @@ class SymbolsSceneGesturesTest {
     @get:Rule
     val prefs = PrefsRule()
 
-    private fun panel(canvas: Boolean): KeyboardHarness {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, canvas)
+    private fun panel(): KeyboardHarness {
         prefs.set(AppPrefs.getInstance().internal.symbolPanelLocked, false)
         return KeyboardHarness().start().also { h ->
             h.tap(h.key("符"))
             h.relayout()
             val layout = KeyboardHarness.find<PickerLayout>(h.inputView)!!
-            assertEquals(canvas, KeyboardHarness.all(layout).any { it is KeyboardCanvasView && it.visibility == View.VISIBLE })
+            assertTrue(KeyboardHarness.all(layout).any { it is KeyboardCanvasView && it.visibility == View.VISIBLE })
         }
     }
 
     private fun KeyboardHarness.rowKeys() = keys().filter { it.id in ROW }
 
-    private fun gestures(canvas: Boolean): List<String> {
-        val ids = panel(canvas).use { h -> h.rowKeys().mapNotNull { it.id } }
-        assertEquals("canvas $canvas: $ids", ROW, ids.toSet())
+    private fun gestures(): List<String> {
+        val ids = panel().use { h -> h.rowKeys().mapNotNull { it.id } }
+        assertEquals("$ids", ROW, ids.toSet())
         val out = mutableListOf("keys $ids")
         for (id in ids) {
-            panel(canvas).use { h ->
+            panel().use { h ->
                 val k = h.rowKeys().single { it.id == id }
                 // what TalkBack reads (a text view's text where it has no description), and its view's name
                 out += "$id said: ${k.description ?: k.label} as ${k.resourceName}"
@@ -74,7 +73,7 @@ class SymbolsSceneGesturesTest {
                     " field ${h.field.text} panel ${KeyboardHarness.find<PickerLayout>(h.inputView)?.isAttachedToWindow == true}"
             }
             // held: its long press's keys or menu, what reaches the engine
-            panel(canvas).use { h ->
+            panel().use { h ->
                 h.api.calls.clear()
                 out += "$id long press: " + h.longPress(h.rowKeys().single { it.id == id })
                 h.idle()
@@ -86,13 +85,8 @@ class SymbolsSceneGesturesTest {
     }
 
     @Test
-    fun theRowAsItsViews() {
-        assertEquals(gestures(false).joinToString("\n"), gestures(true).joinToString("\n"))
-    }
-
-    @Test
     fun theCategoriesAndTheGridAreInTheirSlots() {
-        panel(true).use { h ->
+        panel().use { h ->
             val layout = KeyboardHarness.find<PickerLayout>(h.inputView)!!
             val kb = layout.embeddedKeyboard
             for ((slot, view) in listOf(PickerLayout.CATEGORIES_SLOT to layout.side!!, PickerLayout.GRID_SLOT to layout.grid)) {
@@ -116,7 +110,7 @@ class SymbolsSceneGesturesTest {
     // narrower (one-handed, split): the categories and the grid follow the slots of the scene at the new size
     @Test
     fun theCategoriesAndTheGridFollowTheirSlotsAfterAResize() {
-        panel(true).use { h ->
+        panel().use { h ->
             val layout = KeyboardHarness.find<PickerLayout>(h.inputView)!!
             val before = cellOf(layout, PickerLayout.GRID_SLOT)
             val w = layout.width * 7 / 10
@@ -153,7 +147,7 @@ class SymbolsSceneGesturesTest {
     // the lock shut: TalkBack told its node's words changed (what a tap does now), as its view's new description was
     @Test
     fun theLocksNewWordsToldToAScreenReader() {
-        panel(true).use { h ->
+        panel().use { h ->
             val kb = KeyboardHarness.find<PickerLayout>(h.inputView)!!.embeddedKeyboard
             val canvas = KeyboardHarness.find<KeyboardCanvasView>(kb)!!
             canvas.scene
@@ -167,7 +161,7 @@ class SymbolsSceneGesturesTest {
     // the field's action changed while the panel is up (onReturnDrawableUpdate): Return said as the new one
     @Test
     fun returnAsTheFieldsActionWhenItChanges() {
-        panel(true).use { h ->
+        panel().use { h ->
             val kb = KeyboardHarness.find<PickerLayout>(h.inputView)!!.embeddedKeyboard
             val before = h.rowKeys().map { it.description }
             kb.onReturnDrawableUpdate(ReturnKeyAppearance(R.drawable.ic_baseline_search_24, R.string.a11y_key_enter, customLabel = "前往搜索"))
@@ -180,13 +174,13 @@ class SymbolsSceneGesturesTest {
     @Test
     fun theLockShutAsItsStateSaidAsWhatATapDoes() {
         val app = org.robolectric.RuntimeEnvironment.getApplication()
-        val said = listOf(false, true).map { canvas ->
-            panel(canvas).use { h ->
+        val said = listOf(true).map { _ ->
+            panel().use { h ->
                 val open = h.rowKeys().single { it.id == "lock" }.description
                 h.tap(h.rowKeys().single { it.id == "lock" })
                 h.idle()
                 h.relayout()
-                if (canvas) {
+                run {
                     val node = KeyboardHarness.find<KeyboardCanvasView>(KeyboardHarness.find<PickerLayout>(h.inputView)!!)!!.keyAt("lock")!!
                     assertTrue(node.states.toString(), org.fcitx.fcitx5.android.scene.KeyState.Locked in node.states)
                 }
@@ -194,12 +188,11 @@ class SymbolsSceneGesturesTest {
             }
         }
         assertEquals(listOf(app.getString(R.string.picker_lock), app.getString(R.string.picker_unlock)), said[0])
-        assertEquals(said[0], said[1])
     }
 
     @Test
     fun backInTheAppsWords() {
-        panel(true).use { h -> h.key(org.robolectric.RuntimeEnvironment.getApplication().getString(R.string.picker_back)) }
+        panel().use { h -> h.key(org.robolectric.RuntimeEnvironment.getApplication().getString(R.string.picker_back)) }
     }
 
     private companion object {

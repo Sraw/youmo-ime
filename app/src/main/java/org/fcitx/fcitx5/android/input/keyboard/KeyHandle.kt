@@ -12,8 +12,7 @@ import org.fcitx.fcitx5.android.input.scene.KeyRef
 
 /**
  * A key as its keyboard wires it (BaseKeyboard's wire, 060-render-p2 S1): what its touch does,
- * whatever draws it. A [KeyView], or a key the scene draws (canvas/SceneTouch's SceneKey): the
- * same wiring for both, so the canvas's keys do what the views did.
+ * a key the scene draws (canvas/SceneTouch's SceneKey).
  */
 interface KeyHandle : KeyGesture.Key {
     /** Which key it is, to a popup ([org.fcitx.fcitx5.android.input.popup.PopupAction.key]). */
@@ -21,7 +20,7 @@ interface KeyHandle : KeyGesture.Key {
 
     /**
      * Where a popup over it is placed, in the window: the face across, to the cell's foot down
-     * (KeyView.bounds). Null for a scene's key the scene drawn last has not: no popup over it.
+     * Null for a scene's key the scene drawn last has not: no popup over it.
      */
     val bounds: Rect?
 
@@ -45,7 +44,7 @@ fun interface KeyPlace {
     fun place(keyboard: ViewGroup, out: Rect)
 }
 
-/** A finger's key, for the rest of its touch (BaseKeyboard's routing): a key view, or a key the scene draws. */
+/** A finger's key, for the rest of its touch (BaseKeyboard's routing): a key the scene draws. */
 internal interface TouchTarget {
     val ref: KeyRef
 

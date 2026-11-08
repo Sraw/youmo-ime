@@ -7,8 +7,6 @@ package org.fcitx.fcitx5.android.input.keyboard
 import android.annotation.SuppressLint
 import android.content.Context
 import androidx.annotation.Keep
-import androidx.core.view.children
-import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
@@ -43,7 +41,6 @@ import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Texts
-import splitties.views.existingOrNewId
 import timber.log.Timber
 
 /**
@@ -194,7 +191,7 @@ class GroupedKeyboard(
             )
         }
 
-        /** The layouts their keys are drawn from where the canvas is on (lib/keyboard-scene's k14.xml, k18.xml). */
+        /** The layouts their keys are drawn from (lib/keyboard-scene's k14.xml, k18.xml). */
         internal fun layoutOf(letters: NineKeyLetters): String = shapeOf(letters).board
 
         /** [letters]' groups as their keys show them: without `;` unless [semicolon]. */
@@ -263,15 +260,10 @@ class GroupedKeyboard(
         }
     }
 
-    private val space: TextKeyView by lazy { findViewById(R.id.button_space) }
-    private val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
-    private val lang: ImageKeyView by lazy { findViewById(R.id.button_lang) }
-
     /** What the bottom row has either side of the space, as the field is: as the full keyboard's ([AddressKeys]). */
     override var address: AddressKeys = AddressKeys.NONE
         set(value) {
             field = value
-            showAddressKeys()
             canvas?.invalidateScene()
         }
 
@@ -283,29 +275,12 @@ class GroupedKeyboard(
     }
 
     private fun showLanguageKey() {
-        lang.isVisible = showLangSwitchKey.getValue()
         canvas?.invalidateScene()
     }
 
     init {
-        showAddressKeys()
         showLanguageKey()
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
-    }
-
-    // said "Q W, 1": TalkBack reads the face "QW" as a word; the corner as drawn (～ in Chinese)
-    private fun describeGroups() = groupViews.forEach { (view, group) ->
-        view.contentDescription = context.getString(R.string.a11y_key_grouped, group.uppercase().toList().joinToString(" "), mapped(view.corner))
-    }
-
-    private val AltTextKeyView.corner get() = (def as KeyDef.Appearance.AltText).altText
-
-    // the group keys with their letters, as [layout] made them (pinyin's 18 keys: L without its `;`)
-    private val groupViews: List<Pair<AltTextKeyView, String>> by lazy {
-        val groups = groupsOf(letters, semicolon)
-        keyRows.flatMap { it.children.toList() }.filterIsInstance<AltTextKeyView>().mapNotNull { view ->
-            groups.firstOrNull { it.uppercase() == (view.def as KeyDef.Appearance.AltText).displayText }?.let { view to it }
-        }
     }
 
     // the groups' keys where the scene draws them: each key's letters= (060-render-v2 §15), its first letter's
@@ -314,19 +289,14 @@ class GroupedKeyboard(
 
     // no glide: a stroke drawn alone (笔画筛选), over the group keys, each its first letter's
     override val glide = glideInput(
-        letters = { if (canvas != null) groupPlaces() else groupViews.map { (v, g) -> g[0] to v } },
+        letters = { groupPlaces() },
         enabled = { false },
         filters = { InputMethodCatalog.filtersByStrokes(imeName) },
     ) { _, _ -> }
 
-    // a key's popup names it by its view's id
-    private val groupOf: Map<Int, Pair<String, String>> by lazy {
-        groupViews.associate { (view, group) -> view.existingOrNewId to (group to view.corner) }
-    }
-
-    // the group and corner of the key [ref]: a view's by its id, the scene's by its node's letters= and swipe
+    // the group and corner of the key [ref]: by its node's letters= and swipe
     private fun groupOf(ref: KeyRef): Pair<String, String>? =
-        if (!ref.isScene) groupOf[ref.viewId] else canvas?.keyAt(ref.id, if (ref.copy) 1 else 0)?.let(::groupOfNode)
+        canvas?.keyAt(ref.id, if (ref.copy) 1 else 0)?.let(::groupOfNode)
 
     private fun groupOfNode(node: KeyNode): Pair<String, String>? = node.letters?.let { shown(it.group) to cornerOf(node) }
 
@@ -364,11 +334,6 @@ class GroupedKeyboard(
     // (the address keys commit as they are, and say so)
     override fun onPunctuationUpdate(mapping: Map<String, String>) {
         punctuationMapping = mapping
-        groupViews.forEach { (view, _) -> view.altText.text = mapped(view.corner) }
-        describeGroups()
-        listOf(R.id.button_comma to ",", R.id.button_period to ".").forEach { (id, p) ->
-            findViewById<TextKeyView>(id).mainText.text = mapped(p)
-        }
         canvas?.invalidateScene()
     }
 
@@ -406,7 +371,6 @@ class GroupedKeyboard(
 
     override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
         returnAppearance = appearance
-        `return`.showReturnAction(appearance)
         canvas?.invalidateScene()
     }
 
@@ -415,7 +379,7 @@ class GroupedKeyboard(
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         imeName = ime.uniqueName
-        showInputMethodName(space, ime)
+        showInputMethodName(ime)
         canvas?.invalidateScene()
     }
 
@@ -444,10 +408,8 @@ class GroupedKeyboard(
         return SceneEnvs.of(this, look, theme.isDark, width, height, input = state.input(), texts = texts, marks = SceneBoard.marks(layout, charShortcutMarks))
     }
 
-    // last: describeGroups reads [groupViews] and [punctuationMapping], which an init above them would find not yet made;
-    // the scene reads them all (060's redraw: the keys drawn by the scene engine where the canvas is on, each as its layout says)
+    // last: the scene reads the state above (the keys drawn by the scene engine, each as its layout says)
     init {
-        describeGroups()
         drawKeysWithScene(layoutOf(letters))
         checkGroups()
     }

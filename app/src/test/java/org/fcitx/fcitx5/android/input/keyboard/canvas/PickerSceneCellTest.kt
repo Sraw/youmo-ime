@@ -53,7 +53,6 @@ class PickerSceneCellTest {
 
     @Before
     fun canvasOn() {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         // the 颜文字 these tests open is remembered as the panel last shown: put back after, so a later test's 表情 opens the emoji
         prefs.set(AppPrefs.getInstance().internal.lastPickerType, AppPrefs.getInstance().internal.lastPickerType.getValue())
     }

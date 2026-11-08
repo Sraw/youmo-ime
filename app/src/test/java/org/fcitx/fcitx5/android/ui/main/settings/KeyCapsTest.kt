@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.ui.main.settings
 
 import android.view.ContextThemeWrapper
-import android.view.Gravity
 import android.view.View
 import org.junit.Assert.assertTrue
 import android.widget.FrameLayout
@@ -113,7 +112,6 @@ class KeyCapsTest {
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun theEnginesCapFadesItsWordsAloneAndOutlinesItsFace() {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         fun cap(marked: Boolean, dimmed: Boolean): SceneKeyCell =
             KeyCaps.key(ctx, "W", "2", marked = marked, dimmed = dimmed).let { k ->
                 k.measure(View.MeasureSpec.makeMeasureSpec(W, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(H, View.MeasureSpec.EXACTLY))
@@ -146,7 +144,6 @@ class KeyCapsTest {
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun theEnginesCapIsTheKeyboardsKeyShrunkToIt() {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         val k = KeyCaps.keyboardKeyHeight(ctx)
         assertTrue("$k", k > H)
         fun laid(v: View, w: Int, h: Int) = v.apply {

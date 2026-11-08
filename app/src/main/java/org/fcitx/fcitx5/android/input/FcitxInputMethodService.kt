@@ -315,11 +315,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         prefs.keyboard.shuangpinKeyboard,
         prefs.keyboard.englishKeyboard,
         prefs.advanced.disableAnimation,
-        // every key's symbol laid out anew, those no swipe marks too (AltTextKeyView); was a theme setting's
+        // every key's symbol laid out anew, those no swipe marks too; was a theme setting's
         prefs.keyboard.punctuationPosition,
         prefs.keyboard.shortcutMarkPosition,
-        // the 26 keys drawn by the scene engine or not (TextKeyboard.canvas): made with the keyboard
-        prefs.internal.canvasKeyboard,
     )
 
     private val keyboardHeightPrefs = listOf(prefs.keyboard.keyboardHeightPercent, prefs.keyboard.keyboardHeightPercentLandscape)

@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.text.InputType
-import android.view.View
 import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
@@ -112,7 +111,7 @@ class NineKeysTapUatTest {
         h.clear()
         h.presses("7", 0)
         h.presses("44", QUICK)
-        h.tap(h.inputView.findViewById<View>(R.id.button_backspace))
+        h.tap(h.keyWithId(R.id.button_backspace)!!)
         // Backspace is no digit: sent, the engine takes the letter off whole (NineKeysUatTest)
         assertEquals(nine("74") + listOf(letterAgain('h'), FcitxKeyMapping.FcitxKey_BackSpace.toString()), h.sent())
     }
@@ -202,7 +201,7 @@ class NineKeysTapUatTest {
         }
         typing()
         assertEquals(listOf("4663").flatMap { d -> d.map { (UNICODE + Keyboard.nineKey(it, upper = false)).toString() } }, h.sent())
-        h.tap(h.inputView.findViewById<View>(R.id.button_return))
+        h.tap(h.keyWithId(R.id.button_return)!!)
         assertEquals(FcitxKeyMapping.FcitxKey_Return.toString(), h.sent().last())
         typing()
         h.tap(h.textView(","))

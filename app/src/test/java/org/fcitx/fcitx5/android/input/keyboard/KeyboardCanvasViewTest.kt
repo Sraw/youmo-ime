@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Rect
@@ -33,6 +32,7 @@ import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.engine.table.TableRoots
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.canvas.AndroidTextMeasurer
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
@@ -63,13 +63,11 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import timber.log.Timber
 import org.robolectric.annotation.GraphicsMode
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * The 26 keys drawn by the scene engine (AppPrefs.Internal.canvasKeyboard): one view drawing them,
- * the keys found by the scene's hit areas, a press swapping one key's node, a screen reader's node
- * a key; and every gesture doing what it does on the keys' own views.
+ * The 26 keys drawn by the scene engine: one view drawing them, the keys found by the scene's hit
+ * areas, a press swapping one key's node, a screen reader's node a key.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -79,52 +77,32 @@ class KeyboardCanvasViewTest {
     @get:Rule
     val prefs = PrefsRule()
 
-    private fun harness(on: Boolean, im: org.fcitx.fcitx5.android.core.InputMethodEntry = KeyboardHarness.PINYIN): KeyboardHarness {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, on)
-        return KeyboardHarness(im = im).start()
-    }
+    private fun harness(im: org.fcitx.fcitx5.android.core.InputMethodEntry = KeyboardHarness.PINYIN): KeyboardHarness =
+        KeyboardHarness(im = im).start()
 
     private fun KeyboardHarness.canvas(): KeyboardCanvasView? =
         KeyboardHarness.boardCanvas(inputView)
 
-    private fun KeyboardHarness.keyView(name: String): KeyView =
-        KeyboardHarness.all(inputView).filterIsInstance<KeyView>().first { it.themeKey == name && it.parent is View && (it.parent as View).parent is TextKeyboard }
+    private fun KeyboardHarness.keyView(name: String): ShownKey = keyNamed(name)
 
     @Test
-    fun offTheKeysDrawThemselves() = harness(false).use { h ->
-        assertNull(h.canvas())
-        assertTrue(h.shown(h.keyView("q")))
-    }
-
-    @Test
-    fun onOneViewDrawsTheKeysTheirViewsNot() = harness(true).use { h ->
+    fun oneViewDrawsTheKeys() = harness().use { h ->
         val c = h.canvas()!!
-        val q = h.keyView("q")
-        assertFalse(h.shown(q))
-        // laid out where they were: a popup and the glide trail still find them there
-        assertTrue(q.width > 0)
         val scene = c.scene!!
         assertEquals(26, scene.keys.count { it.id.length == 1 })
-        // every key the scene draws has its view, at the same place; a touch finds it where it is drawn,
-        // read from its cell's corner as from its view's, and a popup over it is placed where the view's was
-        val board = h.textKeyboard()
+        // a touch finds every key where it is drawn; its cell and a popup's place over it found
         for (k in scene.keys) {
-            val v = h.keyView(k.id)
-            val box = h.box(v)
-            val b = c.bounds(k.id)!!
-            assertTrue("${k.id} at $b, its view at $box", box.contains(b.centerX(), b.centerY()))
             assertSame(k.id, k, c.keyAt(k.anchor.x.toFloat(), k.anchor.y.toFloat()))
             val ref = KeyRef.scene(k.id, k.copy)
-            val cell = Rect().also { assertTrue(c.cell(ref, it)) }.apply { offset(c.left, c.top) }
-            assertNear("${k.id}'s cell", Rect().also { v.place(board, it) }, cell)
-            assertNear("${k.id}'s popup's place", v.bounds, Rect().also { assertTrue(c.popupBounds(ref, it)) })
+            assertTrue(k.id, c.cell(ref, Rect()))
+            assertTrue(k.id, c.popupBounds(ref, Rect()))
         }
         assertEquals("q", c.keyAt("q")?.label)
         assertNull(c.keyAt("nothing"))
     }
 
     @Test
-    fun aPressSwapsTheKeysNodeAlone() = harness(true).use { h ->
+    fun aPressSwapsTheKeysNodeAlone() = harness().use { h ->
         val c = h.canvas()!!
         val q0 = c.shownNode("q")!!
         val w0 = c.shownNode("w")!!
@@ -132,8 +110,6 @@ class KeyboardCanvasViewTest {
         assertTrue(c.press("q"))
         h.idle()
         assertTrue(c.shownPressed("q"))
-        // the scene's key took the touch, not its view
-        assertFalse(h.keyView("q").isPressed)
         val q1 = c.shownNode("q")
         assertNotSame(q0, q1)
         assertSame(w0, c.shownNode("w"))
@@ -151,7 +127,7 @@ class KeyboardCanvasViewTest {
     }
 
     @Test
-    fun aScreenReaderReadsAKeyANode() = harness(true).use { h ->
+    fun aScreenReaderReadsAKeyANode() = harness().use { h ->
         val c = h.canvas()!!
         val provider = c.accessibilityNodeProvider!!
         val root = provider.createAccessibilityNodeInfo(View.NO_ID)!!
@@ -163,7 +139,7 @@ class KeyboardCanvasViewTest {
         assertTrue(q.isClickable)
         val space = nodes[keys.indexOfFirst { it.id == "space" }]
         assertEquals(c.resources.getResourceName(R.id.button_space), space.viewIdResourceName)
-        assertEquals(h.keyView("space").contentDescription.toString(), space.contentDescription.toString())
+        assertTrue(space.contentDescription.isNotEmpty())
         val shift = nodes[keys.indexOfFirst { it.id == "shift" }]
         assertEquals(c.context.getString(R.string.a11y_key_shift), shift.contentDescription.toString())
         assertEquals(c.resources.getResourceName(R.id.button_caps), shift.viewIdResourceName)
@@ -173,62 +149,13 @@ class KeyboardCanvasViewTest {
         h.idle()
         assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") })
         // the hidden views are no one's to read
-        val own = AccessibilityNodeInfo.obtain()
-        h.keyView("q").onInitializeAccessibilityNodeInfo(own)
-        assertFalse(own.isVisibleToUser)
     }
-
-    // the same fingers on both: what reaches the engine and the field, and the popups shown, the same
-    private fun gestures(on: Boolean, im: org.fcitx.fcitx5.android.core.InputMethodEntry): List<Any> = harness(on, im).use { h ->
-        // on, the scene's keys take every touch: none reaches a view (BaseKeyboard dispatches to its touch listener first)
-        val viewsTouched = mutableListOf<String>()
-        if (on) h.untouchedViews(viewsTouched)
-        val out = mutableListOf<Any>()
-        h.field.setText("hello world")
-        h.field.setSelection(5)
-        h.idle()
-        h.press(h.keyView("q"))
-        h.release()
-        h.swipe(h.keyView("w"), 0f, -h.box(h.keyView("w")).height().toFloat())
-        out.add(h.longPress(h.keyView("e")))
-        h.swipe(h.keyView("space"), -h.box(h.keyView("space")).width() / 2f, 0f)
-        h.press(h.keyView("backspace"))
-        h.release()
-        h.swipe(h.keyView("backspace"), -h.box(h.keyView("space")).width() / 2f, 0f)
-        out.add(h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") || it.startsWith("reset") })
-        out += h.field.text.toString()
-        out += h.field.selectionStart
-        assertEquals(emptyList<String>(), viewsTouched)
-        out
-    }
-
-    // each of the keyboard's key views records a touch reaching it in [touched]
-    @SuppressLint("ClickableViewAccessibility")
-    private fun KeyboardHarness.untouchedViews(touched: MutableList<String>) {
-        KeyboardHarness.all(textKeyboard()).filterIsInstance<KeyView>().forEach { v ->
-            v.setOnTouchListener { _, e -> touched += "${v.themeKey} ${e.actionMasked}"; false }
-        }
-    }
-
-    // [actual] within a pixel of [expected] on every side: the scene's rounding and the views' layout's
-    private fun assertNear(what: String, expected: Rect, actual: Rect) {
-        val off = maxOf(abs(expected.left - actual.left), abs(expected.top - actual.top), abs(expected.right - actual.right), abs(expected.bottom - actual.bottom))
-        assertTrue("$what $actual, the view's $expected", off <= 1)
-    }
-
-    @Test
-    fun everyGestureAsOnTheViewsPinyin() = assertEquals(gestures(false, KeyboardHarness.PINYIN), gestures(true, KeyboardHarness.PINYIN))
-
-    @Test
-    fun everyGestureAsOnTheViewsEnglish() = assertEquals(gestures(false, KeyboardHarness.ENGLISH), gestures(true, KeyboardHarness.ENGLISH))
-
-    // the views' and the scene's keys side by side, pixel for pixel: BoardCanvasCompareTest, a keyboard a row
 
     // a theme the engine refuses (a font file's name 4.0 takes no file by): 060-render-p2 U8, the
     // built-in theme of its lightness drawn, logged; never the views again (they go in S8). Its keys
     // the built-in theme's as that theme draws them, touched and read as ever
     @Test
-    fun noSceneOfTheThemeTheBuiltInOneOfItsLightness() {
+    fun aThemeNotConvertedTheBuiltInOneOfItsLightness() {
         val logged = mutableListOf<String>()
         val tree = object : Timber.Tree() {
             override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
@@ -240,7 +167,6 @@ class KeyboardCanvasViewTest {
             for (builtIn in listOf(ThemePreset.PixelLight, ThemePreset.PixelDark)) {
                 val look = builtIn.look
                 val broken = Theme.Custom("broken", builtIn.isDark, look.copy(text = look.text.copy(keyFont = "/themes/x/bad:name.ttf")))
-                prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
                 val drawn = KeyboardHarness(builtIn).start().use { h -> h.canvas()!!.scene!!.let { it.base to it.keys.map { k -> k.id to k.faces } } }
                 logged.clear()
                 KeyboardHarness(broken).start().use { h ->
@@ -277,9 +203,8 @@ class KeyboardCanvasViewTest {
                         ThemeAssets.decoder = real
                     }
                     h.idle()
-                    // the canvas kept, the views hidden under it: none drawn again
+                    // the canvas kept
                     assertSame(c, h.canvas())
-                    assertTrue(KeyboardHarness.all(h.textKeyboard()).filterIsInstance<KeyView>().none { h.shown(it) })
                     h.api.calls.clear()
                     h.tap(h.key("q"))
                     assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") })
@@ -294,7 +219,7 @@ class KeyboardCanvasViewTest {
     // no scene at all (the built-in theme's refused too, Host.scene null): nothing drawn, nothing for a
     // reader, logged; no other drawing. Asked again once what the keyboard shows changes
     @Test
-    fun noSceneAtAllNothingDrawn() {
+    fun nothingMadeNothingDrawn() {
         val logged = mutableListOf<String>()
         val tree = object : Timber.Tree() {
             override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
@@ -357,7 +282,7 @@ class KeyboardCanvasViewTest {
         fun corner(ops: List<String>) = texts(ops).single { it[3] == cornerSize }
         // é, not a symbol: under Shift the long press's list is upper-cased, É, which a corner kept from before Shift is not
         val overrides = PopupOverrides.Empty.with("q", listOf("é", "1"))
-        harness(true).use { h ->
+        harness().use { h ->
             val board = h.textKeyboard()
             var was = q(h)
             fun changed(what: String, change: () -> Unit) {
@@ -390,7 +315,7 @@ class KeyboardCanvasViewTest {
             assertNotEquals(before, shifted)
         }
         // a table's roots over the letters and not: the corner the letter itself, then the swipe again
-        harness(true, WUBI).use { h ->
+        harness(WUBI).use { h ->
             try {
                 EngineState.tableKeyboardState.value = wubi(KeyLabels.NONE)
                 val none = q(h)
@@ -406,20 +331,17 @@ class KeyboardCanvasViewTest {
         }
     }
 
-    // the keys a finger finds are the keys shown: as each state shows and hides keys, the scene has
-    // exactly the keys whose views are shown, and a hidden key's place finds no hidden view
+    // the keys a finger finds are the keys shown: as each state shows and hides keys, each of the scene's
+    // keys found where it is
     @Test
-    fun theScenesKeysAreTheShownViewsInEveryState() = harness(true, WUBI).use { h ->
+    fun theScenesKeysAreTheShownViewsInEveryState() = harness(WUBI).use { h ->
         val c = h.canvas()!!
         val board = h.textKeyboard()
         fun check(what: String) {
             h.idle()
             h.relayout()
             val scene = c.scene!!
-            val shown = KeyboardHarness.all(board).filterIsInstance<KeyView>()
-                .filter { it.visibility == View.VISIBLE && it.themeKey != null && it.parent is View && (it.parent as View).parent === board }
-                .mapTo(HashSet()) { it.themeKey!! }
-            assertEquals(what, shown, scene.keys.mapTo(HashSet()) { it.id })
+            assertTrue(what, scene.keys.count { it.id.length == 1 } >= 26)
             for (k in scene.keys) assertSame("$what ${k.id}", k, c.keyAt(k.anchor.x.toFloat(), k.anchor.y.toFloat()))
         }
         fun told(t: TableKeyboard?) {
@@ -456,7 +378,7 @@ class KeyboardCanvasViewTest {
     // pinyin's first key typed and its word committed in a plain field (Return ⏎ either way): the scene
     // kept, none made in the frame (a table's 确定 is another scene: made)
     @Test
-    fun typingKeepsTheScene() = harness(true).use { h ->
+    fun typingKeepsTheScene() = harness().use { h ->
         val c = h.canvas()!!
         val board = h.textKeyboard()
         board.onReturnDrawableUpdate(ReturnKeyAppearance.Enter)
@@ -495,7 +417,7 @@ class KeyboardCanvasViewTest {
 
     // a table's roots over the letters, its 拼 key in Shift's place, drawn by the scene as its views show them
     @Test
-    fun aTablesRootsAndKeys() = harness(true, WUBI).use { h ->
+    fun aTablesRootsAndKeys() = harness(WUBI).use { h ->
         val c = h.canvas()!!
         val wubi = wubi(KeyLabels.ROOTS)
         try {
@@ -526,18 +448,15 @@ class KeyboardCanvasViewTest {
 
     // the user's own long press first on a letter: its corner as the views show it, Shift's list under Shift
     @Test
-    fun aCornerIsTheUsersLongPressFirst() = harness(true).use { h ->
+    fun aCornerIsTheUsersLongPressFirst() = harness().use { h ->
         val c = h.canvas()!!
         assertEquals("1", c.keyAt("q")?.alt)
-        assertEquals((h.keyView("q") as AltTextKeyView).altText.text.toString(), c.keyAt("q")?.alt)
-        for (letter in 'a'..'z') {
-            assertEquals("$letter", (h.keyView("$letter") as AltTextKeyView).altText.text.toString().ifEmpty { null }, c.keyAt("$letter")?.alt)
-        }
+        for (letter in 'a'..'z') assertEquals("$letter", h.keyView("$letter").alt, c.keyAt("$letter")?.alt)
     }
 
     // two fingers down on two keys: both shown pressed, each let go alone
     @Test
-    fun twoFingersTwoKeysPressed() = harness(true).use { h ->
+    fun twoFingersTwoKeysPressed() = harness().use { h ->
         val c = h.canvas()!!
         val q = c.bounds("q")!!
         val p = c.bounds("p")!!
@@ -569,7 +488,7 @@ class KeyboardCanvasViewTest {
 
     // Shift's state told to a screen reader on its node, as its view's was
     @Test
-    fun shiftsStateToldToAScreenReader() = harness(true).use { h ->
+    fun shiftsStateToldToAScreenReader() = harness().use { h ->
         val c = h.canvas()!!
         val events = mutableListOf<AccessibilityEvent>()
         ViewCompat.setAccessibilityDelegate(h.textKeyboard(), object : AccessibilityDelegateCompat() {
@@ -593,7 +512,6 @@ class KeyboardCanvasViewTest {
     // again where they are now, the others kept
     @Test
     fun aKeyShowingThePictureRecordedAgainWhenTheViewMoves() {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         KeyboardHarness(pictured()).start().use { h ->
             val c = h.canvas()!!
             assertTrue(c.keyAt("shift")!!.ops(false).any { it is Op.Picture })
@@ -617,7 +535,6 @@ class KeyboardCanvasViewTest {
         val runner = ThemeAssets.runner
         ThemeAssets.runner = { held += it }
         try {
-            prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
             KeyboardHarness(pictured()).start().use { h ->
                 val c = h.canvas()!!
                 fun frame() = Bitmap.createBitmap(c.width, c.height, Bitmap.Config.ARGB_8888).also { c.draw(Canvas(it)) }
@@ -635,7 +552,7 @@ class KeyboardCanvasViewTest {
 
     // a finger down in the room before A (the row's indent), outside A's view: A's, its swipe and its long press as on A
     @Test
-    fun theIndentBeforeAIsAs() = harness(true).use { h ->
+    fun theIndentBeforeAIsAs() = harness().use { h ->
         val a = h.keyView("a")
         val dp = h.service.resources.displayMetrics.density
         val board = h.textKeyboard()

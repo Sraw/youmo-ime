@@ -134,7 +134,6 @@ class TablesKeysUatTest {
     // the canvas's 确定 is the view's word: the app's key_confirm (OK in English), not the layout's Chinese
     @Test
     fun theCanvasConfirmIsTheAppsWord() {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         val h = harness(InputMethodCatalog.WUBI, "五笔", wubi())
         h.typed("ggg")
         assertEquals(h.service.getString(R.string.key_confirm), h.keyWithId(R.id.button_confirm)!!.label)

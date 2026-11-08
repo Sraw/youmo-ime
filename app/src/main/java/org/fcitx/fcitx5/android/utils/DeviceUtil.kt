@@ -26,10 +26,6 @@ object DeviceUtil {
         }
     }
 
-    val isVivoOriginOS: Boolean by lazy {
-        getSystemProperty("ro.vivo.os.version").isNotEmpty()
-    }
-
     val isFlyme: Boolean by lazy {
         Build.DISPLAY.lowercase().contains("flyme")
     }

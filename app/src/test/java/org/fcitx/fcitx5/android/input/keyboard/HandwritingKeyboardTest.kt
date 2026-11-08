@@ -8,7 +8,6 @@ import android.app.Activity
 import android.os.Looper
 import android.os.SystemClock
 import android.view.MotionEvent
-import android.view.View
 import android.view.ViewGroup
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
@@ -24,6 +23,8 @@ import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.handwriting.InkNet
 import org.fcitx.fcitx5.android.engine.handwriting.InkRecognizer
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
+import org.fcitx.fcitx5.android.input.SceneShownKey
+import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPadView
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognitionTest.Queue
@@ -70,13 +71,12 @@ class HandwritingKeyboardTest {
     ).also {
         it.keyActionListener = KeyActionListener { action, _ -> sent += action }
         Robolectric.buildActivity(Activity::class.java).setup().get().setContentView(it)
+        it.laidOut()
     }
 
-    private fun HandwritingKeyboard.mark(label: String): TextKeyView =
-        (0 until childCount).map { getChildAt(it) }.filterIsInstance<ViewGroup>()
-            .flatMap { row -> (0 until row.childCount).map { row.getChildAt(it) } }
-            .filterIsInstance<TextKeyView>()
-            .single { it.def is KeyDef.Appearance.Text && (it.def as KeyDef.Appearance.Text).displayText == label }
+
+    // the key whose view had [id], as the scene draws it now
+    private fun HandwritingKeyboard.key(id: Int): ShownKey = checkNotNull(shownKeyWithId(id))
 
     private fun HandwritingKeyboard.pad() = (0 until childCount).map { getChildAt(it) }.filterIsInstance<HandwritingPadView>().single()
 
@@ -102,7 +102,7 @@ class HandwritingKeyboardTest {
         val keyboard = keyboard()
         runAll()
         reading(Int.MAX_VALUE)
-        keyboard.mark("。").performClick()
+        keyboard.shownKeys().single { it.id == "period" }.click()
         assertEquals(emptyList<KeyAction>(), sent)
         runAll()
         assertEquals(listOf<KeyAction>(KeyAction.HostKeyAction(".")), sent)
@@ -113,7 +113,7 @@ class HandwritingKeyboardTest {
         val keyboard = keyboard()
         runAll()
         reading(Int.MAX_VALUE)
-        keyboard.mark("。").performClick()
+        keyboard.shownKeys().single { it.id == "period" }.click()
         // another field focused (KeyboardWindow.onStartInput): it was not typed for that one
         keyboard.restart()
         runAll()
@@ -125,7 +125,7 @@ class HandwritingKeyboardTest {
         val keyboard = keyboard()
         runAll()
         reading(Int.MAX_VALUE)
-        keyboard.findViewById<ImageKeyView>(R.id.button_backspace).performClick()
+        keyboard.key(R.id.button_backspace).click()
         assertEquals(emptyList<KeyAction>(), sent)
         runAll()
         // the pad has no stroke then: the engine's
@@ -139,8 +139,8 @@ class HandwritingKeyboardTest {
         val pad = keyboard.pad()
         // a stroke whose read is pending, then 。 and backspace held behind it
         pad.stroke()
-        keyboard.mark("。").performClick()
-        keyboard.findViewById<ImageKeyView>(R.id.button_backspace).performClick()
+        keyboard.shownKeys().single { it.id == "period" }.click()
+        keyboard.key(R.id.button_backspace).click()
         assertEquals(emptyList<KeyAction>(), sent)
         runAll()
         // 。 committed the piece: the backspace deletes in the field, it takes no stroke of that piece back
@@ -196,21 +196,21 @@ class HandwritingKeyboardTest {
     fun theReadingKeyTurnsTheReadingsOnAsLastUsedAndOff() {
         val keyboard = keyboard()
         runAll()
-        val key = keyboard.findViewById<TextKeyView>(R.id.button_reading)
+        val key = { keyboard.key(R.id.button_reading) }
         val name = keyboard.context.getString(R.string.im_candidate_reading)
-        assertEquals(keyboard.context.getString(R.string.hw_reading_key_off, name), key.contentDescription)
-        key.performClick()
+        assertEquals(keyboard.context.getString(R.string.hw_reading_key_off, name), key().description)
+        key().click()
         runAll()
         assertEquals(listOf(ReadingStyle.PINYIN), readings)
         // zhuyin picked in the settings (and kept as last used, by the service: CandidateReadingsUatTest): on,
         // the tap turns it off, the next on in zhuyin
         setting(ReadingStyle.ZHUYIN)
         AppPrefs.getInstance().internal.lastCandidateReading.setValue(ReadingStyle.ZHUYIN.key)
-        assertEquals(keyboard.context.getString(R.string.hw_reading_key_on, name), key.contentDescription)
-        key.performClick()
+        assertEquals(keyboard.context.getString(R.string.hw_reading_key_on, name), key().description)
+        key().click()
         runAll()
         setting(ReadingStyle.OFF)
-        key.performClick()
+        key().click()
         runAll()
         assertEquals(listOf(ReadingStyle.PINYIN, ReadingStyle.OFF, ReadingStyle.ZHUYIN), readings)
         // nothing typed for it
@@ -243,7 +243,7 @@ class HandwritingKeyboardTest {
         val pad = keyboard.pad()
         pad.stroke()
         val piece = pad.pad.piece
-        keyboard.findViewById<TextKeyView>(R.id.button_reading).performClick()
+        keyboard.key(R.id.button_reading).click()
         assertEquals(emptyList<ReadingStyle>(), readings)
         runAll()
         runAll()
@@ -258,12 +258,12 @@ class HandwritingKeyboardTest {
     fun thePadSpansTheFourKeysOnItsRight() {
         val keyboard = keyboard()
         val pad = IntArray(2).also(keyboard.pad()::getLocationInWindow)
-        val backspace = keyboard.findViewById<View>(R.id.button_backspace)
-        val reading = keyboard.findViewById<View>(R.id.button_reading)
-        val top = IntArray(2).also(backspace::getLocationInWindow)
-        val bottom = IntArray(2).also(reading::getLocationInWindow)
-        assertEquals(top[1].toFloat(), pad[1].toFloat(), 1f)
-        assertEquals((bottom[1] + reading.height).toFloat(), (pad[1] + keyboard.pad().height).toFloat(), 1f)
+        val backspace = keyboard.key(R.id.button_backspace)
+        val reading = keyboard.key(R.id.button_reading)
+        // a key's bounds are its canvas's
+        val canvas = IntArray(2).also((backspace as SceneShownKey).canvas::getLocationInWindow)[1]
+        assertEquals((canvas + backspace.bounds.top).toFloat(), pad[1].toFloat(), 1f)
+        assertEquals((canvas + reading.bounds.bottom).toFloat(), (pad[1] + keyboard.pad().height).toFloat(), 1f)
     }
 
     /**

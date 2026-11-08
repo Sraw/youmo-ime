@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  表情面板（PickerLayout panel=false，emojiPicker，rules C9.12）下面的一行键，板 emoji（060-render-p2 S8a：旧 View 删掉时补上）。
+  ABC 15、搜索 10（emoji-search:on）、颜文字 10（:-)）、空格、. 10、⌫ 15、回车 15。
+  , . 是 PunctuationKey：只按下打出，没有长按、没有气泡（popups="off"）。空格不写输入法名（PickerLayout 不调 onInputMethodUpdate）。
+  不画快捷角标：面板的键没有快捷键（BaseKeyboard 的 shortcuts 关）。
+-->
+<keyboard xmlns="https://youmo-ime/layout/1" id="emoji" name="表情" family="symbols" columns="100" popups="off">
+  <row>
+    <key id="back" role="back" kind="function" width="15" label="ABC" text-size="16" text-style="bold" send="layout:Text"/>
+    <key id="search" kind="function" width="10" icon="search" a11y="a11y_key_emoji_search" send="emoji-search:on"/>
+    <key id="emoticon" kind="letter" class="alt-text" width="10" label=":-)" text-size="16" text-style="bold" send="picker:Emoticon"/>
+    <key id="space" role="space" kind="space" face="special" width="fill" text-size="13" a11y="a11y_key_space" badge="{hold-badge}" sound="space" send="sym:space"
+         long-press="space-long-press" swipe-axis="both"/>
+    <key id="period" kind="function" width="10" label="." text-size="23" send="."/>
+    <key id="backspace" role="backspace" kind="function" width="15" icon="backspace" a11y="a11y_key_backspace"
+         sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both"/>
+    <key id="enter" role="enter" kind="enter" face="special" width="15" icon="{return-icon}" a11y="{return}"
+         sound="return" send="sym:Return">
+      <menu>
+        <item label="Emoji" icon="emoji" do="picker:"/>
+      </menu>
+    </key>
+  </row>
+</keyboard>

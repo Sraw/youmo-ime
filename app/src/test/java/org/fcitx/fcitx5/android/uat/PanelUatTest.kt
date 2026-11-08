@@ -14,11 +14,10 @@ import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.data.RecentlyUsed
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.input.picker.EmojiSearchUi
 import org.fcitx.fcitx5.android.input.popup.EmojiModifier
 import org.fcitx.fcitx5.android.input.picker.PickerData
-import org.fcitx.fcitx5.android.input.keyboard.KeyView
-import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
 import org.fcitx.fcitx5.android.input.picker.PickerGridView
 import org.fcitx.fcitx5.android.input.picker.PickerLayout
@@ -68,25 +67,18 @@ class PanelUatTest {
         error("no $label in the grid")
     }
 
-    // a symbol's key is a view of no id (PickerGridAdapter): with the canvas off its bubble is a view's
-    // as before, never the engine's (060-render-p2 S2: its viewId is NO_VIEW as a scene key's is)
+    // a symbol's cell held: its bubble the engine's (S8a: the grids' popups drawn as every key's), the symbol typed
     @Test
     @Uat("PAN-21")
-    fun aSymbolHeldShowsTheViewsBubble() {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, false)
+    fun aSymbolHeldShowsItsBubble() {
         h.start()
         h.tap(h.key("符"))
         val first = KeyboardHarness.all(KeyboardHarness.find<PickerGridView>(h.inputView)!!)
-            .filterIsInstance<TextKeyView>().first { h.shown(it) }
-        val symbol = first.mainText.text.toString()
+            .filterIsInstance<SceneKeyCell>().first { h.shown(it) }
+        val symbol = first.keyNode?.label.orEmpty()
         val finger = h.finger(first, h.at(first))
         h.after(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
-        val all = KeyboardHarness.all(h.inputView)
-        assertTrue(all.none { it is PopupSceneView })
-        // the bubble's text, a view over the panel: not a key's own
-        val bubble = all.filterIsInstance<TextView>().filter { h.shown(it) && it.text.toString() == symbol }
-            .filter { v -> generateSequence(v as View) { it.parent as? View }.none { it is KeyView } }
-        assertEquals(1, bubble.count())
+        assertTrue(KeyboardHarness.all(h.inputView).any { it is PopupSceneView && h.shown(it) })
         finger.up(h.at(first))
         h.idle()
         assertEquals(symbol, h.field.text.toString())
@@ -223,13 +215,13 @@ class PanelUatTest {
     fun emojiSearchByPinyin() {
         h.start()
         h.tap(h.described(h.service.getString(R.string.a11y_key_emoji)))
-        h.tap(h.described(h.service.getString(R.string.emoji_search)))
+        h.tap(h.describedKey(h.service.getString(R.string.emoji_search)))
         for (c in "xiao") h.tap(h.key(c.toString()))
         val row = { KeyboardHarness.find<EmojiSearchUi>(h.inputView)!!.let { ui -> h.texts(ui) } }
         assertTrue(row().toString(), "😄" in row())
         h.captureBoard("PanelUatTest/emoji_search_xiao")
         val search = KeyboardHarness.find<EmojiSearchUi>(h.inputView)!!
-        val backspace = KeyboardHarness.all(search).first { it.contentDescription == "Backspace" }
+        val backspace = h.keys(search).first { it.description == "Backspace" }
         repeat(4) { h.tap(backspace) }
         for (c in "dz") h.tap(h.key(c.toString()))
         assertTrue(row().toString(), "👍" in row())

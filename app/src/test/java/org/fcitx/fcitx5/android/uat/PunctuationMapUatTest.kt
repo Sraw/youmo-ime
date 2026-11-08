@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.uat
 
-import android.view.View
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
@@ -12,7 +11,6 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.KotlinHost
 import org.fcitx.fcitx5.android.core.ScriptedEngine
 import org.fcitx.fcitx5.android.core.startedHost
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
 import org.fcitx.fcitx5.android.host.ModuleConfigs
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
@@ -67,17 +65,16 @@ class PunctuationMapUatTest {
         h = KeyboardHarness(host = fcitx)
         h.service.postFcitxJob { activate(1, "org.example.app") }
         h.start()
-        h.tap(h.inputView.findViewById<View>(R.id.button_comma))
+        h.tap(h.keyWithId(R.id.button_comma)!!)
         until("the mark in the field") { h.field.text.isNotEmpty() }
         assertEquals("、", h.field.text.toString())
     }
 
     // 060-render-p2 S7 #7: "half width after a letter or number" on, after a letter the ， key shows and
-    // bubbles the , it types; after a Chinese word it is ， again; off, ， throughout. Both drawings.
+    // bubbles the , it types; after a Chinese word it is ， again; off, ， throughout.
     @Test
     fun afterALetterTheCommaShowsTheHalfWidthItTypes() {
-        for (canvas in listOf(true, false)) for (on in listOf(true, false)) {
-            prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, canvas)
+        for (on in listOf(true, false)) {
             home.deleteRecursively()
             PunctuationManager.forget()
             File(home, "config/" + ModuleConfigs.PUNCTUATION).apply { parentFile!!.mkdirs() }
@@ -88,12 +85,10 @@ class PunctuationMapUatTest {
             h = KeyboardHarness(host = fcitx)
             h.service.postFcitxJob { activate(1, "org.example.app") }
             h.start()
-            val what = "canvas $canvas, option $on"
+            val what = "option $on"
             val comma = { h.keyWithId(R.id.button_comma)!! }
-            // the views' bubble shows the key's own character, mapped or not (the old drawing's, never
-            // made to map; S8 deletes it): on the views the face only
-            val shown = { faceAndBubble(comma).let { if (canvas) it else it.take(1) } }
-            val twice = { c: String -> if (canvas) listOf(c, c) else listOf(c) }
+            val shown = { faceAndBubble(comma) }
+            val twice = { c: String -> listOf(c, c) }
             // the first press at once, the start's statuses not waited for: its mark shown and typed
             val p = ""
             assertEquals(what, twice("，"), shown())

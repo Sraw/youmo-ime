@@ -5,7 +5,8 @@
 package org.fcitx.fcitx5.android.scene.rules
 
 /**
- * Copied from ime-core's `input.keyboard.KeyTextScale` for P1, Float made Double; P2 deletes that one.
+ * Copied from ime-core's `input.keyboard.KeyTextScale` for P1, Float made Double; that one to be deleted
+ * with the other copies (060-pending-decisions, S8a).
  *
  * How much smaller the keys' text is than its size in the layout: 紧凑's lower keys, the floating
  * keyboard's narrower ones. Both at once take the smaller, not the product: the two together

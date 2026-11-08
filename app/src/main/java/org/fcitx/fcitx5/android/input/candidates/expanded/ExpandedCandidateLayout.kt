@@ -8,7 +8,6 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.Configuration
 import android.view.Gravity
-import android.view.View
 import androidx.constraintlayout.widget.ConstraintLayout
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
@@ -57,7 +56,7 @@ class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout
             const val UP_KEY = "page-up"
             const val DOWN_KEY = "page-down"
 
-            /** The column drawn by the scene where the canvas is on. */
+            /** The column's layout, drawn by the scene. */
             const val LAYOUT = "expanded-side"
 
             private const val UpBtnId = 0xff55
@@ -92,10 +91,6 @@ class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout
             private val NO_MARKS = MarkSettings(shortcuts = emptyMap())
         }
 
-        // the views' (the canvas off): S8 deletes them with the rows
-        private val pageUpView: View by lazy { findViewById(UpBtnId) }
-        private val pageDownView: View by lazy { findViewById(DownBtnId) }
-
         private var returnAppearance = ReturnKeyAppearance.Enter
         private var upEnabled = true
         private var downEnabled = true
@@ -106,16 +101,11 @@ class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout
             upEnabled = up
             downEnabled = down
             canvas?.invalidateScene()
-            if (canvas == null) {
-                pageUpView.isEnabled = up
-                pageDownView.isEnabled = down
-            }
         }
 
         override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
             returnAppearance = appearance
             canvas?.invalidateScene()
-            showReturnView(appearance)
         }
 
         override val sceneTable: SceneKeyDef.Table get() = Pages

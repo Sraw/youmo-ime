@@ -27,7 +27,7 @@ class GlideInput(
     theme: Theme,
     // whether a glide is taken now: an input method that reads one, the setting on, a field where words are typed
     private val enabled: () -> Boolean,
-    // each letter and its key, where it is (a key view, or a key the scene draws): the nine keys' several on one
+    // each letter and its key, where the scene draws it: the nine keys' several on one
     private val letters: () -> List<Pair<Char, KeyPlace>>,
     private val longPressMillis: () -> Long,
     // how far up or down a glide starts, in key heights (GlideGesture)

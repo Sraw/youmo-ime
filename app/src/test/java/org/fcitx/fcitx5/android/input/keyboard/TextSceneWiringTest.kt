@@ -58,7 +58,6 @@ class TextSceneWiringTest {
     private fun entry(im: String, name: String) = InputMethodEntry(im, name, "", "", name.take(1), "zh_CN", "androidengine", false)
 
     private fun compare(form: String, im: InputMethodEntry, table: TableKeyboard? = null, inputType: Int = InputType.TYPE_CLASS_TEXT, composing: Boolean = false): Set<String> {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         return KeyboardHarness(im = im).start(inputType).use { h ->
             EngineState.tableKeyboardState.value = table
             if (composing) EngineState.syllablesState.value = EngineState.SyllableState(im.uniqueName, true, listOf("a"), 1)
@@ -144,7 +143,6 @@ class TextSceneWiringTest {
     // not the layout's built-in 1
     @Test
     fun aLettersSwipeIsTheUsersFirst() {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         prefs.set(AppPrefs.getInstance().internal.popupOverrides, "q ⒜ 1")
         KeyboardHarness(im = KeyboardHarness.ENGLISH).start().use { h ->
             val q = h.keys().single { it.id == "q" }
@@ -157,7 +155,6 @@ class TextSceneWiringTest {
     // a table's roots on the letters' faces: a letter pressed shows its letter in its bubble, as its view's did, not its roots
     @Test
     fun aLetterUnderItsRootsShowsItsLetter() {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         KeyboardHarness(im = entry(InputMethodCatalog.WUBI, "五笔")).start().use { h ->
             EngineState.tableKeyboardState.value = TableKeyboard(InputMethodCatalog.WUBI, emptySet(), false, KeyLabels.NAMES, TableRoots.WUBI86)
             h.idle()
@@ -174,7 +171,6 @@ class TextSceneWiringTest {
     // not one made anew, and its bubble shows the capital
     @Test
     fun shiftKeepsTheLettersKeys() {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         KeyboardHarness(im = KeyboardHarness.ENGLISH).start().use { h ->
             val k = KeyboardHarness.all(h.keyboard).filterIsInstance<TextKeyboard>().single()
             val canvas = KeyboardHarness.all(k).filterIsInstance<KeyboardCanvasView>().single()
@@ -195,7 +191,6 @@ class TextSceneWiringTest {
     // the new content set on it (TextKeyboard's letters take theirs from Table.bubble, so its Shift does not show this)
     @Test
     fun aNodeDifferingInItsBubbleAloneKeepsItsKeyWithTheNewBubble() {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         KeyboardHarness(im = KeyboardHarness.ENGLISH).start().use { h ->
             val k = KeyboardHarness.all(h.keyboard).filterIsInstance<TextKeyboard>().single()
             val canvas = KeyboardHarness.all(k).filterIsInstance<KeyboardCanvasView>().single()
@@ -212,14 +207,12 @@ class TextSceneWiringTest {
         }
     }
 
-    // a glide read where the scene draws the letters, the views (laid out under it, not drawn) moved off them:
-    // the letters' centres the engine gets, in key widths, as far apart as the keys shown
+    // a glide read where the scene draws the letters: the letters' centres the engine gets, in key widths, as
+    // far apart as the keys shown
     @Test
-    fun aGlideIsReadOnTheSceneWhereverTheViewsAre() {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+    fun aGlideIsReadOnTheScene() {
         prefs.set(AppPrefs.getInstance().keyboard.glideTyping, true)
         KeyboardHarness(im = KeyboardHarness.PINYIN).start().use { h ->
-            KeyboardHarness.all(h.keyboard).filterIsInstance<KeyView>().forEach { it.offsetLeftAndRight(it.left / 3) }
             val keys = "qpzm".map { h.key("$it") }
             val first = keys.first().bounds
             h.drag(keys.first(), first.exactCenterX(), first.exactCenterY(), steps = 0, lift = false)
@@ -240,7 +233,6 @@ class TextSceneWiringTest {
     @Test
     @Config(qualifiers = "w800dp-h360dp-land")
     fun aSplitGlideReadsBothCopiesOfG() {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         prefs.set(AppPrefs.getInstance().keyboard.glideTyping, true)
         prefs.set(ThemeManager.prefs.splitKeyboard, SplitKeyboardMode.Always)
         KeyboardHarness(im = KeyboardHarness.PINYIN).start().use { h ->

@@ -11,7 +11,6 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.RecentlyUsed
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.fcitx.fcitx5.android.input.picker.PickerGridView
 import org.fcitx.fcitx5.android.input.picker.PickerSideUi
 import org.junit.After

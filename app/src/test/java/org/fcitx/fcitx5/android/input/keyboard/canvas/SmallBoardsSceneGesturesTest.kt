@@ -10,7 +10,6 @@ import android.view.accessibility.AccessibilityManager
 import android.view.accessibility.AccessibilityNodeInfo
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -47,23 +46,17 @@ class SmallBoardsSceneGesturesTest {
     @get:Rule
     val prefs = PrefsRule()
 
-    private fun both(what: (Boolean) -> List<String>): List<String> {
-        val (views, scene) = listOf(false, true).map { on ->
-            prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, on)
-            what(on)
-        }
-        assertEquals(views.joinToString("\n"), scene.joinToString("\n"))
-        return scene
-    }
+    // what a board's keys did (compared with their views' till S8a deleted them)
+    private fun both(what: () -> List<String>): List<String> = what()
 
-    // whether [root] has a canvas shown: the scene draws it, or the views
+    // whether [root] has a canvas shown: the scene draws it
     private fun drawnByScene(root: View) = KeyboardHarness.all(root).any { it is KeyboardCanvasView && it.visibility == View.VISIBLE }
 
     private fun KeyboardHarness.sent() = api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
 
     @Test
     fun emojiSearch() {
-        val out = both { on ->
+        val out = both {
             KeyboardHarness().start().use { h ->
                 // text in the field before: a held ⌫ clears the query and stops there, never deleting into it
                 h.field.setText("ab")
@@ -73,13 +66,13 @@ class SmallBoardsSceneGesturesTest {
                 // the bar's 表情 opens the panel last shown: no 搜索 (the 颜文字), its own 表情 key back to the emoji
                 h.relayout()
                 val searchName = h.service.getString(R.string.emoji_search)
-                if (KeyboardHarness.all(h.inputView).none { h.shown(it) && it.contentDescription?.toString() == searchName }) {
+                if (h.keys().none { it.description == searchName }) {
                     h.tap(h.keys().first { it.description == h.service.getString(R.string.a11y_key_emoji) })
                     h.relayout()
                 }
-                h.tap(h.described(searchName))
+                h.tap(h.describedKey(searchName))
                 val search = KeyboardHarness.find<EmojiSearchUi>(h.inputView)!!
-                assertEquals(on, drawnByScene(search))
+                assertTrue(drawnByScene(search))
                 val keys = h.keys(search)
                 val out = mutableListOf("keys ${keys.map { it.label ?: it.description }}")
                 for (c in "xiao") h.tap(keys.single { it.label == c.toString() })
@@ -109,12 +102,12 @@ class SmallBoardsSceneGesturesTest {
 
     @Test
     fun expandedColumn() {
-        val out = both { on ->
+        val out = both {
             KeyboardHarness().start().use { h ->
                 h.candidates(*Array(80) { "字$it" })
                 h.tap(h.described(h.service.getString(R.string.expand_candidates_list)))
                 val side = KeyboardHarness.find<ExpandedCandidateLayout.Keyboard>(h.inputView)!!
-                assertEquals(on, drawnByScene(side))
+                assertTrue(drawnByScene(side))
                 val up = { h.keys(side).single { it.description == h.service.getString(R.string.a11y_candidates_prev_page) } }
                 val down = { h.keys(side).single { it.description == h.service.getString(R.string.a11y_candidates_next_page) } }
                 val list = KeyboardHarness.find<ExpandedCandidateLayout>(h.inputView)!!.recyclerView
@@ -125,7 +118,7 @@ class SmallBoardsSceneGesturesTest {
                     "字$at"
                 }
                 val out = mutableListOf("keys ${h.keys(side).map { it.description }}", "first ${first()}")
-                if (on) out += "up disabled ${KeyState.Disabled in KeyboardHarness.find<KeyboardCanvasView>(side)!!.keyAt("page-up")!!.states}"
+                out += "up disabled ${KeyState.Disabled in KeyboardHarness.find<KeyboardCanvasView>(side)!!.keyAt("page-up")!!.states}"
                 // what the column sends to a finger (not a click: a screen reader's): none from a page that cannot
                 // turn, its view disabled, the scene's key :disabled and faded
                 val acts = mutableListOf<String>()
@@ -134,7 +127,7 @@ class SmallBoardsSceneGesturesTest {
                 h.press(up())
                 h.release()
                 out += "up at the top: first ${first()} sent $acts"
-                if (on) {
+                run {
                     // a screen reader's double tap on the page that cannot turn: refused, nothing sent (060-render-p2 §5.3)
                     shadowOf(h.service.getSystemService(AccessibilityManager::class.java)).setEnabled(true)
                     val c = KeyboardHarness.find<KeyboardCanvasView>(side)!!
@@ -156,7 +149,7 @@ class SmallBoardsSceneGesturesTest {
                 h.tap(h.keys(side).single { it.description == "Backspace" })
                 h.tap(h.keys(side).single { it.description?.startsWith("Enter") == true || it.resourceName == "button_return" || it.id == "enter" })
                 out += "sent ${h.sent().map { it.substringAfter("sym=").substringBefore(',') }}"
-                out.filterNot { it.startsWith("up disabled") }.also { if (on) assertTrue(out.toString(), "up disabled true" in out) }
+                out.filterNot { it.startsWith("up disabled") }.also { assertTrue(out.toString(), "up disabled true" in out) }
             }
         }
         // independently: a page down moves past 字0, a page up at the top does nothing and back again goes to 字0;
@@ -180,11 +173,11 @@ class SmallBoardsSceneGesturesTest {
 
     @Test
     fun numberRow() {
-        val out = both { on ->
+        val out = both {
             KeyboardHarness().use { h ->
                 password(h)
                 val row = KeyboardHarness.find<NumberRow>(h.inputView)!!
-                assertEquals(on, drawnByScene(row))
+                assertTrue(drawnByScene(row))
                 val keys = h.keys(row)
                 val out = mutableListOf("keys ${keys.map { it.label }}")
                 h.api.calls.clear()
@@ -207,15 +200,15 @@ class SmallBoardsSceneGesturesTest {
 
     @Test
     fun symbolGrid() {
-        val out = both { on ->
+        val out = both {
             KeyboardHarness().start().use { h ->
                 h.tap(h.key("符"))
                 h.relayout()
                 val grid = KeyboardHarness.find<PickerGridView>(h.inputView)!!
-                assertEquals(on, KeyboardHarness.all(grid).any { it is SceneKeyCell })
-                val cells = KeyboardHarness.all(grid).filter { it is SceneKeyCell || it is org.fcitx.fcitx5.android.input.keyboard.TextKeyView }
+                assertTrue(KeyboardHarness.all(grid).any { it is SceneKeyCell })
+                val cells = KeyboardHarness.all(grid).filterIsInstance<SceneKeyCell>()
                     .filter(h::shown).toList()
-                val label = { v: View -> if (v is SceneKeyCell) v.keyNode?.label.orEmpty() else (v as org.fcitx.fcitx5.android.input.keyboard.TextKeyView).mainText.text.toString() }
+                val label = { v: SceneKeyCell -> v.keyNode?.label.orEmpty() }
                 val labels = cells.map(label)
                 val out = mutableListOf("cells ${labels.take(12)}")
                 val comma = cells.first { label(it) == "，" }

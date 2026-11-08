@@ -134,7 +134,7 @@ class GroupedKeyboardTest {
     // the fourteen keys (pinyin's) and the eighteen (shuangpin's) have the same bottom row
     @Test
     @Uat("PY-91", "SP-20")
-    fun theBottomRowHasNoChineseEnglishKeyAndTheLanguageSwitchFollowsItsSetting() = bothDrawings {
+    fun theBottomRowHasNoChineseEnglishKeyAndTheLanguageSwitchFollowsItsSetting() {
         assertRows(
             listOf("PY-91: fourteen keys" to NineKeyLetters.G14, "SP-20: eighteen keys" to NineKeyLetters.G18),
             { it.first },
@@ -156,12 +156,12 @@ class GroupedKeyboardTest {
 
     @Test
     @Uat("PY-93")
-    fun theSpaceIsAtLeast15PercentOfTheRowInEveryField() = bothDrawings {
+    fun theSpaceIsAtLeast15PercentOfTheRowInEveryField() {
         assertSpaceAtLeast15Percent(GroupedKeyboard(context, ThemePreset.PixelDark))
     }
 
     @Test
-    fun anAddressFieldShowsWhatAddressesAreMadeOf() = bothDrawings {
+    fun anAddressFieldShowsWhatAddressesAreMadeOf() {
         val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark).laidOut()
         keyboard.address = AddressKeys.URL
         assertEquals(null, keyboard.shownKeyWithId(R.id.button_comma))
@@ -171,7 +171,7 @@ class GroupedKeyboardTest {
 
     @Test
     @Uat("PY-105")
-    fun talkBackReadsAGroupLetterByLetterWithItsCorner() = bothDrawings {
+    fun talkBackReadsAGroupLetterByLetterWithItsCorner() {
         val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark).laidOut()
         val groups = keyboard.shownKeys().filter { it.id?.matches(PLACE) == true }
         val described = groups.associate { it.label to it.description }
@@ -190,7 +190,7 @@ class GroupedKeyboardTest {
     }
 
     @Test
-    fun theCommaFullStopAndCornersShowWhatTheyType() = bothDrawings {
+    fun theCommaFullStopAndCornersShowWhatTheyType() {
         val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark).laidOut()
         keyboard.onPunctuationUpdate(mapOf("," to "，", "." to "。", "~" to "～"))
         assertEquals("，", keyboard.shownKeyWithId(R.id.button_comma)!!.label)
@@ -210,7 +210,7 @@ class GroupedKeyboardTest {
     }
 
     @Test
-    fun theLongPressIsReadAsItOpensFromTheUsersKeys() = bothDrawings {
+    fun theLongPressIsReadAsItOpensFromTheUsersKeys() {
         val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark).laidOut()
         val shown = ArrayList<PopupAction>()
         keyboard.popupActionListener = PopupActionListener { shown += it }

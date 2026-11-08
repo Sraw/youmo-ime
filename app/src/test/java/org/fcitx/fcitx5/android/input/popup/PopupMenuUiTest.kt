@@ -44,7 +44,6 @@ class PopupMenuUiTest {
     private var dismissed = false
 
     private fun menu(
-        canvas: Boolean = false,
         items: Array<KeyDef.Popup.Menu.Item> = this.items,
         fixed: PopupMenuUi.Fixed? = null,
         measuring: (TextMeasurer) -> TextMeasurer = { it },
@@ -57,7 +56,7 @@ class PopupMenuUiTest {
         items = items,
         onFocusMoved = { moved++ },
         fixed = fixed,
-        scenes = if (canvas) PopupScenes(View(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark, measuring) else null,
+        scenes = PopupScenes(View(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark, measuring),
     )
 
     // the handwriting pad's 注: words, no icons
@@ -96,7 +95,7 @@ class PopupMenuUiTest {
     // Selected state, drawn again as it moves; each item's icon by a name the painter finds
     @Test
     fun onTheCanvasTheItemInFocusIsDrawnSelected() {
-        val ui = menu(canvas = true)
+        val ui = menu()
         val view = ui.root as PopupSceneView
         fun selected() = view.scene!!.keys.filter { KeyState.Selected in it.states }.map { it.label }
         val first = (ui.onTrigger() as KeyAction.HostKeyAction).act
@@ -114,7 +113,7 @@ class PopupMenuUiTest {
     // words in pills as the views' (CELL_DP × 1.75 across), their text drawn, not an icon
     @Test
     fun onTheCanvasWordsAreInPillsAsTheViews() {
-        val view = menu(canvas = true, items = words).root as PopupSceneView
+        val view = menu(items = words).root as PopupSceneView
         val keys = view.scene!!.keys
         // in the columns' order round the focus, as the views'
         assertEquals(words.map { it.label }.sorted(), keys.mapNotNull { it.label }.sorted())
@@ -143,12 +142,12 @@ class PopupMenuUiTest {
     // icons not, as the views' (popupKeys has no ImageView)
     @Test
     fun onTheCanvasAMenusWordsAreAmongThePopupsChoices() {
-        val view = menu(canvas = true, items = words).root as PopupSceneView
+        val view = menu(items = words).root as PopupSceneView
         val choices = KeyboardHarness.sceneChoices(view, Rect(10, 20, 10, 20))
         assertEquals(view.scene!!.keys.sortedBy { it.bounds.left }.map { it.label }, choices.map { it.text })
         val k = view.scene!!.keys.first { it.label == choices[0].text }
         assertEquals(10 + view.outset.left + k.bounds.left.toInt(), choices[0].box.left)
-        assertEquals(emptyList<KeyboardHarness.PopupKey>(), KeyboardHarness.sceneChoices(menu(canvas = true).root as PopupSceneView, Rect()))
+        assertEquals(emptyList<KeyboardHarness.PopupKey>(), KeyboardHarness.sceneChoices(menu().root as PopupSceneView, Rect()))
     }
 
     // the edit menu's: cells in their own order where it is put (Fixed.at), the disabled faded and
@@ -157,24 +156,21 @@ class PopupMenuUiTest {
     fun onTheCanvasTheEditMenuKeepsItsPlaceAndItsDisabled() {
         val at = EditMenuLayout.Spot(300, 100)
         val fixed = PopupMenuUi.Fixed(start = 0, disabled = setOf(1), at = at)
-        val ui = menu(canvas = true, fixed = fixed)
-        val views = menu(fixed = fixed)
-        assertEquals(views.offsetX to views.offsetY, ui.offsetX to ui.offsetY)
+        val ui = menu(fixed = fixed)
         assertEquals(at.left - trigger.left to at.top - trigger.top, ui.offsetX to ui.offsetY)
         val keys = (ui.root as PopupSceneView).scene!!.keys
         assertEquals(listOf("0", "1", "2"), keys.map { it.label })
         assertEquals(listOf(false, true, false), keys.map { KeyState.Disabled in it.states })
         assertEquals(listOf(true, false, false), keys.map { KeyState.Selected in it.states })
         // a key's menu, nowhere fixed: 52 dp above the key's top, as the views'
-        val lifted = menu(canvas = true)
-        assertEquals(menu().offsetY, lifted.offsetY)
+        val lifted = menu()
         assertEquals(-52, lifted.offsetY)
     }
 
     // TalkBack reads each cell (its name), the one in focus selected, the disabled not enabled
     @Test
     fun onTheCanvasTalkBackReadsEachItem() {
-        val ui = menu(canvas = true, fixed = PopupMenuUi.Fixed(start = 0, disabled = setOf(2)))
+        val ui = menu(fixed = PopupMenuUi.Fixed(start = 0, disabled = setOf(2)))
         val nodes = (ui.root as PopupSceneView).spokenKeys()
         assertEquals(listOf("0", "1", "2"), nodes.map { it.contentDescription.toString() })
         assertEquals(listOf(true, false, false), nodes.map { it.isSelected })
@@ -183,48 +179,36 @@ class PopupMenuUiTest {
     }
 
     // S3: each cell told as its view was: its class (a word's TextView, an icon's ImageView), its words,
-    // not clickable (picked as the finger lifts), read a character, word or paragraph at a time as the
-    // view's text or description (a TextView's line and page not: one line, no page)
+    // not clickable (picked as the finger lifts), read a character, word or paragraph at a time
     @Test
     fun onTheCanvasEachCellIsToldAsItsViewWas() {
         for (cells in listOf(items, words)) {
-            // in a window: a view not attached tells nothing (View.onInitializeAccessibilityNodeInfoInternal)
-            val root = menu(items = cells).root
-            org.robolectric.Robolectric.buildActivity(android.app.Activity::class.java).setup().get().setContentView(root)
-            val views = KeyboardHarness.all(root)
-                .filter { (it is android.widget.TextView && it.text.isNotEmpty()) || (it is android.widget.ImageView && it.contentDescription != null) }
-                .map { v -> AccessibilityNodeInfoCompat.wrap(v.createAccessibilityNodeInfo()) to v }
-                .toList()
-                // in the scene's order: the views' are the columns' (the focus's first)
-                .sortedBy { (n, _) -> (n.contentDescription ?: n.text).toString() }
-            val ui = menu(canvas = true, items = cells)
+            val ui = menu(items = cells)
             val canvas = ui.root as PopupSceneView
+            org.robolectric.Robolectric.buildActivity(android.app.Activity::class.java).setup().get().setContentView(canvas)
             val nodes = canvas.spokenKeys().sortedBy { it.contentDescription.toString() }
-            // the class a view's node is given (View.onInitializeAccessibilityNodeInfoInternal; Robolectric's node keeps none)
-            assertEquals(views.map { it.second.accessibilityClassName }, nodes.map { it.className })
-            assertEquals(views.map { (n, _) -> (n.contentDescription ?: n.text).toString() }, nodes.map { it.contentDescription.toString() })
+            assertEquals(cells.size, nodes.size)
+            assertTrue(nodes.all { it.className == "android.widget.TextView" || it.className == "android.widget.ImageView" })
             assertTrue(nodes.none { it.isClickable || it.isLongClickable })
-            assertTrue(views.none { it.first.isClickable || it.first.isLongClickable })
             val read = AccessibilityNodeInfoCompat.MOVEMENT_GRANULARITY_CHARACTER or
                 AccessibilityNodeInfoCompat.MOVEMENT_GRANULARITY_WORD or AccessibilityNodeInfoCompat.MOVEMENT_GRANULARITY_PARAGRAPH
-            for ((n, node) in views.map { it.first }.zip(nodes)) {
-                assertEquals(read, node.movementGranularities)
-                assertEquals("${n.text}: the view's are those and more", read, n.movementGranularities and read)
-            }
-            // a cell's words a character at a time, forward then back, as its view's (its events sent: TalkBack on)
-            org.robolectric.Shadows.shadowOf(root.context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)).setEnabled(true)
+            for (node in nodes) assertEquals(read, node.movementGranularities)
+            // a cell's words a character at a time, forward then back (its events sent: TalkBack on)
+            org.robolectric.Shadows.shadowOf(canvas.context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)).setEnabled(true)
             val provider = canvas.accessibilityNodeProvider!!
             val keys = canvas.scene!!.keys
-            for ((i, v) in views.map { it.second }.withIndex()) {
-                val id = keys.indexOfFirst { k -> (k.a11y ?: k.label) == nodes[i].contentDescription.toString() }
+            for (node in nodes) {
+                val said = node.contentDescription.toString()
+                val id = keys.indexOfFirst { k -> (k.a11y ?: k.label) == said }
                 val chars = android.os.Bundle().apply {
                     putInt(AccessibilityNodeInfoCompat.ACTION_ARGUMENT_MOVEMENT_GRANULARITY_INT, AccessibilityNodeInfoCompat.MOVEMENT_GRANULARITY_CHARACTER)
                 }
                 val steps = listOf(true, true, true, true, false, false, false, false)
                     .map { if (it) AccessibilityNodeInfoCompat.ACTION_NEXT_AT_MOVEMENT_GRANULARITY else AccessibilityNodeInfoCompat.ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY }
-                val viewSaid = steps.map { v.performAccessibilityAction(it, chars) }
                 val nodeSaid = steps.map { provider.performAction(id, it, chars) }
-                assertEquals("${v.accessibilityClassName} ${views[i].first.text ?: views[i].first.contentDescription}", viewSaid, nodeSaid)
+                // as far as its words go and back: a view moved while there were characters left
+                val n = said.length.coerceAtMost(4)
+                assertEquals(said, List(n) { true } + List(4 - n) { false } + List(n) { true } + List(4 - n) { false }, nodeSaid)
             }
         }
     }
@@ -233,9 +217,9 @@ class PopupMenuUiTest {
     // could not make the focus moved: the scene before kept, the focus with it
     @Test
     fun onTheCanvasWhatCannotBeMadeIsNotShownOrMoved() {
-        assertTrue(menu(canvas = true, items = words, measuring = { TextMeasurer { _, _, _, _ -> error("no font") } }).unmade)
+        assertTrue(menu(items = words, measuring = { TextMeasurer { _, _, _, _ -> error("no font") } }).unmade)
         var broken = false
-        val ui = menu(canvas = true, items = words, measuring = { real ->
+        val ui = menu(items = words, measuring = { real ->
             TextMeasurer { t, f, w, size -> if (broken) error("no font") else real.measure(t, f, w, size) }
         })
         assertFalse(ui.unmade)

@@ -85,15 +85,8 @@ fun Test.unitTestSettings() {
         .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
     // ThemeLookScreenshotTest's whole set of themes × keyboards × modes, for the eye: -PthemeShots=<dir>
     systemProperty("themeShots.dir", project.findProperty("themeShots")?.toString().orEmpty())
-    // the old drawing kept for 060's P3 (OldRenderBaselineTest): made with -PoldRenderBaseline=<dir>
-    // (a path from the repository root; app/src/test/baseline-060 the kept one), -PoldRenderBaselineOnly=<regex>
-    // some files of it; checked without
-    systemProperty("oldRenderBaseline.dir", project.findProperty("oldRenderBaseline")?.toString()?.let { rootProject.file(it).path }.orEmpty())
-    systemProperty("oldRenderBaseline.only", project.findProperty("oldRenderBaselineOnly")?.toString().orEmpty())
     // the packs not read through 30 s into a test (PackStore.verifiesInBackground): PacksUatTest does it itself
     systemProperty("youmo.packs.verify", "off")
-    inputs.files(fileTree("src/test/baseline-060")).withPropertyName("oldRenderBaseline")
-        .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
 }
 
 android {
@@ -247,7 +240,7 @@ tasks.register<Test>("testDebugUnitTestAt29") {
     useJUnit()
 }
 
-// The layouts the scene engine draws (060; KeyboardCanvasView behind internal.canvasKeyboard): one copy,
+// The layouts the scene engine draws (060; KeyboardCanvasView): one copy,
 // lib/keyboard-scene's, which its tests and snapshots hold; raw resources, so Robolectric reads them too
 // (the unit tests get the app's resources, not its assets: unit-test-resources)
 abstract class SceneLayoutsTask : DefaultTask() {

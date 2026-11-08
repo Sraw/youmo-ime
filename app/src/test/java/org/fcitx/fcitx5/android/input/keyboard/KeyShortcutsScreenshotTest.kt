@@ -4,9 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
-import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.theme.Theme
@@ -96,7 +94,7 @@ class KeyShortcutsScreenshotTest {
             // the icons up outside the keys: the bar's, then the menu's cells as well, whichever draws them
             fun icons() = h.shownIcons().size
             val before = icons()
-            val space = h.inputView.findViewById<View>(R.id.button_space)
+            val space = h.keyNamed("space")
             val finger = h.finger(space, h.at(space))
             for (i in 1..6) finger.move(h.at(space, dy = -10f * i, ms = 16))
             val menu = icons() - before

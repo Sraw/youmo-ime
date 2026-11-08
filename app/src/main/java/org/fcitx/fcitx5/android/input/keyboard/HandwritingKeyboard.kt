@@ -6,10 +6,8 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.res.Configuration
 import android.graphics.Rect
 import android.view.MotionEvent
-import android.view.View
 import androidx.annotation.Keep
 import androidx.annotation.VisibleForTesting
 import androidx.core.view.isInvisible
@@ -26,7 +24,6 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
@@ -39,20 +36,14 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
-import org.fcitx.fcitx5.android.input.theme.KeyFaceGeometry
-import org.fcitx.fcitx5.android.input.theme.KeyKind
 import org.fcitx.fcitx5.android.input.theme.KeyNames
-import org.fcitx.fcitx5.android.input.theme.KeyStyleResolver
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.Texts
-import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.lParams
-import splitties.views.dsl.constraintlayout.leftOfParent
 import splitties.views.dsl.core.add
-import splitties.views.existingOrNewId
 
 /**
  * Handwriting: a pad over most of the keyboard, written on a character at a time; backspace (taking
@@ -119,7 +110,7 @@ class HandwritingKeyboard(
         // the pad's rows: those the keys on its right make
         private const val PAD_ROWS = 4
 
-        /** The layout its keys are drawn from where the canvas is on (lib/keyboard-scene's handwriting.xml), the pad its slot [PAD_SLOT]. */
+        /** The layout its keys are drawn from (lib/keyboard-scene's handwriting.xml), the pad its slot [PAD_SLOT]. */
         internal const val LAYOUT = KeyNames.HANDWRITING
         internal const val PAD_SLOT = "pad"
 
@@ -145,17 +136,12 @@ class HandwritingKeyboard(
         )
     }
 
-    private val space: TextKeyView by lazy { findViewById(R.id.button_space) }
-    private val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
-    private val lang: ImageKeyView by lazy { findViewById(R.id.button_lang) }
-    private val readingKey: TextKeyView by lazy { findViewById(R.id.button_reading) }
     private val lastReading: String by AppPrefs.getInstance().internal.lastCandidateReading
 
     private val showLangSwitchKey = AppPrefs.getInstance().keyboard.showLangSwitchKey
 
     @Keep
-    private val showLangSwitchKeyListener = ManagedPreference.OnChangeListener<Boolean> { _, v ->
-        lang.isVisible = v
+    private val showLangSwitchKeyListener = ManagedPreference.OnChangeListener<Boolean> { _, _ ->
         canvas?.invalidateScene()
     }
 
@@ -166,51 +152,20 @@ class HandwritingKeyboard(
         onFinish = ::finish,
     )
 
-    // the pad's face as a letter key's (its image among the keyboard's), drawn on flat keys too as before 3.0; nothing
-    // pressed (it is written on). Where the canvas is on, the scene draws it (the slot's face, handwriting.xml's face="keep")
-    private fun drawPadAsKey() {
-        val keys = ThemeManager.shownLook(theme).keys
-        val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val density = resources.displayMetrics.density
-        padView.drawAsKey(
-            theme, KeyStyleResolver.resolve(keys, null, null, KeyKind.Letter), KeyKind.Letter, keyImages,
-            { w, h -> KeyFaceGeometry.of(w, h, KeyKind.Letter, keys, landscape, density, true, KeyFaceGeometry.Border.On) },
-            press = false,
-        )
-    }
-
     init {
-        add(padView, lParams {
-            topToTop = keyRows[0].existingOrNewId
-            bottomToBottom = keyRows[PAD_ROWS - 1].existingOrNewId
-            leftOfParent()
-            width = 0
-            height = 0
-            matchConstraintPercentWidth = PAD
-        })
-        // under the pad, out of reach: TalkBack would stop on them
-        keyRows.take(PAD_ROWS).forEach { row ->
-            row.getChildAt(0).apply {
-                isEnabled = false
-                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            }
-        }
-        lang.isVisible = showLangSwitchKey.getValue()
+        add(padView, lParams(0, 0))
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
-        // last: the scene reads the keyboard's state (060's redraw: the keys drawn by the scene engine where the canvas is
-        // on); the pad over the canvas, in its slot (onLayout)
-        if (drawKeysWithScene(LAYOUT)) {
-            padView.bringToFront()
-            // the canvas at another size (one-handed, split, another height): the pad to the slot of the scene at that size
-            canvas?.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> post { requestLayout() } }
-        } else {
-            drawPadAsKey()
-        }
+        // last: the scene reads the keyboard's state (the keys drawn by the scene engine; the pad's face the
+        // slot's, handwriting.xml's face="keep"); the pad over the canvas, in its slot (onLayout)
+        drawKeysWithScene(LAYOUT)
+        padView.bringToFront()
+        // the canvas at another size (one-handed, split, another height): the pad to the slot of the scene at that size
+        canvas?.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> post { requestLayout() } }
     }
 
     private val padSlot = Rect()
 
-    // the pad where the scene has its slot: the scene's cells, not the rows of views under it
+    // the pad where the scene has its slot
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         val c = canvas ?: return
@@ -266,7 +221,7 @@ class HandwritingKeyboard(
 
     private val padHit = Rect()
 
-    // where each finger down went while the scene draws the keys: the pad's ids, the keys' ids, in order
+    // where each finger down went: the pad's ids, the keys' ids, in order
     private val padFingers = mutableListOf<Int>()
     private val keyFingers = mutableListOf<Int>()
     // each side's gesture began at its own first finger's down
@@ -274,12 +229,10 @@ class HandwritingKeyboard(
     private var keyDown = 0L
 
     /**
-     * Each finger to what it came down on, where the scene draws the keys: on the pad the pad's, else
-     * the keys' (the scene's routing): a stroke written while ⌫ is held, ⌫ tapped while a stroke is
-     * being written. The views' keyboard gave a touch to whatever its first finger was on.
+     * Each finger to what it came down on: on the pad the pad's, else the keys' (the scene's routing):
+     * a stroke written while ⌫ is held, ⌫ tapped while a stroke is being written.
      */
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        if (canvas == null) return super.dispatchTouchEvent(ev)
         dropLostFingers(ev)
         var taken = false
         when (ev.actionMasked) {
@@ -399,9 +352,6 @@ class HandwritingKeyboard(
         val on = style != ReadingStyle.OFF
         readingOn = on
         canvas?.invalidateScene()
-        readingKey.mainText.setTextColor(if (on) theme.accentKeyBackgroundColor else theme.altKeyTextColor)
-        val name = context.getString(R.string.im_candidate_reading)
-        readingKey.contentDescription = context.getString(if (on) R.string.hw_reading_key_on else R.string.hw_reading_key_off, name)
     }
 
     // the piece on the pad finished first, as a pause does: in the engine's sentence, not committed, then the setting
@@ -427,12 +377,11 @@ class HandwritingKeyboard(
 
     override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
         returnAppearance = appearance
-        `return`.showReturnAction(appearance)
         canvas?.invalidateScene()
     }
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
-        showInputMethodName(space, ime)
+        showInputMethodName(ime)
         canvas?.invalidateScene()
     }
 

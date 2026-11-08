@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.app.Activity
 import android.os.Looper
-import android.view.View
 import android.view.ViewGroup
 import android.widget.ScrollView
 import android.widget.TextView
@@ -22,6 +21,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.nineSpCode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -80,7 +80,7 @@ class T9ShuangpinKeyboardTest {
     @Test
     fun noLanguageKeyAndTheColumnOffersShuangpinsSyllablesNotNineKeys() {
         val keyboard = T9Keyboard(context, ThemePreset.PixelDark, shuangpin = true)
-        assertEquals(View.VISIBLE, keyboard.findViewById<View>(R.id.button_space).visibility)
+        assertTrue(keyboard.laidOut().shownKeyWithId(R.id.button_space) != null)
         assertEquals(true, keyboard.ownsSyllables)
         val items = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single().getChildAt(0) as ViewGroup
         fun column() = (0 until items.childCount).map { items.getChildAt(it) as TextView }.filter { it.isVisible }.map { it.text.toString() }

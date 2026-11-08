@@ -235,7 +235,7 @@ class FloatingController(
         }
     }
 
-    // the keys' radius and margins as KeyView draws them; square where the keys are (按键圆角 直角)
+    // the keys' radius and margins as the scene draws them (KeyFaceGeometry); square where the keys are (按键圆角 直角)
     private fun cornerPx(): Float {
         val landscape = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val keys = ThemeManager.shownLook(theme).keys

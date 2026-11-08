@@ -121,7 +121,6 @@ class KeyShortcutsPageScreenshotTest {
     // none a stand-in drawn in its stead (S7a: they were qwerty's q)
     @Test
     fun everyCapIsTheKeyItNames() {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         open()
         st.idle()
         var caps = 0
@@ -147,7 +146,6 @@ class KeyShortcutsPageScreenshotTest {
 
     @Test
     fun theEnginesCapsWithTheirMarks() {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         open()
         st.idle()
         assertEquals(1, sceneIcons(key("a")))
@@ -165,7 +163,6 @@ class KeyShortcutsPageScreenshotTest {
     @Test
     @Config(qualifiers = "zh-rCN-w393dp-h851dp-port-night-440dpi")
     fun theEnginesCapsInTheKeyboardsThemeAtNight() {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         open()
         st.idle()
         val b = KeyboardHarness.all(key("b")).filterIsInstance<SceneKeyCell>().single()

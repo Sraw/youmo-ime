@@ -83,10 +83,6 @@ class KeyboardPerfBaselineTest {
     private val runs = InstrumentationRegistry.getArguments().getString("perfRuns")?.toInt() ?: 20
     private val warmUp = 3
 
-    // perfCanvas=true / false: the 26 keys drawn by the scene engine or by their views (060 P1); unset, as the setting is
-    private val canvas = InstrumentationRegistry.getArguments().getString("perfCanvas")?.toBooleanStrict()
-    private var canvasWas: Boolean? = null
-
     // perfScreenshot=true: the picture theme's keyboard captured once, to see the picture is drawn
     private val screenshots = InstrumentationRegistry.getArguments().getString("perfScreenshot") == "true"
 
@@ -104,13 +100,8 @@ class KeyboardPerfBaselineTest {
     @Test
     fun keyboardDrawingBaseline() {
         val sdk = android.os.Build.VERSION.SDK_INT
-        log("device ${android.os.Build.MODEL} sdk $sdk runs $runs warm-up $warmUp canvas ${canvas ?: "as set"}")
+        log("device ${android.os.Build.MODEL} sdk $sdk runs $runs warm-up $warmUp")
         selectThisInputMethod()
-        canvas?.let { on ->
-            val pref = AppPrefs.getInstance().internal.canvasKeyboard
-            canvasWas = pref.getValue()
-            onMain { pref.setValue(on) }
-        }
         memory("no keyboard shown yet")
         launch()
         memory("26 keys shown, first time")
@@ -176,7 +167,6 @@ class KeyboardPerfBaselineTest {
         runCatching { if (::frames.isInitialized) onMain { frames.close() } }
         runCatching { putThemesBack() }
         pinyinKeyboardWas?.let { onMain { AppPrefs.getInstance().keyboard.pinyinKeyboard.setValue(it) } }
-        canvasWas?.let { onMain { AppPrefs.getInstance().internal.canvasKeyboard.setValue(it) } }
         runCatching {
             host {
                 imsWere?.let { setEnabledIme(it) }
@@ -506,7 +496,7 @@ class KeyboardPerfBaselineTest {
             }
         }
         row("shift", "tap, on or off", taps)
-        val view = onMain { canvasView() } ?: return log("scene	no canvas: the keys drawn by their views")
+        val view = onMain { canvasView() } ?: return log("scene	no canvas")
         val board = onMain { textKeyboard() }
         fun timed(prepare: () -> Unit): List<Double> = (1..warmUp + runs).map {
             onMain {

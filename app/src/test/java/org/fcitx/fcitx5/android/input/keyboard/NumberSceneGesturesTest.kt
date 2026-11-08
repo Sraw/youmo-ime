@@ -17,7 +17,6 @@ import org.fcitx.fcitx5.android.input.picker.PickerLayout
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
@@ -44,25 +43,24 @@ class NumberSceneGesturesTest {
     @get:Rule
     val prefs = PrefsRule()
 
-    private fun harness(canvas: Boolean, inputType: Int): KeyboardHarness {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, canvas)
+    private fun harness(inputType: Int): KeyboardHarness {
         val prefill = { e: android.widget.EditText ->
             e.setText(TEXT)
             e.setSelection(TEXT.length)
         }
         return KeyboardHarness(ThemePreset.PixelLight).start(inputType, prefill = prefill).also { h ->
             h.relayout()
-            assertEquals(canvas, KeyboardHarness.all(h.keyboard).any { it is KeyboardCanvasView && it.visibility == View.VISIBLE })
+            assertTrue(KeyboardHarness.all(h.keyboard).any { it is KeyboardCanvasView && it.visibility == View.VISIBLE })
         }
     }
 
     // a bubble or a long press's keys up now: a view's, or the engine's (PopupSceneView)
     private fun KeyboardHarness.poppedUp(): Boolean =
-        popupKeys().isNotEmpty() || KeyboardHarness.all(inputView).any { it is PopupSceneView && it.isShown }
+        KeyboardHarness.all(inputView).any { it is PopupSceneView && it.isShown }
 
     // what a finger does on each key of the pad of [inputType]: the keys that put another keyboard up
     // (ABC, !?#) left to [theSwitchingKeysSwitchTheSame], as they would take the rest away
-    private fun gestures(canvas: Boolean, inputType: Int): List<String> = harness(canvas, inputType).use { h ->
+    private fun gestures(inputType: Int): List<String> = harness(inputType).use { h ->
         val ids = h.keys().mapNotNull { it.id }.filter { it !in SWITCHING }
         assertTrue(ids.toString(), ids.size >= MOST_KEYS_AT_LEAST)
         val out = mutableListOf("keys $ids")
@@ -106,7 +104,7 @@ class NumberSceneGesturesTest {
         h.after(HOLD_MS)
         h.release()
         val deletes = h.api.calls.count { it.startsWith("sendKey") }
-        assertTrue("canvas $canvas: $deletes deletes", deletes >= MIN_REPEATS)
+        assertTrue("$deletes deletes", deletes >= MIN_REPEATS)
         sent("backspace held $deletes")
         out
     }
@@ -133,10 +131,9 @@ class NumberSceneGesturesTest {
         override val bounds get() = at
     })
 
+    // what each key does, run through: ⌫ held repeating, a blank taking no press (compared with their views' till S8a deleted them)
     private fun assertSame(inputType: Int) {
-        val views = gestures(false, inputType)
-        val scene = gestures(true, inputType)
-        assertEquals(views.joinToString("\n"), scene.joinToString("\n"))
+        gestures(inputType)
     }
 
     @Test
@@ -164,16 +161,15 @@ class NumberSceneGesturesTest {
     @Test
     fun theSwitchingKeysSwitchTheSame() {
         for ((pad, inputType) in FIELDS) {
-            val seen = listOf(false, true).map { canvas ->
+            val seen = listOf(true).map { _ ->
                 listOf("back", "symbols").map { id ->
-                    harness(canvas, inputType).use { h ->
+                    harness(inputType).use { h ->
                         h.tap(h.keyNamed(id))
                         val picker = KeyboardHarness.find<PickerLayout>(h.inputView)?.isShown == true
                         "$id: letters ${"q" in h.texts()}, picker $picker, ${h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") }}"
                     }
                 }
             }
-            assertEquals("$pad", seen[0], seen[1])
         }
     }
 
@@ -181,8 +177,7 @@ class NumberSceneGesturesTest {
     @Test
     fun returnSaysTheFieldsAction() {
         val actions = listOf(EditorInfo.IME_ACTION_SEARCH, EditorInfo.IME_ACTION_DONE, EditorInfo.IME_ACTION_GO, EditorInfo.IME_ACTION_NEXT, 0)
-        val said = listOf(false, true).map { canvas ->
-            prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, canvas)
+        val said = listOf(true).map { _ ->
             actions.map { action ->
                 KeyboardHarness(ThemePreset.PixelLight).start(InputType.TYPE_CLASS_NUMBER, imeOptions = action).use { h ->
                     h.relayout()
@@ -191,12 +186,11 @@ class NumberSceneGesturesTest {
             }
         }
         assertTrue(said[0].toString(), said[0].toSet().size >= 4)
-        assertEquals(said[0], said[1])
     }
 
     // the field's action told while the pad is up: the scene made again with it, not the one drawn before
     @Test
-    fun returnRedrawsWhenTheActionChanges() = harness(true, InputType.TYPE_CLASS_NUMBER).use { h ->
+    fun returnRedrawsWhenTheActionChanges() = harness(InputType.TYPE_CLASS_NUMBER).use { h ->
         val board = KeyboardHarness.find<NumberKeyboard>(h.inputView)!!
         val canvas = KeyboardHarness.find<KeyboardCanvasView>(board)!!
         val before = canvas.scene!!
@@ -210,16 +204,12 @@ class NumberSceneGesturesTest {
         assertNotEquals(enter, h.keyNamed("enter").description)
     }
 
-    // rules C 疑问 8 (060-render-p2 §5.3): the views' pad swallowed Return's menu with its previews; the
-    // canvas's offers Emoji as every Return does, picked as the finger lifts on it
+    // rules C 疑问 8 (060-render-p2 §5.3): Return offers Emoji as every Return does, picked as the finger
+    // lifts on it (the views' pad swallowed the menu with its previews)
     @Test
     fun returnsLongPressOffersEmojiOnTheCanvasAlone() {
         for ((pad, inputType) in FIELDS) {
-            harness(false, inputType).use { h ->
-                assertEquals("$pad", emptyList<String>(), h.longPress(h.keyNamed("enter")))
-                assertFalse("$pad", KeyboardHarness.find<PickerLayout>(h.inputView)?.isShown == true)
-            }
-            harness(true, inputType).use { h ->
+            harness(inputType).use { h ->
                 // the menu's cells are icons, read by their names (the edit menu's are: SwipePopupScreenshotTest)
                 val before = h.shownIcons().toSet()
                 val enter = h.keyNamed("enter")

@@ -383,7 +383,7 @@ class KeyboardCanvasView(
 
     /**
      * Where a popup over key [ref] is placed, in the window, into [out]: its face across and its cell
-     * down, as a key view's bounds were (KeyView.bounds); false where the scene drawn last has no such key.
+     * down; false where the scene drawn last has no such key.
      */
     fun popupBounds(ref: KeyRef, out: Rect): Boolean {
         val k = current?.keys?.firstOrNull { it.of(ref) } ?: return false
@@ -401,7 +401,7 @@ class KeyboardCanvasView(
     @VisibleForTesting
     fun keyAt(id: String, copy: Int = 0): KeyNode? = scene?.keys?.firstOrNull { it.id == id && it.copy == copy }
 
-    /** Where key [id] is drawn, in the window, as KeyView.bounds says a key's place. */
+    /** Where key [id] is drawn, in the window: a popup's anchor. */
     @VisibleForTesting
     fun bounds(id: String, copy: Int = 0): Rect? {
         val k = keyAt(id, copy) ?: return null
@@ -498,7 +498,6 @@ class KeyboardCanvasView(
         val r = RectF(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat()).also(m::mapRect)
         return Rect(r.left.roundToInt(), r.top.roundToInt(), r.right.roundToInt(), r.bottom.roundToInt())
     }
-
     private inner class Speech : ExploreByTouchHelper(this) {
         override fun getVirtualViewAt(x: Float, y: Float): Int {
             val s = current ?: return INVALID_ID
@@ -590,6 +589,9 @@ class KeyboardCanvasView(
             "a11y_key_separator" to org.fcitx.fcitx5.android.R.string.a11y_key_separator,
             // the symbol panel's way to the number pad
             "a11y_key_numbers" to org.fcitx.fcitx5.android.R.string.a11y_key_number_pad,
+            // the emoji's row (emoji.xml, emoticon.xml): its search, the way back from the emoticons
+            "a11y_key_emoji_search" to org.fcitx.fcitx5.android.R.string.emoji_search,
+            "a11y_key_emoji" to org.fcitx.fcitx5.android.R.string.a11y_key_emoji,
             SceneA11y.SHIFT_ONCE to org.fcitx.fcitx5.android.R.string.a11y_state_shift_once,
             SceneA11y.CAPS_LOCK to org.fcitx.fcitx5.android.R.string.a11y_state_caps_lock,
         )

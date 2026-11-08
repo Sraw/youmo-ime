@@ -16,7 +16,6 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.CandidateWord
-import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.host.HostEvent
@@ -27,7 +26,6 @@ import org.fcitx.fcitx5.android.input.bar.ToolbarButtonLooks
 import org.fcitx.fcitx5.android.input.bar.ToolbarConfig
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
-import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.fcitx.fcitx5.android.ui.common.DynamicListAdapter
 import org.fcitx.fcitx5.android.ui.main.ClipboardEditActivity
 import org.fcitx.fcitx5.android.ui.main.MainActivity

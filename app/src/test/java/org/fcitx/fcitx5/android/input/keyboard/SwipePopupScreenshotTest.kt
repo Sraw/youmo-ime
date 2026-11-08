@@ -84,11 +84,10 @@ class SwipePopupScreenshotTest {
         finger.up(at(space))
     }
 
-    private fun shoot(suffix: String, canvas: Boolean = false) {
+    private fun shoot(suffix: String) {
         longShortcuts()
-        // the keys drawn by the canvas, their popups by the engine (060-render-p2 S2): pictures of their own
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, canvas)
-        val prefix = if (canvas) "canvas_" else ""
+        // the keys drawn by the canvas, their popups by the engine (060-render-p2 S2); named canvas_ since the views' were beside them
+        val prefix = "canvas_"
         // the edit menu's test copies "hello": its entry, kept in the app's object, would show in the bar of a later shot,
         // and one stored late (the clipboard's own thread, a test run before in the same JVM) would still reach the bar
         org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.lastEntry = null
@@ -104,48 +103,27 @@ class SwipePopupScreenshotTest {
         }
     }
 
+    // the bubbles and the edit menu the engine's scenes (060-render-p2 S2, §5.3's differences from the views'
+    // that were: their text dp, not sp; their shadow drawn)
     @Test
-    fun upright() = shoot("port")
+    fun uprightOnTheCanvas() = shoot("port")
 
     @Test
-    fun compact() {
-        // 紧凑 is the level nearest both heights, so both are set (20 alone with landscape 49 is not it)
+    fun compactOnTheCanvas() {
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
         shoot("compact")
     }
 
     @Test
-    fun floating() {
+    fun floatingOnTheCanvas() {
         prefs.set(ThemeManager.prefs.floatingKeyboard, true)
         shoot("floating")
     }
 
     @Test
     @Config(qualifiers = "zh-rCN-w851dp-h393dp-land-440dpi")
-    fun turned() = shoot("land")
-
-    // the same under the canvas: the bubbles and the edit menu the engine's scenes (060-render-p2 S2, §5.3's
-    // differences: their text dp, not sp; their shadow drawn)
-    @Test
-    fun uprightOnTheCanvas() = shoot("port", canvas = true)
-
-    @Test
-    fun compactOnTheCanvas() {
-        prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
-        prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
-        shoot("compact", canvas = true)
-    }
-
-    @Test
-    fun floatingOnTheCanvas() {
-        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
-        shoot("floating", canvas = true)
-    }
-
-    @Test
-    @Config(qualifiers = "zh-rCN-w851dp-h393dp-land-440dpi")
-    fun turnedOnTheCanvas() = shoot("land", canvas = true)
+    fun turnedOnTheCanvas() = shoot("land")
 
     // team-lead, 0.5.1: the letter in the bubble scaled as the keys' text, 紧凑 0.9 of the standard's
     @Test

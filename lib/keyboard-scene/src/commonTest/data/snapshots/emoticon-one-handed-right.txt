@@ -1,0 +1,94 @@
+scene 1080x702 board 219,0,1080,702 no-popups
+base
+  fill rect(0,0,1080,702) #ffeceff1
+slot side-buttons 0,0,219,702
+key back kind=function role=back a11y="ABC"
+  bounds 219,0,348,702
+  shape rect(226.88,18.38,340.13,683.63 r=10.5,10.5,10.5,10.5)
+  hit rect(219,0,348,702)
+  anchor 283.5,351 up 0,-1
+  actions send="layout:Text"
+  text label="ABC"
+  normal
+    shadow rect(226.88,18.38,340.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(226.88,18.38,340.13,683.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    text "ABC" 243.5,366.75 system 700 42 #ff7a858a
+  pressed
+    +2 fill rect(226.88,18.38,340.13,683.63 r=10.5,10.5,10.5,10.5) #1f000000
+key comma kind=function a11y=","
+  bounds 348,0,434,702
+  shape rect(355.88,18.38,426.13,683.63 r=10.5,10.5,10.5,10.5)
+  hit rect(348,0,434,702)
+  anchor 391,351 up 0,-1
+  actions send=","
+  text label=","
+  normal
+    shadow rect(355.88,18.38,426.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(355.88,18.38,426.13,683.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    text "," 372.89,373.64 system 400 60.38 #ff7a858a
+  pressed
+    +2 fill rect(355.88,18.38,426.13,683.63 r=10.5,10.5,10.5,10.5) #1f000000
+key emoji kind=letter a11y="a11y_key_emoji"
+  bounds 434,0,520,702
+  shape rect(441.88,18.38,512.13,683.63 r=10.5,10.5,10.5,10.5)
+  hit rect(434,0,520,702)
+  anchor 477,351 up 0,-1
+  actions send="picker:Emoji"
+  normal
+    shadow rect(441.88,18.38,512.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(441.88,18.38,512.13,683.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    icon emoji 445.5,319.5,508.5,382.5 #ff7a858a
+  pressed
+    +2 fill rect(441.88,18.38,512.13,683.63 r=10.5,10.5,10.5,10.5) #1f000000
+key space kind=space role=space a11y="a11y_key_space"
+  bounds 520,0,736,702
+  shape rect(527.88,18.38,728.13,683.63 r=10.5,10.5,10.5,10.5)
+  hit rect(520,0,736,702)
+  anchor 628,351 up 0,-1
+  actions long-press="space-long-press" send="sym:space" swipe-axis="both"
+  sound=space
+  normal
+    shadow rect(527.88,18.38,728.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(527.88,18.38,728.13,683.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
+  pressed
+    +2 fill rect(527.88,18.38,728.13,683.63 r=10.5,10.5,10.5,10.5) #1f000000
+key period kind=function a11y="."
+  bounds 736,0,822,702
+  shape rect(743.88,18.38,814.13,683.63 r=10.5,10.5,10.5,10.5)
+  hit rect(736,0,822,702)
+  anchor 779,351 up 0,-1
+  actions send="."
+  text label="."
+  normal
+    shadow rect(743.88,18.38,814.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(743.88,18.38,814.13,683.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    text "." 760.89,373.64 system 400 60.38 #ff7a858a
+  pressed
+    +2 fill rect(743.88,18.38,814.13,683.63 r=10.5,10.5,10.5,10.5) #1f000000
+key backspace kind=function role=backspace a11y="a11y_key_backspace"
+  bounds 822,0,951,702
+  shape rect(829.88,18.38,943.13,683.63 r=10.5,10.5,10.5,10.5)
+  hit rect(822,0,951,702)
+  anchor 886.5,351 up 0,-1
+  actions repeat="true" send="sym:BackSpace" swipe-axis="both"
+  sound=delete
+  normal
+    shadow rect(829.88,18.38,943.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(829.88,18.38,943.13,683.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    icon backspace 855,319.5,918,382.5 #ff7a858a
+  pressed
+    +2 fill rect(829.88,18.38,943.13,683.63 r=10.5,10.5,10.5,10.5) #1f000000
+key enter kind=enter role=enter a11y="换行"
+  bounds 951,0,1080,702
+  shape rect(958.88,18.38,1072.13,683.63 r=10.5,10.5,10.5,10.5)
+  hit rect(951,0,1080,702)
+  anchor 1015.5,351 up 0,-1
+  actions send="sym:Return"
+  sound=return
+  menu "Emoji" icon=emoji do="picker:"
+  normal
+    shadow rect(958.88,18.38,1072.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(958.88,18.38,1072.13,683.63 r=10.5,10.5,10.5,10.5) #ff5cb5ab
+    icon enter 984,319.5,1047,382.5 #ffffffff
+  pressed
+    +2 fill rect(958.88,18.38,1072.13,683.63 r=10.5,10.5,10.5,10.5) #1f000000

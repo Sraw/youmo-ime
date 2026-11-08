@@ -138,13 +138,10 @@
     <string name="clipboard_suggestion">顯示剪貼簿建議</string>
     <string name="disabled">已停用</string>
     <string name="system_default">系統預設</string>
-    <string name="canvas_keyboard">新繪製鍵盤（實驗）</string>
-    <string name="canvas_keyboard_summary">正在做的重繪：26 鍵、14 鍵和 18 鍵鍵盤改由新引擎繪製。測試用</string>
     <string name="editor_info_inspector">EditorInfo 檢查器</string>
     <string name="default_">預設</string>
     <string name="saving">正在儲存</string>
     <string name="delete_all_pinned_items">要刪除所有置頂項目嗎？</string>
-    <string name="vivo_keypress_workaround">解決 vivo Origin OS 按鍵檢測問題</string>
     <string name="toolbar_num_row_on_password">輸入密碼時在工具欄上顯示數字列</string>
     <string name="space_long_press_behavior">空格鍵長按行為</string>
     <string name="space_behavior_none">無</string>

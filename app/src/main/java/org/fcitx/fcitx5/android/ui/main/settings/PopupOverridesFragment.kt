@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.ui.main.settings
 
 import android.content.Context
-import android.content.res.Configuration
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
@@ -26,16 +25,10 @@ import com.google.android.material.R as MaterialR
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.popup.PopupEditor
-import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.input.keyboard.GroupedKeyboard
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
-import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
-import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
-import org.fcitx.fcitx5.android.input.keyboard.markSpots
 import org.fcitx.fcitx5.android.input.popup.PopupPreset
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPages
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
@@ -135,22 +128,6 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     // a shortcut as a screen reader says it
     private fun said(name: String): String? = KeyShortcutSection.shortLabel(requireContext(), shortcuts.resolve(name))
 
-    // a shortcut as the key draws it: a command's icon, a text's whole
-    private fun markOf(name: String): KeyCaps.Mark? = when (val shortcut = shortcuts.resolve(name)) {
-        is KeyShortcut.Command -> KeyCaps.Mark.Icon(KeyShortcutLooks.of(shortcut.command).icon)
-        is KeyShortcut.Text -> KeyCaps.Mark.Text(shortcut.text)
-        KeyShortcut.None -> null
-    }
-
-    private val landscape get() = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-
-    // a character key's [symbol] and [name]'s shortcut placed as the keyboard places them (KeySwipes)
-    private fun charMarks(symbol: KeyCaps.Mark?, name: String?): KeyMarks.Placed<KeyCaps.Mark> {
-        val spots = markSpots()
-        val shortcut = name?.let(::markOf)?.takeIf { layers.layers.wayOf(SwipeLayers.Layer.Shortcut) != null }
-        return KeyMarks.place(symbol, shortcut, spots.symbol, spots.shortcut, landscape, keyboardCompact())
-    }
-
     private fun captionWidth(ctx: Context, page: KeyShortcutPages.Page): Int {
         val paint = KeyCaps.label(ctx, "", CAPTION_SP).paint
         return page.rows.maxOf { paint.measureText(functionLabel(it.first().label)) }.toInt() + ctx.dp(CAPTION_GAP_DP)
@@ -165,7 +142,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         val function = page.form == KeyShortcuts.FUNCTION
         val symbols = symbolsOf(page).iterator()
         // a function key's name beside its engine-drawn cap, on one line: as wide as the widest name on the page
-        val captionWidth = if (function && SceneKeyCell.on) captionWidth(ctx, page) else 0
+        val captionWidth = if (function) captionWidth(ctx, page) else 0
         page.rows.forEach { row ->
             val keys = if (function) row.take(1) else row
             with(content) { add(ctx.horizontalLayout {
@@ -175,20 +152,19 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                     val label = if (function) functionLabel(key.label) else key.label
                     val said = names.map { said(it) ?: "–" }.joinToString(" / ").takeIf { names.any { said(it) != null } }
                     val symbol = if (function) null else symbols.next()
-                    val marks = if (function) functionMarks(names) else charMarks(symbol, key.name)
                     // the engine's cap: a character key by its name, a function key by its own (its up and down)
                     val shortcut = KeyCaps.Shortcut(if (function) key.name.substringAfter('/').substringBeforeLast('.') else key.name, stored)
                     // the symbol the engine's cap draws where 标点位置 puts it (its alt), as the keyboard's key
                     val hint = (symbol as? KeyCaps.Mark.Text)?.text.orEmpty()
                     // the engine draws a function key's very face (space blank, the comma a ,): its name beside it, so
-                    // the page says which key it is (the views' caps carry the name on their face)
+                    // the page says which key it is
                     val caption = captionWidth > 0
                     if (caption) add(KeyCaps.label(ctx, label, CAPTION_SP).apply {
                         gravity = Gravity.CENTER_VERTICAL or Gravity.START
                         maxLines = 1
                         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                     }, lParams(captionWidth, ctx.dp(KeyHeight)))
-                    add(KeyCaps.key(ctx, label, hint, marked = names.any(stored::isSet), dimmed = false, marks = marks, said = said, shortcut = shortcut).apply {
+                    add(KeyCaps.key(ctx, label, hint, marked = names.any(stored::isSet), dimmed = false, said = said, shortcut = shortcut).apply {
                         setOnClickListener { editShortcuts(label, names) }
                     }, if (caption) lParams(0, ctx.dp(KeyHeight)) { weight = 1f } else if (function) lParams(matchParent, ctx.dp(KeyHeight)) else keyParams(ctx, weight = 1f))
                 }
@@ -208,16 +184,6 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             KeyShortcutPreset.NUMBER -> List(n) { null }
             else -> List(n) { KeyCaps.Mark.Unshown }
         }
-    }
-
-    // a function key's up and down ([names]), each where it is drawn while that way is on
-    private fun functionMarks(names: List<String>): KeyMarks.Placed<KeyCaps.Mark> {
-        val (up, down) = names.map(::markOf)
-        val l = layers.layers
-        val spots = markSpots()
-        return KeyMarks.placeFunction(
-            up, down, l.up != SwipeLayers.Layer.Off, l.down != SwipeLayers.Layer.Off, spots.symbol, spots.shortcut, landscape, keyboardCompact(),
-        )
     }
 
     /** [names]' shortcuts (one, or a function key's up and down) edited, under [label]. */
@@ -312,8 +278,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         val name = shortcutName(label)
         val marked = custom != null || name?.let(shortcuts::isSet) == true
         val symbol = shown.firstOrNull()
-        val marks = charMarks(symbol?.let(KeyCaps.Mark::Text), name)
-        return KeyCaps.key(ctx, label, symbol.orEmpty(), marked = marked, dimmed = shown.isEmpty(), state = state, marks = marks, said = name?.let(::said), shortcut = name?.let { KeyCaps.Shortcut(it, shortcuts) }).apply {
+        return KeyCaps.key(ctx, label, symbol.orEmpty(), marked = marked, dimmed = shown.isEmpty(), state = state, said = name?.let(::said), shortcut = name?.let { KeyCaps.Shortcut(it, shortcuts) }).apply {
             setOnClickListener { edit(label) }
         }
     }

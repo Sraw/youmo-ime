@@ -11,7 +11,6 @@ import android.widget.ScrollView
 import androidx.constraintlayout.widget.ConstraintLayout
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.EngineState
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
@@ -46,16 +45,15 @@ class T9ColumnFitTest {
     @Test
     fun theLongestSyllablesFitTheNarrowestColumnAtFontScale20() = fits(2.0f)
 
-    // the canvas on: the column in the scene's slot `side` (placed on each scene made, T9Keyboard.onSceneBuilt)
+    // the column moved off, then put back in the scene's slot `side` (placed on each scene made, T9Keyboard.onSceneBuilt)
     @Test
-    fun theLongestSyllablesFitTheNarrowestColumnInItsSlot() = fits(2.0f, canvas = true)
+    fun theLongestSyllablesFitTheNarrowestColumnInItsSlot() = fits(2.0f, moved = true)
 
     @get:Rule
     val prefs = PrefsRule()
 
-    private fun fits(scale: Float, canvas: Boolean = false) {
+    private fun fits(scale: Float, moved: Boolean = false) {
         RuntimeEnvironment.setFontScale(scale)
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, canvas)
         val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark)
         val longest = listOf("shuang", "zhuang", "chuang", "shuan")
         keyboard.show(EngineState.T9State(composing = true, syllables = longest, id = 1))
@@ -65,8 +63,15 @@ class T9ColumnFitTest {
         val h = (HEIGHT_DP * density).toInt()
         keyboard.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
         keyboard.layout(0, 0, w, h)
-        if (canvas) {
-            // the column put elsewhere (the views' cell is where the slot is), then a scene made anew (the keyboard
+        if (!moved) {
+            // the column has no place till a scene is made (T9Keyboard.onSceneBuilt), then laid out there
+            KeyboardHarness.all(keyboard).filterIsInstance<KeyboardCanvasView>().single().scene
+            shadowOf(Looper.getMainLooper()).idle()
+            keyboard.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
+            keyboard.layout(0, 0, w, h)
+        }
+        if (moved) {
+            // the column put elsewhere, then a scene made anew (the keyboard
             // laid out again, as it is drawn): the column placed in its slot after, then laid out there
             val view = KeyboardHarness.all(keyboard).filterIsInstance<KeyboardCanvasView>().single()
             view.scene

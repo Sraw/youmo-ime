@@ -8,7 +8,6 @@ import android.graphics.Rect
 import android.util.Log
 import android.view.ContextThemeWrapper
 import android.view.View
-import android.view.ViewGroup
 import android.widget.FrameLayout
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.theme.Theme
@@ -17,9 +16,10 @@ import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.scene.KeyRef
+import org.fcitx.fcitx5.android.scene.engine.Popups
+import org.mechdancer.dependency.plusAssign
 import org.junit.Assert.assertEquals
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Scene
@@ -38,7 +38,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mechdancer.dependency.DynamicScope
 import org.mechdancer.dependency.manager.wrapToUniqueComponent
-import org.mechdancer.dependency.plusAssign
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
@@ -58,9 +57,6 @@ class PopupComponentTest {
     val prefs = PrefsRule()
 
     private val popup = PopupComponent()
-
-    // read by the popups as they first show one (the input view made again as it changes)
-    private fun canvas(on: Boolean = true) = prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, on)
 
     // in a root 150 px across (1 dp = 1 px): a long press of five has keys 30 wide
     private val key = Rect(55, 500, 95, 550)
@@ -104,10 +100,10 @@ class PopupComponentTest {
         layOut()
         // the bubble gone, the keys alone
         assertEquals(1, popup.root.childCount)
-        val keys = popup.root.getChildAt(0)
-        assertTrue("${keys.width}", keys.width / five.items.size <= PopupComponent.LONG_PRESS_KEY_WIDTH)
-        // over the key, clear of it
-        assertEquals(wide.top - PopupComponent.LONG_PRESS_LIFT, keys.bottom)
+        val keys = popup.root.getChildAt(0) as PopupSceneView
+        assertTrue("${keys.sceneWidth}", keys.sceneWidth / five.items.size <= Popups.KEY_MIN_WIDTH_DP)
+        // over the key, clear of it (the shadow's room under it)
+        assertEquals(wide.top - Popups.LIFT_DP.toInt(), keys.bottom - keys.outset.bottom)
         // the preview's updates, back on the key and swiped, bring no bubble back
         send(PopupAction.PreviewUpdateAction(ID, "q"))
         send(PopupAction.PreviewUpdateAction(ID, "1"))
@@ -133,35 +129,25 @@ class PopupComponentTest {
         assertTrue("wider for a text wider than the key", bubble.layoutParams.width > key.width())
     }
 
-    // 060-render-p2 S2: a key the canvas draws (no view) has its popups as the engine's scenes, in a
-    // view as large as the scene and its shadow's room, that room round where the views' popup is
+    // 060-render-p2 S2: a key's popups are the engine's scenes, in a view as large as the scene and
+    // its shadow's room, that room round the bubble (compared with the views' till S8a deleted them)
     @Test
-    fun aKeyTheCanvasDrawsHasItsBubbleAsASceneWhereTheViewsWouldBe() {
-        canvas()
-        send(PopupAction.PreviewAction(ID, "q", key))
-        val (width, left, top) = placedAt()
-        popup.dismissAll()
+    fun aKeysBubbleIsASceneWithRoomForItsShadow() {
         send(PopupAction.PreviewAction(SCENE, "q", key))
         val scene = bubble as PopupSceneView
         val out = scene.outset
         assertTrue("room for the shadow: $out", out.bottom > 0)
         val lp = scene.layoutParams as FrameLayout.LayoutParams
-        // 1 dp = 1 px here: the engine's sizes are the views'
-        assertEquals(listOf(width, left, top), listOf(lp.width - out.left - out.right, lp.leftMargin + out.left, lp.topMargin + out.top))
+        // as wide as the key, over it
+        assertEquals(key.width(), lp.width - out.left - out.right)
+        assertEquals(key.left, lp.leftMargin + out.left)
+        assertTrue("${lp.topMargin + out.top}", lp.topMargin + out.top < key.top)
         assertEquals(scene.sceneHeight + out.top + out.bottom, lp.height)
         assertEquals("q", scene.scene!!.keys.single().label)
-        // a view's key next: a view's bubble, not the scene's put away
-        popup.dismissAll()
-        send(PopupAction.PreviewAction(ID, "q", key))
-        assertFalse(bubble is PopupSceneView)
-        popup.dismissAll()
-        send(PopupAction.PreviewAction(SCENE, "w", key))
-        assertTrue(bubble is PopupSceneView)
     }
 
     @Test
     fun aSceneBubbleShowsTheUpdatedTextAndIsWiderForWords() {
-        canvas()
         send(PopupAction.PreviewAction(SCENE, "q", key))
         val scene = bubble as PopupSceneView
         send(PopupAction.PreviewUpdateAction(SCENE, "1"))
@@ -174,49 +160,21 @@ class PopupComponentTest {
 
     @Test
     fun aSceneKeysLongPressIsTheEnginesSceneOverTheKey() {
-        canvas()
         send(PopupAction.ShowKeyboardAction(SCENE, five, key))
         layOut()
         val keys = popup.root.getChildAt(0) as PopupSceneView
         val out = keys.outset
         // the keys' bottom the lift over the key, its shadow below
-        assertEquals(key.top - PopupComponent.LONG_PRESS_LIFT, keys.bottom - out.bottom)
+        assertEquals(key.top - Popups.LIFT_DP.toInt(), keys.bottom - out.bottom)
         // the columns round the key pressed, as the views lay them out (PopupKeyboardUiTest)
         assertEquals(listOf("1", "2", "3", "4", "5"), keys.scene!!.keys.mapNotNull { it.label }.sorted())
         assertEquals(keys.sceneWidth + out.left + out.right, keys.width)
-    }
-
-    // the canvas off (the default): nothing of the engine's, whatever the key
-    @Test
-    fun withTheCanvasOffNoPopupIsAScene() {
-        canvas(false)
-        for (key in listOf(NO_ID, SCENE)) {
-            send(PopupAction.PreviewAction(key, "q", this.key))
-            assertFalse("$key", bubble is PopupSceneView)
-            popup.dismissAll()
-            send(PopupAction.ShowKeyboardAction(key, five, this.key))
-            assertFalse("$key", popup.root.getChildAt(0) is PopupSceneView)
-            popup.dismissAll()
-        }
-    }
-
-    // a view of no id (a symbol's or an emoji's in their panels: PickerGridAdapter) is a view's key,
-    // its viewId NO_VIEW as a scene key's is: its popups are views under the canvas too
-    @Test
-    fun aViewOfNoIdKeepsTheViewsPopupsUnderTheCanvas() {
-        canvas()
-        send(PopupAction.PreviewAction(NO_ID, "，", key))
-        assertFalse(bubble is PopupSceneView)
-        popup.dismissAll()
-        send(PopupAction.ShowKeyboardAction(NO_ID, five, key))
-        assertFalse(popup.root.getChildAt(0) is PopupSceneView)
     }
 
     // what the engine cannot make (logged) is no popup this time, never one not drawn that a lift
     // still types: the long press as one with no popup, the bubble none
     @Test
     fun aPopupTheEngineCannotMakeIsNoneAndALiftTypesNothing() {
-        canvas()
         val logged = mutableListOf<String>()
         val tree = object : Timber.Tree() {
             override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
@@ -245,7 +203,6 @@ class PopupComponentTest {
     // a lift types the new one
     @Test
     fun aShownBubbleTheEngineCannotUpdateGoes() {
-        canvas()
         // a character measured, anything longer not
         popup.measuring = { real -> TextMeasurer { t, f, w, size -> if (t.length > 1) error("no font") else real.measure(t, f, w, size) } }
         send(PopupAction.PreviewAction(SCENE, "q", key))
@@ -261,7 +218,6 @@ class PopupComponentTest {
     // a focus moved that changes the shadow's room keeps the keys' box where it was, the view moved round it
     @Test
     fun aLongPressWhoseShadowGrowsStaysWhereItIs() {
-        canvas()
         send(PopupAction.ShowKeyboardAction(SCENE, five, key))
         layOut()
         val view = popup.root.getChildAt(0) as PopupSceneView
@@ -279,7 +235,6 @@ class PopupComponentTest {
     // so a lift types the key drawn selected
     @Test
     fun aFocusTheEngineCannotDrawStaysWhereItWas() {
-        canvas()
         var broken = false
         popup.measuring = { real -> TextMeasurer { t, f, w, size -> if (broken) error("no font") else real.measure(t, f, w, size) } }
         fun lifted(key: KeyRef, moved: Boolean): KeyAction? {
@@ -306,7 +261,6 @@ class PopupComponentTest {
 
     private companion object {
         val ID = KeyRef.view(1)
-        val NO_ID = KeyRef.view(View.NO_ID)
         val SCENE = KeyRef.scene("q", 0)
         val menu = KeyDef.Popup.Menu(arrayOf(KeyDef.Popup.Menu.Item("Emoji", 0, KeyAction.CommitAction("x"))))
     }
@@ -344,7 +298,8 @@ class PopupComponentTest {
             send(PopupAction.ShowKeyboardAction(KeyRef.view(++id), keyboard, key))
             layOut()
             // the long press's keys, added last: a row a child
-            val rows = (popup.root.getChildAt(popup.root.childCount - 1) as ViewGroup).childCount
+            val keys = popup.root.getChildAt(popup.root.childCount - 1) as PopupSceneView
+            val rows = keys.scene!!.keys.map { it.bounds.top }.distinct().size
             return PopupAction.TriggerAction(KeyRef.view(id)).also { send(it) }.outAction to rows
         }
         assertEquals(KeyAction.CommitAction(".") to 1, shown(KeyDef.Popup.Keyboard.Explicit(arrayOf(".", "-"), asIs = true)))

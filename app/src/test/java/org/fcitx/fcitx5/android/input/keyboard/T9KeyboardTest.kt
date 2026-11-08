@@ -26,7 +26,8 @@ import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
-import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.SceneShownKey
+import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupKeyboardUi
@@ -212,6 +213,20 @@ class T9KeyboardTest {
         }
     }
 
+    // a touch down and up in [key]'s middle, sent to its keyboard (whose touches go to the scene's keys)
+    private fun tap(key: ShownKey) {
+        key as SceneShownKey
+        val keyboard = key.canvas.parent as View
+        val x = key.canvas.left + key.bounds.exactCenterX()
+        val y = key.canvas.top + key.bounds.exactCenterY()
+        for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
+            MotionEvent.obtain(0L, 0L, action, x, y, 0).also {
+                keyboard.dispatchTouchEvent(it)
+                it.recycle()
+            }
+        }
+    }
+
     // under the app, whose preferences the keys read, with placeholder strings, as NumberKeyboardTest
     @Test
     @Config(application = FcitxApplication::class)
@@ -271,20 +286,17 @@ class T9KeyboardTest {
         }
     }
 
-    /** The key of [digit], as drawn in its corner. */
-    private fun T9Keyboard.key(digit: Char): AltTextKeyView =
-        (0 until childCount).map { getChildAt(it) }.filterIsInstance<ViewGroup>()
-            .flatMap { row -> (0 until row.childCount).map { row.getChildAt(it) } }
-            .filterIsInstance<AltTextKeyView>()
-            .single { (it.def as KeyDef.Appearance.AltText).altText == digit.toString() }
+    /** The key of [digit], as the scene draws it (laid out the first time). */
+    private fun T9Keyboard.key(digit: Char): ShownKey =
+        apply { if (width == 0) laidOut() }.shownKeys().single { it.id == digit.toString() }
 
     @Test
     @Config(application = FcitxApplication::class)
     fun oneRightAfterADigitIsTheSeparatorBeforeTheEngineTells() {
         val sent = ArrayList<KeyAction>()
         val keyboard = keyboard(sent)
-        keyboard.key('2').performClick()
-        keyboard.key('1').performClick()
+        keyboard.key('2').click()
+        keyboard.key('1').click()
         assertEquals(listOf(coded('2'), coded('1')), sent)
     }
 
@@ -293,11 +305,11 @@ class T9KeyboardTest {
     fun aDigitAfterWhatWasTypedWentIsAKeyOfItsOwn() {
         val sent = ArrayList<KeyAction>()
         val keyboard = keyboard(sent)
-        keyboard.key('4').performClick()
+        keyboard.key('4').click()
         keyboard.show(EngineState.T9State(composing = true, syllables = listOf("g", "h", "i"), id = 1))
         // a candidate picked on the bar: nothing typed
         keyboard.show(EngineState.T9State())
-        keyboard.key('4').performClick()
+        keyboard.key('4').click()
         assertEquals(listOf(coded('4'), coded('4')), sent)
     }
 
@@ -306,10 +318,10 @@ class T9KeyboardTest {
     fun onesPunctuationCyclesThroughTheEnginesOwnReset() {
         val sent = ArrayList<KeyAction>()
         val keyboard = keyboard(sent)
-        keyboard.key('1').performClick()
+        keyboard.key('1').click()
         // the punctuation resets the engine, which tells of nothing typed again
         keyboard.show(EngineState.T9State())
-        keyboard.key('1').performClick()
+        keyboard.key('1').click()
         assertEquals(listOf(KeyAction.CommitAction("，"), KeyAction.CommitAction("。", replacing = "，")), sent)
     }
 
@@ -319,9 +331,9 @@ class T9KeyboardTest {
     fun oneAfterTheCursorMovedIsASymbolOfItsOwn() {
         val sent = ArrayList<KeyAction>()
         val keyboard = keyboard(sent)
-        keyboard.key('1').performClick()
+        keyboard.key('1').click()
         keyboard.cursorMoved()
-        keyboard.key('1').performClick()
+        keyboard.key('1').click()
         assertEquals(listOf(KeyAction.CommitAction("，"), KeyAction.CommitAction("，")), sent)
     }
 
@@ -331,8 +343,8 @@ class T9KeyboardTest {
     fun oneAfterAKeyWithNoLettersIsPunctuation() {
         val sent = ArrayList<KeyAction>()
         val keyboard = keyboard(sent, letters = NineKeyLetters.of(listOf("abc", "")))
-        keyboard.key('3').performClick()
-        keyboard.key('1').performClick()
+        keyboard.key('3').click()
+        keyboard.key('1').click()
         assertEquals(listOf(KeyAction.HostKeyAction("3"), KeyAction.CommitAction("，")), sent)
     }
 
@@ -356,8 +368,8 @@ class T9KeyboardTest {
         val sent = ArrayList<KeyAction>()
         val previews = ArrayList<PopupAction>()
         val keyboard = keyboard(sent, previews, multiTap = T9MultiTap.Off)
-        keyboard.key('1').performClick()
-        keyboard.key('1').performClick()
+        keyboard.key('1').click()
+        keyboard.key('1').click()
         tap(keyboard.key('4'))
         tap(keyboard.key('4'))
         val four = coded('4')
@@ -463,21 +475,21 @@ class T9KeyboardTest {
             setViewTreeLifecycleOwner(Owner())
             keyActionListener = KeyActionListener { action, _ -> sent += action }
         }
-        keyboard.findViewById<View>(R.id.button_caps).performClick()
-        keyboard.key('4').performClick()
-        keyboard.key('4').performClick()
+        keyboard.laidOut().shownKeyWithId(R.id.button_caps)!!.click()
+        keyboard.key('4').click()
+        keyboard.key('4').click()
         assertEquals(listOf(nineKey('4', upper = true), nineKey('4')), sent.filterIsInstance<KeyAction.SymAction>())
         // never glides, whatever 滑行输入 says
         val glide = BaseKeyboard::class.java.getDeclaredMethod("getGlide").apply { isAccessible = true }
         assertEquals(null, glide.invoke(keyboard))
         sent.clear()
         keyboard.inPasswordField = true
-        keyboard.key('4').performClick()
+        keyboard.key('4').click()
         assertEquals(listOf(KeyAction.CommitAction("g")), sent)
         // Shift ends the run: 4 again soon is a capital G of its own, not h in g's place
         sent.clear()
-        keyboard.findViewById<View>(R.id.button_caps).performClick()
-        keyboard.key('4').performClick()
+        keyboard.laidOut().shownKeyWithId(R.id.button_caps)!!.click()
+        keyboard.key('4').click()
         assertEquals(listOf(KeyAction.CommitAction("G")), sent.filterIsInstance<KeyAction.CommitAction>())
         // 1's long press: English's marks, none full width
         val one = T9Keyboard.layout(NineKeyLetters.STANDARD, english = true).flatten()
@@ -523,15 +535,15 @@ class T9KeyboardTest {
     fun neitherHasALanguageKeyAndBothTheGlobeEvenInAnAddressField() {
         val app = RuntimeEnvironment.getApplication()
         for (english in listOf(false, true)) {
-            val keyboard = T9Keyboard(PlaceholderStrings(app), ThemePreset.PixelDark, english = english)
-            val labels = KeyboardHarness.all(keyboard).filterIsInstance<TextKeyView>().map { it.mainText.text.toString() }.toList()
+            val keyboard = T9Keyboard(PlaceholderStrings(app), ThemePreset.PixelDark, english = english).laidOut()
+            val labels = keyboard.shownKeys().map { it.label }
             assertFalse(labels.toString(), labels.any { "英" in it || "中" in it })
-            val globe = keyboard.findViewById<View>(R.id.button_lang)
-            assertTrue(globe.isVisible)
+            fun globe() = keyboard.laidOut().shownKeyWithId(R.id.button_lang) != null
+            assertTrue(globe())
             keyboard.address = AddressKeys.EMAIL
-            assertTrue(globe.isVisible)
+            assertTrue(globe())
             keyboard.address = AddressKeys.NONE
-            assertTrue(globe.isVisible)
+            assertTrue(globe())
         }
     }
 

@@ -51,10 +51,10 @@ import splitties.views.dsl.core.add
  * the categories at the side, the one picked beside them, and a lock in the row of keys.
  */
 @SuppressLint("ViewConstructor")
-class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef, density: PickerGridView.Density, panel: Boolean, searchKey: KeyDef? = null) :
+class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef, density: PickerGridView.Density, private val panel: Boolean, searchKey: KeyDef? = null) :
     ConstraintLayout(context) {
 
-    class Keyboard(context: Context, theme: Theme, keys: List<KeyDef>, board: String? = null, sceneLayout: String? = null) :
+    class Keyboard(context: Context, theme: Theme, keys: List<KeyDef>, board: String, sceneLayout: String) :
         BaseKeyboard(context, theme, listOf(keys), themeBoard = board) {
 
         class PunctuationKey(val symbol: String) : KeyDef(
@@ -77,24 +77,14 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
         fun showLocked(locked: Boolean) {
             this.locked = locked
             canvas?.invalidateScene()
-            // the symbol panel's lock, none in the emoji's; what a tap does said
-            showImageView(
-                R.id.button_panel_lock,
-                if (locked) R.drawable.ic_baseline_lock_24 else R.drawable.ic_baseline_lock_open_24,
-                context.getString(if (locked) R.string.picker_unlock else R.string.picker_lock),
-            )
         }
 
         override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
             returnAppearance = appearance
-            showReturnView(appearance)
             canvas?.invalidateScene()
         }
 
-        /** Whether the scene draws the keys (symbols.xml, 060-render-p2 S5c): the panel's views then go in its slots ([slot]). */
-        val drawnByScene: Boolean get() = canvas != null
-
-        /** Slot [id]'s cell in this keyboard's parent, into [out], as the scene has it; false while the views draw the keys. */
+        /** Slot [id]'s cell in this keyboard's parent, into [out], as the scene has it (symbols.xml, 060-render-p2 S5c); false with no scene. */
         fun slot(id: String, out: Rect): Boolean {
             val c = canvas ?: return false
             if (!c.slot(id, out)) return false
@@ -124,9 +114,8 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
         // last: the scene reads the keyboard's state
         init {
             // the canvas at another size (one-handed, split, another height): the panel's views to the slots of the scene at that size
-            if (sceneLayout != null && drawKeysWithScene(sceneLayout)) {
-                canvas?.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> post { (parent as? View)?.requestLayout() } }
-            }
+            drawKeysWithScene(sceneLayout)
+            canvas?.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> post { (parent as? View)?.requestLayout() } }
         }
 
         private companion object {
@@ -139,9 +128,13 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
     val embeddedKeyboard = Keyboard(
         context, theme, if (panel) panelKeys(context, switchKey) else listKeys(switchKey, searchKey),
         if (panel) KeyNames.SYMBOLS else KeyNames.EMOJI,
-        // the symbol panel drawn by the scene where the canvas is on: its keys, the categories' and the grid's slots
-        // (the emoji's row is S6's)
-        if (panel) KeyNames.SYMBOLS else null,
+        // the symbol panel's keys, the categories' and the grid's slots; the emoji's row, with its search or not
+        // (the emoticons', S8a)
+        when {
+            panel -> "symbols"
+            searchKey != null -> "emoji"
+            else -> "emoticon"
+        },
     )
 
     val grid = PickerGridView(context, theme, density)
@@ -157,7 +150,7 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
         private set
 
     init {
-        if (embeddedKeyboard.drawnByScene) {
+        if (panel) {
             // the scene's board is the whole panel (symbols.xml): the keyboard under it all, the categories
             // and the grid over it, each in its slot (onLayout)
             add(embeddedKeyboard, lParams(matchConstraints, matchConstraints) { centerInParent() })
@@ -173,7 +166,7 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
     // the categories and the grid in the scene's slots, not where the constraints put them
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
-        if (!embeddedKeyboard.drawnByScene) return
+        if (!panel) return
         side?.let { if (embeddedKeyboard.slot(CATEGORIES_SLOT, slotCell)) it.layoutIn(slotCell) }
         if (embeddedKeyboard.slot(GRID_SLOT, slotCell)) grid.layoutIn(slotCell)
     }

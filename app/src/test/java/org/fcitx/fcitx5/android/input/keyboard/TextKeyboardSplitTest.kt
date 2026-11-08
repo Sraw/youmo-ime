@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import androidx.core.view.allViews
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
@@ -22,8 +21,10 @@ import org.robolectric.annotation.Config
 @Config(application = FcitxApplication::class)
 class TextKeyboardSplitTest {
 
-    private fun letters() = TextKeyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark)
-        .allViews.filterIsInstance<AltTextKeyView>().joinToString("") { it.mainText.text }.lowercase()
+    // the scene's letters in its order, row by row
+    private fun letters() = TextKeyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark).laidOut()
+        .shownKeys().filter { it.id!!.length == 1 && it.id!![0] in 'a'..'z' }.sortedWith(compareBy({ it.bounds.top }, { it.bounds.left }))
+        .joinToString("") { it.label }.lowercase()
 
     @After
     fun auto() = ThemeManager.prefs.splitKeyboard.setValue(SplitKeyboardMode.Auto)

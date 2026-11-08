@@ -18,7 +18,6 @@ import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.floating.FloatingHandleSide
-import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.fcitx.fcitx5.android.input.learning.UndoChip
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.junit.After
@@ -202,8 +201,7 @@ class FloatingUatTest {
     fun thePreviewsLettersAsLargeWhileFloating() {
         fun size(): Float = SettingsHarness().use { st ->
             st.open(SettingsRoute.Theme)
-            KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextKeyView>()
-                .first { it.mainText.text.toString() == "q" }.mainText.textSize
+            KeyboardHarness.keysOf(st.activity.window.decorView).first { it.label == "q" }.textSize("q")!!
         }
         h.close()
         prefs.set(floating, true)

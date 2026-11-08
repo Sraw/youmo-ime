@@ -10,7 +10,6 @@ import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
@@ -131,7 +130,6 @@ class SceneKeyDefTest {
     // a key's preview="on" on a board of preview="off": no bubble, the board's word the last (060-render-p2 S4d M1)
     @Test
     fun aKeysPreviewOnGivesWayToItsBoardsOff() {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         val keyboard = ZhuyinKeyboard(context, ThemePreset.PixelLight, nine = true).laidOut()
         val canvas = KeyboardHarness.all(keyboard).filterIsInstance<KeyboardCanvasView>().single()
         // ?: a function key with preview="on"
@@ -143,7 +141,6 @@ class SceneKeyDefTest {
 
     // the 14 keys' nodes, from the canvas a GroupedKeyboard draws with the switch on
     private fun nodes(): Map<String, KeyNode> {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         val keyboard = GroupedKeyboard(context, ThemePreset.PixelLight).laidOut()
         val canvas = KeyboardHarness.all(keyboard).filterIsInstance<KeyboardCanvasView>().single()
         return canvas.scene!!.keys.associateBy { it.id }
@@ -262,7 +259,6 @@ class SceneKeyDefTest {
                 if (priority >= android.util.Log.WARN) logged += message
             }
         }
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         timber.log.Timber.plant(tree)
         try {
             sources(Counted("pack") { "<keyboard/>" }, Counted(BuiltInLayouts.KEY) { "<keyboard/>" }) {
@@ -279,7 +275,6 @@ class SceneKeyDefTest {
                     val canvas = KeyboardHarness.all(k).filterIsInstance<KeyboardCanvasView>().single()
                     assertEquals(View.VISIBLE, canvas.visibility)
                     assertTrue(KeyboardHarness.keysOf(k).isEmpty())
-                    assertTrue(KeyboardHarness.all(k).filterIsInstance<KeyView>().none { it.isShown })
                 }
                 // each layout's two readings, logged once a process (the canvas's own "no scene" a keyboard aside);
                 // no theme blamed, no built-in theme tried for it
@@ -289,17 +284,5 @@ class SceneKeyDefTest {
         } finally {
             timber.log.Timber.uproot(tree)
         }
-    }
-
-    // a keyboard not moved yet (the app has no layout of its id): its views draw, the canvas on or not
-    @Test
-    fun aKeyboardNotMovedIsDrawnByItsViews() {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
-        val unmoved = object : BaseKeyboard(context, ThemePreset.PixelLight, emptyList()) {
-            val scene = drawKeysWithScene("not-moved")
-            val moved = drawKeysWithScene("qwerty")
-        }.laidOut()
-        assertEquals(false, unmoved.scene)
-        assertEquals(true, unmoved.moved)
     }
 }

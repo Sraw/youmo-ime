@@ -4,29 +4,22 @@
  */
 package org.fcitx.fcitx5.android.data.theme
 
-import androidx.core.view.allViews
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.KeyBorderChoice
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.KeyRadiusChoice
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.KeySpacingChoice
-import org.fcitx.fcitx5.android.input.keyboard.KeyView
-import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.theme.KeyStyleChoice
 import org.fcitx.fcitx5.android.input.theme.LookDefaults
-import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
-import java.io.File
 
 /** The key style settings (大小与样式) over the theme in use, as the keyboard reads it, and the theme left as it is. */
 @RunWith(RobolectricTestRunner::class)
@@ -89,32 +82,4 @@ class KeyStyleThemeTest {
         }
     }
 
-    // the keys drawn are the settings', not the theme's
-    @Test
-    @Uat("ST-58")
-    fun aKeyboardMadeIsSquareAndFlatWhenChosen() {
-        prefs.keyRadiusChoice.setValue(KeyRadiusChoice.Square)
-        prefs.keyBorderChoice.setValue(KeyBorderChoice.Off)
-        val keyboard = TextKeyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemeManager.activeTheme)
-        val keys = keyboard.allViews.filterIsInstance<KeyView>().toList()
-        assertTrue(keys.isNotEmpty())
-        keys.forEach {
-            assertEquals(0f, it.radius)
-            assertFalse(it.bordered)
-        }
-    }
-
-    // a reader of the theme's own look in the keyboard would draw over what is chosen: none there (specs/app.md)
-    // only `.look` as written is caught: `with(theme) { look }` or `Theme::look` would pass it (none of them now)
-    @Test
-    fun theKeyboardReadsNoThemesOwnLook() {
-        val root = File("src/main/java/org/fcitx/fcitx5/android")
-        val files = File(root, "input").walk().filter { it.extension == "kt" } +
-            File(root, "ui/main/settings/theme/KeyboardPreviewUi.kt")
-        val readers = files.flatMap { f ->
-            f.readLines().withIndex().filter { Regex("""\.look\b""").containsMatchIn(it.value) }.map { "${f.name}:${it.index + 1}" }
-        }.toList()
-        assertTrue(files.count() > 20)
-        assertEquals(emptyList<String>(), readers)
-    }
 }

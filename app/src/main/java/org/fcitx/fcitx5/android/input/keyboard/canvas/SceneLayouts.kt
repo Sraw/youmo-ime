@@ -33,9 +33,8 @@ interface LayoutSource {
 
 /**
  * The layouts the app has: lib/keyboard-scene's commonMain/layouts, copied by the build as raw
- * resources (copySceneLayouts, a `-` made `_`), so Robolectric reads them too. A keyboard whose
- * layout is here is drawn by the scene where the canvas is on; one moved there (060-render-p2 S4,
- * S5) adds its line.
+ * resources (copySceneLayouts, a `-` made `_`), so Robolectric reads them too: each board's, which
+ * the scene draws; a new one adds its line.
  */
 class BuiltInLayouts(private val context: Context) : LayoutSource {
     override fun text(id: String): String? =
@@ -61,6 +60,8 @@ class BuiltInLayouts(private val context: Context) : LayoutSource {
             "nine" to R.raw.scene_layout_nine,
             "handwriting" to R.raw.scene_layout_handwriting,
             "symbols" to R.raw.scene_layout_symbols,
+            "emoji" to R.raw.scene_layout_emoji,
+            "emoticon" to R.raw.scene_layout_emoticon,
             "emoji-search" to R.raw.scene_layout_emoji_search,
             "expanded-side" to R.raw.scene_layout_expanded_side,
             "number-row" to R.raw.scene_layout_number_row,

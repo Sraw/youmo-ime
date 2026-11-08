@@ -54,18 +54,17 @@ class NineSceneGesturesTest {
 
     private class Variant(val im: InputMethodEntry, val keyboards: ImKeyboards.Chosen, val scheme: ShuangpinScheme = ShuangpinScheme.XIAOHE)
 
-    private fun harness(canvas: Boolean, v: Variant): KeyboardHarness {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, canvas)
+    private fun harness(v: Variant): KeyboardHarness {
         EngineState.shuangpinScheme = v.scheme
         return KeyboardHarness(ThemePreset.PixelLight, v.im, keyboards = v.keyboards).start().also { h ->
             h.relayout()
-            assertEquals(canvas, KeyboardHarness.all(h.keyboard).any { it is KeyboardCanvasView && it.visibility == View.VISIBLE })
+            assertTrue(KeyboardHarness.all(h.keyboard).any { it is KeyboardCanvasView && it.visibility == View.VISIBLE })
             assertTrue(KeyboardHarness.all(h.keyboard).any { it is T9Keyboard })
         }
     }
 
     // what a finger does on each digit key and the right column's, in [v], typing or not
-    private fun gestures(canvas: Boolean, v: Variant, composing: Boolean = false): List<String> = harness(canvas, v).use { h ->
+    private fun gestures(v: Variant, composing: Boolean = false): List<String> = harness(v).use { h ->
         if (composing) {
             EngineState.syllablesState.value = EngineState.SyllableState(v.im.uniqueName, true, listOf("shuang", "zhuang"), 1)
             h.idle()
@@ -76,7 +75,7 @@ class NineSceneGesturesTest {
                 " field ${h.field.text}"
             h.api.calls.clear()
         }
-        // the keys (the views' column spacers, under the column, no keys of the scene's)
+        // the keys
         out += "faces: " + h.keys().filter { it.id != null && it.id != "side" }.map { "${it.id}=${it.label}/${it.alt}" }
         for (digit in "123456789") {
             val k = { h.nineKey("$digit") }
@@ -101,42 +100,35 @@ class NineSceneGesturesTest {
         out
     }
 
-    private fun assertSame(v: Variant, composing: Boolean = false): List<String> {
-        val views = gestures(false, v, composing)
-        val scene = gestures(true, v, composing)
-        assertEquals(views.joinToString("\n"), scene.joinToString("\n"))
-        return scene
-    }
-
     @Test
     fun pinyinsEveryKeyAsItsView() {
-        val scene = assertSame(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS))
-        // what was compared is what the keys do: 5's bubble its letters, its long press its letters and digit
+        val scene = gestures(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS))
+        // what the keys do: 5's bubble its letters, its long press its letters and digit
         assertTrue(scene.joinToString("\n"), "5 pressed: [JKL]" in scene)
         assertTrue(scene.joinToString("\n"), scene.any { it.startsWith("5 long press: [") && "J" in it && "5" in it && "l" in it })
     }
 
     @Test
     fun pinyinsOneIsTheSeparatorWhileTyping() {
-        val scene = assertSame(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS), composing = true)
+        val scene = gestures(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS), composing = true)
         assertTrue(scene.first(), "1=分词/1" in scene.first())
     }
 
     @Test
     fun englishsEveryKeyAsItsView() {
-        val scene = assertSame(Variant(KeyboardHarness.ENGLISH, ImKeyboards.Chosen(english = ImKeyboard.NINE_KEYS)))
+        val scene = gestures(Variant(KeyboardHarness.ENGLISH, ImKeyboards.Chosen(english = ImKeyboard.NINE_KEYS)))
         assertTrue(scene.first(), "5=jkl/5" in scene.first() || "5=JKL/5" in scene.first())
     }
 
     @Test
     fun shuangpinsEveryKeyAsItsView() {
-        val scene = assertSame(Variant(SHUANGPIN, ImKeyboards.Chosen(shuangpin = ImKeyboard.NINE_KEYS), ShuangpinScheme.MICROSOFT))
+        val scene = gestures(Variant(SHUANGPIN, ImKeyboards.Chosen(shuangpin = ImKeyboard.NINE_KEYS), ShuangpinScheme.MICROSOFT))
         assertTrue(scene.first(), "5=JKL;/5" in scene.first())
     }
 
     @Test
     fun shuangpinPlainsEveryKeyAsItsView() {
-        val scene = assertSame(Variant(SHUANGPIN, ImKeyboards.Chosen(shuangpin = ImKeyboard.NINE_KEYS)))
+        val scene = gestures(Variant(SHUANGPIN, ImKeyboards.Chosen(shuangpin = ImKeyboard.NINE_KEYS)))
         assertTrue(scene.first(), "5=JKL/5" in scene.first())
     }
 
@@ -144,16 +136,16 @@ class NineSceneGesturesTest {
     // comma (once the scene's built-in English ", " was read on the nine keys only)
     @Test
     @Config(qualifiers = "zh-rCN-" + KeyboardCanvasViewTest.PORTRAIT)
-    fun aDigitIsReadWithTheAppsSeparator() = harness(true, Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
+    fun aDigitIsReadWithTheAppsSeparator() = harness(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
         assertEquals("ABC，2", h.keys().single { it.id == "2" }.description)
     }
 
     // 连按 on: 5 pressed again soon previews its next letter (its preview found by the scene key's id as by its view's)
     @Test
     fun aDigitPressedAgainPreviewsItsNextLetter() {
-        fun bubbles(canvas: Boolean): List<String> {
+        fun bubbles(): List<String> {
             prefs.set(AppPrefs.getInstance().keyboard.t9MultiTap, T9MultiTap.Medium)
-            return harness(canvas, Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
+            return harness(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
                 h.tap(h.nineKey("5"))
                 h.press(h.nineKey("5"))
                 val shown = h.popupChoices().map { it.text }
@@ -161,29 +153,31 @@ class NineSceneGesturesTest {
                 shown
             }
         }
-        assertEquals(listOf("K"), bubbles(false))
-        assertEquals(listOf("K"), bubbles(true))
+        assertEquals(listOf("K"), bubbles())
     }
 
     // the language key as the setting says, shown again as it changes (as ZhuyinSceneGesturesTest's)
     @Test
     fun theLanguageKeyHiddenAndShownAgain() {
-        for (canvas in listOf(false, true)) harness(canvas, Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
+        harness(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
             val lang = AppPrefs.getInstance().keyboard.showLangSwitchKey
             prefs.set(lang, false)
             h.relayout()
-            assertTrue("canvas $canvas", h.keys().none { it.id == "lang" })
+            assertTrue(h.keys().none { it.id == "lang" })
             lang.setValue(true)
             h.relayout()
-            assertTrue("canvas $canvas", h.keys().any { it.id == "lang" })
+            assertTrue(h.keys().any { it.id == "lang" })
         }
     }
 
     // the column, a native view, in the scene's slot: its box the slot's cell, over the canvas
     @Test
-    fun theColumnSitsInTheScenesSlot() = harness(true, Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
+    fun theColumnSitsInTheScenesSlot() = harness(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
         val canvas = KeyboardHarness.boardCanvas(h.keyboard)!!
         val slot = canvas.scene!!.slots.single { it.id == "side" }.bounds
+        // placed after the scene was made (T9Keyboard.onSceneBuilt), then laid out there
+        h.idle()
+        h.relayout()
         val column = KeyboardHarness.all(h.keyboard).filterIsInstance<android.widget.ScrollView>().single()
         assertEquals(Math.round(slot.left).toInt(), column.left - canvas.left)
         assertEquals(Math.round(slot.top).toInt(), column.top - canvas.top)
@@ -195,7 +189,7 @@ class NineSceneGesturesTest {
 
     // Return's look told alone (nothing typed changes): the scene drawn anew, its key read as the field's action
     @Test
-    fun returnsLookAloneIsDrawn() = harness(true, Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
+    fun returnsLookAloneIsDrawn() = harness(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
         val t9 = KeyboardHarness.all(h.keyboard).filterIsInstance<T9Keyboard>().single()
         val search = ReturnKeyAppearance(R.drawable.ic_baseline_search_24, R.string.a11y_key_action_search)
         assertTrue(h.keys().single { it.id == "enter" }.description != search.label(h.keyboard.context))
@@ -206,7 +200,7 @@ class NineSceneGesturesTest {
 
     // typing told alone (Return's look as it was): 1 drawn anew as 分词, and back
     @Test
-    fun typingAloneRedrawsOne() = harness(true, Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
+    fun typingAloneRedrawsOne() = harness(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
         val t9 = KeyboardHarness.all(h.keyboard).filterIsInstance<T9Keyboard>().single()
         t9.show(EngineState.T9State(composing = true, syllables = listOf("a")))
         h.idle()
@@ -228,16 +222,9 @@ class NineSceneGesturesTest {
         assertGlidesOnTheScene("one-handed")
     }
 
-    // the views, laid out under the scene where it draws the same keys in every form above, moved off it: the
-    // glide still read where the scene draws the keys (the views are never where a glide is read)
-    @Test
-    fun aGlideIsReadOnTheSceneWhereverTheViewsAre() = assertGlidesOnTheScene("views moved") { h ->
-        KeyboardHarness.all(h.keyboard).filterIsInstance<KeyView>().forEach { it.offsetLeftAndRight(it.left / 3) }
-    }
-
     private fun assertGlidesOnTheScene(form: String, before: (KeyboardHarness) -> Unit = {}) {
         prefs.set(AppPrefs.getInstance().keyboard.glideTyping, true)
-        harness(true, Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
+        harness(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
             before(h)
             val keys = "2639".map { h.nineKey("$it") }
             val first = keys.first().bounds
@@ -262,7 +249,6 @@ class NineSceneGesturesTest {
     // board's) the one exception
     @Test
     fun eachKeyIsWiredAsItsViewWas() {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         val app = PlaceholderStrings(RuntimeEnvironment.getApplication())
         val letters = NineKeyLetters.STANDARD
         val variants = mapOf(
@@ -312,7 +298,6 @@ class NineSceneGesturesTest {
     // (ninePopup / onePopup, nine.xml's `popup from="nine"`) alike
     @Test
     fun aDigitKeysLongPressIsItsCapitalsDigitLettersAndSymbols() {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         val app = PlaceholderStrings(RuntimeEnvironment.getApplication())
         fun KeyDef.Popup?.said() = (this as KeyDef.Popup.Keyboard.Explicit).let { "${it.items.toList()} ${it.symbolsFrom} ${it.inRow} ${it.asIs}" }
         fun sceneOf(k: T9Keyboard, id: String): KeyDef.Popup.Keyboard.Explicit? {

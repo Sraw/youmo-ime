@@ -6,25 +6,12 @@ package org.fcitx.fcitx5.android.input.popup
 
 import android.content.Context
 import android.graphics.Rect
-import android.graphics.drawable.GradientDrawable
 import android.view.View
-import android.view.ViewOutlineProvider
 import android.widget.Space
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupScenes
 import org.fcitx.fcitx5.android.scene.engine.PopupKeys
-import splitties.dimensions.dp
-import splitties.views.dsl.core.Ui
-import splitties.views.dsl.core.add
-import splitties.views.dsl.core.frameLayout
-import splitties.views.dsl.core.horizontalLayout
-import splitties.views.dsl.core.lParams
-import splitties.views.dsl.core.matchParent
-import splitties.views.dsl.core.verticalLayout
-import splitties.views.dsl.core.view
-import splitties.views.gravityCenter
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
@@ -36,7 +23,6 @@ import kotlin.math.min
  * @param triggerBounds bound [Rect] of popup trigger view. Used to calculate free space of both sides and
  * determine column order. See [focusColumn] and [columnOrder].
  * @param onDismissSelf callback when popup keyboard wants to close
- * @param radius popup keyboard and key radius
  * @param minKeyWidth key width in popup keyboard, at least: see [keyWidth]
  * @param keyHeight key height in popup keyboard
  * @param lift how far above the trigger's top the popup's bottom is. See [offsetY].
@@ -49,8 +35,7 @@ import kotlin.math.min
  * finger first (KeyDef.Popup.Keyboard.Explicit.inRow); -1, the first under it and the others round it
  * @param onFocusMoved told, with the popup's view, each time another key comes into focus: a buzz,
  * as the finger is not over the key it picks ([PopupFocus])
- * @param scenes the engine's, to draw the keys as its scene (a key the canvas draws, 060-render-p2
- * S2): sized by its rules ([PopupKeys]), [radius] the theme's then; null, as views
+ * @param scenes the engine's, the keys drawn as its scene (060-render-p2 S2), sized by its rules ([PopupKeys])
  */
 class PopupKeyboardUi(
     override val ctx: Context,
@@ -58,7 +43,6 @@ class PopupKeyboardUi(
     outerBounds: Rect,
     triggerBounds: Rect,
     onDismissSelf: PopupContainerUi.() -> Unit = {},
-    private val radius: Float,
     minKeyWidth: Int,
     private val keyHeight: Int,
     private val lift: Int,
@@ -68,38 +52,11 @@ class PopupKeyboardUi(
     private val asIs: Boolean = false,
     inRow: Int = -1,
     private val onFocusMoved: (View) -> Unit = {},
-    private val scenes: PopupScenes? = null,
+    private val scenes: PopupScenes,
 ) : PopupContainerUi(ctx, theme, outerBounds, triggerBounds, onDismissSelf) {
 
-    // the engine's scene of the keys, drawn instead of views: made again as the focus moves
-    private val builder = scenes?.builder()
-
-    class PopupKeyUi(override val ctx: Context, val theme: Theme, val text: String) : Ui {
-
-        val textView = view(::AutoScaleTextView) {
-            text = this@PopupKeyUi.text
-            scaleMode = AutoScaleTextView.Mode.Proportional
-            textSize = TEXT_SIZE
-            // as markInactive has it: keyTextColor left the keys not yet passed over another colour
-            setTextColor(theme.popupTextColor)
-        }
-
-        override val root = frameLayout {
-            add(textView, lParams {
-                gravity = gravityCenter
-            })
-        }
-    }
-
-    private val inactiveBackground = GradientDrawable().apply {
-        cornerRadius = radius
-        setColor(theme.popupBackgroundColor)
-    }
-
-    private val focusBackground = GradientDrawable().apply {
-        cornerRadius = radius
-        setColor(theme.genericActiveBackgroundColor)
-    }
+    // the engine's scene of the keys: made again as the focus moves
+    private val builder = scenes.builder()
 
     private val rowCount: Int
     private val columnCount: Int
@@ -115,19 +72,10 @@ class PopupKeyboardUi(
     private val focusRow: Int
     internal val focusColumn: Int
 
-    private val keyUis = if (scenes != null) emptyList() else labels.map {
-        PopupKeyUi(ctx, theme, it)
-    }
-
-    // the scene's keys' size: the views' worked out below
+    // the scene's keys' size; null, the engine could not say ([unmade])
     private val sceneKeys: PopupKeys?
 
-    /**
-     * One for every key, wide enough for the widest label and no narrower than [minKeyWidth],
-     * and one text size: each label fitted to a fixed width by
-     * itself came out at as many sizes (`.com` smaller than `.cn`). Where the keys so wide would
-     * not fit across [outerBounds], narrower, all their labels made smaller alike.
-     */
+    /** One for every key, as the engine's rules size them ([PopupKeys]): wide enough for the widest label, fitted across [outerBounds]. */
     val keyWidth: Int
 
     init {
@@ -145,18 +93,9 @@ class PopupKeyboardUi(
         rowCount = groupRows.sum()
 
         val room = outerBounds.takeUnless { it.isEmpty }?.width()?.toDouble()
-        sceneKeys = scenes?.made("keys' size", builder?.popupKeys(labels.toList(), columnCount, room, minKeyWidth.toDouble(), keyHeight.toDouble()))
-        val padding = ctx.dp(KEY_PADDING)
-        val widest = keyUis.maxOfOrNull { it.textView.paint.measureText(it.text) } ?: 0f
-        val fitting = ceil(widest).toInt() + 2 * padding
-        val wanted = max(minKeyWidth, fitting)
-        // bounds not laid out yet are empty: nothing to fit in, rather than keys of no width
-        keyWidth = sceneKeys?.width?.toInt() ?: if (outerBounds.isEmpty) wanted else min(wanted, outerBounds.width() / columnCount)
-        if (sceneKeys == null && fitting > keyWidth) {
-            // its padding too, so never below nothing however narrow
-            val size = TEXT_SIZE * keyWidth / fitting
-            keyUis.forEach { it.textView.textSize = size }
-        }
+        sceneKeys = scenes.made("keys' size", builder?.popupKeys(labels.toList(), columnCount, room, minKeyWidth.toDouble(), keyHeight.toDouble()))
+        // not made (logged, nothing shown): still a width that fits, for the places worked out below
+        keyWidth = sceneKeys?.width?.toInt() ?: room?.let { min(minKeyWidth, it.toInt() / columnCount) } ?: minKeyWidth
 
         focusRow = 0
         focusColumn = if (inRow >= 0) inRow else calcInitialFocusedColumn(columnCount, keyWidth, outerBounds, triggerBounds)
@@ -227,37 +166,19 @@ class PopupKeyboardUi(
 
     private var focusedIndex = keyOrders[focusRow][focusColumn]
 
-    private val sceneView = sceneKeys?.let { made(it, focusedIndex) }?.let { first -> scenes?.view(ctx)?.also { it.scene = first } }
+    private val sceneView = sceneKeys?.let { made(it, focusedIndex) }?.let { first -> scenes.view(ctx).also { it.scene = first } }
 
     /**
-     * The engine's, and it could not make the keys (logged): nothing to show, the long press as one
-     * with no popup, never keys not drawn that a lift would still type (no views either: they go).
+     * The engine could not make the keys (logged): nothing to show, the long press as one with no
+     * popup, never keys not drawn that a lift would still type (060: no other drawing to fall back to).
      */
-    val unmade: Boolean get() = scenes != null && sceneView == null
+    val unmade: Boolean get() = sceneView == null
 
-    init {
-        markFocus(focusedIndex)
-    }
-
-    override val root: View = sceneView ?: verticalLayout root@{
-        background = inactiveBackground
-        outlineProvider = ViewOutlineProvider.BACKGROUND
-        elevation = dp(2f)
-        // add rows in reverse order, because newly added view shows at bottom
-        for (i in rowCount - 1 downTo 0) {
-            val order = keyOrders[i]
-            add(horizontalLayout row@{
-                for (j in 0 until columnCount) {
-                    // an empty slot keeps its column, so each key is drawn where onChangeFocus selects it
-                    val slot = keyUis.getOrNull(order[j])?.root ?: Space(ctx)
-                    add(slot, lParams(keyWidth, keyHeight))
-                }
-            }, lParams(width = matchParent))
-        }
-    }
+    // shown only when made ([unmade]): an empty view otherwise, never added
+    override val root: View = sceneView ?: Space(ctx)
 
     // the keys in rows as keyOrders has them, the bottom first, the one in focus selected
-    private fun made(keys: PopupKeys, focus: Int) = scenes?.made("keys", builder?.popup(labels.toList(), keyOrders.map { it.toList() }, keys, focus))
+    private fun made(keys: PopupKeys, focus: Int) = scenes.made("keys", builder?.popup(labels.toList(), keyOrders.map { it.toList() }, keys, focus))
 
     // the focus to move to [focus]: the scene made again; false where it could not be, the one before
     // kept and the focus with it, so a lift types the key drawn selected
@@ -265,20 +186,6 @@ class PopupKeyboardUi(
         val view = sceneView ?: return true
         view.scene = made(sceneKeys ?: return false, focus) ?: return false
         return true
-    }
-
-    private fun markFocus(index: Int) {
-        keyUis.getOrNull(index)?.apply {
-            root.background = focusBackground
-            textView.setTextColor(theme.genericActiveForegroundColor)
-        }
-    }
-
-    private fun markInactive(index: Int) {
-        keyUis.getOrNull(index)?.apply {
-            root.background = null
-            textView.setTextColor(theme.popupTextColor)
-        }
     }
 
     // by how far the finger moves from where it was when the popup opened, not where it is
@@ -300,8 +207,6 @@ class PopupKeyboardUi(
             return true
         }
         if (newFocus != focusedIndex && drawScene(newFocus)) {
-            markInactive(focusedIndex)
-            markFocus(newFocus)
             focusedIndex = newFocus
             onFocusMoved(root)
         }
@@ -314,11 +219,6 @@ class PopupKeyboardUi(
     }
 
     companion object {
-        private const val TEXT_SIZE = 20f
-
-        /** Space each side of the widest label, in dp. */
-        private const val KEY_PADDING = PopupComponent.TEXT_PADDING
-
         /** What picking [key] types: from the long press, and from a letter's swipe (its first). */
         fun keyAction(key: String): KeyAction =
             // one character goes through fcitx like any key; anything longer (a user-entered word, or

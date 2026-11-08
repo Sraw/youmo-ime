@@ -13,14 +13,12 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.pinyin.g14Code
 import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.ShownKey
-import org.fcitx.fcitx5.android.input.ViewShownKey
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.LayoutSource
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
@@ -57,8 +55,8 @@ class GroupedKeyboardTapTest {
 
     private var keyboard = grouped()
 
-    // the keyboard made again as the switch is now (bothDrawings), nothing sent yet
-    private fun drawn(check: () -> Unit) = bothDrawings {
+    // the keyboard made again, nothing sent yet
+    private fun drawn(check: () -> Unit) {
         keyboard = grouped()
         sent.clear()
         check()
@@ -78,14 +76,11 @@ class GroupedKeyboardTapTest {
     private fun tap(c: Char, at: Float) = KeyAction.SymAction(KeySym(UNICODE + Keyboard.tapKey(c, at)), KeyStates.Virtual)
 
     // a touch on [key]: down at [x] across it, then each move by (dx, dy) from there, then up where the last
-    // left it; to its view, or to the keyboard (whose touches go to the scene's keys) at the key's place
+    // left it; to the keyboard (whose touches go to the scene's keys) at the key's place
     private fun touch(key: ShownKey, x: Float, vararg moves: Pair<Float, Float>) {
-        val (view, left, top) = when (key) {
-            is ViewShownKey -> Triple(key.view, 0, 0)
-            // the bounds the canvas's own (no window here): its place in the keyboard added
-            is SceneShownKey -> Triple(keyboard, key.canvas.left + key.bounds.left, key.canvas.top + key.bounds.top)
-            else -> error("$key")
-        }
+        key as SceneShownKey
+        // the bounds the canvas's own (no window here): its place in the keyboard added
+        val (view, left, top) = Triple(keyboard, key.canvas.left + key.bounds.left, key.canvas.top + key.bounds.top)
         val y = top + key.height / 2f
         var time = 1_000L
         fun send(action: Int, ex: Float, ey: Float) {
@@ -170,10 +165,7 @@ class GroupedKeyboardTapTest {
             }
         }
         timber.log.Timber.plant(tree)
-        val switch = AppPrefs.getInstance().internal.canvasKeyboard
-        val was = switch.getValue()
         try {
-            switch.setValue(true)
             keyboard = grouped()
             val bn = key("BN")
             assertTrue(bn is SceneShownKey)
@@ -182,7 +174,6 @@ class GroupedKeyboardTapTest {
             assertTrue(logged.toString(), logged.single().contains(NineKeyLetters.G14.tag()))
         } finally {
             timber.log.Timber.uproot(tree)
-            switch.setValue(was)
             SceneLayouts.source = builtIn
         }
     }
@@ -198,26 +189,11 @@ class GroupedKeyboardTapTest {
         assertEquals(listOf<KeyAction>(code(g14Code('b'))), sent)
     }
 
-    // a CANCEL clears the place too, but DOWN already has, so no test can see that: it is a safeguard
-    @Test
-    fun thePlaceIsTheClicksAloneClearedAfterIt() {
-        // the views' own (CustomGestureView's clickAt): the canvas keeps no place on a key (SceneTouch)
-        val bn = keyboard.allViews.filterIsInstance<AltTextKeyView>().first { (it.def as KeyDef.Appearance.AltText).displayText == "BN" }
-        var seen = Float.NaN
-        bn.setOnClickListener { seen = (it as CustomGestureView).clickAt }
-        touch(ViewShownKey(bn), bn.width * 0.75f)
-        assertEquals(0.75f, seen, 1e-3f)
-        assertTrue(bn.clickAt.isNaN())
-    }
-
     // a node a scene made anew does other than it did gets a key of its own: the old key's gestures cancelled,
     // its long press pending never fires (review S4a #9)
     @Test
     fun aKeyANodeNoLongerDoesAsHasItsGesturesCancelled() {
-        val switch = AppPrefs.getInstance().internal.canvasKeyboard
-        val was = switch.getValue()
-        try {
-            switch.setValue(true)
+        run {
             keyboard = grouped()
             val canvas = keyboard.allViews.filterIsInstance<org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView>().single()
             var fired = 0
@@ -238,8 +214,6 @@ class GroupedKeyboardTapTest {
             assertEquals(listOf(old), replaced)
             org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(3))
             assertEquals(0, fired)
-        } finally {
-            switch.setValue(was)
         }
     }
 }

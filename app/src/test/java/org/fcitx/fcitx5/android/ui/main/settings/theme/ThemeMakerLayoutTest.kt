@@ -29,19 +29,14 @@ import org.fcitx.fcitx5.android.data.theme.ThemeMakerTestdata
 import org.fcitx.fcitx5.android.input.InputView
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.floating.FloatingHandle
-import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
-import org.fcitx.fcitx5.android.input.keyboard.KeyDef
-import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.keyboard.T9Keyboard
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
-import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
-import org.fcitx.fcitx5.android.input.keyboard.themeKind
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Shape
@@ -70,7 +65,7 @@ import kotlin.math.roundToInt
  * contract: data files the theme maker page reads (youmo-layout.json, youmo-icons.json and its blocks).
  * What the theme maker's preview draws, measured on the real keyboard (`youmo-layout`), and the
  * icons it draws with (`youmo-icons`): each phone, orientation, board, mode and state the page
- * offers, every key's cell (a canvas's keys read off its scene, 060-render-p2 S7; a key view's off the view) (its whole cell, the gap not taken off: the page takes the theme's off),
+ * offers, every key's cell (read off the canvas's scene, 060-render-p2 S7) (its whole cell, the gap not taken off: the page takes the theme's off),
  * kind and theme name, every text, icon and fill, and which colour of the palette each is drawn in
  * (read off a keyboard made with a probe theme whose colours are all different). Written into
  * `web/theme-maker/test/testdata/youmo-layout.json` and `youmo-icons.json`, and into the page's two
@@ -201,6 +196,7 @@ class ThemeMakerLayoutTest {
             }
             h.after(SETTLE_MS)
             h.relayout()
+            h.placeSlots()
             val out = view(h, shot, icons)
             if (shot.state == State.LONG_PRESS) h.release()
             out
@@ -292,7 +288,6 @@ class ThemeMakerLayoutTest {
             val p = partOf(v, part)
             when {
                 v === picture -> items += buildJsonObject { put("t", "base"); put("r", s.rect(v)) }
-                v is KeyView -> if (whole && !spacer(v)) items += key(v)
                 v is KeyboardCanvasView -> v.scene?.keys?.forEach { items += sceneKey(v, it) }
                 v is SceneKeyCell -> if (whole) v.keyNode?.let { items += sceneKey(v, it) }
                 v is PopupSceneView -> popupScene(v)
@@ -339,10 +334,6 @@ class ThemeMakerLayoutTest {
             if (v is ImageView) icon(v)?.let { items += it.withPart(part) }
         }
 
-        // a cell kept for what is drawn over it (the nine keys' column): nothing of its own
-        private fun spacer(k: KeyView) = k.def.border == KeyDef.Appearance.Border.Off && k.def.margin.not() &&
-            (k.def as? KeyDef.Appearance.Text)?.displayText.isNullOrEmpty()
-
         private fun partOf(v: View, outer: String) = when {
             v === bar -> "bar"
             v === popup -> "popup"
@@ -375,36 +366,6 @@ class ThemeMakerLayoutTest {
         // the bar's colour under the bar and the code row: a plain view the bar's height, at the keyboard's top
         private fun isBarBackground(v: View) = v.javaClass == View::class.java && v.parent === h.keyboard &&
             s.top(v) == 0 && v.height >= input.kawaiiBar.view.height && v.height <= input.kawaiiBar.view.height * 2
-
-        private fun key(k: KeyView): JsonObject {
-            val face = k.getChildAt(0)
-            val labels = mutableListOf<JsonElement>()
-            val glyphs = mutableListOf<JsonElement>()
-            fun inner(v: View) {
-                if (!h.shown(v) || v.width == 0 || v.alpha == 0f) return
-                if (v is TextView && !v.text.isNullOrEmpty()) {
-                    val role = when {
-                        k is TextKeyView && v === k.mainText -> "main"
-                        k is AltTextKeyView && v === k.altText -> "hint"
-                        else -> "mark"
-                    }
-                    labels += text(v, null).withRole(role)
-                }
-                if (v is ImageView) icon(v)?.let { glyphs += it }
-                if (v is ViewGroup) for (i in 0 until v.childCount) inner(v.getChildAt(i))
-            }
-            inner(face)
-            return buildJsonObject {
-                put("t", "key")
-                put("r", s.rect(face))
-                put("k", k.def.themeKind.id)
-                k.themeKey?.let { put("n", "$board/$it") }
-                put("b", k.def.border.name.lowercase())
-                put("m", k.def.margin)
-                if (labels.isNotEmpty()) put("l", JsonArray(labels))
-                if (glyphs.isNotEmpty()) put("i", JsonArray(glyphs))
-            }
-        }
 
         // a key the canvas draws, as its scene has it: its cell, kind, name, face and gap, and the texts
         // and icons it draws now (a text's box by the font's extent and the text's advance, its x where its line starts)

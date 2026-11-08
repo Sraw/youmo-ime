@@ -228,4 +228,14 @@ class AppPrefsTest {
         sp.edit { clear(); putString("punctuation_position", "BottomLeft"); putString("shortcut_mark_position", "TopLeft") }
         AppPrefs(sp).apply { dropRetired() }.let { assertEquals(KeyMarkPosition.BottomLeft, it.keyboard.punctuationPosition.getValue()) }
     }
+
+    // the redraw's switch of 0.6's betas, stored as either type: dropped, read by nothing, no crash
+    @Test
+    fun theRedrawsSwitchStoredIsDropped() {
+        for (put in listOf<SharedPreferences.Editor.() -> Unit>({ putBoolean("canvas_keyboard", false) }, { putString("canvas_keyboard", "x") })) {
+            sp.edit { clear(); put() }
+            AppPrefs(sp).dropRetired()
+            assertFalse(sp.contains("canvas_keyboard"))
+        }
+    }
 }

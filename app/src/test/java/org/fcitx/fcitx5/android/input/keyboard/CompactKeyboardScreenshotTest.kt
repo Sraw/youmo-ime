@@ -30,7 +30,7 @@ import org.robolectric.annotation.GraphicsMode
 /**
  * 键盘高度 紧凑 (uat/14 ST-51) on every keyboard, upright and turned, at a w393dp 440dpi phone's screen: the goldens
  * under src/test/screenshots/CompactKeyboardScreenshotTest, looked at one by one for text cut off
- * and corners crowded (AutoScaleTextView draws its own text, so no
+ * and corners crowded (the engine squeezes its own text, so no
  * measure here would see it cut: the eye does).
  */
 @RunWith(RobolectricTestRunner::class)

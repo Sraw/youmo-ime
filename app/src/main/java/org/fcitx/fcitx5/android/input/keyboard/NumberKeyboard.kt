@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.annotation.SuppressLint
 import android.content.Context
-import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
@@ -14,7 +13,6 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
-import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.theme.KeyNames
@@ -34,7 +32,7 @@ class NumberKeyboard(
         const val Name = NumberPad.FULL_LAYOUT
 
         /**
-         * The layout its keys are drawn from where the canvas is on (lib/keyboard-scene's number.xml):
+         * The layout its keys are drawn from (lib/keyboard-scene's number.xml):
          * every pad's, each by its `pad=` (xsd README 24), one board a theme styles (`number/<key>`).
          */
         internal const val LAYOUT = KeyNames.NUMBER
@@ -80,26 +78,12 @@ class NumberKeyboard(
         )
     }
 
-    val backspace: ImageKeyView by lazy { findViewById(R.id.button_backspace) }
-    val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
-
     // Return as last shown: its icon on the scene's key too
     private var returnAppearance = ReturnKeyAppearance.Enter
 
     override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
         returnAppearance = appearance
-        `return`.showReturnAction(appearance)
         canvas?.invalidateScene()
-    }
-
-    // the views': no preview nor long press popup here; the edit menu a swipe opens (the space's) and what picks
-    // from it go on. The scene's keys pop up as number.xml says (preview="off" popups="off", SceneKeyDef.onBoard),
-    // Return's Emoji menu with them, which the views swallowed (rules C 疑问 8, fixed on the canvas: 060-render-p2 §5.3)
-    override fun onPopupAction(action: PopupAction) {
-        val viewsOwn = action is PopupAction.PreviewAction || action is PopupAction.PreviewUpdateAction ||
-            action is PopupAction.ShowKeyboardAction || action is PopupAction.ShowMenuAction
-        if (canvas == null && viewsOwn) return
-        super.onPopupAction(action)
     }
 
     // what the keys show now as the scene engine's environment (number.xml's when= and bindings): the pad
@@ -112,7 +96,7 @@ class NumberKeyboard(
         return SceneEnvs.of(this, look, theme.isDark, width, height, Input(pad = padOf(pad)), texts = texts, marks = SceneBoard.marks(layout, charShortcutMarks))
     }
 
-    // last: the scene reads the pad (060's redraw: the keys drawn by the scene engine where the canvas is on)
+    // last: the scene reads the pad (the keys drawn by the scene engine; number.xml's preview="off" popups="off")
     init {
         drawKeysWithScene(LAYOUT)
     }

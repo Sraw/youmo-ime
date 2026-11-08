@@ -1,0 +1,81 @@
+scene 1080x702 no-popups
+base
+  fill rect(0,0,1080,702) #ffeceff1
+key back kind=function role=back a11y="ABC"
+  bounds 0,0,162,702
+  shape rect(7.88,18.38,154.13,683.63)
+  hit rect(0,0,162,702)
+  anchor 81,351 up 0,-1
+  actions send="layout:Text"
+  text label="ABC"
+  normal
+    text "ABC" 41,366.75 system 700 42 #ff7a858a
+  pressed
+    +0 fill rect(7.88,18.38,154.13,683.63) #1f000000
+key comma kind=function a11y=","
+  bounds 162,0,270,702
+  shape rect(169.88,18.38,262.13,683.63)
+  hit rect(162,0,270,702)
+  anchor 216,351 up 0,-1
+  actions send=","
+  text label=","
+  normal
+    text "," 197.89,373.64 system 400 60.38 #ff7a858a
+  pressed
+    +0 fill rect(169.88,18.38,262.13,683.63) #1f000000
+key emoji kind=letter a11y="a11y_key_emoji"
+  bounds 270,0,378,702
+  shape rect(277.88,18.38,370.13,683.63)
+  hit rect(270,0,378,702)
+  anchor 324,351 up 0,-1
+  actions send="picker:Emoji"
+  normal
+    icon emoji 292.5,319.5,355.5,382.5 #ff7a858a
+  pressed
+    +0 fill rect(277.88,18.38,370.13,683.63) #1f000000
+key space kind=space role=space a11y="a11y_key_space"
+  bounds 378,0,648,702
+  shape rect(404.25,42,621.75,660 r=7.88,7.88,7.88,7.88)
+  hit rect(378,0,648,702)
+  anchor 513,351 up 0,-1
+  actions long-press="space-long-press" send="sym:space" swipe-axis="both"
+  sound=space
+  normal
+    fill rect(404.25,42,621.75,660 r=7.88,7.88,7.88,7.88) #ffc9ced1
+  pressed
+    +1 fill rect(404.25,42,621.75,660 r=7.88,7.88,7.88,7.88) #1f000000
+key period kind=function a11y="."
+  bounds 648,0,756,702
+  shape rect(655.88,18.38,748.13,683.63)
+  hit rect(648,0,756,702)
+  anchor 702,351 up 0,-1
+  actions send="."
+  text label="."
+  normal
+    text "." 683.89,373.64 system 400 60.38 #ff7a858a
+  pressed
+    +0 fill rect(655.88,18.38,748.13,683.63) #1f000000
+key backspace kind=function role=backspace a11y="a11y_key_backspace"
+  bounds 756,0,918,702
+  shape rect(763.88,18.38,910.13,683.63)
+  hit rect(756,0,918,702)
+  anchor 837,351 up 0,-1
+  actions repeat="true" send="sym:BackSpace" swipe-axis="both"
+  sound=delete
+  normal
+    icon backspace 805.5,319.5,868.5,382.5 #ff7a858a
+  pressed
+    +0 fill rect(763.88,18.38,910.13,683.63) #1f000000
+key enter kind=enter role=enter a11y="换行"
+  bounds 918,0,1080,702
+  shape rect(953.06,305.06,1044.94,396.94 r=45.94,45.94,45.94,45.94)
+  hit rect(918,0,1080,702)
+  anchor 999,351 up 0,-1
+  actions send="sym:Return"
+  sound=return
+  menu "Emoji" icon=emoji do="picker:"
+  normal
+    fill rect(953.06,305.06,1044.94,396.94 r=45.94,45.94,45.94,45.94) #ff5cb5ab
+    icon enter 967.5,319.5,1030.5,382.5 #ffffffff
+  pressed
+    +1 fill rect(953.06,305.06,1044.94,396.94 r=45.94,45.94,45.94,45.94) #1f000000

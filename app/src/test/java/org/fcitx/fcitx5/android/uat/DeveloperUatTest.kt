@@ -44,9 +44,6 @@ class DeveloperUatTest {
         SettingsHarness().use { st ->
             st.activity
             st.open(SettingsRoute.Developer)
-            // the page shows the new drawing's switch on, as it is by default, and writes it so (it wrote off once)
-            assertTrue((st.pref(R.string.canvas_keyboard) as TwoStatePreference).isChecked)
-            assertTrue(AppPrefs.getInstance().internal.canvasKeyboard.getValue())
             st.pref(R.string.real_time_logs).performClick()
             st.idle()
             assertEquals(LogActivity::class.java.name, shadowOf(st.activity).nextStartedActivity.component!!.className)

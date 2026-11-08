@@ -101,8 +101,8 @@ object Forms {
         "landscape-compact" to landscapeCompact, "floating-landscape" to floatingLandscape, "one-handed-landscape" to oneHandedLandscape,
     )
 
-    /** Every board of rules C, by its id (KeyNames.BOARDS less emoji, which is no layout), and the small boards of 060-render-p2 S6. */
-    val boards = listOf("qwerty", "nine", "k14", "k18", "zhuyin", "zhuyin-nine", "number", "handwriting", "symbols", "emoji-search", "expanded-side", "number-row")
+    /** Every board of rules C, by its file (KeyNames.BOARDS; emoji the emoji's row and the emoticons', S8a), and the small boards of 060-render-p2 S6. */
+    val boards = listOf("qwerty", "nine", "k14", "k18", "zhuyin", "zhuyin-nine", "number", "handwriting", "symbols", "emoji", "emoticon", "emoji-search", "expanded-side", "number-row")
 
     private val layouts = mutableMapOf<String, Layout>()
 

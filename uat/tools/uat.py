@@ -70,10 +70,10 @@ os.environ.setdefault("ADB_MDNS", "0")
 # are the two of a run; a worktree may start its own on another even port up to 5584 (uat.py up --port)
 AVD = os.environ.get("UAT_AVD", "youmo")
 SNAPSHOT = "clean"   # the AVD's state after uat/tools/avd.sh: zh-CN, three-button nav, the WebView shell
-# UAT_CANVAS is gone: the canvas (060's new drawing) is the app's default since 060-render-p2 S7, so
-# a cleared app already draws with it; a command still setting it is told so rather than passed silently
+# UAT_CANVAS is gone: the canvas (060's drawing) is the only one since 060-render-p2 S8a; a command still
+# setting it is told so rather than passed silently
 if "UAT_CANVAS" in os.environ:
-    print("UAT_CANVAS 已不用：新画法是默认，清掉数据的应用本来就用它（060-render-p2 S7）", file=sys.stderr)
+    print("UAT_CANVAS 已不用：键盘只有一种画法（060-render-p2 S8a）", file=sys.stderr)
 # the default pair; any number runs (--devices 5554,5556,5558,… or auto: device_count from free memory)
 PORTS = ("5554", "5556")
 

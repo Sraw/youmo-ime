@@ -4,8 +4,9 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import androidx.core.view.allViews
+import android.view.accessibility.AccessibilityNodeInfo
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.Assert.assertEquals
@@ -29,11 +30,23 @@ class TextKeyboardCapsTest {
 
     private val keyboard = TextKeyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark).apply {
         keyActionListener = KeyActionListener { action, _ -> if (action is KeyAction.HostKeyAction) typed += action.act }
-    }
+    }.laidOut()
 
     private fun type(letter: String): String {
-        keyboard.allViews.filterIsInstance<TextKeyView>().first { (it.def as? KeyDef.Appearance.Text)?.displayText == letter }.performClick()
+        // laid out again: the scene made anew for what Shift or a sentence start changed
+        keyboard.laidOut().shownKeys().first { it.id == letter.lowercase() }.click()
         return typed.last()
+    }
+
+    // Shift tapped, or long pressed (caps lock) as a screen reader does it on its node
+    private fun shift(long: Boolean = false) {
+        val key = keyboard.shownKeys().first { it.id == "shift" } as SceneShownKey
+        if (!long) {
+            key.click()
+            return
+        }
+        val c = key.canvas
+        c.accessibilityNodeProvider!!.performAction(c.scene!!.keys.indexOfFirst { it.id == "shift" }, AccessibilityNodeInfo.ACTION_LONG_CLICK, null)
     }
 
     @Test
@@ -49,10 +62,10 @@ class TextKeyboardCapsTest {
 
     @Test
     fun theUsersShiftAndCapsLockStayWhereNoSentenceStarts() {
-        keyboard.caps.performClick()
+        shift()
         keyboard.applyAutoCaps(false)
         assertEquals("Q", type("Q"))
-        keyboard.caps.performLongClick()
+        shift(long = true)
         keyboard.applyAutoCaps(true)
         keyboard.applyAutoCaps(false)
         assertEquals("Q", type("Q"))
@@ -60,14 +73,14 @@ class TextKeyboardCapsTest {
     }
 
     // every row's letters, the bottom one too: the 双拼 `;` key after L once ended the pass there
-    private fun letters() = keyboard.allViews.filterIsInstance<AltTextKeyView>()
-        .map { it.mainText.text.toString() }.filter { it.length == 1 && it[0].isLetter() }.joinToString("")
+    private fun letters() = keyboard.laidOut().shownKeys().sortedWith(compareBy({ it.bounds.top }, { it.bounds.left }))
+        .map { it.label }.filter { it.length == 1 && it[0] in 'a'..'z' || it in ('A'..'Z').map(Char::toString) }.joinToString("")
 
     @Test
     fun everyLetterFollowsShift() {
-        keyboard.caps.performClick()
+        shift()
         assertEquals("QWERTYUIOPASDFGHJKLZXCVBNM", letters())
-        keyboard.caps.performClick()
+        shift()
         assertEquals("qwertyuiopasdfghjklzxcvbnm", letters())
     }
 }

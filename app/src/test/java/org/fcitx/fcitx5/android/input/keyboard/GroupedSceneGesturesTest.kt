@@ -14,12 +14,8 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
-import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.After
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -54,23 +50,21 @@ class GroupedSceneGesturesTest {
     // in a field of [inputType], text in it and the cursor at its end (what ⌫ and space's swipes act on)
     // [shown] the ids that must be among the keys, [hidden] those that must not
     private fun gestures(
-        canvas: Boolean,
         im: InputMethodEntry,
         inputType: Int = InputType.TYPE_CLASS_TEXT,
         shown: Set<String> = emptySet(),
         hidden: Set<String> = emptySet(),
     ): List<String> {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, canvas)
         val prefill = { e: android.widget.EditText ->
             e.setText(TEXT)
             e.setSelection(TEXT.length)
         }
         return KeyboardHarness(ThemePreset.PixelLight, im).start(inputType, prefill = prefill).use { h ->
             h.relayout()
-            assertEquals(canvas, KeyboardHarness.all(h.keyboard).any { it is KeyboardCanvasView && it.visibility == android.view.View.VISIBLE })
+            assertTrue(KeyboardHarness.all(h.keyboard).any { it is KeyboardCanvasView && it.visibility == android.view.View.VISIBLE })
             val ids = h.keys().mapNotNull { it.id }.filter { it !in SWITCHING }
             assertTrue(ids.toString(), ids.size >= MOST_KEYS_AT_LEAST)
-            assertTrue("canvas $canvas: $ids", ids.containsAll(shown) && ids.none { it in hidden })
+            assertTrue("$ids", ids.containsAll(shown) && ids.none { it in hidden })
             val out = mutableListOf<String>()
             fun sent(what: String) {
                 out += "$what: " + h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") } +
@@ -104,7 +98,7 @@ class GroupedSceneGesturesTest {
             h.after(HOLD_MS)
             h.release()
             val deletes = h.api.calls.count { it.startsWith("sendKey") }
-            assertTrue("canvas $canvas: $deletes deletes", deletes >= MIN_REPEATS)
+            assertTrue("$deletes deletes", deletes >= MIN_REPEATS)
             sent("backspace held $deletes from $held")
             out
         }
@@ -116,9 +110,9 @@ class GroupedSceneGesturesTest {
         shown: Set<String> = emptySet(),
         hidden: Set<String> = emptySet(),
     ) {
-        val views = gestures(false, im, inputType, shown, hidden)
-        val scene = gestures(true, im, inputType, shown, hidden)
-        assertEquals(views.joinToString("\n"), scene.joinToString("\n"))
+        // what each key does, run through: the keys [shown] and not [hidden], ⌫ held repeating (compared with their
+        // views' till S8a deleted them)
+        gestures(im, inputType, shown, hidden)
     }
 
     @Test

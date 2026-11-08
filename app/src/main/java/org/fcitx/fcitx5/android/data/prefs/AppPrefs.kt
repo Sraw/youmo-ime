@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.data.prefs
 
 import android.content.SharedPreferences
-import android.os.Build
 import androidx.annotation.Keep
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
@@ -37,7 +36,6 @@ import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.input.keyboard.VoiceEndMark
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.EmojiModifier
-import org.fcitx.fcitx5.android.utils.DeviceUtil
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.vibrator
 import timber.log.Timber
@@ -61,12 +59,6 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val verboseLog = bool("verbose_log", false)
         val pid = int("pid", 0)
         val editorInfoInspector = bool("editor_info_inspector", false)
-
-        /**
-         * 060's redraw, while it is made (P1): the 26 keys drawn by the scene engine (KeyboardCanvasView)
-         * over TextKeyboard's own keys, which still do the work. Off, nothing of it is made.
-         */
-        val canvasKeyboard = bool("canvas_keyboard", true)
 
         /** [org.fcitx.fcitx5.android.ui.main.AppLanguage]'s tag, read where appcompat cannot know it yet */
         val appLanguage = string("app_language", "")
@@ -146,14 +138,6 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val ignoreSystemCursor = hidden { switch(R.string.ignore_sys_cursor, "ignore_system_cursor", false) }
         val hideKeyConfig = hidden { switch(R.string.hide_key_config, "hide_key_config", true) }
         val disableAnimation = switch(R.string.disable_animation, "disable_animation", false)
-        val vivoKeypressWorkaround = hidden {
-            switch(
-                R.string.vivo_keypress_workaround,
-                "vivo_keypress_workaround",
-                // there's some feedback that this workaround is no longer necessary on Origin OS 4, which based on Android 14
-                Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE && DeviceUtil.isVivoOriginOS
-            )
-        }
         val keyboardHeightPercentBase = hidden {
             enumList(
                 R.string.keyboard_height_percent_base,
@@ -752,7 +736,6 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 internal.toolbarButtons,
                 advanced.ignoreSystemCursor,
                 advanced.disableAnimation,
-                advanced.vivoKeypressWorkaround
             ).forEach {
                 it.putValueTo(this@edit)
             }
@@ -774,7 +757,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
      * backup restored (an import, after [resetHiddenSettings] again) being read at the next.
      */
     fun dropRetired() {
-        if (sharedPreferences.contains(ENGLISH_ON_NINE_KEYS)) sharedPreferences.edit { remove(ENGLISH_ON_NINE_KEYS) }
+        // gone with the old drawing (060-render-p2 S8): 0.6's betas' switch of the redraw, and vivo's touch
+        // routing to the key views (the scene's keys always take their touches so); a stored one, of any type, read by nothing
+        RETIRED.filter { sharedPreferences.contains(it) }.takeIf { it.isNotEmpty() }?.let { keys -> sharedPreferences.edit { keys.forEach(::remove) } }
         migrateSwipe()
         settleMarkPositions()
     }
@@ -837,6 +822,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         // 0.4's: English on the nine keys while 九键's 中/英 had brought it there, gone with the key (I1)
         private const val ENGLISH_ON_NINE_KEYS = "english_on_nine_keys"
+        private val RETIRED = listOf(ENGLISH_ON_NINE_KEYS, "canvas_keyboard", "vivo_keypress_workaround")
 
         // 0.5's swipe setting, and 0.5.1's that took its place
         private const val SWIPE_SYMBOL_BEHAVIOR = "swipe_symbol_behavior"

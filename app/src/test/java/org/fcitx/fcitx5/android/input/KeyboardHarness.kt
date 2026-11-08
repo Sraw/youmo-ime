@@ -53,8 +53,6 @@ import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
-import org.fcitx.fcitx5.android.input.keyboard.KeyView
-import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
 import org.fcitx.fcitx5.android.scene.Op
@@ -295,11 +293,6 @@ class KeyboardHarness(
     fun describedKey(description: String): ShownKey = keys().firstOrNull { it.description == description }
         ?: error("no key described as $description in ${keys().mapNotNull { it.description }}")
 
-    /** The key view showing [label]: for what only the old drawing has (its text view's size, its marks' views); S7 moves these. */
-    fun viewKey(label: String): TextKeyView = all(inputView).filterIsInstance<TextKeyView>()
-        .firstOrNull { shown(it) && it.mainText.text.toString() == label }
-        ?: error("no key view $label in ${texts()}")
-
     /** The view (key, bar button) read out as [description]. */
     fun described(description: String): View = all(inputView)
         .firstOrNull { shown(it) && it.contentDescription?.toString() == description }
@@ -451,36 +444,23 @@ class KeyboardHarness(
         relayout()
     }
 
-    /** The popup's keys up now (a long press's choices), not the keyboard's own labels. */
-    fun popupKeys(): List<TextView> = all(inputView).filterIsInstance<AutoScaleTextView>()
-        // a key's texts, and the nine keys' column's items (a keyboard's own), are no popup's
-        .filter { shown(it) && generateSequence(it as View) { p -> p.parent as? View }.none { p -> p is KeyView || p is BaseKeyboard } }
-        .toList()
-
     /**
      * A popup's key as shown: its label and where it is in the window; [focused], the one the finger
-     * is on (its view's frame given the focus's background, the scene's key selected); [cell], its
-     * whole cell (a view's text is centred in a frame, not laid out to its size); [size], its text's
-     * size (0 for an icon).
+     * is on (the scene's key selected); [cell], its whole cell; [size], its text's size (0 for an icon).
      */
     data class PopupKey(val text: String, val box: Rect, val focused: Boolean = false, val cell: Rect = box, val size: Float = 0f)
 
     /**
-     * The popup's keys up now as [popupKeys], drawn as views or, a key the canvas draws, as the
-     * engine's scene (060-render-p2 S2: no view per key); a scene's in the views' order, top row first.
+     * The popup's keys up now (a long press's choices), as the engine's scene draws them (060-render-p2
+     * S2: no view per key), top row first.
      */
-    fun popupChoices(): List<PopupKey> = popupKeys().map {
-        val frame = it.parent as View
-        PopupKey(it.text.toString(), box(it), frame.background != null, box(frame), it.textSize)
-    } + all(inputView).filterIsInstance<PopupSceneView>().filter { shown(it) }.flatMap { sceneChoices(it, box(it)) }
+    fun popupChoices(): List<PopupKey> = all(inputView).filterIsInstance<PopupSceneView>().filter { shown(it) }.flatMap { sceneChoices(it, box(it)) }.toList()
 
     /**
      * The icons shown outside the keys, as [PopupKey]s read by their descriptions: the bar's and a
-     * menu's cells (the edit menu's) as views, or a menu's cells the canvas's scene draws (S2).
+     * menu's cells (the edit menu's) the scene draws (S2).
      */
-    fun shownIcons(): List<PopupKey> = all(inputView).filter { v ->
-        v is ImageView && shown(v) && generateSequence(v.parent as? View) { it.parent as? View }.none { it is KeyView }
-    }.map { PopupKey(it.contentDescription?.toString().orEmpty(), box(it)) }.toList() +
+    fun shownIcons(): List<PopupKey> = all(inputView).filter { v -> v is ImageView && shown(v) }.map { PopupKey(it.contentDescription?.toString().orEmpty(), box(it)) }.toList() +
         all(inputView).filterIsInstance<PopupSceneView>().filter { shown(it) }.flatMap { v ->
             val at = box(v)
             v.scene?.keys.orEmpty().filter { k -> k.kind == "menu" && k.ops(false).any { it is Op.Icon } }
@@ -726,8 +706,8 @@ class KeyboardHarness(
     }
 
     /**
-     * [capture] of a keyboard moved to the scene (060-render-p2 S4 step 8): drawn by the canvas, its
-     * golden is its own (`canvas_` before the file's name), beside the views' one, which stays as it was.
+     * [capture] of a keyboard drawn by the canvas: its golden is `canvas_` before the file's name (060-render-p2 S4
+     * step 8, when the views' goldens were beside them).
      */
     fun captureBoard(path: String, view: View = keyboard) {
         val canvas = all(view).any { it is KeyboardCanvasView && it.visibility == View.VISIBLE }
@@ -749,6 +729,14 @@ class KeyboardHarness(
     // a keyboard shown slides in, a panel fades: the clock run on past them so every image is the end state
     private fun settled() {
         shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(1))
+        relayout()
+        placeSlots()
+    }
+
+    /** A scene made places what sits in its slots after it (九键's column, T9Keyboard.onSceneBuilt): laid out there. */
+    fun placeSlots() {
+        all(inputView).filterIsInstance<KeyboardCanvasView>().forEach { it.scene }
+        idle()
         relayout()
     }
 
@@ -855,25 +843,21 @@ class KeyboardHarness(
         }
 
         /**
-         * The keys [root] shows, depth first, whichever draws them: a canvas's scene's in its order, the
-         * key views visible and [shown]. [root] may be a keyboard made alone (no input view), laid out.
+         * The keys [root] shows, depth first: each canvas's scene's in its order. [root] may be a keyboard
+         * made alone (no input view), laid out.
          */
         fun keysOf(root: View, shown: (View) -> Boolean = { true }): List<ShownKey> = when {
             root.visibility != View.VISIBLE -> emptyList()
             root is KeyboardCanvasView -> root.scene?.keys?.map { SceneShownKey(root, it.id, it.copy) }.orEmpty()
-            root is KeyView -> if (shown(root)) listOf(ViewShownKey(root)) else emptyList()
             root is ViewGroup -> (0 until root.childCount).flatMap { keysOf(root.getChildAt(it), shown) }
             else -> emptyList()
         }
 
-        /** The symbol grid's cells under [root], whichever draws them: a key view's, or one key's scene (060-render-p2 S6). */
-        fun cells(root: View): Sequence<View> = all(root).filter { it is TextKeyView || it is org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell }
+        /** The symbol grid's cells under [root], each one key's scene (060-render-p2 S6). */
+        fun cells(root: View): Sequence<View> = all(root).filter { it is org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell }
 
         /** What [cell] ([cells]) shows. */
-        fun cellText(cell: View): String = when (cell) {
-            is org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell -> cell.keyNode?.label.orEmpty()
-            else -> (cell as TextKeyView).mainText.text.toString()
-        }
+        fun cellText(cell: View): String = (cell as org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell).keyNode?.label.orEmpty()
 
         /**
          * The keys' canvas under [root]: one a keyboard board draws its keys on (its nearest [BaseKeyboard] the

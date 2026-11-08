@@ -342,7 +342,7 @@ class KeyMarksEverywhereUatTest {
         each(turned)
     }
 
-    // Not walked at a larger system font size: the keys' texts and marks are sized in dp (KeyView), and
+    // Not walked at a larger system font size: the keys' texts and marks are sized in dp (the scene), and
     // upright at fontScale 1.3 the walk printed what it does at 1 line for line. As a third test here it
     // took the full run's JVM past its 3 GB
 }

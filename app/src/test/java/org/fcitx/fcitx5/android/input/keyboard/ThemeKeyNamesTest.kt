@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import androidx.core.view.allViews
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
@@ -94,10 +93,10 @@ class ThemeKeyNamesTest {
     }
 
     @Test
-    fun aBoardsKeysCarryTheirNamesToTheViews() {
-        val keyboard = NumberKeyboard(context, ThemePreset.PixelDark)
+    fun aBoardsKeysCarryTheirNames() {
+        val keyboard = NumberKeyboard(context, ThemePreset.PixelDark).laidOut()
         assertEquals(KeyNames.NUMBER, keyboard.themeBoard)
-        val names = keyboard.allViews.filterIsInstance<KeyView>().mapNotNull { it.themeKey }.toList()
+        val names = keyboard.shownKeys().mapNotNull { it.id }
         assertTrue(names.toString(), "backspace" in names && "1" in names)
     }
 

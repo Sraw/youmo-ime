@@ -30,7 +30,7 @@ import java.io.File
 /**
  * Theme file 3.0 drawn (§4.2 of dev/design/051-d3-theme-maker.md): five sample themes, light and
  * dark, on every keyboard and in every mode. A few are goldens (src/test/screenshots/
- * ThemeLookScreenshotTest), a regression for `KeyFaceDrawable`, the picture and the bar; the whole
+ * ThemeLookScreenshotTest), a regression for the keys' faces, the picture and the bar; the whole
  * set, for the eye, with `-PthemeShots=<dir>`.
  *
  * The images are made in ThemeLookSamples: a picture of bands and rings (where a key's part of it is shows), a

@@ -10,7 +10,6 @@ import android.graphics.Canvas
 import android.graphics.Rect
 import android.view.View
 import androidx.annotation.VisibleForTesting
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -244,8 +243,5 @@ open class SceneKeyCell(context: Context, private val theme: Theme, private val 
         private const val RGB = 0xFFFFFF
         private const val ALPHA_SHIFT = 24
         private val NO_MARKS = MarkSettings(shortcuts = emptyMap())
-
-        /** Whether one key is drawn by the engine (the canvas keyboard on), not as a key view. */
-        val on: Boolean get() = AppPrefs.getInstance().internal.canvasKeyboard.getValue()
     }
 }

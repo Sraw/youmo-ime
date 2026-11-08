@@ -12,7 +12,6 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -95,14 +94,10 @@ class LifecycleUatTest {
                 system(night)
                 val want = (if (night) ThemeManager.prefs.darkModeTheme else ThemeManager.prefs.lightModeTheme).getValue()
                 assertEquals(want.name, ThemeManager.activeTheme.name)
-                // the keys in the theme: the canvas's scene painted in its look, or the views' theme
-                val canvas = KeyboardHarness.boardCanvas(h.inputView)
-                if (canvas != null) {
-                    assertNotNull(canvas.scene)
-                    assertEquals("the keys in the theme", ThemeManager.shownLook(want), canvas.paintedIn)
-                } else {
-                    assertEquals("the keys in the theme", want.name, h.viewKey("n").theme.name)
-                }
+                // the keys in the theme: the canvas's scene painted in its look
+                val canvas = checkNotNull(KeyboardHarness.boardCanvas(h.inputView))
+                assertNotNull(canvas.scene)
+                assertEquals("the keys in the theme", ThemeManager.shownLook(want), canvas.paintedIn)
                 h.api.calls.clear()
                 "nihao".forEach { h.tap(h.key(it.toString())) }
                 assertEquals(h.api.calls.toString(), 5, h.api.calls.count { it.startsWith("sendKey") && "up=false" in it })

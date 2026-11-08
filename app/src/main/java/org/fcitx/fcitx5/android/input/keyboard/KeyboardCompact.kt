@@ -4,7 +4,12 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import android.content.Context
+import android.content.ContextWrapper
+import android.inputmethodservice.InputMethodService
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 
 /**
  * Whether the keyboard is 紧凑 as 键盘高度 is set now ([KeyboardHeightLevels], the level the settings
@@ -14,4 +19,30 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 internal fun keyboardCompact(): Boolean {
     val keyboard = AppPrefs.getInstance().keyboard
     return KeyboardHeightLevels.isCompact(keyboard.keyboardHeightPercent.getValue(), keyboard.keyboardHeightPercentLandscape.getValue())
+}
+
+/**
+ * The keys' text: floating ([FloatingKeyboard]), as much smaller as the keys are shorter, or a letter
+ * and the digit under it ran into each other; 紧凑 ([keyboardCompact]) smaller too, the smaller of
+ * the two where both are ([KeyTextScale]).
+ */
+internal fun keyTextScale(context: Context): Float {
+    // a keyboard drawn elsewhere (the theme's preview in the settings) is not the floating one, but
+    // is 紧凑 as the real one is, so the preview shows what the level does
+    val floating = if (ThemeManager.prefs.floatingKeyboard.getValue() && context.inInputMethod()) {
+        val screen = context.resources.configuration.screenWidthDp
+        FloatingKeyboard.textScale(FloatingKeyboard.widthDp(screen), screen)
+    } else {
+        null
+    }
+    return KeyTextScale.of(keyboardCompact(), floating)
+}
+
+internal fun Context.inInputMethod(): Boolean {
+    var at: Context? = this
+    while (at is ContextWrapper) {
+        if (at is InputMethodService) return true
+        at = at.baseContext
+    }
+    return false
 }

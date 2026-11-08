@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
@@ -25,7 +24,7 @@ class TextKeyboardAddressTest {
 
     private val ids = listOf(R.id.button_comma, R.id.button_slash, R.id.button_at, R.id.button_period, R.id.button_dot, R.id.button_domain)
 
-    private fun shown() = ids.filter { keyboard.findViewById<View>(it).visibility == View.VISIBLE }
+    private fun shown() = ids.filter { keyboard.laidOut().shownKeyWithId(it) != null }
 
     @Test
     fun anAddressFieldHasWhatAddressesAreMadeOfInPlaceOfTheCommaAndFullStop() {

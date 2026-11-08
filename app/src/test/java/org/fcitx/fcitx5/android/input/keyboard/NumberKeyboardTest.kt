@@ -15,7 +15,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.fcitx.fcitx5.android.uat.PrefsRule
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.input.scene.SceneBehavior
 import org.junit.Test
@@ -42,33 +41,23 @@ class NumberKeyboardTest {
     private fun keyboard(pad: NumberPad = NumberPad.FULL) =
         NumberKeyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark, pad).laidOut()
 
+    // the space found by its view's name (uat.py, TalkBack's node: KeyNames.BOARD_RESOURCES)
     @Test
-    fun theSpaceIsTheKeyItIsBuiltAs() {
-        val space = keyboard().findViewById<View>(R.id.button_mini_space)
-        assertTrue("$space", space is ImageKeyView)
-    }
-
-    // the space found by its view's name either way (uat.py, TalkBack's node: KeyNames.BOARD_RESOURCES)
-    @Test
-    fun theSpaceKeepsItsName() = bothDrawings { canvas ->
+    fun theSpaceKeepsItsName() {
         val k = keyboard()
-        assertEquals(canvas, KeyboardHarness.all(k).any { it is KeyboardCanvasView && it.visibility == View.VISIBLE })
+        assertTrue(KeyboardHarness.all(k).any { it is KeyboardCanvasView && it.visibility == View.VISIBLE })
         assertEquals("space", k.shownKeyWithId(R.id.button_mini_space)?.id)
     }
 
-    // every pad: its keys as shown, in order, by name, label, what is read and size, the same either way; a blank
-    // takes no press (its view disabled, the canvas's no key)
+    // every pad: its keys shown, each named, read and sized (compared with the views' till S8a deleted them); a blank
+    // takes no press (the canvas's no key)
     @Test
     fun eachPadShowsTheSameKeys() {
-        val seen = mutableMapOf<Boolean, List<String>>()
-        bothDrawings { canvas ->
-            seen[canvas] = NumberPad.entries.flatMap { pad ->
-                listOf("$pad") + keyboard(pad).shownKeys().filter { it.enabled }
-                    // a view's text is read as its text, no description: the scene's node says it
-                    .map { "${it.id} '${it.label}' ${it.description ?: it.label} ${it.bounds.width()}×${it.bounds.height()}" }
-            }
+        for (pad in NumberPad.entries) {
+            val keys = keyboard(pad).shownKeys().filter { it.enabled }
+            assertTrue("$pad", keys.isNotEmpty())
+            keys.forEach { assertTrue("$pad ${it.id}", it.id != null && (it.description ?: it.label).isNotEmpty() && !it.bounds.isEmpty) }
         }
-        assertEquals(seen.getValue(false).joinToString("\n"), seen.getValue(true).joinToString("\n"))
     }
 
     // each pad's keys wired from number.xml's nodes as their views were (U4 B): sound, the shortcut its swipes
@@ -76,7 +65,6 @@ class NumberKeyboardTest {
     // press's keys (preview="off" popups="off"), Return's Emoji menu alone (rules C 疑问 8)
     @Test
     fun eachKeyIsWiredAsItsViewWas() {
-        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
         for (pad in NumberPad.entries) {
             val k = keyboard(pad)
             val scene = KeyboardHarness.all(k).filterIsInstance<KeyboardCanvasView>().single().scene!!

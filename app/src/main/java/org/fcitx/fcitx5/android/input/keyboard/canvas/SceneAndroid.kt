@@ -29,7 +29,7 @@ import timber.log.Timber
 
 /**
  * A scene's text in [look]'s fonts: `system` the system's, [LookTheme.KEY_FONT] the theme's key font,
- * at the weight asked (ThemeAssets, as KeyView's keyTypeface); null the default one.
+ * at the weight asked (ThemeAssets); null the default one.
  */
 class SceneFonts(private val look: ThemeLook) {
     fun typeface(font: String, weight: Int): Typeface? =

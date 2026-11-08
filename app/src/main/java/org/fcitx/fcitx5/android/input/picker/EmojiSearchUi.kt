@@ -166,7 +166,7 @@ class EmojiSearchUi(context: Context, private val theme: Theme) : LinearLayout(c
 
         private val REPEAT = KeyStates(KeyState.Virtual, KeyState.Repeat)
 
-        /** The search's letters drawn by the scene where the canvas is on (060-render-p2 S6). */
+        /** The search's letters' layout, drawn by the scene (060-render-p2 S6). */
         const val LAYOUT = "emoji-search"
 
         private val NO_MARKS = MarkSettings(shortcuts = emptyMap())

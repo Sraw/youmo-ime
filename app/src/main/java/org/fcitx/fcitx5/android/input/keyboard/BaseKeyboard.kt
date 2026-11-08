@@ -6,21 +6,11 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Rect
-import android.view.InputDevice
 import android.view.MotionEvent
-import android.view.View
-import android.view.accessibility.AccessibilityEvent
 import androidx.annotation.CallSuper
-import androidx.annotation.DrawableRes
 import androidx.annotation.Keep
-import androidx.annotation.VisibleForTesting
 import androidx.constraintlayout.widget.ConstraintLayout
-import androidx.core.view.children
-import androidx.core.view.isVisible
 import kotlin.math.absoluteValue
-import kotlin.math.roundToInt
-import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.InputMethodNames
@@ -57,22 +47,15 @@ import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupKeyboardUi
-import org.fcitx.fcitx5.android.input.popup.keyRef
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.pack.PackKind
 import splitties.dimensions.dp
-import splitties.views.dsl.constraintlayout.above
 import splitties.views.dsl.constraintlayout.below
 import splitties.views.dsl.constraintlayout.bottomOfParent
-import splitties.views.dsl.constraintlayout.centerHorizontally
-import splitties.views.dsl.constraintlayout.centerVertically
-import splitties.views.dsl.constraintlayout.constraintLayout
 import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.constraintlayout.leftOfParent
-import splitties.views.dsl.constraintlayout.leftToRightOf
 import splitties.views.dsl.constraintlayout.rightOfParent
-import splitties.views.dsl.constraintlayout.rightToLeftOf
 import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.add
 
@@ -80,8 +63,6 @@ abstract class BaseKeyboard(
     context: Context,
     protected val theme: Theme,
     private val keyLayout: List<List<KeyDef>>,
-    /** Each key's width in place of its own ([KeyDef.Appearance.percentWidth]): a split layout's. */
-    private val keyWidths: List<List<Float>>? = null,
     /** Its keys' board in a theme ([KeyNames]: `qwerty`, `nine`…), each key named by [KeyDef.name]; null, styled by kind alone. */
     val themeBoard: String? = null,
     /** Whether its keys' swipes reach their shortcuts ([KeyDef.shortcut]): the typing keyboards', not a panel's. */
@@ -149,19 +130,6 @@ abstract class BaseKeyboard(
     /** Set per field ([KeyboardWindow]): an address's has no glide typing, as no word is typed there. */
     open var address: AddressKeys = AddressKeys.NONE
 
-    /**
-     * The bottom row's address keys as [address] says, for a keyboard that has them (the letters', the
-     * grouped and 注音's): the comma and period in an ordinary field, the dot, slash or @ and domain in an address.
-     */
-    protected fun showAddressKeys() {
-        findViewById<View>(R.id.button_comma).isVisible = address == AddressKeys.NONE
-        findViewById<View>(R.id.button_period).isVisible = address == AddressKeys.NONE
-        findViewById<View>(R.id.button_dot).isVisible = address != AddressKeys.NONE
-        findViewById<View>(R.id.button_slash).isVisible = address == AddressKeys.URL
-        findViewById<View>(R.id.button_at).isVisible = address == AddressKeys.EMAIL
-        findViewById<View>(R.id.button_domain).isVisible = address != AddressKeys.NONE
-    }
-
     private val glideTyping = prefs.keyboard.glideTyping
     private val strokeFilter = prefs.keyboard.strokeFilter
 
@@ -215,8 +183,6 @@ abstract class BaseKeyboard(
         glide?.draw(canvas)
     }
 
-    private val vivoKeypressWorkaround by prefs.advanced.vivoKeypressWorkaround
-
     private val hapticOnRepeat by prefs.keyboard.hapticOnRepeat
 
     var popupActionListener: PopupActionListener? = null
@@ -240,80 +206,8 @@ abstract class BaseKeyboard(
         }
     })
 
-    protected val keyRows: List<ConstraintLayout>
-
-    /** A row's views and their own widths, for [fitRow] again once a key is shown or hidden. */
-    private class Row(val keys: List<View>, val widths: List<Float>)
-
-    private val rowKeys = mutableListOf<Row>()
-
-    // a row narrower than the keyboard widens its outermost keys ([fitRow]); a split row fills it by itself (SplitKeyboard.row)
-    private val widens get() = expandKeypressArea && keyWidths == null
-
-    /** [view] shown or not, its row fitted again ([fitRow]). */
-    @VisibleForTesting(otherwise = VisibleForTesting.PROTECTED)
-    internal fun showKey(view: View, shown: Boolean) {
-        if (view.isVisible == shown) return
-        view.isVisible = shown
-        rowKeys.firstOrNull { view in it.keys }?.let { fitRow(it.keys, it.widths, widens) }
-    }
-
-    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-        super.onLayout(changed, left, top, right, bottom)
-        // under the canvas the views' glyphs are not drawn: nothing to settle (laid out again without it)
-        if (canvas == null) settleLetters()
-    }
-
-    // after the keys' own layout: their letters clear of their symbols and shortcuts (KeyMarkYield.letters), at one
-    // size and on one baseline (a letter moved alone sat out of its row: floating at 紧凑, w lower, a left)
-    private fun settleLetters() {
-        val keys = rowKeys.flatMap { it.keys }.filterIsInstance<AltTextKeyView>().filter { it.isVisible }
-            .mapNotNull { k -> k.letterKey()?.let { k to it } }
-        val letters = KeyMarkYield.letters(keys.map { it.second }, gap = dp(1).toFloat())
-        keys.forEachIndexed { i, (k, _) -> k.settle(letters.keys[i]) }
-    }
-
     init {
         isMotionEventSplittingEnabled = true
-        keyRows = keyLayout.mapIndexed { rowIndex, row ->
-            // room between a split keyboard's halves: nothing to touch (a plain view takes no touch, and
-            // findTouchTarget, vivo's, finds key views only)
-            val keyViews = row.map { if (it === GapKey) View(context) else createKeyView(it) }
-            val widths = keyWidths?.get(rowIndex) ?: row.map { it.appearance.percentWidth }
-            rowKeys += Row(keyViews, widths)
-            constraintLayout Row@{
-                isMotionEventSplittingEnabled = true
-                keyViews.forEachIndexed { index, view ->
-                    add(view, lParams {
-                        centerVertically()
-                        if (index == 0) {
-                            leftOfParent()
-                            horizontalChainStyle = LayoutParams.CHAIN_PACKED
-                        } else {
-                            leftToRightOf(keyViews[index - 1])
-                        }
-                        if (index == keyViews.size - 1) {
-                            rightOfParent()
-                            // for RTL
-                            horizontalChainStyle = LayoutParams.CHAIN_PACKED
-                        } else {
-                            rightToLeftOf(keyViews[index + 1])
-                        }
-                        matchConstraintPercentWidth = widths[index]
-                    })
-                }
-                fitRow(keyViews, widths, widens)
-            }
-        }
-        keyRows.forEachIndexed { index, row ->
-            add(row, lParams {
-                if (index == 0) topOfParent()
-                else below(keyRows[index - 1])
-                if (index == keyRows.size - 1) bottomOfParent()
-                else above(keyRows[index + 1])
-                centerHorizontally()
-            })
-        }
         spaceSwipeMoveCursor.registerOnChangeListener(spaceSwipeChangeListener)
         updateSpaceBadges(spaceLongPress.getValue())
         spaceLongPress.registerOnChangeListener(spaceLongPressListener)
@@ -324,13 +218,9 @@ abstract class BaseKeyboard(
         val voice = behavior.talks(PackStore.ready(PackKind.VOICE), inPasswordField)
         holdsToTalk = voice
         canvas?.invalidateScene()
-        val icon = if (voice) R.drawable.ic_baseline_keyboard_voice_24 else null
         // a long press that does nothing here buzzes for nothing either
         val takes = spaceLongPressTakesTouch(behavior, PackStore.ready(PackKind.VOICE), inPasswordField)
-        spaceKeys.forEach {
-            (it as? TextKeyView)?.showBadge(icon)
-            it.keyGesture.longPressFeedbackEnabled = takes
-        }
+        spaceKeys.forEach { it.keyGesture.longPressFeedbackEnabled = takes }
     }
 
     /** What swiping a key types: its own swipe, nothing, or what the user chose ([swipeText]). */
@@ -374,30 +264,12 @@ abstract class BaseKeyboard(
     /** What a tap sends for its key's [action]: the action itself, but where a keyboard adds where it fell, [clickAt] ([KeyGesture.clickAt]). */
     protected open fun pressed(clickAt: Float, action: KeyAction): KeyAction = action
 
-    private fun createKeyView(def: KeyDef): KeyView {
-        return when (def.appearance) {
-            is KeyDef.Appearance.AltText -> AltTextKeyView(context, theme, def.appearance)
-            is KeyDef.Appearance.ImageText -> ImageTextKeyView(context, theme, def.appearance)
-            is KeyDef.Appearance.Text -> TextKeyView(context, theme, def.appearance)
-            is KeyDef.Appearance.Image -> ImageKeyView(context, theme, def.appearance)
-        }.apply {
-            themeKey = def.name
-            style(themeBoard, keyImages)
-            if (def is BlankKey) {
-                isEnabled = false
-                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            }
-            wire(this, def, this)
-        }
-    }
-
     /**
-     * What [key] of [def] does, its view's ([view]) or a key the scene draws (060-render-p2 S1): its
-     * sound, the space's and backspace's swipes, its press, long press, repeat and double tap, its
-     * symbol's and shortcut's swipes ([KeySwipes]), its popups. One wiring for both, so the canvas's
-     * keys do what the views did.
+     * What [key] of [def], a key the scene draws (060-render-p2 S1), does: its sound, the space's and
+     * backspace's swipes, its press, long press, repeat and double tap, its symbol's and shortcut's
+     * swipes ([KeySwipes]), its popups.
      */
-    private fun wire(key: KeyHandle, def: KeyDef, view: KeyView?) {
+    private fun wire(key: KeyHandle, def: KeyDef) {
         key.keyGesture.soundEffect = when (def) {
             // a layout's key: its node's sound (060-render-p2 S4)
             is SceneKeyDef -> def.sound
@@ -413,7 +285,7 @@ abstract class BaseKeyboard(
         wireBehaviors(key, def)
         // set as its long press shows a popup, which then has the touch: no swipe of the key's after that
         val longPopup = LongPopup()
-        swipes.attach(key, def, longPopup, view)
+        swipes.attach(key, def, longPopup)
         def.popup?.forEach { wirePopup(key, def, it, longPopup) }
     }
 
@@ -590,51 +462,27 @@ abstract class BaseKeyboard(
         }
     }
 
-    // a key view's touch, the finger's event made the view's own ([forKey]) and dispatched to it
-    private class ViewTarget(val view: KeyView, val hitRect: Rect) : TouchTarget {
-        override val ref get() = view.keyRef
-        override val enabled get() = view.isEnabled
-
-        override fun send(event: MotionEvent, action: Int, pointerIndex: Int) {
-            val keyEvent = event.forKey(action, pointerIndex, hitRect)
-            view.dispatchTouchEvent(keyEvent)
-            // the key reads it in place and keeps none of it: back to the pool, not left to the finalizer
-            keyEvent.recycle()
-        }
-
-        override fun cancel() = view.cancelGestures()
-    }
-
     /**
-     * The keys drawn by the scene engine over this keyboard's own ([KeyboardCanvasView]), their views
-     * not drawn then: the touches handed to the scene's keys ([sceneKeys]) as vivo's workaround hands
-     * them to the views ([routesTouches]). Null: the keys draw themselves. Set by [drawKeysWithScene].
+     * The keys drawn by the scene engine ([KeyboardCanvasView]), the touches handed to the scene's
+     * keys ([sceneKeys]). Set by [drawKeysWithScene], last in a keyboard's init: null before.
      */
     protected var canvas: KeyboardCanvasView? = null
         private set
 
     // the scene's keys ([drawKeysWithScene]) and what a touch on the canvas finds
-    private val sceneKeys = SceneKeys(this) { key, def -> wire(key, def, null) }
+    private val sceneKeys = SceneKeys(this) { key, def -> wire(key, def) }
 
-    /**
-     * The board the scene engine draws this keyboard's keys from ([drawKeysWithScene], 060-render-p2
-     * S4); null while the views draw them.
-     */
+    /** The board the scene engine draws this keyboard's keys from ([drawKeysWithScene], 060-render-p2 S4). */
     protected var sceneBoard: SceneBoard? = null
         private set
 
     /**
-     * The keys drawn by the scene of the layout [layoutName] from now on, where the canvas is on
-     * (internal.canvasKeyboard) and the keyboard is moved there (the app has its layout,
-     * [BuiltInLayouts.has]); else the views go on drawing them, as they always did. A layout that
-     * does not read ([SceneLayouts.of], logged there) draws nothing: never the views again (U8,
-     * they go in S8). Called last in a keyboard's init: the scene reads its state ([sceneEnv]).
-     * Each key wired as its layout's node says ([SceneKeyDef], [sceneTable] the keyboard's own words:
-     * U4 B). The rows of views stay laid out, not drawn, not touched, not read out (S8 deletes them).
-     * Whether the canvas is put over the keyboard.
+     * The keys drawn by the scene of the app's layout [layoutName] ([BuiltInLayouts]). A layout that
+     * does not read ([SceneLayouts.of], logged there) draws nothing: there is no other drawing (U8).
+     * Called last in a keyboard's init: the scene reads its state ([sceneEnv]). Each key wired as
+     * its layout's node says ([SceneKeyDef], [sceneTable] the keyboard's own words: U4 B).
      */
-    protected fun drawKeysWithScene(layoutName: String): Boolean {
-        if (!AppPrefs.getInstance().internal.canvasKeyboard.getValue() || !BuiltInLayouts.has(layoutName)) return false
+    protected fun drawKeysWithScene(layoutName: String) {
         val layout = SceneLayouts.of(context, layoutName)
         val board = SceneBoard(context, theme, layout) { look, read, width, height -> sceneEnv(look, read, width, height) }
         sceneBoard = board
@@ -644,14 +492,12 @@ abstract class BaseKeyboard(
         view.drawsBase = sceneDrawsBase
         canvas = view
         sceneKeys.byNodes(view, sceneTable) { old -> spaceKeys.remove(old) }
-        keyRows.forEach { it.visibility = View.INVISIBLE }
         add(view, lParams(0, 0) {
             topOfParent()
             bottomOfParent()
             leftOfParent()
             rightOfParent()
         })
-        return true
     }
 
     /**
@@ -661,20 +507,6 @@ abstract class BaseKeyboard(
      */
     protected open fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env =
         SceneEnvs.of(this, look, theme.isDark, width, height, Input(), marks = SceneBoard.marks(layout, charShortcutMarks))
-
-    /** Return's view shown as [appearance], while the views draw the keys (S8 deletes it with them); the scene's is the keyboard's env. */
-    protected fun showReturnView(appearance: ReturnKeyAppearance) {
-        if (canvas == null) findViewById<ImageKeyView>(R.id.button_return)?.showReturnAction(appearance)
-    }
-
-    /** The image key [id]'s view, while the views draw the keys, shown as [icon] and said as [description] (S8 deletes it with them). */
-    protected fun showImageView(id: Int, @DrawableRes icon: Int, description: String) {
-        if (canvas != null) return
-        findViewById<ImageKeyView>(id)?.apply {
-            img.setImageResource(icon)
-            contentDescription = description
-        }
-    }
 
     /** Whether the canvas draws its board's fill under the keys ([KeyboardCanvasView.drawsBase]): a row or a column laid on its own background, not. */
     protected open val sceneDrawsBase: Boolean get() = true
@@ -687,17 +519,14 @@ abstract class BaseKeyboard(
     /** The keyboard's own words for its layout's keys (U4 B): its `action:` placeholders, its composed long presses. */
     protected open val sceneTable: SceneKeyDef.Table = object : SceneKeyDef.Table {}
 
-    /** Where the scene drawn last has its key [id] (its second [copy], a split row's) in this keyboard, as a key's place is (glide typing's, strokes'): nowhere while the views draw the keys. */
+    /** Where the scene drawn last has its key [id] (its second [copy], a split row's) in this keyboard, as a key's place is (glide typing's, strokes'): nowhere before it is drawn. */
     protected fun scenePlace(id: String, copy: Boolean = false): KeyPlace = KeyPlace { _, out ->
         val c = canvas
         if (c != null && c.cell(KeyRef(id, copy), out)) out.offset(c.left, c.top) else out.setEmpty()
     }
 
-    /** The key wired for the scene's [node] ([SceneTouch.keyOf]): what a screen reader's actions on it do; null while the views draw the keys. */
+    /** The key wired for the scene's [node] ([SceneTouch.keyOf]): what a screen reader's actions on it do. */
     internal fun sceneKey(node: KeyNode): SceneKey? = sceneKeys.of(node)
-
-    // the keys' views take touches as the keyboard hands them: vivo's workaround, or keys drawn by the canvas
-    private val routesTouches get() = vivoKeypressWorkaround || canvas != null
 
     /**
      * HashMap of [PointerId (Int)][MotionEvent.getPointerId] to [TouchTarget]
@@ -714,25 +543,8 @@ abstract class BaseKeyboard(
         touchTargets.clear()
     }
 
-    private fun findTouchTarget(event: MotionEvent, pointerIndex: Int): TouchTarget? {
-        sceneKeys.touch?.let { return it.find(event.getX(pointerIndex), event.getY(pointerIndex)) }
-        val x0 = event.getX(pointerIndex).roundToInt()
-        val y0 = event.getY(pointerIndex).roundToInt()
-        val rowHitRect = Rect()
-        val row = keyRows.find {
-            it.getHitRect(rowHitRect)
-            rowHitRect.contains(x0, y0)
-        } ?: return null
-        val x1 = x0 - rowHitRect.left
-        val y1 = y0 - rowHitRect.top
-        val keyHitRect = Rect()
-        val key = row.children.filterIsInstance<KeyView>().find {
-            it.getHitRect(keyHitRect)
-            keyHitRect.contains(x1, y1)
-        } ?: return null
-        keyHitRect.offset(rowHitRect.left, rowHitRect.top)
-        return ViewTarget(key, keyHitRect)
-    }
+    private fun findTouchTarget(event: MotionEvent, pointerIndex: Int): TouchTarget? =
+        sceneKeys.touch?.find(event.getX(pointerIndex), event.getY(pointerIndex))
 
     /** Gives finger [pointerIndex] of [event] to [target] for the rest of its touch. */
     private fun dispatchDown(event: MotionEvent, pointerIndex: Int, target: TouchTarget) {
@@ -744,57 +556,55 @@ abstract class BaseKeyboard(
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         // intercept ACTION_DOWN and all following events will go to parent's onTouchEvent
-        return if (routesTouches && ev.actionMasked == MotionEvent.ACTION_DOWN) true
+        return if (ev.actionMasked == MotionEvent.ACTION_DOWN) true
         else super.onInterceptTouchEvent(ev)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (routesTouches) {
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    releaseAllTouchTargets()
-                    // on no key the touch is not the keyboard's; on a disabled one it is, for a finger after it
-                    val target = findTouchTarget(event, 0) ?: return false
-                    dispatchDown(event, 0, target)
-                    return true
-                }
-                MotionEvent.ACTION_POINTER_DOWN -> {
-                    val i = event.actionIndex
-                    val target = findTouchTarget(event, i) ?: return true
-                    dispatchDown(event, i, target)
-                    return true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    for (i in 0 until event.pointerCount) {
-                        val pid = event.getPointerId(i)
-                        val target = touchTargets[pid] ?: continue
-                        target.send(event, MotionEvent.ACTION_MOVE, i)
-                    }
-                    return true
-                }
-                MotionEvent.ACTION_POINTER_UP -> {
-                    val i = event.actionIndex
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                releaseAllTouchTargets()
+                // on no key the touch is not the keyboard's; on a disabled one it is, for a finger after it
+                val target = findTouchTarget(event, 0) ?: return false
+                dispatchDown(event, 0, target)
+                return true
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                val i = event.actionIndex
+                val target = findTouchTarget(event, i) ?: return true
+                dispatchDown(event, i, target)
+                return true
+            }
+            MotionEvent.ACTION_MOVE -> {
+                for (i in 0 until event.pointerCount) {
                     val pid = event.getPointerId(i)
-                    val target = touchTargets[pid] ?: return true
-                    target.send(event, MotionEvent.ACTION_UP, i)
-                    touchTargets.remove(pid)
-                    return true
+                    val target = touchTargets[pid] ?: continue
+                    target.send(event, MotionEvent.ACTION_MOVE, i)
                 }
-                MotionEvent.ACTION_UP -> {
-                    val pid = event.getPointerId(0)
-                    val target = touchTargets[pid]
-                    if (target == null) {
-                        releaseAllTouchTargets()
-                        return true
-                    }
-                    target.send(event, MotionEvent.ACTION_UP, 0)
-                    touchTargets.remove(pid)
-                    return true
-                }
-                MotionEvent.ACTION_CANCEL -> {
+                return true
+            }
+            MotionEvent.ACTION_POINTER_UP -> {
+                val i = event.actionIndex
+                val pid = event.getPointerId(i)
+                val target = touchTargets[pid] ?: return true
+                target.send(event, MotionEvent.ACTION_UP, i)
+                touchTargets.remove(pid)
+                return true
+            }
+            MotionEvent.ACTION_UP -> {
+                val pid = event.getPointerId(0)
+                val target = touchTargets[pid]
+                if (target == null) {
                     releaseAllTouchTargets()
                     return true
                 }
+                target.send(event, MotionEvent.ACTION_UP, 0)
+                touchTargets.remove(pid)
+                return true
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                releaseAllTouchTargets()
+                return true
             }
         }
         return super.onTouchEvent(event)
@@ -838,8 +648,8 @@ abstract class BaseKeyboard(
     protected var shownImeName: String? = null
         private set
 
-    /** Shows [ime] on [space]: its name, and its sub-mode's ([spaceLabel]). */
-    protected fun showInputMethodName(space: TextKeyView, ime: InputMethodEntry) {
+    /** Shows [ime] on the space: its name, and its sub-mode's ([spaceLabel]), in the scene's next env. */
+    protected fun showInputMethodName(ime: InputMethodEntry) {
         val imeName = spaceLabel(InputMethodNames.of(context, ime), ime.subMode)
         // A change of input method (or of its sub-mode, e.g. an ASCII toggle) is otherwise
         // silent: the name is only on the Space key, which the user is not touching. The first
@@ -847,15 +657,7 @@ abstract class BaseKeyboard(
         // another layout was showing is announced on returning to this one.
         if (shownImeName != null && shownImeName != imeName) announce(imeName)
         shownImeName = imeName
-        space.mainText.text = imeName
-        // TalkBack reads the key's description instead of the text drawn on it, so the name
-        // has to be in the description too
-        space.contentDescription = context.getString(R.string.a11y_key_space_with_ime, imeName)
-        // the label's text and this description, changed together, go out as one event for the key
-        // with no subtree change: the accessibility cache kept the key's old node, and the old name
-        // was read for about a second after a switch (to 拼音 with 英文标点 on; with 中文标点 the
-        // punctuation keys' relabel happened to bring a subtree change along). Said outright here
-        space.parent?.notifySubtreeAccessibilityStateChanged(space, space, AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE)
+        canvas?.invalidateScene()
     }
 
     /**
@@ -903,30 +705,6 @@ abstract class BaseKeyboard(
         releaseAllTouchTargets()
     }
 
-}
-
-/**
- * Finger [pointerIndex] of this event alone, as [action], in the coordinates of the key at [hitRect].
- * Its id stays the finger's: hold to talk follows that id in the real events (VoiceHoldOverlay).
- */
-internal fun MotionEvent.forKey(action: Int, pointerIndex: Int, hitRect: Rect): MotionEvent {
-    KeyPointer.properties[0].id = getPointerId(pointerIndex)
-    KeyPointer.coords[0].apply {
-        x = getX(pointerIndex) - hitRect.left
-        y = getY(pointerIndex) - hitRect.top
-        pressure = getPressure(pointerIndex)
-        size = getSize(pointerIndex)
-    }
-    return MotionEvent.obtain(
-        downTime, eventTime, action, 1, KeyPointer.properties, KeyPointer.coords,
-        metaState, 0, xPrecision, yPrecision, deviceId, edgeFlags, InputDevice.SOURCE_UNKNOWN, 0
-    )
-}
-
-// one of each, refilled for every event: obtain copies them, and touches come on the main thread alone
-private object KeyPointer {
-    val properties = arrayOf(MotionEvent.PointerProperties())
-    val coords = arrayOf(MotionEvent.PointerCoords())
 }
 
 /**

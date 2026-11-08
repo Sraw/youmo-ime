@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import android.content.res.Configuration
 import android.view.View
 import androidx.annotation.Keep
 import org.fcitx.fcitx5.android.data.InputFeedbacks
@@ -55,9 +54,6 @@ internal class KeySwipes(
     private val swipeLayersChoice by prefs.keyboard.swipeLayers
     private val swipeLayers: SwipeLayers get() = swipeLayersChoice.layers
 
-    // the keys whose swipes reach something ([attach]), their marks drawn again as the settings change
-    private val swipingKeys = mutableListOf<Pair<KeyView, KeyDef>>()
-
     @Keep
     private val swipeLayersListener = ManagedPreference.OnChangeListener<SwipeLayersChoice> { _, _ -> showMarks() }
     @Keep
@@ -104,14 +100,12 @@ internal class KeySwipes(
     /**
      * [key]'s vertical swipe, of [def] ([KeySwipe]): a step past the threshold buzzing once, the edit
      * menu opened there and picked from as the finger moves on; none after its long press showed a
-     * popup ([longPopup]). Its marks drawn on its [view], where it has one: the scene's keys have
-     * theirs from the scene.
+     * popup ([longPopup]). Its marks are the scene's.
      */
-    fun attach(key: KeyHandle, def: KeyDef, longPopup: LongPopup, view: KeyView?) {
+    fun attach(key: KeyHandle, def: KeyDef, longPopup: LongPopup) {
         val builtIn = def.behaviors.firstNotNullOfOrNull { (it as? KeyDef.Behavior.Swipe)?.action }
         if (builtIn == null && (def.shortcut == null || !shortcuts)) return
         val both = def.swipesBothWays
-        if (shortcuts && view != null) swipingKeys.add(view to def)
         val g = key.keyGesture
         g.swipeEnabled = true
         g.swipeThresholdY = threshold
@@ -150,40 +144,8 @@ internal class KeySwipes(
         }
     }
 
-    /**
-     * Each swiping key's marks ([KeyMarks]) as the settings are now: its symbol and its shortcut. The
-     * orientation is read once here: turning the screen makes the input view anew (onConfigurationChanged),
-     * whose keyboard places them again as it attaches.
-     */
-    fun showMarks() {
-        keyboard.marksChanged()
-        val layers = swipeLayers
-        val spots = markSpots()
-        val compact = keyboardCompact()
-        val landscape = board.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val charShortcuts = keyboard.charShortcutMarks
-        val shortcutOn = layers.wayOf(SwipeLayers.Layer.Shortcut) != null
-        swipingKeys.forEach { (view, def) ->
-            val placed = when (val key = swipeKey(def)) {
-                is KeySwipe.Key.Char -> {
-                    val symbol = KeyView.Mark.Symbol.takeIf { (view as? AltTextKeyView)?.altText?.text?.isNotEmpty() == true }
-                    val shortcut = markOf(key.shortcut).takeIf { charShortcuts && shortcutOn }
-                    KeyMarks.place(symbol, shortcut, spots.symbol, spots.shortcut, landscape, compact)
-                }
-                is KeySwipe.Key.Function -> KeyMarks.placeFunction(
-                    markOf(key.up), markOf(key.down), layers.up != SwipeLayers.Layer.Off, layers.down != SwipeLayers.Layer.Off,
-                    spots.symbol, spots.shortcut, landscape, compact,
-                )
-            }
-            view.showMarks(placed)
-        }
-    }
-
-    private fun markOf(shortcut: KeyShortcut): KeyView.Mark? = when (shortcut) {
-        is KeyShortcut.Command -> KeyView.Mark.Icon(KeyShortcutLooks.of(shortcut.command).icon)
-        is KeyShortcut.Text -> KeyView.Mark.Text(shortcut.text)
-        KeyShortcut.None -> null
-    }
+    /** The keys' marks made again by the scene as the settings are now: their symbols and their shortcuts. */
+    fun showMarks() = keyboard.marksChanged()
 
     // the threshold just passed ([attach]): a buzz where it reaches anything; whether it opened the edit menu
     private fun swipeReached(key: KeyHandle, def: KeyDef, totalY: Int): Boolean {

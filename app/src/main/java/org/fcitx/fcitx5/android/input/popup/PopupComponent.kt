@@ -6,19 +6,15 @@ package org.fcitx.fcitx5.android.input.popup
 
 import android.content.res.Configuration
 import android.graphics.Rect
-import android.text.TextPaint
-import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.annotation.VisibleForTesting
 import java.util.LinkedList
-import kotlin.math.ceil
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.data.InputFeedbacks
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.UndoChipPlacement
 import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
@@ -39,6 +35,7 @@ import org.fcitx.fcitx5.android.scene.engine.Popups
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.utils.popIn
 import org.mechdancer.dependency.Dependent
+import timber.log.Timber
 import org.mechdancer.dependency.UniqueComponent
 import org.mechdancer.dependency.manager.ManagedHandler
 import org.mechdancer.dependency.manager.managedHandler
@@ -66,35 +63,6 @@ class PopupComponent :
         val gap = ThemeManager.shownLook(theme).keys.gap
         context.dp(if (context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) gap.vLand else gap.v)
     }
-    private val minPopupWidth by lazy {
-        context.dp(38)
-    }
-    private val popupPadding by lazy {
-        context.dp(TEXT_PADDING)
-    }
-    private val popupHeight by lazy {
-        context.dp(116)
-    }
-    private val popupKeyHeight by lazy {
-        context.dp(48)
-    }
-
-    // a long press's keys: one size whatever the key pressed, a 九键 key's as small as a letter's.
-    // They were as wide as the key pressed: a 九键 key's 7 filled the screen across (A B C 2 a b c)
-    private val longPressKeyWidth by lazy {
-        context.dp(LONG_PRESS_KEY_WIDTH)
-    }
-    private val longPressKeyHeight by lazy {
-        context.dp(LONG_PRESS_KEY_HEIGHT)
-    }
-
-    // the long press's keys over the key pressed, this much above its top: clear of the finger
-    private val longPressLift by lazy {
-        context.dp(LONG_PRESS_LIFT)
-    }
-    private val popupRadius by lazy {
-        context.dp(ThemeManager.shownLook(theme).keys.radiusDp).toFloat()
-    }
     private val hideThreshold = 100L
 
     // the popups of the keys the canvas draws, the engine's scenes (060-render-p2 S2)
@@ -104,18 +72,12 @@ class PopupComponent :
     @VisibleForTesting
     internal var measuring: (TextMeasurer) -> TextMeasurer = { it }
 
-    // read once: the input view, this with it, is made again as it changes (FcitxInputMethodService)
-    private val canvasOn by lazy { AppPrefs.getInstance().internal.canvasKeyboard.getValue() }
-
     /**
-     * Where [key]'s popups are drawn by the engine: a key the canvas draws, not a view's. A view's
-     * keep theirs, one of no id too (a picker's: its viewId is NO_VIEW as well); with the canvas off
-     * nothing of the engine's is made at all.
+     * The engine that draws [key]'s popups, every key's (a picker's cell too); null where the theme
+     * did not convert: no popup then, logged, never another drawing (060: the views are gone).
      */
-    private fun scenesFor(key: KeyRef): PopupScenes? {
-        if (!key.isScene || !canvasOn) return null
-        return scenes.takeIf { it.ready }
-    }
+    private fun scenesFor(key: KeyRef): PopupScenes? =
+        scenes.takeIf { it.ready } ?: null.also { Timber.w("no popup for %s: the theme's scene did not convert", key) }
 
     // [dp] in px as the engine's rules size a scene's popup ([Popups.px])
     private fun PopupScenes.px(dp: Double) = Popups.px(dp, density).toInt()
@@ -167,13 +129,12 @@ class PopupComponent :
             place(this, bounds)
             return
         }
-        val scenes = scenesFor(key)
-        val popup = (freeEntry(scenes != null)
-            ?: PopupEntryUi(context, theme, popupKeyHeight, popupRadius, scenes)).apply {
+        val scenes = scenesFor(key) ?: return
+        val popup = (freeEntryUi.pollFirst() ?: PopupEntryUi(context, scenes)).apply {
             lastShowTime = System.currentTimeMillis()
         }
         if (!show(popup, content, null, bounds.width())) {
-            // the engine could not make it (logged): no bubble this time, not the views' (they go)
+            // the engine could not make it (logged): no bubble this time
             freeEntryUi.add(popup)
             return
         }
@@ -190,17 +151,10 @@ class PopupComponent :
         showingEntryUi[key] = popup
     }
 
-    // a bubble put away, of the kind asked: the views' or the scene's
-    private fun freeEntry(scene: Boolean): PopupEntryUi? =
-        freeEntryUi.firstOrNull { (it.sceneView != null) == scene }?.also { freeEntryUi.remove(it) }
-
     // [text] in [popup] over a key [keyWidth] px across, as [fit] has it (null: a character, its
     // size); false where the engine could not make its scene, the one before kept
-    private fun show(popup: PopupEntryUi, text: String, fit: PreviewLabel.Fit?, keyWidth: Int): Boolean {
-        if (popup.sceneView != null) return popup.showScene(fit?.text ?: text, fit?.size?.toDouble(), keyWidth)
-        popup.setText(fit?.text ?: text, fit?.size ?: symbolSize())
-        return true
-    }
+    private fun show(popup: PopupEntryUi, text: String, fit: PreviewLabel.Fit?, keyWidth: Int): Boolean =
+        popup.showScene(fit?.text ?: text, fit?.size?.toDouble(), keyWidth)
 
     private fun updatePopup(key: KeyRef, content: String, words: Boolean) {
         // a long press's keys shown, showKeyboard dismissed the bubble: a letter's preview, wrapped by
@@ -209,17 +163,11 @@ class PopupComponent :
         showingEntryUi[key]?.apply {
             val fit = if (words && PreviewLabel.isWords(content)) wordsFit(content, this) else null
             val text = fit?.text ?: content
-            if (sceneView != null) {
-                if (sceneText == text && sceneSize == fit?.size?.toDouble()) return
-                if (!show(this, text, fit, trigger.width())) {
-                    // not the text before left up while a lift types this one: none, as showPopup's
-                    dismissJobs.remove(key)?.cancel()
-                    return dismissPopupEntry(key, this)
-                }
-            } else {
-                val px = fit?.size ?: symbolSize()
-                if (textView.text.contentEquals(text) && textView.textSize == px) return
-                setText(text, px)
+            if (sceneText == text && sceneSize == fit?.size?.toDouble()) return
+            if (!show(this, text, fit, trigger.width())) {
+                // not the text before left up while a lift types this one: none, as showPopup's
+                dismissJobs.remove(key)?.cancel()
+                return dismissPopupEntry(key, this)
             }
             place(this, trigger)
         }
@@ -232,19 +180,9 @@ class PopupComponent :
     private fun wordsFit(label: String, popup: PopupEntryUi): PreviewLabel.Fit? {
         val scale = keyTextScale(context)
         val width = popup.trigger.width()
-        val scene = popup.sceneView != null
         // asked again on every move of the finger past the threshold: measured once for the same label
-        lastFit?.takeIf { it.label == label && it.scale == scale && it.width == width && it.scene == scene }?.let { return it.fit }
-        if (scene) return sceneWordsFit(label, width)?.also { lastFit = FitFor(label, scale, width, it, scene = true) }
-        val size = sp(PreviewLabel.WORDS_SP * scale)
-        val room = PreviewLabel.room(width.toFloat(), size, popupPadding.toFloat())
-        val paint = TextPaint(popup.textView.paint)
-        val fit = PreviewLabel.fit(label, size, sp(PreviewLabel.MIN_SP * scale), room) { s, px ->
-            paint.textSize = px
-            paint.measureText(s)
-        }
-        lastFit = FitFor(label, scale, width, fit)
-        return fit
+        lastFit?.takeIf { it.label == label && it.scale == scale && it.width == width }?.let { return it.fit }
+        return sceneWordsFit(label, width)?.also { lastFit = FitFor(label, scale, width, it) }
     }
 
     // the engine's: its sizes dp, measured as the scene draws them ([PopupScenes]); none where it
@@ -261,32 +199,27 @@ class PopupComponent :
         return fit.takeIf { measured }
     }
 
-    private class FitFor(val label: String, val scale: Float, val width: Int, val fit: PreviewLabel.Fit, val scene: Boolean = false)
+    private class FitFor(val label: String, val scale: Float, val width: Int, val fit: PreviewLabel.Fit)
 
     private var lastFit: FitFor? = null
 
-    /** A key's letter or symbol in the bubble: scaled as the keys' text is (紧凑, floating), as the words are. */
-    private fun symbolSize() = sp(PreviewLabel.symbolSize(keyTextScale(context)))
-
-    private fun sp(value: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, value, context.resources.displayMetrics)
-
     /**
-     * Over the key [bounds], [width] wide, by default as wide as the key's face (the bounds across)
-     * and its text, never narrower than [minPopupWidth]: a fixed width over a wider key
-     * (九键's, `.com`, any in landscape) left the key's pressed colour showing at both sides.
+     * Over the key [bounds], [width] wide, by default as the engine sizes it: as wide as the key's
+     * face and its text, never narrower than its least (Popups).
      * From [left], by default centred over the key, kept inside the keyboard: a table's roots
      * (TextKeyboard) over A were wider than the half of it left of A.
      */
     private fun place(
         popup: PopupEntryUi,
         bounds: Rect,
-        width: Int = entryWidth(popup, bounds),
+        // the engine's: the key's, its text's or the least, whichever is widest (Popups)
+        width: Int = popup.sceneView.sceneWidth,
         left: Int = ((bounds.left + bounds.right - width) / 2).let { if (root.width > width) it.coerceIn(0, root.width - width) else it },
     ) {
         popup.trigger.set(bounds)
         // the scene's its own height, and room round it for its shadow ([PopupSceneView.outset])
-        val height = popup.sceneView?.sceneHeight ?: popupHeight
-        val out = popup.sceneView?.outset ?: NO_OUTSET
+        val height = popup.sceneView.sceneHeight
+        val out = popup.sceneView.outset
         // align popup bottom with key border bottom [^1]
         val top = bounds.bottom - height - keyBottomMargin - out.top
         val w = width + out.left + out.right
@@ -303,12 +236,6 @@ class PopupComponent :
     private fun FrameLayout.LayoutParams.isAt(width: Int, height: Int, left: Int, top: Int) =
         this.width == width && this.height == height && leftMargin == left && topMargin == top
 
-    private fun entryWidth(popup: PopupEntryUi, bounds: Rect): Int {
-        // the engine's: the key's, its text's or the least, whichever is widest (Popups)
-        popup.sceneView?.let { return it.sceneWidth }
-        val text = ceil(popup.textWidth(popup.textView.text.toString())).toInt() + 2 * popupPadding
-        return maxOf(minPopupWidth, bounds.width(), text)
-    }
 
     private fun showKeyboard(key: KeyRef, keyboard: KeyDef.Popup.Keyboard, bounds: Rect) {
         var keys: Array<String>
@@ -335,18 +262,17 @@ class PopupComponent :
         }
         // the keys float over the key on their own: the bubble under the one in focus, as one shape
         // with it, was as wide as the key pressed, and so were they
-        // a scene's keys sized by the engine's rules (Popups), the views' by these
-        val scenes = scenesFor(key)
+        // sized by the engine's rules (Popups)
+        val scenes = scenesFor(key) ?: return
         val keyboardUi = PopupKeyboardUi(
             context,
             theme,
             rootBounds,
             bounds,
             { dismissPopup(key) },
-            popupRadius,
-            scenes?.px(Popups.KEY_MIN_WIDTH_DP) ?: longPressKeyWidth,
-            scenes?.px(Popups.KEY_HEIGHT_DP) ?: longPressKeyHeight,
-            scenes?.px(Popups.LIFT_DP) ?: longPressLift,
+            scenes.px(Popups.KEY_MIN_WIDTH_DP),
+            scenes.px(Popups.KEY_HEIGHT_DP),
+            scenes.px(Popups.LIFT_DP),
             keys,
             labels,
             split,
@@ -364,6 +290,7 @@ class PopupComponent :
     }
 
     private fun showMenu(key: KeyRef, menu: KeyDef.Popup.Menu, bounds: Rect) {
+        val scenes = scenesFor(key) ?: return
         val menuUi = PopupMenuUi(
             context,
             theme,
@@ -372,7 +299,7 @@ class PopupComponent :
             { dismissPopup(key) },
             menu.items,
             onFocusMoved = { InputFeedbacks.hapticFeedback(it) },
-            scenes = scenesFor(key),
+            scenes = scenes,
         )
         if (menuUi.unmade) return
         showingEntryUi[key]?.let {
@@ -383,8 +310,8 @@ class PopupComponent :
 
     private fun showEditMenu(key: KeyRef, bounds: Rect, password: Boolean) {
         val cells = EditMenuLayout.CELLS
-        val scenes = scenesFor(key)
-        val cell = scenes?.px(Popups.MENU_CELL_DP) ?: context.dp(PopupMenuUi.CELL_DP)
+        val scenes = scenesFor(key) ?: return
+        val cell = scenes.px(Popups.MENU_CELL_DP)
         // up where the notices go, out from under the finger; a notice there put away, its window over the row
         val at = menuRoom?.invoke(cell * cells.size, cell)?.let { room ->
             EditMenuLayout.place(room.notice, bounds.centerX(), cell, rootBounds.left, rootBounds.right, rootBounds.top, room.barMiddle)
@@ -537,17 +464,6 @@ class PopupComponent :
                 val maps = !keyboard.asIs && (it >= keyboard.symbolsFrom || item.none(Char::isLetterOrDigit))
                 if (maps) mapped(item) else item
             }
-
-        /**
-         * Space each side of the bubble's text, in dp; a long press's keys leave as much each side
-         * of their widest label, so the bubble and the key over it come out one width.
-         */
-        internal const val TEXT_PADDING = 6
-
-        /** A long press's keys' least width, their height and their lift over the key, in dp. */
-        internal const val LONG_PRESS_KEY_WIDTH = 34
-        internal const val LONG_PRESS_KEY_HEIGHT = 40
-        internal const val LONG_PRESS_LIFT = 6
 
         private val NO_OUTSET = Rect()
     }

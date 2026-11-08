@@ -71,31 +71,11 @@ class NumberRow(ctx: Context, theme: Theme) : BaseKeyboard(ctx, theme, Layout) {
 
     // the keys drawn by the scene take every touch here (BaseKeyboard routes them to the scene's keys,
     // SceneTouch): the swipe that collapses the row is told apart first, before the keys see the move,
-    // and the key under the finger let go of (a cancel: nothing typed) as a view's was when this intercepted
+    // and the key under the finger let go of (a cancel: nothing typed)
     private var collapsing = false
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (drawnByScene) return sceneTouch(event)
-        var handled = false
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> gestureStartEvent = MotionEvent.obtain(event)
-            MotionEvent.ACTION_MOVE -> checkGesture(event)
-            MotionEvent.ACTION_UP -> {
-                if (collapseGestureTriggered) {
-                    resetState()
-                    onCollapseListener?.invoke()
-                    handled = true
-                }
-            }
-            MotionEvent.ACTION_CANCEL -> resetState()
-        }
-        return super.onTouchEvent(event) || handled
-    }
-
-    private val drawnByScene get() = canvas != null
-
-    private fun sceneTouch(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 resetState()
@@ -127,7 +107,7 @@ class NumberRow(ctx: Context, theme: Theme) : BaseKeyboard(ctx, theme, Layout) {
         return if (collapsing) true else super.onTouchEvent(event)
     }
 
-    // laid on the bar, no keyboard's fill under the digits (as the views drew none)
+    // laid on the bar, no keyboard's fill under the digits
     override val sceneDrawsBase: Boolean get() = false
 
     // no marks: the row's keys reach no shortcut
@@ -140,7 +120,7 @@ class NumberRow(ctx: Context, theme: Theme) : BaseKeyboard(ctx, theme, Layout) {
     }
 
     companion object {
-        /** The row drawn by the scene where the canvas is on (060-render-p2 S6). */
+        /** The row's layout, drawn by the scene (060-render-p2 S6). */
         const val LAYOUT = "number-row"
 
         val Layout = listOf(

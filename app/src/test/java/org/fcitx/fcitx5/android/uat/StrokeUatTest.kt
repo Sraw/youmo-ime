@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.uat
 
-import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.FormattedText
@@ -20,7 +19,6 @@ import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
-import org.fcitx.fcitx5.android.input.ViewShownKey
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.junit.After
@@ -80,8 +78,6 @@ class StrokeUatTest {
     private fun stroke(c: Char) = "sym=${UNICODE + Keyboard.strokeKey(c)},"
 
     // a finger down on [v], moved [across] and [down] of its width and height, then lifted
-    private fun draw(v: org.fcitx.fcitx5.android.input.keyboard.KeyView, across: Float, down: Float) = draw(ViewShownKey(v), across, down)
-
     private fun draw(v: ShownKey, across: Float, down: Float) {
         val b = h.box(v)
         h.drag(v, b.exactCenterX() + across * b.width(), b.exactCenterY() + down * b.height(), steps = 12)
@@ -142,7 +138,6 @@ class StrokeUatTest {
         harness(KeyboardHarness.PINYIN)
         typed("hao")
         h.api.calls.clear()
-        // whichever draws the keys (060-render-p2 S4a: the canvas where it is on)
         draw(h.key("GH"), across = 0f, down = 2f)
         assertEquals(downs().toString(), listOf(true), downs().map { stroke('s') in it })
         close()

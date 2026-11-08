@@ -123,12 +123,12 @@ class GroupedKeyboard18Test {
 
     @Test
     @Uat("SP-21")
-    fun theSpaceIsAtLeast15PercentOfTheRowInEveryField() = bothDrawings {
+    fun theSpaceIsAtLeast15PercentOfTheRowInEveryField() {
         assertSpaceAtLeast15Percent(GroupedKeyboard(context, ThemePreset.PixelDark, NineKeyLetters.G18))
     }
 
     @Test
-    fun theKeyboardHasItsBottomRowAndTalkBackReadsEachGroup() = bothDrawings {
+    fun theKeyboardHasItsBottomRowAndTalkBackReadsEachGroup() {
         val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark, NineKeyLetters.G18).laidOut()
         listOf(R.id.button_lang, R.id.button_space, R.id.button_return, R.id.button_comma, R.id.button_backspace).forEach {
             assertTrue(keyboard.resources.getResourceEntryName(it), keyboard.shownKeyWithId(it) != null)

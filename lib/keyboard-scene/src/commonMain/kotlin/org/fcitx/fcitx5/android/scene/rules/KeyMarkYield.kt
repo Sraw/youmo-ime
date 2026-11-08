@@ -47,7 +47,8 @@ import kotlin.math.sqrt
  * Marks meeting each other ([keptApart]): out into their insets, all as far; what that doesn't part
  * is left out, the most expendable first.
  *
- * ime-core's copy, the views', is the older rule (marks smaller, other corners); P2 deletes it.
+ * ime-core's copy, the views', is the older rule (marks smaller, other corners); to be deleted
+ * with the other copies (060-pending-decisions, S8a).
  */
 object KeyMarkYield {
 

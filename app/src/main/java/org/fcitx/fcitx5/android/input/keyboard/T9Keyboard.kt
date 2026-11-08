@@ -22,8 +22,6 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.annotation.Keep
 import androidx.constraintlayout.widget.ConstraintLayout
-import androidx.core.view.ViewCompat
-import androidx.core.view.children
 import androidx.core.view.isVisible
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -60,10 +58,7 @@ import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.scene.TextBoardState
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
-import org.fcitx.fcitx5.android.input.theme.KeyFaceGeometry
-import org.fcitx.fcitx5.android.input.theme.KeyKind
 import org.fcitx.fcitx5.android.input.theme.KeyNames
-import org.fcitx.fcitx5.android.input.theme.KeyStyleResolver
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.Scene
@@ -75,8 +70,6 @@ import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.constraintlayout.leftOfParent
 import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.add
-import splitties.views.existingOrNewId
-import splitties.views.imageResource
 import kotlin.math.roundToInt
 
 /**
@@ -127,7 +120,7 @@ class T9Keyboard(
     private val english: Boolean = false,
     private val shuangpin: Boolean = false,
     /** 九键双拼's 5 shows `;` (JKL;): only under a scheme that types it (微软's ing). */
-    semicolon: Boolean = true,
+    private val semicolon: Boolean = true,
 ) : BaseKeyboard(
     context, theme, layout(letters, symbols, english, shuangpin, semicolon), themeBoard = KeyNames.NINE, shortcuts = true,
 ), AutoCapsKeys {
@@ -164,9 +157,6 @@ class T9Keyboard(
 
         /** What 1 types while nothing is typed: the first, pressed again soon the next in its place. */
         internal const val ONE = "，。？！"
-
-        // 1's label while something is typed
-        private const val SEPARATOR = "分词"
 
         /** The column's for English: typed through it, which puts a word's space behind them. */
         private val ENGLISH_PUNCTUATION = listOf(",", ".", "?", "!", "'", "-", ":", ";", "@")
@@ -505,8 +495,6 @@ class T9Keyboard(
         )
     }
 
-    private val space: TextKeyView by lazy { findViewById(R.id.button_space) }
-
     /** The field's address: what the column offers in place of punctuation ([AddressKeys.column]). */
     override var address: AddressKeys = AddressKeys.NONE
         set(value) {
@@ -514,24 +502,6 @@ class T9Keyboard(
             field = value
             show(columnState)
         }
-
-    // the keys 1 to 9 by their digits
-    private val digitKeys: Map<Char, AltTextKeyView> = keyRows.flatMap { it.children.toList() }
-        .filterIsInstance<AltTextKeyView>()
-        .associateBy { (it.def as KeyDef.Appearance.AltText).altText.single() }
-
-    // a key's preview names it by its view's id, not by its letters, which two keys may share
-    private val digitOf: Map<Int, Char> = digitKeys.entries.associate { (digit, key) -> key.existingOrNewId to digit }
-
-    // 1, its label as what is typed has it
-    private val one: AltTextKeyView = digitKeys.getValue('1')
-    private val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
-    private val lang: ImageKeyView by lazy { findViewById(R.id.button_lang) }
-
-    // each digit key's letters on it, as the engine reads the digits
-    private val letterKeys: List<Pair<Char, TextKeyView>> = ('2'..'9').flatMap { d ->
-        letters.letters(d).map { it.lowercaseChar() to digitKeys.getValue(d) }
-    }
 
     // each letter where the scene draws its digit's key (nine.xml's key N)
     private val sceneLetters: List<Pair<Char, KeyPlace>> = ('2'..'9').flatMap { d ->
@@ -554,8 +524,8 @@ class T9Keyboard(
     override val glide: GlideInput? = if (english) {
         null
     } else {
-        // the keys where the scene draws them (their centres, GlideGesture's) when it does, else their views
-        glideInput(letters = { if (canvas != null) sceneLetters else letterKeys }, down = GlideGesture.NINE_KEYS_DOWN, enabled = { !shuangpin }, filters = { InputMethodCatalog.filtersByStrokes(imeName) }) { path, layout ->
+        // the keys where the scene draws them (their centres, GlideGesture's)
+        glideInput(letters = { sceneLetters }, down = GlideGesture.NINE_KEYS_DOWN, enabled = { !shuangpin }, filters = { InputMethodCatalog.filtersByStrokes(imeName) }) { path, layout ->
             // a glide ends a run of presses: a key pressed soon after it is a press of its own, not 连按's next letter
             multiTap.reset()
             onAction(KeyAction.GlideAction(Glide(path, layout)))
@@ -587,8 +557,6 @@ class T9Keyboard(
     // the case of the letter 连按 is cycling through, as Shift was when its run started
     private var runUpper = false
 
-    private val caps: ImageKeyView? by lazy { if (english) findViewById(R.id.button_caps) else null }
-
     @Keep
     private val showLangSwitchKeyListener = ManagedPreference.OnChangeListener<Boolean> { _, _ ->
         showLanguageKey()
@@ -596,7 +564,6 @@ class T9Keyboard(
 
     // the language key as the user has it
     private fun showLanguageKey() {
-        lang.isVisible = showLangSwitchKey.getValue()
         canvas?.invalidateScene()
     }
 
@@ -612,18 +579,11 @@ class T9Keyboard(
     }.apply {
         isVerticalScrollBarEnabled = false
         overScrollMode = OVER_SCROLL_NEVER
-        // a function key's face as the theme has `nine/side`, drawn on flat keys too as before 3.0;
-        // its cells take the press
+        // its face is the scene's slot's (nine.xml's `side`): the column draws only its items, which take the press
         val keys = ThemeManager.shownLook(theme).keys
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val h = dp(if (landscape) keys.gap.hLand else keys.gap.h)
         val v = dp(if (landscape) keys.gap.vLand else keys.gap.v)
-        val density = resources.displayMetrics.density
-        drawAsKey(
-            theme, KeyStyleResolver.resolve(keys, KeyNames.NINE, SIDE_KEY, KeyKind.Function), KeyKind.Function, keyImages,
-            { width, height -> KeyFaceGeometry.of(width, height, KeyKind.Function, keys, landscape, density, true, KeyFaceGeometry.Border.On) },
-            press = false,
-        )
         setPadding(h, v, h, v)
         addView(items)
     }
@@ -649,21 +609,7 @@ class T9Keyboard(
     override val ownsSyllables: Boolean get() = !english
 
     init {
-        add(column, lParams {
-            topToTop = keyRows[0].existingOrNewId
-            bottomToBottom = keyRows[2].existingOrNewId
-            leftOfParent()
-            width = 0
-            height = 0
-            matchConstraintPercentWidth = SIDE
-        })
-        // under the column, out of reach: TalkBack would stop on them, a second finger under the vivo workaround hit them
-        keyRows.take(3).forEach { row ->
-            row.getChildAt(0).apply {
-                isEnabled = false
-                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            }
-        }
+        add(column, lParams(0, 0))
         showLanguageKey()
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
         multiTapPref.registerOnChangeListener(multiTapListener)
@@ -701,7 +647,7 @@ class T9Keyboard(
 
     private val columnHit = Rect()
 
-    // the vivo workaround takes every touch for a key: the column's are the column's
+    // the keyboard takes every touch for a key (BaseKeyboard.onInterceptTouchEvent): the column's are the column's
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         column.getHitRect(columnHit)
         if (columnHit.contains(ev.x.toInt(), ev.y.toInt())) return false
@@ -725,7 +671,6 @@ class T9Keyboard(
         columnState = state
         typing = state.composing
         // only when it changes: setText does not skip the same text, and may lay the row out again
-        if (state.composing != was) one.mainText.text = oneLabel(state.composing)
         val labels = labels(state, english, address)
         while (items.childCount < labels.size) items.addView(item(items.childCount))
         for (i in 0 until items.childCount) {
@@ -735,12 +680,6 @@ class T9Keyboard(
         }
         column.scrollTo(0, 0)
         if (state.composing != was) canvas?.invalidateScene()
-    }
-
-    private fun oneLabel(composing: Boolean) = when {
-        english -> if (composing) APOSTROPHE else ENGLISH_ONE_LABEL
-        composing -> SEPARATOR
-        else -> ONE
     }
 
     // one line, in dp as the keys' text is: a syllable longer than the column (shuang, zhuang on a
@@ -817,24 +756,6 @@ class T9Keyboard(
 
     // Shift's icon, said too (as the full keyboard's), and the letters on the keys in its case
     private fun showShift() {
-        val key = caps ?: return
-        key.img.imageResource = when (shift.caps) {
-            AutoCaps.Caps.NONE -> R.drawable.ic_capslock_none
-            AutoCaps.Caps.ONCE -> R.drawable.ic_capslock_once
-            AutoCaps.Caps.LOCK -> R.drawable.ic_capslock_lock
-        }
-        ViewCompat.setStateDescription(
-            key,
-            when (shift.caps) {
-                AutoCaps.Caps.NONE -> null
-                AutoCaps.Caps.ONCE -> context.getString(R.string.a11y_state_shift_once)
-                AutoCaps.Caps.LOCK -> context.getString(R.string.a11y_state_caps_lock)
-            },
-        )
-        for (d in '2'..'9') {
-            val on = letters.letters(d)
-            digitKeys[d]?.mainText?.text = if (shift.upper) on.uppercase() else on.lowercase()
-        }
         canvas?.invalidateScene()
     }
 
@@ -859,8 +780,8 @@ class T9Keyboard(
     override fun onPopupAction(action: PopupAction) {
         val shown = when (action) {
             is PopupAction.PreviewAction -> {
-                // a key view's by its id; the scene's by its id there, the digit (nine.xml)
-                val digit = digitOf[action.key.viewId] ?: action.key.id.singleOrNull()?.takeIf { action.key.isScene && it in digitKeys }
+                // the scene's key by its id there, the digit (nine.xml)
+                val digit = action.key.id.singleOrNull()?.takeIf { it in '1'..'9' }
                 val now = SystemClock.uptimeMillis()
                 pressed = digit?.let { Pressed(it, now) }
                 // 九键双拼 has no 连按: a key's preview is its letters
@@ -885,7 +806,6 @@ class T9Keyboard(
 
     override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
         returnAppearance = appearance
-        `return`.showReturnAction(appearance)
         canvas?.invalidateScene()
     }
 
@@ -894,12 +814,12 @@ class T9Keyboard(
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         imeName = ime.uniqueName
-        showInputMethodName(space, ime)
+        showInputMethodName(ime)
         canvas?.invalidateScene()
     }
 
     // what the keys show now (nine.xml's when= and bindings): English's or not, 1 as what the engine
-    // says is typed ([oneLabel]), each digit's letters as its view has them (the user's, 双拼's, Shift's
+    // says is typed, each digit's letters (the user's, 双拼's, Shift's
     // case), Shift, the language key, the space's input method, Return
     override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env {
         val state = TextBoardState(langKey = showLangSwitchKey.getValue(), holdVoice = holdsToTalk)
@@ -908,7 +828,7 @@ class T9Keyboard(
             imeName = shownImeName.orEmpty(),
             returnLabel = returnAppearance.label(context).toString(),
             returnIcon = SceneIcons.returnName(returnAppearance.icon),
-            nineLetters = ('2'..'9').associate { d -> d.toString() to digitKeys.getValue(d).mainText.text.toString() },
+            nineLetters = ('2'..'9').associate { d -> d.toString() to lettersOn(d, letters, english, shuangpin, semicolon).let { if (english && shift.upper) it.uppercase() else it } },
             a11yGrouped = context.getString(R.string.a11y_key_grouped),
             a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
         )
@@ -946,13 +866,10 @@ class T9Keyboard(
         }
     }
 
-    // last: the scene reads the state above (060's redraw: the keys drawn by the scene engine where the
-    // canvas is on, each wired as its view was, by its theme name; the column a native view in its slot)
+    // last: the scene reads the state above (the keys drawn by the scene engine, each wired as nine.xml's
+    // node says; the column a native view in its slot)
     init {
-        if (drawKeysWithScene(LAYOUT)) {
-            // the slot's face is the scene's: the column draws only its items
-            column.background = null
-            column.bringToFront()
-        }
+        drawKeysWithScene(LAYOUT)
+        column.bringToFront()
     }
 }

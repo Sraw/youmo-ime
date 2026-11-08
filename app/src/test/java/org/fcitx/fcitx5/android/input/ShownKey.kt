@@ -7,27 +7,20 @@ package org.fcitx.fcitx5.android.input
 import android.graphics.Rect
 import android.graphics.RectF
 import android.view.View
-import android.widget.ImageView
-import android.widget.TextView
-import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
-import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
-import org.fcitx.fcitx5.android.input.keyboard.KeyView
-import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.Op
 import kotlin.math.roundToInt
 
 /**
- * A key as a test sees it, whichever draws it (060-render-p2 S3): a key view ([ViewShownKey]) or a
- * key of the scene a [KeyboardCanvasView] draws ([SceneShownKey]). [KeyboardHarness] finds them
- * ([KeyboardHarness.key], [KeyboardHarness.keyNamed]) and puts fingers on them by where they are
- * ([bounds]), so a test written on it runs on both drawings; S8 deletes [ViewShownKey]. Places are
- * the window's, read each time asked: a key moves with its keyboard (one-handed, floating).
+ * A key as a test sees it (060-render-p2 S3): a key of the scene a [KeyboardCanvasView] draws
+ * ([SceneShownKey]). [KeyboardHarness] finds them ([KeyboardHarness.key], [KeyboardHarness.keyNamed])
+ * and puts fingers on them by where they are ([bounds]). Places are the window's, read each time
+ * asked: a key moves with its keyboard (one-handed, floating).
  */
 interface ShownKey {
-    /** The scene's key id (`q`, `space`, layout-1's), a key view's theme name ([KeyView.themeKey]); null for a view not named. */
+    /** The scene's key id (`q`, `space`, layout-1's). */
     val id: String?
 
     /** Which of the two a split row draws of one key it is (G, V): 0, or 1 for the second. */
@@ -39,19 +32,19 @@ interface ShownKey {
     /** Its corner as shown (a letter's symbol, the nine keys' digit, a table's letter under its roots); null for none. */
     val alt: String?
 
-    /** What a screen reader reads for it: its view's content description, its node's; null for none. */
+    /** What a screen reader reads for it: its node's; null for none. */
     val description: String?
 
     /** Whether it takes a press (a blank key does not, nor a key the scene has as disabled). */
     val enabled: Boolean
 
-    /** The state a screen reader is told (Shift's once, locked): its view's state description, its node's; null for none. */
+    /** The state a screen reader is told (Shift's once, locked): its node's; null for none. */
     val state: String?
 
-    /** Its view's id's name (`button_caps`), its node's as told (the same name); null for none. */
+    /** Its resource name as its node tells it (`button_caps`); null for none. */
     val resourceName: String?
 
-    /** Its cell in the window: a view's box, where a popup is placed from. */
+    /** Its cell in the window, where a popup is placed from. */
     val bounds: Rect
 
     /** What is drawn of it in the window: its cell less the gaps between keys. */
@@ -63,10 +56,10 @@ interface ShownKey {
     /** Whether it is shown pressed now. */
     val pressed: Boolean
 
-    /** A click, as the end of a tap calls it (a view's performClick, the scene key's click): whether anything took it. */
+    /** A click, as the end of a tap calls it (the scene key's click): whether anything took it. */
     fun click(): Boolean
 
-    /** The size [text] is drawn at on it (a text view's text size, a scene's text's); null where it draws no such text. */
+    /** The size [text] is drawn at on it (the scene's text's); null where it draws no such text. */
     fun textSize(text: String): Float?
 
     /** How many icons are drawn on it: its own, its marks' (a shortcut's command). */
@@ -76,7 +69,7 @@ interface ShownKey {
     val drawnTexts: List<String>
 
     /**
-     * Where [text] is drawn on it, in the window: a view's text view's box; a scene's text from its
+     * Where [text] is drawn on it, in the window: the scene's text from its
      * left and baseline, its ink's top and width a guess (0.75 and 0.6 of its size: letters and
      * digits). Null where it draws no such text.
      */
@@ -84,47 +77,6 @@ interface ShownKey {
 
     val width: Int get() = bounds.width()
     val height: Int get() = bounds.height()
-}
-
-/** A key view as a [ShownKey]: the old drawing's, the key's own view. */
-class ViewShownKey(val view: KeyView) : ShownKey {
-    override val id: String? get() = view.themeKey
-    override val copy: Int = 0
-    override val label: String get() = (view as? TextKeyView)?.mainText?.text?.toString().orEmpty()
-    override val alt: String?
-        get() = (view as? AltTextKeyView)?.altText?.takeIf { it.visibility == View.VISIBLE }?.text?.toString()?.takeIf { it.isNotEmpty() }
-    override val description: String? get() = view.contentDescription?.toString()
-    // a resource's id only: View.generateViewId's are below a package's (0x01000000)
-    override val resourceName: String? get() = view.id.takeIf { it != View.NO_ID && it ushr 24 != 0 }?.let(view.resources::getResourceEntryName)
-    override val enabled: Boolean get() = view.isEnabled
-    override val state: String? get() = ViewCompat.getStateDescription(view)?.toString()
-    override val bounds: Rect
-        get() {
-            val at = IntArray(2).also(view::getLocationInWindow)
-            return Rect(at[0], at[1], at[0] + view.width, at[1] + view.height)
-        }
-    override val face: Rect get() = bounds.apply { inset(view.hMargin, view.vMargin) }
-    override val hit: Rect get() = bounds
-    override val pressed: Boolean get() = view.isPressed
-    override fun click(): Boolean = view.performClick()
-
-    private fun textViews() = KeyboardHarness.all(view).filterIsInstance<TextView>()
-        .filter { v -> generateSequence(v as View) { it.parent as? View }.takeWhile { it !== view }.all { it.visibility == View.VISIBLE } }
-
-    override fun textSize(text: String): Float? = textViews().firstOrNull { it.text.toString() == text }?.textSize
-
-    // a mark its key left out for want of room is there, see-through (KeyView.settle)
-    override val drawnIcons: Int
-        get() = KeyboardHarness.all(view).filterIsInstance<ImageView>()
-            .count { v -> generateSequence(v as View) { it.parent as? View }.takeWhile { it !== view }.all { it.visibility == View.VISIBLE && it.alpha > 0f } }
-
-    override val drawnTexts: List<String> get() = textViews().map { it.text.toString() }.filter { it.isNotEmpty() }.toList()
-
-    override fun drawn(text: String): RectF? = textViews().firstOrNull { it.text.toString() == text }?.let { v ->
-        val at = IntArray(2).also(v::getLocationInWindow)
-        RectF(at[0].toFloat(), at[1].toFloat(), (at[0] + v.width).toFloat(), (at[1] + v.height).toFloat())
-    }
-    override fun toString() = "view key ${id ?: label}"
 }
 
 /**

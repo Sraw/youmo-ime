@@ -65,11 +65,11 @@ class TextKeyboardTest {
         val zh = mapOf("." to "。", "/" to "、")
         val punctuation = { p: String -> zh.getOrDefault(p, p) }
         val shift = { c: String -> c.uppercase() }
-        assertEquals(".", previewOf(".", KeyRef.view(R.id.button_dot), shift, punctuation))
-        assertEquals("/", previewOf("/", KeyRef.view(R.id.button_slash), shift, punctuation))
-        assertEquals(".com", previewOf(".com", KeyRef.view(R.id.button_domain), shift, punctuation))
+        assertEquals(".", previewOf(".", KeyRef.scene("dot", 0), shift, punctuation))
+        assertEquals("/", previewOf("/", KeyRef.scene("slash", 0), shift, punctuation))
+        assertEquals(".com", previewOf(".com", KeyRef.scene("domain", 0), shift, punctuation))
         // the full stop beside the space is the input method's, and a letter is as Shift has it
-        assertEquals("。", previewOf(".", KeyRef.view(R.id.button_period), shift, punctuation))
+        assertEquals("。", previewOf(".", KeyRef.scene("period", 0), shift, punctuation))
         assertEquals("Q", previewOf("q", KeyRef.view(-1), shift, punctuation))
         // the same keys the scene draws, by their names (060-render-p2 S1)
         assertEquals(".", previewOf(".", KeyRef.scene("dot", 0), shift, punctuation))
