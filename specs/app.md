@@ -979,10 +979,13 @@ process (`AppUtil.restart`); a failed restore reopens what it stopped (`restartA
 New user data must be added to the export, and must survive a restore made by an older version
 (missing files mean defaults).
 The learning is merged, not replaced (U-100, `UserDataManager.importEngine`): the phone's
-`learn.log`, its word lists, its old `*.user` logs and its backups stay; what the backup has of
+`learn.log`, its word lists (`words.added`, `words.blocked`, and English's blocked words
+`words.en.blocked`, `EnglishBlocks.FILE`, a word a line, no reading), its old `*.user` logs and its backups stay; what the backup has of
 learning (the zip's learning backup, or its record, or an older build's logs to convert, with its
-lists) is moved into a directory of its own under `RestoreStash.DIR`, and the engine merges it as it
-next starts (beside any stash not merged yet). A `learn.log.unreadable*` (a later build's log kept
+lists, `words.en.blocked` with them: `RestoreStash.read` reads it into the blocked words, no reading to
+them, as a backup's bytes carry them) is moved into a directory of its own under `RestoreStash.DIR`, and the engine merges it as it
+next starts (beside any stash not merged yet). An emoji blocked in its word's reading (👍🏻 hao) is a
+line of `words.blocked` like any, its syllables not one per code point (`WordLists.blockedEntry`). A `learn.log.unreadable*` (a later build's log kept
 aside) stays. An export with the learning as a backup leaves out the files it is made of and the old
 logs (`*.user`, `*.user.told`) and `learn.table-logs-read`, the phone's own as the record is; with
 that mark (the old logs read into the record) an export without the learning leaves the old logs out

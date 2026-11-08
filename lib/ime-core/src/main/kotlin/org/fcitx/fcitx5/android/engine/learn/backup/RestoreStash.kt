@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.learn.backup
 
+import org.fcitx.fcitx5.android.engine.english.EnglishBlocks
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.learn.LearnState
 import org.fcitx.fcitx5.android.engine.platform.UserFiles
@@ -57,6 +58,8 @@ object RestoreStash {
         // its days of an install its files tell: the same zip again (a retry, another import) the same one
         val files = dir.files().sorted()
         val origin = LearnBackup.origin(*files.flatMap { listOf(it.toByteArray(), dir.file(it).read()) }.toTypedArray())
-        return Backup(null, state, lists.addedWords.map(listed), lists.blockedWords.map(listed), origin)
+        // English's blocked words, no reading to them, as a backup's bytes carry them
+        val english = EnglishBlocks(dir, onError).blocked.map { ListedWord(it, "") }
+        return Backup(null, state, lists.addedWords.map(listed), lists.blockedWords.map(listed) + english, origin)
     }
 }
