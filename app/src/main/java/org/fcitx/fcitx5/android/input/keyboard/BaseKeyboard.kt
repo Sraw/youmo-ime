@@ -634,7 +634,7 @@ abstract class BaseKeyboard(
         val layout = SceneLayouts.of(context, layoutName)
         val board = SceneBoard(context, theme, layout) { look, read, width, height -> sceneEnv(look, read, width, height) }
         sceneBoard = board
-        val view = board.view(keyImages, { node -> sceneKey(node) }) { onSceneBuilt(it) }
+        val view = board.view(keyImages, ::sceneString, { node -> sceneKey(node) }) { onSceneBuilt(it) }
         releaseAllTouchTargets()
         spaceKeys.removeAll { it is SceneKey }
         canvas = view
@@ -659,6 +659,8 @@ abstract class BaseKeyboard(
 
     /** A scene made anew for the canvas ([scene]; null, none drawn): what a keyboard places by it, placed again. */
     internal open fun onSceneBuilt(scene: Scene?) {}
+    /** The keyboard's own words for a string its layout names ([KeyboardCanvasView.Host.string]): null, the app's shared ones. */
+    protected open fun sceneString(name: String): String? = null
 
     /** The keyboard's own words for its layout's keys (U4 B): its `action:` placeholders, its composed long presses. */
     protected open val sceneTable: SceneKeyDef.Table = object : SceneKeyDef.Table {}

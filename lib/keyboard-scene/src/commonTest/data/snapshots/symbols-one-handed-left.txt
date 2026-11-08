@@ -17,7 +17,7 @@ key back kind=function role=back a11y="返回"
     text "返回" 20,630.25 system 700 42 #ff7a858a
   pressed
     +2 fill rect(7.88,545.38,121.13,683.63 r=10.5,10.5,10.5,10.5) #1f000000
-key lock kind=function role=lock a11y="picker_lock"
+key lock kind=function role=lock a11y="a11y_key_panel_lock"
   bounds 129,527,232,702
   shape rect(136.88,545.38,224.13,683.63 r=10.5,10.5,10.5,10.5)
   hit rect(129,527,232,702)

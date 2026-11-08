@@ -38,6 +38,7 @@ import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.stroke.StrokeShape
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.keyboard.HandwritingKeyboard
 import org.fcitx.fcitx5.android.input.bar.CandidateBarHeight
 import org.fcitx.fcitx5.android.input.candidates.CharCardView
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPadView
@@ -117,6 +118,9 @@ class HandwritingUatTest {
     @Uat("HW-01")
     fun theHandwritingKeyboard() {
         h.start()
+        // Chinese punctuation on, as the input method tells (the harness tells none): ，。 as they type
+        KeyboardHarness.find<HandwritingKeyboard>(h.keyboard)!!.onPunctuationUpdate(mapOf("," to "，", "." to "。"))
+        h.idle()
         val keys = h.texts()
         assertTrue(keys.toString(), pad.width > h.keyboard.width / 2)
         // on the right ⌫, ，and 。; below 符 123 space globe enter
@@ -124,7 +128,7 @@ class HandwritingUatTest {
         h.describedKey("Backspace")
         h.describedKey(h.service.getString(R.string.a11y_key_action_done))
         assertTrue(keys.toString(), keys.containsAll(listOf("符", "123")))
-        h.capture("HandwritingUatTest/keyboard")
+        h.captureBoard("HandwritingUatTest/keyboard")
     }
 
     @Test
@@ -268,9 +272,10 @@ class HandwritingUatTest {
         h.start()
         written("银行")
         assertEquals("银行", composing())
-        val key = h.inputView.findViewById<View>(R.id.button_reading)
+        // the scene's key or its view (ShownKey): said and tapped the same
+        val key = h.keyNamed("reading")
         val name = h.service.getString(R.string.im_candidate_reading)
-        assertEquals(h.service.getString(R.string.hw_reading_key_off, name), key.contentDescription)
+        assertEquals(h.service.getString(R.string.hw_reading_key_off, name), key.description)
         val low = h.bar.height
         val padHeight = pad.height
         h.api.calls.clear()
@@ -287,10 +292,10 @@ class HandwritingUatTest {
         assertEquals(h.service.dp(CandidateBarHeight.dp(ThemeManager.prefs.candidateTextSize.getValue(), ReadingStyle.PINYIN)), taller.height)
         assertTrue("$low < ${taller.height}", low < taller.height)
         assertEquals(padHeight, pad.height)
-        val on = h.inputView.findViewById<View>(R.id.button_reading)
-        assertEquals(h.service.getString(R.string.hw_reading_key_on, name), on.contentDescription)
+        val on = h.keyNamed("reading")
+        assertEquals(h.service.getString(R.string.hw_reading_key_on, name), on.description)
         written("银行")
-        h.capture("HandwritingUatTest/reading_key_on")
+        h.captureBoard("HandwritingUatTest/reading_key_on")
     }
 
     private val hang = CharCard(

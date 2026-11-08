@@ -59,6 +59,8 @@ class BuiltInLayouts(private val context: Context) : LayoutSource {
             "grouped-bottom" to R.raw.scene_layout_grouped_bottom,
             "number" to R.raw.scene_layout_number,
             "nine" to R.raw.scene_layout_nine,
+            "handwriting" to R.raw.scene_layout_handwriting,
+            "symbols" to R.raw.scene_layout_symbols,
         )
     }
 }

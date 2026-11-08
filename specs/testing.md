@@ -269,7 +269,9 @@ the case files hold no results. `uat/README.md` has the format, the baselines an
 The runner, `uat/tools/uat.py`: `up` / `down` (two emulators, emulator-5554 and emulator-5556, from the
 AVD's snapshot), `run [--areas] [--ids] [--devices]` (`UAT_BUILD=release`: on the signed arm64
 release APK, the debug package uninstalled first and installed back only for the cases that type into
-its `TypingHostActivity`), `mark` (a visual case after its sheet is seen). One
+its `TypingHostActivity`; `UAT_CANVAS=1`: every case on 060's new drawing, internal.canvasKeyboard written into the cleared
+app's prefs before it starts, by `run-as` on the debug build and as root on the release, and checked once it is up: a
+case whose prefs lost it is blocked), `mark` (a visual case after its sheet is seen). One
 script per case file (`uat/scripts/<file>.py`; handwriting's strokes in `hw_strokes.py`); a case in a
 .md with no script is reported blocked (没有脚本), never left out; a case whose `needs=` names another
 place (a run without the voice pack, a release by hand, a real phone, the JVM) is listed as 在别处跑, not counted

@@ -84,13 +84,15 @@ class KeyboardCanvasView(
 
         /** A scene made anew, about to be drawn: [scene], or null for none (nothing drawn). */
         fun built(scene: Scene?) {}
+        /** The keyboard's own words for a string its layout names (注's on and off, the lock's), over the app's shared ones; null for none. */
+        fun string(name: String): String? = null
     }
 
     // a key's two faces, recorded once each when first drawn; kept across scenes where they are the same.
     // Whether it is shown pressed ([down]) and the state a screen reader is told ([state]: Shift's,
     // SceneA11y.state) go with it: a scene made again for a key typed looks up nothing by a name made
-    // for it, a frame neither
-    private class Faces(val node: KeyNode, val state: String?) {
+    // for it, a frame neither; its words ([said]: 注's and the lock's change with their state) told too when they change
+    private class Faces(val node: KeyNode, val state: String?, val said: String?) {
         var normal: RenderNode? = null
         var pressed: RenderNode? = null
         var down = false
@@ -103,6 +105,9 @@ class KeyboardCanvasView(
     private var painter: ScenePainter? = null
     private var painted: ThemeLook? = null
     private var built: Scene? = null
+
+    // what is drawn under the keys of [built] ([under]), made once a scene: compared and drawn each frame
+    private var drawnUnder: List<Op> = emptyList()
     private var builtFor = 0 to 0
     private var dirty = true
     private var failed = false
@@ -175,11 +180,14 @@ class KeyboardCanvasView(
                 painted = drawn.shownLook
             }
             val old = faces
-            if (repainted || s.base != built?.base) base = null
+            val under = s.under()
+            if (repainted || under != drawnUnder) base = null
+            drawnUnder = under
             built = s
             var said: MutableList<Int>? = null
+            var worded: MutableList<Int>? = null
             faces = s.keys.mapIndexed { i, k ->
-                val f = Faces(k, SceneA11y.state(k.role, k.states))
+                val f = Faces(k, SceneA11y.state(k.role, k.states), SceneA11y.of(k, ::stringNamed).description)
                 // the key in the last scene: at the same place in it mostly (a scene made again has the same keys)
                 val was = old.getOrNull(i)?.takeIf { it.of(k) } ?: old.firstOrNull { it.of(k) }
                 if (was != null) {
@@ -191,6 +199,8 @@ class KeyboardCanvasView(
                     f.down = was.down
                     // its state changed (Shift once, locked): told below
                     if (was.state != f.state) (said ?: ArrayList<Int>().also { said = it }) += i
+                    // its words changed (注 on, the lock shut: what a tap does): told as a view's new description is
+                    if (was.said != f.said) (worded ?: ArrayList<Int>().also { worded = it }) += i
                 }
                 // a key gone with the scene is pressed no more: nothing carries it
                 f
@@ -200,6 +210,7 @@ class KeyboardCanvasView(
             // a key's state changed told to a screen reader as a view's state description is: on the
             // key's node, which TalkBack reads out when it has focus
             said?.forEach { speech.invalidateVirtualView(it, AccessibilityEventCompat.CONTENT_CHANGE_TYPE_STATE_DESCRIPTION) }
+            worded?.forEach { speech.invalidateVirtualView(it, AccessibilityEventCompat.CONTENT_CHANGE_TYPE_CONTENT_DESCRIPTION) }
             host.built(s)
             return s
         }
@@ -243,7 +254,7 @@ class KeyboardCanvasView(
     // what shows the picture recorded again, where it is now (the frame about to be drawn draws it)
     private fun dropPictures() {
         var any = false
-        if (built?.base?.let(CanvasFrame::showsPicture) == true) {
+        if (built != null && CanvasFrame.showsPicture(drawnUnder)) {
             base = null
             any = true
         }
@@ -267,11 +278,11 @@ class KeyboardCanvasView(
         if (!canvas.isHardwareAccelerated) {
             // a software canvas (a bitmap's: screenshots) draws no RenderNode, keeps nothing to record again
             painter.missed = false
-            painter.draw(canvas, s.base)
+            painter.draw(canvas, drawnUnder)
             faces.forEach { painter.draw(canvas, it.node.ops(it.down)) }
             return
         }
-        canvas.drawRenderNode(base.live() ?: record("base", Box(0.0, 0.0, width.toDouble(), height.toDouble()), s.base).also { base = it })
+        canvas.drawRenderNode(base.live() ?: record("base", Box(0.0, 0.0, width.toDouble(), height.toDouble()), drawnUnder).also { base = it })
         for (f in faces) {
             val shown = CanvasFrame.faces(f.down, f.normal.live() != null, f.pressed.live() != null)
             // by index: no iterator for each key in each frame
@@ -344,6 +355,17 @@ class KeyboardCanvasView(
     fun cell(ref: KeyRef, out: Rect): Boolean {
         val k = current?.keys?.firstOrNull { it.of(ref) } ?: return false
         out.set(k.bounds)
+        return true
+    }
+
+    /**
+     * Slot [id]'s cell in this view, into [out], as the scene at the view's size now has it (made
+     * again if the size changed: one-handed, split, another height): where the keyboard puts its own
+     * view (the handwriting pad, 060-render-p2 S5b); false where the scene has no such slot, or none.
+     */
+    fun slot(id: String, out: Rect): Boolean {
+        val s = scene?.slots?.firstOrNull { it.id == id } ?: return false
+        out.set(s.bounds)
         return true
     }
 
@@ -512,7 +534,7 @@ class KeyboardCanvasView(
     private val resourcePackage: String by lazy { resources.getResourcePackageName(org.fcitx.fcitx5.android.R.id.keyboard_view) }
 
     // the layout's names of the app's strings (a11y_key_shift…): the ones its keys name, looked up by name
-    private fun stringNamed(name: String): String? = A11Y_STRINGS[name]?.let(context::getString)
+    private fun stringNamed(name: String): String? = host.string(name) ?: A11Y_STRINGS[name]?.let(context::getString)
 
     private companion object {
         const val NANOS_A_MS = 1e6
@@ -530,11 +552,16 @@ class KeyboardCanvasView(
             "a11y_key_space" to org.fcitx.fcitx5.android.R.string.a11y_key_space,
             "a11y_key_switch_language" to org.fcitx.fcitx5.android.R.string.a11y_key_switch_language,
             "a11y_key_separator" to org.fcitx.fcitx5.android.R.string.a11y_key_separator,
+            // the symbol panel's way to the number pad
+            "a11y_key_numbers" to org.fcitx.fcitx5.android.R.string.a11y_key_number_pad,
             SceneA11y.SHIFT_ONCE to org.fcitx.fcitx5.android.R.string.a11y_state_shift_once,
             SceneA11y.CAPS_LOCK to org.fcitx.fcitx5.android.R.string.a11y_state_caps_lock,
         )
     }
 }
+
+// what is drawn under the keys: the board's base and the slots' faces (a slot's view drawn over it, its own)
+private fun Scene.under(): List<Op> = if (slots.all { it.ops.isEmpty() }) base else base + slots.flatMap { it.ops }
 
 /** Whether this is key [ref]: a split row's second copy ([KeyNode.copy] 1) is its own. */
 internal fun KeyNode.of(ref: KeyRef) = id == ref.id && (copy != 0) == ref.copy

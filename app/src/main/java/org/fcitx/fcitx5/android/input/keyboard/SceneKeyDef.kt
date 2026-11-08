@@ -69,6 +69,8 @@ class SceneKeyDef(
 
         /** The bubble over the key of [node] as it is pressed, over the face the layout gives it; null: the face's. */
         fun bubble(node: KeyNode): String? = null
+        /** A menu item's words as shown for the layout's [label] (handwriting's `reading_off`: the settings' wording). */
+        fun menuLabel(label: String): String = label
     }
 
     companion object {
@@ -125,7 +127,7 @@ class SceneKeyDef(
             }
             if (b.menu.isNotEmpty()) {
                 val items = b.menu.mapNotNull { m ->
-                    act(m.action)?.let { Popup.Menu.Item(m.label, m.icon?.let(SceneIcons::of) ?: 0, it) }
+                    act(m.action)?.let { Popup.Menu.Item(table.menuLabel(m.label), m.icon?.let(SceneIcons::of) ?: 0, it) }
                 }
                 add(Popup.Menu(items.toTypedArray()))
             }

@@ -5,6 +5,7 @@ import io
 import json
 import os
 import re
+import subprocess
 import tempfile
 import threading
 import time
@@ -719,6 +720,66 @@ class PlugTest(unittest.TestCase):
             uat.plug(d, "B0")
         self.assertEqual([], self.enabled(d))
         sleep.assert_not_called()
+
+
+class CanvasOnTest(unittest.TestCase):
+    def test_the_debug_build_writes_as_the_app(self):
+        cmd = uat.canvas_on_cmd("debug")
+        self.assertIn(f"run-as {uat.PKG} sh -c '", cmd)
+        self.assertIn('canvas_keyboard', cmd)
+        self.assertNotIn("chown", cmd)
+        self.assertTrue(cmd.startswith(f"am force-stop {uat.PKG};"))
+
+    def prefs_after(self, before):
+        with tempfile.TemporaryDirectory() as d:
+            f = "shared_prefs/p.xml"
+            if before is not None:
+                os.makedirs(os.path.join(d, "shared_prefs"))
+                with open(os.path.join(d, f), "w") as out:
+                    out.write(before)
+            subprocess.run(["sh", "-c", uat.canvas_prefs_script(f)], cwd=d, check=True)
+            with open(os.path.join(d, f)) as got:
+                return got.read()
+
+    def test_the_canvas_turned_on_keeps_what_the_packs_import_wrote(self):
+        packs = ("<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n<map>\n"
+                 '    <string name="packs_seen">text</string>\n'
+                 '    <boolean name="canvas_keyboard" value="false" />\n</map>\n')
+        after = self.prefs_after(packs)
+        self.assertIn('<string name="packs_seen">text</string>', after)
+        self.assertEqual(1, after.count("canvas_keyboard"))
+        self.assertIn(uat.CANVAS_SET, after)
+        for before in (None, "", "<map />"):
+            after = self.prefs_after(before)
+            self.assertIn(uat.CANVAS_SET, after)
+            self.assertTrue(after.startswith("<map>") and after.rstrip().endswith("</map>"), after)
+
+    def test_the_canvas_goes_on_after_the_clear_and_the_packs_before_the_input_method(self):
+        calls = []
+        d = mock.Mock()
+        with mock.patch.object(uat, "CANVAS", True), \
+                mock.patch.object(uat, "clear_keeping_packs", lambda d: calls.append("clear")), \
+                mock.patch.object(uat, "canvas_on", lambda d: calls.append("canvas_on")), \
+                mock.patch.object(uat, "ensure_ime", lambda d: calls.append("ime")), \
+                mock.patch.object(uat, "canvas_check", lambda d: calls.append("check")), \
+                mock.patch.object(uat, "plug", lambda d, b: (_ for _ in ()).throw(uat.Blocked("stop"))):
+            with self.assertRaises(uat.Blocked):
+                uat.reset(d, "B0", "text")
+        self.assertEqual(["clear", "canvas_on", "ime", "check"], calls)
+
+    def test_the_release_build_writes_as_root_with_the_apps_owner_and_context(self):
+        cmd = uat.canvas_on_cmd("release")
+        self.assertNotIn("run-as", cmd)
+        for part in ("chown -R $u:$u", "chmod 660", "chcon -R"):
+            self.assertIn(part, cmd)
+
+    def test_the_canvas_off_after_the_app_started_blocks_the_case(self):
+        d = mock.Mock()
+        d.sh.return_value = "<map><boolean name=\"canvas_keyboard\" value=\"false\" /></map>"
+        with self.assertRaises(uat.Blocked):
+            uat.canvas_check(d)
+        d.sh.return_value = "<map><boolean name=\"canvas_keyboard\" value=\"true\" /></map>"
+        uat.canvas_check(d)
 
 
 if __name__ == "__main__":

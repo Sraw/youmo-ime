@@ -51,13 +51,19 @@ class SceneBoard(
         private set
 
     /** The canvas drawing the keys of this board, [key] the key wired for a node (what a touch on it and a screen reader's action do). */
-    fun view(images: BoardImages, key: (KeyNode) -> SceneKey?, built: (Scene?) -> Unit = {}): KeyboardCanvasView {
+    fun view(
+        images: BoardImages,
+        string: (String) -> String? = { null },
+        key: (KeyNode) -> SceneKey?,
+        built: (Scene?) -> Unit = {},
+    ): KeyboardCanvasView {
         val look = ThemeManager.shownLook(theme)
         return KeyboardCanvasView(context, images, object : KeyboardCanvasView.Host {
             override fun scene(width: Int, height: Int) = drawn(look, width, height)
             override fun key(node: KeyNode) = key(node)
             override val board get() = layout?.id
             override fun built(scene: Scene?) = built(scene)
+            override fun string(name: String) = string(name)
         })
     }
 
