@@ -2,7 +2,7 @@
 前提/操作/预期."""
 import time
 
-from uat import (Blocked, block_candidate, case, check, first, grouped_keys)
+from uat import (PKG, Blocked, block_candidate, case, check, first, grouped_keys, open_url, script)
 
 
 # ---------------------------------------------------------------- 打字
@@ -366,6 +366,12 @@ def py115(d):
     after = d.cands()
     check(emoji not in after, f"屏蔽后 dianzan 还有「{emoji}」：{after[:8]}")
     d.clear()
+    # review H1: kept over a restart of the input method (the line read back from words.blocked)
+    restart_ime(d)
+    d.type("dianzan")
+    restarted = d.cands(timeout=30)
+    check(emoji not in restarted, f"重启输入法后 dianzan 又有「{emoji}」：{restarted[:8]}")
+    d.clear()
     d.type("uhs")
     u = d.cands()
     check(d.preedit().startswith("u"), f"打了 uhs，编码行是「{d.preedit()}」")
@@ -377,4 +383,48 @@ def py115(d):
     u2 = [x.split()[0] for x in d.cands() if x]
     d.clear()
     check(ch not in u2, f"屏蔽后 uhs 还有「{ch}」：{u2[:8]}")
-    return f"表情「{emoji}」屏蔽后 dianzan {after[:4]}；uhs「{ch}」屏蔽后 {u2[:4]}（拆字、滑行的其他读法由 JVM 管）"
+    return f"表情「{emoji}」屏蔽后 dianzan {after[:4]}，重启输入法后 {restarted[:4]}；uhs「{ch}」屏蔽后 {u2[:4]}（拆字、滑行的其他读法由 JVM 管）"
+
+
+# the input method's process killed and brought back, as a phone's restart would: what was learned read from its files
+def restart_ime(d):
+    pid = d.sh(f"pidof {PKG}").strip()
+    if not pid:
+        raise Blocked("输入法进程没在跑")
+    d.root(f"kill -9 {pid}")
+    time.sleep(1.0)
+    open_url(d, "text")
+    for _ in range(30):
+        if d.screen().find(rid="keyboard_view", where="ime") and "不可用" not in d.im_label():
+            return
+        time.sleep(1.0)
+    raise Blocked("重启后键盘没起来")
+
+
+@case("PY-116", mutates=True)
+def py116(d):
+    tb = script("05-toolbar")
+    # the keyboard up, the bar showing its tools: nothing typed
+    d.type("a")
+    d.clear()
+    trad = tb.status_toggle(d, "简体")
+    try:
+        d.type("guojia")
+        c = d.cands(timeout=30)
+        check("國家" in c, f"繁體下 guojia 的候选 {c[:6]}")
+        menu = block_candidate(d, "國家", "繁體下长按「國家」的菜单")
+        check(any("屏蔽" in t for t in menu), f"繁體候选的菜单里没有屏蔽：{menu}")
+        d.clear()
+        d.type("guojia")
+        after = d.cands()
+        d.clear()
+        # the list may have two that show as 國家 (国家, and the dictionary's own traditional 國家): the one pressed goes
+        check(after.count("國家") < c.count("國家"), f"屏蔽后繁體下 guojia 的「國家」没少：{c[:6]} → {after[:6]}")
+    finally:
+        d.clear()
+        tb.status_toggle(d, trad)
+    d.type("guojia")
+    simp = d.cands()
+    d.clear()
+    check("国家" not in simp, f"屏蔽「國家」后简体下 guojia 还有「国家」：{simp[:6]}")
+    return f"切到「{trad}」：长按「國家」菜单 {menu}；屏蔽后繁體 {after[:4]}，简体 {simp[:4]}"

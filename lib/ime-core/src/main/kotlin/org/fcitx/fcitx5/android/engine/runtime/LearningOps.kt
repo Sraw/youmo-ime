@@ -72,11 +72,12 @@ internal class LearningOps(
      * Does [op] in [im], the input method in use (null where none is: the settings); [act] has the
      * host send the long press's event (an [EngineEvent]) for the candidate at an index.
      */
-    fun apply(im: String?, op: LearningOp, act: (event: Int, index: Int) -> Boolean): LearningResult = when (op) {
+    // [shown]: a candidate's text as the host shows it (繁體: chttrans's output filter), the menu's text that
+    fun apply(im: String?, op: LearningOp, shown: (String) -> String = { it }, act: (event: Int, index: Int) -> Boolean): LearningResult = when (op) {
         // the backups' own (stream D): listed, restored, made
         is BackupOp -> backup(op)
-        is LearningOp.OnCandidate -> im?.let { onCandidate(it, op, act) } ?: LearningResult.Unavailable
-        is LearningOp.OnPage -> im?.let { onCandidate(it, op.op.at(first(it) + op.op.index), act) } ?: LearningResult.Unavailable
+        is LearningOp.OnCandidate -> im?.let { onCandidate(it, op, shown, act) } ?: LearningResult.Unavailable
+        is LearningOp.OnPage -> im?.let { onCandidate(it, op.op.at(first(it) + op.op.index), shown, act) } ?: LearningResult.Unavailable
         is LearningOp.Undo -> undo(im, op.token)
         is LearningOp.UseHabits -> {
             useHabits(op.on)
@@ -168,16 +169,19 @@ internal class LearningOps(
         return token.takeIf { did }
     }
 
-    private fun onCandidate(im: String, op: LearningOp.OnCandidate, act: (Int, Int) -> Boolean): LearningResult {
+    private fun onCandidate(im: String, asShown: LearningOp.OnCandidate, shown: (String) -> String, act: (Int, Int) -> Boolean): LearningResult {
         val s = session(im) ?: return LearningResult.Unavailable
-        // the list changed since the menu showed: another candidate is at the index now
-        if (s.candidates(op.index, 1).firstOrNull()?.text != op.text) return LearningResult.Unavailable
+        // the list changed since the menu showed: another candidate is at the index now. One shown
+        // converted (國家 for 国家) is the engine's text from here on: what is blocked, deleted, pinned
+        val text = s.candidates(asShown.index, 1).firstOrNull()?.text ?: return LearningResult.Unavailable
+        if (text != asShown.text && shown(text) != asShown.text) return LearningResult.Unavailable
+        val op = asShown.at(asShown.index, text)
         val offers = s.offers(op.index)
         val event = { offer: Offer, e: Int ->
             acted { offer in offers && act(e, op.index) }?.let { LearningResult.Done(it) } ?: LearningResult.Unavailable
         }
         return when (op) {
-            is LearningOp.Menu -> menu(im, s, op)
+            is LearningOp.Menu -> menu(im, s, op).copy(text = asShown.text)
             is LearningOp.Delete -> if (Offer.FORGET in offers) delete(op, s.why(op.index)?.whole.orEmpty()) { act(EngineEvent.FORGET, op.index) } else LearningResult.Unavailable
             is LearningOp.Block -> if (Offer.BLOCK in offers) block(op) { act(EngineEvent.BLOCK, op.index) } else LearningResult.Unavailable
             is LearningOp.Pin -> event(Offer.PIN, EngineEvent.PIN)

@@ -269,7 +269,8 @@ class KotlinHost(
 
     override suspend fun learning(op: LearningOp) = onHost {
         val candidate = (op as? LearningOp.OnPage)?.op ?: op as? LearningOp.OnCandidate
-        bridge.learning(op, inputMethodEntryCached.uniqueName) act@{ event ->
+        // 繁體: the menu names the candidate as shown, converted; the engine has it simplified
+        bridge.learning(op, inputMethodEntryCached.uniqueName, ::shownText) act@{ event ->
             // as the menu sends it: asked first, at the index the list has (Fcitx.learning)
             if (candidate == null) return@act false
             if (candidateActions(candidate.index).none { it.id == event }) return@act false

@@ -288,7 +288,7 @@ internal class LearningFacade(
         }
 
     /** Does [op] in [im]: see [Engines.learning]. */
-    fun apply(im: String?, op: LearningOp, act: (event: Int, index: Int) -> Boolean): LearningResult = ops.apply(im, op, act)
+    fun apply(im: String?, op: LearningOp, shown: (String) -> String = { it }, act: (event: Int, index: Int) -> Boolean): LearningResult = ops.apply(im, op, shown, act)
 
     /** [words] each dated as the learning record has it (U-80). */
     fun dated(words: List<UserWord>): List<UserWord> = ops.dated(words)

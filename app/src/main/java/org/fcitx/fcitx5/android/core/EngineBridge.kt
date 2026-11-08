@@ -428,9 +428,9 @@ class EngineBridge {
      * event the way the menu does; on the fcitx thread. With whether what an engine's input method
      * shows is to be shown anew: what was taken back, cleared or turned off may be on it.
      */
-    fun learning(op: LearningOp, im: String, act: (event: Int) -> Boolean): Pair<LearningResult, Boolean> {
+    fun learning(op: LearningOp, im: String, shown: (String) -> String = { it }, act: (event: Int) -> Boolean): Pair<LearningResult, Boolean> {
         // the switch's preference is the app's to set, on the main thread: read when the engine is made
-        val result = engines.learning(im, op) { event, _ -> act(event) }
+        val result = engines.learning(im, op, shown) { event, _ -> act(event) }
         if (result is LearningResult.Cleared) RecentlyUsed.clear(recentsSince(result.fromMinute))
         return result to shownAnew(op, im, result)
     }

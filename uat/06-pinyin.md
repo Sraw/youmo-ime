@@ -185,9 +185,16 @@
 ### PY-115 [P1] 表情、拆字、笔画查字、滑行的其他读法也能屏蔽
 <!-- learning: U-82 U-28 -->
 - **前提**：B0；表情候选、拆字开着；滑行那一步先打开 **滑行输入**。
-- **操作**：点 d i a n z a n，长按候选里的表情 👍；点 u n v z i，长按「好」；点 u h s 后长按查出的一个字；打开滑行，划 n-i-h-a-o，长按第二个候选（另一种读法的词）。每个都选 **屏蔽**、确认，再打一次同样的键看；最后在 **屏蔽的词**（笔画查字的在页顶"码表里按码屏蔽的"里，写着"笔画查字"）里逐个恢复，再打一次。
-- **预期**：四个菜单里都有 **屏蔽**；笔画查字的确认写"打这串码不再出现"，多打一笔、打拼音还出这个字；其余写"以后打字……都不再出现"。屏蔽后同样的键不再出它，恢复后又出。
-- **JVM**：`AsideBlockUatTest.anEmojiAndACharacterByStrokesAreBlockedFromTheKeyboard`（:lib:ime-eval:uatTest，真数据，经宿主的长按动作）、`EnginesAsideBlockTest`（表情、拆字）、`EnginesStrokeBlockTest`、`EnginesGlideBlockTest`。设备上跑过（2026-11-08，emulator-5574）。
+- **操作**：点 d i a n z a n，长按候选里的表情 👍；点 u n v z i，长按「好」；点 u h s 后长按查出的一个字；打开滑行，划 n-i-h-a-o，长按第二个候选（另一种读法的词）。每个都选 **屏蔽**、确认，再打一次同样的键看；表情屏蔽后重启输入法（杀掉进程再弹出键盘），再点 d i a n z a n；最后在 **屏蔽的词**（笔画查字的在页顶"码表里按码屏蔽的"里，写着"笔画查字"）里逐个恢复，再打一次。
+- **预期**：四个菜单里都有 **屏蔽**；笔画查字的确认写"打这串码不再出现"，多打一笔、打拼音还出这个字；其余写"以后打字……都不再出现"。屏蔽后同样的键不再出它，表情重启输入法后也不出（👍🏻 这种码位比音节多的表情也一样），恢复后又出。
+- **JVM**：`EnginesEmojiBlockTest`（码位和音节数对不上的表情：重启、设置里恢复、撤销、备份往返）、`AsideBlockUatTest.anEmojiAndACharacterByStrokesAreBlockedFromTheKeyboard`（:lib:ime-eval:uatTest，真数据，经宿主的长按动作）、`EnginesAsideBlockTest`（表情、拆字）、`EnginesStrokeBlockTest`、`EnginesGlideBlockTest`。设备上跑过（2026-11-08，emulator-5574）。
+
+### PY-116 [P1] 繁體下长按候选能屏蔽
+<!-- learning: U-82 -->
+- **前提**：B0；在状态面板（⋯）里切到 **繁體**。
+- **操作**：点 g u o j i a，长按「國家」，选 **屏蔽**、确认；清空再点 g u o j i a；切回 **简体** 再点一次。
+- **预期**：菜单里有 **屏蔽**，能用；屏蔽后繁體下按的那个「國家」不再出（词库里另有一个本来就是繁体的「國家」，转换后也显示成「國家」，它照旧出），简体下不再出「国家」（屏蔽记的是原文「国家」）。
+- **JVM**：`EnginesConvertedMenuTest.aCandidateShownConvertedIsBlockedAsTheEngineHasIt`（菜单、屏蔽、撤销按引擎里的简体做；宿主经 `HostCore.shownText` 把转换函数传给 `Engines.learning`）。设备上跑过（2026-11-08，emulator-5574；修之前菜单里没有屏蔽）。
 
 ### PY-31 [P1] 固定首位，再取消固定
 <!-- learning: U-83 -->
