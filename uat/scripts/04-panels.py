@@ -98,4 +98,20 @@ def pan23(d):
     ime(d, "，")
     t = d.field_text() or ""
     check(t.endswith("，"), f"框里「{t}」")
-    return f"框里「{t}」"
+    # the emoji's cells: colour emoji, centred in their cells (S6 review)
+    # the symbol panel went back to the letters with the ，: the bar's 表情 from there
+    ime(d, "表情")
+    time.sleep(0.6)
+    d.shot("kb", "表情面板的格子")
+    # the 颜文字's: a long one whole, not cut at its cell's sides (rules B §8a)
+    ime(d, ":-)")
+    time.sleep(0.6)
+    long = "(｡>﹏<｡)ﾉﾞ✧*。"
+    for _ in range(12):
+        n = d.screen().find(desc=long, where="ime")
+        if n:
+            break
+        d.swipe((540, 2000), (540, 1650), 300, 0.6)
+    check(n is not None, f"颜文字里找不到 {long}")
+    d.shot("kb", "颜文字长字")
+    return f"框里「{t}」，表情和颜文字格子见图"

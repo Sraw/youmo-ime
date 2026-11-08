@@ -124,6 +124,7 @@
 
 ### PAN-23 [P1] 符号面板的格子（设备）
 - **前提**：B0（`UAT_CANVAS=1` 时格子是各自一个单键场景，060-render-p2 S6）。
-- **操作**：点「符」；点格子里的「，」。
-- **预期**：格子里的符号键面和以前一样（白键、居中）；点后框里出现「，」。
-- **JVM**：`SmallBoardsSceneGesturesTest.symbolGrid`、`BoardCanvasCompareTest[symbol-grid]`。
+- **操作**：点「符」；点格子里的「，」；点「返回」再点「表情」；点「:-)」进颜文字，往下翻到 `(｡>﹏<｡)ﾉﾞ✧*。`。
+- **预期**：格子里的符号键面和以前一样（白键、居中）；点后框里出现「，」；表情格子里是彩色 emoji，在格子里居中；
+  颜文字的长字整个显示，两边没有被切掉（放不下时字变小，rules B §8a）。
+- **JVM**：`SmallBoardsSceneGesturesTest.symbolGrid`、`PickerSceneCellTest`、`BoardCanvasCompareTest[symbol-grid]`、`[emoticon-grid]`。
