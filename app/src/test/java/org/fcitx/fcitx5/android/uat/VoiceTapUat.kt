@@ -11,6 +11,7 @@ import android.view.inputmethod.BaseInputConnection
 import android.widget.TextView
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.voice.VoiceSession
 import org.fcitx.fcitx5.android.input.voice.VoiceStyle
@@ -69,8 +70,7 @@ open class VoiceTapUat {
     }
 
     // the keyboard's own Enter, named as the field's action
-    protected fun enter(): View =
-        described(ReturnKeyDrawableComponent.appearanceFromEditorInfo(h.info).label(h.service), h.keyboard) ?: error("no Enter on the keyboard")
+    protected fun enter(): ShownKey = h.describedKey(ReturnKeyDrawableComponent.appearanceFromEditorInfo(h.info).label(h.service).toString())
 
     protected fun shown(): List<String> = KeyboardHarness.all(h.inputView)
         .filterIsInstance<TextView>().filter { h.shown(it) }.map { it.text.toString() }.toList()

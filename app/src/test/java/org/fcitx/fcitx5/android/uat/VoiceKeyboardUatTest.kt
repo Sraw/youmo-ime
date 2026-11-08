@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.voice.VoicePermissionActivity
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -38,10 +39,11 @@ class VoiceKeyboardUatTest {
     @After
     fun close() = h.close()
 
-    private val space: View
-        get() = KeyboardHarness.all(h.inputView).first { h.shown(it) && it.contentDescription?.startsWith("Space") == true }
+    // the space as the keyboard shows it (the scene's key on the canvas)
+    private val space: ShownKey
+        get() = h.keyNamed("space")
 
-    private fun hold(v: View) {
+    private fun hold(v: ShownKey) {
         val f = h.finger(v, h.at(v))
         h.advance(700)
         f.up(h.at(v))

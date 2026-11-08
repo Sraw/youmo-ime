@@ -21,6 +21,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.voice.VoiceSession
 import org.fcitx.fcitx5.android.input.voice.VoicePermissionActivity
@@ -76,8 +77,9 @@ class VoiceHoldUatTest {
 
     private fun allowMicrophone() = app.grantPermissions(Manifest.permission.RECORD_AUDIO)
 
-    private val space: View
-        get() = KeyboardHarness.all(h.inputView).first { h.shown(it) && it.contentDescription?.startsWith("Space") == true }
+    // the space as the keyboard shows it (the scene's key on the canvas)
+    private val space: ShownKey
+        get() = h.keyNamed("space")
 
     // the long press fired, the finger still down
     private fun holdSpace(): KeyboardHarness.Finger = h.finger(space, h.at(space)).also { h.advance(700) }

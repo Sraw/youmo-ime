@@ -5,28 +5,20 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.graphics.RectF
-import android.view.View
-import android.view.ViewGroup
-import android.widget.ImageView
 import org.fcitx.fcitx5.android.FcitxApplication
-import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
-import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.ShownKey
-import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
+import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
-import org.fcitx.fcitx5.android.input.keyboard.KeyView
-import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarkYield
 import org.fcitx.fcitx5.android.input.keyboard.KeyTextScale
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -79,8 +71,6 @@ class CompactKeyboardUatTest {
 
     private fun compact() = level(20, 34)
 
-    private fun TextKeyView.size() = mainText.textSize
-
     // its letter's size, whichever draws it
     private fun ShownKey.size() = textSize(label)!!
 
@@ -91,15 +81,11 @@ class CompactKeyboardUatTest {
         return symbol.left >= letter.right && symbol.top < letter.centerY()
     }
 
-    private fun backspace(): KeyView =
-        KeyboardHarness.all(h.inputView).filterIsInstance<KeyView>().first { it.def.viewId == R.id.button_backspace }
+    // the backspace's icons, its own and each shortcut's, as the scene drew them
+    private fun backspaceIcons(): Int = h.keyNamed("backspace").drawnIcons
 
-    // its icon and each corner's
-    private fun icons(v: View): Int = when (v) {
-        is ImageView -> if (v.visibility == View.VISIBLE && v.drawable != null) 1 else 0
-        is ViewGroup -> (0 until v.childCount).sumOf { icons(v.getChildAt(it)) }
-        else -> 0
-    }
+    // its marks' places as the scene drew them (SceneShownKey.markPlaces)
+    private fun ShownKey.marks() = (this as SceneShownKey).markPlaces()
 
     @Test
     @Uat("ST-51")
@@ -131,14 +117,13 @@ class CompactKeyboardUatTest {
         compact()
         h.start()
         for (k in listOf("a", "z", "x", "c", "v")) {
-            val marks = h.viewKey(k).shortcutMarks
-            assertEquals(k, setOf(KeyMarks.Slot.TopLeft), marks.keys)
-            assertTrue(k, marks.values.all { it.alpha != 0f })
+            // drawn, none left out
+            assertEquals(k, listOf("TL"), h.key(k).marks().shortcuts)
         }
         fresh()
         prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.TopLeft)
         h.start()
-        assertEquals(setOf(KeyMarks.Slot.TopRight), h.viewKey("a").shortcutMarks.keys)
+        assertEquals(listOf("TR"), h.key("a").marks().shortcuts)
     }
 
     @Test
@@ -147,7 +132,7 @@ class CompactKeyboardUatTest {
         prefs.set(AppPrefs.getInstance().internal.keyShortcuts, KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好")).serialize())
         h.start()
         assertTrue("standard: both", "你好" in h.texts())
-        val icons = icons(backspace())
+        val icons = backspaceIcons()
         fresh()
         compact()
         h.start()
@@ -160,7 +145,7 @@ class CompactKeyboardUatTest {
         val symbol = q.drawn("1")!!
         assertTrue("$text left of $symbol", text.right <= symbol.left && text.centerY() < q.drawn("q")!!.centerY())
         // the backspace's 清除 (up) and 恢复 (down) both
-        assertEquals(icons, icons(backspace()))
+        assertEquals(icons, backspaceIcons())
         // the shortcut still swipes
         h.swipe(q, 0f, -q.height * 1.3f)
         h.idle()
@@ -196,78 +181,72 @@ class CompactKeyboardUatTest {
         h.start()
         val screen = h.service.resources.configuration.screenWidthDp
         val floating = FloatingKeyboard.textScale(FloatingKeyboard.widthDp(screen), screen)
-        // the smaller, not the product (051-compact §1.3)
-        assertEquals(size * minOf(KeyTextScale.COMPACT, floating), h.key("q").size(), 0.5f)
-        // narrow keys: each letter clear of its symbol in its corner (d and + crossed), the symbols
-        // moved into their corners and smaller, the letters where they were (w sat lower, a further
-        // left), Shift's capitals too
+        // the smaller, not the product (051-compact §1.3); the letters' class then a little smaller for
+        // the marks to fit (docs/keyboard.md: 6% at most, every letter alike)
+        val nominal = size * minOf(KeyTextScale.COMPACT, floating)
         val lower = lettersStayClearOfTheirSymbols()
-        // @ beside a: into the corner and smaller, as far as it goes; the shortcuts' icons into
-        // theirs, top left, 7 dp at least: the letters a hair smaller, all of them
-        assertTrue(lower.any { it.altText.scaleX < 1f })
-        assertTrue(lower[0].mainText.scaleX.toString(), lower[0].mainText.scaleX >= 0.98f)
+        assertTrue("${lower.first().size()} of $nominal", lower.first().size() in nominal * (1 - LETTER_YIELD) - 0.5f..nominal + 0.5f)
         h.tap(h.describedKey("Shift"))
         h.idle()
-        assertEquals("Q", h.viewKey("Q").mainText.text.toString())
-        // A taller than a, @ as small as it goes: every letter as much smaller
-        val upper = lettersStayClearOfTheirSymbols()
-        assertTrue(upper[0].mainText.scaleX.toString(), upper[0].mainText.scaleX in (1f - KeyMarkYield.MAX_LETTER_SHRINK)..0.95f)
+        assertEquals("Q", h.key("Q").label)
+        val upper = lettersStayClearOfTheirSymbols(dropped = true)
+        assertTrue("${upper.first().size()} of $nominal", upper.first().size() in nominal * (1 - LETTER_YIELD) - 0.5f..nominal + 0.5f)
     }
 
     @Test
     @Uat("ST-51")
     fun oneHandedLettersStayInTheirRows() {
-        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
+        // the letters and symbols as on the two-handed compact keyboard: none smaller, the letters as they were
         compact()
         h.start()
-        // @, +, / and \ nudged into their corners, none smaller, the letters as they were
-        val lower = lettersStayClearOfTheirSymbols()
-        assertEquals(setOf("a", "d", "h", "m"), lower.filter { it.altText.moved() }.map { it.mainText.text.toString() }.toSet())
-        assertTrue(lower.all { it.altText.scaleX == 1f && it.mainText.scaleX == 1f })
-        h.tap(h.describedKey("Shift"))
-        h.idle()
-        assertTrue(lettersStayClearOfTheirSymbols().any { it.altText.moved() })
+        val letter = lettersStayClearOfTheirSymbols().first().size()
+        val symbol = h.key("a").let { it.textSize(it.alt!!)!! }
         fresh()
         prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
         h.start()
-        // the standard height: the letters their size too
-        assertTrue(lettersStayClearOfTheirSymbols().all { it.mainText.scaleX == 1f })
+        val lower = lettersStayClearOfTheirSymbols()
+        assertTrue(lower.joinToString { "${it.label} ${it.size()} ${it.textSize(it.alt!!)}" }, lower.all { it.size() == letter && it.textSize(it.alt!!) == symbol })
+        h.tap(h.describedKey("Shift"))
+        h.idle()
+        lettersStayClearOfTheirSymbols(dropped = true)
+        // the standard height: the letters the two-handed keyboard's size too
+        fresh()
+        level(38, 60)
+        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Off)
+        h.start()
+        val standard = lettersStayClearOfTheirSymbols().first().size()
+        fresh()
+        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
+        h.start()
+        assertEquals(standard, lettersStayClearOfTheirSymbols().first().size(), 0.01f)
     }
 
-    private fun View.moved() = scaleX < 1f || translationX != 0f || translationY != 0f
+    // [text]'s glyphs as the scene drew them on [k], measured (not guessed from its size), in the canvas
+    private fun ink(k: ShownKey, text: String): RectF {
+        val texts = (k as SceneShownKey).node.ops(false).filterIsInstance<Op.Text>()
+        val t = texts.firstOrNull { it.text == text } ?: error("$text not drawn on $k: ${texts.map { it.text }}")
+        val r = android.graphics.Rect()
+        android.graphics.Paint().apply { textSize = t.size.toFloat(); textScaleX = t.scaleX.toFloat() }.getTextBounds(text, 0, text.length, r)
+        return RectF(r).apply { offset(t.x.toFloat(), t.baseline.toFloat()) }
+    }
 
-    // each letter and its symbol's ink apart; the letters unmoved, one size, a row's on one baseline
-    private fun lettersStayClearOfTheirSymbols(): List<AltTextKeyView> {
-        val letters = KeyboardHarness.all(h.inputView).filterIsInstance<AltTextKeyView>().filter { h.shown(it) && it.altText.text.isNotEmpty() }.toList()
+    // each letter and its symbol drawn apart; the letters one size, a row's on one baseline. [dropped]: a
+    // symbol may be left out where nothing else makes room, the last of the marks' steps (docs/keyboard.md):
+    // a capital's (W, A wider than w, a); every lower case one is drawn
+    private fun lettersStayClearOfTheirSymbols(dropped: Boolean = false): List<ShownKey> {
+        val letters = h.keys().filter { it.label.length == 1 && it.label[0].isLetter() && it.alt != null }
         assertTrue(letters.size.toString(), letters.size >= 26)
         for (k in letters) {
-            val letter = ink(k.mainText)
-            val symbol = ink(k.altText)
-            assertFalse("${k.mainText.text}: $letter, ${k.altText.text}: $symbol", RectF.intersects(letter, symbol))
-            // its shortcut's icon, as drawn
-            k.shortcutMarks.values.filter { it.alpha > 0f }.forEach { icon ->
-                val box = RectF(0f, 0f, icon.width.toFloat(), icon.height.toFloat()).also { icon.matrix.mapRect(it); it.offset(icon.left.toFloat(), icon.top.toFloat()) }
-                assertFalse("${k.mainText.text}: $letter, its shortcut: $box", RectF.intersects(letter, box))
-            }
-            // the letter where it was: smaller, if at all, about its middle on its baseline
-            val laidOut = RectF().also { k.mainText.inkBounds(it) }
-            val at = floatArrayOf(laidOut.centerX(), k.mainText.baseline.toFloat()).also { k.mainText.matrix.mapPoints(it) }
-            assertEquals(laidOut.centerX(), at[0], 0.5f)
-            assertEquals(k.mainText.baseline.toFloat(), at[1], 0.5f)
-            assertEquals(letters[0].mainText.scaleX, k.mainText.scaleX, 0.001f)
+            val letter = ink(k, k.label)
+            if (dropped && k.alt !in k.drawnTexts) continue
+            val symbol = ink(k, k.alt!!)
+            assertFalse("${k.label}: $letter, ${k.alt}: $symbol", RectF.intersects(letter, symbol))
+            assertEquals(k.label, letters[0].size(), k.size(), 0.001f)
         }
-        for ((_, row) in letters.groupBy { h.box(it).top }) {
-            val baselines = row.map { h.box(it.mainText).top + it.mainText.baseline }.distinct()
-            assertEquals(row.joinToString { it.mainText.text }, 1, baselines.size)
+        for ((_, row) in letters.groupBy { it.bounds.top }) {
+            assertEquals(row.joinToString { it.label }, 1, row.map { it.drawn(it.label)!!.bottom }.distinct().size)
         }
         return letters
-    }
-
-    // [v]'s glyphs as drawn, moved and scaled, in its parent's coordinates
-    private fun ink(v: AutoScaleTextView): RectF = RectF().also {
-        assertTrue(v.inkBounds(it))
-        v.matrix.mapRect(it)
-        it.offset(v.left.toFloat(), v.top.toFloat())
     }
 
     @Test
@@ -291,14 +270,19 @@ class CompactKeyboardUatTest {
     fun thePreviewIsCompactAsTheLevelIsPicked() {
         val st = SettingsHarness().also { settings = it }
         st.open(SettingsRoute.Theme)
-        fun q() = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextKeyView>()
-            .first { it.isShown && it.mainText.text.toString() == "q" }
-        val size = q().mainText.textSize
+        // the preview's q as the engine drew it
+        fun q() = KeyboardHarness.keysOf(st.activity.window.decorView) { it.isShown }.first { it.label == "q" }
+        val size = q().size()
         compact()
         st.idle()
-        assertEquals(size * 0.9f, q().mainText.textSize, 0.5f)
+        assertEquals(size * 0.9f, q().size(), 0.5f)
         level(30, 49)
         st.idle()
-        assertEquals(size, q().mainText.textSize, 0.01f)
+        assertEquals(size, q().size(), 0.01f)
+    }
+
+    private companion object {
+        // the most the letters' class gives way to the marks (docs/keyboard.md, S4e's second step)
+        const val LETTER_YIELD = 0.06f
     }
 }

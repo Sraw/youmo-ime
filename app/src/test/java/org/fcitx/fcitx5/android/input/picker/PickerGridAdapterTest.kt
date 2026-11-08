@@ -4,11 +4,12 @@
  */
 package org.fcitx.fcitx5.android.input.picker
 
+import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
-import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
+import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -66,7 +67,12 @@ class PickerGridAdapterTest {
         val holder = adapter.onCreateViewHolder(grid, adapter.getItemViewType(1))
         repeat(3) { adapter.onBindViewHolder(holder, 1) }
         assertEquals(1, policy.transforms)
-        assertEquals("x!", (holder.itemView as TextKeyView).mainText.text.toString())
+        // the cell as the grid lays it out: the engine's scene of it made at a size
+        holder.itemView.apply {
+            measure(View.MeasureSpec.makeMeasureSpec(120, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(120, View.MeasureSpec.EXACTLY))
+            layout(0, 0, 120, 120)
+        }
+        assertEquals("x!", KeyboardHarness.cellText(holder.itemView))
         // another key, as another skin tone picked since: worked out again
         policy.key = 1
         adapter.rebuild()

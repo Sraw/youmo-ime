@@ -172,8 +172,7 @@ class LandscapeUatTest {
         prefs.set(ThemeManager.prefs.codeRow, CodeRowStyle.Floating)
         val st = SettingsHarness().also { settings = it }
         st.open(SettingsRoute.Theme)
-        fun gs() = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextKeyView>()
-            .count { it.isShown && it.mainText.text.toString() == "g" }
+        fun gs() = KeyboardHarness.keysOf(st.activity.window.decorView) { it.isShown }.count { it.label == "g" }
         assertEquals(2, gs())
         st.capture("LandscapeUatTest/preview_split")
         prefs.set(ThemeManager.prefs.splitKeyboard, SplitKeyboardMode.Off)
