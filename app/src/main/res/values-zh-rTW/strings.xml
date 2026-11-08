@@ -395,6 +395,7 @@
     <string name="word_text">詞</string>
     <string name="word_pinyin">拼音，如 you mo（留空自動填）</string>
     <string name="word_pinyin_invalid">拼音和詞對不上：每個字一個音節</string>
+    <string name="english_block_detail">英文 · 全小寫的詞不分大小寫封鎖</string>
     <plurals name="word_typed_times">
         <item quantity="other">%1$s · 打過 %2$d 次</item>
     </plurals>

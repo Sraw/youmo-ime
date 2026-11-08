@@ -403,6 +403,7 @@
     <string name="word_text">Word</string>
     <string name="word_pinyin">Pinyin, e.g. you mo (blank: filled in for you)</string>
     <string name="word_pinyin_invalid">The pinyin does not match the word: one syllable for each character</string>
+    <string name="english_block_detail">English · a word all in lower case is blocked in any case</string>
     <plurals name="word_typed_times">
         <item quantity="one">%1$s · typed once</item>
         <item quantity="other">%1$s · typed %2$d times</item>
