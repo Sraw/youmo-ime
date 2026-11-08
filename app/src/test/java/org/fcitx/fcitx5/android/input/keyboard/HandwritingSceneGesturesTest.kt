@@ -159,6 +159,11 @@ class HandwritingSceneGesturesTest {
             send(android.view.MotionEvent.ACTION_MOVE, id)
         }
 
+        // a finger the stream loses (no UP for it): the next event goes without it
+        fun lose(id: Int) {
+            at.remove(id)
+        }
+
         fun up(id: Int) {
             send(if (at.size == 1) android.view.MotionEvent.ACTION_UP else android.view.MotionEvent.ACTION_POINTER_UP, id)
             at.remove(id)
@@ -209,6 +214,32 @@ class HandwritingSceneGesturesTest {
             assertEquals(1, pad.pad.strokes.size)
             f.up(0)
             assertEquals(0, pad.pad.strokes.size)
+        }
+    }
+
+    // a MOVE without a finger one side had: that side cancelled, ⌫ let go (no more repeats), the stroke ended
+    @Test
+    fun aSideWhoseFingerTheStreamLostIsCancelled() {
+        harness(true).use { h ->
+            val pad = h.pad()
+            val f = Fingers(h)
+            f.down(0, f.at(h.keyNamed("backspace")))
+            f.down(1, f.at(pad, 0.3f, 0.3f))
+            f.move(1, f.at(pad, 0.5f, 0.4f))
+            f.lose(0)
+            f.move(1, f.at(pad, 0.6f, 0.4f))
+            val keys = { h.api.calls.count { it.startsWith("sendKey") } }
+            h.idle()
+            val after = keys()
+            h.after(2000)
+            h.idle()
+            assertEquals(after, keys())
+            assertEquals(true, pad.pad.drawing)
+            f.down(2, f.at(h.keyNamed("comma")))
+            f.lose(1)
+            f.move(2, f.at(h.keyNamed("comma")))
+            h.idle()
+            assertEquals(false, pad.pad.drawing)
         }
     }
 

@@ -269,6 +269,9 @@ class HandwritingKeyboard(
     // where each finger down went while the scene draws the keys: the pad's ids, the keys' ids, in order
     private val padFingers = mutableListOf<Int>()
     private val keyFingers = mutableListOf<Int>()
+    // each side's gesture began at its own first finger's down
+    private var padDown = 0L
+    private var keyDown = 0L
 
     /**
      * Each finger to what it came down on, where the scene draws the keys: on the pad the pad's, else
@@ -277,9 +280,7 @@ class HandwritingKeyboard(
      */
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         if (canvas == null) return super.dispatchTouchEvent(ev)
-        // a finger the event no longer has (a stream cut short): out of its side
-        padFingers.retainAll { ev.findPointerIndex(it) >= 0 }
-        keyFingers.retainAll { ev.findPointerIndex(it) >= 0 }
+        dropLostFingers(ev)
         var taken = false
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
@@ -292,6 +293,7 @@ class HandwritingKeyboard(
                 padView.getHitRect(padHit)
                 val onPad = padView.isVisible && padHit.contains(ev.getX(i).toInt(), ev.getY(i).toInt())
                 val to = if (onPad) padFingers else keyFingers
+                if (to.isEmpty()) sideDown(onPad, ev.eventTime)
                 to += id
                 taken = send(ev, to, onPad, if (to.size == 1) MotionEvent.ACTION_DOWN else MotionEvent.ACTION_POINTER_DOWN, id)
             }
@@ -318,6 +320,29 @@ class HandwritingKeyboard(
         return taken
     }
 
+    private fun sideDown(onPad: Boolean, at: Long) {
+        if (onPad) padDown = at else keyDown = at
+    }
+
+    private fun dropLostFingers(ev: MotionEvent) {
+        // a finger the event no longer has (a stream cut short): its side's gesture cancelled, with the
+        // fingers it had (those still here), and the side starts over
+        for ((side, toPad) in listOf(padFingers to true, keyFingers to false)) {
+            if (side.all { ev.findPointerIndex(it) >= 0 }) continue
+            side.retainAll { ev.findPointerIndex(it) >= 0 }
+            if (side.isNotEmpty()) send(ev, side, toPad, MotionEvent.ACTION_CANCEL, -1)
+            else cancelEmpty(toPad, ev)
+            side.clear()
+        }
+    }
+
+    // a side whose fingers have all gone from the stream: a bare CANCEL at where [ev] is
+    private fun cancelEmpty(toPad: Boolean, ev: MotionEvent) {
+        val e = MotionEvent.obtain(if (toPad) padDown else keyDown, ev.eventTime, MotionEvent.ACTION_CANCEL, 0f, 0f, 0)
+        if (toPad) padView.dispatchTouchEvent(e) else super.dispatchTouchEvent(e)
+        e.recycle()
+    }
+
     // [ev] with only the fingers [ids] (in their order), its batched samples too (a stroke's points between
     // frames), [action] on finger [id]'s index among them: to the pad in its own pixels, or to the keys (the
     // keyboard's own dispatch, the scene's routing). Whether the side took it
@@ -336,7 +361,7 @@ class HandwritingKeyboard(
         }
         val time = { h: Int -> if (h < ev.historySize) ev.getHistoricalEventTime(h) else ev.eventTime }
         val e = MotionEvent.obtain(
-            ev.downTime, time(0), action or (ids.indexOf(id).coerceAtLeast(0) shl MotionEvent.ACTION_POINTER_INDEX_SHIFT),
+            if (toPad) padDown else keyDown, time(0), action or (ids.indexOf(id).coerceAtLeast(0) shl MotionEvent.ACTION_POINTER_INDEX_SHIFT),
             ids.size, props, coords(0), ev.metaState, ev.buttonState, ev.xPrecision, ev.yPrecision, ev.deviceId, ev.edgeFlags,
             ev.source, ev.flags,
         )
