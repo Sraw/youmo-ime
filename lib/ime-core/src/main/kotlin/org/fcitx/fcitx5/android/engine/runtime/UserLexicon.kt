@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
+import org.fcitx.fcitx5.android.engine.english.EnglishBlocks
 import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
@@ -94,6 +95,9 @@ internal class UserLexicon(
     // in the user directory with the log, in memory without one
     private val lists by lazy(LazyThreadSafetyMode.NONE) { WordLists(userDir, onError) }
 
+    /** English's blocked words, a list of its own (no reading): shown and unblocked among pinyin's, no pinyin to them. */
+    val englishBlocks by lazy(LazyThreadSafetyMode.NONE) { EnglishBlocks(userDir, onError) }
+
     private fun Entry.word(kind: UserWord.Kind, count: Float = 0f) =
         UserWord(text, spelled(), kind, count)
 
@@ -102,13 +106,13 @@ internal class UserLexicon(
     fun userWords(kind: UserWord.Kind): List<UserWord> = when (kind) {
         UserWord.Kind.ADDED -> lists.addedWords.map { it.word(kind) }
         UserWord.Kind.LEARNED -> user().ownWords().sortedByDescending { it.second }.map { (entry, count) -> entry.word(kind, count) }
-        UserWord.Kind.BLOCKED -> lists.blockedWords.map { it.word(kind) }
+        UserWord.Kind.BLOCKED -> lists.blockedWords.map { it.word(kind) } + englishBlocks.blocked.map { UserWord(it, "", kind) }
     }
 
     fun userWordCounts(): Map<UserWord.Kind, Int> = mapOf(
         UserWord.Kind.ADDED to lists.addedWords.size,
         UserWord.Kind.LEARNED to user().ownWords().size,
-        UserWord.Kind.BLOCKED to lists.blockedWords.size,
+        UserWord.Kind.BLOCKED to lists.blockedWords.size + englishBlocks.blocked.size,
     )
 
     /**
@@ -143,6 +147,8 @@ internal class UserLexicon(
     fun addListed(added: Collection<Pair<String, String>>, blocked: Collection<Pair<String, String>>) {
         val add = added.mapNotNull { (text, pinyin) -> WordLists.entry(text, pinyin) }
         val block = blocked.mapNotNull { (text, pinyin) -> WordLists.entry(text, pinyin) }
+        // English's, no pinyin: a backup's of an older build has none
+        englishBlocks.block(blocked.filter { it.second.isEmpty() }.map { it.first })
         if (add.isNotEmpty()) add(add)
         if (block.isNotEmpty()) blockAll(block)
         dropSessions()
@@ -180,6 +186,7 @@ internal class UserLexicon(
             forgotten(learned)
         }
         byKind[UserWord.Kind.BLOCKED]?.let { unblock(it.filterNotNull()) }
+        englishBlocks.unblock(words.filter { it.kind == UserWord.Kind.BLOCKED && it.pinyin.isEmpty() }.map { it.text })
         dropSessions()
     }
 
@@ -367,6 +374,7 @@ internal class UserLexicon(
     fun clearLists() {
         lists.removeAll(lists.addedWords)
         lists.unblockAll(lists.blockedWords)
+        englishBlocks.unblock(englishBlocks.blocked)
         blockedTexts = null
         dropUser()
         dropSessions()

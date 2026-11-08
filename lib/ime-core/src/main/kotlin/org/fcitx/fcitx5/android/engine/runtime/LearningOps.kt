@@ -209,9 +209,19 @@ internal class LearningOps(
 
     private fun block(op: LearningOp.Block, act: () -> Boolean): LearningResult {
         val before = lexicon.blockedOf(op.text).toSet()
+        // English's words have a list of their own (no reading)
+        val english = lexicon.englishBlocks
+        val englishBefore = english.has(op.text)
         var blocked = emptyList<Entry>()
-        val token = acted(inverse = { lexicon.unblock(blocked) }) {
-            act().also { blocked = lexicon.blockedOf(op.text).filter { it !in before } }
+        var englishBlocked = false
+        val token = acted(inverse = {
+            lexicon.unblock(blocked)
+            if (englishBlocked) english.unblock(listOf(op.text))
+        }) {
+            act().also {
+                blocked = lexicon.blockedOf(op.text).filter { it !in before }
+                englishBlocked = !englishBefore && english.has(op.text)
+            }
         } ?: return LearningResult.Unavailable
         return LearningResult.Done(token)
     }
@@ -238,7 +248,9 @@ internal class LearningOps(
         }
         // a table blocks its candidate under the code typed alone (U-28, stream C; review-E-ui Q1);
         // what may follow, as pinyin's, everywhere
-        val scope = if (im in InputMethodCatalog.TABLES && why?.code?.kind != Kinds.PREDICTION) BlockScope.UNDER_CODE else BlockScope.EVERYWHERE
+        // a character by its strokes, under them alone as a table's (U-28)
+        val underCode = im in InputMethodCatalog.TABLES && why?.code?.kind != Kinds.PREDICTION || s.blocksUnderKeys(op.index)
+        val scope = if (underCode) BlockScope.UNDER_CODE else BlockScope.EVERYWHERE
         return LearningResult.Menu(op.text, kindOf(op.text), items, why, scope)
     }
 

@@ -1698,6 +1698,19 @@ IM_BASES = {"B0-五笔": ("五笔", "五笔", None),
 PINYIN_KEYBOARDS = {"B0-14键": "14 键", "B0-九键": "九键", "B0-注音九键": "注音九键", "B0-注音全键盘": "注音全键盘"}
 
 
+def block_candidate(d, which, note):
+    """long-press the candidate which, shoot the menu, then 屏蔽 and its confirmation (U-82: the
+    confirmation is a row of its own); returns the menu's texts, then the confirmation's"""
+    menu = d.long_pick(which)
+    d.shot("full", note)
+    check("屏蔽" in menu, f"长按「{which}」的菜单里没有屏蔽：{[t for t in menu if len(t) < 12][:12]}")
+    d.tap_text("屏蔽", where="all", scroll=False, after=0.6)
+    confirm = d.screen().texts(where="all")
+    d.shot("full", note + "：点屏蔽后的确认")
+    d.tap_text("确定屏蔽", where="all", scroll=False, after=0.8)
+    return menu + confirm
+
+
 def add_im(d, name):
     """settings 输入法 → 添加 → name"""
     d.hide_keyboard()

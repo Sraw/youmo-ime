@@ -180,7 +180,14 @@
 - **前提**：B0。
 - **操作**：点 a z h i，找到几个字拼成的候选「啊之」（不是词库里的一个词），长按，看菜单；选 **屏蔽**，确认；清空，再点 a z h i；再分别点 a、z h i；然后在 **词库与短语 → 用户词库 → 屏蔽的词** 里恢复「啊之」，再点 a z h i。
 - **预期**：菜单里有 **屏蔽**；屏蔽后 a z h i 下没有「啊之」，a 下有「啊」，z h i 下有「之」；屏蔽的词里列着「啊之 a zhi」；恢复后 a z h i 下又有「啊之」。双拼、九键打同样的拼音一样。
-- **JVM**：`EnginesUserWordsTest.aSentenceBlockedFromTheKeyboardIsNeverOfferedAgainTillUnblocked`（菜单有屏蔽，屏蔽、撤销、再屏蔽，组成它的字照常出，存进用户目录，在设置里恢复后又出）、`aSentenceIsBlockedOnEveryPinyinKeyboard`（双拼、九键）、`aSentenceIsBlockedAtItsReadingAlone`（只屏蔽这个读音）；菜单写成的字见 PY-29。设备上待跑。
+- **JVM**：`EnginesUserWordsTest.aSentenceBlockedFromTheKeyboardIsNeverOfferedAgainTillUnblocked`（菜单有屏蔽，屏蔽、撤销、再屏蔽，组成它的字照常出，存进用户目录，在设置里恢复后又出）、`aSentenceIsBlockedOnEveryPinyinKeyboard`（双拼、九键）、`aSentenceIsBlockedAtItsReadingAlone`（只屏蔽这个读音）；菜单写成的字见 PY-29。设备上跑过（2026-11-08，emulator-5574）。
+
+### PY-115 [P1] 表情、拆字、笔画查字、滑行的其他读法也能屏蔽
+<!-- learning: U-82 U-28 -->
+- **前提**：B0；表情候选、拆字开着；滑行那一步先打开 **滑行输入**。
+- **操作**：点 d i a n z a n，长按候选里的表情 👍；点 u n v z i，长按「好」；点 u h s 后长按查出的一个字；打开滑行，划 n-i-h-a-o，长按第二个候选（另一种读法的词）。每个都选 **屏蔽**、确认，再打一次同样的键看；最后在 **屏蔽的词**（笔画查字的在页顶"码表里按码屏蔽的"里，写着"笔画查字"）里逐个恢复，再打一次。
+- **预期**：四个菜单里都有 **屏蔽**；笔画查字的确认写"打这串码不再出现"，多打一笔、打拼音还出这个字；其余写"以后打字……都不再出现"。屏蔽后同样的键不再出它，恢复后又出。
+- **JVM**：`AsideBlockUatTest.anEmojiAndACharacterByStrokesAreBlockedFromTheKeyboard`（:lib:ime-eval:uatTest，真数据，经宿主的长按动作）、`EnginesAsideBlockTest`（表情、拆字）、`EnginesStrokeBlockTest`、`EnginesGlideBlockTest`。设备上跑过（2026-11-08，emulator-5574）。
 
 ### PY-31 [P1] 固定首位，再取消固定
 <!-- learning: U-83 -->

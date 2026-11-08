@@ -366,6 +366,7 @@
     <string name="learning_kind_keys14">拼音 14 键</string>
     <string name="learning_kind_table">码表</string>
     <string name="learning_kind_handwriting">手写</string>
+    <string name="learning_kind_strokes">笔画查字</string>
     <string name="learning_clear_learned">清空学到的</string>
     <string name="learning_clear_learned_summary">学到的顺序和次数；你的词、固定、屏蔽都留下</string>
     <string name="learning_clear_learned_message">清掉：\n· 各处学到的顺序、改选和使用次数，只上屏过一次的记录\n· 前后搭配和学到的联想\n· 英文的次数和排序\n· 表情和符号面板的「最近」\n\n留下：\n· 手动加的词、固定、屏蔽、不再联想、英文里不再自动改的词\n· 你的词（次数清零，仍是你的词）\n· 导入的词（回到没用过的样子）\n· 码表调频学到的顺序（到码表设置里恢复）\n\n自定义短语、快速输入不在这里清，到它们自己的页里删。这次安装存的自动备份一并删掉，清空以后不能再「退回恢复前」；以前装的、拷来的备份不动，恢复它们会带回清掉的。</string>

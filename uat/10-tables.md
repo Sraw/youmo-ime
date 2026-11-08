@@ -121,7 +121,7 @@
 - **前提**：B0-五笔。
 - **操作**：点 z，再点 n i，长按「你」看菜单，选 **屏蔽**，确认；清空，再点 z n i；然后在 **词库与短语 → 用户词库 → 屏蔽的词** 里恢复「你」，再点 z n i。
 - **预期**：菜单里有 **屏蔽**，没有 **固定首位**；屏蔽后反查 ni 没有「你」（全拼里也没有）；恢复后又有。
-- **JVM**：`EnginesTableTest.whatIsLookedUpByPinyinIsBlockedAsFullPinyinBlocksIt`；设备上待跑。
+- **JVM**：`EnginesTableTest.whatIsLookedUpByPinyinIsBlockedAsFullPinyinBlocksIt`；设备上跑过（2026-11-08，emulator-5574）。
 
 ### TBL-18 [P1] 二笔的 [ 拼音反查
 - **前提**：B0-二笔（添加"二笔"并切到它）。

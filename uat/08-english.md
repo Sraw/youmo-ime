@@ -107,3 +107,10 @@
 - **预期**：最后一次 teh 空格不再被改，框里末尾是「teh 」（有改正时点原样的词，和上屏后退格改回一样，见 EN-04、docs/other-input-methods.md）；英文词库的"不再自动改的词"里有 teh。只是打过几次、没改回过的词照样会被改，这一条由单元测试 `EnglishUserTest.aWordTypedTwiceIsCorrectedStill` 管，设备上打不出"不经改正就上屏的 teh"。
 - **JVM**：`EnglishUatTest.theWordAsTypedPickedCountsAsACorrectionTakenBack`（:lib:ime-eval:uatTest，真数据：打字和词库这一半）、`SettingsPagesUatTest.anEnglishWordNoLongerCorrectedIsMarkedAndCorrectedAgainOnATap`（英文词库里 teh 那一行写着不再自动改）；设备上不跑。
 
+
+### EN-27 [P0] 屏蔽一个英文词：不再补全、不再改成它，设置里恢复
+<!-- learning: U-82 -->
+- **前提**：B0-英文。
+- **操作**：打 t h，长按候选里的「the」，看菜单，选 **屏蔽**，确认；清空，打 t h；再打 t h w，按空格；然后在 **词库与短语 → 用户词库 → 屏蔽的词** 里恢复「the」，再打 t h w，按空格。
+- **预期**：菜单里有 **屏蔽**；屏蔽后 t h 的候选里没有「the」，`thw` 空格不再改成「the 」（改成下一个最可能的词，比如 they）；屏蔽的词里列着「the」（没有拼音）；恢复后 t h 下又有「the」，`thw` 空格又改成「the 」。屏蔽前长按英文候选、点屏蔽后，词确实被屏蔽（英文候选的长按动作以前走不到引擎：见下面 JVM）。原样打的那个候选（最左边紧挨着的 th）长按没有屏蔽。
+- **JVM**：`EnglishUatTest.aWordBlockedIsNoLongerCompletedNorCorrectedTo`（:lib:ime-eval:uatTest，真数据，经宿主的长按动作）、`EnginesEnglishBlockTest`（补全、改正、滑行的其他词、撤销、存进用户目录 words.en.blocked、在设置里恢复、备份恢复）、`EnglishSessionTest.aPredictionBlockedIsNotPredictedTillUnblocked`（联想）。设备上跑过（2026-11-08，emulator-5574）。

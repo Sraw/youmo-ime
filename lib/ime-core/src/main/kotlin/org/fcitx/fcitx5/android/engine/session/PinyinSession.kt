@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
-import org.fcitx.fcitx5.android.engine.data.Misreadings
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.lattice.Candidate
 import org.fcitx.fcitx5.android.engine.learn.CommitRows
@@ -596,11 +595,14 @@ class PinyinSession(
 
     // a word, or a sentence of them blocked whole (啊之): blocking each of its words would block common
     // ones; not text kept as typed, nor where nothing is to be kept, as the word blocked is
-    private fun blockable(c: Candidate) = learning && block != null && user != null && entries(c) != null
+    private fun blockable(c: Candidate) = learning && block != null && user != null && blocked(c) != null
+
+    // what blocking [c] blocks: its words, or a sentence of them whole; an emoji or a character by its
+    // parts by its text in the reading it stands for (a phrase, text kept as typed: nothing)
+    private fun blocked(c: Candidate): Entry? = lastRead.aside[c.text]?.let { aside -> AsideBlocks.entry(c.text, aside) { lastRead.candidates.firstOrNull { it.text !in lastRead.aside && c.text in emoji(it.text) }?.let(::entries) } } ?: entries(c)?.let { it.singleOrNull() ?: Entry.of(c.text, it) }
 
     private fun block(index: Int): Snapshot {
-        val c = candidates.getOrNull(index)
-        val word = c?.takeIf { user != null && learning }?.let(::entries)?.let { it.singleOrNull() ?: Entry.of(c.text, it) }
+        val word = candidates.getOrNull(index)?.takeIf { user != null && learning }?.let(::blocked)
         if (word == null || block == null) return snapshot()
         block.invoke(word)
         if (before() == word) dropContext()
@@ -878,7 +880,8 @@ class PinyinSession(
         // the emoji go with the reading shown first: not one held past the first page, nor one a pinned phrase put second
         // the dates 日期 stands for and so on, where the input is no key of them (双拼's sj is a syllable): never twice
         val wordPhrases = { word: String -> if (builtInPhrases && placed.isEmpty()) phraseBook.builtInsOf(word) { time ?: now() } else emptyList() }
-        val withAside = AsideCandidates.place(read, key, emoji, chaizi.takeUnless { spell }, { it.text }, { it.end == rest }, asText, wordPhrases, first = { coarseCandidates.order(readPlaced, pageSize, readHeld).firstOrNull() }) { ordered.tier(it) == Tier.LIFTED }
+        // an emoji blocked in the reading of the word it stands for is not offered for it
+        val withAside = AsideCandidates.place(read, key, AsideBlocks.emoji(emoji, user, read, { it.text }) { entries(it, decoded.graph) }, chaizi.takeUnless { spell }, { it.text }, { it.end == rest }, asText, wordPhrases, first = { coarseCandidates.order(readPlaced, pageSize, readHeld).firstOrNull() }) { ordered.tier(it) == Tier.LIFTED }
         // nothing set aside: the list worked out for that is the one listed
         val listed = if (withAside.candidates === read) readPlaced else withPhrases(withAside.candidates)
         val held = if (withAside.candidates === read) readHeld else coarseCandidates.held(listed, pageSize, kept)

@@ -80,6 +80,9 @@ interface Session {
      */
     fun lookedUp(index: Int): String? = null
 
+    /** Whether a block of the candidate at [index] holds under the keys typed alone (a character by strokes), not everywhere. */
+    fun blocksUnderKeys(index: Int): Boolean = false
+
     /**
      * What was learned changed under the input (a long press taken back, a clear): the candidates
      * read anew, to be shown ([Keyboard.AGAIN]); null where nothing is on show to read again.

@@ -2,7 +2,7 @@
 前提/操作/预期."""
 import time
 
-from uat import (Blocked, case, check, first, grouped_keys)
+from uat import (Blocked, block_candidate, case, check, first, grouped_keys)
 
 
 # ---------------------------------------------------------------- 打字
@@ -330,3 +330,51 @@ case("PY-112", needs="jvm:ZhuyinShortcutsUatTest.dachensKeysTakeTheFullKeyboards
 
 
 case("PY-113", needs="jvm:EnginesReadingsTest.eachCandidateIsReadAsTyped、EnginesReadingsTest.aCharacterOfTwoReadingsIsReadAsTypedThroughFullPinyinsWrappers、StrokeFilterTest.readingsAndLookupsOfAKeptCandidateAreOfItsOwnPlace")(lambda d: None)
+
+
+@case("PY-114", mutates="learn")
+def py114(d):
+    d.type("azhi")
+    c = d.cands()
+    check("啊之" in c, f"a z h i 的候选 {c[:8]}")
+    block_candidate(d, "啊之", "长按「啊之」的菜单")
+    d.clear()
+    d.type("azhi")
+    again = d.cands()
+    check("啊之" not in again, f"屏蔽后 a z h i 还有「啊之」：{again[:8]}")
+    d.clear()
+    d.type("a")
+    a = d.cands()
+    d.clear()
+    d.type("zhi")
+    z = d.cands()
+    d.clear()
+    check("啊" in a and "之" in z, f"a {a[:6]}，zhi {z[:6]}")
+    return f"屏蔽前 {c[:4]}，屏蔽后 {again[:4]}；a 有「啊」、zhi 有「之」（设置里恢复由 JVM 管）"
+
+
+@case("PY-115", mutates="learn")
+def py115(d):
+    d.type("dianzan")
+    c = d.cands()
+    emoji = "👍"
+    if emoji not in c:
+        raise Blocked(f"dianzan 的候选里没有 👍：{c[:8]}")
+    block_candidate(d, emoji, f"长按表情「{emoji}」的菜单")
+    d.clear()
+    d.type("dianzan")
+    after = d.cands()
+    check(emoji not in after, f"屏蔽后 dianzan 还有「{emoji}」：{after[:8]}")
+    d.clear()
+    d.type("uhs")
+    u = d.cands()
+    check(d.preedit().startswith("u"), f"打了 uhs，编码行是「{d.preedit()}」")
+    ch = u[0].split()[0]
+    menu = block_candidate(d, u[0], f"长按笔画查字「{ch}」的菜单")
+    check(any("这串码" in t for t in menu), "笔画查字的确认没写「打这串码不再出现」")
+    d.clear()
+    d.type("uhs")
+    u2 = [x.split()[0] for x in d.cands() if x]
+    d.clear()
+    check(ch not in u2, f"屏蔽后 uhs 还有「{ch}」：{u2[:8]}")
+    return f"表情「{emoji}」屏蔽后 dianzan {after[:4]}；uhs「{ch}」屏蔽后 {u2[:4]}（拆字、滑行的其他读法由 JVM 管）"

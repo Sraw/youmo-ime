@@ -3,7 +3,7 @@ follows its case's 前提/操作/预期."""
 import statistics
 import time
 
-from uat import (Blocked, add_im, case, check, script)
+from uat import (Blocked, add_im, block_candidate, case, check, script)
 
 
 def word(c):
@@ -177,3 +177,19 @@ case("TBL-50", needs="jvm:TablesKeysUatTest.erbisSemicolonHasAKey")(lambda d: No
 
 
 case("TBL-51", needs="jvm:TablesKeysUatTest.wubisAllRootsAreItsNamesAtCompact、TableRootsTest.atCompactAllTheRootsAreShownAsTheirNames")(lambda d: None)
+
+
+@case("TBL-52", base="B0-五笔", mutates="learn")
+def tbl52(d):
+    d.type("zni")
+    c = d.cands()
+    c = [x.split()[0] for x in c if x]
+    check("你" in c, f"z n i 的候选 {c[:6]}")
+    menu = block_candidate(d, 1 + c.index("你"), "五笔反查 z n i，长按「你」的菜单")
+    check("固定首位" not in menu, "反查的菜单里有固定首位")
+    d.clear()
+    d.type("zni")
+    again = [x.split()[0] for x in d.cands() if x]
+    d.clear()
+    check("你" not in again, f"屏蔽后 z n i 还有「你」：{again[:6]}")
+    return f"屏蔽前 {c[:4]}，屏蔽后 {again[:4]}（设置里恢复由 JVM 管）"

@@ -29,6 +29,8 @@ class GlideReading(val keys: String, val word: String, val score: Float, val pin
  * types its reading instead and picks it there, so it is learned and followed (联想) as any word
  * picked. None [blocked] is offered; [readings] in all, the one typed among them. Such a word is
  * looked for on the first page only: one the session lists on a later page shows there again.
+ * Such a word may be blocked from a long press ([blockOther]: pinyin's by its reading, a table's under
+ * its code), and is offered no more.
  */
 class GlideSession(
     private val session: Session,
@@ -38,6 +40,8 @@ class GlideSession(
     private val readings: Int = READINGS,
     /** A word of the other readings committed though [session] holds it back, and the first it showed (asked only if wanted): for learning to record. */
     private val heldBack: (GlideReading, first: () -> String) -> Unit = { _, _ -> },
+    /** Blocks another reading's word as [session] would its own; none offered without. */
+    private val blockOther: ((GlideReading) -> Unit)? = null,
     private val read: (Glide, limit: Int) -> List<GlideReading>,
 ) : Session by session {
 
@@ -71,7 +75,7 @@ class GlideSession(
             is Action.Forget -> pressed(action.index) { action.copy(index = it) }
             is Action.Pin -> pressed(action.index) { action.copy(index = it) }
             is Action.Unpin -> pressed(action.index) { action.copy(index = it) }
-            is Action.Block -> pressed(action.index) { action.copy(index = it) }
+            is Action.Block -> others(action.index)?.let(::blockOther) ?: pressed(action.index) { action.copy(index = it) }
             else -> session.apply(action)
         }
         wrote(action, s)
@@ -157,6 +161,14 @@ class GlideSession(
 
     private fun typing(s: Snapshot) = s.preedit.isNotEmpty() && !s.predicting
 
+    private fun blockOther(reading: GlideReading): Snapshot {
+        val block = blockOther ?: return unchanged()
+        if (!session.learning) return unchanged()
+        block(reading)
+        others = others - reading
+        return unchanged()
+    }
+
     // nothing to forget or pin of another reading's word: the input as it was
     private fun unchanged() = last?.copy(commit = "", deleteBefore = 0, handled = true) ?: session.apply(Action.Refine)
 
@@ -188,13 +200,20 @@ class GlideSession(
         return all
     }
 
-    override fun offers(index: Int): Set<Offer> = if (others(index) != null) emptySet() else session.offers(inner(index))
+    // another reading's word may be blocked, where [session] learns (not in a password field)
+    override fun offers(index: Int): Set<Offer> = when {
+        others(index) == null -> session.offers(inner(index))
+        blockOther != null && session.learning -> setOf(Offer.BLOCK)
+        else -> emptySet()
+    }
 
     // the others are no candidates [session] ranked; its own a place on for each (review-int-runtime S2)
     override fun why(index: Int): Why? = if (others(index) != null) null else session.why(inner(index))
 
     // the others are read by their text: their keys are not what [session] read
     override fun readingOf(index: Int): List<WordReading>? = if (others(index) != null) null else session.readingOf(inner(index))
+
+    override fun blocksUnderKeys(index: Int): Boolean = others(index) == null && session.blocksUnderKeys(inner(index))
 
     override fun lookedUp(index: Int): String? = if (others(index) != null) null else session.lookedUp(inner(index))
 

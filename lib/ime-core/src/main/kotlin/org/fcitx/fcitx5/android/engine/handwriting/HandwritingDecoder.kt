@@ -301,9 +301,12 @@ class HandwritingDecoder(
         if (at == searched.size || at - searchStart == MAX_WORD) return
         val p = searched[at]
         val map = readings()
+        // a character blocked is in no word either (人 blocked, 天人 would show it again as its last),
+        // but where every reading is, as arcsFrom keeps the ink's best
+        val shut = p.texts.map { blocked(index.find(it)) }.takeUnless { all -> all.all { it } }
         for (i in 0 until minOf(alternatives, p.texts.size)) {
             val c = p.texts[i]
-            val syllables = map[c.codePointAt(0)] ?: continue
+            val syllables = map[c.codePointAt(0)]?.takeUnless { shut?.get(i) == true } ?: continue
             val scored = ink + inkWeight * p.scores[i]
             text.append(c)
             for (s in syllables) {

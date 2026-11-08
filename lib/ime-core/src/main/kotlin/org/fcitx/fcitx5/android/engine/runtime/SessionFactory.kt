@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.engine.english.EnglishPhrases
 import org.fcitx.fcitx5.android.engine.english.EnglishSession
 import org.fcitx.fcitx5.android.engine.english.EnglishUser
 import org.fcitx.fcitx5.android.engine.glide.GlideReading
+import org.fcitx.fcitx5.android.engine.user.WordLists
 import org.fcitx.fcitx5.android.engine.glide.GlideSession
 import org.fcitx.fcitx5.android.engine.glide.PinyinGlide
 import org.fcitx.fcitx5.android.engine.glide.TableGlide
@@ -142,8 +143,8 @@ internal class SessionFactory(
                     latin = if (s.latinWords) assets.latinWords else null, userLatin = if (s.latinWords) latinWords else null,
                 )
                 val pinyin = pinyinSession(segmenter, spell = false, chaizi = chaizi())
-                val looked = ForgetsInTables(StrokeLookup(pinyin, assets::strokes, assets::charReading, s.pageSize, blocked = lexicon::isBlocked, follow = pinyin::follow, retype = pinyin::typeAll))
-                GlideSession(looked, syllableBoundary, blocked = glideHeldBack(), heldBack = heldBack(pinyin)) { g, n -> pinyinGlide.decode(g.path, g.layout, n) }
+                val looked = ForgetsInTables(StrokeLookup(pinyin, assets::strokes, assets::charReading, s.pageSize, blocked = lexicon::isBlocked, follow = pinyin::follow, retype = pinyin::typeAll, blockedUnder = { strokes -> learner.openHabits().blockedUnder(strokeCode(strokes)) }, blockUnder = { strokes, text -> learner.openHabits().blockUnder(strokeCode(strokes), text, on = true) }))
+                GlideSession(looked, syllableBoundary, blocked = glideHeldBack(), heldBack = heldBack(pinyin), blockOther = ::blockGlided) { g, n -> pinyinGlide.decode(g.path, g.layout, n) }
             }
             // the 14 keys: no glide, nor 笔画查字 (u is on UI, no stroke key of its own). 简拼 only where nothing
             // else is read, as on the nine keys. Top-1, both models on, the same samples (one exact reading each, so
@@ -161,7 +162,7 @@ internal class SessionFactory(
                 val data = englishData()
                 EnglishSession(
                     data, pageSize = s.pageSize, user = if (learner.useHabits) english.user() else EnglishUser.OFF, nineKeys = s.nineKeys,
-                    phrases = EnglishPhrases(phraseBook(), learnClock::calendar),
+                    phrases = EnglishPhrases(phraseBook(), learnClock::calendar), blocks = lexicon.englishBlocks,
                 )
             }
             HANDWRITING -> {
@@ -188,6 +189,7 @@ internal class SessionFactory(
                     typed = { c -> if (c == PinyinGlide.SEPARATOR) Action.Key(c, glided = true) else Action.Letter(c, glided = true) },
                     readings = GlideSession.NINE_KEYS_READINGS,
                     heldBack = heldBack(pinyin),
+                    blockOther = ::blockGlided,
                 ) { g, n -> pinyinGlide.decode(g.path, g.layout, n) }
             }
             // the 18, 14 and nine keys: as pinyin's 14 keys, no glide nor 笔画查字; learned under spk: (CommitRecorder)
@@ -200,6 +202,7 @@ internal class SessionFactory(
                     syllableBoundary,
                     blocked = glideHeldBack(),
                     heldBack = heldBack(pinyin),
+                    blockOther = ::blockGlided,
                 ) { g, n -> pinyinGlide.decode(g.path, g.layout, n, spelling) }
             }
             else -> table(im, s)
@@ -244,11 +247,22 @@ internal class SessionFactory(
             ),
             between = Action.Pick(0),
             blocked = glideHeldBack { false },
+            // under its code, as the table blocks its own (U-28)
+            blockOther = { r -> learner.openHabits().blockUnder(Code(Kinds.table(im), r.keys), r.word, on = true) },
         ) { g, n -> glide.decode(g.path, g.layout, n) }
     }
 
     // read when first glided: most never glide pinyin
     private val pinyinGlide by lazy { PinyinGlide(assets.pinyinData, user = ::glideUser) }
+
+    // a pinyin glide's other reading's word blocked as it reads, as a long press on it in the list would
+    // (the session kept: the host fetches its candidates next)
+    private fun blockGlided(r: GlideReading) {
+        WordLists.entry(r.word, r.pinyin)?.let { lexicon.block(it) }
+    }
+
+    // a character blocked under strokes is filed as a table's block under its code (U-28), the record's whatever the habits
+    private fun strokeCode(strokes: String) = Code(Kinds.table(StrokeLookup.BLOCK_TABLE), strokes)
 
     // the user's words in a glide's readings, as the sessions score them: added, learned, blocked
     private fun glideUser(): PinyinGlide.User {

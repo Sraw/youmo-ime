@@ -90,6 +90,8 @@ class StrokeFilter(
 
     override fun why(index: Int): Why? = if (!filtering) session.why(index) else keptAt(index)?.let { session.why(it.index) }
 
+    override fun blocksUnderKeys(index: Int): Boolean = if (!filtering) session.blocksUnderKeys(index) else keptAt(index)?.let { session.blocksUnderKeys(it.index) } == true
+
     override fun lookedUp(index: Int): String? = if (!filtering) session.lookedUp(index) else keptAt(index)?.let { session.lookedUp(it.index) }
 
     override fun reread(): Snapshot? {

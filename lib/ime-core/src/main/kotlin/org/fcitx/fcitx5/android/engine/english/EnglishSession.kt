@@ -71,6 +71,8 @@ class EnglishSession(
     // the nine keys' letters (the user's 按键字母): which a key typed for English is
     private val nineKeys: NineKeyLetters = NineKeyLetters.STANDARD,
     private val phrases: EnglishPhrases = EnglishPhrases(),
+    /** The words the user blocked: never offered, predicted, glided or corrected to; none blocked here without. */
+    private val blocks: EnglishBlocks? = null,
 ) : Session {
 
     // what the user committed, kept by the host; else for this session alone
@@ -99,6 +101,7 @@ class EnglishSession(
     // a coarse word the user typed is theirs to be offered; a misspelling once it is theirs, never
     // corrected (see read)
     private fun offered(word: Int): Boolean {
+        if (blocks?.has(checkNotNull(data).word(word)) == true) return false
         val misspelling = misspelt[word]
         if (!misspelling && !coarse.has(word)) return true
         val text = checkNotNull(data).word(word)
@@ -236,12 +239,7 @@ class EnglishSession(
         Action.CommitRaw -> if (input.isEmpty()) snapshot(handled = false) else commit(typed(), space = false, learned = false).copy(handled = false)
         is Action.NineKey -> nineKey(action.digit, action.upper)
         // the nine keys' input is no text to move about in: a tap on it leaves it as it is
-        is Action.Cursor -> if (input.isEmpty() || nineKeyed()) {
-            snapshot(handled = false)
-        } else {
-            cursor = action.at.coerceIn(0, input.length)
-            snapshot()
-        }
+        is Action.Cursor -> cursor(action.at)
         // the keyboard commits the word on an arrow (Keyboard.whileComposing): none comes here
         is Action.Step -> snapshot(handled = false)
         is Action.Context -> context(action)
@@ -251,11 +249,18 @@ class EnglishSession(
         }
         is Action.Forget -> forget(action.index)
         is Action.Unpin -> unpin(action.index)
-        // nothing here refines, inks, pins, blocks or picks a syllable or letter: what is shown stays
-        Action.Refine, is Action.Ink, is Action.Stroke, is Action.Pin, is Action.Block, is Action.Syllable, is Action.Letter, Action.LookUp -> snapshot()
+        is Action.Block -> block(action.index)
+        // nothing here refines, inks, pins or picks a syllable or letter: what is shown stays
+        Action.Refine, is Action.Ink, is Action.Stroke, is Action.Pin, is Action.Syllable, is Action.Letter, Action.LookUp -> snapshot()
     }
 
     // 从自定义词组中删除 is an unpin (LearningMenu), on a phrase: nothing else is pinned here
+    private fun cursor(at: Int): Snapshot {
+        if (input.isEmpty() || nineKeyed()) return snapshot(handled = false)
+        cursor = at.coerceIn(0, input.length)
+        return snapshot()
+    }
+
     private fun unpin(index: Int): Snapshot = also { if (phrases.delete(candidates, index)) read() }.snapshot()
 
     // what was learned read anew after an undo, the session and what is typed kept (review-int S1): the
@@ -279,7 +284,7 @@ class EnglishSession(
 
     // forgetting here records no word, it only takes counts away: offered in a password field too
     override fun offers(index: Int): Set<Offer> = if (phrases.at(candidates, index) != null) OfferRules.offers(learning, forgets = { false }, phrase = true)
-        else OfferRules.offers(learning = true, forgets = { candidates.getOrNull(index)?.let(::learnedAs) != null })
+        else OfferRules.offers(learning = true, forgets = { candidates.getOrNull(index)?.let(::learnedAs) != null }, blocks = { blockable(index) })
 
     // the candidate [text] as the user committed it, if they did: as shown, or as at a sentence's start
     private fun learnedAs(text: String): String? =
@@ -343,7 +348,7 @@ class EnglishSession(
         if (userOnly.isEmpty()) return emptyList()
         val path = GlidePath(glide.path, glide.layout, GlidePath.Weights(), EnglishDecoder.MAX_KEYS)
         if (path.points == 0) return emptyList()
-        return userOnly.mapNotNull { word ->
+        return userOnly.filterNot(::blocked).mapNotNull { word ->
             val key = EnglishData.key(word)
             val fits = key.length in 1..EnglishDecoder.MAX_KEYS && key.indices.all { path.step(it, key[it]) }
             val cost = if (fits) path.cost(key.length) else null
@@ -409,10 +414,21 @@ class EnglishSession(
         return snapshot(commit = made, deleteBefore = found.length)
     }
 
-    private fun forget(index: Int): Snapshot {
-        val word = candidates.getOrNull(index)?.let(::learnedAs) ?: return snapshot()
-        user.forget(word)
-        if (input.isEmpty()) candidates = predictions() else read()
+    private fun blocked(word: String) = blocks?.has(word) == true
+
+    // a word offered, as shown; not the letters typed, which are kept as typed whatever is blocked
+    private fun blockable(index: Int): Boolean {
+        val word = candidates.getOrNull(index) ?: return false
+        return learning && blocks != null && EnglishText.isWord(word) && !(input.isNotEmpty() && word == typed())
+    }
+
+    private fun block(index: Int): Snapshot = shownWithout(candidates.getOrNull(index)?.takeIf { blockable(index) }?.also { checkNotNull(blocks).block(listOf(it)) })
+
+    private fun forget(index: Int): Snapshot = shownWithout(candidates.getOrNull(index)?.let(::learnedAs)?.also(user::forget))
+
+    // what is shown read anew once [gone] is: a long press's 删除 or 屏蔽
+    private fun shownWithout(gone: String?): Snapshot {
+        if (gone != null) if (input.isEmpty()) candidates = predictions() else read()
         return snapshot()
     }
 
@@ -760,7 +776,7 @@ class EnglishSession(
         val name = upper > 1 || upper == 1 && !(typed[0].isUpperCase() && before.lastOrNull().let { it == null || it == EnglishText.START })
         // each part of a word with a hyphen is one, which the words have none of: as typed
         val theirs = user.neverCorrected(typed) || user.neverCorrected(typed.replaceFirstChar(Char::lowercaseChar))
-        correction = if (keepTyped || theirs || '-' in typed) null else data?.let { autocorrect.of(it, typed, keys, found, context, name) }?.let(::inCase)
+        correction = if (keepTyped || theirs || '-' in typed) null else data?.let { autocorrect.of(it, typed, keys, found, context, name) }?.let(::inCase)?.takeUnless(::blocked)
         val data = data ?: return run { candidates = listOf(typed) }
         val words = (found.map { data.word(it.word) to it.score } + ownWords(data, keys, before))
             .sortedByDescending { it.second }
@@ -781,7 +797,7 @@ class EnglishSession(
         val found = offeredOf(SUGGESTED + 1, ::offered) { nine.decoder.suggest(keys, context, it, exactFirst = true) }
             .map { NineKeyWords.Found(data.word(it.word), it.score, it.completes) }
         refreshUser(data)
-        val own = userOnly.mapNotNull { nine.own(it, keys, user.score(Float.NEGATIVE_INFINITY, prev, it)) }
+        val own = userOnly.filterNot(::blocked).mapNotNull { nine.own(it, keys, user.score(Float.NEGATIVE_INFINITY, prev, it)) }
         val words = nine.ordered(found + own, input).map { nine.inCase(capitalI(it), input, upperKeys) }
         // every letter pinned: that word first, as typed, though the data has longer ones it starts
         val pinnedWord = listOfNotNull(capitalI(input.toString()).takeIf { input.none { it in '2'..'9' } })
@@ -792,7 +808,7 @@ class EnglishSession(
     private fun ownWords(data: EnglishData, keys: String, before: List<String>): List<Pair<String, Float>> {
         refreshUser(data)
         val prev = previous(before)
-        return userOnly.mapNotNull { word ->
+        return userOnly.filterNot(::blocked).mapNotNull { word ->
             val key = EnglishData.key(word)
             val spelt = key == keys || keys.length >= costs.completeFrom && key.startsWith(keys)
             if (spelt) word to user.score(Float.NEGATIVE_INFINITY, prev, word) else null
@@ -814,7 +830,7 @@ class EnglishSession(
         val model = offeredOf(SUGGESTED + 1, ::offered) { decoder.predict(context, it) }
             .map { data.word(it.word) to user.score(it.lm, prev, data.word(it.word)) }
         // what the user typed after the word before: theirs to type again
-        val theirs = prev?.let(user::followers).orEmpty().map { word ->
+        val theirs = prev?.let(user::followers).orEmpty().filterNot(::blocked).map { word ->
             val id = data.id(word)
             word to user.score(if (id == NgramModel.NO_WORD) Float.NEGATIVE_INFINITY else data.model.scoreAfter(context, id), prev, word)
         }
@@ -870,6 +886,8 @@ class EnglishSession(
             first = pager.from,
             deleteBefore = deleteBefore,
             cursor = if (cursor == input.length || nineKeyed()) -1 else cursor,
+            // a long press's act (屏蔽, 删除) goes by the host's candidate actions, which a list not actionable has none of
+            actionable = candidates.isNotEmpty(),
         )
     }
 

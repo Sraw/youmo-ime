@@ -1,7 +1,7 @@
 """uat/08-english.md (B0-英文). The .md is the source of truth; each function follows its case's
 前提/操作/预期."""
 
-from uat import case, check, gear, glide_on
+from uat import block_candidate, case, check, gear, glide_on
 
 
 def en_settings(d):
@@ -96,3 +96,22 @@ case("EN-21", needs="jvm:EnglishCapsUatTest.aGlideTakesShiftWhereTheFieldAsksACa
 
 
 case("EN-26", needs="jvm:EnglishUatTest.theWordAsTypedPickedCountsAsACorrectionTakenBack、SettingsPagesUatTest.anEnglishWordNoLongerCorrectedIsMarkedAndCorrectedAgainOnATap")(lambda d: None)
+
+
+@case("EN-27", base="B0-英文", mutates="learn")
+def en27(d):
+    d.type("th")
+    c = d.cands()
+    check("the" in c, f"th 的候选 {c[:6]}")
+    block_candidate(d, "the", "长按英文「the」的菜单")
+    d.clear()
+    d.type("th")
+    again = d.cands()
+    d.clear()
+    check("the" not in again, f"屏蔽后 th 还有 the：{again[:6]}")
+    d.type("thw")
+    d.cands()
+    d.space()
+    t = d.field_text()
+    check(t != "the ", f"thw 空格后框里「{t}」")
+    return f"屏蔽前 {c[:4]}，屏蔽后 {again[:4]}，thw 空格「{t}」（设置里恢复由 JVM 管）"
