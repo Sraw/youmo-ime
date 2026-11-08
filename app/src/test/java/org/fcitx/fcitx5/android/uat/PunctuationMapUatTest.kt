@@ -97,9 +97,10 @@ class PunctuationMapUatTest {
             // the table read (till then the key shows and types its own mark: beforeTheTableIsRead...)
             // the statuses at the start can flip punctuation off and on (the mapping emptied, then read again):
             // the face drawn anew a frame later than the bubble asks; settled when both show the table's mark
-            until("the table read") { shown() == twice("，") }
-            // what those presses typed, the start of what follows
-            h.after(BUBBLE_GONE_MS)
+            var presses = 0
+            until("the table read") { presses++; shown() == twice("，") }
+            // what those presses typed (each a mark), the start of what follows
+            until("the presses typed") { h.field.text.length == presses }
             val p = h.field.text.toString()
             // each press below is lifted, so typed: what goes in is checked with what showed
             assertEquals(what, twice("，"), shown())
