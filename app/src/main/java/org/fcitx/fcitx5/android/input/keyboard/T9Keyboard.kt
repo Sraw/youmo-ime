@@ -693,6 +693,7 @@ class T9Keyboard(
     }
 
     override fun onDetachedFromWindow() {
+        columnPlacer.removeCallbacksAndMessages(null)
         scope?.cancel()
         scope = null
         super.onDetachedFromWindow()
@@ -922,9 +923,11 @@ class T9Keyboard(
     }
 
     // each scene made anew: the column placed where it has the slot, after this frame (a layout pass, not one in a
-    // draw); on the main looper, not View.post, which holds it till the keyboard is attached
+    // draw); on the main looper, not View.post, which holds it till the keyboard is attached. Dropped as it is detached
+    private val columnPlacer = Handler(Looper.getMainLooper())
+
     override fun onSceneBuilt(scene: Scene?) {
-        Handler(Looper.getMainLooper()).post { placeColumn(scene) }
+        columnPlacer.post { placeColumn(scene) }
     }
 
     // the column in the scene's slot `side` (nine.xml), over the canvas: placed where [scene] has it; hidden with no scene

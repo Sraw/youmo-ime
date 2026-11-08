@@ -469,7 +469,7 @@ class TextKeyboard private constructor(
     // glide typing (滑行输入) where the input method reads one; a stroke (笔画筛选) in pinyin's and 双拼's
     // the letters where the scene places them while the canvas draws the keys: each letter node of the scene by
     // its (id, copy), a split row's second G its copy 1
-    private fun sceneLetters(): List<Pair<Char, KeyPlace>> = canvas?.scene?.keys.orEmpty()
+    private fun sceneLetters(): List<Pair<Char, KeyPlace>> = canvas?.shownKeys.orEmpty()
         .filter { it.id.length == 1 && it.id[0] in 'a'..'z' }
         .map { it.id[0] to scenePlace(it.id, it.copy == 1) }
 

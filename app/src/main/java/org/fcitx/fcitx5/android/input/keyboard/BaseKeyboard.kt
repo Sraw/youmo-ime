@@ -603,12 +603,12 @@ abstract class BaseKeyboard(
     /**
      * The keys drawn by the scene engine over this keyboard's own ([KeyboardCanvasView]), their views
      * not drawn then: the touches handed to the scene's keys ([sceneKeys]) as vivo's workaround hands
-     * them to the views ([routesTouches]). Null: the keys draw themselves. Set by [drawKeysOn].
+     * them to the views ([routesTouches]). Null: the keys draw themselves. Set by [drawKeysWithScene].
      */
     protected var canvas: KeyboardCanvasView? = null
         private set
 
-    // the scene's keys ([drawKeysOn], [drawKeysWithScene]) and what a touch on the canvas finds
+    // the scene's keys ([drawKeysWithScene]) and what a touch on the canvas finds
     private val sceneKeys = SceneKeys(this) { key, def -> wire(key, def, null) }
 
     /**
@@ -657,7 +657,7 @@ abstract class BaseKeyboard(
         SceneEnvs.of(this, look, theme.isDark, width, height, Input(), marks = SceneBoard.marks(layout, charShortcutMarks))
 
     /** A scene made anew for the canvas ([scene]; null, none drawn): what a keyboard places by it, placed again. */
-    protected open fun onSceneBuilt(scene: Scene?) {}
+    internal open fun onSceneBuilt(scene: Scene?) {}
 
     /** The keyboard's own words for its layout's keys (U4 B): its `action:` placeholders, its composed long presses. */
     protected open val sceneTable: SceneKeyDef.Table = object : SceneKeyDef.Table {}

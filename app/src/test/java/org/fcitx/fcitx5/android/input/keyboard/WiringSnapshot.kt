@@ -9,17 +9,19 @@ import java.io.File
  * line a key's id and what it does; `WIRING_RECORD=1` records them anew (review the diff before committing).
  */
 internal object WiringSnapshot {
+    // where WIRING_RECORD=1 writes them (the module's directory the tests' working one); read from the classpath
     private val dir = File("src/test/resources/wiring")
 
     /** [old]'s lines are the file's (recorded from them under WIRING_RECORD=1), and [now]'s are too. */
     fun check(name: String, old: List<String>, now: List<String>) {
-        val file = File(dir, "$name.txt")
+        val file = "wiring/$name.txt"
         val was = old.sorted().joinToString("\n", postfix = "\n")
         if (System.getenv("WIRING_RECORD") == "1") {
             dir.mkdirs()
-            file.writeText(was)
+            File(dir, "$name.txt").writeText(was)
         }
-        val committed = file.readText()
+        val committed = if (System.getenv("WIRING_RECORD") == "1") was else
+            checkNotNull(javaClass.classLoader!!.getResource(file)) { "$file: none (WIRING_RECORD=1 records it)" }.readText()
         assertEquals("$file: the views' wiring", committed, was)
         assertEquals("$file: the scene's wiring", committed, now.sorted().joinToString("\n", postfix = "\n"))
     }

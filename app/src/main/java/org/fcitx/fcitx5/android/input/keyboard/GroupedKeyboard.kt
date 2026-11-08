@@ -310,7 +310,7 @@ class GroupedKeyboard(
 
     // the groups' keys where the scene draws them: each key's letters= (060-render-v2 §15), its first letter's
     private fun groupPlaces(): List<Pair<Char, KeyPlace>> =
-        canvas?.scene?.keys.orEmpty().mapNotNull { k -> k.letters?.let { it.group[0] to scenePlace(k.id) } }
+        canvas?.shownKeys.orEmpty().mapNotNull { k -> k.letters?.let { it.group[0] to scenePlace(k.id) } }
 
     // no glide: a stroke drawn alone (笔画筛选), over the group keys, each its first letter's
     override val glide = glideInput(

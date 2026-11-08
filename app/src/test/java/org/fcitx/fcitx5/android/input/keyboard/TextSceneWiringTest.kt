@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.fcitx.fcitx5.android.scene.KeyNode
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -38,7 +39,7 @@ import org.robolectric.annotation.GraphicsMode
  * `;`, a table's (五笔 with its roots and 拼, 仓颉 with its `*`), an address field's keys: shortcut, swipe axes,
  * actions, popups, sound, space/backspace and enabled (confirm's sound Return, as an exception). A letter's
  * press and long press are its letter in either case (TextKeyboard sends and shows them as Shift has
- * them); its bubble its letter too, whatever its face (a table's roots: TextKeyboard.sceneBubble).
+ * them); its bubble its letter too, whatever its face (a table's roots: TextKeyboard's Table.bubble).
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -190,6 +191,27 @@ class TextSceneWiringTest {
         }
     }
 
+    // SceneKeys alone: two nodes of a key that differ in their bubble's content alone (the face's label) are one key,
+    // the new content set on it (TextKeyboard's letters take theirs from Table.bubble, so its Shift does not show this)
+    @Test
+    fun aNodeDifferingInItsBubbleAloneKeepsItsKeyWithTheNewBubble() {
+        prefs.set(AppPrefs.getInstance().internal.canvasKeyboard, true)
+        KeyboardHarness(im = KeyboardHarness.ENGLISH).start().use { h ->
+            val k = KeyboardHarness.all(h.keyboard).filterIsInstance<TextKeyboard>().single()
+            val canvas = KeyboardHarness.all(k).filterIsInstance<KeyboardCanvasView>().single()
+            val keys = SceneKeys(k) { _, _ -> }
+            keys.byNodes(canvas, object : SceneKeyDef.Table {}) { }
+            val q = canvas.keyAt("q")!!
+            fun labelled(l: String) = with(q) {
+                KeyNode(id, copy, kind, role, shape, bounds, hit, anchor, up, states, faces, a11y, actions, l, alt, altRaw, popup, menu, sound, shortcut, letters, lean)
+            }
+            val first = keys.of(labelled("q"))!!
+            val again = keys.of(labelled("Q"))
+            assertSame(first, again)
+            assertEquals("Q", first.bubble)
+        }
+    }
+
     // a glide read where the scene draws the letters, the views (laid out under it, not drawn) moved off them:
     // the letters' centres the engine gets, in key widths, as far apart as the keys shown
     @Test
@@ -254,7 +276,7 @@ class TextSceneWiringTest {
 
     private fun popups(def: KeyDef, letter: Boolean) = def.popup.orEmpty().map { p ->
         when (p) {
-            // a letter's bubble shows its letter as Shift has it (sceneBubble, transformAlphabet)
+            // a letter's bubble shows its letter as Shift has it (Table.bubble, transformAlphabet)
             is KeyDef.Popup.AltPreview -> "bubble ${if (letter) "letter" else p.content} ${p.alternative}"
             is KeyDef.Popup.Preview -> "bubble ${p.content}"
             is KeyDef.Popup.Keyboard.Explicit -> "keys ${p.items.toList()} ${p.symbolsFrom} ${p.asIs} ${p.inRow}"

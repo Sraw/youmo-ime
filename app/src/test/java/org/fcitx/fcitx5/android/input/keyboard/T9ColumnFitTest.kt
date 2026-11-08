@@ -83,6 +83,13 @@ class T9ColumnFitTest {
             val c = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single()
             assertEquals(View.VISIBLE, c.visibility)
             assertEquals(listOf(slot.left, slot.top, slot.right, slot.bottom).map { it.roundToInt() }, listOf(c.left, c.top, c.right, c.bottom))
+            // no scene: the column hidden; a scene again: shown
+            keyboard.onSceneBuilt(null)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(View.GONE, c.visibility)
+            keyboard.onSceneBuilt(view.scene)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(View.VISIBLE, c.visibility)
         }
         val column = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single()
         val items = column.getChildAt(0) as ViewGroup

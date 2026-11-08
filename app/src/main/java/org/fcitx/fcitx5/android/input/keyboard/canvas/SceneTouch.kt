@@ -25,8 +25,8 @@ import org.fcitx.fcitx5.android.scene.KeyNode
 
 /**
  * A key the scene draws (060-render-p2 S1), as its keyboard wires it: what a key view was to its
- * touch, without the view. Its [def] is the old key's, so it does what the view did (the plan's
- * U4 A, until each keyboard's layout says it, S4/S5); its place is the scene's, as drawn last.
+ * touch, without the view. Its [def] is made from its layout's node ([SceneKeyDef], the plan's U4 B),
+ * doing what the view did; its place is the scene's, as drawn last.
  */
 class SceneKey(
     override val ref: KeyRef,
