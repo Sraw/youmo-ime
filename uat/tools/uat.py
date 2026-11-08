@@ -416,7 +416,7 @@ def _load_scripts(areas, files):
 # ---------------------------------------------------------------- one device
 
 class Node:
-    __slots__ = ("text", "desc", "rid", "cls", "pkg", "b", "checked", "focused", "selected",
+    __slots__ = ("text", "desc", "rid", "cls", "pkg", "b", "checked", "focused", "a11y", "selected",
                  "clickable", "parent", "kids", "enabled", "scrollable", "wtype", "key", "alt")
 
     def __init__(self, e, parent):
@@ -431,6 +431,7 @@ class Node:
         self.b = (x0, y0, x1, y1)
         self.checked = e.get("checked") == "true"
         self.focused = e.get("focused") == "true"
+        self.a11y = e.get("a11y-focused") == "true"
         self.selected = e.get("selected") == "true"
         self.clickable = e.get("clickable") == "true"
         self.enabled = e.get("enabled") == "true"
@@ -2843,6 +2844,12 @@ def start_server():
     return p
 
 
+def run_name(day, ver, avd):
+    """the run's record: another AVD's run (UAT_AVD=youmo29) its own, or the same day's runs of one
+    build on two AVDs read and wrote each other's results"""
+    return f"{day.isoformat()}-emulator-{ver}" + ("" if avd == "youmo" else f"-{avd}")
+
+
 def cmd_run(a):
     # every script loaded (the sheets and the results file show all cases of the run), these run
     load_scripts()
@@ -2902,7 +2909,7 @@ def run_on(a, cases, ports):
         install(d, not a.no_voice)
         d.adb("reverse", "tcp:8000", f"tcp:{HTTP_PORT}", check=True)
     ver = version(Device(ports[0]))
-    name = f"{datetime.date.today().isoformat()}-emulator-{ver}"
+    name = run_name(datetime.date.today(), ver, AVD)
     run = Run(name, [c.id for c in cases])
     # a case since removed from the scripts leaves the record, or its last row comes back each run
     for cid in [k for k in run.results if k not in CASES]:

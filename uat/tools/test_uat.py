@@ -608,6 +608,14 @@ class UpTest(unittest.TestCase):
         self.assertFalse([c for c in self.calls() if c in ("root", "shell whoami") or c.startswith("reverse")])
 
 
+class RunNameTest(unittest.TestCase):
+    def test_another_avd_has_its_own_record(self):
+        import datetime
+        day = datetime.date(2026, 11, 8)
+        self.assertEqual(uat.run_name(day, "0.5.2-1-gabc", "youmo"), "2026-11-08-emulator-0.5.2-1-gabc")
+        self.assertEqual(uat.run_name(day, "0.5.2-1-gabc", "youmo29"), "2026-11-08-emulator-0.5.2-1-gabc-youmo29")
+
+
 class ResultsFileTest(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
