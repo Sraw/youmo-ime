@@ -83,9 +83,6 @@ object Shots {
      */
     val looks: List<Shot> by lazy {
         val block = Forms.env("qwerty", Forms.block)
-        fun styled(vararg styles: String, fonts: String = "") = ThemeReader.theme(
-            testData("material-light.xml").replace("</colors>", "</colors>$fonts").replace("</theme>", styles.joinToString("\n", postfix = "\n</theme>")),
-        ).ok()
         listOf(
             Shot("qwerty-align-top-left", "qwerty", block, styled("<style select=\"key\" align=\"top-left\"/>")),
             Shot("qwerty-align-top-center", "qwerty", block, styled("<style select=\"key\" align=\"top-center\"/>")),
@@ -112,12 +109,50 @@ object Shots {
         )
     }
 
-    val all: List<Shot> get() = forms + states + looks
+    /**
+     * 060-render-p3 T4b, a key's shape and cap: material-light with one more each on the block qwerty
+     * (a path with curves and a border, an inner shadow, a depth, and the three with a shadow together).
+     */
+    val shapes: List<Shot> by lazy {
+        val block = Forms.env("qwerty", Forms.block)
+        // a rectangle rounded by quadratic curves, a cubic bulging its top
+        val path = "path(M0 .15 Q0 0 .15 0 C.4 .05 .6 .05 .85 0 Q1 0 1 .15 V.85 Q1 1 .85 1 H.15 Q0 1 0 .85 Z)"
+        listOf(
+            Shot("qwerty-path", "qwerty", block, styled("<style select=\"key\" shape=\"$path\" border=\"1dp #40000000\"/>")),
+            Shot("qwerty-inner-shadow", "qwerty", block, styled("<style select=\"key\" inner-shadow=\"0 1dp 3dp #60000000\"/>")),
+            Shot("qwerty-depth", "qwerty", block, styled("<style select=\"key\" depth=\"3dp\"/>")),
+            Shot(
+                "qwerty-cap", "qwerty", block,
+                styled("<style select=\"key\" shape=\"$path\" depth=\"2dp\" depth-color=\"#ff9e9e9e\" inner-shadow=\"0 -1dp 2dp #50ffffff\"/>"),
+            ),
+        )
+    }
 
-    /** Each popup ([Forms.popups]) in the forms that change how one looks: block, flat, floating (its text smaller). */
+    val all: List<Shot> get() = forms + states + looks + shapes
+
+    /**
+     * Each popup ([Forms.popups]) in the forms that change how one looks: block, flat, floating (its text
+     * smaller); and on the block, T4b's: the bubble with its tail, larger and up; a path; the long press's
+     * cell in focus with its radius and border.
+     */
     val popups: List<PopupShot> = listOf("block" to Forms.block, "flat" to Forms.flat, "floating" to Forms.floating).flatMap { (form, env) ->
         Forms.popups(env).map { (name, make) -> PopupShot("popup-$name-$form", make) }
+    } + listOf(
+        "preview-bubble" to "<style select=\"preview\" shape=\"bubble\"/>",
+        "preview-bubble-large-up" to "<style select=\"preview\" shape=\"bubble\" size=\"130%\" offset=\"-6dp\"/>",
+        "preview-path" to "<style select=\"preview\" shape=\"path(M0 0 H1 V.6 L.6 .6 L.5 .75 L.4 .6 L0 .6 Z)\" inner-shadow=\"0 2dp 2dp #30000000\"/>",
+        "keys-selected-border" to "<style select=\"popup:selected\" radius=\"8dp\" border=\"1dp #ff1565c0\"/>",
+    ).map { (name, style) ->
+        PopupShot("popup-$name-block") {
+            val popups = Forms.popups(Forms.block, styled(style)).toMap()
+            popups.getValue(if (name.startsWith("keys")) "keys" else "preview-symbol")()
+        }
     }
+
+    // material-light with [styles] more, and [fonts]
+    private fun styled(vararg styles: String, fonts: String = "") = ThemeReader.theme(
+        testData("material-light.xml").replace("</colors>", "</colors>$fonts").replace("</theme>", styles.joinToString("\n", postfix = "\n</theme>")),
+    ).ok()
 
     // NumberPad's, full being every form's
     private val PADS = listOf("digits", "signed", "decimal", "signed-decimal", "phone", "datetime")
@@ -139,6 +174,9 @@ class SnapshotTest {
 
     @Test
     fun theTextOnAKey() = checkAll(Shots.looks)
+
+    @Test
+    fun theShapeOfAKey() = checkAll(Shots.shapes)
 
     @Test
     fun everyPopup() = check(Shots.popups.map { it.name to it.scene })

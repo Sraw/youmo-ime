@@ -12,10 +12,10 @@ import android.graphics.RectF
 import android.graphics.drawable.Drawable
 import org.fcitx.fcitx5.android.input.theme.KeyFace
 import org.fcitx.fcitx5.android.input.theme.KeyFaceGeometry
-import org.fcitx.fcitx5.android.input.theme.KeyKind
 import org.fcitx.fcitx5.android.input.theme.ThemeColors
-import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.input.theme.cornerRadius
+import org.fcitx.fcitx5.android.scene.look.KeyKind
+import org.fcitx.fcitx5.android.scene.look.ThemeLook
 
 /**
  * A theme's keys in little, over its thumbnail's base: four rows as the 26 keys have them, each

@@ -105,11 +105,12 @@ object SceneText {
     }
 
     fun op(o: Op): String = when (o) {
-        is Op.Fill -> "fill ${shape(o.shape)} ${o.color}"
+        is Op.Fill -> "fill ${shape(o.shape)} ${o.color}" + (o.less?.let { " less=${shape(it)}" } ?: "")
         is Op.Gradient -> "gradient ${shape(o.shape)} ${n(o.angle)} ${o.stops.joinToString(" ") { "${it.first}@${n(it.second)}" }}"
         is Op.NineSlice -> "nine-slice ${shape(o.shape)} ${q(o.file)} ${o.insets.joinToString(",")} ${o.pxPerDp}" + (o.fallback?.let { " else=$it" } ?: "")
         is Op.Picture -> "picture ${shape(o.shape)} blur=${o.blurDp?.let(::n) ?: "-"} brightness=${o.brightness?.let(::n) ?: "-"}" + (o.over?.let { " over=$it" } ?: "")
         is Op.Shadow -> "shadow ${shape(o.shape)} blur=${n(o.blur)} ${o.color}"
+        is Op.InnerShadow -> "inner-shadow ${shape(o.shape)} hole=${shape(o.hole)} ring=${box(o.ring)} blur=${n(o.blur)} ${o.color}"
         is Op.Stroke -> "stroke ${shape(o.shape)} ${n(o.width)} ${o.color}"
         is Op.Ripple -> "ripple ${shape(o.shape)} ${o.color}"
         is Op.Text -> text(o)

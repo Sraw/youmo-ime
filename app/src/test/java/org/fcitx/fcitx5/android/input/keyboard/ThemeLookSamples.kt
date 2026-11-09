@@ -13,21 +13,21 @@ import android.graphics.RectF
 import android.graphics.Shader
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
-import org.fcitx.fcitx5.android.input.theme.BarBase
-import org.fcitx.fcitx5.android.input.theme.BoardBase
-import org.fcitx.fcitx5.android.input.theme.Crop
-import org.fcitx.fcitx5.android.input.theme.Insets
-import org.fcitx.fcitx5.android.input.theme.KeyFill
-import org.fcitx.fcitx5.android.input.theme.KeyLabel
-import org.fcitx.fcitx5.android.input.theme.KeyOverride
-import org.fcitx.fcitx5.android.input.theme.KeyPressed
-import org.fcitx.fcitx5.android.input.theme.KindStyle
-import org.fcitx.fcitx5.android.input.theme.LookDefaults
-import org.fcitx.fcitx5.android.input.theme.NineSlice
-import org.fcitx.fcitx5.android.input.theme.Palette
-import org.fcitx.fcitx5.android.input.theme.PressEffect
-import org.fcitx.fcitx5.android.input.theme.Picture
-import org.fcitx.fcitx5.android.input.theme.ThemeLook
+import org.fcitx.fcitx5.android.scene.look.BarBase
+import org.fcitx.fcitx5.android.scene.look.BoardBase
+import org.fcitx.fcitx5.android.scene.look.Crop
+import org.fcitx.fcitx5.android.scene.look.Insets
+import org.fcitx.fcitx5.android.scene.look.KeyFill
+import org.fcitx.fcitx5.android.scene.look.KeyLabel
+import org.fcitx.fcitx5.android.scene.look.KeyOverride
+import org.fcitx.fcitx5.android.scene.look.KeyPressed
+import org.fcitx.fcitx5.android.scene.look.KindStyle
+import org.fcitx.fcitx5.android.scene.look.LookDefaults
+import org.fcitx.fcitx5.android.scene.look.NineSlice
+import org.fcitx.fcitx5.android.scene.look.Palette
+import org.fcitx.fcitx5.android.scene.look.Picture
+import org.fcitx.fcitx5.android.scene.look.PressEffect
+import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import java.io.File
 
 /**

@@ -18,11 +18,11 @@ import android.util.SparseArray
 import android.view.View
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
-import org.fcitx.fcitx5.android.input.theme.BarBase
-import org.fcitx.fcitx5.android.input.theme.BoardBase
 import org.fcitx.fcitx5.android.input.theme.PictureWindow
 import org.fcitx.fcitx5.android.input.theme.ThemeColors
-import org.fcitx.fcitx5.android.input.theme.ThemeLook
+import org.fcitx.fcitx5.android.scene.look.BarBase
+import org.fcitx.fcitx5.android.scene.look.BoardBase
+import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import org.fcitx.fcitx5.android.utils.DarkenColorFilter
 import java.lang.ref.WeakReference
 

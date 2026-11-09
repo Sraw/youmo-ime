@@ -4,7 +4,11 @@
  */
 package org.fcitx.fcitx5.android.input.theme
 
-import org.fcitx.fcitx5.android.input.theme.ThemeLookTest.Companion.PALETTE
+import org.fcitx.fcitx5.android.input.theme.LookFixtures.PALETTE
+import org.fcitx.fcitx5.android.scene.look.BarBase
+import org.fcitx.fcitx5.android.scene.look.KeyKind
+import org.fcitx.fcitx5.android.scene.look.LookDefaults
+import org.fcitx.fcitx5.android.scene.look.Picture
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

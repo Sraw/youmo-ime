@@ -24,12 +24,12 @@ import org.fcitx.fcitx5.android.input.picker.PickerGridView
 import org.fcitx.fcitx5.android.input.picker.PickerPolicy
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
-import org.fcitx.fcitx5.android.input.theme.Insets
-import org.fcitx.fcitx5.android.input.theme.KeyFill
-import org.fcitx.fcitx5.android.input.theme.NineSlice
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.engine.Content
 import org.fcitx.fcitx5.android.scene.layout.Text
+import org.fcitx.fcitx5.android.scene.look.Insets
+import org.fcitx.fcitx5.android.scene.look.KeyFill
+import org.fcitx.fcitx5.android.scene.look.NineSlice
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

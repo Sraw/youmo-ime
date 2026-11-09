@@ -87,7 +87,8 @@ object FloatingKeyboard {
      * clip a corner key's face.
      *
      * Theme 3.0's rule, which the app no longer works out (060-render-p3 T7a): the engine's default
-     * of a theme's `frame` (WindowLooks.cornerDp) is, held to this at every look by WindowDefaultsTest.
+     * of a theme's `frame` (WindowLooks.cornerDp) is, held to this rule at every radius and margin by
+     * keyboard-scene's WindowDefaultsTest (a copy of it there: keyboard-scene sees nothing of ime-core).
      */
     fun cornerDp(keyRadius: Int, hMargin: Int, vMargin: Int, bordered: Boolean = true): Int =
         if (keyRadius == 0) 0 else (if (bordered) keyRadius else 0) + minOf(hMargin, vMargin)

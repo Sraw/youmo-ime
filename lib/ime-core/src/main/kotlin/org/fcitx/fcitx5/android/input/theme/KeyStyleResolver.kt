@@ -4,6 +4,13 @@
  */
 package org.fcitx.fcitx5.android.input.theme
 
+import org.fcitx.fcitx5.android.scene.look.KeyFill
+import org.fcitx.fcitx5.android.scene.look.KeyKind
+import org.fcitx.fcitx5.android.scene.look.KeyLabel
+import org.fcitx.fcitx5.android.scene.look.KeyPressed
+import org.fcitx.fcitx5.android.scene.look.Keys
+import org.fcitx.fcitx5.android.scene.look.NineSlice
+
 /** What a key is drawn with at last: its face, pressed face, and whether its text shows. */
 data class KeyStyle(val fill: KeyFill, val pressed: KeyPressed, val label: KeyLabel)
 

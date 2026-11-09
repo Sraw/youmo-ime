@@ -29,12 +29,12 @@ import org.fcitx.fcitx5.android.input.PictureHost
 import org.fcitx.fcitx5.android.input.scene.CanvasFrame
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.scene.SceneA11y
-import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Scene
+import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import timber.log.Timber
 import kotlin.math.ceil
 import kotlin.math.floor

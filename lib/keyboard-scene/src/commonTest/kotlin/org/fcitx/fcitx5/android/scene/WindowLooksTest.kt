@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -125,6 +126,13 @@ class WindowLooksTest {
             withStyle("<style select=\"side-button:pressed\" overlay=\"#44000000\"/><style select=\"side-button\" overlay=\"#33000000\"/>"),
         )
         assertEquals(argb(0x44000000), looks(both).sideButton(emptySet()).pressed, "the state's, more specific, wins")
+        // a shape but circle, rect, bar (a key's path, the bubble): warned of, the circle it is unset
+        for (shape in listOf("path(M0 0 L1 0 L1 1 Z)", "bubble")) {
+            val style = withStyle("<style select=\"side-button\" shape=\"$shape\"/>")
+            assertTrue(warnings(style).single().contains("on side-button does nothing"), shape)
+            assertTrue(looks(theme(style)).sideButton(emptySet()).circle, shape)
+        }
+        assertFalse(looks(theme(withStyle("<style select=\"side-button\" shape=\"bar\"/>"))).sideButton(emptySet()).circle)
     }
 
     @Test

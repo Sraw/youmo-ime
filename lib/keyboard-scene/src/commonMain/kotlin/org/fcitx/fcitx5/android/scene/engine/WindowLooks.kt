@@ -94,7 +94,8 @@ class WindowLooks(private val cascades: Cascades) {
         return SideButton(
             fill = fill(v),
             iconColor = color(v[ICON_COLOR]) ?: variable(ALT_KEY_TEXT),
-            circle = (v[SHAPE] as? Value.Word)?.word?.let { it == CIRCLE } ?: true,
+            // rect and bar a rectangle; circle, or a key's shape of no use here (path(…), bubble: warned of), a circle
+            circle = (v[SHAPE] as? Value.Word)?.word !in SIDE_BUTTON_RECTS,
             radiusDp = look.radius.corners.first(),
             round = look.radius.half,
             pressed = KeyLook(cascade.of(SIDE_BUTTON_PRESSED), theme).overlay ?: variable(KEY_PRESS_HIGHLIGHT),
@@ -154,7 +155,6 @@ class WindowLooks(private val cascades: Cascades) {
 
         private const val FLOATING = "floating"
         private const val FLAT = "flat"
-        private const val CIRCLE = "circle"
         private const val RADIUS = "radius"
         private const val BORDER = "border"
         private const val SHADOW = "shadow"
@@ -164,6 +164,7 @@ class WindowLooks(private val cascades: Cascades) {
         private const val WIDTH = "width"
         private const val HEIGHT = "height"
         private const val BAR = "bar"
+        private val SIDE_BUTTON_RECTS = setOf("rect", BAR)
         private const val KEY_TEXT = "keyText"
         private const val ALT_KEY_TEXT = "altKeyText"
         private const val KEY_PRESS_HIGHLIGHT = "keyPressHighlight"

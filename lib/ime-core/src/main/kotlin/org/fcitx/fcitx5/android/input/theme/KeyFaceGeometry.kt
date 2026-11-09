@@ -4,6 +4,9 @@
  */
 package org.fcitx.fcitx5.android.input.theme
 
+import org.fcitx.fcitx5.android.scene.look.KeyKind
+import org.fcitx.fcitx5.android.scene.look.Keys
+import org.fcitx.fcitx5.android.scene.look.NineSlice
 import kotlin.math.min
 
 /** A rectangle, pixels. */

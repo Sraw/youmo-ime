@@ -31,7 +31,8 @@ internal class Paint(private val theme: Theme, private val density: Double) {
     }
 
     /**
-     * A key's face in one state: its shadow, fill, pressed layer ([pressed]: the state is), border.
+     * A key's face in one state: its shadow, its cap's band (`depth`), fill, inner shadow, pressed layer
+     * ([pressed]: the state is), border (CSS's order: an inset shadow over the background, under the border).
      * The pressed layer is the look's `overlay` over the pressed box, a ripple's from the touch, but
      * none for `press="face"`: the pressed look's own fill is the pressed face (rules B §3: a key with
      * a pressed face of its own is not tinted too), nor where the box has no size (a face of nothing).
@@ -43,19 +44,32 @@ internal class Paint(private val theme: Theme, private val density: Double) {
             val c = theme.color(shadow.color)
             if (!c.transparent) add(Op.Shadow(g.shadow, shadow.blur * density, c))
         }
+        // the band less the face, so a translucent face shows none of it through
+        g.depth?.let { cap -> look.depthColor.takeUnless { it.transparent }?.let { add(Op.Fill(cap, it, face)) } }
         if (face != null) fill(face, look.fill)?.let(::add)
+        if (face != null) inner(face, look)?.let(::add)
         val overlay = look.overlay?.takeIf { !it.transparent && look.press != "face" }
-        if (pressed && overlay != null && g.pressed.box.hasSize) {
+        if (pressed && overlay != null && g.pressed.bounds.hasSize) {
             add(if (look.press == "ripple") Op.Ripple(g.pressed, overlay) else Op.Fill(g.pressed, overlay))
         }
         val border = look.border
-        val w = g.border
-        if (face != null && w > 0 && border.color != null) {
+        val line = g.line
+        if (face != null && line != null && border.color != null) {
             val c = theme.color(border.color)
-            // the line's middle half its width in, so all of it is inside the face
-            val line = Shape.Rect(face.box.inset(w / 2, w / 2, w / 2, w / 2), face.radii.map { maxOf(0.0, it - w / 2) })
-            if (!c.transparent) add(Op.Stroke(line, w, c))
+            if (!c.transparent) add(Op.Stroke(line, g.border, c))
         }
+    }
+
+    // `inner-shadow`: inside the face, all but the face moved by its offset, blurred; the ring round it as
+    // far out as the blur reaches (BlurMaskFilter's radius: some twice it), so it is whole at the face's edge
+    private fun inner(face: Shape, look: KeyLook): Op? {
+        val s = look.innerShadow ?: return null
+        val c = s.color?.let(theme::color)?.takeUnless { it.transparent } ?: return null
+        val blur = s.blur * density
+        val hole = face.moved(s.dx * density, s.dy * density)
+        val far = 2 * blur + 1
+        val ring = face.bounds.union(hole.bounds).inset(-far, -far, -far, -far)
+        return Op.InnerShadow(face, hole, ring, blur, c)
     }
 
     /**

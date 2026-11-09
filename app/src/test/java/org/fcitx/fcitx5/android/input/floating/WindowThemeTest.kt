@@ -30,7 +30,7 @@ import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneWindow
-import org.fcitx.fcitx5.android.input.scene.LookTheme
+import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.After
 import org.junit.Assert.assertEquals

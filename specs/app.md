@@ -261,7 +261,7 @@ with a shadow (`FloatingCorners`; users asked for both). Frame and handle are th
 width and height), read through `SceneWindow` from the engine's `WindowLooks`, whose defaults are the
 rules the app worked out itself before: the radius is the keys' radius plus their
 least margin to the edge (`WindowLooks.cornerDp`, held to theme 3.0's `FloatingKeyboard.cornerDp` at
-every radius and margin by ime-core's `WindowDefaultsTest`; the nested-corner rule: the curve runs
+every radius and margin by keyboard-scene's `WindowDefaultsTest`; the nested-corner rule: the curve runs
 alongside the corner keys' and clips none), square where the keys are (按键圆角 直角, the owner's one setting for corners); the
 handle is a shade of the bar towards the key text (`WindowLooks.handleColor`), as some themes'
 bar is the keyboard's colour (on top; at the bottom it is the keyboard's own); the grip 36×4 dp of
@@ -346,9 +346,9 @@ key views and the 开发者 → 新绘制键盘 switch, its stored key retired):
 and 18 keys: k14.xml, k18.xml, their bottom row grouped-bottom.xml), since S4b `NumberKeyboard` (number.xml,
 its seven pads by `when="pad=…"`) and, since S4c, `ZhuyinKeyboard`'s 大千
 (zhuyin.xml) and, since S4d, its 注音九键 (zhuyin-nine.xml) draw their keys with a `KeyboardCanvasView`,
-no view a key — the next paragraph but one says how a keyboard moves. The canvas draws the scene `lib/keyboard-scene` makes of its layout in the look converted by ime-core's
-`LookTheme` (a 3.0 single key's name a selector with what selectors read escaped in the key: `zhuyin/,` its comma
-key, `number/*` the star; `ScenePainter`: one `RenderNode` a key a face, both kept in the tree and a press only their alpha, since a node left out of a frame loses its recording; a
+no view a key — the next paragraph but one says how a keyboard moves. The canvas draws the scene `lib/keyboard-scene` makes of its layout in the look converted by keyboard-scene's
+`LookTheme` (`scene/look/`) (a 3.0 single key's name the selector of that key, written by `ThemeWriter` with what selectors read escaped: `zhuyin/,` its comma
+key, `number/*` the star; a board's key of a role, `qwerty/shift`, has on its own styles what it does not set of the role's `*/shift`, as 3.0's `KeyStyleResolver` drew it, and a key of a face of its own and no pressed one its kind's pressed face by its name; the look's files named as theme 4 takes a file's name (`LookTheme.fileNames`: `a (1).png` is `a__1_.png`, at most 128 characters, numbered where two meet), the theme's name cut to 64; `ScenePainter`: one `RenderNode` a key a face, both kept in the tree and a press only their alpha, since a node left out of a frame loses its recording; a
 software canvas, a screenshot's, gets the ops drawn straight); `TextKeyboard.scene` builds the
 `Env` from its state (`TextBoardState`, `SceneMarks`, the texts) through `SceneEnvs.of`, which adds
 what every keyboard's has alike (size, density, landscape, compact, floating's text scale in the input
@@ -368,6 +368,15 @@ as a key's `shadow` is, the radius `setShadowLayer` takes too; drawn so, not wit
 the blur is 0 and there under a transparent fill as in CSS), the outline at twice its width
 (`FILL_AND_STROKE`, its inner half under the fill), then the fill; the mask let go after, so the next op starts clean.
 A text in runs (`font-han`/`font-latin`) comes as every run's outline and shadow, then every run's fill (`Paint.content`).
+A face's `inner-shadow` (T4b, `Op.InnerShadow`) `ScenePainter` draws clipped to the face (`clipPath`): its ring less its
+hole (the face moved by the offset; `Path.op` `DIFFERENCE`, the hole filled by the winding rule as the face is, so a path
+crossing itself has no shadow inside its middle) in the colour, blurred by a `BlurMaskFilter` of the blur, as CSS's
+inset shadow; the ring reaches far enough past the face that the blur is whole at its edge. `CanvasFrame.extent` takes the
+face's bounds for it (nothing of it outside). A cap's band (`depth`) is an `Op.Fill` with `less` the face, drawn by
+`Path.op` too, so a translucent face shows none of it through. The blur filters (`Op.Shadow`, `Op.InnerShadow`, a
+text's shadow) are kept a radius each, not made every draw (`PopupSceneView` draws its scene straight each frame).
+`CapPictureTest` draws a path key with an inner shadow and a depth to build/t4b/cap.png, and checks the band under a
+translucent face and a star's inner shadow by pixels.
 `Paint.letterSpacing` on Android 10 leaves the last character's spacing out of `measureText` (its ink the same; later
 versions keep it), so there a spaced label is that much narrower than the engine's arithmetic has it.
 An icon name the app has no drawable of (a layout's) draws nothing and is logged once a process (`SceneIcons.of`).
@@ -436,7 +445,11 @@ and a theme that converted, `PopupScenes`, and its bubble
 (`PopupEntryUi.showScene`), long press (`PopupKeyboardUi`) and menus (`PopupMenuUi`, the edit menu
 too) are a `PopupSceneView` drawing a small scene `SceneBuilder.preview`/`popup`/`menu` makes, its
 sizes the engine's (`engine/Popups`: theme 3.0's in dp, its text dp, not sp; its corners the keys'
-radius; its shadow drawn, rules D4.7/D4.9, which the views' elevation had and Robolectric never drew
+radius; a theme's `shape="bubble"` (a head over the key, a tail down from it), `path(…)`, `size` and `offset`
+(060-render-p3 T4b) all inside the scene, the scene's bottom still the key's, so the placing is unchanged (its width whole
+pixels at any `size`); a rectangle or a path moved down by `offset` reaches that much past the scene's bottom, below the
+key's, drawn in the `outset`: over a bottom-row key the input view clips what goes past its own bottom (accepted, a
+theme's choice to move it down); its shadow drawn, rules D4.7/D4.9, which the views' elevation had and Robolectric never drew
 in their goldens; the view as large as the scene and `outset` round it for the shadow, placed
 that much up and left of where the views' popup goes; the edit menu's lift, `MENU_LIFT_DP`, wherever
 the scenes are). A focus moved is the scene made again, the key
@@ -943,7 +956,7 @@ A custom theme is `files/host-theme/<name>.json` and the files it names beside i
 (a picture's source and its portrait and landscape cuts, key images, fonts). The json is format
 **3.0**: `version` first, then `name`, `isDark`, `palette` (24 colours: the 21 of 2.1 and
 `keyBorderColor`, `keyHintColor`, `toolbarIconColor`), `picture` (or null), `base`, `bar`, `keys`,
-`text`. It is ime-core's `ThemeLook` (`input/theme/`) one to one, through `ThemeLookJson.kt` (the
+`text`. It is keyboard-scene's `ThemeLook` (`scene/look/`, with `LookDefaults` and `LookTheme`: the web converts 3.0 with the same code, and reads its json with `ThemeLookReader`, held to this one by `ThemeLookReaderParityTest`) one to one, through `ThemeLookJson.kt` (the
 only place the two meet): no field has a default, a field missing or not known is an error, and a
 value out of range is refused as the `ThemeLook` is made. `keys.overrides` maps a key's name
 (`KeyNames`: `<board>/<key>`, `*/<role>` for a function key on every board) to its own fill,
