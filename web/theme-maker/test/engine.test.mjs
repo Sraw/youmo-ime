@@ -26,14 +26,14 @@ const E = createRequire(import.meta.url)(ENGINE).YoumoEngine;
 const fixed = E.fixedMeasurer();
 const shots = JSON.parse(read(data, 'facade', 'shots.json'));
 
-// a shot's theme as SnapshotTest's ThemeSource makes it
+// a shot's theme as SnapshotTest's ThemeSource makes it (Kotlin's replace: every one; a function, so a `$` put in is text)
 const themes = new Map();
 function theme(t) {
   const key = JSON.stringify(t);
   if (!themes.has(key)) {
     let text = read(data, t.file);
     if (t.styles || t.fonts) {
-      text = text.replace('</colors>', '</colors>' + (t.fonts || '')).replace('</theme>', [...(t.styles || []), '</theme>'].join('\n'));
+      text = text.replaceAll('</colors>', () => '</colors>' + (t.fonts || '')).replaceAll('</theme>', () => [...(t.styles || []), '</theme>'].join('\n'));
     }
     const r = E.readTheme(text, null, null);
     assert.ok(r.ok, JSON.stringify(r.problems));
@@ -169,34 +169,58 @@ function argb(css) {
 /**
  * A 2D context that writes, as EnginePaintTest's canvas does, a line for each thing drawn, in the device's pixels:
  * a blurred thing is the shadow of what was drawn far off, so its place is the shadow's, its colour the shadow's,
- * its sigma the shadow's blur halved; a fill clipped to outside another (even-odd, a box round both first) is a
- * fill less that other; glyphs stroked and then filled alike are one text with its stroke.
+ * its sigma the shadow's blur halved; glyphs stroked and then filled alike are one text with its stroke. Its canvas
+ * makes layers (the painter's, a canvas of its document): what is drawn on one is written when it is laid on this,
+ * as it is laid (a fill with a shape cut out of it a fill less that shape; at an alpha, its colour's that alpha; as
+ * a shadow, the shadow's colour and blur, nothing cut out: Android's blur of the one shape).
  */
 class RecordingContext {
-  constructor() {
+  constructor(canvas = RecordingContext.page()) {
+    // a line is a string, or an entry ([line] writes it) that a layer laid can still change
     this.lines = [];
+    this.canvas = canvas;
     this.s = this.fresh();
     this.stack = [];
     this.path = [];
   }
 
+  // the page's canvas: its size the shots' at most, layers made as a document makes canvases
+  static page() {
+    return { width: 4000, height: 4000, ownerDocument: { createElement: () => {
+      const layer = { width: 0, height: 0 };
+      const ctx = new RecordingContext(layer);
+      layer.getContext = () => ctx;
+      return layer;
+    } } };
+  }
+
   fresh() {
     return {
-      m: [1, 0, 0, 1, 0, 0], fillStyle: '#000000', strokeStyle: '#000000', lineWidth: 1, lineJoin: 'miter', miterLimit: 10,
+      m: [1, 0, 0, 1, 0, 0], fillStyle: '#000000', strokeStyle: '#000000', lineWidth: 1, lineJoin: 'miter', lineCap: 'butt', miterLimit: 10,
       font: '10px sans-serif', letterSpacing: '0px', shadowColor: 'rgba(0,0,0,0)', shadowBlur: 0, shadowOffsetX: 0, shadowOffsetY: 0,
-      globalAlpha: 1, textAlign: 'start', textBaseline: 'alphabetic', clip: null, less: null,
+      globalAlpha: 1, globalCompositeOperation: 'source-over', textAlign: 'start', textBaseline: 'alphabetic', clip: null,
     };
   }
 
   // the state's members as a context's properties
   static {
-    for (const k of ['fillStyle', 'strokeStyle', 'lineWidth', 'lineJoin', 'miterLimit', 'font', 'letterSpacing', 'shadowColor', 'shadowBlur',
-      'shadowOffsetX', 'shadowOffsetY', 'globalAlpha', 'textAlign', 'textBaseline']) {
+    for (const k of ['fillStyle', 'strokeStyle', 'lineWidth', 'lineJoin', 'lineCap', 'miterLimit', 'font', 'letterSpacing', 'shadowColor', 'shadowBlur',
+      'shadowOffsetX', 'shadowOffsetY', 'globalAlpha', 'globalCompositeOperation', 'textAlign', 'textBaseline']) {
       Object.defineProperty(this.prototype, k, { get() { return this.s[k]; }, set(v) { this.s[k] = v; } });
     }
   }
 
-  // a level's own clip is its own (a restore of it writes `unclip`); a fill less a shape stays so inside
+  // the lines as EnginePaintTest writes them
+  written() { return this.lines.map((l) => (typeof l === 'string' ? l : RecordingContext.line(l))); }
+
+  static line(e) {
+    const blur = e.blur != null ? ' blur=' + n(e.blur) : '';
+    if (e.t === 'fill') return 'fill ' + RecordingContext.box(e.b) + ' ' + e.color + (e.less ? ' less=' + RecordingContext.box(e.less) : '') + blur;
+    return 'text "' + e.text + '" ' + n(e.x) + ',' + n(e.y) + ' w=' + e.w + ' s=' + n(e.size) + ' sx=' + n2(e.sx) + ' ls=' + n2(e.ls) + ' ' + e.color + e.stroke + blur +
+      (e.rot !== 0 ? ' rot=' + e.rot : '');
+  }
+
+  // a level's own clip is its own (a restore of it writes `unclip`)
   save() {
     this.stack.push(this.s);
     this.s = { ...this.s, m: [...this.s.m], clip: null };
@@ -209,6 +233,8 @@ class RecordingContext {
   }
 
   getTransform() { const [a, b, c, d, e, f] = this.s.m; return { a, b, c, d, e, f }; }
+
+  setTransform(a, b, c, d, e, f) { this.s.m = typeof a === 'object' ? [a.a, a.b, a.c, a.d, a.e, a.f] : [a, b, c, d, e, f]; }
 
   transform(a2, b2, c2, d2, e2, f2) {
     const [a, b, c, d, e, f] = this.s.m;
@@ -241,7 +267,9 @@ class RecordingContext {
     return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
   }
 
-  static box(b, dx = 0, dy = 0) { return [n(b[0] + dx), n(b[1] + dy), n(b[2] + dx), n(b[3] + dy)].join(','); }
+  static box(b) { return [n(b[0]), n(b[1]), n(b[2]), n(b[3])].join(','); }
+
+  static moved(b, dx, dy) { return [b[0] + dx, b[1] + dy, b[2] + dx, b[3] + dy]; }
 
   // the shadow's way of drawing, where there is one: [colour, dx, dy, sigma]
   shadow() {
@@ -250,26 +278,28 @@ class RecordingContext {
   }
 
   clip(rule) {
-    const subpaths = this.path;
-    // a box round both, then the shape left out by the even-odd rule: the fill next is that less this
-    if (rule === 'evenodd' && subpaths.length > 1) {
-      this.s.less = RecordingContext.bounds(subpaths.slice(1).flat());
-      this.s.clip = 'less';
-      return;
-    }
-    this.lines.push('clip ' + RecordingContext.box(RecordingContext.bounds(subpaths.flat())));
+    assert.notEqual(rule, 'evenodd', 'Android clips by a winding path');
+    this.lines.push('clip ' + RecordingContext.box(RecordingContext.bounds(this.path.flat())));
     this.s.clip = 'clip';
   }
 
-  fill(a) {
+  clearRect() { this.lines = []; }
+
+  fill(a, rule) {
     if (a instanceof Path2D) return this.icon(a);
+    assert.notEqual(a, 'evenodd', 'Path.op takes winding paths: the nonzero rule');
     const b = RecordingContext.bounds(this.path.flat());
+    // a shape cut out of what the layer has: the fill there less it
+    if (this.s.globalCompositeOperation === 'destination-out') {
+      const last = this.lines.at(-1);
+      assert.ok(last && last.t === 'fill', 'a cut of nothing');
+      last.less = b;
+      return;
+    }
     if (typeof this.s.fillStyle !== 'string') return this.lines.push('gradient ' + RecordingContext.box(b));
-    const less = this.s.less;
-    if (less) return this.lines.push('fill ' + RecordingContext.box(b) + ' ' + argb(this.s.fillStyle) + ' less=' + RecordingContext.box(less));
     const sh = this.shadow();
-    if (sh) return this.lines.push('fill ' + RecordingContext.box(b, sh[1], sh[2]) + ' ' + sh[0] + ' blur=' + n(sh[3]));
-    this.lines.push('fill ' + RecordingContext.box(b) + ' ' + argb(this.s.fillStyle));
+    if (sh) return this.lines.push({ t: 'fill', b: RecordingContext.moved(b, sh[1], sh[2]), color: sh[0], blur: sh[3] });
+    this.lines.push({ t: 'fill', b, color: argb(this.s.fillStyle) });
   }
 
   stroke(p) {
@@ -308,14 +338,45 @@ class RecordingContext {
     px -= Math.cos(angle) * spacing * sx / 2;
     py -= Math.sin(angle) * spacing * sx / 2;
     const sh = this.shadow();
-    if (sh) { px += sh[1]; py += sh[2]; color = sh[0]; }
-    const rot = Math.round(angle * 180 / Math.PI);
-    this.lines.push('text "' + text + '" ' + n(px) + ',' + n(py) + ' w=' + m[1] + ' s=' + n(size) + ' sx=' + n2(sx) + ' ls=' + n2(spacing / Number(m[2])) +
-      ' ' + color + stroke + (sh ? ' blur=' + n(sh[3]) : '') + (rot !== 0 ? ' rot=' + rot : ''));
+    let blur = null;
+    if (sh) { px += sh[1]; py += sh[2]; color = sh[0]; blur = sh[3]; }
+    this.lines.push({ t: 'text', text, x: px, y: py, w: m[1], size, sx, ls: spacing / Number(m[2]), color, stroke, blur, rot: Math.round(angle * 180 / Math.PI) });
   }
 
   createLinearGradient() { return { addColorStop() {} }; }
-  drawImage() { this.lines.push('image'); }
+
+  // a layer laid: its lines here, moved as it is laid, in the shadow's colour and blur or at the alpha laid with
+  drawImage(image, sx, sy, sw, sh, dx, dy) {
+    const layer = image.getContext ? image.getContext('2d') : null;
+    if (!(layer instanceof RecordingContext)) return this.lines.push('image');
+    assert.equal(this.s.globalCompositeOperation, 'source-over');
+    const [ox, oy] = this.map(dx - sx, dy - sy);
+    const shadow = this.shadow();
+    for (const l of layer.lines) {
+      if (typeof l === 'string') { this.lines.push(l); continue; }
+      const e = { ...l };
+      if (shadow) {
+        Object.assign(e, { color: shadow[0], blur: shadow[3], less: null });
+        RecordingContext.shift(e, ox + shadow[1], oy + shadow[2]);
+      } else {
+        // drawn opaque there, laid at an alpha: that alpha its colour's
+        assert.equal(e.color.slice(1, 3), 'ff', 'a layer drawn opaque');
+        e.color = '#' + Math.round(this.s.globalAlpha * 255).toString(16).padStart(2, '0') + e.color.slice(3);
+        RecordingContext.shift(e, ox, oy);
+      }
+      this.lines.push(e);
+    }
+  }
+
+  static shift(e, dx, dy) {
+    if (e.t === 'fill') {
+      e.b = RecordingContext.moved(e.b, dx, dy);
+      if (e.less) e.less = RecordingContext.moved(e.less, dx, dy);
+    } else {
+      e.x += dx;
+      e.y += dy;
+    }
+  }
 }
 
 /**
@@ -346,7 +407,7 @@ test("the library's painter draws what the app's ScenePainter draws, line for li
     const pressed = pressedAt.slice('pressed='.length);
     const ctx = new RecordingContext();
     E.paint(built(all[shot]), ctx, { pressed: pressed === '-' ? null : pressed, icons });
-    const got = ctx.lines;
+    const got = ctx.written();
     const at = got.findIndex((l, i) => !sameLine(l, want[i]));
     if (at >= 0 || got.length !== want.length) {
       const i = at >= 0 ? at : Math.min(got.length, want.length);
@@ -357,11 +418,62 @@ test("the library's painter draws what the app's ScenePainter draws, line for li
 });
 
 test('a page with no icon or image for an op draws what it can: a nine-slice its fallback colour, nothing for the rest', () => {
-  const ctx = new RecordingContext();
-  const s = built(shots.shots.find((x) => x.name === 'qwerty-block'));
-  E.paint(s, ctx, null);
-  assert.ok(!ctx.lines.some((l) => l.startsWith('icon')), 'no icons given, none drawn');
-  assert.ok(ctx.lines.some((l) => l.startsWith('text')));
+  // theme 3.0's space key an image over its key's colour (look-3.0.xml): that colour where the page has no image
+  const t = E.readTheme(read(data, 'facade', 'look-3.0.xml'), null, null);
+  assert.ok(t.ok, JSON.stringify(t.problems));
+  const s = E.buildScene('qwerty', t.theme, { width: 1080, height: 702, density: 2.625, dark: true }, fixed);
+  assert.ok(s.ok, JSON.stringify(s.problems));
+  const face = s.scene.text().split('\n').find((l) => l.includes('nine-slice') && l.includes('full-space.png') && l.includes(' else='));
+  assert.ok(face, 'the space key a nine-slice: ' + s.scene.text().slice(0, 400));
+  const none = new RecordingContext();
+  assert.ok(E.paint(s.scene, none, null).ok);
+  const lines = none.written();
+  assert.ok(!lines.some((l) => l === 'image'), 'no image given, none drawn');
+  assert.ok(!lines.some((l) => l.startsWith('icon')), 'no icons given, none drawn');
+  assert.ok(lines.some((l) => l.startsWith('text')));
+  const fallback = / else=(#[0-9a-f]{8})/.exec(face)[1];
+  assert.ok(lines.some((l) => l.startsWith('fill ') && l.includes(' ' + fallback)), 'the fallback colour ' + fallback + ' filled');
+  // with the image: drawn, its nine pieces
+  const some = new RecordingContext();
+  assert.ok(E.paint(s.scene, some, { images: { 'full-space.png': { image: {}, width: 72, height: 72 } } }).ok);
+  assert.equal(some.written().filter((l) => l === 'image').length, 9);
+});
+
+test("the facade's answers to values of the wrong type are problems, never a throw", () => {
+  const t = E.readTheme(read(data, 'material-light.xml'), null, null).theme;
+  const env = { width: 1080, height: 702, density: 2.625 };
+  const scene = E.buildScene('qwerty', t, env, fixed).scene;
+  const refused = (r, what) => {
+    assert.equal(r.ok, false, what);
+    assert.equal(r.problems[0].line, 0, what);
+    assert.match(r.problems[0].message, /not /, what);
+  };
+  refused(E.readTheme(42, null, null), 'a theme not text');
+  refused(E.readTheme('<theme/>', 'red', null), 'system colours not an object');
+  refused(E.readTheme('<theme/>', { light: { primary: 7 } }, null), 'a system colour not text');
+  refused(E.readLayout(null, null), 'a layout not text');
+  refused(E.readLayout('<layout/>', { k: 3 }), 'a fragment not text');
+  refused(E.buildScene({}, t, env, fixed), 'a layout not one');
+  refused(E.buildScene('qwerty', {}, env, fixed), 'a theme not one');
+  refused(E.buildScene('qwerty', t, 5, fixed), 'an environment not one');
+  refused(E.buildScene('qwerty', t, env, {}), 'a measurer not one');
+  refused(E.buildPopup(t, env, null, fixed), 'no request');
+  refused(E.buildPopup(t, env, { kind: 'preview', text: 1, keyWidth: 40 }, fixed), 'a preview text not text');
+  refused(E.buildPopup(t, env, { kind: 'keys', labels: 'ab', rows: [[0]], columns: 1, selected: 0 }, fixed), 'labels not a list');
+  refused(E.buildPopup(t, env, { kind: 'keys', labels: ['a'], rows: [[0.5]], columns: 1, selected: 0 }, fixed), 'a row not whole numbers');
+  refused(E.buildPopup(t, env, { kind: 'menu', cells: [{ label: 'a' }], order: [0], selected: '0' }, fixed), 'selected not a number');
+  refused(E.paint(scene, new RecordingContext(), { pressed: 3 }), 'pressed not an id or list');
+  refused(E.paint(scene, new RecordingContext(), { pressed: ['q', 1] }), 'a pressed id not text');
+  refused(E.paint(scene, new RecordingContext(), { fonts: { system: 1 } }), 'a font not text');
+  refused(E.paint(scene, new RecordingContext(), { picture: 'p.png' }), 'the picture not a function');
+  refused(E.paint({}, new RecordingContext(), null), 'a scene not one');
+  refused(E.paint(scene, {}, null), 'a context not one');
+  refused(E.canvasMeasurer({}, null), 'a context to measure with not one');
+  refused(E.convert30(null), 'a theme 3.0 not text');
+  // and a right one still is: the environment as text, a popup of kind none a problem of its own
+  assert.ok(E.buildScene('qwerty', t, JSON.stringify(env), fixed).ok);
+  assert.equal(E.buildPopup(t, env, { kind: 'nope' }, fixed).problems[0].message, 'no popup of kind "nope"');
+  assert.ok(E.paint(scene, new RecordingContext(), { pressed: ['q'] }).ok);
 });
 
 test('the built-in themes and layouts are what the build put in (lib/keyboard-scene builtInFiles)', () => {

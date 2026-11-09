@@ -57,7 +57,7 @@ let pressed = null;
 async function themeOf(t) {
   let text = await (await fetch('/data/' + t.file)).text();
   if (t.styles || t.fonts) {
-    text = text.replace('</colors>', '</colors>' + (t.fonts || '')).replace('</theme>', [...(t.styles || []), '</theme>'].join('\n'));
+    text = text.replaceAll('</colors>', () => '</colors>' + (t.fonts || '')).replaceAll('</theme>', () => [...(t.styles || []), '</theme>'].join('\n'));
   }
   return E.readTheme(text, null, null);
 }
@@ -102,7 +102,7 @@ async function preview() {
   const problems = [];
   if (!read.ok) problems.push(...read.problems);
   else {
-    const measurer = $('canvasMeasure').checked ? E.canvasMeasurer($('canvas').getContext('2d'), null) : E.fixedMeasurer();
+    const measurer = $('canvasMeasure').checked ? E.canvasMeasurer($('canvas').getContext('2d'), null).measurer : E.fixedMeasurer();
     const r = E.buildScene($('board').value, read.theme, env, measurer);
     if (!r.ok) problems.push(...r.problems);
     else { current = r.scene; problems.push(...current.json().warnings); draw(current); }

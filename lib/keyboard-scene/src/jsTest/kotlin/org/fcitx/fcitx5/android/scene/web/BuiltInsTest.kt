@@ -82,7 +82,7 @@ class BuiltInsTest {
               return t === 'bare' ? { width: 40 } : { width: 10 * t.length, actualBoundingBoxLeft: 1, actualBoundingBoxRight: 9, actualBoundingBoxAscent: 7,
               actualBoundingBoxDescent: 2, fontBoundingBoxAscent: 11, fontBoundingBoxDescent: 3 }; } })""",
         )
-        val m = CanvasMeasurer(ctx) { "\"F-$it\"" }
+        val m = CanvasMeasurer(ctx, { "\"F-$it\"" })
         val q = m.measure("qq", "system", 700, 20.0)
         assertEquals(20.0, q.advance)
         assertEquals(Box(-1.0, -7.0, 9.0, 2.0), q.ink)
@@ -98,6 +98,48 @@ class BuiltInsTest {
         assertEquals(-10.5, bare.top)
         assertEquals(3.0, bare.bottom)
     }
+
+    // the page's own fonts first: their sources' yMax and yMin, as Android's FontMetrics of the same fonts
+    @Test
+    fun thePagesFontsExtentIsTheirHeadTablesBox() {
+        val m = CanvasMeasurer(measuring(), { "\"Youmo Latin\", \"Youmo Han\", sans-serif" })
+        val latin = m.measure("qq", "system", 400, 20.0)
+        assertEquals(-20 * 2163.0 / 2048, latin.top)
+        assertEquals(20 * 555.0 / 2048, latin.bottom)
+        val han = CanvasMeasurer(measuring(), { "\"Youmo Han\"" }).measure("中", "system", 700, 10.0)
+        assertEquals(-18.06, han.top, 1e-9)
+        assertEquals(10.46, han.bottom, 1e-9)
+    }
+
+    // a font not in yet: measured in the one shown meanwhile, and not kept, so the scene built once it is in is its
+    @Test
+    fun aMeasureBeforeItsFontIsInIsNotKept() {
+        var loaded = false
+        val ctx = measuring()
+        val m = CanvasMeasurer(ctx, { "\"F-$it\"" }, loaded = { loaded })
+        m.measure("qq", "system", 400, 20.0)
+        m.measure("qq", "system", 400, 20.0)
+        assertEquals(2, (ctx.asked as Array<String>).size, "asked again while the font is not in")
+        loaded = true
+        m.measure("qq", "system", 400, 20.0)
+        m.measure("qq", "system", 400, 20.0)
+        assertEquals(3, (ctx.asked as Array<String>).size, "kept once it is")
+    }
+
+    // the last [limit] asked for kept: one asked again is kept over one asked once before it
+    @Test
+    fun theMeasuresKeptAreTheLastAskedFor() {
+        val ctx = measuring()
+        val m = CanvasMeasurer(ctx, { "\"F-$it\"" }, limit = 2)
+        for (t in listOf("a", "b", "a", "c", "a", "b")) m.measure(t, "system", 400, 20.0)
+        // a, b; a kept; c (b out: a was asked since); a kept; b again
+        assertEquals(listOf("a", "b", "c", "b"), (ctx.asked as Array<String>).map { it.substringAfterLast('|') })
+    }
+
+    private fun measuring(): dynamic = js(
+        """({ asked: [], measureText: function (t) { this.asked.push(this.font + '|' + this.letterSpacing + '|' + t);
+          return { width: 10 * t.length, fontBoundingBoxAscent: 11, fontBoundingBoxDescent: 3 }; } })""",
+    )
 
     private fun exists(path: String): Boolean = js("require('fs')").existsSync(path) as Boolean
 }
