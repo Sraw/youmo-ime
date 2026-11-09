@@ -1035,9 +1035,11 @@ The app does not edit themes (user, 2026-11-03) and in 0.5.x does not link the w
 applies, imports, and on a long press exports or deletes one of the user's (Monet exports
 `Theme.Builtin.toCustom()`: its colours now and the key style it keeps, fixed, named as 0.5 named it,
 `MonetLight#<primary>`). A built-in theme of two versions is one card (`ThemeCards`, the theme page's
-list and the light and dark slots' dialogs alike): a small 浅/深 on its thumbnail shows the other version,
-a tap on the card picks the one shown; the version a slot or the theme in use is shows, and its mark
-only while it is shown (dark over light over in use; a slot's dialog opens on the slot's version). The fcitx edit page
+list and the light and dark slots' dialogs alike): a small 浅/深 on its thumbnail shows the other version
+and picks nothing (its touch target 48 dp, the chip in its corner; read out as the version shown and what a
+tap does, `theme_version_*_switch`), a tap on the card picks the one shown; the version a slot or the theme
+in use is shows, and its mark only while it is shown (dark over light over in use; a slot's dialog opens on
+the slot's version and keeps the theme picked, not the card: `SimpleThemeListAdapter.selectedTheme`). The fcitx edit page
 (`CustomThemeActivity`, its cropper) went with the old 选择图片… and 复制内置主题…; themes made by them
 before are listed, used, exported and deleted like any other. Thumbnails (`ThemeThumbnailUi`) draw four rows of the
 theme's keys in little (`ThemeThumbnailKeys`, colours only: no key image decoded) over its base
@@ -1053,16 +1055,26 @@ those as before) drawn as `LookDefaults` with them, which is what the files' sty
 the colours were held to the deleted `ThemePreset`/`Theme.Monet` by `BuiltinThemesPresetTest`, commit
 bb317aba3). Monet's colours are `system(role, fallback)`: `ThemeMonet.systemColors` gives the roles from
 Android 14 (the light bar `surface-container-highest`, the dark `surface-container-high`), on 12 and 13
-the palette tones 0.5 approximated them with, before 12 none (the fallbacks: 0.5's static MD3 colours);
+the palette tones 0.5 approximated them with (every role, the two 0.5 had none for, the light high and
+the dark highest, the tones nearest Material's between their neighbours), before 12 none (the fallbacks: 0.5's static MD3 colours);
 re-read on a configuration change (`onSystemPlatteChange`) and when the key style is settled. Transparent's
 two are no built-in theme: test data, `commonTest/data/transparent.xml`.
 
 The settings name a built-in theme by **reference**: its file's name and version, `pixel#dark`, or its
 name alone where it has one (`deep-blue`; `deep-blue#dark` finds it too). `ThemeManager.getTheme` finds
-the user's theme of that name first, then the built-in. `ThemePrefs.migrateThemeRefs` (from
+the user's theme of that name first, then the built-in, then the built-in of that 0.5 name (a slot not
+moved yet). A theme of the user's named as a reference is now (`monokai`, `pixel#dark`: 0.5's import
+refused only 0.5's names) would hide the built-in one, so at `ThemeManager`'s start, before the slots are
+moved, `ThemeFilesManager.moveClashing` saves it again under a UUID of its name (its files as they are,
+its json's age kept), `ThemePrefs.renameThemeRefs` points every slot naming it at the copy (committed),
+and only then its old json goes: a kill anywhere leaves each slot on a json there is, the next start
+finishes onto the same UUID (a random one where that name holds another theme already). Not while the
+themes are not settled or before the first unlock (none listed). `ThemePrefs.migrateThemeRefs` (from
 `ThemeManager`'s start, the custom themes listed) moves a slot (`normal_mode_theme`, `light_mode_theme`,
 `dark_mode_theme`) naming one by its 0.5 name (`PixelDark`, `MonetLight`, `BuiltinThemeFiles.LEGACY`)
-to its reference, unless a theme of the user's has that name; a name of no theme stays (the default). No
+to its reference, unless a theme of the user's has that name or may have it (`ThemeFilesManager.mayHoldTheme`:
+its json there unread, or the directory not read; such a slot is read as the built-in theme meanwhile);
+a name of no theme stays (the default). No
 mark: no old name is written any more and an import of one (or of a reference) is refused
 (`exception_theme_name_clash`), so it runs at every start and a backup of an older version, or the
 device-encrypted copy an older version wrote, is moved as it is read; `syncToDeviceEncryptedStorage`

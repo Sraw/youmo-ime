@@ -239,6 +239,60 @@ object ThemeFilesManager {
     }
 
     /**
+     * Whether a theme of the user's may be named [name] though none of that name is listed: its json is
+     * there (one that did not read: a later build's, one cut short), or the directory cannot be read
+     * (the themes not settled, A4, or before the first unlock; a listing that failed). A setting naming
+     * [name] is then not moved to a built-in theme for good (ThemePrefs.migrateThemeRefs).
+     */
+    fun mayHoldTheme(name: String): Boolean = !writable || dir.list() == null || File(dir, "$name.json").exists()
+
+    /**
+     * 060-render-p3 T3: the user's [themes] whose names are now a built-in theme's reference ([clashes]:
+     * `monokai`, `pixel#dark`, which 0.5's import let through as no built-in theme had them) saved again
+     * under a UUID, their files as they are and their json's age kept (the list's order), as the theme
+     * of that name would hide the built-in one ([ThemeManager.getTheme]: the user's first). [repoint]
+     * (every setting naming the old name named the new one; false if that was not written) runs between
+     * the new json written and the old one deleted, so a kill anywhere leaves each setting naming a json
+     * there is, and the next start does what was left: the UUID is the old name's ([UUID.nameUUIDFromBytes]),
+     * so it is redone onto the same file, no second copy; a random one only where that name holds another
+     * theme already (an old backup brought back after the copy was changed). Nothing while the themes
+     * are not settled (before the first unlock too): none is listed then, and nothing may be written.
+     * One not saved or not repointed stays as it was, moved at the next start. The list, each moved one
+     * in its place.
+     */
+    fun moveClashing(
+        themes: List<Theme.Custom>,
+        clashes: (String) -> Boolean,
+        repoint: (from: String, to: String) -> Boolean,
+    ): List<Theme.Custom> {
+        if (!writable || themes.none { clashes(it.name) }) return themes
+        val moved = themes.map { theme ->
+            if (!clashes(theme.name)) return@map theme
+            val stable = UUID.nameUUIDFromBytes(theme.name.encodeToByteArray()).toString()
+            val copyOf = { name: String -> theme.copy(name = name) }
+            // a json of the stable name not this theme's copy (one that reads otherwise, or not at all)
+            val taken = File(dir, "$stable.json").exists() && themes.none { it == copyOf(stable) }
+            val copy = copyOf(if (taken) UUID.randomUUID().toString() else stable)
+            try {
+                writeWhole(copy, themeFile(theme).lastModified())
+            } catch (e: IOException) {
+                Timber.w(e, "Theme ${theme.name} not saved under a new name")
+                return@map theme
+            }
+            if (!repoint(theme.name, copy.name)) {
+                Timber.w("Settings naming theme ${theme.name} not written: kept till the next start")
+                return@map theme
+            }
+            // its json only: its files are the copy's
+            themeFile(theme).delete()
+            copy
+        }
+        syncDir()
+        // a copy a start before left (killed before the old json went) is listed already
+        return moved.distinctBy { it.name }
+    }
+
+    /**
      * [dest] will be closed on finished
      */
     fun exportTheme(theme: Theme.Custom, dest: OutputStream) =

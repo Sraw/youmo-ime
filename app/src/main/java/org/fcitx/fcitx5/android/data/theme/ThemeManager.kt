@@ -47,17 +47,31 @@ object ThemeManager {
         it.migrateSizeFollow()
     }
 
-    // before the themes, which an older format's are read with (the key style settings before 3.0)
-    private val customThemes: MutableList<Theme.Custom> = ThemeFilesManager.listThemes(prefs.legacyLook())
+    // before the themes, which an older format's are read with (the key style settings before 3.0). One
+    // named as a built-in theme is now (`monokai`, which 0.5 let in) would hide it: saved again under a
+    // UUID, the settings naming it with it (060-render-p3 T3), before they are moved below
+    private val customThemes: MutableList<Theme.Custom> = ThemeFilesManager.moveClashing(
+        ThemeFilesManager.listThemes(prefs.legacyLook()),
+        clashes = { BuiltinThemeFiles.find(builtinThemes, it) != null },
+        repoint = prefs::renameThemeRefs,
+    ).toMutableList()
 
     init {
-        // 0.5's names of the built-in themes in the settings (060-render-p3 T3), before a theme is read of them
-        prefs.migrateThemeRefs(customThemes.mapTo(HashSet()) { it.name })
+        // 0.5's names of the built-in themes in the settings (060-render-p3 T3), before a theme is read of them;
+        // not one a theme of the user's may have though it is not listed (its json unread, the dir unread)
+        val customs = customThemes.mapTo(HashSet()) { it.name }
+        BuiltinThemeFiles.LEGACY.keys.filterTo(customs, ThemeFilesManager::mayHoldTheme)
+        prefs.migrateThemeRefs(customs)
     }
 
-    /** The theme [name] refers to: the user's of that name, else the built-in one ([BuiltinThemeFiles.find]); null where none is. */
+    /**
+     * The theme [name] refers to: the user's of that name, else the built-in one ([BuiltinThemeFiles.find]),
+     * else the built-in one of that 0.5 name (a setting not moved yet: [ThemePrefs.migrateThemeRefs]); null
+     * where none is.
+     */
     fun getTheme(name: String): Theme? =
         customThemes.find { it.name == name } ?: BuiltinThemeFiles.find(builtinThemes, name)
+            ?: BuiltinThemeFiles.LEGACY[name]?.let { BuiltinThemeFiles.find(builtinThemes, it) }
 
     fun getAllThemes(): List<Theme> = customThemes + builtinThemes
 
