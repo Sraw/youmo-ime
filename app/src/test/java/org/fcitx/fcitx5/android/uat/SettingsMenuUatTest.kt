@@ -20,9 +20,9 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.data.theme.deriveCustomNoBackground
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
@@ -205,23 +205,23 @@ class SettingsMenuUatTest {
     fun followingTheSystemAThemeTappedAsks() {
         val follow = ThemeManager.prefs.followSystemDayNightTheme
         follow.setValue(true)
-        ThemeManager.setNormalModeTheme(ThemePreset.PixelLight)
+        ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
         try {
             st.open(SettingsRoute.Theme)
             val before = ThemeManager.activeTheme.name
-            pick(ThemePreset.PixelDark.name)
+            pick(TestThemes.PixelDark.name)
             assertTrue(texts().toString() + dialogText(), st.s(R.string.theme_message_follow_system_day_night_mode_enabled) == dialogText())
             dialog().getButton(DialogInterface.BUTTON_POSITIVE).performClick()
             st.idle()
             assertEquals(before, ThemeManager.activeTheme.name)
-            pick(ThemePreset.PixelDark.name)
+            pick(TestThemes.PixelDark.name)
             dialog().getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
             st.idle()
             assertFalse(follow.getValue())
-            assertEquals(ThemePreset.PixelDark.name, ThemeManager.activeTheme.name)
+            assertEquals(TestThemes.PixelDark.name, ThemeManager.activeTheme.name)
             assertTrue(keyboardIsDark())
         } finally {
-            ThemeManager.setNormalModeTheme(ThemePreset.PixelLight)
+            ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
             follow.setValue(follow.defaultValue)
         }
     }
@@ -233,7 +233,7 @@ class SettingsMenuUatTest {
     fun themesAreImportedAndOnesOwnExportedOrDeletedFromALongPress() {
         val follow = ThemeManager.prefs.followSystemDayNightTheme
         follow.setValue(false)
-        val mine = ThemePreset.PixelDark.deriveCustomNoBackground("mine")
+        val mine = TestThemes.PixelDark.deriveCustomNoBackground("mine")
         assertTrue(ThemeManager.saveTheme(mine))
         try {
             st.open(SettingsRoute.Theme)
@@ -262,7 +262,7 @@ class SettingsMenuUatTest {
             assertEquals(ThemeManager.prefs.normalModeTheme.defaultValue.name, ThemeManager.activeTheme.name)
         } finally {
             ThemeManager.deleteTheme("mine")
-            ThemeManager.setNormalModeTheme(ThemePreset.PixelLight)
+            ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
             follow.setValue(follow.defaultValue)
         }
     }

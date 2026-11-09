@@ -131,10 +131,10 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
                     onSelectTheme(theme)
                 }
                 root.setOnLongClickListener {
-                    when (theme) {
-                        is Theme.Custom -> onThemeActions(theme)
-                        // its look the wallpaper's colours now, its key style with them: a fixed copy
-                        is Theme.Monet -> onExportTheme(theme.toCustom())
+                    when {
+                        theme is Theme.Custom -> onThemeActions(theme)
+                        // Monet's: its look the wallpaper's colours now, its key style with them: a fixed copy
+                        theme is Theme.Builtin && theme.followsSystem -> onExportTheme(theme.toCustom())
                         else -> return@setOnLongClickListener false
                     }
                     true

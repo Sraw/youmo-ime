@@ -22,7 +22,7 @@ import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
@@ -231,7 +231,7 @@ class T9KeyboardTest {
     @Test
     @Config(application = FcitxApplication::class)
     fun aClickReleasedOnAListSinceReplacedIsDropped() {
-        val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark, semicolon = false)
+        val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, semicolon = false)
         val picked = ArrayList<KeyAction>()
         keyboard.keyActionListener = KeyActionListener { action, _ -> picked += action }
         // in a window, where View posts the click of a released item to the looper, as on a phone
@@ -279,7 +279,7 @@ class T9KeyboardTest {
         multiTap: T9MultiTap = T9MultiTap.Medium,
     ): T9Keyboard {
         AppPrefs.getInstance().keyboard.t9MultiTap.setValue(multiTap)
-        return T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark, letters, semicolon = false).apply {
+        return T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, letters, semicolon = false).apply {
             setViewTreeLifecycleOwner(Owner())
             keyActionListener = KeyActionListener { action, _ -> sent += action }
             popupActionListener = PopupActionListener { previews += it }
@@ -471,7 +471,7 @@ class T9KeyboardTest {
     @Config(application = FcitxApplication::class)
     fun englishShiftCapitalisesTheNextKeyAndAPasswordTypesALetterAtATime() {
         val sent = ArrayList<KeyAction>()
-        val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark, english = true, semicolon = false).apply {
+        val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, english = true, semicolon = false).apply {
             setViewTreeLifecycleOwner(Owner())
             keyActionListener = KeyActionListener { action, _ -> sent += action }
         }
@@ -502,7 +502,7 @@ class T9KeyboardTest {
     @Config(application = FcitxApplication::class)
     fun anAddressFieldsMarksAreInTheColumn() {
         for (english in listOf(false, true)) {
-            val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark, english = english, semicolon = false)
+            val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, english = english, semicolon = false)
             val sent = mutableListOf<KeyAction>()
             keyboard.keyActionListener = KeyActionListener { action, _ -> sent += action }
             // the column: the scrolling list left of the keys
@@ -535,7 +535,7 @@ class T9KeyboardTest {
     fun neitherHasALanguageKeyAndBothTheGlobeEvenInAnAddressField() {
         val app = RuntimeEnvironment.getApplication()
         for (english in listOf(false, true)) {
-            val keyboard = T9Keyboard(PlaceholderStrings(app), ThemePreset.PixelDark, english = english, semicolon = false).laidOut()
+            val keyboard = T9Keyboard(PlaceholderStrings(app), TestThemes.PixelDark, english = english, semicolon = false).laidOut()
             val labels = keyboard.shownKeys().map { it.label }
             assertFalse(labels.toString(), labels.any { "英" in it || "中" in it })
             fun globe() = keyboard.laidOut().shownKeyWithId(R.id.button_lang) != null
@@ -551,7 +551,7 @@ class T9KeyboardTest {
     @Test
     @Config(application = FcitxApplication::class)
     fun theColumnShowsTheNineKeysSyllablesAloneNotAnotherInputMethods() {
-        val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark, semicolon = false)
+        val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, semicolon = false)
         val items = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single().getChildAt(0) as ViewGroup
         fun column() = (0 until items.childCount).map { items.getChildAt(it) as TextView }.filter { it.isVisible }.map { it.text.toString() }
         val activity = Robolectric.buildActivity(Activity::class.java).setup().get()

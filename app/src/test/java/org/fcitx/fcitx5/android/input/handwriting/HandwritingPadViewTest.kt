@@ -8,7 +8,7 @@ import android.app.Activity
 import android.os.Looper
 import android.os.SystemClock
 import android.view.MotionEvent
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -34,7 +34,7 @@ class HandwritingPadViewTest {
     private val finished = ArrayList<Int>()
 
     private fun pad() = HandwritingPadView(
-        PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark,
+        PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark,
         { reads += it }, { PAUSE }, { finished += it },
     ).also { Robolectric.buildActivity(Activity::class.java).setup().get().setContentView(it) }
 

@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android.input.picker
 
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.junit.Assert.assertTrue
@@ -27,7 +27,7 @@ class PickerGridViewTest {
 
     @Test
     fun aMeasureBeforeTheFirstSizeMakesKeysForAScreenNotTheWholeList() {
-        val grid = PickerGridView(RuntimeEnvironment.getApplication(), ThemePreset.PixelDark, PickerGridView.Density.Medium)
+        val grid = PickerGridView(RuntimeEnvironment.getApplication(), TestThemes.PixelDark, PickerGridView.Density.Medium)
         val items = Array(2000) { "e$it" }
         val adapter = PickerGridAdapter(
             grid, KeyActionListener { _, _ -> }, PopupActionListener {}, listOf(PickerData.Category("a") to items),

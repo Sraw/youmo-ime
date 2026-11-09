@@ -8,7 +8,7 @@ import android.text.InputType
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.InputMethodEntry
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
@@ -41,7 +41,7 @@ class TypedScenesUatTest {
     private fun entry(im: String, name: String) = InputMethodEntry(im, name, "", "", name.take(1), "zh_CN", "androidengine", false)
 
     private fun typed(view: View) =
-        SceneEnvs.of(view, ThemePreset.PixelLight.look, false, 1000, 700, Input(ime = "pinyin")).typed
+        SceneEnvs.of(view, TestThemes.PixelLight.look, false, 1000, 700, Input(ime = "pinyin")).typed
 
     @Test
     fun theInputMethodAndTheFieldAreTheThemesScenes() {

@@ -6,8 +6,8 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -28,11 +28,11 @@ class T9KeyboardScreenshotTest {
 
     @Test
     @Uat("T9-01")
-    fun theNineKeysLight() = check(ThemePreset.PixelLight, "t9_light")
+    fun theNineKeysLight() = check(TestThemes.PixelLight, "t9_light")
 
     @Test
     @Uat("T9-01")
-    fun theNineKeysDark() = check(ThemePreset.PixelDark, "t9_dark")
+    fun theNineKeysDark() = check(TestThemes.PixelDark, "t9_dark")
 
     private fun check(theme: Theme, name: String) = KeyboardHarness(theme, KeyboardHarness.PINYIN, keyboards = KeyboardHarness.NINE_KEYS).use { h ->
         h.start()

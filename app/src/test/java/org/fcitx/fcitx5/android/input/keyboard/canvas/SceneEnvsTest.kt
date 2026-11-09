@@ -6,8 +6,8 @@ package org.fcitx.fcitx5.android.input.keyboard.canvas
 
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
@@ -35,7 +35,7 @@ class SceneEnvsTest {
     @Test
     @Config(qualifiers = "w800dp-h360dp-land")
     fun theScreensAndTheKeyboardsOwn() {
-        val blocks = ThemePreset.PixelDark.look
+        val blocks = TestThemes.PixelDark.look
         val env = SceneEnvs.of(view, blocks, dark = true, width = 2000, height = 600, input = Input(), split = true, shift = Shift.Lock)
         assertEquals(2000.0, env.width, 0.0)
         assertEquals(600.0, env.height, 0.0)
@@ -53,7 +53,7 @@ class SceneEnvsTest {
     @Test
     fun floatingOnlyInTheInputMethod() {
         ThemeManager.prefs.floatingKeyboard.setValue(true)
-        val env = SceneEnvs.of(view, ThemePreset.PixelDark.look, dark = false, width = 1000, height = 700, input = Input())
+        val env = SceneEnvs.of(view, TestThemes.PixelDark.look, dark = false, width = 1000, height = 700, input = Input())
         assertNull(env.floating)
         assertFalse(env.landscape)
     }

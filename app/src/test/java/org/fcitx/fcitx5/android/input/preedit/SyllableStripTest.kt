@@ -20,7 +20,7 @@ import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.host.HostEvent
@@ -63,7 +63,7 @@ class SyllableStripTest {
 
     @Test
     fun theRowIsTheCodeAndTheSyllablesEachWithItsId() {
-        val row = CodeRowUi(context, ThemePreset.PixelDark) {}
+        val row = CodeRowUi(context, TestThemes.PixelDark) {}
         assertTrue(row.root.findViewById<View>(R.id.code_row_text) != null)
         assertTrue(row.root.findViewById<View>(R.id.code_row_syllables) === row.syllables)
         // the code first, the syllables at the right end
@@ -73,7 +73,7 @@ class SyllableStripTest {
 
     @Test
     fun goneWithNothingToTakeOrForAnotherInputMethod() {
-        val strip = SyllableStrip(context, ThemePreset.PixelDark)
+        val strip = SyllableStrip(context, TestThemes.PixelDark)
         assertEquals(View.GONE, strip.visibility)
         strip.show(typing("ni", "mi"))
         assertEquals(View.VISIBLE, strip.visibility)
@@ -90,7 +90,7 @@ class SyllableStripTest {
 
     @Test
     fun theSyllablesTakeAtMostSixTenthsOfTheRow() {
-        val row = CodeRowUi(context, ThemePreset.PixelDark) {}
+        val row = CodeRowUi(context, TestThemes.PixelDark) {}
         row.syllables.show(typing(*Array(30) { "zhuang" }))
         val width = 1000
         row.root.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(100, View.MeasureSpec.EXACTLY))
@@ -104,7 +104,7 @@ class SyllableStripTest {
 
     @Test
     fun aTapGivesFeedbackThenSendsTheSyllablesKey() {
-        val strip = SyllableStrip(context, ThemePreset.PixelDark)
+        val strip = SyllableStrip(context, TestThemes.PixelDark)
         val sent = ArrayList<KeyAction>()
         strip.show(typing("ni", "mi", "o", id = 3))
         val order = ArrayList<String>()
@@ -119,7 +119,7 @@ class SyllableStripTest {
 
     @Test
     fun aClickReleasedOnAListSinceReplacedIsDropped() {
-        val strip = SyllableStrip(context, ThemePreset.PixelDark)
+        val strip = SyllableStrip(context, TestThemes.PixelDark)
         val sent = ArrayList<KeyAction>()
         strip.onPick = { sent += it }
         // in a window, where View posts the click of a released item to the looper, as on a phone
@@ -139,7 +139,7 @@ class SyllableStripTest {
 
     @Test
     fun talkBackReadsASyllableAsAPinyinButton() {
-        val strip = SyllableStrip(context, ThemePreset.PixelDark)
+        val strip = SyllableStrip(context, TestThemes.PixelDark)
         strip.show(typing("ni"))
         assertEquals(context.getString(R.string.a11y_syllable, "ni"), strip.item(0).contentDescription)
         val info = AccessibilityNodeInfo.obtain()
@@ -149,14 +149,14 @@ class SyllableStripTest {
 
     @Test
     fun aSyllableIsATouchWide() {
-        val strip = SyllableStrip(context, ThemePreset.PixelDark)
+        val strip = SyllableStrip(context, TestThemes.PixelDark)
         strip.show(typing("e"))
         assertEquals((40 * context.resources.displayMetrics.density).toInt(), strip.item(0).minWidth)
     }
 
     @Test
     fun aPressHeldWhileTheListIsReplacedTakesNothingOnRelease() {
-        val strip = SyllableStrip(context, ThemePreset.PixelDark)
+        val strip = SyllableStrip(context, TestThemes.PixelDark)
         val sent = ArrayList<KeyAction>()
         strip.onPick = { sent += it }
         Robolectric.buildActivity(Activity::class.java).setup().get()
@@ -178,7 +178,7 @@ class SyllableStripTest {
 
     @Test
     fun aTapOnTheCodeStillMovesTheCursorBesideTheSyllables() {
-        val row = CodeRowUi(context, ThemePreset.PixelDark) {}
+        val row = CodeRowUi(context, TestThemes.PixelDark) {}
         val taps = ArrayList<Int>()
         row.onTap = { taps += it }
         Robolectric.buildActivity(Activity::class.java).setup().get()
@@ -206,7 +206,7 @@ class SyllableStripTest {
 
     @Test
     fun shuangpinsSyllablesShowUnlessTheKeyboardOffersThemItself() {
-        val strip = SyllableStrip(context, ThemePreset.PixelDark)
+        val strip = SyllableStrip(context, TestThemes.PixelDark)
         // the 18 keys: 双拼's grouped session answers as 双拼
         strip.show(typing("ni", "mi", im = InputMethodCatalog.SHUANGPIN))
         assertEquals(View.VISIBLE, strip.visibility)

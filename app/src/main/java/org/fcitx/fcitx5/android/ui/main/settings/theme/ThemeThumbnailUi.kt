@@ -101,7 +101,7 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
         val foregroundTint = ColorStateList.valueOf(theme.altKeyTextColor)
         dynamicIcon.apply {
             visibility =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && theme is Theme.Monet) View.VISIBLE else View.GONE
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && theme is Theme.Builtin && theme.followsSystem) View.VISIBLE else View.GONE
             imageTintList = foregroundTint
         }
         checkMark.imageTintList = foregroundTint

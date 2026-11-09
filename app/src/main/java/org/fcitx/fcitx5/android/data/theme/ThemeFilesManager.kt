@@ -292,7 +292,8 @@ object ThemeFilesManager {
                     ThemeAssetLimits.look(decoded.look)?.let(::refused)
                     // the name becomes a file name in dir, so a crafted one must not be a path out of it
                     if (!isPlainFileName(decoded.name)) errorRuntime(R.string.invalid_value)
-                    if (ThemeManager.BuiltinThemes.find { it.name == decoded.name } != null)
+                    // a built-in theme's name, or its 0.5 name, which the settings move to it (ThemePrefs.migrateThemeRefs)
+                    if (BuiltinThemeFiles.find(ThemeManager.BuiltinThemes, decoded.name) != null || decoded.name in BuiltinThemeFiles.LEGACY)
                         errorRuntime(R.string.exception_theme_name_clash)
                     val oldTheme = themes.find { it.name == decoded.name } as? Theme.Custom
                     val newCreated = oldTheme == null

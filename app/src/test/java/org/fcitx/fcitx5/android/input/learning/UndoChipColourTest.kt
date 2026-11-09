@@ -4,8 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.learning
 
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.Contrast
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -14,9 +14,9 @@ import org.junit.Test
 class UndoChipColourTest {
 
     // found by reflection, so a preset added is checked too
-    private val presets = ThemePreset::class.java.declaredFields
+    private val presets = TestThemes::class.java.declaredFields
         .filter { Theme.Builtin::class.java.isAssignableFrom(it.type) }
-        .map { it.isAccessible = true; it.get(ThemePreset) as Theme.Builtin }
+        .map { it.isAccessible = true; it.get(TestThemes) as Theme.Builtin }
 
     @Test
     fun undoIsLegibleOnThePopupColourInEveryTheme() {

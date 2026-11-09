@@ -10,8 +10,8 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.floating.FloatingHandleSide
@@ -169,12 +169,12 @@ class MotionNoticeUatTest {
     fun clipboardDeleteUndoneOnTheNoticeInEitherTheme() {
         prefs.set(ThemeManager.prefs.followSystemDayNightTheme, false)
         try {
-            ThemeManager.setNormalModeTheme(ThemePreset.PixelLight)
+            ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
             deleteAndUndo("light")
-            ThemeManager.setNormalModeTheme(ThemePreset.PixelDark)
+            ThemeManager.setNormalModeTheme(TestThemes.PixelDark)
             deleteAndUndo("dark")
         } finally {
-            ThemeManager.setNormalModeTheme(ThemePreset.PixelLight)
+            ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
         }
         // deletes while it shows add up: a swipe, then a long press, one 撤销 for both
         h.start()

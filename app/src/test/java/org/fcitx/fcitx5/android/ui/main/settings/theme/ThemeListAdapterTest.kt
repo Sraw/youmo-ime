@@ -4,8 +4,8 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings.theme
 
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.data.theme.deriveCustomNoBackground
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeThumbnailUi.State
 import org.junit.Assert.assertEquals
@@ -20,7 +20,7 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class ThemeListAdapterTest {
 
-    private fun theme(name: String) = ThemePreset.MaterialLight.deriveCustomNoBackground(name)
+    private fun theme(name: String) = TestThemes.MaterialLight.deriveCustomNoBackground(name)
 
     private val a = theme("a")
     private val x = theme("x")

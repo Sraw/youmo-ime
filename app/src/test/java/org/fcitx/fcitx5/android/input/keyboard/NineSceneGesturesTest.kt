@@ -10,8 +10,8 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
@@ -56,7 +56,7 @@ class NineSceneGesturesTest {
 
     private fun harness(v: Variant): KeyboardHarness {
         EngineState.shuangpinScheme = v.scheme
-        return KeyboardHarness(ThemePreset.PixelLight, v.im, keyboards = v.keyboards).start().also { h ->
+        return KeyboardHarness(TestThemes.PixelLight, v.im, keyboards = v.keyboards).start().also { h ->
             h.relayout()
             assertTrue(KeyboardHarness.all(h.keyboard).any { it is KeyboardCanvasView && it.visibility == View.VISIBLE })
             assertTrue(KeyboardHarness.all(h.keyboard).any { it is T9Keyboard })
@@ -251,10 +251,10 @@ class NineSceneGesturesTest {
         val app = PlaceholderStrings(RuntimeEnvironment.getApplication())
         val letters = NineKeyLetters.STANDARD
         val variants = mapOf(
-            "pinyin" to { T9Keyboard(app, ThemePreset.PixelLight, letters, semicolon = false) },
-            "english" to { T9Keyboard(app, ThemePreset.PixelLight, letters, english = true, semicolon = false) },
-            "shuangpin" to { T9Keyboard(app, ThemePreset.PixelLight, shuangpin = true, semicolon = true) },
-            "shuangpin plain" to { T9Keyboard(app, ThemePreset.PixelLight, shuangpin = true, semicolon = false) },
+            "pinyin" to { T9Keyboard(app, TestThemes.PixelLight, letters, semicolon = false) },
+            "english" to { T9Keyboard(app, TestThemes.PixelLight, letters, english = true, semicolon = false) },
+            "shuangpin" to { T9Keyboard(app, TestThemes.PixelLight, shuangpin = true, semicolon = true) },
+            "shuangpin plain" to { T9Keyboard(app, TestThemes.PixelLight, shuangpin = true, semicolon = false) },
         )
         val olds = mapOf(
             "pinyin" to T9Keyboard.layout(letters),
@@ -309,9 +309,9 @@ class NineSceneGesturesTest {
         assertEquals(pinyin2, T9Keyboard.ninePopup('2', "ABC", NineKeySymbols.STANDARD.symbols('2')).said())
         assertEquals(shuangpin5, T9Keyboard.ninePopup('5', "JKL", NineKeySymbols.STANDARD.symbols('5')).said())
         assertEquals(english1, T9Keyboard.onePopup(true, NineKeySymbols.STANDARD).said())
-        assertEquals(pinyin2, sceneOf(T9Keyboard(app, ThemePreset.PixelLight, semicolon = false), "2").said())
-        assertEquals(shuangpin5, sceneOf(T9Keyboard(app, ThemePreset.PixelLight, shuangpin = true, semicolon = true), "5").said())
-        assertEquals(english1, sceneOf(T9Keyboard(app, ThemePreset.PixelLight, english = true, semicolon = false), "1").said())
+        assertEquals(pinyin2, sceneOf(T9Keyboard(app, TestThemes.PixelLight, semicolon = false), "2").said())
+        assertEquals(shuangpin5, sceneOf(T9Keyboard(app, TestThemes.PixelLight, shuangpin = true, semicolon = true), "5").said())
+        assertEquals(english1, sceneOf(T9Keyboard(app, TestThemes.PixelLight, english = true, semicolon = false), "1").said())
     }
 
     // a view's key by the scene's id: its name, else the function key it is

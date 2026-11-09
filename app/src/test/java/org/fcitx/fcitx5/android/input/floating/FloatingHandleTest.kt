@@ -10,7 +10,7 @@ import android.view.MotionEvent
 import android.view.ViewConfiguration
 import android.view.ViewGroup
 import org.fcitx.fcitx5.android.assertRows
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -35,7 +35,7 @@ class FloatingHandleTest {
 
     // docked (始终显示悬浮条), attached: its long press is posted to the view
     private fun docked() = FloatingHandle(
-        PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark, FloatingHandleSide.Bottom,
+        PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, FloatingHandleSide.Bottom,
         FloatingHandle.Mode.Docked { x, y, touch ->
             detached += x to y
             touches += touch
@@ -55,7 +55,7 @@ class FloatingHandleTest {
     // each drop's lifted flag, for a drag ended by [end] and then a stray up
     private fun floatingDrops(end: Int): List<Boolean> {
         val drops = ArrayList<Boolean>()
-        val handle = FloatingHandle(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark, FloatingHandleSide.entries.first(), FloatingHandle.Mode.Floating({ _, _ -> }, { drops += it }) {})
+        val handle = FloatingHandle(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, FloatingHandleSide.entries.first(), FloatingHandle.Mode.Floating({ _, _ -> }, { drops += it }) {})
         handle.onTouchEvent(MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, 0f, 0f, 0))
         handle.onTouchEvent(MotionEvent.obtain(0, 1, end, 0f, 0f, 0))
         // ended once: a second end is no drop

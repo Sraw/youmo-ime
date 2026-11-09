@@ -11,8 +11,8 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.core.EngineState
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.input.bar.CandidateBarHeight
 import org.fcitx.fcitx5.android.input.candidates.CandidateItemUi
@@ -44,7 +44,7 @@ class GridReadingWidthTest {
 
     // what CandidateItemUi's text needs, in the grid's unit (a word's width over its text size, scaled by 候选字号)
     private fun drawn(): Float {
-        val ui = CandidateItemUi(RuntimeEnvironment.getApplication(), ThemePreset.PixelLight)
+        val ui = CandidateItemUi(RuntimeEnvironment.getApplication(), TestThemes.PixelLight)
         ui.updateCandidate(word)
         val text = (ui.root as ViewGroup).getChildAt(0) as TextView
         val scale = ThemeManager.prefs.candidateTextSize.getValue() / CandidateBarHeight.DEFAULT_TEXT_SP.toFloat()
@@ -54,7 +54,7 @@ class GridReadingWidthTest {
     @Test
     @Uat("PY-111")
     fun aWordWithReadingsIsMeasuredAsItIsDrawnInEachStyle() {
-        val grid = object : GridPagingCandidateViewAdapter(ThemePreset.PixelLight) {}
+        val grid = object : GridPagingCandidateViewAdapter(TestThemes.PixelLight) {}
         for (style in listOf(ReadingStyle.OFF, ReadingStyle.PINYIN, ReadingStyle.ZHUYIN)) {
             EngineState.candidateReadingState.value = style
             assertEquals("$style", drawn(), grid.annotatedWidth(word, hint = style == ReadingStyle.OFF), 0.01f)

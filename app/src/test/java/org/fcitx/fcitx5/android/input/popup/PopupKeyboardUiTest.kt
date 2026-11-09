@@ -10,7 +10,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
@@ -62,7 +62,7 @@ class PopupKeyboardUiTest {
     ): PopupKeyboardUi {
         return PopupKeyboardUi(
             ctx = RuntimeEnvironment.getApplication(),
-            theme = ThemePreset.PixelDark,
+            theme = TestThemes.PixelDark,
             outerBounds = outerBounds,
             triggerBounds = trigger,
             onDismissSelf = { onDismiss() },
@@ -75,7 +75,7 @@ class PopupKeyboardUiTest {
             asIs = asIs,
             inRow = inRow,
             onFocusMoved = onFocusMoved,
-            scenes = PopupScenes(View(context), ThemePreset.PixelDark),
+            scenes = PopupScenes(View(context), TestThemes.PixelDark),
             faceInset = faceInset,
         )
     }

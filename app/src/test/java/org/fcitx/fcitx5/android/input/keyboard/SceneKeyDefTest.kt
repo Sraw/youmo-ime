@@ -10,7 +10,7 @@ import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -130,7 +130,7 @@ class SceneKeyDefTest {
     // a key's preview="on" on a board of preview="off": no bubble, the board's word the last (060-render-p2 S4d M1)
     @Test
     fun aKeysPreviewOnGivesWayToItsBoardsOff() {
-        val keyboard = ZhuyinKeyboard(context, ThemePreset.PixelLight, nine = true).laidOut()
+        val keyboard = ZhuyinKeyboard(context, TestThemes.PixelLight, nine = true).laidOut()
         val canvas = KeyboardHarness.all(keyboard).filterIsInstance<KeyboardCanvasView>().single()
         // ?: a function key with preview="on"
         val question = SceneBehavior.of(canvas.scene!!.keys.single { it.id == "r2c5" })
@@ -141,7 +141,7 @@ class SceneKeyDefTest {
 
     // the 14 keys' nodes, from the canvas a GroupedKeyboard draws with the switch on
     private fun nodes(): Map<String, KeyNode> {
-        val keyboard = GroupedKeyboard(context, ThemePreset.PixelLight).laidOut()
+        val keyboard = GroupedKeyboard(context, TestThemes.PixelLight).laidOut()
         val canvas = KeyboardHarness.all(keyboard).filterIsInstance<KeyboardCanvasView>().single()
         return canvas.scene!!.keys.associateBy { it.id }
     }
@@ -263,13 +263,13 @@ class SceneKeyDefTest {
         try {
             sources(Counted("pack") { "<keyboard/>" }, Counted(BuiltInLayouts.KEY) { "<keyboard/>" }) {
                 val keyboards = listOf(
-                    GroupedKeyboard(context, ThemePreset.PixelLight).laidOut(),
-                    GroupedKeyboard(context, ThemePreset.PixelLight, NineKeyLetters.G18).laidOut(),
-                    TextKeyboard(context, ThemePreset.PixelLight).laidOut(),
+                    GroupedKeyboard(context, TestThemes.PixelLight).laidOut(),
+                    GroupedKeyboard(context, TestThemes.PixelLight, NineKeyLetters.G18).laidOut(),
+                    TextKeyboard(context, TestThemes.PixelLight).laidOut(),
                     // made again: read once all the same
-                    TextKeyboard(context, ThemePreset.PixelLight).laidOut(),
+                    TextKeyboard(context, TestThemes.PixelLight).laidOut(),
                     // a theme not the built-in: no scene is no theme's fault, the built-in's not tried (no warning)
-                    TextKeyboard(context, ThemePreset.MaterialLight).laidOut(),
+                    TextKeyboard(context, TestThemes.MaterialLight).laidOut(),
                 )
                 for (k in keyboards) {
                     val canvas = KeyboardHarness.all(k).filterIsInstance<KeyboardCanvasView>().single()

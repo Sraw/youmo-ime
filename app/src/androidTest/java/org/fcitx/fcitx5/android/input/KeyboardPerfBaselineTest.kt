@@ -36,7 +36,6 @@ import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.input.keyboard.LetterCaseChoice
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
@@ -335,7 +334,7 @@ class KeyboardPerfBaselineTest {
         followSystemWas = prefs.followSystemDayNightTheme.getValue()
         themeWas = prefs.normalModeTheme.getValue()
         log("theme\tkey border setting ${prefs.keyBorderChoice.getValue()} (FollowTheme: each theme's own)")
-        val block = ThemePreset.PixelLight
+        val block = ThemeManager.builtin("pixel#light")
         val flat = Theme.Custom(FLAT, isDark = false, look = block.look.copy(keys = block.look.keys.copy(blocks = false)))
         val pictured = Theme.Custom(PICTURED, isDark = false, look = flat.look.copy(picture = picture(), base = BoardBase.Picture))
         val saved = onMain {
