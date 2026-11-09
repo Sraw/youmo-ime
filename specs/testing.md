@@ -370,10 +370,52 @@ Changing the page: edit `web/theme-maker/src/` (`page.html` with slots for the r
 `lib.js`: everything the tests hold to the app's rules, `ui.js`: the page), then
 `node web/theme-maker/tools/assemble.mjs`, which writes `index.html`: the sources put in, the
 generated blocks kept from the `index.html` there is, and the Content-Security-Policy's
-`script-src` set to the two scripts' SHA-256 (nothing else runs; an edit to `index.html` by hand
-breaks them). The page's test fails when `index.html` is not what assemble makes of `src/`, and
-when the CSP's hashes are not its scripts'. Commit `src/` and `index.html` together. The site is
-`index.html` alone: the Pages workflow leaves `src/`, `tools/` and `test/` out.
+`script-src` set to the three scripts' SHA-256 (nothing else runs; an edit to `index.html` by hand
+breaks them). The page's test fails when `index.html` is not what assemble makes of `src/`, the
+engine and the fonts, and when the CSP's hashes are not its scripts'. Commit `src/` and `index.html`
+together. The site is `index.html` alone: the Pages workflow leaves `src/`, `tools/`, `test/`,
+`fonts/` and `dev/` out.
+
+### The engine in the page (060-render-p3 W1)
+
+The page carries `lib/keyboard-scene` as a library: `jsMain`'s `YoumoEngine` (`@JsExport`: read a
+theme 4 or a layout with problems as values, build a scene or a popup in an environment given as
+JSON (`scene/json/EnvJson`), paint it on a 2D context (`web/CanvasPainter`, ScenePainter op for
+op), convert a theme 3.0, write a theme, the built-in layouts and themes (`web/BuiltIns` over
+`BuiltInFiles`, which the `builtInFiles` task writes of `src/commonMain/layouts` and `themes`), the
+browser's `TextMeasurer` (`web/CanvasMeasurer`, measureText's boxes)).
+`./gradlew :lib:keyboard-scene:youmoEngine` writes `build/youmo-engine/youmo-engine.js` (UMD, global
+`youmo-engine`; indents and the source map's line dropped, `<!--` and `</` escaped); assemble puts it
+in the page's `youmo-engine` script and the four subset fonts (`fonts/`, `tools/subset-fonts.py`:
+Roboto and Noto Sans CJK SC from Robolectric's runtime, cut to what a keyboard shows, 160 KB) in a
+`youmo-fonts` style as data URLs. The page's test holds the block to the build (so CI builds the
+engine before it, in the unit test job and the Pages workflow), to 1.2 MB, and the fonts to the files.
+
+What holds the library to the app:
+- `FacadeShotsTest` (commonTest) writes `data/facade/shots.json`: how each snapshot was asked for (the
+  board, the environment as EnvJson, the theme as a recipe of a test file, its styles and fonts; a
+  popup's request), and `data/facade/look-3.0.xml`/`look-3.0-files.txt`: the test theme 3.0 made 4.0
+  by `LookTheme`. Recorded with the snapshots (`-Psnapshots.record=true`), compared otherwise.
+- `web/theme-maker/test/engine.test.mjs` (node, needs the built engine; CI's unit test job runs it
+  with format.test.mjs) builds every snapshot through the facade from shots.json and compares
+  `scene.text()` with it, converts look-3.0.json, writes a theme, reads layouts with and without
+  their fragments, and paints each scene of `testdata/paint.txt` on a recording 2D context.
+- `paint.txt` and `engine-icons.json` are the app's `EnginePaintTest` (Robolectric, NATIVE graphics):
+  ScenePainter's calls on a recording Canvas for 20 shots, normalized to device pixels to a tenth
+  (fills, fills less a shape, blurs as their sigma, strokes, text with its weight, size, squeeze,
+  spacing, stroke and shadow, icons by name, clips); the node test compares them line for line, a
+  tenth's difference allowed (floats against doubles). The test also writes the icons the scenes name
+  into the page's `youmo-engine-icons` block and each shot's picture to `app/build/w1-pixel/`.
+  `-PupdateThemeMaker` writes them again.
+- The nine-slice, the picture, a gradient and a ripple, which no snapshot has, are `jsTest`'s
+  `CanvasPainterTest` (NineSliceCut held to NineSliceLayout's cases); `BuiltInsTest` holds the built-in
+  files to `src/commonMain`'s and the measurer to its cache and fallbacks.
+- `node web/theme-maker/test/pixel-smoke.mjs` (local, not CI: needs Playwright's headless shell or
+  `CHROMIUM=`) draws six groups of shots in Chromium through `dev/engine.html` and compares them
+  with `app/build/w1-pixel/`: under 2% of pixels off by more than 48, under 0.2% in 5x5 areas off by
+  more than 16 (the plain board against the app's with q pressed must fail it, and does).
+- `node web/theme-maker/dev/serve.mjs` serves `dev/engine.html`, a preview of any board, theme,
+  size and form drawn by the engine; development only, never published.
 
 ## Golden files from upstream fcitx
 

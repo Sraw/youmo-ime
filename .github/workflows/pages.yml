@@ -11,6 +11,7 @@ on:
       - main
     paths:
       - "web/**"
+      - "lib/keyboard-scene/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -26,10 +27,19 @@ jobs:
   build:
     name: Test and pack the page
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Fetch source code
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # the page's engine is lib/keyboard-scene's build (060-render-p3 W1): its test holds index.html to it
+      - name: Set up the build
+        uses: ./.github/actions/setup-build
+
+      - name: Build the page's engine
+        run: ./gradlew --build-cache :lib:keyboard-scene:youmoEngine
 
       - name: Setup Node
         uses: actions/setup-node@v5
@@ -37,17 +47,20 @@ jobs:
           node-version: "24"
 
       - name: Run theme maker tests
-        run: node --test web/theme-maker/test/format.test.mjs
+        run: node --test web/theme-maker/test/format.test.mjs web/theme-maker/test/engine.test.mjs
 
-      # the site: web/ as it is, the page's tests, sources and tools left out (index.html is all it needs)
+      # the site: web/ as it is, the page's tests, sources, tools, fonts (in index.html) and dev pages left out
+      # (index.html is all it needs)
       - name: Pack the site
         run: |
           mkdir _site
-          tar -C web --exclude='./*/test' --exclude='./*/src' --exclude='./*/tools' -cf - . | tar -C _site -xf -
+          tar -C web --exclude='./*/test' --exclude='./*/src' --exclude='./*/tools' --exclude='./*/fonts' --exclude='./*/dev' -cf - . | tar -C _site -xf -
           test -f _site/theme-maker/index.html
           test ! -e _site/theme-maker/test
           test ! -e _site/theme-maker/src
           test ! -e _site/theme-maker/tools
+          test ! -e _site/theme-maker/fonts
+          test ! -e _site/theme-maker/dev
 
       - name: Upload the site
         uses: actions/upload-pages-artifact@v4
