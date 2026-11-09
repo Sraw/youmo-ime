@@ -39,7 +39,7 @@ class VoiceTapOverlay(
 ) : BaseInputView.Hold {
     private val theme = inputView.theme
     private val ctx = inputView.context
-    private val look = VoiceStyle.look(ctx, theme)
+    private val look = VoiceStyle.panel(ctx, theme)
     private val service = inputView.service
 
     private val tap = VoiceTap()

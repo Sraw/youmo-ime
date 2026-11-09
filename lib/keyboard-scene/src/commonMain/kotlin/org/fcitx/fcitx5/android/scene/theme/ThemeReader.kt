@@ -285,8 +285,7 @@ object ThemeReader {
         named(values, a, colors, fonts)
         selectors?.let { readElsewhere(it, values.keys, el.line, p) }
         reserved += selectors?.let { shapes(it, values, el.line, p) } ?: 0
-        selectors?.let { unreadByWindow(it, values.keys, el.line, p) }
-        selectors?.let { unreadByPanel(it, values.keys, el.line, p) }
+        selectors?.let { unread(it, values.keys, el.line, p) }
         if (values.isEmpty() && reserved == 0) a.problem("a style that sets nothing")
         return selectors?.let { Style(it, values, order, el.line) }
     }
@@ -384,6 +383,12 @@ object ThemeReader {
         states.isEmpty() -> WINDOW_READS.getValue(widget)
         widget == "side-button" && states == setOf("pressed") -> listOf("overlay")
         else -> emptyList()
+    }
+
+    // what the window's widgets and the panels have no use for (T7a, T7b)
+    private fun unread(selectors: List<Selector>, props: Set<String>, line: Int, p: Problems) {
+        unreadByWindow(selectors, props, line, p)
+        unreadByPanel(selectors, props, line, p)
     }
 
     // a panel's property it has no use for (`clipboard shadow=`), as the window's; the voice mask's blur and the

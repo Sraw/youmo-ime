@@ -158,14 +158,14 @@ class PanelThemeTest {
     @Test
     fun theVoiceMask() {
         // before: the keyboard's colour at 0xE0 of its alpha (VoiceStyle.mask), the pill the accent at 0x29, its bars the accent; the glass of before
-        val plain = VoiceStyle.look(ctx, theme)
+        val plain = VoiceStyle.panel(ctx, theme)
         val kb = theme.keyboardColor
         assertEquals((kb and 0xFFFFFF) or ((kb ushr 24) * 0xE0 / 0xFF shl 24), plain.fill.value)
         assertEquals(ColorUtils.setAlphaComponent(theme.accentKeyBackgroundColor, 0x29), plain.micFill.value)
         assertEquals(theme.accentKeyBackgroundColor, plain.micColor.value)
         assertEquals(VoiceGlass.Blur(VoiceGlass.SCALE, 2), VoiceStyle.glass(ctx, plain).blur)
         everything()
-        val themed = VoiceStyle.look(ctx, theme)
+        val themed = VoiceStyle.panel(ctx, theme)
         assertEquals(PanelLooks.Voice(Argb(0x80123456.toInt()), 0.0, Argb(0xff777777.toInt()), Argb(0xff888888.toInt())), themed)
         // blur 0: none taken, the keys plain under the mask
         assertNull(VoiceStyle.glass(ctx, themed).blur)

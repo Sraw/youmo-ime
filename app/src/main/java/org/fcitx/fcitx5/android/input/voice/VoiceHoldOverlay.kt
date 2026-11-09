@@ -45,7 +45,7 @@ class VoiceHoldOverlay(
     private val main = Handler(Looper.getMainLooper())
     private var gone = false
 
-    private val look = VoiceStyle.look(ctx, theme)
+    private val look = VoiceStyle.panel(ctx, theme)
     private val talkColor = look.fill.value
     private val glass = VoiceStyle.glass(ctx, look)
     private var colorAnimator: ValueAnimator? = null

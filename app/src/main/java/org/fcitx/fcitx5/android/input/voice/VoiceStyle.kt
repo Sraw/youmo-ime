@@ -38,7 +38,7 @@ object VoiceStyle {
      * blur ([VoiceGlass]), the microphone's bubble and bars. Not set: the keyboard's colour a little see-through
      * (PanelLooks.MASK_ALPHA: shapes and colours seen, the text clear, user 2026-11-07), the glass of before.
      */
-    fun look(context: Context, theme: Theme): PanelLooks.Voice = ScenePanels.voice(context, theme)
+    fun panel(context: Context, theme: Theme): PanelLooks.Voice = ScenePanels.voice(context, theme)
 
     /** The mask's glass of [look] on [context]'s screen: its blur dp as px ([VoiceGlass.Blur.of]), not set the app's of before. */
     fun glass(context: Context, look: PanelLooks.Voice): VoiceGlass {
