@@ -51,6 +51,9 @@ class ExpandTest {
         assertEquals(setOf("im=pinyin"), env.scenes.filter { '=' in it }.toSet(), "a text field and no board: the input method alone")
         assertEquals(setOf("im=shuangpin", "field=url"), env.copy(input = Input(ime = "shuangpin", field = "url")).scenes.filter { '=' in it }.toSet())
         assertEquals(emptySet(), env.copy(input = Input(ime = null, field = null)).scenes.filter { '=' in it }.toSet())
+        // the input method's own word of it, where the app knows it: the board's Input left to its when=
+        val told = env.copy(input = Input(ime = "pinyin", field = "url"), typed = setOf("im=english", "field=number"))
+        assertEquals(setOf("im=english", "field=number"), told.scenes.filter { '=' in it }.toSet())
         for (field in listOf("password", "number")) {
             for (row in 0..3) assertEquals(ids(env, row), ids(env.copy(input = env.input.copy(field = field)), row), "$field, row $row")
         }

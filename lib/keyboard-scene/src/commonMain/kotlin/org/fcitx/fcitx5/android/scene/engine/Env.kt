@@ -49,6 +49,12 @@ data class Env(
     val states: Map<String, Set<KeyState>> = emptyMap(),
     /** The board's id, its layout's (`nine`): the theme's `@keyboard=` scene. Null: none (a popup's, every board's). */
     val board: String? = null,
+    /**
+     * What is typed as the input method knows it, as the theme's scenes (`im=wubi`, `field=password`):
+     * in place of what [input] says of it, which is what the board's `when=` asks (a qwerty board's
+     * `ime=pinyin` under English too). Null: as [input] says (a test, a settings page's keys).
+     */
+    val typed: Set<String>? = null,
 ) {
     /** The keyboard's width in dp as Android's configuration has it (a whole number, rounded down). */
     val widthDp: Int get() = (width / density + DP_EPSILON).toInt()
@@ -72,9 +78,13 @@ data class Env(
             if (dark) add("dark")
             if (flat) add("flat")
             // what is typed: the input method (a table also by its name), the field, the board
-            input.ime?.let { add("im=$it") }
-            input.table?.let { add("im=$it") }
-            input.field?.takeIf { it in Selector.FIELDS }?.let { add("field=$it") }
+            if (typed != null) {
+                addAll(typed)
+            } else {
+                input.ime?.let { add("im=$it") }
+                input.table?.let { add("im=$it") }
+                input.field?.takeIf { it in Selector.FIELDS }?.let { add("field=$it") }
+            }
             board?.let { add("keyboard=$it") }
         }
 
