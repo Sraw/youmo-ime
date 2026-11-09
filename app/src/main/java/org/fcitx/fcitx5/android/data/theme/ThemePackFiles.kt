@@ -28,6 +28,8 @@ import org.fcitx.fcitx5.android.scene.theme.SystemColors
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.scene.theme.Value
 import org.fcitx.fcitx5.android.utils.appContext
+import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.utils.errorRuntime
 import org.fcitx.fcitx5.android.utils.isPlainFileName
 import timber.log.Timber
@@ -309,8 +311,8 @@ object ThemePackFiles {
         internal val from: File,
         internal val files: Set<String>,
         val layouts: List<String>,
-        /** How many actions its layouts have that type text of their own (`commit:`, [ThemePackLayouts.commits]). */
-        val commits: Int,
+        /** Its layouts as they would be drawn: the keyboards replaced, the files not used, their `commit:` actions. */
+        val layoutReport: ThemePackLayouts.Report,
         /** Each a line to show: what is ignored by this version, keys hard to read. */
         val warnings: List<String>,
         /** Its preview image, a file checked to be one. */
@@ -348,8 +350,8 @@ object ThemePackFiles {
         checkFiles(from, files, checks)
         val layouts = checkLayouts(File(from, LAYOUTS), checks)
         val warnings = read.warnings.map { it.toString() } + listOfNotNull(checks.lowContrast(ThemePackCheck.lowContrast(theme)))
-        val commits = layouts.sumOf { ThemePackLayouts.commits(File(from, "$LAYOUTS/$it").readText()) }
-        return Staged(theme, source, from, files.all, layouts, commits, warnings, files.preview?.let { File(from, it) })
+        val report = ThemePackLayouts.report(File(from, LAYOUTS), layouts, { SceneLayouts.builtIn(appContext, it) }, BuiltInLayouts(appContext)::text)
+        return Staged(theme, source, from, files.all, layouts, report, warnings, files.preview?.let { File(from, it) })
     }
 
     private fun readChecked(source: String, checks: Checks): Parsed.Ok<SceneTheme> =

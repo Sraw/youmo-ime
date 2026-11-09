@@ -33,9 +33,9 @@ interface LayoutSource {
 
     /**
      * Why [layout], read as [id] from this source, is not taken (the app's drawn instead, logged once); null where it
-     * is: a theme pack's held to the app's id and family ([ThemePackLayouts]).
+     * is: a theme pack's held to what the app's of [id] must have to be typed on ([ThemePackLayouts.judge]).
      */
-    fun refuses(id: String, layout: Layout): String? = null
+    fun refuses(id: String, layout: Layout, fragments: Map<String, Fragment>): String? = null
 }
 
 /**
@@ -96,6 +96,9 @@ object SceneLayouts {
     // by the source's key and the layout's id
     private val read = HashMap<Pair<String, String>, Read>()
 
+    // the key of the source [of] read from last
+    private var current: String? = null
+
     /**
      * Where the layouts come from first: the theme pack in use's, else the app's ([ThemePackLayouts.current]: asked each
      * time, so a theme changed is followed, the input view made again); a test's own. Set, those read are read again.
@@ -120,6 +123,11 @@ object SceneLayouts {
         val app = context.applicationContext ?: context
         val first = source(app)
         val back = fallback(app)
+        // a pack left (re-imported, another in use): what was read of it dropped
+        if (first.key != current) {
+            current = first.key
+            read.keys.removeAll { it.first != first.key && it.first != back.key }
+        }
         return readFrom(first, id, back) ?: readFrom(back, id, back)
     }
 
@@ -147,14 +155,17 @@ object SceneLayouts {
             is Parsed.Ok -> l.value
             is Parsed.Failed -> return null.also { Timber.e("scene layout %s: %s", id, l.problems) }
         }
-        source.refuses(id, layout)?.let { why -> return null.also { Timber.e("scene layout %s of %s not taken: %s", id, source.key, why) } }
         val fragments = HashMap<String, Fragment>()
         for (src in layout.parts.filterIsInstance<Include>().map { it.src }.distinct()) {
-            val t = runCatching { source.text(src) ?: back.text(src).takeIf { back !== source } }.getOrNull() ?: return null.also { Timber.e("scene layout %s: no fragment %s", id, src) }
+            val t = runCatching { source.text(src) ?: back.takeIf { it.key != source.key }?.text(src) }.getOrNull()
+                ?: return null.also { Timber.e("scene layout %s: no fragment %s", id, src) }
             when (val f = LayoutReader.fragment(t)) {
                 is Parsed.Ok -> fragments[src] = f.value
                 is Parsed.Failed -> return null.also { Timber.e("scene layout %s: fragment %s: %s", id, src, f.problems) }
             }
+        }
+        source.refuses(id, layout, fragments)?.let { why ->
+            return null.also { Timber.e("scene layout %s of %s not taken: %s", id, source.key, why) }
         }
         return SceneLayout(id, layout, fragments)
     }

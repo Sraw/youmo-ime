@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings.im
 
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardLabels
 import android.content.Context
 import android.widget.ArrayAdapter
 import android.widget.ListView
@@ -27,7 +28,6 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
-import org.fcitx.fcitx5.android.data.theme.ThemePackLayouts
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
@@ -725,7 +725,7 @@ object InputMethodSettings {
             }
         }
 
-    // a keyboard's name, with the theme's layout's it is drawn with (ThemePackLayouts.label); any other choice's own
+    // a keyboard's name, with the theme's layout's it is drawn with (KeyboardLabels.label); any other choice's own
     private fun keyboardLabel(context: Context, choice: ManagedPreferenceEnum): String {
         val own = context.getString(choice.stringRes)
         val (im, keyboard) = when (choice) {
@@ -734,7 +734,7 @@ object InputMethodSettings {
             is EnglishKeyboard -> InputMethodCatalog.ENGLISH to choice.keyboard
             else -> return own
         }
-        return ThemePackLayouts.label(context, im, keyboard, own)
+        return KeyboardLabels.label(context, im, keyboard, own)
     }
 
     private fun appToggle(context: Context, item: AppToggle, page: PreferenceGroup) = SwitchPreferenceCompat(context).apply {

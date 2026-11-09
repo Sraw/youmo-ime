@@ -540,10 +540,13 @@ first, and where it has none or it does not read, one step back to the app's own
 theme 4.0 pack is in use, `ThemePackLayouts` (key `theme:<file>@<theme.xml's time>`, so a pack imported again is read
 again; a theme change makes the input view anew) reads its `layouts/<id>.xml`, only for an id the app has
 (`BuiltInLayouts.has`: a pack replaces keyboards, never adds one), and refuses (`LayoutSource.refuses`, logged once,
-the app's drawn) one whose `id` or `family` is not the app's of that id; a fragment it includes that the pack has not
-is the app's. Block by block: a bad `k14.xml` falls back alone (`ThemePackLayoutsTest`). The keyboard choices
-(the input method pages, ⋯'s 键盘) name the theme's layout a keyboard is drawn with (`keyboard_themed`,
-`18 键（主题：17 键）`; not where T9b draws the app's instead, 双拼 on own groups); ids stay as the theme format names the boards (`k14/r1c1`,
+the app's drawn) one that is not as typable as the app's of that id (`ThemePackLayouts.judge`: its `id` and `family`,
+and every slot kind, function key of role backspace/enter/lang and digit key the app's has, its includes in place); a
+fragment it includes that the pack has not is the app's, a fragment of the pack's is read only by the pack's own
+keyboards. Block by block: a bad `k14.xml` falls back alone (`ThemePackLayoutsTest`). `SceneLayouts.of` drops what was
+read of other sources once the source's key changes. The keyboard choices (the input method pages, ⋯'s 键盘) name
+the theme's layout a keyboard is drawn with (`KeyboardLabels`, `keyboard_themed`, `18 键（主题：17 键）`, the name cut
+at 24 characters; not where T9b draws the app's instead, 双拼 on own groups, which it does not log for them); ids stay as the theme format names the boards (`k14/r1c1`,
 `ThemeKeyNamesTest.aSceneLayoutsKeysAreItsBoardsNames`). `SceneBoard` makes the canvas view and its scenes
 (the U8 fallback, the kept scenes, the marks' settings) for any keyboard; the keyboard gives its state as
 `sceneEnv` (its `Input`, texts, marks; `GroupedKeyboard` through `TextBoardState`) and calls
@@ -1282,8 +1285,11 @@ the packs listed) is replaced, as it could not be deleted otherwise. A new pack 
 16 layouts, `.xml`, 64 KB each. Warnings (not refusals): what the reader skips (a later version's names), and
 key text under 3:1 on its keys in a version (`ThemePackCheck`'s contrast). The confirmation
 (`ThemePackDialogs`) shows the preview, author, version, license, the format, that it replaces a pack or a
-3.0 theme of the name, the layouts it replaces with the count of their `commit:` actions
-(`ThemePackLayouts.commits`, comments left out) and those it has of no app id (never read), and the warnings; 导入 places it, 取消 (or back) deletes what was unpacked.
+3.0 theme of the name, the keyboards it replaces as they would be drawn (`ThemePackLayouts.report`: read by the
+engine's reader and judged as above) with the count of their `commit:` actions (from the parsed layouts and the
+pack's fragments they include, each once: keys', variants', defaults', popup items' `send`, menu items' `do`; a
+character reference counts as what it reads as), the files never used (not an app id, unreadable, refused, a fragment
+no keyboard used includes), and the warnings; 导入 places it, 取消 (or back) deletes what was unpacked.
 
 Placing (`ThemePackFiles.place`) copies it into `v4/.saving/new-<uuid>/`, each file synced, renames an old
 pack of the name aside into `v4/.saving/old-<uuid>/<name>`, renames the new one into place, syncs `v4/`, and

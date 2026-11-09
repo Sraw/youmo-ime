@@ -133,8 +133,8 @@
     <string name="theme_pack_import_title">导入主题 %1$s？</string>
     <string name="theme_pack_import">导入</string>
     <string name="theme_pack_replaces">会替换你已有的同名主题。</string>
-    <string name="theme_pack_layouts">此主题包含自定义布局：%1$s（其中 %2$d 个按键直接输入布局里写的文字）。</string>
-    <string name="theme_pack_layouts_unused">不会使用的布局（主题只能替换已有的键盘）：%1$s</string>
+    <string name="theme_pack_layouts">此主题包含自定义布局：%1$s（其中 %2$d 个动作直接输入布局里写的文字）。</string>
+    <string name="theme_pack_layouts_unused">不会使用的布局（读不出、缺键盘必需的键，或不是已有的键盘）：%1$s</string>
     <string name="keyboard_themed">%1$s（主题：%2$s）</string>
     <string name="theme_pack_warnings">注意：</string>
     <string name="theme_info">信息</string>

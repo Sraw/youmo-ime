@@ -631,7 +631,7 @@ SCENE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "li
 
 def push_layouts_pack(d):
     """uat-layouts.theme in 下载: Nord as a pack of its own with a 26 keys whose q types 你好, an 18 keys of
-    another name and a k14 that does not read; returns how many commit: actions its layouts have"""
+    another name and a k14 that does not read"""
     import zipfile
 
     def read(*p):
@@ -650,20 +650,19 @@ def push_layouts_pack(d):
     d.adb("push", p, "/sdcard/Download/uat-layouts.theme")
     d.sh("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/uat-layouts.theme")
     time.sleep(1)
-    strip = re.compile(r"<!--.*?-->", re.S)
-    return sum(len(re.findall(r"=\s*[\"']commit:", strip.sub("", t))) for t in layouts.values())
 
 
-@case("ST-68", base="B0-设置", mutates=True)
+@case("ST-72", base="B0-设置", mutates=True)
 def st68(d):
     from uat import gear
     appearance_tab(d, "大小与样式")
     d.switch("跟随系统夜间模式", False)
-    commits = push_layouts_pack(d)
+    push_layouts_pack(d)
     d.step("导入")
     import_theme(d, "uat-layouts")
-    told = f"此主题包含自定义布局：k14, k18, qwerty（其中 {commits} 个按键直接输入布局里写的文字）"
-    check(d.wait_text(told, timeout=8, where="all", contains=True), f"确认框没写「{told}」：{d.screen().texts('all')[:10]}")
+    # the app's 26 keys' four (/ @ . .com) and q's; k14 does not read
+    for told in ("此主题包含自定义布局：k18, qwerty（其中 5 个动作直接输入布局里写的文字）", "缺键盘必需的键，或不是已有的键盘）：k14"):
+        check(d.wait_text(told, timeout=8, where="all", contains=True), f"确认框没写「{told}」：{d.screen().texts('all')[:10]}")
     d.tap_text("导入", where="all", scroll=False, after=3.0)
     appearance_tab(d, "主题")
     item = custom_item(d)
@@ -688,4 +687,4 @@ def st68(d):
         n = len(d.keys(refresh=True))
         check(n > 10, f"{option} 没弹出（{n} 个键）")
         out.append(f"{option} {n} 键")
-    return f"提示 {commits} 个 commit:；q 打出你好；" + "、".join(out)
+    return "提示 5 个 commit:、k14 不用；q 打出你好；" + "、".join(out)
