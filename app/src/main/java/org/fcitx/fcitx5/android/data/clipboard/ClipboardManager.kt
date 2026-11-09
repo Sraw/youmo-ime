@@ -129,9 +129,13 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
 
     var lastEntry: ClipboardEntry? = null
 
+    // the listeners told before the entry is published: whoever sees [lastEntry] (this runs on Default, not main)
+    // knows they have been, so what they posted to the main thread is queued by then (a test's copy waits for
+    // lastEntry; told after, the bar's clipboard suggestion could land after the test's next tap, taking the
+    // toolbar it had just expanded: LandscapeUatTest.clipboardAtTheSide)
     private fun updateLastEntry(entry: ClipboardEntry) {
-        lastEntry = entry
         onUpdateListeners.forEach { it.onUpdate(entry) }
+        lastEntry = entry
     }
 
     fun init(context: Context) {
