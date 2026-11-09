@@ -281,10 +281,15 @@ object ThemeReader {
         for (v in values.values) {
             colorsOf(v).flatMap { it.refs() }.filter { it !in colors }.forEach { a.problem("@$it is no colour") }
         }
-        (values["font"] as? Value.Word)?.word?.takeIf { it != "system" && it !in fonts }?.let { a.problem("font=\"$it\" is no <font>") }
+        for (font in FONT_PROPERTIES) {
+            (values[font] as? Value.Word)?.word?.takeIf { it != "system" && it !in fonts }?.let { a.problem("$font=\"$it\" is no <font>") }
+        }
         if (values.isEmpty() && reserved == 0) a.problem("a style that sets nothing")
         return selectors?.let { Style(it, values, order, el.line) }
     }
+
+    // the properties naming a font: a <font>'s, or system
+    private val FONT_PROPERTIES = listOf("font", "font-han", "font-latin")
 
     // a property of today's value a later stage reads ([Values.reservedValue]): ignored
     private val RESERVED_VALUE = Value.Flag(false)

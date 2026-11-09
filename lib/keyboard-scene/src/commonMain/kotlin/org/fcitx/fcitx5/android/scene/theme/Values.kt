@@ -38,8 +38,20 @@ data class Border(val width: Double, val color: ColorExpr?) {
     }
 }
 
+/**
+ * What `space-content=` or a `return-icon-<action>=` puts on its key instead of what the layout gives:
+ * [ImeName] the layout's own (the space's input method name), [None] nothing, a [Text], an [Icon].
+ */
+sealed interface Shown {
+    data object ImeName : Shown
+    data object None : Shown
+    data class Text(val text: String) : Shown
+    data class Icon(val name: String) : Shown
+}
+
 /** A style property's value as read; which kind each property takes is [Values.read]'s table. */
 sealed interface Value {
+    data class OfShown(val shown: Shown) : Value
     data class OfFill(val fill: Fill) : Value
     data class OfColor(val color: ColorExpr) : Value
     data class OfRadius(val radius: Radius) : Value
@@ -71,19 +83,28 @@ object Values {
     private const val MAX_BLUR_DP = 25
     private const val MAX_PERCENT = 100.0
     private const val FOUR = 4
+    private const val MIN_SPACING_EM = -0.1
+    private const val MAX_SPACING_EM = 0.5
+    private val EM = Regex("-?[0-9](\\.[0-9]{1,3})?em")
+    private val ICON_SHOWN = Regex("icon\\(([a-z0-9]+(-[a-z0-9]+)*)\\)")
+    private val TEXT_SHOWN = Regex("text\\(([^()]{1,32})\\)")
+    private const val RETURN_ICON = "return-icon-"
+
+    /** Return's actions a theme may give an icon or a text of its own (`return-icon-<action>`). */
+    val RETURN_ACTIONS = listOf("send", "search", "go", "next", "done", "newline")
 
     /** The properties a `<style>` may have. */
     val PROPERTIES = listOf(
         "fill", "overlay", "shape", "radius", "border", "shadow", "inset", "color", "font", "weight", "scale", "size",
         "hidden", "icon-color", "press", "padding",
-    )
+        // T4a: the text on a key
+        "align", "letter-spacing", "stroke", "text-shadow", "font-han", "font-latin", "space-content",
+    ) + RETURN_ACTIONS.map { "$RETURN_ICON$it" }
 
     private const val LEN = "(-?[0-9]+(\\.[0-9]+)?dp|0)"
     private const val PERCENT_FORM = "[0-9]+(\\.[0-9]+)?%"
     private const val LEN_OR_PERCENT = "($LEN|$PERCENT_FORM)( ($LEN|$PERCENT_FORM))?"
     private const val MS = "[0-9]{1,3}ms"
-    private const val NAME = "[a-zA-Z][a-zA-Z0-9_-]{0,31}"
-    private const val ICON_OR_TEXT = "icon\\([a-z0-9]+(-[a-z0-9]+)*\\)|text\\([^()]{1,32}\\)"
 
     // ASCII white space spelt out: `\s` is more on JS than on the JVM, and a file must read the same on both
     private const val FILE = "[^,()/\\\\:*?\"<>| \\t\\n\\r\\f\\x0B]{1,128}"
@@ -112,26 +133,12 @@ object Values {
     private val SHADOW = lengthsThenColor(3, none = true)
 
     /**
-     * Style properties of a later stage of 0.6.0 (060-render-p3: T4a–T7b, A1–A3, the sounds' `sticker`),
+     * Style properties of a later stage of 0.6.0 (060-render-p3: T4b–T7b, A1–A3, the sounds' `sticker`),
      * each with its value's form: read where it is of the form, ignored with a warning (a theme made
      * for a newer app still imports); a value not of the form, or naming a colour not there, is a
      * problem like any. A stage that makes one work moves it to [PROPERTIES].
      */
     val RESERVED: Map<String, Reserved> = mapOf(
-        // T4a: the text on a key
-        "align" to form("center|top-left|top-center"),
-        "letter-spacing" to form("-?[0-9](\\.[0-9]{1,3})?em"),
-        "stroke" to lengthsThenColor(1, none = false),
-        "text-shadow" to SHADOW,
-        "font-han" to form(NAME),
-        "font-latin" to form(NAME),
-        "space-content" to form("ime-name|none|$ICON_OR_TEXT"),
-        "return-icon-send" to form(ICON_OR_TEXT),
-        "return-icon-search" to form(ICON_OR_TEXT),
-        "return-icon-go" to form(ICON_OR_TEXT),
-        "return-icon-next" to form(ICON_OR_TEXT),
-        "return-icon-done" to form(ICON_OR_TEXT),
-        "return-icon-newline" to form(ICON_OR_TEXT),
         // T4b: shapes, the bubble
         "inner-shadow" to SHADOW,
         "depth" to form(LEN),
@@ -194,7 +201,40 @@ object Values {
             else -> null
         }
         "press" -> raw.takeIf { it in listOf("tint", "ripple", "face") }?.let(Value::Word)
-        else -> null
+        else -> textOnAKey(property, raw)
+    }
+
+    // T4a's
+    private fun textOnAKey(property: String, raw: String): Value? = when (property) {
+        "align" -> raw.takeIf { it in listOf(CENTER, TOP_LEFT, TOP_CENTER) }?.let(Value::Word)
+        "letter-spacing" -> raw.takeIf(EM::matches)?.removeSuffix("em")?.toDouble()
+            ?.takeIf { it in MIN_SPACING_EM..MAX_SPACING_EM }?.let(Value::Number)
+        "stroke" -> stroke(raw)?.let(Value::OfBorder)
+        "text-shadow" -> shadow(raw)?.let(Value::OfShadow)
+        "font-han", "font-latin" -> raw.takeIf(FONT::matches)?.let(Value::Word)
+        "space-content" -> when (raw) {
+            "ime-name" -> Shown.ImeName
+            "none" -> Shown.None
+            else -> shown(raw)
+        }?.let(Value::OfShown)
+        else -> if (property.removePrefix(RETURN_ICON) in RETURN_ACTIONS && property.startsWith(RETURN_ICON)) shown(raw)?.let(Value::OfShown) else null
+    }
+
+    /** `align=`: the key's glyph in the middle of its face (as ever), at its top left corner, at its top. */
+    const val CENTER = "center"
+    const val TOP_LEFT = "top-left"
+    const val TOP_CENTER = "top-center"
+
+    // `icon(name)` or `text(…)`
+    private fun shown(raw: String): Shown? =
+        ICON_SHOWN.matchEntire(raw)?.let { Shown.Icon(it.groupValues[1]) } ?: TEXT_SHOWN.matchEntire(raw)?.let { Shown.Text(it.groupValues[1]) }
+
+    /** `stroke=`: its width, 0–3 dp as a border's (the outline drawn so far outside the glyphs), and its colour. */
+    fun stroke(raw: String): Border? {
+        val p = raw.split(' ', limit = 2)
+        if (p.size != 2) return null
+        val width = dp(p[0], MAX_BORDER_DP) ?: return null
+        return Border(width, ColorExpr.parse(p[1]) ?: return null)
     }
 
     /** `7dp` (or `0`) as dp, within ±[max]; negative only where [signed]. */
