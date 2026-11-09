@@ -388,7 +388,7 @@ class ThemeTest {
             assertTrue(warnings(withStyle("<style select=\"preview\" $attr/>")).single().contains("is not supported"), attr)
         }
         // of the wrong form, or misspelt: refused as ever
-        assertTrue(problems(withStyle("<style select=\"key\" align=\"middle\"/>")).first().contains("align"))
+        assertTrue(problems(withStyle("<style select=\"key\" color=\"#000000\" align=\"middle\"/>")).single().contains("align"))
         assertTrue(problems(withStyle("<style select=\"key\" transition=\"fast\"/>")).isNotEmpty())
         assertTrue(problems(withStyle("<style select=\"key\" alignn=\"center\"/>")).any { it.contains("unknown attribute alignn=") })
         assertTrue(problems(withStyle("<style select=\"key\" shape=\"blob\"/>")).isNotEmpty())
@@ -424,7 +424,7 @@ class ThemeTest {
         assertEquals(Value.OfShown(Shown.ImeName), read("space-content=\"ime-name\"")["space-content"])
         assertEquals(Value.OfShown(Shown.None), read("space-content=\"none\"")["space-content"])
         assertEquals(Value.OfShown(Shown.Text("空格")), read("space-content=\"text(空格)\"")["space-content"])
-        assertEquals(Value.OfShown(Shown.Icon("keyboard-space")), read("space-content=\"icon(keyboard-space)\"")["space-content"])
+        assertEquals(Value.OfShown(Shown.Icon("space")), read("space-content=\"icon(space)\"")["space-content"])
         for (action in Values.RETURN_ACTIONS) {
             assertEquals(Value.OfShown(Shown.Text("发送")), read("return-icon-$action=\"text(发送)\"")["return-icon-$action"])
             assertEquals(Value.OfShown(Shown.Icon("send")), read("return-icon-$action=\"icon(send)\"")["return-icon-$action"])
@@ -454,6 +454,26 @@ class ThemeTest {
         assertTrue(problems(withStyle("<style select=\"key\" return-icon-previous=\"icon(send)\"/>")).any { it.contains("unknown attribute return-icon-previous=") })
         assertTrue(problems(withStyle("<style select=\"key\" font-han=\"fancy\"/>")).single().contains("font-han=\"fancy\" is no <font>"))
         assertTrue(problems(withStyle("<style select=\"key\" font-latin=\"fancy\"/>")).single().contains("font-latin=\"fancy\" is no <font>"))
+        // -0em as 0: one value
+        assertEquals(Value.Number(0.0), read("letter-spacing=\"-0em\"")["letter-spacing"])
+        // an icon the app has none of: refused, by its name
+        for (name in Icons.ALL) assertEquals(Value.OfShown(Shown.Icon(name)), read("space-content=\"icon($name)\"")["space-content"])
+        assertEquals(
+            "<style>: return-icon-send=\"icon(rocket)\" is no icon of the app's",
+            problems(withStyle("<style select=\"key\" return-icon-send=\"icon(rocket)\"/>")).single(),
+        )
+        // on a part they are not read from: a warning, the theme read
+        val elsewhere = warnings(withStyle("<style select=\"key mark, */enter label\" align=\"top-left\" space-content=\"none\" return-icon-go=\"text(Go)\"/>"))
+        assertEquals(
+            listOf(
+                "align= on a key's mark does nothing: it is read from its label",
+                "space-content= on a key's mark does nothing: it is read from its label",
+                "return-icon-go= on a key's mark does nothing: it is read from its icon",
+                "return-icon-go= on a key's label does nothing: it is read from its icon",
+            ),
+            elsewhere,
+        )
+        assertTrue(warnings(withStyle("<style select=\"key label\" align=\"top-left\"/><style select=\"*/enter icon\" return-icon-go=\"text(Go)\"/>")).isEmpty())
     }
 
     @Test

@@ -88,7 +88,7 @@ object Values {
     private val EM = Regex("-?[0-9](\\.[0-9]{1,3})?em")
     private val ICON_SHOWN = Regex("icon\\(([a-z0-9]+(-[a-z0-9]+)*)\\)")
     private val TEXT_SHOWN = Regex("text\\(([^()]{1,32})\\)")
-    private const val RETURN_ICON = "return-icon-"
+    const val RETURN_ICON = "return-icon-"
 
     /** Return's actions a theme may give an icon or a text of its own (`return-icon-<action>`). */
     val RETURN_ACTIONS = listOf("send", "search", "go", "next", "done", "newline")
@@ -208,7 +208,7 @@ object Values {
     private fun textOnAKey(property: String, raw: String): Value? = when (property) {
         "align" -> raw.takeIf { it in listOf(CENTER, TOP_LEFT, TOP_CENTER) }?.let(Value::Word)
         "letter-spacing" -> raw.takeIf(EM::matches)?.removeSuffix("em")?.toDouble()
-            ?.takeIf { it in MIN_SPACING_EM..MAX_SPACING_EM }?.let(Value::Number)
+            ?.takeIf { it in MIN_SPACING_EM..MAX_SPACING_EM }?.let { Value.Number(it + 0.0) } // -0em as 0
         "stroke" -> stroke(raw)?.let(Value::OfBorder)
         "text-shadow" -> shadow(raw)?.let(Value::OfShadow)
         "font-han", "font-latin" -> raw.takeIf(FONT::matches)?.let(Value::Word)
