@@ -47,9 +47,9 @@ class PopupScenes(
     @VisibleForTesting measuring: (TextMeasurer) -> TextMeasurer = { it },
 ) {
     private val look = ThemeManager.shownLook(theme)
-    private val fonts = SceneFonts(look)
+    private val fonts = SceneFonts.of(theme, look)
     private val measurer = measuring(AndroidTextMeasurer(fonts))
-    private val sceneTheme = SceneThemes.of(look, theme.name, theme.isDark)
+    private val sceneTheme = SceneThemes.of(theme, look)
 
     /** Whether the theme converted: its popups drawn as scenes. */
     val ready: Boolean get() = sceneTheme != null

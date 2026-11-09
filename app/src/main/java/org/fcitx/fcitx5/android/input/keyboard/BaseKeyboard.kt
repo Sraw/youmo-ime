@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.data.theme.ThemePackFiles
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
@@ -87,6 +88,8 @@ abstract class BaseKeyboard(
     // drawn as their kinds till they are in (ThemeAssets)
     protected val keyImages: BoardImages by lazy {
         val look = ThemeManager.shownLook(theme)
+        // a pack's: every image its styles name (060-render-p3 T8a; a few, ThemeAssetLimits holds each)
+        (theme as? Theme.Pack)?.let { return@lazy ThemeAssets.boardImages(look, themeBoard, ThemePackFiles.images(it.drawn)) }
         // no board name (the number row, a search's keys): the kinds' and the roles' images still
         val board = themeBoard
         // its keys' and the places it draws apart from them (the nine keys' column)

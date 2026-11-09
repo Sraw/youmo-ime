@@ -37,7 +37,7 @@ object SceneWindow {
 
     // [theme]'s window, of the theme its keys are drawn in (a test's own: SceneThemes.source); null: its look made no theme
     private fun looks(theme: Theme): WindowLooks? =
-        SceneThemes.of(ThemeManager.shownLook(theme), theme.name, theme.isDark)?.let { WindowLooks(SceneThemes.cascades(it)) }
+        SceneThemes.of(theme, ThemeManager.shownLook(theme))?.let { WindowLooks(SceneThemes.cascades(it)) }
 
     /** Where the board is placed as the theme's scenes: [oneHanded] at a side, the letters [split]. */
     fun placement(oneHanded: Boolean, split: Boolean): Set<String> = setOfNotNull(ONE_HANDED.takeIf { oneHanded }, SPLIT.takeIf { split })

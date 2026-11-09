@@ -32,7 +32,7 @@ object KeyboardArea {
     @VisibleForTesting
     internal var themeSizes: () -> ThemeSizes = {
         val theme = ThemeManager.activeTheme
-        SceneThemes.of(ThemeManager.shownLook(theme), theme.name, theme.isDark)?.keyboardSizes ?: ThemeSizes()
+        SceneThemes.of(theme, ThemeManager.shownLook(theme))?.keyboardSizes ?: ThemeSizes()
     }
 
     /** The three settings, each following the theme or not, and the theme's sizes. */
