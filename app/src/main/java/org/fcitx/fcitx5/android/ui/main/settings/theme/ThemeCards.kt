@@ -7,7 +7,7 @@ package org.fcitx.fcitx5.android.ui.main.settings.theme
 import org.fcitx.fcitx5.android.data.theme.Theme
 
 /**
- * The theme lists' cards (060-render-p3 T3): a built-in theme of two versions (`pixel#light`,
+ * The theme lists' cards (060-render-p3 T3): a built-in theme or a pack (T8a) of two versions (`pixel#light`,
  * `pixel#dark`) is one card showing one of them, its 浅/深 switching to the other; any other theme a
  * card of its own. [shown] is each card's theme as listed, in the order of the themes it is made of.
  */
@@ -19,13 +19,15 @@ class ThemeCards(themes: List<Theme>, dark: Boolean = false) {
     val shown: MutableList<Theme>
 
     init {
-        val pairs = themes.filterIsInstance<Theme.Builtin>().groupBy { it.file }.values.filter { it.size == 2 }
+        // a built-in file's or a pack's (Theme.Versioned): one of each name, never both (an import refuses a built-in's)
+        val versioned = themes.filter { it is Theme.Versioned }
+        val pairs = versioned.groupBy { it::class to (it as Theme.Versioned).file }.values.filter { it.size == 2 }
         others = pairs.flatMap { (a, b) -> listOf(a.name to b, b.name to a) }.toMap()
         val seen = HashSet<String>()
         // a pair's [dark] version shown at first (the light one in the list, the slot's in a slot's)
         shown = themes.mapNotNull { t ->
-            if (t !is Theme.Builtin || t.name !in others) return@mapNotNull t
-            if (!seen.add(t.file)) null else if (t.isDark == dark) t else others.getValue(t.name)
+            if (t !is Theme.Versioned || t.name !in others) return@mapNotNull t
+            if (!seen.add(t::class.simpleName + "/" + t.file)) null else if (t.isDark == dark) t else others.getValue(t.name)
         }.toMutableList()
     }
 
