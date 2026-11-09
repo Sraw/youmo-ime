@@ -31,11 +31,13 @@ import kotlin.math.min
  * @param split where the keys set apart start: drawn in rows of their own above the others; none
  * past the last key
  * @param asIs every key committed as it is, never typed as a key ([keyAction])
- * @param inRow the keys before [split] in one row, in their order, the one at [inRow] under the
- * finger first (KeyDef.Popup.Keyboard.Explicit.inRow); -1, the first under it and the others round it
+ * @param inRow the keys before [split] in one row, in their order, the one at [inRow] in focus first,
+ * the row moved whole to the column the room either side picks (KeyDef.Popup.Keyboard.Explicit.inRow); -1, the first under it and the others round it
  * @param onFocusMoved told, with the popup's view, each time another key comes into focus: a buzz,
  * as the finger is not over the key it picks ([PopupFocus])
  * @param scenes the engine's, the keys drawn as its scene (060-render-p2 S2), sized by its rules ([PopupKeys])
+ * @param faceInset how far [triggerBounds] (the key's face) is in from the key's cell across: the
+ * finger's x, given [onChangeFocus], is from the cell (the theme's inset, 3dp by default)
  */
 class PopupKeyboardUi(
     override val ctx: Context,
@@ -53,6 +55,7 @@ class PopupKeyboardUi(
     inRow: Int = -1,
     private val onFocusMoved: (View) -> Unit = {},
     private val scenes: PopupScenes,
+    private val faceInset: Int = 0,
 ) : PopupContainerUi(ctx, theme, outerBounds, triggerBounds, onDismissSelf) {
 
     // the engine's scene of the keys: made again as the focus moves
@@ -71,6 +74,9 @@ class PopupKeyboardUi(
     // the row and column in focus at first; the column read by tests, to move from it
     private val focusRow: Int
     internal val focusColumn: Int
+
+    // the column the in-order row (inRow) starts at: moved whole so its key at inRow is in focus
+    private val rowStart: Int
 
     // the scene's keys' size; null, the engine could not say ([unmade])
     private val sceneKeys: PopupKeys?
@@ -98,7 +104,11 @@ class PopupKeyboardUi(
         keyWidth = sceneKeys?.width?.toInt() ?: room?.let { min(minKeyWidth, it.toInt() / columnCount) } ?: minKeyWidth
 
         focusRow = 0
-        focusColumn = if (inRow >= 0) inRow else calcInitialFocusedColumn(columnCount, keyWidth, outerBounds, triggerBounds)
+        // by the room either side, as for any popup: inRow's own place left the row's start under a
+        // key at the screen's right, the popup moved in and the finger right of every key but none
+        val wanted = calcInitialFocusedColumn(columnCount, keyWidth, outerBounds, triggerBounds)
+        rowStart = if (inRow >= 0) (wanted - inRow).coerceIn(0, columnCount - groups[0].count()) else 0
+        focusColumn = if (inRow >= 0) rowStart + inRow else wanted
     }
 
     /**
@@ -153,13 +163,15 @@ class PopupKeyboardUi(
      * in which `0` indicates default focus
      */
     private val keyOrders = groups.flatMapIndexed { g, group ->
-        // the row in order as it is; the others round the column in focus
-        val order = if (g == 0 && inRow >= 0) IntArray(columnCount) { it } else columnOrder
+        // the row in order as it is, from rowStart, the slots either side empty; the others round
+        // the column in focus
+        val inOrder = g == 0 && inRow >= 0
+        val order = if (inOrder) IntArray(columnCount) { (it - rowStart).takeIf { at -> at in 0 until group.count() } ?: -1 } else columnOrder
         List(groupRows[g]) { r ->
             // a slot past its group's keys is empty: -1
             IntArray(columnCount) { col ->
                 val index = group.first + r * columnCount + order[col]
-                if (index <= group.last) index else -1
+                if (order[col] >= 0 && index <= group.last) index else -1
             }
         }
     }.toTypedArray()
@@ -188,6 +200,9 @@ class PopupKeyboardUi(
         return true
     }
 
+    private val inOrder = inRow >= 0
+    private val edgeMargin = EDGE_MARGIN * ctx.resources.displayMetrics.density
+
     // by how far the finger moves from where it was when the popup opened, not where it is
     private val focus = PopupFocus(
         rows = keyOrders.toList(),
@@ -198,6 +213,13 @@ class PopupKeyboardUi(
         cancelBelow = triggerBounds.height().toFloat(),
         // the key's bottom edge, in onChangeFocus's coordinates (the popup's, offsetY up)
         cancelAt = (triggerBounds.height() - offsetY).toFloat(),
+        // the screen's edges, in onChangeFocus's coordinates (the popup's, offsetX across, from the
+        // key's cell: the trigger its face, faceInset in it), EDGE_MARGIN in: the last key picked a
+        // little short of the edge. A row in order only: the full keyboard's and the pickers' popups
+        // as before
+        leftEdge = if (outerBounds.isEmpty || !inOrder) Float.NEGATIVE_INFINITY else outerBounds.left - triggerBounds.left + faceInset - offsetX + edgeMargin,
+        rightEdge = if (outerBounds.isEmpty || !inOrder) Float.POSITIVE_INFINITY else outerBounds.right - triggerBounds.left + faceInset - offsetX - edgeMargin,
+        minStepX = keyWidth * PopupFocus.MIN_STEP,
     )
 
     override fun onChangeFocus(x: Float, y: Float): Boolean {
@@ -219,6 +241,9 @@ class PopupKeyboardUi(
     }
 
     companion object {
+        /** How far in from the screen's edge, in dp, the finger picks a row's last key. */
+        const val EDGE_MARGIN = 4f
+
         /** What picking [key] types: from the long press, and from a letter's swipe (its first). */
         fun keyAction(key: String): KeyAction =
             // one character goes through fcitx like any key; anything longer (a user-entered word, or

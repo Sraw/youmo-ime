@@ -32,6 +32,7 @@ import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.popup.PopupFocus
 import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.preedit.SyllableStrip
 import org.fcitx.fcitx5.android.uat.PrefsRule
@@ -173,6 +174,24 @@ class GroupedKeyboardUatTest {
         assertTrue(h.api.calls.toString(), "reset()" in h.api.calls)
         assertTrue(h.field.text.toString(), h.field.text.toString().endsWith("w"))
         assertTrue(sent().toString(), sent().isEmpty())
+        // L at the screen's right, under wider symbols (L 0 l, 4 above): its corner over the finger,
+        // the row moved right to the popup's end; it once started at the pushed-in popup's left,
+        // every key left of the finger. A move right of a key's step picks l
+        h.field.setText("")
+        typing(InputMethodCatalog.PINYIN, "ni", "bu")
+        val l = group("L")
+        val f = h.finger(l, KeyboardHarness.Touch(l.bounds.width() / 2f, l.bounds.height() / 2f))
+        h.after(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
+        val shown = h.popupChoices().associate { it.text to it.box }
+        val fingerX = l.bounds.exactCenterX().toInt()
+        assertTrue("$shown", shown["0"]!!.let { fingerX in it.left until it.right })
+        assertEquals("$shown", shown.values.maxOf { it.right }, shown["l"]!!.right)
+        val step = shown["0"]!!.width() * PopupFocus.STEP
+        // the popup's first move is where its focus starts from
+        f.move(KeyboardHarness.Touch(l.bounds.width() / 2f, l.bounds.height() / 2f))
+        f.move(KeyboardHarness.Touch(l.bounds.width() / 2f + step, l.bounds.height() / 2f))
+        f.up(KeyboardHarness.Touch(l.bounds.width() / 2f + step, l.bounds.height() / 2f))
+        assertTrue(h.field.text.toString(), h.field.text.toString().endsWith("l"))
     }
 
     // a grouped keyboard with no 中/英 key ([probe] its letters' group): the globe asks the host for the
@@ -452,6 +471,29 @@ class GroupedKeyboardUatTest {
     }
 
     // the keyboard's half: 九键双拼's popups, its code row and the 123 page's strip; what a syllable
+    // 九键's right side: the row (6's capitals, 6, its letters) wider than the symbols above, pushed
+    // in from the edge on a narrow screen, left the last letter more steps right than the finger had
+    // room for. The steps right are shorter where the room is: a slide to the screen's last pixel
+    // picks it. Not the evidence for that: this screen leaves 6 room for whole steps, so it passes
+    // with them too; PopupKeyboardUiTest's edge cases (keys wide enough to be pushed in) are
+    @Test
+    @Uat("SP-24")
+    fun aNineKeyAtTheRightReachesItsLastLetterOnScreen() {
+        nineSp()
+        val six = h.nineKey("6")
+        val middle = KeyboardHarness.Touch(six.bounds.width() / 2f, six.bounds.height() / 2f)
+        val f = h.finger(six, middle)
+        h.after(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
+        val shown = h.popupChoices()
+        val row = shown.filter { it.box.bottom == shown.maxOf { k -> k.box.bottom } }.sortedBy { it.box.left }
+        // the popup's first move is where its focus starts from; then to the screen's last pixel
+        f.move(middle)
+        val edge = KeyboardHarness.Touch(h.box(h.inputView).right - 1f - six.bounds.left, six.bounds.height() / 2f)
+        f.move(edge)
+        f.up(edge)
+        assertEquals("${row.map { it.text }}", row.last().text, h.field.text.toString())
+    }
+
     // picked makes of the code is KeyboardHalvesUatTest's
     @Test
     @Uat("SP-24")
