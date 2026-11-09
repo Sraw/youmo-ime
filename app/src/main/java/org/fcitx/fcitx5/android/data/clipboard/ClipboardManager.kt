@@ -127,6 +127,8 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
         }
     }
 
+    // written on Default, read on main
+    @Volatile
     var lastEntry: ClipboardEntry? = null
 
     // the listeners told before the entry is published: whoever sees [lastEntry] (this runs on Default, not main)
