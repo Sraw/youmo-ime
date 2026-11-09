@@ -18,7 +18,9 @@ import java.io.IOException
  * their defaults ([ThemeManager]), the user told. Nothing built for a view not shown (a settings page, the keyboard
  * made again while hidden) marks it, so a process ended otherwise (an update, the system's) resets nothing. The
  * mark is in the files not backed up (a crash is this phone's); written, not synced: a process that dies leaves
- * what it wrote, and the main thread does not wait on the disk.
+ * what it wrote, and the main thread does not wait on the disk. A window hidden before the frame after the first
+ * commits nothing: the mark is pending till the next show's first commit, and a process ended in that gap resets
+ * the pack falsely (no commit seen, it cannot be cleared safely sooner).
  */
 object PackDrawGuard {
 
@@ -62,6 +64,23 @@ object PackDrawGuard {
         mark().delete()
     }
 
+    // the frames asked for while a pack's mark is pending ([askFrame]), a pack
+    private val asked = HashMap<Key, Int>()
+
+    /**
+     * Whether the view drawing [key]'s pending frame may ask for another, whose commit tells that one drawn: the
+     * first [MAX_ASKED] times a process. A device that commits no frame (or calls back none) then draws no more
+     * than that; the mark stays till a later frame's commit.
+     */
+    fun askFrame(key: Key): Boolean {
+        val n = asked.getOrDefault(key, 0)
+        if (n >= MAX_ASKED) return false
+        asked[key] = n + 1
+        return true
+    }
+
+    const val MAX_ASKED = 3
+
     /** Whether the pack [key]'s first frame of this process was drawn. */
     @VisibleForTesting
     internal fun confirmed(key: Key) = key in drawn
@@ -78,6 +97,7 @@ object PackDrawGuard {
     @VisibleForTesting
     internal fun reset() {
         drawn.clear()
+        asked.clear()
         pending = null
     }
 }

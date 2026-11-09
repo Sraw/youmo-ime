@@ -166,4 +166,25 @@ class PackDrawGuardTest {
         ThemeManager.refreshThemes()
         assertEquals(listOf("mine#light", "mine#dark"), ThemeManager.Packs.map { it.name })
     }
+
+    // a device that calls back no frame's commit: a few frames asked for (PackDrawGuard.MAX_ASKED), then none more,
+    // the mark kept till a later frame's commit
+    @Test
+    fun framesAskedForAPackPendingStopAfterAFew() {
+        val dark = placed()[1]
+        ThemeManager.setNormalModeTheme(dark)
+        KeyboardHarness(theme = dark).start().use { h ->
+            val c = KeyboardHarness.boardCanvas(h.inputView)!!
+            repeat(PackDrawGuard.MAX_ASKED) {
+                frame(c)
+                h.after(50)
+                assertTrue("frame ${it + 1} asked for", c.isDirty)
+            }
+            frame(c)
+            h.after(50)
+            assertFalse("no frame more asked for", c.isDirty)
+            assertTrue(mark.exists())
+            assertFalse(PackDrawGuard.confirmed(PackDrawGuard.key(dark)))
+        }
+    }
 }

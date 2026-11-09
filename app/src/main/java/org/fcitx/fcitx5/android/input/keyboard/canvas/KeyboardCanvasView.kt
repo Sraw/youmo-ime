@@ -324,10 +324,11 @@ class KeyboardCanvasView(
         // after this: the pack's first frame drawn once a frame is committed, not here. ViewRootImpl.performDraw
         // takes the commit callbacks before it draws, so one registered here goes with the window's next
         // frame, asked for (a keyboard shown and hidden untouched draws one): that one committed, the frames
-        // are drawn in order, this one was. Once it is, none is asked for again (drawing() false, pack null)
+        // are drawn in order, this one was. Once it is, none is asked for again (drawing() false, pack null),
+        // nor past a few (PackDrawGuard.askFrame: a device that calls back none draws no more)
         pack?.let { p ->
             viewTreeObserver.registerFrameCommitCallback { PackDrawGuard.frameDrawn(p) }
-            postInvalidateOnAnimation()
+            if (PackDrawGuard.askFrame(p)) postInvalidateOnAnimation()
         }
     }
 
