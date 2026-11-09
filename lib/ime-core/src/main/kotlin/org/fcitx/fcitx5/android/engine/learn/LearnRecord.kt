@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.engine.learn
 
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+
 /** A word as learned: its text, simplified, and its reading, spelt syllables joined by spaces; "" where none (a table's code, letters). */
 data class Word(val text: String, val reading: String)
 
@@ -88,6 +90,15 @@ object Kinds {
         // a scheme's name has no colon (EngineSettings.SCHEMES), the tag no colon either
         kind.startsWith(SHUANGPIN_KEYS) -> kind.substringAfter(':').substringAfter(':', "").ifEmpty { null }
         else -> null
+    }
+
+    /**
+     * The grouped keyboard the keys of a [keys] or [shuangpinKeys] kind were typed on, to show its codes as
+     * letters (`bn ui`): a `qk:` kind's [NineKeyLetters.filedAs] (G14, G18, a layout's own by its tag), a
+     * `spk:` kind's [NineKeyLetters.grouped] (G18, G14, NINE_SP); null for any other kind.
+     */
+    fun keysOf(kind: String): NineKeyLetters? = keysTag(kind)?.let { tag ->
+        if (kind.startsWith(KEYS)) NineKeyLetters.filedAs(tag) else NineKeyLetters.grouped(tag)
     }
 
     fun table(im: String) = "$TABLE$im"

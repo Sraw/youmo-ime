@@ -509,16 +509,27 @@ A group key writes its letters (`letters="qw"`, 060-render-v2 §15): its tap is 
 keyboard's `sceneTable.group`, as `wire` sends it, its place added by `pressed`), its long press with no
 `popup` written (or `from="group"`) the letters' row the views' was (`sceneTable.groupPopup`). The
 app collects a layout's groups (`SceneGroups.of`, row by row, a fragment's where included) into a
-`NineKeyLetters` and holds it to the keyboard's (G14, G18): any other is logged and the keyboard's own
-kept, so codes, learning and `wire` never change by a layout (`SceneBehaviorTest`). The engine makes a
-keyboard of other groupings (`SceneGroups.letters` over `SceneGroups.written`, `NineKeyLetters.custom`;
-engine.md), which the app does not use yet (T9b). `letters` keep their rows (`"pq rs"` 2 × 2, a space a row):
+`NineKeyLetters` and takes it as the keyboard is made (`GroupedKeyboard.grouping`, `SceneGroups.taken`,
+060-render-p3 T9b): the keyboard's own groups (G14, G18) as always, their codes, `wire` and learning
+unchanged; on pinyin's 14 and 18 keys (`ownGroups`, KeyboardWindow) a grouping of its own that makes a
+keyboard (`NineKeyLetters.custom` over `SceneGroups.written`, engine.md) is typed as such: each key's code
+its key's place among the keyboard's groups (`SceneGroups.ids`, by the node's id; `CUSTOM_BLOCK`, sent as
+it is, no `wire`; a letter, or the same letters, on two keys each key its own), a leaning tap `Keyboard.tapKey(code, x, y)` with where across and down its scene cell the
+finger came down (`KeyGesture.clickAt`, `clickDown`; a click no touch made, the code alone), and the groups
+told the engine as the keyboard is shown, not as it is made (`onAttach`, `EngineState.ownKeys`; the bridge's `syncOwnKeys` before
+each key sets `NineKeyLetters.inUse` and `EngineSettings.ownKeys`, `configure` and `reload` keep them).
+Anything else is refused, logged with why, and the app's own layout drawn instead (`SceneLayouts.builtIn`):
+groups that make no keyboard, the other built-in keyboard's groups, and any grouping of its own on 双拼's
+keyboards (`GroupedKeyboardOwnGroupsTest`, `KeyboardCustomTest`). The theme's board stays `k14`/`k18`.
+A group key's long press is made as it opens only where its layout wrote none (or `from="group"`); a key
+that swipes no corner gets its letters alone (`longPressOf`). `letters` keep their rows (`"pq rs"` 2 × 2, a space a row):
 where a tap leans and, P3, where the default label draws; the built-ins write their labels (`QW`, one
 word centred), so no label is drawn by the rows yet. Whether a tap leans (按落点加权) is the layout's:
 a group of two letters or more without `lean="off"` (`SceneGroups.leaning`, read whichever draws the
 keys), the 18 keys writing `lean="off"`; a layout whose groups are not the keyboard's, or none read, leans
-as built in (`SceneGroups.leaningOf`: G14's two-letter groups); the engine places taps of G14's codes alone (`Keyboard.placesTaps`),
-so 双拼's 14 keys (sent as `shuangpin14Key`) and any 18 keys send the code only, as before.
+as built in (`SceneGroups.leaningOf`: G14's two-letter groups); the engine places taps of G14's codes and a
+layout's own codes alone (`Keyboard.placesTaps`), so 双拼's 14 keys (sent as `shuangpin14Key`) and the built-in
+18 keys send the code only, as before; the built-in 14 keys' taps are their `TAPS` character, wherever down the key.
 
 The number keyboard (S4b) is one layout, `number.xml`, for all seven pads: `NumberKeyboard` gives its
 `NumberPad` as `Input.pad` (`full`, `signed-decimal`…) and the keys beside the digits are chosen by

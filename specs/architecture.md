@@ -139,7 +139,7 @@ long code to be typed or deleted there; arrows and the swipe on space move it to
 
 `InputMethodCatalog` (`engine/`) lists the input methods by name (`PINYIN`, `SHUANGPIN`,
 `TABLES`, `HANDWRITING`, `ENGLISH` = `keyboard-us`; the nine, 18 and 14 keys are keyboards of
-pinyin and 双拼, not input methods: their sessions `T9`, `PINYIN_KEYS18`, `PINYIN_KEYS`,
+pinyin and 双拼, not input methods: their sessions `T9`, `PINYIN_KEYS18`, `PINYIN_KEYS`, `PINYIN_KEYS_OWN` (a theme's own groups),
 `SHUANGPIN_KEYS18`, `SHUANGPIN_KEYS14`, `SHUANGPIN_NINE` live inside `KeyboardPair`), what the host lists of each, the keys each types
 with and the data files' names: fixed, read by `host/` and `input/`, which never name `Engines`.
 `Engines` (`engine/runtime`) makes each session at first use (`SessionFactory`), and is the one door to the

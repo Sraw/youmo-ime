@@ -303,6 +303,11 @@ class NineKeyLetters private constructor(
             if (keyboard.codes.firstOrNull()?.code in CUSTOM_BLOCK) current = keyboard
         }
 
+        /** None in use: a custom block's code read as no keyboard's ([ofCode]) till the next [inUse]; what a test leaves after it. */
+        fun clearInUse() {
+            current = null
+        }
+
         // filedAs's last tag and keyboard: SpelledForm asks for each code of each word read
         @Volatile
         private var lastFiled: Pair<String, NineKeyLetters?>? = null
