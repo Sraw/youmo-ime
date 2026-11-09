@@ -14,7 +14,7 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { createHash } from 'node:crypto';
 import { deflateRawSync } from 'node:zlib';
-import { assemble, blockOf, ENGINE, engineText, fontFaces, FONTS, NO_ENGINE } from '../tools/assemble.mjs';
+import { assemble, blockOf, CLASSIC, CLASSIC_SRC, ENGINE, engineText, fontFaces, FONTS, NO_ENGINE } from '../tools/assemble.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const data = join(here, 'testdata');
@@ -622,6 +622,8 @@ test('contrast is Contrast.ratio, a colour reads dark as the page guesses, a cut
 
 test('index.html is what tools/assemble.mjs makes of src/ (src/ changed, the page not made again: fails)', () => {
   assert.ok(assemble() === html, 'index.html is not src/ assembled: node web/theme-maker/tools/assemble.mjs');
+  // the maker before 0.6.0, kept at classic/ (060-render-p3 §5.1): its own src/classic/, the library and blocks shared
+  assert.ok(assemble(CLASSIC_SRC) === readFileSync(CLASSIC, 'utf8'), 'classic/index.html is not src/classic/ assembled');
 });
 
 // 060-render-p3 W1: the engine is not in git (a change to its code would have to make the page again); the
@@ -669,13 +671,13 @@ test('assemble.mjs refuses a page it cannot make, and puts in text that looks li
   const src = join(here, '..', 'src');
   const dir = mkdtempSync(join(tmpdir(), 'youmo-assemble-'));
   try {
-    for (const f of ['style.css', 'lib.js', 'ui.js']) copyFileSync(join(src, f), join(dir, f));
+    for (const f of ['style.css', 'maker.js', 'ui.js']) copyFileSync(join(src, f), join(dir, f));
     const page = readFileSync(join(src, 'page.html'), 'utf8');
     const made = (p, old = html) => { writeFileSync(join(dir, 'page.html'), p); return assemble(dir, old); };
     assert.throws(() => made(page.replace('{{ui}}', '')), /no \{\{ui\}\}/, 'a slot missing');
     assert.throws(() => made(page.replace('{{css}}', '{{css}}{{css}}')), /2 \{\{css\}\}/, 'a slot twice');
     assert.throws(() => made(page, html.replace('id="youmo-icons"', 'id="youmo-other"')), /no youmo-icons block/, 'a generated block missing');
-    assert.throws(() => made(page.replace(/<script id="youmo-ui">/, '<script>')), /not three scripts/, 'a script not hashed');
+    assert.throws(() => made(page.replace(/<script id="youmo-ui">/, '<script>')), /a script not hashed/, 'a script not hashed');
     // a slot's name inside what is put in is text, not a slot
     writeFileSync(join(dir, 'style.css'), '/* {{lib}} $& */');
     const out = made(page);
@@ -712,8 +714,9 @@ test('an image is decoded only within what it may be: the source a photo, a cut 
   assert.ok(!L.decodable(L.imageSize(huge.files[theme.picture.src]), L.decodeCaps(format, L.fileRole(huge.theme, huge.theme.picture.src))));
 });
 
-test('the page runs only its own three scripts, by their hashes, as git keeps it and as built', () => {
-  for (const [what, page] of [['index.html', html], ['the page built', built()]]) {
+test('each page runs only its own scripts, by their hashes, as git keeps it and as built', () => {
+  const classic = readFileSync(CLASSIC, 'utf8');
+  for (const [what, page, count] of [['index.html', html, 4], ['the page built', built(), 4], ['classic', classic, 3], ['classic built', assemble(CLASSIC_SRC, html, ENGINE), 3]]) {
     const m = /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(page);
     assert.ok(m, 'no CSP meta in ' + what);
     const csp = m[1];
@@ -723,7 +726,7 @@ test('the page runs only its own three scripts, by their hashes, as git keeps it
     assert.deepEqual(dirs['form-action'], ["'none'"]);
     assert.ok(!dirs['script-src'].includes("'unsafe-inline'"));
     const run = [...page.matchAll(/<script(?![^>]*type="application\/json")[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
-    assert.equal(run.length, 3, what);
+    assert.equal(run.length, count, what);
     assert.deepEqual(dirs['script-src'], run.map((t) => "'sha256-" + createHash('sha256').update(t).digest('base64') + "'"), what);
   }
 });
