@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard.canvas
 
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Scene
@@ -38,7 +38,7 @@ class PopupSceneViewTest {
     // a scene of the same size with a shadow reaching further is a view of another size: laid out again
     @Test
     fun aShadowsReachOfItsOwnLaysItOutAgain() {
-        val view = PopupScenes(View(context), ThemePreset.PixelDark).view(context)
+        val view = PopupScenes(View(context), TestThemes.PixelDark).view(context)
         view.scene = scene(0.0)
         view.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
         view.layout(0, 0, view.measuredWidth, view.measuredHeight)

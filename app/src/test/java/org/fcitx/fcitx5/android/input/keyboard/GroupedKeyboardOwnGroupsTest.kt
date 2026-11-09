@@ -15,7 +15,7 @@ import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.g14Code
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
@@ -91,7 +91,7 @@ class GroupedKeyboardOwnGroupsTest {
         NineKeyLetters.inUse(NineKeyLetters.G14)
     }
 
-    private fun grouped(ownGroups: Boolean = true) = GroupedKeyboard(context, ThemePreset.PixelDark, ownGroups = ownGroups).apply {
+    private fun grouped(ownGroups: Boolean = true) = GroupedKeyboard(context, TestThemes.PixelDark, ownGroups = ownGroups).apply {
         setViewTreeLifecycleOwner(Owner())
         keyActionListener = KeyActionListener { action, _ -> sent += action }
         popupActionListener = PopupActionListener { popups += it }

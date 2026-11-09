@@ -9,7 +9,7 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
@@ -48,7 +48,7 @@ class NumberSceneGesturesTest {
             e.setText(TEXT)
             e.setSelection(TEXT.length)
         }
-        return KeyboardHarness(ThemePreset.PixelLight).start(inputType, prefill = prefill).also { h ->
+        return KeyboardHarness(TestThemes.PixelLight).start(inputType, prefill = prefill).also { h ->
             h.relayout()
             assertTrue(KeyboardHarness.all(h.keyboard).any { it is KeyboardCanvasView && it.visibility == View.VISIBLE })
         }
@@ -179,7 +179,7 @@ class NumberSceneGesturesTest {
         val actions = listOf(EditorInfo.IME_ACTION_SEARCH, EditorInfo.IME_ACTION_DONE, EditorInfo.IME_ACTION_GO, EditorInfo.IME_ACTION_NEXT, 0)
         val said = listOf(true).map { _ ->
             actions.map { action ->
-                KeyboardHarness(ThemePreset.PixelLight).start(InputType.TYPE_CLASS_NUMBER, imeOptions = action).use { h ->
+                KeyboardHarness(TestThemes.PixelLight).start(InputType.TYPE_CLASS_NUMBER, imeOptions = action).use { h ->
                     h.relayout()
                     h.keyNamed("enter").let { "${it.description} ${it.drawnIcons}" }
                 }

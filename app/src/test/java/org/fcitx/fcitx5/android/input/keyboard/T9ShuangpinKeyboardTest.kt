@@ -16,7 +16,7 @@ import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.nineSpCode
@@ -91,7 +91,7 @@ class T9ShuangpinKeyboardTest {
 
     @Test
     fun noLanguageKeyAndTheColumnOffersShuangpinsSyllablesNotNineKeys() {
-        val keyboard = T9Keyboard(context, ThemePreset.PixelDark, shuangpin = true, semicolon = true)
+        val keyboard = T9Keyboard(context, TestThemes.PixelDark, shuangpin = true, semicolon = true)
         assertTrue(keyboard.laidOut().shownKeyWithId(R.id.button_space) != null)
         assertEquals(true, keyboard.ownsSyllables)
         val items = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single().getChildAt(0) as ViewGroup

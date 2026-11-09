@@ -11,8 +11,8 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.CandidateWord
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.bar.CandidateBarHeight
@@ -54,7 +54,7 @@ class CandidateHintsUatTest {
 
     private fun shown(sp: Int, dark: Boolean, name: String?) {
         ThemeManager.prefs.candidateTextSize.setValue(sp)
-        val h = KeyboardHarness(theme = if (dark) ThemePreset.PixelDark else ThemePreset.PixelLight).also { harness = it }.start()
+        val h = KeyboardHarness(theme = if (dark) TestThemes.PixelDark else TestThemes.PixelLight).also { harness = it }.start()
         val bar = h.described(h.service.getString(R.string.expand_toolbar)).parent as View
         h.api.candidates = words.map { (w, r) -> CandidateWord("", w, "", readings = r) }.toTypedArray()
         h.emit(HostEvent.Candidates(words.size, h.api.candidates.toList()))
@@ -90,7 +90,7 @@ class CandidateHintsUatTest {
     @Uat("PY-111")
     fun theFloatingWindowsCandidatesAreOneHeightHintedOrNot() {
         val ctx = RuntimeEnvironment.getApplication()
-        val theme = ThemePreset.PixelLight
+        val theme = TestThemes.PixelLight
         val setup: TextView.() -> Unit = { textSize = 20f; setPadding(4, 2, 4, 2) }
         val heights = words.map { (w, r) ->
             LabeledCandidateItemUi(ctx, theme, setup).also { it.update(CandidateWord("1", w, "", readings = r), false) }.root.run {

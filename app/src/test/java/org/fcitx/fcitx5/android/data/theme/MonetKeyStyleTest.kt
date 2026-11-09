@@ -46,7 +46,7 @@ class MonetKeyStyleTest {
             putBoolean("key_border", false); putInt("key_radius", 10); putInt("key_vertical_margin", 2)
         }
         assertEquals(old, ThemeManager.prefs.legacyLook())
-        val monet = ThemeMonet.getLight()
+        val monet = ThemeManager.builtin("monet#light")
         val slot = ThemeLookMigration.Slot({ monet }, { error("a Monet theme is not copied") })
         assertTrue(ThemeManager.prefs.settleLook(listOf(slot), ThemeManager::saveTheme))
     }
@@ -66,7 +66,7 @@ class MonetKeyStyleTest {
         assertEquals(name, 2, look.keys.gap.v)
     }
 
-    private fun monet() = ThemeManager.getAllThemes().first { it is Theme.Monet && !it.isDark } as Theme.Monet
+    private fun monet() = ThemeManager.builtin("monet#light")
 
     @Test
     @Uat("ST-35")
@@ -89,7 +89,7 @@ class MonetKeyStyleTest {
         ThemeManager.onSystemPlatteChange(appContext.resources.configuration)
         ThemeManager.setNormalModeTheme(monet())
         ThemeManager.activeTheme.styled()
-        ThemeManager.setNormalModeTheme(ThemePreset.PixelLight)
+        ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
         assertTrue(ThemeManager.activeTheme.look.keys.blocks)
         assertEquals(old, ThemeManager.prefs.monetLook())
         // back by the list, and as the setting reads it at a start

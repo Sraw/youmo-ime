@@ -19,7 +19,7 @@ import org.fcitx.fcitx5.android.data.pack.AppData
 import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.pack.TestShelves
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.handwriting.InkNet
 import org.fcitx.fcitx5.android.engine.handwriting.InkRecognizer
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
@@ -66,7 +66,7 @@ class HandwritingKeyboardTest {
     private val delivered = ArrayList<String>()
 
     private fun keyboard(recognition: HandwritingRecognition = this.recognition) = HandwritingKeyboard(
-        PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark,
+        PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark,
         deliver = { reading, _ -> delivered += reading.texts }, finished = { finished += it }, recognition = recognition, setReading = { readings += it },
     ).also {
         it.keyActionListener = KeyActionListener { action, _ -> sent += action }

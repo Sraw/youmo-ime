@@ -80,6 +80,10 @@ fun Test.unitTestSettings() {
     // the theme maker's shared cases (ThemeMakerRulesTest): compared, or with -PupdateThemeMaker written
     systemProperty("themeMaker.testdata", rootProject.file("web/theme-maker/test/testdata").path)
     systemProperty("themeMaker.update", project.hasProperty("updateThemeMaker").toString())
+    // the built-in themes' files (src/commonMain/themes) and Transparent's, test data (src/commonTest/data): TestThemes
+    systemProperty("scene.src", rootProject.file("lib/keyboard-scene/src").path)
+    inputs.file(rootProject.file("lib/keyboard-scene/src/commonTest/data/transparent.xml")).withPropertyName("transparentTheme")
+        .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
     // compared with the page and its files: a change there is a reason to run again, not an up-to-date skip
     inputs.dir(rootProject.file("web/theme-maker")).withPropertyName("themeMaker")
         .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
@@ -245,13 +249,17 @@ tasks.register<Test>("testDebugUnitTestAt29") {
     useJUnit()
 }
 
-// The layouts the scene engine draws (060; KeyboardCanvasView): one copy,
-// lib/keyboard-scene's, which its tests and snapshots hold; raw resources, so Robolectric reads them too
-// (the unit tests get the app's resources, not its assets: unit-test-resources)
+// The layouts the scene engine draws (060; KeyboardCanvasView) and the built-in themes (060-render-p3 T3):
+// one copy, lib/keyboard-scene's, which its tests and snapshots hold and the web reads; raw resources, so
+// Robolectric reads them too (the unit tests get the app's resources, not its assets: unit-test-resources)
 abstract class SceneLayoutsTask : DefaultTask() {
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.NAME_ONLY)
     abstract val layouts: ConfigurableFileCollection
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NAME_ONLY)
+    abstract val themes: ConfigurableFileCollection
 
     @get:OutputDirectory
     abstract val outputDir: DirectoryProperty
@@ -263,12 +271,15 @@ abstract class SceneLayoutsTask : DefaultTask() {
         raw.mkdirs()
         // a resource's name has no `-`: grouped-bottom.xml is scene_layout_grouped_bottom (SceneLayouts.RAW)
         layouts.forEach { it.copyTo(File(raw, "scene_layout_${it.name.replace('-', '_')}")) }
+        // deep-blue.xml is scene_theme_deep_blue (BuiltinThemes)
+        themes.forEach { it.copyTo(File(raw, "scene_theme_${it.name.replace('-', '_')}")) }
     }
 }
 
 val sceneLayouts = tasks.register<SceneLayoutsTask>("copySceneLayouts") {
     // every layout the app draws and the fragments they include (060-render-p2 S4: a keyboard's moved there as it is drawn)
     layouts.from(rootProject.fileTree("lib/keyboard-scene/src/commonMain/layouts") { include("*.xml") })
+    themes.from(rootProject.fileTree("lib/keyboard-scene/src/commonMain/themes") { include("*.xml") })
     outputDir.set(layout.buildDirectory.dir("generated/scene-layouts"))
 }
 

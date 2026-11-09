@@ -28,9 +28,9 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.EnglishKeyboard
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
@@ -153,7 +153,7 @@ class SettingsUatTest {
     @Uat("ST-05")
     fun aDarkThemeTurnsPreviewAndKeyboardDark() {
         ThemeManager.prefs.followSystemDayNightTheme.setValue(false)
-        ThemeManager.setNormalModeTheme(ThemePreset.PixelLight)
+        ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
         // the preview as shipped, the tests' baseline embedded (OneDefaultPreferencesShadow)
         val codeRowWas = ThemeManager.prefs.codeRow.getValue()
         ThemeManager.prefs.codeRow.setValue(CodeRowStyle.Floating)
@@ -163,12 +163,9 @@ class SettingsUatTest {
             val list = KeyboardHarness.all(activity.window.decorView).filterIsInstance<RecyclerView>()
                 .firstOrNull { it.adapter is ThemeListAdapter }
                 ?: error(KeyboardHarness.all(activity.window.decorView).filterIsInstance<RecyclerView>().map { it.adapter?.javaClass?.name }.toList().toString())
-            val at = ThemeManager.getAllThemes().indexOfFirst { it.name == ThemePreset.PixelDark.name } + 1
-            list.scrollToPosition(at)
-            idle()
-            list.findViewHolderForAdapterPosition(at)!!.itemView.performClick()
-            idle()
-            assertEquals(ThemePreset.PixelDark.name, ThemeManager.activeTheme.name)
+            // Pixel's card shows its light version, in use: its 深, then the card
+            pickTheme(list, TestThemes.PixelDark.name, ::idle)
+            assertEquals(TestThemes.PixelDark.name, ThemeManager.activeTheme.name)
             capture("theme_dark")
             // the keyboard made after it: its background the dark theme's
             KeyboardHarness(theme = null).use { h ->
@@ -179,7 +176,7 @@ class SettingsUatTest {
                 assertTrue("background ${Integer.toHexString(corner)}", Color.luminance(corner) < 0.2f)
             }
         } finally {
-            ThemeManager.setNormalModeTheme(ThemePreset.PixelLight)
+            ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
             ThemeManager.prefs.followSystemDayNightTheme.setValue(ThemeManager.prefs.followSystemDayNightTheme.defaultValue)
             ThemeManager.prefs.codeRow.setValue(codeRowWas)
         }

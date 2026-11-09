@@ -4,8 +4,8 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings.theme
 
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.data.theme.deriveCustomNoBackground
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeThumbnailUi.State
 import org.junit.Assert.assertEquals
@@ -20,7 +20,7 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class ThemeListAdapterTest {
 
-    private fun theme(name: String) = ThemePreset.MaterialLight.deriveCustomNoBackground(name)
+    private fun theme(name: String) = TestThemes.MaterialLight.deriveCustomNoBackground(name)
 
     private val a = theme("a")
     private val x = theme("x")
@@ -75,4 +75,50 @@ class ThemeListAdapterTest {
             list.marks()
         )
     }
+
+    // region a built-in theme of two versions, one card (060-render-p3 T3)
+
+    private val light = TestThemes.PixelLight
+    private val dark = TestThemes.PixelDark
+
+    @Test
+    fun aPairIsOneCardShowingItsLightVersionFirst() {
+        val list = adapter(a, light, dark, TestThemes.DeepBlue).apply { setSelectedThemes(a) }
+        assertEquals(listOf("a" to State.Selected, "pixel#light" to State.Normal, "deep-blue" to State.Normal), list.marks())
+        assertEquals(3 + ThemeListAdapter.OFFSET, list.itemCount)
+    }
+
+    @Test
+    fun theVersionMarkedIsShownAndItsMarkOnlyOnIt() {
+        val list = adapter(a, light, dark).apply { setSelectedThemes(dark) }
+        assertEquals(listOf("a" to State.Normal, "pixel#dark" to State.Selected), list.marks())
+        list.switchVersion(2)
+        assertEquals(listOf("a" to State.Normal, "pixel#light" to State.Normal), list.marks())
+        list.switchVersion(2)
+        assertEquals(listOf("a" to State.Normal, "pixel#dark" to State.Selected), list.marks())
+        // a card of one version has none to switch to
+        list.switchVersion(1)
+        assertEquals(listOf("a" to State.Normal, "pixel#dark" to State.Selected), list.marks())
+    }
+
+    @Test
+    fun bothSlotsOnOnePairShowTheOneInUseTheOtherSwitchedTo() {
+        val list = adapter(a, light, dark).apply { setSelectedThemes(light, light = light, dark = dark) }
+        assertEquals(listOf("a" to State.Normal, "pixel#light" to State.LightMode), list.marks())
+        list.switchVersion(2)
+        assertEquals(listOf("a" to State.Normal, "pixel#dark" to State.DarkMode), list.marks())
+        // the system dark now: its version shown
+        list.switchVersion(2)
+        list.setSelectedThemes(dark, light = light, dark = dark)
+        assertEquals(listOf("a" to State.Normal, "pixel#dark" to State.DarkMode), list.marks())
+    }
+
+    @Test
+    fun aThemeImportedBeforeAPairMovesItsMarkWithIt() {
+        val list = adapter(a, light, dark).apply { setSelectedThemes(dark) }
+        list.prependTheme(b)
+        assertEquals(listOf("b" to State.Normal, "a" to State.Normal, "pixel#dark" to State.Selected), list.marks())
+    }
+
+    // endregion
 }

@@ -13,8 +13,8 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
@@ -72,7 +72,7 @@ class StrokeUatTest {
     private fun harness(im: InputMethodEntry, glide: Boolean = false, keyboards: ImKeyboards.Chosen? = null): KeyboardHarness {
         prefs.set(strokeFilter, !glide)
         prefs.set(glideTyping, glide)
-        return KeyboardHarness(ThemePreset.PixelLight, im, keyboards = keyboards).also { open = it }.start()
+        return KeyboardHarness(TestThemes.PixelLight, im, keyboards = keyboards).also { open = it }.start()
     }
 
     // pinyin typed (the code row shows it) or nothing; in a temporary mode, with its line [aux] above

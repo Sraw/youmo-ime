@@ -9,8 +9,8 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
@@ -57,7 +57,7 @@ class KeyMarksScreenshotTest {
     ) {
         prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, symbolAt)
         prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, shortcutAt)
-        KeyboardHarness(ThemePreset.PixelLight, board.first, keyboards = board.second).use { h ->
+        KeyboardHarness(TestThemes.PixelLight, board.first, keyboards = board.second).use { h ->
             h.start()
             table?.let {
                 EngineState.tableKeyboardState.value = it

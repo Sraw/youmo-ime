@@ -10,9 +10,9 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
@@ -86,7 +86,7 @@ class CompactKeyboardScreenshotTest {
         // the 注音 keyboards' 简繁 hint: not said, and its "told" put back for the tests after (KeyboardPickerUatTest)
         prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
         for (b in boards) {
-            KeyboardHarness(ThemePreset.PixelLight, b.im, keyboards = b.keyboards).use { h ->
+            KeyboardHarness(TestThemes.PixelLight, b.im, keyboards = b.keyboards).use { h ->
                 h.start(b.inputType)
                 b.table?.let {
                     EngineState.tableKeyboardState.value = it
@@ -112,7 +112,7 @@ class CompactKeyboardScreenshotTest {
 
     // the full keyboard with the layouts 紧凑 meets: floating, one-handed, dark; split turned; [shift]:
     // its capitals too, taller beside their symbols
-    private fun shootFull(name: String, theme: Theme = ThemePreset.PixelLight, shift: Boolean = false) {
+    private fun shootFull(name: String, theme: Theme = TestThemes.PixelLight, shift: Boolean = false) {
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
         KeyboardHarness(theme).use { h ->
@@ -136,7 +136,7 @@ class CompactKeyboardScreenshotTest {
         prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
         shootFull("one_handed_port", shift = true)
         ThemeManager.prefs.oneHanded.setValue(OneHanded.Off)
-        shootFull("dark_port", ThemePreset.PixelDark)
+        shootFull("dark_port", TestThemes.PixelDark)
     }
 
     @Test

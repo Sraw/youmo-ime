@@ -9,6 +9,7 @@ import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -19,7 +20,8 @@ import org.robolectric.annotation.Config
 
 /**
  * 0.6.0's 跟随主题 of the keyboard's size (060-render-p3 T5): an upgrade's size at its default follows
- * the theme, one set stays, once; a backup of an older version brought back is moved again.
+ * the theme, one set stays, once; a backup of an older version brought back is moved again. And the
+ * themes the settings name (T3): a built-in one by its 0.5 name names it as it is now.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
@@ -115,6 +117,124 @@ class ThemePrefsMigrationTest {
         ThemeManager.syncToDeviceEncryptedStorage()
         assertTrue(device.getBoolean(ThemePrefs.SIZES_FOLLOW_MIGRATED, false))
     }
+
+    // region the themes' references (T3)
+
+    private val slots = listOf("normal_mode_theme", "light_mode_theme", "dark_mode_theme")
+
+    private fun stored(on: android.content.SharedPreferences = sp) = slots.map { on.getString(it, null) }
+
+    private fun store(vararg names: String?, follow: Boolean? = null, on: android.content.SharedPreferences = sp) = on.edit(commit = true) {
+        slots.zip(names).forEach { (key, name) -> if (name == null) remove(key) else putString(key, name) }
+        if (follow != null) putBoolean("follow_system_dark_mode", follow)
+    }
+
+    @Test
+    fun aBuiltInThemeNotFollowingTheSystemIsTheVersionItWas() {
+        store("PixelLight", follow = false)
+        val prefs = ThemePrefs(sp)
+        prefs.migrateThemeRefs(emptySet())
+        assertEquals(listOf("pixel#light", null, null), stored())
+        assertFalse(prefs.followSystemDayNightTheme.getValue())
+        // the same colours as 0.5's PixelLight: the file's light version
+        assertEquals(TestThemes.PixelLight, prefs.normalModeTheme.getValue())
+    }
+
+    @Test
+    fun theLightAndDarkSlotsFollowingTheSystemAreTheVersionsTheyWere() {
+        store("Monokai", "MaterialLight", "NordDark", follow = true)
+        val prefs = ThemePrefs(sp)
+        prefs.migrateThemeRefs(emptySet())
+        assertEquals(listOf("monokai", "material#light", "nord#dark"), stored())
+        assertTrue(prefs.followSystemDayNightTheme.getValue())
+        assertEquals(TestThemes.MaterialLight, prefs.lightModeTheme.getValue())
+        assertEquals(TestThemes.NordDark, prefs.darkModeTheme.getValue())
+        assertEquals(TestThemes.Monokai, prefs.normalModeTheme.getValue())
+    }
+
+    @Test
+    fun monetsTwoAreMonetsVersions() {
+        store("MonetDark", "MonetLight", "MonetDark", follow = true)
+        val prefs = ThemePrefs(sp)
+        prefs.migrateThemeRefs(emptySet())
+        assertEquals(listOf("monet#dark", "monet#light", "monet#dark"), stored())
+        val light = prefs.lightModeTheme.getValue() as Theme.Builtin
+        val dark = prefs.darkModeTheme.getValue() as Theme.Builtin
+        assertTrue(light.followsSystem && !light.isDark)
+        assertTrue(dark.followsSystem && dark.isDark)
+        assertEquals(ThemeManager.builtin("monet#dark"), prefs.normalModeTheme.getValue())
+    }
+
+    @Test
+    fun everyOldNameIsABuiltInThemeOfItsLightness() {
+        for ((old, ref) in BuiltinThemeFiles.LEGACY) {
+            val theme = ThemeManager.builtin(ref)
+            assertEquals(old, !old.endsWith("Light"), theme.isDark)
+            assertEquals(old, old.startsWith("Monet"), theme.followsSystem)
+            assertEquals(old, BuiltinThemeFiles.legacyName(ref))
+        }
+        // each built-in theme had one: every user's is one of them
+        assertEquals(ThemeManager.BuiltinThemes.map { it.name }.toSet(), BuiltinThemeFiles.LEGACY.values.toSet())
+    }
+
+    @Test
+    fun aDeletedThemesNameIsLeftAndReadAsTheDefault() {
+        store("0f6c2a4e-deleted", "MaterialLight", null, follow = true)
+        val prefs = ThemePrefs(sp)
+        prefs.migrateThemeRefs(emptySet())
+        assertEquals(listOf("0f6c2a4e-deleted", "material#light", null), stored())
+        assertEquals(ThemeManager.DefaultTheme, prefs.normalModeTheme.getValue())
+        assertEquals(prefs.darkModeTheme.defaultValue, prefs.darkModeTheme.getValue())
+    }
+
+    @Test
+    fun aThemeOfTheUsersOfAnOldNameIsTheUsers() {
+        // the user's own named so (imported as no built-in one had the name, MonetLight's say): theirs, as before
+        store("MonetLight", "PixelLight")
+        ThemePrefs(sp).migrateThemeRefs(setOf("MonetLight"))
+        assertEquals(listOf("MonetLight", "pixel#light", null), stored())
+    }
+
+    @Test
+    fun movedAtEveryStartNothingTwice() {
+        store("DeepBlue", "nord#light", "AMOLEDBlack")
+        val prefs = ThemePrefs(sp)
+        prefs.migrateThemeRefs(emptySet())
+        assertEquals(listOf("deep-blue", "nord#light", "amoled-black"), stored())
+        prefs.migrateThemeRefs(emptySet())
+        assertEquals(listOf("deep-blue", "nord#light", "amoled-black"), stored())
+        // a backup of an older version brought back: moved at the next start
+        store("PixelDark", "PixelLight", "PixelDark")
+        prefs.migrateThemeRefs(emptySet())
+        assertEquals(listOf("pixel#dark", "pixel#light", "pixel#dark"), stored())
+        // a value of a damaged file, no string: left, read as the default
+        sp.edit(commit = true) { putInt("normal_mode_theme", 3) }
+        prefs.migrateThemeRefs(emptySet())
+        assertEquals(3, sp.getInt("normal_mode_theme", 0))
+    }
+
+    @Test
+    fun beforeTheFirstUnlockTheCopyIsMovedAsItIsRead() {
+        val app = RuntimeEnvironment.getApplication()
+        val device = PreferenceManager.getDefaultSharedPreferences(app.createDeviceProtectedStorageContext())
+        // the copy an older version made: its names; read so before the first unlock (no theme of the user's listed)
+        store("NordLight", "MonetLight", "MonetDark", follow = true, on = device)
+        ThemePrefs(device).migrateThemeRefs(emptySet())
+        assertEquals(listOf("nord#light", "monet#light", "monet#dark"), stored(device))
+        // the app's own, copied over it: as it names them now
+        val prefs = ThemeManager.prefs
+        val before = slots.map { PreferenceManager.getDefaultSharedPreferences(app).getString(it, null) }
+        try {
+            store("MaterialDark", "MonokAI-unknown", "PixelDark", on = PreferenceManager.getDefaultSharedPreferences(app))
+            prefs.migrateThemeRefs(emptySet())
+            ThemeManager.syncToDeviceEncryptedStorage()
+            assertEquals(listOf("material#dark", prefs.lightModeTheme.defaultValue.name, "pixel#dark"), stored(device))
+        } finally {
+            store(*before.toTypedArray(), on = PreferenceManager.getDefaultSharedPreferences(app))
+        }
+    }
+
+    // endregion
 
     @Test
     fun aNumberNotAnIntIsTakenAsSet() {

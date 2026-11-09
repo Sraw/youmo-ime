@@ -11,8 +11,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import org.fcitx.fcitx5.android.data.theme.CustomThemeSerializer
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.data.theme.backgroundImage
 import org.fcitx.fcitx5.android.data.theme.deriveCustomBackground
 import org.fcitx.fcitx5.android.engine.assertRows
@@ -160,7 +160,7 @@ class ThemeSerializationTest {
     @Test
     fun preservation() {
         val fakeCustomTheme =
-            ThemePreset
+            TestThemes
                 .TransparentDark
                 .deriveCustomBackground("", "", "")
 
@@ -177,7 +177,7 @@ class ThemeSerializationTest {
         // over a background image, the popup gets the preset matching the theme's darkness
         Assert.assertEquals(
             "popupBackgroundColor from preset",
-            ThemePreset.PixelDark.popupBackgroundColor,
+            TestThemes.PixelDark.popupBackgroundColor,
             decoded.popupBackgroundColor
         )
         Assert.assertEquals("Round trip", decoded, decoded.toJson().toCustomTheme().first)

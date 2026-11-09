@@ -36,6 +36,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.comparesScreenshots
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.until
 import org.fcitx.fcitx5.android.core.FakeHostApi
 import org.fcitx.fcitx5.android.core.FakeHostConnection
@@ -48,7 +49,6 @@ import org.fcitx.fcitx5.android.data.pack.TestShelves
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
@@ -79,7 +79,7 @@ import org.robolectric.shadows.ShadowPopupMenu
  * Call [close] at the end (an `@After`): the daemon seam is global.
  */
 class KeyboardHarness(
-    theme: Theme? = ThemePreset.PixelLight,
+    theme: Theme? = TestThemes.PixelLight,
     im: InputMethodEntry = PINYIN,
     /** A real host to type through (a [KotlinHost] on a scripted engine) in place of [api]: its own events, its own answers. */
     host: HostApi? = null,

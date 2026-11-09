@@ -13,7 +13,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.pinyin.g14Code
@@ -47,7 +47,7 @@ class GroupedKeyboardTapTest {
         override val lifecycle = LifecycleRegistry(this)
     }
 
-    private fun grouped() = GroupedKeyboard(context, ThemePreset.PixelDark).apply {
+    private fun grouped() = GroupedKeyboard(context, TestThemes.PixelDark).apply {
         setViewTreeLifecycleOwner(Owner())
         keyActionListener = KeyActionListener { action, _ -> sent += action }
         laidOut(1080, 800)

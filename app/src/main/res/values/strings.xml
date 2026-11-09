@@ -122,6 +122,9 @@
     <string name="follow_system_day_night_theme_summary">Override manual theme selection</string>
     <string name="light_mode_theme">Light mode theme</string>
     <string name="dark_mode_theme">Dark mode theme</string>
+    <string name="theme_version_light">Light</string>
+    <string name="theme_version_dark">Dark</string>
+    <string name="theme_version_switch">Show its light or dark version</string>
     <string name="new_theme">New theme</string>
     <string name="skip">Skip</string>
     <string name="theme_migrated">Theme has been migrated to the current version</string>
