@@ -12,11 +12,16 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.scene.LookTheme
+import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Shape
+import org.fcitx.fcitx5.android.scene.Shape.Path.Op.Close
+import org.fcitx.fcitx5.android.scene.Shape.Path.Op.LineTo
+import org.fcitx.fcitx5.android.scene.Shape.Path.Op.MoveTo
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.getOr
+import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -94,6 +99,35 @@ class CapPictureTest {
         assertTrue(red(at(box.centerX, box.bottom + 2 * density)))
         assertTrue(red(at(box.left + 4, box.bottom + 2 * density)))
         assertEquals(BACKGROUND, at(box.centerX, band.bottom + 2))
+    }
+
+    // a band under a translucent face shows only below it; a path crossing itself (a star, its middle inside by
+    // the winding rule its fill is drawn by) has an inner shadow of no offset nowhere inside, its middle too
+    @Test
+    fun aBandLessItsFaceAndAStarsInnerShadowByItsFillsRule() {
+        val b = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)
+        b.eraseColor(BACKGROUND)
+        val painter = ScenePainter(View(context), look, BoardImages.NONE, SceneFonts(look))
+        val face = Shape.Rect(Box(10.0, 10.0, 90.0, 80.0))
+        val band = face.moved(0.0, 10.0)
+        val star = Shape.Path(
+            listOf(MoveTo(150.0, 100.0), LineTo(180.0, 200.0), LineTo(100.0, 135.0), LineTo(200.0, 135.0), LineTo(120.0, 200.0), Close),
+        )
+        painter.draw(
+            Canvas(b),
+            listOf(
+                Op.Fill(band, Argb(0xFFFF0000.toInt()), less = face),
+                Op.Fill(face, Argb(0x40FFFFFF)),
+                Op.Fill(star, Argb(0xFFFFFFFF.toInt())),
+                Op.InnerShadow(star, star, Box(90.0, 90.0, 210.0, 210.0), 0.0, Argb(0xFF0000FF.toInt())),
+            ),
+        )
+        val under = b.getPixel(50, 40)
+        assertTrue("no red under the face: ${Integer.toHexString(under)}", Color.red(under) == Color.green(under))
+        assertTrue(red(b.getPixel(50, 85)))
+        val middle = b.getPixel(150, 150)
+        assertTrue("the star's middle white: ${Integer.toHexString(middle)}", white(middle))
+        assertTrue(white(b.getPixel(150, 120)))
     }
 
     private companion object {

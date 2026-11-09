@@ -62,6 +62,7 @@ class ScenePainter(
     private val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val picture = PicturePaint()
     private val path = Path()
+    private val other = Path()
     private val rect = RectF()
     private val src = Rect()
 
@@ -81,10 +82,13 @@ class ScenePainter(
 
     private fun draw(canvas: Canvas, op: Op) {
         when (op) {
-            is Op.Fill -> fill(canvas, op.shape, op.color.value)
+            is Op.Fill -> {
+                val less = op.less
+                if (less == null) fill(canvas, op.shape, op.color.value) else fillLess(canvas, op.shape, less, op.color.value)
+            }
             is Op.Ripple -> fill(canvas, op.shape, op.color.value)
             is Op.Shadow -> {
-                if (op.blur > 0) paint.maskFilter = BlurMaskFilter(op.blur.toFloat(), BlurMaskFilter.Blur.NORMAL)
+                paint.maskFilter = blur(op.blur)
                 fill(canvas, op.shape, op.color.value)
                 paint.maskFilter = null
             }
@@ -117,22 +121,47 @@ class ScenePainter(
         canvas.drawPath(pathOf(shape), paint)
     }
 
-    // inside the face, its ring less its hole filled even-odd and blurred (BlurMaskFilter draws on a hardware
-    // canvas since API 28): the face clipped first, so the ring's path may be built in the one path after
+    // [shape] less [less] (a key cap's band less its face): Path.op's difference, each of the two filled as a
+    // face is (winding), so what is left is what shows of the one past the other however either crosses itself
+    private fun fillLess(canvas: Canvas, shape: Shape, less: Shape, color: Int) {
+        plain(color)
+        path.rewind()
+        add(path, shape)
+        other.rewind()
+        add(other, less)
+        path.op(other, Path.Op.DIFFERENCE)
+        canvas.drawPath(path, paint)
+    }
+
+    // inside the face, its ring less its hole blurred (BlurMaskFilter draws on a hardware canvas since API 28): the
+    // face clipped first, so the ring's path may be built in the one path after; the hole taken out by Path.op, filled
+    // by the face's rule (winding), so a path crossing itself has as much inside its clip as inside its hole
     private fun innerShadow(canvas: Canvas, op: Op.InnerShadow) {
         canvas.save()
         canvas.clipPath(pathOf(op.shape))
         path.rewind()
-        path.fillType = Path.FillType.EVEN_ODD
         val r = op.ring
         path.addRect(r.left.toFloat(), r.top.toFloat(), r.right.toFloat(), r.bottom.toFloat(), Path.Direction.CW)
-        add(path, op.hole)
+        other.rewind()
+        add(other, op.hole)
+        path.op(other, Path.Op.DIFFERENCE)
         plain(op.color.value)
-        if (op.blur > 0) paint.maskFilter = BlurMaskFilter(op.blur.toFloat(), BlurMaskFilter.Blur.NORMAL)
+        paint.maskFilter = blur(op.blur)
         canvas.drawPath(path, paint)
         paint.maskFilter = null
-        path.fillType = Path.FillType.WINDING
         canvas.restore()
+    }
+
+    // a blur of [radius] px (none for none), one filter a radius: a popup's scene is drawn straight to its view, a
+    // shadow's every frame made anew would be one more object each time
+    private fun blur(radius: Double): BlurMaskFilter? = if (radius > 0) {
+        blurs.getOrPut(radius.toFloat()) { BlurMaskFilter(radius.toFloat(), BlurMaskFilter.Blur.NORMAL) }
+    } else {
+        null
+    }
+
+    private val blurs = object : LinkedHashMap<Float, BlurMaskFilter>(KEPT_BLURS, LOAD, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Float, BlurMaskFilter>?) = size > KEPT_BLURS
     }
 
     private fun pathOf(shape: Shape): Path {
@@ -259,7 +288,7 @@ class ScenePainter(
         }
         op.shadow?.let { shadow ->
             textPaint(op, shadow.color.value, op.stroke)
-            if (shadow.blur > 0.0) paint.maskFilter = BlurMaskFilter(shadow.blur.toFloat(), BlurMaskFilter.Blur.NORMAL)
+            paint.maskFilter = blur(shadow.blur)
             canvas.drawText(op.text, x + shadow.dx.toFloat(), y + shadow.dy.toFloat(), paint)
             // what comes next starts from a paint of none (fill keeps a shadow's mask: Op.Shadow's)
             paint.maskFilter = null
@@ -332,6 +361,7 @@ class ScenePainter(
 
         const val RADII = 8
         private const val KEPT_ICONS = 64
+        private const val KEPT_BLURS = 16
 
         // the icons drawn, every painter's (main thread), the last KEPT_ICONS used: a keyboard made again (a
         // theme switched) inflates none again; let go when what inflating one reads changes (night mode,
