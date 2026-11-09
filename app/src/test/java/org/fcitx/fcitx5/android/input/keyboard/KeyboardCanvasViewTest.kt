@@ -49,6 +49,10 @@ import org.fcitx.fcitx5.android.scene.Shape
 import org.fcitx.fcitx5.android.scene.look.BoardBase
 import org.fcitx.fcitx5.android.scene.look.Crop
 import org.fcitx.fcitx5.android.scene.look.KeyFill
+import org.fcitx.fcitx5.android.scene.look.KeyLabel
+import org.fcitx.fcitx5.android.scene.look.KeyOverride
+import org.fcitx.fcitx5.android.scene.look.KeyPressed
+import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.scene.look.Picture
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
@@ -156,7 +160,8 @@ class KeyboardCanvasViewTest {
         // the hidden views are no one's to read
     }
 
-    // a theme the engine refuses (a font file's name 4.0 takes no file by): 060-render-p2 U8, the
+    // a theme the engine refuses (more single keys than a 3.0 file brings, each a pressed colour of its own: more
+    // styles than LookTheme.MAX_STYLES; a file's odd name no longer, LookTheme renames it): 060-render-p2 U8, the
     // built-in theme of its lightness drawn, logged; never the views again (they go in S8). Its keys
     // the built-in theme's as that theme draws them, touched and read as ever
     @Test
@@ -171,7 +176,11 @@ class KeyboardCanvasViewTest {
         try {
             for (builtIn in listOf(ThemePreset.PixelLight, ThemePreset.PixelDark)) {
                 val look = builtIn.look
-                val broken = Theme.Custom("broken", builtIn.isDark, look.copy(text = look.text.copy(keyFont = "/themes/x/bad:name.ttf")))
+                val many = (0..LookTheme.MAX_STYLES / 2).associate { i -> "b$i/k" to KeyOverride(null, KeyPressed.Color(i), KeyLabel.Show) }
+                val broken = Theme.Custom(
+                    "broken", builtIn.isDark,
+                    look.copy(keys = look.keys.copy(overrides = many), text = look.text.copy(keyFont = "/themes/x/bad.ttf")),
+                )
                 val drawn = KeyboardHarness(builtIn).start().use { h -> h.canvas()!!.scene!!.let { it.base to it.keys.map { k -> k.id to k.faces } } }
                 logged.clear()
                 KeyboardHarness(broken).start().use { h ->
