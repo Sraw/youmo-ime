@@ -42,18 +42,22 @@ data class Argb(val value: Int) {
  * pattern shows one level):
  * - `darker(c, n%)`: each of r, g, b n% nearer black; `lighter(c, n%)`: nearer white;
  * - `alpha(c, n%)`: c with its alpha set to n% (not multiplied: what the maker's slider shows);
- * - `mix(a, b, n%)`: n% of the way from a to b, alpha too (the floating handle's 10% of the text).
+ * - `mix(a, b, n%)`: n% of the way from a to b, alpha too (the floating handle's 10% of the text);
+ * - `system(name, c)`: the system's colour [name] (one of [SYSTEM_NAMES]: Material's roles, Android's
+ *   palette), c where the reader was given none (an older Android, the web).
  */
 sealed interface ColorExpr {
     data class Literal(val argb: Argb) : ColorExpr
     data class Ref(val name: String) : ColorExpr
     data class Fn(val name: String, val args: List<ColorExpr>, val percent: Double) : ColorExpr
+    data class System(val name: String, val fallback: ColorExpr) : ColorExpr
 
-    /** Its colour, [vars] giving a variable's (null: no such colour). */
-    fun resolve(vars: (String) -> Argb?): Argb? = when (this) {
+    /** Its colour, [vars] giving a variable's (null: no such colour), [system] the system's (null: the fallback). */
+    fun resolve(vars: (String) -> Argb?, system: (String) -> Argb? = { null }): Argb? = when (this) {
         is Literal -> argb
         is Ref -> vars(name)
-        is Fn -> args.map { it.resolve(vars) ?: return null }.let { apply(name, it, percent / PERCENT) }
+        is Fn -> args.map { it.resolve(vars, system) ?: return null }.let { apply(name, it, percent / PERCENT) }
+        is System -> fallback.resolve(vars, system)?.let { system(name) ?: it }
     }
 
     /** The variables it names. */
@@ -61,6 +65,7 @@ sealed interface ColorExpr {
         is Literal -> emptyList()
         is Ref -> listOf(name)
         is Fn -> args.flatMap { it.refs() }
+        is System -> fallback.refs()
     }
 
     companion object {
@@ -75,6 +80,17 @@ sealed interface ColorExpr {
         /** Functions nested this deep at most, a colour [MAX_LENGTH] characters: a theme comes from anywhere. */
         const val MAX_DEPTH = 8
         const val MAX_LENGTH = 256
+
+        /**
+         * The names `system()` takes: Material's roles the Monet theme uses, and Android's palette
+         * (`system_accent1_0` … `system_neutral2_1000`, 5 groups of 13 tones) as `accent1-0` … `neutral2-1000`.
+         */
+        val SYSTEM_NAMES: Set<String> = setOf(
+            "primary", "on-primary", "secondary-container", "surface-container", "surface-container-high",
+            "surface-container-highest", "surface-bright", "on-surface", "on-surface-variant",
+        ) + listOf("accent1", "accent2", "accent3", "neutral1", "neutral2").flatMap { group ->
+            listOf(0, 10, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000).map { "$group-$it" }
+        }
 
         /** [text] read, or null where it is no colour (or nested over [MAX_DEPTH], or over [MAX_LENGTH] long). */
         fun parse(text: String): ColorExpr? = if (text.length > MAX_LENGTH) null else parse(text, 0)
@@ -93,6 +109,7 @@ sealed interface ColorExpr {
 
         private fun function(t: String, depth: Int): ColorExpr? {
             val name = t.substringBefore('(')
+            if (name == "system") return system(t, depth)
             val arity = ARITY[name] ?: return null
             if (!t.endsWith(")")) return null
             val args = splitTop(t.substring(name.length + 1, t.length - 1)) ?: return null
@@ -101,6 +118,18 @@ sealed interface ColorExpr {
             val colors = args.dropLast(1).map { parse(it, depth) ?: return null }
             return Fn(name, colors, percent)
         }
+
+        // system(name, fallback): a name of the list, then any colour with no system() anywhere in it
+        private fun system(t: String, depth: Int): ColorExpr? {
+            if (!t.endsWith(")")) return null
+            val args = splitTop(t.substring("system(".length, t.length - 1)) ?: return null
+            if (args.size != 2) return null
+            val name = args[0].trim().takeIf { it in SYSTEM_NAMES } ?: return null
+            val fallback = parse(args[1], depth) ?: return null
+            return if (fallback.hasSystem()) null else System(name, fallback)
+        }
+
+        private fun ColorExpr.hasSystem(): Boolean = this is System || this is Fn && args.any { it.hasSystem() }
 
         /** [s] split at its commas outside parentheses; null where they do not match. */
         fun splitTop(s: String): List<String>? {
