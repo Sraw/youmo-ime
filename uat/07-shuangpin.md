@@ -155,5 +155,5 @@
 - **前提**：B0-18键，**方案** 是"小鹤"（再试一次"自然码"）；然后 **键盘** 改成「九键」再看一次。
 - **操作**：看 L 那个键（九键看 5 键），长按它。
 - **预期**：18 键的键面只写 L，九键的 5 键只写 JKL、1 键角标只写 `1`，都不写 `;`；长按一行里没有 `;` 和 `:`（九键 2–9 键自己设的符号照旧）。把方案改成"微软"，不收起键盘，18 键马上变成 L;，九键 1 键角标马上变成 `1;`（5 键仍是 JKL）。
-- **JVM**：`ShuangpinKeysUatTest.theEighteenKeysUnderASchemeWithoutTheSemicolonShowLAlone`（小鹤键面是 L，没有 `;`）、`ShuangpinKeysUatTest.theNineKeysUnderASchemeWithoutTheSemicolonShowJklAlone`（5 键是 JKL，长按没有 `;` `:`；小鹤、自然码 1 键角标是 `1`，新画法和旧 View 都查；换成微软后不收起键盘就是 `1;`）、`KeyboardWindowTest`（小鹤、自然码的 18 键和九键是没有分号的那个，微软是带分号的）、`GroupedKeyboard18Test.pinyinsEighteenKeysShowLWithoutTheSemicolon`（不带分号时长按没有 `;` `:`，码不变）；设备上不跑。
+- **JVM**：`ShuangpinKeysUatTest.theEighteenKeysUnderASchemeWithoutTheSemicolonShowLAlone`（小鹤键面是 L，没有 `;`）、`ShuangpinKeysUatTest.theNineKeysUnderASchemeWithoutTheSemicolonShowJklAlone`（5 键是 JKL，长按没有 `;` `:`；小鹤、自然码 1 键角标是 `1`，新画法和旧 View 都查；换成微软、重新开始输入后就是 `1;`）、`KeyboardWindowTest`（小鹤、自然码的 18 键和九键是没有分号的那个，微软是带分号的）、`GroupedKeyboard18Test.pinyinsEighteenKeysShowLWithoutTheSemicolon`（不带分号时长按没有 `;` `:`，码不变）；设备上不跑。
 

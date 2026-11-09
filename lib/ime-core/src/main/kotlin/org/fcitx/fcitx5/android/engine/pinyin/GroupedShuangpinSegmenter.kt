@@ -94,7 +94,7 @@ class GroupedShuangpinSegmenter(
      * Whether [final], a key's code, ends a syllable after [lead]: a key's code (the pair reads one) or
      * an initial taken off the bar, as letters (its syllables of that final's group).
      */
-    fun endsSyllable(lead: String, final: Char): Boolean =
+    override fun endsSyllable(lead: String, final: Char): Boolean =
         if (lead.length == 1 && letters.isCode(lead[0])) "$lead$final" in pairs else withFinal["$lead$final"] != null
 
     override fun reads(c: Char) = letters.isCode(c)

@@ -55,6 +55,9 @@ interface KeyedSegmenter : Segmenter {
     /** Whether [c] of the input ends a syllable: the separator, a tone on the zhuyin keyboards. */
     fun separates(c: Char): Boolean = c == SyllableGraph.SEPARATOR
 
+    /** Whether [final], a key's code, ends a syllable after [lead] (a key's code or an initial taken off the bar): only grouped 双拼 says. */
+    fun endsSyllable(lead: String, final: Char): Boolean = false
+
     /** The pinyin letters [c] of the input may be in a custom phrase's key, null for none of the kind (see PhraseKeys.of's ways): zhuyin's keys'. */
     fun phraseWays(c: Char): List<String>? = null
 
