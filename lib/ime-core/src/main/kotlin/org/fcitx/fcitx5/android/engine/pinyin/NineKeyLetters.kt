@@ -4,6 +4,9 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
+import kotlin.math.roundToInt
+import kotlin.math.sqrt
+
 /**
  * Which letters each key of a keyboard of letter groups types, ü as v, each key standing in the
  * input for its code of [codes]. The nine keys' 2 to 9 (codes `23456789`, 1 the separator): as on
@@ -21,6 +24,8 @@ class NineKeyLetters private constructor(
     val separator: Char? = '1',
     // the tag the learning record files the keys under where it is not their letters ([NINE_SP]'s)
     private val filedAs: String? = null,
+    // each key's letters as rows ([custom]'s `pq rs`), where a tap's place falls on them; null: a row each
+    private val rows: List<List<String>>? = null,
 ) {
 
     /** Whether the codes are a grouped keyboard's private use codes ([G14], [G18], [NINE_SP]), not the nine keys' digits: shown as letters. */
@@ -32,12 +37,29 @@ class NineKeyLetters private constructor(
     /**
      * How far a tap at [at] across a key (0 its left edge, 1 its right) goes against its letter
      * [index] (of [letters]), 0 on that letter's half to 1 at the far edge. Two letters a key (the
-     * 14 keys', the only ones tapped with a place: Keyboard.TAPS): the first is the left half, any
-     * other the right. One rule for the segmenter, the syllable bar and Keyboard.typedLetter.
+     * 14 keys', tapped across alone: Keyboard.TAPS): the first is the left half, any other the
+     * right; the two dimensional [against] gives the same for a row of two. The segmenter, the
+     * syllable bar and Keyboard.typedLetter go by the key aware one (code, index, place).
      */
     fun against(index: Int, at: Float): Float {
         val lean = 2 * (at - HALF) // -1 the left edge, 1 the right
         return if (index == 0) maxOf(0f, lean) else maxOf(0f, -lean)
+    }
+
+    /** The rows the letters of [code] sit in on its key, top to bottom (one row for a built-in keyboard's). */
+    fun rowsOf(code: Char): List<String> = codes.indexOf(code).let { k -> if (k < 0) emptyList() else rows?.get(k) ?: listOf(keys[k]) }
+
+    /**
+     * How far a tap at [place] ([NineKeyLetters.place], or a one dimensional x alone) on the key of
+     * [code] goes against its letter [index] (of [letters]): [against] over the key's [rowsOf], a one
+     * dimensional place its y the middle. A key of one row of two letters (the 14 keys') goes by the
+     * two halves' rule, the same values (NineKeyLettersCustomTest), so built-in typing stays as it was.
+     */
+    fun against(code: Char, index: Int, place: Float): Float {
+        val cells = rowsOf(code)
+        val x = placeX(place)
+        if (cells.size == 1 && cells[0].length == 2) return against(index, x)
+        return against(index, x, placeY(place).takeUnless { it.isNaN() } ?: HALF, cells)
     }
 
     /** Whether [c] is one of the keys' codes. */
@@ -103,7 +125,7 @@ class NineKeyLetters private constructor(
         return if (isStandard) "" else keys.joinToString(",")
     }
 
-    override fun equals(other: Any?) = other is NineKeyLetters && other.keys == keys && other.codes == codes
+    override fun equals(other: Any?) = other is NineKeyLetters && other.keys == keys && other.codes == codes && other.rows == rows
 
     override fun hashCode() = keys.hashCode() * 31 + codes.hashCode()
 
@@ -120,6 +142,54 @@ class NineKeyLetters private constructor(
         const val MAX = 5
 
         private const val TYPINGS = 64
+
+        /** The most groups a layout's own keyboard ([custom]) has: its codes' block, [CUSTOM_BLOCK]. */
+        const val CUSTOM_MAX = 30
+
+        // a two dimensional place: x plus twice (1 + its row of [PLACE_ROWS] places); a one dimensional one is x alone, 0 to 1
+        private const val PLACE_ROWS = 9
+        private const val PLACE_SPAN = 2f
+
+        /**
+         * A tap's place on its key, [x] across (0 its left edge, 1 its right) and [y] down (0 its top,
+         * 1 its bottom, to the nearest of 9), as one value the input's taps carry (PressedKeys, the
+         * segmenter): [placeX] and [placeY] read it back. A place of x alone (the 14 keys') is that x.
+         */
+        fun place(x: Float, y: Float): Float = PLACE_SPAN * (1 + (y.coerceIn(0f, 1f) * (PLACE_ROWS - 1)).roundToInt()) + x.coerceIn(0f, 1f)
+
+        /** [place]'s x. */
+        fun placeX(place: Float): Float = if (place < PLACE_SPAN) place else place - PLACE_SPAN * (place / PLACE_SPAN).toInt()
+
+        /** [place]'s y; NaN for a one dimensional place. */
+        fun placeY(place: Float): Float =
+            if (place.isNaN() || place < PLACE_SPAN) Float.NaN else ((place / PLACE_SPAN).toInt() - 1).toFloat() / (PLACE_ROWS - 1)
+
+        /**
+         * How far a tap at ([x], [y]) on a key (0 to 1 each way) goes against its letter [index], the
+         * letters sitting in [rows] (top to bottom, each row's letters sharing its width, the rows its
+         * height; 060-render-v2 §15): the distance from the tap to that letter's cell over the
+         * distance from the cell to the key's farthest corner, 0 to 1. One row of two is the halves'
+         * [against] point by point (each a straight distance, never through a square root).
+         */
+        fun against(index: Int, x: Float, y: Float, rows: List<String>): Float {
+            var r = 0
+            var i = index
+            while (r < rows.size && i >= rows[r].length) i -= rows[r++].length
+            if (r == rows.size) return 0f
+            val cell = Cell(i.toFloat() / rows[r].length, (i + 1).toFloat() / rows[r].length, r.toFloat() / rows.size, (r + 1).toFloat() / rows.size)
+            val far = maxOf(maxOf(cell.distance(0f, 0f), cell.distance(1f, 0f)), maxOf(cell.distance(0f, 1f), cell.distance(1f, 1f)))
+            if (far == 0f) return 0f
+            return (cell.distance(x, y) / far).coerceIn(0f, 1f)
+        }
+
+        // a letter's box on its key: from (x, y) to it straight along one axis where the other is within it
+        private class Cell(val left: Float, val right: Float, val top: Float, val bottom: Float) {
+            fun distance(x: Float, y: Float): Float {
+                val dx = if (x < left) left - x else if (x > right) x - right else 0f
+                val dy = if (y < top) top - y else if (y > bottom) y - bottom else 0f
+                return if (dx == 0f) dy else if (dy == 0f) dx else sqrt(dx * dx + dy * dy)
+            }
+        }
 
         private const val HALF = 0.5f
 
@@ -176,6 +246,57 @@ class NineKeyLetters private constructor(
         private const val FIRST_G14_CODE = '\uF8DA'
         private const val FIRST_NINE_SP_CODE = '\uF8F4'
 
+        // a layout's own groups' codes ([custom]): U+F840 on, freed of Keyboard.SYLLABLES (97 ids, not 98)
+        private const val FIRST_CUSTOM_CODE = '\uF840'
+
+        /**
+         * The codes of a layout's own keyboard ([custom]): its keys' in order from U+F840, at most
+         * [CUSTOM_MAX]. Numbered anew for each keyboard made, never kept: what is learnt is filed
+         * by the groups ([tag]), a code by its key's place among them.
+         */
+        val CUSTOM_BLOCK = FIRST_CUSTOM_CODE.code until FIRST_CUSTOM_CODE.code + CUSTOM_MAX
+
+        // the layout's own keyboard last made: its codes are the ones a custom block's code is read as ([ofCode])
+        @Volatile
+        private var current: NineKeyLetters? = null
+
+        /**
+         * What is wrong with [groups] (each a key's letters, rows apart by a space) for a keyboard of
+         * their own: a to z each on some key (ü as v), a key 1 to [MAX] letters of a to z and ;, none
+         * twice, at most [CUSTOM_MAX] keys; null where nothing is.
+         */
+        @Suppress("ReturnCount")
+        fun problem(groups: List<String>): String? {
+            if (groups.isEmpty() || groups.size > CUSTOM_MAX) return "${groups.size} keys, not 1 to $CUSTOM_MAX"
+            for (g in groups) {
+                val letters = g.replace(" ", "")
+                if (letters.isEmpty() || letters.length > MAX) return "\"$g\" is not 1 to $MAX letters"
+                if (letters.any { it !in 'a'..'z' && it != ';' } || g.split(' ').any { it.isEmpty() }) return "\"$g\" is not letters in rows"
+                if (letters.toSet().size != letters.length) return "\"$g\" has a letter twice"
+            }
+            val missing = ('a'..'z').filter { c -> groups.none { c in it } }
+            return if (missing.isEmpty()) null else "no key types ${missing.joinToString("")}"
+        }
+
+        /**
+         * The grouped keyboard of [groups] (a layout's `letters=`, rows apart by a space; [problem]
+         * none, else IllegalArgumentException): [G14] or [G18] where their letters are those
+         * keyboards' (their codes, their record, so the built-in 14 and 18 keys move nothing),
+         * otherwise one of its own, its codes from [CUSTOM_BLOCK], filed under its [tag].
+         */
+        fun custom(groups: List<String>): NineKeyLetters = made(groups).also { if (it.codes[0].code in CUSTOM_BLOCK) current = it }
+
+        private fun made(groups: List<String>): NineKeyLetters {
+            problem(groups)?.let { throw IllegalArgumentException(it) }
+            val keys = groups.map { it.replace(" ", "") }
+            listOf(G14, G18).firstOrNull { it.keys == keys }?.let { return it }
+            val rows = groups.map { it.split(' ') }.takeIf { r -> r.any { it.size > 1 } }
+            return NineKeyLetters(keys, keys.indices.map { FIRST_CUSTOM_CODE + it }.joinToString(""), separator = null, rows = rows)
+        }
+
+        /** The grouped keyboard what is learnt under [tag] was typed on: [grouped]'s, else a layout's own ([custom], a row a key); null for none. */
+        fun filedAs(tag: String): NineKeyLetters? = grouped(tag) ?: tag.split(',').takeIf { problem(it) == null }?.let(::made)
+
         /**
          * The blocks the grouped keyboards' codes are taken from, whole: [G18]'s U+F8C0 to U+F8D9,
          * [G14]'s U+F8DA to U+F8F3, [NINE_SP]'s U+F8F4 to U+F8FC. The one place they are written:
@@ -201,7 +322,11 @@ class NineKeyLetters private constructor(
          * The grouped keyboard [c] is a code of ([G14], [G18], [NINE_SP]), null for anything else, the
          * nine keys' digits too: one code is of one keyboard alone, so this is all a reader needs.
          */
-        fun ofCode(c: Int): NineKeyLetters? = if (c > Char.MAX_VALUE.code) null else GROUPED.firstOrNull { it.isCode(c.toChar()) }
+        fun ofCode(c: Int): NineKeyLetters? = when {
+            c > Char.MAX_VALUE.code -> null
+            c in CUSTOM_BLOCK -> current?.takeIf { it.isCode(c.toChar()) }
+            else -> GROUPED.firstOrNull { it.isCode(c.toChar()) }
+        }
 
         /** Keys of zhuyin symbols, [codes] theirs ([ZhuyinKeys]): no separator of their own, never grouped(tag)'s. */
         internal fun zhuyin(keys: List<String>, codes: String) = NineKeyLetters(keys, codes, separator = null)

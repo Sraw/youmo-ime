@@ -213,11 +213,12 @@ sealed class Action {
             const val ANY = -1
 
             /**
-             * Ids of the syllables offered run from 0 to this, less one, then again: 98 so that
-             * Keyboard.SYLLABLES ends at U+F87F, the private use area after it left to the grouped
-             * keyboards' codes (ZhuyinKeys from U+F880).
+             * Ids of the syllables offered run from 0 to this, less one, then again: 97 so that
+             * Keyboard.SYLLABLES ends at U+F83F, the private use area after it left to the grouped
+             * keyboards' codes (a layout's own from U+F840, NineKeyLetters.CUSTOM_BLOCK; ZhuyinKeys
+             * from U+F880). Was 98: an id is a list's on show alone, never kept.
              */
-            const val IDS = 98
+            const val IDS = 97
 
             /** At most this many syllables are offered. */
             const val MAX = 64
