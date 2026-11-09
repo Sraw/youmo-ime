@@ -12,7 +12,7 @@ import org.json.JSONObject
 /**
  * The polish tagger (060-voice-tagger.md: ELECTRA-small, int8, 21 MB): its model mapped from the
  * assets (`voice/polish-tagger.ort`, [OrtModel]) and its lists (`polish-tagger.json`: the
- * characters, the ops and the marks after). A [VoicePolishStream.Tagger] for [stream], run on the
+ * characters, the ops, the marks after and the number classes). A [VoicePolishStream.Tagger] for [stream], run on the
  * thread that asks, the recognizer's; [close] when done.
  */
 class VoicePolisher private constructor(
@@ -24,12 +24,16 @@ class VoicePolisher private constructor(
     /** A new hold's: K and the window as measured (VoicePolishStream's). */
     fun stream() = VoicePolishStream(tags, this)
 
-    override fun labels(text: IntArray): Pair<IntArray, IntArray> {
-        if (text.isEmpty()) return IntArray(0) to IntArray(0)
+    override fun labels(text: IntArray): VoicePolishStream.Labels {
+        if (text.isEmpty()) return VoicePolishStream.Labels(IntArray(0), IntArray(0))
         val ids = vocab.encode(text)
-        // by position, as exported (op, after): the two are 44 and 28 wide, so swapped, rows() fails loudly
-        val (op, after) = model.runLongs(ids, longArrayOf(1, ids.size.toLong()))
-        return rows(op, text.size, tags.ops.size) to rows(after, text.size, tags.afters.size)
+        // by position, as exported (op, after, num): 44, 28 and 9 wide, so out of order, rows() fails loudly
+        val (op, after, num) = model.runLongs(ids, longArrayOf(1, ids.size.toLong()))
+        return VoicePolishStream.Labels(
+            rows(op, text.size, tags.ops.size),
+            rows(after, text.size, tags.afters.size),
+            rows(num, text.size, tags.nums.size),
+        )
     }
 
     // the text's rows of [out] ([1, n, width]): the export leaves [CLS] and [SEP]'s out already (voice-eval tagger.py)
@@ -49,7 +53,7 @@ class VoicePolisher private constructor(
         fun open(): VoicePolisher {
             val json = JSONObject(AppData.open("$DIR/polish-tagger.json").bufferedReader().use { it.readText() })
             val vocab = VoicePolishVocab(json.getJSONArray("vocab").strings(), json.getLong("cls"), json.getLong("sep"), json.getLong("unk"))
-            val tags = VoicePolishTags(json.getJSONArray("ops").strings(), json.getJSONArray("after").strings())
+            val tags = VoicePolishTags(json.getJSONArray("ops").strings(), json.getJSONArray("after").strings(), json.getJSONArray("num").strings())
             return VoicePolisher(OrtModel.open(AppData.map("$DIR/polish-tagger.ort"), THREADS), vocab, tags)
         }
 

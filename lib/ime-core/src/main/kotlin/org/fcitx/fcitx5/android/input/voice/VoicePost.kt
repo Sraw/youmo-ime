@@ -5,9 +5,9 @@
 package org.fcitx.fcitx5.android.input.voice
 
 /**
- * What is typed from the stretches a hold heard, 语音整理 off: [VoiceLive] without its tagger, for
- * the evaluation (`ime-eval voice-post`, which replays recorded stretches through it), so a change
- * to the joining or the rules is measured before it ships. Fillers,
+ * What is typed from the stretches a hold heard without the tagger (as when it fails to load):
+ * [VoiceLive] alone, for the evaluation (`ime-eval voice-post`, which replays recorded stretches
+ * through it, no onnxruntime there), so a change to the joining or the clean-up is measured before it ships. Fillers,
  * stammers, slips and punctuation are the polish model's ([VoicePolishStream]; 060-voice-tagger.md),
  * not rules here: the user's choice 2026-11-06, the model doing them better than rules would.
  */

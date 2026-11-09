@@ -48,8 +48,6 @@ class VoiceListener(
     private val hotwords: suspend () -> VoiceHotwords.Words,
     /** the pinyin engine's models (VoiceEngine.language): to rank what is heard, and for the blocked words */
     private val language: VoiceChoice.Language,
-    /** 语音整理: the polish tagger on the text as it streams */
-    private val polish: Boolean = true,
 ) : VoiceSession.Listening {
 
     enum class Failure { NoModel, NoMicrophone }
@@ -243,7 +241,7 @@ class VoiceListener(
             return
         }
         val recognizer = models.recognizer
-        val live = VoiceLive(if (polish) models.polisher?.stream() else null)
+        val live = VoiceLive(models.polisher?.stream())
         val stream = try {
             VoiceEngine.stream(recognizer, words)
         } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {

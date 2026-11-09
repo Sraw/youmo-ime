@@ -39,7 +39,7 @@ class VoiceTalkTest {
     @Test
     fun eachPartIsCleanedOnItsOwn() {
         val talk = VoiceTalk(asItGoes = true)
-        assertEquals("2026年，" to "我们", talk.step("二零二六年，我们", 6))
+        assertEquals("二零二六年，" to "我们", talk.step("二零二六年，我们", 6))
         assertEquals("我们见", talk.rest("二零二六年，我们见"))
     }
 

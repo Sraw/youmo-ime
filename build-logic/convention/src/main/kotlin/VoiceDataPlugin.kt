@@ -39,12 +39,12 @@ import javax.inject.Inject
  *   trained on some million hours, Mandarin and English with punctuation. Of the models sherpa-onnx
  *   runs, the most accurate on the voice evaluation sets (AISHELL-1, FLEURS, ASCEND mixed speech)
  *   but for those five to fifteen times slower, the fastest, and the smallest; and, a transducer,
- *   it takes hotwords. Numbers it writes in characters: VoiceText puts them in digits. Its encoder
+ *   it takes hotwords. Numbers it writes in characters: the polish tagger puts them in digits. Its encoder
  *   is fine-tuned by us for accented Mandarin (KeSpeech's dialect speech 17.1% -> 14.6% wrong,
  *   standard sets unchanged), on synthesized dialect speech held to the original by anchor batches.
  * - silero VAD (MIT): whether what was heard is speech at all (VoiceQuiet).
  * - The polish tagger (ours, 060-voice-tagger.md): drops fillers and words taken back, adds marks,
- *   as the text streams; for now from [LOCAL_PROPERTY]'s directory only, with the streaming model.
+ *   writes numbers in digits (its num head), as the text streams; for now from [LOCAL_PROPERTY]'s directory only, with the streaming model.
  * - Hotwords: the new-word pack (EngineDataPlugin's `downloadEngineWords`), each word's characters
  *   apart by spaces as the dict tool's `hotwords` writes them (HotwordSpelling.spelled), and the
  *   model's BPE vocabulary, which sherpa-onnx encodes them with, read out of its SentencePiece model.

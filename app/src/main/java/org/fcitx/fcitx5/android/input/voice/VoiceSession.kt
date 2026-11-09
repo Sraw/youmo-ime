@@ -126,7 +126,6 @@ class VoiceSession(
             events,
             hotwords = { VoiceEngine.userHotwords(fcitx, habits = AppPrefs.getInstance().internal.useHabits.getValue()) },
             language = VoiceEngine.language(fcitx),
-            polish = AppPrefs.getInstance().keyboard.voicePolish.getValue(),
         )).also {
             it.load()
             it.start()

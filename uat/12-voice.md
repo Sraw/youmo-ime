@@ -39,7 +39,7 @@
 - **前提**：B0-语音。
 - **操作**：按住空格说"二零零二年"，松开；再按住说"百分之五十七"，松开。
 - **预期**：框里是「2002年57%」（或中间带标点）。
-- **JVM**：`VoiceHoldUatTest.numbersAreWrittenInDigits`（识别出的「二零零二年」「百分之五十七」经 VoiceText/ChineseNumbers 上屏为「2002年57%」（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））；设备上不跑。听不听得出是 `~/voice-eval` 的基准。
+- **JVM**：`VoiceHoldUatTest.numbersAreWrittenInDigits`（识别出的「二零零二年」「百分之五十七」经整理模型的数字头（测试里的小标注器）和 ChineseNumbers 上屏为「2002年57%」；`aTaggerFailingTypesTheRawText`：整理失败时原样上屏「二零零二年」（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））；设备上不跑。听不听得出是 `~/voice-eval` 的基准。
 
 ### VO-07 [P1] 不是数字的不乱改
 - **前提**：B0-语音。
@@ -206,7 +206,7 @@
 - **模拟器**：只做冒烟：聊天框里点麦克风，播 `zouba`，播完点那一层结束，等那一层收起后点键盘的回车；只看聊天记录里「我们走吧」正好一条、聊天框空了。
 
 ### VO-29 [P1] 点麦克风说话，定下来的边说边上屏
-- **前提**：B0-语音，多行的「普通文本」框，语音整理开着。
+- **前提**：B0-语音，多行的「普通文本」框。
 - **操作**：点工具栏上的麦克风，连着说几句（中间正常停顿），比如"今天天气很好 我们出去走走 晚上回来吃饭"，说的时候看框里，最后点麦克风结束。
 - **预期**：说着的时候，前面已经定下来的句子变成普通文字（没有下划线），只有最后还在变的一段带下划线；结束后整段是说的话，没有重复、没有漏字，句末按输入框加不加句号（只在结束时加）。说着的时候点框里别的位置：带下划线的那段撤掉，接着说的从新位置开始，结束后不重复。在聊天框里说着时应用把框清空（发出去了）：已经说过的不会再上屏一遍。结束时整理失败（退回原文）也只补后面的，不重复。
 - **JVM**：`VoiceTapUatTest.whatIsSettledIsTypedAsItIsSaid`（一段话在下一段开始前整段待定，下一段一来前一段连标点上屏，最后只补剩下的、句号只在结束时加）、`VoiceTapUatTest.polishedTheFrozenPartIsTypedAsItIsSaid`（开语音整理：冻结的部分边说边上屏）、`VoiceTapUatTest.polishedThenThePolishFailingAtTheEndOnlyWhatFollowsIsTyped`（已上屏「我到了。」，结束时原文「嗯我到了马上走」，只补「马上走」）、`VoiceTapUatTest.underEnglishWhatIsSaidIsTypedOnce`（英文输入法：结束时不把待定文字原地定成文字再上屏一遍）、`VoiceTapUatTest.theCursorMovedWhileTalkingTheTailComposesWhereItWent`、`VoiceTapUatTest.whatTheAppSentIsNotTypedAgain`（说着时框被清空，结束后框还是空的）、`VoiceTapUatTest.whatTheAppRewroteIsNotTypedAgainTheTalkGoesOn`、`VoiceLiveTest`、`VoiceTalkTest`（ime-core：只算关了的段、整理已冻结的部分、停在标点后；改写过的只补公共前缀以后的；原文按子序列对齐，只补后面的；应用拿走的不再打；整理失败后不再边说边上屏）、`EditingSessionTest.aProvisionalCompositionTheAppTookIsNotTakenAgain`（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`）；真机上照"操作"跑一遍（整理冻结的时机看真的模型；微信里发送后框清空）。
