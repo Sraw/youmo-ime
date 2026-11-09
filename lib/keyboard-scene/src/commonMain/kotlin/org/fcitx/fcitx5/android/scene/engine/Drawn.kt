@@ -8,10 +8,14 @@ import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
 
 /** Which part of a key a piece is (the theme's part names), so each state colours it as its part. */
-enum class Part(val xml: String) { Label("label"), Icon("icon"), Badge("badge"), Mark("mark"), Shortcut("shortcut") }
+/** [Hint]: what a function key's swipes do (its marks, drawn as [Shortcut]s); asked only whether it is hidden. */
+enum class Part(val xml: String) { Label("label"), Icon("icon"), Badge("badge"), Mark("mark"), Shortcut("shortcut"), Hint("hint") }
 
-/** Text placed: from ([x], [baseline]), [size] px, squeezed to [scaleX]. */
-data class PlacedText(val text: String, val x: Double, val baseline: Double, val size: Double, val scaleX: Double, val font: String, val weight: Int, val part: Part)
+/** Text placed: from ([x], [baseline]), [size] px, squeezed to [scaleX], its characters [spacing] em apart (a theme's letter-spacing). */
+data class PlacedText(
+    val text: String, val x: Double, val baseline: Double, val size: Double, val scaleX: Double, val font: String, val weight: Int, val part: Part,
+    val spacing: Double = 0.0,
+)
 
 data class PlacedIcon(val name: String, val box: Box, val part: Part)
 
@@ -56,7 +60,7 @@ fun Drawn.grows(measurer: TextMeasurer): KeyMarkYield.Grows? {
     if (texts.isEmpty()) return null
     // the ink at [s], from the ink's corner as [mapTo] has it at [s]
     fun at(s: Double): Box = texts.map { t ->
-        val m = measurer.measure(t.text, t.font, t.weight, t.size * s).ink
+        val m = measurer.measure(t.text, t.font, t.weight, t.size * s, t.spacing).ink
         val x = (t.x - ink.left) * s
         val y = (t.baseline - ink.top) * s
         Box(x + m.left * t.scaleX, y + m.top, x + m.right * t.scaleX, y + m.bottom)

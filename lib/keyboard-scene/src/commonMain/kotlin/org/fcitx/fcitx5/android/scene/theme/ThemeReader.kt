@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.scene.theme
 
+import org.fcitx.fcitx5.android.scene.Icons
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Problems
 import org.fcitx.fcitx5.android.scene.xml.Attributes
@@ -276,23 +277,97 @@ object ThemeReader {
                 values[prop] = v
             }
         }
-        reserved += reserved(el, a, p, colors)
+        reserved += sizesAndReserved(el, a, p, colors, selectors.orEmpty(), values)
         a.done()
-        selectors?.mapNotNull { it.reserved }?.distinct()?.forEach { p.warn(el.line, ignored(it)) }
-        for (v in values.values) {
-            colorsOf(v).flatMap { it.refs() }.filter { it !in colors }.forEach { a.problem("@$it is no colour") }
-        }
-        (values["font"] as? Value.Word)?.word?.takeIf { it != "system" && it !in fonts }?.let { a.problem("font=\"$it\" is no <font>") }
+        selectors?.let { selectorWarnings(el, p, it) }
+        named(values, a, colors, fonts)
+        selectors?.let { readElsewhere(it, values.keys, el.line, p) }
         if (values.isEmpty() && reserved == 0) a.problem("a style that sets nothing")
         return selectors?.let { Style(it, values, order, el.line) }
     }
 
+    // a keyboard's size: on a keyboard alone, or (under a scene, in a state, a list) read, warned of, ignored; the same
+    // names of another widget a later stage's, of one in a list with a keyboard too; how many ignored
+    private fun sizesAndReserved(
+        el: XmlElement, a: Attributes, p: Problems, colors: Set<String>, selectors: List<Selector>, values: MutableMap<String, Value>,
+    ): Int {
+        val keyboard = selectors.any { it.widget == "keyboard" }
+        val sized = if (keyboard) sizes(el, a, p, selectors, values) else 0
+        val keyboards = keyboard && selectors.all { it.widget == "keyboard" }
+        return sized + reserved(el, a, p, colors, skip = if (keyboards) Values.KEYBOARD_SIZES else emptyList())
+    }
+
+    // what of the selectors selects nothing: a later stage's, an input method this app has none of (a misspelt
+    // one, a table it lacks)
+    private fun selectorWarnings(el: XmlElement, p: Problems, selectors: List<Selector>) {
+        selectors.mapNotNull { it.reserved }.distinct().forEach { p.warn(el.line, ignored(it)) }
+        selectors.flatMap { it.scenes }.filter { it.startsWith("im=") && it.removePrefix("im=") !in Selector.IMS }.distinct()
+            .forEach { p.warn(el.line, "@$it is no input method of this app: it selects nothing") }
+    }
+
+    // what a style's [values] name is there: its colours in <colors>, its fonts a <font>, its icons the app's
+    private fun named(values: Map<String, Value>, a: Attributes, colors: Set<String>, fonts: Set<String>) {
+        for (v in values.values) {
+            colorsOf(v).flatMap { it.refs() }.filter { it !in colors }.forEach { a.problem("@$it is no colour") }
+        }
+        for (font in FONT_PROPERTIES) {
+            (values[font] as? Value.Word)?.word?.takeIf { it != "system" && it !in fonts }?.let { a.problem("$font=\"$it\" is no <font>") }
+        }
+        for ((prop, v) in values) {
+            ((v as? Value.OfShown)?.shown as? Shown.Icon)?.name?.takeIf { it !in Icons.ALL }?.let { a.problem("$prop=\"icon($it)\" is no icon of the app's") }
+        }
+    }
+
+    // the properties naming a font: a <font>'s, or system
+    private val FONT_PROPERTIES = listOf("font", "font-han", "font-latin")
+
+    // a key's properties read from one part of it (`align` and `space-content` from its label, `return-icon-*`
+    // from its icon, inherited from the key): set on another part they do nothing, which a warning says
+    private fun readElsewhere(selectors: List<Selector>, props: Set<String>, line: Int, p: Problems) {
+        for (prop in props) {
+            val from = if (prop.startsWith(Values.RETURN_ICON)) "icon" else if (prop in LABEL_READ) "label" else continue
+            selectors.mapNotNull { it.part }.filter { it != from }.distinct()
+                .forEach { p.warn(line, "$prop= on a key's $it does nothing: it is read from its $from") }
+        }
+    }
+
+    private val LABEL_READ = setOf("align", "space-content")
+
     // a property of today's value a later stage reads ([Values.reservedValue]): ignored
     private val RESERVED_VALUE = Value.Flag(false)
 
-    // a later stage's properties ([Values.RESERVED]) each a warning where of their form and naming colours there; how many
-    private fun reserved(el: XmlElement, a: Attributes, p: Problems, colors: Set<String>): Int {
-        val given = Values.RESERVED.filterKeys { el[it] != null }
+    // the keyboard's size, set where every selector is a `keyboard` under no scene or state ([Values.KEYBOARD_SIZES]);
+    // else of its form, and ignored with a warning saying why (how many: a style of them alone sets something): a
+    // theme's keyboard has one size, its scenes and states cannot change it, and a list's other widgets have none
+    private fun sizes(el: XmlElement, a: Attributes, p: Problems, selectors: List<Selector>, values: MutableMap<String, Value>): Int {
+        var ignored = 0
+        val keyboards = selectors.filter { it.widget == "keyboard" }
+        val why = when {
+            keyboards.size < selectors.size -> "in a list of other widgets is ignored: a style of the keyboard alone sets its size"
+            keyboards.any { it.scenes.isNotEmpty() } -> "under a scene is ignored: a theme's keyboard has one size"
+            keyboards.any { it.states.isNotEmpty() } -> "in a state is ignored: a theme's keyboard has one size"
+            else -> null
+        }
+        for (prop in Values.KEYBOARD_SIZES.filter { el[it] != null }) {
+            val what = when (prop) {
+                "height" -> "10%–90%, portrait then landscape"
+                "side-padding" -> "0–300dp, portrait then landscape"
+                else -> "0–100dp, portrait then landscape"
+            }
+            val v = a.value(prop, what) { Values.keyboardSize(prop, it) } ?: continue
+            if (why == null) {
+                values[prop] = Value.OfTwin(v)
+            } else {
+                p.warn(el.line, "$prop= of a keyboard $why")
+                ignored++
+            }
+        }
+        return ignored
+    }
+
+    // a later stage's properties ([Values.RESERVED], but [skip]) each a warning where of their form and naming colours there; how many
+    private fun reserved(el: XmlElement, a: Attributes, p: Problems, colors: Set<String>, skip: List<String>): Int {
+        val given = Values.RESERVED.filterKeys { el[it] != null && it !in skip }
         for ((prop, form) in given) {
             val refs = a.value(prop, "a value of $prop") { form.read(it) }?.flatMap { it.refs() } ?: continue
             refs.filter { it !in colors }.forEach { a.problem("@$it is no colour") }

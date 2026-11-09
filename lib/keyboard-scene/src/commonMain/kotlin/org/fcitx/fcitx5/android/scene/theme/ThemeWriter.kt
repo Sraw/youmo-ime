@@ -18,7 +18,8 @@ package org.fcitx.fcitx5.android.scene.theme
  *   `<colors>` had are gone (a theme read keeps their values only); a style's colours are kept as
  *   written, `@name`, `system()` and all.
  * - A style's selectors joined by `, `, each as [selector] writes it; its properties in
- *   [Values.PROPERTIES]' order, each as [value] writes it. A style that sets nothing is left out.
+ *   [Values.PROPERTIES]' order and then [Values.KEYBOARD_SIZES]', each as [value] writes it. A style
+ *   that sets nothing is left out.
  * - Fonts and icons by name.
  *
  * A theme picked as its other version ([Theme.variant]) is written as its file: read back, it is the
@@ -59,7 +60,7 @@ object ThemeWriter {
         theme.fonts.entries.sortedBy { it.key }.forEach { (name, src) -> element("  ", "font", listOf("name" to name, "src" to src)) }
         // one that sets nothing (a later stage's properties alone, ignored as read) left out: a file of it would not read
         theme.styles.filter { it.values.isNotEmpty() }.forEach { s ->
-            val props = Values.PROPERTIES.mapNotNull { p -> s.values[p]?.let { p to value(p, it) } }
+            val props = WRITTEN.mapNotNull { p -> s.values[p]?.let { p to value(p, it) } }
             element("  ", "style", listOf("select" to s.selectors.joinToString(", ", transform = ::selector)) + props)
         }
         theme.icons.entries.sortedBy { it.key }.forEach { (name, src) -> element("  ", "icon", listOf("name" to name, "src" to src)) }
@@ -67,6 +68,9 @@ object ThemeWriter {
     }
 
     private val CUTS = listOf("portrait", "landscape")
+
+    // a style's properties in the order written: PROPERTIES', then the keyboard's size
+    private val WRITTEN = Values.PROPERTIES + Values.KEYBOARD_SIZES
 
     private fun StringBuilder.colors(colors: Map<String, Argb>) {
         val required = ThemeReader.REQUIRED_COLORS.filter { it in colors }
@@ -124,14 +128,31 @@ object ThemeWriter {
         is Value.OfShadow -> v.shadow.let { s ->
             s.color?.takeIf { s != Shadow.NONE }?.let { "${length(s.dx)} ${length(s.dy)} ${length(s.blur)} ${color(it)}" } ?: "none"
         }
-        is Value.OfBorder -> v.border.let { b -> b.color?.takeIf { b != Border.NONE }?.let { "${length(b.width)} ${color(it)}" } ?: "none" }
+        // a stroke has no `none`: one of no colour is none drawn, a transparent one
+        is Value.OfBorder -> v.border.let { b ->
+            if (property == "stroke") {
+                "${length(b.width)} ${color(b.color ?: ColorExpr.Literal(Argb.TRANSPARENT))}"
+            } else {
+                b.color?.takeIf { b != Border.NONE }?.let { "${length(b.width)} ${color(it)}" } ?: "none"
+            }
+        }
         is Value.Word -> v.word
         is Value.Flag -> v.on.toString()
         is Value.Number -> when (property) {
             "scale" -> "${number(v.number)}%"
             "size" -> "${number(v.number)}sp"
+            "letter-spacing" -> "${number(v.number)}em"
             else -> number(v.number)
         }
+        is Value.OfShown -> when (val s = v.shown) {
+            Shown.ImeName -> "ime-name"
+            Shown.None -> "none"
+            is Shown.Text -> "text(${s.text})"
+            is Shown.Icon -> "icon(${s.name})"
+        }
+        // one value where upright and turned are alike
+        is Value.OfTwin -> listOf(v.twin.portrait, v.twin.landscape).distinct()
+            .joinToString(" ") { if (property == "height") "${number(it)}%" else length(it) }
     }
 
     private fun fill(f: Fill): String = when (f) {

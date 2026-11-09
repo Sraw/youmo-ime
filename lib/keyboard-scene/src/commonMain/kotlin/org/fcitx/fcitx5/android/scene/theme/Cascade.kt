@@ -32,7 +32,11 @@ class Cascade(theme: Theme, private val scene: Set<String>) {
         val general = general(target)
         looked[general]?.let { return it }
         val own = own(general)
-        val out = if (general.part == null) own else of(general.copy(part = null)).filterKeys { it in INHERITED } + own
+        val out = if (general.part == null) {
+            own
+        } else {
+            of(general.copy(part = null)).filterKeys { it in INHERITED && !(it == HIDDEN && general.part == HINT) } + own
+        }
         looked[general] = out
         return out
     }
@@ -74,8 +78,20 @@ class Cascade(theme: Theme, private val scene: Set<String>) {
     }
 
     companion object {
-        /** What a part takes from its key unless a style of its own sets it. */
-        val INHERITED = setOf("color", "icon-color", "font", "weight", "scale", "hidden")
+        /**
+         * What a part takes from its key unless a style of its own sets it: how its text is drawn, as CSS's
+         * text properties are inherited (`key { stroke }` outlines the label and the marks), and what the
+         * key shows (`space-content` set on the space as on its label).
+         */
+        val INHERITED = setOf(
+            "color", "icon-color", "font", "weight", "scale", "hidden",
+            "align", "letter-spacing", "stroke", "text-shadow", "font-han", "font-latin", "space-content",
+        ) + Values.RETURN_ACTIONS.map { "return-icon-$it" }
+
+        // a key's `hidden` hides its label, icon and symbol, never what its swipes do (rules B §5: the
+        // shortcuts stay): the hint hidden only by a style of its own (`key hint { hidden }`)
+        private const val HIDDEN = "hidden"
+        private const val HINT = "hint"
     }
 }
 
@@ -83,11 +99,38 @@ class Cascade(theme: Theme, private val scene: Set<String>) {
  * A theme's cascades by the scenes they are in, kept: what a cascade has worked out (its [Cascade.of]s)
  * depends on nothing else, so the scenes made again of one theme (Shift, Return, a key typed) find
  * their keys' looks already there. One thread's, as the builder is.
+ *
+ * Kept by those of the scenes the theme names: a scene none of its selectors asks of changes nothing
+ * a cascade works out, so the input method, the field and the board (`im=` `field=` `keyboard=`,
+ * always in [org.fcitx.fcitx5.android.scene.engine.Env.scenes]) make no more cascades of a theme that
+ * names none of them than before. One that names some has one for each set of them met together,
+ * so as many as it names allow (every input method, field and board it names, light and dark, ...):
+ * the last [KEPT] used kept, the least used let go first (060-render-p3 T5, ThemeTest). A cascade
+ * let go is made again as asked, its looks worked out again.
  */
 class Cascades(val theme: Theme) {
-    private val made = HashMap<Set<String>, Cascade>()
+    // in the order last used: the first is let go first
+    private val made = LinkedHashMap<Set<String>, Cascade>()
 
-    fun of(scene: Set<String>): Cascade = made.getOrPut(scene) { Cascade(theme, scene) }
+    // the scenes some selector of the theme asks of
+    private val named: Set<String> = theme.styles.flatMapTo(HashSet()) { style -> style.selectors.flatMap { it.scenes } }
+
+    fun of(scene: Set<String>): Cascade {
+        val asked = if (named.containsAll(scene)) scene else scene.filterTo(HashSet()) { it in named }
+        // put last again: the order of use
+        val c = made.remove(asked) ?: Cascade(theme, asked)
+        made[asked] = c
+        if (made.size > KEPT) made.remove(made.keys.first())
+        return c
+    }
+
+    /** How many cascades are kept: what a test measures. */
+    val size: Int get() = made.size
+
+    companion object {
+        /** The most kept of a theme: one of no scenes has one, one of `@dark` two. */
+        const val KEPT = 32
+    }
 }
 
 /** A key's look in one state, from its [Cascade]d properties: defaults for what no style sets. */
@@ -116,6 +159,28 @@ class TextLook(private val v: Map<String, Value>, private val theme: Theme) {
     val weight: Int get() = (v["weight"] as? Value.Number)?.number?.toInt() ?: NORMAL
     val scale: Double get() = ((v["scale"] as? Value.Number)?.number ?: PERCENT) / PERCENT
     val hidden: Boolean get() = (v["hidden"] as? Value.Flag)?.on ?: false
+
+    /** Where the key's glyph is on its face ([Values.CENTER], as ever, [Values.TOP_LEFT], [Values.TOP_CENTER]). */
+    val align: String get() = (v["align"] as? Value.Word)?.word ?: Values.CENTER
+
+    /** Space added after each character, em (Paint.letterSpacing's). */
+    val letterSpacing: Double get() = (v["letter-spacing"] as? Value.Number)?.number ?: 0.0
+
+    /** The font of its Han characters, and of its Latin ones ([Scripts]); null: [font]'s. */
+    val fontHan: String? get() = (v["font-han"] as? Value.Word)?.word
+    val fontLatin: String? get() = (v["font-latin"] as? Value.Word)?.word
+
+    /** An outline round its glyphs: its width (dp) and colour; none where not set or of no width. */
+    val stroke: Border? get() = (v["stroke"] as? Value.OfBorder)?.border?.takeIf { it.width > 0 && it.color != null }
+
+    /** A shadow under its text, dp; none where not set or `none`. */
+    val textShadow: Shadow? get() = (v["text-shadow"] as? Value.OfShadow)?.shadow?.takeIf { it.color != null }
+
+    /** What the space shows instead of the layout's label (`space-content`); null: the layout's. */
+    val spaceContent: Shown? get() = (v["space-content"] as? Value.OfShown)?.shown
+
+    /** What Return shows for [action] (`return-icon-<action>`, [Values.RETURN_ACTIONS]) instead of its icon; null: its icon. */
+    fun returnIcon(action: String): Shown? = (v["return-icon-$action"] as? Value.OfShown)?.shown
 
     private companion object {
         val BLACK = Argb(0xFF000000.toInt())

@@ -323,7 +323,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         prefs.keyboard.letterCase,
     )
 
-    private val keyboardHeightPrefs = listOf(prefs.keyboard.keyboardHeightPercent, prefs.keyboard.keyboardHeightPercentLandscape)
+    // 跟随主题 too: a level whose numbers are stored already changes only it, and the theme's height may be 紧凑
+    private val keyboardHeightPrefs = with(prefs.keyboard) {
+        listOf(keyboardHeightPercent, keyboardHeightPercentLandscape, keyboardHeightFollowTheme)
+    }
 
     // whether the keyboard was made under PackGateView: made anew when the text pack's readiness changes
     private var gateBuilt = false
@@ -443,7 +446,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     // 键盘高度 into or out of 紧凑 makes the keys anew; another level only resizes them (InputView).
     // A level sets both of its numbers in one edit, so each call sees both
     @Keep
-    private val keyboardHeightListener = ManagedPreference.OnChangeListener<Int> { _, _ ->
+    private val keyboardHeightListener = ManagedPreference.OnChangeListener<Any> { _, _ ->
         val compact = keyboardCompact()
         if (compact == compactBuilt) return@OnChangeListener
         rebuilding(ViewRebuild.SETTING)

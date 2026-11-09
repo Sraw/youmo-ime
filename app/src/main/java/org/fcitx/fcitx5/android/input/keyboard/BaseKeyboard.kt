@@ -126,6 +126,19 @@ abstract class BaseKeyboard(
             updateSpaceBadges(spaceLongPress.getValue())
         }
 
+    // what is typed ([SceneEnvs.typing]: the input method, the field) as the scene was last made anew for
+    // it: told while shown, and one shown again (another keyboard was, or the bar's) catches up as it is
+    private var typingSeen = SceneEnvs.typing
+    private val onTyping = { typingChanged() }
+
+    /** What is typed changed: the theme's scenes of it drawn. */
+    private fun typingChanged() {
+        val now = SceneEnvs.typing
+        if (now == typingSeen) return
+        typingSeen = now
+        canvas?.invalidateScene()
+    }
+
     /** Set per field ([KeyboardWindow]): an address's has no glide typing, as no word is typed there. */
     open var address: AddressKeys = AddressKeys.NONE
 
@@ -678,7 +691,14 @@ abstract class BaseKeyboard(
     // the marks drawn once the subclass is made: they read its corners and symbols (swipeText)
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        SceneEnvs.watch(onTyping)
+        typingChanged()
         showSwipeMarks()
+    }
+
+    override fun onDetachedFromWindow() {
+        SceneEnvs.unwatch(onTyping)
+        super.onDetachedFromWindow()
     }
 
     /** Whether the character keys draw their shortcuts' marks: not where their faces have no room ([TextKeyboard]'s roots). */

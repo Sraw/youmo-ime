@@ -11,6 +11,7 @@ import androidx.annotation.StringRes
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.keyboard.LevelPick
 import org.fcitx.fcitx5.android.ui.main.modified.MySwitchPreference
 import org.fcitx.fcitx5.android.ui.main.settings.DialogSeekBarPreference
@@ -29,7 +30,9 @@ abstract class ManagedPreferenceUi<T : Preference>(
     /**
      * A choice of a few [levels], each setting the int preferences [keys] at once; itself stored
      * nowhere: shown as the level nearest what they hold, so a value set by an older version
-     * shows as its nearest level and stays till the user picks one.
+     * shows as its nearest level and stays till the user picks one. With [follow] (a boolean
+     * preference's key and default), 跟随主题 first: picked, it is set and the keys go back to
+     * their defaults; a level picked unsets it.
      */
     class Levels(
         @StringRes
@@ -38,22 +41,40 @@ abstract class ManagedPreferenceUi<T : Preference>(
         private val store: SharedPreferences,
         val keys: List<Pair<String, Int>>,
         private val levels: List<Level>,
-        enableUiOn: (() -> Boolean)? = null
+        enableUiOn: (() -> Boolean)? = null,
+        val follow: Pair<String, Boolean>? = null,
     ) : ManagedPreferenceUi<ListPreference>(key, enableUiOn) {
 
         /** A level named [label]: [values] for the keys, in their order. */
         class Level(@StringRes val label: Int, vararg val values: Int)
 
-        /** The level nearest what the keys hold ([LevelPick]: as the keyboard reads 键盘高度's). */
-        fun current(): Int =
-            LevelPick.nearest(keys.map { (name, default) -> store.getInt(name, default) }, levels.map { it.values.toList() })
+        // 跟随主题's place before the levels
+        private val first = if (follow != null) 1 else 0
 
-        /** Sets the keys to level [index], the nearest too if [again]; false if there is none such. */
+        /** 跟随主题 is set ([follow]). */
+        fun following(): Boolean = follow?.let { (name, default) -> store.getBoolean(name, default) } ?: false
+
+        /** 跟随主题 (0) where it is set, else the level nearest what the keys hold ([LevelPick]: as the keyboard reads 键盘高度's). */
+        fun current(): Int = if (following()) {
+            0
+        } else {
+            first + LevelPick.nearest(keys.map { (name, default) -> store.getInt(name, default) }, levels.map { it.values.toList() })
+        }
+
+        /** Sets the keys to level [index] (0 跟随主题 where there is [follow]), the one shown too if [again]; false if there is none such. */
         fun pick(index: Int, again: Boolean = false): Boolean {
-            val level = levels.getOrNull(index) ?: return false
-            // the nearest, as the list shows it when the page opens: not written over what is there
+            // the one shown as the page opens: not written over what is there
             if (!again && index == current()) return true
+            if (follow != null && index == 0) {
+                store.edit {
+                    putBoolean(follow.first, true)
+                    keys.forEach { (name, _) -> remove(name) }
+                }
+                return true
+            }
+            val level = levels.getOrNull(index - first) ?: return false
             store.edit {
+                follow?.let { putBoolean(it.first, false) }
                 keys.forEachIndexed { k, (name, _) -> putInt(name, level.values[k]) }
             }
             return true
@@ -74,8 +95,9 @@ abstract class ManagedPreferenceUi<T : Preference>(
             key = this@Levels.key
             isIconSpaceReserved = false
             isSingleLineTitle = false
-            entryValues = levels.indices.map { it.toString() }.toTypedArray()
-            entries = levels.map { context.getString(it.label) }.toTypedArray()
+            val labels = (if (follow != null) listOf(R.string.follow_theme) else emptyList()) + levels.map { it.label }
+            entryValues = labels.indices.map { it.toString() }.toTypedArray()
+            entries = labels.map { context.getString(it) }.toTypedArray()
             summaryProvider = ListPreference.SimpleSummaryProvider.getInstance()
             // stored nowhere: without a default the list would not read the level at all
             setDefaultValue("0")

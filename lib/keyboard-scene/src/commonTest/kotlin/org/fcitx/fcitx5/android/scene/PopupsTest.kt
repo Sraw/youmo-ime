@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Cascade
+import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.test.Test
@@ -190,6 +191,28 @@ class PopupsTest {
         assertEquals(wide - 2 * px(Popups.MENU_PILL_SIDE_DP), pill.width, 1e-9)
         val text = s.keys.first().ops(false).filterIsInstance<Op.Text>().single()
         assertEquals(Popups.MENU_TEXT_DP * d, text.size, 1e-9)
+    }
+
+    // 060-render-p3 T4a review: a theme's letter-spacing and each script's font measured in the popups as on the keys
+    @Test
+    fun aPopupsTextIsMeasuredAsAKeys() {
+        val styled = ThemeReader.theme(
+            testData("material-light.xml").replace("</colors>", "</colors>\n<font name=\"kai\" src=\"kai.ttf\"/>")
+                .replace("</theme>", "<style select=\"preview, popup, menu\" letter-spacing=\"0.2em\" font-han=\"kai\"/>\n</theme>"),
+        ).ok()
+        val b = SceneBuilder(styled, Forms.block, FakeMeasurer)
+        val size = Popups.KEY_TEXT_DP * d
+        val spaced = FakeMeasurer.measure(".com", "system", 400, size, 0.2).advance
+        assertEquals(ceil(spaced) + 2 * px(Popups.TEXT_PADDING_DP), b.popupKeys(listOf(".com"), 1, 2000.0).ok().width)
+        val runs = b.preview("拼a", 100.0).ok().texts()
+        assertEquals(listOf("拼" to "kai", "a" to "system"), runs.map { it.text to it.font })
+        assertTrue(runs.all { it.letterSpacing == 0.2 })
+        assertEquals(
+            FakeMeasurer.measure("拼a", "system", 400, runs[0].size, 0.2).advance,
+            b.previewWidth("拼a", runs[0].size).ok(),
+        )
+        val pill = b.menu(listOf(MenuCell("拼音", null)), listOf(0), 0).ok().texts().single()
+        assertEquals("kai" to 0.2, pill.font to pill.letterSpacing)
     }
 
     // the keyboard drawing it has nowhere to send a throw: a fault is a problem

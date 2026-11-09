@@ -49,7 +49,7 @@ class AndroidTextMeasurer(val fonts: SceneFonts) : TextMeasurer {
     private val ink = Rect()
     private val metrics = Paint.FontMetrics()
 
-    private data class Asked(val text: String, val font: String, val weight: Int, val size: Double)
+    private data class Asked(val text: String, val font: String, val weight: Int, val size: Double, val spacing: Double)
 
     // the least recently asked let go first (access order), so a table's roots or another font for a
     // while do not keep growing it
@@ -62,15 +62,19 @@ class AndroidTextMeasurer(val fonts: SceneFonts) : TextMeasurer {
     var measured = 0
         private set
 
-    override fun measure(text: String, font: String, weight: Int, size: Double): TextMetrics =
-        kept.getOrPut(Asked(text, font, weight, size)) { measured(text, font, weight, size) }
+    override fun measure(text: String, font: String, weight: Int, size: Double): TextMetrics = measure(text, font, weight, size, 0.0)
 
-    private fun measured(text: String, font: String, weight: Int, size: Double): TextMetrics {
+    // Paint measures a theme's letter-spacing itself (its getTextBounds too), so not the default's arithmetic
+    override fun measure(text: String, font: String, weight: Int, size: Double, letterSpacing: Double): TextMetrics =
+        kept.getOrPut(Asked(text, font, weight, size, letterSpacing)) { measured(text, font, weight, size, letterSpacing) }
+
+    private fun measured(text: String, font: String, weight: Int, size: Double, letterSpacing: Double): TextMetrics {
         measured++
         Trace.beginSection("measure text")
         try {
             paint.typeface = fonts.typeface(font, weight)
             paint.textSize = size.toFloat()
+            paint.letterSpacing = letterSpacing.toFloat()
             val advance = paint.measureText(text)
             paint.getTextBounds(text, 0, text.length, ink)
             paint.getFontMetrics(metrics)
@@ -132,9 +136,20 @@ object SceneIcons {
     // icon="drawable:123") is no resource looked up that may not exist
     private val named = mutableSetOf<Int>()
 
+    /** The names it draws: the scene's own [org.fcitx.fcitx5.android.scene.Icons.ALL] (a test holds them alike), and none of the menus' ([nameOf]). */
+    val names: Set<String> get() = all.keys
+
+    // the names asked for that it has no drawable of: each logged once a process (a layout's or theme's
+    // name the app does not have draws nothing, every frame)
+    private val unknown = mutableSetOf<String>()
+
     @DrawableRes
-    fun of(name: String): Int? = all[name]
-        ?: name.takeIf { it.startsWith(DRAWABLE) }?.substring(DRAWABLE.length)?.toIntOrNull()?.takeIf { synchronized(named) { it in named } }
+    fun of(name: String): Int? {
+        val id = all[name]
+            ?: name.takeIf { it.startsWith(DRAWABLE) }?.substring(DRAWABLE.length)?.toIntOrNull()?.takeIf { synchronized(named) { it in named } }
+        if (id == null && synchronized(unknown) { unknown.add(name) }) Timber.w("scene icon %s: the app has none, drawn as nothing", name)
+        return id
+    }
 
     /**
      * [icon]'s name for a scene (a menu's item, KeyDef's drawable): its own where it has one, else

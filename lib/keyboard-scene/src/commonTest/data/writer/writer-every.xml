@@ -53,6 +53,13 @@
   <style select="menu" fill="#ffff0000" radius="50%"/>
   <style select="clipboard, candidate:first comment" fill="@key"/>
   <style select="popup:selected" overlay="#80ffffff" font="system" press="face"/>
+  <style select="key label" align="top-left" letter-spacing="0.05em" stroke="0.5dp @keyShadow" text-shadow="0 1dp 1dp #80000000" font-han="afont" font-latin="system"/>
+  <style select="key[role=space] label" space-content="text(空 格)"/>
+  <style select="*/space label" space-content="ime-name"/>
+  <style select="*/enter label, key mark" align="top-center" letter-spacing="-0.1em" stroke="0 transparent" text-shadow="none"/>
+  <style select="key[role=enter] icon" return-icon-send="icon(backspace)" return-icon-search="text(搜)"/>
+  <style select="keyboard" height="38% 52.5%" side-padding="8dp" bottom-padding="0 48dp"/>
+  <style select="keyboard" height="40%"/>
   <icon name="a-icon" src="a.svg"/>
   <icon name="z-icon" src="z.png"/>
 </theme>

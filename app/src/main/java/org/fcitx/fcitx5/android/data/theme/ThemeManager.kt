@@ -46,6 +46,8 @@ object ThemeManager {
     val prefs = AppPrefs.getInstance().registerProvider(::ThemePrefs).also {
         // before a Monet theme's look is made
         ThemeLookMigration.monetLook = it.monetLook()
+        // before the keyboard's size is read
+        it.migrateSizeFollow()
     }
 
     private var monetThemes = listOf(ThemeMonet.getLight(), ThemeMonet.getDark())
@@ -267,6 +269,8 @@ object ThemeManager {
             val monet = prefs.monetLook()
             if (monet != null) putString(ThemeLookMigration.MONET_KEY, ThemeLookMigration.encode(monet))
             else remove(ThemeLookMigration.MONET_KEY)
+            // the sizes' 跟随主题 moved (no managed preference): before the first unlock not moved again
+            putBoolean(ThemePrefs.SIZES_FOLLOW_MIGRATED, prefs.sizeFollowMigrated)
         }
     }
 

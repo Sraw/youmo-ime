@@ -7,19 +7,15 @@ package org.fcitx.fcitx5.android.input.keyboard
 import android.content.Context
 import android.content.ContextWrapper
 import android.inputmethodservice.InputMethodService
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 
 /**
- * Whether the keyboard is 紧凑 as 键盘高度 is set now ([KeyboardHeightLevels], the level the settings
- * list shows): its keys' text smaller ([keyTextScale]), their marks in the top right only ([KeyMarks]).
+ * Whether the keyboard is 紧凑 as 键盘高度 is set now, or the theme's height followed ([KeyboardSizes.compact]:
+ * [KeyboardHeightLevels], the level the settings list shows): its keys' text smaller ([keyTextScale]), their marks in the top right only ([KeyMarks]).
  * Read as the keys are made; the service makes them anew when this changes.
  */
-internal fun keyboardCompact(): Boolean {
-    val keyboard = AppPrefs.getInstance().keyboard
-    return KeyboardHeightLevels.isCompact(keyboard.keyboardHeightPercent.getValue(), keyboard.keyboardHeightPercentLandscape.getValue())
-}
+internal fun keyboardCompact(): Boolean = KeyboardArea.sizes().compact
 
 /**
  * The keys' text: floating ([FloatingKeyboard]), as much smaller as the keys are shorter, or a letter
