@@ -599,8 +599,11 @@ class KeyboardCanvasView(
     }
 }
 
-// what is drawn under the keys: the board's base and the slots' faces (a slot's view drawn over it, its own)
-private fun Scene.under(drawsBase: Boolean): List<Op> = (if (drawsBase) base else emptyList()).let { b -> if (slots.all { it.ops.isEmpty() }) b else b + slots.flatMap { it.ops } }
+// what is drawn under the keys: the board's base and the slots' faces (a slot's view drawn over it, its own).
+// Not the base's picture: the view under the keyboard (the picture host's base, ThemePictureDrawable.board)
+// shows it already, and a picture with alpha laid twice is darker than theme 3.0 drew it
+internal fun Scene.under(drawsBase: Boolean): List<Op> =
+    (if (drawsBase) base.filterNot { it is Op.Picture } else emptyList()).let { b -> if (slots.all { it.ops.isEmpty() }) b else b + slots.flatMap { it.ops } }
 
 /** Whether this is key [ref]: a split row's second copy ([KeyNode.copy] 1) is its own. */
 internal fun KeyNode.of(ref: KeyRef) = id == ref.id && (copy != 0) == ref.copy

@@ -27,6 +27,7 @@ import org.fcitx.fcitx5.android.scene.SceneText
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
+import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.junit.Assert.assertEquals
@@ -95,7 +96,9 @@ class LookThemeTest {
         val scene = scene(theme, SceneData.portrait)
         assertTrue(scene.base.any { it is Op.Picture })
         val q = key(scene, "q")
-        assertEquals(Op.NineSlice(q.shape, "key.png", listOf(1, 2, 3, 4), 2), q.ops(false).filterIsInstance<Op.NineSlice>().single())
+        // the letter's colour under its image where the image is not there, as theme 3.0 showed it
+        val keyColor = Argb(look.palette.keyBackgroundColor)
+        assertEquals(Op.NineSlice(q.shape, "key.png", listOf(1, 2, 3, 4), 2, keyColor), q.ops(false).filterIsInstance<Op.NineSlice>().single())
         // its own pressed face, not tinted over
         val pressed = q.ops(true).filterIsInstance<Op.NineSlice>().map { it.file }
         assertTrue(pressed.toString(), "key-down.png" in pressed)
@@ -103,7 +106,8 @@ class LookThemeTest {
         assertEquals(LookTheme.KEY_FONT, text.font)
         assertEquals(700, text.weight)
         val shift = key(scene, "shift")
-        assertTrue(shift.ops(false).any { it is Op.Picture })
+        // the function keys' colour laid over their picture, as theme 3.0's face did
+        assertEquals(Argb(look.palette.altKeyBackgroundColor), shift.ops(false).filterIsInstance<Op.Picture>().single().over)
         assertTrue(shift.ops(true).any { it is Op.Fill && it.color.value == 0xff112233.toInt() })
         // w's label hidden, its corner's symbol too (a hidden label hides the symbol: rules B §5); its face its kind's image
         val w = key(scene, "w")

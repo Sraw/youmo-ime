@@ -37,6 +37,7 @@ import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.canvas.AndroidTextMeasurer
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
+import org.fcitx.fcitx5.android.input.keyboard.canvas.under
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
@@ -506,6 +507,18 @@ class KeyboardCanvasViewTest {
         val node = c.accessibilityNodeProvider!!.createAccessibilityNodeInfo(shift)!!
         // the compat's: a node's own stateDescription is API 30's, not Android 10's
         assertEquals(c.context.getString(R.string.a11y_state_shift_once), AccessibilityNodeInfoCompat.wrap(node).stateDescription?.toString())
+    }
+
+    // the board's picture is the view's under the keyboard (ThemePictureDrawable.board): not laid a second
+    // time under the keys, where a picture with alpha would come out darker than theme 3.0 drew it
+    @Test
+    fun theBoardsPictureIsNotDrawnTwice() {
+        val board = pictured().let { Theme.Custom(it.name, it.isDark, it.look.copy(base = org.fcitx.fcitx5.android.input.theme.BoardBase.Picture)) }
+        KeyboardHarness(board).start().use { h ->
+            val scene = h.canvas()!!.scene!!
+            assertTrue(scene.base.any { it is Op.Picture })
+            assertTrue(scene.under(drawsBase = true).none { it is Op.Picture })
+        }
     }
 
     // the view moved over the picture (one-handed to the other side): the keys showing it recorded

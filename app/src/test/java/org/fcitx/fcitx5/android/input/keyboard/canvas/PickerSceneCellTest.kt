@@ -132,6 +132,28 @@ class PickerSceneCellTest {
         }
     }
 
+    // a theme whose letters are a nine-slice image: the grid's cells have no images to draw it with, and
+    // show the letters' colour there, as theme 3.0's cells did (not the panel through an empty face)
+    @Test
+    fun aNineSliceThemesCellShowsTheKeyColour() {
+        val light = ThemePreset.PixelLight.look
+        val slice = org.fcitx.fcitx5.android.input.theme.NineSlice("/nowhere/k.png", org.fcitx.fcitx5.android.input.theme.Insets(1, 1, 1, 1), 1)
+        val framed = org.fcitx.fcitx5.android.data.theme.Theme.Custom(
+            "framed", false, light.copy(keys = light.keys.copy(letter = light.keys.letter.copy(fill = org.fcitx.fcitx5.android.input.theme.KeyFill.Image(slice)))),
+        )
+        KeyboardHarness(framed).start().use { h ->
+            h.tap(h.key("符"))
+            h.relayout()
+            val cell = h.shownCells().first()
+            val face = cell.keyNode!!.ops(false).filterIsInstance<Op.NineSlice>().single()
+            assertEquals(light.palette.keyBackgroundColor, face.fallback?.value)
+            val b = android.graphics.Bitmap.createBitmap(cell.width, cell.height, android.graphics.Bitmap.Config.ARGB_8888)
+            cell.draw(android.graphics.Canvas(b))
+            val box = face.shape.bounds
+            assertEquals(light.palette.keyBackgroundColor, b.getPixel(box.left.roundToInt() + 6, box.centerY.roundToInt()))
+        }
+    }
+
     @Test
     fun everyEmoticonWholeInItsCellAt360dp() = everyEmoticonWhole("+w360dp")
 

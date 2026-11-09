@@ -127,8 +127,8 @@ object LookTheme {
         style("key.function", "fill" to fill(names, keys.function.fill, "@altKey"), "color" to "@altKeyText", "icon-color" to "@altKeyText")
         style("key.enter", "fill" to fill(names, keys.enter.fill, "@accentKey"), "color" to "@accentKeyText", "icon-color" to "@accentKeyText")
         style("key.space", "fill" to fill(names, keys.space.fill, "@key"))
-        listOf("letter" to keys.letter, "function" to keys.function, "enter" to keys.enter, "space" to keys.space)
-            .forEach { (kind, k) -> pressed(names, "key.$kind:pressed", k.pressed) }
+        listOf(Triple("letter", keys.letter, "@key"), Triple("function", keys.function, "@altKey"), Triple("enter", keys.enter, "@accentKey"), Triple("space", keys.space, "@key"))
+            .forEach { (kind, k, color) -> pressed(names, "key.$kind:pressed", k.pressed, color) }
         style("key.alt-text", "color" to "@altKeyText", "icon-color" to "@altKeyText")
         style("key mark, key shortcut", "color" to "@keyHint", "icon-color" to "@keyHint")
         // a shortcut's text is not of the theme's size (rules B §6: keyScale leaves it be)
@@ -160,23 +160,27 @@ object LookTheme {
     /** The kinds' fills as the look has them: what the kind's own [KindStyle] says. */
     private fun fill(names: Map<String, String>, f: KeyFill, color: String): String = when (f) {
         KeyFill.Color -> color
-        is KeyFill.Image -> image(names, f.slice)
-        is KeyFill.Picture -> picture(f.blurDp, f.brightness)
+        is KeyFill.Image -> image(names, f.slice, color)
+        // theme 3.0 laid the kind's colour over the picture (its face's colour, translucent or not)
+        is KeyFill.Picture -> picture(f.blurDp, f.brightness, color)
     }
 
     // a pressed face of its own is not tinted too (rules B §3): press="face"
-    private fun StringBuilder.pressed(names: Map<String, String>, select: String, p: KeyPressed) {
+    private fun StringBuilder.pressed(names: Map<String, String>, select: String, p: KeyPressed, color: String = "") {
         when (p) {
             KeyPressed.Darken -> Unit
             is KeyPressed.Color -> style(select, "fill" to Argb(p.argb).toString(), "press" to "face")
-            is KeyPressed.Image -> style(select, "fill" to image(names, p.slice), "press" to "face")
+            is KeyPressed.Image -> style(select, "fill" to image(names, p.slice, color), "press" to "face")
         }
     }
 
-    private fun image(names: Map<String, String>, s: NineSlice) =
-        "image(${names[s.file] ?: fileName(s.file)}, ${s.insets.left} ${s.insets.top} ${s.insets.right} ${s.insets.bottom}, ${s.pxPerDp}x)"
+    // [fallback]: the kind's colour, which theme 3.0 showed where the image was not (yet) there
+    private fun image(names: Map<String, String>, s: NineSlice, fallback: String = "") =
+        "image(${names[s.file] ?: fileName(s.file)}, ${s.insets.left} ${s.insets.top} ${s.insets.right} ${s.insets.bottom}, ${s.pxPerDp}x" +
+            (if (fallback.isEmpty()) ")" else ", $fallback)")
 
-    private fun picture(blurDp: Int, brightness: Int) = "picture(${blurDp}dp, $brightness%)"
+    private fun picture(blurDp: Int, brightness: Int, over: String = "") =
+        "picture(${blurDp}dp, $brightness%${if (over.isEmpty()) "" else ", $over"})"
 
     private fun StringBuilder.style(select: String, vararg props: Pair<String, String>) {
         append("""  <style select="${escape(select)}"""")
