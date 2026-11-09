@@ -184,6 +184,8 @@ object ThemeReader {
         is Value.OfFill -> when (val f = v.fill) {
             is Fill.Solid -> listOf(f.color)
             is Fill.Linear -> f.stops.map { it.first }
+            is Fill.Picture -> listOfNotNull(f.over)
+            is Fill.Image -> listOfNotNull(f.fallback)
             else -> emptyList()
         }
         else -> emptyList()

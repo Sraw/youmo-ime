@@ -125,11 +125,11 @@ sealed interface Op {
     /** A linear gradient over [shape], [angle] degrees, its stops (colour, 0–1). */
     data class Gradient(val shape: Shape, val angle: Double, val stops: List<Pair<Argb, Double>>) : Op
 
-    /** A nine-slice image over [shape], its [insets] source pixels at [pxPerDp]. */
-    data class NineSlice(val shape: Shape, val file: String, val insets: List<Int>, val pxPerDp: Int) : Op
+    /** A nine-slice image over [shape], its [insets] source pixels at [pxPerDp]; [fallback] filled where the image is not there (theme 3.0's key colour). */
+    data class NineSlice(val shape: Shape, val file: String, val insets: List<Int>, val pxPerDp: Int, val fallback: Argb? = null) : Op
 
-    /** The keyboard's picture under [shape], as the theme's `<picture>` unless given. */
-    data class Picture(val shape: Shape, val blurDp: Double?, val brightness: Double?) : Op
+    /** The keyboard's picture under [shape], as the theme's `<picture>` unless given; [over] laid on it (theme 3.0's key colour). */
+    data class Picture(val shape: Shape, val blurDp: Double?, val brightness: Double?, val over: Argb? = null) : Op
 
     /** A shadow: [shape] drawn in [color], blurred [blur] px (none: a solid edge, theme 3.0's). */
     data class Shadow(val shape: Shape, val blur: Double, val color: Argb) : Op
