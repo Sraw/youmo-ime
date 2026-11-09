@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.graphics.Rect
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.FormattedText
@@ -155,6 +156,35 @@ class StrokeUatTest {
         h.api.calls.clear()
         draw(h.nineKey("2"), across = 0.8f, down = 1.2f)
         assertEquals(downs().toString(), listOf(true), downs().map { stroke('n') in it })
+    }
+
+    // the split keyboard's gap: a stroke may start there (no key to tap); a tap there, or a glide, still does nothing
+    @Test
+    @Uat("KB-42")
+    @Config(qualifiers = "w851dp-h393dp-land-440dpi")
+    fun aStrokeStartsInTheSplitGapTooATapOrAGlideThereDoNothing() {
+        harness(KeyboardHarness.PINYIN)
+        assertEquals(h.texts().toString(), 2, h.keys().count { it.label.equals("g", ignoreCase = true) })
+        // between T and Y, the top row's halves
+        val t = h.box(h.key("t"))
+        val y = h.box(h.key("y"))
+        assertTrue("$t $y", y.left - t.right > t.width())
+        val gap = Rect(t.right, t.top, y.left, t.bottom)
+        typed("hao")
+        h.api.calls.clear()
+        h.drag(gap, gap.exactCenterX(), gap.exactCenterY() + 2f * t.height())
+        assertEquals(downs().toString(), listOf(true), downs().map { stroke('s') in it })
+        // a tap there: nothing
+        h.api.calls.clear()
+        h.drag(gap, gap.exactCenterX(), gap.exactCenterY(), steps = 1)
+        assertEquals(emptyList<String>(), downs())
+        close()
+        // glide typing chosen: no glide from the gap, nothing typed
+        harness(KeyboardHarness.PINYIN, glide = true)
+        typed("hao")
+        h.api.calls.clear()
+        h.drag(gap, gap.exactCenterX() + 3f * t.width(), gap.exactCenterY())
+        assertTrue(h.api.calls.toString(), h.api.calls.none { it.startsWith("offerGlide") } && downs().isEmpty())
     }
 
     @Test

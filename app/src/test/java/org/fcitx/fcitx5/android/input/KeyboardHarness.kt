@@ -533,7 +533,8 @@ class KeyboardHarness(
     /** [drag] from [k]'s middle. */
     fun drag(k: ShownKey, toX: Float, toY: Float, holdMs: Long = 0, steps: Int = 12, lift: Boolean = true) = drag(k.bounds, toX, toY, holdMs, steps, lift)
 
-    private fun drag(b: Rect, toX: Float, toY: Float, holdMs: Long, steps: Int, lift: Boolean) {
+    /** [drag] from the middle of [b], the screen's: where no key is (the split keyboard's gap). */
+    fun drag(b: Rect, toX: Float, toY: Float, holdMs: Long = 0, steps: Int = 12, lift: Boolean = true) {
         val x = b.exactCenterX()
         val y = b.exactCenterY()
         finger(MotionEvent.ACTION_DOWN, x, y)

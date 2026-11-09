@@ -78,6 +78,27 @@ class GlideTouchTest {
     }
 
     @Test
+    fun inTheSplitGapAStrokeStartsAGlideDoesNotATapIsTheKeys() {
+        val t = GlideTouch()
+        // a stroke drawn from the gap
+        t.down(0, 50f, 70f, 0, onLetter = false, keyWidth = 100f, keyHeight = 140f, longPressMillis = 300, stroke = true, inGap = true)
+        assertEquals(0, t.pointer)
+        assertEquals(Route.CANCEL_KEYS, t.move(50f, 120f, 40))
+        assertEquals(Route.GLIDE, t.up(50f, 140f, cancelled = false))
+        assertEquals(6, t.takeGlided()?.size)
+        // a tap there: the keys' as ever, no path
+        t.down(0, 50f, 70f, 0, onLetter = false, keyWidth = 100f, keyHeight = 140f, longPressMillis = 300, stroke = true, inGap = true)
+        assertEquals(Route.KEYS, t.up(50f, 70f, cancelled = false))
+        assertNull(t.takeGlided())
+        // glide typing: not from the gap
+        t.down(0, 50f, 70f, 0, onLetter = false, keyWidth = 100f, keyHeight = 140f, longPressMillis = 300, inGap = true)
+        assertEquals(GlideTouch.NO_POINTER, t.pointer)
+        assertEquals(Route.KEYS, t.move(250f, 70f, 40))
+        assertEquals(Route.KEYS, t.up(250f, 70f, cancelled = false))
+        assertNull(t.takeGlided())
+    }
+
+    @Test
     fun twoFingersRollingAreTheKeys() {
         val t = touch()
         assertEquals(Route.KEYS, t.otherDown())
