@@ -1112,4 +1112,8 @@
     <string name="pack_voice_needed_update">語音輸入需要把語音包更新到 v%1$d：設定 → 資源包</string>
     <string name="pack_voice_needed_app">語音包 v%1$d 是給更新版應用程式的：請更新幽默輸入法</string>
     <string name="pack_voice_damaged">語音包已損壞，請重新匯入：設定 → 資源包</string>
+    <string name="letter_case">拼音鍵字母大小寫</string>
+    <string name="letter_case_lower">總是小寫</string>
+    <string name="letter_case_shift">跟隨 Shift</string>
+    <string name="letter_case_upper">總是大寫</string>
 </resources>

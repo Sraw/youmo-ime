@@ -40,6 +40,8 @@ import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.LetterCaseRule
+import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.engine.Texts
 import timber.log.Timber
 
@@ -341,8 +343,8 @@ class GroupedKeyboard(
     // public for its test, which has no touch to open one
     public override fun onPopupAction(action: PopupAction) {
         val shown = when (action) {
-            is PopupAction.PreviewAction -> action.copy(content = previewOf(action.content, action.key, { it }, ::mapped))
-            is PopupAction.PreviewUpdateAction -> action.copy(content = previewOf(action.content, action.key, { it }, ::mapped))
+            is PopupAction.PreviewAction -> action.copy(content = previewOf(cased(action.content), action.key, { it }, ::mapped))
+            is PopupAction.PreviewUpdateAction -> action.copy(content = previewOf(cased(action.content), action.key, { it }, ::mapped))
             is PopupAction.ShowKeyboardAction -> groupOf(action.key)?.let { (group, corner) ->
                 action.copy(keyboard = longPressOf(group, corner, ::symbolsOf))
             } ?: action
@@ -377,6 +379,14 @@ class GroupedKeyboard(
     // the input method shown, for whether a stroke is drawn (笔画筛选)
     private var imeName = ""
 
+    // 拼音键字母大小写 (made anew when it changes): the groups' faces and bubbles in capitals but where it says otherwise
+    private val letterCase by AppPrefs.getInstance().keyboard.letterCase
+    private val upper: Boolean get() = LetterCaseRule.upper(letterCase.case, Shift.None, shiftless = true)
+
+    // a group's letters in a bubble as the face has them; a corner as it is
+    private fun cased(content: String) =
+        if (content.isNotEmpty() && content.all { it.isLetter() || it == ';' }) LetterCaseRule.shown(content, upper) else content
+
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         imeName = ime.uniqueName
         showInputMethodName(ime)
@@ -395,6 +405,7 @@ class GroupedKeyboard(
         )
         val texts = Texts(
             imeName = shownImeName.orEmpty(),
+            letterCase = letterCase.case,
             comma = mapped(","),
             period = mapped("."),
             returnLabel = returnAppearance.label(context).toString(),

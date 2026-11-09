@@ -61,6 +61,7 @@ import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.LetterCaseRule
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.engine.Texts
 import splitties.dimensions.dp
@@ -531,6 +532,9 @@ class T9Keyboard(
 
     private val showLangSwitchKey = AppPrefs.getInstance().keyboard.showLangSwitchKey
 
+    // 拼音键字母大小写 (made anew when it changes): pinyin's letters in capitals but where it says otherwise
+    private val letterCase by AppPrefs.getInstance().keyboard.letterCase
+
     private val multiTapPref = AppPrefs.getInstance().keyboard.t9MultiTap
 
     // English's 连按 is on always where it types a letter at a time: at 连按选字母's pace, or its own
@@ -771,6 +775,12 @@ class T9Keyboard(
 
     private var previewing: Previewing? = null
 
+    // a pressed letter's bubble: English's as Shift has it (what it types), pinyin's as its face (拼音键字母大小写)
+    private fun previewCase(letter: Char): String = LetterCaseRule.shown(
+        letter.toString(),
+        if (english) runUpper else LetterCaseRule.upper(letterCase.case, Shift.None, shiftless = true),
+    )
+
     // the digit key gone down last
     private var pressed: Pressed? = null
 
@@ -784,7 +794,7 @@ class T9Keyboard(
                 pressed = digit?.let { Pressed(it, now) }
                 // 九键双拼 has no 连按: a key's preview is its letters
                 val letter = digit?.takeUnless { shuangpin }?.let { multiTap.peek(it, letters.letters(it), now) }
-                previewing = letter?.let { Previewing(action.key, action.content, if (!english || runUpper) it.uppercase() else it.lowercase()) }
+                previewing = letter?.let { Previewing(action.key, action.content, previewCase(it)) }
                 previewing?.let { action.copy(content = it.letter) }
             }
             // back from the digit a swipe shows
@@ -826,6 +836,7 @@ class T9Keyboard(
             imeName = shownImeName.orEmpty(),
             returnLabel = returnAppearance.label(context).toString(),
             returnIcon = SceneIcons.returnName(returnAppearance.icon),
+            letterCase = LetterCaseRule.forIme(letterCase.case, english),
             nineLetters = ('2'..'9').associate { d -> d.toString() to lettersOn(d, letters, english, shuangpin, semicolon).let { if (english && shift.upper) it.uppercase() else it } },
             a11yGrouped = context.getString(R.string.a11y_key_grouped),
             a11ySpace = context.getString(R.string.a11y_key_space_with_ime),

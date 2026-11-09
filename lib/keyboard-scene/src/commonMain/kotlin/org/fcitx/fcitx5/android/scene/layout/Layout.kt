@@ -200,6 +200,9 @@ sealed interface Text {
         val WITH_LETTER = setOf("case", "root", "sp-hint", "alt")
         val WITH_NUMBER = setOf("zhuyin-group", "nine-letters")
 
+        /** `{group:qw}`: a 14/18 键 key's one or two letters (`;` among them), cased as 拼音键字母大小写 says. */
+        const val GROUP = "group"
+
         /** `{punct:x}`: any one character but a space or a brace (`(`, `@`, `:` among the 18 keys' corners). */
         const val PUNCT = "punct"
         val PLAIN = setOf("ime-name", "return", "confirm", "table-extra", "comma", "period", "back")

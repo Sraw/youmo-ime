@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   14 键（GroupedKeyboard：Grouped14、GroupedShuangpin14，rules C §3），板 k14。宽度为行宽的百分之几：前两行每组 20，
-  第 3 行 分词 15 + 四组各 17.5 + ⌫ 15。组键：组字母大写 20 号，角标（讯飞）1–0 ~ ! @ ?，~ ! @ ? 按标点映射显示（{punct:~}）；
+  第 3 行 分词 15 + 四组各 17.5 + ⌫ 15。组键：组字母 20 号（{group:qw}：大写，拼音键字母大小写另定），角标（讯飞）1–0 ~ ! @ ?，~ ! @ ? 按标点映射显示（{punct:~}）；
   键名按位置 r1c1…，快捷键 g14/<小写组字母>。组的字母写在 letters= 上（060-render-v2 §15「自定义字母分组」）：点按发这组的组码
   （App 从布局收集各组拼成 NineKeyLetters，须等于 G14；按落点加权：letters="as" 是一行两格，点在哪半边哪个字母权重高，
   060-render-v2 §15「按落点加权」），上滑发角标（数字为小键盘数字），长按不写 popup 时是组合式的
@@ -11,39 +11,39 @@
 <keyboard xmlns="https://youmo-ime/layout/1" id="k14" name="14 键" family="grouped" columns="100">
   <defaults kind="letter" text-size="20" width="20"/>
   <row>
-    <key id="r1c1" label="QW" alt="1" letters="qw" swipe-up="keypad:1"
+    <key id="r1c1" label="{group:qw}" alt="1" letters="qw" swipe-up="keypad:1"
          shortcut="g14/qw"/>
-    <key id="r1c2" label="ER" alt="2" letters="er" swipe-up="keypad:2"
+    <key id="r1c2" label="{group:er}" alt="2" letters="er" swipe-up="keypad:2"
          shortcut="g14/er"/>
-    <key id="r1c3" label="TY" alt="3" letters="ty" swipe-up="keypad:3"
+    <key id="r1c3" label="{group:ty}" alt="3" letters="ty" swipe-up="keypad:3"
          shortcut="g14/ty"/>
-    <key id="r1c4" label="UI" alt="4" letters="ui" swipe-up="keypad:4"
+    <key id="r1c4" label="{group:ui}" alt="4" letters="ui" swipe-up="keypad:4"
          shortcut="g14/ui"/>
-    <key id="r1c5" label="OP" alt="5" letters="op" swipe-up="keypad:5"
+    <key id="r1c5" label="{group:op}" alt="5" letters="op" swipe-up="keypad:5"
          shortcut="g14/op"/>
   </row>
   <row>
-    <key id="r2c1" label="AS" alt="6" letters="as" swipe-up="keypad:6"
+    <key id="r2c1" label="{group:as}" alt="6" letters="as" swipe-up="keypad:6"
          shortcut="g14/as"/>
-    <key id="r2c2" label="DF" alt="7" letters="df" swipe-up="keypad:7"
+    <key id="r2c2" label="{group:df}" alt="7" letters="df" swipe-up="keypad:7"
          shortcut="g14/df"/>
-    <key id="r2c3" label="GH" alt="8" letters="gh" swipe-up="keypad:8"
+    <key id="r2c3" label="{group:gh}" alt="8" letters="gh" swipe-up="keypad:8"
          shortcut="g14/gh"/>
-    <key id="r2c4" label="JK" alt="9" letters="jk" swipe-up="keypad:9"
+    <key id="r2c4" label="{group:jk}" alt="9" letters="jk" swipe-up="keypad:9"
          shortcut="g14/jk"/>
-    <key id="r2c5" label="L" alt="0" letters="l" swipe-up="keypad:0"
+    <key id="r2c5" label="{group:l}" alt="0" letters="l" swipe-up="keypad:0"
          shortcut="g14/l"/>
   </row>
   <row>
     <key id="apostrophe" role="apostrophe" kind="function" width="15" label="分词" text-size="16" a11y="a11y_key_separator"
          send="'" shortcut="separator"/>
-    <key id="r3c1" width="17.5" label="ZX" alt="{punct:~}" letters="zx" swipe-up="~"
+    <key id="r3c1" width="17.5" label="{group:zx}" alt="{punct:~}" letters="zx" swipe-up="~"
          shortcut="g14/zx"/>
-    <key id="r3c2" width="17.5" label="CV" alt="{punct:!}" letters="cv" swipe-up="!"
+    <key id="r3c2" width="17.5" label="{group:cv}" alt="{punct:!}" letters="cv" swipe-up="!"
          shortcut="g14/cv"/>
-    <key id="r3c3" width="17.5" label="BN" alt="{punct:@}" letters="bn" swipe-up="@"
+    <key id="r3c3" width="17.5" label="{group:bn}" alt="{punct:@}" letters="bn" swipe-up="@"
          shortcut="g14/bn"/>
-    <key id="r3c4" width="17.5" label="M" alt="{punct:?}" letters="m" swipe-up="?"
+    <key id="r3c4" width="17.5" label="{group:m}" alt="{punct:?}" letters="m" swipe-up="?"
          shortcut="g14/m"/>
     <key id="backspace" role="backspace" kind="function" width="15" icon="backspace" a11y="a11y_key_backspace"
          sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both" shortcut="backspace"/>

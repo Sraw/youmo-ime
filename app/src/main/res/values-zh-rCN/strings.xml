@@ -1112,4 +1112,8 @@
     <string name="pack_voice_needed_update">语音输入需要把语音包更新到 v%1$d：设置 → 资源包</string>
     <string name="pack_voice_needed_app">语音包 v%1$d 是给更新版应用的：请更新幽默输入法</string>
     <string name="pack_voice_damaged">语音包已损坏，请重新导入：设置 → 资源包</string>
+    <string name="letter_case">拼音键字母大小写</string>
+    <string name="letter_case_lower">总是小写</string>
+    <string name="letter_case_shift">跟随 Shift</string>
+    <string name="letter_case_upper">总是大写</string>
 </resources>

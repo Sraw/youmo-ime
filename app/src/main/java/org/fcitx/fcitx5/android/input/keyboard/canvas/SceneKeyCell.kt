@@ -10,6 +10,7 @@ import android.graphics.Canvas
 import android.graphics.Rect
 import android.view.View
 import androidx.annotation.VisibleForTesting
+import kotlin.math.roundToInt
 import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -20,6 +21,7 @@ import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Input
+import org.fcitx.fcitx5.android.scene.engine.LetterCase
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.Texts
@@ -31,7 +33,6 @@ import org.fcitx.fcitx5.android.scene.layout.Row
 import org.fcitx.fcitx5.android.scene.layout.RowSplit
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import timber.log.Timber
-import kotlin.math.roundToInt
 
 /**
  * One key drawn by the engine on its own (060-render-p2 S6): a scene of a board of that key only, its
@@ -101,7 +102,15 @@ open class SceneKeyCell(context: Context, private val theme: Theme, private val 
      * keys' size there ([Board.width] × [Board.height], KeyboardArea) and the key of [Board.shortcut] drawn
      * shrunk to the cell, so its label, its marks kept and given way are the keyboard's own; [attrs] unused. Null: [attrs]'s key alone.
      */
-    data class Board(val layout: String, val shortcut: String, val width: Int, val height: Int, val alts: Map<String, String> = emptyMap())
+    data class Board(
+        val layout: String,
+        val shortcut: String,
+        val width: Int,
+        val height: Int,
+        val alts: Map<String, String> = emptyMap(),
+        /** 拼音键字母大小写, its letters' faces as the keyboard's (a pinyin board's: English's never drawn here). */
+        val letterCase: LetterCase = LetterCase.Shift,
+    )
 
     var board: Board? = null
         set(value) {
@@ -174,7 +183,7 @@ open class SceneKeyCell(context: Context, private val theme: Theme, private val 
     // the whole keyboard of [b], as it is docked (the marks the page's)
     private fun onBoard(t: org.fcitx.fcitx5.android.scene.theme.Theme, b: Board): Scene? {
         val layout = SceneLayouts.of(context, b.layout) ?: return null
-        val env = SceneEnvs.of(this, look, theme.isDark, b.width, b.height, Input(), texts = Texts(alts = b.alts), marks = marks)
+        val env = SceneEnvs.of(this, look, theme.isDark, b.width, b.height, Input(), texts = Texts(alts = b.alts, letterCase = b.letterCase), marks = marks)
         return when (val s = SceneBuilder(t, env, measurer, cascades = SceneThemes.cascades(t)).build(layout.layout, layout.fragments)) {
             is Parsed.Ok -> s.value.also { v -> if (v.keys.none { it.shortcut == b.shortcut }) Timber.e("key cell: no key of %s on %s", b.shortcut, b.layout) }
             is Parsed.Failed -> null.also { Timber.e("key cell: no scene of %s: %s; nothing drawn", b.layout, s.problems) }

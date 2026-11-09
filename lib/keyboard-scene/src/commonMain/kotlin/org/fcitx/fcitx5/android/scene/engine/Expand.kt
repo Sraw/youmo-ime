@@ -129,10 +129,16 @@ object Expand {
             key, attrs, label, alt,
             attrs.icon?.let { icon(it, env) },
             attrs.badge?.let { icon(it, env) },
-            attrs.a11y?.let { text(it, env) } ?: spoken(attrs, key.letters != null, label, alt, env.texts),
+            attrs.a11y?.let { text(it, env) } ?: spoken(attrs, key.letters != null, heard(attrs, label, env), alt, env.texts),
             attrs.alt?.let(::written),
         )
     }
+
+    // the label a screen reader is given: as following Shift shows it, whatever 拼音键字母大小写 draws (the key's
+    // meaning read the same, a capital not read as one only because it is drawn so)
+    private fun heard(attrs: KeyAttrs, label: String?, env: Env): String? =
+        if (env.texts.letterCase == LetterCase.Shift) label
+        else attrs.label?.let { text(it, env.copy(texts = env.texts.copy(letterCase = LetterCase.Shift))) }
 
     /**
      * What a screen reader says of a key the layout gives no a11y, as theme 3.0's keys said it: the
@@ -170,7 +176,12 @@ object Expand {
     private fun binding(name: String, arg: String, env: Env): String {
         val texts = env.texts
         return when (name) {
-            "case" -> if (env.shift != Shift.None || texts.keepUppercase) arg.uppercase() else arg
+            "case" -> cased(arg, env)
+            // a table's root over its letter; a letter with none its letter as `{case:x}` shows it (so a screen
+            // reader's text, read under 跟随 Shift, is the same whatever 拼音键字母大小写 draws)
+            "root" -> texts.other["root:$arg"]?.takeIf { it.isNotEmpty() } ?: cased(arg, env)
+            // a 14/18 键 key's letters: capitals with no Shift to follow, unless the setting says otherwise
+            "group" -> LetterCaseRule.shown(arg, LetterCaseRule.upper(texts.letterCase, env.shift, shiftless = true))
             "alt" -> texts.alts?.get(arg).orEmpty()
             "punct" -> texts.punctuation[arg] ?: arg
             "comma" -> texts.comma
@@ -184,9 +195,12 @@ object Expand {
         }
     }
 
-    // rules C §2: pinyin's and 双拼's in capitals; English's as Shift has them, small without
+    private fun cased(letter: String, env: Env): String =
+        LetterCaseRule.shown(letter, LetterCaseRule.upper(env.texts.letterCase, env.shift, keepUppercase = env.texts.keepUppercase))
+
+    // rules C §2: pinyin's and 双拼's in capitals (or as 拼音键字母大小写 says); English's as Shift has them, small without
     private fun nineLetters(letters: String, env: Env): String =
-        if (env.input.ime == "english" && env.shift == Shift.None) letters.lowercase() else letters.uppercase()
+        LetterCaseRule.shown(letters, LetterCaseRule.upper(env.texts.letterCase, env.shift, shiftless = env.input.ime != "english"))
 
     /** An icon's name: as written, or a binding's (null: none drawn). */
     fun icon(t: Text, env: Env): String? = when (t) {

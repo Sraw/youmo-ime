@@ -103,13 +103,15 @@ class TextBoardSceneTest {
     @Test
     fun aTablesRootsOverTheLetters() {
         val wubi = TableKeyboard(InputMethodCatalog.WUBI, emptySet(), false, KeyLabels.ROOTS, TableRoots.WUBI86)
-        val roots = SceneLetters.roots(wubi) { it.uppercase() }
+        val roots = SceneLetters.roots(wubi)
         assertEquals(26, roots.size)
         assertEquals(wubi.label('g'), roots["root:g"])
         assertTrue(roots.values.any { '\n' in it })
+        // z has no root: left empty, the engine's {root:z} shows the letter ({case:z})
+        assertEquals("", roots["root:z"])
         // none shown: nothing for the binding, nor while the table shows the letters
-        assertTrue(SceneLetters.roots(null) { "$it" }.isEmpty())
-        assertTrue(SceneLetters.roots(wubi.copy(labels = KeyLabels.NONE)) { "$it" }.isEmpty())
+        assertTrue(SceneLetters.roots(null).isEmpty())
+        assertTrue(SceneLetters.roots(wubi.copy(labels = KeyLabels.NONE)).isEmpty())
         val alts = SceneLetters.alts { c -> if (c == 'q') null else "$c!" }
         assertEquals(25, alts.size)
         assertEquals("a!", alts["a"])

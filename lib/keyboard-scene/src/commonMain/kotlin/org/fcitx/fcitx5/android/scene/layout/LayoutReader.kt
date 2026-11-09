@@ -316,6 +316,7 @@ object LayoutReader {
         val ok = when {
             arg == null -> name in Text.PLAIN || name in Text.ICONS
             name == Text.PUNCT -> PUNCT_ARG.matches(arg)
+            name == Text.GROUP -> GROUP_ARG.matches(arg)
             name in Text.WITH_LETTER -> LETTER_ARG.matches(arg)
             name in Text.WITH_NUMBER -> NUMBER_ARG.matches(arg)
             else -> false
@@ -366,6 +367,7 @@ object LayoutReader {
     private val ON_OFF = listOf("on", "off")
     private val POPUP_FROM = listOf("preset", "list", "none", "nine", "group")
     private val NUMBER_ARG = Regex("[0-9]{1,2}")
+    private val GROUP_ARG = Regex("[a-z;]{1,2}")
     private val FAMILIES = listOf("letters", "zhuyin", "nine", "zhuyin-nine", "grouped", "number", "symbols", "handwriting", "emoji-search", "expanded-side", "number-row")
     private val KINDS = listOf("letter", "function", "space", "enter")
     private val SLOT_KINDS = listOf("handwriting-pad", "nine-side", "handwriting-candidates", "symbol-categories", "symbol-grid")

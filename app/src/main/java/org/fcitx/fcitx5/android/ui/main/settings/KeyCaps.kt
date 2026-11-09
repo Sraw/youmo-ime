@@ -114,7 +114,8 @@ object KeyCaps {
         // overrides; none with 标点位置 无): without them no symbol is drawn, nor does one take a mark's room
         val alts = if (markSpots().symbol == KeyMarks.At.None) emptyMap() else
             SceneLetters.alts { c -> c.toString().let { PopupOverridesCache.user.current.resolve(it, PopupPreset[it])?.firstOrNull() } }
-        return SceneKeyCell.Board(layout, shortcut, KeyboardArea.keysWidth(ctx), KeyboardArea.keysHeight(ctx, code), alts)
+        return SceneKeyCell.Board(layout, shortcut, KeyboardArea.keysWidth(ctx), KeyboardArea.keysHeight(ctx, code), alts,
+            AppPrefs.getInstance().keyboard.letterCase.getValue().case)
     }
 
     // a shortcut page's form: its board and the code row that board has

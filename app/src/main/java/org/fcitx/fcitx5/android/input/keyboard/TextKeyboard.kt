@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.InputMethodEntry
+import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.core.KeyState
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -39,6 +40,8 @@ import org.fcitx.fcitx5.android.input.scene.SceneLetters
 import org.fcitx.fcitx5.android.input.scene.TextBoardState
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.LetterCase
+import org.fcitx.fcitx5.android.scene.engine.LetterCaseRule
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.layout.Layout
@@ -170,6 +173,10 @@ class TextKeyboard(
 
     private val keepLettersUppercase by AppPrefs.getInstance().keyboard.keepLettersUppercase
 
+    // 拼音键字母大小写 as it holds for the input method now: English's follows Shift (made anew when it changes)
+    private val letterCaseChoice by AppPrefs.getInstance().keyboard.letterCase
+    private val letterCase: LetterCase get() = LetterCaseRule.forIme(letterCaseChoice.case, english = imeName == InputMethodNames.KEYBOARD)
+
     // what the user made of the long press: a letter's first is its swipe and its corner too
     private val popupOverridesPref = AppPrefs.getInstance().internal.popupOverrides
 
@@ -237,10 +244,12 @@ class TextKeyboard(
             returnIcon = SceneIcons.returnName(returnAppearance.icon),
             confirm = context.getString(R.string.key_confirm),
             keepUppercase = keepLettersUppercase,
+            letterCase = letterCase,
             punctuation = punctuationMapping,
             // the corners and a table's roots
             alts = alts(),
-            other = SceneLetters.roots(table) { c -> letterShown(c.toString()) },
+            // a letter with no root left empty: the engine shows it as {case:x} would (Expand's root)
+            other = SceneLetters.roots(table),
             // the formats as they are: the engine fills their places (getString with no arguments formats nothing)
             a11yGrouped = context.getString(R.string.a11y_key_grouped),
             a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
@@ -250,11 +259,7 @@ class TextKeyboard(
             this, look, theme.isDark, width, height,
             input = state.input(),
             split = isSplit,
-            shift = when (capsState) {
-                CapsState.None -> Shift.None
-                CapsState.Once -> Shift.Once
-                CapsState.Lock -> Shift.Lock
-            },
+            shift = shift(),
             texts = texts,
             marks = marks,
         )
@@ -299,8 +304,14 @@ class TextKeyboard(
             .associateBy { it.displayText[0].lowercaseChar() }
     }
 
-    // a letter as its key shows it with no table's roots over it: Shift's case, or kept upper case
-    private fun letterShown(letter: String) = if (keepLettersUppercase) letter.uppercase() else transformAlphabet(letter)
+    // a letter as its key shows it with no table's roots over it: Shift's case, kept upper case, or 拼音键字母大小写's
+    private fun letterShown(letter: String) = LetterCaseRule.shown(letter, LetterCaseRule.upper(letterCase, shift(), keepUppercase = keepLettersUppercase))
+
+    private fun shift(): Shift = when (capsState) {
+        CapsState.None -> Shift.None
+        CapsState.Once -> Shift.Once
+        CapsState.Lock -> Shift.Lock
+    }
 
     // a letter key's corner: its swipe (the long press's first, built in or the user's, as Shift has it) as
     // the punctuation maps it; the letter itself while a table's roots are over it. The corners are kept
@@ -481,7 +492,7 @@ class TextKeyboard(
         }
     }
 
-    private fun transformPopupPreview(key: KeyRef, c: String) = previewOf(c, key, ::transformAlphabet, ::transformPunctuation)
+    private fun transformPopupPreview(key: KeyRef, c: String) = previewOf(c, key, ::letterShown, ::transformPunctuation)
 
     // a letter's bubble shows its letter whatever its face (Shift's case, a table's roots), as its view's did;
     // a getter: the keys are wired in init, before this class's properties are
