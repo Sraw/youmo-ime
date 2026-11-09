@@ -123,6 +123,10 @@ def import_theme(d, name):
     appearance_tab(d, "主题")
     d.tap_text("新增主题", after=3.0)
     s = d.screen()
+    # 0.6.0's 新增主题 asks first: a file to import, or the web page to make one (M5)
+    if s.find(text="导入主题文件"):
+        d.tap(s.find(text="导入主题文件").c, 3.0)
+        s = d.screen()
     n = next((k for k in s.app() if k.text and k.text.startswith(name)), None)
     if not n and s.find(text="下载"):
         d.tap(s.find(text="下载").c, 2.0)
