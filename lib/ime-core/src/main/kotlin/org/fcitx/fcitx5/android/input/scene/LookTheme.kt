@@ -178,11 +178,7 @@ object LookTheme {
             pressed(names, ks.of(":pressed"), p, "@key")
             if (p is KeyPressed.Image) pressed(names, ks.of(".function:pressed"), p, "@altKey")
         }
-        darkened.forEach { (f, ks) ->
-            style(ks.of(":pressed"), "fill" to fill(names, f ?: keys.letter.fill, "@key"), "press" to if (ripple) "ripple" else "tint")
-            style(ks.of(".function:pressed"), "fill" to fill(names, f ?: keys.function.fill, "@altKey"))
-            style(ks.of(".space:pressed"), "fill" to fill(names, f ?: keys.space.fill, "@key"))
-        }
+        darkened(names, keys, darkened, beforeFlat = true)
         fills.values.flatten().takeIf { it.isNotEmpty() }?.let { style(it.of("", "@flat "), "fill" to "transparent") }
         // flat, nothing pressed either: no face, and no tint where 3.0 drew none over a pressed face of its own
         pressed.values.flatten().takeIf { it.isNotEmpty() }
@@ -201,11 +197,23 @@ object LookTheme {
                 else -> pressed(names, ks.of(".enter:pressed") + ", " + ks.of(".space:pressed", "@flat "), p)
             }
         }
-        darkened.forEach { (f, ks) ->
-            style(ks.of(".enter:pressed"), "fill" to fill(names, f ?: keys.enter.fill, "@accentKey"))
-            style(ks.of(".space:pressed", "@flat "), "fill" to (f?.let { fill(names, it, "@spaceBar") } ?: "@spaceBar"))
-        }
+        darkened(names, keys, darkened, beforeFlat = false)
         overrides.filterValues { it.label == KeyLabel.Hide }.keys.toList().takeIf { it.isNotEmpty() }?.let { style(it.of(" label"), "hidden" to "true") }
+    }
+
+    // [overrides]' Darken lines, before the flat ones (a key's, its function kind's, the space's) or after (Return's, the flat space's)
+    private fun StringBuilder.darkened(names: Map<String, String>, keys: Keys, darkened: Map<KeyFill?, List<String>>, beforeFlat: Boolean) {
+        darkened.forEach { (f, ks) ->
+            fun of(suffix: String, scene: String = "") = ks.joinToString(", ") { "$scene$it$suffix" }
+            if (beforeFlat) {
+                style(of(":pressed"), "fill" to fill(names, f ?: keys.letter.fill, "@key"), "press" to if (keys.press == PressEffect.Ripple) "ripple" else "tint")
+                style(of(".function:pressed"), "fill" to fill(names, f ?: keys.function.fill, "@altKey"))
+                style(of(".space:pressed"), "fill" to fill(names, f ?: keys.space.fill, "@key"))
+            } else {
+                style(of(".enter:pressed"), "fill" to fill(names, f ?: keys.enter.fill, "@accentKey"))
+                style(of(".space:pressed", "@flat "), "fill" to (f?.let { fill(names, it, "@spaceBar") } ?: "@spaceBar"))
+            }
+        }
     }
 
     /** The kinds' fills as the look has them: what the kind's own [KindStyle] says. */
