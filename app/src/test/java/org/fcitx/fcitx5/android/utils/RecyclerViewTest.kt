@@ -54,7 +54,13 @@ class RecyclerViewTest {
             .setSystemWindowInsets(nav)
             .setStableInsets(nav)
             .build()
-        activity.window.decorView.dispatchApplyWindowInsets(insets.toWindowInsets())
+        val platform = insets.toWindowInsets()!!
+        // below API 30 compat also cuts them to the root's stable insets (View.getRootWindowInsets, the view root's
+        // last insets), which a test window never got: set them there as the system would
+        val viewRoot = activity.window.decorView.parent
+        viewRoot.javaClass.getDeclaredField("mLastWindowInsets").apply { isAccessible = true }.set(viewRoot, platform)
+        // to the content view: the decor's action bar layout would take them first
+        root.dispatchApplyWindowInsets(platform)
         assertEquals(48, list.paddingBottom)
         assertEquals(false, list.clipToPadding)
     }
