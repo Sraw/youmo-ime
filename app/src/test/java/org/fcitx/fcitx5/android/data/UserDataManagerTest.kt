@@ -450,10 +450,14 @@ class UserDataManagerTest {
         )
         val fresh = moved("fresh")
         fresh.theme.put("v4/q/theme.xml", "phone's")
+        // the phone's pack of a name the backup has: replaced whole, not merged (a file of it left over)
+        fresh.theme.put("v4/p/theme.xml", "phone's p")
+        fresh.theme.put("v4/p/old.png", "old")
         UserDataManager.import(zip.inputStream(), fresh).getOrThrow()
         assertEquals("<theme/>", File(fresh.theme, "v4/p/theme.xml").readText())
         assertEquals("png", File(fresh.theme, "v4/p/k.png").readText())
         assertEquals("<layout/>", File(fresh.theme, "v4/p/layouts/qwerty.xml").readText())
+        assertFalse(File(fresh.theme, "v4/p/old.png").exists())
         assertEquals("phone's", File(fresh.theme, "v4/q/theme.xml").readText())
     }
 
