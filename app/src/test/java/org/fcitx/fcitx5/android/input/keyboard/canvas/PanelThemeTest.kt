@@ -114,6 +114,17 @@ class PanelThemeTest {
     }
 
     @Test
+    fun theCategoryShownIsTheKeysTextOpaque() {
+        // a key text half seen: the one shown whole, as alpha(1f) had it, whether the engine made the theme or not
+        val light = TestThemes.PixelLight.look
+        val faint = Theme.Custom("faint", false, light.copy(palette = light.palette.copy(keyTextColor = 0x80212121.toInt())))
+        assertEquals(Argb(0xff212121.toInt()), ScenePanels.picker(ctx, faint, side = true).selected.color)
+        SceneThemes.source = { _, _, _ -> "<theme/>" }
+        assertEquals(Argb(0xff212121.toInt()), ScenePanels.picker(ctx, faint, side = true).selected.color)
+        assertEquals(Argb(0xff212121.toInt()), ScenePanels.picker(ctx, faint, side = false).selected.color)
+    }
+
+    @Test
     fun aTabShownOnItsOwnFillHasItsRippleBackOnceAnotherIs() {
         everything()
         val light = TestThemes.PixelLight.look

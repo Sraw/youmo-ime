@@ -106,6 +106,17 @@ class PanelLooksTest {
     }
 
     @Test
+    fun theCategoryShownIsTheKeysTextOpaque() {
+        // the app's alpha(1f) of before: a key text half seen, the one shown whole; the others at their fade
+        val t = theme(source.replace("<color name=\"keyText\" value=\"#37474f\"/>", "<color name=\"keyText\" value=\"#80212121\"/>"))
+        for (side in listOf(true, false)) {
+            val p = looks(t).picker(emptySet(), side)
+            assertEquals(argb(0xff212121), p.selected.color)
+            assertEquals(if (side) PanelLooks.SIDE_FADE else PanelLooks.TAB_FADE, p.categories.color.value ushr 24)
+        }
+    }
+
+    @Test
     fun theEditingPanelNotSetIsTheAppsOfBefore() {
         val e = looks().editing(emptySet())
         assertEquals(PanelLooks.Editing(null, null, false, 4.0), e)

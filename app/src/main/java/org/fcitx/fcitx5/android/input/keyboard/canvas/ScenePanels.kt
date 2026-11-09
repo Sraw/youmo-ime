@@ -41,7 +41,8 @@ object ScenePanels {
             PanelLooks.Picker(
                 fill = null,
                 categories = PanelLooks.Categories(Argb(theme.barColor).takeIf { side }, Argb((text.value and RGB) or (fade shl ALPHA))),
-                selected = PanelLooks.Categories(Argb(theme.keyboardColor).takeIf { side }, text),
+                // opaque, as PanelLooks' default (the app's alpha(1f) of before)
+                selected = PanelLooks.Categories(Argb(theme.keyboardColor).takeIf { side }, Argb((text.value and RGB) or (OPAQUE shl ALPHA))),
             )
         }
 
@@ -73,6 +74,7 @@ object ScenePanels {
 
     private const val RGB = 0xFFFFFF
     private const val ALPHA = 24
+    private const val OPAQUE = 0xFF
 
     // a pill's corners: GradientDrawable draws none rounder than half its shorter side (API 29's too)
     private const val PILL = 10_000f
