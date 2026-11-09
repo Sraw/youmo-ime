@@ -151,7 +151,7 @@ object SceneText {
         }
     }
 
-    private fun q(s: String): String = "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\""
+    private fun q(s: String): String = "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t") + "\""
 
     private const val HUNDRED = 100.0
     private const val TEN = 10

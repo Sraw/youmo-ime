@@ -274,7 +274,7 @@ class HandwritingEngineUatTest {
 
     @Test
     @Uat("HW-31")
-    fun eachCharacterWrittenIsBlockedFromTheKeyboard() = with(replay()) {
+    fun theLastCharacterWrittenIsBlockedFromTheKeyboard() = with(replay()) {
         write("天", "夫")
         write("人", "入", "大")
         val at = page.indexOf("人")
@@ -282,5 +282,7 @@ class HandwritingEngineUatTest {
         val done = learn(org.fcitx.fcitx5.android.engine.learn.control.LearningOp.Block(at, "人"))
         assertTrue("$done", done is org.fcitx.fcitx5.android.engine.learn.control.LearningResult.Done)
         assertTrue("after $page", "人" !in page)
+        // another of the ink's readings first in its place
+        assertTrue("after $page", page.isNotEmpty())
     }
 }

@@ -362,7 +362,8 @@ class DictionaryFormatTest {
         val reads: (List<String>) -> Map<String, String?> = { texts -> texts.associateWith { readings[it] } }
         val big5 = traditional.joinToString("\n") { it.first }.toByteArray(charset("Big5"))
         // some of its pairs no Han as GBK reads them (lines of no word), the rest characters the guess does not read
-        assertTrue(DictionaryFormat.analyse({ big5.inputStream() }, guess = reads) is Refused)
+        val refused = DictionaryFormat.analyse({ big5.inputStream() }, guess = reads) as Refused
+        assertTrue("${refused.reason}", refused.reason in setOf(Reason.UNREADABLE, Reason.MISMATCH))
         // Han all through as GBK reads it, but not words the dictionary reads: a mismatch
         val gbk = traditional.joinToString("\n") { it.first }.toByteArray(WordLists.GB18030)
         val readsNone: (List<String>) -> Map<String, String?> = { texts -> texts.associateWith { null } }

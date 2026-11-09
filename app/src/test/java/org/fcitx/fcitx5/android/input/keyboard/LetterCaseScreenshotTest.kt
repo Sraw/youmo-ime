@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -37,7 +38,11 @@ class LetterCaseScreenshotTest {
     private val setting = AppPrefs.getInstance().keyboard.letterCase
 
     @After
-    fun settingAtItsDefault() = setting.setValue(setting.defaultValue)
+    fun settingAtItsDefault() {
+        setting.setValue(setting.defaultValue)
+        // process-wide: a 五笔 keyboard of a later test would show these roots
+        EngineState.tableKeyboardState.value = null
+    }
 
     private fun KeyboardHarness.letter(id: String) = keys().single { it.id == id }
 
@@ -48,6 +53,8 @@ class LetterCaseScreenshotTest {
     }
 
     @Test
+
+    @Uat("KB-68")
     fun pinyinAlwaysUpper() {
         val heard = KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).start().use { h -> h.letter("q").description }
         setting.setValue(LetterCaseChoice.Upper)
@@ -63,6 +70,8 @@ class LetterCaseScreenshotTest {
     }
 
     @Test
+
+    @Uat("KB-68")
     fun pinyinAlwaysLowerWithShiftOn() {
         setting.setValue(LetterCaseChoice.Lower)
         KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).start().use { h ->
@@ -78,6 +87,8 @@ class LetterCaseScreenshotTest {
     }
 
     @Test
+
+    @Uat("KB-68")
     fun pinyinFollowingShift() {
         KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).start().use { h ->
             assertEquals("q", h.letter("q").label)
@@ -89,6 +100,7 @@ class LetterCaseScreenshotTest {
 
     // English types what it shows: Shift's case, whatever the setting
     @Test
+    @Uat("KB-68")
     fun englishIgnoresIt() {
         setting.setValue(LetterCaseChoice.Upper)
         KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.ENGLISH).start().use { h ->
@@ -104,6 +116,8 @@ class LetterCaseScreenshotTest {
     }
 
     @Test
+
+    @Uat("KB-68")
     fun fourteenAndNineKeysAlwaysLower() {
         val fourteen = ImKeyboards.Chosen(pinyin = ImKeyboard.KEYS14)
         val heard14 = KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN, keyboards = fourteen).start().use { h -> h.letter("r1c1").description }
@@ -125,6 +139,7 @@ class LetterCaseScreenshotTest {
 
     // English's 九键 types its letters as Shift has them: its faces so whatever the setting (forIme)
     @Test
+    @Uat("KB-68")
     fun englishNineKeysIgnoreIt() {
         setting.setValue(LetterCaseChoice.Upper)
         KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.ENGLISH, keyboards = ENGLISH_NINE).start().use { h ->
@@ -139,6 +154,7 @@ class LetterCaseScreenshotTest {
 
     // one keyboard, the input method switched under it: English's faces Shift's, pinyin's the setting's again
     @Test
+    @Uat("KB-68")
     fun switchingInputMethodsInOneKeyboard() {
         setting.setValue(LetterCaseChoice.Upper)
         KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).start().use { h ->
@@ -152,6 +168,7 @@ class LetterCaseScreenshotTest {
 
     // what a tap sends is as it was under 跟随 Shift: the setting draws, never types
     @Test
+    @Uat("KB-68")
     fun whatIsTypedIsUnchanged() {
         fun typed(choice: LetterCaseChoice, shift: Boolean, keyboards: ImKeyboards.Chosen? = null, id: String = "q"): List<String> {
             setting.setValue(choice)
@@ -180,6 +197,7 @@ class LetterCaseScreenshotTest {
 
     // 五笔's roots shown: z has none, its letter drawn as the setting says, read as following Shift has it
     @Test
+    @Uat("KB-68")
     fun aTableLetterWithNoRootIsReadAsEver() {
         val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false)
         fun z() = KeyboardHarness(TestThemes.PixelLight, wubi).start().use { h ->

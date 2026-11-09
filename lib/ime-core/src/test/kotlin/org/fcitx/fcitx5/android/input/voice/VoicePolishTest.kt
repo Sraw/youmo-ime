@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
+import org.fcitx.fcitx5.android.Uat
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -12,6 +13,7 @@ import org.junit.Test
 
 class VoicePolishTest {
 
+    // contract: a fixture written by polish_golden.py (resources/voice/polish-golden.tsv), which mutation cannot see.
     // resources/voice/polish_golden.py: voice-eval's tags.py and fusion_exp.py's freeze rule on fixed texts
     private val golden = javaClass.getResourceAsStream("/voice/polish-golden.tsv")!!.bufferedReader().readLines()
         .filter { it.isNotEmpty() }.map { it.split('\t') }
@@ -45,6 +47,7 @@ class VoicePolishTest {
         }
     }
 
+    @Uat("VO-35")
     @Test
     fun appliesAsPython() {
         for (c in cases("apply")) {
@@ -252,5 +255,31 @@ class VoicePolishTest {
     @Test
     fun everyMarkATalkIsTypedUpToEndsANumber() {
         for (c in VoiceLive.ENDS) assertTrue("$c", "$c" in VoicePolishTags.NUMBER_BREAKS)
+    }
+
+    @Test
+    fun aNumberGoingOnPastTheFrozenEndShowsWholeInTheRest() {
+        val tagger = VoicePolishStream.Tagger { w -> VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size), IntArray(w.size) { 3 }) }
+        val stream = VoicePolishStream(numTags, tagger, freezeAfter = 1, window = 8)
+        // 二零二 frozen, 六 not: not 「202」 then 「六」
+        assertEquals(VoicePolishStream.Shown("", "二零二六"), stream.update("二零二六"))
+        assertEquals("2026", stream.finish("二零二六"))
+    }
+
+    @Test
+    fun englishMarksStayEnglishWithTheirSpaces() {
+        val raw = "Yes, I know? 好的？"
+        val text = VoicePolishTags.norm(raw)
+        val keep = IntArray(text.size)
+        assertEquals("Yes, I know?好的？", tags.apply(text, keep, keep, VoicePolishTags.spaces(raw, text)))
+        // a non-breaking space is one to spaces as to norm
+        val nb = "Windows\u00a011"
+        val t = VoicePolishTags.norm(nb)
+        assertEquals("Windows 11", tags.apply(t, IntArray(t.size), IntArray(t.size), VoicePolishTags.spaces(nb, t)))
+        // nothing after 。 either (。。 would read as an ellipsis)
+        val stop = VoicePolishTags.norm("好。")
+        val after = intArrayOf(0, tags.afters.indexOf("。"))
+        tags.guarded(stop, IntArray(stop.size), after)
+        assertEquals(0, after[1])
     }
 }

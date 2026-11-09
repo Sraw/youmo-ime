@@ -802,7 +802,9 @@ class KeyboardHarness(
         override fun <T> runImmediately(block: suspend HostApi.() -> T): T = runBlocking { block(host) }
         // as the daemon's: a host not up yet (a test pressing before it starts) does it once it is
         override suspend fun <T> runOnReady(block: suspend HostApi.() -> T): T {
-            // the wait timed alone, not [block]; a plain error, which a cancelled job could not swallow
+            // the wait timed alone, not [block]; a plain error, which a cancelled job could not swallow. Timed on the
+            // caller's dispatcher: on the paused main looper that is the test's clock (after()/advance() run it on,
+            // idle() does not), not real time
             if (host is org.fcitx.fcitx5.android.core.KotlinHost)
                 withTimeoutOrNull(READY_TIMEOUT_MS) { host.lifecycle.whenReady { } } ?: error("the host not up in $READY_TIMEOUT_MS ms")
             return block(host)
@@ -835,11 +837,10 @@ class KeyboardHarness(
 
         inline fun <reified T : View> find(v: View): T? = all(v).firstNotNullOfOrNull { it as? T }
 
-        /** [v] and every view under it, depth first. */
         /**
          * [v]'s keys with words, [at] where it is in the window: a bubble's, a long press's, a
-         * menu's words (the 注's pills, an item of no icon); a menu's icons are not, as their views
-         * (ImageView) are not among [popupKeys]. Top row first, then left to right.
+         * menu's words (the 注's pills, an item of no icon); a menu's icons are not ([shownIcons]
+         * reads those). Top row first, then left to right; [popupChoices] the ones up now.
          */
         fun sceneChoices(v: PopupSceneView, at: Rect): List<PopupKey> = v.scene?.keys.orEmpty()
             .filter { it.kind == "popup" || it.kind == "preview" || (it.kind == "menu" && it.ops(false).none { op -> op is Op.Icon }) }
@@ -861,7 +862,7 @@ class KeyboardHarness(
          * made alone (no input view), laid out.
          */
         fun keysOf(root: View, shown: (View) -> Boolean = { true }): List<ShownKey> = when {
-            root.visibility != View.VISIBLE -> emptyList()
+            root.visibility != View.VISIBLE || !shown(root) -> emptyList()
             root is KeyboardCanvasView -> root.scene?.keys?.map { SceneShownKey(root, it.id, it.copy) }.orEmpty()
             root is ViewGroup -> (0 until root.childCount).flatMap { keysOf(root.getChildAt(it), shown) }
             else -> emptyList()
@@ -883,6 +884,7 @@ class KeyboardHarness(
             board != null && board !is org.fcitx.fcitx5.android.input.bar.ui.idle.NumberRow
         }
 
+        /** [v] and every view under it, depth first. */
         fun all(v: View): Sequence<View> = sequence {
             yield(v)
             if (v is ViewGroup) for (i in 0 until v.childCount) yieldAll(all(v.getChildAt(i)))

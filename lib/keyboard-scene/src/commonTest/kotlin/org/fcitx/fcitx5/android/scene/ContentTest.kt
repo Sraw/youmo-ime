@@ -13,7 +13,6 @@ import org.fcitx.fcitx5.android.scene.engine.MarkContent
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
-import org.fcitx.fcitx5.android.scene.engine.TextMetrics
 import org.fcitx.fcitx5.android.scene.engine.toInk
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
@@ -65,7 +64,7 @@ class ContentTest {
         val label = texts(s, "space").single()
         val size = 13 * d
         near(size, label.size)
-        near(face(s, "space").centerX - kotlin.math.ceil(2 * size) / 2, label.x)
+        near(face(s, "space").centerX - ceil(2 * size) / 2, label.x)
         val numbers = texts(s, "numbers").single()
         assertEquals(700, numbers.weight, "text-style=bold")
     }
@@ -92,13 +91,13 @@ class ContentTest {
         assertEquals("redo", redo.name)
         val f = face(s, "y")
         // as its ImageView was laid out: from the pixel its margins reach, whole pixels wide
-        near(kotlin.math.floor(f.left + 3 * d), redo.box.left)
-        near(kotlin.math.floor(f.top + 2 * d), redo.box.top)
-        near(kotlin.math.floor(11 * d + 0.5), redo.box.width)
+        near(floor(f.left + 3 * d), redo.box.left)
+        near(floor(f.top + 2 * d), redo.box.top)
+        near(floor(11 * d + 0.5), redo.box.width)
         val backspace = icons(s, "backspace").map { it.name }
         assertEquals(listOf("backspace", "delete-sweep", "restore").sorted(), backspace.sorted())
         val down = icons(s, "backspace").first { it.name == "restore" }
-        assertTrue(kotlin.math.abs(face(s, "backspace").bottom - 2 * d - down.box.bottom) < 1.0, "down's at the bottom, within its pixel")
+        assertTrue(abs(face(s, "backspace").bottom - 2 * d - down.box.bottom) < 1.0, "down's at the bottom, within its pixel")
         assertEquals("cursor-move", icons(s, "space").single().name)
     }
 
@@ -129,7 +128,7 @@ class ContentTest {
         // boxes a quarter dp in from the face's top and bottom and their corners within the face's rounded ones;
         // drawn no smaller than the marks' cap; one left out only where that is not enough
         // the theme's 4 dp corners, and square ones (where the quarter dp is what stops them)
-        val floor = 0.25
+        val edgeDp = 0.25
         var kept = 0
         var smaller = 0
         var left = 0
@@ -158,31 +157,12 @@ class ContentTest {
             kept++
             if (up.height < icon - 0.01) smaller++
             assertTrue(up.bottom <= down.top + 0.01, "apart $at: $up $down")
-            assertTrue(up.top >= f.top + floor * d - 0.01, "up in its face $at: $up")
-            assertTrue(down.bottom <= f.bottom - floor * d + 0.01, "down in its face $at: $down")
+            assertTrue(up.top >= f.top + edgeDp * d - 0.01, "up in its face $at: $up")
+            assertTrue(down.bottom <= f.bottom - edgeDp * d + 0.01, "down in its face $at: $down")
             iconsWithinArcs(key, at)
         }
         // the sweep met all three: kept as they were, kept smaller, one left out
         assertTrue(kept - smaller >= 20 && smaller >= 10 && left >= 10, "kept $kept (smaller $smaller), left out $left")
-    }
-
-    @Test
-    fun aFloatingBoardsIconsKeepTheirCornersWithinTheFacesArcs() {
-        // floating (and floating compact) boards from their height down to 55% of it, a px or two either way,
-        // at every density: every shortcut's and ⌫'s icon's box, where it moved for its key's glyph, keeps its
-        // corners within the face's rounded ones (less the border); some against them (within the half px the
-        // yields keep off the face's edges, the most a pixel's rounding moves them)
-        val heights = listOf(1.0, 0.9, 0.8, 0.7, 0.65, 0.6, 0.55).flatMap { part -> listOf(0.0, 1.0, 2.0).map { px -> part to px } }
-        var against = 0
-        for (d in listOf(2.0, 2.625, 2.75, 3.0, 3.5)) for (compact in listOf(false, true)) for (board in listOf("qwerty", "k14", "zhuyin", "zhuyin-nine", "handwriting")) {
-            val k = d / Forms.DENSITY
-            against += heights.sumOf { (part, px) ->
-                val e = Forms.floating.copy(width = Forms.floating.width * k, height = Forms.floating.height * k * part - px, density = d, compact = compact)
-                val at = "at $d, ${if (compact) "compact " else ""}$board $part of its height less $px px"
-                Forms.scene(board, Forms.env(board, e)).keys.sumOf { iconsWithinArcs(it, at) }
-            }
-        }
-        assertTrue(against >= 10, "against the arcs: $against")
     }
 
     @Test
@@ -196,12 +176,15 @@ class ContentTest {
                 val e = Forms.env("zhuyin", form.copy(width = form.width * k, height = h.toDouble(), density = d))
                 h to Forms.scene("zhuyin", e).keys.flatMap { it.ops(false) }.filterIsInstance<Op.Icon>().firstOrNull { it.name == "delete-sweep" }?.box
             }
+            var compared = 0
             for (i in 2 until at.size) {
                 val (a, b, c) = Triple(at[i - 2].second, at[i - 1].second, at[i].second)
                 if (a == null || b == null || c == null) continue
+                compared++
                 fun step(x: Box, y: Box) = maxOf(abs(x.left - y.left), abs(x.top - y.top))
                 assertTrue(!(step(a, b) > 1.5 && step(b, c) > 1.5 && step(a, c) <= 1.5), "flicker at $d, ${form.width}, ${at[i - 1].first} px: $a, $b, $c")
             }
+            assertTrue(compared > 0, "the sweep icon drawn three heights running somewhere at $d, ${form.width}")
         }
     }
 
@@ -210,9 +193,12 @@ class ContentTest {
         // floating qwerty, k14, k18, zhuyin and floating compact zhuyin nine at 2, 2.75 and 3.5 px a dp, from their
         // height down to 55% a px at a time: every text and icon at most about 2% smaller or larger a px (an
         // icon's whole px: a px of it, 2.2% of a 46 px one), and every shortcut and ⌫ icon within its face's
-        // arcs (060-render-p2 S4e)
-        val boards = listOf("qwerty", "k14", "k18", "zhuyin").map { it to false } + ("zhuyin-nine" to true)
-        for (d in listOf(1.5, 2.0, 2.75, 3.5)) for ((board, compact) in boards) sweepSmoothly(d, board, Forms.floating.copy(compact = compact))
+        // arcs (060-render-p2 S4e); some against them (within the half px the yields keep off the face's edges,
+        // the most a pixel's rounding moves them), or the arcs were never in play
+        val boards = listOf("qwerty", "k14", "k18", "zhuyin", "handwriting").map { it to false } + ("zhuyin-nine" to true)
+        var against = 0
+        for (d in listOf(1.5, 2.0, 2.75, 3.5)) for ((board, compact) in boards) against += sweepSmoothly(d, board, Forms.floating.copy(compact = compact))
+        assertTrue(against >= 10, "against the arcs: $against")
     }
 
     @Test
@@ -224,20 +210,23 @@ class ContentTest {
         for (d in listOf(1.5, 2.0, 2.75, 3.5)) for (form in listOf(Forms.compact, small)) for (board in listOf("qwerty", "k14", "k18")) sweepSmoothly(d, board, form)
     }
 
-    private fun sweepSmoothly(d: Double, board: String, form: Env) {
+    // the icons against the arcs on the way
+    private fun sweepSmoothly(d: Double, board: String, form: Env): Int {
         val k = d / Forms.DENSITY
         val top = form.height * k
         var last: Map<String, Pair<Double, Boolean>>? = null
         var h = top
+        var against = 0
         while (h >= top * 0.55) {
             val sc = Forms.scene(board, Forms.env(board, form.copy(width = form.width * k, height = h, density = d)))
             val at = "at $d, ${form.width} ${if (form.compact) "compact " else ""}$board $h px"
-            sc.keys.forEach { iconsWithinArcs(it, at) }
+            against += sc.keys.sumOf { iconsWithinArcs(it, at) }
             val sizes = sc.keys.flatMap { key -> key.ops(false).mapNotNull { op -> sized(key, op) } }.toMap()
             last?.let { was -> sizes.forEach { (id, v) -> was[id]?.let { o -> smallStep(id, o.first, v, d, at) } } }
             last = sizes
             h -= 1.0
         }
+        return against
     }
 
     @Test
@@ -427,7 +416,6 @@ class ContentTest {
         // out on the edges before they are put on whole pixels)
         for (d in listOf(2.0, 2.625, 2.75, 3.0, 3.5)) {
             var last: Map<String, Box>? = null
-            var lastH = 0.0
             var px = 0
             while (px < 40) {
                 val h = 150.0 * d - px
@@ -437,7 +425,6 @@ class ContentTest {
                 val now = icons(s, "backspace").associate { it.name to it.box.moved(-f.left, -f.top) }
                 val was = last
                 if (was != null && was.keys == now.keys) {
-                    val step = abs(lastH - f.height)
                     for ((name, b) in now) {
                         val o = was.getValue(name)
                         val moved = maxOf(abs(b.left - o.left), abs(b.top - o.top), abs(b.right - o.right), abs(b.bottom - o.bottom))
@@ -445,7 +432,6 @@ class ContentTest {
                     }
                 }
                 last = now
-                lastH = f.height
                 px++
             }
         }
@@ -616,7 +602,7 @@ class ContentTest {
     // laidOut) almost a px further left, back onto the "@" they had moved left of it
     @Test
     fun aKeysMarksStayApartWhereItsIconIsLaidOutOnWholePixels() {
-        val wide = object : org.fcitx.fcitx5.android.scene.engine.TextMeasurer {
+        val wide = object : TextMeasurer {
             override fun measure(text: String, font: String, weight: Int, size: Double) = FakeMeasurer.measure(text, font, weight, size).let { m ->
                 if (text == "@") m.copy(ink = Box(m.ink.left, m.ink.top, m.ink.left + 0.82 * size, m.ink.bottom), advance = 0.9 * size) else m
             }

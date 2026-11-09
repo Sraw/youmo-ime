@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.KeyState
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
@@ -113,7 +114,10 @@ class PickerWindow(
             is KeyAction.HostKeyAction -> {
                 // we want the behavior of CommitAction (commit the character, not through the engine),
                 // but don't want to include it in recently used list; as punctuation maps it, as its face
-                // shows it ({punct:.} in emoji.xml, emoticon.xml): 显示和输出一致
+                // shows it ({punct:.} in emoji.xml, emoticon.xml): 显示和输出一致. Before what it types is
+                // known (a first install, the host not up) dropped, as the text keyboards' punctuation keys are
+                if (!punctuation.known) punctuation.update(PunctuationStartKeys.known)
+                if (!punctuation.known) return@KeyActionListener
                 commonKeyActionListener.listener.onKeyAction(KeyAction.CommitAction(punctuation.mapping[it.act] ?: it.act), source)
             }
 

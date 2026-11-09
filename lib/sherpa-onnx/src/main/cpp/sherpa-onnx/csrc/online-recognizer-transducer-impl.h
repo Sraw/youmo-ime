@@ -10,8 +10,8 @@
 #include <limits>
 #include <memory>
 #include <mutex>  // NOLINT
-#include <regex>  // NOLINT
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -229,7 +229,8 @@ class OnlineRecognizerTransducerImpl : public OnlineRecognizerImpl {
       InitOnlineStream(stream.get());
       return stream;
     }
-    auto hws = std::regex_replace(hotwords, std::regex("/"), "\n");
+    std::string hws = hotwords;
+    std::replace(hws.begin(), hws.end(), '/', '\n');
     // youmo: EncodeHotwords would dereference a missing BPE encoder
     if (bpe_encoder_ == nullptr) {
       std::string kept;
@@ -300,7 +301,9 @@ class OnlineRecognizerTransducerImpl : public OnlineRecognizerImpl {
     if (!phrases.empty()) {
       // matched, never scored: the decoder only asks where a phrase ends
       s->SetBlockGraph(std::make_shared<ContextGraph>(phrases, 0.0f));
-      InitOnlineStream(s.get());  // its hyps' block states at the root
+      // its hyps' block states at the root (the stream is new: nothing else
+      // to start again)
+      RootGraphStates(s.get(), &s->GetResult().hyps);
     }
     return s;
   }
@@ -471,9 +474,11 @@ class OnlineRecognizerTransducerImpl : public OnlineRecognizerImpl {
       // (the encoder state buffers are kept)
       // youmo: each carried less the best's log prob, so the next segment's
       // n-best scores (divided by its length) are near its own, not ruled by
-      // the last one's sum. The beam's pruning is as before; its best and
-      // n-best (ranked by log prob over length) are the segment's own: upstream
-      // dividing the last segment's sum by a short length favoured long ones
+      // the last one's sum: upstream dividing the last segment's sum by a short
+      // length favoured long ones. Not as upstream for the beam: r starts with
+      // the blank hyp at 0 (GetEmptyResult), now level with the best carried
+      // one instead of far ahead of them all, and a carried hyp whose context
+      // is blanks log-adds into it
       double best = -std::numeric_limits<double>::infinity();
       for (const auto &it : last_result.hyps) {
         best = std::max(best, it.second.log_prob);
@@ -591,14 +596,16 @@ class OnlineRecognizerTransducerImpl : public OnlineRecognizerImpl {
   void CheckNoLm() const {
     if (!config_.lm_config.model.empty()) {
       SHERPA_ONNX_LOGE("An online LM is not built (youmo).");
-      SHERPA_ONNX_EXIT(-1);
+      // thrown, not _Exit: the recognizer's making is under SafeJNI
+      throw std::invalid_argument("an online LM is not built");
     }
   }
 
   void CheckNoWhisperFeature() const {
     if (model_->UseWhisperFeature()) {
       SHERPA_ONNX_LOGE("Whisper features are not built (youmo).");
-      SHERPA_ONNX_EXIT(-1);
+      // a voice pack's model with them: thrown, voice input reports it
+      throw std::invalid_argument("whisper features are not built");
     }
   }
 

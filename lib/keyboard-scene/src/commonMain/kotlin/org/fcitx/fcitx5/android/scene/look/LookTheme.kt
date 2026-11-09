@@ -100,6 +100,16 @@ object LookTheme {
 
     private const val UNNAMED = "theme"
 
+    // a layout's key id at its longest: no key is named longer, and a longer name only grows the file
+    private const val MAX_KEY_NAME = 32
+
+    // a 3.0 single key's name theme 4 can select: `*`'s only for a role (`*/Shift`, `*/,` select nothing
+    // and would make the whole theme unreadable), any key no longer than a key id; the others kept in
+    // the 3.0 file, not used, as an unknown board's are
+    private fun named(name: String): Boolean = KeyNames.split(name).let { (board, key) ->
+        key.length <= MAX_KEY_NAME && (board != KeyNames.ALL || KeyNames.isRole(key))
+    }
+
     /** The font's name in the file written, for the look's key font (theme 4 names a `<font>`). */
     const val KEY_FONT = "key"
 
@@ -162,7 +172,7 @@ object LookTheme {
         s.add(key.with(FLAT, "space"), "fill" to solid(SPACE_BAR), "shape" to Value.Word("bar"), "radius" to radius(FLAT_SPACE_RADIUS_DP))
         s.add(key.with(FLAT, "enter"), "fill" to solid(ACCENT_KEY), "shape" to Value.Word("circle"))
         // single keys over their kinds, later so they win the tie
-        s.overrides(keys, keys.overrides.entries.sortedBy { it.key }.associate { it.key to it.value })
+        s.overrides(keys, keys.overrides.entries.filter { named(it.key) }.sortedBy { it.key }.associate { it.key to it.value })
         val popupShadow = Shadow(0.0, POPUP_SHADOW_DP, POPUP_SHADOW_DP, ColorExpr.Literal(Argb(POPUP_SHADOW)))
         s.add(listOf(of("preview"), of("popup")), "fill" to solid(ref("popupBackground")), "color" to color("popupText"), "radius" to radius(keys.radiusDp), "shadow" to Value.OfShadow(popupShadow))
         s.add(of("popup", state = "selected"), "fill" to solid(ref("genericActiveBackground")), "color" to color("genericActiveForeground"))
@@ -172,7 +182,9 @@ object LookTheme {
         // no rounder than a radius is read (keys of 24 dp and a gap made no theme, and no keyboard was drawn); the
         // frame round it is the app's outline, of no such limit (WindowLooks.cornerDp), so its corners are the same.
         // The handle the engine's default (WindowLooks.handleColor), as the window's frame
-        s.add(of("keyboard", FLOATING), "radius" to radius(minOf(keys.radiusDp + minOf(keys.gap.h, keys.gap.v), Keys.MAX_RADIUS_DP)))
+        // Square keys: the frame is square (WindowLooks.cornerDp is 0), so the keyboard is too
+        val floatingRadius = if (keys.radiusDp == 0) 0 else minOf(keys.radiusDp + minOf(keys.gap.h, keys.gap.v), Keys.MAX_RADIUS_DP)
+        s.add(of("keyboard", FLOATING), "radius" to radius(floatingRadius))
         val picture = look.picture?.let { p ->
             val cuts = listOfNotNull("portrait" to fileName(p.portrait.file), p.landscape?.let { "landscape" to fileName(it.file) }).toMap()
             Picture(fileName(p.src), p.brightness.toDouble(), p.blurDp.toDouble(), cuts)

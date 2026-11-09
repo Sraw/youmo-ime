@@ -294,4 +294,10 @@
 - **前提**：B0（右侧一列由引擎画，060-render-p2 S6）。
 - **操作**：打 nihao；点候选栏右边的展开；看右侧一列；点下页。
 - **预期**：右侧从上到下是上页、下页、⌫、回车；在最上面时上页淡出；点下页后列表翻到后面的候选。
-- **JVM**：`SmallBoardsSceneGesturesTest.expandedColumn`、`BarUatTest.expandedCandidatesGridSelects`、`BoardCanvasCompareTest[expanded-side]`。
+- **JVM**：`SmallBoardsSceneGesturesTest.expandedColumn`、`BarUatTest.expandedCandidatesGridSelects`。
+
+### TB-52 [P1] 展开工具栏后复制的建议仍在，再次评估候选栏时工具栏保持展开
+- **前提**：B0；复制一段文字，候选栏出现复制的建议。
+- **操作**：手动展开工具栏；让输入重启（换到别的框再回来，或同框重新开始输入）。
+- **预期**：工具栏仍展开，不被收回成复制的建议。
+- **JVM**：`BarUatTest.theToolbarExpandedOverAClipStaysExpanded`；设备上不跑。

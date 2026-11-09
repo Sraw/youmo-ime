@@ -33,7 +33,7 @@ class ExpandTest {
         assertEquals("semicolon", ids(shuangpin, 1).last())
         val table = env.copy(input = Input(ime = "table", table = "wubi", tableExtra = "star"))
         assertEquals("star", ids(table, 1).last())
-        assertEquals("lookup", ids(table, 2).first(), "TextKeyboard.kt:300-306: 拼 instead of ⇧")
+        assertEquals("lookup", ids(table, 2).first(), "a table's lookup key: 拼 instead of ⇧")
         assertEquals("lookup-on", ids(table.copy(input = table.input.copy(lookingUp = true)), 2).first())
         val url = env.copy(input = Input(field = "url"))
         assertEquals(listOf("symbols", "numbers", "slash", "space", "dot", "domain", "lang", "enter"), ids(url, 3))

@@ -27,7 +27,8 @@ object ThemeReader {
     private val VERSION = Regex("4\\.[0-9]+")
     private val VAR_NAME = Regex("[a-zA-Z][a-zA-Z0-9_-]{0,31}")
     // ASCII white space spelt out: `\s` is more on JS than on the JVM, and a file must read the same on both
-    private val FILE = Regex("[^/\\\\:*?\"<>| \\t\\n\\r\\f\\x0B\\u00A0][^/\\\\:*?\"<>|]{0,127}")
+    // no control character, nor a name all dots
+    internal val FILE = Regex("(?!\\.+$)[^/\\\\:*?\"<>| \\x00-\\x1F\\u00A0][^/\\\\:*?\"<>|\\x00-\\x1F]{0,127}")
     private val ICON = Regex("[a-z0-9]+(-[a-z0-9]+)*")
 
     /** The colours the app's own widgets take by name (theme 3.0's, less their Color suffix). */
@@ -91,11 +92,8 @@ object ThemeReader {
         val pictures = root.all("picture")
         if (pictures.size > 1) p.add(pictures[1].line, "<picture> given twice")
         val picture = pictures.firstOrNull()?.let { picture(it, p) }
-        val fonts = root.all("font").also { if (it.size > MAX_FONTS) p.add(it[MAX_FONTS].line, "over $MAX_FONTS fonts") }
-            .mapNotNull { named(it, p, "src") }.toMap()
-        val iconEls = root.all("icon")
-        if (iconEls.size > MAX_ICONS) p.add(iconEls[MAX_ICONS].line, "over $MAX_ICONS icons")
-        val icons = iconEls.take(MAX_ICONS).mapNotNull { named(it, p, "src") }.toMap()
+        val fonts = named(atMost(root.all("font"), MAX_FONTS, p, "fonts"), p, "font")
+        val icons = named(atMost(root.all("icon"), MAX_ICONS, p, "icons"), p, "icon")
         val styleEls = root.all("style")
         if (styleEls.size > maxStyles) p.add(styleEls[maxStyles].line, "over $maxStyles styles")
         // the rest not read: the file is refused already, and a million styles would each be a problem
@@ -182,7 +180,7 @@ object ThemeReader {
         Attributes(el, p).apply { oneOf("variant", listOf("dark")) }.done()
         val raw = LinkedHashMap<String, Pair<ColorExpr, Int>>()
         if (el.children.size > MAX_COLORS) p.add(el.line, "over $MAX_COLORS colours")
-        for (c in el.children) {
+        for (c in el.children.take(MAX_COLORS)) {
             val (name, value) = color(c, p) ?: continue
             if (name in raw) p.add(c.line, "the colour $name is given twice")
             raw[name] = value to c.line
@@ -216,15 +214,18 @@ object ThemeReader {
         fun problem(colour: String, line: Int, message: String) {
             if (reported.add(Triple(dark?.contains(colour) == true, colour, message))) p.add(line, message + where)
         }
-        fun resolve(name: String, seen: Set<String>): Argb? {
+        // the names being resolved, one set for the whole walk (not a copy at each step: a long chain stays cheap)
+        val seen = HashSet<String>()
+        fun resolve(name: String): Argb? {
             done[name]?.let { return it }
             val (expr, line) = raw[name] ?: return null
-            if (name in seen) return null.also { problem(name, line, "the colour $name is defined by itself") }
-            val v = expr.resolve({ resolve(it, seen + name) }, system::get)
+            if (!seen.add(name)) return null.also { problem(name, line, "the colour $name is defined by itself") }
+            val v = expr.resolve(::resolve, system::get)
+            seen.remove(name)
             if (v == null) expr.refs().filter { it !in raw }.forEach { problem(name, line, "@$it is no colour") }
             return v?.also { done[name] = it }
         }
-        raw.keys.forEach { resolve(it, emptySet()) }
+        raw.keys.forEach { resolve(it) }
         return raw.keys.mapNotNull { k -> done[k]?.let { k to it } }.toMap()
     }
 
@@ -250,6 +251,23 @@ object ThemeReader {
     }
 
     private const val MAX_BLUR = 25.0
+
+    // the first [max] of [els], one more a problem ("over [max] [what]")
+    private fun atMost(els: List<XmlElement>, max: Int, p: Problems, what: String): List<XmlElement> {
+        if (els.size > max) p.add(els[max].line, "over $max $what")
+        return els.take(max)
+    }
+
+    // [els]' names and files, a name given twice a problem as a colour's is ([what]: font, icon)
+    private fun named(els: List<XmlElement>, p: Problems, what: String): Map<String, String> {
+        val out = LinkedHashMap<String, String>()
+        for (el in els) {
+            val (name, src) = named(el, p, "src") ?: continue
+            if (name in out) p.add(el.line, "the $what $name is given twice")
+            out[name] = src
+        }
+        return out
+    }
 
     private fun named(el: XmlElement, p: Problems, file: String): Pair<String, String>? {
         val a = Attributes(el, p)

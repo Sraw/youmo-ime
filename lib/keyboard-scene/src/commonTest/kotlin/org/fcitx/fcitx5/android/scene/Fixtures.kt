@@ -19,7 +19,8 @@ import kotlin.test.fail
 /**
  * A font of fixed sizes, the same on every platform (060-render-v2 §6 step 5's fake): a Latin
  * character 0.6 of the size across, a wide (CJK) one 1.0, bold 5% wider; ink from 0.05 of the size
- * in from each side, cap height 0.7, descenders 0.2; the font's extent 1.05 above, 0.3 below.
+ * in from each side, cap height 0.7, descenders 0.2; the font's extent 1.05 above, 0.3 below. Widths go by
+ * UTF-16 unit: a character past the BMP (😀, 𠀀) counts twice; no test measures one.
  */
 object FakeMeasurer : TextMeasurer {
     override fun measure(text: String, font: String, weight: Int, size: Double): TextMetrics {
@@ -58,7 +59,7 @@ object Fixtures {
     /** A phone upright, 411 dp wide, the keyboard 274 dp tall. */
     val portrait = Env(1080.0, 720.0, DENSITY, input = Input(langKey = true), texts = texts)
 
-    /** The same, the keyboard compact (its height setting's lowest, text 0.9). */
+    /** The same, the keyboard compact (text 0.9), 576 px: not the height setting's lowest (that is [Forms.compact]'s). */
     val compact = portrait.copy(height = 576.0, compact = true)
 
     /** A phone on its side, 914 dp: split (SplitKeyboard.Mode.AUTO splits from 600 dp). */

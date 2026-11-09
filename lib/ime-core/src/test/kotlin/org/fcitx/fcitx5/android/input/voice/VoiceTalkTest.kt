@@ -121,4 +121,15 @@ class VoiceTalkTest {
         // what was typed not all in it (it should be): what differs is typed, not dropped
         assertEquals("你好", talk.rest("你好", raw = true))
     }
+
+    @Test
+    fun thePolishFailingAfterANumberWrittenInDigitsTypesWhatFollowsItOnce() {
+        val talk = VoiceTalk(asItGoes = true)
+        assertEquals("我买了3个苹果。" to "", talk.step("我买了3个苹果。", 8))
+        // the raw text has the number as said: what was typed found in it, not typed again
+        assertEquals("再见", talk.rest("我买了三个苹果再见", raw = true))
+        val percent = VoiceTalk(asItGoes = true)
+        assertEquals("涨了50%。" to "", percent.step("涨了50%。", 6))
+        assertEquals("然后", percent.rest("涨了百分之五十然后", raw = true))
+    }
 }

@@ -32,11 +32,11 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The nine keys drawn by the scene (060-render-p2 S5a, nine.xml) do what their views did, in each of
- * the four (九键拼音, English's, 双拼's with and without `;`): every key's face and what it is read as, its
- * bubble as it is pressed, its tap, its swipe down, its long press, what reaches the engine and the field;
- * 1 as what is typed has it (分词 while the engine says so). Each key is wired from its node (U4 B).
- * The column is a native view over the scene's slot `side`, in its box, its items the same either way.
+ * The nine keys drawn by the scene (060-render-p2 S5a, nine.xml), in each of the four (九键拼音, English's,
+ * 双拼's with and without `;`): every key's face and what it is read as, its bubble as it is pressed, its
+ * tap, its swipe down, its long press, 0's, 重输's and ⌫'s taps, what reaches the engine and the field,
+ * held to the committed record ([GestureSnapshot]); 1 as what is typed has it (分词 while the engine says
+ * so). Each key is wired from its node (U4 B). The column is a native view over the scene's slot `side`.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -101,8 +101,9 @@ class NineSceneGesturesTest {
     }
 
     @Test
-    fun pinyinsEveryKeyAsItsView() {
+    fun pinyinsEveryKey() {
         val scene = gestures(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS))
+        GestureSnapshot.check("nine-pinyin", scene)
         // what the keys do: 5's bubble its letters, its long press its letters and digit
         assertTrue(scene.joinToString("\n"), "5 pressed: [JKL]" in scene)
         assertTrue(scene.joinToString("\n"), scene.any { it.startsWith("5 long press: [") && "J" in it && "5" in it && "l" in it })
@@ -115,22 +116,26 @@ class NineSceneGesturesTest {
     }
 
     @Test
-    fun englishsEveryKeyAsItsView() {
+    fun englishsEveryKey() {
         val scene = gestures(Variant(KeyboardHarness.ENGLISH, ImKeyboards.Chosen(english = ImKeyboard.NINE_KEYS)))
-        assertTrue(scene.first(), "5=jkl/5" in scene.first() || "5=JKL/5" in scene.first())
+        GestureSnapshot.check("nine-english", scene)
+        // lower case, as English's nine keys always are (LetterCaseScreenshotTest)
+        assertTrue(scene.first(), "5=jkl/5" in scene.first())
     }
 
     @Test
-    fun shuangpinsEveryKeyAsItsView() {
+    fun shuangpinsEveryKey() {
         val scene = gestures(Variant(SHUANGPIN, ImKeyboards.Chosen(shuangpin = ImKeyboard.NINE_KEYS), ShuangpinScheme.MICROSOFT))
+        GestureSnapshot.check("nine-shuangpin-microsoft", scene)
         assertTrue(scene.first(), "5=JKL/5" in scene.first())
-        // 微软's ; on 1, beside its digit, as the views have it
+        // 微软's ; on 1, beside its digit, as it is drawn
         assertTrue(scene.first(), "/1;" in scene.first())
     }
 
     @Test
-    fun shuangpinPlainsEveryKeyAsItsView() {
+    fun shuangpinPlainsEveryKey() {
         val scene = gestures(Variant(SHUANGPIN, ImKeyboards.Chosen(shuangpin = ImKeyboard.NINE_KEYS)))
+        GestureSnapshot.check("nine-shuangpin-plain", scene)
         assertTrue(scene.first(), "5=JKL/5" in scene.first())
     }
 
@@ -183,6 +188,7 @@ class NineSceneGesturesTest {
         assertEquals(Math.round(slot.right).toInt(), column.right - canvas.left)
         assertEquals(Math.round(slot.bottom).toInt(), column.bottom - canvas.top)
         val parent = column.parent as android.view.ViewGroup
+        assertTrue("the column beside the canvas", canvas.parent === parent)
         assertTrue("the column over the canvas", parent.indexOfChild(column) > parent.indexOfChild(canvas))
     }
 
@@ -221,10 +227,9 @@ class NineSceneGesturesTest {
         assertGlidesOnTheScene("one-handed")
     }
 
-    private fun assertGlidesOnTheScene(form: String, before: (KeyboardHarness) -> Unit = {}) {
+    private fun assertGlidesOnTheScene(form: String) {
         prefs.set(AppPrefs.getInstance().keyboard.glideTyping, true)
         harness(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
-            before(h)
             val keys = "2639".map { h.nineKey("$it") }
             val first = keys.first().bounds
             h.drag(keys.first(), first.exactCenterX(), first.exactCenterY(), steps = 0, lift = false)

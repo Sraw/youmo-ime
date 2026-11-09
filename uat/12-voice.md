@@ -34,6 +34,7 @@
 - **操作**：点工具栏上的麦克风；再长按空格（不说话），手指上滑到取消区停一下再滑回。
 - **预期**：那一层下面的键是模糊的，只看得出大致的形状和颜色，位置和键盘对得上（悬浮、横屏、图片背景、圆角都一样）；「正在听…」和提示文字清楚，不和键帽上的字叠在一起；点按说话的那一层上没有 ×，只能点麦克风或这一层结束（不想要的结束后自己删）。长按空格的卡片同样是毛玻璃，上滑到取消区变红，滑回恢复。
 - **JVM**：`VoiceGlassTest`（盒式模糊的结果、缩小和放大的坐标换算、键盘画进缩小图时不画那一层自己）、`VoiceTapUatTest.theMaskHasNoEnterStoppedTheKeyboardsSendsIt`（那一层上没有按钮）（`:app:testDebugUnitTest`）；真机上照"操作"截图看。
+- **真机**：截图看盖层的毛玻璃（手工）。
 
 ### VO-06 [P1] 数字按习惯写
 - **前提**：B0-语音。
@@ -76,7 +77,7 @@
 - **前提**：B0-语音。
 - **操作**：打开测试页的全部输入框（地址不带 `#`），在「普通文本」框长按空格说"你好"，不松手……说完前用另一只手点下面的「句子」框，再松开。
 - **预期**：「你好」不会出现在「句子」框里。
-- **JVM**：`VoiceHoldUatTest.onlyTheFieldItWasSaidForGetsIt`（说完前换到另一个框，松开后两个框都没有「你好」（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））；设备上不跑。
+- **JVM**：`VoiceHoldUatTest.onlyTheFieldItWasSaidForGetsIt`（说完前换到另一个框，松开后两个框都没有「你好」（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））；`VoiceHoldUatTest.whatWasHeardBeforeAnotherFieldGoesWithTheHold`（按住时已听到「你好」再换框：按住作废，两个框都没有）；设备上不跑。
 
 ### VO-13 [P1] 改掉空格长按行为
 - **前提**：B0-设置（导入了语音包），**按键 → 空格键长按行为** 改成"显示输入法选择对话框"。
@@ -196,7 +197,7 @@
 - **前提**：B0-语音；手机连着电脑的 adb（Android 12+）。先 `adb shell cmd sensor_privacy enable 0 microphone` 关掉麦克风。
 - **操作**：长按空格不放 3 秒；手指不松，在电脑上 `adb shell cmd sensor_privacy disable 0 microphone` 打开麦克风（从下拉栏或别的应用打开会把这次按住打断），对着手机说"你好"，松开。
 - **预期**：约 2 秒后显示「麦克风没有声音」；有声音后变回「正在听…」，框里是「你好」。
-- **JVM**：`VoiceOnsetTest.twoSecondsOfZeroesIsASilentMicrophoneToldOnce`（2 秒全零报一次，之后的第一个非零采样仍是开麦；`lib/ime-core`）、`VoiceHoldUatTest.aSilentMicrophoneIsSaidAndListeningComesWithTheFirstSound`、`VoiceTapUatTest.aSilentMicrophoneIsSaid`（`:app:testDebugUnitTest`）；设备上不跑：模拟器空闲时本来就读到全零，量不出"没声音"和"没开始说"的区别，真机上照"操作"跑一遍。
+- **JVM**：`VoiceOnsetTest.twoSecondsOfZeroesIsASilentMicrophoneToldOnce`（2 秒全零报一次，之后的第一个非零采样仍是开麦；`lib/ime-core`）、`VoiceHoldUatTest.aSilentMicrophoneIsSaidAndListeningComesWithTheFirstSound`、`VoiceTapUatTest.aSilentMicrophoneIsSaid`（`:app:testDebugUnitTest`）；设备上不跑：要用真机系统的麦克风开关（`sensor_privacy`）；模拟器的片段麦克风在片段之间也送一点底噪，读不到 2 秒全零，真机上照"操作"跑一遍。
 
 ### VO-28 [P1] 点麦克风说话后发送
 - **前提**：B0-语音。
@@ -225,6 +226,12 @@
 
 ### VO-34 [P0] 没有语音包时麦克风提示导入
 - **前提**：B0，导入了文字包、没导入语音包。
-- **操作**：点候选栏的麦克风；再长按空格。
+- **操作**：点工具栏上的麦克风；再长按空格。
 - **预期**：键盘照常能打字。点麦克风时提示「语音输入需要导入语音包：设置 → 资源包」并打开资源包页，不问录音权限；语音包版本太旧时提示要更新到哪一版；语音包比应用新（格式更新）时提示「语音包 vN 是给更新版应用的：请更新幽默输入法」；语音包已损坏时提示重新导入。长按空格什么都不做（和 0.5.x 文字版一样）：没有提示、不打开页面，空格上没有麦克风角标，按住后照样能左右慢拖移动光标。导入语音包后空格上出现麦克风角标，长按就能说话。
 - **JVM**：`PacksUatTest.withoutTheVoicePackTheMicrophoneAsksForItAndTheSpaceDoesNothing`、`aVoicePackForANewerAppAsksForTheAppsUpdate`、`KeyboardUatTest.withoutTheVoicePackTheDefaultHoldLeavesTheSlowDragItsCursor`（`:app:testDebugUnitTest`）。
+
+### VO-35 [P1] 句末句号按输入框，语音整理去掉口头禅
+- **前提**：B0-语音（**按键 → 语音句末句号** 是默认的"按输入框"）。
+- **操作**：在测试页的「聊天」框、「搜索」框（单行）、多行的「普通文本」框里各长按空格说"嗯 我到了"，松开；再说"你到了吗"。把 **语音句末句号** 改成"照说的保留"、再改成"都不加"，在三个框里各说一遍"我到了"。
+- **预期**：口头禅「嗯」不上屏。默认时：聊天框里是「我到了」（句号去掉）、「你到了吗？」（问号保留）；搜索框里句末不带任何标点（「我到了」「你到了吗」）；普通文本框里照说的「我到了。」。"照说的保留"时聊天框、普通文本框都是「我到了。」，搜索框仍不带标点；"都不加"时三个框都是「我到了」。
+- **JVM**：`VoiceEndTest.aChatLosesItsClosingMarkAQuestionKeepsItsOwn`、`VoiceEndTest.aLineLosesEveryEndMark`（单行框不管选哪项都去掉句末标点）、`VoiceEndTest.elsewhereTheTextEndsAsSaidUnlessDropped`、`VoiceEndTest.aSearchAnAddressOrOneLineIsALine`、`VoicePolishTest.appliesAsPython`（语音整理去掉口头禅、加标点，和评测脚本逐字一致；`lib/ime-core`）；真机上照"操作"跑一遍（真的模型）。

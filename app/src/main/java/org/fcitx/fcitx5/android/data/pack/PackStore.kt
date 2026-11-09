@@ -65,9 +65,11 @@ object PackStore {
     private val shelf: PackShelf
         get() = opened ?: synchronized(this) {
             opened ?: PackShelf(root, trustedKeys(), requirements()).also {
-                it.load()
+                // leftovers deleted after, on their own thread: a main-thread wait here is the load alone
+                it.load(tidy = false)
                 Timber.i("packs: %s", PackKind.entries.joinToString { k -> "${k.id} ${describe(it.status(k))}" })
                 opened = it
+                thread(name = "packs-tidy") { it.tidy() }
             }
         }
 
@@ -82,7 +84,7 @@ object PackStore {
 
     fun ready(kind: PackKind) = status(kind) is PackStatus.Ready
 
-    /** The directory of [kind]'s files, it ready; else null. */
+    /** The directory of [kind]'s files, if ready; else null. */
     fun dir(kind: PackKind): File? = shelf.dir(kind)
 
     /** Loads the shelf now: on a worker at the app's start, so the keyboard's first look need not wait on it. */
@@ -144,20 +146,21 @@ object PackStore {
                 VerifyDue.STALE -> if (charging()) shelf.verify(kind) else false.also { waiting = true }
             }
         }
-        if (damaged.isNotEmpty()) {
-            Timber.w("resource packs damaged: %s", damaged.joinToString { it.id })
-            changed()
-        }
+        damaged(damaged)
         return waiting
     }
 
     /** Every pack in use read through, due or not, now, on this thread: true if one was found damaged. */
     @VisibleForTesting
     fun verifyNow(): Boolean {
-        val damaged = PackKind.entries.filter { shelf.verify(it) }
-        if (damaged.isEmpty()) return false
-        Timber.w("resource packs damaged: %s", damaged.joinToString { it.id })
-        changed()
+        return damaged(PackKind.entries.filter { shelf.verify(it) })
+    }
+
+    // [kinds] found damaged by a read through: said, and the rest told; true if any
+    private fun damaged(kinds: List<PackKind>): Boolean {
+        if (kinds.isEmpty()) return false
+        Timber.w("resource packs damaged: %s", kinds.joinToString { it.id })
+        changed(kinds)
         return true
     }
 
@@ -195,13 +198,14 @@ object PackStore {
         }
         if (!damaged) return false
         Timber.w("resource pack %s damaged, found after the host failed on it", kind.id)
-        mutableState.update { State(snapshot(), it.generation + 1) }
         thread(name = "packs-restart", isDaemon = true) {
             try {
                 restartHost()
             } catch (@Suppress("TooGenericExceptionCaught") t: RuntimeException) {
                 Timber.e(t, "host not restarted after a pack found damaged")
             }
+            // counted after the restart, as changed() does: the keyboard's field focused again on the new host, not the one going
+            mutableState.update { State(snapshot(), it.generation + 1) }
         }
         return true
     }
@@ -236,7 +240,7 @@ object PackStore {
             if (result is ImportResult.Imported) {
                 // imported whatever comes of telling the rest: the pack is in use from the next start
                 try {
-                    changed()
+                    changed(listOf(result.manifest.kind))
                 } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
                     Timber.e(e, "after a pack import")
                 }
@@ -249,12 +253,15 @@ object PackStore {
     @VisibleForTesting
     var restartHost: () -> Boolean = HostDaemon::restartIfRunning
 
-    // the engine made anew on the new files; whatever reads them looks again (AppData's generation)
-    private fun changed() {
+    // [kinds] changed: the engine made anew on the new files if the text pack is among them; whatever
+    // reads the packs looks again ([state]'s generation, or [dir] asked again)
+    private fun changed(kinds: List<PackKind>) {
         // the host restarted first: its engines (mapped on the old pack, or not made without one)
         // made anew. The state after it, so what the keyboard queues on it (its field focused again)
-        // waits for the new host, not the one going. A restart that throws is no reason not to count
-        val restarted = try {
+        // waits for the new host, not the one going. A restart that throws is no reason not to count.
+        // The host reads no voice pack: a voice pack's change does not restart it (and lose what is being composed)
+        val restartsHost = PackKind.TEXT in kinds
+        val restarted = restartsHost && try {
             restartHost()
         } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
             Timber.e(e, "host not restarted after a pack change")
@@ -263,9 +270,9 @@ object PackStore {
         // an import and a verify may both count: neither count lost
         mutableState.update { State(snapshot(), it.generation + 1) }
         // the generation replaced, once the host is up on the new one (restartIfRunning waits for
-        // it) and the rest told to look again: a file of it opened only now would have been gone.
+        // it, if restarted) and the rest told to look again: a file of it opened only now would have been gone.
         // A host not up anew in time may still read it: left for the next start's load
-        if (restarted) shelf.sweep()
+        if (restarted || !restartsHost) shelf.sweep()
     }
 
     private fun snapshot() = PackKind.entries.associateWith { shelf.status(it) }

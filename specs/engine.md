@@ -793,7 +793,7 @@ One character at a time: two recognizers, trained outside this repository on syn
 image (9 × 64 × 64 planes) and by its pen path, weighed 0.7 to 0.3 with 0.2 × its log frequency.
 Their dense and recurrent weights are int8 (the convolutions float): 121 MB → 43 MB in the APK, the
 same on CASIA to a hundredth of a point (`handwriting-models-20261015` against `-20261014b`). They
-are mapped from the APK where they lie (`OrtModel`: the asset uncompressed, the model's bytes used
+are mapped from their resource-pack file where they lie (`OrtModel`: the model's bytes used
 directly, prepacking off), so their weights are clean file pages, not the heap: on redroid after
 writing, the app's private memory is the same with either, its mapped APK 173 → 96 MB.
 `InkFeatures` is held to the training code by golden data (`ink-golden.json.gz`, the training

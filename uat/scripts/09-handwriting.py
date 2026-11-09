@@ -112,7 +112,7 @@ case("HW-29", needs="jvm:HandwritingUatTest.aHeldCharactersCardThenItsButtonsAnd
 case("HW-30", needs="jvm:HandwritingUatTest.copyPutsTheCharacterAloneOnTheClipboardAndCommitIsATap")(lambda d: None)
 
 
-@case("HW-31", base="B0-手写", mutates="learn")
+@case("HW-31", base="B0-手写", mutates=True)
 def hw31(d):
     d.wait(lambda *_: d.screen().find(desc="手写板", where="ime"), 10, what="书写板")
     write(d, "天")

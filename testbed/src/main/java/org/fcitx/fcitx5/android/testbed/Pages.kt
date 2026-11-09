@@ -214,7 +214,7 @@ object Pages {
         label("应用每隔 N 秒改文字或光标")
         val interval = field("interval", "间隔秒数", NUMBER) { setText("$DEFAULT_INTERVAL_S") }
         val timed = field("timed", "应用定时改它：setText 加 # 或 setSelection(0)")
-        fun every() = (interval.text.toString().toLongOrNull() ?: DEFAULT_INTERVAL_S.toLong()).coerceAtLeast(1) * MS
+        fun every() = (interval.text.toString().toLongOrNull() ?: DEFAULT_INTERVAL_S.toLong()).coerceIn(1, MAX_INTERVAL_S) * MS
         timer("定时 setText", every = ::every) {
             timed.setText("${timed.text}#"); timed.setSelection(timed.length())
             log.event("timed", "app", JSONObject().put("detail", "setText"))
@@ -280,6 +280,9 @@ object Pages {
     }
 
     private const val MS = 1000L
+
+    // an hour: a number typed past it overflowed the delay to a negative, the timer spinning the main thread
+    private const val MAX_INTERVAL_S = 3600L
     private const val SPACER_DP = 600
     private const val TERMINAL_DP = 56
 
@@ -297,6 +300,8 @@ object Pages {
             }
             loadUrl("file:///android_asset/web.html")
         }
+        // the page left: its renderer and scripts gone with it, not logging into the next page's log
+        onLeave += { web.destroy() }
         add(web)
     }
 

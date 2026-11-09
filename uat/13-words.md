@@ -188,11 +188,11 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **预期**：`trad-words.txt` 照常导入（字和读音对不上只查按 GBK 读的文件），词库页列出 trad-words，候选里有「氪喵燈塔」；`trad-big5.txt` 提示"格式不支持：字和读音大多对不上…"，词库页没有 trad-big5。
 - **JVM**：`DictionaryUatTest.utf8TraditionalInBig5Not`（UTF-8 繁体照常并入、有氪喵燈塔；Big5 的拒绝为字和读音对不上（基础词库的读音用 UTF-8 那份的字代替））；设备上不跑。
 
-### WD-14q [P1] 只写了词的行：确认框单列，太多就不并入基础词库
-- **前提**：B0-设置，`no-pinyin-some.txt`（60 行带拼音，1 行只有词「氪喵无音」）、`no-pinyin-most.txt`（3 行带拼音，7 行只有词）已放到"下载"目录。
-- **操作**：**导入词库** 选 `no-pinyin-some.txt`，看标题，取消；再 **导入词库** 选 `no-pinyin-most.txt`，选"基础词库"点 **导入词库**。
-- **预期**：`no-pinyin-some.txt` 的标题下面写着"60 个词"和"1 个词没有拼音（只能并入用户词库）"；`no-pinyin-most.txt` 提示"格式不支持：有些行没有拼音；没有拼音的词只能并入用户词库"，词库页没有新增。
-- **JVM**：`DictionaryUatTest.wordsWithoutPinyinApartTooManyNotForTheBase`（60 个词、1 个没有拼音；太多的拒绝为有些行没有拼音）；设备上不跑。
+### WD-14q [P1] 只写了词的行：并入基础词库时按词库推拼音，推不出的单列
+- **前提**：B0-设置，`no-pinyin-some.txt`（60 行带拼音，1 行只有词「氪喵无音」）、`no-pinyin-most.txt`（3 行带拼音，7 行只有词，字都是常用字）已放到"下载"目录。
+- **操作**：**导入词库** 选 `no-pinyin-some.txt`，看标题，取消；再 **导入词库** 选 `no-pinyin-most.txt`，看标题，选"基础词库"点 **导入词库**。
+- **预期**：并入基础词库时只写词的行按词库推拼音（0.6.0 起）：`no-pinyin-some.txt` 的标题下面写着"61 个词"和"其中 1 个词的拼音按词库推出"；`no-pinyin-most.txt` 写着"10 个词"和"其中 7 个词的拼音按词库推出"，导入后词库页"基础词库"里多了它。只写词的行一个拼音也推不出时（比如全是词库里没有的字）才提示"格式不支持：有些行没有拼音；没有拼音的词只能并入用户词库"。
+- **JVM**：`DictionaryUatTest.wordsWithoutPinyinApartTooManyNotForTheBase`（不推拼音时的读法：60 个词、1 个没有拼音；太多的拒绝为有些行没有拼音）；推拼音的那半：`PinyinDictManagerTest.aListOfWordsAloneIsPreparedWithTheReadingsGuessed`、ime-core `DictionaryFormatTest.aGuessFillsInAmongWordsWithPinyinAndLeavesTheBlockedAlone`；设备上不跑。
 
 ### WD-14r [P0] 从 0.3.2 升级：导入的大词库转换成压缩的，空间省下一大半
 - **前提**：装着 v0.3.2 正式版（不是要测的这一版），在它里面按 WD-14d 把雾凇拼音并入基础词库，等合好（候选里有「阿坝州」）；再导入 `dict-words.txt` 并入基础词库后把它 **关闭**；记下 **系统设置 → 应用 → 幽默输入法 → 存储** 的"用户数据"大小和词库目录（`adb shell ls -l /sdcard/Android/data/<包名>/files/data/pinyin/dictionaries`：`frost_dict_for_fcitx5.txt`、`dict-words.txt.disable`、`merged.ymd` 约 106 MB）。

@@ -29,7 +29,9 @@ TEST(MappedFile, OneThatCannotBeMappedThrows) {
   EXPECT_THROW(MapFile(testing::TempDir() + "no-such-model.ort"), std::runtime_error);
   // empty: nothing to map
   std::string path = testing::TempDir() + "mapped-file-empty.ort";
-  fclose(fopen(path.c_str(), "wb"));
+  FILE *f = fopen(path.c_str(), "wb");
+  ASSERT_NE(f, nullptr);
+  fclose(f);
   EXPECT_THROW(MapFile(path), std::runtime_error);
   remove(path.c_str());
 }

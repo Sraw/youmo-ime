@@ -53,7 +53,6 @@ class KeyContent(
     val own: Boolean = false,
 )
 
-/** What a key's content is drawn in, as the theme has it in its normal state: one per part. */
 /** A key's parts' looks, each cascaded when asked: most keys have no badge, many no mark. */
 class Looks(private val of: (Part) -> TextLook) {
     val label: TextLook get() = of(Part.Label)
@@ -211,9 +210,10 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         val at = lines.map { measure(it, look, m.weight, first) }
         val wide = at.maxOf { it.m.advance }
         val tall = at.first().m.let { it.bottom - it.top } * lines.size
-        val roomX = content.width - 2 * ROOTS_INSET_DP * d
+        val roomX = maxOf(0.0, content.width - 2 * ROOTS_INSET_DP * d)
         val fit = minOf(1.0, if (wide > 0) roomX / wide else 1.0, if (tall > 0) content.height / tall else 1.0)
-        val size = if (fit < 1.0 && fit > 0.0) first * fit else first
+        // no room at all: the least it is drawn at, never its full size
+        val size = if (fit < 1.0) first * maxOf(fit, ROOTS_MIN_FIT) else first
         val ms = if (size == first) at else lines.map { measure(it, look, m.weight, size) }
         val lineHeight = ms.first().m.let { it.bottom - it.top }
         val top = cy - lineHeight * lines.size / 2
@@ -345,7 +345,7 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         }
 
         fun squeezed(max: Double): Measured =
-            if (box.width <= max || box.width <= 0) this else Measured(text, m, size, font, weight, max / box.width, spacing, runs)
+            if (box.width <= max || box.width <= 0) this else Measured(text, m, size, font, weight, scaleX * max / box.width, spacing, runs)
 
         /** Drawn with its box centred on ([cx], [cy]). */
         fun at(cx: Double, cy: Double, part: Part): Drawn =
@@ -393,6 +393,9 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
 
         /** The roots kept this far in from the face's sides (TextKeyboard's ROOTS_INSET_DP). */
         const val ROOTS_INSET_DP = 6.0
+
+        // the least a table's roots shrink to on a face too narrow for them
+        private const val ROOTS_MIN_FIT = 0.1
 
         private const val ROOT = "root"
         private const val SPACE = "space"

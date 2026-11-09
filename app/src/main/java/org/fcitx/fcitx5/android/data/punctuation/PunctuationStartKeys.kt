@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.data.punctuation
 
 import android.content.Context
+import android.os.UserManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import timber.log.Timber
@@ -35,14 +36,38 @@ object PunctuationStartKeys {
     /** [known] as it comes. */
     val keys: StateFlow<Map<String, String>?> get() = read
 
-    private fun file(ctx: Context) = File(ctx.filesDir, FILE)
+    // device-protected: the keyboard starts before the first unlock too (direct boot), where the credential store
+    // can be neither read nor written
+    private fun file(ctx: Context) = File(ctx.createDeviceProtectedStorageContext().filesDir, FILE)
+
+    // where 0.6's betas kept it (the credential store): moved over once, when the user has unlocked and the
+    // device-protected copy is not there yet, so an upgrade does not hold the punctuation keys back again
+    internal fun migrate(ctx: Context) {
+        val f = file(ctx)
+        if (f.exists()) return
+        val old = File(ctx.filesDir, FILE)
+        if (ctx.getSystemService(UserManager::class.java)?.isUserUnlocked != true || !old.isFile) return
+        try {
+            old.copyTo(f)
+            old.delete()
+        } catch (e: IOException) {
+            Timber.w(e, "punctuation start keys not moved")
+        }
+    }
 
     /** Read on a thread of its own (the service's onCreate): a file read kept off the main thread. */
     fun preload(ctx: Context) {
         val f = file(ctx)
         thread(name = "punctuation-start-keys") {
+            migrate(ctx)
             val keys = load(f)
-            synchronized(this) { if (read.value == null && written == null) read.value = keys }
+            synchronized(this) {
+                if (read.value == null && written == null) {
+                    read.value = keys
+                    // as on disk: the host's first write of the same keys is no rewrite
+                    written = keys
+                }
+            }
         }
     }
 
@@ -50,7 +75,6 @@ object PunctuationStartKeys {
     fun write(ctx: Context, keys: Map<String, String>) {
         synchronized(this) {
             if (keys == written) return
-            written = keys
             read.value = keys
         }
         val f = file(ctx)
@@ -62,7 +86,8 @@ object PunctuationStartKeys {
                 out.write(text.toByteArray())
                 out.fd.sync()
             }
-            if (!tmp.renameTo(f)) Timber.w("punctuation start keys: not renamed")
+            // only once on disk: a write that failed (a full disk) is tried again at the next change
+            if (tmp.renameTo(f)) synchronized(this) { written = keys } else Timber.w("punctuation start keys: not renamed")
         } catch (e: IOException) {
             Timber.w(e, "punctuation start keys not written")
         }
@@ -96,6 +121,7 @@ object PunctuationStartKeys {
 
     /** [load] at once, for a test that starts the keyboard with no service start before it. */
     fun loadNow(ctx: Context) {
+        migrate(ctx)
         val keys = load(file(ctx))
         synchronized(this) { read.value = keys }
     }

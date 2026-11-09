@@ -18,7 +18,7 @@ interface VoiceRecognition<R> {
     fun result(): R
     fun text(result: R): String
 
-    /** the result's first token, in seconds from the stream's start; null: none */
+    /** the result's first token, in seconds from the stream's last [reset] (its start, before one); null: none */
     fun firstTime(result: R): Float?
 }
 
@@ -38,9 +38,13 @@ class VoiceSegments<R>(
     private val closed: suspend (String) -> Unit,
     private val quiet: VoiceQuiet,
 ) {
-    /** samples handed to the recognizer, from the microphone's opening; this segment's from [start] */
+    /**
+     * samples handed to the recognizer, from the microphone's opening; this segment's from [start]
+     * as the quiet judges it, its timestamps from [resetAt]
+     */
     private var fed = 0L
     private var start = 0L
+    private var resetAt = 0L
     private var last = ""
 
     // what this segment showed: one held back as the room's, unchanged, is not told again
@@ -51,7 +55,11 @@ class VoiceSegments<R>(
     var kept = 0
         private set
 
-    /** the first token's frame, from the microphone's opening: where the speech starts, for the UAT (VO-23/24) */
+    /**
+     * the first kept segment's first token, in samples from the microphone's opening: where the
+     * speech starts, for the UAT (VO-23/24); late by what the recognizer had not decoded at the
+     * reset before it (no more than a chunk)
+     */
     var speechStart: Int? = null
         private set
 
@@ -76,7 +84,9 @@ class VoiceSegments<R>(
             if (recognizer.isEndpoint()) {
                 close()
                 recognizer.reset()
-                start = fed
+                resetAt = fed
+                // what was fed but not decoded at the endpoint is the next segment's: its windows judged with it
+                start = maxOf(0L, fed - (sampleRate * UNDECODED_SECONDS).toLong())
             } else {
                 val text = recognizer.text(recognizer.result())
                 // a short word held back while it had no level is shown once it has, though unchanged
@@ -96,15 +106,29 @@ class VoiceSegments<R>(
     private suspend fun close() {
         val result = recognizer.result()
         last = ""
-        if (recognizer.text(result).isBlank()) return
+        if (recognizer.text(result).isBlank()) {
+            // what showed of it was taken back by the recognizer: taken back here too
+            if (shown.isNotEmpty()) closed("")
+            shown = ""
+            return
+        }
         // the room's: what showed of it goes, nothing is kept
         val text = heard(choose(result))
-        // the first segment's timestamps count from the stream's start, the microphone's opening
-        if (text.isNotEmpty() && kept++ == 0) speechStart = recognizer.firstTime(result)?.let { (it * sampleRate).toInt() }
+        // a segment's timestamps count from the reset before it
+        if (text.isNotEmpty()) {
+            if (kept == 0) speechStart = recognizer.firstTime(result)?.let { (resetAt + it * sampleRate).toInt() }
+            kept++
+        }
         // the room's, nothing of it shown: nothing to tell
         if (text.isNotEmpty() || shown.isNotEmpty()) closed(text)
         shown = ""
     }
 
     private fun heard(text: String) = if (quiet.keeps(text, start, fed)) text else ""
+
+    private companion object {
+        // the recognizer's backlog at an endpoint, a chunk and its context at most; well inside the
+        // trailing silence an endpoint needs, so no speech before it is counted
+        const val UNDECODED_SECONDS = 0.5
+    }
 }

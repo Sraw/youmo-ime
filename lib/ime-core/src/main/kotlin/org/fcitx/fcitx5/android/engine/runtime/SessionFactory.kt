@@ -26,7 +26,6 @@ import org.fcitx.fcitx5.android.engine.english.EnglishPhrases
 import org.fcitx.fcitx5.android.engine.english.EnglishSession
 import org.fcitx.fcitx5.android.engine.english.EnglishUser
 import org.fcitx.fcitx5.android.engine.glide.GlideReading
-import org.fcitx.fcitx5.android.engine.user.WordLists
 import org.fcitx.fcitx5.android.engine.glide.GlideSession
 import org.fcitx.fcitx5.android.engine.glide.PinyinGlide
 import org.fcitx.fcitx5.android.engine.glide.TableGlide
@@ -65,6 +64,7 @@ import org.fcitx.fcitx5.android.engine.table.TableOptions
 import org.fcitx.fcitx5.android.engine.table.TableSession
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserScorer
+import org.fcitx.fcitx5.android.engine.user.WordLists
 
 /**
  * Makes the session of each input method as [settings] and the user's habits have it ([Engines]
@@ -143,7 +143,13 @@ internal class SessionFactory(
                     latin = if (s.latinWords) assets.latinWords else null, userLatin = if (s.latinWords) latinWords else null,
                 )
                 val pinyin = pinyinSession(segmenter, spell = false, chaizi = chaizi())
-                val looked = ForgetsInTables(StrokeLookup(pinyin, assets::strokes, assets::charReading, s.pageSize, blocked = lexicon::isBlocked, follow = pinyin::follow, retype = pinyin::typeAll, blockedUnder = { strokes -> learner.openHabits().blockedUnder(strokeCode(strokes)) }, blockUnder = { strokes, text -> learner.openHabits().blockUnder(strokeCode(strokes), text, on = true) }))
+                val looked = ForgetsInTables(
+                    StrokeLookup(
+                        pinyin, assets::strokes, assets::charReading, s.pageSize, blocked = lexicon::isBlocked, follow = pinyin::follow, retype = pinyin::typeAll,
+                        blockedUnder = { strokes -> learner.openHabits().blockedUnder(strokeCode(strokes)) },
+                        blockUnder = { strokes, text -> learner.openHabits().blockUnder(strokeCode(strokes), text, on = true) },
+                    ),
+                )
                 GlideSession(looked, syllableBoundary, blocked = glideHeldBack(), heldBack = heldBack(pinyin), blockOther = ::blockOtherReading) { g, n -> pinyinGlide.decode(g.path, g.layout, n) }
             }
             // the 14 keys: no glide, nor 笔画查字 (u is on UI, no stroke key of its own). 简拼 only where nothing

@@ -11,6 +11,9 @@ inputs:
   robolectric:
     description: "A cache key prefix for Robolectric's android-all jars (one per job: each fetches its own SDKs'); empty: none"
     default: ""
+  npm:
+    description: "Cache ~/.npm (only the job that runs lib/keyboard-scene's JS tests: another would save an empty cache under the same key first)"
+    default: "false"
 
 runs:
   using: composite
@@ -52,6 +55,7 @@ runs:
     # lib/keyboard-scene's JS tests install their runner with npm (kotlin.js.yarn=false), into npm's
     # own cache, which the Gradle cache does not cover; the lock pins what is installed
     - name: Cache npm
+      if: inputs.npm == 'true'
       uses: actions/cache@v6
       with:
         path: ~/.npm

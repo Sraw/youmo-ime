@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.input.picker.EmojiSearchUi
+import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.EmojiModifier
 import org.fcitx.fcitx5.android.input.picker.PickerData
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
@@ -26,6 +27,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -41,6 +43,12 @@ class PanelUatTest {
 
     @get:Rule
     val prefs = PrefsRule()
+
+    // 表情 opens the panel last shown, which another test may have left at 颜文字 or the symbols: the emoji here
+    @Before
+    fun emojiShownLast() {
+        prefs.set(AppPrefs.getInstance().internal.lastPickerType, PickerWindow.Key.Emoji.name)
+    }
 
     private val h = KeyboardHarness()
 

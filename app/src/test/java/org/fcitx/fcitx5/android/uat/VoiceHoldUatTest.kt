@@ -215,6 +215,38 @@ class VoiceHoldUatTest {
         assertEquals(-1 to -1, composing())
     }
 
+    /** Input restarted in the same field while the finger is down (a WebView, restartInput): what is said is kept. */
+    @Test
+    fun inputRestartedInTheSameFieldWhileHoldingKeepsWhatIsSaid() {
+        allowMicrophone()
+        h.start(MULTI_LINE, fieldId = 7)
+        val f = holdSpace()
+        voice.heard("今天天气")
+        h.advance(100)
+        h.restart()
+        h.advance(100)
+        voice.said += "很好。"
+        f.lift()
+        assertEquals("今天天气，很好。", text())
+    }
+
+    // a hold whose recognizer never answers: what was heard is still typed when it is given up
+    @Test
+    fun aHoldCutShortTypesWhatWasHeard() {
+        allowMicrophone()
+        h.start(MULTI_LINE)
+        val f = holdSpace()
+        voice.heard("今天天气")
+        h.advance(100)
+        // the tail never recorded, and a cut not answered either: 15 s and given up
+        voice.held = true
+        voice.stuck = true
+        f.lift()
+        h.advance(15_100)
+        assertEquals("今天天气", text())
+        assertTrue(shown().toString(), string(R.string.voice_tap_cut_short) in shown())
+    }
+
     @Test
     @Uat("VO-03")
     fun slidingUpDropsIt() {
@@ -442,6 +474,24 @@ class VoiceHoldUatTest {
         f.lift()
         assertEquals("", h.field.text.toString())
         assertEquals("", first.text.toString())
+    }
+
+    // heard while the space is held, then another field: the hold dropped (VoiceHoldOverlay.inputEnded),
+    // what was heard with it; neither field gets it (a tap's talk, unlike a hold, types it into the first)
+    @Test
+    @Uat("VO-12")
+    fun whatWasHeardBeforeAnotherFieldGoesWithTheHold() {
+        allowMicrophone()
+        h.start()
+        val first = h.field
+        val f = holdSpace()
+        voice.heard("你好")
+        h.advance(100)
+        h.start()
+        f.lift()
+        h.advance(500)
+        assertEquals("", first.text.toString())
+        assertEquals("", h.field.text.toString())
     }
 
     @Test

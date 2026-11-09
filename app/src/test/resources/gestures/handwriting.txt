@@ -1,0 +1,24 @@
+keys [backspace, comma, period, reading, symbols, numbers, space, lang, enter]
+backspace tap: [sendKey(sym=65288, states=536870912, code=0, up=false)] field 
+backspace long press: []
+backspace long press sent: [sendKey(sym=65288, states=536870912, code=0, up=false), sendKey(sym=65288, states=536870912, code=0, up=false), sendKey(sym=65288, states=536870912, code=0, up=false)] field 
+comma tap: [sendKey(key=,, states=536870912, code=51, up=false)] field 
+comma long press: [”, “, …, 、, ；, ：, ！, ？]
+comma long press sent: [sendKey(key=？, states=536870912, code=0, up=false)] field 
+period tap: [sendKey(key=., states=536870912, code=52, up=false)] field 
+period long press: []
+period long press sent: [sendKey(key=., states=536870912, code=52, up=false)] field 
+reading tap: [] field 
+symbols tap: [] field 
+numbers tap: [] field 
+numbers long press: []
+numbers long press sent: [triggerUnicode()] field 
+space tap: [sendKey(sym=32, states=536870912, code=0, up=false)] field 
+space long press: []
+space long press sent: [] field 
+lang tap: [] field 
+lang long press: []
+lang long press sent: [] field 
+enter tap: [sendKey(sym=65293, states=536870912, code=0, up=false)] field 
+enter long press: []
+enter long press sent: [] field 

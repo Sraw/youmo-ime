@@ -90,7 +90,9 @@ class VoiceTalk(private val asItGoes: Boolean) {
 
     // where what was typed ends in [raw]: its characters found there in order, its marks skipped (the
     // polish added them), a character of raw's not matched skipped (one the polish took out); null if
-    // not all of it is there. The marks raw has after it go with it
+    // not all of it is there. The marks raw has after it go with it. A number the polish wrote in
+    // digits (3, 50%, 8:05) is the run of number characters raw said it in (三, 百分之五十); a letter
+    // the polish cased otherwise is the same letter
     private fun afterTypedIn(raw: String): Int? {
         var i = 0
         var j = 0
@@ -98,7 +100,12 @@ class VoiceTalk(private val asItGoes: Boolean) {
             when {
                 !typed[j].isLetterOrDigit() -> j++
                 i == raw.length -> return null
-                typed[j] == raw[i] -> {
+                typed[j] in '0'..'9' && (raw[i] in SAID_DIGITS || raw.startsWith(PERCENT, i)) -> {
+                    val from = j
+                    while (j < typed.length && (typed[j] in '0'..'9' || typed[j] in IN_NUMBERS)) j++
+                    i = afterSaidNumber(raw, i, clock = ':' in typed.substring(from, j))
+                }
+                typed[j].equals(raw[i], ignoreCase = true) -> {
                     i++
                     j++
                 }
@@ -109,6 +116,28 @@ class VoiceTalk(private val asItGoes: Boolean) {
         return i
     }
 
+    // where the number said at [from] in [raw] ends: 百分之 before it, 点 between its digits, a
+    // [clock]'s 分 after it
+    private fun afterSaidNumber(raw: String, from: Int, clock: Boolean): Int {
+        var i = if (raw.startsWith(PERCENT, from)) from + PERCENT.length else from
+        while (i < raw.length && (raw[i] in SAID_DIGITS || pointInNumber(raw, i))) i++
+        if (clock && raw.getOrNull(i) == '分') i++
+        return i
+    }
+
     /** What is left to type of what was heard last: the talk ended before the recognizer was done. */
     fun restNow(): String? = rest(last, lastRaw)
+
+    // 点 between two of a number's digits
+    private fun pointInNumber(raw: String, at: Int) = raw[at] == '点' && raw.getOrNull(at + 1)?.let { it in SAID_DIGITS } == true
+
+    private companion object {
+        // what a number is said in, but its 万, 亿, 点 and 分之, which stay or are matched as characters
+        const val SAID_DIGITS = "零〇一二两三四五六七八九十百千幺"
+
+        // what the polish writes inside a number in digits
+        const val IN_NUMBERS = ".:%/"
+
+        const val PERCENT = "百分之"
+    }
 }

@@ -46,10 +46,16 @@ class VoicePostRunTest {
     }
 
     @Test
-    fun theReferencesNumbersAreReadAsTheAppTypesThem() {
+    fun theReferencesNumbersAreComparedAsWritten() {
+        // numbers are the polish tagger's call, not this scorer's: a reference written in Han
+        // numerals against a typed 2026 is wrong; the same form on both sides is not
         val s = VoicePostRun.Score()
         VoicePostRun.score("二零二六年", "2026年", s)
-        assertEquals(0, s.wordErrors)
+        assertEquals(4, s.wordErrors) // 2026 for one numeral, three numerals missing, 年 matched
+        val same = VoicePostRun.Score()
+        VoicePostRun.score("2026年", "2026年", same)
+        VoicePostRun.score("二零二六年", "二零二六年", same)
+        assertEquals(0, same.wordErrors)
     }
 
     @Test

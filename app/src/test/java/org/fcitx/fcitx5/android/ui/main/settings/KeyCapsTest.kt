@@ -6,20 +6,20 @@ package org.fcitx.fcitx5.android.ui.main.settings
 
 import android.view.ContextThemeWrapper
 import android.view.View
-import org.junit.Assert.assertTrue
 import android.widget.FrameLayout
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.theme.Argb
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
-import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,6 +35,7 @@ import kotlin.math.roundToInt
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class KeyCapsTest {
 
     @get:Rule
@@ -110,7 +111,6 @@ class KeyCapsTest {
     // the symbol as they are, never a disabled key's fading; edited, outlined along the face drawn in the keyboard
     // theme's accent
     @Test
-    @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun theEnginesCapFadesItsWordsAloneAndOutlinesItsFace() {
         fun cap(marked: Boolean, dimmed: Boolean): SceneKeyCell =
             KeyCaps.key(ctx, "W", "2", marked = marked, dimmed = dimmed).let { k ->
@@ -142,7 +142,6 @@ class KeyCapsTest {
     // a cap is the keyboard's key made at its size and drawn shrunk to the cap (060-pending-decisions, the
     // shortcut page's marks where the keyboard puts them): its ops the key's at the keyboard's height
     @Test
-    @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun theEnginesCapIsTheKeyboardsKeyShrunkToIt() {
         val k = KeyCaps.keyboardKeyHeight(ctx)
         assertTrue("$k", k > H)

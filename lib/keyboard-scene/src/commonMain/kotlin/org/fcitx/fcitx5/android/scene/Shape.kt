@@ -32,7 +32,7 @@ data class Point(val x: Double, val y: Double)
 
 /**
  * What a key is shaped as (060-render-v2 §3.1): a value, not a rectangle written into everything, so a
- * fan of keys later is a [Path] the backends already draw. 0.6.0 makes only [Rect]s.
+ * fan of keys later is a [Path] the backends already draw. A theme's `path(…)` face is a [Path]; the rest are [Rect]s.
  */
 sealed interface Shape {
     /** The box it fits in: a screen reader's bounds, where a popup goes, what to redraw. */

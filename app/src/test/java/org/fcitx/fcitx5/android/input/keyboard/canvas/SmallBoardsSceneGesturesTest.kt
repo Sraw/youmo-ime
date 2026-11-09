@@ -10,6 +10,7 @@ import android.view.accessibility.AccessibilityManager
 import android.view.accessibility.AccessibilityNodeInfo
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -36,9 +37,8 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * The small boards 060-render-p2 S6 moved to the scene (表情搜索's letters, 展开候选's column, the
- * password field's number row, the symbol grid's cells): the same gestures on each drawing give the
- * same output, and that output is what each key is for (the expected values written here, not read
- * from either drawing).
+ * password field's number row, the symbol grid's cells): what each key does to a finger is what it is
+ * for (the expected values written here, not read from the drawing).
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -48,9 +48,6 @@ class SmallBoardsSceneGesturesTest {
     @get:Rule
     val prefs = PrefsRule()
 
-    // what a board's keys did (compared with their views' till S8a deleted them)
-    private fun both(what: () -> List<String>): List<String> = what()
-
     // whether [root] has a canvas shown: the scene draws it
     private fun drawnByScene(root: View) = KeyboardHarness.all(root).any { it is KeyboardCanvasView && it.visibility == View.VISIBLE }
 
@@ -59,6 +56,7 @@ class SmallBoardsSceneGesturesTest {
     // the emoji panel's full stop (emoji.xml): its face as punctuation maps it, the key it sends the one the input
     // panel commits mapped the same way, no bubble (popups="off"): with Chinese punctuation 。, without it .
     @Test
+    @Uat("PAN-24")
     fun thePickersFullStopShowsWhatItTypes() = KeyboardHarness().start().use { h ->
         h.tap(h.described(h.service.getString(R.string.a11y_key_emoji)))
         h.relayout()
@@ -86,6 +84,7 @@ class SmallBoardsSceneGesturesTest {
             release()
             // typed as the face shows it (committed by the panel as punctuation maps it, not through the engine)
             assertEquals(api.calls.toString(), face, field.text.toString())
+            assertTrue(api.calls.toString(), api.calls.none { it.startsWith("sendKey") })
             field.setText("")
             idle()
         }
@@ -93,7 +92,7 @@ class SmallBoardsSceneGesturesTest {
 
     @Test
     fun emojiSearch() {
-        val out = both {
+        val out = run {
             KeyboardHarness().start().use { h ->
                 // text in the field before: a held ⌫ clears the query and stops there, never deleting into it
                 h.field.setText("ab")
@@ -127,7 +126,9 @@ class SmallBoardsSceneGesturesTest {
             }
         }
         // independently: 26 letters, 返回 and ⌫; xiao finds 😄; the field's ab kept, nothing typed into it nor deleted; 返回 closes the search
-        assertEquals(28, out[0].removePrefix("keys [").removeSuffix("]").split(", ").size)
+        val keys = out[0].removePrefix("keys [").removeSuffix("]").split(", ")
+        assertEquals(out[0], 28, keys.size)
+        assertTrue(out[0], ('a'..'z').all { "$it" in keys })
         assertEquals("xiao: true", out[1])
         // ⌫ takes the query's last letter; held, the query is cleared to its hint and stops there: the field's ab
         // kept and nothing sent to the engine either time
@@ -139,7 +140,7 @@ class SmallBoardsSceneGesturesTest {
 
     @Test
     fun expandedColumn() {
-        val out = both {
+        val out = run {
             KeyboardHarness().start().use { h ->
                 h.candidates(*Array(80) { "字$it" })
                 h.tap(h.described(h.service.getString(R.string.expand_candidates_list)))
@@ -172,6 +173,8 @@ class SmallBoardsSceneGesturesTest {
                     assertFalse(c.accessibilityNodeProvider!!.performAction(i, AccessibilityNodeInfo.ACTION_CLICK, null))
                     h.idle()
                     assertEquals("first 字0 sent []", "first ${first()} sent $acts")
+                    // off again: the rest is a finger's, as without a screen reader
+                    shadowOf(h.service.getSystemService(AccessibilityManager::class.java)).setEnabled(false)
                 }
                 h.tap(down())
                 h.after(1000)
@@ -191,6 +194,11 @@ class SmallBoardsSceneGesturesTest {
         }
         // independently: a page down moves past 字0, a page up at the top does nothing and back again goes to 字0;
         // ⌫ and Return reach the engine as BackSpace (0xff08) and Return (0xff0d)
+        // the column's keys: the two pages, ⌫ and Return among them
+        val app = RuntimeEnvironment.getApplication()
+        for (d in listOf(app.getString(R.string.a11y_candidates_prev_page), app.getString(R.string.a11y_candidates_next_page), "Backspace")) {
+            assertTrue(out[0], d in out[0])
+        }
         assertEquals("first 字0", out[1])
         assertEquals("up at the top: first 字0 sent []", out[2])
         assertEquals("down: moved true", out[3])
@@ -210,7 +218,7 @@ class SmallBoardsSceneGesturesTest {
 
     @Test
     fun numberRow() {
-        val out = both {
+        val out = run {
             KeyboardHarness().use { h ->
                 password(h)
                 val row = KeyboardHarness.find<NumberRow>(h.inputView)!!
@@ -237,7 +245,7 @@ class SmallBoardsSceneGesturesTest {
 
     @Test
     fun symbolGrid() {
-        val out = both {
+        val out = run {
             KeyboardHarness().start().use { h ->
                 h.tap(h.key("符"))
                 h.relayout()

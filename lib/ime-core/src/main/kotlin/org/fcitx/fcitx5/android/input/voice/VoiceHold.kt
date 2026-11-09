@@ -7,8 +7,8 @@ package org.fcitx.fcitx5.android.input.voice
 /**
  * Hold to talk, on the space key as Sogou's and WeChat's keyboards have it: the long press opens
  * the microphone, what is said is typed when the finger lifts, and lifting it after sliding up
- * [cancelDistance] or more drops it. What is heard meanwhile is shown, not typed: a stretch is
- * recognized at each pause, the last one once the finger lifts.
+ * [cancelDistance] or more drops it. What is said shows as it is recognized (VoiceLive) and is
+ * typed when the finger lifts; this is the finger's part: its zone, and what lifting it does.
  */
 class VoiceHold(private val cancelDistance: Float) {
 

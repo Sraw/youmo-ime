@@ -115,5 +115,6 @@ class KeyboardCustomTest {
         val again = PinyinSession(sessionTestData(), T9Segmenter(abbreviations = false, letters = k17), spell = true, prediction = false)
         assertTrue(k17.keysOf('p').length == 2)
         assertTrue(Keyboard(again, nineKeys = false).onEvent(EngineEvent.CHAR, Keyboard.tapKey(code("pqrs"), 0f, 0f)).handled)
+        assertEquals('p', Keyboard.typedLetter(Keyboard.tapKey(code("pqrs"), 0f, 0f)))
     }
 }

@@ -11,7 +11,10 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.LayoutSource
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
@@ -75,6 +78,43 @@ class T9ColumnFitTest {
         assertSame(params, column.layoutParams)
     }
 
+    // no scene made (its layout unreadable): the column hidden with the keys, as the new drawing failing shows
+    // nothing (T9Keyboard.onLayout, no scene no slot); the same keyboard with its layout read shows it. The
+    // layout is read as the keyboard is made, so the unreadable one is in place before
+    @Test
+    fun theColumnHidesWhenTheSceneIsNotMade() {
+        fun columnShown(): Int {
+            val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, semicolon = false)
+            val column = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single()
+            val density = keyboard.resources.displayMetrics.density
+            val w = (NARROWEST_DP * density).toInt()
+            val h = (HEIGHT_DP * density).toInt()
+            keyboard.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
+            keyboard.layout(0, 0, w, h)
+            return column.visibility
+        }
+        assertEquals(View.VISIBLE, columnShown())
+        val builtIn = SceneLayouts.source
+        val builtInFallback = SceneLayouts.fallback
+        val unreadable = { ctx: android.content.Context ->
+            val own = BuiltInLayouts(ctx)
+            object : LayoutSource {
+                override val key = "nine-unreadable"
+
+                override fun text(id: String) = if (id == "nine") "<not a layout" else own.text(id)
+            }
+        }
+        // the app's own is the step back where a source does not read: unreadable too, so no scene at all
+        SceneLayouts.source = unreadable
+        SceneLayouts.fallback = unreadable
+        try {
+            assertEquals(View.INVISIBLE, columnShown())
+        } finally {
+            SceneLayouts.source = builtIn
+            SceneLayouts.fallback = builtInFallback
+        }
+    }
+
     private fun fits(scale: Float, moved: Boolean = false) {
         RuntimeEnvironment.setFontScale(scale)
         val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, semicolon = false)
@@ -96,10 +136,9 @@ class T9ColumnFitTest {
         }
         // one measure and layout, no frame after it (no looper run): the column in its slot already, shown
         val slot = checkNotNull(view.scene).slots.single { it.id == "side" }.bounds
-        val c = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single()
-        assertEquals(View.VISIBLE, c.visibility)
-        assertEquals(listOf(slot.left, slot.top, slot.right, slot.bottom).map { it.roundToInt() }, listOf(c.left, c.top, c.right, c.bottom))
         val column = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single()
+        assertEquals(View.VISIBLE, column.visibility)
+        assertEquals(listOf(slot.left, slot.top, slot.right, slot.bottom).map { it.roundToInt() }, listOf(column.left, column.top, column.right, column.bottom))
         val items = column.getChildAt(0) as ViewGroup
         val ink = RectF()
         var shrunk = false

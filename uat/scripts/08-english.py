@@ -98,7 +98,7 @@ case("EN-21", needs="jvm:EnglishCapsUatTest.aGlideTakesShiftWhereTheFieldAsksACa
 case("EN-26", needs="jvm:EnglishUatTest.theWordAsTypedPickedCountsAsACorrectionTakenBack、SettingsPagesUatTest.anEnglishWordNoLongerCorrectedIsMarkedAndCorrectedAgainOnATap")(lambda d: None)
 
 
-@case("EN-27", base="B0-英文", mutates="learn")
+@case("EN-27", base="B0-英文", mutates=True)
 def en27(d):
     d.type("th")
     c = d.cands()

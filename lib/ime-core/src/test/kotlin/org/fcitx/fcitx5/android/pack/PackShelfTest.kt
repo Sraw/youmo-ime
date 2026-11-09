@@ -240,11 +240,15 @@ class PackShelfTest {
         damage(shelf, PackKind.TEXT, "engine/pinyin.data")
         var found: Boolean? = null
         val verify = Thread { found = shelf.verify(PackKind.TEXT) }.apply { start() }
-        assertTrue(reached.await(5, java.util.concurrent.TimeUnit.SECONDS))
         val files = TEXT_FILES + ("engine/english.data" to "en".toByteArray())
-        assertTrue(shelf.take(text(version = 4, files = files)) is ImportResult.Imported)
-        go.countDown()
+        try {
+            assertTrue(reached.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            assertTrue(shelf.take(text(version = 4, files = files)) is ImportResult.Imported)
+        } finally {
+            go.countDown()
+        }
         verify.join(5000)
+        assertFalse("the verify still runs", verify.isAlive)
         assertEquals(false, found)
         assertReady(shelf, PackKind.TEXT, 4, files)
         assertSame(VerifyDue.UNVERIFIED, shelf.due(PackKind.TEXT))
@@ -605,7 +609,7 @@ class PackShelfTest {
         val status = shelf().status(PackKind.TEXT)
         assertTrue("$status", status is PackStatus.Damaged)
         // the pointer naming nothing, or something unsafe
-        File(root, "text/current").writeText("../voice")
+        File(root, "${PackKind.TEXT.id}/${PackShelf.CURRENT}").writeText("../voice")
         assertSame(PackStatus.Missing, shelf().status(PackKind.TEXT))
     }
 

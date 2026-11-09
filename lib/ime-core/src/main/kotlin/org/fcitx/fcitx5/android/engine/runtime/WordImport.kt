@@ -99,19 +99,21 @@ internal class WordImport(
                 export = WordListFiles.exportMark(raw)
                 own = WordListFiles.exportMark(raw, old = true) == true
             }
-            if (line.startsWith(WordListFiles.ENGLISH_BLOCK_MARK)) {
-                val word = line.removePrefix(WordListFiles.ENGLISH_BLOCK_MARK).trim()
-                if (EnglishText.isWord(word)) english += word else unread++
-            } else if (!line.startsWith(WordListFiles.LEARNED_MARK)) {
-                WordLists.line(raw)?.let {
+            when {
+                line.startsWith(WordListFiles.ENGLISH_BLOCK_MARK) -> {
+                    val word = line.removePrefix(WordListFiles.ENGLISH_BLOCK_MARK).trim()
+                    if (EnglishText.isWord(word)) english += word else unread++
+                }
+                line.startsWith(WordListFiles.LEARNED_MARK) -> {
+                    val rest = line.removePrefix(WordListFiles.LEARNED_MARK)
+                    val word = WordLists.line(rest)
+                    val entry = word?.pinyin?.let { WordLists.entry(word.text, it) }
+                    if (export != true || entry == null || word.blocked) unread++ else learn[entry] = learnedCount(rest)
+                }
+                else -> WordLists.line(raw)?.let {
                     read += it
                     counts += ImportFiles.frequency(raw)
                 }
-            } else {
-                val rest = line.removePrefix(WordListFiles.LEARNED_MARK)
-                val word = WordLists.line(rest)
-                val entry = word?.pinyin?.let { WordLists.entry(word.text, it) }
-                if (export != true || entry == null || word.blocked) unread++ else learn[entry] = learnedCount(rest)
             }
         }
         return ListRead(read, counts, learn, unread, own, english)

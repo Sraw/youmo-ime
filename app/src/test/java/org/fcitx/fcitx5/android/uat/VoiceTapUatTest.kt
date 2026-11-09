@@ -13,12 +13,10 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.input.voice.VoicePolishStream
 import org.fcitx.fcitx5.android.input.voice.VoicePolishTags
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -83,7 +81,7 @@ class VoiceTapUatTest : VoiceTapUat() {
         h.advance(100)
         assertEquals("我们走吧", text())
         assertFalse(talking)
-        // the mask gone, the keys take presses again
+        // the mask gone: nothing left over the keys
         h.advance(1000)
         assertNull(mask())
         assertEquals(1, voice.closes)
@@ -140,7 +138,7 @@ class VoiceTapUatTest : VoiceTapUat() {
     }
 
     @Test
-    @Uat("VO-28")
+    @Uat("VO-05", "VO-28")
     fun theMaskHasNoEnterStoppedTheKeyboardsSendsIt() {
         allowMicrophone()
         h.start()
@@ -230,16 +228,20 @@ class VoiceTapUatTest : VoiceTapUat() {
         assertEquals(1, voice.closes)
     }
 
-    @Test
-    @Uat("VO-29")
-    fun polishedTheFrozenPartIsTypedAsItIsSaid() {
-        allowMicrophone()
-        // the polish (always on): a tagger deleting 嗯, a 。 after 了 (as VoiceLiveTest's)
+    /** The polish (always on): a tagger deleting 嗯, a 。 after 了 (as VoiceLiveTest's). */
+    private fun polishDroppingUmMarkingLe() {
         val tags = VoicePolishTags(listOf("keep", "del"), listOf("", "，", "。"), listOf("none"))
         val tagger = VoicePolishStream.Tagger { w ->
             VoicePolishStream.Labels(IntArray(w.size) { if (w[it] == '嗯'.code) VoicePolishTags.DEL else VoicePolishTags.KEEP }, IntArray(w.size) { if (w[it] == '了'.code) 2 else 0 })
         }
         voice.polish = { VoicePolishStream(tags, tagger, freezeAfter = 2, window = 8) }
+    }
+
+    @Test
+    @Uat("VO-29")
+    fun polishedTheFrozenPartIsTypedAsItIsSaid() {
+        allowMicrophone()
+        polishDroppingUmMarkingLe()
         h.start(MULTI_LINE)
         tapMic()
         voice.heard("嗯我到了马上走")
@@ -257,11 +259,7 @@ class VoiceTapUatTest : VoiceTapUat() {
     @Uat("VO-29")
     fun polishedThenThePolishFailingAtTheEndOnlyWhatFollowsIsTyped() {
         allowMicrophone()
-        val tags = VoicePolishTags(listOf("keep", "del"), listOf("", "，", "。"), listOf("none"))
-        val tagger = VoicePolishStream.Tagger { w ->
-            VoicePolishStream.Labels(IntArray(w.size) { if (w[it] == '嗯'.code) VoicePolishTags.DEL else VoicePolishTags.KEEP }, IntArray(w.size) { if (w[it] == '了'.code) 2 else 0 })
-        }
-        voice.polish = { VoicePolishStream(tags, tagger, freezeAfter = 2, window = 8) }
+        polishDroppingUmMarkingLe()
         h.start(MULTI_LINE)
         tapMic()
         voice.heard("嗯我到了马上走")
@@ -295,6 +293,25 @@ class VoiceTapUatTest : VoiceTapUat() {
         assertEquals("你好，世界，走吧。", text())
         assertEquals(-1 to -1, composing())
         assertEquals(1, voice.closes)
+    }
+
+    @Test
+    @Uat("VO-29")
+    fun theViewsMadeAnewWhileTalkingTheTailIsTypedOnce() {
+        allowMicrophone()
+        h.start(MULTI_LINE)
+        tapMic()
+        voice.heard("今天天气")
+        h.advance(100)
+        assertEquals(0 to 4, composing())
+        // a theme's rebuild (floating on) while the tail still composes: it is not finished in the
+        // field as text, then typed again by the talk the old view's end stops
+        ThemeManager.prefs.floatingKeyboard.setValue(true)
+        restore += { ThemeManager.prefs.floatingKeyboard.setValue(false) }
+        h.idle()
+        h.relayout()
+        h.advance(1000)
+        assertEquals(text(), 1, text().split("今天天气").size - 1)
     }
 
     @Test

@@ -15,12 +15,23 @@ def area(s):
     return w.b
 
 
+def zero(n):
+    return (n.b[2] - n.b[0]) * (n.b[3] - n.b[1]) <= 0
+
+
+def inside(n, box):
+    return n.b[0] >= box[0] - 1 and n.b[1] >= box[1] - 1 and n.b[2] <= box[2] + 1 and n.b[3] <= box[3] + 1
+
+
 def keys(s, box):
-    """the touchable nodes inside box (keys, cells), with their words (the app's: a candidate's menu
-    is a popup outside the keyboard's window)"""
-    inside = [n for n in s.nodes if n.pkg == PKG and n.clickable and n.b[0] >= box[0] - 1 and n.b[1] >= box[1] - 1
-              and n.b[2] <= box[2] + 1 and n.b[3] <= box[3] + 1]
-    return [n for n in inside if (n.b[2] - n.b[0]) * (n.b[3] - n.b[1]) > 0]
+    """the touchable nodes over box (keys, cells), with their words (the app's: a candidate's menu
+    is a popup outside the keyboard's window): those reaching out of it and empty ones too, so that
+    explore can tell them (a node merely touching box's edge is a neighbour's, not one of these)"""
+    def over(n):
+        if zero(n):
+            return box[0] <= n.b[0] <= box[2] and box[1] <= n.b[1] <= box[3]
+        return min(n.b[2], box[2]) - max(n.b[0], box[0]) > 0 and min(n.b[3], box[3]) - max(n.b[1], box[1]) > 0
+    return [n for n in s.nodes if n.pkg == PKG and n.clickable and over(n)]
 
 
 def words(n):
@@ -42,6 +53,10 @@ def explore(d, box=None, skip=lambda n: False, want=None, least=4):
     box = box or area(s)
     ns = [n for n in keys(s, box) if not skip(n)]
     check(len(ns) >= least, f"只找到 {len(ns)} 个键")
+    empty = [f"{words(n)}{n.b}" for n in ns if zero(n)]
+    check(not empty, f"零面积的框：{empty[:3]}")
+    out = [f"{words(n)}{n.b}" for n in ns if not inside(n, box)]
+    check(not out, f"框出了 {box}：{out[:3]}")
     silent = [n.b for n in ns if not words(n).strip()]
     check(not silent, f"没话可读的键：{silent}")
     bad = overlaps(ns)
@@ -136,6 +151,8 @@ def ax12(d):
     s = d.screen()
     menu = [n for n in s.nodes if n.pkg == PKG and n.clickable and n.b not in before and (n.text or n.desc)]
     check(len(menu) >= 2, f"长按后的菜单只有 {[words(n) for n in menu]}")
-    box = (min(n.b[0] for n in menu), min(n.b[1] for n in menu), max(n.b[2] for n in menu), max(n.b[3] for n in menu))
+    # the screen (B0: portrait), not a box made of the menu's own nodes, which every one is inside
+    w, h = map(int, d.sh("wm size").strip().splitlines()[-1].split()[-1].split("x"))
+    box = (0, 0, w, h)
     return explore(d, box=box, skip=lambda n: n.b in before, want=["屏蔽"], least=2)
 

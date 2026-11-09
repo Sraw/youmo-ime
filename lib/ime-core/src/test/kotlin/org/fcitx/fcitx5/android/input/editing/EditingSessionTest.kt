@@ -767,22 +767,43 @@ class EditingSessionTest {
     private fun preedit(text: String, cursor: Int) = FormattedText(arrayOf(text), intArrayOf(0), cursor)
 
     @Test
-    fun aProvisionalCompositionIsTakenAwayWhenTheCursorLeavesIt() {
-        // voice's text still to come, composing after "ab"; the user taps before "a"
-        val (s, e) = session("ab", cursor = 2)
-        s.updateComposingText(formatted("你好"), provisional = true)
-        assertEquals("ab你好", e.text)
-        assertTrue(s.provisional)
-        e.setSelection(0, 0)
-        assertEquals(EditingSession.CursorUpdate.None, s.report(0))
-        assertEquals("ab", e.text)
-        assertEquals(0, e.selectionStart)
-        assertFalse(s.provisional)
-        assertTrue(s.composing.isEmpty())
-    }
+    fun aProvisionalCompositionTheEditorEndedOrTheUserTappedInto() = assertRows(
+        "the cursor moved past it: still there, taken away" to {
+            val (s, e) = session("abc", cursor = 2)
+            val told = mutableListOf<Boolean>()
+            s.provisionalTaken = { told += it }
+            s.updateComposingText(formatted("你好"), provisional = true)
+            assertEquals("ab你好c", e.text)
+            e.setSelection(5, 5)
+            assertEquals(EditingSession.CursorUpdate.None, s.report(5))
+            assertEquals(listOf(false), told)
+            assertEquals("abc", e.text)
+            assertEquals(3, e.selectionStart)
+        },
+        "the editor dropped its composing span, the cursor moved past it: still taken away, not left as text" to {
+            val (s, e) = session("abc", cursor = 2)
+            val told = mutableListOf<Boolean>()
+            s.provisionalTaken = { told += it }
+            s.updateComposingText(formatted("你好"), provisional = true)
+            // an InputFilter or a WebView ended the composition on its own: the text stays, no span
+            e.finishComposingText()
+            e.setSelection(5, 5)
+            assertEquals(EditingSession.CursorUpdate.None, s.report(5))
+            assertEquals(listOf(false), told)
+            assertEquals("abc", e.text)
+            assertEquals(3, e.selectionStart)
+        },
+        "the cursor tapped inside it: not fcitx's preedit, nothing moved" to {
+            val (s, e) = session("ab", cursor = 2)
+            s.updateComposingText(formatted("你好"), provisional = true)
+            e.setSelection(3, 3)
+            assertEquals(EditingSession.CursorUpdate.None, s.report(3, composing = 2 to 4))
+            assertTrue(s.provisional)
+        }
+    )
 
     @Test
-    fun aProvisionalCompositionTheAppTookIsNotTakenAgain() = assertRows(
+    fun aProvisionalCompositionLeftOrTakenByTheApp() = assertRows(
         "the field cleared (a chat's text sent)" to {
             val (s, e) = session("ab", cursor = 2)
             val told = mutableListOf<Boolean>()
@@ -829,16 +850,39 @@ class EditingSessionTest {
             assertEquals(listOf(false), told)
             assertEquals("ab", e.text)
         },
-        "the cursor moved past it: still there, taken away" to {
-            val (s, e) = session("abc", cursor = 2)
-            val told = mutableListOf<Boolean>()
-            s.provisionalTaken = { told += it }
+        "the cursor moved before it: taken away, the cursor where it went" to {
+            // voice's text still to come, composing after "ab"; the user taps before "a"
+            val (s, e) = session("ab", cursor = 2)
             s.updateComposingText(formatted("你好"), provisional = true)
-            assertEquals("ab你好c", e.text)
-            e.setSelection(5, 5)
-            assertEquals(EditingSession.CursorUpdate.None, s.report(5))
-            assertEquals(listOf(false), told)
+            assertEquals("ab你好", e.text)
+            assertTrue(s.provisional)
+            e.setSelection(0, 0)
+            assertEquals(EditingSession.CursorUpdate.None, s.report(0))
+            assertEquals("ab", e.text)
+            assertEquals(0, e.selectionStart)
+            assertFalse(s.provisional)
+            assertTrue(s.composing.isEmpty())
+        },
+        "the cursor moved forward past text after it: kept where it went" to {
+            val (s, e) = session("ab", cursor = 1)
+            s.updateComposingText(formatted("你好"), provisional = true)
+            assertEquals("a你好b", e.text)
+            // after "b": two places on once the composition is gone
+            e.setSelection(4, 4)
+            assertEquals(EditingSession.CursorUpdate.None, s.report(4))
+            assertEquals("ab", e.text)
+            assertEquals(2, e.selectionStart)
+        },
+        "the app shortened it: measured by the span reported" to {
+            val (s, e) = session("abc", cursor = 1)
+            s.updateComposingText(formatted("你好"), provisional = true)
+            // the app made it one character ("a你bc", its span 1..2), then the user tapped at the end
+            e.setComposingText("你", 1)
+            e.setSelection(4, 4)
+            assertEquals(EditingSession.CursorUpdate.None, s.report(4, composing = 1 to 2))
             assertEquals("abc", e.text)
+            // one place back, the span's length as reported, not as composed
+            assertEquals(3, e.selectionStart)
         },
     )
 
@@ -903,31 +947,6 @@ class EditingSessionTest {
             assertEquals(emptyList<Boolean>(), told)
         },
     )
-
-    @Test
-    fun aProvisionalCompositionLeftForwardKeepsTheCursorWhereItWent() {
-        val (s, e) = session("ab", cursor = 1)
-        s.updateComposingText(formatted("你好"), provisional = true)
-        assertEquals("a你好b", e.text)
-        // after "b": two places on once the composition is gone
-        e.setSelection(4, 4)
-        assertEquals(EditingSession.CursorUpdate.None, s.report(4))
-        assertEquals("ab", e.text)
-        assertEquals(2, e.selectionStart)
-    }
-
-    @Test
-    fun aProvisionalCompositionLeftIsMeasuredByTheSpanReported() {
-        val (s, e) = session("abc", cursor = 1)
-        s.updateComposingText(formatted("你好"), provisional = true)
-        // the app made it one character ("a你bc", its span 1..2), then the user tapped at the end
-        e.setComposingText("你", 1)
-        e.setSelection(4, 4)
-        assertEquals(EditingSession.CursorUpdate.None, s.report(4, composing = 1 to 2))
-        assertEquals("abc", e.text)
-        // one place back, the span's length as reported, not as composed
-        assertEquals(3, e.selectionStart)
-    }
 
     @Test
     fun aProvisionalCompositionIsReplacedByTheCommit() {

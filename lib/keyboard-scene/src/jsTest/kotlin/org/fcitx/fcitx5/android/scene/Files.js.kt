@@ -8,7 +8,7 @@ package org.fcitx.fcitx5.android.scene
 private val fs: dynamic = js("require('fs')")
 
 internal actual fun readText(path: String): String? =
-    if (fs.existsSync(path) as Boolean) fs.readFileSync(path, "utf8") as String else null
+    if (fs.existsSync(path) as Boolean && fs.statSync(path).isFile() as Boolean) fs.readFileSync(path, "utf8") as String else null
 
 internal actual fun writeText(path: String, text: String) {
     fs.writeFileSync(path, text, "utf8")

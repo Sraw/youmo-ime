@@ -9,17 +9,18 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.input.keyboard.OneHanded
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.ShownKey
-import org.fcitx.fcitx5.android.scene.Op
+import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.KeyTextScale
+import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.scene.Op
+import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield.MAX_CLASS_SHRINK as LETTER_YIELD
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
-import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
-import org.fcitx.fcitx5.android.input.keyboard.KeyTextScale
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -185,12 +186,12 @@ class CompactKeyboardUatTest {
         // the marks to fit (docs/keyboard.md: 6% at most, every letter alike)
         val nominal = size * minOf(KeyTextScale.COMPACT, floating)
         val lower = lettersStayClearOfTheirSymbols()
-        assertTrue("${lower.first().size()} of $nominal", lower.first().size() in nominal * (1 - LETTER_YIELD) - 0.5f..nominal + 0.5f)
+        assertTrue("${lower.first().size()} of $nominal", lower.first().size() in nominal * (1 - LETTER_YIELD.toFloat()) - 0.5f..nominal + 0.5f)
         h.tap(h.describedKey("Shift"))
         h.idle()
         assertEquals("Q", h.key("Q").label)
         val upper = lettersStayClearOfTheirSymbols(dropped = true)
-        assertTrue("${upper.first().size()} of $nominal", upper.first().size() in nominal * (1 - LETTER_YIELD) - 0.5f..nominal + 0.5f)
+        assertTrue("${upper.first().size()} of $nominal", upper.first().size() in nominal * (1 - LETTER_YIELD.toFloat()) - 0.5f..nominal + 0.5f)
     }
 
     @Test
@@ -236,6 +237,9 @@ class CompactKeyboardUatTest {
     private fun lettersStayClearOfTheirSymbols(dropped: Boolean = false): List<ShownKey> {
         val letters = h.keys().filter { it.label.length == 1 && it.label[0].isLetter() && it.alt != null }
         assertTrue(letters.size.toString(), letters.size >= 26)
+        // left out only where it does not fit: a few capitals (decision 62: A, W, M), never the board's all
+        val left = letters.filter { it.alt !in it.drawnTexts }.map { it.label }
+        assertTrue("left out: $left", if (dropped) left.size <= 3 else left.isEmpty())
         for (k in letters) {
             val letter = ink(k, k.label)
             // the letters one size whether or not the symbol stays
@@ -280,10 +284,5 @@ class CompactKeyboardUatTest {
         level(30, 49)
         st.idle()
         assertEquals(size, q().size(), 0.01f)
-    }
-
-    private companion object {
-        // the most the letters' class gives way to the marks (docs/keyboard.md, S4e's second step)
-        const val LETTER_YIELD = 0.06f
     }
 }

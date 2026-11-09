@@ -42,19 +42,21 @@ import kotlin.math.roundToInt
  */
 class PopupScenes(
     private val view: View,
-    private val theme: Theme,
+    theme: Theme,
     /** The text measured through this: a test's, to make the engine fail. */
     @VisibleForTesting measuring: (TextMeasurer) -> TextMeasurer = { it },
 ) {
-    private val look = ThemeManager.shownLook(theme)
+    // the built-in where the engine makes nothing of the theme, as the keys are (U8): popups shown still
+    private val theme = SceneBoard.drawnTheme(theme)
+    private val look = ThemeManager.shownLook(this.theme)
     private val fonts = SceneFonts(look)
     private val measurer = measuring(AndroidTextMeasurer(fonts))
-    private val sceneTheme = SceneThemes.of(look, theme.name, theme.isDark)
+    private val sceneTheme = SceneThemes.of(look, this.theme.name, this.theme.isDark)
 
     /** Whether the theme converted: its popups drawn as scenes. */
     val ready: Boolean get() = sceneTheme != null
 
-    /** A builder in the environment now; null where the theme did not convert (the keyboard's keys are views then too). */
+    /** A builder in the environment now; null where neither the theme nor the built-in converted (nothing drawn, logged). */
     fun builder(): SceneBuilder? = sceneTheme?.let {
         val env = SceneEnvs.of(view, look, theme.isDark, view.width, view.height, Input())
         SceneBuilder(it, env, measurer, cascades = SceneThemes.cascades(it))
@@ -62,7 +64,7 @@ class PopupScenes(
 
     /**
      * What [made] made of [what]; a failure logged and null: the popup then not shown (a new one) or
-     * the scene it had kept (a focus moved), never the views instead (they go in S8) and never a
+     * the scene it had kept (a focus moved), never the views instead (gone) and never a
      * popup not drawn that a lift would still type.
      */
     fun <T> made(what: String, made: Parsed<T>?): T? = when (made) {

@@ -218,4 +218,15 @@ class WordListsTest {
         dir.file(WordLists.BLOCKED).write("👍🏻 hao\n😃 ni'hao 0\n👌 hao x\nℹ️ xin\n".toByteArray())
         assertEquals(listOf("👍🏻", "😃", "ℹ️"), WordLists(dir).blockedWords.map { it.text })
     }
+
+    // a Latin candidate blocked in pinyin is written as its upper-case letter syllables: it reads back after a restart
+    @Test
+    fun aBlockedLatinWordReadsBackAsItsLetters() {
+        val dir = MemoryFiles()
+        dir.file(WordLists.BLOCKED).write("hello H'E'L'L'O\niPhone I'P'H'O'N'E\n".toByteArray())
+        val read = WordLists(dir).blockedWords
+        assertEquals(listOf("hello", "iPhone"), read.map { it.text })
+        assertEquals(listOf(WordLists.blockedEntry("hello", "H'E'L'L'O"), WordLists.blockedEntry("iPhone", "I'P'H'O'N'E")), read)
+        assertEquals(5, read[0].syllables.size)
+    }
 }

@@ -92,8 +92,7 @@ class SceneTouchTest {
         f.up(at(k))
     }
 
-    // off, as the keyboard routes them: as the system splits them among the views Robolectric's split
-    // event moves q's finger (q swiped, 1 typed), which no device does
+    // two fingers down on q and p, each lifted on its own key: each types its own, in the order lifted
     @Test
     fun twoFingersOnTwoKeysEachTypesItsOwn() {
         val typed = gesture { h ->
@@ -117,7 +116,10 @@ class SceneTouchTest {
         // e's choices (3, é, …), the finger slid onto 3
         val (labels, typed) = gesture { h -> h.longPress(h.keyView("e"), pick = "3") to h.typed() }
         assertTrue(labels.toString(), labels.size > 1)
-        assertTrue(typed.toString(), typed.isNotEmpty())
+        // one choice typed, not e itself: which one the harness's straight slide lands on is not exact
+        // (the popup's own focus stepping is PopupFocusTest's)
+        assertEquals(typed.toString(), 1, typed.size)
+        assertFalse(typed.toString(), Regex("""(key=|char=|commit\()e\b""").containsMatchIn(typed[0]))
     }
 
     // the finger's place on the popup read from the key's cell's corner, as from its view's: A's cell
@@ -289,7 +291,7 @@ class SceneTouchTest {
     }
 
     @Test
-    fun aGlidesPathAndLettersAsOnTheViews() {
+    fun aGlideReachesTheEngineWithItsPath() {
         prefs.set(AppPrefs.getInstance().keyboard.glideTyping, true)
         val glide = gesture(KeyboardHarness.ENGLISH) { h ->
             val keys = "hello".map { h.keyView("$it") }
@@ -299,8 +301,9 @@ class SceneTouchTest {
             h.box(keys.last()).let { h.move(it.exactCenterX(), it.exactCenterY(), steps = 1, lift = true) }
             val g = h.api.glides.singleOrNull()
             assertNotNull(h.api.calls.toString(), g)
-            g!!.path.toList() to ('a'..'z').map { g.layout.centre(it) }
+            g!!.path.toList()
         }
-        assertTrue(glide.first.size > 4)
+        // the path as the finger went (the letters' centres the glide reads: TextSceneWiringTest.aGlideIsReadOnTheScene)
+        assertTrue(glide.toString(), glide.size > 4)
     }
 }

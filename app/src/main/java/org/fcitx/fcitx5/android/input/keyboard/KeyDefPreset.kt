@@ -88,7 +88,7 @@ class AddressKey(
         viewId = viewId,
     ),
     setOf(Behavior.Press(KeyAction.CommitAction(text))),
-    if (more.isEmpty()) arrayOf(Popup.Preview(text)) else arrayOf(Popup.Preview(text), Popup.Keyboard.Explicit(more.toTypedArray())),
+    if (more.isEmpty()) arrayOf(Popup.Preview(text)) else arrayOf(Popup.Preview(text), Popup.Keyboard.Explicit(more.toTypedArray(), asIs = true)),
     name,
 )
 
@@ -125,7 +125,7 @@ class CapsKey(percentWidth: Float = 0.15f) : KeyDef(
         viewId = R.id.button_caps,
         percentWidth = percentWidth,
         variant = Variant.Alternative,
-        // updated to the state-specific label by TextKeyboard.updateCapsButtonIcon
+        // updated to the state-specific label by TextKeyboard's scene
         contentDescription = R.string.a11y_key_shift
     ),
     setOf(

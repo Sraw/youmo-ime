@@ -20,6 +20,8 @@ object VoiceOpening {
         // what broke first is what is thrown; a stop or unload failing after it is suppressed into it
         var broke: Throwable? = null
         var after: Throwable? = null
+        // false in the finally on a return out of [use]: what is after it is not reached
+        var through = false
         try {
             start()
             // an Error too: sherpa's library not loading, memory running out
@@ -30,6 +32,7 @@ object VoiceOpening {
                 null
             }
             use(detector)
+            through = true
         } catch (e: Throwable) {
             broke = e
             throw e
@@ -44,11 +47,13 @@ object VoiceOpening {
             } catch (e: Throwable) {
                 after = suppress(broke ?: after, e)
             }
+            // a return out of [use]: the stop's or the unload's failure told, not thrown over the return
+            if (!through && broke == null) after?.let(failed)
         }
         // reached only with nothing broken before: the stop's or the unload's failure
         after?.let { throw it }
     }
 
-    /** [e] the first failure, or suppressed into the one before it */
-    fun suppress(first: Throwable?, e: Throwable): Throwable = first?.apply { addSuppressed(e) } ?: e
+    /** [e] the first failure, or suppressed into the one before it (not into itself: the same one thrown again) */
+    fun suppress(first: Throwable?, e: Throwable): Throwable = first?.apply { if (this !== e) addSuppressed(e) } ?: e
 }

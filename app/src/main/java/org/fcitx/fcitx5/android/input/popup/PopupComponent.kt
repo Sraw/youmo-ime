@@ -185,7 +185,7 @@ class PopupComponent :
         return sceneWordsFit(label, width)?.also { lastFit = FitFor(label, scale, width, it) }
     }
 
-    // the engine's: its sizes dp, measured as the scene draws them ([PopupScenes]); none where it
+    // the engine's: its sizes px, measured as the scene draws them ([PopupScenes]); none where it
     // could not say, the label then shown as a character is
     private fun sceneWordsFit(label: String, width: Int): PreviewLabel.Fit? {
         val b = scenes.builder() ?: return null
@@ -235,7 +235,6 @@ class PopupComponent :
 
     private fun FrameLayout.LayoutParams.isAt(width: Int, height: Int, left: Int, top: Int) =
         this.width == width && this.height == height && leftMargin == left && topMargin == top
-
 
     private fun showKeyboard(key: KeyRef, keyboard: KeyDef.Popup.Keyboard, bounds: Rect, faceInset: Int = 0) {
         var keys: Array<String>

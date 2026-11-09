@@ -29,7 +29,6 @@ import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Input
-import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import splitties.views.dsl.constraintlayout.above
@@ -110,7 +109,7 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
                 punctuation = punctuationMapping,
             )
             // no marks: a panel's swipes reach no shortcut (BaseKeyboard's shortcuts off), as its views drew none
-            val env = SceneEnvs.of(this, look, theme.isDark, width, height, Input(holdVoice = holdsToTalk), texts = texts, marks = NO_MARKS)
+            val env = SceneEnvs.of(this, look, theme.isDark, width, height, Input(holdVoice = holdsToTalk), texts = texts, marks = SceneEnvs.NO_MARKS)
             return if (locked) env.copy(states = LOCKED) else env
         }
 
@@ -125,12 +124,14 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
         init {
             // the canvas at another size (one-handed, split, another height): the panel's views to the slots of the scene at that size
             drawKeysWithScene(sceneLayout)
-            canvas?.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> post { (parent as? View)?.requestLayout() } }
+            // only when its size changed: a layout at the same size places the slots where they are
+            canvas?.addOnLayoutChangeListener { _, l, t, r, b, oldL, oldT, oldR, oldB ->
+                if (r - l != oldR - oldL || b - t != oldB - oldT) post { (parent as? View)?.requestLayout() }
+            }
         }
 
         private companion object {
             val LOCKED = mapOf("lock" to setOf(KeyState.Locked))
-            val NO_MARKS = MarkSettings(shortcuts = emptyMap())
         }
     }
 

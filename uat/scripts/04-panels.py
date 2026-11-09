@@ -58,7 +58,8 @@ case("PAN-19", needs="jvm:FieldPadUatTest.decimalAndSignedFieldsKeepTheDotAndThe
 case("PAN-20", needs="jvm:FieldPadUatTest.leavingANumberFieldGoesBackToTheLetters")(lambda d: None)
 
 
-case("PAN-21", needs="jvm:PanelUatTest.aSymbolHeldShowsTheViewsBubble")(lambda d: None)
+case("PAN-21", needs="jvm:PanelUatTest.aSymbolHeldShowsItsBubble")(lambda d: None)
+case("PAN-24", needs="jvm:SmallBoardsSceneGesturesTest.thePickersFullStopShowsWhatItTypes")(lambda d: None)
 
 
 def ime(d, w, after=0.6):
@@ -108,10 +109,16 @@ def pan23(d):
     time.sleep(0.6)
     long = "(｡>﹏<｡)ﾉﾞ✧*。"
     for _ in range(12):
-        n = d.screen().find(desc=long, where="ime")
+        s = d.screen()
+        n = s.find(desc=long, where="ime")
         if n:
             break
-        d.swipe((540, 2000), (540, 1650), 300, 0.6)
+        # up a third of the panel, at its middle: no screen size assumed
+        w = s.find(rid="input_window", where="ime")
+        if not w:
+            raise Blocked("颜文字面板不在")
+        x, y0, y1 = (w.b[0] + w.b[2]) // 2, w.b[3] - (w.b[3] - w.b[1]) // 6, w.b[1] + (w.b[3] - w.b[1]) // 2
+        d.swipe((x, y0), (x, y1), 300, 0.6)
     check(n is not None, f"颜文字里找不到 {long}")
     d.shot("kb", "颜文字长字")
     return f"框里「{t}」，表情和颜文字格子见图"

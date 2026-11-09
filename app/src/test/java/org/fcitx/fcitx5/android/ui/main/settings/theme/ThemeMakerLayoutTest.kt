@@ -366,8 +366,6 @@ class ThemeMakerLayoutTest {
         private fun isBarBackground(v: View) = v.javaClass == View::class.java && v.parent === h.keyboard &&
             s.top(v) == 0 && v.height >= input.kawaiiBar.view.height && v.height <= input.kawaiiBar.view.height * 2
 
-        // a key the canvas draws, as its scene has it: its cell, kind, name, face and gap, and the texts
-        // and icons it draws now (a text's box by the font's extent and the text's advance, its x where its line starts)
         // a text the scene draws, (x0, y0) its scene's origin in the window
         private fun sceneText(op: Op.Text, x0: Double, y0: Double) = buildJsonObject {
             val paint = Paint().apply {
@@ -385,6 +383,8 @@ class ThemeMakerLayoutTest {
             put("al", "l"); put("x", s.dp(x0 + op.x - s.origin[0]))
         }
 
+        // a key the canvas draws, as its scene has it: its cell, kind, name, face and gap, and the texts
+        // and icons it draws now (a text's box by the font's extent and the text's advance, its x where its line starts)
         private fun sceneKey(canvas: View, k: KeyNode): JsonObject {
             val at = IntArray(2).also(canvas::getLocationInWindow)
             val x0 = at[0].toDouble()

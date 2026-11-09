@@ -33,7 +33,7 @@ import java.io.File
 /**
  * The five sample themes of theme file 3.0 (colours, a frosted picture, the picture cut out by the
  * keys, nine-slice images with a font, an image per key), light and dark: ThemeLookScreenshotTest's,
- * and OldRenderBaselineTest's look of them kept for 060. Their images are made in [dir]; a font file
+ * and ThemeBaselineCompareTest's look of them kept for 060. Their images are made in [dir]; a font file
  * is none (the font sample's keys are drawn in monospace by the tests' decoder, as a font read would be).
  */
 class ThemeLookSamples(private val dir: File) {

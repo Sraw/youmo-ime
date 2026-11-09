@@ -47,7 +47,7 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
         }
         for (i in text.indices) {
             val written = when (op[i]) {
-                KEEP -> String(Character.toChars(text[i]))
+                KEEP -> kept(text[i], out, spaced != null)
                 DEL -> ""
                 else -> ops[op[i]]
             }
@@ -77,13 +77,13 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
      * The model's labels of [text] (normed) with what it does wrong in English undone, in place:
      * an English letter is kept (its ops are Chinese words and a del, which took the second r of
      * 「sorry」 as a stutter: 「I'm sory」 typed on a OnePlus 6T, 2026-11-06), and nothing is written
-     * after a full stop (「I'm sorry.。」). Applied by [VoicePolishStream] to what the model says; not in
+     * after a full stop, question or exclamation mark (「I'm sorry.。」, 「。。」 read as an ellipsis). Applied by [VoicePolishStream] to what the model says; not in
      * [apply], which is voice-eval's tags.py to the letter.
      */
     fun guarded(text: IntArray, op: IntArray, after: IntArray): Pair<IntArray, IntArray> {
         for (i in text.indices) {
             if (text[i] < 0x80 && Character.isLetter(text[i])) op[i] = KEEP
-            if (text[i] == '.'.code) after[i] = 0
+            if (text[i] in STOPS) after[i] = 0
         }
         return op to after
     }
@@ -97,19 +97,34 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
 
         private const val ASCII = 0x80
 
+        // norm's full width marks, and what English writes for each
+        private val WIDE_MARKS = "，？！：；".codePoints().toArray()
+        private const val ASCII_MARKS = ",?!:;"
+        private val STOPS = ".。？！".codePoints().toArray()
+
         // marks end a number though the tagger put them in one (numeval.py render); each of VoiceLive.ENDS
         // among them (VoicePolishTest checks), so what is typed as it is said is never cut inside a number
         internal val NUMBER_BREAKS = setOf("，", "。", "？", "！", "、", "…", "：", "；", ",", "?", "!", ";")
 
         private val PAUSE_BEFORE_MARK = Regex("[，、；：]+(?=[。？！…，])")
 
+        // a mark after an English letter as English writes it (「Yes, I know?」): norm made it full width
+        private fun kept(c: Int, out: StringBuilder, english: Boolean): String {
+            val afterLetter = out.lastOrNull()?.let { it.code < ASCII && it.isLetter() } == true
+            return if (english && afterLetter && c in WIDE_MARKS) ASCII_MARKS[WIDE_MARKS.indexOf(c)].toString()
+            else String(Character.toChars(c))
+        }
+
         private fun isAsciiWord(c: Int) = c < 0x80 && Character.isLetterOrDigit(c)
 
-        private fun endsAWord(out: StringBuilder) = out.isNotEmpty() && isAsciiWord(out.last().code)
+        // an English word, or its mark (「Yes, I」: the space after the comma kept)
+        private fun endsAWord(out: StringBuilder) = out.isNotEmpty() && (isAsciiWord(out.last().code) || out.last() in ASCII_MARKS)
 
         /**
          * For each character of [norm]`(raw)`, whether [raw] had a space before it between two
-         * English words (letters or digits): the tagger reads none, the text written keeps them.
+         * English words (letters or digits), or after an English word's mark (「Yes, I」): the tagger
+         * reads none, the text written keeps them. A space is what [norm] takes out (Kotlin's
+         * isWhitespace, NBSP among them, and U+0085).
          * [norm] neither drops nor changes a letter or digit, so the k-th of them is the raw text's k-th.
          */
         fun spaces(raw: String, normed: IntArray): BooleanArray {
@@ -123,7 +138,9 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
                         lastWord = true
                         gap = false
                     }
-                    Character.isWhitespace(c) -> gap = true
+                    isSpace(c) -> gap = true
+                    // the word goes on through its mark: 「Yes, I」
+                    lastWord && !gap && c < ASCII && c.toChar() in ASCII_MARKS -> Unit
                     else -> {
                         lastWord = false
                         gap = false
@@ -133,6 +150,8 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
             var k = 0
             return BooleanArray(normed.size) { i -> isAsciiWord(normed[i]) && wanted.getOrElse(k++) { false } }
         }
+
+        private fun isSpace(c: Int) = c == 0x85 || (Character.isBmpCodePoint(c) && c.toChar().isWhitespace())
 
         /** [text] as the tagger reads it: no spaces, title marks or ·, 「……」 and ... as one 「…」, ASCII marks full width. */
         fun norm(text: String): IntArray {
@@ -260,7 +279,10 @@ class VoicePolishStream(
         done = minOf(done, same)
         frozen = minOf(frozen, same)
         text = next
+        val wasSpaced = spaced
         spaced = VoicePolishTags.spaces(raw, next)
+        // the polished prefix shown holds while its characters and their spaces do
+        if (shownCut > frozen || (0 until shownCut).any { spaced[it] != wasSpaced[it] }) shownCut = -1
         if (seenOp.size < text.size) {
             seenOp = seenOp.copyOf(text.size)
             seenAfter = seenAfter.copyOf(text.size)
@@ -287,10 +309,21 @@ class VoicePolishStream(
         done = end
     }
 
+    // the frozen prefix last polished for shown, and its length: polished again only when it changed
+    private var shownCut = -1
+    private var shownPolished = ""
+
     private fun shown(): Shown {
-        val polished = tags.apply(text.copyOf(frozen), seenOp.copyOf(frozen), seenAfter.copyOf(frozen), spaced, seenNum.copyOf(frozen))
+        // a number going on past the frozen end shows whole in the rest, not half written (二零二 202 then 六)
+        var cut = frozen
+        if (cut < done && seenNum[cut] != 0) while (cut > 0 && seenNum[cut - 1] != 0) cut--
+        if (cut != shownCut) {
+            shownPolished = tags.apply(text.copyOf(cut), seenOp.copyOf(cut), seenAfter.copyOf(cut), spaced, seenNum.copyOf(cut))
+            shownCut = cut
+        }
+        val polished = shownPolished
         val rest = StringBuilder()
-        for (i in frozen until text.size) {
+        for (i in cut until text.size) {
             if (spaced[i]) rest.append(' ')
             rest.appendCodePoint(text[i])
         }

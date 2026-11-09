@@ -273,21 +273,16 @@ class GroupedKeyboard(
 
     @Keep
     private val showLangSwitchKeyListener = ManagedPreference.OnChangeListener<Boolean> { _, _ ->
-        showLanguageKey()
-    }
-
-    private fun showLanguageKey() {
         canvas?.invalidateScene()
     }
 
     init {
-        showLanguageKey()
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
     }
 
     // the groups' keys where the scene draws them: each key's letters= (060-render-v2 §15), its first letter's
     private fun groupPlaces(): List<Pair<Char, KeyPlace>> =
-        canvas?.shownKeys.orEmpty().mapNotNull { k -> k.letters?.let { it.group[0] to scenePlace(k.id) } }
+        canvas?.shownKeys.orEmpty().mapNotNull { k -> k.letters?.let { it.group[0] to scenePlace(k.id, k.copy == 1) } }
 
     // no glide: a stroke drawn alone (笔画筛选), over the group keys, each its first letter's
     override val glide = glideInput(
@@ -344,7 +339,8 @@ class GroupedKeyboard(
     public override fun onPopupAction(action: PopupAction) {
         val shown = when (action) {
             is PopupAction.PreviewAction -> action.copy(content = previewOf(cased(action.content), action.key, { it }, ::mapped))
-            is PopupAction.PreviewUpdateAction -> action.copy(content = previewOf(cased(action.content), action.key, { it }, ::mapped))
+            // a swipe's shortcut named (words) shows as the user named it: the case rule is the letters'
+            is PopupAction.PreviewUpdateAction -> action.copy(content = previewOf(if (action.words) action.content else cased(action.content), action.key, { it }, ::mapped))
             is PopupAction.ShowKeyboardAction -> groupOf(action.key)?.let { (group, corner) ->
                 action.copy(keyboard = longPressOf(group, corner, ::symbolsOf))
             } ?: action

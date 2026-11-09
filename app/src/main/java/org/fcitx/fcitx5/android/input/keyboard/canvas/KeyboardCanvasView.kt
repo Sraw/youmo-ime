@@ -179,8 +179,9 @@ class KeyboardCanvasView(
                 Timber.e("keyboard canvas: no scene of the keys %d × %d; none drawn", width, height)
                 failed = true
                 built = null
+                faces.forEach(::discardFaces)
                 faces = emptyList()
-                base = null
+                dropBase()
                 speech.invalidateRoot()
                 host.built(null)
                 return null
@@ -193,7 +194,7 @@ class KeyboardCanvasView(
             }
             val old = faces
             val under = s.under(drawsBase)
-            if (repainted || under != drawnUnder) base = null
+            if (repainted || under != drawnUnder) dropBase()
             drawnUnder = under
             built = s
             var said: MutableList<Int>? = null
@@ -217,6 +218,9 @@ class KeyboardCanvasView(
                 // a key gone with the scene is pressed no more: nothing carries it
                 f
             }
+            // the nodes no new key kept: their display lists (and the theme's bitmaps they hold) let go now, not at GC
+            val kept = faces.flatMapTo(HashSet()) { listOfNotNull(it.normal, it.pressed) }
+            old.forEach { f -> listOfNotNull(f.normal, f.pressed).forEach { if (it !in kept) it.discardDisplayList() } }
             speech.reading.clear()
             speech.invalidateRoot()
             // a key's state changed told to a screen reader as a view's state description is: on the
@@ -245,6 +249,8 @@ class KeyboardCanvasView(
 
     override fun onDetachedFromWindow() {
         viewTreeObserver.removeOnPreDrawListener(moved)
+        dropBase()
+        faces.forEach(::discardFaces)
         super.onDetachedFromWindow()
     }
 
@@ -267,12 +273,11 @@ class KeyboardCanvasView(
     private fun dropPictures() {
         var any = false
         if (built != null && CanvasFrame.showsPicture(drawnUnder)) {
-            base = null
+            dropBase()
             any = true
         }
         faces.filter { it.pictured }.forEach {
-            it.normal = null
-            it.pressed = null
+            discardFaces(it)
             any = true
         }
         if (any) invalidate()
@@ -284,8 +289,8 @@ class KeyboardCanvasView(
         // an image or the picture in since it was recorded: recorded again
         if (painter.missed) {
             painter.missed = false
-            base = null
-            faces.forEach { it.normal = null; it.pressed = null }
+            dropBase()
+            faces.forEach(::discardFaces)
         }
         if (!canvas.isHardwareAccelerated) {
             // a software canvas (a bitmap's: screenshots) draws no RenderNode, keeps nothing to record again
@@ -309,6 +314,19 @@ class KeyboardCanvasView(
                 canvas.drawRenderNode(node)
             }
         }
+    }
+
+    // a node let go of: its display list freed now, not when the GC finalizes it
+    private fun dropBase() {
+        base?.discardDisplayList()
+        base = null
+    }
+
+    private fun discardFaces(f: Faces) {
+        f.normal?.discardDisplayList()
+        f.pressed?.discardDisplayList()
+        f.normal = null
+        f.pressed = null
     }
 
     // a node still holding what was recorded: one the renderer let go of (the window gone, memory

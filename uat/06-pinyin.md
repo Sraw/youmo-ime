@@ -247,7 +247,7 @@
 - **JVM**：`HostCasesUatTest.backspaceInTheMiddleOfThePinyin`（点 shi 后退格三下：拼音 ni wo zui xi huan de、光标在 ni 后，空格「你我最喜欢的」）；设备上不跑。
 
 ### PY-41 [P1] 空格键左右滑动移动拼音里的光标，长拼音跟着滚动
-- **前提**：B0，**按键 → 划动空格键以移动光标** 开着（默认）；先把 **长按空格** 设为"无"（它默认是语音输入，长按后手指归语音）。
+- **前提**：B0，**按键 → 划动空格键以移动光标** 开着（默认）；先把 **按键 → 空格键长按行为** 设为"无"（它默认是语音输入，长按后手指归语音）。
 - **操作**：点一串很长的拼音，例如 w o x i a n g z h i d a o j i n t i a n w a n s h a n g w o m e n q u n a l i c h i f a n；按住空格键不松手，用约 4 秒、很慢地（每秒不到一个键宽）往左拖大约三分之一个屏宽。
 - **预期**：开始拖以后（哪怕过了长按的时间才动）拼音行里的光标一格一格往前移，不弹出长按菜单，框里的光标不动；光标走到行的左边缘外时，这一行自动往右滚，光标一直看得见。用手指在拼音行上左右拖，也能滚动这一行。
 - **JVM**：`KeyboardUatTest.aSlowSpaceDragMovesThePinyinCursorAndTheRowFollowsIt`（空格慢拖（过了长按时间才动）发 ←、不弹长按、框里不动，拼音行随引擎的光标滚动，手指拖行也滚；光标在拼音里怎么走是引擎的（HostCasesUatTest））；设备上不跑。
@@ -405,8 +405,8 @@
 ### PY-89 [P1] 长按分组键
 - **前提**：B0-14键。
 - **操作**：长按 QW 看弹出的一排；松开不选（往下滑走）。点 BN UI，长按 QW，滑到 q 松开。
-- **预期**：最下面一行是 `Q W 1 q w`，手指一开始在 1 上；上面几行是 q、w 在全键盘上长按出的符号（不含数字、字母和角标的 1）：q、w 长按只有数字和大写，所以 QW 上面没有别的行；长按 AS 时最下面一行是 `A S 6 a s`，上面有 `@` `*`（a、s 在全键盘上长按出的符号）。打字中选 q：框里是第一个候选，后面跟着 q。
-- **JVM**：`GroupedKeyboardUatTest.theLongPressIsTheGroupsLettersAroundTheCornerWithTheLettersSymbolsAbove`（QW 只有 `Q W 1 q w`，原地松开打出 1；AS 最下 `A S 6 a s`、上面 @ *；打字中从长按选字母（测试选 w，和 q 同一路）：先 reset 再上字母）、`KeyboardHalvesUatTest.aLetterOfTheLongPressWhileTypingFollowsTheFirstCandidate`（uatTest，真数据：第一候选后跟字母）；设备上不跑。
+- **预期**：最下面一行是 `Q W 1 q w`，手指一开始在 1 上；上面几行是 q、w 在全键盘上长按出的符号（不含数字、字母和角标的 1）：q、w 长按只有数字和大写，所以 QW 上面没有别的行；长按 AS 时最下面一行是 `A S 6 a s`，上面有 `@` `*`（a、s 在全键盘上长按出的符号）。打字中选 q：框里是第一个候选，后面跟着 q。靠屏幕边的键（QW 在最左、L 在最右）长按后往边上滑，能选到那一行最边上的字母（离屏幕边 4dp 内就选中，不用滑出屏幕）。
+- **JVM**：`GroupedKeyboardUatTest.aLooseKeyAtTheLeftReachesItsFirstLetterAtTheEdge`（键缝宽的主题里 QW 在最左边，滑到屏幕边选到 Q）、`GroupedKeyboardUatTest.theLongPressIsTheGroupsLettersAroundTheCornerWithTheLettersSymbolsAbove`（QW 只有 `Q W 1 q w`，原地松开打出 1；AS 最下 `A S 6 a s`、上面 @ *；打字中从长按选字母（测试选 w，和 q 同一路）：先 reset 再上字母）、`KeyboardHalvesUatTest.aLetterOfTheLongPressWhileTypingFollowsTheFirstCandidate`（uatTest，真数据：第一候选后跟字母）；设备上不跑。
 
 ### PY-90 [P1] 14 键和全键盘分开学，学成的词两边都有
 <!-- learning: qk: 和全拼各学各的；你的词共用 -->

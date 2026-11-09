@@ -15,8 +15,10 @@ import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.picker.PickerLayout
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
@@ -28,12 +30,12 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The number pads drawn by the scene do what their views did (060-render-p2 S4b, U4 B): on each of
- * the seven pads, every key's tap, swipes and long press, the space's and backspace's sideways
- * swipes, backspace held, a tap on each blank place, what reaches the engine and the field, the same
- * with each key wired from number.xml's node as from its old KeyDef. Return's long press is the one
- * thing meant to differ (rules C 疑问 8, 060-render-p2 §5.3): the views swallowed its Emoji menu,
- * the canvas shows it ([returnsLongPressOffersEmojiOnTheCanvasAlone]).
+ * The number pads drawn by the scene (060-render-p2 S4b, U4 B): on each of the seven pads, every key's
+ * tap, swipes and long press, the space's and backspace's sideways swipes, backspace held, a tap on
+ * each blank place, what reaches the engine and the field, each key wired from number.xml's node, held
+ * to the committed record ([GestureSnapshot]); no key pops a bubble as it is pressed and a blank place
+ * sends nothing, checked as they run. Return's long press offers Emoji (rules C 疑问 8, 060-render-p2
+ * §5.3; [returnsLongPressOffersEmojiOnTheCanvasAlone]).
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -59,7 +61,7 @@ class NumberSceneGesturesTest {
         KeyboardHarness.all(inputView).any { it is PopupSceneView && it.isShown }
 
     // what a finger does on each key of the pad of [inputType]: the keys that put another keyboard up
-    // (ABC, !?#) left to [theSwitchingKeysSwitchTheSame], as they would take the rest away
+    // (ABC, !?#) left to [theSwitchingKeysSwitch], as they would take the rest away
     private fun gestures(inputType: Int): List<String> = harness(inputType).use { h ->
         val ids = h.keys().mapNotNull { it.id }.filter { it !in SWITCHING }
         assertTrue(ids.toString(), ids.size >= MOST_KEYS_AT_LEAST)
@@ -73,7 +75,7 @@ class NumberSceneGesturesTest {
             val k = { h.keyNamed(id) }
             // no bubble as it is pressed (preview="off"), on either drawing
             h.press(k())
-            out += "$id pressed shows a popup: ${h.poppedUp()}"
+            assertFalse("$id pressed shows a popup", h.poppedUp())
             h.release()
             sent("$id tap")
             h.swipe(k(), 0f, -k().bounds.height().toFloat())
@@ -97,9 +99,10 @@ class NumberSceneGesturesTest {
         for ((name, at) in blanks(h)) {
             h.press(at)
             h.release()
+            assertTrue("blank $name: ${h.api.calls}", h.api.calls.none { it.startsWith("sendKey") || it.startsWith("commit") })
             sent("blank $name tap")
         }
-        // ⌫ held: deletes over and over, as many either way
+        // ⌫ held: deletes over and over
         h.press(h.keyNamed("backspace"))
         h.after(HOLD_MS)
         h.release()
@@ -131,44 +134,21 @@ class NumberSceneGesturesTest {
         override val bounds get() = at
     })
 
-    // what each key does, run through: ⌫ held repeating, a blank taking no press (compared with their views' till S8a deleted them)
-    private fun assertSame(inputType: Int) {
-        gestures(inputType)
+    // every pad's keys as recorded, one row a pad (each its own harness)
+    @Test
+    fun everyPadsKeysDoWhatTheyDid() = assertRows(FIELDS.entries, { (pad, _) -> "$pad" }) { (pad, inputType) ->
+        GestureSnapshot.check("number-$pad", gestures(inputType))
     }
 
+    // ABC back to the letters, !?# the symbols' page, on every pad; neither types anything
     @Test
-    fun theFullPad() = assertSame(FIELDS.getValue(NumberPad.FULL))
-
-    @Test
-    fun thePinsDigits() = assertSame(FIELDS.getValue(NumberPad.DIGITS))
-
-    @Test
-    fun theSignedPad() = assertSame(FIELDS.getValue(NumberPad.SIGNED))
-
-    @Test
-    fun theDecimalPad() = assertSame(FIELDS.getValue(NumberPad.DECIMAL))
-
-    @Test
-    fun theSignedDecimalPad() = assertSame(FIELDS.getValue(NumberPad.SIGNED_DECIMAL))
-
-    @Test
-    fun thePhonesPad() = assertSame(FIELDS.getValue(NumberPad.PHONE))
-
-    @Test
-    fun theDatesPad() = assertSame(FIELDS.getValue(NumberPad.DATETIME))
-
-    // ABC back to the letters, !?# the symbols' page: the same either way, on every pad
-    @Test
-    fun theSwitchingKeysSwitchTheSame() {
-        for ((pad, inputType) in FIELDS) {
-            val seen = listOf(true).map { _ ->
-                listOf("back", "symbols").map { id ->
-                    harness(inputType).use { h ->
-                        h.tap(h.keyNamed(id))
-                        val picker = KeyboardHarness.find<PickerLayout>(h.inputView)?.isShown == true
-                        "$id: letters ${"q" in h.texts()}, picker $picker, ${h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") }}"
-                    }
-                }
+    fun theSwitchingKeysSwitch() = assertRows(FIELDS.entries, { (pad, _) -> "$pad" }) { (_, inputType) ->
+        for (id in listOf("back", "symbols")) {
+            harness(inputType).use { h ->
+                h.tap(h.keyNamed(id))
+                val picker = KeyboardHarness.find<PickerLayout>(h.inputView)?.isShown == true
+                if (id == "back") assertTrue("ABC: the letters", "q" in h.texts()) else assertTrue("!?#: the symbols' page", picker)
+                assertTrue("$id: ${h.api.calls}", h.api.calls.none { it.startsWith("sendKey") || it.startsWith("commit") })
             }
         }
     }
@@ -177,15 +157,13 @@ class NumberSceneGesturesTest {
     @Test
     fun returnSaysTheFieldsAction() {
         val actions = listOf(EditorInfo.IME_ACTION_SEARCH, EditorInfo.IME_ACTION_DONE, EditorInfo.IME_ACTION_GO, EditorInfo.IME_ACTION_NEXT, 0)
-        val said = listOf(true).map { _ ->
-            actions.map { action ->
-                KeyboardHarness(TestThemes.PixelLight).start(InputType.TYPE_CLASS_NUMBER, imeOptions = action).use { h ->
-                    h.relayout()
-                    h.keyNamed("enter").let { "${it.description} ${it.drawnIcons}" }
-                }
+        val said = actions.map { action ->
+            KeyboardHarness(TestThemes.PixelLight).start(InputType.TYPE_CLASS_NUMBER, imeOptions = action).use { h ->
+                h.relayout()
+                h.keyNamed("enter").let { "${it.description} ${it.drawnIcons}" }
             }
         }
-        assertTrue(said[0].toString(), said[0].toSet().size >= 4)
+        assertTrue(said.toString(), said.toSet().size >= 4)
     }
 
     // the field's action told while the pad is up: the scene made again with it, not the one drawn before
@@ -242,12 +220,12 @@ class NumberSceneGesturesTest {
             NumberPad.DATETIME to (InputType.TYPE_CLASS_DATETIME or InputType.TYPE_DATETIME_VARIATION_NORMAL),
         )
 
-        // the digits, space, backspace and Return at least: a key missing on one side is caught by the ids compared
+        // the digits, space, backspace and Return at least; which ones, the record says
         const val MOST_KEYS_AT_LEAST = 13
 
         const val TEXT = "12 34"
 
-        // ⌫ held this long repeats: some deletes at least, the same count each side
+        // ⌫ held this long repeats: some deletes at least
         const val HOLD_MS = 1500L
         const val MIN_REPEATS = 3
     }

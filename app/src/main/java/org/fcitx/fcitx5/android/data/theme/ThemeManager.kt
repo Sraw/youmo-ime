@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.ThemeManager.activeTheme
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
 import org.fcitx.fcitx5.android.input.theme.KeyStyleChoice
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import org.fcitx.fcitx5.android.utils.WeakHashSet
@@ -189,6 +190,7 @@ object ThemeManager {
      */
     fun filesChanged(name: String, update: () -> Unit = {}) {
         ThemeAssets.clear()
+        SceneThemes.forgetAll()
         val before = _activeTheme
         update()
         when {

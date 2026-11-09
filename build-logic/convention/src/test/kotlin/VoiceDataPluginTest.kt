@@ -25,19 +25,13 @@ class VoiceDataPluginTest {
         return byteArrayOf(0x0a, message.size.toByte()) + message
     }
 
-    // b3afc985b: the pinned release is the offline model, which the streaming recognizer cannot load
+    // the pinned release is the offline model, which the streaming recognizer cannot load
     // (sherpa-onnx ends the process), so the downloads alone build no APK until the streaming one is
     // released; the linking is held by the local directory's test below
     @Test
     fun withoutTheLocalDirectoryTheBuildSaysWhereTheModelsComeFrom() {
-        val sources = folder.newFolder("voice-sources")
-        val archive = sources.resolve(VoiceDataPlugin.MODEL_NAME).apply { mkdirs() }
-        for (name in VoiceDataPlugin.MODEL_FILES) archive.resolve(name).writeText(name)
-        val ort = folder.newFolder("voice-ort")
         val project = ProjectBuilder.builder().withProjectDir(folder.newFolder("app")).build()
         val task = project.tasks.register("copyVoiceModels", VoiceDataPlugin.CopyVoiceModels::class.java).get()
-        task.model.set(sources)
-        task.ort.set(ort)
         task.hotwords.set(folder.newFile("hotwords.txt").apply { writeText("新 词\n") })
         task.vad.set(folder.newFile("silero_vad.onnx").apply { writeText("vad") })
         task.outputDir.set(folder.root.resolve("voice-assets"))

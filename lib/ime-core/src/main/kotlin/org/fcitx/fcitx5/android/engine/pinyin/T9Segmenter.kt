@@ -343,7 +343,7 @@ class T9Segmenter(
         /** The letters that are an initial alone. */
         private const val INITIAL_LETTERS = "bcdfghjklmnpqrstwxyz"
 
-        // a key's letter, its index in the group, in a choice of [choiceOf]: of up to NineKeyLetters.MAX (5): three bits, six keys in an Int
+        // a key's letter, its index in the group, in a choice of [choiceOf]: of up to NineKeyLetters.MAX (5): three bits, ten keys in an Int (a syllable has at most six)
         private const val LETTER_BITS = 3
         private const val LETTER_MASK = 7
 

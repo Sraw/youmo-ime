@@ -134,7 +134,7 @@ key enter kind=enter role=enter a11y="换行"
   anchor 999,632 up 0,-1
   actions send="sym:Return"
   sound=return shortcut="return"
-  menu "emoji" icon=emoji do="picker:Emoji"
+  menu "Emoji" icon=emoji do="picker:"
   normal
     shadow rect(925.88,580.38,1072.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(925.88,580.38,1072.13,683.63 r=10.5,10.5,10.5,10.5) #ff5cb5ab

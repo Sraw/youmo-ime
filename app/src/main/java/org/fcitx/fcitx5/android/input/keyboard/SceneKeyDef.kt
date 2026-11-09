@@ -89,9 +89,11 @@ class SceneKeyDef(
                 }
             }
             val behaviors = buildSet {
-                act(b.press)?.let { add(Behavior.Press(it)) }
+                // the press resolved once: a group's or a placeholder's table asked (and a missing one logged) once
+                val press = act(b.press)
+                press?.let { add(Behavior.Press(it)) }
                 act(b.longPress)?.let { add(Behavior.LongPress(it)) }
-                if (b.repeat) act(b.press)?.let { add(Behavior.Repeat(table.repeat(it, node))) }
+                if (b.repeat) press?.let { add(Behavior.Repeat(table.repeat(it, node))) }
                 act(b.swipe)?.let { add(Behavior.Swipe(it)) }
                 act(b.doubleTap)?.let { add(Behavior.DoubleTap(it)) }
             }

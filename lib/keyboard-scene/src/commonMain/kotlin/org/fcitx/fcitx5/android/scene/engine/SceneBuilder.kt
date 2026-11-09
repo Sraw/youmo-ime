@@ -62,28 +62,28 @@ class SceneBuilder(
      * out here. Never throws: a fault of the engine's own is a problem too, so a bad file a user
      * imported cannot take the keyboard down.
      */
-    // anything at all: the caller is the keyboard drawing itself, which has nowhere to send a throw
+    // any exception (an Error, out of memory, is not a layout's fault): the caller is the keyboard drawing itself, which has nowhere to send a throw
     @Suppress("TooGenericExceptionCaught")
     fun build(layout: Layout, fragments: Map<String, Fragment> = emptyMap()): Parsed<Scene> = try {
         scene(layout, fragments)
-    } catch (e: Throwable) {
-        Parsed.Failed(0, "the scene could not be built: ${e::class.simpleName}")
+    } catch (e: Exception) {
+        Parsed.Failed(0, "the scene could not be built: ${fault(e)}")
     }
 
     /**
      * A key's preview bubble (rules D §4, [PopupBuilder.preview]): [text] over a key [keyWidth] px
      * across, at [size] px (a shortcut's words fitted), else a character's size. Never throws.
      */
-    fun preview(text: String, keyWidth: Double, size: Double? = null): Parsed<Scene> = safely { popups.preview(text, keyWidth, size) }
+    fun preview(text: String, keyWidth: Double, size: Double? = null): Parsed<Scene> = safely("preview") { popups.preview(text, keyWidth, size) }
 
     /** The bubble's words' size and the least they shrink to, px (PreviewLabel fits them). Never throws. */
-    fun previewWordsSize(): Parsed<Pair<Double, Double>> = safely { popups.wordsSize() }
+    fun previewWordsSize(): Parsed<Pair<Double, Double>> = safely("preview words size") { popups.wordsSize() }
 
     /** The space each side of the bubble's text, px. Never throws. */
-    fun previewPadding(): Parsed<Double> = safely { popups.padding() }
+    fun previewPadding(): Parsed<Double> = safely("preview padding") { popups.padding() }
 
     /** How wide [text] is drawn in the bubble at [size] px. Never throws. */
-    fun previewWidth(text: String, size: Double): Parsed<Double> = safely { popups.previewWidth(text, size) }
+    fun previewWidth(text: String, size: Double): Parsed<Double> = safely("preview width") { popups.previewWidth(text, size) }
 
     /**
      * A long press's keys' size for [labels] [columns] across in [room] px ([PopupBuilder.popupKeys]):
@@ -95,26 +95,29 @@ class SceneBuilder(
         room: Double?,
         minWidth: Double = Popups.px(Popups.KEY_MIN_WIDTH_DP, env.density),
         height: Double = Popups.px(Popups.KEY_HEIGHT_DP, env.density),
-    ): Parsed<PopupKeys> = safely { popups.popupKeys(labels, columns, room, minWidth, height) }
+    ): Parsed<PopupKeys> = safely("popup keys") { popups.popupKeys(labels, columns, room, minWidth, height) }
 
     /** A long press's keys ([PopupBuilder.popup]): [rows] of [labels]' indices, the bottom one first, [selected] in focus. Never throws. */
     fun popup(labels: List<String>, rows: List<List<Int>>, keys: PopupKeys, selected: Int): Parsed<Scene> =
-        safely { popups.popup(labels, rows, keys, selected) }
+        safely("popup") { popups.popup(labels, rows, keys, selected) }
 
     /** A menu's cells' size ([PopupBuilder.menuKeys]). Never throws. */
-    fun menuKeys(cells: List<MenuCell>): Parsed<PopupKeys> = safely { popups.menuKeys(cells) }
+    fun menuKeys(cells: List<MenuCell>): Parsed<PopupKeys> = safely("menu keys") { popups.menuKeys(cells) }
 
     /** A menu ([PopupBuilder.menu]): [cells] in [order] across, [selected] in focus, [disabled] faded. Never throws. */
     fun menu(cells: List<MenuCell>, order: List<Int>, selected: Int, disabled: Set<Int> = emptySet()): Parsed<Scene> =
-        safely { popups.menu(cells, order, selected, disabled) }
+        safely("menu") { popups.menu(cells, order, selected, disabled) }
 
     // as build: a fault of the engine's own is a problem, never a throw into the keyboard drawing it
     @Suppress("TooGenericExceptionCaught")
-    private fun <T> safely(make: () -> T): Parsed<T> = try {
+    private fun <T> safely(what: String, make: () -> T): Parsed<T> = try {
         Parsed.Ok(make())
-    } catch (e: Throwable) {
-        Parsed.Failed(0, "the popup could not be built: ${e::class.simpleName}")
+    } catch (e: Exception) {
+        Parsed.Failed(0, "the $what could not be built: ${fault(e)}")
     }
+
+    // the only trace a fault leaves (the keyboard logs it and draws nothing): its class, message and stack
+    private fun fault(e: Exception): String = e.stackTraceToString()
 
     private fun scene(layout: Layout, fragments: Map<String, Fragment>): Parsed<Scene> {
         val warnings = Problems()
@@ -350,7 +353,8 @@ class SceneBuilder(
         }
         fun fits(f: Drawn) = f.ink.width * least + (f.grows(measurer)?.at(least)?.let { it.left + it.right } ?: 0.0) <= room.width
         // measured at the class's most, not scaled (§8b): a font's ink can be wider there than scaled
-        if (g.ink.width <= room.width || fits(g)) return g
+        // no room at all (insets wider than the face): unshrunk, never by a negative scale, which mirrors it
+        if (room.width <= 0 || g.ink.width <= room.width || fits(g)) return g
         val s = minOf(1.0, room.width / (g.ink.width * least))
         val fit = shrunk(s)
         if (fits(fit)) return fit

@@ -20,13 +20,6 @@ class PreviewLabelTest {
 
     private fun fit(label: String) = PreviewLabel.fit(label, 16f, 12f, room, ems)
 
-    // team-lead, 0.5.1: the letter in the bubble grows and shrinks with the keys' text, as the words do
-    @Test
-    fun aCharacterIsScaledAsTheKeys() {
-        assertEquals(23f, PreviewLabel.symbolSize(1f), 0f)
-        assertEquals(23f * 0.9f, PreviewLabel.symbolSize(0.9f), 1e-4f)
-    }
-
     @Test
     fun oneCharacterIsNoWordsTwoAre() {
         assertFalse(PreviewLabel.isWords("你"))

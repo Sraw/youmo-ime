@@ -48,6 +48,8 @@ class VoiceGlass(color: Int) : Drawable() {
             override fun onViewDetachedFromWindow(v: View) {
                 shot?.recycle()
                 shot = null
+                // the card made anew for each talk; were it kept, not freed twice
+                v.removeOnAttachStateChangeListener(this)
             }
         })
     }
@@ -138,26 +140,26 @@ class VoiceGlass(color: Int) : Drawable() {
         private fun blurLine(pixels: IntArray, start: Int, step: Int, n: Int, r: Int, line: IntArray) {
             for (i in 0 until n) line[i] = pixels[start + i * step]
             val span = 2 * r + 1
-            var a = 0
+            var alpha = 0
             var red = 0
-            var g = 0
-            var b = 0
+            var green = 0
+            var blue = 0
             fun at(i: Int) = line[i.coerceIn(0, n - 1)]
             for (i in -r..r) {
                 val p = at(i)
-                a += p ushr 24
+                alpha += p ushr 24
                 red += p shr 16 and 0xFF
-                g += p shr 8 and 0xFF
-                b += p and 0xFF
+                green += p shr 8 and 0xFF
+                blue += p and 0xFF
             }
             for (i in 0 until n) {
-                pixels[start + i * step] = (a / span shl 24) or (red / span shl 16) or (g / span shl 8) or (b / span)
+                pixels[start + i * step] = (alpha / span shl 24) or (red / span shl 16) or (green / span shl 8) or (blue / span)
                 val out = at(i - r)
                 val come = at(i + r + 1)
-                a += (come ushr 24) - (out ushr 24)
+                alpha += (come ushr 24) - (out ushr 24)
                 red += (come shr 16 and 0xFF) - (out shr 16 and 0xFF)
-                g += (come shr 8 and 0xFF) - (out shr 8 and 0xFF)
-                b += (come and 0xFF) - (out and 0xFF)
+                green += (come shr 8 and 0xFF) - (out shr 8 and 0xFF)
+                blue += (come and 0xFF) - (out and 0xFF)
             }
         }
     }

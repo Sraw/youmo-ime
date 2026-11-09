@@ -102,14 +102,15 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      */
     fun migrateSizeFollow() {
         if (sizeFollowMigrated) return
-        val lists = managedPreferencesUi.filterIsInstance<ManagedPreferenceUi.Levels>().filter { it.follow != null }
-        val stored = lists.any { sharedPreferences.contains(it.follow!!.first) }
+        // each list with its 跟随主题 flag's key
+        val lists = managedPreferencesUi.filterIsInstance<ManagedPreferenceUi.Levels>().mapNotNull { l -> l.follow?.let { l to it.first } }
+        val stored = lists.any { (_, flag) -> sharedPreferences.contains(flag) }
         sharedPreferences.edit {
-            if (!stored) lists.forEach { list ->
+            if (!stored) lists.forEach { (list, flag) ->
                 val set = list.keys.any { (name, default) ->
                     runCatching { sharedPreferences.getInt(name, default) }.getOrNull() != default
                 }
-                putBoolean(list.follow!!.first, !set)
+                putBoolean(flag, !set)
             }
             putBoolean(SIZES_FOLLOW_MIGRATED, true)
         }

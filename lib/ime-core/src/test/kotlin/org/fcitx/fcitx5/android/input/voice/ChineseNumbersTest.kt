@@ -4,22 +4,26 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.input.voice.ChineseNumbers.Kind
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.util.Locale
 
 // the runs the tagger marks in voice-eval's num-data/cases-N.tsv, as each class writes them
 class ChineseNumbersTest {
 
-    private fun check(kind: Kind, vararg pairs: Pair<String, String>) {
-        for ((said, written) in pairs) assertEquals("$said as $kind", written, ChineseNumbers.written(said, kind))
-    }
+    // every pair checked, the failing ones listed together; each pair's why is the comment above its group
+    private fun check(kind: Kind, vararg pairs: Pair<String, String>) =
+        assertRows(pairs.asList(), { (said, _) -> "$said as $kind" }) { (said, written) ->
+            assertEquals(written, ChineseNumbers.written(said, kind))
+        }
 
     @Test
     fun valuesAreIntegersAndDecimalsWithTheirBigPlaces() {
         check(
             Kind.VALUE,
-            "四十五" to "45", "一百二十三" to "123", "二十八" to "28", "十" to "10", "十二" to "12",
+            "四十五" to "45", "一亿七万" to "100070000", "三十亿五万" to "3000050000", "一亿零七万" to "100070000", "一百二十三" to "123", "二十八" to "28", "十" to "10", "十二" to "12",
             "四千五" to "4500", "一千二百" to "1200", "三十三万六千零五" to "336005", "十二万三千" to "123000",
             // 万 and 亿 at the end stay characters
             "十四亿" to "14亿", "五万" to "5万", "三十三万" to "33万", "三万亿" to "3万亿",
@@ -30,6 +34,7 @@ class ChineseNumbersTest {
     @Test
     fun digitsAreDigitByDigit() {
         check(Kind.DIGITS, "幺三八幺二三四五六七八" to "13812345678", "四七二九幺五" to "472915", "三零二" to "302")
+        check(Kind.DIGITS, "一九二点一六八" to "192.168")
         // a place among them: read as a value
         check(Kind.DIGITS, "一百二十三" to "123", "三万" to "3万", "十二" to "12")
     }
@@ -43,7 +48,7 @@ class ChineseNumbersTest {
     fun timesAreHourAndMinutesOrKeepTheirCharacters() {
         check(
             Kind.TIME,
-            "十点十五" to "10:15", "三点四十" to "3:40", "八点五分" to "8:05", "十点零五分" to "10:05",
+            "十点十五" to "10:15", "八点十" to "8:10", "三点四十" to "3:40", "八点五分" to "8:05", "十点零五分" to "10:05",
             "八点半" to "8点半", "八点一刻" to "8点一刻", "八点" to "8点", "七点整" to "7点整", "十一" to "11",
             "二十四点" to "24点",
         )
@@ -63,10 +68,35 @@ class ChineseNumbersTest {
     fun whatDoesNotReadAsItsKindStaysAsSaid() {
         check(Kind.VALUE, "一点二点三" to "一点二点三", "万一" to "万一", "二十三四" to "二十三四", "一千零" to "一千零", "三点十" to "三点十")
         check(Kind.TIME, "八点七十" to "八点七十", "万点" to "万点")
+        // 24 is an hour alone, a quarter one or three, a lone minute character maybe 八点五十 misheard
+        check(Kind.TIME, "二十四点三十" to "二十四点三十", "二十四点半" to "二十四点半", "八点九刻" to "八点九刻", "八点五" to "八点五")
+        // 两 is no digit said one by one
+        check(Kind.VALUE, "三点两" to "三点两")
         check(Kind.PERCENT, "百分之几" to "百分之几", "百分之百" to "百分之百")
         check(Kind.RATIO, "三四" to "三四", "几比二" to "几比二")
         check(Kind.MODEL, "V点" to "V点")
         check(Kind.NONE, "二十" to "二十")
         assertEquals(Kind.PERCENT, Kind.of("percent"))
+    }
+
+    @Test
+    fun digitsWhateverThePhonesLanguage() {
+        // %02d wrote 10:٠٥ with the phone in Arabic or Persian
+        val format = Locale.getDefault(Locale.Category.FORMAT)
+        try {
+            for (tag in listOf("ar-EG", "fa-IR")) {
+                Locale.setDefault(Locale.Category.FORMAT, Locale.forLanguageTag(tag))
+                check(Kind.TIME, "十点零五分" to "10:05", "八点五分" to "8:05")
+            }
+        } finally {
+            Locale.setDefault(Locale.Category.FORMAT, format)
+        }
+    }
+
+    @Test
+    fun aClassThisBuildDoesNotKnowIsNone() {
+        // a newer tagger's class: its runs as said, not the polish failing to load
+        assertEquals(Kind.NONE, Kind.of("ordinal"))
+        assertEquals(Kind.TIME, Kind.of("time"))
     }
 }

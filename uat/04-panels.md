@@ -120,11 +120,17 @@
 - **前提**：B0（表情搜索的字母键由引擎画，060-render-p2 S6）。
 - **操作**：点「表情」；点放大镜；点 x i a o；点 **返回**。
 - **预期**：字母键三行、和键盘一样的键面；打 xiao 时上面一排有 😄；返回后回到表情列表。
-- **JVM**：同 PAN-12（`PanelUatTest.emojiSearchByPinyin`）；两种画法同一手势同一结果见 `SmallBoardsSceneGesturesTest.emojiSearch`。
+- **JVM**：同 PAN-12（`PanelUatTest.emojiSearchByPinyin`）；引擎画的键上点、滑、退格的结果见 `SmallBoardsSceneGesturesTest.emojiSearch`。
 
 ### PAN-23 [P1] 符号面板的格子（设备）
 - **前提**：B0（格子是各自一个单键场景，060-render-p2 S6）。
 - **操作**：点「符」；点格子里的「，」；点「返回」再点「表情」；点「:-)」进颜文字，往下翻到 `(｡>﹏<｡)ﾉﾞ✧*。`。
-- **预期**：格子里的符号键面和以前一样（白键、居中）；点后框里出现「，」；表情格子里是彩色 emoji，在格子里居中；
+- **预期**：格子里的符号白键、居中；点后框里出现「，」；表情格子里是彩色 emoji，在格子里居中；
   颜文字的长字整个显示，两边没有被切掉（放不下时字变小，rules B §8a）。
-- **JVM**：`SmallBoardsSceneGesturesTest.symbolGrid`、`PickerSceneCellTest`、`BoardCanvasCompareTest[symbol-grid]`、`[emoticon-grid]`。
+- **JVM**：`SmallBoardsSceneGesturesTest.symbolGrid`、`PickerSceneCellTest`。
+
+### PAN-24 [P1] 表情、颜文字面板底排的句号、逗号跟着标点模式
+- **前提**：B0，中文标点。
+- **操作**：点「表情」，看底排句号键的键面，点它；点「:-)」进颜文字，看底排逗号键，点它。切到英文标点（工具栏 **⋯** 或 Ctrl+.）后再各点一次。
+- **预期**：中文标点时键面是「。」「，」，框里打出「。」「，」；英文标点时键面是「.」「,」，打出「.」「,」。按下时没有气泡，不进最近使用。
+- **JVM**：`SmallBoardsSceneGesturesTest.thePickersFullStopShowsWhatItTypes`（`:app:testDebugUnitTest`）。

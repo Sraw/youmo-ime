@@ -72,9 +72,12 @@ class NineKeyLettersCustomTest {
     fun groupsOfABuiltInKeyboardAreThatKeyboardAndItsRecord() {
         assertSame(NineKeyLetters.G14, NineKeyLetters.custom(NineKeyLetters.G14.tag().split(',')))
         assertSame(NineKeyLetters.G18, NineKeyLetters.custom(NineKeyLetters.G18.tag().split(',')))
-        // written in rows, the same letters: the same keyboard
         val rows = NineKeyLetters.G14.tag().split(',').map { it.toList().joinToString(" ") }
-        assertSame(NineKeyLetters.G14, NineKeyLetters.custom(rows))
+        // written in rows, the same letters: the same keyboard (codes, record), its rows kept so a tap across alone leans to no stacked letter
+        val stacked = NineKeyLetters.custom(rows)
+        assertEquals(NineKeyLetters.G14, stacked)
+        assertEquals(NineKeyLetters.G14.tag(), stacked.tag())
+        assertEquals(listOf("q", "w"), stacked.rowsOf(stacked.codes[0]))
     }
 
     @Test

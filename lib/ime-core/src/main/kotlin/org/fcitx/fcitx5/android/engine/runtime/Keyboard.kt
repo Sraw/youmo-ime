@@ -529,7 +529,7 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
         val TAPS = 0xF0200 until 0xF0200 + ALPHABET * TAP_STEPS
 
         /** How many places down a key [tapKey] with a y tells apart: the middle one, 4, is the key's centre. */
-        const val TAP_ROWS = 9
+        const val TAP_ROWS = NineKeyLetters.PLACE_ROWS
 
         // a layout's own keyboard's codes (NineKeyLetters.CUSTOM_BLOCK)
         private val FIRST_CUSTOM = NineKeyLetters.CUSTOM_BLOCK.first.toChar()
@@ -553,7 +553,7 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
          * character it always was. Clamped first; NaN is no place, send the code itself.
          */
         fun tapKey(code: Char, x: Float, y: Float): Int {
-            require(code in FIRST_CUSTOM..LAST_CUSTOM && !x.isNaN() && !y.isNaN() || code in FIRST_CODE..LAST_CODE) { "tap $code at $x, $y" }
+            require((code in FIRST_CUSTOM..LAST_CUSTOM && !x.isNaN() && !y.isNaN()) || code in FIRST_CODE..LAST_CODE) { "tap $code at $x, $y" }
             if (code in FIRST_CODE..LAST_CODE) return tapKey(code, x)
             val across = (x.coerceIn(0f, 1f) * (TAP_STEPS - 1)).roundToInt()
             val down = (y.coerceIn(0f, 1f) * (TAP_ROWS - 1)).roundToInt()

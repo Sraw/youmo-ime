@@ -35,9 +35,11 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
+import org.fcitx.fcitx5.android.input.keyboard.canvas.set
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.scene.KeyState
+import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.Texts
@@ -152,24 +154,40 @@ class HandwritingKeyboard(
         onFinish = ::finish,
     )
 
-    init {
-        add(padView, lParams(0, 0))
-        showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
-        // last: the scene reads the keyboard's state (the keys drawn by the scene engine; the pad's face the
-        // slot's, handwriting.xml's face="keep"); the pad over the canvas, in its slot (onLayout)
-        drawKeysWithScene(LAYOUT)
-        padView.bringToFront()
-        // the canvas at another size (one-handed, split, another height): the pad to the slot of the scene at that size
-        canvas?.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> post { requestLayout() } }
+    private val padSlot = Rect()
+
+    // in onLayout, which reads the scene (made there if it must be): placed already, nothing to ask
+    private var placing = false
+
+    // the scene made anew as it is drawn (Return, a key shown, 注; or none, failed): the pad placed by it
+    // again, shown or hidden with the keys, not left as the last layout had it
+    override fun onSceneBuilt(scene: Scene?) {
+        if (placing) return
+        // asked only when the slot moved, appeared or went: a scene made again for Shift or Return alone lays
+        // nothing out
+        val slot = scene?.slots?.firstOrNull { it.id == PAD_SLOT }
+        val c = canvas ?: return
+        if (slot == null) {
+            if (padView.isVisible) requestLayout()
+            return
+        }
+        builtSlot.set(slot.bounds)
+        builtSlot.offset(c.left, c.top)
+        if (!padView.isVisible || builtSlot != padSlot) requestLayout()
     }
 
-    private val padSlot = Rect()
+    private val builtSlot = Rect()
 
     // the pad where the scene has its slot
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         val c = canvas ?: return
-        val placed = c.slot(PAD_SLOT, padSlot)
+        placing = true
+        val placed = try {
+            c.slot(PAD_SLOT, padSlot)
+        } finally {
+            placing = false
+        }
         // no scene (none even of the built-in theme, 060-render-p2 U8): nothing of the keyboard shown, the pad neither
         padView.isInvisible = !placed
         if (!placed) return
@@ -236,20 +254,7 @@ class HandwritingKeyboard(
         dropLostFingers(ev)
         var taken = false
         when (ev.actionMasked) {
-            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
-                if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
-                    padFingers.clear()
-                    keyFingers.clear()
-                }
-                val i = ev.actionIndex
-                val id = ev.getPointerId(i)
-                padView.getHitRect(padHit)
-                val onPad = padView.isVisible && padHit.contains(ev.getX(i).toInt(), ev.getY(i).toInt())
-                val to = if (onPad) padFingers else keyFingers
-                if (to.isEmpty()) sideDown(onPad, ev.eventTime)
-                to += id
-                taken = send(ev, to, onPad, if (to.size == 1) MotionEvent.ACTION_DOWN else MotionEvent.ACTION_POINTER_DOWN, id)
-            }
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> taken = fingerDown(ev)
             MotionEvent.ACTION_MOVE -> {
                 if (padFingers.isNotEmpty()) taken = send(ev, padFingers, true, MotionEvent.ACTION_MOVE, -1)
                 if (keyFingers.isNotEmpty()) taken = send(ev, keyFingers, false, MotionEvent.ACTION_MOVE, -1) || taken
@@ -271,6 +276,29 @@ class HandwritingKeyboard(
             }
         }
         return taken
+    }
+
+    // a finger down: to the pad or the keys, by where it lands; whether the side took it
+    private fun fingerDown(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
+            // a side still holding a finger is a stream cut short whose id this one reuses (always 0),
+            // which dropLostFingers cannot see: cancelled before the new gesture, as no UP will come
+            if (padFingers.isNotEmpty()) cancelEmpty(true, ev)
+            if (keyFingers.isNotEmpty()) cancelEmpty(false, ev)
+            padFingers.clear()
+            keyFingers.clear()
+        }
+        val i = ev.actionIndex
+        val id = ev.getPointerId(i)
+        padView.getHitRect(padHit)
+        val onPad = padView.isVisible && padHit.contains(ev.getX(i).toInt(), ev.getY(i).toInt())
+        val to = if (onPad) padFingers else keyFingers
+        if (to.isEmpty()) sideDown(onPad, ev.eventTime)
+        to += id
+        val taken = send(ev, to, onPad, if (to.size == 1) MotionEvent.ACTION_DOWN else MotionEvent.ACTION_POINTER_DOWN, id)
+        // the gesture kept while the pad is shown, its first finger on no key: a finger after it on the
+        // pad comes here only if the stream does
+        return taken || (ev.actionMasked == MotionEvent.ACTION_DOWN && padView.isVisible)
     }
 
     private fun sideDown(onPad: Boolean, at: Long) {
@@ -322,13 +350,6 @@ class HandwritingKeyboard(
         val taken = if (toPad) padView.dispatchTouchEvent(e) else super.dispatchTouchEvent(e)
         e.recycle()
         return taken
-    }
-
-    // the keyboard takes every touch for a key (BaseKeyboard.onInterceptTouchEvent): the pad's are the pad's
-    override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
-        padView.getHitRect(padHit)
-        if (padHit.contains(ev.x.toInt(), ev.y.toInt())) return false
-        return super.onInterceptTouchEvent(ev)
     }
 
     // public for its tests: a long press's pick (注's styles) comes here as a tap does. super's is
@@ -423,5 +444,21 @@ class HandwritingKeyboard(
     // a getter: asked in init (drawKeysWithScene), before this class's own properties are made
     override val sceneTable: SceneKeyDef.Table get() = object : SceneKeyDef.Table {
         override fun menuLabel(label: String): String = MENU_LABELS[label]?.let(context::getString) ?: label
+    }
+
+    // last, after every field its scene reads (sceneEnv): the keyboard's state
+    init {
+        add(padView, lParams(0, 0))
+        showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
+        // the keys drawn by the scene engine; the pad's face the slot's, handwriting.xml's face="keep"; the pad
+        // over the canvas, in its slot (onLayout)
+        drawKeysWithScene(LAYOUT)
+        padView.bringToFront()
+        // the canvas at another size (one-handed, split, another height): the pad to the slot of the scene at
+        // that size; laid out again at the same bounds, nothing to place again
+        canvas?.addOnLayoutChangeListener { _, l, t, r, b, oldL, oldT, oldR, oldB ->
+            val moved = l != oldL || t != oldT
+            if (moved || r != oldR || b != oldB) post { requestLayout() }
+        }
     }
 }

@@ -83,11 +83,12 @@ class PictureHost(private val look: ThemeLook, val base: View, private val lands
     private fun place(view: View, blurDp: Int, w: Int, h: Int): Placed? {
         // before it is asked for: let go while asked, it is asked again
         val generation = ThemeAssets.generation
-        // not holding the view till the decode is done: a keyboard let go meanwhile (its theme changed,
-        // the keys' canvas given up) is not kept
+        // not holding the view, nor this host (whose base is the input view's), till the decode is done:
+        // a keyboard let go meanwhile (its theme changed, the keys' canvas given up) is not kept
         val asking = WeakReference(view)
+        val host = WeakReference(this)
         val got = ThemeAssets.pictureOrLater(look, landscape, blurDp, w, base.resources.displayMetrics.density) {
-            decodingBlurs.remove(blurDp)
+            host.get()?.decodingBlurs?.remove(blurDp)
             asking.get()?.invalidate()
         }
         if (got == null) {

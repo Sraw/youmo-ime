@@ -5,12 +5,10 @@ import io
 import json
 import os
 import re
-import subprocess
 import tempfile
 import threading
 import time
 import unittest
-import unittest.mock
 from types import SimpleNamespace
 from unittest import mock
 
@@ -260,17 +258,22 @@ class FixturesTest(unittest.TestCase):
             return self.reversed if args == ("reverse", "--list") else ""
 
     def setUp(self):
-        self._port, self._server = uat.HTTP_PORT, uat.start_server
+        self._port, self._server, self._running = uat.HTTP_PORT, uat.start_server, uat._fixtures_server
         uat.HTTP_PORT = None
+        uat._fixtures_checked.clear()
         self.started = []
-        uat.start_server = lambda: self.started.append(uat.HTTP_PORT) or unittest.mock.Mock()
+        uat.start_server = lambda: self.started.append(uat.HTTP_PORT) or mock.Mock()
+        self._atexit = mock.patch("atexit.register")
+        self._atexit.start()
 
     def tearDown(self):
-        uat.HTTP_PORT, uat.start_server = self._port, self._server
+        self._atexit.stop()
+        uat.HTTP_PORT, uat.start_server, uat._fixtures_server = self._port, self._server, self._running
+        uat._fixtures_checked.clear()
 
     def test_nothing_serving_starts_the_server_and_reverses_the_port(self):
         d = self.Dev()
-        with unittest.mock.patch("socket.socket") as sock:
+        with mock.patch("socket.socket") as sock:
             sock.return_value.connect_ex.return_value = 1   # refused
             uat.ensure_fixtures(d)
         self.assertEqual(self.started, [8801])
@@ -278,18 +281,38 @@ class FixturesTest(unittest.TestCase):
 
     def test_already_served_and_reversed_nothing_again(self):
         d = self.Dev("emulator-5556 tcp:8000 tcp:8801\n")
-        with unittest.mock.patch("socket.socket") as sock, \
-                unittest.mock.patch.object(uat, "serves_our_fixtures", return_value=True):
+        with mock.patch("socket.socket") as sock, \
+                mock.patch.object(uat, "serves_our_fixtures", return_value=True):
             sock.return_value.connect_ex.return_value = 0
             uat.ensure_fixtures(d)
         self.assertEqual(self.started, [])
         self.assertEqual(d.calls, [("reverse", "--list")])
 
+    def test_checked_once_a_device_then_nothing_again(self):
+        """open_page comes here on every reset: the server and the reverse are asked once"""
+        d = self.Dev("emulator-5556 tcp:8000 tcp:8801\n")
+        with mock.patch("socket.socket") as sock, \
+                mock.patch.object(uat, "serves_our_fixtures", return_value=True) as ours:
+            sock.return_value.connect_ex.return_value = 0
+            uat.ensure_fixtures(d)
+            uat.ensure_fixtures(d)
+        self.assertEqual(1, ours.call_count)
+        self.assertEqual(d.calls, [("reverse", "--list")])
+
+    def test_someone_elses_server_inside_a_case_blocks_it(self):
+        """a SystemExit in a device's thread ended it unrecorded: inside a case it is Blocked"""
+        d = self.Dev()
+        d.case = object()
+        with mock.patch("socket.socket") as sock, \
+                mock.patch.object(uat, "serves_our_fixtures", return_value=False):
+            sock.return_value.connect_ex.return_value = 0
+            with self.assertRaises(uat.Blocked):
+                uat.ensure_fixtures(d)
 
     def test_someone_elses_server_on_the_port_stops_with_why(self):
         d = self.Dev()
-        with unittest.mock.patch("socket.socket") as sock, \
-                unittest.mock.patch.object(uat, "serves_our_fixtures", return_value=False):
+        with mock.patch("socket.socket") as sock, \
+                mock.patch.object(uat, "serves_our_fixtures", return_value=False):
             sock.return_value.connect_ex.return_value = 0
             with self.assertRaises(SystemExit) as e:
                 uat.ensure_fixtures(d)
@@ -706,9 +729,18 @@ class ResultsFileTest(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
         os.makedirs(os.path.join(self.dir, "runs"))
-        for p in (mock.patch.object(uat, "OUT", self.dir), mock.patch.object(uat, "UAT", self.dir)):
+        dev = mock.MagicMock()
+        dev.return_value.sh.return_value = "29\n"
+        for p in (mock.patch.object(uat, "OUT", self.dir), mock.patch.object(uat, "UAT", self.dir),
+                  mock.patch.object(uat, "Device", dev)):
             p.start()
             self.addCleanup(p.stop)
+
+    def test_the_device_line_names_the_api_level_the_run_had(self):
+        # youmo29 (Android 10) was recorded as android-36
+        p = uat.write_results(uat.Run("r", []), {}, "v", ["5554"], 1, [])
+        with open(p, encoding="utf-8") as f:
+            self.assertIn("android-29 google_apis", f.read().splitlines()[2])
 
     def test_the_device_line_closes_its_bracket_then_goes_on(self):
         # dropping a clause left "{ABI}，）1080×2340": a comma before the bracket, none after it
@@ -774,6 +806,15 @@ class ClipMicTest(unittest.TestCase):
             p.wait(0.01)
         self.assertEqual(["clear", "on"], [re.search(r"--method (\w+)", c).group(1) for c in d.calls[-2:]])
 
+    def test_kill_from_a_finally_hides_no_failure_when_the_app_no_longer_answers(self):
+        d = uat.Device.__new__(uat.Device)
+        d.sh = lambda cmd: "Error while accessing provider"
+        uat.ClipPlay(d, 0).kill()   # no Blocked over the case's own Fail
+
+    def test_the_clips_time_counts_from_the_queueing(self):
+        d = self.device([])
+        self.assertEqual(100 + 2 + 0.2, uat.ClipPlay(d, 2, start=100).end)
+
     def test_clip_mic_clears_before_it_turns_on(self):
         d = self.device([])
         d._clips_in = {"a"}
@@ -813,6 +854,73 @@ class ScreenBackTest(unittest.TestCase):
         with mock.patch.object(uat, "stepped", lambda d, e: str(e)):
             uat.run_case(d, c, run)
         self.assertIn("wm size reset; wm density reset", d.calls)
+
+    def test_a_case_not_run_here_asks_the_screen_nothing(self):
+        # a hundred-odd jvm/voice/release cases each cost a wm round trip for nothing
+        d = self.device("Physical size: 1080x2340\n")
+        def fn(_):
+            raise AssertionError("not run")
+        c = SimpleNamespace(id="X-1", visual=False, fn=fn, unmet=lambda d: (uat.Elsewhere, "jvm"))
+        run = SimpleNamespace(started=lambda *a: None, record=lambda *a: None)
+        self.assertEqual("在别处跑", uat.run_case(d, c, run))
+        self.assertEqual([], d.calls)
+
+
+class ClearAndPacksTest(unittest.TestCase):
+    """the reset's data clearing and the packs' import: a failure blocks the case, not the device's thread"""
+
+    def device(self, answer):
+        d = uat.Device.__new__(uat.Device)
+        d.calls, d.case, d.serial = [], None, "emulator-5556"
+
+        def sh(cmd):
+            d.calls.append(cmd)
+            return answer(cmd)
+        d.sh = sh
+        return d
+
+    def test_a_clearing_that_did_not_finish_is_blocked(self):
+        d = self.device(lambda cmd: "rm: Permission denied\n" if cmd.startswith("run-as") else "")
+        with mock.patch.object(uat, "BUILD", "debug"), self.assertRaises(uat.Blocked):
+            uat.clear_keeping_packs(d)
+        run_as = [c for c in d.calls if c.startswith("run-as")][0]
+        self.assertNotIn("+ ;", run_as.split("files &&")[0])   # every step chained by &&: a failed one stops it
+        self.assertIn("ls -A", run_as)
+
+    def test_a_clearing_resets_the_microphone_flags_and_the_app_language(self):
+        d = self.device(lambda cmd: "cleared\n" if cmd.startswith("run-as") else "")
+        with mock.patch.object(uat, "BUILD", "debug"):
+            uat.clear_keeping_packs(d)
+        self.assertIn("clear-permission-flags", d.calls[0])
+        self.assertIn("set-app-locales", d.calls[0])
+
+    def test_a_pack_not_imported_inside_a_case_blocks_it(self):
+        d = self.device(lambda cmd: "Result: Bundle[{result=refused:bad}]" if "--method import" in cmd
+                        else "Result: Bundle[{text=missing}]")
+        d.case = object()
+        ok = SimpleNamespace(returncode=0, stdout="", stderr="")
+        with mock.patch.object(uat, "BUILD", "debug"), \
+                mock.patch.object(uat, "pack_files", return_value={"text": (__file__, 2)}), \
+                mock.patch.object(uat.subprocess, "run", return_value=ok), \
+                self.assertRaises(uat.Blocked):
+            uat.import_packs(d, voice=False)
+
+    def test_no_pack_built_inside_a_case_blocks_it_outside_stops(self):
+        d = self.device(lambda cmd: "")
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(uat, "PACKS", tmp):
+            with self.assertRaises(SystemExit):
+                uat.import_packs(d)
+            d.case = object()
+            with self.assertRaises(uat.Blocked):
+                uat.import_packs(d)
+
+    def test_a_pack_already_at_the_builds_version_is_not_copied_again(self):
+        d = self.device(lambda cmd: "Result: Bundle[{text=v2}]")
+        with mock.patch.object(uat, "BUILD", "debug"), \
+                mock.patch.object(uat, "pack_files", return_value={"text": (__file__, 2)}), \
+                mock.patch.object(uat.subprocess, "run") as run:
+            uat.import_packs(d, voice=False)
+        run.assert_not_called()
 
 
 class PlugTest(unittest.TestCase):

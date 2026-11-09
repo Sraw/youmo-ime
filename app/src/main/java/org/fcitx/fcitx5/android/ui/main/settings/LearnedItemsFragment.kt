@@ -114,10 +114,11 @@ class LearnedItemsFragment : PaddingPreferenceFragment() {
 
         /**
          * A pin's keys as the user reads them: a grouped keyboard's codes (private use, most fonts
-         * draw them blank, TalkBack reads nothing) as their letters, `bn ui`;
-         * any other kind's as stored.
+         * draw them blank, TalkBack reads nothing) as their letters, `bn ui`; a strokes block's
+         * (笔画查字) as the strokes, `一丨丿丶乛`, one of anything else (a hand-edited or damaged record)
+         * as stored; any other kind's as stored.
          */
-        fun keys(code: Code): String = if (code.kind == STROKES) Strokes.shown(code.keys)
+        fun keys(code: Code): String = if (code.kind == STROKES && code.keys.all { it in Strokes.KEYS }) Strokes.shown(code.keys)
             else Kinds.keysTag(code.kind)?.let { NineKeyLetters.grouped(it) }?.shown(code.keys) ?: code.keys
 
         // a character blocked under the strokes typed (笔画查字), filed as a table's block is

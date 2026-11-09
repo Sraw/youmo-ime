@@ -16,7 +16,7 @@ object KeyTextScale {
 
     const val COMPACT = 0.9
 
-    /** The scale, [compact] or not, floating at [floating] (DoubleingKeyboard.textScale) or docked (null). */
+    /** The scale, [compact] or not, floating at [floating] (FloatingKeyboard.textScale) or docked (null). */
     fun of(compact: Boolean, floating: Double?): Double =
         minOf(if (compact) COMPACT else 1.0, floating ?: 1.0)
 

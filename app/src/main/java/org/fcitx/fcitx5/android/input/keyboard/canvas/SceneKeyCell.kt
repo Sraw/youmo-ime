@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.LetterCase
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
+import org.fcitx.fcitx5.android.scene.engine.Part
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.layout.Key
@@ -42,12 +43,14 @@ import timber.log.Timber
  * ([ownSize]) is the size its attrs give, not the keyboard's 紧凑 or floating; a key cap is as the keyboard.
  */
 @SuppressLint("ViewConstructor")
-open class SceneKeyCell(context: Context, private val theme: Theme, private val ownSize: Boolean = false) : CustomGestureView(context) {
+open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boolean = false) : CustomGestureView(context) {
 
-    private val look = ThemeManager.shownLook(theme)
+    // the built-in where the engine makes nothing of the theme, as the keys are (U8): the cells drawn still
+    private val theme = SceneBoard.drawnTheme(theme)
+    private val look = ThemeManager.shownLook(this.theme)
     private val fonts = SceneFonts(look)
     private val measurer = AndroidTextMeasurer(fonts)
-    private val sceneTheme = SceneThemes.of(look, theme.name, theme.isDark)
+    private val sceneTheme = SceneThemes.of(look, this.theme.name, this.theme.isDark)
     private val painter = ScenePainter(this, look, BoardImages.NONE, fonts)
 
     /** The key: its face, its words, its marks' names. */
@@ -67,7 +70,7 @@ open class SceneKeyCell(context: Context, private val theme: Theme, private val 
         }
 
     /** The marks a shortcut name of [attrs] reaches (the settings' caps): none by default. */
-    var marks: MarkSettings = NO_MARKS
+    var marks: MarkSettings = SceneEnvs.NO_MARKS
         set(value) {
             if (field == value) return
             field = value
@@ -228,7 +231,17 @@ open class SceneKeyCell(context: Context, private val theme: Theme, private val 
         val k = keyNode ?: return emptyList()
         val ops = k.ops(isPressed).let { ops ->
             if (labelAlpha == 1.0) ops
-            else ops.map { if (it is Op.Text && it.text == k.label) it.copy(color = it.color.times(labelAlpha)) else it }
+            // the label's every piece (a mixed-font label is several texts), its outline and shadow with it;
+            // never a mark that happens to read as the label
+            else ops.map {
+                if (it is Op.Text && it.part == Part.Label.xml) {
+                    it.copy(
+                        color = it.color.times(labelAlpha),
+                        stroke = it.stroke?.let { s -> s.copy(color = s.color.times(labelAlpha)) },
+                        shadow = it.shadow?.let { s -> s.copy(color = s.color.times(labelAlpha)) },
+                    )
+                } else it
+            }
         }
         val line = outline ?: return ops
         return ops + Op.Stroke(k.shape, OUTLINE_DP * resources.displayMetrics.density / shrink, line)
@@ -252,6 +265,5 @@ open class SceneKeyCell(context: Context, private val theme: Theme, private val 
         private const val OUTLINE_DP = 2.0
         private const val RGB = 0xFFFFFF
         private const val ALPHA_SHIFT = 24
-        private val NO_MARKS = MarkSettings(shortcuts = emptyMap())
     }
 }

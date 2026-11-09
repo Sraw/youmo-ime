@@ -28,7 +28,6 @@ import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Input
-import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import org.fcitx.fcitx5.android.utils.singleSideBorderDrawable
@@ -62,6 +61,8 @@ class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout
             private const val UpBtnId = 0xff55
             private const val DownBtnId = 0xff56
 
+            // read for its keys' images alone (BaseKeyboard's keyImages, by name): what the keys show and do is
+            // expanded-side.xml's and PAGES'; the view ids are no one's now
             val Layout: List<List<KeyDef>> = listOf(
                 listOf(
                     ImageLayoutSwitchKey(
@@ -88,7 +89,6 @@ class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout
             )
 
             private val PAGES = mapOf(UP_KEY to KeyAction.LayoutSwitchAction(UpBtnLabel), DOWN_KEY to KeyAction.LayoutSwitchAction(DownBtnLabel))
-            private val NO_MARKS = MarkSettings(shortcuts = emptyMap())
         }
 
         private var returnAppearance = ReturnKeyAppearance.Enter
@@ -120,7 +120,7 @@ class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout
         // Return, the pages that cannot turn `:disabled`; no marks (the column's keys reach no shortcut)
         override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env {
             val texts = Texts(returnLabel = returnAppearance.label(context).toString(), returnIcon = SceneIcons.returnName(returnAppearance.icon))
-            val env = SceneEnvs.of(this, look, theme.isDark, width, height, Input(), texts = texts, marks = NO_MARKS)
+            val env = SceneEnvs.of(this, look, theme.isDark, width, height, Input(), texts = texts, marks = SceneEnvs.NO_MARKS)
             val disabled = listOfNotNull(UP_KEY.takeIf { !upEnabled }, DOWN_KEY.takeIf { !downEnabled })
             return if (disabled.isEmpty()) env else env.copy(states = disabled.associateWith { setOf(KeyState.Disabled) })
         }

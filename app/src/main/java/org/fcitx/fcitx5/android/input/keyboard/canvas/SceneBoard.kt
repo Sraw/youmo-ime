@@ -68,7 +68,7 @@ class SceneBoard(
 
     // 060-render-p2 U8: a scene the theme makes none of (the engine refusing it, or what the theme made)
     // is the built-in theme's of the same lightness, logged; none of that either, nothing (the canvas
-    // draws nothing and logs it). Never the views again: they go in S8
+    // draws nothing and logs it). The old views are gone
     // The fallback's the built-in theme's whole: its look, its fonts, its measurer, as it draws itself
     private fun drawn(look: ThemeLook, width: Int, height: Int): KeyboardCanvasView.Drawn? {
         if (layout == null) return null
@@ -123,7 +123,9 @@ class SceneBoard(
         // a theme switched back to makes no scene again and measures no text again; what a switch allocates
         // more than the views' decides whether a GC stops its first frame (specs/app.md)
         private const val KEPT_SCENES = 4
-        private val measurers = LinkedHashMap<ThemeLook, AndroidTextMeasurer>(KEPT_SCENES, 0.75f, true)
+        // a look's measurer: as many as the themes kept (SceneThemes), not the scenes
+        private const val KEPT_LOOKS = 4
+        private val measurers = lruMap<ThemeLook, AndroidTextMeasurer>(KEPT_LOOKS)
         private val scenesKept = ArrayDeque<Made>()
 
         // the themes (by name and look) that made no scene, the built-in drawn instead: logged once each,
@@ -142,7 +144,20 @@ class SceneBoard(
         private var marksMade: Pair<MarksFor, MarkSettings>? = null
 
         private fun measurer(look: ThemeLook): AndroidTextMeasurer = measurers.getOrPut(look) { AndroidTextMeasurer(SceneFonts(look)) }
-            .also { if (measurers.size > KEPT_SCENES) measurers.remove(measurers.keys.first()) }
+
+        /**
+         * The theme a popup or a panel's cell draws in: [theme], or where the engine makes no theme of
+         * it, the built-in of the same lightness, as the keyboard's keys fall back (060-render-p2 U8;
+         * logged once a look, as theirs).
+         */
+        fun drawnTheme(theme: Theme): Theme {
+            val look = ThemeManager.shownLook(theme)
+            if (SceneThemes.of(look, theme.name, theme.isDark) != null) return theme
+            val builtIn = ThemeManager.builtin(if (theme.isDark) "pixel#dark" else "pixel#light")
+            if (builtIn.name == theme.name) return theme
+            if (firstFallBack(theme.name, look)) Timber.w("scene: no theme of %s; the built-in %s's drawn", theme.name, builtIn.name)
+            return builtIn
+        }
 
         /** [layout]'s keys' shortcut names, its fragments' too. */
         fun names(layout: SceneLayout): Set<String> = namesMade?.takeIf { it.first === layout }?.second
@@ -160,5 +175,11 @@ class SceneBoard(
 
         /** The scenes kept let go, the next asked made anew as things are: a measure of what making one costs (KeyboardPerfBaselineTest). */
         fun forgetScenes() = scenesKept.clear()
+
+        /** The scenes and the looks' measurers let go: a theme's file written over under the same path ([SceneThemes.forgetAll]). */
+        fun forgetLooks() {
+            scenesKept.clear()
+            measurers.clear()
+        }
     }
 }

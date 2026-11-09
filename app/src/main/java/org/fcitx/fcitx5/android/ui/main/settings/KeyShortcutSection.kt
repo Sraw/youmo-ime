@@ -88,7 +88,7 @@ class KeyShortcutSection(private val ctx: Context, title: String, off: Boolean, 
     }
 
     private fun chooseCommand() {
-        // voice input only where the build has it (051-c §1.5)
+        // every command, voice input too: without the voice pack it opens the packs page
         val commands = KeyCommand.entries
         AlertDialog.Builder(ctx)
             .setTitle(R.string.shortcut_command)
