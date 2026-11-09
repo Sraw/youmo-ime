@@ -82,6 +82,7 @@ class KeyboardPerfBaselineTest {
 
     private val runs = InstrumentationRegistry.getArguments().getString("perfRuns")?.toInt() ?: 20
     private val warmUp = 3
+    private val only = InstrumentationRegistry.getArguments().getString("perfOnly")?.split(',')
 
     // perfScreenshot=true: the picture theme's keyboard captured once, to see the picture is drawn
     private val screenshots = InstrumentationRegistry.getArguments().getString("perfScreenshot") == "true"
@@ -102,6 +103,13 @@ class KeyboardPerfBaselineTest {
         val sdk = android.os.Build.VERSION.SDK_INT
         log("device ${android.os.Build.MODEL} sdk $sdk runs $runs warm-up $warmUp")
         selectThisInputMethod()
+        if (only != null) {
+            // perfOnly=theme,shift: those parts alone, for a trace short enough to read
+            launch()
+            if ("theme" in only) switchThemes()
+            if ("shift" in only) sceneCosts()
+            return
+        }
         memory("no keyboard shown yet")
         launch()
         memory("26 keys shown, first time")
