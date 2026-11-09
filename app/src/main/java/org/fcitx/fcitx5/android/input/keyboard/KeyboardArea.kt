@@ -80,7 +80,7 @@ object KeyboardArea {
     fun keysHeight(ctx: Context, codeRowDp: Int, handle: Int = 0): Int = KeyboardHeightCap.keysHeight(
         requestedHeight(ctx),
         ctx.resources.displayMetrics.heightPixels,
-        ctx.dp(KawaiiBarComponent.heightDp() + codeRowDp),
+        ctx.dp(KawaiiBarComponent.heightDp(ctx) + codeRowDp),
         bottomPadding(ctx),
         handleHeight = handle,
     )

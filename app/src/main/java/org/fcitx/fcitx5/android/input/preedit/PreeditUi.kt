@@ -11,6 +11,7 @@ import android.graphics.Paint
 import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.RectShape
 import android.text.SpannableStringBuilder
+import android.text.Layout
 import android.text.Spanned
 import android.text.SpannedString
 import android.text.style.DynamicDrawableSpan
@@ -150,7 +151,9 @@ open class PreeditUi(
 
     /**
      * The code's text, the theme's underline ([PreeditLook.Underline]) drawn under each [ThemedUnderline]:
-     * a span cannot set an underline's colour or thickness before Android 10's hidden APIs.
+     * no public API sets an underline's colour or thickness (`TextPaint.underlineColor` and
+     * `underlineThickness` are hidden at every API level; `UnderlineSpan` takes the text's colour and the
+     * font's thickness), so the view draws the line, where the font puts its own (`Paint.underlinePosition`, API 29).
      */
     @SuppressLint("ViewConstructor")
     class PreeditTextView(context: Context, private val underline: PreeditLook.Underline?) : AppCompatTextView(context) {
@@ -161,22 +164,38 @@ open class PreeditUi(
             val text = text as? Spanned ?: return
             val layout = layout ?: return
             val width = underline?.let { maxOf(1f, (it.widthDp * resources.displayMetrics.density).toInt().toFloat()) } ?: return
-            val below = textSize * UNDER_BASELINE
+            val below = paint.underlinePosition
             for (span in text.getSpans(0, text.length, ThemedUnderline::class.java)) {
-                val start = text.getSpanStart(span)
-                val end = text.getSpanEnd(span)
-                for (l in layout.getLineForOffset(start)..layout.getLineForOffset(end)) {
-                    val from = layout.getPrimaryHorizontal(maxOf(start, layout.getLineStart(l)))
-                    val to = if (end <= layout.getLineEnd(l)) layout.getPrimaryHorizontal(end) else layout.getLineRight(l)
-                    val top = totalPaddingTop + layout.getLineBaseline(l) + below
-                    canvas.drawRect(totalPaddingLeft + minOf(from, to), top, totalPaddingLeft + maxOf(from, to), top + width, line)
+                for (seg in segments(layout, text.getSpanStart(span), text.getSpanEnd(span))) {
+                    val top = totalPaddingTop + layout.getLineBaseline(seg.line) + below
+                    canvas.drawRect(totalPaddingLeft + seg.left, top, totalPaddingLeft + seg.right, top + width, line)
                 }
             }
         }
 
-        private companion object {
-            // where under the baseline the line goes, of the text size (about the font's own underline's)
-            const val UNDER_BASELINE = 0.11f
+        /** A stretch of underline on [line], from [left] to [right] of the layout, px. */
+        data class Segment(val line: Int, val left: Float, val right: Float)
+
+        companion object {
+            /**
+             * [start] to [end]'s stretch on each line it is on, the code wrapped (the floating strip): a line it
+             * goes on past ends at the line's end edge, right or left by its paragraph's direction, not at the
+             * offset there, which is the next line's start; a span ending at a wrap draws nothing on the next line.
+             */
+            fun segments(layout: Layout, start: Int, end: Int): List<Segment> {
+                if (end <= start) return emptyList()
+                return (layout.getLineForOffset(start)..layout.getLineForOffset(end - 1)).map { l ->
+                    val from = layout.getPrimaryHorizontal(maxOf(start, layout.getLineStart(l)))
+                    val rtl = layout.getParagraphDirection(l) == Layout.DIR_RIGHT_TO_LEFT
+                    val wraps = end >= layout.getLineEnd(l) && l < layout.lineCount - 1
+                    val to = when {
+                        !wraps -> layout.getPrimaryHorizontal(end)
+                        rtl -> layout.getLineLeft(l)
+                        else -> layout.getLineRight(l)
+                    }
+                    Segment(l, minOf(from, to), maxOf(from, to))
+                }
+            }
         }
     }
 }

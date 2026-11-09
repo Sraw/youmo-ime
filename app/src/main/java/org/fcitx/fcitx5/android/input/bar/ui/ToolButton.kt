@@ -16,10 +16,12 @@ import android.view.ViewPropertyAnimator
 import android.widget.ImageView
 import androidx.annotation.ColorInt
 import androidx.annotation.DrawableRes
+import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.candidates.SceneBar
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.scene.engine.ToolbarLook
+import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
 import org.fcitx.fcitx5.android.utils.circlePressHighlightDrawable
 import org.fcitx.fcitx5.android.utils.motionSettings
@@ -65,24 +67,31 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         if (look.fill != look.onFill) background = background(look, on)
     }
 
-    // none set: the press highlight's circle (a ripple) as ever; else the fill of its shape, the pressed colour over it
+    // no fill nor radius in this state: the press highlight's circle (a ripple) as ever, so a theme's
+    // `toolbar:selected fill` alone leaves every button off as it was; else the fill of its shape, the pressed colour over it
     private fun background(look: ToolbarLook, on: Boolean): Drawable {
         val fill = if (on) look.onFill else look.fill
-        if (look.radius == null && look.fill == null && look.onFill == null) return pressHighlight(look.pressed.value)
-        fun shape(color: Int) = GradientDrawable().apply {
-            setColor(color)
-            val r = look.radius
-            if (r == null) {
-                shape = GradientDrawable.OVAL
-            } else if (r.half) {
-                cornerRadius = Float.MAX_VALUE
-            } else {
-                cornerRadii = r.corners.flatMap { listOf(dp(it.toFloat()), dp(it.toFloat())) }.toFloatArray()
-            }
-        }
+        if (look.radius == null && fill == null) return pressHighlight(look.pressed.value)
+        fun shape(color: Argb): Drawable = look.radius?.let { SceneBar.shape(context, it, color) } ?: Circle(color.value)
         return StateListDrawable().apply {
-            addState(intArrayOf(android.R.attr.state_pressed), LayerDrawable(listOfNotNull(fill?.let { shape(it.value) }, shape(look.pressed.value)).toTypedArray()))
-            addState(intArrayOf(), fill?.let { shape(it.value) } ?: ColorDrawable(Color.TRANSPARENT))
+            addState(intArrayOf(android.R.attr.state_pressed), LayerDrawable(listOfNotNull(fill?.let(::shape), shape(look.pressed)).toTypedArray()))
+            addState(intArrayOf(), fill?.let(::shape) ?: ColorDrawable(Color.TRANSPARENT))
+        }
+    }
+
+    // no radius: a circle, as wide as the button's shorter side and in its middle (an oval in a wide button is not)
+    @VisibleForTesting
+    internal class Circle(@ColorInt color: Int) : GradientDrawable() {
+        init {
+            shape = OVAL
+            setColor(color)
+        }
+
+        override fun setBounds(left: Int, top: Int, right: Int, bottom: Int) {
+            val side = minOf(right - left, bottom - top)
+            val x = left + (right - left - side) / 2
+            val y = top + (bottom - top - side) / 2
+            super.setBounds(x, y, x + side, y + side)
         }
     }
 

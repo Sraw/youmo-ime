@@ -78,7 +78,7 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
     // (where the cap binds, a 14 键 user's real keys are the tall row's 14 dp shorter); read each time,
     // as 候选字号 can change on this page
     // the keyboard with nothing typed: floating over the app (编码行), the code row is no part of it
-    private val barHeight get() = ctx.dp(KawaiiBarComponent.heightDp(barPercent()) + if (KawaiiBarComponent.codeRowFloats()) 0 else CodeRowHeight.THIN_DP)
+    private val barHeight get() = ctx.dp(KawaiiBarComponent.heightDp(ctx, barPercent()) + if (KawaiiBarComponent.codeRowFloats()) 0 else CodeRowHeight.THIN_DP)
     private val fakeKawaiiBar = view(::View)
 
     // the shown theme's `bar height=` (060-render-p3 T6b), the one made with before setTheme

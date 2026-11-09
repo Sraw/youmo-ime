@@ -98,7 +98,7 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme, val bar: BarL
             color(fg) {
                 if (hint && candidate.readings.isNotEmpty()) {
                     val fm = text.paint.fontMetrics
-                    val baseline = (ctx.dp(CandidateBarHeight.dp(textSp)) - (fm.bottom - fm.top)) / 2 - fm.top
+                    val baseline = (ctx.dp(CandidateBarHeight.dp(textSp, ReadingStyle.OFF, bar.heightPercent)) - (fm.bottom - fm.top)) / 2 - fm.top
                     val size = ReadingSpan.hintSize(text.paint, baseline, floor)
                     ReadingSpan.annotate(this, candidate.text, candidate.readings, altFg, size, baseline)
                 } else {

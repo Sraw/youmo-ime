@@ -456,7 +456,7 @@ class InputView(
                     // start and end set in updateKeyboardSize, as the bar's
                 })
             }
-            add(kawaiiBar.view, lParams(0, dp(KawaiiBarComponent.heightDp())) {
+            add(kawaiiBar.view, lParams(0, dp(KawaiiBarComponent.heightDp(context))) {
                 when {
                     top != null -> below(top)
                     floatingHandle != null && !handleAtBottom -> below(floatingHandle)

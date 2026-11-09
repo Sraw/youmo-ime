@@ -58,7 +58,7 @@ class EditorInfoWindow : InputWindow.ExtendedInputWindow<EditorInfoWindow>() {
 
     private val barExtension by lazy {
         context.horizontalLayout {
-            add(copyButton, lParams(dp(KawaiiBarComponent.buttonWidthDp()), dp(KawaiiBarComponent.heightDp())))
+            add(copyButton, lParams(dp(KawaiiBarComponent.buttonWidthDp(context)), dp(KawaiiBarComponent.heightDp(context))))
         }
     }
 

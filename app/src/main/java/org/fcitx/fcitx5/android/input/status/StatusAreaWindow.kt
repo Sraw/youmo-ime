@@ -172,8 +172,8 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
 
     private val barExtension by lazy {
         context.horizontalLayout {
-            val width = dp(KawaiiBarComponent.buttonWidthDp())
-            val height = dp(KawaiiBarComponent.heightDp())
+            val width = dp(KawaiiBarComponent.buttonWidthDp(context))
+            val height = dp(KawaiiBarComponent.heightDp(context))
             if (editorInfoInspector) {
                 add(editorInfoButton, lParams(width, height))
             }

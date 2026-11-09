@@ -29,7 +29,7 @@ class CandidateUi(override val ctx: Context, theme: Theme, private val horizonta
 
     override val root = ctx.constraintLayout {
         // the bar's height (候选字号), never narrower than a 40 dp touch target
-        add(expandButton, lParams(dp(KawaiiBarComponent.buttonWidthDp()), dp(KawaiiBarComponent.heightDp())) {
+        add(expandButton, lParams(dp(KawaiiBarComponent.buttonWidthDp(ctx)), dp(KawaiiBarComponent.heightDp(ctx))) {
             centerVertically()
             endOfParent()
         })

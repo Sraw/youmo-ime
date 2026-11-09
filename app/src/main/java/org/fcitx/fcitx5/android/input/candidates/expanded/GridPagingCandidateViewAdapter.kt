@@ -67,6 +67,9 @@ abstract class GridPagingCandidateViewAdapter(theme: Theme) : PagingCandidateVie
 
     private val readingPaint = TextPaint()
 
+    // the theme's `bar height=` (T6b): the rows a bar's height each, as the bar and the flexbox window's
+    private fun barPercent(): Double = bar?.heightPercent ?: SceneBar.heightPercent()
+
     /**
      * [candidate]'s width with its readings ([ReadingSpan]): measured as CandidateItemUi draws them, at the
      * candidates' own size, since a reading's floor does not scale with the words; a hint's ([hint], 候选词注音
@@ -80,7 +83,7 @@ abstract class GridPagingCandidateViewAdapter(theme: Theme) : PagingCandidateVie
         val annotated = SpannableStringBuilder()
         if (hint) {
             val fm = paint.fontMetrics
-            val bar = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, CandidateBarHeight.dp(textSp).toFloat(), metrics)
+            val bar = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, CandidateBarHeight.dp(textSp, ReadingStyle.OFF, barPercent()).toFloat(), metrics)
             val baseline = (bar - (fm.bottom - fm.top)) / 2 - fm.top
             ReadingSpan.annotate(annotated, candidate.text, candidate.readings, 0, ReadingSpan.hintSize(paint, baseline, floor), baseline)
         } else {
@@ -93,7 +96,7 @@ abstract class GridPagingCandidateViewAdapter(theme: Theme) : PagingCandidateVie
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CandidateViewHolder {
         return super.onCreateViewHolder(parent, viewType).apply {
             itemView.apply {
-                layoutParams = GridLayoutManager.LayoutParams(matchParent, dp(CandidateBarHeight.dp(textSp, EngineState.candidateReading.value)))
+                layoutParams = GridLayoutManager.LayoutParams(matchParent, dp(CandidateBarHeight.dp(textSp, EngineState.candidateReading.value, barPercent())))
             }
         }
     }
