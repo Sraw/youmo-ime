@@ -78,7 +78,8 @@ class PopupFocus(
         row = settle(row, startRow - dy / stepY, rows.size, HYSTERESIS)
         val slots = rows[row]
         val step = if (dx < 0) stepLeft else stepRight
-        column = settle(column, startColumn + dx / step, slots.size, HYSTERESIS * stepX / step)
+        // the slack in pixels, HYSTERESIS of a whole step: as it was where the step is whole
+        column = settle(column, startColumn + dx / step, slots.size, if (step == stepX) HYSTERESIS else HYSTERESIS * stepX / step)
         return nearest(slots, column)
     }
 

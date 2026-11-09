@@ -36,6 +36,8 @@ import kotlin.math.min
  * @param onFocusMoved told, with the popup's view, each time another key comes into focus: a buzz,
  * as the finger is not over the key it picks ([PopupFocus])
  * @param scenes the engine's, the keys drawn as its scene (060-render-p2 S2), sized by its rules ([PopupKeys])
+ * @param faceInset how far [triggerBounds] (the key's face) is in from the key's cell across: the
+ * finger's x, given [onChangeFocus], is from the cell (the theme's inset, 3dp by default)
  */
 class PopupKeyboardUi(
     override val ctx: Context,
@@ -53,6 +55,7 @@ class PopupKeyboardUi(
     inRow: Int = -1,
     private val onFocusMoved: (View) -> Unit = {},
     private val scenes: PopupScenes,
+    private val faceInset: Int = 0,
 ) : PopupContainerUi(ctx, theme, outerBounds, triggerBounds, onDismissSelf) {
 
     // the engine's scene of the keys: made again as the focus moves
@@ -210,12 +213,12 @@ class PopupKeyboardUi(
         cancelBelow = triggerBounds.height().toFloat(),
         // the key's bottom edge, in onChangeFocus's coordinates (the popup's, offsetY up)
         cancelAt = (triggerBounds.height() - offsetY).toFloat(),
-        // the screen's edges, in onChangeFocus's coordinates (the popup's, offsetX across), EDGE_MARGIN
-        // in: the finger's x is from the key's cell, the trigger its face, inset a few dp in it; and
-        // the last key is picked a little short of the edge. A row in order only: the full keyboard's
-        // and the pickers' popups as before
-        leftEdge = if (outerBounds.isEmpty || !inOrder) Float.NEGATIVE_INFINITY else outerBounds.left - triggerBounds.left - offsetX + edgeMargin,
-        rightEdge = if (outerBounds.isEmpty || !inOrder) Float.POSITIVE_INFINITY else outerBounds.right - triggerBounds.left - offsetX - edgeMargin,
+        // the screen's edges, in onChangeFocus's coordinates (the popup's, offsetX across, from the
+        // key's cell: the trigger its face, faceInset in it), EDGE_MARGIN in: the last key picked a
+        // little short of the edge. A row in order only: the full keyboard's and the pickers' popups
+        // as before
+        leftEdge = if (outerBounds.isEmpty || !inOrder) Float.NEGATIVE_INFINITY else outerBounds.left - triggerBounds.left + faceInset - offsetX + edgeMargin,
+        rightEdge = if (outerBounds.isEmpty || !inOrder) Float.POSITIVE_INFINITY else outerBounds.right - triggerBounds.left + faceInset - offsetX - edgeMargin,
         minStepX = keyWidth * PopupFocus.MIN_STEP,
     )
 
@@ -238,8 +241,8 @@ class PopupKeyboardUi(
     }
 
     companion object {
-        /** How far in from the screen's edge, in dp, the finger picks a row's last key: more than a key face's inset in its cell. */
-        const val EDGE_MARGIN = 8f
+        /** How far in from the screen's edge, in dp, the finger picks a row's last key. */
+        const val EDGE_MARGIN = 4f
 
         /** What picking [key] types: from the long press, and from a letter's swipe (its first). */
         fun keyAction(key: String): KeyAction =

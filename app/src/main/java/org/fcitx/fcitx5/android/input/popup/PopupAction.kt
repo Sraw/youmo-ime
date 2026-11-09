@@ -32,10 +32,12 @@ sealed class PopupAction {
         override val key: KeyRef
     ) : PopupAction()
 
+    /** [faceInset]: how far [bounds] (the key's face) is in from its cell across, where the finger's x is from. */
     data class ShowKeyboardAction(
         override val key: KeyRef,
         val keyboard: KeyDef.Popup.Keyboard,
-        val bounds: Rect
+        val bounds: Rect,
+        val faceInset: Int = 0,
     ) : PopupAction()
 
     data class ShowMenuAction(

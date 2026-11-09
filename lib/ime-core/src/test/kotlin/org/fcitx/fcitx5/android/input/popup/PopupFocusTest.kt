@@ -134,7 +134,7 @@ class PopupFocusTest {
         assertEquals(3, nearTheRight().slide(300, 288))
         assertEquals(0, nearTheRight().slide(300, 240))
         // up the same as ever
-        assertEquals(7, nearTheRight().slide(300, 300).let { nearTheRight().also { f -> f.moveTo(300f, 0f) }.moveTo(300f, -25f) })
+        assertEquals(7, nearTheRight().apply { moveTo(300f, 0f) }.moveTo(300f, -25f))
     }
 
     @Test
