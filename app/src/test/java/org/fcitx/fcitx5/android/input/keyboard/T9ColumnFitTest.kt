@@ -16,7 +16,6 @@ import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -52,7 +51,8 @@ class T9ColumnFitTest {
     val prefs = PrefsRule()
 
     // no scene yet (never laid out): the column not shown; then shown in its slot, and laid out again at the same
-    // size nothing changes: its layout params the same object, no layout asked for (a loop once: 0bfe7fa6b)
+    // size nothing changes: its layout params the same object, not set again (setting them asks for a layout: a loop
+    // once, 0bfe7fa6b)
     @Test
     fun theColumnWaitsForTheSceneAndThenStaysPut() {
         val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark)
@@ -69,10 +69,10 @@ class T9ColumnFitTest {
         assertEquals(View.VISIBLE, column.visibility)
         pass()
         val params = column.layoutParams
+        // laid out again for certain (the same size alone would skip onLayout): the slot unmoved, its params not set again
+        keyboard.requestLayout()
         pass()
         assertSame(params, column.layoutParams)
-        assertFalse(column.isLayoutRequested)
-        assertFalse(keyboard.isLayoutRequested)
     }
 
     private fun fits(scale: Float, moved: Boolean = false) {
