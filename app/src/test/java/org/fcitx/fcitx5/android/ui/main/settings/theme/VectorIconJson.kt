@@ -45,7 +45,11 @@ object VectorIconJson {
                                 val stroke = attr(c, "strokeColor") != null
                                 check(fill != stroke) { "$name: a path of ${if (fill) "both a fill and a stroke" else "no colour"}, which the page draws in one tint" }
                                 for ((a, default) in STROKE_DEFAULTS) {
-                                    attr(c, a)?.let { check(it == default) { "$name: $a=\"$it\", where the page draws VectorDrawable's $default" } }
+                                    attr(c, a)?.let {
+                                        // "1.0" is the default "1" (aapt keeps a float as written)
+                                        val same = it == default || it.toDoubleOrNull()?.let { n -> n == default.toDoubleOrNull() } == true
+                                        check(same) { "$name: $a=\"$it\", where the page draws VectorDrawable's $default" }
+                                    }
                                 }
                                 put("d", attr(c, "pathData") ?: "")
                                 attr(c, "fillType")?.let { put("rule", if (it == "evenOdd") "evenodd" else "nonzero") }
