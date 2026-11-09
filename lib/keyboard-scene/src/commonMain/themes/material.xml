@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  内置主题 Material，浅色、深色两版（0.5 的 MaterialLight、MaterialDark）。
+  3.0 的内置主题只给颜色，外观全是 LookDefaults（块状、圆角 4dp、阴影 1dp、键缝 h3 v7、横屏 v4、按下 Tint）；
+  下面的样式就是 LookTheme 把它们写成 4.0 的样子，App 也照这些画（BuiltinThemeEquivalenceTest 逐字比场景）。
+  keyBorder、keyHint、toolbarIcon 3.0 没单给，取 Palette 的默认（= keyShadow、altKeyText、altKeyText）。
+-->
+<theme xmlns="https://youmo-ime/theme/4" name="material" variants="light dark" version="4.0">
+  <colors>
+    <color name="background" value="#eceff1"/>
+    <color name="bar" value="#e4e7e9"/>
+    <color name="keyboard" value="#eceff1"/>
+    <color name="key" value="#fbfbfc"/>
+    <color name="keyText" value="#37474f"/>
+    <color name="candidateText" value="#37474f"/>
+    <color name="candidateLabel" value="#37474f"/>
+    <color name="candidateComment" value="#7a858a"/>
+    <color name="altKey" value="#dfe2e4"/>
+    <color name="altKeyText" value="#7a858a"/>
+    <color name="accentKey" value="#5cb5ab"/>
+    <color name="accentKeyText" value="#ffffff"/>
+    <color name="keyPressHighlight" value="#1f000000"/>
+    <color name="keyShadow" value="#c0c3c4"/>
+    <color name="popupBackground" value="#d9dbdd"/>
+    <color name="popupText" value="#37474f"/>
+    <color name="spaceBar" value="#c9ced1"/>
+    <color name="divider" value="#1f000000"/>
+    <color name="clipboardEntry" value="#fbfbfc"/>
+    <color name="genericActiveBackground" value="#80cbc4"/>
+    <color name="genericActiveForeground" value="#37474f"/>
+    <color name="keyBorder" value="@keyShadow"/>
+    <color name="keyHint" value="@altKeyText"/>
+    <color name="toolbarIcon" value="@altKeyText"/>
+  </colors>
+  <colors variant="dark">
+    <color name="background" value="#263238"/>
+    <color name="bar" value="#21272b"/>
+    <color name="keyboard" value="#263238"/>
+    <color name="key" value="#404a50"/>
+    <color name="keyText" value="#d9dbdc"/>
+    <color name="candidateText" value="#d9dbdc"/>
+    <color name="candidateLabel" value="#d9dbdc"/>
+    <color name="candidateComment" value="#adb1b3"/>
+    <color name="altKey" value="#313c42"/>
+    <color name="altKeyText" value="#adb1b3"/>
+    <color name="accentKey" value="#6eaca8"/>
+    <color name="keyPressHighlight" value="#33ffffff"/>
+    <color name="keyShadow" value="#1f292e"/>
+    <color name="popupBackground" value="#3c474c"/>
+    <color name="popupText" value="#ffffff"/>
+    <color name="spaceBar" value="#3b464c"/>
+    <color name="divider" value="#1fffffff"/>
+    <color name="clipboardEntry" value="#404a50"/>
+    <color name="genericActiveBackground" value="#4db6ac"/>
+    <color name="genericActiveForeground" value="#ffffff"/>
+  </colors>
+  <style select="keyboard" fill="@background"/>
+  <style select="@flat keyboard" fill="@keyboard"/>
+  <style select="bar" fill="transparent"/>
+  <style select="panel" fill="transparent"/>
+  <style select="@flat panel" fill="@bar"/>
+  <style select="key" fill="@key" radius="4dp" border="none" shadow="0 1dp 0 @keyShadow" inset="7dp 3dp" color="@keyText" font="system" weight="400" scale="100%" icon-color="@keyText" press="tint"/>
+  <style select="@landscape key" inset="4dp 3dp"/>
+  <style select="key:pressed" overlay="@keyPressHighlight"/>
+  <style select="key.function" fill="@altKey" color="@altKeyText" icon-color="@altKeyText"/>
+  <style select="key.enter" fill="@accentKey" color="@accentKeyText" icon-color="@accentKeyText"/>
+  <style select="key.space" fill="@key"/>
+  <style select="key.alt-text" color="@altKeyText" icon-color="@altKeyText"/>
+  <style select="key mark, key shortcut" color="@keyHint" icon-color="@keyHint"/>
+  <style select="key shortcut" scale="100%"/>
+  <style select="key.enter mark" color="@accentKeyText"/>
+  <style select="key badge" icon-color="@altKeyText"/>
+  <style select="*/reading:on" color="@accentKey" icon-color="@accentKey"/>
+  <style select="@flat key" fill="transparent" radius="0" shadow="none"/>
+  <style select="@flat key.space" fill="@spaceBar" shape="bar" radius="3dp"/>
+  <style select="@flat key.enter" fill="@accentKey" shape="circle"/>
+  <style select="preview, popup" fill="@popupBackground" radius="4dp" shadow="0 2dp 2dp #33000000" color="@popupText"/>
+  <style select="popup:selected" fill="@genericActiveBackground" color="@genericActiveForeground"/>
+  <style select="menu" fill="@accentKey" radius="50%" color="@accentKeyText" icon-color="@accentKeyText"/>
+  <style select="menu:selected" overlay="@keyPressHighlight"/>
+  <style select="@floating keyboard" radius="7dp"/>
+  <style select="handle" fill="mix(@background,@keyText,10%)"/>
+</theme>

@@ -19,10 +19,12 @@ internal val TEST_DATA: String by lazy { testDataDir() }
 
 /**
  * [name] of src/commonTest/data, or of src/commonMain/layouts (the layouts the app draws, qwerty.xml:
- * one copy, the app's, which the tests and snapshots are of).
+ * one copy, the app's, which the tests and snapshots are of), or of src/commonMain/themes (the built-in
+ * themes, pixel.xml).
  */
 internal fun testData(name: String): String =
-    readText("$TEST_DATA/$name") ?: readText("$TEST_DATA/../../commonMain/layouts/$name") ?: error("no $TEST_DATA/$name")
+    readText("$TEST_DATA/$name") ?: readText("$TEST_DATA/../../commonMain/layouts/$name")
+        ?: readText("$TEST_DATA/../../commonMain/themes/$name") ?: error("no $TEST_DATA/$name")
 
 /** The names of the files in [dir], sorted. */
 internal expect fun listNames(dir: String): List<String>
