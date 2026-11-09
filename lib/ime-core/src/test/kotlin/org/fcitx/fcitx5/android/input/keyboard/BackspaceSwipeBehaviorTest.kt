@@ -158,7 +158,7 @@ class BackspaceSwipeBehaviorTest {
     }
 
     /**
-     * Under the vivo keypress workaround a cancelled swipe gets no release. The next touch must
+     * A swipe BaseKeyboard cancels directly (a scene key's gesture) gets no release. The next touch must
      * not inherit its reading: a plain tap would otherwise delete a selection, and a new swipe
      * would skip deciding afresh whether a composition is in progress.
      */

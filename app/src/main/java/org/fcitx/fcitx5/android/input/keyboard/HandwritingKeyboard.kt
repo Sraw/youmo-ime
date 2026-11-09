@@ -324,7 +324,7 @@ class HandwritingKeyboard(
         return taken
     }
 
-    // the vivo workaround takes every touch for a key: the pad's are the pad's
+    // the keyboard takes every touch for a key (BaseKeyboard.onInterceptTouchEvent): the pad's are the pad's
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         padView.getHitRect(padHit)
         if (padHit.contains(ev.x.toInt(), ev.y.toInt())) return false
