@@ -46,7 +46,7 @@ internal class CommitRecorder(
     val habits = to.habits
     private val layout = letters?.tag()
     // a grouped keyboard's keys apart from the nine keys' (qk:, not t9:); 注音九键's 连按 is under its own kind (zy:), never t9m:
-    private val grouped = layout != null && (NineKeyLetters.grouped(layout) != null || Kinds.isZhuyin(to.kind))
+    private val grouped = layout != null && (letters?.isGrouped == true || Kinds.isZhuyin(to.kind))
     // grouped 双拼 (to.kind sp:<scheme>) spk:<scheme>:<tag>, the 14 keys qk:<tag>, zhuyin's its own
     private val kind = when {
         layout == null || Kinds.isZhuyin(to.kind) -> to.kind

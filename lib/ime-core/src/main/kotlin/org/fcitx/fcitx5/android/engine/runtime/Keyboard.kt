@@ -189,7 +189,7 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
     private fun char(codePoint: Int, payload: Action? = null): Snapshot {
         hostChar(codePoint, payload)?.let { return it }
         // whatever the session: one sent the wrong way reads as its code would, never as U+FFFD ending the input
-        if (codePoint in TAPS) {
+        if (codePoint in TAPS || codePoint in PLACES) {
             val (code, at) = untapped(codePoint)
             return session.apply(Action.Key(code, at = at))
         }
@@ -528,21 +528,61 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
          */
         val TAPS = 0xF0200 until 0xF0200 + ALPHABET * TAP_STEPS
 
-        /** Whether a tap's place goes with the code [code] ([tapKey]): the 14 keys' codes alone yet (P3: any layout's groups). */
-        fun placesTaps(code: Char): Boolean = code in FIRST_CODE..LAST_CODE
+        /** How many places down a key [tapKey] with a y tells apart: the middle one, 4, is the key's centre. */
+        const val TAP_ROWS = 9
+
+        // a layout's own keyboard's codes (NineKeyLetters.CUSTOM_BLOCK)
+        private val FIRST_CUSTOM = NineKeyLetters.CUSTOM_BLOCK.first.toChar()
+        private val LAST_CUSTOM = NineKeyLetters.CUSTOM_BLOCK.last.toChar()
+
+        /**
+         * Characters a layout's own keyboard (NineKeyLetters.custom) sends for a tap with its place, a
+         * code and where it fell across and down the key: [tapKey] with a y. [TAP_STEPS] × [TAP_ROWS]
+         * a code, [NineKeyLetters.CUSTOM_MAX] codes (4590). As [TAPS], only on a key's way to the
+         * engine: never learned, kept or backed up.
+         */
+        val PLACES = 0xF1000 until 0xF1000 + NineKeyLetters.CUSTOM_MAX * TAP_STEPS * TAP_ROWS
+
+        /** Whether a tap's place goes with the code [code] ([tapKey]): the 14 keys' codes and a layout's own keyboard's. */
+        fun placesTaps(code: Char): Boolean = code in FIRST_CODE..LAST_CODE || code in FIRST_CUSTOM..LAST_CUSTOM
+
+        /**
+         * The character for a tap at ([x], [y]) on the key of [code] (0 to 1 each way, left to right
+         * and top to bottom), to the nearest of [TAP_STEPS] across and [TAP_ROWS] down: a layout's own
+         * keyboard's ([PLACES]); the 14 keys' have one row, so theirs is [tapKey] across alone, the
+         * character it always was. Clamped first; NaN is no place, send the code itself.
+         */
+        fun tapKey(code: Char, x: Float, y: Float): Int {
+            require(code in FIRST_CUSTOM..LAST_CUSTOM && !x.isNaN() && !y.isNaN() || code in FIRST_CODE..LAST_CODE) { "tap $code at $x, $y" }
+            if (code in FIRST_CODE..LAST_CODE) return tapKey(code, x)
+            val across = (x.coerceIn(0f, 1f) * (TAP_STEPS - 1)).roundToInt()
+            val down = (y.coerceIn(0f, 1f) * (TAP_ROWS - 1)).roundToInt()
+            return PLACES.first + ((code - FIRST_CUSTOM) * TAP_STEPS + across) * TAP_ROWS + down
+        }
+
+        /** The code a tap's character ([TAPS], [PLACES]) is of, its place dropped; null for any other. */
+        fun tappedCode(codePoint: Int): Char? = if (codePoint in TAPS || codePoint in PLACES) untapped(codePoint).first else null
 
         /**
          * The character for a tap at [at] across the key of [code] (0 its left edge, 1 its right),
          * to the nearest of [TAP_STEPS]. Clamped first: just past 1 would round into the next code's
-         * places, learned under that key. NaN is no place; send the code itself.
+         * places, learned under that key. NaN is no place; send the code itself. A layout's own
+         * keyboard's code: its middle row ([tapKey] with a y).
          */
         fun tapKey(code: Char, at: Float): Int {
+            if (code in FIRST_CUSTOM..LAST_CUSTOM) return tapKey(code, at, 0.5f)
             require(code in FIRST_CODE..LAST_CODE && !at.isNaN()) { "tap $code at $at" }
             return TAPS.first + (code - FIRST_CODE) * TAP_STEPS + (at.coerceIn(0f, 1f) * (TAP_STEPS - 1)).roundToInt()
         }
 
-        // a [tapKey]'s code and place back
-        private fun untapped(codePoint: Int): Pair<Char, Float> {
+        // a [tapKey]'s code and place back: across alone (TAPS), or across and down as one (NineKeyLetters.place)
+        internal fun untapped(codePoint: Int): Pair<Char, Float> {
+            if (codePoint in PLACES) {
+                val n = codePoint - PLACES.first
+                val across = (n / TAP_ROWS) % TAP_STEPS
+                return (FIRST_CUSTOM + n / (TAP_ROWS * TAP_STEPS)) to
+                    NineKeyLetters.place(across.toFloat() / (TAP_STEPS - 1), (n % TAP_ROWS).toFloat() / (TAP_ROWS - 1))
+            }
             val n = codePoint - TAPS.first
             return (FIRST_CODE + n / TAP_STEPS) to (n % TAP_STEPS).toFloat() / (TAP_STEPS - 1)
         }
@@ -559,6 +599,13 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
             if (codePoint in PINYIN_NINE) return keyedChar(codePoint)
             val internal = keyedChar(codePoint)?.code ?: codePoint
             // a code alone has no side: its key's first letter, whichever keyboard's it is
+            if (internal in PLACES) {
+                val (code, place) = untapped(internal)
+                val letters = NineKeyLetters.ofCode(code.code) ?: return null
+                val group = letters.letters(code)
+                // the letter the tap went least against, the first of those alike
+                return group[group.indices.minBy { letters.against(code, it, place) }]
+            }
             if (internal !in TAPS) return NineKeyLetters.ofCode(internal)?.letters(internal.toChar())?.first()
             val (code, at) = untapped(codePoint)
             // the taps are the 14 keys' alone yet: G18's go at indices 26 to 51 (design §1.4)

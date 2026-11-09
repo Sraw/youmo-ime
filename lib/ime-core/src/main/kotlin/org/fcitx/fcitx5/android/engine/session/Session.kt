@@ -170,9 +170,10 @@ sealed class Action {
      * A key typed. One the engine [reads][Session.reads] goes into the input; any other ends it,
      * committed as the engine would have it, and is the app's (the snapshot is not
      * [handled][Snapshot.handled]): what comes after it does not run on from what came before.
-     * [glided]: typed by a glide, no key pressed (learning files it by its pinyin). [at]: where
-     * across its key a grouped keyboard's code was tapped, 0 the left edge and 1 the right
-     * ([Keyboard.tapKey][org.fcitx.fcitx5.android.engine.runtime.Keyboard.tapKey]); NaN for none.
+     * [glided]: typed by a glide, no key pressed (learning files it by its pinyin). [at]: where on
+     * its key a grouped keyboard's code was tapped ([Keyboard.tapKey][org.fcitx.fcitx5.android.engine.runtime.Keyboard.tapKey]):
+     * the 14 keys' across alone, 0 the left edge and 1 the right; a layout's own keyboard's across
+     * and down packed as one ([NineKeyLetters.place][org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters.place]); NaN for none.
      */
     data class Key(val char: Char, val glided: Boolean = false, val at: Float = Float.NaN) : Action()
 
@@ -213,11 +214,12 @@ sealed class Action {
             const val ANY = -1
 
             /**
-             * Ids of the syllables offered run from 0 to this, less one, then again: 98 so that
-             * Keyboard.SYLLABLES ends at U+F87F, the private use area after it left to the grouped
-             * keyboards' codes (ZhuyinKeys from U+F880).
+             * Ids of the syllables offered run from 0 to this, less one, then again: 97 so that
+             * Keyboard.SYLLABLES ends at U+F83F, the private use area after it left to the grouped
+             * keyboards' codes (a layout's own from U+F840, NineKeyLetters.CUSTOM_BLOCK; ZhuyinKeys
+             * from U+F880). Was 98: an id is a list's on show alone, never kept.
              */
-            const val IDS = 98
+            const val IDS = 97
 
             /** At most this many syllables are offered. */
             const val MAX = 64

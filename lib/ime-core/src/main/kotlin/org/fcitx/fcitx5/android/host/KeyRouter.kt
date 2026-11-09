@@ -119,7 +119,8 @@ class KeyRouter(
         endPunctuation(ic, take = true)
         val im = services.inputMethod(ic)
         // a grouped keyboard's code (NineKeyLetters.ofCode, and the rest of their blocks; those past the BMP,
-        // Keyboard.KEYED_CODES), a tap's with its place (Keyboard.TAPS, the 14 keys' alone yet) too: never let
+        // Keyboard.KEYED_CODES; a layout's own keyboard's, NineKeyLetters.CUSTOM_BLOCK), a tap's with its place
+        // (Keyboard.TAPS, the 14 keys'; Keyboard.PLACES, a layout's own keyboard's) too: never let
         // through, the app would type it. The input method whose keyboard it is reads it; any other (a switch the
         // keyboard shown has not caught up with) has it swallowed, never read as one of its own groups
         // A stroke drawn (笔画筛选, Keyboard.STROKES) the same: the input methods that filter by one read it

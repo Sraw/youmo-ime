@@ -148,7 +148,7 @@ internal class NineKeys(
         val tap = taps.getOrElse(k) { Float.NaN }
         val group = if (at + k < input.length) letters.letters(input[at + k]) else ""
         val j = group.indexOf(spelling[k]).takeIf { it >= 0 || spelling[k] != 'v' } ?: group.indexOf('u')
-        !tap.isNaN() && group.length > 1 && j >= 0 && letters.against(j, tap) >= OBJECTION
+        !tap.isNaN() && group.length > 1 && j >= 0 && letters.against(input[at + k], j, tap) >= OBJECTION
     }
 
     // the syllables [graph] (of the input from [from]) reads at input position [at], each to its most

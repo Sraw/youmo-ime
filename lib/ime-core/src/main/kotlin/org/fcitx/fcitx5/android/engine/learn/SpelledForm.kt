@@ -97,7 +97,7 @@ enum class SpelledForm {
          * are filed by the code itself ([filedUnder]), so its letters would look where none is.
          */
         fun nineKeyLetters(keyboard: String, code: Char): String = when {
-            keyboard.startsWith(GROUPED) -> Kinds.keysTag(keyboard)?.let { NineKeyLetters.grouped(it) }?.letters(code).orEmpty()
+            keyboard.startsWith(GROUPED) -> Kinds.keysTag(keyboard)?.let { NineKeyLetters.filedAs(it) }?.letters(code).orEmpty()
             !keyboard.startsWith(NINE_KEYS) || code !in '2'..'9' -> ""
             else -> keyboard.removePrefix(NINE_KEYS).split(',').getOrElse(code - '2') { "" }
         }
