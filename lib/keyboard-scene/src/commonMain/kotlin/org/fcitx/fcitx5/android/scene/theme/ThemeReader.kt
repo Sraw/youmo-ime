@@ -425,7 +425,8 @@ object ThemeReader {
         widget != "candidate" -> if (states.isEmpty()) BAR_READS.getValue(widget) else emptyList()
         part != null -> if ("pressed" in states) emptyList() else listOf("color")
         states.isEmpty() -> BAR_READS.getValue(widget)
-        states == setOf("pressed") -> listOf("overlay")
+        // the first pressed has an overlay of its own; nothing presses a selected candidate (the window's, by keys)
+        "pressed" in states && (states - "pressed" - "first").isEmpty() -> listOf("overlay")
         "pressed" !in states -> CANDIDATE_STATE_READS
         else -> emptyList()
     }

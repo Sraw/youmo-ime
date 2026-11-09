@@ -100,6 +100,10 @@ class BarLookTest {
         assertEquals(argb(0xFF444444), l.firstSelected.fill)
         assertEquals(l.candidate(first = true, selected = false), l.first)
         assertEquals(l.candidate(first = false, selected = true), l.selected)
+        // the first pressed: its own overlay where a style names it
+        val firstPressed = look(theme("<style select=\"candidate:pressed\" overlay=\"#40000000\"/>", "<style select=\"candidate:first:pressed\" overlay=\"#60ffffff\"/>"))
+        assertEquals(argb(0x60FFFFFF), firstPressed.first.pressed)
+        assertEquals(argb(0x40000000), firstPressed.plain.pressed)
     }
 
     @Test
@@ -149,9 +153,13 @@ class BarLookTest {
                 "<style select=\"candidate\" fill=\"#ffffffff\" radius=\"4dp\" inset=\"2dp\" padding=\"0 8dp\" gap=\"2dp\" label-style=\"none\" color=\"#ff000000\" font=\"system\" weight=\"700\"/>",
                 "<style select=\"candidate:first, candidate:selected\" fill=\"#ffffffff\" color=\"#ff000000\" font=\"system\" weight=\"700\"/>",
                 "<style select=\"candidate label, candidate:first comment, candidate:selected label\" color=\"#ff000000\"/>",
-                "<style select=\"candidate:pressed\" overlay=\"#40000000\"/>",
+                "<style select=\"candidate:pressed, candidate:first:pressed\" overlay=\"#40000000\"/>",
                 "<style select=\"candidates-divider, candidates-panel\" fill=\"#ff000000\"/>",
             ).isEmpty(),
+        )
+        assertEquals(
+            listOf("overlay= on candidate:pressed:selected does nothing: it reads nothing in that state"),
+            warnings("<style select=\"candidate:selected:pressed\" overlay=\"#40000000\"/>"),
         )
         assertEquals(
             listOf("size= on candidate does nothing: it reads fill radius inset padding gap color font weight label-style"),

@@ -103,6 +103,17 @@ object LookTheme {
     /** The font's name in the file written, for the look's key font (theme 4 names a `<font>`). */
     const val KEY_FONT = "key"
 
+    /** The font's name in the file written, for the look's candidate font (060-render-p3 T6a). */
+    const val CANDIDATE_FONT = "candidate"
+
+    /**
+     * The look's candidates' font and weight as a 4.0 theme's `candidate` has them; null where it sets
+     * neither (the system's font at 400: the engine's default), so a theme of none writes no style.
+     */
+    fun candidateFont(text: Text): Pair<String, Int>? =
+        if (text.candidateFont == null && text.candidateWeight == LookDefaults.TEXT.candidateWeight) null
+        else (if (text.candidateFont != null) CANDIDATE_FONT else "system") to text.candidateWeight
+
     /** The look as a 4.0 theme's text: [theme], as [ThemeWriter] writes every theme. */
     fun xml(look: ThemeLook, name: String, dark: Boolean): String = ThemeWriter.write(theme(look, name, dark))
 
@@ -177,7 +188,9 @@ object LookTheme {
             val cuts = listOfNotNull("portrait" to fileName(p.portrait.file), p.landscape?.let { "landscape" to fileName(it.file) }).toMap()
             Picture(fileName(p.src), p.brightness.toDouble(), p.blurDp.toDouble(), cuts)
         }
-        val fonts = look.text.keyFont?.let { mapOf(KEY_FONT to fileName(it)) } ?: emptyMap()
+        // the candidates' font and weight (T6a): theme 3.0's own, so a theme exported or shown on the web keeps them
+        candidateFont(text)?.let { (font, weight) -> s.add(of("candidate"), "font" to Value.Word(font), "weight" to Value.Number(weight.toDouble())) }
+        val fonts = listOfNotNull(text.keyFont?.let { KEY_FONT to fileName(it) }, text.candidateFont?.let { CANDIDATE_FONT to fileName(it) }).toMap()
         val colors = colors(look.palette).associate { (n, c) -> n to Argb(c) }
         // one version, light or dark; the dark one's colours its dark version's too, as a file of it reads
         return Theme(themeName(name), dark, VERSION, colors, s.styles, fonts, emptyMap(), picture, darkColors = colors.takeIf { dark })
