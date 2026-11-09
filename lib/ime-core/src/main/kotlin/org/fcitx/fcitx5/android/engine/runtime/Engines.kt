@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.runtime
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.HANDWRITING
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN_KEYS_OWN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.SHUANGPIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.TABLES
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.glides
@@ -23,6 +24,7 @@ import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.platform.Blobs
 import org.fcitx.fcitx5.android.engine.platform.Clock
@@ -335,21 +337,42 @@ class Engines(
     /**
      * What the user set; the sessions are made again for a change, what was typed dropped. But for
      * 候选词注音 alone (the handwriting pad's 注): what is typed stays, and the host has what is on show
-     * read again ([Keyboard.RECALL]), annotated the new way.
+     * read again ([Keyboard.RECALL]), annotated the new way. And for a layout's own groups alone
+     * ([EngineSettings.ownKeys], told at a key: EngineBridge.syncOwnKeys): only the session typing on them
+     * is made anew, told the field's text as one made later is ([KeyboardPair.dropKeyed]).
      */
     var settings = EngineSettings()
         set(value) {
             hostThread.check()
             if (value == field) return
             val readingOnly = value == field.copy(candidateReading = value.candidateReading)
+            val ownKeysOnly = value == field.copy(ownKeys = value.ownKeys)
             field = value
+            // a layout's own keyboard told (060-render-p3 T9b): the one its codes are read by from now on
+            ownKeys = value.ownKeyboard?.also(NineKeyLetters::inUse) != null
             if (readingOnly) return
+            // told at the field's first key, after its context (review M1): the other sessions, what they
+            // typed and knew, and what the decoders share stay; the text before the cursor reaches the new one
+            if (ownKeysOnly) return dropOwnKeys()
             dropSessions()
             assets.dropDecoderExtensionsIfLearned()
             // what a lower level no longer runs leaves memory, read again if the level goes up
             if (value.modelLevel < ModelLevel.MEDIUM) assets.sentenceModel.drop()
             if (value.modelLevel < ModelLevel.HIGH) assets.refiningModel.drop()
         }
+
+    // the session typing on a layout's own groups alone: made anew at its next code, on the groups told now
+    private fun dropOwnKeys() {
+        pairs.getValue(PINYIN).dropKeyed(PINYIN_KEYS_OWN)
+        keyboards.remove(PINYIN_KEYS_OWN)
+        sessions.remove(PINYIN_KEYS_OWN)
+    }
+
+    // whether [settings] name a layout's own keyboard (EngineSettings.ownKeyboard): what its codes are read by
+    private var ownKeys = false
+
+    // a layout's own keyboard's code or tap: none but that keyboard reads it
+    private fun isOwnKeysCode(c: Int) = c in NineKeyLetters.CUSTOM_BLOCK || c in Keyboard.PLACES
 
     private val latin = LatinSync { w -> assets.englishData?.let { it.id(w) != NO_WORD } == true }
 
@@ -371,6 +394,13 @@ class Engines(
     fun onEvent(im: String, event: Int, arg: Int, learning: Boolean = true, payload: Action? = null): Snapshot {
         hostThread.check()
         if (im == PINYIN) syncLatin()
+        // a layout's own keyboard's code (a tap's too) with none told: no keys to read it by, swallowed, what is
+        // shown left as it is, never handed back to be typed as it is (the app tells its keyboard first: EngineBridge)
+        if (!ownKeys && event == EngineEvent.CHAR && isOwnKeysCode(arg)) {
+            // a refine or a pick of the snapshot before is not this key's (review L7)
+            val shown = pairs[im]?.showing ?: keyboard(im).showing
+            return annotated(im, shown.copy(commit = "", deleteBefore = 0, handled = true, refines = false, picked = false))
+        }
         val s = pairs[im]?.onEvent(event, arg, learning, payload)
             ?: keyboard(im).onEvent(if (event == EngineEvent.HARD_CHAR) EngineEvent.CHAR else event, arg, learning, payload)
         return annotated(im, s)

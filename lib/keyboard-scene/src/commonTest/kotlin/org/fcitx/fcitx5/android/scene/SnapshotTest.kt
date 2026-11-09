@@ -5,21 +5,51 @@
 package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
+import org.fcitx.fcitx5.android.scene.engine.BarLook
+import org.fcitx.fcitx5.android.scene.engine.BarSample
 import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.Shift
+import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** A scene the snapshots hold: [board] in [env], drawn by [theme], written to snapshots/[name].txt. */
-class Shot(val name: String, val board: String, val env: Env, val theme: Theme = Fixtures.materialLight) {
-    val scene: Scene by lazy { Forms.scene(board, env, theme) }
+/**
+ * A theme the shots draw with: [file] of the test data, [styles] added at its end and [fonts] after its
+ * colours; written so (FacadeShotsTest) that the theme maker's library's tests make the same one.
+ */
+data class ThemeSource(val file: String, val styles: List<String> = emptyList(), val fonts: String = "") {
+    val text: String
+        get() = if (styles.isEmpty() && fonts.isEmpty()) {
+            testData(file)
+        } else {
+            testData(file).replace("</colors>", "</colors>$fonts").replace("</theme>", styles.joinToString("\n", postfix = "\n</theme>"))
+        }
+
+    val theme: Theme get() = read.getOrPut(this) { ThemeReader.theme(text).ok() }
+
+    companion object {
+        val LIGHT = ThemeSource("material-light.xml")
+        val DARK = ThemeSource("material-dark.xml")
+        private val read = HashMap<ThemeSource, Theme>()
+    }
 }
 
-/** A popup's scene the snapshots hold, written to snapshots/[name].txt. */
-class PopupShot(val name: String, make: () -> Scene) {
+/** A scene the snapshots hold: [board] in [env], drawn by [theme], written to snapshots/[name].txt. */
+class Shot(val name: String, val board: String, val env: Env, val theme: ThemeSource = ThemeSource.LIGHT) {
+    val scene: Scene by lazy { Forms.scene(board, env, theme.theme) }
+}
+
+/** A popup's scene the snapshots hold: [ask] in [env], drawn by [theme], written to snapshots/[name].txt. */
+class PopupShot(val name: String, val env: Env, val ask: PopupAsk, val theme: ThemeSource = ThemeSource.LIGHT) {
+    val scene: Scene by lazy { ask.scene(SceneBuilder(theme.theme, env, FakeMeasurer), env) }
+}
+
+/** A sample candidate bar's scene (T6a): not a popup ask, so not in the library's shots.json. */
+class BarShot(val name: String, make: () -> Scene) {
     val scene: Scene by lazy(make)
 }
 
@@ -38,8 +68,8 @@ object Shots {
         val block = Forms.block
         fun on(board: String, change: (Env) -> Env) = change(Forms.env(board, block))
         listOf(
-            Shot("qwerty-dark", "qwerty", block.copy(dark = true), Forms.materialDark),
-            Shot("qwerty-dark-flat", "qwerty", Forms.flat.copy(dark = true), Forms.materialDark),
+            Shot("qwerty-dark", "qwerty", block.copy(dark = true), ThemeSource.DARK),
+            Shot("qwerty-dark-flat", "qwerty", Forms.flat.copy(dark = true), ThemeSource.DARK),
             Shot(
                 "qwerty-table-looking-up", "qwerty",
                 on("qwerty") { it.copy(input = it.input.copy(ime = "table", table = "wbx", composing = true, lookingUp = true)) },
@@ -136,23 +166,48 @@ object Shots {
      * cell in focus with its radius and border.
      */
     val popups: List<PopupShot> = listOf("block" to Forms.block, "flat" to Forms.flat, "floating" to Forms.floating).flatMap { (form, env) ->
-        Forms.popups(env).map { (name, make) -> PopupShot("popup-$name-$form", make) }
+        Forms.popupAsks.map { (name, ask) -> PopupShot("popup-$name-$form", env, ask) }
     } + listOf(
         "preview-bubble" to "<style select=\"preview\" shape=\"bubble\"/>",
         "preview-bubble-large-up" to "<style select=\"preview\" shape=\"bubble\" size=\"130%\" offset=\"-6dp\"/>",
         "preview-path" to "<style select=\"preview\" shape=\"path(M0 0 H1 V.6 L.6 .6 L.5 .75 L.4 .6 L0 .6 Z)\" inner-shadow=\"0 2dp 2dp #30000000\"/>",
         "keys-selected-border" to "<style select=\"popup:selected\" radius=\"8dp\" border=\"1dp #ff1565c0\"/>",
     ).map { (name, style) ->
-        PopupShot("popup-$name-block") {
-            val popups = Forms.popups(Forms.block, styled(style)).toMap()
-            popups.getValue(if (name.startsWith("keys")) "keys" else "preview-symbol")()
+        val asks = Forms.popupAsks.toMap()
+        PopupShot("popup-$name-block", Forms.block, asks.getValue(if (name.startsWith("keys")) "keys" else "preview-symbol"), styled(style))
+    }
+
+    /**
+     * T6a's sample candidate bar ([BarSample]) on a phone (2.75 px a dp, 候选字号 20sp): material-light's, as
+     * the app drew it before; a theme's pills on a coloured bar, the first in another colour, numbered,
+     * the comment its own colour, spaced; dotted, no lines between, padded by the theme; in dark.
+     */
+    val bars: List<BarShot> = listOf(
+        "default" to emptyList(),
+        "capsule" to listOf(
+            "<style select=\"bar\" fill=\"#ffeceff1\"/>",
+            "<style select=\"candidate\" fill=\"#ffffffff\" radius=\"50%\" inset=\"6dp 2dp\" gap=\"4dp\" label-style=\"number\"/>",
+            "<style select=\"candidate:first\" fill=\"@accentKey\" color=\"#ffffffff\"/>",
+            "<style select=\"candidate comment\" color=\"#ff1565c0\"/>",
+            "<style select=\"candidates-divider\" fill=\"transparent\"/>",
+        ),
+        "dot-padded" to listOf(
+            "<style select=\"candidate\" padding=\"0 16dp\" label-style=\"dot\" weight=\"700\"/>",
+            "<style select=\"candidate label\" color=\"#ffe53935\"/>",
+            "<style select=\"candidates-divider\" fill=\"#ff90a4ae\"/>",
+        ),
+        "dark" to listOf("<style select=\"@dark candidate\" fill=\"#ff263238\" color=\"#ffeceff1\"/>", "<style select=\"@dark bar\" fill=\"#ff000000\"/>"),
+    ).map { (name, styles) ->
+        BarShot("bar-$name") {
+            val scenes = if (name == "dark") setOf("dark") else emptySet()
+            BarSample.scene(BarLook.of(Cascades(styled(*styles.toTypedArray()).theme), scenes), BAR, FakeMeasurer)
         }
     }
 
+    private val BAR = BarSample.Metrics(width = 1080.0, height = 110.0, density = 2.75, textSize = 55.0, paddingDp = 9.0, minWidthDp = 32.0)
+
     // material-light with [styles] more, and [fonts]
-    private fun styled(vararg styles: String, fonts: String = "") = ThemeReader.theme(
-        testData("material-light.xml").replace("</colors>", "</colors>$fonts").replace("</theme>", styles.joinToString("\n", postfix = "\n</theme>")),
-    ).ok()
+    private fun styled(vararg styles: String, fonts: String = "") = ThemeSource("material-light.xml", styles.toList(), fonts)
 
     // NumberPad's, full being every form's
     private val PADS = listOf("digits", "signed", "decimal", "signed-decimal", "phone", "datetime")
@@ -182,6 +237,9 @@ class SnapshotTest {
     fun everyPopup() = check(Shots.popups.map { it.name to it.scene })
 
     @Test
+    fun theSampleCandidateBar() = check(Shots.bars.map { it.name to it.scene })
+
+    @Test
     fun noBoardWarnsInAnyForm() {
         val warned = Shots.forms.mapNotNull { s -> s.scene.warnings.takeIf { it.isNotEmpty() }?.let { "${s.name}: $it" } }
         assertTrue(warned.isEmpty(), warned.joinToString("\n"))
@@ -192,7 +250,7 @@ class SnapshotTest {
     fun everySnapshotIsAShot() {
         // recording, the shots may not all be written yet (the tests run in any order)
         if (recording()) return
-        val names = Shots.all.map { it.name } + Shots.popups.map { it.name }
+        val names = Shots.all.map { it.name } + Shots.popups.map { it.name } + Shots.bars.map { it.name }
         assertEquals(names.toSet().size, names.size, "two shots of one name")
         val files = listNames("$TEST_DATA/snapshots")
         assertEquals(names.map { "$it.txt" }.sorted(), files)

@@ -38,12 +38,22 @@ data class EngineSettings(
     val tables: Map<String, TableSettings> = emptyMap(),
     /** The nine keys' letters: the app's, set on the keyboard's side, not in the addon's config. */
     val nineKeys: NineKeyLetters = NineKeyLetters.STANDARD,
+    /**
+     * The letter groups of a layout of its own the screen shows in place of the 14 or 18 keys (a theme's
+     * 17 keys, 060-render-p3 T9b), each a key's `letters=` as written (rows apart by a space), null for
+     * none: what [org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN_KEYS_OWN] types on
+     * ([ownKeyboard]). The keyboard's, as [nineKeys]; the rows kept, as where a tap leans goes by them.
+     */
+    val ownKeys: List<String>? = null,
     /** Whether English suggests words ([ENGLISH_SUGGEST]): the keyboard's to know, the engine's is the addon's. */
     val englishSuggest: Boolean = true,
     /** 候选词注音: what is shown above or beside each character of a Chinese candidate. */
     val candidateReading: ReadingStyle = ReadingStyle.OFF,
 ) {
     val scheme: ShuangpinScheme get() = SCHEMES[shuangpin] ?: ShuangpinScheme.ZIRANMA
+
+    /** The keyboard [ownKeys] make (NineKeyLetters.custom), null for none or groups that make none (NineKeyLetters.problem). */
+    val ownKeyboard: NineKeyLetters? get() = ownKeys?.takeIf { NineKeyLetters.problem(it) == null }?.let(NineKeyLetters::custom)
 
     companion object {
         const val SHUANGPIN_PROFILE = "ShuangpinProfile"

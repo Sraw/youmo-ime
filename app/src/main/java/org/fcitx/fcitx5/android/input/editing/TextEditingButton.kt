@@ -35,7 +35,9 @@ class TextEditingButton(
     private val rippled: Boolean,
     private val bordered: Boolean,
     private val radius: Float,
-    private val altStyle: Boolean = false
+    private val altStyle: Boolean = false,
+    // the theme's fill (ScenePanels.editing): a block of it whatever the keys; null, the keys' colours, a block as [bordered]
+    private val fill: Int? = null,
 ) : CustomGestureView(ctx) {
 
     // bordered
@@ -47,8 +49,8 @@ class TextEditingButton(
     private val lineWidth = max(1, dp(1) / 2)
 
     init {
-        if (bordered) {
-            val bkgColor = if (altStyle) theme.altKeyBackgroundColor else theme.keyBackgroundColor
+        if (bordered || fill != null) {
+            val bkgColor = fill ?: if (altStyle) theme.altKeyBackgroundColor else theme.keyBackgroundColor
             background = shadowedKeyBackgroundDrawable(
                 bkgColor, theme.keyShadowColor,
                 radius, shadowWidth, hInset, vInset

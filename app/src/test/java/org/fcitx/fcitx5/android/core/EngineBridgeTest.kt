@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.runtime.Engines
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.fcitx.fcitx5.android.host.EngineOptions
 import org.fcitx.fcitx5.android.utils.appContext
@@ -35,6 +36,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
@@ -579,6 +581,44 @@ class EngineBridgeTest {
                 assertEquals(again, bridge.engines.settings.nineKeys)
             } finally {
                 pref.setValue("")
+                bridge.close()
+            }
+        }
+
+        // 060-render-p3 T9b: the groups of a theme's layout of its own the keyboard shows reach the engine before its
+        // next key, and stay over the config read again and a reload; the same ones again make nothing anew
+        @Test
+        fun aLayoutsOwnGroupsShownReachTheEngineBeforeTheNextKey() {
+            val own = listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m", "pq rs", "abc", "xyz")
+            val letters = NineKeyLetters.custom(own)
+            try {
+                bridge.configure(EngineSettings())
+                assertNull(bridge.engines.settings.ownKeys)
+                // none shown: nothing changes
+                bridge.syncOwnKeys()
+                assertNull(bridge.engines.settings.ownKeys)
+                EngineState.ownKeys = own
+                bridge.syncOwnKeys()
+                assertEquals(own, bridge.engines.settings.ownKeys)
+                assertEquals(letters, bridge.engines.settings.ownKeyboard)
+                // the keyboard in use for its codes: what a temporary mode reads of a tap
+                assertEquals('r', Keyboard.typedLetter(Keyboard.tapKey(letters.codes[own.indexOf("pq rs")], 0f, 1f)))
+                val told = bridge.engines.settings
+                bridge.syncOwnKeys()
+                assertSame(told, bridge.engines.settings)
+                // fcitx's config read again, and a reload: still told
+                bridge.configure(EngineSettings(prediction = false))
+                assertEquals(own, bridge.engines.settings.ownKeys)
+                bridge.reload()
+                assertEquals(own, bridge.engines.settings.ownKeys)
+                // made again after a close, its config not yet read: told before the next key
+                bridge.close()
+                assertNull(bridge.engines.settings.ownKeys)
+                bridge.syncOwnKeys()
+                assertEquals(own, bridge.engines.settings.ownKeys)
+            } finally {
+                EngineState.ownKeys = null
+                NineKeyLetters.clearInUse()
                 bridge.close()
             }
         }

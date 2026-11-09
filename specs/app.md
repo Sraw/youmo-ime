@@ -251,6 +251,40 @@ keys has it (`InputView.navbarStrip`), and 仅颜色 sets the window's bar colou
 `SceneWindow.darkButtonsOn`; a mid grey's luminance is 0.22, yet black on it stands out more). The
 hardware keyboard's bar (its candidates alone) is the theme's whatever the floating setting says.
 
+The candidate bar, the expanded candidates and the hardware keyboard's window are drawn by their views
+as the theme's `candidate`, `candidates-divider`, `bar` and `candidates-panel` say (060-render-p3 T6a):
+the engine works out a `BarLook` (keyboard-scene `engine/BarLook`: per candidate plain, `:first`,
+`:selected` and both, its fill, pressed overlay, colours of the words, `label` and `comment`, font and
+weight; the corners, the inset from the cell, the padding, the `gap`, `label-style`, the lines' colour,
+the bar's base and the panel's) in the window's scenes but floating (`SceneWindow.scenes`), and
+`candidates/SceneBar` turns it into drawables, a typeface and px (`(dp × density).toInt()`, as the
+engine's sample bar). A theme setting none of it, every built-in one, has the bar as before: no fill,
+the pressed colour over the whole cell, 3.0's candidate colours and font (LookTheme writes 3.0's candidate
+font and weight as the theme's `candidate` style, its font `<font name="candidate">`; a font's name is read
+as the keys' are, `SceneFonts`: `candidate`, `key`, else the system's till a theme's own fonts are, T8a), the padding of 候选字号
+(`KawaiiBarComponent.candidatePaddingDp`), the divider's 1 dp line, the panel the bar's colour over flat
+keys; a look that made no theme the same of its colours (`SceneBar.plain`). A candidate's shape is a
+`LayerDrawable` inset, not an `InsetDrawable`, whose inset a view takes as its padding. `gap` widens
+the horizontal bar's room between two (the line in its middle, `FlexboxVerticalDecoration`); a
+transparent divider draws nothing but keeps its room. `label-style` (number: 1 2 3 of the whole list,
+the expanded grid's numbers going on from the bar's; dot: •; none, the default) stands before the
+words, a space after it; the hardware keyboard's window, whose default is fcitx's own label, shows
+fcitx's label for number; a screen reader reads the candidate without the theme's number or dot (the
+text's content description). `:first` is the list's first in the bar (scrolled, it is still the list's
+first, out of sight), the page's first in the hardware keyboard's window (each page's), and never in the
+expanded grid (its cells go on past the bar's). `gap` is the horizontal bar's alone; `padding` the bar's
+and the flexbox expanded window's (the grid one and the hardware keyboard's window keep their own); the
+hardware keyboard's window has no pressed colour.
+One BarLook is worked out for a bar and handed to its holders (`HorizontalCandidateViewAdapter.bar`,
+`PagingCandidateViewAdapter.bar`, `PagedCandidatesUi`). `CandidateViewHolder` draws a holder bound at another index again where its
+look or label differs (the first's own look, its number). The candidate's size is still 候选字号's
+(the bar's height and the grid's rows follow it): a theme's `size` there is warned of, not read.
+`BarThemeTest` holds the views to the theme, and to `BarSample.scene` (the engine's sample bar, its
+snapshots `bar-*.txt`): each candidate's box within a pixel, its fill and colours the same, of a theme of
+none of it, pills and a dotted one, a candidate with a comment among them. The sample is the bar at its words'
+own widths (`NeverFillWidth`); filling its width (Auto, Always), the app stretches each candidate, which the
+web's preview does not show.
+
 Floating (`ThemePrefs.floatingKeyboard`, the status area's 悬浮键盘; the input view is made anew for
 it): `keyboardView` is `FloatingKeyboard.widthDp` wide (70% of the screen, 300–420 dp), its boards as
 much shorter (85% at least), with `FloatingHandle` at the bottom (24 dp: a short bar and the dock button;
@@ -509,16 +543,27 @@ A group key writes its letters (`letters="qw"`, 060-render-v2 §15): its tap is 
 keyboard's `sceneTable.group`, as `wire` sends it, its place added by `pressed`), its long press with no
 `popup` written (or `from="group"`) the letters' row the views' was (`sceneTable.groupPopup`). The
 app collects a layout's groups (`SceneGroups.of`, row by row, a fragment's where included) into a
-`NineKeyLetters` and holds it to the keyboard's (G14, G18): any other is logged and the keyboard's own
-kept, so codes, learning and `wire` never change by a layout (`SceneBehaviorTest`). The engine makes a
-keyboard of other groupings (`SceneGroups.letters` over `SceneGroups.written`, `NineKeyLetters.custom`;
-engine.md), which the app does not use yet (T9b). `letters` keep their rows (`"pq rs"` 2 × 2, a space a row):
+`NineKeyLetters` and takes it as the keyboard is made (`GroupedKeyboard.grouping`, `SceneGroups.taken`,
+060-render-p3 T9b): the keyboard's own groups (G14, G18) as always, their codes, `wire` and learning
+unchanged; on pinyin's 14 and 18 keys (`ownGroups`, KeyboardWindow) a grouping of its own that makes a
+keyboard (`NineKeyLetters.custom` over `SceneGroups.written`, engine.md) is typed as such: each key's code
+its key's place among the keyboard's groups (`SceneGroups.ids`, by the node's id; `CUSTOM_BLOCK`, sent as
+it is, no `wire`; a letter, or the same letters, on two keys each key its own), a leaning tap `Keyboard.tapKey(code, x, y)` with where across and down its scene cell the
+finger came down (`KeyGesture.clickAt`, `clickDown`; a click no touch made, the code alone), and the groups
+told the engine as the keyboard is shown, not as it is made (`onAttach`, `EngineState.ownKeys`; the bridge's `syncOwnKeys` before
+each key sets `NineKeyLetters.inUse` and `EngineSettings.ownKeys`, `configure` and `reload` keep them).
+Anything else is refused, logged with why, and the app's own layout drawn instead (`SceneLayouts.builtIn`):
+groups that make no keyboard, the other built-in keyboard's groups, and any grouping of its own on 双拼's
+keyboards (`GroupedKeyboardOwnGroupsTest`, `KeyboardCustomTest`). The theme's board stays `k14`/`k18`.
+A group key's long press is made as it opens only where its layout wrote none (or `from="group"`); a key
+that swipes no corner gets its letters alone (`longPressOf`). `letters` keep their rows (`"pq rs"` 2 × 2, a space a row):
 where a tap leans and, P3, where the default label draws; the built-ins write their labels (`QW`, one
 word centred), so no label is drawn by the rows yet. Whether a tap leans (按落点加权) is the layout's:
 a group of two letters or more without `lean="off"` (`SceneGroups.leaning`, read whichever draws the
 keys), the 18 keys writing `lean="off"`; a layout whose groups are not the keyboard's, or none read, leans
-as built in (`SceneGroups.leaningOf`: G14's two-letter groups); the engine places taps of G14's codes alone (`Keyboard.placesTaps`),
-so 双拼's 14 keys (sent as `shuangpin14Key`) and any 18 keys send the code only, as before.
+as built in (`SceneGroups.leaningOf`: G14's two-letter groups); the engine places taps of G14's codes and a
+layout's own codes alone (`Keyboard.placesTaps`), so 双拼's 14 keys (sent as `shuangpin14Key`) and the built-in
+18 keys send the code only, as before; the built-in 14 keys' taps are their `TAPS` character, wherever down the key.
 
 The number keyboard (S4b) is one layout, `number.xml`, for all seven pads: `NumberKeyboard` gives its
 `NumberPad` as `Input.pad` (`full`, `signed-decimal`…) and the keys beside the digits are chosen by
@@ -1005,6 +1050,29 @@ part (`ThemePictureDrawable.bar`); panels (expanded candidates, clipboard, statu
 colour only over flat keys (`ThemeColors.panel`). Key text is `keyScale` of its size in the theme's
 font (`ThemeAssets.typeface`, the weight asked); hints, marks and the bar's icons take
 `keyHintColor` and `toolbarIconColor`.
+
+The app's own panels take what the theme in use sets of them (060-render-p3 T7b; §16: their native
+views know the colours and a few properties), read through `ScenePanels` (input/keyboard/canvas) from the
+engine's `PanelLooks`, whose defaults are the look the app worked out itself before, so a theme 3.0's
+looks as it did; the scenes are the window's (`SceneWindow.scenes`: not `@floating` nor a placement's), a fill a
+colour alone (a picture's warned of and ignored), and a look that made no theme has that
+look of before worked out of its colours. `clipboard` (fill, radius, color): an entry's card and a split
+entry's pieces (`ClipboardEntryUi`, `ClipboardChunksUi`), not set the `clipboardEntry` colour, the keys'
+text, half the keys' radius (as 按键圆角 sets it, whatever `@flat`: the P2 rule, once
+`ThemeColors.entryRadius`). `picker` (fill, under the grid) and its part `categories` (fill, color; the one
+shown `picker:selected categories`): the symbols' column (`PickerSideUi`: the bar's colour, the one shown
+the keyboard's, the text the keys' at 60% and, shown, opaque) and the emoji's tabs (`PickerTabsUi`: on the bar, at 50%).
+`editing` (fill, radius): its buttons (`TextEditingButton`), not set the keys' colours, blocks or the flat
+grid of lines as the keys (a radius then nothing), the corners twice the keys' dp as as many px (its old
+setting's look), pills where the keys are; a fill set is a block whatever the keys. `voice` (fill, blur 0–25 dp) and its part `mic` (fill, icon-color): the mask's
+colour (not set, the keyboard's at `PanelLooks.MASK_ALPHA`), its frosted glass (`VoiceGlass.Blur.of`: three
+box blurs of the radius, as the picture's, on the keys taken 2 to 8 times smaller, under 4 px a little more; 0, none, the keys plain
+under the colour; not set, the glass of before), the microphone's bubble and bars (the accent colour at
+`MIC_ALPHA`, and whole). The glass is one picture of the keys taken once on every API: RenderEffect is API 31's
+and blurs a view's own drawing, not what is under it. The handwriting pad's `ink-color`, `ink-width` (1–8 dp)
+and `grid` / `grid-color` are on its slot's style (`handwriting/pad`, as its fill): the engine puts the
+strokes' `Ink` on the slot (`HandwritingKeyboard` gives it to `HandwritingPadView`; not set, the keys' text,
+3.5 dp) and a 田字格 of 1 dp lines over the pad's face in its ops (`engine/Pads`; not set, none).
 
 `ThemeAssets` (`data/theme/`) decodes off the main thread and caches for one theme's files at a time:
 the picture once an orientation at the width it is drawn (halved while wider, and till it is at most

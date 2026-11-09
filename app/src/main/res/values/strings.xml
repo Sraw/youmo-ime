@@ -573,6 +573,7 @@
     <string name="im_pinyin_keys18">Pinyin (18 keys)</string>
     <string name="im_shuangpin_keys14">Shuangpin (14 keys)</string>
     <string name="learning_kind_keys18">Pinyin, 18 keys</string>
+    <string name="learning_kind_keys_own">Pinyin, a theme\'s keys</string>
     <string name="learning_kind_shuangpin_keys14">Shuangpin, 14 keys</string>
     <string name="english_keyboard">Keyboard</string>
     <string name="english_keyboard_summary">The on-screen keyboard English is typed on. A hardware keyboard still types letters.</string>

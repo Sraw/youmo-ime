@@ -30,6 +30,7 @@ import org.fcitx.fcitx5.android.input.scene.CanvasFrame
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.scene.SceneA11y
 import org.fcitx.fcitx5.android.scene.Box
+import org.fcitx.fcitx5.android.scene.Ink
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.Op
@@ -380,6 +381,9 @@ class KeyboardCanvasView(
         out.set(s.bounds)
         return true
     }
+
+    /** The handwriting pad's ink in slot [id] as the scene has it (060-render-p3 T7b); null where it has no such slot. */
+    fun slotInk(id: String): Ink? = scene?.slots?.firstOrNull { it.id == id }?.ink
 
     /**
      * Where a popup over key [ref] is placed, in the window, into [out]: its face across and its cell

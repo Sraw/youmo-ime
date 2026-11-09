@@ -12,6 +12,7 @@ import android.graphics.Path
 import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
+import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import splitties.dimensions.dp
@@ -42,6 +43,17 @@ class HandwritingPadView(
         strokeJoin = Paint.Join.ROUND
     }
     private val path = Path()
+
+    @VisibleForTesting
+    internal val inkPaint: Paint get() = ink
+
+    /** The strokes' colour and width, px, as the theme's scene has them (its slot's Ink, 060-render-p3 T7b). */
+    fun ink(color: Int, width: Float) {
+        if (ink.color == color && ink.strokeWidth == width) return
+        ink.color = color
+        ink.strokeWidth = width
+        invalidate()
+    }
 
     // the finished strokes, traced again only when they change (InkPad.edits)
     private val finishedInk = Path()

@@ -43,13 +43,12 @@ data class Selector(
     }
 
     /**
-     * What of it a later stage makes work ([RESERVED_WIDGETS], [RESERVED_STATES], a candidate's part),
-     * null where none: read, but it selects nothing yet.
+     * What of it a later stage makes work ([RESERVED_WIDGETS], [RESERVED_STATES]), null where none:
+     * read, but it selects nothing yet.
      */
     val reserved: String? = when {
         widget in RESERVED_WIDGETS -> widget
         states.any { it in RESERVED_STATES } -> ":" + states.first { it in RESERVED_STATES }
-        widget == "candidate" && part != null -> "candidate $part"
         else -> null
     }
 
@@ -81,22 +80,36 @@ data class Selector(
         private const val WEIGHT = 100
 
         val SCENES = setOf("compact", "landscape", "floating", "split", "one-handed", "dark", "flat")
-        /** Widgets of a later stage of 0.6.0 (060-render-p3: T6a, T6b, T7b), read but selecting nothing yet. */
-        val RESERVED_WIDGETS = setOf(
-            "clipboard", "picker", "editing", "voice", "preedit", "toolbar", "candidates-panel", "candidates-divider",
-        )
+        /** Widgets of a later stage of 0.6.0 (060-render-p3: T6b), read but selecting nothing yet. */
+        val RESERVED_WIDGETS = setOf("preedit", "toolbar")
+
+        /**
+         * The bar and the candidates, which the app's views draw (060-render-p3 T6a:
+         * [org.fcitx.fcitx5.android.scene.engine.BarLook]): the bar's base, a candidate and its parts,
+         * the lines between candidates, the expanded candidates' panel.
+         */
+        val BAR_WIDGETS = setOf("bar", "candidate", "candidates-divider", "candidates-panel")
 
         /** The keyboard's window round its keys (060-render-p3 T7a: [org.fcitx.fcitx5.android.scene.engine.WindowLooks], `split-gap` the scene's). */
         val WINDOW_WIDGETS = setOf("frame", "handle", "side-button", "split-gap", "navbar")
-        val WIDGETS = setOf("keyboard", "bar", "candidate", "popup", "preview", "menu", "panel", "key") + WINDOW_WIDGETS + RESERVED_WIDGETS
+
+        /** The app's own panels over the keyboard (060-render-p3 T7b: [org.fcitx.fcitx5.android.scene.engine.PanelLooks]). */
+        val PANEL_WIDGETS = setOf("clipboard", "picker", "editing", "voice")
+        val WIDGETS = setOf("keyboard", "popup", "preview", "menu", "panel", "key") + BAR_WIDGETS + WINDOW_WIDGETS + PANEL_WIDGETS + RESERVED_WIDGETS
         val PARTS = setOf("label", "mark", "shortcut", "root", "icon", "hint", "badge")
 
-        /** A candidate's parts (T6a): its number and its comment. */
+        /**
+         * A panel's parts (T7b): the picker's bar of categories (`picker categories`; the one shown is
+         * `picker:selected`), the voice mask's microphone (`voice mic`: the bubble its sound shows in).
+         */
+        val PANEL_PARTS = mapOf("picker" to setOf("categories"), "voice" to setOf("mic"))
+
+        /** A candidate's parts (T6a): its number and its comment (a comment, a reading over its words). */
         val CANDIDATE_PARTS = setOf("label", "comment")
 
-        /** States of a later stage (T6a: the first candidate). */
-        val RESERVED_STATES = setOf("first")
-        val STATES = setOf("pressed", "locked", "shifted", "disabled", "selected", "on") + RESERVED_STATES
+        /** States of a later stage: none left since T6a made the first candidate's (`:first`) work. */
+        val RESERVED_STATES = emptySet<String>()
+        val STATES = setOf("pressed", "locked", "shifted", "disabled", "selected", "on", "first") + RESERVED_STATES
 
         /**
          * The scenes of what is typed ([org.fcitx.fcitx5.android.scene.engine.Env.scenes]): `@im=<input
@@ -130,9 +143,12 @@ data class Selector(
             val rest = words.drop(scenes.size)
             if (rest.isEmpty() || rest.size > 2) return null
             val head = head(rest[0]) ?: return null
-            val parts = if (head.widget == "candidate") CANDIDATE_PARTS else PARTS
+            val parts = when (head.widget) {
+                "candidate" -> CANDIDATE_PARTS
+                "key" -> PARTS
+                else -> PANEL_PARTS[head.widget] ?: emptySet()
+            }
             val part = rest.getOrNull(1)?.let { it.plain()?.takeIf(parts::contains) ?: return null }
-            if (part != null && head.widget != "key" && head.widget != "candidate") return null
             return head.copy(scenes = scenes.toSet(), part = part)
         }
 

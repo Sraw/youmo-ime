@@ -1,0 +1,64 @@
+scene 1080x110 no-preview no-popups
+base
+  fill rect(0,0,1080,110) #ff000000
+  fill rect(158,22,160,88) #1f000000
+  fill rect(373,22,375,88) #1f000000
+  fill rect(478,22,480,88) #1f000000
+  fill rect(869,22,871,88) #1f000000
+  fill rect(974,22,976,88) #1f000000
+key candidate/0 kind=candidate a11y="幽默"
+  bounds 0,0,158,110
+  shape rect(0,0,158,110)
+  hit rect(0,0,158,110)
+  anchor 79,55 up 0,-1
+  text label="幽默"
+  normal
+    fill rect(0,0,158,110) #ff263238
+    text "幽默" 24,75.63 system 400 55 #ffeceff1
+  pressed
+    +2 fill rect(0,0,158,110) #1f000000
+key candidate/1 kind=candidate a11y="输入法"
+  bounds 160,0,373,110
+  shape rect(160,0,373,110)
+  hit rect(160,0,373,110)
+  anchor 266.5,55 up 0,-1
+  text label="输入法"
+  normal
+    fill rect(160,0,373,110) #ff263238
+    text "输入法" 184,75.63 system 400 55 #ffeceff1
+  pressed
+    +2 fill rect(160,0,373,110) #1f000000
+key candidate/2 kind=candidate a11y="有"
+  bounds 375,0,478,110
+  shape rect(375,0,478,110)
+  hit rect(375,0,478,110)
+  anchor 426.5,55 up 0,-1
+  text label="有"
+  normal
+    fill rect(375,0,478,110) #ff263238
+    text "有" 399,75.63 system 400 55 #ffeceff1
+  pressed
+    +2 fill rect(375,0,478,110) #1f000000
+key candidate/3 kind=candidate a11y="油墨"
+  bounds 480,0,869,110
+  shape rect(480,0,869,110)
+  hit rect(480,0,869,110)
+  anchor 674.5,55 up 0,-1
+  text label="油墨"
+  normal
+    fill rect(480,0,869,110) #ff263238
+    text "油墨" 504,75.63 system 400 55 #ffeceff1
+    text " yóu mò" 614,75.63 system 400 55 #ffeceff1
+  pressed
+    +3 fill rect(480,0,869,110) #1f000000
+key candidate/4 kind=candidate a11y="又"
+  bounds 871,0,974,110
+  shape rect(871,0,974,110)
+  hit rect(871,0,974,110)
+  anchor 922.5,55 up 0,-1
+  text label="又"
+  normal
+    fill rect(871,0,974,110) #ff263238
+    text "又" 895,75.63 system 400 55 #ffeceff1
+  pressed
+    +2 fill rect(871,0,974,110) #1f000000

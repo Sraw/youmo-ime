@@ -18,7 +18,6 @@ import org.fcitx.fcitx5.android.engine.learn.control.LexiconView
 import org.fcitx.fcitx5.android.engine.learn.control.ListedItem
 import org.fcitx.fcitx5.android.engine.learn.control.MenuItem
 import org.fcitx.fcitx5.android.engine.learn.control.WordKind
-import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
@@ -342,7 +341,7 @@ internal class LearningOps(
 
     // a grouped keyboard's codes as their keys' letters (bn ui): the report is pasted where they would read as nothing
     private fun reported(code: Code): String =
-        Kinds.keysTag(code.kind)?.let(NineKeyLetters::grouped)?.shown(code.keys) ?: code.keys
+        Kinds.keysOf(code.kind)?.shown(code.keys) ?: code.keys
 
     private fun overview(): LearningResult.Overview {
         val state = log().state

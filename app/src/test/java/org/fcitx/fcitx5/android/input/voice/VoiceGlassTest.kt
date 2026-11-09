@@ -149,6 +149,39 @@ class VoiceGlassTest {
 
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun aThemesBlurTakesTheKeysAsMuchSmaller() {
+        val board = FrameLayout(ctx)
+        val card = view(Color.GREEN).apply { alpha = 0f }
+        lay(board, 640, 320, view(Color.BLUE) to Rect(0, 0, 640, 320), card to Rect(320, 0, 640, 320))
+        // twice smaller (Blur.of's least), not SCALE times
+        val shot = VoiceGlass.capture(board, card, VoiceGlass.Blur(2, 1))!!
+        assertEquals(160, shot.width)
+        assertEquals(160, shot.height)
+        assertEquals(Color.BLUE, shot.getPixel(80, 80))
+        shot.recycle()
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun noBlurTakesNothingTheKeysPlainUnderTheColour() {
+        val board = FrameLayout(ctx)
+        val card = view(Color.GREEN).apply { alpha = 0f }
+        lay(board, 64, 64, view(Color.BLUE) to Rect(0, 0, 64, 64), card to Rect(0, 0, 64, 64))
+        val glass = VoiceGlass(0x80336699.toInt(), blur = null)
+        glass.under(card, board)
+        card.viewTreeObserver.dispatchOnPreDraw()
+        glass.take(board, card)
+        glass.setBounds(0, 0, 8, 8)
+        val out = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888)
+        glass.draw(Canvas(out))
+        // the colour as it is (premultiplied, to a step), not opaque (nothing failed) nor over a picture of the blue
+        val p = out.getPixel(4, 4)
+        assertEquals(0x80, Color.alpha(p))
+        assertTrue(Integer.toHexString(p), Color.red(p) in 0x32..0x34 && Color.blue(p) in 0x98..0x9A)
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun nothingTakenTheMaskIsOpaque() {
         val board = FrameLayout(ctx)
         val card = view(Color.YELLOW)

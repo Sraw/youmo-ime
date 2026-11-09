@@ -78,6 +78,20 @@
   <style select="split-gap" fill="@keyboard" radius="4dp"/>
   <style select="navbar" color="follow"/>
   <style select="@landscape navbar" color="#654321"/>
+  <style select="candidate" fill="@key" radius="50%" inset="4dp 2dp" padding="0 12.5dp" gap="6dp" label-style="dot" font="system" weight="700"/>
+  <style select="candidate:first" fill="#ffff00" color="#000000"/>
+  <style select="candidate:selected label, candidate comment" color="@altKeyText"/>
+  <style select="candidate:pressed" overlay="#30000000"/>
+  <style select="candidates-divider" fill="transparent"/>
+  <style select="@dark candidates-panel" fill="@bar"/>
+  <style select="clipboard" fill="@key" radius="50%" color="@altKeyText"/>
+  <style select="picker" fill="@keyboard"/>
+  <style select="picker categories" fill="@bar" color="alpha(@keyText, 60%)"/>
+  <style select="@dark picker:selected categories" fill="@background" color="@keyText"/>
+  <style select="editing" fill="@altKey" radius="6.5dp"/>
+  <style select="voice" fill="#c0000000" blur="12.5dp"/>
+  <style select="voice mic" fill="@accentKey" icon-color="#ffffff"/>
+  <style select="handwriting/pad" ink-color="#ff0000" ink-width="1dp" grid="true" grid-color="alpha(@divider, 50%)"/>
   <icon name="z-icon" src="z.png"/>
   <icon name="a-icon" src="a.svg"/>
 </theme>

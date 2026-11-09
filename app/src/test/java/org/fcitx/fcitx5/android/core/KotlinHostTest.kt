@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.assertRows
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.host.ConfigHome
 import org.fcitx.fcitx5.android.host.EngineOptions
@@ -99,8 +100,28 @@ class KotlinHostTest {
         AppPrefs.getInstance().internal.nineKeysMerged.run { setValue(defaultValue) }
         // published by the host, read by the keyboard window: not the next test's
         EngineState.traditionalIms = null
+        EngineState.ownKeys = null
+        NineKeyLetters.clearInUse()
         EngineNotices.sayer = null
         directBoot(false)
+    }
+
+    // 060-render-p3 T9b review L6: the groups a layout's own keyboard told as it was shown reach the engine's
+    // side with its first key, before the key does (EngineBridge.syncOwnKeys): the keyboard its codes are read by
+    @Test
+    fun aKeyTellsTheGroupsTheKeyboardShownToldFirst() = runBlocking {
+        val own = listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m", "pq rs", "abc", "xyz")
+        val letters = NineKeyLetters.custom(own)
+        NineKeyLetters.clearInUse()
+        EngineState.ownKeys = own
+        assertNull(NineKeyLetters.ofCode(letters.codes[0].code))
+        fcitx.sendKey('a', 0u, 0, false, 0)
+        assertEquals(letters, NineKeyLetters.ofCode(letters.codes[0].code))
+        // other groups told: the next key reads by them
+        val other = NineKeyLetters.custom(own.reversed())
+        EngineState.ownKeys = own.reversed()
+        fcitx.sendKey('b', 0u, 0, false, 0)
+        assertEquals(other, NineKeyLetters.ofCode(other.codes[0].code))
     }
 
     @Test

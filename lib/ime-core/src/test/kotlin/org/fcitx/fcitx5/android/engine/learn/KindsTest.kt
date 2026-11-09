@@ -47,6 +47,27 @@ class KindsTest {
         assertNull(Kinds.keysTag("spk:Ziranma"))
     }
 
+    // what a learned code's keys are shown by (LearningOps' report, the learned list): a qk: kind filed as its keyboard is, a
+    // layout's own too (060-render-p3 T9b), an spk: kind by the grouped keyboards alone; the built-in two as they were
+    @Test
+    fun keysOfIsTheKeyboardEachGroupedKindWasTypedOn() {
+        assertEquals(NineKeyLetters.G14, Kinds.keysOf(Kinds.keys(NineKeyLetters.G14.tag())))
+        assertEquals(NineKeyLetters.G18, Kinds.keysOf(Kinds.keys(NineKeyLetters.G18.tag())))
+        val own = NineKeyLetters.custom(NineKeyLetters.G14.tag().split(',') + listOf("pq rs", "abc", "xyz"))
+        val filed = Kinds.keysOf(Kinds.keys(own.tag()))
+        assertEquals(own, filed)
+        assertEquals("bn ui", filed!!.shown(own.key('b').toString() + own.key('u')))
+        // 双拼's: its grouped keyboards; a layout's own groups are pinyin's alone
+        assertEquals(nine, Kinds.keysOf(Kinds.shuangpinKeys("MS", nine.tag())))
+        assertEquals(NineKeyLetters.G14, Kinds.keysOf(Kinds.shuangpinKeys("MS", NineKeyLetters.G14.tag())))
+        assertNull(Kinds.keysOf(Kinds.shuangpinKeys("MS", own.tag())))
+        // 双拼's nine keys' groups under qk: a layout's own (NineKeyLetters.filedAs); no keyboard at all: none, the keys shown as stored
+        assertNotEquals(nine, Kinds.keysOf(Kinds.keys(nine.tag())))
+        assertNull(Kinds.keysOf(Kinds.keys("q,q")))
+        assertNull(Kinds.keysOf(Kinds.FULL))
+        assertNull(Kinds.keysOf(Kinds.nineKeys(NineKeyLetters.STANDARD.tag())))
+    }
+
     @Test
     fun isShuangpinOnEveryKeyboard() {
         assertTrue(Kinds.isShuangpin(Kinds.shuangpin("MS")))
