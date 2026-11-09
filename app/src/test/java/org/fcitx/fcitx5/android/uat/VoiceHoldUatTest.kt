@@ -398,6 +398,8 @@ class VoiceHoldUatTest {
     @Uat("VO-07")
     fun wordsWithNumeralsAreLeftAlone() {
         allowMicrophone()
+        // whether 十分 is a number is the tagger's (measured in voice-eval's cases-N.tsv): this one marks none
+        voice.polish = { VoicePolishStream(numberTags, VoicePolishStream.Tagger { w -> VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size)) }) }
         h.start()
         say("这个电影十分有趣")
         assertEquals("这个电影十分有趣", text())

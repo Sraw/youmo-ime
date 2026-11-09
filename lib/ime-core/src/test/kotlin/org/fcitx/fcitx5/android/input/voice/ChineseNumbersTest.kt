@@ -30,6 +30,8 @@ class ChineseNumbersTest {
     @Test
     fun digitsAreDigitByDigit() {
         check(Kind.DIGITS, "幺三八幺二三四五六七八" to "13812345678", "四七二九幺五" to "472915", "三零二" to "302")
+        // a place among them: read as a value
+        check(Kind.DIGITS, "一百二十三" to "123", "三万" to "3万", "十二" to "12")
     }
 
     @Test
@@ -43,7 +45,10 @@ class ChineseNumbersTest {
             Kind.TIME,
             "十点十五" to "10:15", "三点四十" to "3:40", "八点五分" to "8:05", "十点零五分" to "10:05",
             "八点半" to "8点半", "八点一刻" to "8点一刻", "八点" to "8点", "七点整" to "7点整", "十一" to "11",
+            "二十四点" to "24点",
         )
+        // past a day's hours or an hour's minutes, or 分 with no minutes: as said
+        check(Kind.TIME, "二十五点十分" to "二十五点十分", "八点六十" to "八点六十", "八点分" to "八点分", "二零二六点" to "二零二六点")
     }
 
     @Test
@@ -56,9 +61,9 @@ class ChineseNumbersTest {
 
     @Test
     fun whatDoesNotReadAsItsKindStaysAsSaid() {
-        check(Kind.VALUE, "万一" to "万一", "二十三四" to "二十三四", "一千零" to "一千零", "三点十" to "三点十")
+        check(Kind.VALUE, "一点二点三" to "一点二点三", "万一" to "万一", "二十三四" to "二十三四", "一千零" to "一千零", "三点十" to "三点十")
         check(Kind.TIME, "八点七十" to "八点七十", "万点" to "万点")
-        check(Kind.PERCENT, "百分之几" to "百分之几")
+        check(Kind.PERCENT, "百分之几" to "百分之几", "百分之百" to "百分之百")
         check(Kind.RATIO, "三四" to "三四", "几比二" to "几比二")
         check(Kind.MODEL, "V点" to "V点")
         check(Kind.NONE, "二十" to "二十")

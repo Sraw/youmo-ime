@@ -78,7 +78,7 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
 
         // the marks a talk is typed up to as it goes: not 「.」 (3.5, e.g.), 「：」 (what follows
         // belongs to it) nor 「…」
-        private const val ENDS = "。？！；，、?!;,"
+        internal const val ENDS = "。？！；，、?!;,"
 
         /**
          * How much of [fixed] (text that stays) may be typed now: up to its last mark with a

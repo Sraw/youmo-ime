@@ -1095,7 +1095,7 @@ the tap's presses, what is typed as it is said) are in ime-core's `input/voice/`
   freezing each character's three labels once 16 characters follow. Numbers are the tagger's alone: adjacent
   characters of a num class not none (deleted ones skipped) are one run, written as its majority class by
   `ChineseNumbers.written` (value, digits, date, time, money, percent, model, ratio; conversion only, no rules on
-  whether). `VoiceText.clean` (spaces, spelled letters, noise) runs after it. A tagger that fails to load, or
+  whether; a time's 半, 刻, 整 and a bare hour stay characters: 8点半, 7点整, 8点; hour and minutes 10:15). `VoiceText.clean` (spaces, spelled letters, noise) runs after it. A tagger that fails to load, or
   fails at the end, leaves the raw recognized text typed, numbers in characters.
 - What is heard so far is the field's composing text (`FcitxInputMethodService.composeVoice`): voice's text is the
   text itself, as English's word (pitfalls.md). Not in a password field, a raw-key (`TYPE_NULL`) one, nor when the

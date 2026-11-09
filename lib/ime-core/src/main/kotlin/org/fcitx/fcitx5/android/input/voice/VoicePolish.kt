@@ -14,7 +14,7 @@ package org.fcitx.fcitx5.android.input.voice
  *
  * Characters are code points, as the model's vocabulary and Python's strings have them.
  */
-class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums: List<String> = listOf("none")) {
+class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums: List<String>) {
 
     private val kinds = nums.map(ChineseNumbers.Kind::of)
 
@@ -53,7 +53,8 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
             }
             val kind = num?.let { kinds[it[i]] } ?: ChineseNumbers.Kind.NONE
             if (written.isNotEmpty()) {
-                if (kind != ChineseNumbers.Kind.NONE && written !in NUMBER_BREAKS) {
+                // an English letter or digit is no part of one (Windows11: the space before 11 kept)
+                if (kind != ChineseNumbers.Kind.NONE && written !in NUMBER_BREAKS && written.codePointAt(0) >= ASCII) {
                     run.append(written)
                     runKinds += kind
                 } else {
@@ -94,8 +95,11 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
         // U+0085 too, which Python's \s takes and Kotlin's isWhitespace does not
         private const val DROPPED = "《》·\u0085"
 
-        // marks end a number though the tagger put them in one (numeval.py render)
-        private val NUMBER_BREAKS = setOf("，", "。", "？", "！", "、", "…", "：", "；")
+        private const val ASCII = 0x80
+
+        // marks end a number though the tagger put them in one (numeval.py render); each of VoiceLive.ENDS
+        // among them (VoicePolishTest checks), so what is typed as it is said is never cut inside a number
+        internal val NUMBER_BREAKS = setOf("，", "。", "？", "！", "、", "…", "：", "；", ",", "?", "!", ";")
 
         private val PAUSE_BEFORE_MARK = Regex("[，、；：]+(?=[。？！…，])")
 
@@ -270,7 +274,9 @@ class VoicePolishStream(
         frozen = maxOf(frozen, start)
         val part = text.copyOfRange(start, end)
         val labels = tagger.labels(part)
-        val (op, after, num) = Triple(labels.op, labels.after, labels.num)
+        val op = labels.op
+        val after = labels.after
+        val num = labels.num
         check(op.size == end - start && after.size == end - start && num.size == end - start) { "a label each of ${end - start} characters" }
         if (guard) tags.guarded(part, op, after)
         // a frozen character keeps its labels, though tagged again in the window

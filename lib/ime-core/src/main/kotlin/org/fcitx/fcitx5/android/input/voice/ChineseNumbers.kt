@@ -8,8 +8,15 @@ package org.fcitx.fcitx5.android.input.voice
  * A number the polish tagger marked ([VoicePolishTags], its `num` head; 060-voice-tagger.md 数字头)
  * written as one types it, as the [Kind] the tagger gave it. Whether a run of characters is a
  * number at all is the tagger's say, not this: 一个, 十分有趣, 三四个人 are never marked. A run that
- * does not read as its kind is written as it was said. voice-eval's `numeval.py render`, but for a
- * time's 半 and 刻 and a bare hour, kept in characters (8点半, 8点), and 万/亿 kept (33万).
+ * does not read as its kind is written as it was said.
+ *
+ * voice-eval's `numeval.py render_run`, but for these:
+ * - a time's 半, 刻 and 整 and a bare hour stay characters (8点半, 8点一刻, 7点整, 8点), not 8:30, 7:00;
+ *   an hour past 24 or minutes past 59 (八点七十), or 分 with no minutes (八点分), as said;
+ * - 万/亿 at the end kept (33万, 3.5亿), where render writes the whole value;
+ * - a value of two points (一点二点三) as said; a model's later part with a place by value (三点十二 3.12);
+ * - a ratio with neither 比 nor 分之 as said; 百分之百 as said (百 alone reads as no number);
+ * - digits with a place among them (一百二十三) read as a value, 123.
  */
 object ChineseNumbers {
 
@@ -30,6 +37,7 @@ object ChineseNumbers {
     private val BIG = mapOf('万' to 10_000L, '亿' to 100_000_000L)
 
     private const val MINUTES = 60
+    private const val HOURS = 24
     private const val PERCENT = "百分之"
     private const val FRACTION = "分之"
 
@@ -39,7 +47,8 @@ object ChineseNumbers {
     /** [run] as [kind] writes it; as it was if it does not read so. */
     fun written(run: String, kind: Kind): String = when (kind) {
         Kind.NONE -> null
-        Kind.DIGITS -> run.map { c -> DIGITS[c]?.let { "$it" } ?: "$c" }.joinToString("")
+        // a place among them: the tagger's class wrong, the number read as said (一百二十三 123)
+        Kind.DIGITS -> if (run.any { it in SMALL || it in BIG }) value(run) else run.map { c -> DIGITS[c]?.let { "$it" } ?: "$c" }.joinToString("")
         Kind.TIME -> time(run)
         Kind.PERCENT -> value(run.removePrefix(PERCENT))?.let { "$it%" }
         Kind.MODEL -> model(run)
@@ -59,14 +68,14 @@ object ChineseNumbers {
         return "$first.$fraction$big"
     }
 
-    /** 十点十五 10:15, 八点五分 8:05, 八点半 and 八点 in characters; null if no time. */
+    /** 十点十五 10:15, 八点五分 8:05, 八点半, 八点一刻, 八点整 and 八点 in characters; null if no time. */
     private fun time(s: String): String? {
         val point = s.indexOf('点')
         if (point < 0) return value(s)
-        val hour = integerDigits(s.substring(0, point)) ?: return null
-        val minutes = s.substring(point + 1).removeSuffix("分")
-        if (minutes in IN_CHARACTERS || minutes.endsWith("刻")) return "${hour}点$minutes"
-        val m = integerDigits(minutes)?.toIntOrNull()?.takeIf { it < MINUTES } ?: return null
+        val hour = integerDigits(s.substring(0, point))?.takeIf { (it.toLongOrNull() ?: Long.MAX_VALUE) <= HOURS } ?: return null
+        val said = s.substring(point + 1)
+        if (said in IN_CHARACTERS || said.endsWith("刻")) return "${hour}点$said"
+        val m = integerDigits(said.removeSuffix("分"))?.toIntOrNull()?.takeIf { it < MINUTES } ?: return null
         // not %02d, which writes the phone's language's digits (٠٥ in Arabic)
         return "$hour:" + "$m".padStart(2, '0')
     }
@@ -113,8 +122,8 @@ object ChineseNumbers {
         // a place first is no number, but 十 (十五); 幺 only among digits
         if ('幺' in raw) return null
         if (raw.first() in BIG || (raw.first() in SMALL && raw.first() != '十')) return null
-        val reading = Reading()
         if (raw.any { it !in DIGITS && it !in SMALL && it !in BIG }) return null
+        val reading = Reading()
         return if (raw.all { reading.read(it) }) reading.value()?.toString() else null
     }
 

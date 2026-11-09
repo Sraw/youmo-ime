@@ -16,7 +16,7 @@ class VoicePolishTest {
     private val golden = javaClass.getResourceAsStream("/voice/polish-golden.tsv")!!.bufferedReader().readLines()
         .filter { it.isNotEmpty() }.map { it.split('\t') }
 
-    private val tags = VoicePolishTags(golden.first { it[0] == "ops" }.drop(1), golden.first { it[0] == "afters" }.drop(1))
+    private val tags = VoicePolishTags(golden.first { it[0] == "ops" }.drop(1), golden.first { it[0] == "afters" }.drop(1), listOf("none"))
 
     private fun cases(kind: String) = golden.filter { it[0] == kind }.also { assertTrue("$kind cases", it.isNotEmpty()) }
 
@@ -138,8 +138,8 @@ class VoicePolishTest {
 
     @Test
     fun labelsAndTheirListsAreChecked() {
-        assertThrows(IllegalArgumentException::class.java) { VoicePolishTags(listOf("del", "keep"), listOf("")) }
-        assertThrows(IllegalArgumentException::class.java) { VoicePolishTags(listOf("keep", "del"), listOf("，")) }
+        assertThrows(IllegalArgumentException::class.java) { VoicePolishTags(listOf("del", "keep"), listOf(""), listOf("none")) }
+        assertThrows(IllegalArgumentException::class.java) { VoicePolishTags(listOf("keep", "del"), listOf("，"), listOf("none")) }
         assertThrows(IllegalArgumentException::class.java) { tags.apply(intArrayOf(1, 2), intArrayOf(0), intArrayOf(0, 0)) }
         assertThrows(IllegalArgumentException::class.java) { VoicePolishStream(tags, ::fake, freezeAfter = 4, window = 4) }
         val short = VoicePolishStream(tags, { VoicePolishStream.Labels(IntArray(0), IntArray(0)) })
@@ -236,5 +236,21 @@ class VoicePolishTest {
         kind = 0
         assertEquals("2026年", stream.finish("二零二六年"))
         assertEquals("2026", stream.frozenPrefix(4))
+    }
+
+    @Test
+    fun anEnglishWordIsNoPartOfANumber() {
+        // the tagger marking 「Windows 11」's digits: they keep their space and stay as typed
+        val raw = "Windows 11"
+        val text = VoicePolishTags.norm(raw)
+        val none = IntArray(text.size)
+        val num = IntArray(text.size).also { it[7] = 7; it[8] = 7 }
+        assertEquals("Windows 11", numTags.apply(text, none, none, VoicePolishTags.spaces(raw, text), num))
+    }
+
+    // what is typed as it is said is cut after VoiceLive.ENDS: each ends a number, so no cut is inside one
+    @Test
+    fun everyMarkATalkIsTypedUpToEndsANumber() {
+        for (c in VoiceLive.ENDS) assertTrue("$c", "$c" in VoicePolishTags.NUMBER_BREAKS)
     }
 }

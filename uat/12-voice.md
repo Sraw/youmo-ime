@@ -45,7 +45,7 @@
 - **前提**：B0-语音。
 - **操作**：按住空格说"这个电影十分有趣"，松开。
 - **预期**：框里是「这个电影十分有趣」，"十分"没被写成 10 分。
-- **JVM**：`VoiceHoldUatTest.wordsWithNumeralsAreLeftAlone`（「十分有趣」不改（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））；设备上不跑。
+- **JVM**：`VoiceHoldUatTest.wordsWithNumeralsAreLeftAlone`（整理模型一个字都没标成数字时，「十分有趣」原样上屏（假识别器加一个什么都不标的小标注器，其后整条链是 App 的；`:app:testDebugUnitTest`））。「十分」算不算数字由整理模型判断，在 voice-eval 的 `num-data/cases-N.tsv` 里量；设备上不跑。
 
 ### VO-08 [P1] 中英夹杂
 - **前提**：B0-语音。
@@ -209,7 +209,7 @@
 - **前提**：B0-语音，多行的「普通文本」框。
 - **操作**：点工具栏上的麦克风，连着说几句（中间正常停顿），比如"今天天气很好 我们出去走走 晚上回来吃饭"，说的时候看框里，最后点麦克风结束。
 - **预期**：说着的时候，前面已经定下来的句子变成普通文字（没有下划线），只有最后还在变的一段带下划线；结束后整段是说的话，没有重复、没有漏字，句末按输入框加不加句号（只在结束时加）。说着的时候点框里别的位置：带下划线的那段撤掉，接着说的从新位置开始，结束后不重复。在聊天框里说着时应用把框清空（发出去了）：已经说过的不会再上屏一遍。结束时整理失败（退回原文）也只补后面的，不重复。
-- **JVM**：`VoiceTapUatTest.whatIsSettledIsTypedAsItIsSaid`（一段话在下一段开始前整段待定，下一段一来前一段连标点上屏，最后只补剩下的、句号只在结束时加）、`VoiceTapUatTest.polishedTheFrozenPartIsTypedAsItIsSaid`（开语音整理：冻结的部分边说边上屏）、`VoiceTapUatTest.polishedThenThePolishFailingAtTheEndOnlyWhatFollowsIsTyped`（已上屏「我到了。」，结束时原文「嗯我到了马上走」，只补「马上走」）、`VoiceTapUatTest.underEnglishWhatIsSaidIsTypedOnce`（英文输入法：结束时不把待定文字原地定成文字再上屏一遍）、`VoiceTapUatTest.theCursorMovedWhileTalkingTheTailComposesWhereItWent`、`VoiceTapUatTest.whatTheAppSentIsNotTypedAgain`（说着时框被清空，结束后框还是空的）、`VoiceTapUatTest.whatTheAppRewroteIsNotTypedAgainTheTalkGoesOn`、`VoiceLiveTest`、`VoiceTalkTest`（ime-core：只算关了的段、整理已冻结的部分、停在标点后；改写过的只补公共前缀以后的；原文按子序列对齐，只补后面的；应用拿走的不再打；整理失败后不再边说边上屏）、`EditingSessionTest.aProvisionalCompositionTheAppTookIsNotTakenAgain`（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`）；真机上照"操作"跑一遍（整理冻结的时机看真的模型；微信里发送后框清空）。
+- **JVM**：`VoiceTapUatTest.whatIsSettledIsTypedAsItIsSaid`（一段话在下一段开始前整段待定，下一段一来前一段连标点上屏，最后只补剩下的、句号只在结束时加）、`VoiceTapUatTest.polishedTheFrozenPartIsTypedAsItIsSaid`（语音整理冻结的部分边说边上屏）、`VoiceTapUatTest.polishedThenThePolishFailingAtTheEndOnlyWhatFollowsIsTyped`（已上屏「我到了。」，结束时原文「嗯我到了马上走」，只补「马上走」）、`VoiceTapUatTest.underEnglishWhatIsSaidIsTypedOnce`（英文输入法：结束时不把待定文字原地定成文字再上屏一遍）、`VoiceTapUatTest.theCursorMovedWhileTalkingTheTailComposesWhereItWent`、`VoiceTapUatTest.whatTheAppSentIsNotTypedAgain`（说着时框被清空，结束后框还是空的）、`VoiceTapUatTest.whatTheAppRewroteIsNotTypedAgainTheTalkGoesOn`、`VoiceLiveTest`、`VoiceTalkTest`（ime-core：只算关了的段、整理已冻结的部分、停在标点后；改写过的只补公共前缀以后的；原文按子序列对齐，只补后面的；应用拿走的不再打；整理失败后不再边说边上屏）、`EditingSessionTest.aProvisionalCompositionTheAppTookIsNotTakenAgain`（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`）；真机上照"操作"跑一遍（整理冻结的时机看真的模型；微信里发送后框清空）。
 
 ### VO-30 [P1] 点麦克风说话时换输入框、收起键盘
 - **前提**：B0-语音。
