@@ -266,7 +266,7 @@ class PopupKeyboardUiTest {
 
     // 九键's (and 九键双拼's) own long press of [digit], as T9Keyboard makes it
     private fun nine(digit: Char, shuangpin: Boolean): KeyDef.Popup.Keyboard.Explicit = T9Keyboard.ninePopup(
-        digit, T9Keyboard.lettersOn(digit, NineKeyLetters.STANDARD, english = false, shuangpin = shuangpin, semicolon = true),
+        digit, T9Keyboard.lettersOn(digit, NineKeyLetters.STANDARD, english = false, shuangpin = shuangpin),
         NineKeySymbols.STANDARD.symbols(digit),
     )
 
