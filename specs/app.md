@@ -336,7 +336,8 @@ changing with the composing (Done to Enter) still does. `AndroidTextMeasurer` ke
 texts it measured (text, font, weight, size), so a scene made again measures only what is new.
 The theme's styles matched to a key (`Cascade.of`) are kept by target, a key no selector names
 as one with no key (the 26 letters share theirs), with what it inherits; `Cascades` keeps a theme's
-cascade by its scenes (`flat` and not), and a cascade keeps the looks the builder worked out of it for
+cascade by the scenes it names (`flat` and not; what is typed only where the theme names it, so a
+theme of no `@im=` makes no more of them), and a cascade keeps the looks the builder worked out of it for
 a key (`Cascade.kept`: by board, id, role, classes and states, a `Cascade.KeptKey<T>` naming what is
 kept under it). Kept a process too (main thread), for
 a keyboard made again (each theme switch builds the input view): `SceneThemes` the last 4 themes read
@@ -854,6 +855,19 @@ Rules for settings, all decided:
   span (`LevelPick` in ime-core); the level itself is not stored, so adding one can show an old odd
   value as a neighbouring level, its numbers unchanged. 键盘高度's levels are `KeyboardHeightLevels`'
   (ime-core), as the keyboard reads 紧凑 by the same numbers.
+- **跟随主题 of the keyboard's size** (060-render-p3 T5). 键盘高度, 两侧边距 and 底部边距 have 跟随主题 first
+  (`levels(..., follow =)`: a `PBool` of `AppPrefs.Keyboard`, `keyboard_*_follow_theme`, default true,
+  `hidden(setByLevels = true)`): picked, it is set and the ints are removed (their defaults); a level
+  picked unsets it. `KeyboardArea.sizes()` (ime-core `KeyboardSizes`) is the theme's size
+  (`Theme.keyboardSizes`, `keyboard { height; side-padding; bottom-padding }`, of the theme in use as
+  `SceneThemes` reads it; a test's `KeyboardArea.themeSizes`) where a setting follows and the theme sets
+  one, else the ints; 紧凑 and 贴底 are read from it too (a theme's bottom padding followed is no
+  贴底), `KeyboardHeightCap` after it as before, floating still without paddings. A theme 3.0 and the
+  built-in ones set no size. `ThemePrefs.migrateSizeFollow` (from `ThemeManager.prefs`) once moves an
+  upgrade's sizes: each at its defaults (贴底's flush is not) follows, one set does not; the mark
+  `keyboard_sizes_follow_migrated` is a key of no preference, so the hidden reset keeps it and an older
+  version's backup brought back, which has none, is moved again. `ThemePrefsMigrationTest`,
+  `KeyboardAreaTest`, ime-core `KeyboardSizesTest`.
 - **`hidden { }`** marks a preference with no UI: it is reset to its default once on upgrade and after
   a restore (`resetHiddenSettings`), so an old value set where the UI used to be cannot linger.
 - **Searchable.** `SettingsIndex` builds the search from the same declarations (managed categories
