@@ -44,6 +44,11 @@ data class Border(val width: Double, val color: ColorExpr?) {
     }
 }
 
+/** A keyboard's size upright and turned ([Values.KEYBOARD_SIZES]): `height` in % of the screen's height, a padding in dp. */
+data class Twin(val portrait: Double, val landscape: Double) {
+    fun of(landscape: Boolean): Double = if (landscape) this.landscape else portrait
+}
+
 /**
  * What `space-content=` or a `return-icon-<action>=` puts on its key instead of what the layout gives:
  * [ImeName] the layout's own (the space's input method name), [None] nothing, a [Text], an [Icon].
@@ -71,6 +76,7 @@ sealed interface Value {
     data class Word(val word: String) : Value
     data class Number(val number: Double) : Value
     data class Flag(val on: Boolean) : Value
+    data class OfTwin(val twin: Twin) : Value
 }
 
 /** Reading a style property's value: null where it is not one of that property. */
@@ -179,6 +185,34 @@ object Values {
         // §16's second tier: a key's sticker layer
         "sticker" to form("none|$FILE"),
     )
+
+    /**
+     * The keyboard's size (060-render-v2 §15, 主题管尺寸): set on `keyboard` alone, under no scene,
+     * portrait then landscape (one value: both). The same names on another widget are a later stage's
+     * ([RESERVED]: the bar's height, the handle's).
+     */
+    val KEYBOARD_SIZES = listOf("height", "side-padding", "bottom-padding")
+
+    // what the settings' own ranges are (AppPrefs: 键盘高度 10–90%, 两侧边距 0–300dp, 底部边距 0–100dp)
+    private const val MIN_HEIGHT = 10.0
+    private const val MAX_HEIGHT = 90.0
+    private const val MAX_SIDE_DP = 300.0
+    private const val MAX_BOTTOM_DP = 100.0
+
+    /** A keyboard size of [property] ([KEYBOARD_SIZES]): `38% 52%`, `8dp 48dp`, `0`; null where not one, or out of range. */
+    fun keyboardSize(property: String, raw: String): Twin? {
+        val parts = raw.split(' ')
+        if (parts.size !in 1..2) return null
+        val v = parts.map {
+            when (property) {
+                "height" -> percent(it)?.takeIf { p -> p in MIN_HEIGHT..MAX_HEIGHT }
+                "side-padding" -> dp(it, MAX_SIDE_DP)
+                "bottom-padding" -> dp(it, MAX_BOTTOM_DP)
+                else -> null
+            } ?: return null
+        }
+        return Twin(v.first(), v.last())
+    }
 
     /**
      * Values of a property of today that a later stage gives a new form: the navigation bar's

@@ -41,10 +41,37 @@ class ThemePrefsTest {
     @Test
     fun aLevelListShowsTheLevelOfWhatItsPreferencesHold() {
         val prefs = ThemePrefs(sp)
-        // untouched: standard height (after 紧凑 and 矮), no padding
         val lists = listOf("keyboard_height_level", "keyboard_side_padding_level", "keyboard_bottom_padding_level")
-        // 贴底 is first, before 无
-        assertEquals(listOf(2, 0, 1), lists.map { prefs.level(it) })
+        // untouched: 跟随主题, first (060-render-p3 T5)
+        assertEquals(listOf(0, 0, 0), lists.map { prefs.level(it) })
+        // not following: standard height (after 跟随主题, 紧凑 and 矮), no padding; 贴底 is before 无
+        sp.edit {
+            listOf("keyboard_height_follow_theme", "keyboard_side_padding_follow_theme", "keyboard_bottom_padding_follow_theme")
+                .forEach { putBoolean(it, false) }
+        }
+        assertEquals(listOf(3, 1, 2), lists.map { prefs.level(it) })
+    }
+
+    // 跟随主题 picked: set, the numbers back to their defaults (today's look where the theme sets none);
+    // a level picked: no more following
+    @Test
+    fun followingTheThemeIsPickedAndLeft() {
+        val list = ThemePrefs(sp).managedPreferencesUi.filterIsInstance<ManagedPreferenceUi.Levels>()
+            .single { it.key == "keyboard_side_padding_level" }
+        list.pick(3)
+        assertFalse(sp.getBoolean("keyboard_side_padding_follow_theme", true))
+        assertEquals(24 to 120, sp.getInt("keyboard_side_padding", -1) to sp.getInt("keyboard_side_padding_landscape", -1))
+        assertEquals(3, list.current())
+        list.pick(0)
+        assertTrue(sp.getBoolean("keyboard_side_padding_follow_theme", false))
+        assertFalse(sp.contains("keyboard_side_padding"))
+        assertFalse(sp.contains("keyboard_side_padding_landscape"))
+        assertEquals(0, list.current())
+        // 无 is the defaults, yet a choice of its own: not following
+        list.pick(1)
+        assertFalse(sp.getBoolean("keyboard_side_padding_follow_theme", true))
+        assertEquals(1, list.current())
+        assertFalse(list.pick(4))
     }
 
     // 紧凑 the lowest, first, each of its numbers ime-core's: the keyboard reads 紧凑 by those
@@ -54,13 +81,13 @@ class ThemePrefsTest {
         val list = ThemePrefs(sp).managedPreferencesUi.filterIsInstance<ManagedPreferenceUi.Levels>()
             .single { it.key == "keyboard_height_level" }
         val app = RuntimeEnvironment.getApplication()
-        assertEquals(listOf("紧凑", "矮", "标准", "高", "很高"), list.createUi(app).entries.map { it.toString() })
+        assertEquals(listOf("跟随主题", "紧凑", "矮", "标准", "高", "很高"), list.createUi(app).entries.map { it.toString() })
         // ThemePrefs(sp) keeps them in sp
         val held = { sp.getInt("keyboard_height_percent", -1) to sp.getInt("keyboard_height_percent_landscape", -1) }
-        list.pick(0)
-        assertEquals(20 to 34, held())
-        assertEquals(0, list.current())
         list.pick(1)
+        assertEquals(20 to 34, held())
+        assertEquals(1, list.current())
+        list.pick(2)
         assertEquals(26 to 42, held())
     }
 
@@ -70,15 +97,15 @@ class ThemePrefsTest {
         val list = ThemePrefs(sp).managedPreferencesUi.filterIsInstance<ManagedPreferenceUi.Levels>()
             .single { it.key == "keyboard_bottom_padding_level" }
         val held = { listOf("keyboard_bottom_padding", "keyboard_bottom_padding_landscape", "keyboard_bottom_flush").map { sp.getInt(it, -1) } }
-        list.pick(0)
-        assertEquals(listOf(0, 0, 1), held())
-        assertEquals(0, list.current())
         list.pick(1)
-        assertEquals(listOf(0, 0, 0), held())
+        assertEquals(listOf(0, 0, 1), held())
         assertEquals(1, list.current())
-        list.pick(3)
+        list.pick(2)
+        assertEquals(listOf(0, 0, 0), held())
+        assertEquals(2, list.current())
+        list.pick(4)
         assertEquals(listOf(20, 12, 0), held())
-        assertEquals(3, list.current())
+        assertEquals(4, list.current())
     }
 
     // the key style settings before 3.0 are no preferences now, only what ThemeLookMigration reads: the

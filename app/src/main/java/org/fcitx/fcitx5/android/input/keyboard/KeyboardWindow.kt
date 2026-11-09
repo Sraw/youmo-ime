@@ -34,12 +34,14 @@ import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.preedit.PreeditComponent
+import org.fcitx.fcitx5.android.input.scene.SceneTyping
 import org.fcitx.fcitx5.android.input.wm.EssentialWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
@@ -365,6 +367,8 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         currentKeyboard?.inPasswordField = service.inPasswordField
         val traits = info.toEditorTraits()
         address = AddressKeys.of(traits)
+        typingField = SceneTyping.field(traits, service.inPasswordField)
+        typingChanged()
         currentKeyboard?.address = address
         // a number's, phone's or date's field its pad, any other the letters: leaving the one for
         // another, the input method's letters come back, the nine keys, the 14 keys as they were
@@ -401,8 +405,20 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private val keyboardPrefs = AppPrefs.getInstance().keyboard
 
+    // what is typed, as a theme's scenes (060-render-p3 T5): the input method, the field
+    private var typingIm: String? = null
+    private var typingField: String? = null
+
+    private fun typingChanged() {
+        val scenes = SceneTyping.scenes(typingIm, typingField)
+        // the keyboards shown told (BaseKeyboard), this one as it is attached again too
+        SceneEnvs.typing = scenes
+    }
+
     override fun onImeUpdate(ime: InputMethodEntry) {
         spaceKeys.current = ime
+        typingIm = ime.uniqueName
+        typingChanged()
         preedit.ui.syllables.owned = stripHidden()
         val letters = lettersOf(ime.uniqueName, keyboardPrefs.imKeyboards(), EngineState.shuangpinScheme, service.inPasswordField)
         // left for another input method while quick input had the place of the pad or a zhuyin keyboard:

@@ -78,12 +78,21 @@ class AppPrefsTest {
             .filter { it.first in own }
             .associate { (key, default) -> key to default + 1 }
         assertTrue(levels.keys.containsAll(listOf("keyboard_height_percent", "keyboard_long_press_delay")))
+        // and 跟随主题 of the keyboard's size, which a level list sets too
+        val follows = (categories + ThemeManager.prefs)
+            .flatMap { it.managedPreferencesUi }
+            .filterIsInstance<ManagedPreferenceUi.Levels>()
+            .mapNotNull { it.follow?.first }
+            .filter { it in own }
+        assertEquals(3, follows.size)
         sp.edit {
             levels.forEach { (key, value) -> putInt(key, value) }
+            follows.forEach { putBoolean(it, false) }
             putBoolean("popup_on_key_press", false)
         }
         prefs.resetHiddenSettings()
         assertEquals(levels, levels.mapValues { sp.getInt(it.key, -1) })
+        assertTrue(follows.none { sp.getBoolean(it, true) })
         assertFalse("shown", prefs.keyboard.popupOnKeyPress.getValue())
     }
 

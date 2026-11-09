@@ -90,7 +90,8 @@ class SceneBoard(
 
     // the scene of [sceneTheme] ([look]'s): the last kept for the same values, or made; null, the engine refused it
     private fun scene(layout: SceneLayout, sceneTheme: SceneTheme, look: ThemeLook, measurer: TextMeasurer, width: Int, height: Int): Scene? {
-        val env = SceneTrace.section("env") { env(look, layout, width, height) }
+        // the board's id its theme's @keyboard= (060-render-p3 T5)
+        val env = SceneTrace.section("env") { env(look, layout, width, height).copy(board = layout.id) }
         // the same values make the same scene: one asked again for nothing that shows (the first key typed,
         // the word committed: Return's look unchanged) is the last one, not made again in the frame
         scenesKept.lastOrNull { it.theme === sceneTheme && it.layout === layout && it.measurer === measurer && it.env == env }?.let { return it.scene }

@@ -62,9 +62,11 @@ abstract class ManagedPreferenceCategory(
         key: String,
         keys: List<Pair<String, Int>>,
         levels: List<ManagedPreferenceUi.Levels.Level>,
-        enableUiOn: (() -> Boolean)? = null
+        // 跟随主题, first in the list (060-render-p3 T5)
+        follow: ManagedPreference.PBool? = null,
+        enableUiOn: (() -> Boolean)? = null,
     ) {
-        ManagedPreferenceUi.Levels(title, key, sharedPreferences, keys, levels, enableUiOn).registerUi()
+        ManagedPreferenceUi.Levels(title, key, sharedPreferences, keys, levels, enableUiOn, follow?.let { it.key to it.defaultValue }).registerUi()
     }
 
     /** A line of [text] among the settings, stored nowhere. */

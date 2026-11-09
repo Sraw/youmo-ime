@@ -43,14 +43,14 @@ data class Selector(
     }
 
     /**
-     * What of it a later stage makes work ([RESERVED_WIDGETS], [RESERVED_STATES], a candidate's part,
-     * an `@im=` `@field=` `@keyboard=` scene), null where none: read, but it selects nothing yet.
+     * What of it a later stage makes work ([RESERVED_WIDGETS], [RESERVED_STATES], a candidate's part),
+     * null where none: read, but it selects nothing yet.
      */
     val reserved: String? = when {
         widget in RESERVED_WIDGETS -> widget
         states.any { it in RESERVED_STATES } -> ":" + states.first { it in RESERVED_STATES }
         widget == "candidate" && part != null -> "candidate $part"
-        else -> scenes.firstOrNull { '=' in it }?.let { "@$it" }
+        else -> null
     }
 
     /** Whether it selects [target] in [scene] (the scenes the environment is in). */
@@ -96,8 +96,18 @@ data class Selector(
         val RESERVED_STATES = setOf("first")
         val STATES = setOf("pressed", "locked", "shifted", "disabled", "selected", "on") + RESERVED_STATES
 
-        /** The scenes of what is typed (T5): `@im=<input method>`, `@field=<kind>`, `@keyboard=<board>`. */
+        /**
+         * The scenes of what is typed ([org.fcitx.fcitx5.android.scene.engine.Env.scenes]): `@im=<input
+         * method>` (its kind, `pinyin` `shuangpin` `english` `table` `handwriting`, or a table's name, `wubi`),
+         * `@field=<kind>` of these, `@keyboard=<board>` (a layout's id, `nine`).
+         */
         val FIELDS = setOf("password", "url", "number", "email")
+
+        /**
+         * The words of `@im=` that select (the app's SceneTyping, held to it by its test): the kinds, T9 and
+         * zhuyin `pinyin` as their engine is, and the tables' names. Another is read, warned of, selects nothing.
+         */
+        val IMS = setOf("pinyin", "shuangpin", "english", "table", "handwriting", "wubi", "cangjie", "ziranma", "erbi", "wubipinyin")
         private val IM = Regex("[a-z0-9]+(-[a-z0-9]+)*")
         private val BOARD = Regex("[a-z0-9]+(-[a-z0-9]+)*")
         private val CLASS = Regex("[a-z][a-z0-9-]*")
