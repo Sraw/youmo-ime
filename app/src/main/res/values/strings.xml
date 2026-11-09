@@ -152,7 +152,8 @@
     <string name="dark_mode_theme">Dark mode theme</string>
     <string name="theme_version_light">Light</string>
     <string name="theme_version_dark">Dark</string>
-    <string name="theme_version_switch">Show its light or dark version</string>
+    <string name="theme_version_light_switch">Light version, tap for the dark one</string>
+    <string name="theme_version_dark_switch">Dark version, tap for the light one</string>
     <string name="new_theme">New theme</string>
     <string name="skip">Skip</string>
     <string name="theme_migrated">Theme has been migrated to the current version</string>

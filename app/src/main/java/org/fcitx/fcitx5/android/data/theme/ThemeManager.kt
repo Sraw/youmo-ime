@@ -53,7 +53,7 @@ object ThemeManager {
     }
 
     // before the themes, which an older format's are read with (the key style settings before 3.0)
-    private val customThemes: MutableList<Theme.Custom> = ThemeFilesManager.listThemes(prefs.legacyLook())
+    private val customThemes: MutableList<Theme.Custom> = listCustomThemes(prefs).first.toMutableList()
 
     // the user's theme 4.0 packs, each version one (060-render-p3 T8a); listed after the 3.0 themes, whose
     // listing clears what a kill left of a save first
@@ -61,11 +61,6 @@ object ThemeManager {
 
     /** The user's theme 4.0 packs, each version one ([Theme.Pack]). */
     val Packs: List<Theme.Pack> get() = packs
-
-    init {
-        // 0.5's names of the built-in themes in the settings (060-render-p3 T3), before a theme is read of them
-        prefs.migrateThemeRefs(customThemes.mapTo(HashSet()) { it.name })
-    }
 
     /**
      * The pack [file] took the keyboard down as it was first drawn ([PackDrawGuard]): the settings naming one
@@ -80,11 +75,36 @@ object ThemeManager {
     }
 
     /**
-     * The theme [name] refers to: the user's of that name, a pack's version ([BuiltinThemeFiles.find]: `name#dark`),
-     * else the built-in one; null where none is.
+     * The user's themes ([ThemeFilesManager.listThemes]; [ThemePrefs.legacyLook] for an older format's),
+     * the settings naming themes made right with them (060-render-p3 T3), as a start does and a refresh
+     * again (themes not settled at the start may be since: A4). One named as a built-in theme is now
+     * (`monokai`, which 0.5 let in) would hide it: saved again under a UUID, the settings naming it with
+     * it ([ThemeFilesManager.moveClashing]); then 0.5's names of the built-in themes in the settings
+     * moved ([ThemePrefs.migrateThemeRefs]), not one a theme of the user's may have though it is not
+     * listed ([ThemeFilesManager.mayHoldThemes]). With whether a setting was changed.
+     */
+    @VisibleForTesting
+    internal fun listCustomThemes(prefs: ThemePrefs): Pair<List<Theme.Custom>, Boolean> {
+        var changed = false
+        val themes = ThemeFilesManager.moveClashing(
+            ThemeFilesManager.listThemes(prefs.legacyLook()),
+            clashes = { BuiltinThemeFiles.find(builtinThemes, it) != null },
+            repoint = { from, to -> prefs.renameThemeRefs(from, to).also { changed = changed || it } },
+        )
+        val customs = themes.mapTo(HashSet()) { it.name }
+        customs += ThemeFilesManager.mayHoldThemes(BuiltinThemeFiles.LEGACY.keys)
+        if (prefs.migrateThemeRefs(customs)) changed = true
+        return themes to changed
+    }
+
+    /**
+     * The theme [name] refers to: the user's 3.0 theme of that name, else a pack's version ([BuiltinThemeFiles.find]:
+     * `name#dark`), else the built-in one, else the built-in one of that 0.5 name (a setting not moved yet:
+     * [ThemePrefs.migrateThemeRefs]); null where none is.
      */
     fun getTheme(name: String): Theme? =
         customThemes.find { it.name == name } ?: BuiltinThemeFiles.find(packs, name) ?: BuiltinThemeFiles.find(builtinThemes, name)
+            ?: BuiltinThemeFiles.LEGACY[name]?.let { BuiltinThemeFiles.find(builtinThemes, it) }
 
     /** The user's packs, the user's 3.0 themes, the built-in ones. */
     fun getAllThemes(): List<Theme> = packs + customThemes + builtinThemes
@@ -105,9 +125,12 @@ object ThemeManager {
     }
 
     fun refreshThemes() {
+        val (themes, changed) = listCustomThemes(prefs)
         customThemes.clear()
-        customThemes.addAll(ThemeFilesManager.listThemes(prefs.legacyLook()))
+        customThemes.addAll(themes)
         packs = ThemeFilesManager.listPacks()
+        // the copy for before the first unlock names what this one does (the start syncs it after init)
+        if (changed) syncToDeviceEncryptedStorage()
         activeTheme = evaluateActiveTheme()
     }
 

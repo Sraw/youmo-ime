@@ -12,6 +12,7 @@ import android.os.Build
 import android.view.Gravity
 import android.view.View
 import android.view.ViewOutlineProvider
+import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.R
@@ -67,13 +68,24 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
     }
 
     // a built-in theme of two versions (ThemeCards): which is shown, tapped the other
-    val version = textView {
+    val versionChip = textView {
         gravity = Gravity.CENTER
         textSize = 12f
         minWidth = dp(32)
         minHeight = dp(32)
         setPaddingDp(8, 0, 8, 0)
-        contentDescription = ctx.getString(R.string.theme_version_switch)
+        // read out by [version], which says what a tap does
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+    }
+
+    /**
+     * What is tapped of [versionChip]: 48 dp at the least (the chip 32 dp high, its corner of the card),
+     * the chip in its top end corner as before, so the card looks the same.
+     */
+    val version = FrameLayout(ctx).apply {
+        minimumWidth = dp(48)
+        minimumHeight = dp(48)
+        addView(versionChip, FrameLayout.LayoutParams(wrapContent, wrapContent, Gravity.TOP or Gravity.END))
         visibility = View.GONE
     }
 
@@ -125,8 +137,8 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
             imageTintList = foregroundTint
         }
         checkMark.imageTintList = foregroundTint
-        version.setTextColor(theme.altKeyTextColor)
-        version.background = GradientDrawable().apply {
+        versionChip.setTextColor(theme.altKeyTextColor)
+        versionChip.background = GradientDrawable().apply {
             cornerRadius = ctx.dp(16f)
             setColor(theme.altKeyBackgroundColor)
         }
@@ -142,7 +154,9 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
             version.setOnClickListener(null)
             return
         }
-        version.setText(if (dark) R.string.theme_version_dark else R.string.theme_version_light)
+        versionChip.setText(if (dark) R.string.theme_version_dark else R.string.theme_version_light)
+        // the version shown and what a tap does (a screen reader's: the chip's 浅/深 alone says neither)
+        version.contentDescription = ctx.getString(if (dark) R.string.theme_version_dark_switch else R.string.theme_version_light_switch)
         version.setOnClickListener { switch() }
     }
 

@@ -1103,9 +1103,11 @@ The app does not edit themes (user, 2026-11-03) and in 0.5.x does not link the w
 applies, imports, and on a long press exports or deletes one of the user's (Monet exports
 `Theme.Builtin.toCustom()`: its colours now and the key style it keeps, fixed, named as 0.5 named it,
 `MonetLight#<primary>`). A built-in theme of two versions is one card (`ThemeCards`, the theme page's
-list and the light and dark slots' dialogs alike): a small 浅/深 on its thumbnail shows the other version,
-a tap on the card picks the one shown; the version a slot or the theme in use is shows, and its mark
-only while it is shown (dark over light over in use; a slot's dialog opens on the slot's version). The fcitx edit page
+list and the light and dark slots' dialogs alike): a small 浅/深 on its thumbnail shows the other version
+and picks nothing (its touch target 48 dp, the chip in its corner; read out as the version shown and what a
+tap does, `theme_version_*_switch`), a tap on the card picks the one shown; the version a slot or the theme
+in use is shows, and its mark only while it is shown (dark over light over in use; a slot's dialog opens on
+the slot's version and keeps the theme picked, not the card: `SimpleThemeListAdapter.selectedTheme`). The fcitx edit page
 (`CustomThemeActivity`, its cropper) went with the old 选择图片… and 复制内置主题…; themes made by them
 before are listed, used, exported and deleted like any other. Thumbnails (`ThemeThumbnailUi`) draw four rows of the
 theme's keys in little (`ThemeThumbnailKeys`, colours only: no key image decoded) over its base
@@ -1121,20 +1123,36 @@ those as before) drawn as `LookDefaults` with them, which is what the files' sty
 the colours were held to the deleted `ThemePreset`/`Theme.Monet` by `BuiltinThemesPresetTest`, commit
 bb317aba3). Monet's colours are `system(role, fallback)`: `ThemeMonet.systemColors` gives the roles from
 Android 14 (the light bar `surface-container-highest`, the dark `surface-container-high`), on 12 and 13
-the palette tones 0.5 approximated them with, before 12 none (the fallbacks: 0.5's static MD3 colours);
+the palette tones 0.5 approximated them with (every role, the two 0.5 had none for, the light high and
+the dark highest, the tones nearest Material's between their neighbours), before 12 none (the fallbacks: 0.5's static MD3 colours);
 re-read on a configuration change (`onSystemPlatteChange`) and when the key style is settled. Transparent's
 two are no built-in theme: test data, `commonTest/data/transparent.xml`.
 
 The settings name a built-in theme by **reference**: its file's name and version, `pixel#dark`, or its
 name alone where it has one (`deep-blue`; `deep-blue#dark` finds it too). `ThemeManager.getTheme` finds
-the user's theme of that name first, then the built-in. `ThemePrefs.migrateThemeRefs` (from
-`ThemeManager`'s start, the custom themes listed) moves a slot (`normal_mode_theme`, `light_mode_theme`,
-`dark_mode_theme`) naming one by its 0.5 name (`PixelDark`, `MonetLight`, `BuiltinThemeFiles.LEGACY`)
-to its reference, unless a theme of the user's has that name; a name of no theme stays (the default). No
+the user's theme of that name first, then the built-in, then the built-in of that 0.5 name (a slot not
+moved yet). `ThemeManager.listCustomThemes` lists the user's themes and sets the slots right with them,
+at the start and at every `refreshThemes` (themes not settled at the start may be since, A4; a refresh
+that changed a slot syncs the device-encrypted copy). A json whose file name is not its theme's name (put
+there by hand) is renamed to `<name>.json` as it is listed (not listed where that is another's json), as
+save, delete and the moves write that file. A theme of the user's named as a reference is now
+(`monokai`, `pixel#dark`: 0.5's import refused only 0.5's names) would hide the built-in one, so before
+the slots are moved `ThemeFilesManager.moveClashing` saves it again under a UUID of its name (its files
+as they are, its json's age kept), `ThemePrefs.renameThemeRefs` points every slot naming it at the copy
+(committed), and only then its old json goes: a kill anywhere leaves each slot on a json there is, the
+next start finishes onto the same UUID (where that name holds another theme already, the first of
+`<name>#1`, `<name>#2`… free or holding this copy). Not while the themes are not settled or before the
+first unlock (none listed). Then `ThemePrefs.migrateThemeRefs` moves a slot (`normal_mode_theme`,
+`light_mode_theme`, `dark_mode_theme`) naming one by its 0.5 name (`PixelDark`, `MonetLight`,
+`BuiltinThemeFiles.LEGACY`) to its reference, unless a theme of the user's has that name or may have it
+(`ThemeFilesManager.mayHoldThemes`, the directory read once: its json there unread, or the directory not
+read; such a slot is read as the built-in theme meanwhile); a name of no theme stays (the default). No
 mark: no old name is written any more and an import of one (or of a reference) is refused
 (`exception_theme_name_clash`), so it runs at every start and a backup of an older version, or the
 device-encrypted copy an older version wrote, is moved as it is read; `syncToDeviceEncryptedStorage`
-copies the references as they are now.
+copies the references as they are now. Before the first unlock nothing is moved, so a user's theme name
+there that is a reference now (`monokai`, in a copy synced before the theme was moved) reads as the
+built-in theme until the unlock.
 
 Import (`ThemeFilesManager.importTheme`) takes the json and every file it names, by file name only
 (never a path, never a `.json`, never `.saving`); it checks all before copying any, so a refusal leaves nothing.
@@ -1178,7 +1196,8 @@ from a look (the theme page's preview, the thumbnail, the picture under the keys
 `Pack.look`: `LookDefaults` with its 24 colours, its picture, and the fonts its plain `key` and `candidate`
 styles name. Icons are checked and kept but not drawn yet (the engine draws its built-in icons by name).
 The list is packs, then 3.0 themes, then built-ins; a pack's versions are one card (`ThemeCards`);
-`getTheme` finds a 3.0 theme of the name first, then a pack's version, then a built-in. A `Theme.Pack` keeps
+`getTheme` finds a 3.0 theme of the name first, then a pack's version, then a built-in, then the built-in of
+that 0.5 name (a pack is never named as either: refused at import, skipped at listing). A `Theme.Pack` keeps
 no text of its file (its `stamp` is the file's time, so one imported again is another theme): `scene` reads
 `theme.xml` when first drawn, and one that no longer reads is drawn as the built-in Pixel theme
 (`ThemePackFiles.scene`, `user_data_unreadable` told once). The bar and panels are drawn from the pack's own

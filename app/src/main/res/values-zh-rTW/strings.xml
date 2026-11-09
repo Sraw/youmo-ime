@@ -152,7 +152,8 @@
     <string name="dark_mode_theme">夜間模式主題</string>
     <string name="theme_version_light">淺</string>
     <string name="theme_version_dark">深</string>
-    <string name="theme_version_switch">切換淺色、深色版本</string>
+    <string name="theme_version_light_switch">淺色版本，點按切換到深色</string>
+    <string name="theme_version_dark_switch">深色版本，點按切換到淺色</string>
     <string name="new_theme">新主題</string>
     <string name="skip">跳過</string>
     <string name="theme_migrated">主題已遷移至目前版本</string>
