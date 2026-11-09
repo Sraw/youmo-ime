@@ -58,7 +58,12 @@ class RecyclerViewTest {
         // below API 30 compat also cuts them to the root's stable insets (View.getRootWindowInsets, the view root's
         // last insets), which a test window never got: set them there as the system would
         val viewRoot = activity.window.decorView.parent
-        viewRoot.javaClass.getDeclaredField("mLastWindowInsets").apply { isAccessible = true }.set(viewRoot, platform)
+        // a hidden field of ViewRootImpl (API 29's and Robolectric's), read by View.getRootWindowInsets: renamed or
+        // gone in a later SDK or Robolectric, this says so rather than failing on a missing navigation bar
+        val lastInsets = runCatching { viewRoot.javaClass.getDeclaredField("mLastWindowInsets") }.getOrElse {
+            throw AssertionError("ViewRootImpl.mLastWindowInsets not found in ${viewRoot.javaClass}: the test sets the root's insets there", it)
+        }
+        lastInsets.apply { isAccessible = true }.set(viewRoot, platform)
         // to the content view: the decor's action bar layout would take them first
         root.dispatchApplyWindowInsets(platform)
         assertEquals(48, list.paddingBottom)
