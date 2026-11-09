@@ -95,19 +95,19 @@ class BaseKeyboardTest {
     @Test
     fun theSpacesLongPressCarriesTheFingersPointer() {
         told { t ->
-        prefs.set(AppPrefs.getInstance().keyboard.spaceKeyLongPressBehavior, SpaceLongPressBehavior.Enumerate)
-        val h = t.h
-        val space = h.keyNamed("space")
-        val root = IntArray(2).also(h.inputView::getLocationInWindow)
-        val props = arrayOf(MotionEvent.PointerProperties().apply { id = 3; toolType = MotionEvent.TOOL_TYPE_FINGER })
-        val at = arrayOf(MotionEvent.PointerCoords().apply { x = space.bounds.exactCenterX() - root[0]; y = space.bounds.exactCenterY() - root[1] })
-        val down = SystemClock.uptimeMillis()
-        fun send(action: Int) = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, 1, props, at, 0, 0, 1f, 1f, 0, 0, 0, 0)
-            .also { h.inputView.dispatchTouchEvent(it); it.recycle() }
-        send(MotionEvent.ACTION_DOWN)
-        h.after(ViewConfiguration.getLongPressTimeout() + 500L)
-        assertTrue(t.actions.toString(), KeyAction.SpaceLongPressAction(pointer = 3) in t.actions)
-        send(MotionEvent.ACTION_UP)
+            prefs.set(AppPrefs.getInstance().keyboard.spaceKeyLongPressBehavior, SpaceLongPressBehavior.Enumerate)
+            val h = t.h
+            val space = h.keyNamed("space")
+            val root = IntArray(2).also(h.inputView::getLocationInWindow)
+            val props = arrayOf(MotionEvent.PointerProperties().apply { id = 3; toolType = MotionEvent.TOOL_TYPE_FINGER })
+            val at = arrayOf(MotionEvent.PointerCoords().apply { x = space.bounds.exactCenterX() - root[0]; y = space.bounds.exactCenterY() - root[1] })
+            val down = SystemClock.uptimeMillis()
+            fun send(action: Int) = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, 1, props, at, 0, 0, 1f, 1f, 0, 0, 0, 0)
+                .also { h.inputView.dispatchTouchEvent(it); it.recycle() }
+            send(MotionEvent.ACTION_DOWN)
+            h.after(ViewConfiguration.getLongPressTimeout() + 500L)
+            assertTrue(t.actions.toString(), KeyAction.SpaceLongPressAction(pointer = 3) in t.actions)
+            send(MotionEvent.ACTION_UP)
         }
     }
 

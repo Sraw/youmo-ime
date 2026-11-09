@@ -62,23 +62,32 @@ class SmallBoardsSceneGesturesTest {
     fun thePickersFullStopShowsWhatItTypes() = KeyboardHarness().start().use { h ->
         h.tap(h.described(h.service.getString(R.string.a11y_key_emoji)))
         h.relayout()
-        val kb = KeyboardHarness.all(h.inputView).filterIsInstance<PickerLayout.Keyboard>().first { h.shown(it) }
-        for ((mapping, face) in listOf(mapOf("." to "。", "," to "，") to "。", emptyMap<String, String>() to ".")) {
+        h.typesAsShown("period", "。", ".")
+        // the emoticon page's comma the same (emoticon.xml)
+        h.tap(h.key(":-)"))
+        h.relayout()
+        h.typesAsShown("comma", "，", ",")
+    }
+
+    // [id] on the picker shown: [chinese] with the Chinese punctuation mapping, [plain] with none, as its face and typed
+    private fun KeyboardHarness.typesAsShown(id: String, chinese: String, plain: String) {
+        val kb = KeyboardHarness.all(inputView).filterIsInstance<PickerLayout.Keyboard>().first { shown(it) }
+        for ((mapping, face) in listOf(mapOf("." to "。", "," to "，") to chinese, emptyMap<String, String>() to plain)) {
             // the input method's punctuation component, which broadcasts to the panel and its keyboard
-            val punctuation = h.inputView.javaClass.getDeclaredField("punctuation").apply { isAccessible = true }
-                .get(h.inputView) as PunctuationComponent
+            val punctuation = inputView.javaClass.getDeclaredField("punctuation").apply { isAccessible = true }
+                .get(inputView) as PunctuationComponent
             punctuation.update(mapping)
-            h.relayout()
-            val period = h.keys(kb).single { it.id == "period" }
-            assertEquals(face, period.label)
-            h.api.calls.clear()
-            h.press(period)
-            assertEquals("no bubble", emptyList<Any>(), h.popupChoices())
-            h.release()
+            relayout()
+            val key = keys(kb).single { it.id == id }
+            assertEquals(face, key.label)
+            api.calls.clear()
+            press(key)
+            assertEquals("no bubble", emptyList<Any>(), popupChoices())
+            release()
             // typed as the face shows it (committed by the panel as punctuation maps it, not through the engine)
-            assertEquals(h.api.calls.toString(), face, h.field.text.toString())
-            h.field.setText("")
-            h.idle()
+            assertEquals(api.calls.toString(), face, field.text.toString())
+            field.setText("")
+            idle()
         }
     }
 
