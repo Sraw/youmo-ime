@@ -17,6 +17,7 @@ import android.text.style.DynamicDrawableSpan
 import android.text.style.UnderlineSpan
 import android.view.View
 import android.widget.TextView
+import androidx.appcompat.widget.AppCompatTextView
 import androidx.annotation.ColorInt
 import androidx.core.text.buildSpannedString
 import org.fcitx.fcitx5.android.core.toSpannedString
@@ -152,7 +153,7 @@ open class PreeditUi(
      * a span cannot set an underline's colour or thickness before Android 10's hidden APIs.
      */
     @SuppressLint("ViewConstructor")
-    class PreeditTextView(context: Context, private val underline: PreeditLook.Underline?) : TextView(context) {
+    class PreeditTextView(context: Context, private val underline: PreeditLook.Underline?) : AppCompatTextView(context) {
         private val line = Paint().apply { underline?.color?.let { color = it.value } }
 
         override fun onDraw(canvas: Canvas) {

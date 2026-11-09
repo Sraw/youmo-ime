@@ -48,10 +48,10 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         }
 
     /** The theme's toolbar button (060-render-p3 T6b): its fill and shape, its icon's colour, pressed and on. */
-    private var look: ToolbarLook? = null
+    private var toolbar: ToolbarLook? = null
 
     constructor(context: Context, @DrawableRes icon: Int, theme: Theme, look: ToolbarLook = SceneBar.of(context, theme).toolbar) : this(context) {
-        this.look = look
+        toolbar = look
         image.imageTintList = ColorStateList.valueOf(look.icon.value)
         setIcon(icon)
         background = background(look, on = false)
@@ -60,7 +60,7 @@ class ToolButton(context: Context) : CustomGestureView(context) {
 
     /** A toggle's button drawn on ([ToolbarLook.onIcon], [ToolbarLook.onFill]) or off, as the theme has it. */
     fun setOn(on: Boolean) {
-        val look = look ?: return
+        val look = toolbar ?: return
         setIconTint((if (on) look.onIcon else look.icon).value)
         if (look.fill != look.onFill) background = background(look, on)
     }
