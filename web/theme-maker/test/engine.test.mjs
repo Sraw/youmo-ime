@@ -1,0 +1,364 @@
+// The theme maker's engine (060-render-p3 W1: lib/keyboard-scene's library, youmo-engine.js) against what the
+// JVM's engine and the app make: every snapshot's scene built through the library's facade is the snapshot
+// (lib/keyboard-scene's facade/shots.json says how each was asked for), a theme 3.0 made 4.0 is the JVM's, and
+// the library's painter draws on a 2D context what the app's ScenePainter draws on its canvas (testdata/paint.txt,
+// EnginePaintTest's), line for line.
+// Run: ./gradlew :lib:keyboard-scene:youmoEngine, then node --test web/theme-maker/test/engine.test.mjs
+// contract: the library's facade (YoumoEngine) and CanvasPainter against the JVM's snapshots and the app's
+// drawing, which neither side's own tests can see.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { ENGINE } from '../tools/assemble.mjs';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const scene = join(here, '..', '..', '..', 'lib', 'keyboard-scene', 'src');
+const data = join(scene, 'commonTest', 'data');
+const testdata = join(here, 'testdata');
+const read = (...p) => readFileSync(join(...p), 'utf8');
+
+// Path2D is the browser's; an icon's path here is its name (the icons below), so a fill of one says which
+globalThis.Path2D = class { constructor(d) { this.d = d; } };
+const E = createRequire(import.meta.url)(ENGINE).YoumoEngine;
+const fixed = E.fixedMeasurer();
+const shots = JSON.parse(read(data, 'facade', 'shots.json'));
+
+// a shot's theme as SnapshotTest's ThemeSource makes it
+const themes = new Map();
+function theme(t) {
+  const key = JSON.stringify(t);
+  if (!themes.has(key)) {
+    let text = read(data, t.file);
+    if (t.styles || t.fonts) {
+      text = text.replace('</colors>', '</colors>' + (t.fonts || '')).replace('</theme>', [...(t.styles || []), '</theme>'].join('\n'));
+    }
+    const r = E.readTheme(text, null, null);
+    assert.ok(r.ok, JSON.stringify(r.problems));
+    themes.set(key, r.theme);
+  }
+  return themes.get(key);
+}
+
+function built(s) {
+  const r = s.request ? E.buildPopup(theme(s.theme), s.env, s.request, fixed) : E.buildScene(s.board, theme(s.theme), s.env, fixed);
+  assert.ok(r.ok, s.name + ': ' + JSON.stringify(r.problems));
+  return r.scene;
+}
+
+test('every snapshot is what the library builds of its ask (the JVM wrote them, the library is held to them)', () => {
+  const all = [...shots.shots, ...shots.popups];
+  assert.equal(all.length, readdirSync(join(data, 'snapshots')).length, 'a shot for every snapshot');
+  const wrong = all.filter((s) => built(s).text() !== read(data, 'snapshots', s.name + '.txt')).map((s) => s.name);
+  assert.deepEqual(wrong, []);
+});
+
+test("a scene's keys, slots and size as a page reads them", () => {
+  const s = built(shots.shots.find((x) => x.name === 'qwerty-block'));
+  const j = s.json();
+  assert.equal(j.width, 1080);
+  assert.equal(s.width, 1080);
+  assert.equal(s.height, j.height);
+  const q = j.keys.find((k) => k.id === 'q');
+  assert.equal(q.label, 'q');
+  assert.equal(q.actions.send, 'q');
+  assert.deepEqual(q.bounds.slice(0, 3), [0, 0, 108]);
+  assert.ok(q.shape.rect && q.shape.radii.length === 4);
+  assert.equal(j.keys[s.keyAt(50, 80)].id, 'q');
+  assert.ok(Array.isArray(j.slots) && Array.isArray(j.warnings));
+  const space = j.keys.find((k) => k.id === 'space');
+  assert.ok(space && space.sound === 'space', JSON.stringify(space));
+});
+
+test('a theme 3.0 is made 4.0 as the JVM makes it, its files named alike', () => {
+  const c = E.convert30(read(data, 'look-3.0.json'));
+  assert.ok(c.ok, JSON.stringify(c.problems));
+  assert.equal(c.xml, read(data, 'facade', 'look-3.0.xml'));
+  assert.equal(c.name, 'full');
+  assert.equal(c.dark, true);
+  assert.equal(c.files.map(([a, b]) => a + ' ' + b + '\n').join(''), read(data, 'facade', 'look-3.0-files.txt'));
+  // what it makes reads, and draws
+  const t = E.readTheme(c.xml, null, null);
+  assert.ok(t.ok, JSON.stringify(t.problems));
+  assert.ok(E.buildScene('qwerty', t.theme, { width: 1080, height: 702, density: 2.625, dark: true }, fixed).ok);
+  const bad = E.convert30('{\n  "version": 3.0,');
+  assert.equal(bad.ok, false);
+  assert.equal(bad.problems[0].line, 2);
+});
+
+test('a theme is written as the JVM writes it; a bad one is its problems with their lines, never a throw', () => {
+  const t = E.readTheme(read(data, 'material-light.xml'), null, null);
+  assert.ok(t.ok);
+  assert.equal(E.writeTheme(t.theme), read(data, 'writer', 'material-light.xml'));
+  const info = t.theme.info(false);
+  assert.equal(info.name, t.theme.name);
+  assert.deepEqual([...t.theme.variants], ['light']);
+  assert.match(info.colors.keyboard, /^#[0-9a-f]{8}$/);
+  const bad = E.readTheme('<theme xmlns="https://youmo-ime/theme/4" version="4.0">\n<colors>\n<color name="x" value="nope"/>', null, null);
+  assert.equal(bad.ok, false);
+  assert.ok(bad.problems.length > 0 && bad.problems.every((p) => typeof p.line === 'number' && p.message));
+  assert.equal(E.readTheme('', null, null).ok, false);
+  // system() colours from the page: a wrong one is a problem, not a throw
+  assert.equal(E.readTheme(read(data, 'material-light.xml'), { light: { primary: 'red' } }, null).ok, false);
+  assert.ok(E.readTheme(read(data, 'material-light.xml'), { light: { primary: '#ff0000' }, dark: {} }, null).ok);
+});
+
+test("the app's layouts are the library's, a layout of a page's reads with its own fragments or the app's", () => {
+  const dir = join(scene, 'commonMain', 'layouts');
+  const files = readdirSync(dir).filter((f) => f.endsWith('.xml')).map((f) => f.slice(0, -4)).sort();
+  const boards = files.filter((f) => /<keyboard[\s>]/.test(read(dir, f + '.xml')));
+  assert.deepEqual([...E.layouts()], boards);
+  for (const f of files) assert.equal(E.layoutSource(f), read(dir, f + '.xml'));
+  assert.equal(E.layoutSource('nope'), null);
+  assert.equal(E.layout('grouped-bottom'), null, 'a fragment is no board');
+  assert.equal(E.layout('qwerty').id, 'qwerty');
+  // the app's themes (060-render-p3 T3's files, where there are any)
+  const themesDir = join(scene, 'commonMain', 'themes');
+  let themeFiles = [];
+  try { themeFiles = readdirSync(themesDir).filter((f) => f.endsWith('.xml')).map((f) => f.slice(0, -4)).sort(); } catch (e) { /* none yet */ }
+  assert.deepEqual([...E.themes()], themeFiles);
+  for (const f of themeFiles) assert.equal(E.themeSource(f), read(themesDir, f + '.xml'));
+
+  const k14 = read(dir, 'k14.xml');
+  const own = E.readLayout(k14, null);
+  assert.ok(own.ok, JSON.stringify(own.problems));
+  const light = theme({ file: 'material-light.xml' });
+  const env = { width: 1080, height: 702, density: 2.625 };
+  assert.equal(E.buildScene(own.layout, light, env, fixed).scene.text(), E.buildScene('k14', light, env, fixed).scene.text());
+  // its own bottom row instead of the app's
+  const fragment = read(dir, 'grouped-bottom.xml');
+  const mine = E.readLayout(k14, { 'grouped-bottom': fragment });
+  assert.ok(mine.ok);
+  const missing = E.readLayout(k14.replace(/src="grouped-bottom"/g, 'src="nowhere"'), null);
+  assert.equal(missing.ok, false);
+  assert.match(missing.problems[0].message, /nowhere/);
+  assert.equal(E.readLayout(k14, { 'grouped-bottom': '<fragment' }).ok, false);
+  assert.equal(E.buildScene('nope', light, env, fixed).ok, false);
+  assert.equal(E.buildScene('qwerty', light, { width: 1080 }, fixed).ok, false, 'an environment without its height');
+  assert.equal(E.buildScene('qwerty', light, '{"width": 1, "height": 1, "density": 1, "shift": "twice"}', fixed).ok, false);
+  assert.equal(E.buildPopup(light, env, { kind: 'nothing' }, fixed).ok, false);
+});
+
+// ------------------------------------------------------------------ the painter, on a context that writes down
+
+// one decimal, as EnginePaintTest writes (Kotlin's roundToLong: halves up)
+const fixedN = (v, places) => {
+  const units = Math.floor(v * 10 ** places + 0.5);
+  const sign = units < 0 ? '-' : '';
+  const a = String(Math.abs(units)).padStart(places + 1, '0');
+  return sign + a.slice(0, a.length - places) + '.' + a.slice(a.length - places);
+};
+const n = (v) => fixedN(v, 1);
+const n2 = (v) => fixedN(v, 2);
+
+function argb(css) {
+  const m = /^rgba\((\d+),(\d+),(\d+),([\d.e-]+)\)$/.exec(css);
+  if (m) return '#' + [Math.round(Number(m[4]) * 255), Number(m[1]), Number(m[2]), Number(m[3])].map((x) => x.toString(16).padStart(2, '0')).join('');
+  if (css === '#000000') return '#ff000000';
+  throw new Error('a colour the painter does not write: ' + css);
+}
+
+/**
+ * A 2D context that writes, as EnginePaintTest's canvas does, a line for each thing drawn, in the device's pixels:
+ * a blurred thing is the shadow of what was drawn far off, so its place is the shadow's, its colour the shadow's,
+ * its sigma the shadow's blur halved; a fill clipped to outside another (even-odd, a box round both first) is a
+ * fill less that other; glyphs stroked and then filled alike are one text with its stroke.
+ */
+class RecordingContext {
+  constructor() {
+    this.lines = [];
+    this.s = this.fresh();
+    this.stack = [];
+    this.path = [];
+  }
+
+  fresh() {
+    return {
+      m: [1, 0, 0, 1, 0, 0], fillStyle: '#000000', strokeStyle: '#000000', lineWidth: 1, lineJoin: 'miter', miterLimit: 10,
+      font: '10px sans-serif', letterSpacing: '0px', shadowColor: 'rgba(0,0,0,0)', shadowBlur: 0, shadowOffsetX: 0, shadowOffsetY: 0,
+      globalAlpha: 1, textAlign: 'start', textBaseline: 'alphabetic', clip: null, less: null,
+    };
+  }
+
+  // the state's members as a context's properties
+  static {
+    for (const k of ['fillStyle', 'strokeStyle', 'lineWidth', 'lineJoin', 'miterLimit', 'font', 'letterSpacing', 'shadowColor', 'shadowBlur',
+      'shadowOffsetX', 'shadowOffsetY', 'globalAlpha', 'textAlign', 'textBaseline']) {
+      Object.defineProperty(this.prototype, k, { get() { return this.s[k]; }, set(v) { this.s[k] = v; } });
+    }
+  }
+
+  // a level's own clip is its own (a restore of it writes `unclip`); a fill less a shape stays so inside
+  save() {
+    this.stack.push(this.s);
+    this.s = { ...this.s, m: [...this.s.m], clip: null };
+  }
+
+  restore() {
+    const clipped = this.s.clip;
+    this.s = this.stack.pop();
+    if (clipped === 'clip') this.lines.push('unclip');
+  }
+
+  getTransform() { const [a, b, c, d, e, f] = this.s.m; return { a, b, c, d, e, f }; }
+
+  transform(a2, b2, c2, d2, e2, f2) {
+    const [a, b, c, d, e, f] = this.s.m;
+    this.s.m = [a * a2 + c * b2, b * a2 + d * b2, a * c2 + c * d2, b * c2 + d * d2, a * e2 + c * f2 + e, b * e2 + d * f2 + f];
+  }
+
+  translate(x, y) { this.transform(1, 0, 0, 1, x, y); }
+  scale(x, y) { this.transform(x, 0, 0, y, 0, 0); }
+  rotate(r) { this.transform(Math.cos(r), Math.sin(r), -Math.sin(r), Math.cos(r), 0, 0); }
+
+  map(x, y) { const [a, b, c, d, e, f] = this.s.m; return [a * x + c * y + e, b * x + d * y + f]; }
+
+  // a path's points in the device's pixels as they are added (a canvas's path is), by subpath
+  beginPath() { this.path = []; }
+  moveTo(x, y) { this.path.push([this.map(x, y)]); }
+  lineTo(x, y) { if (!this.path.length) this.path.push([]); this.path.at(-1).push(this.map(x, y)); }
+  closePath() {}
+  rect(x, y, w, h) { this.path.push([this.map(x, y), this.map(x + w, y), this.map(x + w, y + h), this.map(x, y + h)]); }
+
+  arc(cx, cy, r, a0, a1) {
+    // its ends and every quarter it passes: its bounds
+    const at = [a0, a1];
+    for (let q = Math.ceil(a0 / (Math.PI / 2)); q * (Math.PI / 2) < a1; q++) at.push(q * (Math.PI / 2));
+    for (const a of at) this.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+  }
+
+  static bounds(points) {
+    const xs = points.map((p) => p[0]);
+    const ys = points.map((p) => p[1]);
+    return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+  }
+
+  static box(b, dx = 0, dy = 0) { return [n(b[0] + dx), n(b[1] + dy), n(b[2] + dx), n(b[3] + dy)].join(','); }
+
+  // the shadow's way of drawing, where there is one: [colour, dx, dy, sigma]
+  shadow() {
+    if (this.s.shadowBlur <= 0) return null;
+    return [argb(this.s.shadowColor), this.s.shadowOffsetX, this.s.shadowOffsetY, this.s.shadowBlur / 2];
+  }
+
+  clip(rule) {
+    const subpaths = this.path;
+    // a box round both, then the shape left out by the even-odd rule: the fill next is that less this
+    if (rule === 'evenodd' && subpaths.length > 1) {
+      this.s.less = RecordingContext.bounds(subpaths.slice(1).flat());
+      this.s.clip = 'less';
+      return;
+    }
+    this.lines.push('clip ' + RecordingContext.box(RecordingContext.bounds(subpaths.flat())));
+    this.s.clip = 'clip';
+  }
+
+  fill(a) {
+    if (a instanceof Path2D) return this.icon(a);
+    const b = RecordingContext.bounds(this.path.flat());
+    if (typeof this.s.fillStyle !== 'string') return this.lines.push('gradient ' + RecordingContext.box(b));
+    const less = this.s.less;
+    if (less) return this.lines.push('fill ' + RecordingContext.box(b) + ' ' + argb(this.s.fillStyle) + ' less=' + RecordingContext.box(less));
+    const sh = this.shadow();
+    if (sh) return this.lines.push('fill ' + RecordingContext.box(b, sh[1], sh[2]) + ' ' + sh[0] + ' blur=' + n(sh[3]));
+    this.lines.push('fill ' + RecordingContext.box(b) + ' ' + argb(this.s.fillStyle));
+  }
+
+  stroke(p) {
+    if (p instanceof Path2D) return this.icon(p);
+    const [a, b] = this.s.m;
+    this.lines.push('stroke ' + RecordingContext.box(RecordingContext.bounds(this.path.flat())) + ' ' + argb(this.s.strokeStyle) + ' w=' + n(this.s.lineWidth * Math.hypot(a, b)));
+  }
+
+  // an icon: its name (its one path's, below), its box the viewport's corners on the device
+  icon(p) {
+    const view = icons[p.d];
+    const corners = [this.map(0, 0), this.map(view.vw, 0), this.map(view.vw, view.vh), this.map(0, view.vh)];
+    this.lines.push('icon ' + p.d + ' ' + RecordingContext.box(RecordingContext.bounds(corners)) + ' ' + argb(this.s.fillStyle));
+  }
+
+  fillText(text, x, y) {
+    if (this.stroked === text) { this.stroked = null; return; }
+    this.text(text, x, y, argb(this.s.fillStyle), '');
+  }
+
+  strokeText(text, x, y) {
+    this.stroked = text;
+    const [a, b] = this.s.m;
+    this.text(text, x, y, argb(this.s.strokeStyle), ' stroke=' + n(this.s.lineWidth * Math.hypot(a, b)));
+  }
+
+  // where Paint would have it: the painter moved it by half a letter's spacing (squeezed), along the text's line
+  text(text, x, y, color, stroke) {
+    const m = /^(\d+) ([\d.e-]+)px /.exec(this.s.font);
+    const [a, b, c, d] = this.s.m;
+    const sx = Math.hypot(a, b) / Math.hypot(c, d);
+    const size = Number(m[2]) * Math.hypot(c, d);
+    const spacing = parseFloat(this.s.letterSpacing);
+    const angle = Math.atan2(b, a);
+    let [px, py] = this.map(x, y);
+    px -= Math.cos(angle) * spacing * sx / 2;
+    py -= Math.sin(angle) * spacing * sx / 2;
+    const sh = this.shadow();
+    if (sh) { px += sh[1]; py += sh[2]; color = sh[0]; }
+    const rot = Math.round(angle * 180 / Math.PI);
+    this.lines.push('text "' + text + '" ' + n(px) + ',' + n(py) + ' w=' + m[1] + ' s=' + n(size) + ' sx=' + n2(sx) + ' ls=' + n2(spacing / Number(m[2])) +
+      ' ' + color + stroke + (sh ? ' blur=' + n(sh[3]) : '') + (rot !== 0 ? ' rot=' + rot : ''));
+  }
+
+  createLinearGradient() { return { addColorStop() {} }; }
+  drawImage() { this.lines.push('image'); }
+}
+
+/**
+ * Two lines alike: the same words, each number within a tenth and a little: the app draws in floats, the library in
+ * doubles, so a number at a half of a tenth (42.95) may round either way.
+ */
+function sameLine(a, b) {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  const num = /-?\d+(?:\.\d+)?/g;
+  if (a.replace(num, '#') !== b.replace(num, '#')) return false;
+  const x = a.match(num) || [];
+  const y = b.match(num) || [];
+  return x.every((v, i) => Math.abs(Number(v) - Number(y[i])) <= 0.1 + 1e-9);
+}
+
+// the app's icons by the scene's names (EnginePaintTest writes them): each here a path of its own name
+const icons = Object.fromEntries(Object.keys(JSON.parse(read(testdata, 'engine-icons.json'))).map((k) => [k, { vw: 24, vh: 24, paths: [{ d: k }] }]));
+
+test("the library's painter draws what the app's ScenePainter draws, line for line (testdata/paint.txt)", () => {
+  const sections = read(testdata, 'paint.txt').split(/^== /m).filter(Boolean);
+  assert.ok(sections.length >= 10, 'the shots EnginePaintTest draws');
+  const all = Object.fromEntries([...shots.shots, ...shots.popups].map((s) => [s.name, s]));
+  const wrong = [];
+  for (const section of sections) {
+    const [head, ...want] = section.replace(/\n$/, '').split('\n');
+    const [name, shot, pressedAt] = head.split(' ');
+    const pressed = pressedAt.slice('pressed='.length);
+    const ctx = new RecordingContext();
+    E.paint(built(all[shot]), ctx, { pressed: pressed === '-' ? null : pressed, icons });
+    const got = ctx.lines;
+    const at = got.findIndex((l, i) => !sameLine(l, want[i]));
+    if (at >= 0 || got.length !== want.length) {
+      const i = at >= 0 ? at : Math.min(got.length, want.length);
+      wrong.push(name + ' line ' + (i + 2) + ':\n  app:     ' + want[i] + '\n  library: ' + got[i]);
+    }
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test('a page with no icon or image for an op draws what it can: a nine-slice its fallback colour, nothing for the rest', () => {
+  const ctx = new RecordingContext();
+  const s = built(shots.shots.find((x) => x.name === 'qwerty-block'));
+  E.paint(s, ctx, null);
+  assert.ok(!ctx.lines.some((l) => l.startsWith('icon')), 'no icons given, none drawn');
+  assert.ok(ctx.lines.some((l) => l.startsWith('text')));
+});
+
+test('the built-in themes and layouts are what the build put in (lib/keyboard-scene builtInFiles)', () => {
+  assert.ok(E.layouts().includes('qwerty') && E.layouts().includes('nine'));
+  assert.equal(E.layoutSource('grouped-bottom'), read(scene, 'commonMain', 'layouts', 'grouped-bottom.xml'));
+});

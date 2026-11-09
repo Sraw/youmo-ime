@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Engine preview</title>
+<!-- The engine's preview (060-render-p3 W1), for development only: any board, theme, size and form drawn by
+     lib/keyboard-scene's library as the app draws it. Served by dev/serve.mjs; not the maker's page, never
+     published. ?shot=<name>[&pressed=<id>] draws a snapshot's ask as the JVM's tests made it (facade/shots.json),
+     measured as they were (FixedMeasurer), and writes the canvas as a PNG data URL into #out: test/pixel-smoke.mjs. -->
+<style>
+  @font-face { font-family: "Youmo Latin"; font-weight: 400; font-display: block; src: url(/fonts/latin-400.woff2) format("woff2"); }
+  @font-face { font-family: "Youmo Latin"; font-weight: 700; font-display: block; src: url(/fonts/latin-700.woff2) format("woff2"); }
+  @font-face { font-family: "Youmo Han"; font-weight: 400; font-display: block; src: url(/fonts/han-400.woff2) format("woff2"); }
+  @font-face { font-family: "Youmo Han"; font-weight: 700; font-display: block; src: url(/fonts/han-700.woff2) format("woff2"); }
+  body { font: 14px system-ui, sans-serif; margin: 16px; background: #fafafa; color: #222; }
+  form { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 12px; }
+  label { display: inline-flex; gap: 4px; align-items: center; }
+  input[type=number] { width: 6em; }
+  textarea { width: 100%; height: 8em; font: 12px ui-monospace, monospace; }
+  canvas { display: block; border: 1px solid #ccc; max-width: 100%; }
+  #problems { color: #b00020; white-space: pre-wrap; }
+  #out { display: none; }
+</style>
+</head>
+<body>
+<form id="form">
+  <label>键盘 <select id="board"></select></label>
+  <label>主题 <select id="theme"></select></label>
+  <label>宽 <input id="width" type="number" value="1080"></label>
+  <label>高 <input id="height" type="number" value="702"></label>
+  <label>密度 <input id="density" type="number" value="2.625" step="0.025"></label>
+  <label><input id="dark" type="checkbox">深色</label>
+  <label><input id="landscape" type="checkbox">横屏</label>
+  <label><input id="floating" type="checkbox">悬浮</label>
+  <label><input id="split" type="checkbox">分体</label>
+  <label><input id="oneHanded" type="checkbox">单手</label>
+  <label><input id="compact" type="checkbox">紧凑</label>
+  <label><input id="flat" type="checkbox">扁平</label>
+  <label>停靠 <select id="dock"><option value="">—</option><option>left</option><option>right</option></select></label>
+  <label><input id="canvasMeasure" type="checkbox" checked>按字体量字</label>
+</form>
+<details><summary>主题 XML（选「自己的」时用）</summary><textarea id="xml"></textarea></details>
+<div id="problems"></div>
+<canvas id="canvas"></canvas>
+<pre id="out"></pre>
+<script src="/engine.js"></script>
+<script>
+'use strict';
+const E = globalThis['youmo-engine'].YoumoEngine;
+const $ = (id) => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+let icons = {};
+let pressed = null;
+
+// a snapshot's theme as SnapshotTest's ThemeSource makes it: the file, its styles and fonts put in
+async function themeOf(t) {
+  let text = await (await fetch('/data/' + t.file)).text();
+  if (t.styles || t.fonts) {
+    text = text.replace('</colors>', '</colors>' + (t.fonts || '')).replace('</theme>', [...(t.styles || []), '</theme>'].join('\n'));
+  }
+  return E.readTheme(text, null, null);
+}
+
+function draw(scene) {
+  const c = $('canvas');
+  c.width = scene.width;
+  c.height = scene.height;
+  c.style.width = scene.width / devicePixelRatio + 'px';
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  E.paint(scene, ctx, { pressed, icons });
+}
+
+async function fontsLoaded() {
+  await Promise.all(['400', '700'].flatMap((w) => [document.fonts.load(w + ' 20px "Youmo Latin"', 'a'), document.fonts.load(w + ' 20px "Youmo Han"', '中')]));
+}
+
+async function shot(name) {
+  const all = await (await fetch('/shots.json')).json();
+  const s = [...all.shots, ...all.popups].find((x) => x.name === name);
+  if (!s) throw new Error('no shot ' + name);
+  const theme = await themeOf(s.theme);
+  if (!theme.ok) throw new Error(JSON.stringify(theme.problems));
+  const fixed = E.fixedMeasurer();
+  const r = s.request ? E.buildPopup(theme.theme, s.env, s.request, fixed) : E.buildScene(s.board, theme.theme, s.env, fixed);
+  if (!r.ok) throw new Error(JSON.stringify(r.problems));
+  pressed = params.get('pressed');
+  draw(r.scene);
+  $('out').textContent = $('canvas').toDataURL('image/png');
+}
+
+let current = null;
+async function preview() {
+  const choice = $('theme').value;
+  const read = choice === 'own' ? E.readTheme($('xml').value, null, null)
+    : choice.startsWith('app:') ? E.readTheme(E.themeSource(choice.slice(4)), null, null)
+    : await themeOf({ file: choice });
+  const env = { width: +$('width').value, height: +$('height').value, density: +$('density').value };
+  for (const k of ['dark', 'landscape', 'floating', 'split', 'oneHanded', 'compact', 'flat']) if ($(k).checked) env[k] = true;
+  if ($('dock').value) env.dock = $('dock').value;
+  const problems = [];
+  if (!read.ok) problems.push(...read.problems);
+  else {
+    const measurer = $('canvasMeasure').checked ? E.canvasMeasurer($('canvas').getContext('2d'), null) : E.fixedMeasurer();
+    const r = E.buildScene($('board').value, read.theme, env, measurer);
+    if (!r.ok) problems.push(...r.problems);
+    else { current = r.scene; problems.push(...current.json().warnings); draw(current); }
+  }
+  $('problems').textContent = problems.map((p) => (p.line ? 'line ' + p.line + ': ' : '') + p.message).join('\n');
+}
+
+(async () => {
+  icons = await (await fetch('/icons.json')).json();
+  await fontsLoaded();
+  if (params.get('shot')) {
+    try { await shot(params.get('shot')); } catch (e) { $('out').textContent = 'error: ' + e.message; }
+    return;
+  }
+  for (const id of E.layouts()) $('board').add(new Option(id, id));
+  $('board').value = 'qwerty';
+  for (const f of ['material-light.xml', 'material-dark.xml']) $('theme').add(new Option(f, f));
+  for (const t of E.themes()) $('theme').add(new Option('app: ' + t, 'app:' + t));
+  $('theme').add(new Option('自己的', 'own'));
+  $('form').addEventListener('input', preview);
+  $('xml').addEventListener('input', () => { if ($('theme').value === 'own') preview(); });
+  // a key pressed where clicked, as the phone shows it held
+  $('canvas').addEventListener('pointerdown', (e) => {
+    if (!current) return;
+    const r = $('canvas').getBoundingClientRect();
+    const k = current.keyAt((e.clientX - r.left) * current.width / r.width, (e.clientY - r.top) * current.height / r.height);
+    pressed = k >= 0 ? current.json().keys[k].id : null;
+    draw(current);
+  });
+  $('canvas').addEventListener('pointerup', () => { pressed = null; if (current) draw(current); });
+  await preview();
+})();
+</script>
+</body>
+</html>
