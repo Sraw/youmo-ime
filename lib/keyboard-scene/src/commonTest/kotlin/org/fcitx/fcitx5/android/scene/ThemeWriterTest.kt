@@ -19,6 +19,8 @@ import org.fcitx.fcitx5.android.scene.theme.ThemeWriter
 import org.fcitx.fcitx5.android.scene.theme.Value
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ThemeWriterTest {
@@ -114,14 +116,46 @@ class ThemeWriterTest {
     fun valuesMadeNotReadAreWrittenAsWhatTheyDraw() {
         assertEquals("none", ThemeWriter.value("shadow", Value.OfShadow(Shadow(0.0, 1.0, 0.0, null))))
         assertEquals("none", ThemeWriter.value("border", Value.OfBorder(Border(1.0, null))))
-        assertEquals("0 0 0 #ff000000", ThemeWriter.value("shadow", Value.OfShadow(Shadow(0.0, 0.0, 0.0, ColorExpr.Literal(Argb(0xff000000.toInt()))))))
-        assertEquals("picture(0dp, 100%, @key)", ThemeWriter.value("fill", Value.OfFill(Fill.Picture(null, null, ColorExpr.Ref("key")))))
+        assertEquals("0 0 0 #000000", ThemeWriter.value("shadow", Value.OfShadow(Shadow(0.0, 0.0, 0.0, ColorExpr.Literal(Argb(0xff000000.toInt()))))))
         assertEquals("1dp 2dp 3dp 4dp", ThemeWriter.value("inset", Value.OfInset(Inset(1.0, 2.0, 3.0, 4.0))))
         // a style that sets nothing (a later stage's properties alone) is not written: a file of it would not read
         val t = read("material-light.xml")
         val nothing = Style(listOf(Selector.parse("preview")!!), emptyMap(), t.styles.size, 0)
         val more = Theme(t.name, t.dark, t.version, t.colors, t.styles + nothing, t.fonts, t.icons, t.picture, t.variants, t.baseColors, t.darkColors, t.meta)
         assertEquals(ThemeWriter.write(t), ThemeWriter.write(more))
+    }
+
+    // a picture() of the <picture>'s blur and brightness with a colour over it: no text says it (picture() names
+    // both, or neither and no colour), and no theme read or made has one; written, it is refused, not guessed
+    @Test
+    fun aPictureOfTheThemesBlurWithAColourIsRefused() {
+        assertEquals("picture", ThemeWriter.value("fill", Value.OfFill(Fill.Picture(null, null))))
+        assertEquals("picture(4dp, 90%, @key)", ThemeWriter.value("fill", Value.OfFill(Fill.Picture(4.0, 90.0, ColorExpr.Ref("key")))))
+        for (half in listOf(Fill.Picture(null, null, ColorExpr.Ref("key")), Fill.Picture(4.0, null), Fill.Picture(null, 90.0))) {
+            assertFailsWith<IllegalArgumentException>("$half") { ThemeWriter.value("fill", Value.OfFill(half)) }
+        }
+    }
+
+    // a colour near the longest the reader takes (ColorExpr.MAX_LENGTH), functions nested, in its shortest form:
+    // written as it is, and read back; one as an author may write it (spaces, `transparent`, an opaque alpha) shorter
+    @Test
+    fun aLongColourIsWrittenNoLonger() {
+        val system = "system(surface-container-highest,#80abcdef)"
+        var long = "darker(#80123456,10%)"
+        repeat(4) { long = "mix($long,$system,100%)" }
+        assertTrue(long.length in ColorExpr.MAX_LENGTH - 30..ColorExpr.MAX_LENGTH, "${long.length}")
+        val c = assertNotNull(ColorExpr.parse(long))
+        assertEquals(long, ThemeWriter.color(c))
+        // in a theme, as a style's fill: written and read back the same
+        val t = read("material-light.xml")
+        val style = Style(listOf(Selector.parse("key")!!), mapOf("fill" to Value.OfFill(Fill.Solid(c))), t.styles.size, 0)
+        val more = Theme(t.name, t.dark, t.version, t.colors, t.styles + style, t.fonts, t.icons, t.picture, t.variants, t.baseColors, t.darkColors, t.meta)
+        assertSameTheme(more, rewritten(more), "a long colour")
+        val spaced = "mix( darker(#FF123456, 10%) , system(primary, transparent), 50% )"
+        val written = ThemeWriter.color(assertNotNull(ColorExpr.parse(spaced)))
+        assertEquals("mix(darker(#123456,10%),system(primary,#00000000),50%)", written)
+        assertEquals(ColorExpr.parse(spaced), ColorExpr.parse(written))
+        assertEquals("#80123456", ThemeWriter.color(ColorExpr.parse("#80123456")!!))
     }
 
     private companion object {

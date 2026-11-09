@@ -13,14 +13,20 @@ package org.fcitx.fcitx5.android.scene.theme
  *   two spaces an indent, a line each.
  * - Colours as [Theme] holds them, resolved: `<colors>` the light version's (or the only one's), the
  *   24 of [ThemeReader.REQUIRED_COLORS] first and in that order, the theme's own after them by name;
- *   `<colors variant="dark">` only those the dark version has otherwise. A colour is `#aarrggbb`
- *   ([Argb]'s text), a fully transparent black `transparent`. The variables and `system()` a file's
- *   `<colors>` had are gone (a theme read keeps their values only); a style's colours are kept as
- *   written, `@name`, `system()` and all.
+ *   `<colors variant="dark">` only those the dark version has otherwise. A colour is written as
+ *   the shortest the reader takes ([color]): `#rrggbb` where opaque, else `#aarrggbb`, a function's
+ *   arguments after a bare `,`; so a colour read (at most [ColorExpr.MAX_LENGTH] characters) is never
+ *   written longer, and reads back. A style's colours are kept as written, `@name`, `system()` and all.
  * - A style's selectors joined by `, `, each as [selector] writes it; its properties in
  *   [Values.PROPERTIES]' order and then [Values.KEYBOARD_SIZES]', each as [value] writes it. A style
  *   that sets nothing is left out.
  * - Fonts and icons by name.
+ *
+ * Not a faithful exporter of a 4.0 file whose `<colors>` use `system()` or other colours (`@name`,
+ * `darker(@key, 10%)`): a theme read keeps their values only, resolved with the system's colours of
+ * the reading, so the file written has those values as literals and no longer follows the system's
+ * colours nor a colour it named. What it is made for, LookTheme's themes (literal colours) and a file
+ * of literal `<colors>`, it writes as they are.
  *
  * A theme picked as its other version ([Theme.variant]) is written as its file: read back, it is the
  * version first drawn.
@@ -165,10 +171,13 @@ object ThemeWriter {
         is Fill.Linear -> "linear(${number(f.angle)}deg, ${f.stops.joinToString(", ") { (c, at) -> "${color(c)} ${number(at)}%" }})"
         is Fill.Image -> "image(${f.file}, ${f.insets.joinToString(" ")}, ${f.pxPerDp}x" + (f.fallback?.let { ", ${color(it)})" } ?: ")")
         // its blur in dp always: picture()'s grammar has no bare 0
-        is Fill.Picture -> if (f.blurDp == null && f.brightness == null && f.over == null) {
-            "picture"
-        } else {
-            "picture(${number(f.blurDp ?: 0.0)}dp, ${number(f.brightness ?: FULL)}%" + (f.over?.let { ", ${color(it)})" } ?: ")")
+        is Fill.Picture -> when {
+            f.blurDp == null && f.brightness == null && f.over == null -> "picture"
+            // the <picture>'s blur and brightness (null) with another's colour over it: picture()'s text has no
+            // such form (it names a blur and brightness, or nothing), and none read nor made is one
+            f.blurDp == null || f.brightness == null ->
+                throw IllegalArgumentException("picture(${f.blurDp}, ${f.brightness}, ${f.over}): picture() names both its blur and brightness, or neither and no colour")
+            else -> "picture(${number(f.blurDp)}dp, ${number(f.brightness)}%" + (f.over?.let { ", ${color(it)})" } ?: ")")
         }
     }
 
@@ -182,20 +191,25 @@ object ThemeWriter {
     private fun inset(i: Inset): String =
         if (i.top == i.bottom && i.left == i.right) "${length(i.top)} ${length(i.right)}" else listOf(i.top, i.right, i.bottom, i.left).joinToString(" ") { length(it) }
 
-    /** [c] as a colour's text: `#aarrggbb`, `@name`, `transparent` for a transparent black, a function of them. */
+    /**
+     * [c] as a colour's text, the shortest the reader takes: `#rrggbb` where opaque, else `#aarrggbb`
+     * (`#00000000`, not `transparent`), `@name`, a function of them with no space after its commas.
+     */
     fun color(c: ColorExpr): String = when (c) {
         is ColorExpr.Literal -> color(c.argb)
         is ColorExpr.Ref -> "@${c.name}"
-        is ColorExpr.Fn -> "${c.name}(${c.args.joinToString(", ") { color(it) }}, ${number(c.percent)}%)"
-        is ColorExpr.System -> "system(${c.name}, ${color(c.fallback)})"
+        is ColorExpr.Fn -> "${c.name}(${c.args.joinToString(",") { color(it) }},${number(c.percent)}%)"
+        is ColorExpr.System -> "system(${c.name},${color(c.fallback)})"
     }
 
-    private fun color(c: Argb): String = if (c == Argb.TRANSPARENT) "transparent" else c.toString()
+    // [Argb]'s `#aarrggbb`, its alpha left out where opaque
+    private fun color(c: Argb): String = c.toString().let { if (c.alpha == OPAQUE) "#" + it.substring(ALPHA_DIGITS) else it }
+
+    private const val OPAQUE = 0xff
+    private const val ALPHA_DIGITS = 3
 
     // a length: dp, 0 without its unit (as CSS writes it, and the built-in themes)
     private fun length(dp: Double): String = if (dp == 0.0) "0" else "${number(dp)}dp"
-
-    private const val FULL = 100.0
 
     /**
      * [d] as a plain decimal, the same on the JVM and JS: `4` not `4.0`, `0.5`, never an exponent

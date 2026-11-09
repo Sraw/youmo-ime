@@ -1,35 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <theme xmlns="https://youmo-ime/theme/4" name="names-dark" variants="dark" version="4.0">
   <colors>
-    <color name="background" value="#ffeceff1"/>
-    <color name="bar" value="#ffe4e7e9"/>
-    <color name="keyboard" value="#ffeceff1"/>
-    <color name="key" value="#fffbfbfc"/>
-    <color name="keyText" value="#ff37474f"/>
-    <color name="candidateText" value="#ff37474f"/>
-    <color name="candidateLabel" value="#ff37474f"/>
-    <color name="candidateComment" value="#ff7a858a"/>
-    <color name="altKey" value="#ffdfe2e4"/>
-    <color name="altKeyText" value="#ff7a858a"/>
-    <color name="accentKey" value="#ff5cb5ab"/>
-    <color name="accentKeyText" value="#ffffffff"/>
+    <color name="background" value="#eceff1"/>
+    <color name="bar" value="#e4e7e9"/>
+    <color name="keyboard" value="#eceff1"/>
+    <color name="key" value="#fbfbfc"/>
+    <color name="keyText" value="#37474f"/>
+    <color name="candidateText" value="#37474f"/>
+    <color name="candidateLabel" value="#37474f"/>
+    <color name="candidateComment" value="#7a858a"/>
+    <color name="altKey" value="#dfe2e4"/>
+    <color name="altKeyText" value="#7a858a"/>
+    <color name="accentKey" value="#5cb5ab"/>
+    <color name="accentKeyText" value="#ffffff"/>
     <color name="keyPressHighlight" value="#1f000000"/>
-    <color name="keyShadow" value="#ffc0c3c4"/>
-    <color name="popupBackground" value="#ffd9dbdd"/>
-    <color name="popupText" value="#ff37474f"/>
-    <color name="spaceBar" value="#ffc9ced1"/>
+    <color name="keyShadow" value="#c0c3c4"/>
+    <color name="popupBackground" value="#d9dbdd"/>
+    <color name="popupText" value="#37474f"/>
+    <color name="spaceBar" value="#c9ced1"/>
     <color name="divider" value="#1f000000"/>
-    <color name="clipboardEntry" value="#fffbfbfc"/>
-    <color name="genericActiveBackground" value="#ff80cbc4"/>
-    <color name="genericActiveForeground" value="#ff37474f"/>
-    <color name="keyBorder" value="#ffc0c3c4"/>
-    <color name="keyHint" value="#ff7a858a"/>
-    <color name="toolbarIcon" value="#ff7a858a"/>
+    <color name="clipboardEntry" value="#fbfbfc"/>
+    <color name="genericActiveBackground" value="#80cbc4"/>
+    <color name="genericActiveForeground" value="#37474f"/>
+    <color name="keyBorder" value="#c0c3c4"/>
+    <color name="keyHint" value="#7a858a"/>
+    <color name="toolbarIcon" value="#7a858a"/>
   </colors>
   <style select="keyboard" fill="@background"/>
   <style select="@flat keyboard" fill="@keyboard"/>
-  <style select="bar" fill="transparent"/>
-  <style select="panel" fill="transparent"/>
+  <style select="bar" fill="#00000000"/>
+  <style select="panel" fill="#00000000"/>
   <style select="@flat panel" fill="@bar"/>
   <style select="key" fill="image(key.png, 1 1 1 1, 1x, @key)" radius="4dp" border="none" shadow="0 1dp 0 @keyShadow" inset="7dp 3dp" color="@keyText" font="system" weight="400" scale="100%" icon-color="@keyText" press="tint"/>
   <style select="@landscape key" inset="4dp 3dp"/>
@@ -44,12 +44,12 @@
   <style select="key.enter mark" color="@accentKeyText"/>
   <style select="key badge" icon-color="@altKeyText"/>
   <style select="*/reading:on" color="@accentKey" icon-color="@accentKey"/>
-  <style select="@flat key" fill="transparent" radius="0" shadow="none"/>
+  <style select="@flat key" fill="#00000000" radius="0" shadow="none"/>
   <style select="@flat key.space" fill="@spaceBar" shape="bar" radius="3dp"/>
   <style select="@flat key.enter" fill="@accentKey" shape="circle"/>
   <style select="number/\*, number/\:, zhuyin-nine/r1c1, zhuyin/\,, zhuyin/\., zhuyin//, zhuyin/;" fill="image(k.png, 12 12 12 12, 3x, @key)"/>
   <style select="number/\*.function, number/\:.function, zhuyin-nine/r1c1.function, zhuyin/\,.function, zhuyin/\..function, zhuyin//.function, zhuyin/;.function" fill="image(k.png, 12 12 12 12, 3x, @altKey)"/>
-  <style select="@flat number/\*, @flat number/\:, @flat zhuyin-nine/r1c1, @flat zhuyin/\,, @flat zhuyin/\., @flat zhuyin//, @flat zhuyin/;" fill="transparent"/>
+  <style select="@flat number/\*, @flat number/\:, @flat zhuyin-nine/r1c1, @flat zhuyin/\,, @flat zhuyin/\., @flat zhuyin//, @flat zhuyin/;" fill="#00000000"/>
   <style select="number/\*.enter, number/\:.enter, zhuyin-nine/r1c1.enter, zhuyin/\,.enter, zhuyin/\..enter, zhuyin//.enter, zhuyin/;.enter" fill="image(k.png, 12 12 12 12, 3x, @accentKey)"/>
   <style select="@flat number/\*.space, @flat number/\:.space, @flat zhuyin-nine/r1c1.space, @flat zhuyin/\,.space, @flat zhuyin/\..space, @flat zhuyin//.space, @flat zhuyin/;.space" fill="image(k.png, 12 12 12 12, 3x, @spaceBar)"/>
   <style select="number/\* label, number/\: label, zhuyin-nine/r1c1 label, zhuyin/\, label, zhuyin/\. label, zhuyin// label, zhuyin/; label" hidden="true"/>
@@ -58,5 +58,5 @@
   <style select="menu" fill="@accentKey" radius="50%" color="@accentKeyText" icon-color="@accentKeyText"/>
   <style select="menu:selected" overlay="@keyPressHighlight"/>
   <style select="@floating keyboard" radius="7dp"/>
-  <style select="handle" fill="mix(@background, @keyText, 10%)"/>
+  <style select="handle" fill="mix(@background,@keyText,10%)"/>
 </theme>

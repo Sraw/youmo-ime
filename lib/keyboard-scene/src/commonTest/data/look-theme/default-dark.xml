@@ -1,35 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <theme xmlns="https://youmo-ime/theme/4" name="default-dark" variants="dark" version="4.0">
   <colors>
-    <color name="background" value="#ff263238"/>
-    <color name="bar" value="#ff21272b"/>
-    <color name="keyboard" value="#ff263238"/>
-    <color name="key" value="#ff404a50"/>
-    <color name="keyText" value="#ffd9dbdc"/>
-    <color name="candidateText" value="#ffd9dbdc"/>
-    <color name="candidateLabel" value="#ffd9dbdc"/>
-    <color name="candidateComment" value="#ffadb1b3"/>
-    <color name="altKey" value="#ff313c42"/>
-    <color name="altKeyText" value="#ffadb1b3"/>
-    <color name="accentKey" value="#ff6eaca8"/>
-    <color name="accentKeyText" value="#ffffffff"/>
+    <color name="background" value="#263238"/>
+    <color name="bar" value="#21272b"/>
+    <color name="keyboard" value="#263238"/>
+    <color name="key" value="#404a50"/>
+    <color name="keyText" value="#d9dbdc"/>
+    <color name="candidateText" value="#d9dbdc"/>
+    <color name="candidateLabel" value="#d9dbdc"/>
+    <color name="candidateComment" value="#adb1b3"/>
+    <color name="altKey" value="#313c42"/>
+    <color name="altKeyText" value="#adb1b3"/>
+    <color name="accentKey" value="#6eaca8"/>
+    <color name="accentKeyText" value="#ffffff"/>
     <color name="keyPressHighlight" value="#33ffffff"/>
-    <color name="keyShadow" value="#ff1f292e"/>
-    <color name="popupBackground" value="#ff3c474c"/>
-    <color name="popupText" value="#ffffffff"/>
-    <color name="spaceBar" value="#ff3b464c"/>
+    <color name="keyShadow" value="#1f292e"/>
+    <color name="popupBackground" value="#3c474c"/>
+    <color name="popupText" value="#ffffff"/>
+    <color name="spaceBar" value="#3b464c"/>
     <color name="divider" value="#1fffffff"/>
-    <color name="clipboardEntry" value="#ff404a50"/>
-    <color name="genericActiveBackground" value="#ff4db6ac"/>
-    <color name="genericActiveForeground" value="#ffffffff"/>
-    <color name="keyBorder" value="#ff1f292e"/>
-    <color name="keyHint" value="#ffadb1b3"/>
-    <color name="toolbarIcon" value="#ffadb1b3"/>
+    <color name="clipboardEntry" value="#404a50"/>
+    <color name="genericActiveBackground" value="#4db6ac"/>
+    <color name="genericActiveForeground" value="#ffffff"/>
+    <color name="keyBorder" value="#1f292e"/>
+    <color name="keyHint" value="#adb1b3"/>
+    <color name="toolbarIcon" value="#adb1b3"/>
   </colors>
   <style select="keyboard" fill="@background"/>
   <style select="@flat keyboard" fill="@keyboard"/>
-  <style select="bar" fill="transparent"/>
-  <style select="panel" fill="transparent"/>
+  <style select="bar" fill="#00000000"/>
+  <style select="panel" fill="#00000000"/>
   <style select="@flat panel" fill="@bar"/>
   <style select="key" fill="@key" radius="4dp" border="none" shadow="0 1dp 0 @keyShadow" inset="7dp 3dp" color="@keyText" font="system" weight="400" scale="100%" icon-color="@keyText" press="tint"/>
   <style select="@landscape key" inset="4dp 3dp"/>
@@ -43,7 +43,7 @@
   <style select="key.enter mark" color="@accentKeyText"/>
   <style select="key badge" icon-color="@altKeyText"/>
   <style select="*/reading:on" color="@accentKey" icon-color="@accentKey"/>
-  <style select="@flat key" fill="transparent" radius="0" shadow="none"/>
+  <style select="@flat key" fill="#00000000" radius="0" shadow="none"/>
   <style select="@flat key.space" fill="@spaceBar" shape="bar" radius="3dp"/>
   <style select="@flat key.enter" fill="@accentKey" shape="circle"/>
   <style select="preview, popup" fill="@popupBackground" radius="4dp" shadow="0 2dp 2dp #33000000" color="@popupText"/>
@@ -51,5 +51,5 @@
   <style select="menu" fill="@accentKey" radius="50%" color="@accentKeyText" icon-color="@accentKeyText"/>
   <style select="menu:selected" overlay="@keyPressHighlight"/>
   <style select="@floating keyboard" radius="7dp"/>
-  <style select="handle" fill="mix(@background, @keyText, 10%)"/>
+  <style select="handle" fill="mix(@background,@keyText,10%)"/>
 </theme>

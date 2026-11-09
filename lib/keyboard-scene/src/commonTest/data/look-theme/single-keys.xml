@@ -1,30 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <theme xmlns="https://youmo-ime/theme/4" name="single-keys" variants="light" version="4.0">
   <colors>
-    <color name="background" value="#ffeceff1"/>
-    <color name="bar" value="#ffe4e7e9"/>
-    <color name="keyboard" value="#ffeceff1"/>
-    <color name="key" value="#fffbfbfc"/>
-    <color name="keyText" value="#ff37474f"/>
-    <color name="candidateText" value="#ff37474f"/>
-    <color name="candidateLabel" value="#ff37474f"/>
-    <color name="candidateComment" value="#ff7a858a"/>
-    <color name="altKey" value="#ffdfe2e4"/>
-    <color name="altKeyText" value="#ff7a858a"/>
-    <color name="accentKey" value="#ff5cb5ab"/>
-    <color name="accentKeyText" value="#ffffffff"/>
+    <color name="background" value="#eceff1"/>
+    <color name="bar" value="#e4e7e9"/>
+    <color name="keyboard" value="#eceff1"/>
+    <color name="key" value="#fbfbfc"/>
+    <color name="keyText" value="#37474f"/>
+    <color name="candidateText" value="#37474f"/>
+    <color name="candidateLabel" value="#37474f"/>
+    <color name="candidateComment" value="#7a858a"/>
+    <color name="altKey" value="#dfe2e4"/>
+    <color name="altKeyText" value="#7a858a"/>
+    <color name="accentKey" value="#5cb5ab"/>
+    <color name="accentKeyText" value="#ffffff"/>
     <color name="keyPressHighlight" value="#1f000000"/>
-    <color name="keyShadow" value="#ffc0c3c4"/>
-    <color name="popupBackground" value="#ffd9dbdd"/>
-    <color name="popupText" value="#ff37474f"/>
-    <color name="spaceBar" value="#ffc9ced1"/>
+    <color name="keyShadow" value="#c0c3c4"/>
+    <color name="popupBackground" value="#d9dbdd"/>
+    <color name="popupText" value="#37474f"/>
+    <color name="spaceBar" value="#c9ced1"/>
     <color name="divider" value="#1f000000"/>
-    <color name="clipboardEntry" value="#fffbfbfc"/>
-    <color name="genericActiveBackground" value="#ff80cbc4"/>
-    <color name="genericActiveForeground" value="#ff37474f"/>
-    <color name="keyBorder" value="#ffc0c3c4"/>
-    <color name="keyHint" value="#ff7a858a"/>
-    <color name="toolbarIcon" value="#ff7a858a"/>
+    <color name="clipboardEntry" value="#fbfbfc"/>
+    <color name="genericActiveBackground" value="#80cbc4"/>
+    <color name="genericActiveForeground" value="#37474f"/>
+    <color name="keyBorder" value="#c0c3c4"/>
+    <color name="keyHint" value="#7a858a"/>
+    <color name="toolbarIcon" value="#7a858a"/>
   </colors>
   <picture src="src.jpg" brightness="70%" blur="0">
     <cut orientation="portrait" file="port.png"/>
@@ -32,8 +32,8 @@
   </picture>
   <style select="keyboard" fill="@background"/>
   <style select="@flat keyboard" fill="@keyboard"/>
-  <style select="bar" fill="transparent"/>
-  <style select="panel" fill="transparent"/>
+  <style select="bar" fill="#00000000"/>
+  <style select="panel" fill="#00000000"/>
   <style select="@flat panel" fill="@bar"/>
   <style select="key" fill="@key" radius="4dp" border="none" shadow="0 1dp 0 @keyShadow" inset="7dp 3dp" color="@keyText" font="system" weight="400" scale="100%" icon-color="@keyText" press="ripple"/>
   <style select="@landscape key" inset="4dp 3dp"/>
@@ -41,7 +41,7 @@
   <style select="key.function" fill="picture(4dp, 90%, @altKey)" color="@altKeyText" icon-color="@altKeyText"/>
   <style select="key.enter" fill="image(enter.png, 12 12 12 12, 3x, @accentKey)" color="@accentKeyText" icon-color="@accentKeyText"/>
   <style select="key.space" fill="@key"/>
-  <style select="key.enter:pressed" fill="#ff112233" press="face"/>
+  <style select="key.enter:pressed" fill="#112233" press="face"/>
   <style select="key.space:pressed" fill="image(down.png, 1 1 1 1, 1x, @key)" press="face"/>
   <style select="@flat key.space:pressed" fill="image(down.png, 1 1 1 1, 1x, @spaceBar)" press="face"/>
   <style select="key.alt-text" color="@altKeyText" icon-color="@altKeyText"/>
@@ -50,7 +50,7 @@
   <style select="key.enter mark" color="@accentKeyText"/>
   <style select="key badge" icon-color="@altKeyText"/>
   <style select="*/reading:on" color="@accentKey" icon-color="@accentKey"/>
-  <style select="@flat key" fill="transparent" radius="0" shadow="none"/>
+  <style select="@flat key" fill="#00000000" radius="0" shadow="none"/>
   <style select="@flat key.space" fill="@spaceBar" shape="bar" radius="3dp"/>
   <style select="@flat key.enter" fill="@accentKey" shape="circle"/>
   <style select="*/backspace" fill="@key"/>
@@ -63,16 +63,16 @@
   <style select="qwerty/r.function" fill="image(r.png, 12 12 12 12, 3x, @altKey)"/>
   <style select="*/enter:pressed, */shift:pressed" fill="image(down.png, 1 1 1 1, 1x, @key)" press="face"/>
   <style select="*/enter.function:pressed, */shift.function:pressed" fill="image(down.png, 1 1 1 1, 1x, @altKey)" press="face"/>
-  <style select="*/space:pressed, qwerty/w:pressed" fill="#ff445566" press="face"/>
+  <style select="*/space:pressed, qwerty/w:pressed" fill="#445566" press="face"/>
   <style select="*/lang:pressed, qwerty/e:pressed" fill="@key" press="ripple"/>
   <style select="*/lang.function:pressed, qwerty/e.function:pressed" fill="picture(4dp, 90%, @altKey)"/>
   <style select="*/lang.space:pressed, qwerty/e.space:pressed" fill="@key"/>
   <style select="qwerty/r:pressed" fill="image(r.png, 12 12 12 12, 3x, @key)" press="ripple"/>
   <style select="qwerty/r.function:pressed" fill="image(r.png, 12 12 12 12, 3x, @altKey)"/>
   <style select="qwerty/r.space:pressed" fill="image(r.png, 12 12 12 12, 3x, @key)"/>
-  <style select="@flat */backspace, @flat */shift, @flat qwerty/w, @flat qwerty/a, @flat qwerty/q, @flat qwerty/r" fill="transparent"/>
-  <style select="@flat */enter:pressed, @flat */shift:pressed, @flat */space:pressed, @flat qwerty/w:pressed" fill="transparent" press="ripple"/>
-  <style select="@flat */lang:pressed, @flat qwerty/e:pressed, @flat qwerty/r:pressed" fill="transparent"/>
+  <style select="@flat */backspace, @flat */shift, @flat qwerty/w, @flat qwerty/a, @flat qwerty/q, @flat qwerty/r" fill="#00000000"/>
+  <style select="@flat */enter:pressed, @flat */shift:pressed, @flat */space:pressed, @flat qwerty/w:pressed" fill="#00000000" press="ripple"/>
+  <style select="@flat */lang:pressed, @flat qwerty/e:pressed, @flat qwerty/r:pressed" fill="#00000000"/>
   <style select="*/backspace.enter" fill="@accentKey"/>
   <style select="@flat */backspace.space" fill="@spaceBar"/>
   <style select="*/shift.enter, qwerty/w.enter" fill="image(key.png, 1 1 1 1, 1x, @accentKey)"/>
@@ -83,7 +83,7 @@
   <style select="@flat qwerty/r.space" fill="image(r.png, 12 12 12 12, 3x, @spaceBar)"/>
   <style select="*/enter.enter:pressed, */shift.enter:pressed" fill="image(down.png, 1 1 1 1, 1x, @accentKey)" press="face"/>
   <style select="@flat */enter.space:pressed, @flat */shift.space:pressed" fill="image(down.png, 1 1 1 1, 1x, @spaceBar)" press="face"/>
-  <style select="*/space.enter:pressed, qwerty/w.enter:pressed, @flat */space.space:pressed, @flat qwerty/w.space:pressed" fill="#ff445566" press="face"/>
+  <style select="*/space.enter:pressed, qwerty/w.enter:pressed, @flat */space.space:pressed, @flat qwerty/w.space:pressed" fill="#445566" press="face"/>
   <style select="*/lang.enter:pressed, qwerty/e.enter:pressed" fill="image(enter.png, 12 12 12 12, 3x, @accentKey)"/>
   <style select="@flat */lang.space:pressed, @flat qwerty/e.space:pressed" fill="@spaceBar"/>
   <style select="qwerty/r.enter:pressed" fill="image(r.png, 12 12 12 12, 3x, @accentKey)"/>
@@ -94,5 +94,5 @@
   <style select="menu" fill="@accentKey" radius="50%" color="@accentKeyText" icon-color="@accentKeyText"/>
   <style select="menu:selected" overlay="@keyPressHighlight"/>
   <style select="@floating keyboard" radius="7dp"/>
-  <style select="handle" fill="mix(@background, @keyText, 10%)"/>
+  <style select="handle" fill="mix(@background,@keyText,10%)"/>
 </theme>
