@@ -340,6 +340,11 @@ as a key's `shadow` is, the radius `setShadowLayer` takes too; drawn so, not wit
 the blur is 0 and there under a transparent fill as in CSS), the outline at twice its width
 (`FILL_AND_STROKE`, its inner half under the fill), then the fill; the mask let go after, so the next op starts clean.
 A text in runs (`font-han`/`font-latin`) comes as every run's outline and shadow, then every run's fill (`Paint.content`).
+A face's `inner-shadow` (T4b, `Op.InnerShadow`) `ScenePainter` draws clipped to the face (`clipPath`): its ring less its
+hole (the face moved by the offset) filled even-odd in the colour, blurred by a `BlurMaskFilter` of the blur, as CSS's
+inset shadow; the ring reaches far enough past the face that the blur is whole at its edge. `CanvasFrame.extent` takes the
+face's bounds for it (nothing of it outside). `CapPictureTest` draws a path key with an inner shadow and a depth to
+build/t4b/cap.png.
 `Paint.letterSpacing` on Android 10 leaves the last character's spacing out of `measureText` (its ink the same; later
 versions keep it), so there a spaced label is that much narrower than the engine's arithmetic has it.
 An icon name the app has no drawable of (a layout's) draws nothing and is logged once a process (`SceneIcons.of`).
@@ -406,7 +411,8 @@ and a theme that converted, `PopupScenes`, and its bubble
 (`PopupEntryUi.showScene`), long press (`PopupKeyboardUi`) and menus (`PopupMenuUi`, the edit menu
 too) are a `PopupSceneView` drawing a small scene `SceneBuilder.preview`/`popup`/`menu` makes, its
 sizes the engine's (`engine/Popups`: theme 3.0's in dp, its text dp, not sp; its corners the keys'
-radius; its shadow drawn, rules D4.7/D4.9, which the views' elevation had and Robolectric never drew
+radius; a theme's `shape="bubble"` (a head over the key, a tail down from it), `path(…)`, `size` and `offset`
+(060-render-p3 T4b) all inside the scene, its bottom still the key's, so the placing is unchanged; its shadow drawn, rules D4.7/D4.9, which the views' elevation had and Robolectric never drew
 in their goldens; the view as large as the scene and `outset` round it for the shadow, placed
 that much up and left of where the views' popup goes; the edit menu's lift, `MENU_LIFT_DP`, wherever
 the scenes are). A focus moved is the scene made again, the key
