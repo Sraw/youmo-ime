@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.input.theme.BarBase
 import org.fcitx.fcitx5.android.input.theme.BoardBase
 import org.fcitx.fcitx5.android.input.theme.KeyFill
 import org.fcitx.fcitx5.android.input.theme.KeyLabel
+import org.fcitx.fcitx5.android.input.theme.KeyOverride
 import org.fcitx.fcitx5.android.input.theme.KeyPressed
 import org.fcitx.fcitx5.android.input.theme.KindStyle
 import org.fcitx.fcitx5.android.input.theme.NineSlice
@@ -142,17 +143,7 @@ object LookTheme {
         style("@flat key.space", "fill" to "@spaceBar", "shape" to "bar", "radius" to "3dp")
         style("@flat key.enter", "fill" to "@accentKey", "shape" to "circle")
         // single keys over their kinds, later so they win the tie
-        keys.overrides.toSortedMap().forEach { (name, o) ->
-            val key = selector(name)
-            // the key's kind's colour, as ThemeColors.face gives it: under a picture, while an image
-            // loads or cannot be read, and as the face of fill=Color; a key and its kind together
-            // outrank the key alone, so each kind has its own line
-            KIND_COLORS.forEach { (scene, kind, color) ->
-                o.fill?.let { style("$scene$key$kind", "fill" to fill(names, it, color)) }
-                o.pressed?.let { pressed(names, "$scene$key$kind:pressed", it, color) }
-            }
-            if (o.label == KeyLabel.Hide) style("$key label", "hidden" to "true")
-        }
+        keys.overrides.toSortedMap().forEach { (name, o) -> override(names, selector(name), o) }
         style("preview, popup", "fill" to "@popupBackground", "color" to "@popupText", "radius" to "${keys.radiusDp}dp", "shadow" to "0 2dp 2dp #33000000")
         style("popup:selected", "fill" to "@genericActiveBackground", "color" to "@genericActiveForeground")
         style("menu", "fill" to "@accentKey", "color" to "@accentKeyText", "icon-color" to "@accentKeyText", "radius" to "50%")
@@ -161,6 +152,17 @@ object LookTheme {
         style("@floating keyboard", "radius" to "${keys.radiusDp + minOf(keys.gap.h, keys.gap.v)}dp")
         style("handle", "fill" to "mix(@background, @keyText, 10%)")
         appendLine("</theme>")
+    }
+
+    private fun StringBuilder.override(names: Map<String, String>, key: String, o: KeyOverride) {
+        // the key's kind's colour, as ThemeColors.face gives it: under a picture, while an image
+        // loads or cannot be read, and as the face of fill=Color; a key and its kind together
+        // outrank the key alone, so each kind has its own line
+        KIND_COLORS.forEach { (scene, kind, color) ->
+            o.fill?.let { style("$scene$key$kind", "fill" to fill(names, it, color)) }
+            o.pressed?.let { pressed(names, "$scene$key$kind:pressed", it, color) }
+        }
+        if (o.label == KeyLabel.Hide) style("$key label", "hidden" to "true")
     }
 
     /** The kinds' fills as the look has them: what the kind's own [KindStyle] says. */
