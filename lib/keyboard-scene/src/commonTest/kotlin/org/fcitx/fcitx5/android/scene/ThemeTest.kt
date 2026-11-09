@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.theme.Argb
+import org.fcitx.fcitx5.android.scene.theme.Border
 import org.fcitx.fcitx5.android.scene.theme.Cascade
 import org.fcitx.fcitx5.android.scene.theme.ColorExpr
 import org.fcitx.fcitx5.android.scene.theme.Fill
@@ -14,6 +15,8 @@ import org.fcitx.fcitx5.android.scene.theme.KeyLook
 import org.fcitx.fcitx5.android.scene.theme.Meta
 import org.fcitx.fcitx5.android.scene.theme.Radius
 import org.fcitx.fcitx5.android.scene.theme.Selector
+import org.fcitx.fcitx5.android.scene.theme.Shadow
+import org.fcitx.fcitx5.android.scene.theme.Shown
 import org.fcitx.fcitx5.android.scene.theme.SystemColors
 import org.fcitx.fcitx5.android.scene.theme.TextLook
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
@@ -373,10 +376,8 @@ class ThemeTest {
     fun reservedNamesWarnNotFail() {
         // each of a later stage's style properties, of its form: a warning, the style kept
         val reserved = listOf(
-            "align=\"top-left\"", "letter-spacing=\"0.1em\"", "stroke=\"1dp #000000\"", "text-shadow=\"0 1dp 2dp #80000000\"",
-            "text-shadow=\"none\"", "inner-shadow=\"none\"", "side-padding=\"2% 5%\"", "bottom-padding=\"1%\"",
+            "inner-shadow=\"none\"", "side-padding=\"2% 5%\"", "bottom-padding=\"1%\"",
             "underline=\"none\"", "cursor-color=\"system(primary, @keyText)\"",
-            "font-han=\"system\"", "font-latin=\"system\"", "space-content=\"ime-name\"", "return-icon-send=\"icon(send)\"",
             "inner-shadow=\"0 1dp 2dp @keyShadow\"", "depth=\"2dp\"", "depth-color=\"@keyShadow\"", "tail=\"true\"", "offset=\"-4dp\"",
             "height=\"38% 52%\"", "width=\"24dp\"", "side-padding=\"8dp 48dp\"", "bottom-padding=\"0 0\"", "gap=\"4dp\"",
             "label-style=\"dot\"", "underline=\"1dp @keyText\"", "cursor-color=\"@keyText\"", "blur=\"12dp\"",
@@ -384,7 +385,7 @@ class ThemeTest {
             "transition=\"150ms ease-out\"", "press-scale=\"95%\"", "press-sink=\"2dp\"", "appear=\"scale 150ms\"",
             "effect=\"particles(star.png, 12, 24dp, 600ms)\"", "sticker=\"cat.png\"",
         )
-        assertEquals(Values.RESERVED.size, reserved.map { it.substringBefore('=') }.toSet().size + 5, "every one tried but the other return icons")
+        assertEquals(Values.RESERVED.size, reserved.map { it.substringBefore('=') }.toSet().size, "every one tried")
         for (attr in reserved) {
             val w = warnings(withStyle("<style select=\"key\" $attr/>"))
             assertTrue(w.single().contains("${attr.substringBefore('=')}= is not supported"), "$attr: $w")
@@ -397,12 +398,12 @@ class ThemeTest {
             assertTrue(warnings(withStyle("<style select=\"preview\" $attr/>")).single().contains("is not supported"), attr)
         }
         // of the wrong form, or misspelt: refused as ever
-        assertTrue(problems(withStyle("<style select=\"key\" align=\"middle\"/>")).single().contains("align"))
+        assertTrue(problems(withStyle("<style select=\"key\" color=\"#000000\" align=\"middle\"/>")).single().contains("align"))
         assertTrue(problems(withStyle("<style select=\"key\" transition=\"fast\"/>")).isNotEmpty())
         assertTrue(problems(withStyle("<style select=\"key\" alignn=\"center\"/>")).any { it.contains("unknown attribute alignn=") })
         assertTrue(problems(withStyle("<style select=\"key\" shape=\"blob\"/>")).isNotEmpty())
         // colours in a reserved property: a colour, naming colours there
-        for (attr in listOf("ink-color=\"rgb(0,0,0)\"", "cursor-color=\"nonsense(x)\"", "stroke=\"1dp nonsense\"", "text-shadow=\"0 1dp 2dp\"")) {
+        for (attr in listOf("ink-color=\"rgb(0,0,0)\"", "cursor-color=\"nonsense(x)\"")) {
             assertTrue(problems(withStyle("<style select=\"key\" $attr/>")).single().contains("is not a value of"), attr)
         }
         assertEquals(listOf("<style>: @keyShadw is no colour"), problems(withStyle("<style select=\"key\" depth-color=\"@keyShadw\"/>")))
@@ -415,16 +416,86 @@ class ThemeTest {
         assertTrue(problems(source.replace("</theme>", "<noises/>\n</theme>")).single().contains("<noises> is not allowed"))
     }
 
+    // 060-render-p3 T4a: the text on a key, read; of the wrong form or out of its range refused
+    @Test
+    fun theTextOnAKeyReads() {
+        val fonts = source.replace("</colors>", "</colors>\n<font name=\"kai\" src=\"kai.ttf\"/>")
+        fun read(attr: String) = ThemeReader.theme(fonts.replace("</theme>", "<style select=\"key\" $attr/>\n</theme>")).ok().styles.last().values
+        for (a in listOf("center", "top-left", "top-center")) assertEquals(Value.Word(a), read("align=\"$a\"")["align"])
+        assertEquals(Value.Number(0.1), read("letter-spacing=\"0.1em\"")["letter-spacing"])
+        assertEquals(Value.Number(-0.1), read("letter-spacing=\"-0.1em\"")["letter-spacing"])
+        assertEquals(Value.Number(0.5), read("letter-spacing=\"0.5em\"")["letter-spacing"])
+        assertEquals(Value.OfBorder(Border(1.5, ColorExpr.parse("#000000"))), read("stroke=\"1.5dp #000000\"")["stroke"])
+        assertEquals(Value.OfBorder(Border(3.0, ColorExpr.parse("@keyText"))), read("stroke=\"3dp @keyText\"")["stroke"])
+        assertEquals(Value.OfShadow(Shadow(0.0, 1.0, 2.0, ColorExpr.parse("#80000000"))), read("text-shadow=\"0 1dp 2dp #80000000\"")["text-shadow"])
+        assertEquals(Value.OfShadow(Shadow.NONE), read("text-shadow=\"none\"")["text-shadow"])
+        assertEquals(Value.Word("kai"), read("font-han=\"kai\"")["font-han"])
+        assertEquals(Value.Word("system"), read("font-latin=\"system\"")["font-latin"])
+        assertEquals(Value.OfShown(Shown.ImeName), read("space-content=\"ime-name\"")["space-content"])
+        assertEquals(Value.OfShown(Shown.None), read("space-content=\"none\"")["space-content"])
+        assertEquals(Value.OfShown(Shown.Text("空格")), read("space-content=\"text(空格)\"")["space-content"])
+        assertEquals(Value.OfShown(Shown.Icon("space")), read("space-content=\"icon(space)\"")["space-content"])
+        for (action in Values.RETURN_ACTIONS) {
+            assertEquals(Value.OfShown(Shown.Text("发送")), read("return-icon-$action=\"text(发送)\"")["return-icon-$action"])
+            assertEquals(Value.OfShown(Shown.Icon("send")), read("return-icon-$action=\"icon(send)\"")["return-icon-$action"])
+        }
+        // a key's text look is inherited by its parts, as CSS's; the hint takes no `hidden` from its key
+        val t = ThemeReader.theme(withStyle("<style select=\"key\" stroke=\"1dp #000000\" hidden=\"true\"/>")).ok()
+        val c = Cascade(t, emptySet())
+        val q = Selector.Target("key", "qwerty", "q", null, setOf("letter"))
+        assertEquals(Border(1.0, ColorExpr.parse("#000000")), TextLook(c.of(q.copy(part = "mark")), t).stroke)
+        assertTrue(TextLook(c.of(q.copy(part = "label")), t).hidden)
+        assertTrue(!TextLook(c.of(q.copy(part = "hint")), t).hidden)
+        val own = ThemeReader.theme(withStyle("<style select=\"key hint\" hidden=\"true\"/>")).ok()
+        assertTrue(TextLook(Cascade(own, emptySet()).of(q.copy(part = "hint")), own).hidden)
+        // none set: today's look
+        val none = TextLook(Cascade(Fixtures.materialLight, emptySet()).of(q.copy(part = "label")), Fixtures.materialLight)
+        assertEquals(listOf<Any?>(Values.CENTER, 0.0, null, null, null, null, null, null), listOf(none.align, none.letterSpacing, none.fontHan, none.fontLatin, none.stroke, none.textShadow, none.spaceContent, none.returnIcon("send")))
+        // refused
+        for (attr in listOf(
+            "align=\"middle\"", "align=\"top-right\"", "letter-spacing=\"0.6em\"", "letter-spacing=\"-0.2em\"", "letter-spacing=\"0.1\"",
+            "letter-spacing=\"1px\"", "stroke=\"4dp #000000\"", "stroke=\"none\"", "stroke=\"1dp\"", "stroke=\"1dp nonsense\"",
+            "text-shadow=\"0 1dp 2dp\"", "text-shadow=\"0 17dp 0 #000000\"", "text-shadow=\"0 1dp -2dp #000000\"",
+            "space-content=\"text()\"", "space-content=\"text(${"x".repeat(33)})\"", "space-content=\"icon(Send)\"", "space-content=\"send\"",
+            "return-icon-send=\"none\"", "return-icon-done=\"ime-name\"", "font-han=\"1kai\"",
+        )) {
+            assertTrue(problems(fonts.replace("</theme>", "<style select=\"key\" color=\"#000000\" $attr/>\n</theme>")).single().contains("is not a value of"), attr)
+        }
+        assertTrue(problems(withStyle("<style select=\"key\" return-icon-previous=\"icon(send)\"/>")).any { it.contains("unknown attribute return-icon-previous=") })
+        assertTrue(problems(withStyle("<style select=\"key\" font-han=\"fancy\"/>")).single().contains("font-han=\"fancy\" is no <font>"))
+        assertTrue(problems(withStyle("<style select=\"key\" font-latin=\"fancy\"/>")).single().contains("font-latin=\"fancy\" is no <font>"))
+        // -0em as 0: one value
+        assertEquals(Value.Number(0.0), read("letter-spacing=\"-0em\"")["letter-spacing"])
+        // an icon the app has none of: refused, by its name
+        for (name in Icons.ALL) assertEquals(Value.OfShown(Shown.Icon(name)), read("space-content=\"icon($name)\"")["space-content"])
+        assertEquals(
+            "<style>: return-icon-send=\"icon(rocket)\" is no icon of the app's",
+            problems(withStyle("<style select=\"key\" return-icon-send=\"icon(rocket)\"/>")).single(),
+        )
+        // on a part they are not read from: a warning, the theme read
+        val elsewhere = warnings(withStyle("<style select=\"key mark, */enter label\" align=\"top-left\" space-content=\"none\" return-icon-go=\"text(Go)\"/>"))
+        assertEquals(
+            listOf(
+                "align= on a key's mark does nothing: it is read from its label",
+                "space-content= on a key's mark does nothing: it is read from its label",
+                "return-icon-go= on a key's mark does nothing: it is read from its icon",
+                "return-icon-go= on a key's label does nothing: it is read from its icon",
+            ),
+            elsewhere,
+        )
+        assertTrue(warnings(withStyle("<style select=\"key label\" align=\"top-left\"/><style select=\"*/enter icon\" return-icon-go=\"text(Go)\"/>")).isEmpty())
+    }
+
     @Test
     fun aThemeOfEveryLaterStageImports() {
-        // reserved.xml: theme-4.xsd's example of T1 (xmllint-checked), names of T4a–A3 and a sound pack in it
+        // reserved.xml: theme-4.xsd's example of T1 (xmllint-checked), T4a's names (read now), T4b–A3's and a sound pack in it
         val t = ThemeReader.theme(testData("reserved.xml"))
         assertTrue(t is Parsed.Ok, "${t.problems()}")
         assertEquals(setOf(false, true), t.value.variants)
         assertEquals(Argb(0xFF303030.toInt()), t.value.variant(dark = true).colors["key"])
         assertEquals("0.6.0", t.value.meta?.minApp)
         val ignored = listOf(
-            "83|<sounds>", "79|transition=", "79|@im=wubi", "79|clipboard", "79|:first", "80|align=", "80|stroke=", "80|depth=",
+            "83|<sounds>", "79|transition=", "79|@im=wubi", "79|clipboard", "79|:first", "80|depth=",
             "80|press-scale=", "80|effect=", "80|sticker=", "81|shape=\"path(M0 0 L1 0 L1 1 Z)\"", "81|size=\"120%\"", "81|tail=",
             "81|appear=", "82|height=", "82|side-padding=",
         ).map { "$it is not supported by this version, ignored" }
