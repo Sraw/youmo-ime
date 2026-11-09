@@ -125,34 +125,39 @@ object ThemeWriter {
         is Value.OfColor -> color(v.color)
         is Value.OfRadius -> radius(v.radius)
         is Value.OfInset -> inset(v.inset)
-        is Value.OfShadow -> v.shadow.let { s ->
-            s.color?.takeIf { s != Shadow.NONE }?.let { "${length(s.dx)} ${length(s.dy)} ${length(s.blur)} ${color(it)}" } ?: "none"
-        }
-        // a stroke has no `none`: one of no colour is none drawn, a transparent one
-        is Value.OfBorder -> v.border.let { b ->
-            if (property == "stroke") {
-                "${length(b.width)} ${color(b.color ?: ColorExpr.Literal(Argb.TRANSPARENT))}"
-            } else {
-                b.color?.takeIf { b != Border.NONE }?.let { "${length(b.width)} ${color(it)}" } ?: "none"
-            }
-        }
+        is Value.OfShadow -> shadow(v.shadow)
+        is Value.OfBorder -> border(property, v.border)
         is Value.Word -> v.word
         is Value.Flag -> v.on.toString()
-        is Value.Number -> when (property) {
-            "scale" -> "${number(v.number)}%"
-            "size" -> "${number(v.number)}sp"
-            "letter-spacing" -> "${number(v.number)}em"
-            else -> number(v.number)
-        }
-        is Value.OfShown -> when (val s = v.shown) {
-            Shown.ImeName -> "ime-name"
-            Shown.None -> "none"
-            is Shown.Text -> "text(${s.text})"
-            is Shown.Icon -> "icon(${s.name})"
-        }
+        is Value.Number -> number(property, v.number)
+        is Value.OfShown -> shown(v.shown)
         // one value where upright and turned are alike
         is Value.OfTwin -> listOf(v.twin.portrait, v.twin.landscape).distinct()
             .joinToString(" ") { if (property == "height") "${number(it)}%" else length(it) }
+    }
+
+    private fun shadow(s: Shadow): String =
+        s.color?.takeIf { s != Shadow.NONE }?.let { "${length(s.dx)} ${length(s.dy)} ${length(s.blur)} ${color(it)}" } ?: "none"
+
+    // a stroke has no `none`: one of no colour is none drawn, a transparent one
+    private fun border(property: String, b: Border): String = if (property == "stroke") {
+        "${length(b.width)} ${color(b.color ?: ColorExpr.Literal(Argb.TRANSPARENT))}"
+    } else {
+        b.color?.takeIf { b != Border.NONE }?.let { "${length(b.width)} ${color(it)}" } ?: "none"
+    }
+
+    private fun number(property: String, n: Double): String = when (property) {
+        "scale" -> "${number(n)}%"
+        "size" -> "${number(n)}sp"
+        "letter-spacing" -> "${number(n)}em"
+        else -> number(n)
+    }
+
+    private fun shown(s: Shown): String = when (s) {
+        Shown.ImeName -> "ime-name"
+        Shown.None -> "none"
+        is Shown.Text -> "text(${s.text})"
+        is Shown.Icon -> "icon(${s.name})"
     }
 
     private fun fill(f: Fill): String = when (f) {
