@@ -78,6 +78,81 @@ object Values {
         "hidden", "icon-color", "press", "padding",
     )
 
+    private const val COLOR = "(#[0-9A-Fa-f]{6}|#[0-9A-Fa-f]{8}|@[a-zA-Z][a-zA-Z0-9_-]*|transparent|[a-z]+\\(.+\\))"
+    private const val LEN = "(-?[0-9]+(\\.[0-9]+)?dp|0)"
+    private const val PERCENT_FORM = "[0-9]+(\\.[0-9]+)?%"
+    private const val MS = "[0-9]{1,3}ms"
+    private const val NAME = "[a-zA-Z][a-zA-Z0-9_-]{0,31}"
+    private const val ICON_OR_TEXT = "icon\\([a-z0-9]+(-[a-z0-9]+)*\\)|text\\([^()]{1,32}\\)"
+    private const val FILE = "[^,()\\s/\\\\:*?\"<>|]{1,128}"
+    private const val SHADOW = "$LEN $LEN $LEN $COLOR"
+
+    /**
+     * Style properties of a later stage of 0.6.0 (060-render-p3: T4a–T7b, A1–A3, the sounds' `sticker`),
+     * each with its value's form: read where it is of the form, ignored with a warning (a theme made
+     * for a newer app still imports); a value not of the form is a problem like any. A stage that
+     * makes one work moves it to [PROPERTIES].
+     */
+    val RESERVED: Map<String, Regex> = mapOf(
+        // T4a: the text on a key
+        "align" to "center|top-left|top-center",
+        "letter-spacing" to "-?[0-9](\\.[0-9]{1,3})?em",
+        "stroke" to "$LEN $COLOR",
+        "text-shadow" to SHADOW,
+        "font-han" to NAME,
+        "font-latin" to NAME,
+        "space-content" to "ime-name|none|$ICON_OR_TEXT",
+        "return-icon-send" to ICON_OR_TEXT,
+        "return-icon-search" to ICON_OR_TEXT,
+        "return-icon-go" to ICON_OR_TEXT,
+        "return-icon-next" to ICON_OR_TEXT,
+        "return-icon-done" to ICON_OR_TEXT,
+        "return-icon-newline" to ICON_OR_TEXT,
+        // T4b: shapes, the bubble
+        "inner-shadow" to SHADOW,
+        "depth" to LEN,
+        "depth-color" to COLOR,
+        "tail" to "true|false",
+        "offset" to LEN,
+        // T5 (the keyboard, portrait then landscape), T6b (the bar), T7a (the handle)
+        "height" to "($LEN|$PERCENT_FORM)( ($LEN|$PERCENT_FORM))?",
+        "width" to LEN,
+        "side-padding" to "$LEN( $LEN)?",
+        "bottom-padding" to "$LEN( $LEN)?",
+        // T6a, T6b: the candidates, the pre-edit text
+        "gap" to LEN,
+        "label-style" to "none|number|dot",
+        "underline" to "none|$LEN $COLOR",
+        "cursor-color" to COLOR,
+        // T7b: the panels, the handwriting pad
+        "blur" to LEN,
+        "ink-color" to COLOR,
+        "ink-width" to LEN,
+        "grid-color" to COLOR,
+        "grid" to "true|false",
+        // A1–A3: motion
+        "transition" to "$MS (linear|ease|ease-in|ease-out|ease-in-out)",
+        "press-scale" to PERCENT_FORM,
+        "press-sink" to LEN,
+        "appear" to "(fade|scale|rise) $MS",
+        "effect" to "none|ripple-image\\($FILE, ?$PERCENT_FORM, ?$MS\\)|particles\\($FILE, ?[0-9]{1,2}, ?$LEN, ?$MS\\)",
+        // §16's second tier: a key's sticker layer
+        "sticker" to "none|$FILE",
+        // anchored: Kotlin/JS matches a whole value by the first alternative that starts one (FONT above), so "ease" would end "ease-out"
+    ).mapValues { (_, v) -> Regex("(?:$v)$") }
+
+    /**
+     * Values of a property of today that a later stage gives a new form: `shape="path(…)"`, `bubble`
+     * (T4b), a bubble's `size="120%"` (T4b), the navigation bar's `color="follow"` (T7a). Ignored with
+     * a warning as [RESERVED]'s are.
+     */
+    fun reservedValue(property: String, raw: String): Boolean = when (property) {
+        "shape" -> raw == "bubble" || raw.startsWith("path(") && raw.endsWith(")")
+        "size" -> PCT.matches(raw)
+        "color" -> raw == "follow"
+        else -> false
+    }
+
     fun read(property: String, raw: String): Value? = when (property) {
         "fill" -> fill(raw)?.let(Value::OfFill)
         "overlay", "color", "icon-color" -> ColorExpr.parse(raw)?.let(Value::OfColor)

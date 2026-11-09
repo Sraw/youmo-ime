@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  内置主题 MaterialLight（ThemePreset.kt:9-34）转成 4.0。3.0 的内置主题只给颜色，外观全是 LookDefaults
+  （core/…/input/theme/LookDefaults.kt）：块状、圆角 4dp、描边 0、阴影 1dp、键缝 h3 v7（横屏 h3 v4）、按下 Tint、
+  四类键都是 Color/Darken、字重 400、字号 100%、bar 透明、无背景图。下面的 style 就是这些默认值写成选择器。
+  keyBorder、keyHint、toolbarIcon 3.0 没单给，取 Palette 的默认（= keyShadow、altKeyText、altKeyText）。
+  平铺（@flat）的规则是「按键样式」设置能把任何主题改成平铺时要用的，所以内置主题也写上。
+-->
+<theme xmlns="https://youmo-ime/theme/4" name="MaterialLight" variants="light dark" version="4.0">
+  <meta author="youmo" version="1" license="CC0-1.0" min-app="0.6.0" preview="preview.png"/>
+  <colors>
+    <color name="background" value="#eceff1"/>
+    <color name="bar" value="#e4e7e9"/>
+    <color name="keyboard" value="#eceff1"/>
+    <color name="key" value="#fbfbfc"/>
+    <color name="keyText" value="#37474f"/>
+    <color name="candidateText" value="#37474f"/>
+    <color name="candidateLabel" value="#37474f"/>
+    <color name="candidateComment" value="#7a858a"/>
+    <color name="altKey" value="#dfe2e4"/>
+    <color name="altKeyText" value="#7a858a"/>
+    <color name="accentKey" value="#5cb5ab"/>
+    <color name="accentKeyText" value="#ffffff"/>
+    <color name="keyPressHighlight" value="#1f000000"/>
+    <color name="keyShadow" value="#c0c3c4"/>
+    <color name="popupBackground" value="#d9dbdd"/>
+    <color name="popupText" value="#37474f"/>
+    <color name="spaceBar" value="#c9ced1"/>
+    <color name="divider" value="#1f000000"/>
+    <color name="clipboardEntry" value="#fbfbfc"/>
+    <color name="genericActiveBackground" value="#80cbc4"/>
+    <color name="genericActiveForeground" value="#37474f"/>
+    <color name="keyBorder" value="@keyShadow"/>
+    <color name="keyHint" value="@altKeyText"/>
+    <color name="toolbarIcon" value="@altKeyText"/>
+  </colors>
+  <colors variant="dark">
+    <color name="key" value="system(surface-container-high, #303030)"/>
+  </colors>
+
+  <!-- 板：块状时底 = background，平铺时 = keyboard（ThemeColors.board）；bar 透明（BarBase.Transparent） -->
+  <style select="keyboard" fill="@background"/>
+  <style select="@flat keyboard" fill="@keyboard"/>
+  <style select="bar" fill="transparent"/>
+  <!-- 原生面板：块状时透出板底，平铺时用 bar 色（ThemeColors.panel） -->
+  <style select="panel" fill="transparent"/>
+  <style select="@flat panel" fill="@bar"/>
+
+  <!-- 键：四类（letter、function、space、enter）当类名用 -->
+  <style select="key" fill="@key" radius="4dp" border="none" shadow="0 1dp 0 @keyShadow" inset="7dp 3dp"
+         color="@keyText" icon-color="@keyText" font="system" weight="400" scale="100%" press="tint"/>
+  <style select="@landscape key" inset="4dp 3dp"/>
+  <style select="key:pressed" overlay="@keyPressHighlight"/>
+  <style select="key.function" fill="@altKey" color="@altKeyText" icon-color="@altKeyText"/>
+  <style select="key.enter" fill="@accentKey" color="@accentKeyText" icon-color="@accentKeyText"/>
+  <style select="key.space" fill="@key"/>
+  <!-- AltForeground：字母键的底、功能键的字色（🌐） -->
+  <style select="key.alt-text" color="@altKeyText" icon-color="@altKeyText"/>
+  <style select="key mark, key shortcut" color="@keyHint" icon-color="@keyHint"/>
+  <style select="key.enter mark" color="@accentKeyText"/>
+  <style select="key badge" icon-color="@altKeyText"/>
+  <!-- 手写的 注 键开着（:on）：字是强调色（HandwritingKeyboard 的 reading 键） -->
+  <style select="*/reading:on" color="@accentKey" icon-color="@accentKey"/>
+
+  <!-- 平铺（KeyFaceGeometry 的 flat 分支）：普通键无面；空格是横条、回车是圆（尺寸是引擎规则，见规则清单「疑问」1） -->
+  <style select="@flat key" fill="transparent" shadow="none" radius="0"/>
+  <style select="@flat key.space" fill="@spaceBar" shape="bar" radius="3dp"/>
+  <style select="@flat key.enter" fill="@accentKey" shape="circle"/>
+  <!-- face=keep 的键（确定、拼 开、九键左列、手写板）平铺也画块：由布局的 face 说，引擎在 @flat 下照块状算 -->
+
+  <!-- 弹出层：圆角跟键（PopupComponent.kt:88-89） -->
+  <style select="preview, popup" fill="@popupBackground" color="@popupText" radius="4dp" shadow="0 2dp 2dp #33000000"/>
+  <style select="popup:selected" fill="@genericActiveBackground" color="@genericActiveForeground"/>
+  <style select="menu" fill="@accentKey" color="@accentKeyText" icon-color="@accentKeyText" radius="50%"/>
+
+  <!-- 悬浮：圆角 = 键圆角 + min(横缝, 竖缝) = 4 + 3（FloatingKeyboard.cornerDp）；把手 = 板底混 10% 字色 -->
+  <style select="@floating keyboard" radius="7dp"/>
+  <style select="handle" fill="mix(@background, @keyText, 10%)"/>
+  <style select="@im=wubi @field=password key, clipboard, candidate:first comment" fill="@key" transition="150ms ease-out"/>
+  <style select="key" align="top-left" stroke="1dp #000000" depth="2dp" press-scale="95%" effect="particles(star.png, 12, 24dp, 600ms)" sticker="cat.png"/>
+  <style select="preview" shape="path(M0 0 L1 0 L1 1 Z)" size="120%" tail="true" appear="scale 150ms"/>
+  <style select="keyboard" height="38% 52%" side-padding="8dp 48dp"/>
+  <sounds><sound key="key" src="tap.ogg"/></sounds>
+</theme>
