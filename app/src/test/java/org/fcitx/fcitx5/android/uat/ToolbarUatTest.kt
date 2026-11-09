@@ -254,6 +254,8 @@ class ToolbarUatTest {
         assertEquals("x.com@li", h.field.text.toString())
         // again: x.com then li, not neighbours but both Latin, a space; li then @, neighbours, the text between (none)
         h.field.setText("")
+        // from the panel again: the bar no longer offers the clip, let go when the toolbar was expanded to open it
+        h.clipboard("发到 li@x.com 看看")
         menu("发到 li@x.com 看看", R.string.clipboard_split)
         h.waitFor("the pieces shown again") { h.entry("x.com") != null }
         // 重选 drops what was picked
