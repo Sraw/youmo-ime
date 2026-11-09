@@ -36,6 +36,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.comparesScreenshots
+import org.fcitx.fcitx5.android.until
 import org.fcitx.fcitx5.android.core.FakeHostApi
 import org.fcitx.fcitx5.android.core.FakeHostConnection
 import org.fcitx.fcitx5.android.core.whenReady
@@ -586,15 +587,8 @@ class KeyboardHarness(
         ?.let { t -> generateSequence(t) { it.parent as? View }.firstOrNull { it.hasOnClickListeners() } }
 
     /** Waits (Room, the IO threads) till [ok], idling the main thread meanwhile. */
-    fun waitFor(what: String, ok: () -> Boolean) {
-        val deadline = System.currentTimeMillis() + 10_000
-        while (!ok()) {
-            check(System.currentTimeMillis() < deadline) { "never: $what; shown ${texts(inputView)}" }
-            Thread.sleep(20)
-            idle()
-            relayout()
-        }
-    }
+    fun waitFor(what: String, ok: () -> Boolean) =
+        until(what, state = { "; shown ${texts(inputView)}" }, step = { idle(); relayout() }, done = ok)
 
     /**
      * The popup menu up now (a long press's, the clipboard's 清空), its item [title] picked as a tap

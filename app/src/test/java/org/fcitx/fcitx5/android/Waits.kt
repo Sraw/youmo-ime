@@ -10,7 +10,10 @@ package org.fcitx.fcitx5.android
  * IO dispatcher's) whose end the main looper then draws: neither thread's idle alone says it is done,
  * so it is waited for in real time, ended the moment [done] holds; the bound only says when to give up.
  */
-fun until(what: String, state: () -> Any? = { "" }, timeoutMs: Long = 10_000, step: () -> Unit = {}, done: () -> Boolean) {
+/** How long [until] waits by default: far past any wait that succeeds, which ends at once, on a loaded machine. */
+const val WAIT_MS = 30_000L
+
+fun until(what: String, state: () -> Any? = { "" }, timeoutMs: Long = WAIT_MS, step: () -> Unit = {}, done: () -> Boolean) {
     val end = System.currentTimeMillis() + timeoutMs
     while (!done()) {
         check(System.currentTimeMillis() < end) { "no $what ${state()}" }
