@@ -282,7 +282,7 @@ object ThemeReader {
         selectors?.let { selectorWarnings(el, p, it) }
         named(values, a, colors, fonts)
         selectors?.let { readElsewhere(it, values.keys, el.line, p) }
-        selectors?.let { shapes(it, values, el.line, p) }
+        reserved += selectors?.let { shapes(it, values, el.line, p) } ?: 0
         if (values.isEmpty() && reserved == 0) a.problem("a style that sets nothing")
         return selectors?.let { Style(it, values, order, el.line) }
     }
@@ -335,20 +335,35 @@ object ThemeReader {
     private val LABEL_READ = setOf("align", "space-content")
 
     // T4b's that do nothing where they are set, which a warning says: the bubble's shape, tail, size and
-    // offset on anything but the bubble, a cap's depth on anything but a key, a radius beside a path
-    private fun shapes(selectors: List<Selector>, values: Map<String, Value>, line: Int, p: Problems) {
+    // offset on anything but the bubble, a cap's depth on anything but a key, a path or an inner shadow on
+    // what has no face drawn of it (the keyboard's base a plain fill, the bar's and the rest the app's), a radius
+    // beside a path, a tail beside a shape that is no bubble. A size in % not on the bubble alone is ignored
+    // too: kept, it would stand in for the sp size the widget would inherit. How many ignored.
+    private fun shapes(selectors: List<Selector>, values: MutableMap<String, Value>, line: Int, p: Problems): Int {
         val bubbly = listOfNotNull(
             "shape=\"bubble\"".takeIf { (values["shape"] as? Value.Word)?.word == Values.BUBBLE },
-            "size= in %".takeIf { values["size"] is Value.Percent },
             "tail=".takeIf { "tail" in values },
             "offset=".takeIf { "offset" in values },
         )
-        val widgets = selectors.map { it.widget }.distinct()
+        val widgets = selectors.map { it.widget }.distinct().filter { it !in Selector.RESERVED_WIDGETS }
         for (w in widgets.filter { it != "preview" }) bubbly.forEach { p.warn(line, "$it on $w does nothing: only the preview (the key's bubble) has it") }
         val capped = listOf("depth", "depth-color").filter { it in values }
         for (w in widgets.filter { it != "key" }) capped.forEach { p.warn(line, "$it= on $w does nothing: only a key has a cap") }
+        val faced = listOfNotNull("shape=\"path(…)\"".takeIf { values["shape"] is Value.OfPath }, "inner-shadow=".takeIf { "inner-shadow" in values })
+        for (w in widgets.filter { it !in FACED }) faced.forEach { p.warn(line, "$it on $w does nothing: only a key, a popup, the preview and a menu have a face drawn") }
         if (values["shape"] is Value.OfPath && "radius" in values) p.warn(line, "radius= does nothing beside a path(…): the path is the outline")
+        val shape = values["shape"]
+        if ("tail" in values && shape != null && (shape as? Value.Word)?.word != Values.BUBBLE) {
+            p.warn(line, "tail= does nothing beside a shape that is no bubble: only a bubble has a tail")
+        }
+        if (values["size"] !is Value.Percent || selectors.all { it.widget == "preview" && it.part == null }) return 0
+        values.remove("size")
+        p.warn(line, "size= in % is ignored but in a style of the preview alone (the key's bubble): elsewhere a size is a text's, in sp")
+        return 1
     }
+
+    // the widgets a face is drawn of, a path's or an inner shadow's
+    private val FACED = setOf("key", "popup", "preview", "menu")
 
     // a property of today's value a later stage reads ([Values.reservedValue]): ignored
     private val RESERVED_VALUE = Value.Flag(false)

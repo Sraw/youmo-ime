@@ -442,9 +442,28 @@ class ThemeTest {
         assertEquals(listOf("<style>: @keyShadw is no colour"), problems(withStyle("<style select=\"key\" depth-color=\"@keyShadw\"/>")))
         // where they do nothing: a bubble's on a key, a cap on the bubble, a radius beside a path
         assertTrue(warnings(withStyle("<style select=\"preview\" shape=\"bubble\" tail=\"false\" size=\"120%\" offset=\"-4dp\"/>")).isEmpty())
-        assertEquals(4, warnings(withStyle("<style select=\"key\" shape=\"bubble\" tail=\"false\" size=\"120%\" offset=\"-4dp\"/>")).count { it.contains("only the preview") })
+        val onAKey = warnings(withStyle("<style select=\"key\" shape=\"bubble\" tail=\"false\" size=\"120%\" offset=\"-4dp\"/>"))
+        assertEquals(3, onAKey.count { it.contains("only the preview") })
+        assertEquals(1, onAKey.count { it.startsWith("size= in % is ignored") })
         assertTrue(warnings(withStyle("<style select=\"preview\" depth=\"2dp\"/>")).single().contains("only a key has a cap"))
         assertTrue(warnings(withStyle("<style select=\"key\" shape=\"path(M0 0 H1 V1 Z)\" radius=\"4dp\"/>")).single().contains("radius= does nothing"))
+        // a tail beside a shape that is no bubble
+        for (shape in listOf("rect", "path(M0 0 H1 V1 Z)")) {
+            assertTrue(warnings(withStyle("<style select=\"preview\" shape=\"$shape\" tail=\"true\"/>")).single().contains("only a bubble has a tail"), shape)
+        }
+        // a path or an inner shadow on what has no face drawn (the keyboard's a plain fill, the bar's the app's)
+        for (w in listOf("keyboard", "bar", "candidate", "handle", "panel")) {
+            val faceless = warnings(withStyle("<style select=\"$w\" shape=\"path(M0 0 H1 V1 Z)\" inner-shadow=\"0 1dp 0 #40000000\"/>"))
+            assertEquals(2, faceless.count { it.contains("on $w does nothing: only a key, a popup, the preview and a menu have a face drawn") }, "$w: $faceless")
+        }
+        for (w in listOf("key", "popup", "preview", "menu")) {
+            assertTrue(warnings(withStyle("<style select=\"$w\" shape=\"path(M0 0 H1 V1 Z)\" inner-shadow=\"0 1dp 0 #40000000\"/>")).isEmpty(), w)
+        }
+        // a size in % elsewhere than the preview alone ignored: the key's sp size it would knock out kept
+        val sized = ThemeReader.theme(withStyle("<style select=\"key\" size=\"14sp\"/><style select=\"preview, key.letter\" size=\"120%\"/>")).ok()
+        assertNull(sized.styles.last().values["size"], "dropped")
+        val sizedA = Cascade(sized, emptySet()).of(Selector.Target("key", "qwerty", "a", "letter", setOf("letter"), emptySet()))
+        assertEquals(Value.Number(14.0), sizedA["size"], "the key's sp kept")
         // the cascade: unset, nothing; the band's colour a solid fill's darker, else a translucent black
         val t = ThemeReader.theme(withStyle("<style select=\"key\" depth=\"3dp\"/><style select=\"key.letter\" fill=\"linear(90deg, @key 0%, @altKey 100%)\"/>")).ok()
         val c = Cascade(t, emptySet())
@@ -544,7 +563,9 @@ class ThemeTest {
         val ignored = listOf(
             "83|<sounds>", "79|transition=", "79|clipboard", "79|:first",
             "80|press-scale=", "80|effect=", "80|sticker=", "81|appear=",
-        ).map { "$it is not supported by this version, ignored" }
+        ).map { "$it is not supported by this version, ignored" } +
+            // its preview a path with a tail, which only a bubble has
+            "81|tail= does nothing beside a shape that is no bubble: only a bubble has a tail"
         assertEquals(ignored, t.warnings().map { "${it.line}|${it.message}" })
         assertEquals(KeyboardSizes(height = Twin(38.0, 52.0), sidePadding = Twin(8.0, 48.0)), t.value.keyboardSizes)
     }
