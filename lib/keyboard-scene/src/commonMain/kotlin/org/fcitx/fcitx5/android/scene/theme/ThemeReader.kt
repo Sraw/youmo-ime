@@ -402,13 +402,7 @@ object ThemeReader {
     // handwriting pad's ink and grid set on what does not read them, too
     private fun unreadByPanel(selectors: List<Selector>, props: Set<String>, line: Int, p: Problems) {
         for (s in selectors.filter { it.widget in Selector.PANEL_WIDGETS }.map { Selector.Target(it.widget, states = it.states, part = it.part) }.distinct()) {
-            val selected = s.widget == "picker" && s.states == setOf("selected")
-            val reads = when {
-                // the one shown: its categories' fill and colour, and the colour they inherit; no fill of the picker's own
-                selected && s.part == null -> listOf("color")
-                s.states.isEmpty() || selected -> PANEL_READS.getValue(s.part?.let { "${s.widget} $it" } ?: s.widget)
-                else -> emptyList()
-            }
+            val reads = panelReads(s)
             val at = s.widget + s.states.sorted().joinToString("") { ":$it" } + s.part?.let { " $it" }.orEmpty()
             val said = if (reads.isEmpty()) "it reads nothing in that state" else "it reads ${reads.joinToString(" ")}"
             props.filter { it !in reads }.forEach { p.warn(line, "$it= on $at does nothing: $said") }
@@ -434,6 +428,17 @@ object ThemeReader {
             .filterNot { it.board == PAD_BOARD && it.key == PAD_KEY }
             .map { s -> s.board?.let { "$it/${s.key ?: "*"}" } ?: "*/${s.starRole}" }.distinct()
         for (at in named) pad.forEach { p.warn(line, "$it= on $at does nothing: it is the handwriting pad's (handwriting/pad)") }
+    }
+
+    // what [s] (a panel, its states and part) reads: in a state, only the picker's one shown
+    private fun panelReads(s: Selector.Target): List<String> {
+        val selected = s.widget == "picker" && s.states == setOf("selected")
+        return when {
+            // the one shown: its categories' fill and colour, and the colour they inherit; no fill of the picker's own
+            selected && s.part == null -> listOf("color")
+            s.states.isEmpty() || selected -> PANEL_READS.getValue(s.part?.let { "${s.widget} $it" } ?: s.widget)
+            else -> emptyList()
+        }
     }
 
     // what each panel reads, and each part of one (060-render-p3 T7b, engine/PanelLooks): `color` and `icon-color`
