@@ -126,6 +126,11 @@ abstract class BaseKeyboard(
             updateSpaceBadges(spaceLongPress.getValue())
         }
 
+    /** What is typed changed ([SceneEnvs.typing]: the input method, the field): the theme's scenes of it drawn. */
+    fun typingChanged() {
+        canvas?.invalidateScene()
+    }
+
     /** Set per field ([KeyboardWindow]): an address's has no glide typing, as no word is typed there. */
     open var address: AddressKeys = AddressKeys.NONE
 

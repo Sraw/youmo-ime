@@ -27,6 +27,13 @@ import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
 object SceneEnvs {
 
     /**
+     * What is typed now as a theme's scenes (`im=wubi`, `field=password`; SceneTyping): KeyboardWindow's
+     * as the input method and the field change (main thread). Null before it tells: then, and outside
+     * the input method (a settings page), what each keyboard's Input says.
+     */
+    var typing: Set<String>? = null
+
+    /**
      * [view]'s keys at [width] × [height] px in [look] ([dark] its theme's): landscape as the screen is,
      * compact as the height setting is (KeyboardHeightCap), floating's text scale only in the input
      * method (not a settings page's preview), [split] where the keyboard splits its letters.
@@ -65,6 +72,7 @@ object SceneEnvs {
             shift = shift,
             texts = texts,
             marks = marks,
+            typed = typing.takeIf { context.inInputMethod() },
         )
     }
 }
