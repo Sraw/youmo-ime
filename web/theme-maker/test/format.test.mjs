@@ -14,11 +14,15 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { createHash } from 'node:crypto';
 import { deflateRawSync } from 'node:zlib';
-import { assemble, blockOf, engineText, fontFaces, FONTS } from '../tools/assemble.mjs';
+import { assemble, blockOf, ENGINE, engineText, fontFaces, FONTS, NO_ENGINE } from '../tools/assemble.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const data = join(here, 'testdata');
 const html = readFileSync(join(here, '..', 'index.html'), 'utf8');
+// the page as the site has it (pages.yml): index.html with the build's engine put in; made when a test asks, so
+// that only those tests fail where the engine is not built (./gradlew :lib:keyboard-scene:youmoEngine)
+let builtPage = null;
+const built = () => (builtPage ??= assemble(undefined, html, ENGINE));
 
 function block(id) {
   const text = blockOf(html, id);
@@ -620,15 +624,20 @@ test('index.html is what tools/assemble.mjs makes of src/ (src/ changed, the pag
   assert.ok(assemble() === html, 'index.html is not src/ assembled: node web/theme-maker/tools/assemble.mjs');
 });
 
-// 060-render-p3 W1: the engine is the build's, as it is, within its budget; the fonts are fonts/
-test("the page's engine is lib/keyboard-scene's build, and no bigger than its budget", () => {
-  const engine = block('youmo-engine');
-  assert.equal(engine, engineText(), 'index.html has another engine: ./gradlew :lib:keyboard-scene:youmoEngine, then assemble');
-  // the plan's 600 KB is not met without a minifier (none without npm here): 1.05 MB as built, held below 1.2 MB
+// 060-render-p3 W1: the engine is not in git (a change to its code would have to make the page again); the
+// page built is the build's engine as it is, within its budget, the rest index.html's; the fonts are fonts/
+test("index.html holds no engine; the page built holds the build's, and no bigger than its budget", () => {
+  assert.equal(blockOf(html, 'youmo-engine'), NO_ENGINE);
+  const engine = blockOf(built(), 'youmo-engine');
+  assert.equal(engine, engineText(), 'the page built has another engine');
+  // the plan's 600 KB is not met without a minifier (none without npm here): 1.09 MB as built, held below 1.2 MB
   // so that it grows only on purpose
   assert.ok(Buffer.byteLength(engine) <= 1_200_000, 'the engine is ' + Buffer.byteLength(engine) + ' bytes');
   // the global a page reads it by (build.gradle.kts: the library's link names it)
   assert.match(engine, /globalThis\['youmo-engine'\] = factory\(/);
+  // all else as index.html: the engine's script and the CSP's hash of it the only difference
+  const rest = (page) => page.replace(/<script id="youmo-engine">[\s\S]*?<\/script>/, '').replace(/script-src [^;]*;/, '');
+  assert.equal(rest(built()), rest(html));
 });
 
 test("the page's fonts are fonts/, each family's two weights, put in whole", () => {
@@ -703,18 +712,20 @@ test('an image is decoded only within what it may be: the source a photo, a cut 
   assert.ok(!L.decodable(L.imageSize(huge.files[theme.picture.src]), L.decodeCaps(format, L.fileRole(huge.theme, huge.theme.picture.src))));
 });
 
-test('the page runs only its own three scripts, by their hashes', () => {
-  const m = /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(html);
-  assert.ok(m, 'no CSP meta in index.html');
-  const csp = m[1];
-  const dirs = Object.fromEntries(csp.split(';').map((d) => d.trim().split(/\s+/)).map(([k, ...v]) => [k, v]));
-  assert.deepEqual(dirs['default-src'], ["'none'"]);
-  assert.deepEqual(dirs['base-uri'], ["'none'"]);
-  assert.deepEqual(dirs['form-action'], ["'none'"]);
-  assert.ok(!dirs['script-src'].includes("'unsafe-inline'"));
-  const run = [...html.matchAll(/<script(?![^>]*type="application\/json")[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
-  assert.equal(run.length, 3);
-  assert.deepEqual(dirs['script-src'], run.map((t) => "'sha256-" + createHash('sha256').update(t).digest('base64') + "'"));
+test('the page runs only its own three scripts, by their hashes, as git keeps it and as built', () => {
+  for (const [what, page] of [['index.html', html], ['the page built', built()]]) {
+    const m = /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(page);
+    assert.ok(m, 'no CSP meta in ' + what);
+    const csp = m[1];
+    const dirs = Object.fromEntries(csp.split(';').map((d) => d.trim().split(/\s+/)).map(([k, ...v]) => [k, v]));
+    assert.deepEqual(dirs['default-src'], ["'none'"]);
+    assert.deepEqual(dirs['base-uri'], ["'none'"]);
+    assert.deepEqual(dirs['form-action'], ["'none'"]);
+    assert.ok(!dirs['script-src'].includes("'unsafe-inline'"));
+    const run = [...page.matchAll(/<script(?![^>]*type="application\/json")[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+    assert.equal(run.length, 3, what);
+    assert.deepEqual(dirs['script-src'], run.map((t) => "'sha256-" + createHash('sha256').update(t).digest('base64') + "'"), what);
+  }
 });
 
 test('the zip is written byte for byte the same, its names UTF-8, CRCs right', async () => {
@@ -900,4 +911,17 @@ test('the measured layout and icons have what the preview draws', () => {
   for (const b of ['qwerty', 'nine', 'k14', 'k18', 'zhuyin', 'zhuyin-nine', 'number', 'symbols']) {
     assert.ok(layout.views.some((v) => v.phone === layout.phones[0].id && !v.land && v.board === b && v.mode === 'normal' && v.state === 'idle'), b);
   }
+});
+
+// dev/serve.mjs (the engine's preview, pixel-smoke's server): a path it cannot read is no file, never the server down
+test('the dev server answers a malformed or outside path with no file, and the page with its engine', async () => {
+  const { answer } = await import('../dev/serve.mjs');
+  assert.equal(answer('/fonts/%E0%A4%A'), null);
+  assert.equal(answer('/data/%2e%2e%2fsecret.xml'), null);
+  assert.equal(answer('/fonts/..%2Flatin-400.woff2'), null);
+  assert.equal(answer('/nothing'), null);
+  assert.equal(answer('/fonts/latin-400.woff2')[0], 'font/woff2');
+  const [type, page] = answer('/page.html');
+  assert.equal(type, 'text/html; charset=utf-8');
+  assert.equal(page, built());
 });

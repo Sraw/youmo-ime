@@ -31,7 +31,9 @@ friends) are pinned with their integrity hashes by `kotlin-js-store/package-lock
 packages are named by the JS target's `outputModuleName`, `youmo-engine`: renaming it means
 `./gradlew kotlinUpgradePackageLock`). The root build applies `base` because the Kotlin/JS plugin
 wants the root's `clean`. The JS target is also a library (`binaries.library()`, UMD, ES classes,
-whole-program output): `:lib:keyboard-scene:youmoEngine` writes the theme maker's engine file
+whole-program output): `:lib:keyboard-scene:youmoEngine` writes the theme maker's engine file,
+which is not committed: `web/theme-maker/tools/assemble.mjs --engine` puts it in the page where the
+page is built (the Pages workflow; the node tests, in memory), so CI builds it before them
 (specs/testing.md, the engine in the page).
 
 Memory: compiling the pinyin data alone is ~4 GB resident (3.6 GB measured, in a JVM of its own;

@@ -1,8 +1,10 @@
 name: Pages
 
 # The theme maker (web/theme-maker/index.html, one file that needs nothing else) on GitHub Pages:
-# web/ without the tests, at https://<owner>.github.io/<repo>/theme-maker/. Published only when its
-# own test passes, so a page that reads or writes theme files unlike the app never goes up.
+# web/ without the tests, at https://<owner>.github.io/<repo>/theme-maker/, its index.html the one
+# the repository keeps with the engine put in (lib/keyboard-scene's build: tools/assemble.mjs --engine).
+# Published only when its own test passes, so a page that reads or writes theme files unlike the app
+# never goes up.
 # Needs the repository's Pages source set to "GitHub Actions" (Settings › Pages).
 
 on:
@@ -12,6 +14,9 @@ on:
     paths:
       - "web/**"
       - "lib/keyboard-scene/**"
+      # what the engine is built with: the Kotlin version, the build's own plugins
+      - "gradle/libs.versions.toml"
+      - "build-logic/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -34,7 +39,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      # the page's engine is lib/keyboard-scene's build (060-render-p3 W1): its test holds index.html to it
+      # the page's engine is lib/keyboard-scene's build (060-render-p3 W1), put in the page when it is packed
       - name: Set up the build
         uses: ./.github/actions/setup-build
 
@@ -49,13 +54,15 @@ jobs:
       - name: Run theme maker tests
         run: node --test web/theme-maker/test/format.test.mjs web/theme-maker/test/engine.test.mjs
 
-      # the site: web/ as it is, the page's tests, sources, tools, fonts (in index.html) and dev pages left out
-      # (index.html is all it needs)
+      # the site: web/ as it is, the page's tests, sources, tools, fonts (in index.html), dev pages and build
+      # left out (index.html is all it needs), its index.html the page with its engine
       - name: Pack the site
         run: |
           mkdir _site
-          tar -C web --exclude='./*/test' --exclude='./*/src' --exclude='./*/tools' --exclude='./*/fonts' --exclude='./*/dev' -cf - . | tar -C _site -xf -
-          test -f _site/theme-maker/index.html
+          tar -C web --exclude='./*/test' --exclude='./*/src' --exclude='./*/tools' --exclude='./*/fonts' --exclude='./*/dev' --exclude='./*/build' -cf - . | tar -C _site -xf -
+          node web/theme-maker/tools/assemble.mjs --engine _site/theme-maker/index.html
+          grep -q "globalThis\['youmo-engine'\] = factory(" _site/theme-maker/index.html
+          test ! -e _site/theme-maker/build
           test ! -e _site/theme-maker/test
           test ! -e _site/theme-maker/src
           test ! -e _site/theme-maker/tools
