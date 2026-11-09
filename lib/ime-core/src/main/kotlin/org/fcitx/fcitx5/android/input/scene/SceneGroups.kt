@@ -68,6 +68,36 @@ object SceneGroups {
      */
     fun letters(groups: List<String>): NineKeyLetters? = if (NineKeyLetters.problem(groups) != null) null else NineKeyLetters.custom(groups)
 
+    /** How a grouped keyboard takes the layout it shows ([taken]). */
+    sealed interface Taken {
+        /** The layout's groups are the keyboard's own ([taken]'s expected): its codes, record and wiring as they always were. */
+        data object BuiltIn : Taken
+
+        /** A layout's own groups ([NineKeyLetters.custom] of [written], rows kept), typed as such: pinyin's own keyboard. */
+        class Own(val letters: NineKeyLetters, val written: List<String>) : Taken
+
+        /** Groups the keyboard cannot type, [why]: the layout gone by whole, the keyboard's built-in one drawn and typed. */
+        class Refused(val why: String) : Taken
+    }
+
+    /**
+     * How the grouped keyboard read as [expected] (G14, G18) takes [layout] (060-render-p3 T9b): its own
+     * groups ([Taken.BuiltIn]); a grouping of its own where [own] (pinyin's keyboards, which a layout's
+     * own keyboard types on) and the groups make one other than the built-in ones ([Taken.Own]); otherwise
+     * [Taken.Refused] with [mismatch]'s reason: groups that make no keyboard, the other built-in one's,
+     * any of 双拼's keyboards.
+     */
+    fun taken(layout: Layout, expected: NineKeyLetters, own: Boolean, fragments: Map<String, Fragment> = emptyMap()): Taken {
+        val groups = of(layout, fragments)
+        val why = mismatch(groups, expected) ?: return Taken.BuiltIn
+        val made = letters(groups)
+        return when {
+            made == null || made == NineKeyLetters.G14 || made == NineKeyLetters.G18 -> Taken.Refused(why)
+            !own -> Taken.Refused("$why (a layout's own groups are pinyin's alone)")
+            else -> written(layout, fragments).let { Taken.Own(NineKeyLetters.custom(it), it) }
+        }
+    }
+
     /**
      * What is wrong with [groups] for a keyboard the engine reads as [expected]: null where they are its
      * groups, in order; otherwise why (the keyboard then goes by [expected], its codes and record as they were).

@@ -56,6 +56,34 @@ class KeyboardCustomTest {
         assertEquals(NineKeyLetters.G14, SceneGroups.letters(SceneGroups.written(SceneData.read("k14.xml").let { (LayoutReader.layout(it) as Parsed.Ok).value }, frags())))
     }
 
+    // how the grouped keyboards take a layout (060-render-p3 T9b): theirs as always; a layout's own on pinyin's alone;
+    // any other refused with why, the keyboard's built-in layout drawn
+    @Test
+    fun aGroupedKeyboardTakesItsOwnTheLayoutsOwnOrRefuses() {
+        fun layout(name: String) = (LayoutReader.layout(SceneData.read(name)) as Parsed.Ok).value
+        val k14 = layout("k14.xml")
+        val k18 = layout("k18.xml")
+        assertEquals(SceneGroups.Taken.BuiltIn, SceneGroups.taken(k14, NineKeyLetters.G14, own = true, frags()))
+        assertEquals(SceneGroups.Taken.BuiltIn, SceneGroups.taken(k14, NineKeyLetters.G14, own = false, frags()))
+        assertEquals(SceneGroups.Taken.BuiltIn, SceneGroups.taken(k18, NineKeyLetters.G18, own = false, frags()))
+        // the 17 keys on pinyin's: its own keyboard, the rows as written
+        val own = SceneGroups.taken(k17Layout, NineKeyLetters.G14, own = true) as SceneGroups.Taken.Own
+        assertEquals(k17, own.letters)
+        assertTrue("pq rs" in own.written)
+        assertEquals(SceneGroups.written(k17Layout), own.written)
+        assertEquals(own.letters, (SceneGroups.taken(k17Layout, NineKeyLetters.G18, own = true) as SceneGroups.Taken.Own).letters)
+        // on 双拼's: refused, said why
+        val sp = SceneGroups.taken(k17Layout, NineKeyLetters.G14, own = false) as SceneGroups.Taken.Refused
+        assertTrue(sp.why, "pinyin's alone" in sp.why)
+        // the other built-in keyboard's groups in its place: refused, never its codes
+        assertTrue(SceneGroups.taken(k18, NineKeyLetters.G14, own = true, frags()) is SceneGroups.Taken.Refused)
+        assertTrue(SceneGroups.taken(k14, NineKeyLetters.G18, own = true, frags()) is SceneGroups.Taken.Refused)
+        // groups that make no keyboard: a letter on none (k17 without its key of z), refused
+        val noZ = LayoutReader.layout(SceneData.read("k17.xml").replace("letters=\"zx\"", "letters=\"x\"").replace("letters=\"xyz\"", "letters=\"xy\"")) as Parsed.Ok
+        val bad = SceneGroups.taken(noZ.value, NineKeyLetters.G14, own = true) as SceneGroups.Taken.Refused
+        assertTrue(bad.why, "make no keyboard" in bad.why)
+    }
+
     private fun frags() = mapOf("grouped-bottom" to (LayoutReader.fragment(SceneData.read("grouped-bottom.xml")) as Parsed.Ok).value)
 
     @Test

@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog.HANDWRITING
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN_KEYS
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN_KEYS18
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN_KEYS_OWN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.ZHUYIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.ZHUYIN_NINE
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.SHUANGPIN
@@ -154,6 +155,13 @@ internal class SessionFactory(
             // the 18 keys: 双拼's groups (I1 Q4: G18 first, measured; another grouping if it falls short), ; no
             // letter of pinyin's; as the 14 keys otherwise, learned under qk:<G18's tag>
             PINYIN_KEYS18 -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = NineKeyLetters.G18), spell = true))
+            // a layout's own groups (a theme's 17 keys, 060-render-p3 T9b): as the 14 keys, learned under qk:<their tag>;
+            // its keyboard the one in use, its codes read by it (typedLetter). None told (Engines swallows their codes
+            // then): G14's, which reads none of them
+            PINYIN_KEYS_OWN -> {
+                val own = s.ownKeyboard?.also(NineKeyLetters::inUse) ?: NineKeyLetters.G14
+                ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = own), spell = true))
+            }
             // pinyin in zhuyin (design 051 §3.3): the nine keys' way with symbols for letters, a tone a separator
             // the decoder weighs; learned under zy:nine and zy:dachen, apart from pinyin's keyboards
             ZHUYIN_NINE -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = ZhuyinKeys.NINE, toneAllows = assets.pinyinData.tones::allows), spell = true, kind = Kinds.ZHUYIN_NINE))

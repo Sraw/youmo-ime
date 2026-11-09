@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.platform.Blobs
 import org.fcitx.fcitx5.android.engine.platform.Clock
@@ -343,6 +344,8 @@ class Engines(
             if (value == field) return
             val readingOnly = value == field.copy(candidateReading = value.candidateReading)
             field = value
+            // a layout's own keyboard told (060-render-p3 T9b): the one its codes are read by from now on
+            ownKeys = value.ownKeyboard?.also(NineKeyLetters::inUse) != null
             if (readingOnly) return
             dropSessions()
             assets.dropDecoderExtensionsIfLearned()
@@ -350,6 +353,9 @@ class Engines(
             if (value.modelLevel < ModelLevel.MEDIUM) assets.sentenceModel.drop()
             if (value.modelLevel < ModelLevel.HIGH) assets.refiningModel.drop()
         }
+
+    // whether [settings] name a layout's own keyboard (EngineSettings.ownKeyboard): what its codes are read by
+    private var ownKeys = false
 
     private val latin = LatinSync { w -> assets.englishData?.let { it.id(w) != NO_WORD } == true }
 
@@ -371,6 +377,11 @@ class Engines(
     fun onEvent(im: String, event: Int, arg: Int, learning: Boolean = true, payload: Action? = null): Snapshot {
         hostThread.check()
         if (im == PINYIN) syncLatin()
+        // a layout's own keyboard's code (a tap's too) with none told: no keys to read it by, swallowed, what is
+        // shown left as it is, never handed back to be typed as it is (the app tells its keyboard first: EngineBridge)
+        if (!ownKeys && event == EngineEvent.CHAR && (arg in NineKeyLetters.CUSTOM_BLOCK || arg in Keyboard.PLACES)) {
+            return annotated(im, (pairs[im]?.showing ?: keyboard(im).showing).copy(commit = "", deleteBefore = 0, handled = true))
+        }
         val s = pairs[im]?.onEvent(event, arg, learning, payload)
             ?: keyboard(im).onEvent(if (event == EngineEvent.HARD_CHAR) EngineEvent.CHAR else event, arg, learning, payload)
         return annotated(im, s)

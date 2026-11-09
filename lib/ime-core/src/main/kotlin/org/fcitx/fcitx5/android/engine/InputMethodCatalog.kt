@@ -30,6 +30,13 @@ object InputMethodCatalog {
     /** Pinyin on the 18 keys (NineKeyLetters.G18, 双拼's groups, `l;` read as `l`): a session [PINYIN] hands its codes to, as [PINYIN_KEYS]. */
     const val PINYIN_KEYS18 = "engine-pinyin#keys18"
 
+    /**
+     * Pinyin on a layout's own letter groups (060-render-p3 T9b: a theme's 17 keys in place of the 14 or
+     * 18 keys; EngineSettings.ownKeys, NineKeyLetters.custom): a session [PINYIN] hands their codes
+     * (NineKeyLetters.CUSTOM_BLOCK) and taps (Keyboard.PLACES) to, as [PINYIN_KEYS].
+     */
+    const val PINYIN_KEYS_OWN = "engine-pinyin#keysOwn"
+
     /** Pinyin typed in zhuyin, 注音九键 and 注音全键盘 (大千, ZhuyinKeys): sessions [PINYIN] hands their codes to, as [PINYIN_KEYS]. */
     const val ZHUYIN_NINE = "engine-pinyin#zhuyin9"
     const val ZHUYIN = "engine-pinyin#zhuyin"

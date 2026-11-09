@@ -526,7 +526,7 @@ setting either: it reads the codes.
   settles nothing. Learning under a dropped scheme (`sp:Ziguang`, `spk:Ziguang:…`) is kept as it
   is, listed and forgotten by its old name (`ShuangpinNames` names all eight).
 - No tap position on G18 yet; `Keyboard.TAPS` leaves indices 26–51 for it (design k14-tap §1.4).
-- **A layout's own groups** (060-render-p3 T9a; the engine part, the app wires it in T9b).
+- **A layout's own groups** (060-render-p3 T9a, the engine part; T9b, the app's: app.md, grouped keys).
   `NineKeyLetters.custom(groups)` (each a key's `letters=`, rows apart by a space): `problem` refuses
   groups that leave a letter of a–z on no key (ü as v), a key of 0 or more than 5 letters (a–z, `;`), a
   letter twice on one key, or more than 30 keys. Groups whose letters are G14's or G18's are those
@@ -548,6 +548,13 @@ setting either: it reads the codes.
   0 to 1 (a row of two equals the halves' rule at every place, `NineKeyLettersCustomTest`). The segmenter
   keeps three bits a key for which letter (five letters a key). `typedLetter` gives the letter the tap went
   least against. `lean` stays the layout's (`Key.leans`; `lean="off"` sends the code alone).
+  Typed in pinyin by its own session `PINYIN_KEYS_OWN` (`engine-pinyin#keysOwn`; `KeyboardPair.pinyinKeyed`
+  routes `CUSTOM_BLOCK` and `PLACES` to it): a `T9Segmenter` over `EngineSettings.ownKeyboard` (the
+  groups the app tells, `ownKeys`, rows kept, so a change of rows makes the sessions anew), no
+  abbreviations, `spell = true`, in `ForgetsInTables`, its letters `inUse` as it is made; learned under
+  `qk:<tag>` (`EnginesOwnKeysTest`). Settings naming no keyboard (none, or groups `problem` refuses):
+  `Engines` swallows those codes, what is shown left as it is, never typed as characters. The learning
+  report and the learned list show a grouped kind's keys by `Kinds.keysOf` (`qk:` `filedAs`, `spk:` `grouped`).
 
 ### 注音 on the nine keys and on 大千
 
