@@ -32,7 +32,11 @@ class Cascade(theme: Theme, private val scene: Set<String>) {
         val general = general(target)
         looked[general]?.let { return it }
         val own = own(general)
-        val out = if (general.part == null) own else of(general.copy(part = null)).filterKeys { it in INHERITED } + own
+        val out = if (general.part == null) {
+            own
+        } else {
+            of(general.copy(part = null)).filterKeys { it in INHERITED && !(it == HIDDEN && general.part == HINT) } + own
+        }
         looked[general] = out
         return out
     }
@@ -74,8 +78,20 @@ class Cascade(theme: Theme, private val scene: Set<String>) {
     }
 
     companion object {
-        /** What a part takes from its key unless a style of its own sets it. */
-        val INHERITED = setOf("color", "icon-color", "font", "weight", "scale", "hidden")
+        /**
+         * What a part takes from its key unless a style of its own sets it: how its text is drawn, as CSS's
+         * text properties are inherited (`key { stroke }` outlines the label and the marks), and what the
+         * key shows (`space-content` set on the space as on its label).
+         */
+        val INHERITED = setOf(
+            "color", "icon-color", "font", "weight", "scale", "hidden",
+            "align", "letter-spacing", "stroke", "text-shadow", "font-han", "font-latin", "space-content",
+        ) + Values.RETURN_ACTIONS.map { "return-icon-$it" }
+
+        // a key's `hidden` hides its label, icon and symbol, never what its swipes do (rules B §5: the
+        // shortcuts stay): the hint hidden only by a style of its own (`key hint { hidden }`)
+        private const val HIDDEN = "hidden"
+        private const val HINT = "hint"
     }
 }
 
@@ -143,6 +159,28 @@ class TextLook(private val v: Map<String, Value>, private val theme: Theme) {
     val weight: Int get() = (v["weight"] as? Value.Number)?.number?.toInt() ?: NORMAL
     val scale: Double get() = ((v["scale"] as? Value.Number)?.number ?: PERCENT) / PERCENT
     val hidden: Boolean get() = (v["hidden"] as? Value.Flag)?.on ?: false
+
+    /** Where the key's glyph is on its face ([Values.CENTER], as ever, [Values.TOP_LEFT], [Values.TOP_CENTER]). */
+    val align: String get() = (v["align"] as? Value.Word)?.word ?: Values.CENTER
+
+    /** Space added after each character, em (Paint.letterSpacing's). */
+    val letterSpacing: Double get() = (v["letter-spacing"] as? Value.Number)?.number ?: 0.0
+
+    /** The font of its Han characters, and of its Latin ones ([Scripts]); null: [font]'s. */
+    val fontHan: String? get() = (v["font-han"] as? Value.Word)?.word
+    val fontLatin: String? get() = (v["font-latin"] as? Value.Word)?.word
+
+    /** An outline round its glyphs: its width (dp) and colour; none where not set or of no width. */
+    val stroke: Border? get() = (v["stroke"] as? Value.OfBorder)?.border?.takeIf { it.width > 0 && it.color != null }
+
+    /** A shadow under its text, dp; none where not set or `none`. */
+    val textShadow: Shadow? get() = (v["text-shadow"] as? Value.OfShadow)?.shadow?.takeIf { it.color != null }
+
+    /** What the space shows instead of the layout's label (`space-content`); null: the layout's. */
+    val spaceContent: Shown? get() = (v["space-content"] as? Value.OfShown)?.shown
+
+    /** What Return shows for [action] (`return-icon-<action>`, [Values.RETURN_ACTIONS]) instead of its icon; null: its icon. */
+    fun returnIcon(action: String): Shown? = (v["return-icon-$action"] as? Value.OfShown)?.shown
 
     private companion object {
         val BLACK = Argb(0xFF000000.toInt())

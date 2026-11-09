@@ -142,7 +142,9 @@ sealed interface Op {
 
     /**
      * [text] from ([x], [baseline]) in [font] [weight] at [size] px, squeezed to [scaleX] of its
-     * width, turned [rotation] degrees about ([x], [baseline]) (§3.1; 0 for now).
+     * width, turned [rotation] degrees about ([x], [baseline]) (§3.1; 0 for now); its characters
+     * [letterSpacing] em apart (Paint.letterSpacing's), outlined by [stroke] under its fill and
+     * shadowed by [shadow] (a theme's `stroke`, `text-shadow`: drawn, never measured, as CSS's).
      */
     data class Text(
         val text: String,
@@ -154,8 +156,19 @@ sealed interface Op {
         val color: Argb,
         val scaleX: Double = 1.0,
         val rotation: Double = 0.0,
+        val letterSpacing: Double = 0.0,
+        val stroke: TextStroke? = null,
+        val shadow: TextShadow? = null,
+        /** The part of its key it is (`label`, `mark`, `shortcut`, `badge`…, a theme's part names; null: none), for what reads a scene: not drawn. */
+        val part: String? = null,
     ) : Op
 
     /** The icon [name] in [box], tinted [tint], turned [rotation] degrees about its middle. */
     data class Icon(val name: String, val box: Box, val tint: Argb, val rotation: Double = 0.0) : Op
 }
+
+/** An outline [width] px outside a text's glyphs, in [color]: drawn first, its fill over it. */
+data class TextStroke(val width: Double, val color: Argb)
+
+/** A text's shadow: its glyphs moved ([dx], [dy]) px, blurred [blur] px (0: sharp), in [color]. */
+data class TextShadow(val dx: Double, val dy: Double, val blur: Double, val color: Argb)

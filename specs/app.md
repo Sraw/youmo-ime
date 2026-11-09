@@ -333,7 +333,16 @@ again. `composing` reaches the `Input` only with a table (qwerty.xml asks it of 
 tone; `showTyping` calls `invalidateScene()`; zhuyin-nine.xml's `r4c4` variant), so
 pinyin's first key and its committed word make no scene elsewhere; in a field with an action, Return's label
 changing with the composing (Done to Enter) still does. `AndroidTextMeasurer` keeps the last 512
-texts it measured (text, font, weight, size), so a scene made again measures only what is new.
+texts it measured (text, font, weight, size, letter spacing: `Paint.letterSpacing`), so a scene made again measures only what is new.
+A text's `text-shadow` and `stroke` (060-render-p3 T4a) `ScenePainter` draws under its fill: the shadow (the glyphs
+again, moved, in its colour, the outline's where there is one, blurred by a `BlurMaskFilter` of the blur as its radius,
+as a key's `shadow` is, the radius `setShadowLayer` takes too; drawn so, not with `setShadowLayer`, it is sharp where
+the blur is 0 and there under a transparent fill as in CSS), the outline at twice its width
+(`FILL_AND_STROKE`, its inner half under the fill), then the fill; the mask let go after, so the next op starts clean.
+A text in runs (`font-han`/`font-latin`) comes as every run's outline and shadow, then every run's fill (`Paint.content`).
+`Paint.letterSpacing` on Android 10 leaves the last character's spacing out of `measureText` (its ink the same; later
+versions keep it), so there a spaced label is that much narrower than the engine's arithmetic has it.
+An icon name the app has no drawable of (a layout's) draws nothing and is logged once a process (`SceneIcons.of`).
 The theme's styles matched to a key (`Cascade.of`) are kept by target, a key no selector names
 as one with no key (the 26 letters share theirs), with what it inherits; `Cascades` keeps a theme's
 cascade by the scenes it names (`flat` and not; what is typed only where the theme names it, so a
