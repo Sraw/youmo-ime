@@ -320,7 +320,7 @@ its seven pads by `when="pad=…"`) and, since S4c, `ZhuyinKeyboard`'s 大千
 (zhuyin.xml) and, since S4d, its 注音九键 (zhuyin-nine.xml) draw their keys with a `KeyboardCanvasView`,
 no view a key — the next paragraph but one says how a keyboard moves. The canvas draws the scene `lib/keyboard-scene` makes of its layout in the look converted by keyboard-scene's
 `LookTheme` (`scene/look/`) (a 3.0 single key's name the selector of that key, written by `ThemeWriter` with what selectors read escaped: `zhuyin/,` its comma
-key, `number/*` the star; a board's key of a role, `qwerty/shift`, has on its own styles what it does not set of the role's `*/shift`, as 3.0's `KeyStyleResolver` drew it; `ScenePainter`: one `RenderNode` a key a face, both kept in the tree and a press only their alpha, since a node left out of a frame loses its recording; a
+key, `number/*` the star; a board's key of a role, `qwerty/shift`, has on its own styles what it does not set of the role's `*/shift`, as 3.0's `KeyStyleResolver` drew it, and a key of a face of its own and no pressed one its kind's pressed face by its name; the look's files named as theme 4 takes a file's name (`LookTheme.fileNames`: `a (1).png` is `a__1_.png`, at most 128 characters, numbered where two meet), the theme's name cut to 64; `ScenePainter`: one `RenderNode` a key a face, both kept in the tree and a press only their alpha, since a node left out of a frame loses its recording; a
 software canvas, a screenshot's, gets the ops drawn straight); `TextKeyboard.scene` builds the
 `Env` from its state (`TextBoardState`, `SceneMarks`, the texts) through `SceneEnvs.of`, which adds
 what every keyboard's has alike (size, density, landscape, compact, floating's text scale in the input

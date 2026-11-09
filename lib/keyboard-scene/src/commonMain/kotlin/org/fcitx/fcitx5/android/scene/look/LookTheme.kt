@@ -62,18 +62,40 @@ object LookTheme {
     fun fileName(path: String): String = path.substringAfterLast('/')
 
     /**
-     * The look's files ([ThemeLook.files]) by the names theme 4 gives them: each its [fileName], one
-     * that another file has already numbered (`a~2.png`), so two images of one name in two folders
-     * stay two. What the app looks a file up by, and the theme written ([xml]) names.
+     * The look's files ([ThemeLook.files]) by the names theme 4 gives them: each its [fileName] as theme 4
+     * takes a file's name (ThemeReader's FILE: a character it does not, `,()/\:*?"<>|` and white space,
+     * as `_`; [MAX_FILE] characters at most, the extension kept), one that another file has already
+     * numbered (`a~2.png`), so two images of one name in two folders stay two. What the app looks a
+     * file up by, and the theme written ([xml]) names: a 3.0 file of any names (the web converts any) reads.
      */
     fun fileNames(look: ThemeLook): Map<String, String> {
         val taken = HashSet<String>()
         return look.files().associateWith { path ->
-            val name = fileName(path)
-            val dot = name.lastIndexOf('.').takeIf { it > 0 } ?: name.length
-            generateSequence(1) { it + 1 }.map { n -> if (n == 1) name else "${name.take(dot)}~$n${name.drop(dot)}" }.first(taken::add)
+            val name = safe(fileName(path))
+            val dot = name.lastIndexOf('.').takeIf { it > 0 && name.length - it <= MAX_EXTENSION } ?: name.length
+            val (stem, extension) = name.take(dot) to name.drop(dot)
+            generateSequence(1) { it + 1 }.map { n ->
+                val number = if (n == 1) "" else "~$n"
+                cut(stem, MAX_FILE - extension.length - number.length) + number + extension
+            }.first(taken::add)
         }
     }
+
+    // a file's name of the characters theme 4 takes in one, one at least
+    private fun safe(name: String): String = name.map { if (it in UNSAFE || it.isWhitespace()) '_' else it }.joinToString("").ifEmpty { "_" }
+
+    // [s] at most [n] characters, not a character cut in two (a surrogate pair's first left alone)
+    private fun cut(s: String, n: Int): String = if (s.length <= n) s else s.take(n).let { if (it.last().isHighSurrogate()) it.dropLast(1) else it }
+
+    /** A file's name in a theme 4 at its longest (ThemeReader's FILE). */
+    const val MAX_FILE = 128
+    private const val MAX_EXTENSION = 10
+    private const val UNSAFE = ",()/\\:*?\"<>|"
+
+    /** [name] as a theme 4's name: cut to [ThemeReader.MAX_NAME], `theme` where blank (a 3.0 file's may be either). */
+    fun themeName(name: String): String = cut(name, ThemeReader.MAX_NAME).ifBlank { UNNAMED }
+
+    private const val UNNAMED = "theme"
 
     /** The font's name in the file written, for the look's key font (theme 4 names a `<font>`). */
     const val KEY_FONT = "key"
@@ -85,7 +107,7 @@ object LookTheme {
     fun theme(look: ThemeLook, name: String, dark: Boolean): Theme {
         val keys = look.keys
         val names = fileNames(look)
-        fun fileName(path: String) = names.getOrElse(path) { LookTheme.fileName(path) }
+        fun fileName(path: String) = names.getOrElse(path) { safe(LookTheme.fileName(path)) }
         val s = Styles(names)
         // the board: the picture under it, or ThemeColors.board's colour (block: background, flat: keyboard)
         if (look.picture != null && look.base == BoardBase.Picture) {
@@ -153,7 +175,7 @@ object LookTheme {
         val fonts = look.text.keyFont?.let { mapOf(KEY_FONT to fileName(it)) } ?: emptyMap()
         val colors = colors(look.palette).associate { (n, c) -> n to Argb(c) }
         // one version, light or dark; the dark one's colours its dark version's too, as a file of it reads
-        return Theme(name, dark, VERSION, colors, s.styles, fonts, emptyMap(), picture, darkColors = colors.takeIf { dark })
+        return Theme(themeName(name), dark, VERSION, colors, s.styles, fonts, emptyMap(), picture, darkColors = colors.takeIf { dark })
     }
 
     // Single keys' faces, each over its kind's colour as ThemeColors.face gives it (under a picture, while an
@@ -283,7 +305,7 @@ object LookTheme {
 
         // [fallback]: the kind's colour, which theme 3.0 showed where the image was not (yet) there
         private fun image(s: NineSlice, fallback: ColorExpr?) =
-            Fill.Image(names[s.file] ?: fileName(s.file), listOf(s.insets.left, s.insets.top, s.insets.right, s.insets.bottom), s.pxPerDp, fallback)
+            Fill.Image(names[s.file] ?: safe(fileName(s.file)), listOf(s.insets.left, s.insets.top, s.insets.right, s.insets.bottom), s.pxPerDp, fallback)
     }
 
     /**

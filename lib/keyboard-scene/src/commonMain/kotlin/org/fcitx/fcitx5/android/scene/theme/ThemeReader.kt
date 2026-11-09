@@ -174,7 +174,8 @@ object ThemeReader {
         return (0 until THREE).firstOrNull { x[it] != y[it] }?.let { x[it] > y[it] } ?: false
     }
 
-    private const val MAX_NAME = 64
+    /** A theme's `name=` at its longest, characters. */
+    const val MAX_NAME = 64
 
     // a <colors>' variables as written, each with its line; the 24 all there where [required]
     private fun rawColors(el: XmlElement, p: Problems, required: Boolean): Map<String, Pair<ColorExpr, Int>> {

@@ -356,6 +356,48 @@ class LookThemeTest {
         }
     }
 
+    // a 3.0 file's names of any characters and length (the web converts any file): what theme 4 takes in a file's name
+    // ([ThemeReader]'s FILE), a character it does not as `_`, cut to 128 keeping the extension, numbered where two meet;
+    // a theme's name cut to the 64 characters theme 4 takes, none a name too
+    @Test
+    fun anyNameOfAFileOrThemeReads() {
+        val base = LookDefaults.look(palette(themeFile("material-light.xml")))
+        fun image(path: String) = KeyFill.Image(NineSlice(path, Insets(1, 1, 1, 1), 1))
+        fun down(path: String) = KeyPressed.Image(NineSlice(path, Insets(1, 1, 1, 1), 1))
+        val long = "/t/" + "x".repeat(200) + ".png"
+        val look = base.copy(
+            keys = base.keys.copy(
+                letter = KindStyle(image("/t/a (1).png"), down("/u/a_(1).png")),
+                function = KindStyle(image(long), down("/t/b,c:d?\"e\"<f>|g*h\\i.png")),
+                space = KindStyle(image("/t/ta\tb.png"), down("/t/")),
+                enter = KindStyle(image("/v/" + "x".repeat(200) + ".png"), KeyPressed.Darken),
+            ),
+        )
+        val names = LookTheme.fileNames(look)
+        assertEquals("a__1_.png", names["/t/a (1).png"])
+        assertEquals("a__1_~2.png", names["/u/a_(1).png"])
+        assertEquals("b_c_d__e__f__g_h_i.png", names["/t/b,c:d?\"e\"<f>|g*h\\i.png"])
+        assertEquals("x".repeat(124) + ".png", names[long])
+        assertEquals("x".repeat(122) + "~2.png", names["/v/" + "x".repeat(200) + ".png"])
+        assertEquals("_", names["/t/"])
+        val file = Regex("[^,()/\\\\:*?\"<>| \\t\\n\\r\\u000C\\u000B]{1,128}")
+        assertTrue(names.values.all(file::matches), "$names")
+        assertEquals(names.size, names.values.toSet().size)
+        // an emoji not cut in two: its half no character
+        val names64 = listOf(
+            "名".repeat(80) to "名".repeat(64), "" to "theme", "  " to "theme", "a" to "a",
+            "a" + "😀".repeat(40) to "a" + "😀".repeat(31),
+        )
+        for ((name, shown) in names64) {
+            val read = ThemeReader.theme(LookTheme.xml(look, name, false), maxStyles = LookTheme.MAX_STYLES)
+            assertTrue(read is Parsed.Ok, "$name: $read")
+            assertEquals(shown, read.value.name)
+        }
+        val q = key(scene(theme(LookTheme.xml(look, "T", false)), portrait), "q")
+        assertEquals("a__1_.png", q.ops(false).filterIsInstance<Op.NineSlice>().single().file)
+        assertTrue("a__1_~2.png" in q.ops(true).filterIsInstance<Op.NineSlice>().map { it.file })
+    }
+
     // two images of one name in two folders stay two: the second numbered, in the theme written and the app's lookup alike
     @Test
     fun filesOfOneNameInTwoFoldersKeptApart() {
