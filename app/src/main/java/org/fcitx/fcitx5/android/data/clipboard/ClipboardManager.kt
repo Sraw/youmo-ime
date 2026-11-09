@@ -95,12 +95,14 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
     private fun transform(text: String): String =
         if (clearUrlsPref.getValue()) cleanClipboardText(text, clearUrls?.let { it::transform }) else text
 
+    // added and removed on main, told on Default: guarded by itself, told from a copy outside the lock (a
+    // ConcurrentModificationException there, twice, would take the process down: the scope has no handler)
     fun addOnUpdateListener(listener: OnClipboardUpdateListener) {
-        onUpdateListeners.add(listener)
+        synchronized(onUpdateListeners) { onUpdateListeners.add(listener) }
     }
 
     fun removeOnUpdateListener(listener: OnClipboardUpdateListener) {
-        onUpdateListeners.remove(listener)
+        synchronized(onUpdateListeners) { onUpdateListeners.remove(listener) }
     }
 
     private val enabledPref = AppPrefs.getInstance().clipboard.clipboardListening
@@ -135,8 +137,9 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
     // knows they have been, so what they posted to the main thread is queued by then (a test's copy waits for
     // lastEntry; told after, the bar's clipboard suggestion could land after the test's next tap, taking the
     // toolbar it had just expanded: LandscapeUatTest.clipboardAtTheSide)
-    private fun updateLastEntry(entry: ClipboardEntry) {
-        onUpdateListeners.forEach { it.onUpdate(entry) }
+    @VisibleForTesting
+    internal fun updateLastEntry(entry: ClipboardEntry) {
+        synchronized(onUpdateListeners) { onUpdateListeners.toList() }.forEach { it.onUpdate(entry) }
         lastEntry = entry
     }
 
