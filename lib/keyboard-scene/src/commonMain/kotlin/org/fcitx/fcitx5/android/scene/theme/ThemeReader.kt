@@ -276,23 +276,34 @@ object ThemeReader {
                 values[prop] = v
             }
         }
-        // a keyboard's size: on a keyboard alone, or (under a scene, in a state, a list) read, warned of, ignored; the same
-        // names of another widget a later stage's, of one in a list with a keyboard too
-        val keyboard = selectors?.any { it.widget == "keyboard" } == true
-        if (keyboard) reserved += sizes(el, a, p, selectors.orEmpty(), values)
-        val keyboards = keyboard && selectors.orEmpty().all { it.widget == "keyboard" }
-        reserved += reserved(el, a, p, colors, skip = if (keyboards) Values.KEYBOARD_SIZES else emptyList())
+        reserved += sizesAndReserved(el, a, p, colors, selectors.orEmpty(), values)
         a.done()
-        selectors?.mapNotNull { it.reserved }?.distinct()?.forEach { p.warn(el.line, ignored(it)) }
-        // an input method this app has none of (a misspelt one, a table it lacks): it selects nothing
-        selectors?.flatMap { it.scenes }?.filter { it.startsWith("im=") && it.removePrefix("im=") !in Selector.IMS }?.distinct()
-            ?.forEach { p.warn(el.line, "@$it is no input method of this app: it selects nothing") }
+        selectors?.let { selectorWarnings(el, p, it) }
         for (v in values.values) {
             colorsOf(v).flatMap { it.refs() }.filter { it !in colors }.forEach { a.problem("@$it is no colour") }
         }
         (values["font"] as? Value.Word)?.word?.takeIf { it != "system" && it !in fonts }?.let { a.problem("font=\"$it\" is no <font>") }
         if (values.isEmpty() && reserved == 0) a.problem("a style that sets nothing")
         return selectors?.let { Style(it, values, order, el.line) }
+    }
+
+    // a keyboard's size: on a keyboard alone, or (under a scene, in a state, a list) read, warned of, ignored; the same
+    // names of another widget a later stage's, of one in a list with a keyboard too; how many ignored
+    private fun sizesAndReserved(
+        el: XmlElement, a: Attributes, p: Problems, colors: Set<String>, selectors: List<Selector>, values: MutableMap<String, Value>,
+    ): Int {
+        val keyboard = selectors.any { it.widget == "keyboard" }
+        val sized = if (keyboard) sizes(el, a, p, selectors, values) else 0
+        val keyboards = keyboard && selectors.all { it.widget == "keyboard" }
+        return sized + reserved(el, a, p, colors, skip = if (keyboards) Values.KEYBOARD_SIZES else emptyList())
+    }
+
+    // what of the selectors selects nothing: a later stage's, an input method this app has none of (a misspelt
+    // one, a table it lacks)
+    private fun selectorWarnings(el: XmlElement, p: Problems, selectors: List<Selector>) {
+        selectors.mapNotNull { it.reserved }.distinct().forEach { p.warn(el.line, ignored(it)) }
+        selectors.flatMap { it.scenes }.filter { it.startsWith("im=") && it.removePrefix("im=") !in Selector.IMS }.distinct()
+            .forEach { p.warn(el.line, "@$it is no input method of this app: it selects nothing") }
     }
 
     // a property of today's value a later stage reads ([Values.reservedValue]): ignored
