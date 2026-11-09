@@ -82,13 +82,66 @@ class NineKeysSemicolonTest {
 
     @Test
     fun otherSchemesHaveNoIngOnOne() {
-        // 自然码's ing is y: its keyboard sends 1 as the separator, and the code reads as nothing
+        // 自然码's ing is y: its keyboard sends 1 while typing as the separator ' (T9Keyboard.resolveShuangpin)
         val s = session(ShuangpinScheme.ZIRANMA)
-        val typed = s.type("yy")
-        assertEquals("应", typed.candidates.first())
-        s.apply(Backspace)
-        val one = s.type("1")
-        assertFalse(one.syllables.toString(), "ying" in one.syllables)
+        s.type("y")
+        val cut = s.apply(Key('\''))
+        assertFalse(cut.syllables.toString(), "ying" in cut.syllables)
+        assertEquals("y", cut.preedit)
+        val typed = s.type("yi")
+        assertEquals("一一", typed.candidates.first())
+        // nothing read as ;: y, then yi, committed as typed
+        assertEquals("yyi", s.apply(Action.CommitRaw).commit)
+    }
+
+    @Test
+    fun oneAfterAKeyMakingNoSyllableWithItSeparates() {
+        // 4 (GHI) then 1: g; h; i; (ch;) are no syllables, so the separator, never a ; no reading takes
+        val s = session()
+        s.type("g1")
+        val raw = s.apply(Action.CommitRaw).commit
+        assertFalse(raw, ';' in raw)
+    }
+
+    @Test
+    fun oneAfterAnInitialTakenThatMakesNoSyllableWithItSeparates() {
+        val s = session()
+        val typed = s.type("g")
+        s.apply(Action.Syllable(typed.syllables.indexOf("g")))
+        s.type("1")
+        val raw = s.apply(Action.CommitRaw).commit
+        assertFalse(raw, ';' in raw)
+    }
+
+    // the input as the session has it, each case read where 1 is pressed
+    private val ms = GroupedShuangpinSegmenter(ShuangpinScheme.MICROSOFT, NINE_SP)
+    private fun read(input: String, from: Int = 0, cursor: Int = input.length) =
+        semicolonRead(NINE_SP_SEMICOLON, ms, input, from, cursor)
+    private fun k(letters: String) = letters.map { NINE_SP.key(it) }.joinToString("")
+
+    @Test
+    fun whereOneIsReadAsIngOrTheSeparator() {
+        val sep = '\''
+        // y: ing; y; then 1: the separator (y;')
+        assertEquals(NINE_SP_SEMICOLON, read(k("y")))
+        assertEquals(sep, read(k("y;")))
+        // after what is committed already (from > 0): counted from there
+        assertEquals(NINE_SP_SEMICOLON, read(k("yi") + k("y"), from = 2))
+        assertEquals(sep, read(k("yi") + k("y"), from = 1))
+        // the cursor inside the input: the keys before it
+        assertEquals(NINE_SP_SEMICOLON, read(k("yyi"), cursor = 1))
+        assertEquals(sep, read(k("yyi"), cursor = 2))
+        // a zero-initial syllable, o h (ang): whole, so 1 after it separates
+        assertEquals(sep, read(k("oh")))
+        // a whole syllable taken off the bar: the separator; an initial taken: its final, if it makes one
+        assertEquals(sep, read("ying'"))
+        assertEquals(NINE_SP_SEMICOLON, read("y'"))
+        assertEquals(sep, read("g'"))
+        // 4 then 1: no syllable, the separator
+        assertEquals(sep, read(k("g")))
+        // nothing before it: swallowed
+        assertNull(read(""))
+        assertNull(read(k("yi"), from = 2))
     }
 
     // the record files the nine keys' codes under the tag they had with ; on 5: what was learned is still theirs

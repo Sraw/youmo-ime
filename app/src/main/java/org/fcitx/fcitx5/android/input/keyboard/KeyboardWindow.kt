@@ -120,7 +120,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         GroupedKeyboard.NamePinyin18 to { GroupedKeyboard(context, theme, NineKeyLetters.G18, Keyboard::pinyin18Key, semicolon = false) },
         GroupedKeyboard.NameShuangpin14 to { GroupedKeyboard(context, theme, NineKeyLetters.G14, Keyboard::shuangpin14Key) },
         // the user's 按键字符 (its symbols) as 九键拼音 has them; its letters are 全拼's alone
-        T9Keyboard.ShuangpinName to { T9Keyboard(context, theme, symbols = NineKeySymbols.parse(AppPrefs.getInstance().keyboard.t9Symbols.getValue()), shuangpin = true) },
+        T9Keyboard.ShuangpinName to { T9Keyboard(context, theme, symbols = NineKeySymbols.parse(AppPrefs.getInstance().keyboard.t9Symbols.getValue()), shuangpin = true, semicolon = true) },
         T9Keyboard.ShuangpinPlainName to { T9Keyboard(context, theme, symbols = NineKeySymbols.parse(AppPrefs.getInstance().keyboard.t9Symbols.getValue()), shuangpin = true, semicolon = false) },
         ZhuyinKeyboard.NameNine to { ZhuyinKeyboard(context, theme, nine = true) },
         ZhuyinKeyboard.NameFull to { ZhuyinKeyboard(context, theme, nine = false) },
@@ -141,7 +141,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private fun nineKeys(english: Boolean): T9Keyboard {
         val keyboard = AppPrefs.getInstance().keyboard
-        return T9Keyboard(context, theme, NineKeyLetters.parse(keyboard.t9Letters.getValue()), NineKeySymbols.parse(keyboard.t9Symbols.getValue()), english)
+        return T9Keyboard(context, theme, NineKeyLetters.parse(keyboard.t9Letters.getValue()), NineKeySymbols.parse(keyboard.t9Symbols.getValue()), english, semicolon = false)
     }
 
     // [tell] the engine of the pad, in order with the keys; the call sends the Ink key carrying it itself (HostApi.offerInk)

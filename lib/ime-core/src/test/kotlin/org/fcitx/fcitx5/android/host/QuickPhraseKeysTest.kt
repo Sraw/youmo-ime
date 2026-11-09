@@ -33,7 +33,7 @@ class QuickPhraseKeysTest {
         val sp = of(NineKeyLetters.NINE_SP.codes[3].code)
         assertEquals('5'.code, sp.shown)
         assertEquals("5JKLjkl", chars(sp))
-        assertEquals('1'.code, of(NineKeyLetters.NINE_SP_SEMICOLON.code).shown)
+        assertEquals('\''.code, of(NineKeyLetters.NINE_SP_SEMICOLON.code).shown)
     }
 
     @Test

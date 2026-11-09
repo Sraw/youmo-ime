@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.engine.phrase.Chaizi
 import org.fcitx.fcitx5.android.engine.phrase.AsideCandidates
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
 import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
+import org.fcitx.fcitx5.android.engine.pinyin.GroupedShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.KeyedSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
@@ -183,7 +184,7 @@ class PinyinSession(
 
     private val decoder = PinyinDecoder(
         data.dictionary, data.vocabulary, use.scorer(data.model, user, prior), penalties,
-        user = user, extensions = extensions, wholeFirst = segmenter.typesLetters, coarse = coarse, asTyped = ::asTyped,
+        user = user, extensions = extensions, wholeFirst = segmenter.typesLetters, coarse = coarse, asTyped = { keyed.asTyped(it) },
         whole = use.whole(data.model, user, prior), uncounted = use.uncounted(data.model, user, prior), toneAllows = (segmenter as? KeyedSegmenter)?.toneAllows,
     )
     private val predictor = Predictor(data.model, data.vocabulary, data.dictionary, user, coarse = coarse, charReadings = charReadings)
@@ -327,7 +328,8 @@ class PinyinSession(
     }
 
     private fun type(typed: Char, glided: Boolean = false, at: Float = Float.NaN): Snapshot {
-        val c = if (endsInput(typed)) return leave() else semicolonRead(typed, keyed, input, readFrom(), cursor) ?: return snapshot()
+        if (endsInput(typed)) return leave()
+        val c = semicolonRead(typed, keyed, input, readFrom(), cursor) ?: return snapshot()
         // on the nine keys 1 is 分词; on 大千 a space after a syllable with no tone its first tone
         insert((if (c == NINE_KEYS_SEPARATOR && nineKeys?.oneSeparates == true) SyllableGraph.SEPARATOR else if (c == ' ') keyed?.spaceTone ?: c else c).toString(), glided, at)
         read()
@@ -715,7 +717,7 @@ class PinyinSession(
         // digits no reading took stay as typed
         val shown = lastRead.restShown.filter { it != ' ' && it != SyllableGraph.SEPARATOR }
         // a letter typed as itself (九键) is upper case in the input; no other input has one
-        val rest = if (nineKeys == null || shown.isEmpty()) asTyped(input.substring(readFrom())) else shown
+        val rest = if (nineKeys == null || shown.isEmpty()) keyed.asTyped(input.substring(readFrom())) else shown
         val text = pieces.joinToString("") { it.text } + if (keysBack) "" else rest
         record(CommitRows.Pick(readFrom(), listOf(Word(rest, "")), intArrayOf(input.length), 'F', "", null).takeUnless { keysBack })
         // text as typed is no words: nothing to go on from
@@ -728,7 +730,7 @@ class PinyinSession(
 
     // nothing picked, nothing put in: the text before is as it was
     override fun handBack(): HandedBack {
-        val keys = asTyped(input.substring(readFrom()))
+        val keys = keyed.asTyped(input.substring(readFrom()))
         if (pieces.isNotEmpty()) return HandedBack(commitRaw(keysBack = true).commit, lastCommit, keys)
         clear()
         return HandedBack("", null, keys)
@@ -892,7 +894,7 @@ class PinyinSession(
         // rest of the input as typed after it
         val best = read.firstOrNull { it.end == rest && it !in held }
             ?: shownOrder.firstOrNull()?.takeIf { decoded.sentences.isNotEmpty() }?.let { throughEnd(it, decoded.graph.end) }
-        val shown = if (best == null) PreeditPlaces.Builder().add(asTyped(decoded.graph.input), readFrom(), input.length) else shows.preedit(decoded.graph, best)
+        val shown = if (best == null) PreeditPlaces.Builder().add(keyed.asTyped(decoded.graph.input), readFrom(), input.length) else shows.preedit(decoded.graph, best)
         val picked = pieces.joinToString("") { it.text }
         val restShown = shown.rest
         lastRead = Read(
@@ -958,9 +960,6 @@ class PinyinSession(
         )
     }
 
-    // text kept as typed as it shows and is committed: see KeyedSegmenter.asTyped (a grouped key's code never reaches the field)
-    private fun asTyped(text: String) = keyed?.asTyped(text) ?: text
-
     // how the input shows: its syllables, as typed, spelt (an inner class, for the session's size)
     private val shows = Shows()
 
@@ -990,11 +989,11 @@ class PinyinSession(
                     nineKeys?.note(readFrom() + from, reading.ends.map { readFrom() + it }, reading.syllables)
                     raw = false
                 } else if (raw) {
-                    parts[parts.size - 1] = parts.last() + asTyped(graph.text(from, to))
+                    parts[parts.size - 1] = parts.last() + keyed.asTyped(graph.text(from, to))
                     ends[ends.size - 1] = to
                 } else {
                     // as rest in commitRaw
-                    parts += asTyped(graph.text(from, to))
+                    parts += keyed.asTyped(graph.text(from, to))
                     ends += to
                     raw = true
                 }
@@ -1133,30 +1132,41 @@ private fun separates(c: Char, nineKeysSeparate: Boolean) = c == SyllableGraph.S
 
 /**
  * What [c] types at [cursor] of [input] (read from [from]) on [keyed]: 九键双拼's 1 sends 微软's `;`
- * while typing ([NineKeyLetters.NINE_SP_SEMICOLON]), a final where one goes ([finalNext]), else the
+ * while typing ([NineKeyLetters.NINE_SP_SEMICOLON]), a final where one goes and the key or initial
+ * before it makes a syllable with it ([leadOf], GroupedShuangpinSegmenter.endsSyllable), else the
  * separator, or nothing with no key before it; any other key itself.
  */
-private fun semicolonRead(c: Char, keyed: KeyedSegmenter?, input: CharSequence, from: Int, cursor: Int): Char? = when {
-    c != NineKeyLetters.NINE_SP_SEMICOLON || keyed?.letters != NineKeyLetters.NINE_SP -> c
-    finalNext(input, from, cursor, keyed::isKey) -> c
-    cursor == from -> null
-    else -> SyllableGraph.SEPARATOR
+internal fun semicolonRead(c: Char, keyed: KeyedSegmenter?, input: CharSequence, from: Int, cursor: Int): Char? {
+    if (c != NineKeyLetters.NINE_SP_SEMICOLON || keyed?.letters != NineKeyLetters.NINE_SP) return c
+    val lead = leadOf(input, from, cursor, keyed::isKey)
+    return when {
+        lead != null && (keyed as? GroupedShuangpinSegmenter)?.endsSyllable(lead, c) == true -> c
+        cursor == from -> null
+        else -> SyllableGraph.SEPARATOR
+    }
 }
 
 /**
- * Whether the key typed next at [cursor] of [input] (read from [from]) is a syllable's second, two
- * keys a syllable: an odd number of keys ([isKey]) since the last separator, a syllable taken or
- * [from]; an initial taken off the bar (its letters, then a separator) binds the key after it as its final.
+ * What the key typed next at [cursor] of [input] (read from [from]) would end as a syllable's second,
+ * two keys a syllable: the key before it, after an even number of keys ([isKey]) since the last
+ * separator, a syllable taken or [from]; with no key since an initial taken off the bar (its letters,
+ * then a separator), that initial, which binds the key after it as its final. Null where an initial goes.
  */
-private fun finalNext(input: CharSequence, from: Int, cursor: Int, isKey: (Char) -> Boolean): Boolean {
+private fun leadOf(input: CharSequence, from: Int, cursor: Int, isKey: (Char) -> Boolean): String? {
     var i = cursor
     while (i > from && isKey(input[i - 1])) i--
-    var keys = cursor - i
-    if (i - 1 > from && input[i - 1] == SyllableGraph.SEPARATOR && input[i - 2] in 'a'..'z') {
-        var start = i - 2
+    var start = i - 1
+    if (start > from && input[start] == SyllableGraph.SEPARATOR && input[start - 1] in 'a'..'z') {
         while (start > from && input[start - 1] in 'a'..'z') start--
-        val taken = input.substring(start, i - 1)
-        if (Syllables.id(taken) < 0 || Syllables.split(taken) == null) keys++
     }
-    return keys % 2 == 1
+    val taken = if (start < i - 1) input.substring(start, i - 1).takeIf { Syllables.id(it) < 0 || Syllables.split(it) == null } else null
+    val keys = cursor - i + (if (taken != null) 1 else 0)
+    return when {
+        keys % 2 == 0 -> null
+        cursor > i -> input[cursor - 1].toString()
+        else -> taken
+    }
 }
+
+// text kept as typed as it shows and is committed: see KeyedSegmenter.asTyped (a grouped key's code never reaches the field)
+private fun KeyedSegmenter?.asTyped(text: String) = this?.asTyped(text) ?: text

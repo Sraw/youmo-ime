@@ -251,9 +251,9 @@ class NineSceneGesturesTest {
         val app = PlaceholderStrings(RuntimeEnvironment.getApplication())
         val letters = NineKeyLetters.STANDARD
         val variants = mapOf(
-            "pinyin" to { T9Keyboard(app, ThemePreset.PixelLight, letters) },
-            "english" to { T9Keyboard(app, ThemePreset.PixelLight, letters, english = true) },
-            "shuangpin" to { T9Keyboard(app, ThemePreset.PixelLight, shuangpin = true) },
+            "pinyin" to { T9Keyboard(app, ThemePreset.PixelLight, letters, semicolon = false) },
+            "english" to { T9Keyboard(app, ThemePreset.PixelLight, letters, english = true, semicolon = false) },
+            "shuangpin" to { T9Keyboard(app, ThemePreset.PixelLight, shuangpin = true, semicolon = true) },
             "shuangpin plain" to { T9Keyboard(app, ThemePreset.PixelLight, shuangpin = true, semicolon = false) },
         )
         val olds = mapOf(
@@ -309,9 +309,9 @@ class NineSceneGesturesTest {
         assertEquals(pinyin2, T9Keyboard.ninePopup('2', "ABC", NineKeySymbols.STANDARD.symbols('2')).said())
         assertEquals(shuangpin5, T9Keyboard.ninePopup('5', "JKL", NineKeySymbols.STANDARD.symbols('5')).said())
         assertEquals(english1, T9Keyboard.onePopup(true, NineKeySymbols.STANDARD).said())
-        assertEquals(pinyin2, sceneOf(T9Keyboard(app, ThemePreset.PixelLight), "2").said())
-        assertEquals(shuangpin5, sceneOf(T9Keyboard(app, ThemePreset.PixelLight, shuangpin = true), "5").said())
-        assertEquals(english1, sceneOf(T9Keyboard(app, ThemePreset.PixelLight, english = true), "1").said())
+        assertEquals(pinyin2, sceneOf(T9Keyboard(app, ThemePreset.PixelLight, semicolon = false), "2").said())
+        assertEquals(shuangpin5, sceneOf(T9Keyboard(app, ThemePreset.PixelLight, shuangpin = true, semicolon = true), "5").said())
+        assertEquals(english1, sceneOf(T9Keyboard(app, ThemePreset.PixelLight, english = true, semicolon = false), "1").said())
     }
 
     // a view's key by the scene's id: its name, else the function key it is

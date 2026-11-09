@@ -57,18 +57,18 @@ class T9ShuangpinKeyboardTest {
     fun aDigitKeySendsItsGroupsCodeEveryPressItsOwn() {
         val tap = MultiTap(400)
         for (d in '2'..'9') {
-            assertEquals(code(NineKeyLetters.NINE_SP.codes[d - '2']), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("$d"), keys, tap, 0L, composing = false))
+            assertEquals(code(NineKeyLetters.NINE_SP.codes[d - '2']), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("$d"), keys, tap, 0L, composing = false, semicolon = false))
         }
         // pressed again soon: no 连按, the same code again
-        assertEquals(code(nineSpCode('2')), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("2"), keys, tap, 10L, composing = true))
-        assertEquals(code(nineSpCode('2')), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("2"), keys, tap, 20L, composing = true))
+        assertEquals(code(nineSpCode('2')), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("2"), keys, tap, 10L, composing = true, semicolon = false))
+        assertEquals(code(nineSpCode('2')), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("2"), keys, tap, 20L, composing = true, semicolon = false))
     }
 
     @Test
     fun oneIsTheSeparatorWhileTypingElsePunctuation() {
         val tap = MultiTap(0)
-        assertEquals(KeyAction.HostKeyAction("'"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("1"), keys, tap, 0L, composing = true))
-        assertEquals(KeyAction.CommitAction("，"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("1"), keys, tap, 0L, composing = false))
+        assertEquals(KeyAction.HostKeyAction("'"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("1"), keys, tap, 0L, composing = true, semicolon = false))
+        assertEquals(KeyAction.CommitAction("，"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("1"), keys, tap, 0L, composing = false, semicolon = false))
     }
 
     // 微软's: 1 while typing is ;'s code, the engine reading it as ing or the separator; else punctuation as ever
@@ -84,14 +84,14 @@ class T9ShuangpinKeyboardTest {
     fun theLongPressAndOtherKeysAreAsNineKeysHasThem() {
         val tap = MultiTap(0)
         val popup = KeyActionListener.Source.Popup
-        assertEquals(KeyAction.CommitAction("j"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("j"), popup, tap, 0L, composing = true))
-        assertEquals(KeyAction.CommitAction("5"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("5"), popup, tap, 0L, composing = true))
-        assertEquals(KeyAction.HostKeyAction("0"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("0"), keys, tap, 0L, composing = true))
+        assertEquals(KeyAction.CommitAction("j"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("j"), popup, tap, 0L, composing = true, semicolon = false))
+        assertEquals(KeyAction.CommitAction("5"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("5"), popup, tap, 0L, composing = true, semicolon = false))
+        assertEquals(KeyAction.HostKeyAction("0"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("0"), keys, tap, 0L, composing = true, semicolon = false))
     }
 
     @Test
     fun noLanguageKeyAndTheColumnOffersShuangpinsSyllablesNotNineKeys() {
-        val keyboard = T9Keyboard(context, ThemePreset.PixelDark, shuangpin = true)
+        val keyboard = T9Keyboard(context, ThemePreset.PixelDark, shuangpin = true, semicolon = true)
         assertTrue(keyboard.laidOut().shownKeyWithId(R.id.button_space) != null)
         assertEquals(true, keyboard.ownsSyllables)
         val items = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single().getChildAt(0) as ViewGroup

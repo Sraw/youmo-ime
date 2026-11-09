@@ -119,7 +119,7 @@ class T9Keyboard(
     private val english: Boolean = false,
     private val shuangpin: Boolean = false,
     /** 九键双拼's 1 types `;` while typing, shown beside its digit: only under a scheme that types it (微软's ing). */
-    private val semicolon: Boolean = true,
+    private val semicolon: Boolean,
 ) : BaseKeyboard(
     context, theme, layout(letters, symbols, english, shuangpin, semicolon), themeBoard = KeyNames.NINE, shortcuts = true,
 ), AutoCapsKeys {
@@ -220,7 +220,7 @@ class T9Keyboard(
             tap: MultiTap,
             time: Long,
             composing: Boolean,
-            semicolon: Boolean = false,
+            semicolon: Boolean,
         ): KeyAction {
             val key = (action as? KeyAction.HostKeyAction)?.act?.singleOrNull()
             if (source == KeyActionListener.Source.Popup || key == null || key !in '1'..'9') return resolve(action, source, tap, time, composing)
@@ -261,9 +261,8 @@ class T9Keyboard(
          * [symbols] in rows above.
          */
         internal fun ninePopup(digit: Char, letters: String, symbols: List<String>) = KeyDef.Popup.Keyboard.Explicit(
-            // ;'s capital is : (九键双拼's JKL;), as Shift gives it: no second ;
-            letters.map { if (it == ';') ":" else it.uppercase() }.toTypedArray() + digit.toString() +
-                letters.lowercase().map { it.toString() } + symbols.filter { it != ":" || ';' !in letters },
+            letters.map { it.uppercase() }.toTypedArray() + digit.toString() +
+                letters.lowercase().map { it.toString() } + symbols,
             symbolsFrom = 1 + 2 * letters.length,
             inRow = letters.length,
         )
