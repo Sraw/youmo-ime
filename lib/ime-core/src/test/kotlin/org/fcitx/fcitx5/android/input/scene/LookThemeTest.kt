@@ -100,8 +100,8 @@ class LookThemeTest {
         val keyColor = Argb(look.palette.keyBackgroundColor)
         assertEquals(Op.NineSlice(q.shape, "key.png", listOf(1, 2, 3, 4), 2, keyColor), q.ops(false).filterIsInstance<Op.NineSlice>().single())
         // its own pressed face, not tinted over
-        val pressed = q.ops(true).filterIsInstance<Op.NineSlice>().map { it.file }
-        assertTrue(pressed.toString(), "key-down.png" in pressed)
+        val pressed = q.ops(true).filterIsInstance<Op.NineSlice>()
+        assertTrue(pressed.toString(), pressed.any { it.file == "key-down.png" && it.fallback == keyColor })
         val text = q.ops(false).filterIsInstance<Op.Text>().first()
         assertEquals(LookTheme.KEY_FONT, text.font)
         assertEquals(700, text.weight)
@@ -109,11 +109,49 @@ class LookThemeTest {
         // the function keys' colour laid over their picture, as theme 3.0's face did
         assertEquals(Argb(look.palette.altKeyBackgroundColor), shift.ops(false).filterIsInstance<Op.Picture>().single().over)
         assertTrue(shift.ops(true).any { it is Op.Fill && it.color.value == 0xff112233.toInt() })
-        // w's label hidden, its corner's symbol too (a hidden label hides the symbol: rules B §5); its face its kind's image
+        // w's label hidden, its corner's symbol too (a hidden label hides the symbol: rules B §5); its face
+        // fill=Color, its kind's colour over the kind's image (theme 3.0: own fill or the kind's colour)
         val w = key(scene, "w")
         assertTrue(w.ops(false).filterIsInstance<Op.Text>().none { it.text == "w" })
-        assertTrue(w.ops(false).any { it is Op.NineSlice })
+        assertTrue(w.ops(false).none { it is Op.NineSlice })
+        assertTrue(w.ops(false).any { it is Op.Fill && it.color == keyColor })
         assertTrue(key(scene, "space").ops(false).any { it is Op.NineSlice })
+    }
+
+    // a single key's own face over its kind's colour, as theme 3.0's (ThemeColors.face for every key):
+    // under its picture, while its image is not there, and as fill=Color over a kind's picture or image
+    @Test
+    fun aSingleKeysFaceHasItsKindsColour() {
+        val slice = NineSlice("/data/themes/t/key.png", Insets(1, 1, 1, 1), 1)
+        val down = NineSlice("/data/themes/t/key-down.png", Insets(1, 1, 1, 1), 1)
+        val base = LookDefaults.look(palette(SceneData.theme("material-light.xml")))
+        val look = base.copy(
+            picture = Picture("/data/themes/t/src.jpg", Crop("/data/themes/t/p.jpg", null, 0), null, 80, 0),
+            keys = base.keys.copy(
+                function = KindStyle(KeyFill.Picture(4, 90), KeyPressed.Darken),
+                space = KindStyle(KeyFill.Color, KeyPressed.Image(down)),
+                overrides = mapOf(
+                    "qwerty/q" to KeyOverride(KeyFill.Picture(2, 80), null, KeyLabel.Show),
+                    "*/shift" to KeyOverride(KeyFill.Image(slice), KeyPressed.Image(down), KeyLabel.Show),
+                    "*/backspace" to KeyOverride(KeyFill.Color, null, KeyLabel.Show),
+                    "*/enter" to KeyOverride(null, KeyPressed.Image(down), KeyLabel.Show),
+                ),
+            ),
+        )
+        val p = look.palette
+        val theme = theme(LookTheme.xml(look, "T", false))
+        val scene = scene(theme, SceneData.portrait)
+        assertEquals(Argb(p.keyBackgroundColor), key(scene, "q").ops(false).filterIsInstance<Op.Picture>().single().over)
+        val shift = key(scene, "shift")
+        assertEquals(Argb(p.altKeyBackgroundColor), shift.ops(false).filterIsInstance<Op.NineSlice>().single().fallback)
+        assertTrue(shift.ops(true).any { it is Op.NineSlice && it.file == "key-down.png" && it.fallback == Argb(p.altKeyBackgroundColor) })
+        val backspace = key(scene, "backspace").ops(false)
+        assertTrue(backspace.none { it is Op.Picture })
+        assertTrue(backspace.toString(), backspace.any { it is Op.Fill && it.color == Argb(p.altKeyBackgroundColor) })
+        assertTrue(key(scene, "enter").ops(true).any { it is Op.NineSlice && it.fallback == Argb(p.accentKeyBackgroundColor) })
+        // a flat space's pressed image over the space bar's colour, as its face is
+        val flat = scene(theme, SceneData.portrait.copy(flat = true))
+        assertTrue(key(flat, "space").ops(true).any { it is Op.NineSlice && it.fallback == Argb(p.spaceBarColor) })
     }
 
     // 3.0's single keys by their names (KeyNames): 大千's , . ; / - selected as the keys of those ids, a

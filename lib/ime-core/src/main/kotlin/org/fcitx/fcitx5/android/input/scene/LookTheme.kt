@@ -129,6 +129,8 @@ object LookTheme {
         style("key.space", "fill" to fill(names, keys.space.fill, "@key"))
         listOf(Triple("letter", keys.letter, "@key"), Triple("function", keys.function, "@altKey"), Triple("enter", keys.enter, "@accentKey"), Triple("space", keys.space, "@key"))
             .forEach { (kind, k, color) -> pressed(names, "key.$kind:pressed", k.pressed, color) }
+        // a flat space's colour is the space bar's (ThemeColors.face), its pressed image's too
+        pressed(names, "@flat key.space:pressed", keys.space.pressed, "@spaceBar")
         style("key.alt-text", "color" to "@altKeyText", "icon-color" to "@altKeyText")
         style("key mark, key shortcut", "color" to "@keyHint", "icon-color" to "@keyHint")
         // a shortcut's text is not of the theme's size (rules B §6: keyScale leaves it be)
@@ -142,9 +144,13 @@ object LookTheme {
         // single keys over their kinds, later so they win the tie
         keys.overrides.toSortedMap().forEach { (name, o) ->
             val key = selector(name)
-            // Color: the kind's colour, which the kind's style gives already
-            o.fill?.takeIf { it != KeyFill.Color }?.let { style(key, "fill" to fill(names, it, "")) }
-            o.pressed?.let { pressed(names, "$key:pressed", it) }
+            // the key's kind's colour, as ThemeColors.face gives it: under a picture, while an image
+            // loads or cannot be read, and as the face of fill=Color; a key and its kind together
+            // outrank the key alone, so each kind has its own line
+            KIND_COLORS.forEach { (scene, kind, color) ->
+                o.fill?.let { style("$scene$key$kind", "fill" to fill(names, it, color)) }
+                o.pressed?.let { pressed(names, "$scene$key$kind:pressed", it, color) }
+            }
             if (o.label == KeyLabel.Hide) style("$key label", "hidden" to "true")
         }
         style("preview, popup", "fill" to "@popupBackground", "color" to "@popupText", "radius" to "${keys.radiusDp}dp", "shadow" to "0 2dp 2dp #33000000")
@@ -191,6 +197,15 @@ object LookTheme {
     // a 3.0 key name as a selector: what a selector reads otherwise in the key's name escaped, so that
     // 大千's zhuyin/, is its comma key, not a list of two, and number/* the star key, not every key
     // (theme-4 §selectors); a role's name (*/space) has none of them
+    /** (scene, class, colour): every kind's face colour, a flat space's the space bar's. */
+    private val KIND_COLORS = listOf(
+        Triple("", "", "@key"),
+        Triple("", ".function", "@altKey"),
+        Triple("", ".enter", "@accentKey"),
+        Triple("", ".space", "@key"),
+        Triple("@flat ", ".space", "@spaceBar"),
+    )
+
     internal fun selector(name: String): String {
         val slash = name.indexOf('/')
         if (slash < 0) return name
