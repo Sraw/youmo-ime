@@ -2,6 +2,7 @@ scene 2340x529 board 1358.25,0,2340,529
 base
   fill rect(0,0,2340,529) #ffeceff1
 slot handwriting-pad pad 1358.25,0,2193,423
+  ink #ff37474f 9.19
   shadow rect(1366.13,10.5,2185.13,415.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
   fill rect(1366.13,10.5,2185.13,412.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
 slot side-buttons 0,0,1358.25,529

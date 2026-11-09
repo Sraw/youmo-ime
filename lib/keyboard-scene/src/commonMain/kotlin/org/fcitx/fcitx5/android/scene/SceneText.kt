@@ -30,6 +30,7 @@ object SceneText {
         scene.base.forEach { appendLine("  ${op(it)}") }
         for (s in scene.slots) {
             appendLine("slot ${s.kind}${s.id?.let { " $it" }.orEmpty()} ${box(s.bounds)}")
+            s.ink?.let { appendLine("  ink ${it.color} ${n(it.width)}") }
             s.ops.forEach { appendLine("  ${op(it)}") }
         }
         for (k in scene.keys) key(k)

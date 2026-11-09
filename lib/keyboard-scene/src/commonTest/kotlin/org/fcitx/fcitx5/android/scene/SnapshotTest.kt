@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
@@ -13,14 +14,35 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** A scene the snapshots hold: [board] in [env], drawn by [theme], written to snapshots/[name].txt. */
-class Shot(val name: String, val board: String, val env: Env, val theme: Theme = Fixtures.materialLight) {
-    val scene: Scene by lazy { Forms.scene(board, env, theme) }
+/**
+ * A theme the shots draw with: [file] of the test data, [styles] added at its end and [fonts] after its
+ * colours; written so (FacadeShotsTest) that the theme maker's library's tests make the same one.
+ */
+data class ThemeSource(val file: String, val styles: List<String> = emptyList(), val fonts: String = "") {
+    val text: String
+        get() = if (styles.isEmpty() && fonts.isEmpty()) {
+            testData(file)
+        } else {
+            testData(file).replace("</colors>", "</colors>$fonts").replace("</theme>", styles.joinToString("\n", postfix = "\n</theme>"))
+        }
+
+    val theme: Theme get() = read.getOrPut(this) { ThemeReader.theme(text).ok() }
+
+    companion object {
+        val LIGHT = ThemeSource("material-light.xml")
+        val DARK = ThemeSource("material-dark.xml")
+        private val read = HashMap<ThemeSource, Theme>()
+    }
 }
 
-/** A popup's scene the snapshots hold, written to snapshots/[name].txt. */
-class PopupShot(val name: String, make: () -> Scene) {
-    val scene: Scene by lazy(make)
+/** A scene the snapshots hold: [board] in [env], drawn by [theme], written to snapshots/[name].txt. */
+class Shot(val name: String, val board: String, val env: Env, val theme: ThemeSource = ThemeSource.LIGHT) {
+    val scene: Scene by lazy { Forms.scene(board, env, theme.theme) }
+}
+
+/** A popup's scene the snapshots hold: [ask] in [env], drawn by [theme], written to snapshots/[name].txt. */
+class PopupShot(val name: String, val env: Env, val ask: PopupAsk, val theme: ThemeSource = ThemeSource.LIGHT) {
+    val scene: Scene by lazy { ask.scene(SceneBuilder(theme.theme, env, FakeMeasurer), env) }
 }
 
 /**
@@ -38,8 +60,8 @@ object Shots {
         val block = Forms.block
         fun on(board: String, change: (Env) -> Env) = change(Forms.env(board, block))
         listOf(
-            Shot("qwerty-dark", "qwerty", block.copy(dark = true), Forms.materialDark),
-            Shot("qwerty-dark-flat", "qwerty", Forms.flat.copy(dark = true), Forms.materialDark),
+            Shot("qwerty-dark", "qwerty", block.copy(dark = true), ThemeSource.DARK),
+            Shot("qwerty-dark-flat", "qwerty", Forms.flat.copy(dark = true), ThemeSource.DARK),
             Shot(
                 "qwerty-table-looking-up", "qwerty",
                 on("qwerty") { it.copy(input = it.input.copy(ime = "table", table = "wbx", composing = true, lookingUp = true)) },
@@ -136,23 +158,19 @@ object Shots {
      * cell in focus with its radius and border.
      */
     val popups: List<PopupShot> = listOf("block" to Forms.block, "flat" to Forms.flat, "floating" to Forms.floating).flatMap { (form, env) ->
-        Forms.popups(env).map { (name, make) -> PopupShot("popup-$name-$form", make) }
+        Forms.popupAsks.map { (name, ask) -> PopupShot("popup-$name-$form", env, ask) }
     } + listOf(
         "preview-bubble" to "<style select=\"preview\" shape=\"bubble\"/>",
         "preview-bubble-large-up" to "<style select=\"preview\" shape=\"bubble\" size=\"130%\" offset=\"-6dp\"/>",
         "preview-path" to "<style select=\"preview\" shape=\"path(M0 0 H1 V.6 L.6 .6 L.5 .75 L.4 .6 L0 .6 Z)\" inner-shadow=\"0 2dp 2dp #30000000\"/>",
         "keys-selected-border" to "<style select=\"popup:selected\" radius=\"8dp\" border=\"1dp #ff1565c0\"/>",
     ).map { (name, style) ->
-        PopupShot("popup-$name-block") {
-            val popups = Forms.popups(Forms.block, styled(style)).toMap()
-            popups.getValue(if (name.startsWith("keys")) "keys" else "preview-symbol")()
-        }
+        val asks = Forms.popupAsks.toMap()
+        PopupShot("popup-$name-block", Forms.block, asks.getValue(if (name.startsWith("keys")) "keys" else "preview-symbol"), styled(style))
     }
 
     // material-light with [styles] more, and [fonts]
-    private fun styled(vararg styles: String, fonts: String = "") = ThemeReader.theme(
-        testData("material-light.xml").replace("</colors>", "</colors>$fonts").replace("</theme>", styles.joinToString("\n", postfix = "\n</theme>")),
-    ).ok()
+    private fun styled(vararg styles: String, fonts: String = "") = ThemeSource("material-light.xml", styles.toList(), fonts)
 
     // NumberPad's, full being every form's
     private val PADS = listOf("digits", "signed", "decimal", "signed-decimal", "phone", "datetime")

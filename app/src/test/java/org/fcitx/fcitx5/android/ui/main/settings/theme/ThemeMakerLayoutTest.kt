@@ -503,55 +503,7 @@ class ThemeMakerLayoutTest {
 
     // ------------------------------------------------------------------ icons
 
-    /** The vector [name] as the page draws it: its viewport and paths (filled, unless stroked). */
-    private fun icon(name: String): String {
-        val file = File("src/main/res/drawable/$name.xml").takeIf { it.exists() }
-            ?: File("app/src/main/res/drawable/$name.xml")
-        val doc = javax.xml.parsers.DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
-            .newDocumentBuilder().parse(file)
-        val ns = "http://schemas.android.com/apk/res/android"
-        val root = doc.documentElement
-        fun attr(e: org.w3c.dom.Element, a: String) = e.getAttributeNS(ns, a).takeIf { it.isNotEmpty() }
-        val paths = buildJsonArray {
-            fun visit(e: org.w3c.dom.Element, transform: String?) {
-                val children = e.childNodes
-                for (i in 0 until children.length) {
-                    val c = children.item(i) as? org.w3c.dom.Element ?: continue
-                    when (c.tagName) {
-                        "group" -> visit(c, listOfNotNull(transform, groupTransform(c, ::attr)).joinToString(" ").ifEmpty { null })
-                        "path" -> add(buildJsonObject {
-                            put("d", attr(c, "pathData") ?: "")
-                            attr(c, "fillType")?.let { put("rule", if (it == "evenOdd") "evenodd" else "nonzero") }
-                            if (attr(c, "strokeColor") != null && attr(c, "fillColor") == null) {
-                                put("stroke", attr(c, "strokeWidth")?.toDouble() ?: 1.0)
-                            }
-                            attr(c, "fillAlpha")?.let { put("alpha", it.toDouble()) }
-                            transform?.let { put("transform", it) }
-                        })
-                    }
-                }
-            }
-            visit(root, null)
-        }
-        return buildJsonObject {
-            put("vw", attr(root, "viewportWidth")!!.toDouble())
-            put("vh", attr(root, "viewportHeight")!!.toDouble())
-            put("paths", paths)
-        }.toString()
-    }
-
-    // a group's transform as SVG's: about its pivot, scaled and rotated, then translated
-    private fun groupTransform(e: org.w3c.dom.Element, attr: (org.w3c.dom.Element, String) -> String?): String? {
-        val px = attr(e, "pivotX")?.toDouble() ?: 0.0
-        val py = attr(e, "pivotY")?.toDouble() ?: 0.0
-        val tx = attr(e, "translateX")?.toDouble() ?: 0.0
-        val ty = attr(e, "translateY")?.toDouble() ?: 0.0
-        val sx = attr(e, "scaleX")?.toDouble() ?: 1.0
-        val sy = attr(e, "scaleY")?.toDouble() ?: 1.0
-        val r = attr(e, "rotation")?.toDouble() ?: 0.0
-        if (listOf(tx, ty, sx - 1, sy - 1, r).all { it == 0.0 }) return null
-        return "translate(${tx + px} ${ty + py}) rotate($r) scale($sx $sy) translate(${-px} ${-py})"
-    }
+    private fun icon(name: String): String = VectorIconJson.of(name)
 
     private fun String.swapSides(): String {
         val w = Regex("w(\\d+)dp").find(this)!!.groupValues[1]

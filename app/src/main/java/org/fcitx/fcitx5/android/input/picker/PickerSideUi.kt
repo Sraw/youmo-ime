@@ -15,19 +15,22 @@ import android.widget.TextView
 import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.keyboard.canvas.ScenePanels
 import org.fcitx.fcitx5.android.scene.look.PressEffect
-import org.fcitx.fcitx5.android.utils.alpha
 import org.fcitx.fcitx5.android.utils.pressHighlightDrawable
 import org.fcitx.fcitx5.android.utils.rippleDrawable
 import splitties.dimensions.dp
 
 /**
  * The symbol panel's categories, named in words down its side as Sogou lists them: icons in a
- * row above said less, and left no room for more of them.
+ * row above said less, and left no room for more of them. Their colours the theme's (`picker
+ * categories`, the one shown `picker:selected categories`; 060-render-p3 T7b).
  */
 class PickerSideUi(context: Context, private val theme: Theme) : ScrollView(context) {
 
     private val keyRipple = ThemeManager.shownLook(theme).keys.press == PressEffect.Ripple
+
+    private val look = ScenePanels.picker(context, theme, side = true)
 
     private val column = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
 
@@ -39,7 +42,7 @@ class PickerSideUi(context: Context, private val theme: Theme) : ScrollView(cont
 
     init {
         isVerticalScrollBarEnabled = false
-        setBackgroundColor(theme.barColor)
+        look.categories.fill?.let { setBackgroundColor(it.value) }
         addView(column)
     }
 
@@ -52,7 +55,7 @@ class PickerSideUi(context: Context, private val theme: Theme) : ScrollView(cont
                 textSize = 15f
                 gravity = Gravity.CENTER
                 maxLines = 1
-                setTextColor(theme.keyTextColor)
+                setTextColor(look.categories.color.value)
                 if (!keyRipple) foreground = pressHighlightDrawable(theme.keyPressHighlightColor)
                 setOnClickListener { onPick?.invoke(i) }
                 column.addView(this, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(ITEM_HEIGHT)))
@@ -78,10 +81,11 @@ class PickerSideUi(context: Context, private val theme: Theme) : ScrollView(cont
 
     private fun style(item: TextView, active: Boolean) {
         item.typeface = if (active) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-        item.setTextColor(theme.keyTextColor.alpha(if (active) 1f else INACTIVE))
-        // the one shown the colour of the list beside it, as if a tab of it
+        item.setTextColor((if (active) look.selected else look.categories).color.value)
+        // the one shown the colour of the list beside it, as if a tab of it (not set: PanelLooks' default)
+        val shown = look.selected.fill.takeIf { active }
         item.background = when {
-            active -> ColorDrawable(theme.keyboardColor)
+            shown != null -> ColorDrawable(shown.value)
             keyRipple -> rippleDrawable(theme.keyPressHighlightColor)
             else -> null
         }
@@ -89,6 +93,5 @@ class PickerSideUi(context: Context, private val theme: Theme) : ScrollView(cont
 
     companion object {
         private const val ITEM_HEIGHT = 44
-        private const val INACTIVE = 0.6f
     }
 }
