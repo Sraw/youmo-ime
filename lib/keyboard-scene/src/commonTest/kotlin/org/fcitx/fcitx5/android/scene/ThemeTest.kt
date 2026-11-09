@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.scene.theme.KeyLook
 import org.fcitx.fcitx5.android.scene.theme.Meta
 import org.fcitx.fcitx5.android.scene.theme.Radius
 import org.fcitx.fcitx5.android.scene.theme.Selector
+import org.fcitx.fcitx5.android.scene.theme.SystemColors
 import org.fcitx.fcitx5.android.scene.theme.TextLook
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.scene.theme.Value
@@ -304,7 +305,7 @@ class ThemeTest {
         val t = ThemeReader.theme(withDark("<color name=\"keyShadow\" value=\"#123456\"/>")).getOr { error("$it") }.variant(true)
         assertEquals(Argb(0xFF123456.toInt()), t.colors["keyBorder"])
         assertTrue(problems(withDark("<color name=\"newOne\" value=\"#123456\"/>")).any { it.contains("not in the light") })
-        assertTrue(problems(withDark("<color name=\"key\" value=\"@nothing\"/>")).any { it == "@nothing is no colour" })
+        assertTrue(problems(withDark("<color name=\"key\" value=\"@nothing\"/>")).any { it == "@nothing is no colour in the dark colours" })
         assertTrue(problems(withDark("", variants = "variants=\"light\"")).any { it.contains("no dark variant") })
         assertTrue(problems(source.replace(root, "")).any { it.contains("variants= is required") })
         assertTrue(problems(source.replace(root, "dark=\"false\" variants=\"light\"")).any { it.contains("both") })
@@ -320,13 +321,20 @@ class ThemeTest {
         assertNotNull(ColorExpr.parse("system(neutral2-1000, darker(@key, 10%))"))
         assertNotNull(ColorExpr.parse("darker(system(on-surface, #000000), 10%)"))
         assertEquals(5 * 13 + 9, ColorExpr.SYSTEM_NAMES.size)
+        val names = listOf("primary", "on-primary", "secondary-container", "surface-container", "surface-container-high",
+            "surface-container-highest", "surface-bright", "on-surface", "on-surface-variant", "accent1-0", "accent2-10",
+            "accent3-50", "neutral1-500", "neutral2-1000")
+        assertTrue(ColorExpr.SYSTEM_NAMES.containsAll(names))
+        assertTrue(listOf("accent1-25", "accent4-0", "neutral3-100", "secondary", "on-secondary").none { it in ColorExpr.SYSTEM_NAMES })
         assertNull(ColorExpr.parse("system(accent1-25, #000000)"), "no such tone")
         assertNull(ColorExpr.parse("system(primary)"), "a fallback is required")
         assertNull(ColorExpr.parse("system(primary, system(on-primary, #000000))"))
+        assertNull(ColorExpr.parse("system(primary, darker(system(on-primary, #000000), 10%))"), "nested anywhere")
         // in a theme: the reader's given colour, else the fallback; the fallback's variable checked
         val s = source.replace("<color name=\"key\" value=\"#fbfbfc\"/>", "<color name=\"key\" value=\"system(surface-bright, #fbfbfc)\"/>")
         assertEquals(Argb(0xFFFBFBFC.toInt()), ThemeReader.theme(s).getOr { error("$it") }.colors["key"])
-        val given = ThemeReader.theme(s, systemColors = mapOf("surface-bright" to Argb(0xFF0000FF.toInt()))).getOr { error("$it") }
+        val given = ThemeReader.theme(s, systemColors = SystemColors(mapOf("surface-bright" to Argb(0xFF0000FF.toInt())), emptyMap()))
+            .getOr { error("$it") }
         assertEquals(Argb(0xFF0000FF.toInt()), given.colors["key"])
         assertTrue(problems(source.replace("value=\"#fbfbfc\"", "value=\"system(primary, @nothing)\"")).any { it == "@nothing is no colour" })
         assertTrue(problems(source.replace("value=\"#fbfbfc\"", "value=\"system(primary-ish, #000000)\"")).isNotEmpty())
@@ -348,7 +356,7 @@ class ThemeTest {
         assertTrue(problems(s.replace("Ann", "A".repeat(65))).isNotEmpty())
         assertTrue(problems(s.replace("0.6.0", "six")).isNotEmpty())
         assertTrue(problems(s.replace("author=", "authr=")).any { it.contains("unknown attribute") })
-        assertTrue(problems(s.replace("<colors>", "<colors>").replace("</colors>", "</colors>\n<meta/>")).any { it.contains("given twice") })
+        assertTrue(problems(s.replace("</colors>", "</colors>\n<meta/>")).any { it.contains("given twice") })
     }
 
     @Test
@@ -356,6 +364,8 @@ class ThemeTest {
         // each of a later stage's style properties, of its form: a warning, the style kept
         val reserved = listOf(
             "align=\"top-left\"", "letter-spacing=\"0.1em\"", "stroke=\"1dp #000000\"", "text-shadow=\"0 1dp 2dp #80000000\"",
+            "text-shadow=\"none\"", "inner-shadow=\"none\"", "side-padding=\"2% 5%\"", "bottom-padding=\"1%\"",
+            "underline=\"none\"", "cursor-color=\"system(primary, @keyText)\"",
             "font-han=\"system\"", "font-latin=\"system\"", "space-content=\"ime-name\"", "return-icon-send=\"icon(send)\"",
             "inner-shadow=\"0 1dp 2dp @keyShadow\"", "depth=\"2dp\"", "depth-color=\"@keyShadow\"", "tail=\"true\"", "offset=\"-4dp\"",
             "height=\"38% 52%\"", "width=\"24dp\"", "side-padding=\"8dp 48dp\"", "bottom-padding=\"0 0\"", "gap=\"4dp\"",
@@ -364,7 +374,7 @@ class ThemeTest {
             "transition=\"150ms ease-out\"", "press-scale=\"95%\"", "press-sink=\"2dp\"", "appear=\"scale 150ms\"",
             "effect=\"particles(star.png, 12, 24dp, 600ms)\"", "sticker=\"cat.png\"",
         )
-        assertEquals(Values.RESERVED.size, reserved.size + 5, "every one tried but the other return icons")
+        assertEquals(Values.RESERVED.size, reserved.map { it.substringBefore('=') }.toSet().size + 5, "every one tried but the other return icons")
         for (attr in reserved) {
             val w = warnings(withStyle("<style select=\"key\" $attr/>"))
             assertTrue(w.single().contains("${attr.substringBefore('=')}= is not supported"), "$attr: $w")
@@ -381,6 +391,14 @@ class ThemeTest {
         assertTrue(problems(withStyle("<style select=\"key\" transition=\"fast\"/>")).isNotEmpty())
         assertTrue(problems(withStyle("<style select=\"key\" alignn=\"center\"/>")).any { it.contains("unknown attribute alignn=") })
         assertTrue(problems(withStyle("<style select=\"key\" shape=\"blob\"/>")).isNotEmpty())
+        // colours in a reserved property: a colour, naming colours there
+        for (attr in listOf("ink-color=\"rgb(0,0,0)\"", "cursor-color=\"nonsense(x)\"", "stroke=\"1dp nonsense\"", "text-shadow=\"0 1dp 2dp\"")) {
+            assertTrue(problems(withStyle("<style select=\"key\" $attr/>")).single().contains("is not a value of"), attr)
+        }
+        assertEquals(listOf("<style>: @keyShadw is no colour"), problems(withStyle("<style select=\"key\" depth-color=\"@keyShadw\"/>")))
+        // a reserved value of the wrong form, an empty path
+        assertTrue(problems(withStyle("<style select=\"preview\" size=\"12\"/>")).any { it.contains("size=\"12\" is not") })
+        assertTrue(problems(withStyle("<style select=\"preview\" shape=\"path( )\"/>")).any { it.contains("shape=\"path( )\" is not") })
         // elements: a sound pack, whatever it holds; an animated picture
         val sounds = "<sounds><sound key=\"key\" src=\"tap.ogg\"/></sounds>"
         assertTrue(warnings(source.replace("</theme>", "$sounds\n</theme>")).single().contains("<sounds> is not supported"))
@@ -395,8 +413,12 @@ class ThemeTest {
         assertEquals(setOf(false, true), t.value.variants)
         assertEquals(Argb(0xFF303030.toInt()), t.value.variant(dark = true).colors["key"])
         assertEquals("0.6.0", t.value.meta?.minApp)
-        assertTrue(t.warnings().size >= 10, "${t.warnings()}")
-        assertTrue(t.warnings().any { it.message.startsWith("<sounds>") })
+        val ignored = listOf(
+            "83|<sounds>", "79|transition=", "79|@im=wubi", "79|clipboard", "79|:first", "80|align=", "80|stroke=", "80|depth=",
+            "80|press-scale=", "80|effect=", "80|sticker=", "81|shape=\"path(M0 0 L1 0 L1 1 Z)\"", "81|size=\"120%\"", "81|tail=",
+            "81|appear=", "82|height=", "82|side-padding=",
+        ).map { "$it is not supported by this version, ignored" }
+        assertEquals(ignored, t.warnings().map { "${it.line}|${it.message}" })
     }
 
     @Test
@@ -412,6 +434,7 @@ class ThemeTest {
         assertEquals(":first", s("candidate:first").reserved)
         assertNull(Selector.parse("candidate mark"))
         assertNull(Selector.parse("toolbar label"))
+        assertNull(Selector.parse("key:first"), ":first is a candidate's")
         assertNull(s("key:pressed").reserved)
         assertNull(s("@dark key").reserved)
         // such a style reads, warns, and selects nothing yet
@@ -420,5 +443,70 @@ class ThemeTest {
         val t = ThemeReader.theme(src).getOr { error("$it") }
         val target = Selector.Target("key", "qwerty", "q", null, setOf("letter"))
         assertTrue(t.styles.last().selectors.none { it.matches(target, setOf("dark", "compact")) })
+    }
+
+    @Test
+    fun systemColoursInStylesAndPerVariant() {
+        val light = mapOf("primary" to Argb(0xFF0000AA.toInt()), "accent1-500" to Argb(0xFF00AA00.toInt()))
+        val dark = mapOf("primary" to Argb(0xFF0000DD.toInt()), "accent1-500" to Argb(0xFF00AA00.toInt()))
+        val sys = SystemColors(light, dark)
+        val styled = withStyle(
+            "<style select=\"key\" fill=\"system(primary, #111111)\" shadow=\"0 1dp 0 system(accent1-500, #222222)\"/>\n" +
+                "<style select=\"popup\" fill=\"linear(90deg, system(primary, #333333) 0%, #000000 100%)\"/>",
+        )
+        val t = ThemeReader.theme(styled, systemColors = sys).getOr { error("$it") }
+        val key = t.styles[t.styles.size - 2].values
+        assertEquals(Argb(0xFF0000AA.toInt()), t.color(((key["fill"] as Value.OfFill).fill as Fill.Solid).color))
+        assertEquals(Argb(0xFF00AA00.toInt()), t.color(assertNotNull((key["shadow"] as Value.OfShadow).shadow.color)))
+        val stop = ((t.styles.last().values["fill"] as Value.OfFill).fill as Fill.Linear).stops[0].first
+        assertEquals(Argb(0xFF0000AA.toInt()), t.color(stop))
+        val none = ThemeReader.theme(styled).getOr { error("$it") }
+        assertEquals(Argb(0xFF333333.toInt()), none.color(stop), "no system colours: the fallback")
+        // the light <colors> take the light roles, the dark ones the dark; a style's follows the version drawn
+        val both = source.replace(root, "variants=\"light dark\"")
+            .replace("<color name=\"key\" value=\"#fbfbfc\"/>", "<color name=\"key\" value=\"system(primary, #fbfbfc)\"/>")
+            .replace("</colors>", "</colors>\n<colors variant=\"dark\"><color name=\"bar\" value=\"system(primary, #000000)\"/></colors>")
+            .replace("</theme>", "<style select=\"menu\" fill=\"system(primary, #444444)\"/>\n</theme>")
+        val v = ThemeReader.theme(both, systemColors = sys).getOr { error("$it") }
+        assertEquals(Argb(0xFF0000AA.toInt()), v.colors["key"])
+        val d = v.variant(dark = true)
+        assertEquals(Argb(0xFF0000DD.toInt()), d.colors["key"], "a light colour the dark set does not give: again, with the dark roles")
+        assertEquals(Argb(0xFF0000DD.toInt()), d.colors["bar"])
+        val menu = ((v.styles.last().values["fill"] as Value.OfFill).fill as Fill.Solid).color
+        assertEquals(Argb(0xFF0000AA.toInt()), v.color(menu))
+        assertEquals(Argb(0xFF0000DD.toInt()), d.color(menu))
+        // a dark-only theme's <colors> are its dark ones
+        val onlyDark = ThemeReader.theme(source.replace(root, "variants=\"dark\"")
+            .replace("<color name=\"key\" value=\"#fbfbfc\"/>", "<color name=\"key\" value=\"system(primary, #fbfbfc)\"/>"), systemColors = sys)
+        assertEquals(Argb(0xFF0000DD.toInt()), onlyDark.getOr { error("$it") }.colors["key"])
+    }
+
+    @Test
+    fun darkCyclesAndProblemsOnce() {
+        fun withDark(colors: String) = source.replace(root, "variants=\"light dark\"")
+            .replace("</colors>", "</colors>\n<colors variant=\"dark\">$colors</colors>")
+        // key is @keyText only in the dark, keyText @key everywhere: a cycle of the dark colours alone
+        val cyc = source.replace("<color name=\"keyText\" value=\"#37474f\"/>", "<color name=\"keyText\" value=\"@key\"/>")
+            .replace(root, "variants=\"light dark\"")
+            .replace("</colors>", "</colors>\n<colors variant=\"dark\"><color name=\"key\" value=\"@keyText\"/></colors>")
+        assertTrue(problems(cyc).isNotEmpty() && problems(cyc).all { it.endsWith("is defined by itself in the dark colours") }, "${problems(cyc)}")
+        // a light colour's problem, resolved again for the dark: once
+        val broken = withDark("<color name=\"bar\" value=\"#000000\"/>").replace("<color name=\"key\" value=\"#fbfbfc\"/>", "<color name=\"key\" value=\"@nothing\"/>")
+        assertEquals(1, problems(broken).count { it.startsWith("@nothing is no colour") }, "${problems(broken)}")
+        // two colours naming the same missing one: each its own problem
+        val two = source.replace("<color name=\"key\" value=\"#fbfbfc\"/>", "<color name=\"key\" value=\"@nothing\"/>")
+            .replace("<color name=\"keyText\" value=\"#37474f\"/>", "<color name=\"keyText\" value=\"@nothing\"/>")
+        assertEquals(2, problems(two).count { it == "@nothing is no colour" })
+    }
+
+    @Test
+    fun appVersionsCompared() {
+        assertTrue(ThemeReader.newer("0.6.0", "0.5.2"))
+        assertTrue(ThemeReader.newer("0.6.1", "v0.6.0-12-gabcdef"))
+        assertTrue(!ThemeReader.newer("0.6.0", "0.6.0-12-gabcdef"))
+        assertTrue(!ThemeReader.newer("0.6.0", "0.6"), "no patch: cannot tell")
+        assertTrue(!ThemeReader.newer("0.6.0", "dev"), "garbage: cannot tell")
+        assertTrue(!ThemeReader.newer("0.6.0", ""))
+        assertTrue(!ThemeReader.newer("1.0.0", "0.6.0.1"))
     }
 }

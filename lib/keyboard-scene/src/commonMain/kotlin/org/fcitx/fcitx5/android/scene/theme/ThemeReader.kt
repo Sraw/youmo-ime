@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.scene.theme
 
 import org.fcitx.fcitx5.android.scene.Parsed
-import org.fcitx.fcitx5.android.scene.Problem
 import org.fcitx.fcitx5.android.scene.Problems
 import org.fcitx.fcitx5.android.scene.xml.Attributes
 import org.fcitx.fcitx5.android.scene.xml.Xml
@@ -25,7 +24,8 @@ object ThemeReader {
     private const val PERCENT = 100.0
     private val VERSION = Regex("4\\.[0-9]+")
     private val VAR_NAME = Regex("[a-zA-Z][a-zA-Z0-9_-]{0,31}")
-    private val FILE = Regex("[^/\\\\:*?\"<>|\\s][^/\\\\:*?\"<>|]{0,127}")
+    // ASCII white space spelt out: `\s` is more on JS than on the JVM, and a file must read the same on both
+    private val FILE = Regex("[^/\\\\:*?\"<>| \\t\\n\\r\\f\\x0B][^/\\\\:*?\"<>|]{0,127}")
     private val ICON = Regex("[a-z0-9]+(-[a-z0-9]+)*")
 
     /** The colours the app's own widgets take by name (theme 3.0's, less their Color suffix). */
@@ -43,10 +43,13 @@ object ThemeReader {
     val RESERVED_ELEMENTS = setOf("sounds", "sound")
 
     /**
-     * [source] read, `system()` colours from [systemColors] (none: each its fallback), refused where its
-     * `<meta min-app>` is newer than [appVersion] (null: not checked).
+     * [source] read, `system()` colours from [systemColors] (none: each its fallback; the light
+     * `<colors>` take its light ones, `<colors variant="dark">` and a dark-only theme its dark ones),
+     * refused where its `<meta min-app>` is newer than [appVersion]. [appVersion] null: not checked;
+     * the app (T8a) passes its release's base version (`Versions.baseVersionName`, `0.6.0`), not a
+     * development build's `0.6.0-12-gabcdef`, whose suffix [newer] would drop anyway.
      */
-    fun theme(source: String, systemColors: Map<String, Argb> = emptyMap(), appVersion: String? = null): Parsed<Theme> =
+    fun theme(source: String, systemColors: SystemColors = SystemColors.NONE, appVersion: String? = null): Parsed<Theme> =
         when (val xml = Xml.parse(source)) {
             is Parsed.Failed -> xml
             is Parsed.Ok -> theme(xml.value, systemColors, appVersion)
@@ -57,13 +60,13 @@ object ThemeReader {
      * finds, a stack it overflows) is a problem of the file, never a crash of the keyboard.
      */
     @Suppress("TooGenericExceptionCaught")
-    fun theme(root: XmlElement, systemColors: Map<String, Argb> = emptyMap(), appVersion: String? = null): Parsed<Theme> = try {
+    fun theme(root: XmlElement, systemColors: SystemColors = SystemColors.NONE, appVersion: String? = null): Parsed<Theme> = try {
         read(root, systemColors, appVersion)
     } catch (e: Throwable) {
         Parsed.Failed(root.line, "the theme could not be read: ${e::class.simpleName}")
     }
 
-    private fun read(root: XmlElement, system: Map<String, Argb>, appVersion: String?): Parsed<Theme> {
+    private fun read(root: XmlElement, system: SystemColors, appVersion: String?): Parsed<Theme> {
         if (root.name != "theme") return Parsed.Failed(root.line, "the root is <${root.name}>, not <theme>")
         val p = Problems()
         val a = Attributes(root, p)
@@ -97,23 +100,25 @@ object ThemeReader {
         val styles = styleEls.take(MAX_STYLES).mapIndexedNotNull { i, el -> style(el, i, p, colors.keys, fonts.keys) }
         return p.result {
             val drawn = if (dark) darkColors ?: colors else colors
-            Theme(name.orEmpty(), dark, version.orEmpty(), drawn, styles, fonts, icons, picture, variants, colors, darkColors, meta)
+            Theme(name.orEmpty(), dark, version.orEmpty(), drawn, styles, fonts, icons, picture, variants, colors, darkColors, meta, system)
         }
     }
 
     // <colors>, and <colors variant="dark"> where given: the dark one the light one but what it gives
-    private fun colorTables(root: XmlElement, variants: Set<Boolean>, p: Problems, system: Map<String, Argb>): Pair<Map<String, Argb>, Map<String, Argb>?> {
+    private fun colorTables(root: XmlElement, variants: Set<Boolean>, p: Problems, system: SystemColors): Pair<Map<String, Argb>, Map<String, Argb>?> {
         val (darkEls, baseEls) = root.all("colors").partition { it["variant"] == "dark" }
         if (baseEls.size != 1) p.add(root.line, "<theme> needs one <colors>")
         if (darkEls.size > 1) p.add(darkEls[1].line, "<colors variant=\"dark\"> given twice")
         if (darkEls.isNotEmpty() && true !in variants) p.add(darkEls[0].line, "<colors variant=\"dark\"> in a theme with no dark variant")
         val baseRaw = baseEls.firstOrNull()?.let { rawColors(it, p, required = true) }.orEmpty()
+        val reported = HashSet<Pair<String, String>>()
+        val colors = resolved(baseRaw, p, system.of(variants == setOf(true)), reported, "")
         val darkColors = darkEls.firstOrNull()?.let { el ->
             val over = rawColors(el, p, required = false)
             over.filterKeys { it !in baseRaw }.forEach { (k, v) -> p.add(v.second, "the colour $k is not in the light <colors>") }
-            resolved(baseRaw + over, p, system)
+            resolved(baseRaw + over, p, system.dark, reported, " in the dark colours")
         }
-        return resolved(baseRaw, p, system) to darkColors
+        return colors to darkColors
     }
 
     // variants="light|dark|light dark", or 3.0's way dark="true|false": one of the two
@@ -136,7 +141,7 @@ object ThemeReader {
     private const val MAX_META = 64
     private const val THREE = 3
     private val APP_VERSION = Regex("[0-9]{1,4}\\.[0-9]{1,4}\\.[0-9]{1,4}")
-    private val PREVIEW = Regex("[^/\\\\:*?\"<>|\\s][^/\\\\:*?\"<>|]{0,122}\\.(png|webp)")
+    private val PREVIEW = Regex("[^/\\\\:*?\"<>| \\t\\n\\r\\f\\x0B][^/\\\\:*?\"<>|]{0,122}\\.(png|webp)")
 
     private fun meta(el: XmlElement, p: Problems, appVersion: String?): Meta {
         val a = Attributes(el, p)
@@ -155,12 +160,14 @@ object ThemeReader {
         return meta
     }
 
-    /** Whether [version] (`0.6.0`) is newer than [app] (`0.5.2`, `0.6.0-beta1`: its first three numbers). */
+    /**
+     * Whether [version] (`0.6.0`) is newer than [app] (`0.5.2`; a leading `v` and what follows a `-`
+     * dropped: `v0.6.0-beta1` is `0.6.0`). Either not three numbers after that: false, it cannot tell.
+     */
     fun newer(version: String, app: String): Boolean {
-        fun numbers(v: String) = v.split('.').take(THREE).map { part -> part.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
-            .let { it + List(THREE - it.size) { 0 } }
-        val x = numbers(version)
-        val y = numbers(app)
+        fun numbers(v: String) = v.removePrefix("v").substringBefore('-').takeIf(APP_VERSION::matches)?.split('.')?.map { it.toInt() }
+        val x = numbers(version) ?: return false
+        val y = numbers(app) ?: return false
         return (0 until THREE).firstOrNull { x[it] != y[it] }?.let { x[it] > y[it] } ?: false
     }
 
@@ -190,19 +197,26 @@ object ThemeReader {
         return if (name == null || value == null) null else name to value
     }
 
-    // every colour variable resolved, those that name what is not there or themselves left out (and a problem)
-    // (each problem once: the dark colours resolve the light ones they do not give again)
-    private fun resolved(raw: Map<String, Pair<ColorExpr, Int>>, p: Problems, system: Map<String, Argb>): Map<String, Argb> {
+    // every colour variable resolved, those that name what is not there or themselves left out (and a
+    // problem, [where] the table says which; each colour's once in [reported]: the dark colours resolve
+    // the light ones they do not give again)
+    private fun resolved(
+        raw: Map<String, Pair<ColorExpr, Int>>,
+        p: Problems,
+        system: Map<String, Argb>,
+        reported: MutableSet<Pair<String, String>>,
+        where: String,
+    ): Map<String, Argb> {
         val done = HashMap<String, Argb>()
-        fun problem(line: Int, message: String) {
-            if (Problem(line, message) !in p.all) p.add(line, message)
+        fun problem(colour: String, line: Int, message: String) {
+            if (reported.add(colour to message)) p.add(line, message + where)
         }
         fun resolve(name: String, seen: Set<String>): Argb? {
             done[name]?.let { return it }
             val (expr, line) = raw[name] ?: return null
-            if (name in seen) return null.also { problem(line, "the colour $name is defined by itself") }
+            if (name in seen) return null.also { problem(name, line, "the colour $name is defined by itself") }
             val v = expr.resolve({ resolve(it, seen + name) }, system::get)
-            if (v == null) expr.refs().filter { it !in raw }.forEach { problem(line, "@$it is no colour") }
+            if (v == null) expr.refs().filter { it !in raw }.forEach { problem(name, line, "@$it is no colour") }
             return v?.also { done[name] = it }
         }
         raw.keys.forEach { resolve(it, emptySet()) }
@@ -214,7 +228,7 @@ object ThemeReader {
         val src = a.matching("src", FILE, "a file name") ?: a.required("src")
         val brightness = a.value("brightness", "0%–100%") { Values.percent(it)?.takeIf { v -> v <= PERCENT } } ?: PERCENT
         val blur = a.value("blur", "0dp–25dp") { Values.dp(it, MAX_BLUR) } ?: 0.0
-        if (a.boolean("animated") == true) p.warn(el.line, ignored("<picture animated=\"true\">"))
+        if (a.oneOf("animated", listOf("true", "false")) == "true") p.warn(el.line, ignored("<picture animated=\"true\">"))
         a.done()
         val cuts = el.children.mapNotNull { cut ->
             if (cut.name != "cut") return@mapNotNull null.also { p.add(cut.line, "<${cut.name}> is not allowed in <picture>") }
@@ -248,12 +262,18 @@ object ThemeReader {
         val selectors = select?.let { Selector.parseList(it) ?: null.also { a.problem("select=\"$select\" is no selector") } }
         // the properties it sets, in PROPERTIES' order: a theme's styles are many, each sets a few
         val values = LinkedHashMap<String, Value>()
+        var reserved = 0
         for ((prop, what) in PROPERTY_VALUES) {
-            val raw = el[prop]
-            if (raw == null || Values.read(prop, raw) == null && Values.reservedValue(prop, raw)) continue
-            a.value(prop, what) { Values.read(prop, it) }?.let { values[prop] = it }
+            val raw = el[prop] ?: continue
+            val v = a.value(prop, what) { Values.read(prop, it) ?: RESERVED_VALUE.takeIf { _ -> Values.reservedValue(prop, it) } }
+            if (v === RESERVED_VALUE) {
+                p.warn(el.line, ignored("$prop=\"$raw\""))
+                reserved++
+            } else if (v != null) {
+                values[prop] = v
+            }
         }
-        val reserved = reserved(el, a, p)
+        reserved += reserved(el, a, p, colors)
         a.done()
         selectors?.mapNotNull { it.reserved }?.distinct()?.forEach { p.warn(el.line, ignored(it)) }
         for (v in values.values) {
@@ -264,21 +284,18 @@ object ThemeReader {
         return selectors?.let { Style(it, values, order, el.line) }
     }
 
-    // a later stage's properties and values ([Values.RESERVED], [Values.reservedValue]) each a warning; how many
-    private fun reserved(el: XmlElement, a: Attributes, p: Problems): Int {
-        var n = 0
-        for (prop in Values.PROPERTIES) {
-            val raw = el[prop]?.takeIf { Values.read(prop, it) == null && Values.reservedValue(prop, it) } ?: continue
-            a.string(prop)
-            p.warn(el.line, ignored("$prop=\"$raw\""))
-            n++
+    // a property of today's value a later stage reads ([Values.reservedValue]): ignored
+    private val RESERVED_VALUE = Value.Flag(false)
+
+    // a later stage's properties ([Values.RESERVED]) each a warning where of their form and naming colours there; how many
+    private fun reserved(el: XmlElement, a: Attributes, p: Problems, colors: Set<String>): Int {
+        val given = Values.RESERVED.filterKeys { el[it] != null }
+        for ((prop, form) in given) {
+            val refs = a.value(prop, "a value of $prop") { form.read(it) }?.flatMap { it.refs() } ?: continue
+            refs.filter { it !in colors }.forEach { a.problem("@$it is no colour") }
+            p.warn(el.line, ignored("$prop="))
         }
-        for ((prop, form) in Values.RESERVED) {
-            if (el[prop] == null) continue
-            if (a.value(prop, "a value of $prop") { it.takeIf(form::matches) } != null) p.warn(el.line, ignored("$prop="))
-            n++
-        }
-        return n
+        return given.size
     }
 
     // each property and how a problem names its value

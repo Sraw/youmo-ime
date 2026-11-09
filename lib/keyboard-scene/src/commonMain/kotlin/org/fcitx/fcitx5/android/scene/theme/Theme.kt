@@ -26,16 +26,36 @@ class Theme(
     /** The dark version's colours where `<colors variant="dark">` gave some (each one it did not give, [baseColors]'). */
     val darkColors: Map<String, Argb>? = null,
     val meta: Meta? = null,
+    /** The system's colours it was read with: a style's `system()` takes [dark]'s. */
+    val systemColors: SystemColors = SystemColors.NONE,
 ) {
+    // once, not a function object each colour
+    private val variable: (String) -> Argb? = colors::get
+    private val system: (String) -> Argb? = systemColors.of(dark)::get
+
     /** [expr]'s colour here; transparent where it names what is not there (checked on reading). */
-    fun color(expr: ColorExpr): Argb = expr.resolve(colors::get) ?: Argb.TRANSPARENT
+    fun color(expr: ColorExpr): Argb = expr.resolve(variable, system) ?: Argb.TRANSPARENT
 
     /** This theme drawn as its dark or light version; itself where it has only the other. */
     fun variant(dark: Boolean): Theme = if (dark == this.dark || dark !in variants) {
         this
     } else {
         val drawn = if (dark) darkColors ?: baseColors else baseColors
-        Theme(name, dark, version, drawn, styles, fonts, icons, picture, variants, baseColors, darkColors, meta)
+        Theme(name, dark, version, drawn, styles, fonts, icons, picture, variants, baseColors, darkColors, meta, systemColors)
+    }
+}
+
+/**
+ * What `system(name, fallback)` takes, by name ([ColorExpr.SYSTEM_NAMES]): Material's roles differ
+ * between the light and the dark ([light], [dark]: Android's `system_primary_light`, `…_dark`); the
+ * palette's tones are the same in both, so the caller puts them in each.
+ */
+data class SystemColors(val light: Map<String, Argb>, val dark: Map<String, Argb>) {
+    fun of(dark: Boolean): Map<String, Argb> = if (dark) this.dark else light
+
+    companion object {
+        /** None: every `system()` its fallback (an older Android, the web). */
+        val NONE = SystemColors(emptyMap(), emptyMap())
     }
 }
 

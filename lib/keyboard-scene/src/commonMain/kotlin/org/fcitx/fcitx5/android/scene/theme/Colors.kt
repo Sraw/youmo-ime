@@ -119,15 +119,17 @@ sealed interface ColorExpr {
             return Fn(name, colors, percent)
         }
 
-        // system(name, fallback): a name of the list, then any colour but another system()'s
+        // system(name, fallback): a name of the list, then any colour with no system() anywhere in it
         private fun system(t: String, depth: Int): ColorExpr? {
             if (!t.endsWith(")")) return null
             val args = splitTop(t.substring("system(".length, t.length - 1)) ?: return null
             if (args.size != 2) return null
             val name = args[0].trim().takeIf { it in SYSTEM_NAMES } ?: return null
             val fallback = parse(args[1], depth) ?: return null
-            return if (fallback is System) null else System(name, fallback)
+            return if (fallback.hasSystem()) null else System(name, fallback)
         }
+
+        private fun ColorExpr.hasSystem(): Boolean = this is System || this is Fn && args.any { it.hasSystem() }
 
         /** [s] split at its commas outside parentheses; null where they do not match. */
         fun splitTop(s: String): List<String>? {

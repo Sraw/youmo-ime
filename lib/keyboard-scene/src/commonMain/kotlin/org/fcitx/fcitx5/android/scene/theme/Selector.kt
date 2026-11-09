@@ -223,6 +223,7 @@ data class Selector(
                 }
             }
             if (sel.widget != "key" && (sel.classes.isNotEmpty() || sel.roles.isNotEmpty())) return null
+            if ("first" in sel.states && sel.widget != "candidate") return null
             return sel
         }
     }
