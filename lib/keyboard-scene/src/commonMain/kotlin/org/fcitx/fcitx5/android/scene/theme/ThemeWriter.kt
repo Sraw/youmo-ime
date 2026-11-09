@@ -1,0 +1,215 @@
+/*
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+ */
+package org.fcitx.fcitx5.android.scene.theme
+
+/**
+ * A [Theme] as theme-4.xsd's text, canonical: one theme is always the same text, whoever wrote the
+ * file it was read from and however, and [ThemeReader] reads it back as the same theme (its
+ * [Theme.styles] at other lines). What an export and the theme maker save.
+ *
+ * - The elements in the reader's order (meta, colors, the dark colors, picture, font, style, icon),
+ *   two spaces an indent, a line each.
+ * - Colours as [Theme] holds them, resolved: `<colors>` the light version's (or the only one's), the
+ *   24 of [ThemeReader.REQUIRED_COLORS] first and in that order, the theme's own after them by name;
+ *   `<colors variant="dark">` only those the dark version has otherwise. A colour is `#aarrggbb`
+ *   ([Argb]'s text), a fully transparent black `transparent`. The variables and `system()` a file's
+ *   `<colors>` had are gone (a theme read keeps their values only); a style's colours are kept as
+ *   written, `@name`, `system()` and all.
+ * - A style's selectors joined by `, `, each as [selector] writes it; its properties in
+ *   [Values.PROPERTIES]' order, each as [value] writes it. A style that sets nothing is left out.
+ * - Fonts and icons by name.
+ *
+ * A theme picked as its other version ([Theme.variant]) is written as its file: read back, it is the
+ * version first drawn.
+ */
+object ThemeWriter {
+
+    fun write(theme: Theme): String = buildString {
+        appendLine("""<?xml version="1.0" encoding="UTF-8"?>""")
+        val variants = when (theme.variants) {
+            setOf(true) -> "dark"
+            setOf(false) -> "light"
+            else -> "light dark"
+        }
+        appendLine("""<theme xmlns="${ThemeReader.NAMESPACE}" name="${escape(theme.name)}" variants="$variants" version="${escape(theme.version)}">""")
+        theme.meta?.let { m ->
+            element(
+                "  ", "meta",
+                listOf("author" to m.author, "version" to m.version, "license" to m.license, "min-app" to m.minApp, "preview" to m.preview),
+            )
+        }
+        appendLine("  <colors>")
+        colors(theme.baseColors)
+        appendLine("  </colors>")
+        theme.darkColors?.filter { (name, c) -> theme.baseColors[name] != c }?.takeIf { it.isNotEmpty() }?.let {
+            appendLine("""  <colors variant="dark">""")
+            colors(it)
+            appendLine("  </colors>")
+        }
+        theme.picture?.let { p ->
+            appendLine("""  <picture src="${escape(p.src)}" brightness="${number(p.brightness)}%" blur="${length(p.blurDp)}">""")
+            // portrait first: the two orientations the reader takes, then any other it would refuse anyway
+            p.cuts.entries.sortedBy { (o, _) -> CUTS.indexOf(o).takeIf { it >= 0 } ?: CUTS.size }.forEach { (o, file) ->
+                appendLine("""    <cut orientation="${escape(o)}" file="${escape(file)}"/>""")
+            }
+            appendLine("  </picture>")
+        }
+        theme.fonts.entries.sortedBy { it.key }.forEach { (name, src) -> element("  ", "font", listOf("name" to name, "src" to src)) }
+        // one that sets nothing (a later stage's properties alone, ignored as read) left out: a file of it would not read
+        theme.styles.filter { it.values.isNotEmpty() }.forEach { s ->
+            val props = Values.PROPERTIES.mapNotNull { p -> s.values[p]?.let { p to value(p, it) } }
+            element("  ", "style", listOf("select" to s.selectors.joinToString(", ", transform = ::selector)) + props)
+        }
+        theme.icons.entries.sortedBy { it.key }.forEach { (name, src) -> element("  ", "icon", listOf("name" to name, "src" to src)) }
+        appendLine("</theme>")
+    }
+
+    private val CUTS = listOf("portrait", "landscape")
+
+    private fun StringBuilder.colors(colors: Map<String, Argb>) {
+        val required = ThemeReader.REQUIRED_COLORS.filter { it in colors }
+        val own = colors.keys.filter { it !in ThemeReader.REQUIRED_COLORS }.sorted()
+        (required + own).forEach { name -> appendLine("""    <color name="$name" value="${color(colors.getValue(name))}"/>""") }
+    }
+
+    // an element with no children, its attributes those given (a null one left out)
+    private fun StringBuilder.element(indent: String, name: String, attributes: List<Pair<String, String?>>) {
+        append(indent).append('<').append(name)
+        attributes.forEach { (k, v) -> if (v != null) append(' ').append(k).append("=\"").append(escape(v)).append('"') }
+        appendLine("/>")
+    }
+
+    /**
+     * [s] as a `select=` writes it: its scenes (`@flat`; [Selector.SCENES]' order, then the scenes of what
+     * is typed by name), the widget or the key (`qwerty/q`, `*`/role, `qwerty/` and a star for every key
+     * of a board), its classes, roles and states each by name, its part. A key's name has every
+     * character a selector reads otherwise escaped (`zhuyin/\,`, `number/\*`), as [Selector] reads it.
+     */
+    fun selector(s: Selector): String = buildString {
+        val known = Selector.SCENES.toList()
+        s.scenes.sortedWith(compareBy({ known.indexOf(it).takeIf { i -> i >= 0 } ?: known.size }, { it })).forEach { append('@').append(it).append(' ') }
+        append(
+            when {
+                s.starRole != null -> "*/${s.starRole}"
+                s.board != null && s.key != null -> "${s.board}/${escapeName(s.key)}"
+                s.board != null -> "${s.board}/*"
+                else -> s.widget
+            },
+        )
+        s.classes.sorted().forEach { append('.').append(it) }
+        s.roles.sorted().forEach { append("[role=").append(it).append(']') }
+        s.states.sorted().forEach { append(':').append(it) }
+        s.part?.let { append(' ').append(it) }
+    }
+
+    // what a selector reads otherwise, escaped wherever it is in a key's name: a list's comma, a space, a
+    // qualifier's . : [, a star (alone, every key of the board), the escape itself
+    private fun escapeName(name: String): String = buildString {
+        name.forEach { c ->
+            if (c in NAME_ESCAPED) append('\\')
+            append(c)
+        }
+    }
+
+    private const val NAME_ESCAPED = ",.:[* \\"
+
+    /** [v], the value of [property], as the property's attribute writes it. */
+    fun value(property: String, v: Value): String = when (v) {
+        is Value.OfFill -> fill(v.fill)
+        is Value.OfColor -> color(v.color)
+        is Value.OfRadius -> radius(v.radius)
+        is Value.OfInset -> inset(v.inset)
+        is Value.OfShadow -> v.shadow.let { s ->
+            s.color?.takeIf { s != Shadow.NONE }?.let { "${length(s.dx)} ${length(s.dy)} ${length(s.blur)} ${color(it)}" } ?: "none"
+        }
+        is Value.OfBorder -> v.border.let { b -> b.color?.takeIf { b != Border.NONE }?.let { "${length(b.width)} ${color(it)}" } ?: "none" }
+        is Value.Word -> v.word
+        is Value.Flag -> v.on.toString()
+        is Value.Number -> when (property) {
+            "scale" -> "${number(v.number)}%"
+            "size" -> "${number(v.number)}sp"
+            else -> number(v.number)
+        }
+    }
+
+    private fun fill(f: Fill): String = when (f) {
+        is Fill.Solid -> color(f.color)
+        is Fill.Linear -> "linear(${number(f.angle)}deg, ${f.stops.joinToString(", ") { (c, at) -> "${color(c)} ${number(at)}%" }})"
+        is Fill.Image -> "image(${f.file}, ${f.insets.joinToString(" ")}, ${f.pxPerDp}x" + (f.fallback?.let { ", ${color(it)})" } ?: ")")
+        // its blur in dp always: picture()'s grammar has no bare 0
+        is Fill.Picture -> if (f.blurDp == null && f.brightness == null && f.over == null) {
+            "picture"
+        } else {
+            "picture(${number(f.blurDp ?: 0.0)}dp, ${number(f.brightness ?: FULL)}%" + (f.over?.let { ", ${color(it)})" } ?: ")")
+        }
+    }
+
+    private fun radius(r: Radius): String = when {
+        r.half -> "50%"
+        r.corners.distinct().size == 1 -> length(r.corners[0])
+        else -> r.corners.joinToString(" ") { length(it) }
+    }
+
+    // two values where top and bottom, left and right are alike (a key's gaps), else all four
+    private fun inset(i: Inset): String =
+        if (i.top == i.bottom && i.left == i.right) "${length(i.top)} ${length(i.right)}" else listOf(i.top, i.right, i.bottom, i.left).joinToString(" ") { length(it) }
+
+    /** [c] as a colour's text: `#aarrggbb`, `@name`, `transparent` for a transparent black, a function of them. */
+    fun color(c: ColorExpr): String = when (c) {
+        is ColorExpr.Literal -> color(c.argb)
+        is ColorExpr.Ref -> "@${c.name}"
+        is ColorExpr.Fn -> "${c.name}(${c.args.joinToString(", ") { color(it) }}, ${number(c.percent)}%)"
+        is ColorExpr.System -> "system(${c.name}, ${color(c.fallback)})"
+    }
+
+    private fun color(c: Argb): String = if (c == Argb.TRANSPARENT) "transparent" else c.toString()
+
+    // a length: dp, 0 without its unit (as CSS writes it, and the built-in themes)
+    private fun length(dp: Double): String = if (dp == 0.0) "0" else "${number(dp)}dp"
+
+    private const val FULL = 100.0
+
+    /**
+     * [d] as a plain decimal, the same on the JVM and JS: `4` not `4.0`, `0.5`, never an exponent
+     * (the JVM writes 0.0001 as `1.0E-4`, JS 1e-7 as `1e-7`; the reader takes neither).
+     */
+    internal fun number(d: Double): String {
+        val text = d.toString()
+        val e = text.indexOfFirst { it == 'E' || it == 'e' }
+        val plain = if (e < 0) text else shifted(text.substring(0, e), text.substring(e + 1).toInt())
+        return plain.removeSuffix(".0").let { if ('.' in it) it.trimEnd('0').removeSuffix(".") else it }
+    }
+
+    // a mantissa (`-1.25`) with its point moved [exponent] places
+    private fun shifted(mantissa: String, exponent: Int): String {
+        val negative = mantissa.startsWith('-')
+        val m = mantissa.removePrefix("-")
+        val point = m.indexOf('.').let { if (it < 0) m.length else it }
+        val digits = m.replace(".", "")
+        val at = point + exponent
+        val body = when {
+            at <= 0 -> "0." + "0".repeat(-at) + digits
+            at >= digits.length -> digits + "0".repeat(at - digits.length)
+            else -> digits.substring(0, at) + "." + digits.substring(at)
+        }
+        return (if (negative) "-" else "") + body
+    }
+
+    // an attribute's value: XML's five, and the white space a reader of another kind would fold
+    private fun escape(s: String): String = buildString {
+        s.forEach { c ->
+            when (c) {
+                '&' -> append("&amp;")
+                '"' -> append("&quot;")
+                '<' -> append("&lt;")
+                '>' -> append("&gt;")
+                '\t' -> append("&#9;")
+                '\n' -> append("&#10;")
+                '\r' -> append("&#13;")
+                else -> append(c)
+            }
+        }
+    }
+}

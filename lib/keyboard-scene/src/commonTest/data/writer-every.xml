@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ThemeWriterTest's theme of every form a value has, written by hand as an author might: not canonical -->
+<theme version="4.2" variants="light dark" xmlns="https://youmo-ime/theme/4" name="Every &quot;form&quot; &amp; &lt;more&gt;">
+  <meta preview="preview.webp" min-app="0.6.0" author="someone" license="CC0-1.0"/>
+  <colors>
+    <color name="zeta" value="#123456"/>
+    <color name="background" value="#eceff1"/>
+    <color name="bar" value="#e4e7e9"/>
+    <color name="keyboard" value="@background"/>
+    <color name="key" value="system(surface-bright, #fbfbfc)"/>
+    <color name="keyText" value="#37474f"/>
+    <color name="candidateText" value="#37474f"/>
+    <color name="candidateLabel" value="#37474f"/>
+    <color name="candidateComment" value="#7a858a"/>
+    <color name="altKey" value="darker(@key, 10%)"/>
+    <color name="altKeyText" value="#7a858a"/>
+    <color name="accentKey" value="#5cb5ab"/>
+    <color name="accentKeyText" value="#ffffff"/>
+    <color name="keyPressHighlight" value="#1f000000"/>
+    <color name="keyShadow" value="#c0c3c4"/>
+    <color name="popupBackground" value="#d9dbdd"/>
+    <color name="popupText" value="#37474f"/>
+    <color name="spaceBar" value="#c9ced1"/>
+    <color name="divider" value="#1f000000"/>
+    <color name="clipboardEntry" value="#fbfbfc"/>
+    <color name="genericActiveBackground" value="#80cbc4"/>
+    <color name="genericActiveForeground" value="#37474f"/>
+    <color name="keyBorder" value="@keyShadow"/>
+    <color name="keyHint" value="@altKeyText"/>
+    <color name="toolbarIcon" value="@altKeyText"/>
+    <color name="alpha" value="transparent"/>
+  </colors>
+  <colors variant="dark">
+    <color name="background" value="#202124"/>
+    <color name="keyText" value="#37474f"/>
+    <color name="zeta" value="#00ffffff"/>
+  </colors>
+  <picture src="src.jpg" brightness="72.5%" blur="0dp">
+    <cut orientation="landscape" file="land.png" rotation="90"/>
+    <cut orientation="portrait" file="port.png" rect="0 0 10 10"/>
+  </picture>
+  <font name="zfont" src="z.ttf"/>
+  <font name="afont" src="a.otf"/>
+  <style select="keyboard" fill="picture"/>
+  <style select="@flat @dark keyboard" fill="linear(-45deg, @background 0%, alpha(@keyText, 50%) 37.5%, #ff000000 100%)"/>
+  <style select="bar" fill="picture(4dp, 90%)"/>
+  <style select="key" press="ripple" weight="700" scale="117.5%" font="afont" icon-color="system(primary, mix(@key, @keyText, 25%))" color="@keyText"
+         inset="1dp 2dp 3dp 4dp" shadow="-1.5dp 2dp 0dp @keyShadow" border="0.5dp @keyBorder" radius="1dp 2dp 3dp 0" shape="rect" overlay="transparent" fill="image(key.png, 1 2 3 4, 2x, @key)"/>
+  <style select="@landscape key" inset="0dp 0.25dp" radius="0dp" border="none" shadow="none"/>
+  <style select="@compact @landscape @floating @split @one-handed @dark @flat key.function.alt-text[role=shift]:pressed:locked label" color="#33000000"/>
+  <style select="@keyboard=k18 @im=wubi @field=password key" fill="image(k.png, 0 0 0 0)"/>
+  <style select="qwerty/q" size="20.5sp" hidden="false" padding="2dp"/>
+  <style select="zhuyin/\,, zhuyin/\., zhuyin/\:, number/\*, zhuyin/\[x, odd/a\ b, odd/\\, zhuyin//" hidden="true"/>
+  <style select="qwerty/*, */enter:on, key[role=space]" fill="picture(0dp, 100%, @accentKey)"/>
+  <style select="menu" radius="50%" fill="#ff0000"/>
+  <style select="clipboard, candidate:first comment" fill="@key"/>
+  <style select="popup:selected" overlay="#80ffffff" press="face" font="system"/>
+  <style select="preview" shape="path(M0 0 L1 0 L1 1 Z)"/>
+  <icon name="z-icon" src="z.png"/>
+  <icon name="a-icon" src="a.svg"/>
+</theme>
