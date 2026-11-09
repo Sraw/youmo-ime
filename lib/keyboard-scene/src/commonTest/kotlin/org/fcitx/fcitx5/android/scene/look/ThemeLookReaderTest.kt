@@ -88,7 +88,9 @@ class ThemeLookReaderTest {
         assertIs<Parsed.Failed>(Json.parse(" ".repeat(Json.MAX_CHARS) + "1"))
     }
 
-    // what kotlinx's ThemeLookJson refuses, this does too: a field missing, one not known, a value of another kind or out of range
+    // a file not of the form, refused as kotlinx's ThemeLookJson refuses it: a field missing, one not known, a value of
+    // another kind or out of range (JSON's text itself the two read apart where no maker writes it: the app's
+    // ThemeLookReaderParityTest)
     @Test
     fun aFileNotOfTheFormIsAProblem() {
         fun failed(from: String, to: String): List<String> {

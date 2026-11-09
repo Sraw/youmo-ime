@@ -37,7 +37,11 @@ object Json {
     const val MAX_DEPTH = 32
     const val MAX_STRING = 4096
 
-    /** The value [source] is, or why not. */
+    /**
+     * The value [source] is, or why not. A file comes from anywhere: whatever else goes wrong reading
+     * it (a bug of ours it finds) is a problem of the file too, never a crash, as ThemeReader has it.
+     */
+    @Suppress("TooGenericExceptionCaught")
     fun parse(source: String): Parsed<JsonValue> =
         if (source.length > MAX_CHARS) {
             Parsed.Failed(0, "the file is over $MAX_CHARS characters")
@@ -46,6 +50,8 @@ object Json {
                 Parsed.Ok(JsonReader(source).document())
             } catch (e: JsonException) {
                 Parsed.Failed(e.line, e.message.orEmpty())
+            } catch (e: Throwable) {
+                Parsed.Failed(0, "the file could not be read: ${e::class.simpleName}")
             }
         }
 }
@@ -59,7 +65,7 @@ private class JsonReader(private val s: String) {
 
     fun document(): JsonValue {
         // a byte order mark, as an editor may save one
-        if (s.startsWith('﻿')) i++
+        if (s.startsWith(BOM)) i++
         val v = value(0)
         space()
         if (i < s.length) fail("text after the value")
@@ -214,5 +220,6 @@ private class JsonReader(private val s: String) {
         const val HEX = "0123456789abcdefABCDEF"
         const val HEX_DIGITS = 4
         const val HEX_RADIX = 16
+        const val BOM = '﻿'
     }
 }

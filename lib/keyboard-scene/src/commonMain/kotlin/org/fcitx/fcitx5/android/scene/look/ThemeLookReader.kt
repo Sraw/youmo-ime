@@ -16,17 +16,23 @@ data class ThemeLookFile(val name: String, val dark: Boolean, val look: ThemeLoo
  * ThemeLookJson reads, the same way (held so by the app's ThemeLookReaderParityTest). Every field
  * is there, `null` written where one may be none; one not known is refused, as is a value out of
  * [ThemeLook]'s ranges. `"version": "3.0"` only: the app's migrations of older files are its own.
- * A problem is the file's, with its line, never a crash.
+ * Its JSON is strict where kotlinx's is not (a key twice, a number in quotes, `8e0` for an int, a
+ * control character unescaped: refused here), and a byte order mark is skipped (kotlinx refuses
+ * one); no maker writes any of these. A problem is the file's, with its line, never a crash.
  */
 object ThemeLookReader {
     const val VERSION = "3.0"
 
+    // whatever else goes wrong (a bug of ours a file finds) a problem of the file too, as ThemeReader has it
+    @Suppress("TooGenericExceptionCaught")
     fun read(source: String): Parsed<ThemeLookFile> = when (val json = Json.parse(source)) {
         is Parsed.Failed -> json
         is Parsed.Ok -> try {
             Parsed.Ok(file(json.value))
         } catch (e: ShapeException) {
             Parsed.Failed(e.line, e.message.orEmpty())
+        } catch (e: Throwable) {
+            Parsed.Failed(0, "the theme could not be read: ${e::class.simpleName}")
         }
     }
 
