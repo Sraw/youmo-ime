@@ -10,6 +10,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -36,6 +37,7 @@ import org.fcitx.fcitx5.android.input.voice.VoiceStyle
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.engine.PanelLooks
 import org.fcitx.fcitx5.android.scene.look.LookTheme
+import org.fcitx.fcitx5.android.scene.look.PressEffect
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.After
@@ -103,6 +105,30 @@ class PanelThemeTest {
     }
 
     @Test
+    fun aFlatLooksEntriesAreAsRoundAsItsKeysSay() {
+        // 按键圆角 10 dp, the keys flat (square): the entries half of it still, as ThemeColors.entryRadius had them
+        val light = TestThemes.PixelLight.look
+        val flat = Theme.Custom("flat", false, light.copy(keys = light.keys.copy(radiusDp = 10, blocks = false)))
+        val look = ScenePanels.clipboard(ctx, flat)
+        assertEquals(5 * density, ScenePanels.clipboardRadius(ctx, look), 0f)
+    }
+
+    @Test
+    fun aTabShownOnItsOwnFillHasItsRippleBackOnceAnotherIs() {
+        everything()
+        val light = TestThemes.PixelLight.look
+        val rippled = Theme.Custom("rippled", false, light.copy(keys = light.keys.copy(press = PressEffect.Ripple)))
+        val tabs = PickerTabsUi(ctx, rippled).apply { setTabs(listOf(PickerData.Category("一"), PickerData.Category("二"))) }
+        fun tab(i: Int) = tabs.root.getChildAt(i)
+        tabs.activateTab(1)
+        assertEquals(0xff444444.toInt(), (tab(1).background as ColorDrawable).color)
+        assertTrue(tab(0).background is RippleDrawable)
+        tabs.activateTab(0)
+        assertTrue(tab(1).background is RippleDrawable)
+        assertEquals(0xff444444.toInt(), (tab(0).background as ColorDrawable).color)
+    }
+
+    @Test
     fun thePickersCategories() {
         fun side() = PickerSideUi(ctx, theme).apply {
             setCategories(listOf("一", "二"))
@@ -117,12 +143,13 @@ class PanelThemeTest {
         // before: the column the bar's colour, the one shown the keyboard's; the text the keys' at 60% and whole
         val s = side()
         assertEquals(theme.barColor, (s.background as ColorDrawable).color)
-        assertEquals(listOf(ColorUtils.setAlphaComponent(theme.keyTextColor, 153), theme.keyTextColor), items(s).map { it.currentTextColor })
+        val whole = ColorUtils.setAlphaComponent(theme.keyTextColor, 0xFF)
+        assertEquals(listOf(ColorUtils.setAlphaComponent(theme.keyTextColor, 153), whole), items(s).map { it.currentTextColor })
         assertEquals(theme.keyboardColor, (items(s)[1].background as ColorDrawable).color)
         // the tabs on the bar's own, at 50% and whole
         val t = tabs()
         assertNull(t.root.background)
-        assertEquals(listOf(ColorUtils.setAlphaComponent(theme.keyTextColor, 128), theme.keyTextColor), labels(t).map { it.currentTextColor })
+        assertEquals(listOf(ColorUtils.setAlphaComponent(theme.keyTextColor, 128), whole), labels(t).map { it.currentTextColor })
         assertNull(ScenePanels.picker(ctx, theme, side = true).fill)
         everything()
         val themed = side()
@@ -174,11 +201,13 @@ class PanelThemeTest {
 
     @Test
     fun theBlurOfAThemeIsThreeBoxBlursOfItsRadius() {
-        // as many small pixels as leave 2 of the radius, no more than 8 times smaller: within half a small pixel
+        // as many small pixels as leave 2 of the radius, no more than 8 times smaller: within half a small pixel;
+        // no less than twice smaller, a small blur a little more (never the keys taken whole)
         assertEquals(VoiceGlass.Blur(8, 2), VoiceGlass.Blur.of(16.0))
         assertEquals(VoiceGlass.Blur(8, 8), VoiceGlass.Blur.of(25 * 2.625))
-        assertEquals(VoiceGlass.Blur(1, 3), VoiceGlass.Blur.of(3.0))
-        assertEquals(VoiceGlass.Blur(1, 1), VoiceGlass.Blur.of(0.5))
+        assertEquals(VoiceGlass.Blur(3, 2), VoiceGlass.Blur.of(6.0))
+        assertEquals(VoiceGlass.Blur(2, 2), VoiceGlass.Blur.of(3.0))
+        assertEquals(VoiceGlass.Blur(2, 1), VoiceGlass.Blur.of(0.5))
         assertNull(VoiceGlass.Blur.of(0.4))
         assertNull(VoiceGlass.Blur.of(0.0))
     }

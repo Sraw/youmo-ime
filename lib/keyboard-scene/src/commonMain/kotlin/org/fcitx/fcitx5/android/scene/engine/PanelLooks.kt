@@ -60,7 +60,8 @@ class PanelLooks(private val cascades: Cascades) {
             ),
             selected = Categories(
                 fill = fill(shown) ?: variable(KEYBOARD).takeIf { side },
-                color = color(shown[COLOR]) ?: text,
+                // the app's of before: the keys' text made opaque (alpha(1f))
+                color = color(shown[COLOR]) ?: Argb((text.value and RGB) or (OPAQUE shl ALPHA)),
             ),
         )
     }
@@ -74,11 +75,13 @@ class PanelLooks(private val cascades: Cascades) {
     fun editing(scenes: Set<String>): Editing {
         val v = cascades.of(scenes).of(EDITING)
         val radius = (v[RADIUS] as? Value.OfRadius)?.radius
+        val keys = keyRadius(scenes)
         return Editing(
             fill = fill(v),
             radiusDp = radius?.corners?.max(),
-            round = radius?.half == true,
-            keyRadiusDp = keyRadius(scenes).corners.max(),
+            // not set, a pill as the keys are
+            round = (radius ?: keys).half,
+            keyRadiusDp = keys.corners.max(),
         )
     }
 
@@ -148,6 +151,7 @@ class PanelLooks(private val cascades: Cascades) {
         fun mask(color: Argb): Argb = Argb((color.value and RGB) or ((color.alpha * MASK_ALPHA / BYTE) shl ALPHA))
 
         private const val RGB = 0xFFFFFF
+        private const val OPAQUE = 0xFF
         private const val ALPHA = 24
         private const val BYTE = 0xFF
         private const val FLAT = "flat"

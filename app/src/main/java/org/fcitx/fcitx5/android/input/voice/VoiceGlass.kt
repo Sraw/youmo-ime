@@ -99,7 +99,8 @@ class VoiceGlass(color: Int, @get:VisibleForTesting internal val blur: Blur? = B
             /**
              * A theme's blur of [px] (its dp on this screen): three box blurs of that radius, as the keyboard's
              * picture's (BoxBlur), on the keys taken as much smaller as leaves [MIN_RADIUS] small pixels of
-             * it, no more than [SCALE] times (a small blur on the keys as they are); under half a pixel, none.
+             * it, no more than [SCALE] nor less than [MIN_SCALE] times: a small blur is a little more than asked
+             * (under 4 px, one or two small pixels: 2 or 4 px), never the keys taken whole; under half a pixel, none.
              */
             fun of(px: Double): Blur? {
                 if (px < HALF) return null
@@ -108,7 +109,7 @@ class VoiceGlass(color: Int, @get:VisibleForTesting internal val blur: Blur? = B
             }
 
             private const val MIN_RADIUS = 2
-            private const val MIN_SCALE = 1
+            private const val MIN_SCALE = 2
             private const val HALF = 0.5
         }
     }

@@ -113,6 +113,9 @@ class PanelLooksTest {
         val t = theme(withStyle("<style select=\"editing\" fill=\"@accentKey\" radius=\"8.5dp\"/><style select=\"@landscape editing\" radius=\"50%\"/>"))
         assertEquals(PanelLooks.Editing(accent, 8.5, false, 4.0), looks(t).editing(emptySet()))
         assertEquals(PanelLooks.Editing(accent, 0.0, true, 4.0), looks(t).editing(setOf("landscape")))
+        // pill keys, the buttons not set: pills too
+        val pills = theme(withStyle("<style select=\"key\" radius=\"50%\"/>"))
+        assertTrue(looks(pills).editing(emptySet()).round)
     }
 
     @Test
@@ -169,6 +172,28 @@ class PanelLooksTest {
         assertEquals(
             listOf("grid= on clipboard does nothing: it reads fill radius color"),
             warnings(withStyle("<style select=\"clipboard\" grid=\"true\"/>")),
+        )
+        // the one shown with no part: the colour its categories inherit, no fill of its own
+        assertEquals(
+            listOf("fill= on picker:selected does nothing: it reads color"),
+            warnings(withStyle("<style select=\"picker:selected\" fill=\"@key\" color=\"@keyText\"/>")),
+        )
+        // a window widget's warned of once, by what it reads
+        val handle = warnings(withStyle("<style select=\"handle\" ink-color=\"@keyText\"/>"))
+        assertEquals(1, handle.size, "$handle")
+        assertTrue(handle.single().startsWith("ink-color= on handle does nothing"), "$handle")
+        // a key named that is not the pad: none of it read (a class may be the pad's)
+        assertEquals(
+            listOf(
+                "ink-width= on qwerty/q does nothing: it is the handwriting pad's (handwriting/pad)",
+                "ink-width= on handwriting/* does nothing: it is the handwriting pad's (handwriting/pad)",
+            ),
+            warnings(withStyle("<style select=\"qwerty/q, handwriting/*, handwriting/pad, key.pen\" ink-width=\"2dp\"/>")),
+        )
+        // a panel's fill a colour alone: the native view's
+        assertTrue(
+            "fill= on picker is no colour: a panel's fill is a colour alone, ignored" in
+                warnings(withStyle("<style select=\"picker\" fill=\"picture\"/>")),
         )
     }
 

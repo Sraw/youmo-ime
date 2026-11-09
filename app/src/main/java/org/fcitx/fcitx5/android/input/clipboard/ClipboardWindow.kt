@@ -80,11 +80,11 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(), Inpu
     }
 
     private val adapter: ClipboardAdapter by lazy {
-        val entry = ScenePanels.clipboard(context, theme)
+        val look = ScenePanels.clipboard(context, theme)
         object : ClipboardAdapter(
             theme,
-            entry,
-            ScenePanels.clipboardRadius(context, entry),
+            look,
+            ScenePanels.clipboardRadius(context, look),
             clipboardMaskSensitive
         ) {
             override fun onPin(id: Int) {
