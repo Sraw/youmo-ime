@@ -337,7 +337,8 @@ texts it measured (text, font, weight, size), so a scene made again measures onl
 The theme's styles matched to a key (`Cascade.of`) are kept by target, a key no selector names
 as one with no key (the 26 letters share theirs), with what it inherits; `Cascades` keeps a theme's
 cascade by the scenes it names (`flat` and not; what is typed only where the theme names it, so a
-theme of no `@im=` makes no more of them), and a cascade keeps the looks the builder worked out of it for
+theme of no `@im=` makes no more of them; the last `Cascades.KEPT` = 32 used, as a theme naming many
+scenes has one for each set of them met together), and a cascade keeps the looks the builder worked out of it for
 a key (`Cascade.kept`: by board, id, role, classes and states, a `Cascade.KeptKey<T>` naming what is
 kept under it). Kept a process too (main thread), for
 a keyboard made again (each theme switch builds the input view): `SceneThemes` the last 4 themes read
@@ -866,8 +867,14 @@ Rules for settings, all decided:
   built-in ones set no size. `ThemePrefs.migrateSizeFollow` (from `ThemeManager.prefs`) once moves an
   upgrade's sizes: each at its defaults (贴底's flush is not) follows, one set does not; the mark
   `keyboard_sizes_follow_migrated` is a key of no preference, so the hidden reset keeps it and an older
-  version's backup brought back, which has none, is moved again. `ThemePrefsMigrationTest`,
-  `KeyboardAreaTest`, ime-core `KeyboardSizesTest`.
+  version's backup brought back, which has none, is moved again. The mark is copied to device-encrypted
+  storage with the theme preferences, and a stored `keyboard_*_follow_theme` counts as done too (only
+  0.6.0 writes one), so a start before the first unlock never makes a default level picked follow; a
+  number that is no int is taken as set. The three flags are listened to as the ints are (the service's
+  紧凑 check, `ThemeFragment`'s `SIZE_KEYS`, the preview's), since a level whose ints are stored already
+  changes only its flag; the preview measures itself again on a theme switch. `TextKeyboard.widthDp`
+  (floating's width, the split placement) reads the side padding from `KeyboardArea.sizes()` too.
+  `ThemePrefsMigrationTest`, `KeyboardAreaTest`, `ThemeSizesUatTest`, ime-core `KeyboardSizesTest`.
 - **`hidden { }`** marks a preference with no UI: it is reset to its default once on upgrade and after
   a restore (`resetHiddenSettings`), so an old value set where the UI used to be cannot linger.
 - **Searchable.** `SettingsIndex` builds the search from the same declarations (managed categories
