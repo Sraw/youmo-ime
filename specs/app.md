@@ -333,7 +333,10 @@ again. `composing` reaches the `Input` only with a table (qwerty.xml asks it of 
 tone; `showTyping` calls `invalidateScene()`; zhuyin-nine.xml's `r4c4` variant), so
 pinyin's first key and its committed word make no scene elsewhere; in a field with an action, Return's label
 changing with the composing (Done to Enter) still does. `AndroidTextMeasurer` keeps the last 512
-texts it measured (text, font, weight, size), so a scene made again measures only what is new.
+texts it measured (text, font, weight, size, letter spacing: `Paint.letterSpacing`), so a scene made again measures only what is new.
+A text's `text-shadow` and `stroke` (060-render-p3 T4a) `ScenePainter` draws under its fill: the shadow (one of no blur
+the glyphs again, moved, since `setShadowLayer` draws none), the outline at twice its width
+(`FILL_AND_STROKE`, its inner half under the fill), then the fill.
 The theme's styles matched to a key (`Cascade.of`) are kept by target, a key no selector names
 as one with no key (the 26 letters share theirs), with what it inherits; `Cascades` keeps a theme's
 cascade by its scenes (`flat` and not), and a cascade keeps the looks the builder worked out of it for
