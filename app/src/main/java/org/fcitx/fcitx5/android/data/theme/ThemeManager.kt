@@ -78,26 +78,26 @@ object ThemeManager {
     private fun finishReplacements(): Boolean {
         if (!ThemeFilesManager.writable || packs.isEmpty()) return false
         var renamed = false
-        val replaced = customThemes.filter { c -> packs.any { it.name == c.name || it.file == c.name } }
-        for (custom in replaced) {
+        customThemes.filter { c -> packs.any { it.name == c.name || it.file == c.name } }.forEach { custom ->
             val versions = packs.filter { it.name == custom.name || it.file == custom.name }
-            if (versions.none { it.name == custom.name }) {
-                val to = (versions.firstOrNull { it.isDark == custom.isDark } ?: versions.first()).name
-                if (!prefs.renameThemeRefs(custom.name, to)) {
-                    Timber.w("Settings naming theme ${custom.name} not written: replaced by its pack at the next listing")
-                    continue
-                }
-                renamed = true
+            // named bare, the pack of two versions: its version of the same lightness
+            val to = if (versions.any { it.name == custom.name }) null else (versions.firstOrNull { it.isDark == custom.isDark } ?: versions.first()).name
+            if (to != null && !prefs.renameThemeRefs(custom.name, to)) {
+                Timber.w("Settings naming theme ${custom.name} not written: replaced by its pack at the next listing")
+                return@forEach
             }
-            try {
-                ThemeFilesManager.deleteThemeFiles(custom)
-            } catch (e: IOException) {
-                Timber.w(e, "Theme ${custom.name} replaced by its pack not deleted")
-                continue
-            }
-            customThemes.remove(custom)
+            if (to != null) renamed = true
+            if (replacedDeleted(custom)) customThemes.remove(custom)
         }
         return renamed
+    }
+
+    private fun replacedDeleted(custom: Theme.Custom): Boolean = try {
+        ThemeFilesManager.deleteThemeFiles(custom)
+        true
+    } catch (e: IOException) {
+        Timber.w(e, "Theme ${custom.name} replaced by its pack not deleted")
+        false
     }
 
     // whether the mark of a pack that took the last process down was consulted: once a process, once

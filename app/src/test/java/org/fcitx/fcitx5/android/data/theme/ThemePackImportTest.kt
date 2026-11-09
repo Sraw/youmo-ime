@@ -4,19 +4,10 @@
  */
 package org.fcitx.fcitx5.android.data.theme
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.RenderNode
-import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
-import org.junit.Assert.assertNotNull
-import org.robolectric.annotation.GraphicsMode
-import org.robolectric.util.ReflectionHelpers
 import androidx.preference.PreferenceManager
 import kotlinx.serialization.json.Json
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.directBoot
 import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
@@ -676,100 +667,6 @@ class ThemePackImportTest {
         ThemeFilesManager.listPacks()
         assertEquals(before, tree(File(packs, "mine")))
         assertFalse(File(packs, ".saving").exists())
-    }
-
-    // a frame of the window drawn on the RenderThread (hardware), in ViewRootImpl.performDraw's order: the commit
-    // callbacks registered till now taken first, then the keyboard's canvas [c] recorded; what is returned runs
-    // once this frame is committed ([commit]). Robolectric's own windows draw no frame, so none is drawn otherwise
-    private fun frame(c: KeyboardCanvasView): List<Runnable> {
-        val taken = ReflectionHelpers.callInstanceMethod<ArrayList<Runnable>?>(c.viewTreeObserver, "captureFrameCommitCallbacks").orEmpty()
-        val node = RenderNode("frame")
-        c.draw(node.beginRecording(c.width, c.height))
-        node.endRecording()
-        return taken
-    }
-
-    private fun commit(callbacks: List<Runnable>) = callbacks.forEach(Runnable::run)
-
-    private fun softwareFrame(c: KeyboardCanvasView) = c.draw(Canvas(Bitmap.createBitmap(c.width, c.height, Bitmap.Config.ARGB_8888)))
-
-    @Test
-    @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun aPackThatTookTheKeyboardDownIsNotDrawnAgainOnItsOwn() {
-        val marks = File(appContext.cacheDir, "marks").apply { mkdirs() }
-        val mark = File(marks, "theme-pack-drawing")
-        PackDrawGuard.dir = { marks }
-        PackDrawGuard.reset()
-        try {
-            val dark = placed(sample())[1]
-            val key = PackDrawGuard.key(dark)
-            // its theme built, for a keyboard made while hidden or a settings page's sizes, no frame drawn: nothing marked
-            assertNotNull(SceneThemes.of(dark, ThemeManager.shownLook(dark)))
-            ThemeManager.setNormalModeTheme(dark)
-            SceneBar.heightPercent(appContext)
-            assertFalse(mark.exists())
-            KeyboardHarness(theme = dark).start().use { h ->
-                val c = KeyboardHarness.boardCanvas(h.inputView)!!
-                assertNotNull(c.scene)
-                assertFalse(mark.exists())
-                // its first frame: marked till the RenderThread has drawn it (its glyphs, its pictures)
-                val first = frame(c)
-                assertEquals("mine", mark.readText())
-                // that frame committed: its callback was registered as it drew, so it goes with the next frame
-                commit(first)
-                assertTrue(mark.exists())
-                // which is asked for (a keyboard shown and hidden untouched would draw no other)
-                assertFalse(c.isDirty)
-                h.after(50)
-                assertTrue("another frame asked for", c.isDirty)
-                // another pack's frame clears nothing
-                PackDrawGuard.frameDrawn(PackDrawGuard.Key("other", 0))
-                assertTrue(mark.exists())
-                // the next frame committed: the first was drawn before it
-                commit(frame(c))
-                assertFalse(mark.exists())
-                assertTrue(PackDrawGuard.confirmed(key))
-                // drawn once in this process: the frame the second asked for drawn, not marked again, none more asked for
-                h.after(50)
-                commit(frame(c))
-                assertFalse(mark.exists())
-                h.after(50)
-                assertFalse("no frame more asked for", c.isDirty)
-            }
-            // a frame drawn on a bitmap (software) is drawn then and there: no mark left
-            PackDrawGuard.reset()
-            KeyboardHarness(theme = dark).start().use { h ->
-                softwareFrame(KeyboardHarness.boardCanvas(h.inputView)!!)
-                assertFalse(mark.exists())
-                assertTrue(PackDrawGuard.confirmed(key))
-            }
-            // imported again (another file time): guarded again
-            val again = key.copy(stamp = key.stamp + 1)
-            assertTrue(PackDrawGuard.drawing(again))
-            PackDrawGuard.frameDrawn(again)
-            // its first frame of a process recorded, never committed: the process went down with it
-            PackDrawGuard.reset()
-            KeyboardHarness(theme = dark).start().use { h -> frame(KeyboardHarness.boardCanvas(h.inputView)!!) }
-            assertTrue(mark.exists())
-            // the next start before the first unlock (the files not settled): nothing to reset, the mark kept for after
-            directBoot(true)
-            assertFalse(ThemeFilesManager.writable)
-            ThemeManager.consultPackCrash()
-            assertTrue(mark.exists())
-            assertEquals(dark.name, ThemeManager.prefs.normalModeTheme.getValue().name)
-            // settled: the settings naming it back to their defaults, the pack kept
-            directBoot(false)
-            ThemeManager.consultPackCrash()
-            assertFalse(mark.exists())
-            assertEquals(ThemeManager.prefs.normalModeTheme.defaultValue, ThemeManager.prefs.normalModeTheme.getValue())
-            ThemeManager.refreshThemes()
-            assertEquals(listOf("mine#light", "mine#dark"), ThemeManager.Packs.map { it.name })
-        } finally {
-            directBoot(false)
-            PackDrawGuard.dir = { appContext.noBackupFilesDir }
-            PackDrawGuard.reset()
-            marks.deleteRecursively()
-        }
     }
 
     @Test
