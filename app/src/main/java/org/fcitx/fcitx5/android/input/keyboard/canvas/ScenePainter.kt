@@ -164,7 +164,9 @@ class ScenePainter(
         val bitmap = images.bitmap(file)
         val size = images.size(file)
         if (bitmap == null || size == null) {
-            // drawn as nothing till it is in, then again
+            // the colour theme 3.0 showed there till the image is in, or where none reads
+            op.fallback?.let { fill(canvas, op.shape, it.value) }
+            // drawn again once it is in
             if (!images.ready) {
                 missed = true
                 // once, and not holding the view: one the keyboard let go (its keys drawn by their views
@@ -200,6 +202,13 @@ class ScenePainter(
 
     // the theme's picture where the shape is over the keyboard's base, as the old keys' faces showed it
     private fun picture(canvas: Canvas, op: Op.Picture) {
+        pictureItself(canvas, op)
+        // the colour over it, there with the picture or without (theme 3.0's key face laid its colour on
+        // the picture, and the colour alone where there was none to show)
+        op.over?.let { fill(canvas, op.shape, it.value) }
+    }
+
+    private fun pictureItself(canvas: Canvas, op: Op.Picture) {
         val p = look.picture ?: return
         val blur = op.blurDp?.roundToInt() ?: p.blurDp
         val brightness = op.brightness?.roundToInt() ?: p.brightness

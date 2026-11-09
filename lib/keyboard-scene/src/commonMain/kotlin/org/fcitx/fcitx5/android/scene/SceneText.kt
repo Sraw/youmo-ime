@@ -107,18 +107,21 @@ object SceneText {
     fun op(o: Op): String = when (o) {
         is Op.Fill -> "fill ${shape(o.shape)} ${o.color}"
         is Op.Gradient -> "gradient ${shape(o.shape)} ${n(o.angle)} ${o.stops.joinToString(" ") { "${it.first}@${n(it.second)}" }}"
-        is Op.NineSlice -> "nine-slice ${shape(o.shape)} ${q(o.file)} ${o.insets.joinToString(",")} ${o.pxPerDp}"
-        is Op.Picture -> "picture ${shape(o.shape)} blur=${o.blurDp?.let(::n) ?: "-"} brightness=${o.brightness?.let(::n) ?: "-"}"
+        is Op.NineSlice -> "nine-slice ${shape(o.shape)} ${q(o.file)} ${o.insets.joinToString(",")} ${o.pxPerDp}" + (o.fallback?.let { " else=$it" } ?: "")
+        is Op.Picture -> "picture ${shape(o.shape)} blur=${o.blurDp?.let(::n) ?: "-"} brightness=${o.brightness?.let(::n) ?: "-"}" + (o.over?.let { " over=$it" } ?: "")
         is Op.Shadow -> "shadow ${shape(o.shape)} blur=${n(o.blur)} ${o.color}"
         is Op.Stroke -> "stroke ${shape(o.shape)} ${n(o.width)} ${o.color}"
         is Op.Ripple -> "ripple ${shape(o.shape)} ${o.color}"
-        is Op.Text -> "text ${q(o.text)} ${n(o.x)},${n(o.baseline)} ${o.font} ${o.weight} ${n(o.size)} ${o.color}" +
-            (if (o.scaleX != 1.0) " scale-x=${n(o.scaleX)}" else "") + (if (o.rotation != 0.0) " rotate=${n(o.rotation)}" else "") +
-            (if (o.letterSpacing != 0.0) " spacing=${n(o.letterSpacing)}" else "") +
-            (o.stroke?.let { " stroke=${n(it.width)},${it.color}" } ?: "") +
-            (o.shadow?.let { " shadow=${n(it.dx)},${n(it.dy)},${n(it.blur)},${it.color}" } ?: "")
+        is Op.Text -> text(o)
         is Op.Icon -> "icon ${o.name} ${box(o.box)} ${o.tint}" + (if (o.rotation != 0.0) " rotate=${n(o.rotation)}" else "")
     }
+
+    // what a text has besides its place, font and colour only where it has it (a snapshot of none as before)
+    private fun text(o: Op.Text): String = "text ${q(o.text)} ${n(o.x)},${n(o.baseline)} ${o.font} ${o.weight} ${n(o.size)} ${o.color}" +
+        (if (o.scaleX != 1.0) " scale-x=${n(o.scaleX)}" else "") + (if (o.rotation != 0.0) " rotate=${n(o.rotation)}" else "") +
+        (if (o.letterSpacing != 0.0) " spacing=${n(o.letterSpacing)}" else "") +
+        (o.stroke?.let { " stroke=${n(it.width)},${it.color}" } ?: "") +
+        (o.shadow?.let { " shadow=${n(it.dx)},${n(it.dy)},${n(it.blur)},${it.color}" } ?: "")
 
     fun shape(s: Shape): String = when (s) {
         is Shape.Rect -> "rect(${box(s.box)}${if (s.radii.all { it == 0.0 }) "" else " r=" + s.radii.joinToString(",", transform = ::n)})"

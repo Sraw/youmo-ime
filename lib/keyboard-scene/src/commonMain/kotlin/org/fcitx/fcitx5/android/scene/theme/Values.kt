@@ -11,11 +11,17 @@ sealed interface Fill {
     /** `linear(angle, colour pos%, …)`. */
     data class Linear(val angle: Double, val stops: List<Pair<ColorExpr, Double>>) : Fill
 
-    /** `image(file, l t r b[, Nx])`: a nine-slice, its corners [insets] source pixels at [pxPerDp]. */
-    data class Image(val file: String, val insets: List<Int>, val pxPerDp: Int) : Fill
+    /**
+     * `image(file, l t r b[, Nx][, colour])`: a nine-slice, its corners [insets] source pixels at [pxPerDp];
+     * [fallback] filled where the image is not there (none read, not in yet), as theme 3.0 showed the key's colour.
+     */
+    data class Image(val file: String, val insets: List<Int>, val pxPerDp: Int, val fallback: ColorExpr? = null) : Fill
 
-    /** `picture(blur, brightness)`: the keyboard's picture under the key; null: as `<picture>` has it. */
-    data class Picture(val blurDp: Double?, val brightness: Double?) : Fill
+    /**
+     * `picture(blur, brightness[, colour])`: the keyboard's picture under the key; null: as `<picture>` has it.
+     * [over]: a colour laid over it, as theme 3.0 laid the key's colour over its picture.
+     */
+    data class Picture(val blurDp: Double?, val brightness: Double?, val over: ColorExpr? = null) : Fill
 }
 
 /** `radius=`: four corners (top left, top right, bottom right, bottom left), dp; [half]: 50%, a pill or a circle. */
@@ -71,8 +77,8 @@ object Values {
     // "system" a name like any other: Kotlin/JS takes the first alternative that starts a match and
     // wants it whole, so "system|…" refused "systemui" there
     private val FONT = Regex("[a-zA-Z][a-zA-Z0-9_-]{0,31}")
-    private val IMAGE = Regex("image\\(([^,()]+), ?([0-9]{1,4}) ([0-9]{1,4}) ([0-9]{1,4}) ([0-9]{1,4})(?:, ?([1-8])x)?\\)")
-    private val PICTURE = Regex("picture(?:\\(([0-9]{1,2})dp, ?([0-9]{1,3})%\\))?")
+    private val IMAGE = Regex("image\\(([^,()]+), ?([0-9]{1,4}) ([0-9]{1,4}) ([0-9]{1,4}) ([0-9]{1,4})(?:, ?([1-8])x)?(?:, ?(.+))?\\)")
+    private val PICTURE = Regex("picture(?:\\(([0-9]{1,2})dp, ?([0-9]{1,3})%(?:, ?(.+))?\\))?")
     private val LINEAR = Regex("linear\\((-?[0-9]{1,3})deg, ?(.+)\\)")
     private const val MAX_LENGTH_DP = 24.0
     private const val MAX_OFFSET_DP = 16.0
@@ -250,14 +256,16 @@ object Values {
         ColorExpr.parse(raw)?.let { return Fill.Solid(it) }
         IMAGE.matchEntire(raw)?.let { m ->
             val g = m.groupValues
-            return Fill.Image(g[1].trim(), (2..5).map { g[it].toInt() }, g[6].ifEmpty { "1" }.toInt())
+            val fallback = g[7].ifEmpty { null }?.let { ColorExpr.parse(it.trim()) ?: return null }
+            return Fill.Image(g[1].trim(), (2..5).map { g[it].toInt() }, g[6].ifEmpty { "1" }.toInt(), fallback)
         }
         PICTURE.matchEntire(raw)?.let { m ->
             val blur = m.groupValues[1].ifEmpty { null }?.toInt()
             val bright = m.groupValues[2].ifEmpty { null }?.toDouble()
             val tooBlurred = blur != null && blur > MAX_BLUR_DP
             if (tooBlurred || bright != null && bright > MAX_PERCENT) return null
-            return Fill.Picture(blur?.toDouble(), bright)
+            val over = m.groupValues[3].ifEmpty { null }?.let { ColorExpr.parse(it.trim()) ?: return null }
+            return Fill.Picture(blur?.toDouble(), bright, over)
         }
         LINEAR.matchEntire(raw)?.let { m ->
             val stops = ColorExpr.splitTop(m.groupValues[2])?.map { stop ->

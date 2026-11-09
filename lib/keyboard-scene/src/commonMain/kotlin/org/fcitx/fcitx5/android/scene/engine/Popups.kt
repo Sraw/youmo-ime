@@ -271,8 +271,9 @@ internal class PopupBuilder(
                 shadow = op.shadow?.let { it.copy(color = it.color.of()) },
             )
             is Op.Icon -> op.copy(tint = op.tint.of())
-            // an image or the picture has no colour to fade: as it is
-            is Op.NineSlice, is Op.Picture -> op
+            // the colours over the picture and under the image faded; the picture and the image themselves as they are
+            is Op.Picture -> op.copy(over = op.over?.of())
+            is Op.NineSlice -> op.copy(fallback = op.fallback?.of())
         }
     }
 
