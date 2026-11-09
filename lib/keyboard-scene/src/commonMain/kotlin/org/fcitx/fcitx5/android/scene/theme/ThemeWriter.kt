@@ -161,7 +161,7 @@ object ThemeWriter {
         "size" -> "${number(n)}sp"
         "letter-spacing" -> "${number(n)}em"
         // T7a's grip on a handle (Values.HANDLE_SIZES): a keyboard's height and width are twins, not numbers
-        "depth", "offset", "width", "height", "gap" -> length(n)
+        "depth", "offset", "width", "height", "gap", "blur", "ink-width" -> length(n)
         else -> number(n)
     }
 

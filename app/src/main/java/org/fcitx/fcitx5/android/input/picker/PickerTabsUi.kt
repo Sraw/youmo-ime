@@ -6,13 +6,15 @@ package org.fcitx.fcitx5.android.input.picker
 
 import android.content.Context
 import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
 import androidx.annotation.DrawableRes
 import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.ScenePanels
 import org.fcitx.fcitx5.android.scene.look.PressEffect
-import org.fcitx.fcitx5.android.utils.alpha
 import org.fcitx.fcitx5.android.utils.pressHighlightDrawable
 import org.fcitx.fcitx5.android.utils.rippleDrawable
 import splitties.resources.drawable
@@ -32,9 +34,12 @@ import splitties.views.dsl.core.view
 import splitties.views.gravityCenter
 import splitties.views.imageDrawable
 
+/** The emoji's categories as tabs in the bar, their colours the theme's (`picker categories`, the one shown `picker:selected categories`; 060-render-p3 T7b). */
 class PickerTabsUi(override val ctx: Context, val theme: Theme) : Ui {
 
     private val keyRipple = ThemeManager.shownLook(theme).keys.press == PressEffect.Ripple
+
+    private val look = ScenePanels.picker(ctx, theme, side = false)
 
     inner class TabUi : Ui {
         override val ctx = this@PickerTabsUi.ctx
@@ -44,10 +49,13 @@ class PickerTabsUi(override val ctx: Context, val theme: Theme) : Ui {
         val label = textView {
             textSize = 16f // sp
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(theme.keyTextColor)
+            setTextColor(look.categories.color.value)
         }
 
         val icon = imageView()
+
+        // its background not shown: the ripple, if any
+        private val plain: Drawable? = if (keyRipple) rippleDrawable(theme.keyPressHighlightColor) else null
 
         override val root = view(::CustomGestureView) {
             add(label, lParams {
@@ -57,7 +65,7 @@ class PickerTabsUi(override val ctx: Context, val theme: Theme) : Ui {
                 gravity = gravityCenter
             })
             if (keyRipple) {
-                background = rippleDrawable(theme.keyPressHighlightColor)
+                background = plain
             } else {
                 foreground = pressHighlightDrawable(theme.keyPressHighlightColor)
             }
@@ -74,16 +82,18 @@ class PickerTabsUi(override val ctx: Context, val theme: Theme) : Ui {
 
         fun setIcon(@DrawableRes src: Int) {
             icon.imageDrawable = ctx.drawable(src)!!.apply {
-                setTint(theme.keyTextColor.alpha(0.5f))
+                setTint(look.categories.color.value)
             }
             label.isVisible = false
             icon.isVisible = true
         }
 
         fun setActive(active: Boolean) {
-            val color = theme.keyTextColor.alpha(if (active) 1f else 0.5f)
+            val color = (if (active) look.selected else look.categories).color.value
             label.setTextColor(color)
             icon.imageDrawable?.setTint(color)
+            // the one shown on a fill of its own where the theme gives it one (none by default: the bar's)
+            look.selected.fill?.let { root.background = if (active) ColorDrawable(it.value) else plain }
         }
     }
 
@@ -92,7 +102,9 @@ class PickerTabsUi(override val ctx: Context, val theme: Theme) : Ui {
 
     private var onTabClick: (TabUi.(Int) -> Unit)? = null
 
-    override val root = constraintLayout { }
+    override val root = constraintLayout {
+        look.categories.fill?.let { setBackgroundColor(it.value) }
+    }
 
     fun setTabs(categories: List<PickerData.Category>) {
         tabs.forEach { root.removeView(it.root) }

@@ -285,10 +285,7 @@ object ThemeReader {
         named(values, a, colors, fonts)
         selectors?.let { readElsewhere(it, values.keys, el.line, p) }
         reserved += selectors?.let { shapes(it, values, el.line, p) } ?: 0
-        selectors?.let {
-            unreadByWindow(it, values.keys, el.line, p)
-            unreadByBar(it, values, el.line, p)
-        }
+        selectors?.let { unread(it, values, el.line, p) }
         if (values.isEmpty() && reserved == 0) a.problem("a style that sets nothing")
         return selectors?.let { Style(it, values, order, el.line) }
     }
@@ -388,6 +385,78 @@ object ThemeReader {
         else -> emptyList()
     }
 
+    // what the window's widgets, the panels and the candidates have no use for (T7a, T7b, T6a)
+    private fun unread(selectors: List<Selector>, values: Map<String, Value>, line: Int, p: Problems) {
+        unreadByWindow(selectors, values.keys, line, p)
+        unreadByPanel(selectors, values.keys, line, p)
+        unreadByBar(selectors, values, line, p)
+        val fill = (values["fill"] as? Value.OfFill)?.fill
+        // a panel's native view takes a colour; a picture's or an image's fill is the scene's alone (PanelLooks.fill)
+        if (fill != null && fill !is Fill.Solid) {
+            selectors.map { it.widget }.filter { it in Selector.PANEL_WIDGETS }.distinct()
+                .forEach { p.warn(line, "fill= on $it is no colour: a panel's fill is a colour alone, ignored") }
+        }
+        unreadPad(selectors, values.keys, line, p)
+    }
+
+    // a panel's property it has no use for (`clipboard shadow=`), as the window's; the voice mask's blur and the
+    // handwriting pad's ink and grid set on what does not read them, too
+    private fun unreadByPanel(selectors: List<Selector>, props: Set<String>, line: Int, p: Problems) {
+        for (s in selectors.filter { it.widget in Selector.PANEL_WIDGETS }.map { Selector.Target(it.widget, states = it.states, part = it.part) }.distinct()) {
+            val reads = panelReads(s)
+            val at = s.widget + s.states.sorted().joinToString("") { ":$it" } + s.part?.let { " $it" }.orEmpty()
+            val said = if (reads.isEmpty()) "it reads nothing in that state" else "it reads ${reads.joinToString(" ")}"
+            props.filter { it !in reads }.forEach { p.warn(line, "$it= on $at does nothing: $said") }
+        }
+        for (prop in props) {
+            val (widget, whose) = when (prop) {
+                "blur" -> "voice" to "the voice mask's"
+                in PAD_PROPERTIES -> "key" to "the handwriting pad's (handwriting/pad)"
+                else -> continue
+            }
+            // the window's widgets and the candidates' warned of already, by what they read (unreadByWindow, unreadByBar)
+            selectors.map { it.widget }.filter { it != widget && it !in Selector.PANEL_WIDGETS && it !in WINDOW_READS && it !in Selector.BAR_WIDGETS }.distinct()
+                .forEach { p.warn(line, "$prop= on $it does nothing: it is $whose") }
+        }
+    }
+
+    // the pad's ink and grid on a key named that is not the pad (`qwerty/q`, `handwriting/*`, which selects no slot, `*/enter`):
+    // it reads them alone; a class or a kind may be the pad's
+    private fun unreadPad(selectors: List<Selector>, props: Set<String>, line: Int, p: Problems) {
+        val pad = props.filter { it in PAD_PROPERTIES }
+        if (pad.isEmpty()) return
+        val named = selectors.filter { it.widget == "key" && (it.board != null || it.starRole != null) }
+            .filterNot { it.board == PAD_BOARD && it.key == PAD_KEY }
+            .map { s -> s.board?.let { "$it/${s.key ?: "*"}" } ?: "*/${s.starRole}" }.distinct()
+        for (at in named) pad.forEach { p.warn(line, "$it= on $at does nothing: it is the handwriting pad's (handwriting/pad)") }
+    }
+
+    // what [s] (a panel, its states and part) reads: in a state, only the picker's one shown
+    private fun panelReads(s: Selector.Target): List<String> {
+        val selected = s.widget == "picker" && s.states == setOf("selected")
+        return when {
+            // the one shown: its categories' fill and colour, and the colour they inherit; no fill of the picker's own
+            selected && s.part == null -> listOf("color")
+            s.states.isEmpty() || selected -> PANEL_READS.getValue(s.part?.let { "${s.widget} $it" } ?: s.widget)
+            else -> emptyList()
+        }
+    }
+
+    // what each panel reads, and each part of one (060-render-p3 T7b, engine/PanelLooks): `color` and `icon-color`
+    // on the picker and the voice mask are their parts', inherited
+    private val PANEL_READS = mapOf(
+        "clipboard" to listOf("fill", "radius", "color"),
+        "picker" to listOf("fill", "color"),
+        "picker categories" to listOf("fill", "color"),
+        "editing" to listOf("fill", "radius"),
+        "voice" to listOf("fill", "blur", "icon-color"),
+        "voice mic" to listOf("fill", "icon-color"),
+    )
+
+    private val PAD_PROPERTIES = setOf("ink-color", "ink-width", "grid-color", "grid")
+    private const val PAD_BOARD = "handwriting"
+    private const val PAD_KEY = "pad"
+
     // what each widget of the window round the keys reads (060-render-p3 T7a, engine/WindowLooks, SceneBuilder's split gap)
     private val WINDOW_READS = mapOf(
         "frame" to listOf("radius", "border", "shadow"),
@@ -401,7 +470,9 @@ object ThemeReader {
     // that state or part: warned of, as the window's are; the bar's base of a gradient or an image, which the
     // bar's view does not draw (only a colour or the picture)
     private fun unreadByBar(selectors: List<Selector>, values: Map<String, Value>, line: Int, p: Problems) {
-        val others = selectors.map { it.widget }.distinct().filter { it !in Selector.BAR_WIDGETS && it !in Selector.RESERVED_WIDGETS && it !in WINDOW_READS }
+        // the window's and the panels' warned of by what they read (unreadByWindow, unreadByPanel)
+        val others = selectors.map { it.widget }.distinct()
+            .filter { it !in Selector.BAR_WIDGETS && it !in Selector.RESERVED_WIDGETS && it !in WINDOW_READS && it !in Selector.PANEL_WIDGETS }
         for (w in others) CANDIDATE_ONLY.filter { it in values }.forEach { p.warn(line, "$it= on $w does nothing: only a candidate has it") }
         for (s in selectors.filter { it.widget in Selector.BAR_WIDGETS }.distinctBy { Triple(it.widget, it.states, it.part) }) {
             val on = s.widget + s.states.sorted().joinToString("") { ":$it" } + (s.part?.let { " $it" } ?: "")

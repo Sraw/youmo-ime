@@ -110,9 +110,14 @@ class KeyNode(
 /**
  * A native widget's place (the handwriting pad, the nine keys' column, a one-handed board's side
  * buttons): the app puts its view there, over [ops], a key's face drawn under it where the layout
- * gives it a look (never pressed).
+ * gives it a look (never pressed). The handwriting pad's [ink] is what its strokes are drawn in
+ * (060-render-p3 T7b: [org.fcitx.fcitx5.android.scene.engine.Pads]); its grid, where the theme shows
+ * one, is in [ops], over the face.
  */
-class SlotNode(val kind: String, val id: String?, val bounds: Box, val ops: List<Op> = emptyList())
+class SlotNode(val kind: String, val id: String?, val bounds: Box, val ops: List<Op> = emptyList(), val ink: Ink? = null)
+
+/** The handwriting pad's strokes: their colour and width, px. */
+data class Ink(val color: Argb, val width: Double)
 
 /**
  * One drawing step, px, the engine's arithmetic done (§3, its geometry by [Shape] as §3.1 has it).

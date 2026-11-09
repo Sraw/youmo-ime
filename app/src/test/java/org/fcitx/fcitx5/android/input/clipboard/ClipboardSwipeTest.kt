@@ -12,6 +12,8 @@ import android.view.ViewGroup
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.data.theme.TestThemes
+import org.fcitx.fcitx5.android.scene.engine.PanelLooks
+import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -29,7 +31,7 @@ class ClipboardSwipeTest {
 
     private fun grid(text: String, cut: Boolean = false): ClipboardChunksUi {
         val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
-        val ui = ClipboardChunksUi(activity, TestThemes.PixelLight, 8f, text, cut) {}
+        val ui = ClipboardChunksUi(activity, TestThemes.PixelLight, PanelLooks.Clipboard(Argb(0xFFFFFFFF.toInt()), 8.0, false, Argb(0xFF000000.toInt())), text, cut) {}
         activity.setContentView(ui.root, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, HEIGHT))
         ui.show(ClipboardChunks.chunks(text))
         idle(0)
