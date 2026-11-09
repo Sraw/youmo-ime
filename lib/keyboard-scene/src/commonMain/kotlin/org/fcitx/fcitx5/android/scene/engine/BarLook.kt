@@ -115,7 +115,7 @@ data class BarLook(
             val v = c.of(PREEDIT)
             val color = color(v["color"], theme) ?: variable(theme, KEY_TEXT)
             return PreeditLook(color, color(v["cursor-color"], theme) ?: color, (v["underline"] as? Value.OfBorder)?.border?.let { b ->
-                PreeditLook.Underline(b.width, b.color?.takeIf { b != Border.NONE }?.let(theme::color))
+                PreeditLook.Underline(b.width, b.color?.takeIf { b != Border.NONE && b.width > 0.0 }?.let(theme::color))
             })
         }
 
@@ -230,7 +230,7 @@ data class CandidateLook(
 /**
  * The code being typed (编码行 and the floating strip; 060-render-p3 T6b): its text's [color], its
  * cursor's, and the [underline] fcitx asks for under some of it: null the text's own (UnderlineSpan),
- * else of its width in dp and colour (null none drawn).
+ * else of its width in dp and colour (null none drawn: `none`, or 0 wide).
  */
 data class PreeditLook(val color: Argb, val cursor: Argb, val underline: Underline?) {
     data class Underline(val widthDp: Double, val color: Argb?)

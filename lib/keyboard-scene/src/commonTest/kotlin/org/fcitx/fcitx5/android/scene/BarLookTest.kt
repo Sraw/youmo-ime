@@ -265,6 +265,8 @@ class BarLookTest {
         // a cursor of its own; no underline at all
         val p = look(theme("<style select=\"preedit\" cursor-color=\"#ffff0000\" underline=\"none\"/>")).preedit
         assertEquals(PreeditLook(text, argb(0xFFFF0000), PreeditLook.Underline(0.0, null)), p)
+        // 0 wide is none too, not a hairline
+        assertEquals(PreeditLook.Underline(0.0, null), look(theme("<style select=\"preedit\" underline=\"0 @keyText\"/>")).preedit.underline)
         // on, a fill unset: the button's own
         assertEquals(argb(0xFFEEEEEE), look(theme("<style select=\"toolbar\" fill=\"#ffeeeeee\"/>")).toolbar.onFill)
     }
@@ -274,8 +276,13 @@ class BarLookTest {
         assertTrue(warnings("<style select=\"preedit\" fill=\"#ff000000\"/>").single().contains("fill= on preedit does nothing"))
         assertTrue(warnings("<style select=\"toolbar:selected\" radius=\"4dp\"/>").single().contains("radius= on toolbar:selected does nothing"))
         assertTrue(warnings("<style select=\"key\" underline=\"none\"/>").single().contains("only the code being typed"))
-        assertTrue(warnings("<style select=\"toolbar\" cursor-color=\"@keyText\"/>").any { it.contains("cursor-color= on toolbar does nothing") })
+        assertTrue(warnings("<style select=\"toolbar\" cursor-color=\"@keyText\"/>").single().contains("cursor-color= on toolbar does nothing"))
         assertTrue(ThemeReader.theme(withStyle("<style select=\"preedit\" underline=\"9dp @keyText\"/>")).problems().isNotEmpty(), "at most 3dp, a border's")
+        // the bar is not placed per window form: such a scene never matches
+        for (s in listOf("@floating bar", "@split toolbar", "@one-handed preedit", "@one-handed candidate")) {
+            assertTrue(warnings("<style select=\"$s\" fill=\"#ff000000\"/>").any { it.contains("$s never matches") }, s)
+        }
+        assertTrue(warnings("<style select=\"@landscape bar\" fill=\"#ff000000\"/>").isEmpty())
     }
 
     @Test
