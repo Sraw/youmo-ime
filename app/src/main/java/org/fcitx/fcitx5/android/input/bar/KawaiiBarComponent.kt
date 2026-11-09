@@ -147,11 +147,16 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     private var numberRowMode = IdleUiPolicy.NumberRowMode.Auto
 
+    // the entry the clipboard suggestion shows, as its listener was told: picked or edited, this one (the global
+    // lastEntry may be set after the listeners are told, or be another's by then)
+    private var shownEntry: ClipboardEntry? = null
+
     @Keep
     private val onClipboardUpdateListener =
         ClipboardManager.OnClipboardUpdateListener {
             if (!clipboardSuggestion.getValue()) return@OnClipboardUpdateListener
             imeScope.launch {
+                shownEntry = it
                 if (it.text.isEmpty()) {
                     isClipboardFresh = false
                 } else {
@@ -368,7 +373,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             }
             clipboardUi.suggestionView.apply {
                 setOnClickListener {
-                    ClipboardManager.lastEntry?.let {
+                    shownEntry?.let {
                         service.commitOverEngine(it.text)
                     }
                     clipboardTimeoutJob?.cancel()
@@ -377,7 +382,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     evalIdleUiState()
                 }
                 setOnLongClickListener {
-                    ClipboardManager.lastEntry?.let {
+                    shownEntry?.let {
                         AppUtil.launchClipboardEdit(context, it.id, true)
                     }
                     true
