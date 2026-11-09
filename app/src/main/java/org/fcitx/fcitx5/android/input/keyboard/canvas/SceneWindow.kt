@@ -67,10 +67,13 @@ object SceneWindow {
 
     /** The drag handle at the keyboard's [top] or its bottom. */
     fun handle(theme: Theme, scenes: Set<String>, top: Boolean): WindowLooks.Handle =
-        looks(theme)?.handle(scenes, top) ?: Argb(theme.altKeyTextColor).let {
-            val fill = if (top) WindowLooks.handleColor(Argb(theme.barColor), Argb(theme.keyTextColor)) else null
-            WindowLooks.Handle(fill, it, it, WindowLooks.GRIP_WIDTH_DP, WindowLooks.GRIP_HEIGHT_DP)
-        }
+        looks(theme)?.handle(scenes, top) ?: plainHandle(theme, top)
+
+    /** The handle of [theme]'s colours alone, no theme 4.0 of it (a look that made none): the app's of before. */
+    fun plainHandle(theme: Theme, top: Boolean): WindowLooks.Handle = Argb(theme.altKeyTextColor).let {
+        val fill = if (top) WindowLooks.handleColor(Argb(theme.barColor), Argb(theme.keyTextColor)) else null
+        WindowLooks.Handle(fill, it, it, WindowLooks.GRIP_WIDTH_DP, WindowLooks.GRIP_HEIGHT_DP)
+    }
 
     /** A button beside a board at a side. */
     fun sideButton(theme: Theme, scenes: Set<String>): WindowLooks.SideButton =

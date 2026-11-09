@@ -159,6 +159,9 @@ class InputView(
     // till placed first, when the service's navigation bar, which a view before may have placed, is told too
     private var placedScenes: Set<String>? = null
 
+    // the window's scenes then (windowScenes): the keyboard's height changes `@compact` with the board where it was
+    private var placedWindowScenes: Set<String>? = null
+
     // the empty side of a board put at the other (SplitKeyboard.Dock): a button moves it across
     private fun moveButton(to: SplitKeyboard.Dock, icon: Int, description: Int) = sideButton(icon, description) {
         if (oneHandedPlaced) ThemeManager.prefs.oneHanded.setValue(OneHanded.entries.first { it.dock == to })
@@ -607,11 +610,13 @@ class InputView(
 
     // the board placed anew as the theme's scenes: what the theme has of them, the navigation bar, the docked handle
     private fun placeScenes(scenes: Set<String>) {
-        if (scenes == placedScenes) return
+        val window = SceneWindow.scenes(context, theme, floating, scenes)
+        if (scenes == placedScenes && window == placedWindowScenes) return
         placedScenes = scenes
+        placedWindowScenes = window
         paintNavbar()
         service.boardPlaced(scenes)
-        if (!floating) floatingHandle?.dress(windowScenes())
+        if (!floating) floatingHandle?.dress(floatingController.handleLook(window))
     }
 
     // the scenes the window round the keys is in now (SceneWindow.scenes)

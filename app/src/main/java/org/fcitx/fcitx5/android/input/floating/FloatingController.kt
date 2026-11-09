@@ -21,6 +21,7 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.floating.FloatingSwitch.Bounds
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneWindow
+import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
 import org.fcitx.fcitx5.android.input.motion.Motion
 import org.fcitx.fcitx5.android.scene.engine.WindowLooks
 import org.fcitx.fcitx5.android.utils.interpolator
@@ -52,10 +53,14 @@ class FloatingController(
 
     /** Floating, its handle; docked, the same strip if 始终显示悬浮条 (read once too), its grip held letting go. */
     val handle: FloatingHandle? = when {
-        floating -> FloatingHandle(context, theme, side, FloatingHandle.Mode.Floating(::drag, ::drop, ::dock))
-        prefs.alwaysShowHandle.getValue() -> FloatingHandle(context, theme, side, FloatingHandle.Mode.Docked(::detach))
+        floating -> FloatingHandle(context, theme, side, FloatingHandle.Mode.Floating(::drag, ::drop, ::dock), handleLook())
+        prefs.alwaysShowHandle.getValue() -> FloatingHandle(context, theme, side, FloatingHandle.Mode.Docked(::detach), handleLook())
         else -> null
     }
+
+    /** The theme's handle in [scenes] (SceneWindow.scenes: docked, as the board is placed), at the handle's side. */
+    fun handleLook(scenes: Set<String> = SceneWindow.scenes(context, theme, floating)): WindowLooks.Handle =
+        SceneWindow.handle(theme, scenes, side == FloatingHandleSide.Top)
 
     private val switch = FloatingSwitch()
     private lateinit var keyboard: View
@@ -244,7 +249,10 @@ class FloatingController(
     private var framed: Pair<List<Int>, WindowLooks.Frame>? = null
     private var cornered: Pair<List<Int>, Float>? = null
 
-    private fun screen() = context.resources.configuration.let { listOf(it.orientation, it.screenWidthDp, it.screenHeightDp) }
+    // what the frame's scenes change with: the screen turned or resized, the keyboard's height (`@compact`)
+    private fun screen() = context.resources.configuration.let {
+        listOf(it.orientation, it.screenWidthDp, it.screenHeightDp, if (keyboardCompact()) 1 else 0)
+    }
 
     private fun frame(): WindowLooks.Frame {
         val at = screen()

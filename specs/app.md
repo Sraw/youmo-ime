@@ -239,8 +239,9 @@ function keys' text colour on nothing, a round ripple of the pressed colour, as 
 split's room between the halves is filled with the theme's `split-gap` where it sets one (the engine draws it,
 `SceneBuilder`), else it shows the keyboard's own. The window's scenes are the screen's and settings' and the
 board's placement, `@one-handed` and `@split` (`SceneWindow.placement`, as the engine's `Env.scenes` has them):
-`InputView.placeScenes` tells the side buttons, the docked handle (`FloatingHandle.dress`) and the
-navigation bar as the board is placed anew.
+`InputView.placeScenes` tells the side buttons, the docked handle (`FloatingHandle.dress`, the look
+worked out by `FloatingController.handleLook`: the view reads no settings) and the navigation bar as the
+board is placed anew or the keyboard's height changes `@compact`.
 
 The navigation bar under a docked keyboard is the theme's `navbar { color }` where it sets a colour
 (T7a; `follow`, the default, and floating: as before, the colour under the keys): where the keyboard
@@ -267,7 +268,7 @@ bar is the keyboard's colour (on top; at the bottom it is the keyboard's own); t
 the function keys' text colour; the shadow 6 dp. A frame's border is a stroke over the keyboard
 (`FloatingCorners.border`), its shadow's colour the outline shadow's (Android 9+; its offset is the
 system's, a theme's ignored; the system scales its alpha by its own shadow alphas, ~4% ambient and
-~19% spot, so a theme's shadow colour shows faintly). The frame is worked out once a screen, its corner
+~19% spot, so a theme's shadow colour shows faintly). The frame is worked out once a screen (and `@compact`), its corner
 once a size too (`FloatingController.frame`, `cornerPx`), as the outline and the border ask for it as they
 draw. A look that made no theme (`SceneThemes` refused it) has the window of its keys as before:
 `FloatingKeyboard.cornerDp`, the handle's shade of the bar (`SceneWindow`). As Gboard's, it never

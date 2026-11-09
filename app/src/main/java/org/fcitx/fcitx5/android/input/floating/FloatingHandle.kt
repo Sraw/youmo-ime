@@ -18,6 +18,7 @@ import android.widget.ImageView
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneWindow
+import org.fcitx.fcitx5.android.scene.engine.WindowLooks
 import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
 import splitties.dimensions.dp
 
@@ -34,8 +35,9 @@ import splitties.dimensions.dp
 class FloatingHandle(
     context: Context,
     private val theme: Theme,
-    private val side: FloatingHandleSide,
+    side: FloatingHandleSide,
     private val mode: Mode,
+    look: WindowLooks.Handle = SceneWindow.plainHandle(theme, side == FloatingHandleSide.Top),
 ) : FrameLayout(context) {
 
     /** Which of the two it is: one or the other's callbacks, never a mix. */
@@ -87,12 +89,12 @@ class FloatingHandle(
         }
     }
 
-    // the scenes it is dressed in last ([dress])
-    private var dressed: Set<String>? = null
+    // the look it is dressed in last ([dress])
+    private var dressed: WindowLooks.Handle? = null
 
     init {
         addView(grip, LayoutParams(0, 0, Gravity.CENTER))
-        dress(SceneWindow.scenes(context, theme, floating = mode is Mode.Floating))
+        dress(look)
         // TalkBack's long press is no touch: the grip's middle stands for the finger
         if (mode is Mode.Docked) {
             contentDescription = context.getString(R.string.floating_keyboard)
@@ -106,14 +108,15 @@ class FloatingHandle(
     }
 
     /**
-     * As the theme's `handle` (060-render-p3 T7a) is in [scenes]: the docked one's as its board is placed
-     * (`@one-handed`, `@split`). Not set, at the top a shade of the bar (in a theme whose bar is the
-     * keyboard's colour it was not told apart), at the bottom the keyboard's own under it.
+     * As [look], the theme's `handle` (060-render-p3 T7a, `SceneWindow.handle`) worked out by who holds
+     * it: the docked one's as its board is placed (`@one-handed`, `@split`). Worked out there, as the
+     * scenes are of the settings, which a view of its own does not read. Not set, at the top a shade of
+     * the bar (in a theme whose bar is the keyboard's colour it was not told apart), at the bottom the
+     * keyboard's own under it.
      */
-    fun dress(scenes: Set<String>) {
-        if (scenes == dressed) return
-        dressed = scenes
-        val look = SceneWindow.handle(theme, scenes, side == FloatingHandleSide.Top)
+    fun dress(look: WindowLooks.Handle) {
+        if (look == dressed) return
+        dressed = look
         val fill = look.fill
         if (fill != null) setBackgroundColor(fill.value) else background = null
         grip.background = GradientDrawable().apply {
