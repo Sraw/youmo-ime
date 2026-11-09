@@ -15,7 +15,6 @@ import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.After
@@ -158,32 +157,101 @@ class ThemeNameClashTest {
         val changed = saved(uuid("monokai"), 1_000_000_000_000, of = TestThemes.TransparentLight)
         saved("monokai", 1_000_000_001_000)
         store("monokai", uuid("monokai"), "x")
+        // killed before the settings were written, twice: the same copy each start, no third json
+        repeat(2) {
+            assertTrue(move { _, _ -> false }.any { it.name == "monokai" })
+            assertEquals(setOf("monokai.json", uuid("monokai#1") + ".json", uuid("monokai") + ".json"), jsons())
+        }
         val moved = move()
-        val copy = moved.single { it.name != uuid("monokai") }
-        assertNotEquals(uuid("monokai"), copy.name)
-        assertEquals(listOf(copy.name, uuid("monokai"), "x"), stored())
+        assertEquals(listOf(uuid("monokai#1"), uuid("monokai")), moved.map { it.name })
+        assertEquals(listOf(uuid("monokai#1"), uuid("monokai"), "x"), stored())
         assertEquals(changed, ThemeFilesManager.listThemes().single { it.name == uuid("monokai") })
-        assertEquals(setOf(copy.name + ".json", uuid("monokai") + ".json"), jsons())
+        assertEquals(setOf(uuid("monokai#1") + ".json", uuid("monokai") + ".json"), jsons())
     }
 
     @Test
-    fun aThemeNotListedMayHoldAName() {
-        assertFalse(ThemeFilesManager.mayHoldTheme("MonetLight"))
-        // a json that does not read (a later build's): not listed, its name the user's all the same. The
-        // user told it does not read: said here, not left for a later test's keyboard to show
+    fun aJsonNamedOtherwiseIsMovedToItsName() {
+        saved("monokai", 1_000_000_000_000)
+        File(dir, "monokai.json").renameTo(File(dir, "foo.json"))
+        saved("mine", 1_000_000_001_000)
+        // a second json of a name listed already: not listed, left as it is
+        File(dir, "mine.json").copyTo(File(dir, "bar.json"))
+        store("monokai", "mine", "x")
+        val moved = move()
+        assertEquals(listOf("mine", uuid("monokai")), moved.map { it.name })
+        assertEquals(listOf(uuid("monokai"), "mine", "x"), stored())
+        assertEquals(setOf("bar.json", "mine.json", uuid("monokai") + ".json"), jsons())
+        // one not clashing deleted is gone: not listed again from its json of another name
+        saved("other", 1_000_000_002_000)
+        File(dir, "other.json").renameTo(File(dir, "baz.json"))
+        ThemeFilesManager.deleteThemeFiles(ThemeFilesManager.listThemes().single { it.name == "other" })
+        assertEquals(listOf("mine", uuid("monokai")), ThemeFilesManager.listThemes().map { it.name })
+        assertEquals(setOf("bar.json", "mine.json", uuid("monokai") + ".json"), jsons())
+    }
+
+    // a json that does not read (a later build's), not listed. The user told it does not read: said here,
+    // not left for a later test's keyboard to show
+    private fun unreadable(name: String) {
         val before = EngineNotices.sayer
         EngineNotices.forgetToldOnce()
         EngineNotices.sayer = EngineNotices.Sayer { _, _ -> true }
         try {
-            File(dir, "MonetLight.json").writeText("""{"version":"9.0"}""")
-            assertTrue(ThemeFilesManager.listThemes().none { it.name == "MonetLight" })
+            File(dir, "$name.json").writeText("""{"version":"9.0"}""")
+            assertTrue(ThemeFilesManager.listThemes().none { it.name == name })
             shadowOf(Looper.getMainLooper()).idle()
         } finally {
             EngineNotices.sayer = before
             EngineNotices.forgetToldOnce()
         }
-        assertTrue(ThemeFilesManager.mayHoldTheme("MonetLight"))
-        assertFalse(ThemeFilesManager.mayHoldTheme("MonetDark"))
+    }
+
+    @Test
+    fun aThemeNotListedMayHoldAName() {
+        val legacy = BuiltinThemeFiles.LEGACY.keys
+        assertEquals(emptyList<String>(), ThemeFilesManager.mayHoldThemes(legacy))
+        // its name the user's all the same
+        unreadable("MonetLight")
+        assertEquals(listOf("MonetLight"), ThemeFilesManager.mayHoldThemes(legacy))
+    }
+
+    @Test
+    fun aStartMovesAClashingThemeThenTheOldNamesNotOneTheUserMayHold() {
+        saved("monokai", 1_000_000_000_000)
+        unreadable("MonetLight")
+        store("monokai", "PixelDark", "MonetLight")
+        val (themes, changed) = ThemeManager.listCustomThemes(prefs)
+        assertTrue(changed)
+        assertEquals(listOf(uuid("monokai")), themes.map { it.name })
+        assertEquals(listOf(uuid("monokai"), "pixel#dark", "MonetLight"), stored())
+        // the next start: nothing to change
+        assertEquals(themes to false, ThemeManager.listCustomThemes(prefs))
+        // an old name alone: changed too (the copy for before the first unlock synced)
+        store("DeepBlue")
+        assertTrue(ThemeManager.listCustomThemes(prefs).second)
+        assertEquals("deep-blue", stored().first())
+    }
+
+    @Test
+    fun aRefreshMovesAClashingThemeAndSyncsTheCopyBeforeTheFirstUnlock() {
+        val sp = androidx.preference.PreferenceManager.getDefaultSharedPreferences(appContext)
+        val de = androidx.preference.PreferenceManager.getDefaultSharedPreferences(appContext.createDeviceProtectedStorageContext())
+        val key = ThemeManager.prefs.normalModeTheme.key
+        val was = sp.getString(key, null)
+        // themes settled since the start (A4): one named as a built-in theme there now
+        saved("monokai", 1_000_000_000_000)
+        sp.edit(commit = true) { putString(key, "monokai") }
+        try {
+            ThemeManager.refreshThemes()
+            assertEquals(uuid("monokai"), sp.getString(key, null))
+            assertEquals(uuid("monokai"), de.getString(key, null))
+            assertEquals(listOf(uuid("monokai")), ThemeManager.getAllThemes().filterIsInstance<Theme.Custom>().map { it.name })
+            assertTrue(ThemeManager.getTheme("monokai") is Theme.Builtin)
+        } finally {
+            sp.edit(commit = true) { if (was == null) remove(key) else putString(key, was) }
+            dir.listFiles()?.forEach { it.deleteRecursively() }
+            ThemeManager.refreshThemes()
+            ThemeManager.syncToDeviceEncryptedStorage()
+        }
     }
 
     @Test
@@ -198,7 +266,7 @@ class ThemeNameClashTest {
         HostConfigDir.forget()
         try {
             assertFalse(ThemeFilesManager.writable)
-            assertTrue(ThemeFilesManager.mayHoldTheme("MonetLight"))
+            assertEquals(listOf("MonetLight"), ThemeFilesManager.mayHoldThemes(listOf("MonetLight")))
             store("monokai", "monokai", "monokai")
             assertSame(listed, ThemeFilesManager.moveClashing(listed, clashes, prefs::renameThemeRefs))
             assertEquals(listOf("monokai", "monokai", "monokai"), stored())

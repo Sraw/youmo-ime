@@ -1131,22 +1131,28 @@ two are no built-in theme: test data, `commonTest/data/transparent.xml`.
 The settings name a built-in theme by **reference**: its file's name and version, `pixel#dark`, or its
 name alone where it has one (`deep-blue`; `deep-blue#dark` finds it too). `ThemeManager.getTheme` finds
 the user's theme of that name first, then the built-in, then the built-in of that 0.5 name (a slot not
-moved yet). A theme of the user's named as a reference is now (`monokai`, `pixel#dark`: 0.5's import
-refused only 0.5's names) would hide the built-in one, so at `ThemeManager`'s start, before the slots are
-moved, `ThemeFilesManager.moveClashing` saves it again under a UUID of its name (its files as they are,
-its json's age kept), `ThemePrefs.renameThemeRefs` points every slot naming it at the copy (committed),
-and only then its old json goes: a kill anywhere leaves each slot on a json there is, the next start
-finishes onto the same UUID (a random one where that name holds another theme already). Not while the
-themes are not settled or before the first unlock (none listed). `ThemePrefs.migrateThemeRefs` (from
-`ThemeManager`'s start, the custom themes listed) moves a slot (`normal_mode_theme`, `light_mode_theme`,
-`dark_mode_theme`) naming one by its 0.5 name (`PixelDark`, `MonetLight`, `BuiltinThemeFiles.LEGACY`)
-to its reference, unless a theme of the user's has that name or may have it (`ThemeFilesManager.mayHoldTheme`:
-its json there unread, or the directory not read; such a slot is read as the built-in theme meanwhile);
-a name of no theme stays (the default). No
+moved yet). `ThemeManager.listCustomThemes` lists the user's themes and sets the slots right with them,
+at the start and at every `refreshThemes` (themes not settled at the start may be since, A4; a refresh
+that changed a slot syncs the device-encrypted copy). A json whose file name is not its theme's name (put
+there by hand) is renamed to `<name>.json` as it is listed (not listed where that is another's json), as
+save, delete and the moves write that file. A theme of the user's named as a reference is now
+(`monokai`, `pixel#dark`: 0.5's import refused only 0.5's names) would hide the built-in one, so before
+the slots are moved `ThemeFilesManager.moveClashing` saves it again under a UUID of its name (its files
+as they are, its json's age kept), `ThemePrefs.renameThemeRefs` points every slot naming it at the copy
+(committed), and only then its old json goes: a kill anywhere leaves each slot on a json there is, the
+next start finishes onto the same UUID (where that name holds another theme already, the first of
+`<name>#1`, `<name>#2`… free or holding this copy). Not while the themes are not settled or before the
+first unlock (none listed). Then `ThemePrefs.migrateThemeRefs` moves a slot (`normal_mode_theme`,
+`light_mode_theme`, `dark_mode_theme`) naming one by its 0.5 name (`PixelDark`, `MonetLight`,
+`BuiltinThemeFiles.LEGACY`) to its reference, unless a theme of the user's has that name or may have it
+(`ThemeFilesManager.mayHoldThemes`, the directory read once: its json there unread, or the directory not
+read; such a slot is read as the built-in theme meanwhile); a name of no theme stays (the default). No
 mark: no old name is written any more and an import of one (or of a reference) is refused
 (`exception_theme_name_clash`), so it runs at every start and a backup of an older version, or the
 device-encrypted copy an older version wrote, is moved as it is read; `syncToDeviceEncryptedStorage`
-copies the references as they are now.
+copies the references as they are now. Before the first unlock nothing is moved, so a user's theme name
+there that is a reference now (`monokai`, in a copy synced before the theme was moved) reads as the
+built-in theme until the unlock.
 
 Import (`ThemeFilesManager.importTheme`) takes the json and every file it names, by file name only
 (never a path, never a `.json`, never `.saving`); it checks all before copying any, so a refusal leaves nothing.

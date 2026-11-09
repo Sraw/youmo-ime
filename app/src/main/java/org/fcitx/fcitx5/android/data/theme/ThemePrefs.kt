@@ -273,19 +273,22 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      * by its 0.5 name (`PixelDark`, `MonetLight`) names it as it is now (`pixel#dark`, `monet#light`,
      * [BuiltinThemeFiles.LEGACY]): what each showed it shows. One naming a theme of the user's
      * ([customs]: the listed ones' names, and any a json not listed or a directory not read may hold,
-     * [ThemeFilesManager.mayHoldTheme]) is left, which it was before as well (the user's first); till it
-     * is moved, [ThemeManager.getTheme] reads an old name as the built-in theme. Run at every start, no mark:
+     * [ThemeFilesManager.mayHoldThemes]) is left, which it was before as well (the user's first); till it
+     * is moved, [ThemeManager.getTheme] reads an old name as the built-in theme. Run at every start and
+     * refresh, no mark:
      * no old name is written any more (an import of one is refused), so a backup of an older version
      * brought back, and the copy for before the first unlock (written by an older version, read with
      * this one's), are moved as they are read. A name of no theme (one deleted) is left: the default.
+     * Whether a slot was moved.
      */
-    fun migrateThemeRefs(customs: Set<String>) {
+    fun migrateThemeRefs(customs: Set<String>): Boolean {
         val moved = listOf(normalModeTheme.key, lightModeTheme.key, darkModeTheme.key).mapNotNull { key ->
             // a value not a string (a damaged file) is no name: left, read as the default
             val name = runCatching { sharedPreferences.getString(key, null) }.getOrNull() ?: return@mapNotNull null
             BuiltinThemeFiles.LEGACY[name]?.takeIf { name !in customs }?.let { key to it }
         }
         if (moved.isNotEmpty()) sharedPreferences.edit { moved.forEach { (key, ref) -> putString(key, ref) } }
+        return moved.isNotEmpty()
     }
 
     /**
