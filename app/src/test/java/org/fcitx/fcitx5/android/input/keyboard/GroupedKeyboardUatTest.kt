@@ -24,7 +24,9 @@ import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
+import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.input.theme.Gap
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
@@ -72,9 +74,9 @@ class GroupedKeyboardUatTest {
     private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
     private val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false)
 
-    private fun keys14(im: InputMethodEntry = KeyboardHarness.PINYIN): KeyboardHarness {
+    private fun keys14(im: InputMethodEntry = KeyboardHarness.PINYIN, theme: Theme = ThemePreset.PixelLight): KeyboardHarness {
         prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, PinyinKeyboard.Keys14)
-        return KeyboardHarness(ThemePreset.PixelLight, im).also {
+        return KeyboardHarness(theme, im).also {
             harness = it
             it.api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH)
             it.api.enabledIme = it.api.availableIme
@@ -192,6 +194,36 @@ class GroupedKeyboardUatTest {
         f.move(KeyboardHarness.Touch(l.bounds.width() / 2f + step, l.bounds.height() / 2f))
         f.up(KeyboardHarness.Touch(l.bounds.width() / 2f + step, l.bounds.height() / 2f))
         assertTrue(h.field.text.toString(), h.field.text.toString().endsWith("l"))
+    }
+
+    // QW at the screen's left with loose keys (gap.h 5dp): Q W 1 q w, the 1 right of the finger, Q two
+    // shorter steps left with little room. The popup is placed by the key's face, the finger's x is
+    // from its cell: the face's inset (the gap) passed with the long press, or the room left was
+    // counted an inset too much and Q stayed out of reach at the screen's edge
+    @Test
+    @Uat("PY-89")
+    fun aLooseKeyAtTheLeftReachesItsFirstLetterAtTheEdge() {
+        val loose = Theme.Custom("loose", false, ThemePreset.PixelLight.look.let { it.copy(keys = it.keys.copy(gap = Gap(5, 9, 5, 6))) })
+        keys14(theme = loose).start()
+        typing(InputMethodCatalog.PINYIN, "ni", "bu")
+        val qw = group("QW")
+        val density = h.inputView.resources.displayMetrics.density
+        // the face 5dp in its cell across, as the long press passes it
+        assertEquals((5 * density).toInt().toFloat(), (qw.bounds.width() - qw.face.width()) / 2f, 1f)
+        // pressed left of its middle, 25dp from the screen's edge: less room than whole steps take
+        // to Q, by about the inset (with it counted as room the last step lands past the edge)
+        val y = qw.bounds.height() / 2f
+        var x = (25 * density).toInt() - qw.bounds.left
+        val f = h.finger(qw, KeyboardHarness.Touch(x.toFloat(), y))
+        h.after(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
+        assertTrue(h.popupChoices().first { it.text == "1" }.box.left > x + qw.bounds.left)
+        // a pixel at a time to the screen's left edge
+        while (x > -qw.bounds.left) {
+            x--
+            f.move(KeyboardHarness.Touch(x.toFloat(), y))
+        }
+        f.up(KeyboardHarness.Touch(x.toFloat(), y))
+        assertTrue(h.field.text.toString(), h.field.text.toString().endsWith("Q"))
     }
 
     // a grouped keyboard with no 中/英 key ([probe] its letters' group): the globe asks the host for the
