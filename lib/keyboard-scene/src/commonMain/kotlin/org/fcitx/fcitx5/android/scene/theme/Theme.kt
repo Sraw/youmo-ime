@@ -39,6 +39,12 @@ class Theme(
     /** [expr]'s colour here; transparent where it names what is not there (checked on reading). */
     fun color(expr: ColorExpr): Argb = expr.resolve(variable, system) ?: Argb.TRANSPARENT
 
+    /** The keyboard's size it sets ([Values.KEYBOARD_SIZES]), each null where it sets none: the later style's where two do. */
+    val keyboardSizes: KeyboardSizes by lazy {
+        fun last(name: String) = styles.lastOrNull { name in it.values }?.let { (it.values[name] as? Value.OfTwin)?.twin }
+        KeyboardSizes(last("height"), last("side-padding"), last("bottom-padding"))
+    }
+
     /** This theme drawn as its dark or light version; itself where it has only the other. */
     fun variant(dark: Boolean): Theme = if (dark == this.dark || dark !in variants) {
         this
@@ -61,6 +67,12 @@ data class SystemColors(val light: Map<String, Argb>, val dark: Map<String, Argb
         val NONE = SystemColors(emptyMap(), emptyMap())
     }
 }
+
+/**
+ * A theme's keyboard size (060-render-v2 §15): the keyboard's [height] in % of the screen's height,
+ * its [sidePadding] each side and [bottomPadding] under it in dp; each portrait then landscape.
+ */
+data class KeyboardSizes(val height: Twin? = null, val sidePadding: Twin? = null, val bottomPadding: Twin? = null)
 
 /** A `<style>`: its selectors, its properties as read, and where it is (later wins a tie). */
 class Style(val selectors: List<Selector>, val values: Map<String, Value>, val order: Int, val line: Int)

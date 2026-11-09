@@ -452,6 +452,19 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         /** 贴底 chosen ([keyboardBottomFlush]). */
         val bottomFlush: Boolean get() = keyboardBottomFlush.getValue() == 1
 
+        // 跟随主题 of each of the three (060-render-p3 T5): the theme's size where it gives one, else
+        // the numbers above, which 跟随主题 puts back to their defaults. The default, for 0.6.0's own;
+        // an upgrade's are ThemePrefs.migrateSizeFollow's (a size set kept, not following)
+        val keyboardHeightFollowTheme = hidden(setByLevels = true) {
+            switch(R.string.follow_theme, "keyboard_height_follow_theme", true)
+        }
+        val keyboardSidePaddingFollowTheme = hidden(setByLevels = true) {
+            switch(R.string.follow_theme, "keyboard_side_padding_follow_theme", true)
+        }
+        val keyboardBottomPaddingFollowTheme = hidden(setByLevels = true) {
+            switch(R.string.follow_theme, "keyboard_bottom_padding_follow_theme", true)
+        }
+
         init {
             section(R.string.section_sound_and_vibration)
         }

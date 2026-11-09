@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.layout.Condition
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
+import org.fcitx.fcitx5.android.scene.theme.Selector
 
 /**
  * Everything outside the layout and the theme a scene depends on: the keyboard's size, the scene's
@@ -46,6 +47,14 @@ data class Env(
      * `reading` [KeyState.On] (手写的注 on), `lock` [KeyState.Locked] (a panel's lock).
      */
     val states: Map<String, Set<KeyState>> = emptyMap(),
+    /** The board's id, its layout's (`nine`): the theme's `@keyboard=` scene. Null: none (a popup's, every board's). */
+    val board: String? = null,
+    /**
+     * What is typed as the input method knows it, as the theme's scenes (`im=wubi`, `field=password`):
+     * in place of what [input] says of it, which is what the board's `when=` asks (a qwerty board's
+     * `ime=pinyin` under English too). Null: as [input] says (a test, a settings page's keys).
+     */
+    val typed: Set<String>? = null,
 ) {
     /** The keyboard's width in dp as Android's configuration has it (a whole number, rounded down). */
     val widthDp: Int get() = (width / density + DP_EPSILON).toInt()
@@ -54,7 +63,11 @@ data class Env(
     val isOneHanded: Boolean
         get() = floating == null && !split && SplitKeyboard.placement(oneHanded, dock, false, true, widthDp) != null
 
-    /** The theme's scene prefixes this environment is in. */
+    /**
+     * The theme's scene prefixes this environment is in: the screen's and the settings', and what is
+     * typed (`im=pinyin`, `im=table` and `im=wubi` a table, `field=password`, `keyboard=nine`). A
+     * theme's cascades are kept by those of them it names ([org.fcitx.fcitx5.android.scene.theme.Cascades]).
+     */
     val scenes: Set<String>
         get() = buildSet {
             if (compact) add("compact")
@@ -64,6 +77,15 @@ data class Env(
             if (isOneHanded) add("one-handed")
             if (dark) add("dark")
             if (flat) add("flat")
+            // what is typed: the input method (a table also by its name), the field, the board
+            if (typed != null) {
+                addAll(typed)
+            } else {
+                input.ime?.let { add("im=$it") }
+                input.table?.let { add("im=$it") }
+                input.field?.takeIf { it in Selector.FIELDS }?.let { add("field=$it") }
+            }
+            board?.let { add("keyboard=$it") }
         }
 
     /** What a `when=` asks of, answered here. */

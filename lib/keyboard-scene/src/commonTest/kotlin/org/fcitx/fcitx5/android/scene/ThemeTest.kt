@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.scene.theme.ColorExpr
 import org.fcitx.fcitx5.android.scene.theme.Fill
 import org.fcitx.fcitx5.android.scene.theme.Inset
 import org.fcitx.fcitx5.android.scene.theme.KeyLook
+import org.fcitx.fcitx5.android.scene.theme.KeyboardSizes
 import org.fcitx.fcitx5.android.scene.theme.Meta
 import org.fcitx.fcitx5.android.scene.theme.Radius
 import org.fcitx.fcitx5.android.scene.theme.Selector
@@ -20,6 +21,7 @@ import org.fcitx.fcitx5.android.scene.theme.Shown
 import org.fcitx.fcitx5.android.scene.theme.SystemColors
 import org.fcitx.fcitx5.android.scene.theme.TextLook
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
+import org.fcitx.fcitx5.android.scene.theme.Twin
 import org.fcitx.fcitx5.android.scene.theme.Value
 import org.fcitx.fcitx5.android.scene.theme.Values
 import kotlin.test.Test
@@ -494,19 +496,22 @@ class ThemeTest {
         assertEquals(setOf(false, true), t.value.variants)
         assertEquals(Argb(0xFF303030.toInt()), t.value.variant(dark = true).colors["key"])
         assertEquals("0.6.0", t.value.meta?.minApp)
+        // T5 made its scenes and the keyboard's size work: no warning of them
         val ignored = listOf(
-            "83|<sounds>", "79|transition=", "79|@im=wubi", "79|clipboard", "79|:first", "80|depth=",
+            "83|<sounds>", "79|transition=", "79|clipboard", "79|:first", "80|depth=",
             "80|press-scale=", "80|effect=", "80|sticker=", "81|shape=\"path(M0 0 L1 0 L1 1 Z)\"", "81|size=\"120%\"", "81|tail=",
-            "81|appear=", "82|height=", "82|side-padding=",
+            "81|appear=",
         ).map { "$it is not supported by this version, ignored" }
         assertEquals(ignored, t.warnings().map { "${it.line}|${it.message}" })
+        assertEquals(KeyboardSizes(height = Twin(38.0, 52.0), sidePadding = Twin(8.0, 48.0)), t.value.keyboardSizes)
     }
 
     @Test
     fun scenesPartsAndWidgetsOfLaterStages() {
         fun s(t: String) = assertNotNull(Selector.parse(t), t)
         assertEquals(setOf("im=wubi", "field=password"), s("@im=wubi @field=password key").scenes)
-        assertEquals("@keyboard=nine", s("@keyboard=nine key.letter").reserved)
+        // T5's: they select (typedScenesSelectAsTheEnvironmentIs)
+        assertNull(s("@keyboard=nine key.letter").reserved)
         assertNull(Selector.parse("@field=phone key"))
         assertNull(Selector.parse("@im=Wubi key"))
         assertNull(Selector.parse("@colour=red key"))
@@ -519,7 +524,7 @@ class ThemeTest {
         assertNull(s("key:pressed").reserved)
         assertNull(s("@dark key").reserved)
         // such a style reads, warns, and selects nothing yet
-        val src = withStyle("<style select=\"@im=wubi key, clipboard\" fill=\"#123456\"/>")
+        val src = withStyle("<style select=\"toolbar, clipboard\" fill=\"#123456\"/>")
         assertEquals(2, warnings(src).size)
         val t = ThemeReader.theme(src).getOr { error("$it") }
         val target = Selector.Target("key", "qwerty", "q", null, setOf("letter"))

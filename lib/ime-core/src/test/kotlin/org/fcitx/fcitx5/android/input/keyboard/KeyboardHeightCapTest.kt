@@ -5,8 +5,10 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.assertRows
+import org.fcitx.fcitx5.android.scene.theme.Twin
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.fcitx.fcitx5.android.scene.theme.KeyboardSizes as ThemeSizes
 
 class KeyboardHeightCapTest {
 
@@ -33,6 +35,16 @@ class KeyboardHeightCapTest {
         },
         "a screen too short for the bars gives no keys rather than a negative height" to {
             assertEquals(0, KeyboardHeightCap.keysHeight(100, 50, 58, 12))
+        },
+        // 060-render-p3 T5: the theme's height followed is asked for as a setting's is, and cut alike
+        "the theme sets a height: the cap binds it as a level" to {
+            val sizes = KeyboardSizes(
+                KeyboardSizes.Setting(true, 30, 49), KeyboardSizes.Setting(true, 0, 0), KeyboardSizes.Setting(true, 0, 0), false,
+                ThemeSizes(height = Twin(40.0, 60.0)),
+            )
+            assertEquals(393 * 60 / 100, sizes.heightPx(393, landscape = true))
+            assertEquals(275 - 58 - 12, KeyboardHeightCap.keysHeight(sizes.heightPx(393, landscape = true), 393, 58, 12))
+            assertEquals(340, KeyboardHeightCap.keysHeight(sizes.heightPx(851, landscape = false), 851, 58, 12))
         },
     )
 }

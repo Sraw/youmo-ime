@@ -82,10 +82,9 @@ class TextKeyboard(
         fun widthDp(context: Context): Int {
             val config = context.resources.configuration
             if (ThemeManager.prefs.floatingKeyboard.getValue()) return FloatingKeyboard.widthDp(config.screenWidthDp)
-            val keyboard = AppPrefs.getInstance().keyboard
             val landscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE
-            val padding = (if (landscape) keyboard.keyboardSidePaddingLandscape else keyboard.keyboardSidePadding).getValue()
-            return config.screenWidthDp - 2 * padding
+            // the theme's where the setting follows it (KeyboardArea.sidePadding): a fraction of a dp cut, as there
+            return (config.screenWidthDp - 2 * KeyboardArea.sizes().sidePaddingDp(landscape)).toInt()
         }
 
         val Layout: List<List<KeyDef>> = listOf(
