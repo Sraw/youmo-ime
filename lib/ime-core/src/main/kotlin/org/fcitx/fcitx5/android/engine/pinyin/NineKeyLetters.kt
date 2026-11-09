@@ -19,6 +19,8 @@ class NineKeyLetters private constructor(
     private val keys: List<String>,
     val codes: String = DIGITS,
     val separator: Char? = '1',
+    // the tag the learning record files the keys under where it is not their letters ([NINE_SP]'s)
+    private val filedAs: String? = null,
 ) {
 
     /** Whether the codes are a grouped keyboard's private use codes ([G14], [G18], [NINE_SP]), not the nine keys' digits: shown as letters. */
@@ -106,7 +108,7 @@ class NineKeyLetters private constructor(
     override fun hashCode() = keys.hashCode() * 31 + codes.hashCode()
 
     // made once: grouped(tag) compares it for each code of each word typed on the 14 keys (SpelledForm)
-    private val tagText = keys.joinToString(",")
+    private val tagText = filedAs ?: keys.joinToString(",")
 
     /** The layout as the learning record files the nine keys' codes under it: every key's letters, the standard ones too. */
     fun tag(): String = tagText
@@ -150,33 +152,40 @@ class NineKeyLetters private constructor(
         val G18 = grouped(FIRST_PRIVATE_CODE, "q", "we", "rt", "y", "u", "io", "p", "a", "sd", "fg", "h", "jk", "l;", "z", "xc", "v", "bn", "m")
 
         /**
-         * 双拼 on the nine keys: the letters on a phone, ; with jkl, fixed (the user's 九键 letters
-         * are 全拼's), codes private use, U+F8F4 plus (the key's digit − 2), after [G14]'s block:
-         * apart from the digits, so no t9: row, and from the other grouped keyboards' codes. Not
-         * through [normalize].
+         * 双拼 on the nine keys: the letters on a phone, fixed (the user's 九键 letters are 全拼's),
+         * and a ninth key `;` (微软's ing), typed by 1 where a final goes (PinyinSession); codes
+         * private use, U+F8F4 plus (the key's digit − 2), `;` U+F8FC, after [G14]'s block: apart
+         * from the digits, so no t9: row, and from the other grouped keyboards' codes. Not through
+         * [normalize]. Filed under the tag it had when `;` was on 5 (`…,jkl;,…`): a code of 2 to 9
+         * means what it meant, so what was learned stays its own; only `;` typed on 5 before
+         * (微软's ing) is a code no key now types, never matched again.
          */
         val NINE_SP = NineKeyLetters(
-            listOf("abc", "def", "ghi", "jkl;", "mno", "pqrs", "tuv", "wxyz"),
-            (0 until 8).map { FIRST_NINE_SP_CODE + it }.joinToString(""),
+            listOf("abc", "def", "ghi", "jkl", "mno", "pqrs", "tuv", "wxyz", ";"),
+            (0 until 9).map { FIRST_NINE_SP_CODE + it }.joinToString(""),
             separator = null,
+            filedAs = "abc,def,ghi,jkl;,mno,pqrs,tuv,wxyz",
         )
 
+        /** [NINE_SP]'s `;` key's code, which 1 sends while something is typed on 微软's keys. */
+        val NINE_SP_SEMICOLON: Char = NINE_SP.key(';')
+
         // three blocks one after the other in the last 64 of the BMP's private use area, past the
-        // syllables'; U+F8FC–F8FF left free
+        // syllables'; U+F8FD–F8FF left free
         private const val FIRST_PRIVATE_CODE = '\uF8C0'
         private const val FIRST_G14_CODE = '\uF8DA'
         private const val FIRST_NINE_SP_CODE = '\uF8F4'
 
         /**
          * The blocks the grouped keyboards' codes are taken from, whole: [G18]'s U+F8C0 to U+F8D9,
-         * [G14]'s U+F8DA to U+F8F3, [NINE_SP]'s U+F8F4 to U+F8FB. The one place they are written:
+         * [G14]'s U+F8DA to U+F8F3, [NINE_SP]'s U+F8F4 to U+F8FC. The one place they are written:
          * what must never reach a field as text (KeyCodes) reads them here.
          */
         val G14_BLOCK = FIRST_G14_CODE.code..FIRST_G14_CODE.code + ('z' - 'a')
         val G18_BLOCK = FIRST_PRIVATE_CODE.code..FIRST_PRIVATE_CODE.code + ('z' - 'a')
-        val NINE_SP_BLOCK = FIRST_NINE_SP_CODE.code..FIRST_NINE_SP_CODE.code + 7
+        val NINE_SP_BLOCK = FIRST_NINE_SP_CODE.code..FIRST_NINE_SP_CODE.code + 8
 
-        /** Every grouped keyboard's code, the three blocks together (U+F8C0–F8FB). */
+        /** Every grouped keyboard's code, the three blocks together (U+F8C0–F8FC). */
         val CODES = G18_BLOCK.first..NINE_SP_BLOCK.last
 
         private val GROUPED by lazy { listOf(G14, G18, NINE_SP) }

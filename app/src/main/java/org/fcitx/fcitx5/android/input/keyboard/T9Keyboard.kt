@@ -102,8 +102,9 @@ import splitties.views.dsl.core.add
  * and on 1, an apostrophe in the word while one is typed. It never glides.
  *
  * [shuangpin]: 九键双拼 ([ShuangpinName], design §3.4), 双拼 on [NineKeyLetters.NINE_SP]'s keys
- * (JKL; on 5, for 微软's ing): a digit key sends its group's code, which the engine
- * reads as any of its letters; 1 while typing the separator `'`; the column 双拼's syllables. No
+ * (5 JKL alone): a digit key sends its group's code, which the engine reads as any of its
+ * letters; 1 while typing the separator `'`, but 微软's `;` (its ing, a small `;` beside 1's digit)
+ * that the engine reads as ing where a final goes, else as the separator; the column 双拼's syllables. No
  * 连按, no glide, the letters always the standard ones. None has 中/英 (I1): the language key goes
  * round the input methods, each on its own keyboard.
  */
@@ -117,8 +118,8 @@ class T9Keyboard(
     symbols: NineKeySymbols = NineKeySymbols.STANDARD,
     private val english: Boolean = false,
     private val shuangpin: Boolean = false,
-    /** 九键双拼's 5 shows `;` (JKL;): only under a scheme that types it (微软's ing). */
-    private val semicolon: Boolean = true,
+    /** 九键双拼's 1 types `;` while typing, shown beside its digit: only under a scheme that types it (微软's ing). */
+    private val semicolon: Boolean,
 ) : BaseKeyboard(
     context, theme, layout(letters, symbols, english, shuangpin, semicolon), themeBoard = KeyNames.NINE, shortcuts = true,
 ), AutoCapsKeys {
@@ -209,8 +210,9 @@ class T9Keyboard(
         /**
          * What [action] from [source] types for 九键双拼: a digit key's press its group's code
          * ([NineKeyLetters.NINE_SP]), every press a key of its own; 1 while [composing] the
-         * separator, else punctuation as [resolve] has it; a long press's letter or digit committed
-         * as it is; anything else as it is.
+         * separator, or with [semicolon] (微软's) the code of `;`, which the engine reads as ing
+         * after an initial and as the separator elsewhere; else punctuation as [resolve] has it; a
+         * long press's letter or digit committed as it is; anything else as it is.
          */
         internal fun resolveShuangpin(
             action: KeyAction,
@@ -218,12 +220,14 @@ class T9Keyboard(
             tap: MultiTap,
             time: Long,
             composing: Boolean,
+            semicolon: Boolean,
         ): KeyAction {
             val key = (action as? KeyAction.HostKeyAction)?.act?.singleOrNull()
             if (source == KeyActionListener.Source.Popup || key == null || key !in '1'..'9') return resolve(action, source, tap, time, composing)
             if (key == '1') {
                 if (!composing) return resolve(action, source, tap, time, composing = false)
                 tap.reset()
+                if (semicolon) return KeyAction.SymAction(KeySym(UNICODE + NineKeyLetters.NINE_SP_SEMICOLON.code), KeyStates.Virtual)
                 // the engine's 双拼 separates with ', a digit being no key of it
                 return KeyAction.HostKeyAction("'")
             }
@@ -257,9 +261,8 @@ class T9Keyboard(
          * [symbols] in rows above.
          */
         internal fun ninePopup(digit: Char, letters: String, symbols: List<String>) = KeyDef.Popup.Keyboard.Explicit(
-            // ;'s capital is : (九键双拼's JKL;), as Shift gives it: no second ;
-            letters.map { if (it == ';') ":" else it.uppercase() }.toTypedArray() + digit.toString() +
-                letters.lowercase().map { it.toString() } + symbols.filter { it != ":" || ';' !in letters },
+            letters.map { it.uppercase() }.toTypedArray() + digit.toString() +
+                letters.lowercase().map { it.toString() } + symbols,
             symbolsFrom = 1 + 2 * letters.length,
             inRow = letters.length,
         )
@@ -274,8 +277,8 @@ class T9Keyboard(
             }
 
         /** The letters on digit key [d] (2 to 9), as [layout] puts them. */
-        internal fun lettersOn(d: Char, letters: NineKeyLetters, english: Boolean, shuangpin: Boolean, semicolon: Boolean) = when {
-            shuangpin -> NineKeyLetters.NINE_SP.letters(NineKeyLetters.NINE_SP.codes[d - '2']).uppercase().let { if (semicolon) it else it.replace(";", "") }
+        internal fun lettersOn(d: Char, letters: NineKeyLetters, english: Boolean, shuangpin: Boolean) = when {
+            shuangpin -> NineKeyLetters.NINE_SP.letters(NineKeyLetters.NINE_SP.codes[d - '2']).uppercase()
             english -> letters.letters(d).lowercase()
             else -> letters.letters(d).uppercase()
         }
@@ -424,7 +427,7 @@ class T9Keyboard(
 
         /**
          * The keys, each digit key with [letters]' letters on it; [english]'s in lower case, Shift for
-         * 重输; [shuangpin]'s [NineKeyLetters.NINE_SP]'s (5's `;` left off but with [semicolon]), and no 中/英.
+         * 重输; [shuangpin]'s [NineKeyLetters.NINE_SP]'s (1 marked `;` beside its digit with [semicolon]), and no 中/英.
          */
         internal fun layout(
             letters: NineKeyLetters,
@@ -433,15 +436,18 @@ class T9Keyboard(
             shuangpin: Boolean = false,
             semicolon: Boolean = true,
         ): List<List<KeyDef>> {
-            fun on(d: Char) = lettersOn(d, letters, english, shuangpin, semicolon)
-            return layoutOf(::on, symbols, english)
+            fun on(d: Char) = lettersOn(d, letters, english, shuangpin)
+            return layoutOf(::on, symbols, english, oneAlt = if (shuangpin && semicolon) ONE_SEMICOLON else "1")
         }
 
-        private fun layoutOf(on: (Char) -> String, symbols: NineKeySymbols, english: Boolean): List<List<KeyDef>> = listOf(
+        /** 1's digit with 微软's `;` beside it: what 1 types while typing on its 九键双拼. */
+        internal const val ONE_SEMICOLON = "1;"
+
+        private fun layoutOf(on: (Char) -> String, symbols: NineKeySymbols, english: Boolean, oneAlt: String): List<List<KeyDef>> = listOf(
             listOf(
                 spacer(SIDE_KEY),
                 KeyDef(
-                    KeyDef.Appearance.AltText(displayText = if (english) ENGLISH_ONE_LABEL else ONE, altText = "1", textSize = 16f, percentWidth = DIGIT),
+                    KeyDef.Appearance.AltText(displayText = if (english) ENGLISH_ONE_LABEL else ONE, altText = oneAlt, textSize = 16f, percentWidth = DIGIT),
                     setOf(
                         KeyDef.Behavior.Press(KeyAction.HostKeyAction("1")),
                         KeyDef.Behavior.Swipe(keypad('1')),
@@ -508,7 +514,7 @@ class T9Keyboard(
 
     // a digit key's long press (nine.xml's `popup from="nine"`), as the views' (ninePopup, onePopup)
     private val ninePopups: Map<String, KeyDef.Popup.Keyboard> by lazy {
-        ('2'..'9').associate { d -> "$d" to ninePopup(d, lettersOn(d, letters, english, shuangpin, semicolon), symbols.symbols(d)) } +
+        ('2'..'9').associate { d -> "$d" to ninePopup(d, lettersOn(d, letters, english, shuangpin), symbols.symbols(d)) } +
             listOfNotNull(onePopup(english, symbols)?.let { "1" to it })
     }
 
@@ -708,7 +714,7 @@ class T9Keyboard(
         val time = pressed?.takeIf { it.digit == key }?.time ?: SystemClock.uptimeMillis()
         pressed = null
         if (english) return onEnglish(action, source, time)
-        val out = if (shuangpin) resolveShuangpin(action, source, multiTap, time, typing) else resolve(action, source, multiTap, time, typing, letters)
+        val out = if (shuangpin) resolveShuangpin(action, source, multiTap, time, typing, semicolon) else resolve(action, source, multiTap, time, typing, letters)
         // a key the engine reads as typing: 1 right after it is the separator, though the engine
         // has not told of what is typed yet
         if (isTypingKey(out)) typing = true
@@ -830,14 +836,15 @@ class T9Keyboard(
     // says is typed, each digit's letters (the user's, 双拼's, Shift's
     // case), Shift, the language key, the space's input method, Return
     override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env {
-        val state = TextBoardState(langKey = showLangSwitchKey.getValue(), holdVoice = holdsToTalk)
+        // 微软's 九键双拼: scheme-types=semicolon, 1's `;` (nine.xml)
+        val state = TextBoardState(semicolonScheme = shuangpin && semicolon, langKey = showLangSwitchKey.getValue(), holdVoice = holdsToTalk)
         val input = state.input().copy(ime = if (english) "english" else state.input().ime, composing = columnState.composing)
         val texts = Texts(
             imeName = shownImeName.orEmpty(),
             returnLabel = returnAppearance.label(context).toString(),
             returnIcon = SceneIcons.returnName(returnAppearance.icon),
             letterCase = LetterCaseRule.forIme(letterCase.case, english),
-            nineLetters = ('2'..'9').associate { d -> d.toString() to lettersOn(d, letters, english, shuangpin, semicolon).let { if (english && shift.upper) it.uppercase() else it } },
+            nineLetters = ('2'..'9').associate { d -> d.toString() to lettersOn(d, letters, english, shuangpin).let { if (english && shift.upper) it.uppercase() else it } },
             a11yGrouped = context.getString(R.string.a11y_key_grouped),
             a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
         )

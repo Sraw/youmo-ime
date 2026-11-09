@@ -72,7 +72,7 @@ class KeyboardWindowTest {
         val letters = TextKeyboard(context, ThemePreset.PixelDark)
         show(letters, InputMethodCatalog.PINYIN)
         assertEquals("the window appearing, which TalkBack says itself", emptyList<String>(), frame.announced)
-        show(T9Keyboard(context, ThemePreset.PixelDark, shuangpin = true), InputMethodCatalog.SHUANGPIN)
+        show(T9Keyboard(context, ThemePreset.PixelDark, shuangpin = true, semicolon = true), InputMethodCatalog.SHUANGPIN)
         show(letters, InputMethodCatalog.PINYIN)
         assertEquals(listOf(placeholder(R.string.im_shuangpin), placeholder(R.string.im_pinyin)), frame.announced)
     }
@@ -121,9 +121,9 @@ class KeyboardWindowTest {
 
     @Test
     fun onlyTheNineKeysColumnsOwnTheSyllables() {
-        assertEquals(true, T9Keyboard(context, ThemePreset.PixelDark, shuangpin = true).ownsSyllables)
-        assertEquals(true, T9Keyboard(context, ThemePreset.PixelDark).ownsSyllables)
-        assertEquals(false, T9Keyboard(context, ThemePreset.PixelDark, english = true).ownsSyllables)
+        assertEquals(true, T9Keyboard(context, ThemePreset.PixelDark, shuangpin = true, semicolon = true).ownsSyllables)
+        assertEquals(true, T9Keyboard(context, ThemePreset.PixelDark, semicolon = false).ownsSyllables)
+        assertEquals(false, T9Keyboard(context, ThemePreset.PixelDark, english = true, semicolon = false).ownsSyllables)
         assertEquals(false, GroupedKeyboard(context, ThemePreset.PixelDark, NineKeyLetters.G18).ownsSyllables)
         assertEquals(false, TextKeyboard(context, ThemePreset.PixelDark).ownsSyllables)
     }

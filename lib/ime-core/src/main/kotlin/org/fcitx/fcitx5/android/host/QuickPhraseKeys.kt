@@ -33,6 +33,8 @@ object QuickPhraseKeys {
         if (codePoint in Keyboard.LETTERS) return letter('a' + (codePoint - Keyboard.LETTERS.first) % ALPHABET)
         if (codePoint in NineKeyLetters.NINE_SP_BLOCK) {
             val c = codePoint.toChar()
+            // 微软's ; is 1's while typing: the separator there, as 1 is on the other schemes' keys
+            if (c == NineKeyLetters.NINE_SP_SEMICOLON) return of('\''.code, nine)
             return digit('2' + NineKeyLetters.NINE_SP.codes.indexOf(c), NineKeyLetters.NINE_SP.letters(c))
         }
         val shown = Keyboard.typedLetter(codePoint)

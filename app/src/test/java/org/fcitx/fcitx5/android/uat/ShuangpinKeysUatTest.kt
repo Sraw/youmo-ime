@@ -21,6 +21,9 @@ import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.preedit.SyllableStrip
+import org.fcitx.fcitx5.android.input.keyboard.T9Keyboard
+import org.fcitx.fcitx5.android.input.keyboard.KeyDef
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -126,6 +129,19 @@ class ShuangpinKeysUatTest {
         assertTrue(h.texts().toString(), "JKL" in h.texts() && "JKL;" !in h.texts())
         val five = h.longPress(h.nineKey("5"))
         assertFalse("$five", five.any { it == ";" || it == "；" || it == ":" || it == "：" })
+        // 微软's ; is 1's, marked 1; beside its digit: not under 小鹤 nor 自然码, drawn (the scene) or as the views had it
+        for (scheme in listOf(ShuangpinScheme.XIAOHE, ShuangpinScheme.ZIRANMA)) {
+            EngineState.shuangpinScheme = scheme
+            h.start()
+            assertEquals("$scheme", "1", h.nineKey("1").alt)
+        }
+        val oldOne = T9Keyboard.layout(NineKeyLetters.STANDARD, shuangpin = true, semicolon = false).flatten()
+            .firstNotNullOf { it.appearance as? KeyDef.Appearance.AltText }
+        assertEquals("1", oldOne.altText)
+        // the scheme changed to 微软's, the input started again (as the engine's settings do): 1; at once
+        EngineState.shuangpinScheme = ShuangpinScheme.MICROSOFT
+        h.start()
+        assertEquals("1;", h.nineKey("1").alt)
     }
 
     @Test

@@ -91,8 +91,8 @@ class KeyboardTapsTest {
             nineSpCode('5').code to 'j',
         )
         for ((codePoint, letter) in rows) assertEquals(Integer.toHexString(codePoint), letter, Keyboard.typedLetter(codePoint))
-        // no grouped key's code (CV's v; U+F8C2 is no 18-key key's, U+F8FC past the blocks, ⒈ and ⒜ text), nor anything else
-        for (codePoint in listOf(g14Code('v').code, 0xF8C2, 0xF8FC, '⒈'.code, 0x249C, 'b'.code, Keyboard.letterKey('b', again = false), Keyboard.INK)) {
+        // no grouped key's code (CV's v; U+F8C2 is no 18-key key's, U+F8FD past the blocks, ⒈ and ⒜ text), nor anything else
+        for (codePoint in listOf(g14Code('v').code, 0xF8C2, 0xF8FD, '⒈'.code, 0x249C, 'b'.code, Keyboard.letterKey('b', again = false), Keyboard.INK)) {
             assertNull(Integer.toHexString(codePoint), Keyboard.typedLetter(codePoint))
         }
     }

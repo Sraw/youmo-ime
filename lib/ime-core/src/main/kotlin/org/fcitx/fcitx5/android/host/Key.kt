@@ -263,7 +263,7 @@ object KeyCodes {
     /** U+F8C0–F8D9: 双拼's 18 keys' (NineKeyLetters.G18), private use past Keyboard.SYLLABLES. */
     val G18 = NineKeyLetters.G18_BLOCK
 
-    /** U+F8F4–F8FB: 九键双拼's digit keys (NineKeyLetters.NINE_SP). */
+    /** U+F8F4–F8FC: 九键双拼's digit keys and its `;` (NineKeyLetters.NINE_SP). */
     val NINE_SHUANGPIN = NineKeyLetters.NINE_SP_BLOCK
 
     /**

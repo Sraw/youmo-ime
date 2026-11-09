@@ -29,10 +29,11 @@ class QuickPhraseKeysTest {
         assertEquals("4GHgh", chars(of(Keyboard.nineKey('4', upper = true), mine)))
         // 0 and 1 have no letters: the digit
         assertEquals("0", chars(of(Keyboard.pinyinNineKey('0'))))
-        // 九键双拼's: fixed letters, ; on 5
+        // 九键双拼's: fixed letters, 5 JKL alone; 微软's ; is 1's
         val sp = of(NineKeyLetters.NINE_SP.codes[3].code)
         assertEquals('5'.code, sp.shown)
-        assertEquals("5;JKLjkl", chars(sp))
+        assertEquals("5JKLjkl", chars(sp))
+        assertEquals('\''.code, of(NineKeyLetters.NINE_SP_SEMICOLON.code).shown)
     }
 
     @Test

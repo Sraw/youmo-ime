@@ -392,7 +392,7 @@ are offered where nothing is learned (a password field, `Session.learning` false
 - **Codes.** A grouped layout is a `NineKeyLetters` preset (`G14`), not made through `normalize`:
   each key is one code character, U+F8DA + its first letter's place (BMP private use past the
   syllables' and `G18`'s; R16 F4356, ⒜–⒵ before: text a user may type). The three grouped blocks are
-  `G18` U+F8C0–F8D9, `G14` U+F8DA–F8F3, `NINE_SP` U+F8F4–F8FB (`NineKeyLetters.CODES`), U+F8FC–F8FF free. The eight-key layouts (STANDARD and the user's 按键字母) keep the digits 2–9 and the
+  `G18` U+F8C0–F8D9, `G14` U+F8DA–F8F3, `NINE_SP` U+F8F4–F8FC (`NineKeyLetters.CODES`; U+F8FC its `;`, 微软's ing, which 1 sends while typing), U+F8FD–F8FF free. The eight-key layouts (STANDARD and the user's 按键字母) keep the digits 2–9 and the
   separator `'1'`, their `tag`, `serialize`, `parse` byte for byte (a contract test). The touch
   nine keys do not send those digits: `Keyboard.pinyinNineKey(digit)` (plane 15, 0xF0400+,
   `Keyboard.PINYIN_NINE`) for 2–9 and for 1 while typing, which `KeyboardPair` routes to the
@@ -502,6 +502,9 @@ setting either: it reads the codes.
   keeps, every keyboard on the same ones; the 8 schemes 0.4 had, range): chat's held-out full / 18 keys / nine
   keys 73.8 / 61.2–64.4 / 30.4–31.5%, pinyin.tsv 97.0 / 92.1–93.9 / 70.9–76.7%. For comparison 九键
   拼音 53.6% on chat, the 14 keys 61.3%. Table per scheme: design §1.5.
+  微软 nine keys after `;` moved to 1 (2026-11-09, `shuangpin ms --keys nine` then `pinyin --scheme ms-nine`, both
+  models, the app's pinyin.data, all samples typed rather than `--same`'s): chat held-out 31.5 → 33.0%, pinyin.tsv
+  73.7 → 75.3%; against the old run 4 won, 1 lost of 827 shared.
 - **Learning.** Kind `spk:<scheme>:<tag>` (`Kinds.shuangpinKeys`, the scheme as
   `EngineSettings.SCHEMES` names it, no colon in any), apart from `sp:<scheme>` and from each
   scheme's: the same keys read other syllables under another. `Kinds.isShuangpin` is true for
