@@ -306,7 +306,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private var contextDropped = false
 
     private val recreateInputViewPrefs: Array<ManagedPreference<*>> = arrayOf(
-        prefs.keyboard.expandKeypressArea,
         // drawn on 九键's keys, and in their long press
         prefs.keyboard.t9Letters,
         prefs.keyboard.t9Symbols,

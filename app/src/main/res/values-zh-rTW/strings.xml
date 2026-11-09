@@ -184,7 +184,6 @@
     <string name="confirm_import_user_data">匯入使用者資料會覆寫設定、自訂短語、快速輸入、標點和剪貼簿（備份裡沒有的，手機上的也刪掉：0.5.1 以前的備份沒有快速輸入，自己加的條目會沒了，關掉的內建表會重新打開），學到的和詞庫與手機上現有的合併；重新啟動後生效。是否繼續？</string>
     <string name="clear_clp_db_confirm">剪貼簿資料庫將會被完全清空，包括已置頂條目。是否繼續？</string>
     <string name="clear_clp_db_not_all">部分剪貼簿資料未能清除，可能仍然存在，或在下次啟動時重新出現；再次清空，或重新啟動後再清空，或許有效。</string>
-    <string name="expand_keypress_area">將按鍵範圍擴展至邊緣</string>
     <string name="lang_switch_key_behavior">語言切換鍵行為</string>
     <string name="lang_switch_behavior_next_ime_app">切換至下一個輸入法</string>
     <string name="_cannot_be_empty">%1$s不能為空</string>

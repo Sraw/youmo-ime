@@ -184,7 +184,6 @@
     <string name="confirm_import_user_data">Importing user data overrides the settings, custom phrases, quick input, punctuation and the clipboard (what the backup lacks is deleted here too: a backup from before 0.5.1 has no quick input, so your own entries go and the built-in tables you turned off come back on), and merges the words and what was learned with this phone\'s; the app restarts for it to take effect. Proceed?</string>
     <string name="clear_clp_db_confirm">Clipboard database would be completely cleared, including pinned items. Proceed?</string>
     <string name="clear_clp_db_not_all">Some clipboard data could not be cleared. It may still be there or come back at the next start; clearing again, or after a restart, may help.</string>
-    <string name="expand_keypress_area">Expand keypress area to the edge</string>
     <string name="lang_switch_key_behavior">Language switch key behavior</string>
     <string name="lang_switch_behavior_next_ime_app">Switch to next input method App</string>
     <string name="_cannot_be_empty">%1$s cannot be empty</string>

@@ -74,7 +74,6 @@ abstract class BaseKeyboard(
     private val prefs = AppPrefs.getInstance()
 
     private val popupOnKeyPress by prefs.keyboard.popupOnKeyPress
-    private val expandKeypressArea by prefs.keyboard.expandKeypressArea
 
     private val spaceSwipeMoveCursor = prefs.keyboard.spaceSwipeMoveCursor
     private val spaceKeys = mutableListOf<KeyHandle>()

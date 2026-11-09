@@ -46,7 +46,7 @@ class ManagedPreferenceSectionsTest {
         }
 
         val first = switch(R.string.popup_on_key_press, "first", true)
-        val second = switch(R.string.expand_keypress_area, "second", false)
+        val second = switch(R.string.popup_on_key_press, "second", false)
 
         init {
             section(R.string.section_candidates)
@@ -93,7 +93,7 @@ class ManagedPreferenceSectionsTest {
         }
 
         val first = switch(R.string.popup_on_key_press, "first", true)
-        val second = switch(R.string.expand_keypress_area, "second", false)
+        val second = switch(R.string.popup_on_key_press, "second", false)
 
         init {
             section(R.string.section_candidates)

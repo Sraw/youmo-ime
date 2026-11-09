@@ -235,7 +235,7 @@ class AddressUatTest {
         val ways = listOf<Pair<String, () -> Unit>>(
             "hidden" to ::hideAndShow,
             "rebuilt" to {
-                prefs.set(keyboard.expandKeypressArea, !keyboard.expandKeypressArea.getValue())
+                prefs.set(keyboard.t9Letters, keyboard.t9Letters.getValue() + " ")
                 h.idle()
                 h.relayout()
             },

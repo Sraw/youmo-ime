@@ -184,7 +184,6 @@
     <string name="confirm_import_user_data">导入用户数据会覆盖设置、自定义短语、快速输入、标点和剪贴板（备份里没有的，手机上的也删掉：0.5.1 以前的备份没有快速输入，自己加的条目会没了，关掉的自带表会重新打开），学到的和词库与手机上现有的合并；重启应用后生效。继续吗？</string>
     <string name="clear_clp_db_confirm">剪贴板数据库将会被完全清空，包括已置顶的条目。继续吗？</string>
     <string name="clear_clp_db_not_all">部分剪贴板数据未能清除，可能仍然存在，或在下次启动时重新出现；再次清空，或重启后再清空，或许有效。</string>
-    <string name="expand_keypress_area">将按键范围扩展至边缘</string>
     <string name="lang_switch_key_behavior">语言切换键行为</string>
     <string name="lang_switch_behavior_next_ime_app">切换至下一个输入法应用</string>
     <string name="_cannot_be_empty">%1$s不能为空</string>

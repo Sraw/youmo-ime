@@ -160,8 +160,6 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 false
             )
         }
-        val expandKeypressArea =
-            hidden { switch(R.string.expand_keypress_area, "expand_keypress_area", false) }
         /** What a key's swipe up and down reach ([SwipeLayers]); the old 划动输入标点符号及数字 moves over ([dropRetired]). */
         val swipeLayers = enumList(
             R.string.swipe_layers,
@@ -757,8 +755,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
      * backup restored (an import, after [resetHiddenSettings] again) being read at the next.
      */
     fun dropRetired() {
-        // gone with the old drawing (060-render-p2 S8): 0.6's betas' switch of the redraw, and vivo's touch
-        // routing to the key views (the scene's keys always take their touches so); a stored one, of any type, read by nothing
+        // gone with the old drawing (060-render-p2 S8): 0.6's betas' switch of the redraw, vivo's touch routing to
+        // the key views (the scene's keys always take their touches so), and 扩大按键触摸区 (the engine always
+        // gives a key its cell to the edge); a stored one, of any type, read by nothing
         RETIRED.filter { sharedPreferences.contains(it) }.takeIf { it.isNotEmpty() }?.let { keys -> sharedPreferences.edit { keys.forEach(::remove) } }
         migrateSwipe()
         settleMarkPositions()
@@ -822,7 +821,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         // 0.4's: English on the nine keys while 九键's 中/英 had brought it there, gone with the key (I1)
         private const val ENGLISH_ON_NINE_KEYS = "english_on_nine_keys"
-        private val RETIRED = listOf(ENGLISH_ON_NINE_KEYS, "canvas_keyboard", "vivo_keypress_workaround")
+        private val RETIRED = listOf(ENGLISH_ON_NINE_KEYS, "canvas_keyboard", "vivo_keypress_workaround", "expand_keypress_area")
 
         // 0.5's swipe setting, and 0.5.1's that took its place
         private const val SWIPE_SYMBOL_BEHAVIOR = "swipe_symbol_behavior"
