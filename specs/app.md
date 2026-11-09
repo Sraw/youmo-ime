@@ -1120,9 +1120,11 @@ window asked only under a scaled view); `KeyFaceDrawable` lays a key image's nin
 The theme list's thumbnails (`ThemeAssets.thumbnail`) are its portrait cut decoded 160 dp wide on the
 same thread, blurred as on the keyboard, 12 MB of them kept; one that does not read is not kept.
 
-The app does not edit themes (user, 2026-11-03) and in 0.5.x does not link the web theme maker
-(user, 2026-11-04: making themes moves to a later version, now 0.6.0): 新增主题 opens the import picker directly, no menu; the page
-(`web/theme-maker`) stays on GitHub Pages for 0.6.0, unlinked from the app and the user docs. A theme file is `<name>.theme`, a zip inside (user, 2026-11-04, so it is not taken for any zip): exported under that name as `application/octet-stream` (a provider may add `.zip` for `application/zip`), and the import picker shows every file (`*/*`, `.theme` has no MIME type) and takes only a display name ending `.theme` (ime-core's `ThemeFileName`; `.zip`, an earlier 0.5.1's or the page's, or no name, is refused with `exception_theme_filename`, which says to rename it). An export is always a theme 4.0 pack (below). The theme list
+The app does not edit themes (user, 2026-11-03). 新增主题 is a menu (`ThemeAddMenu`, 060-render-p3 M5,
+replacing 0.5.x's import picker opened directly): 导入主题文件, the import picker; 在网页上制作 (a second
+line 做好后回到这里导入), the web theme maker (`web/theme-maker`, `Const.themeMakerUrl`,
+https://sraw.github.io/youmo-ime/theme-maker/ as `pages.yml` publishes it) opened in a browser by
+`openUrl`: the app has no network permission, so no WebView. The user docs link the page too. A theme file is `<name>.theme`, a zip inside (user, 2026-11-04, so it is not taken for any zip): exported under that name as `application/octet-stream` (a provider may add `.zip` for `application/zip`), and the import picker shows every file (`*/*`, `.theme` has no MIME type) and takes only a display name ending `.theme` (ime-core's `ThemeFileName`; `.zip`, an earlier 0.5.1's or the page's, or no name, is refused with `exception_theme_filename`, which says to rename it). An export is always a theme 4.0 pack (below). The theme list
 applies, imports, and on a long press exports or deletes one of the user's (Monet exports
 `Theme.Builtin.toCustom()`: its colours now and the key style it keeps, fixed, named as 0.5 named it,
 `MonetLight#<primary>`). A built-in theme of two versions is one card (`ThemeCards`, the theme page's
