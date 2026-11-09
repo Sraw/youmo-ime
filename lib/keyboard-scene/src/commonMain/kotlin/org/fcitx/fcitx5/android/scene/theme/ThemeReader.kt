@@ -275,7 +275,10 @@ object ThemeReader {
                 values[prop] = v
             }
         }
-        reserved += reserved(el, a, p, colors)
+        // a keyboard's size: on a keyboard alone, or (under a scene) read, warned of, ignored; the same names elsewhere a later stage's
+        val keyboard = selectors?.any { it.widget == "keyboard" } == true
+        if (keyboard) reserved += sizes(el, a, p, selectors.orEmpty(), values)
+        reserved += reserved(el, a, p, colors, skip = if (keyboard) Values.KEYBOARD_SIZES else emptyList())
         a.done()
         selectors?.mapNotNull { it.reserved }?.distinct()?.forEach { p.warn(el.line, ignored(it)) }
         for (v in values.values) {
@@ -289,9 +292,32 @@ object ThemeReader {
     // a property of today's value a later stage reads ([Values.reservedValue]): ignored
     private val RESERVED_VALUE = Value.Flag(false)
 
-    // a later stage's properties ([Values.RESERVED]) each a warning where of their form and naming colours there; how many
-    private fun reserved(el: XmlElement, a: Attributes, p: Problems, colors: Set<String>): Int {
-        val given = Values.RESERVED.filterKeys { el[it] != null }
+    // the keyboard's size, set where every selector is a `keyboard` under no scene or state ([Values.KEYBOARD_SIZES]);
+    // else of its form, and ignored with a warning (how many: a style of them alone sets something): a theme's keyboard
+    // has one size, its scenes cannot change it
+    private fun sizes(el: XmlElement, a: Attributes, p: Problems, selectors: List<Selector>, values: MutableMap<String, Value>): Int {
+        var ignored = 0
+        val alone = selectors.all { it.widget == "keyboard" && it.scenes.isEmpty() && it.states.isEmpty() }
+        for (prop in Values.KEYBOARD_SIZES.filter { el[it] != null }) {
+            val what = when (prop) {
+                "height" -> "10%–90%, portrait then landscape"
+                "side-padding" -> "0–300dp, portrait then landscape"
+                else -> "0–100dp, portrait then landscape"
+            }
+            val v = a.value(prop, what) { Values.keyboardSize(prop, it) } ?: continue
+            if (alone) {
+                values[prop] = Value.OfTwin(v)
+            } else {
+                p.warn(el.line, "$prop= of a keyboard under a scene is ignored: a theme's keyboard has one size")
+                ignored++
+            }
+        }
+        return ignored
+    }
+
+    // a later stage's properties ([Values.RESERVED], but [skip]) each a warning where of their form and naming colours there; how many
+    private fun reserved(el: XmlElement, a: Attributes, p: Problems, colors: Set<String>, skip: List<String>): Int {
+        val given = Values.RESERVED.filterKeys { el[it] != null && it !in skip }
         for ((prop, form) in given) {
             val refs = a.value(prop, "a value of $prop") { form.read(it) }?.flatMap { it.refs() } ?: continue
             refs.filter { it !in colors }.forEach { a.problem("@$it is no colour") }

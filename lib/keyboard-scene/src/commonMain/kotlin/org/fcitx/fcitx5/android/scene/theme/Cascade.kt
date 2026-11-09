@@ -83,11 +83,26 @@ class Cascade(theme: Theme, private val scene: Set<String>) {
  * A theme's cascades by the scenes they are in, kept: what a cascade has worked out (its [Cascade.of]s)
  * depends on nothing else, so the scenes made again of one theme (Shift, Return, a key typed) find
  * their keys' looks already there. One thread's, as the builder is.
+ *
+ * Kept by those of the scenes the theme names: a scene none of its selectors asks of changes nothing
+ * a cascade works out, so the input method, the field and the board (`im=` `field=` `keyboard=`,
+ * always in [org.fcitx.fcitx5.android.scene.engine.Env.scenes]) make no more cascades of a theme that
+ * names none of them than before; one that does, one more for each it names (060-render-p3 T5: at
+ * most 8 a board, CascadesTest).
  */
 class Cascades(val theme: Theme) {
     private val made = HashMap<Set<String>, Cascade>()
 
-    fun of(scene: Set<String>): Cascade = made.getOrPut(scene) { Cascade(theme, scene) }
+    // the scenes some selector of the theme asks of
+    private val named: Set<String> = theme.styles.flatMapTo(HashSet()) { style -> style.selectors.flatMap { it.scenes } }
+
+    fun of(scene: Set<String>): Cascade {
+        val asked = if (named.containsAll(scene)) scene else scene.filterTo(HashSet()) { it in named }
+        return made.getOrPut(asked) { Cascade(theme, asked) }
+    }
+
+    /** How many cascades are kept: what a test measures. */
+    val size: Int get() = made.size
 }
 
 /** A key's look in one state, from its [Cascade]d properties: defaults for what no style sets. */

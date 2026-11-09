@@ -5,18 +5,24 @@
 package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
+import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Cascade
+import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.ColorExpr
 import org.fcitx.fcitx5.android.scene.theme.Fill
 import org.fcitx.fcitx5.android.scene.theme.Inset
 import org.fcitx.fcitx5.android.scene.theme.KeyLook
+import org.fcitx.fcitx5.android.scene.theme.KeyboardSizes
 import org.fcitx.fcitx5.android.scene.theme.Meta
 import org.fcitx.fcitx5.android.scene.theme.Radius
 import org.fcitx.fcitx5.android.scene.theme.Selector
 import org.fcitx.fcitx5.android.scene.theme.SystemColors
 import org.fcitx.fcitx5.android.scene.theme.TextLook
+import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
+import org.fcitx.fcitx5.android.scene.theme.Twin
 import org.fcitx.fcitx5.android.scene.theme.Value
 import org.fcitx.fcitx5.android.scene.theme.Values
 import kotlin.test.Test
@@ -413,19 +419,22 @@ class ThemeTest {
         assertEquals(setOf(false, true), t.value.variants)
         assertEquals(Argb(0xFF303030.toInt()), t.value.variant(dark = true).colors["key"])
         assertEquals("0.6.0", t.value.meta?.minApp)
+        // T5 made its scenes and the keyboard's size work: no warning of them
         val ignored = listOf(
-            "83|<sounds>", "79|transition=", "79|@im=wubi", "79|clipboard", "79|:first", "80|align=", "80|stroke=", "80|depth=",
+            "83|<sounds>", "79|transition=", "79|clipboard", "79|:first", "80|align=", "80|stroke=", "80|depth=",
             "80|press-scale=", "80|effect=", "80|sticker=", "81|shape=\"path(M0 0 L1 0 L1 1 Z)\"", "81|size=\"120%\"", "81|tail=",
-            "81|appear=", "82|height=", "82|side-padding=",
+            "81|appear=",
         ).map { "$it is not supported by this version, ignored" }
         assertEquals(ignored, t.warnings().map { "${it.line}|${it.message}" })
+        assertEquals(KeyboardSizes(height = Twin(38.0, 52.0), sidePadding = Twin(8.0, 48.0)), t.value.keyboardSizes)
     }
 
     @Test
     fun scenesPartsAndWidgetsOfLaterStages() {
         fun s(t: String) = assertNotNull(Selector.parse(t), t)
         assertEquals(setOf("im=wubi", "field=password"), s("@im=wubi @field=password key").scenes)
-        assertEquals("@keyboard=nine", s("@keyboard=nine key.letter").reserved)
+        // T5's: they select (typedScenesSelectAsTheEnvironmentIs)
+        assertNull(s("@keyboard=nine key.letter").reserved)
         assertNull(Selector.parse("@field=phone key"))
         assertNull(Selector.parse("@im=Wubi key"))
         assertNull(Selector.parse("@colour=red key"))
@@ -438,7 +447,7 @@ class ThemeTest {
         assertNull(s("key:pressed").reserved)
         assertNull(s("@dark key").reserved)
         // such a style reads, warns, and selects nothing yet
-        val src = withStyle("<style select=\"@im=wubi key, clipboard\" fill=\"#123456\"/>")
+        val src = withStyle("<style select=\"toolbar, clipboard\" fill=\"#123456\"/>")
         assertEquals(2, warnings(src).size)
         val t = ThemeReader.theme(src).getOr { error("$it") }
         val target = Selector.Target("key", "qwerty", "q", null, setOf("letter"))
@@ -543,5 +552,96 @@ class ThemeTest {
         val both = oneLine.replace(root, "variants=\"light dark\"")
             .replace("</colors>", "</colors>\n<colors variant=\"dark\"><color name=\"key\" value=\"@nothing\"/></colors>")
         assertEquals(listOf("@nothing is no colour", "@nothing is no colour", "@nothing is no colour in the dark colours"), problems(both).filter { "@nothing" in it })
+    }
+
+    // 060-render-p3 T5: what is typed as scenes, the keyboard's size
+
+    @Test
+    fun typedScenesSelectAsTheEnvironmentIs() {
+        val t = ThemeReader.theme(
+            withStyle(
+                "<style select=\"@im=wubi key\" fill=\"#000001\"/>\n" +
+                    "<style select=\"@field=password key\" fill=\"#000002\"/>\n" +
+                    "<style select=\"@keyboard=nine key\" fill=\"#000003\"/>",
+            ),
+        ).getOr { error("$it") }
+        val q = Selector.Target("key", "qwerty", "q", null, setOf("letter"))
+        fun fill(env: Env) = (KeyLook(Cascade(t, env.scenes).of(q), t).fill as Fill.Solid).color
+        val plain = Fixtures.portrait
+        val before = fill(plain)
+        val wubi = plain.copy(input = Input(ime = "table", table = "wubi"))
+        assertEquals(ColorExpr.parse("#000001"), fill(wubi))
+        // a table by its kind is no table by its name
+        assertEquals(before, fill(plain.copy(input = Input(ime = "table", table = "cangjie"))))
+        assertEquals(ColorExpr.parse("#000002"), fill(plain.copy(input = Input(field = "password"))))
+        assertEquals(before, fill(plain.copy(input = Input(field = "text"))))
+        assertEquals(ColorExpr.parse("#000003"), fill(plain.copy(board = "nine")))
+        assertEquals(before, fill(plain.copy(board = "qwerty")))
+        // as specific as a class: the later of two that both hold, the password's
+        assertEquals(ColorExpr.parse("#000002"), fill(wubi.copy(input = wubi.input.copy(field = "password"))))
+        // no warning: they work now
+        assertEquals(emptyList(), warnings(withStyle("<style select=\"@im=wubi @field=url @keyboard=k18 key\" fill=\"#000001\"/>")))
+    }
+
+    // what the input method, the field and the board make of a theme's cascades: none more where it names
+    // none of them, and for one that does, at most 8 a board in one screen (060-render-p3 T5), each of the
+    // input methods and fields there is met
+    @Test
+    fun cascadesAreKeptByTheScenesAThemeNames() {
+        val ims = listOf(Input(ime = "pinyin"), Input(ime = "shuangpin"), Input(ime = "english"), Input(ime = "table", table = "wubi"),
+            Input(ime = "table", table = "cangjie"), Input(ime = "handwriting"), Input(ime = null))
+        val fields = listOf("text", "password", "url", "email", "number", null)
+        fun made(theme: Theme, board: String): Int {
+            val c = Cascades(theme)
+            for (im in ims) for (field in fields) for (dark in listOf(false, true)) {
+                val env = Fixtures.portrait.copy(input = im.copy(field = field), board = board, dark = dark)
+                c.of(env.scenes)
+                c.of(env.scenes - "flat")
+            }
+            return c.size
+        }
+        // material-light names no scene of these: one, whatever is typed
+        assertEquals(1, made(Fixtures.materialLight, "qwerty"))
+        val named = ThemeReader.theme(
+            withStyle(
+                "<style select=\"@im=wubi key\" fill=\"#000001\"/>\n<style select=\"@field=password key, @field=url key\" fill=\"#000002\"/>\n" +
+                    "<style select=\"@keyboard=nine key\" fill=\"#000003\"/>",
+            ),
+        ).getOr { error("$it") }
+        for (board in listOf("qwerty", "nine")) {
+            // wubi or not, a password, a URL or neither; light or dark the same, the theme naming no @dark
+            val n = made(named, board)
+            assertEquals(2 * 3, n, board)
+            assertTrue(n <= 8, "$board: $n")
+        }
+    }
+
+    @Test
+    fun theKeyboardsSizeIsReadAndChecked() {
+        fun sizes(style: String) = ThemeReader.theme(withStyle(style)).getOr { error("$it") }.keyboardSizes
+        assertEquals(KeyboardSizes(), Fixtures.materialLight.keyboardSizes)
+        assertEquals(
+            KeyboardSizes(Twin(40.0, 40.0), Twin(0.0, 24.5), Twin(4.0, 0.0)),
+            sizes("<style select=\"keyboard\" height=\"40%\" side-padding=\"0 24.5dp\" bottom-padding=\"4dp 0\"/>"),
+        )
+        assertEquals(emptyList(), warnings(withStyle("<style select=\"keyboard\" height=\"10% 90%\"/>")))
+        // the later style's, a property at a time
+        val two = "<style select=\"keyboard\" height=\"30% 40%\" side-padding=\"8dp\"/>\n<style select=\"keyboard\" height=\"35% 45%\"/>"
+        assertEquals(KeyboardSizes(Twin(35.0, 45.0), Twin(8.0, 8.0)), sizes(two))
+        // out of the settings' ranges, of another unit, three values: refused
+        for (bad in listOf("height=\"95%\"", "height=\"9%\"", "height=\"300dp\"", "side-padding=\"301dp\"", "side-padding=\"5%\"",
+            "bottom-padding=\"101dp\"", "bottom-padding=\"-1dp\"", "height=\"30% 40% 50%\"", "height=\"\"")) {
+            assertTrue(problems(withStyle("<style select=\"keyboard\" $bad/>")).first().contains(bad.substringBefore('=')), bad)
+        }
+        // under a scene: of its form, ignored with a warning; one size a theme
+        val scened = withStyle("<style select=\"@landscape keyboard\" height=\"40%\"/>")
+        assertTrue(warnings(scened).single().contains("height= of a keyboard under a scene is ignored"))
+        assertEquals(KeyboardSizes(), sizes("<style select=\"@landscape keyboard\" height=\"40%\"/>"))
+        assertTrue(problems(withStyle("<style select=\"@landscape keyboard\" height=\"95%\"/>")).isNotEmpty())
+        // another widget's: a later stage's (the bar's height, T6b), as before
+        assertTrue(warnings(withStyle("<style select=\"bar\" height=\"40dp\"/>")).single().contains("height= is not supported"))
+        // with today's properties, the keyboard's fill still works
+        val both = ThemeReader.theme(withStyle("<style select=\"keyboard\" fill=\"#123456\" height=\"40%\"/>")).getOr { error("$it") }
+        assertEquals(setOf("fill", "height"), both.styles.last().values.keys)
     }
 }

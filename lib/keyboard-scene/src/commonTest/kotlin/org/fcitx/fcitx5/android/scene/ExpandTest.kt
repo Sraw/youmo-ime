@@ -42,6 +42,20 @@ class ExpandTest {
         assertEquals(listOf("symbols", "numbers", "comma", "space", "period", "enter"), ids(env.copy(input = Input(langKey = false)), 3))
     }
 
+    // 060-render-p3 T5: the input method, the field and the board as the theme's scenes; the field's kinds
+    // past an address's (a password, a number) leave the keys shown as they were
+    @Test
+    fun whatIsTypedIsTheThemesScenes() {
+        val typed = env.copy(input = Input(ime = "table", table = "wubi", field = "password"), board = "nine")
+        assertEquals(setOf("im=table", "im=wubi", "field=password", "keyboard=nine"), typed.scenes - env.scenes.filterNot { it.startsWith("im=") }.toSet())
+        assertEquals(setOf("im=pinyin"), env.scenes.filter { '=' in it }.toSet(), "a text field and no board: the input method alone")
+        assertEquals(setOf("im=shuangpin", "field=url"), env.copy(input = Input(ime = "shuangpin", field = "url")).scenes.filter { '=' in it }.toSet())
+        assertEquals(emptySet(), env.copy(input = Input(ime = null, field = null)).scenes.filter { '=' in it }.toSet())
+        for (field in listOf("password", "number")) {
+            for (row in 0..3) assertEquals(ids(env, row), ids(env.copy(input = env.input.copy(field = field)), row), "$field, row $row")
+        }
+    }
+
     @Test
     fun bindings() {
         val texts = Texts(imeName = "拼音", comma = "，", period = "。", returnLabel = "发送", keepUppercase = false,
