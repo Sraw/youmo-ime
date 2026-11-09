@@ -207,6 +207,10 @@ class PopupKeyboardUi(
         cancelBelow = triggerBounds.height().toFloat(),
         // the key's bottom edge, in onChangeFocus's coordinates (the popup's, offsetY up)
         cancelAt = (triggerBounds.height() - offsetY).toFloat(),
+        // the screen's edges, in onChangeFocus's coordinates (the popup's, offsetX across)
+        leftEdge = if (outerBounds.isEmpty) Float.NEGATIVE_INFINITY else (outerBounds.left - triggerBounds.left - offsetX).toFloat(),
+        rightEdge = if (outerBounds.isEmpty) Float.POSITIVE_INFINITY else (outerBounds.right - triggerBounds.left - offsetX).toFloat(),
+        minStepX = keyWidth * PopupFocus.MIN_STEP,
     )
 
     override fun onChangeFocus(x: Float, y: Float): Boolean {

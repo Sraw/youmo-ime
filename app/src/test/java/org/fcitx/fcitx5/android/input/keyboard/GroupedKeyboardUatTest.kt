@@ -471,6 +471,28 @@ class GroupedKeyboardUatTest {
     }
 
     // the keyboard's half: 九键双拼's popups, its code row and the 123 page's strip; what a syllable
+    // 九键's right side: the row (6's capitals, 6, its letters) wider than the symbols above, pushed
+    // in from the edge on a narrow screen, left the last letter more steps right than the finger had
+    // room for. The steps right are shorter where the room is: a slide to the screen's last pixel
+    // picks it (here, with room enough, at whole steps as ever)
+    @Test
+    @Uat("SP-24")
+    fun aNineKeyAtTheRightReachesItsLastLetterOnScreen() {
+        nineSp()
+        val six = h.nineKey("6")
+        val middle = KeyboardHarness.Touch(six.bounds.width() / 2f, six.bounds.height() / 2f)
+        val f = h.finger(six, middle)
+        h.after(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
+        val shown = h.popupChoices()
+        val row = shown.filter { it.box.bottom == shown.maxOf { k -> k.box.bottom } }.sortedBy { it.box.left }
+        // the popup's first move is where its focus starts from; then to the screen's last pixel
+        f.move(middle)
+        val edge = KeyboardHarness.Touch(h.box(h.inputView).right - 1f - six.bounds.left, six.bounds.height() / 2f)
+        f.move(edge)
+        f.up(edge)
+        assertEquals("${row.map { it.text }}", row.last().text, h.field.text.toString())
+    }
+
     // picked makes of the code is KeyboardHalvesUatTest's
     @Test
     @Uat("SP-24")

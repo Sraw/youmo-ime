@@ -100,4 +100,49 @@ class PopupFocusTest {
             assertEquals(PopupFocus.CANCELLED, f.moveTo(40f, 104f))
         },
     )
+
+    // 九键's 3 at the right edge: the digit at 300, the edge 30 right of it, the left one far
+    private fun nearTheRight() = PopupFocus(
+        rows = listOf(intArrayOf(0, 1, 2, 3, 4, 5, 6), intArrayOf(-1, -1, 8, 7, 9, -1, -1)),
+        startRow = 0, startColumn = 3, stepX = 20f, stepY = 25f, cancelBelow = 50f,
+        leftEdge = 0f, rightEdge = 330f, minStepX = 5f,
+    )
+
+    @Test
+    fun towardANearEdgeTheStepsAreShorterSoTheLastKeyIsReachedOnScreen() {
+        val f = nearTheRight()
+        assertEquals(3, f.moveTo(300f, 0f))
+        // 3 columns in 30: 30 / 2.75 a step
+        assertEquals(4, f.moveTo(312f, 0f))
+        assertEquals(6, f.moveTo(329f, 0f))
+        // the far side as before, a step of 20
+        assertEquals(2, f.moveTo(280f, 0f))
+        assertEquals(0, f.moveTo(240f, 0f))
+        // up the same as ever
+        assertEquals(7, f.moveTo(300f, -25f))
+    }
+
+    @Test
+    fun withRoomEnoughTheStepsAreAsBefore() {
+        val f = PopupFocus(
+            rows = listOf(intArrayOf(0, 1, 2, 3, 4, 5, 6)), startRow = 0, startColumn = 3,
+            stepX = 20f, stepY = 25f, cancelBelow = 50f, leftEdge = 0f, rightEdge = 1000f, minStepX = 5f,
+        )
+        f.moveTo(500f, 0f)
+        assertEquals(3, f.moveTo(512f, 0f))
+        assertEquals(4, f.moveTo(520f, 0f))
+        assertEquals(2, f.moveTo(480f, 0f))
+    }
+
+    @Test
+    fun noStepIsShorterThanTheLeast() {
+        // the finger at the very edge: steps of 5, a shake no key further
+        val f = PopupFocus(
+            rows = listOf(intArrayOf(0, 1, 2, 3, 4, 5, 6)), startRow = 0, startColumn = 3,
+            stepX = 20f, stepY = 25f, cancelBelow = 50f, leftEdge = 0f, rightEdge = 300f, minStepX = 5f,
+        )
+        f.moveTo(300f, 0f)
+        assertEquals(3, f.moveTo(303f, 0f))
+        assertEquals(4, f.moveTo(305f, 0f))
+    }
 }
