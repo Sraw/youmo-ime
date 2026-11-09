@@ -130,10 +130,14 @@ class WindowThemeTest {
             val shown = sideButtons(h).filter { h.shown(it) }
             assertEquals("the arrow across and the whole width again", 2, shown.size)
             for (b in shown) sideButton(h, b)
-            // the bar's own colour (颜色 only below 35, which draws behind it whatever it is told); the strip under the keys too
-            @Suppress("DEPRECATION")
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) assertEquals(BROWN, h.service.window.window!!.navigationBarColor)
-            assertEquals(listOf(BROWN), strips(h))
+            // below 35, 仅颜色: the bar's own colour, the keyboard not under it; 35 draws the window behind
+            // the bar whatever it is told (edge to edge), the strip in the bar's room under the keys has it
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                @Suppress("DEPRECATION")
+                assertEquals(BROWN, h.service.window.window!!.navigationBarColor)
+            } else {
+                assertEquals(listOf(BROWN), strips(h))
+            }
             keep(h, "one_handed_left")
         }
     }
