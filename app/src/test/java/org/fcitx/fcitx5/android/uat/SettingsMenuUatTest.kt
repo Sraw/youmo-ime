@@ -229,8 +229,12 @@ class SettingsMenuUatTest {
         assertTrue(ThemeManager.saveTheme(mine))
         try {
             st.open(SettingsRoute.Theme)
-            // 新增主题: straight to the import's file picker, no menu, nothing made here
+            // 新增主题: a menu (060-render-p3 M5), 导入主题文件 the import's file picker, 在网页上制作 the browser
             themeList().findViewHolderForAdapterPosition(0)!!.itemView.performClick()
+            st.idle()
+            val menu = dialog().listView
+            assertEquals(2, menu.adapter.count)
+            menu.performItemClick(menu.adapter.getView(0, null, menu), 0, menu.adapter.getItemId(0))
             st.idle()
             assertEquals(Intent.ACTION_GET_CONTENT, shadowOf(st.activity).nextStartedActivity?.action)
             // one's own theme: no edit button, its long press 信息 (060-render-p3 T8a), 导出 or 删除
