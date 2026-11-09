@@ -14,14 +14,12 @@ import android.os.SystemClock
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
-import android.os.Handler
-import android.os.Looper
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.annotation.Keep
-import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -61,7 +59,6 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.scene.KeyNode
-import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.engine.Texts
@@ -70,7 +67,6 @@ import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.constraintlayout.leftOfParent
 import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.add
-import kotlin.math.roundToInt
 
 /**
  * Pinyin on nine keys (九键), laid out as 搜狗 does: a column on the left offering what the first
@@ -609,6 +605,8 @@ class T9Keyboard(
     override val ownsSyllables: Boolean get() = !english
 
     init {
+        // placed in onLayout, not shown before
+        column.isInvisible = true
         add(column, lParams(0, 0))
         showLanguageKey()
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
@@ -639,7 +637,6 @@ class T9Keyboard(
     }
 
     override fun onDetachedFromWindow() {
-        columnPlacer.removeCallbacksAndMessages(null)
         scope?.cancel()
         scope = null
         super.onDetachedFromWindow()
@@ -843,27 +840,22 @@ class T9Keyboard(
         return SceneEnvs.of(this, look, theme.isDark, width, height, input = input, shift = caps, texts = texts, marks = SceneBoard.marks(layout, charShortcutMarks))
     }
 
-    // each scene made anew: the column placed where it has the slot, after this frame (a layout pass, not one in a
-    // draw); on the main looper, not View.post, which holds it till the keyboard is attached. Dropped as it is detached
-    private val columnPlacer = Handler(Looper.getMainLooper())
+    private val columnSlot = Rect()
 
-    override fun onSceneBuilt(scene: Scene?) {
-        columnPlacer.post { placeColumn(scene) }
-    }
-
-    // the column in the scene's slot `side` (nine.xml), over the canvas: placed where [scene] has it; hidden with no scene
-    private fun placeColumn(scene: Scene?) {
-        val box = scene?.slots?.firstOrNull { it.id == SIDE_KEY }?.bounds
-        column.visibility = if (box == null) View.GONE else View.VISIBLE
-        if (box == null) return
-        val lp = column.layoutParams as ConstraintLayout.LayoutParams
-        val at = listOf(box.left.roundToInt(), box.top.roundToInt(), box.right.roundToInt(), box.bottom.roundToInt())
-        // laid out there already: no layout again
-        if (listOf(lp.leftMargin, lp.topMargin, lp.leftMargin + lp.width, lp.topMargin + lp.height) == at) return
-        column.layoutParams = lParams(at[2] - at[0], at[3] - at[1]) {
-            topOfParent(at[1])
-            leftOfParent(at[0])
+    // the column where the scene has its slot `side` (nine.xml), over the canvas, in the same pass as the canvas (as
+    // HandwritingKeyboard's pad): never a frame elsewhere; no scene (060-render-p2 U8), the column not shown either
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        val c = canvas ?: return
+        val placed = c.slot(SIDE_KEY, columnSlot)
+        column.isInvisible = !placed
+        if (!placed) return
+        columnSlot.offset(c.left, c.top)
+        val exactly = { size: Int -> MeasureSpec.makeMeasureSpec(size, MeasureSpec.EXACTLY) }
+        if (column.width != columnSlot.width() || column.height != columnSlot.height() || column.isLayoutRequested) {
+            column.measure(exactly(columnSlot.width()), exactly(columnSlot.height()))
         }
+        column.layout(columnSlot.left, columnSlot.top, columnSlot.right, columnSlot.bottom)
     }
 
     // last: the scene reads the state above (the keys drawn by the scene engine, each wired as nine.xml's

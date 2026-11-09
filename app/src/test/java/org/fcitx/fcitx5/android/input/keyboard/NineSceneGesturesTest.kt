@@ -175,9 +175,6 @@ class NineSceneGesturesTest {
     fun theColumnSitsInTheScenesSlot() = harness(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
         val canvas = KeyboardHarness.boardCanvas(h.keyboard)!!
         val slot = canvas.scene!!.slots.single { it.id == "side" }.bounds
-        // placed after the scene was made (T9Keyboard.onSceneBuilt), then laid out there
-        h.idle()
-        h.relayout()
         val column = KeyboardHarness.all(h.keyboard).filterIsInstance<android.widget.ScrollView>().single()
         assertEquals(Math.round(slot.left).toInt(), column.left - canvas.left)
         assertEquals(Math.round(slot.top).toInt(), column.top - canvas.top)

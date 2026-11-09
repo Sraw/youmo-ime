@@ -730,14 +730,6 @@ class KeyboardHarness(
     private fun settled() {
         shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(1))
         relayout()
-        placeSlots()
-    }
-
-    /** A scene made places what sits in its slots after it (九键's column, T9Keyboard.onSceneBuilt): laid out there. */
-    fun placeSlots() {
-        all(inputView).filterIsInstance<KeyboardCanvasView>().forEach { it.scene }
-        idle()
-        relayout()
     }
 
     private var closed = false

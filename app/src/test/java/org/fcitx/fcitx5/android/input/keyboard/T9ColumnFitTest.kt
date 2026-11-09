@@ -4,11 +4,9 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import android.graphics.RectF
-import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ScrollView
-import androidx.constraintlayout.widget.ConstraintLayout
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
@@ -26,7 +24,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import org.robolectric.Shadows.shadowOf
 import kotlin.math.roundToInt
 
 /**
@@ -45,7 +42,7 @@ class T9ColumnFitTest {
     @Test
     fun theLongestSyllablesFitTheNarrowestColumnAtFontScale20() = fits(2.0f)
 
-    // the column moved off, then put back in the scene's slot `side` (placed on each scene made, T9Keyboard.onSceneBuilt)
+    // laid out again at another size: the column in the scene's slot `side` in that same pass (T9Keyboard.onLayout)
     @Test
     fun theLongestSyllablesFitTheNarrowestColumnInItsSlot() = fits(2.0f, moved = true)
 
@@ -63,39 +60,19 @@ class T9ColumnFitTest {
         val h = (HEIGHT_DP * density).toInt()
         keyboard.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
         keyboard.layout(0, 0, w, h)
-        if (!moved) {
-            // the column has no place till a scene is made (T9Keyboard.onSceneBuilt), then laid out there
-            KeyboardHarness.all(keyboard).filterIsInstance<KeyboardCanvasView>().single().scene
-            shadowOf(Looper.getMainLooper()).idle()
-            keyboard.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
-            keyboard.layout(0, 0, w, h)
-        }
+        val view = KeyboardHarness.all(keyboard).filterIsInstance<KeyboardCanvasView>().single()
+        var height = h
         if (moved) {
-            // the column put elsewhere, then a scene made anew (the keyboard
-            // laid out again, as it is drawn): the column placed in its slot after, then laid out there
-            val view = KeyboardHarness.all(keyboard).filterIsInstance<KeyboardCanvasView>().single()
-            view.scene
-            shadowOf(Looper.getMainLooper()).idle()
-            (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single()
-                .layoutParams = ConstraintLayout.LayoutParams(1, 1)
-            val taller = h + h / 4
-            keyboard.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(taller, View.MeasureSpec.EXACTLY))
-            keyboard.layout(0, 0, w, taller)
-            val slot = checkNotNull(view.scene).slots.single { it.id == "side" }.bounds
-            shadowOf(Looper.getMainLooper()).idle()
-            keyboard.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(taller, View.MeasureSpec.EXACTLY))
-            keyboard.layout(0, 0, w, taller)
-            val c = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single()
-            assertEquals(View.VISIBLE, c.visibility)
-            assertEquals(listOf(slot.left, slot.top, slot.right, slot.bottom).map { it.roundToInt() }, listOf(c.left, c.top, c.right, c.bottom))
-            // no scene: the column hidden; a scene again: shown
-            keyboard.onSceneBuilt(null)
-            shadowOf(Looper.getMainLooper()).idle()
-            assertEquals(View.GONE, c.visibility)
-            keyboard.onSceneBuilt(view.scene)
-            shadowOf(Looper.getMainLooper()).idle()
-            assertEquals(View.VISIBLE, c.visibility)
+            // laid out again at another size: the column moves with the slot in that same pass
+            height = h + h / 4
+            keyboard.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+            keyboard.layout(0, 0, w, height)
         }
+        // one measure and layout, no frame after it (no looper run): the column in its slot already, shown
+        val slot = checkNotNull(view.scene).slots.single { it.id == "side" }.bounds
+        val c = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single()
+        assertEquals(View.VISIBLE, c.visibility)
+        assertEquals(listOf(slot.left, slot.top, slot.right, slot.bottom).map { it.roundToInt() }, listOf(c.left, c.top, c.right, c.bottom))
         val column = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single()
         val items = column.getChildAt(0) as ViewGroup
         val ink = RectF()

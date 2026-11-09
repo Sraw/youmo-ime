@@ -196,7 +196,6 @@ class ThemeMakerLayoutTest {
             }
             h.after(SETTLE_MS)
             h.relayout()
-            h.placeSlots()
             val out = view(h, shot, icons)
             if (shot.state == State.LONG_PRESS) h.release()
             out
