@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.keyboard.canvas
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.LinearGradient
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
@@ -64,7 +65,16 @@ class ScenePainter(
     private val src = Rect()
 
     // an icon's drawable by what it is drawn as, not where: one a size, drawn moved to its place
-    private data class IconKey(val name: String, val tint: Int, val width: Int, val height: Int)
+    // [pixelWidth], [pixelHeight]: the size it is drawn at on the device, the canvas's scale applied (a settings page's
+    // smaller preview, a key's own): a vector keeps the raster of its first draw, which another scale would stretch
+    private data class IconKey(
+        val name: String,
+        val tint: Int,
+        val width: Int,
+        val height: Int,
+        val pixelWidth: Int,
+        val pixelHeight: Int,
+    )
 
     fun draw(canvas: Canvas, ops: List<Op>) = ops.forEach { draw(canvas, it) }
 
@@ -217,6 +227,9 @@ class ScenePainter(
         if (op.rotation != 0.0) canvas.restore()
     }
 
+    private val scale = Matrix()
+    private val scaleValues = FloatArray(9)
+
     private fun icon(canvas: Canvas, op: Op.Icon) {
         // one drawable a name, tint and size, its bounds at 0, 0 and the canvas moved to the place: a
         // vector's tint and bounds are the drawable's own, which a display list recorded with it reads
@@ -233,7 +246,12 @@ class ScenePainter(
             iconsDensity = config.densityDpi
             iconsFontScale = config.fontScale
         }
-        val d = icons.getOrPut(IconKey(op.name, op.tint.value, w, h)) {
+        @Suppress("DEPRECATION") // the matrix the canvas draws with so far: its scale is what the raster is made at
+        canvas.getMatrix(scale)
+        scale.getValues(scaleValues)
+        val pw = (w * abs(scaleValues[Matrix.MSCALE_X])).roundToInt()
+        val ph = (h * abs(scaleValues[Matrix.MSCALE_Y])).roundToInt()
+        val d = icons.getOrPut(IconKey(op.name, op.tint.value, w, h, pw, ph)) {
             SceneIcons.of(op.name)?.let { ContextCompat.getDrawable(view.context, it)?.mutate() }?.also {
                 it.setTint(op.tint.value)
                 it.setBounds(0, 0, w, h)
