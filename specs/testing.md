@@ -348,7 +348,7 @@ page falls back to none of another phone's, and the node test holds each phone's
 default's. So the page is about 1.5 MB, the layout block most of it (4 phones × 43 views); a fifth
 phone adds about 0.3 MB. The page's layout rule, also the user's: one scroll, the page's (no column
 scrolls in itself, no `overflow`/`max-height` on one), and the preview stays in view only while it
-fits (`fitPreview` in ui.js: the window's height wide, 55% of it narrow).
+fits (`fitPreview` in classic/ui.js: the window's height wide, 55% of it narrow).
 
 The page's side: `node --test web/theme-maker/test/format.test.mjs` (Node 24; CI's unit test job and
 the Pages workflow run it) loads the page's `youmo-lib` block as the page runs it and holds it to
@@ -366,15 +366,23 @@ preview reads (format 1: views of items, every key name one `KeyNames` knows, ev
 field, every icon there). The test task takes `web/theme-maker` as an
 input, so a change to the page reruns it. Nothing in those blocks is edited by hand.
 
-Changing the page: edit `web/theme-maker/src/` (`page.html` with slots for the rest, `style.css`,
-`lib.js`: everything the tests hold to the app's rules, `ui.js`: the page), then
-`node web/theme-maker/tools/assemble.mjs`, which writes `index.html`: the sources put in, the
-generated blocks kept from the `index.html` there is, and the Content-Security-Policy's
-`script-src` set to the three scripts' SHA-256 (nothing else runs; an edit to `index.html` by hand
-breaks them). The page's test fails when `index.html` is not what assemble makes of `src/` and the
-fonts, and when the CSP's hashes are not its scripts'. Commit `src/` and `index.html` together. The
+Two pages (060-render-p3 M1): `index.html`, the maker (`src/`: `page.html` with slots for the rest,
+`style.css`, `maker.js`: the document, held to the engine by `test/maker.test.mjs`, `ui.js`: the
+page), and `classic/index.html`, the maker before 0.6.0, kept till 0.6.x ends (`src/classic/`: its
+`page.html`, `style.css`, `ui.js`); both run `src/lib.js` (everything the tests hold to the app's
+3.0 rules and zip). Edit them, then `node web/theme-maker/tools/assemble.mjs`, which writes both: the
+sources put in, the generated blocks kept from the `index.html` there is (classic takes them from it
+too), and the Content-Security-Policy's `script-src` set to each script's SHA-256 (four on the maker,
+three on classic; nothing else runs, a script not hashed is refused, an edit by hand breaks them).
+The page's test fails when either page is not what assemble makes of its sources and the fonts, and
+when the CSP's hashes are not its scripts'. Commit `src/` and both pages together.
+`test/maker.test.mjs` (node, needs the built engine; CI runs it with the other two): a document
+saved opens the same (theme.xml first, files, `layouts/` kept as they are), 3.0 and 2.1 files open
+as 4.0 through the engine's `convert30`, undo and redo (at most 100 back), the draft kept and given
+back (a failing store is no draft, never a throw), every board and form of the preview's
+environment builds. The
 site is `index.html` with the engine put in: the Pages workflow leaves `src/`, `tools/`, `test/`,
-`fonts/`, `dev/` and `build/` out and writes its `index.html` with `assemble.mjs --engine <file>`.
+`fonts/`, `dev/` and `build/` out and writes its `index.html` (and `classic/index.html` beside it) with `assemble.mjs --engine <file>`.
 
 ### The engine in the page (060-render-p3 W1)
 
@@ -395,7 +403,7 @@ four subset fonts (`fonts/`, `tools/subset-fonts.py`: Roboto and Noto Sans CJK S
 runtime, cut to what a keyboard shows, 160 KB) are in git, in a `youmo-fonts` style as data URLs: they
 depend on no engine code, as `youmo-engine-icons` depends on the app's drawables only. The page's test
 holds `index.html` to `NO_ENGINE`, and the page assembled with the build's engine (in memory) to the
-build, to 1.2 MB, to three scripts and their hashes, and to `index.html` but for that script; CI builds
+build, to 1.2 MB, to its scripts and their hashes, and to `index.html` but for that script; CI builds
 the engine and assembles the page before the node tests, in the unit test job and the Pages workflow.
 A page that uses the engine needs it put in: opened straight from the repository, `index.html` has none.
 
