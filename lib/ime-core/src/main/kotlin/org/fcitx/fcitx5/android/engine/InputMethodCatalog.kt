@@ -109,7 +109,7 @@ object InputMethodCatalog {
      * one another input method gets (the keyboard shown behind a switch) is dropped, never read.
      */
     fun readsCode(im: String, c: Int): Boolean = when {
-        c in Keyboard.TAPS || c in Keyboard.PINYIN_NINE || c in Keyboard.PINYIN_18 || c in Keyboard.ZHUYIN_NINE || c in Keyboard.ZHUYIN_FULL -> im == PINYIN
+        c in Keyboard.TAPS || c in Keyboard.PLACES || c in NineKeyLetters.CUSTOM_BLOCK || c in Keyboard.PINYIN_NINE || c in Keyboard.PINYIN_18 || c in Keyboard.ZHUYIN_NINE || c in Keyboard.ZHUYIN_FULL -> im == PINYIN
         c in Keyboard.SHUANGPIN_14 -> im == SHUANGPIN
         else -> when (NineKeyLetters.ofCode(c)) {
             null -> false
@@ -119,7 +119,7 @@ object InputMethodCatalog {
     }
 
     /** Whether [c] is a grouped keyboard's code, some input method's to read ([readsCode]): never text for a field. */
-    fun isCode(c: Int): Boolean = c in NineKeyLetters.CODES || c in Keyboard.TAPS || c in Keyboard.KEYED_CODES
+    fun isCode(c: Int): Boolean = c in NineKeyLetters.CODES || c in NineKeyLetters.CUSTOM_BLOCK || c in Keyboard.TAPS || c in Keyboard.PLACES || c in Keyboard.KEYED_CODES
 
     // with nothing typed ' is the app's: through the engine it would be a mark, ‘
     private fun separates(c: Int, composing: Boolean) = composing && c == SyllableGraph.SEPARATOR.code

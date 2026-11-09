@@ -60,7 +60,7 @@ class KeyboardTapsTest {
     fun noTwoKeyBlocksShareACharacter() {
         val ranges = listOf(
             Keyboard.LETTERS, Keyboard.NINE_DIGITS, Keyboard.NINE_LETTERS, Keyboard.INK..Keyboard.LOOKUP, Keyboard.STROKES,
-            Keyboard.PINYIN_NINE, Keyboard.PINYIN_18, Keyboard.SHUANGPIN_14, Keyboard.TAPS,
+            Keyboard.PINYIN_NINE, Keyboard.PINYIN_18, Keyboard.SHUANGPIN_14, Keyboard.TAPS, Keyboard.PLACES,
         )
         // no two blocks overlap, the taps included
         for ((i, a) in ranges.withIndex()) for (b in ranges.drop(i + 1)) {

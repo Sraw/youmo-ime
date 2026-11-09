@@ -454,8 +454,9 @@ keyboard's `sceneTable.group`, as `wire` sends it, its place added by `pressed`)
 `popup` written (or `from="group"`) the letters' row the views' was (`sceneTable.groupPopup`). The
 app collects a layout's groups (`SceneGroups.of`, row by row, a fragment's where included) into a
 `NineKeyLetters` and holds it to the keyboard's (G14, G18): any other is logged and the keyboard's own
-kept, so codes, learning and `wire` never change by a layout (`SceneBehaviorTest`; other groupings, a
-17-key layout's, are P3's engine work). `letters` keep their rows (`"pq rs"` 2 × 2, a space a row):
+kept, so codes, learning and `wire` never change by a layout (`SceneBehaviorTest`). The engine makes a
+keyboard of other groupings (`SceneGroups.letters` over `SceneGroups.written`, `NineKeyLetters.custom`;
+engine.md), which the app does not use yet (T9b). `letters` keep their rows (`"pq rs"` 2 × 2, a space a row):
 where a tap leans and, P3, where the default label draws; the built-ins write their labels (`QW`, one
 word centred), so no label is drawn by the rows yet. Whether a tap leans (按落点加权) is the layout's:
 a group of two letters or more without `lean="off"` (`SceneGroups.leaning`, read whichever draws the

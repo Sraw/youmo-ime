@@ -164,7 +164,7 @@ class T9Segmenter(
             initialChoices.forEach { (k, m) -> initialLetters[k] = m.values.toIntArray() }
         }
 
-        // which of its key's letters each of [typed] is, [keys] the keys typing it: two bits a key
+        // which of its key's letters each of [typed] is, [keys] the keys typing it: LETTER_BITS a key
         private fun choiceOf(keys: String, typed: String): Int {
             var choice = 0
             for (k in keys.indices) choice = choice or (letters.letters(keys[k]).indexOf(typed[k]).coerceIn(0, LETTER_MASK) shl (LETTER_BITS * k))
@@ -247,7 +247,7 @@ class T9Segmenter(
                 val tap = taps.getOrElse(at + k) { Float.NaN }
                 // a letter typed as itself, a key of one letter: nothing to weigh
                 if (tap.isNaN() || !letters.isCode(typed[k]) || letters.letters(typed[k]).length < 2) continue
-                sum += letters.against((choice shr (LETTER_BITS * k)) and LETTER_MASK, tap)
+                sum += letters.against(typed[k], (choice shr (LETTER_BITS * k)) and LETTER_MASK, tap)
             }
             if (sum > 0f) any = true
             sum
@@ -344,8 +344,9 @@ class T9Segmenter(
         private const val INITIAL_LETTERS = "bcdfghjklmnpqrstwxyz"
 
         // a key's letter, the group's first or second, in a choice of [choiceOf]
-        private const val LETTER_BITS = 2
-        private const val LETTER_MASK = 3
+        // a key's letter of up to NineKeyLetters.MAX (5): three bits, six keys in an Int
+        private const val LETTER_BITS = 3
+        private const val LETTER_MASK = 7
 
         /** A letter typed as itself, as it stands in the input: see the class. */
         val FIXED = 'A'..'Z'

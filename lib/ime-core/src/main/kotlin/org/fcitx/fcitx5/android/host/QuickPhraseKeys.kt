@@ -39,12 +39,8 @@ object QuickPhraseKeys {
         }
         val shown = Keyboard.typedLetter(codePoint)
         if (shown != null) {
-            val code = if (codePoint in Keyboard.TAPS) {
-                // a tap's code, its place across the key dropped: the whole key's letters
-                NineKeyLetters.G14_BLOCK.first + (codePoint - Keyboard.TAPS.first) / Keyboard.TAP_STEPS
-            } else {
-                Keyboard.keyedChar(codePoint)?.code ?: codePoint
-            }
+            // a tap's code, its place on the key dropped: the whole key's letters
+            val code = Keyboard.tappedCode(codePoint)?.code ?: Keyboard.keyedChar(codePoint)?.code ?: codePoint
             val group = NineKeyLetters.ofCode(code)?.letters(code.toChar())
             return QuickPhraseKey(shown.code, group?.ifEmpty { null }?.let(::either) ?: setOf(shown.code))
         }
