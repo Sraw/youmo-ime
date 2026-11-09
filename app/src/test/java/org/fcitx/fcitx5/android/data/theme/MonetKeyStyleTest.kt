@@ -24,6 +24,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.File
 
 /**
  * The key style a Monet theme in use kept from the settings before theme file 3.0 (not copied: its
@@ -113,8 +114,8 @@ class MonetKeyStyleTest {
         ThemeLookMigration.monetLook = null
         val opened = ThemeFilesManager.openTheme(ByteArrayInputStream(bytes.toByteArray())).getOrThrow() as ThemeFilesManager.Opened.Pack
         val imported = opened.commit().getOrThrow().single()
-        assertEquals(ThemePackFiles.of(fixed.look, fixed.name, fixed.isDark).first, imported.source)
-        assertNotEquals(ThemePackFiles.of(LookDefaults.look(fixed.look.palette), fixed.name, fixed.isDark).first, imported.source)
+        assertEquals(ThemePackFiles.of(fixed.look, fixed.name, fixed.isDark).first, File(imported.dir, ThemePackFiles.THEME_XML).readText())
+        assertNotEquals(ThemePackFiles.of(LookDefaults.look(fixed.look.palette), fixed.name, fixed.isDark).first, File(imported.dir, ThemePackFiles.THEME_XML).readText())
         assertEquals(monet.look.palette, imported.look.palette)
         ThemeManager.refreshThemes()
         ThemeManager.deleteTheme(imported.name)

@@ -180,8 +180,9 @@ sealed class Theme : Parcelable {
 
     /**
      * A theme 4.0 pack of the user's (060-render-p3 T8a), as one of its versions: [file] its name and its folder's
-     * (`v4/<file>/` in the themes', [dir]), [source] its `theme.xml`. Its keys, bar and popups are drawn as the file
-     * says ([scene]); the views round them take its colours and what [look] makes of its picture and fonts.
+     * (`v4/<file>/` in the themes', [dir]), [stamp] its `theme.xml`'s time (a pack imported again another theme).
+     * Its keys, bar and popups are drawn as the file says ([scene], read from it when first drawn: no pack's text is
+     * kept); the views round them take its colours and what [look] makes of its picture and fonts.
      */
     @Parcelize
     data class Pack(
@@ -189,12 +190,15 @@ sealed class Theme : Parcelable {
         override val isDark: Boolean,
         override val file: String,
         val dir: String,
-        val source: String,
+        val stamp: Long,
     ) : Theme(), Versioned {
 
-        /** Its theme as the engine reads it, this version ([ThemePackFiles.read]: with the system's colours as they are). */
+        /**
+         * Its theme as the engine reads it, this version ([ThemePackFiles.scene]: with the system's colours as they
+         * are; the built-in theme's where its file no longer reads).
+         */
         @IgnoredOnParcel
-        val scene: SceneTheme by lazy { ThemePackFiles.read(source).variant(isDark) }
+        val scene: SceneTheme by lazy { ThemePackFiles.scene(dir, isDark) }
 
         /** [scene] as drawn: its files by their paths ([ThemePackFiles.drawn]). */
         @IgnoredOnParcel

@@ -25,6 +25,7 @@ import androidx.core.view.accessibility.AccessibilityEventCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.customview.widget.ExploreByTouchHelper
 import org.fcitx.fcitx5.android.data.theme.BoardImages
+import org.fcitx.fcitx5.android.data.theme.PackDrawGuard
 import org.fcitx.fcitx5.android.input.PictureHost
 import org.fcitx.fcitx5.android.input.scene.CanvasFrame
 import org.fcitx.fcitx5.android.input.scene.KeyRef
@@ -293,6 +294,7 @@ class KeyboardCanvasView(
             painter.missed = false
             painter.draw(canvas, drawnUnder)
             faces.forEach { painter.draw(canvas, it.node.ops(it.down)) }
+            PackDrawGuard.frameDrawn()
             return
         }
         canvas.drawRenderNode(base.live() ?: record("base", Box(0.0, 0.0, width.toDouble(), height.toDouble()), drawnUnder).also { base = it })
@@ -310,6 +312,8 @@ class KeyboardCanvasView(
                 canvas.drawRenderNode(node)
             }
         }
+        // a pack's first frame drawn, not one that took the keyboard down
+        PackDrawGuard.frameDrawn()
     }
 
     // a node still holding what was recorded: one the renderer let go of (the window gone, memory

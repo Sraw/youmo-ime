@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.data.theme
 import android.content.res.Configuration
 import android.widget.Toast
 import androidx.annotation.Keep
+import androidx.annotation.VisibleForTesting
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import org.fcitx.fcitx5.android.R
@@ -56,7 +57,7 @@ object ThemeManager {
 
     // the user's theme 4.0 packs, each version one (060-render-p3 T8a); listed after the 3.0 themes, whose
     // listing clears what a kill left of a save first
-    private var packs: List<Theme.Pack> = ThemeFilesManager.listPacks()
+    private var packs: List<Theme.Pack> = ThemeFilesManager.listPacks(builtinThemes)
 
     /** The user's theme 4.0 packs, each version one ([Theme.Pack]). */
     val Packs: List<Theme.Pack> get() = packs
@@ -64,6 +65,18 @@ object ThemeManager {
     init {
         // 0.5's names of the built-in themes in the settings (060-render-p3 T3), before a theme is read of them
         prefs.migrateThemeRefs(customThemes.mapTo(HashSet()) { it.name })
+    }
+
+    /**
+     * The pack [file] took the keyboard down as it was first drawn ([PackDrawGuard]): the settings naming one
+     * of its versions go back to their defaults (a built-in theme), the user told. The pack is kept, to be
+     * deleted or picked again.
+     */
+    @VisibleForTesting
+    internal fun packCrashed(file: String) {
+        val refs = packs.filter { it.file == file }.map { it.name }.filter { r -> customThemes.none { it.name == r } }
+        Timber.w("Theme pack $file did not draw its first frame: the settings naming it reset")
+        if (prefs.dropThemeRefs(refs.toSet())) appContext.toast(appContext.getString(R.string.theme_pack_draw_failed, file), Toast.LENGTH_LONG)
     }
 
     /**
@@ -76,18 +89,19 @@ object ThemeManager {
     /** The user's packs, the user's 3.0 themes, the built-in ones. */
     fun getAllThemes(): List<Theme> = packs + customThemes + builtinThemes
 
-    // Monet's versions read again with the system's colours as they are now (and its keys' look as it is)
-    private fun reloadMonet() {
-        val monet = BuiltinThemeFiles.load(
-            appContext.resources, ThemeMonet.systemColors(appContext),
-            BuiltinThemeFiles.FILES.filter { it.first == BuiltinThemeFiles.MONET },
-        )
+    // Monet's versions read again with the system's colours as they are now (and its keys' look as it is);
+    // whether the packs were (the system's colours changed: a configuration's other changes leave them be)
+    private fun reloadMonet(): Boolean {
+        val colors = ThemeMonet.systemColors(appContext)
+        val monet = BuiltinThemeFiles.load(appContext.resources, colors, BuiltinThemeFiles.FILES.filter { it.first == BuiltinThemeFiles.MONET })
         val others = builtinThemes.filter { it.file != BuiltinThemeFiles.MONET }
         // Monet's first, as the files are
         builtinThemes = monet + others
+        if (colors == ThemePackFiles.systemColors) return false
         // the packs' system() too: each read again (a copy reads its file anew)
-        ThemePackFiles.systemColors = ThemeMonet.systemColors(appContext)
+        ThemePackFiles.systemColors = colors
         packs = packs.map { it.copy() }
+        return true
     }
 
     fun refreshThemes() {
@@ -269,6 +283,8 @@ object ThemeManager {
 
     fun init(configuration: Configuration) {
         isDarkMode = configuration.isDarkMode()
+        // the app's start, on the main thread (the toast): before the theme in use is read
+        PackDrawGuard.crashed()?.let(::packCrashed)
         _activeTheme = evaluateActiveTheme()
         settleKeyStyle()
         // fire all `OnThemeChangedListener`s on theme preferences change
@@ -292,13 +308,13 @@ object ThemeManager {
 
     fun onSystemPlatteChange(newConfig: Configuration) {
         isDarkMode = newConfig.isDarkMode()
-        reloadMonet()
+        val packsRead = reloadMonet()
         // `ManagedThemePreference` finds the theme its name refers to ([getTheme]),
         // thus `evaluateActiveTheme()` should be called after Monet's are read again
         val before = _activeTheme
         activeTheme = evaluateActiveTheme()
         // a pack's read again equals the one before (its file's the same): drawn anew all the same, its system() new
-        if (_activeTheme === before && before is Theme.Pack) {
+        if (_activeTheme === before && before is Theme.Pack && packsRead) {
             _activeTheme = evaluateActiveTheme()
             fireChange()
             return

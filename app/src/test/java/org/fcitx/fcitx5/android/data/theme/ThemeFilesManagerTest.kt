@@ -309,7 +309,7 @@ class ThemeFilesManagerTest {
     }
 
     private fun files(name: String) = arrayOf(
-        "$name-cropped.png" to "1080x720", "$name-src" to "photo", "$name-q.png" to "64x64",
+        "$name-cropped.png" to "1080x720", "$name-src" to "4000x3000", "$name-q.png" to "64x64",
         "$name-fn.png" to "32x32", "$name-font.ttf" to "font",
     )
 

@@ -286,6 +286,14 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         if (moved.isNotEmpty()) sharedPreferences.edit { moved.forEach { (key, ref) -> putString(key, ref) } }
     }
 
+    /** The slots naming one of [refs] back to their defaults ([PackDrawGuard]): whether any was. */
+    fun dropThemeRefs(refs: Set<String>): Boolean {
+        val keys = listOf(normalModeTheme.key, lightModeTheme.key, darkModeTheme.key)
+            .filter { runCatching { sharedPreferences.getString(it, null) }.getOrNull() in refs }
+        if (keys.isNotEmpty()) sharedPreferences.edit { keys.forEach(::remove) }
+        return keys.isNotEmpty()
+    }
+
     val dayNightModePrefNames = setOf(
         followSystemDayNightTheme.key,
         lightModeTheme.key,

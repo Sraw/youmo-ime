@@ -142,6 +142,9 @@
     <string name="exception_theme_file_clash">The theme\'s file %1$s has the name of another theme\'s file</string>
     <string name="exception_theme_version">This theme was made by a newer version of this keyboard (theme format %1$s): update it to use the theme</string>
     <string name="exception_theme_newer_kept">A theme of this name made by a newer version of this keyboard is here: this version cannot read it, so it is not replaced</string>
+    <string name="exception_theme_xml_top">The theme\'s theme.xml must be at the top of the zip, not in a folder</string>
+    <string name="exception_theme_packs">There are already %1$s theme packs: delete one first</string>
+    <string name="theme_pack_draw_failed">Theme %1$s failed to show last time: the default theme is used instead</string>
     <string name="theme_not_saved">The theme could not be saved: the phone\'s storage may be full</string>
     <string name="follow_system_day_night_theme">Follow system day/night theme</string>
     <string name="follow_system_day_night_theme_summary">Override manual theme selection</string>

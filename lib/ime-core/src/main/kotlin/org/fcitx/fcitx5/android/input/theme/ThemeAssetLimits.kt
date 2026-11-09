@@ -36,6 +36,12 @@ object ThemeAssetLimits {
     /** An SVG icon: a path and its fill take a few KB; more is a drawing, not an icon ([SvgSubset]). */
     const val MAX_ICON_BYTES = 64L * 1024
 
+    /**
+     * The packs a phone keeps: each is read whole as the themes are listed (the keyboard's start), up to
+     * [MAX_THEME_XML_BYTES] a pack; past it a new one is refused, and a listing reads the newest this many.
+     */
+    const val MAX_PACKS = 100
+
     /** A limit passed, and by what. */
     enum class Breach {
         Entries, FileSize, TotalSize, PictureSide, KeyImageSide, KeyImageSize, Overrides,

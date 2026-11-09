@@ -23,7 +23,7 @@ import org.fcitx.fcitx5.android.scene.theme.Argb
 object ScenePanels {
 
     private fun looks(theme: Theme): PanelLooks? =
-        SceneThemes.of(ThemeManager.shownLook(theme), theme.name, theme.isDark)?.let { PanelLooks(SceneThemes.cascades(it)) }
+        SceneThemes.of(theme, ThemeManager.shownLook(theme))?.let { PanelLooks(SceneThemes.cascades(it)) }
 
     private fun scenes(context: Context, theme: Theme) = SceneWindow.scenes(context, theme)
 

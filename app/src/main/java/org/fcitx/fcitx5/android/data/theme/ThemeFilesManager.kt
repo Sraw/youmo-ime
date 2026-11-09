@@ -167,20 +167,24 @@ object ThemeFilesManager {
 
     fun deleteThemeFiles(theme: Theme.Custom) {
         if (!writable) notSettled()
+        deleteCustom(theme, ThemeManager.getAllThemes())
+    }
+
+    // [theme]'s json and its files, not a file another of [themes] names too, as an import leaves another's be
+    private fun deleteCustom(theme: Theme.Custom, themes: List<Theme>) {
         themeFile(theme).delete()
-        // not a file another theme names too, as an import leaves another's be
-        val others = othersFiles(theme.name, ThemeManager.getAllThemes())
+        val others = othersFiles(theme.name, themes)
         theme.look.files().map(::File).filter { it.isThemeAsset() && it.name !in others }.forEach { it.delete() }
     }
 
     // what a kill left of a pack being written is cleared at the process's first listing of them
     private var packsSwept = false
 
-    /** The user's theme 4.0 packs, each version one ([ThemePackFiles.list]). */
-    fun listPacks(): List<Theme.Pack> {
+    /** The user's theme 4.0 packs, each version one ([ThemePackFiles.list]; none named as one of [builtins] is). */
+    fun listPacks(builtins: List<Theme.Builtin> = ThemeManager.BuiltinThemes): List<Theme.Pack> {
         val sweep = writable && !packsSwept
         if (sweep) packsSwept = true
-        return ThemePackFiles.list(dir, sweep)
+        return ThemePackFiles.list(dir, sweep, builtins)
     }
 
     /** Deletes the pack [file], every version of it. */
@@ -271,7 +275,7 @@ object ThemeFilesManager {
 
     private fun exportCustom(theme: Theme.Custom, dest: OutputStream) {
         ownFiles(theme, dest)
-        val (xml, names) = ThemePackFiles.of(theme.look, theme.name, theme.isDark)
+        val (xml, names) = ThemePackFiles.of(exportedLook(theme.look), theme.name, theme.isDark)
         ZipOutputStream(dest.buffered()).use { zip ->
             zip.putNextEntry(ZipEntry(ThemePackFiles.THEME_XML))
             zip.write(xml.encodeToByteArray())
@@ -281,6 +285,14 @@ object ThemeFilesManager {
             }
             zip.closeEntry()
         }
+    }
+
+    // a 3.0 theme's source photo is not limited (only its cuts are drawn), a pack's is as its cuts: one past that
+    // exported as its portrait cut (the source is for cutting again, which the app does not), so the pack imports
+    private fun exportedLook(look: ThemeLook): ThemeLook {
+        val picture = look.picture ?: return look
+        val fits = probe.imageSize(File(picture.src))?.let { (w, h) -> ThemeAssetLimits.picture(w, h) == null } == true
+        return if (fits) look else look.copy(picture = picture.copy(src = picture.portrait.file))
     }
 
     // a planted json would aim an export at any file of the app's: only the theme dir's go, checked before any is written
@@ -348,15 +360,23 @@ object ThemeFilesManager {
 
         class Pack internal constructor(
             val staged: ThemePackFiles.Staged,
-            /** A pack of its name is there: taking it replaces that one whole. */
-            val replaces: Boolean,
+            private val packThere: Boolean,
+            /** The user's 3.0 themes named as it or one of its versions: replaced by it, their json deleted. */
+            internal val customs: List<Theme.Custom>,
+            private val themes: List<Theme>,
             private val unpacked: File,
         ) : Opened {
+            /** A pack of its name, or a 3.0 theme named as it is, is there: taking it replaces that one. */
+            val replaces: Boolean get() = packThere || customs.isNotEmpty()
+
             /** Put in place (off the main thread), its versions; what was unpacked gone either way. */
             fun commit(): Result<List<Theme.Pack>> = runCatching {
                 try {
                     if (!writable) notSettled()
-                    ThemePackFiles.place(dir, staged)
+                    ThemePackFiles.place(dir, staged).also {
+                        // the settings naming a 3.0 theme it replaces name the pack now (ThemeManager.getTheme)
+                        customs.forEach { deleteCustom(it, themes) }
+                    }
                 } finally {
                     discard()
                 }
@@ -397,10 +417,21 @@ object ThemeFilesManager {
                         ThemeAssetLimits.entry(count, size, total)?.let(::refused)
                     }
                 }
+                // a folder zipped whole: its theme.xml in it, said so (a 3.0 theme's json read so is not a pack's)
+                if (ThemePackFiles.themeXmlInFolder(names)) errorRuntime(R.string.exception_theme_xml_top)
                 if (!File(temp, ThemePackFiles.THEME_XML).isFile) return@runCatching Opened.Json(importJson(extracted, themes))
                 val staged = ThemePackFiles.check(temp, names, packChecks)
                 packClash(staged, themes)
-                Opened.Pack(staged, File(ThemePackFiles.folder(dir), staged.name).exists(), temp).also { kept = true }
+                val packs = themes.filterIsInstance<Theme.Pack>()
+                val there = File(ThemePackFiles.folder(dir), staged.name).exists()
+                // one there not listed (a later build's, one that does not read) is not replaced unseen, as a 3.0 theme's
+                if (there && packs.none { it.file == staged.name }) errorRuntime(R.string.exception_theme_newer_kept)
+                if (!there && packs.distinctBy { it.file }.size >= ThemeAssetLimits.MAX_PACKS) {
+                    errorRuntime(R.string.exception_theme_packs, ThemeAssetLimits.MAX_PACKS.toString())
+                }
+                val refs = ThemePackFiles.refs(staged.name, staged.theme.variants) + staged.name
+                val customs = themes.filterIsInstance<Theme.Custom>().filter { it.name in refs }
+                Opened.Pack(staged, there, customs, themes, temp).also { kept = true }
             } finally {
                 if (!kept) temp.deleteRecursively()
             }
@@ -417,16 +448,12 @@ object ThemeFilesManager {
         }
 
     /**
-     * A pack whose name is a built-in theme's ([BuiltinThemeFiles.find], or a name of 0.5's the settings move to
-     * one), or whose versions' names ([ThemePackFiles.refs]) are a 3.0 theme's: the settings name one theme by it.
+     * A pack named as a built-in theme is ([ThemePackFiles.builtinClash]: the settings name one theme by it). One
+     * named as a 3.0 theme of the user's replaces it ([Opened.Pack.customs]).
      */
     private fun packClash(staged: ThemePackFiles.Staged, themes: List<Theme>) {
-        val name = staged.name
-        val refs = ThemePackFiles.refs(name, staged.theme.variants) + name
-        val builtins = ThemeManager.BuiltinThemes
-        val builtin = builtins.any { it.file == name } ||
-            refs.any { BuiltinThemeFiles.find(builtins, it) != null || it in BuiltinThemeFiles.LEGACY }
-        if (builtin || themes.any { it is Theme.Custom && it.name in refs }) errorRuntime(R.string.exception_theme_name_clash)
+        val builtins = themes.filterIsInstance<Theme.Builtin>().ifEmpty { ThemeManager.BuiltinThemes }
+        if (ThemePackFiles.builtinClash(staged.name, staged.theme.variants, builtins)) errorRuntime(R.string.exception_theme_name_clash)
     }
 
     // the theme 3.0 json among [extracted] (an older one's too) imported with its files ([importTheme])

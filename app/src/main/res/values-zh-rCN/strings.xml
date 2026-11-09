@@ -142,6 +142,9 @@
     <string name="exception_theme_file_clash">主题的文件 %1$s 和另一个主题的文件重名</string>
     <string name="exception_theme_version">这个主题是更新版本的幽默输入法做的（主题格式 %1$s），更新输入法后才能用</string>
     <string name="exception_theme_newer_kept">已有一个同名的主题，是更新版本的幽默输入法做的：这一版读不了它，不替换</string>
+    <string name="exception_theme_xml_top">主题的 theme.xml 要放在压缩包最外层，不能在文件夹里</string>
+    <string name="exception_theme_packs">已经有 %1$s 个主题包了：先删掉一个再导入</string>
+    <string name="theme_pack_draw_failed">主题 %1$s 上次显示时出错，已换回默认主题</string>
     <string name="theme_not_saved">主题没能保存：手机存储空间可能满了</string>
     <string name="follow_system_day_night_theme">跟随系统夜间模式</string>
     <string name="follow_system_day_night_theme_summary">覆盖手动主题选择</string>

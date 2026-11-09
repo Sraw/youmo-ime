@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.data.theme
 
+import androidx.annotation.StringRes
+import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineNotices
 import org.fcitx.fcitx5.android.input.theme.SvgSubset
@@ -25,6 +27,7 @@ import org.fcitx.fcitx5.android.scene.theme.Style
 import org.fcitx.fcitx5.android.scene.theme.SystemColors
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.scene.theme.Value
+import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.errorRuntime
 import org.fcitx.fcitx5.android.utils.isPlainFileName
 import timber.log.Timber
@@ -47,8 +50,10 @@ import org.fcitx.fcitx5.android.scene.theme.Theme as SceneTheme
  * stays a json beside them ([ThemeFilesManager]); a backup takes the folder with the rest, and an older
  * build restoring it lists json files only, so it never sees them.
  *
- * A pack is put in place whole: written into `v4/.saving/<random>/`, each file synced, then renamed over
- * its name (the one it replaces renamed away first and deleted after), and the directory synced.
+ * A pack is put in place whole: written into `v4/.saving/new-<random>/`, each file synced, then renamed over
+ * its name (the one it replaces renamed away first, into `.saving/old-<random>/<name>`, and deleted after),
+ * and the directory synced. A kill between the two renames leaves the old one aside: the next listing puts it
+ * back where nothing took its place ([list]).
  */
 object ThemePackFiles {
 
@@ -57,6 +62,9 @@ object ThemePackFiles {
     const val LAYOUTS = "layouts"
 
     private const val SAVING = ".saving"
+    private const val NEW = "new-"
+    private const val OLD = "old-"
+    private const val GONE = "gone-"
     private const val MACOS = "__MACOSX"
     private val VERSIONS = listOf("#light", "#dark")
 
@@ -67,11 +75,33 @@ object ThemePackFiles {
     /** The packs' folder in the themes' [themes]. */
     fun folder(themes: File) = File(themes, FOLDER)
 
-    /** [source] read as a pack listed is: thrown where it does not read, as it did when listed (a bug). */
-    fun read(source: String): SceneTheme = when (val t = ThemeReader.theme(source, systemColors)) {
+    /**
+     * [source] read as a pack is: thrown where it does not read. A pack may have the styles a 3.0 theme
+     * written as 4.0 has ([LookTheme.MAX_STYLES], past a hand-written file's), so one exported imports again.
+     */
+    fun read(source: String): SceneTheme = when (val t = parse(source)) {
         is Parsed.Ok -> t.value
-        is Parsed.Failed -> error("a pack listed does not read: ${t.problems}")
+        is Parsed.Failed -> error("a pack does not read: ${t.problems.take(SHOWN)}")
     }
+
+    private fun parse(source: String, appVersion: String? = null) =
+        ThemeReader.theme(source.removePrefix(BOM), systemColors, appVersion, LookTheme.MAX_STYLES)
+
+    /**
+     * The pack in [dir], its version [dark], as it is drawn: read from its file when first drawn (no pack's text
+     * kept in memory). One that no longer reads (changed or removed since it was listed) is drawn as the built-in
+     * theme, the user told, never thrown where the keyboard draws.
+     */
+    fun scene(dir: String, dark: Boolean): SceneTheme = runCatching { read(File(dir, THEME_XML).readText()).variant(dark) }
+        .getOrElse { e ->
+            Timber.w(e, "Theme pack $dir drawn as the built-in theme")
+            EngineNotices.failedOnce(R.string.user_data_unreadable)
+            fallback(dark)
+        }
+
+    // the built-in theme a pack that does not read is drawn as (the settings' default's file)
+    private fun fallback(dark: Boolean): SceneTheme =
+        read(BuiltinThemeFiles.text(appContext.resources, R.raw.scene_theme_pixel)).variant(dark)
 
     // the 24 colours by their names in theme 4 (LookTheme's order is the Palette's)
     private val NAMES = LookTheme.colors(LookDefaults.look(Palette(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)).palette).map { it.first }
@@ -141,48 +171,84 @@ object ThemePackFiles {
         .mapNotNull { ((it as? Value.OfFill)?.fill as? Fill.Image) }.distinctBy { it.file }
         .map { NineSlice(it.file, Insets(0, 0, 0, 0), it.pxPerDp.coerceAtLeast(1)) }
 
-    /** The versions of the pack [file] in [dir], [scene] its theme read: each a [Theme.Pack], the light first. */
-    fun versions(scene: SceneTheme, file: String, dir: File, source: String): List<Theme.Pack> {
+    /**
+     * The versions of the pack [file] in [dir], [scene] its theme read: each a [Theme.Pack], the light first, told
+     * from the pack there before it by its `theme.xml`'s time (a pack imported again is another theme).
+     */
+    fun versions(scene: SceneTheme, file: String, dir: File): List<Theme.Pack> {
         val paired = scene.variants.size > 1
+        val stamp = File(dir, THEME_XML).lastModified()
         return listOf(false, true).filter { it in scene.variants }
-            .map { dark -> Theme.Pack(BuiltinThemeFiles.ref(file, dark, paired), dark, file, dir.path, source) }
+            .map { dark -> Theme.Pack(BuiltinThemeFiles.ref(file, dark, paired), dark, file, dir.path, stamp) }
     }
 
     /** How the settings would refer to the versions of a pack named [name] of [variants] ([BuiltinThemeFiles.ref]). */
     fun refs(name: String, variants: Set<Boolean>): List<String> =
         listOf(false, true).filter { it in variants }.map { BuiltinThemeFiles.ref(name, it, variants.size > 1) }
 
+    /** Whether [name] may not be a pack's: a path, `.`-led (the folder's own), or a version's name (`x#dark`). */
+    fun badName(name: String): Boolean = !isPlainFileName(name) || name.startsWith(".") || VERSIONS.any { name.endsWith(it) }
+
     /**
-     * The packs in [themes] (the themes' directory), newest first, each of its versions: one whose `theme.xml`
-     * does not read (a later build's, one cut short) or that misses a file it names is not listed, the user told
-     * (as a 3.0 theme's json is). [sweep]: what a kill left of a pack being written is cleared first.
+     * Whether a pack [name] of [variants] would be named as a built-in theme of [builtins] is (its file's name,
+     * or one of its versions' a built-in's reference or 0.5 name): the settings name one theme by it.
      */
-    fun list(themes: File, sweep: Boolean): List<Theme.Pack> {
-        val root = folder(themes)
-        if (sweep) File(root, SAVING).deleteRecursively()
-        val dirs = root.listFiles(FileFilter { it.isDirectory && !it.name.startsWith(".") }) ?: return emptyList()
-        return dirs.sortedByDescending { it.lastModified() }.flatMap(::listed)
+    fun builtinClash(name: String, variants: Set<Boolean>, builtins: List<Theme.Builtin>): Boolean {
+        val refs = refs(name, variants) + name
+        return builtins.any { it.file == name } || refs.any { BuiltinThemeFiles.find(builtins, it) != null || it in BuiltinThemeFiles.LEGACY }
     }
 
-    private fun listed(dir: File): List<Theme.Pack> {
+    /**
+     * The packs in [themes] (the themes' directory), newest first (the newest [ThemeAssetLimits.MAX_PACKS]), each
+     * of its versions. Not listed, logged and the user told as a 3.0 theme's json is, a pack an import would refuse:
+     * one whose `theme.xml` does not read (a later build's, one cut short), of a name not its folder's, not a pack's
+     * or a built-in's ([builtins]: one restored, or a later build's built-in), hiding the keys' labels one cannot type
+     * without, or missing a file it names. [sweep]: what a kill left of a pack being written cleared first, the pack it
+     * was replacing put back.
+     */
+    fun list(themes: File, sweep: Boolean, builtins: List<Theme.Builtin>): List<Theme.Pack> {
+        val root = folder(themes)
+        if (sweep) sweep(root)
+        val dirs = root.listFiles(FileFilter { it.isDirectory && !it.name.startsWith(".") }) ?: return emptyList()
+        return dirs.sortedByDescending { it.lastModified() }.take(ThemeAssetLimits.MAX_PACKS).flatMap { listed(it, builtins) }
+    }
+
+    // a kill between a place's renames left the pack it replaced aside (`old-<random>/<name>`): put back where none
+    // took its place; the rest (a pack half written, one being deleted, one replaced) cleared
+    private fun sweep(root: File) {
+        val saving = File(root, SAVING)
+        saving.listFiles(FileFilter { it.isDirectory && it.name.startsWith(OLD) })?.forEach { aside ->
+            val pack = aside.listFiles()?.singleOrNull() ?: return@forEach
+            val target = File(root, pack.name)
+            if (!badName(pack.name) && !target.exists() && pack.renameTo(target)) Timber.i("Theme pack ${pack.name} put back after a kill")
+        }
+        saving.deleteRecursively()
+        sync(root)
+    }
+
+    private fun listed(dir: File, builtins: List<Theme.Builtin>): List<Theme.Pack> {
         val xml = File(dir, THEME_XML)
-        val theme = xml.takeIf { it.isFile && it.length() <= ThemeAssetLimits.MAX_THEME_XML_BYTES }?.readText()?.let { source ->
-            when (val t = ThemeReader.theme(source, systemColors)) {
-                is Parsed.Ok -> t.value.takeIf { it.name == dir.name }?.let { it to source }
-                is Parsed.Failed -> null.also { Timber.w("Theme pack ${dir.name} does not read: ${t.problems.take(SHOWN)}") }
-            }
-        } ?: run {
-            EngineNotices.failedOnce(R.string.user_data_unreadable)
-            Timber.w("Theme pack ${dir.name} not listed: no theme.xml of its name that reads")
-            return emptyList()
+        val source = xml.takeIf { it.isFile && it.length() <= ThemeAssetLimits.MAX_THEME_XML_BYTES }?.readText()
+        val theme = when (val t = source?.let { parse(it) }) {
+            is Parsed.Ok -> t.value
+            is Parsed.Failed -> return skipped(dir, "does not read: ${t.problems.take(SHOWN)}", R.string.user_data_unreadable)
+            null -> return skipped(dir, "has no theme.xml", R.string.user_data_unreadable)
         }
-        val missing = ThemePackCheck.files(theme.first).all.firstOrNull { !inside(dir, it) }
-        if (missing != null) {
-            EngineNotices.failedOnce(R.string.theme_file_missing)
-            Timber.w("Theme pack ${dir.name} misses its file $missing")
-            return emptyList()
+        val name = theme.name
+        when {
+            name != dir.name -> return skipped(dir, "is named $name", R.string.user_data_unreadable)
+            badName(name) || builtinClash(name, theme.variants, builtins) -> return skipped(dir, "has a built-in's name", R.string.user_data_unreadable)
+            ThemePackCheck.hidesRequired(theme).isNotEmpty() -> return skipped(dir, "hides the keys' labels", R.string.user_data_unreadable)
         }
-        return versions(theme.first, dir.name, dir, theme.second)
+        val missing = ThemePackCheck.files(theme).all.firstOrNull { !inside(dir, it) }
+        if (missing != null) return skipped(dir, "misses its file $missing", R.string.theme_file_missing)
+        return versions(theme, dir.name, dir)
+    }
+
+    private fun skipped(dir: File, why: String, @StringRes tell: Int): List<Theme.Pack> {
+        EngineNotices.failedOnce(tell)
+        Timber.w("Theme pack ${dir.name} not listed: it $why")
+        return emptyList()
     }
 
     // [name] a plain file right in [dir] (a crafted name of the theme's, `..` say, never one out of it)
@@ -206,9 +272,24 @@ object ThemePackFiles {
         }
     }
 
-    /** Whether a zip of the entries [names] has a folder a pack may not (only `layouts/`, and a Mac's `__MACOSX/` ignored). */
-    fun foreignFolder(names: Collection<String>): String? =
-        names.filter { '/' in it }.map { it.substringBefore('/') }.firstOrNull { it != LAYOUTS && it != MACOS }
+    /**
+     * Whether a zip of the entries [names] has a folder a pack may not: only `layouts/` (no folder in it), a Mac's
+     * `__MACOSX/` ignored.
+     */
+    fun foreignFolder(names: Collection<String>): String? = names.firstNotNullOfOrNull { name ->
+        // the folders the entry is in: `a/b/` and `a/b/x` are in a and b, `x` in none
+        val folders = name.split('/').dropLast(1)
+        when {
+            folders.isEmpty() || folders[0] == MACOS -> null
+            folders[0] != LAYOUTS -> folders[0]
+            folders.size > 1 -> folders.joinToString("/")
+            else -> null
+        }
+    }
+
+    /** Whether a zip of the entries [names] has its `theme.xml` in a folder, not at its top (a folder zipped whole). */
+    fun themeXmlInFolder(names: Collection<String>): Boolean =
+        THEME_XML !in names && names.any { it.endsWith("/$THEME_XML") && !it.startsWith("$MACOS/") }
 
     /**
      * A pack unpacked in [from] and checked, for the user to see before it is taken ([info]): what [commit]
@@ -252,7 +333,7 @@ object ThemePackFiles {
         val theme = read.value
         ThemePackCheck.hidesRequired(theme).firstOrNull()?.let { errorRuntime(R.string.exception_theme_hidden_required, it.toString()) }
         val name = theme.name
-        if (!isPlainFileName(name) || name.startsWith(".") || VERSIONS.any { name.endsWith(it) }) errorRuntime(R.string.exception_theme_pack_name, name)
+        if (badName(name)) errorRuntime(R.string.exception_theme_pack_name, name)
         val files = ThemePackCheck.files(theme)
         checkFiles(from, files, checks)
         val layouts = checkLayouts(File(from, LAYOUTS), checks)
@@ -261,11 +342,11 @@ object ThemePackFiles {
     }
 
     private fun readChecked(source: String, checks: Checks): Parsed.Ok<SceneTheme> =
-        when (val read = ThemeReader.theme(source, systemColors, checks.appVersion)) {
+        when (val read = parse(source, checks.appVersion)) {
             is Parsed.Ok -> read
             is Parsed.Failed -> {
                 // one this version is too old for, said so (the update is what helps), not as a broken file
-                val minApp = (ThemeReader.theme(source, systemColors) as? Parsed.Ok)?.value?.meta?.minApp
+                val minApp = (parse(source) as? Parsed.Ok)?.value?.meta?.minApp
                 val app = checks.appVersion
                 if (minApp != null && app != null && ThemeReader.newer(minApp, app)) errorRuntime(R.string.exception_theme_min_app, minApp)
                 errorRuntime(R.string.exception_theme_invalid, read.problems.take(SHOWN).joinToString("\n"))
@@ -275,7 +356,8 @@ object ThemePackFiles {
     private fun checkFiles(from: File, files: ThemePackCheck.Files, checks: Checks) {
         files.all.firstOrNull { !inside(from, it) || it == THEME_XML }?.let { errorRuntime(R.string.exception_theme_file, it) }
         fun size(name: String) = checks.probe.imageSize(File(from, name)) ?: errorRuntime(R.string.exception_theme_image, name)
-        files.pictures.forEach { n -> size(n).let { (w, h) -> ThemeAssetLimits.picture(w, h)?.let(checks.refused) } }
+        // the source photo too, though only its cuts are drawn: every file a pack brings is what it is named
+        (files.pictures + listOfNotNull(files.source)).forEach { n -> size(n).let { (w, h) -> ThemeAssetLimits.picture(w, h)?.let(checks.refused) } }
         files.images.forEach { n -> size(n).let { (w, h) -> ThemeAssetLimits.keyImage(w, h, File(from, n).length())?.let(checks.refused) } }
         files.preview?.let { n -> size(n).let { (w, h) -> ThemeAssetLimits.preview(w, h, File(from, n).length())?.let(checks.refused) } }
         files.fonts.forEach { n -> if (!checks.probe.fontReads(File(from, n))) errorRuntime(R.string.exception_theme_font, n) }
@@ -306,8 +388,10 @@ object ThemePackFiles {
     internal fun place(themes: File, staged: Staged): List<Theme.Pack> {
         val root = folder(themes)
         val saving = File(root, SAVING).apply { mkdirs() }
-        val temp = File(saving, UUID.randomUUID().toString())
+        val temp = File(saving, NEW + UUID.randomUUID())
         val target = File(root, staged.name)
+        // the pack it replaces, aside as old-<random>/<name> (what a listing after a kill puts back)
+        var aside: File? = null
         var old: File? = null
         var done = false
         try {
@@ -321,19 +405,28 @@ object ThemePackFiles {
             }
             sync(temp)
             if (target.exists()) {
-                old = File(saving, UUID.randomUUID().toString())
-                need(target.renameTo(old), "cannot move ${target.name} aside")
+                aside = File(saving, OLD + UUID.randomUUID()).also { need(it.mkdirs(), "cannot make ${it.name}") }
+                old = File(aside, staged.name).also { need(target.renameTo(it), "cannot move ${target.name} aside") }
+                sync(saving)
             }
-            if (!temp.renameTo(target)) old?.renameTo(target)
-            need(target.exists() && !temp.exists(), "cannot put ${target.name} in place")
+            beforeInPlace?.invoke()
+            need(temp.renameTo(target), "cannot put ${target.name} in place")
             sync(root)
             done = true
         } finally {
-            if (!done) temp.deleteRecursively()
-            old?.deleteRecursively()
+            if (!done) {
+                temp.deleteRecursively()
+                // the one it replaced back; where even that fails, left aside for the next listing to put back
+                if (old?.exists() == true && !target.exists()) old.renameTo(target)
+            }
+            if (done || old?.exists() != true) aside?.deleteRecursively()
         }
-        return versions(staged.theme, staged.name, target, staged.source)
+        return versions(staged.theme, staged.name, target)
     }
+
+    /** A test's: run by [place] between moving the pack it replaces aside and putting the new one in place. */
+    @VisibleForTesting
+    internal var beforeInPlace: (() -> Unit)? = null
 
     private fun need(ok: Boolean, what: String) {
         if (!ok) throw IOException(what)
@@ -360,7 +453,7 @@ object ThemePackFiles {
         if (!isPlainFileName(file) || file.startsWith(".")) return
         val root = folder(themes)
         val dir = File(root, file).takeIf { it.isDirectory } ?: return
-        val aside = File(File(root, SAVING).apply { mkdirs() }, UUID.randomUUID().toString())
+        val aside = File(File(root, SAVING).apply { mkdirs() }, GONE + UUID.randomUUID())
         (if (dir.renameTo(aside)) aside else dir).deleteRecursively()
         sync(root)
     }
@@ -368,7 +461,8 @@ object ThemePackFiles {
     /** [pack] as a `.theme` zip into [dest]: its `theme.xml` first, then the files it names, then its layouts. */
     internal fun export(pack: Theme.Pack, dest: OutputStream) {
         val dir = File(pack.dir)
-        val theme = read(pack.source)
+        val source = File(dir, THEME_XML).readText()
+        val theme = read(source)
         val names = ThemePackCheck.files(theme).all.sorted()
         names.firstOrNull { !inside(dir, it) }?.let {
             dest.close()
@@ -376,7 +470,7 @@ object ThemePackFiles {
         }
         ZipOutputStream(dest.buffered()).use { zip ->
             zip.putNextEntry(ZipEntry(THEME_XML))
-            zip.write(pack.source.encodeToByteArray())
+            zip.write(source.encodeToByteArray())
             names.forEach { name ->
                 zip.putNextEntry(ZipEntry(name))
                 File(dir, name).inputStream().use { it.copyTo(zip) }

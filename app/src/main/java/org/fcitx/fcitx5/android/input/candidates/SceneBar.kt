@@ -45,7 +45,7 @@ object SceneBar {
      * floating, the bar the same over a floating keyboard and a docked one).
      */
     fun of(context: Context, theme: Theme): BarLook =
-        SceneThemes.of(ThemeManager.shownLook(theme), theme.name, theme.isDark)
+        SceneThemes.of(theme, ThemeManager.shownLook(theme))
             ?.let { BarLook.of(SceneThemes.cascades(it), SceneWindow.scenes(context, theme)) }
             ?: plain(theme)
 
