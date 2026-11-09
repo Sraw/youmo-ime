@@ -164,6 +164,21 @@ object ThemeReader {
     }
 
     /**
+     * Whether [source] is a later build's theme, whether or not it reads here: its root's `version=` a later
+     * format's than 4.x (`5.0`), or its `<meta min-app>` newer than [app]. A file that is no XML, or says
+     * neither, is not ([newer]: what cannot tell is not).
+     */
+    fun laterBuilds(source: String, app: String): Boolean {
+        val root = (Xml.parse(source) as? Parsed.Ok)?.value?.takeIf { it.name == "theme" } ?: return false
+        val format = root["version"]?.let(FORMAT::matchEntire)?.groupValues?.get(1)?.toIntOrNull()
+        if (format != null && format > FORMAT_MAJOR) return true
+        return root.all("meta").any { meta -> meta["min-app"]?.let { newer(it, app) } == true }
+    }
+
+    private const val FORMAT_MAJOR = 4
+    private val FORMAT = Regex("([0-9]{1,4})\\.[0-9]{1,4}")
+
+    /**
      * Whether [version] (`0.6.0`) is newer than [app] (`0.5.2`; a leading `v` and what follows a `-`
      * dropped: `v0.6.0-beta1` is `0.6.0`). Either not three numbers after that: false, it cannot tell.
      */

@@ -662,6 +662,17 @@ class ThemeTest {
     }
 
     @Test
+    fun aLaterBuildsFileIsToldWhetherOrNotItReads() {
+        val head = "<theme xmlns=\"${ThemeReader.NAMESPACE}\" name=\"x\""
+        assertTrue(ThemeReader.laterBuilds("$head version=\"5.0\"><colors/></theme>", "0.6.0"), "a later format")
+        assertTrue(ThemeReader.laterBuilds("$head version=\"4.0\"><meta min-app=\"0.7.0\"/><whatever/></theme>", "0.6.0"), "a later app's, not read here")
+        assertTrue(!ThemeReader.laterBuilds("$head version=\"4.3\"><meta min-app=\"0.6.0\"/></theme>", "0.6.0"))
+        assertTrue(!ThemeReader.laterBuilds("$head version=\"4.0\"><colors/>", "0.6.0"), "no XML: cannot tell")
+        assertTrue(!ThemeReader.laterBuilds("<layout version=\"9.0\"/>", "0.6.0"), "no theme")
+        assertTrue(!ThemeReader.laterBuilds("$head version=\"x\"/>", "0.6.0"))
+    }
+
+    @Test
     fun aDarkVersionWithoutDarkColoursTakesTheDarkRoles() {
         val sys = SystemColors(mapOf("primary" to Argb(0xFF0000AA.toInt())), mapOf("primary" to Argb(0xFF0000DD.toInt())))
         val s = source.replace(root, "variants=\"light dark\"")
