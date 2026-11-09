@@ -155,6 +155,9 @@
     <string name="theme_version_light_switch">Light version, tap for the dark one</string>
     <string name="theme_version_dark_switch">Dark version, tap for the light one</string>
     <string name="new_theme">New theme</string>
+    <string name="theme_add_import">Import a theme file</string>
+    <string name="theme_add_web">Make one on the web</string>
+    <string name="theme_add_web_hint">Come back here to import it when done</string>
     <string name="skip">Skip</string>
     <string name="theme_migrated">Theme has been migrated to the current version</string>
     <string name="keep_keyboard_letters_uppercase">Keep keyboard letters uppercase</string>
