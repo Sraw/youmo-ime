@@ -356,7 +356,9 @@ object ThemeReader {
         if ("tail" in values && shape != null && (shape as? Value.Word)?.word != Values.BUBBLE) {
             p.warn(line, "tail= does nothing beside a shape that is no bubble: only a bubble has a tail")
         }
-        if (values["size"] !is Value.Percent || selectors.all { it.widget == "preview" && it.part == null }) return 0
+        // a later stage's widgets aside (warned of, selecting nothing), as the warnings above
+        val live = selectors.filter { it.widget !in Selector.RESERVED_WIDGETS }
+        if (values["size"] !is Value.Percent || live.all { it.widget == "preview" && it.part == null }) return 0
         values.remove("size")
         p.warn(line, "size= in % is ignored but in a style of the preview alone (the key's bubble): elsewhere a size is a text's, in sp")
         return 1

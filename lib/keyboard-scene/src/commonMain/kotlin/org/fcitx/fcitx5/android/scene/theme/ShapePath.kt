@@ -173,7 +173,9 @@ data class ShapePath(val segments: List<Segment>) {
             return Reader(tokens(data) ?: return null).read()?.takeIf { it.encloses() }
         }
 
-        // a sub-path's area (the shoelace's, closed back to its start, its curves fine chords in the unit box) not nought
+        // some sub-path's points not all in a line (its curves fine chords in the unit box): the triangles from its first
+        // point to each edge, their areas each taken whatever its sign, not nought. Not the signed (shoelace) area,
+        // which is nought for a bowtie or a figure of eight that fill as much as any
         private fun ShapePath.encloses(): Boolean {
             val polygons = ArrayList<MutableList<Point>>()
             for (op in outline(UNIT, UNIT_TOLERANCE).ops) {
@@ -184,7 +186,8 @@ data class ShapePath(val segments: List<Segment>) {
                 }
             }
             return polygons.any { p ->
-                abs(p.indices.sumOf { i -> p[i].x * p[(i + 1) % p.size].y - p[(i + 1) % p.size].x * p[i].y }) / 2 > SLACK
+                val o = p[0]
+                (1 until p.size - 1).sumOf { i -> abs((p[i].x - o.x) * (p[i + 1].y - o.y) - (p[i + 1].x - o.x) * (p[i].y - o.y)) } / 2 > SLACK
             }
         }
 

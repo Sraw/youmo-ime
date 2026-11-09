@@ -464,6 +464,10 @@ class ThemeTest {
         assertNull(sized.styles.last().values["size"], "dropped")
         val sizedA = Cascade(sized, emptySet()).of(Selector.Target("key", "qwerty", "a", "letter", setOf("letter"), emptySet()))
         assertEquals(Value.Number(14.0), sizedA["size"], "the key's sp kept")
+        // a later stage's widget beside the preview (warned of, selecting nothing) does not drop it
+        val withReserved = withStyle("<style select=\"preview, clipboard\" size=\"120%\"/>")
+        assertEquals(Value.Percent(120.0), ThemeReader.theme(withReserved).ok().styles.last().values["size"])
+        assertTrue(warnings(withReserved).none { it.startsWith("size= in % is ignored") })
         // the cascade: unset, nothing; the band's colour a solid fill's darker, else a translucent black
         val t = ThemeReader.theme(withStyle("<style select=\"key\" depth=\"3dp\"/><style select=\"key.letter\" fill=\"linear(90deg, @key 0%, @altKey 100%)\"/>")).ok()
         val c = Cascade(t, emptySet())

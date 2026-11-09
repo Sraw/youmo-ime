@@ -184,6 +184,10 @@ class ShapeTest {
         // one curve and its Z enclose something; a line and a sub-path of nothing beside an outline are fine
         assertNotNull(ShapePath.parse("M0 1 Q.5 0 1 1 Z"))
         assertNotNull(ShapePath.parse("M0 0 L1 1 Z M0 0 H1 V1 Z"))
+        // crossing itself, its signed area nought, but filling some: a bowtie, a figure of eight
+        assertNotNull(ShapePath.parse("M0 0 L1 1 L1 0 L0 1 Z"))
+        assertNotNull(ShapePath.parse("M.5 .5 C1 0 1 1 .5 .5 C0 0 0 1 .5 .5 Z"))
+        assertNotNull(ShapePath.parse("M0 0 L1 1 V0 L0 1 Z M.2 .2 L.4 .4 Z"), "a line beside it")
     }
 
     // so many curves from corner to corner of a big box: no more than 1024 points in all, the whole path coarser

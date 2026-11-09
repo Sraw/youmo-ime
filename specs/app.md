@@ -418,8 +418,10 @@ and a theme that converted, `PopupScenes`, and its bubble
 too) are a `PopupSceneView` drawing a small scene `SceneBuilder.preview`/`popup`/`menu` makes, its
 sizes the engine's (`engine/Popups`: theme 3.0's in dp, its text dp, not sp; its corners the keys'
 radius; a theme's `shape="bubble"` (a head over the key, a tail down from it), `path(…)`, `size` and `offset`
-(060-render-p3 T4b) all inside the scene, its bottom still the key's, so the placing is unchanged (its width whole pixels
-at any `size`; a rectangle or a path moved down by `offset` reaches past the scene's bottom, drawn in the `outset`); its shadow drawn, rules D4.7/D4.9, which the views' elevation had and Robolectric never drew
+(060-render-p3 T4b) all inside the scene, the scene's bottom still the key's, so the placing is unchanged (its width whole
+pixels at any `size`); a rectangle or a path moved down by `offset` reaches that much past the scene's bottom, below the
+key's, drawn in the `outset`: over a bottom-row key the input view clips what goes past its own bottom (accepted, a
+theme's choice to move it down); its shadow drawn, rules D4.7/D4.9, which the views' elevation had and Robolectric never drew
 in their goldens; the view as large as the scene and `outset` round it for the shadow, placed
 that much up and left of where the views' popup goes; the edit menu's lift, `MENU_LIFT_DP`, wherever
 the scenes are). A focus moved is the scene made again, the key
