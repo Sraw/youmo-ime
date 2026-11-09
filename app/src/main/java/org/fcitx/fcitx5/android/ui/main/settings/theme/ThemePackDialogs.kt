@@ -13,6 +13,7 @@ import androidx.appcompat.app.AlertDialog
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
+import org.fcitx.fcitx5.android.data.theme.ThemePackLayouts
 import org.fcitx.fcitx5.android.scene.theme.Meta
 import splitties.dimensions.dp
 import java.io.File
@@ -36,6 +37,9 @@ object ThemePackDialogs {
         val staged = pack.staged
         val out = lines(ctx, staged.theme.meta, staged.theme.version).toMutableList()
         if (pack.replaces) out += ctx.getString(R.string.theme_pack_replaces)
+        val (replaced, unused) = ThemePackLayouts.replaced(staged.layouts)
+        if (replaced.isNotEmpty()) out += ctx.getString(R.string.theme_pack_layouts, replaced.joinToString(", "), staged.commits)
+        if (unused.isNotEmpty()) out += ctx.getString(R.string.theme_pack_layouts_unused, unused.joinToString(", "))
         if (staged.warnings.isNotEmpty()) out += ctx.getString(R.string.theme_pack_warnings) + "\n" + staged.warnings.joinToString("\n") { "· $it" }
         return out.joinToString("\n")
     }

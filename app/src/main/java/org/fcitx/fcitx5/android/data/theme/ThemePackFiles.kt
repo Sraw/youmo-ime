@@ -309,6 +309,8 @@ object ThemePackFiles {
         internal val from: File,
         internal val files: Set<String>,
         val layouts: List<String>,
+        /** How many actions its layouts have that type text of their own (`commit:`, [ThemePackLayouts.commits]). */
+        val commits: Int,
         /** Each a line to show: what is ignored by this version, keys hard to read. */
         val warnings: List<String>,
         /** Its preview image, a file checked to be one. */
@@ -346,7 +348,8 @@ object ThemePackFiles {
         checkFiles(from, files, checks)
         val layouts = checkLayouts(File(from, LAYOUTS), checks)
         val warnings = read.warnings.map { it.toString() } + listOfNotNull(checks.lowContrast(ThemePackCheck.lowContrast(theme)))
-        return Staged(theme, source, from, files.all, layouts, warnings, files.preview?.let { File(from, it) })
+        val commits = layouts.sumOf { ThemePackLayouts.commits(File(from, "$LAYOUTS/$it").readText()) }
+        return Staged(theme, source, from, files.all, layouts, commits, warnings, files.preview?.let { File(from, it) })
     }
 
     private fun readChecked(source: String, checks: Checks): Parsed.Ok<SceneTheme> =

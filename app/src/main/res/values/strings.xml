@@ -133,6 +133,9 @@
     <string name="theme_pack_import_title">Import theme %1$s?</string>
     <string name="theme_pack_import">Import</string>
     <string name="theme_pack_replaces">Your theme of this name will be replaced.</string>
+    <string name="theme_pack_layouts">Keyboards of its own in this theme: %1$s (%2$d keys that type text of their own).</string>
+    <string name="theme_pack_layouts_unused">Layouts not used (a theme only replaces the app\'s keyboards): %1$s</string>
+    <string name="keyboard_themed">%1$s (theme: %2$s)</string>
     <string name="theme_pack_warnings">Note:</string>
     <string name="theme_info">Info</string>
     <string name="theme_info_author">Author: %1$s</string>

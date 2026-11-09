@@ -133,6 +133,9 @@
     <string name="theme_pack_import_title">匯入主題 %1$s？</string>
     <string name="theme_pack_import">匯入</string>
     <string name="theme_pack_replaces">會取代你已有的同名主題。</string>
+    <string name="theme_pack_layouts">此主題包含自訂佈局：%1$s（其中 %2$d 個按鍵直接輸入佈局裡寫的文字）。</string>
+    <string name="theme_pack_layouts_unused">不會使用的佈局（主題只能取代已有的鍵盤）：%1$s</string>
+    <string name="keyboard_themed">%1$s（主題：%2$s）</string>
     <string name="theme_pack_warnings">注意：</string>
     <string name="theme_info">資訊</string>
     <string name="theme_info_author">作者：%1$s</string>
