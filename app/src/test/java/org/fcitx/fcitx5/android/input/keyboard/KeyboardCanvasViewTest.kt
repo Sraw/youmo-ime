@@ -174,7 +174,8 @@ class KeyboardCanvasViewTest {
         }
         Timber.plant(tree)
         try {
-            for (builtIn in listOf(TestThemes.PixelLight, TestThemes.PixelDark)) {
+            // the app's own (its look the object the fallback paints in)
+            for (builtIn in listOf(ThemeManager.builtin("pixel#light"), ThemeManager.builtin("pixel#dark"))) {
                 val look = builtIn.look
                 val many = (0..LookTheme.MAX_STYLES / 2).associate { i -> "b$i/k" to KeyOverride(null, KeyPressed.Color(i), KeyLabel.Show) }
                 val broken = Theme.Custom(

@@ -183,15 +183,7 @@ class SettingsMenuUatTest {
     private fun themeList(): RecyclerView = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<RecyclerView>()
         .first { it.adapter is ThemeListAdapter }
 
-    private fun pick(name: String) {
-        val list = themeList()
-        // under the 新增 row
-        val at = (list.adapter as ThemeListAdapter).entries.indexOfFirst { it.name == name } + 1
-        list.scrollToPosition(at)
-        st.idle()
-        list.findViewHolderForAdapterPosition(at)!!.itemView.performClick()
-        st.idle()
-    }
+    private fun pick(name: String) = pickTheme(themeList(), name, st::idle)
 
     private fun keyboardIsDark(): Boolean = KeyboardHarness(theme = null).use { h ->
         h.start()

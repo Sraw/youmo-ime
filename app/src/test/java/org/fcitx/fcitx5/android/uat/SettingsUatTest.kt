@@ -163,11 +163,8 @@ class SettingsUatTest {
             val list = KeyboardHarness.all(activity.window.decorView).filterIsInstance<RecyclerView>()
                 .firstOrNull { it.adapter is ThemeListAdapter }
                 ?: error(KeyboardHarness.all(activity.window.decorView).filterIsInstance<RecyclerView>().map { it.adapter?.javaClass?.name }.toList().toString())
-            val at = ThemeManager.getAllThemes().indexOfFirst { it.name == TestThemes.PixelDark.name } + 1
-            list.scrollToPosition(at)
-            idle()
-            list.findViewHolderForAdapterPosition(at)!!.itemView.performClick()
-            idle()
+            // Pixel's card shows its light version, in use: its 深, then the card
+            pickTheme(list, TestThemes.PixelDark.name, ::idle)
             assertEquals(TestThemes.PixelDark.name, ThemeManager.activeTheme.name)
             capture("theme_dark")
             // the keyboard made after it: its background the dark theme's
