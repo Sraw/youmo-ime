@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemePrefs.NavbarBackground
 import org.fcitx.fcitx5.android.input.PictureHost
 import org.fcitx.fcitx5.android.input.ThemePictureDrawable
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
+import org.fcitx.fcitx5.android.input.candidates.SceneBar
 import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
@@ -77,8 +78,11 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
     // (where the cap binds, a 14 键 user's real keys are the tall row's 14 dp shorter); read each time,
     // as 候选字号 can change on this page
     // the keyboard with nothing typed: floating over the app (编码行), the code row is no part of it
-    private val barHeight get() = ctx.dp(KawaiiBarComponent.heightDp() + if (KawaiiBarComponent.codeRowFloats()) 0 else CodeRowHeight.THIN_DP)
+    private val barHeight get() = ctx.dp(KawaiiBarComponent.heightDp(barPercent()) + if (KawaiiBarComponent.codeRowFloats()) 0 else CodeRowHeight.THIN_DP)
     private val fakeKawaiiBar = view(::View)
+
+    // the shown theme's `bar height=` (060-render-p3 T6b), the one made with before setTheme
+    private fun barPercent(): Double = SceneBar.of(ctx, if (::shownTheme.isInitialized) shownTheme else theme).heightPercent
 
     private var keyboardWidth = -1
     private var keyboardHeight = -1
@@ -198,7 +202,8 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         bkg.background = ThemePictureDrawable.board(look)
         val landscape = ctx.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         PictureHost.install(fakeInputView, look.picture?.let { PictureHost(look, bkg, landscape) })
-        fakeKawaiiBar.background = ThemePictureDrawable.bar(look)
+        // the bar as the input view has it, the theme's `bar` (SceneBar)
+        fakeKawaiiBar.background = SceneBar.background(SceneBar.of(ctx, theme))
         shownTheme = theme
         makeKeyboard()
         if (!switched) return

@@ -21,7 +21,6 @@ import android.widget.ProgressBar
 import android.widget.ViewAnimator
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.bar.IdleUiPolicy.Display
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ToolbarButton
@@ -120,8 +119,7 @@ class IdleUi(
     }
 
     /** A toggle's button drawn lit while on, as its entry in the ⋯ panel is. */
-    fun setActive(button: ToolbarButton, active: Boolean) =
-        buttons.getValue(button).setIconTint(if (active) theme.accentKeyBackgroundColor else ThemeManager.shownLook(theme).palette.toolbarIconColor)
+    fun setActive(button: ToolbarButton, active: Boolean) = buttons.getValue(button).setOn(active)
 
     // the bar's right, after the toolbar: there whenever the bar is idle
     private val pinnedBar = horizontalLayout()

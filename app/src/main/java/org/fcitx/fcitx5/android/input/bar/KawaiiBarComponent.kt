@@ -53,6 +53,7 @@ import org.fcitx.fcitx5.android.input.bar.ui.IdleUi
 import org.fcitx.fcitx5.android.input.bar.ui.TitleUi
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
+import org.fcitx.fcitx5.android.input.candidates.SceneBar
 import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateStyle
 import org.fcitx.fcitx5.android.input.candidates.expanded.window.FlexboxExpandedCandidateWindow
 import org.fcitx.fcitx5.android.input.candidates.expanded.window.GridExpandedCandidateWindow
@@ -718,10 +719,11 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     companion object {
         /**
-         * The bar's height in dp, from 候选字号 (a preference read, so read once a view); the input
-         * view is made anew when that changes.
+         * The bar's height in dp, from 候选字号 (a preference read, so read once a view) and the theme's
+         * `bar height=` ([SceneBar.heightPercent]); the input view is made anew when either changes.
          */
-        fun heightDp(): Int = CandidateBarHeight.dp(ThemeManager.prefs.candidateTextSize.getValue(), EngineState.candidateReading.value)
+        fun heightDp(percent: Double = SceneBar.heightPercent()): Int =
+            CandidateBarHeight.dp(ThemeManager.prefs.candidateTextSize.getValue(), EngineState.candidateReading.value, percent)
 
         /** A candidate's side padding in dp, from 候选字号 ([CandidateSpacing]). */
         fun candidatePaddingDp(): Int = CandidateSpacing.paddingDp(ThemeManager.prefs.candidateTextSize.getValue())

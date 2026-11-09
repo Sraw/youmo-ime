@@ -6,13 +6,20 @@ package org.fcitx.fcitx5.android.input.bar.ui
 
 import android.content.Context
 import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
+import android.graphics.drawable.StateListDrawable
 import android.view.ViewPropertyAnimator
 import android.widget.ImageView
 import androidx.annotation.ColorInt
 import androidx.annotation.DrawableRes
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.candidates.SceneBar
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
+import org.fcitx.fcitx5.android.scene.engine.ToolbarLook
 import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
 import org.fcitx.fcitx5.android.utils.circlePressHighlightDrawable
 import org.fcitx.fcitx5.android.utils.motionSettings
@@ -40,11 +47,43 @@ class ToolButton(context: Context) : CustomGestureView(context) {
             image.rotation = value
         }
 
-    constructor(context: Context, @DrawableRes icon: Int, theme: Theme) : this(context) {
-        image.imageTintList = ColorStateList.valueOf(ThemeManager.shownLook(theme).palette.toolbarIconColor)
+    /** The theme's toolbar button (060-render-p3 T6b): its fill and shape, its icon's colour, pressed and on. */
+    private var look: ToolbarLook? = null
+
+    constructor(context: Context, @DrawableRes icon: Int, theme: Theme, look: ToolbarLook = SceneBar.of(context, theme).toolbar) : this(context) {
+        this.look = look
+        image.imageTintList = ColorStateList.valueOf(look.icon.value)
         setIcon(icon)
-        setPressHighlightColor(theme.keyPressHighlightColor)
+        background = background(look, on = false)
         add(image, lParams(wrapContent, wrapContent, gravityCenter))
+    }
+
+    /** A toggle's button drawn on ([ToolbarLook.onIcon], [ToolbarLook.onFill]) or off, as the theme has it. */
+    fun setOn(on: Boolean) {
+        val look = look ?: return
+        setIconTint((if (on) look.onIcon else look.icon).value)
+        if (look.fill != look.onFill) background = background(look, on)
+    }
+
+    // none set: the press highlight's circle (a ripple) as ever; else the fill of its shape, the pressed colour over it
+    private fun background(look: ToolbarLook, on: Boolean): Drawable {
+        val fill = if (on) look.onFill else look.fill
+        if (look.radius == null && look.fill == null && look.onFill == null) return pressHighlight(look.pressed.value)
+        fun shape(color: Int) = GradientDrawable().apply {
+            setColor(color)
+            val r = look.radius
+            if (r == null) {
+                shape = GradientDrawable.OVAL
+            } else if (r.half) {
+                cornerRadius = Float.MAX_VALUE
+            } else {
+                cornerRadii = r.corners.flatMap { listOf(dp(it.toFloat()), dp(it.toFloat())) }.toFloatArray()
+            }
+        }
+        return StateListDrawable().apply {
+            addState(intArrayOf(android.R.attr.state_pressed), LayerDrawable(listOfNotNull(fill?.let { shape(it.value) }, shape(look.pressed.value)).toTypedArray()))
+            addState(intArrayOf(), fill?.let { shape(it.value) } ?: ColorDrawable(Color.TRANSPARENT))
+        }
     }
 
     fun iconAnimate(): ViewPropertyAnimator = image.animate()
@@ -70,12 +109,10 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         image.imageResource = icon
     }
 
-    fun setPressHighlightColor(@ColorInt color: Int) {
-        // the ripple's spread is animation too: off with 移除动画 as with 禁用动画
-        background = if (!motionSettings().animates) {
-            circlePressHighlightDrawable(color)
-        } else {
-            borderlessRippleDrawable(color, dp(20))
-        }
+    // the ripple's spread is animation too: off with 移除动画 as with 禁用动画
+    private fun pressHighlight(@ColorInt color: Int): Drawable = if (!motionSettings().animates) {
+        circlePressHighlightDrawable(color)
+    } else {
+        borderlessRippleDrawable(color, dp(20))
     }
 }

@@ -285,6 +285,22 @@ none of it, pills and a dotted one, a candidate with a comment among them. The s
 own widths (`NeverFillWidth`); filling its width (Auto, Always), the app stretches each candidate, which the
 web's preview does not show.
 
+T6b adds three to `BarLook`. `bar height=` (80%–140%, on a style of bars alone, a scene allowed) scales the
+bar 候选字号 gives (`CandidateBarHeight.dp(…, percent)`, rounded to a dp; a line of pinyin readings is added
+after, unscaled): `KawaiiBarComponent.heightDp()` takes the active theme's in the window's scenes
+(`SceneBar.heightPercent`, kept per theme file and scenes), so every view sized by the bar follows; the keys
+keep their height, the keyboard grows by the difference (the 70% cap, `KeyboardHeightCap`, counts the bar as
+before), docked and floating alike (`BarToolbarThemeTest`). `toolbar` (fill, radius, icon-color;
+`:pressed` overlay; `:selected`, a toggle on, fill and icon-color) is every `ToolButton`'s: nothing set,
+the press highlight's circle and `toolbarIcon`, on `accentKey`, as before; a fill or radius makes it a shape
+(no radius: a circle) with the overlay over it pressed (`ToolButton.setOn`). `preedit` (color, cursor-color,
+underline) is the code row's, the floating strip's and the hardware keyboard window's code (`PreeditUi`)
+and the syllables' text colour: nothing set, `keyText` and fcitx's `UnderlineSpan`; an `underline` of the
+theme is drawn by `PreeditUi.PreeditTextView` under each span fcitx underlines (a span cannot set an
+underline's colour or width on Android 10), `none` none. The floating code strip's colour and the settings
+page's preview bar (its base and height, of the theme shown) are the theme's `bar` too. A candidate's
+`size` stays unread: 候选字号 is the user's setting, and the bar's height the theme's.
+
 Floating (`ThemePrefs.floatingKeyboard`, the status area's 悬浮键盘; the input view is made anew for
 it): `keyboardView` is `FloatingKeyboard.widthDp` wide (70% of the screen, 300–420 dp), its boards as
 much shorter (85% at least), with `FloatingHandle` at the bottom (24 dp: a short bar and the dock button;

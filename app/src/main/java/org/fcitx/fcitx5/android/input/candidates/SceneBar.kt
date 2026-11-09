@@ -24,11 +24,14 @@ import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import org.fcitx.fcitx5.android.scene.engine.BarLook
 import org.fcitx.fcitx5.android.scene.engine.BarSample
 import org.fcitx.fcitx5.android.scene.engine.CandidateLook
+import org.fcitx.fcitx5.android.scene.engine.PreeditLook
+import org.fcitx.fcitx5.android.scene.engine.ToolbarLook
 import org.fcitx.fcitx5.android.scene.look.BarBase
 import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Inset
 import org.fcitx.fcitx5.android.scene.theme.Radius
+import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.pressHighlightDrawable
 
 /**
@@ -69,8 +72,30 @@ object SceneBar {
             radius = Radius(List(CORNERS) { 0.0 }), inset = Inset(0.0, 0.0, 0.0, 0.0), padding = null, gapDp = 0.0, labelStyle = null,
             divider = Argb(theme.dividerColor),
             panel = ThemeColors.panel(look.palette, look.keys)?.let(::Argb),
+            preedit = PreeditLook(Argb(theme.keyTextColor), Argb(theme.keyTextColor), null),
+            toolbar = Argb(look.palette.toolbarIconColor).let { ToolbarLook(null, null, it, press, null, Argb(theme.accentKeyBackgroundColor)) },
         )
     }
+
+    // the last theme file and scenes asked of and their bar's height: asked for by every view on the bar as it is made
+    private var shownHeight: Triple<Any?, Set<String>, Double>? = null
+
+    /**
+     * The bar's height in % of what 候选字号 makes it, the active theme's in the window's scenes now
+     * (KawaiiBarComponent.heightDp): 100 for a theme setting none.
+     */
+    fun heightPercent(): Double {
+        val theme = ThemeManager.activeTheme
+        val scenes = SceneWindow.scenes(appContext, theme)
+        // the theme file SceneThemes keeps: another look, or the same made anew, another file
+        val file = SceneThemes.of(ThemeManager.shownLook(theme), theme.name, theme.isDark)
+        shownHeight?.let { (f, s, h) -> if (f === file && s == scenes) return h }
+        val h = file?.let { BarLook.of(SceneThemes.cascades(it), scenes).heightPercent } ?: FULL
+        shownHeight = Triple(file, scenes, h)
+        return h
+    }
+
+    private const val FULL = 100.0
 
     /** The bar's base, under the bar and the row of the code being typed: none, a colour, the picture's part there. */
     fun background(bar: BarLook): Drawable? = when (val b = bar.base) {
