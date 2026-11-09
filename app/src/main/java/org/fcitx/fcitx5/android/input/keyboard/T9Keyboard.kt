@@ -856,9 +856,8 @@ class T9Keyboard(
         // constraint pass sizing it otherwise (0×0) and this pass back would change its size each time, its
         // onSizeChanged posting a layout again, never done
         val lp = column.layoutParams as ConstraintLayout.LayoutParams
-        if (lp.leftMargin != columnSlot.left || lp.topMargin != columnSlot.top ||
-            lp.width != columnSlot.width() || lp.height != columnSlot.height()
-        ) {
+        val at = listOf(columnSlot.left, columnSlot.top, columnSlot.width(), columnSlot.height())
+        if (listOf(lp.leftMargin, lp.topMargin, lp.width, lp.height) != at) {
             column.layoutParams = lParams(columnSlot.width(), columnSlot.height()) {
                 topOfParent(columnSlot.top)
                 leftOfParent(columnSlot.left)
