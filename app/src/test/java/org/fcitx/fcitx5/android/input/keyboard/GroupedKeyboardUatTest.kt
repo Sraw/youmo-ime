@@ -32,6 +32,7 @@ import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.popup.PopupFocus
 import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.preedit.SyllableStrip
 import org.fcitx.fcitx5.android.uat.PrefsRule
@@ -173,6 +174,24 @@ class GroupedKeyboardUatTest {
         assertTrue(h.api.calls.toString(), "reset()" in h.api.calls)
         assertTrue(h.field.text.toString(), h.field.text.toString().endsWith("w"))
         assertTrue(sent().toString(), sent().isEmpty())
+        // L at the screen's right, under wider symbols (L 0 l, 4 above): its corner over the finger,
+        // the row moved right to the popup's end; it once started at the pushed-in popup's left,
+        // every key left of the finger. A move right of a key's step picks l
+        h.field.setText("")
+        typing(InputMethodCatalog.PINYIN, "ni", "bu")
+        val l = group("L")
+        val f = h.finger(l, KeyboardHarness.Touch(l.bounds.width() / 2f, l.bounds.height() / 2f))
+        h.after(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
+        val shown = h.popupChoices().associate { it.text to it.box }
+        val fingerX = l.bounds.exactCenterX().toInt()
+        assertTrue("$shown", shown["0"]!!.let { fingerX in it.left until it.right })
+        assertEquals("$shown", shown.values.maxOf { it.right }, shown["l"]!!.right)
+        val step = shown["0"]!!.width() * PopupFocus.STEP
+        // the popup's first move is where its focus starts from
+        f.move(KeyboardHarness.Touch(l.bounds.width() / 2f, l.bounds.height() / 2f))
+        f.move(KeyboardHarness.Touch(l.bounds.width() / 2f + step, l.bounds.height() / 2f))
+        f.up(KeyboardHarness.Touch(l.bounds.width() / 2f + step, l.bounds.height() / 2f))
+        assertTrue(h.field.text.toString(), h.field.text.toString().endsWith("l"))
     }
 
     // a grouped keyboard with no 中/英 key ([probe] its letters' group): the globe asks the host for the

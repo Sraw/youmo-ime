@@ -212,6 +212,53 @@ class PopupKeyboardUiTest {
     }
 
     @Test
+    fun aRowInOrderAtTheScreensRightLeavesKeysRightOfTheFinger() {
+        // 18 键's L (L - l under 5 symbols, the row shorter), 九键's 2 (longer than its symbols), 九键双拼's
+        // 5 and 9: at the right edge the row's start under the finger left every key left of it
+        val cases = listOf(
+            arrayOf("L", "-", "l", "#0", "#1", "#2", "#3", "#4") to 1,
+            arrayOf("A", "B", "C", "2", "a", "b", "c", "@", "!", "\"") to 3,
+            arrayOf("J", "K", "L", "5", "j", "k", "l", "#", "(", ")") to 3,
+            arrayOf("W", "X", "Y", "Z", "9", "w", "x", "y", "z", ":", "'", "~") to 4,
+        )
+        val right = Rect(960, 500, 1000, 550)
+        val left = Rect(0, 500, 40, 550)
+        val centre = Rect(480, 500, 520, 550)
+        for ((keys, inRow) in cases) {
+            val split = 2 * inRow + 1
+            for (trigger in listOf(right, left, centre)) {
+                val ui = popup(keys, trigger, split = split, inRow = inRow)
+                val drawn = drawn(ui)
+                val what = "${keys[inRow]} at ${trigger.left}"
+                assertEquals(what, keys.size, drawn.size)
+                // the row in order, the key given in focus at first, the first symbol above it
+                assertEquals(what, (0 until split).map { 0 to drawn[keys[0]]!!.second + it }, keys.take(split).map { drawn[it] })
+                assertEquals(what, ui.focusColumn, drawn[keys[inRow]]!!.second)
+                assertEquals(what, KeyAction.HostKeyAction(keys[inRow]), ui.onTrigger())
+                assertEquals(what, ui.focusColumn, drawn[keys[split]]!!.second)
+                val keyLeft = trigger.left + ui.focusedKeyLeft
+                when (trigger) {
+                    // the corner over the finger, or the row as far toward the edge as the popup lets
+                    // it (its start under the finger once: the popup pushed in, every key left of it);
+                    // keys right of the focus, or the focus the last column
+                    right -> {
+                        val last = drawn.values.maxOf { it.second }
+                        assertTrue(what, keyLeft <= trigger.centerX() && trigger.centerX() < keyLeft + ui.keyWidth ||
+                            drawn[keys[split - 1]]!!.second == last)
+                        assertTrue(what, ui.focusColumn < last || keyLeft <= trigger.centerX())
+                    }
+                    left -> assertTrue(what, keyLeft <= trigger.centerX() && trigger.centerX() < keyLeft + ui.keyWidth ||
+                        drawn[keys[0]]!!.second == 0)
+                    // room either side: centred over the key
+                    else -> assertEquals(what, trigger.left + (trigger.width() - ui.keyWidth) / 2, keyLeft)
+                }
+                // every key reached by a move from the focus, right and left alike
+                drawn.forEach { (label, cell) -> assertEquals(what, PopupKeyboardUi.keyAction(label), ui.select(cell.first, cell.second)) }
+            }
+        }
+    }
+
+    @Test
     fun theTopRowKeepsItsEmptySlots() {
         // 13 keys, 5 columns: the top row's 3 are drawn in the middle columns, not packed to one side
         val keys = drawn(popup(13, Rect(480, 500, 520, 550)))
@@ -445,7 +492,9 @@ class PopupKeyboardUiTest {
         val ui = popup(keys, Rect(480, 500, 520, 550), split = 1, inRow = 0)
         val drawn = drawn(ui)
         assertEquals(3, ui.rows())
-        assertEquals(0 to 0, drawn["1"])
+        // centred, room either side: the digit in the middle column, under the first symbol
+        assertEquals(0 to 2, drawn["1"])
+        assertEquals(1 to 2, drawn["#0"])
         assertEquals(KeyAction.HostKeyAction("1"), ui.onTrigger())
     }
 }
