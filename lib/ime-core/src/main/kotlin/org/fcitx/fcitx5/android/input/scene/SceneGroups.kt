@@ -29,6 +29,10 @@ object SceneGroups {
     fun written(layout: Layout, fragments: Map<String, Fragment> = emptyMap()): List<String> =
         keys(layout, fragments).mapNotNull { it.letters?.rows?.joinToString(" ") }
 
+    /** The ids of [layout]'s keys of a group, in [of]'s order: which key each group is, where two keys have the same letters. */
+    fun ids(layout: Layout, fragments: Map<String, Fragment> = emptyMap()): List<String> =
+        keys(layout, fragments).filter { it.letters != null }.map { it.id }
+
     /**
      * [layout]'s groups whose tap leans to the letter it fell nearest (their keys' `lean=`, 按落点加权,
      * 060-render-v2 §15): two letters or more, lean= not off. Whether the engine can take a tap's place

@@ -513,10 +513,10 @@ app collects a layout's groups (`SceneGroups.of`, row by row, a fragment's where
 060-render-p3 T9b): the keyboard's own groups (G14, G18) as always, their codes, `wire` and learning
 unchanged; on pinyin's 14 and 18 keys (`ownGroups`, KeyboardWindow) a grouping of its own that makes a
 keyboard (`NineKeyLetters.custom` over `SceneGroups.written`, engine.md) is typed as such: each key's code
-its group's place among the keyboard's (`CUSTOM_BLOCK`, sent as it is, no `wire`; a letter on two keys each
-key its own), a leaning tap `Keyboard.tapKey(code, x, y)` with where across and down its scene cell the
+its key's place among the keyboard's groups (`SceneGroups.ids`, by the node's id; `CUSTOM_BLOCK`, sent as
+it is, no `wire`; a letter, or the same letters, on two keys each key its own), a leaning tap `Keyboard.tapKey(code, x, y)` with where across and down its scene cell the
 finger came down (`KeyGesture.clickAt`, `clickDown`; a click no touch made, the code alone), and the groups
-told the engine as the keyboard is made and shown (`EngineState.ownKeys`; the bridge's `syncOwnKeys` before
+told the engine as the keyboard is shown, not as it is made (`onAttach`, `EngineState.ownKeys`; the bridge's `syncOwnKeys` before
 each key sets `NineKeyLetters.inUse` and `EngineSettings.ownKeys`, `configure` and `reload` keep them).
 Anything else is refused, logged with why, and the app's own layout drawn instead (`SceneLayouts.builtIn`):
 groups that make no keyboard, the other built-in keyboard's groups, and any grouping of its own on 双拼's

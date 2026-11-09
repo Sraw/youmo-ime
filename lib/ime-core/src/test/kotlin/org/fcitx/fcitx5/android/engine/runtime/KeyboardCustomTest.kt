@@ -84,6 +84,19 @@ class KeyboardCustomTest {
         assertTrue(bad.why, "make no keyboard" in bad.why)
     }
 
+    // review L3: each group's key by its id, in the groups' order, two keys of the same letters each its own
+    @Test
+    fun theKeysOfTheGroupsAreNamedInTheirOrder() {
+        assertEquals(17, SceneGroups.ids(k17Layout).size)
+        assertEquals(listOf("r3c3", "r3c4", "r3c5"), SceneGroups.ids(k17Layout).takeLast(3))
+        val twice = (LayoutReader.layout(SceneData.read("k17.xml").replace("letters=\"xyz\"", "letters=\"ab c\"")) as Parsed.Ok).value
+        assertEquals(listOf("abc", "abc"), SceneGroups.of(twice).takeLast(2))
+        assertEquals(listOf("r3c4", "r3c5"), SceneGroups.ids(twice).takeLast(2))
+        // the grouped bottom row's keys are of no group
+        val k14 = (LayoutReader.layout(SceneData.read("k14.xml")) as Parsed.Ok).value
+        assertEquals(SceneGroups.of(k14, frags()).size, SceneGroups.ids(k14, frags()).size)
+    }
+
     private fun frags() = mapOf("grouped-bottom" to (LayoutReader.fragment(SceneData.read("grouped-bottom.xml")) as Parsed.Ok).value)
 
     @Test

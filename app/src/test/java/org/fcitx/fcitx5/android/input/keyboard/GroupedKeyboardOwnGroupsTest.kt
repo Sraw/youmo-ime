@@ -58,10 +58,22 @@ class GroupedKeyboardOwnGroupsTest {
     private val popups = ArrayList<PopupAction>()
     private val sourceWas = SceneLayouts.source
 
-    // the sample, its XYZ key with a long press of its own written, the grouped bottom row under it all
-    private val k17 = File("../lib/keyboard-scene/src/commonTest/data/k17.xml").readText()
-        .replace("letters=\"xyz\"/>", "letters=\"xyz\">\n      <popup from=\"list\" as-is=\"true\"><item text=\"xyz\"/><item text=\"XYZ\"/></popup>\n    </key>")
+    private val sample = File("../lib/keyboard-scene/src/commonTest/data/k17.xml").readText()
         .replace("</keyboard>", "  <include src=\"grouped-bottom\"/>\n</keyboard>")
+
+    // the sample, its XYZ key with a long press of its own written, the grouped bottom row under it all
+    private val k17 = sample
+        .replace("letters=\"xyz\"/>", "letters=\"xyz\">\n      <popup from=\"list\" as-is=\"true\"><item text=\"xyz\"/><item text=\"XYZ\"/></popup>\n    </key>")
+
+    // the sample with the letters of one key on another too: ABC (leaning here) and, in XYZ's place, AB C of two rows
+    private val twice = sample
+        .replace("letters=\"abc\" lean=\"off\"", "letters=\"abc\"")
+        .replace("label=\"XYZ\" letters=\"xyz\"", "label=\"AB C\" letters=\"ab c\"")
+    private val writtenTwice = listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m", "pq rs", "abc", "ab c")
+
+    // what the test's source has in the 14 keys' place and the 18 keys' (null: the app's own)
+    private var k14Text = k17
+    private var k18Text: String? = null
 
     // the letters as the engine reads the sample's groups: the order of the keys, row by row
     private val written = listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m", "pq rs", "abc", "xyz")
@@ -79,7 +91,11 @@ class GroupedKeyboardOwnGroupsTest {
             object : LayoutSource {
                 override val key = "k17-sample"
 
-                override fun text(id: String) = if (id == "k14") k17 else app.text(id)
+                override fun text(id: String) = when (id) {
+                    "k14" -> k14Text
+                    "k18" -> k18Text ?: app.text(id)
+                    else -> app.text(id)
+                }
             }
         }
     }
@@ -88,15 +104,24 @@ class GroupedKeyboardOwnGroupsTest {
     fun asBuiltIn() {
         SceneLayouts.source = sourceWas
         EngineState.ownKeys = null
-        NineKeyLetters.inUse(NineKeyLetters.G14)
+        NineKeyLetters.clearInUse()
     }
 
-    private fun grouped(ownGroups: Boolean = true) = GroupedKeyboard(context, TestThemes.PixelDark, ownGroups = ownGroups).apply {
+    // made, not shown: KeyboardWindow's onAttach is each test's to call
+    private fun GroupedKeyboard.wired() = apply {
         setViewTreeLifecycleOwner(Owner())
         keyActionListener = KeyActionListener { action, _ -> sent += action }
         popupActionListener = PopupActionListener { popups += it }
         laidOut(1080, 800)
     }
+
+    private fun grouped(ownGroups: Boolean = true) = GroupedKeyboard(context, TestThemes.PixelDark, ownGroups = ownGroups).wired()
+
+    // pinyin's 18 keys, as KeyboardWindow makes them
+    private fun pinyin18() =
+        GroupedKeyboard(context, TestThemes.PixelDark, NineKeyLetters.G18, Keyboard::pinyin18Key, semicolon = false, ownGroups = true).wired()
+
+    private fun symOf(action: KeyAction) = (action as KeyAction.SymAction).sym.sym - UNICODE
 
     private fun codeOf(group: String) = letters.codes[written.indexOf(group)]
 
@@ -128,7 +153,56 @@ class GroupedKeyboardOwnGroupsTest {
         assertTrue(labels.toString(), labels.containsAll(listOf("PQRS", "ABC", "XYZ", "AS", "BN")))
         // the grouped bottom row under them
         assertTrue(keyboard.shownKeys().any { it.id == "space" })
+        // told as it is shown, not as it is made (review L2: one made and never shown, a preview, tells nothing)
+        assertNull(EngineState.ownKeys)
+        keyboard.onAttach()
         assertEquals(written, EngineState.ownKeys)
+    }
+
+    // review L6: each keyboard shown tells its own groups again; one of the built-in groups leaves them as told
+    @Test
+    fun eachKeyboardShownTellsItsOwnGroupsAgain() {
+        k18Text = twice
+        val k14 = grouped()
+        val k18 = pinyin18()
+        val shuangpin = grouped(ownGroups = false)
+        assertNull(EngineState.ownKeys)
+        k14.onAttach()
+        assertEquals(written, EngineState.ownKeys)
+        k18.onAttach()
+        assertEquals(writtenTwice, EngineState.ownKeys)
+        shuangpin.onAttach()
+        assertEquals(writtenTwice, EngineState.ownKeys)
+        k14.onAttach()
+        assertEquals(written, EngineState.ownKeys)
+    }
+
+    // review L4: in pinyin's 18 keys' place, the layout's own codes as they are, never wired as the 18 keys' (pinyin18Key)
+    @Test
+    fun theEighteenKeysPlaceSendsTheLayoutsOwnCodes() {
+        k18Text = k17
+        val keyboard = pinyin18()
+        keyboard.onAttach()
+        assertEquals(written, EngineState.ownKeys)
+        keyboard.touch(keyboard.shownKey("PQRS"), 0.75f, 0.25f)
+        keyboard.touch(keyboard.shownKey("M"), 0.5f, 0.5f)
+        keyboard.touch(keyboard.shownKey("ABC"), 0.9f, 0.5f)
+        assertEquals(listOf<KeyAction>(tap(codeOf("pq rs"), 0.75f, 0.25f), code(codeOf("m")), code(codeOf("abc"))), sent)
+    }
+
+    // review L3: two keys of the same letters each send their own code, read by their own rows
+    @Test
+    fun twoKeysOfTheSameLettersEachSendTheirOwnCode() {
+        k14Text = twice
+        val keyboard = grouped()
+        val own = NineKeyLetters.custom(writtenTwice)
+        keyboard.touch(keyboard.shownKey("ABC"), 0.9f, 0.1f)
+        keyboard.touch(keyboard.shownKey("AB C"), 0.9f, 0.1f)
+        assertEquals(listOf<KeyAction>(tap(own.codes[15], 0.9f, 0.1f), tap(own.codes[16], 0.9f, 0.1f)), sent)
+        // the keyboard in use, as EngineBridge.syncOwnKeys has it before each key: c at the one row's right, b at
+        // the top row's right of the two
+        NineKeyLetters.inUse(own)
+        assertEquals(listOf('c', 'b'), sent.map { Keyboard.typedLetter(symOf(it)) })
     }
 
     @Test
@@ -141,10 +215,10 @@ class GroupedKeyboardOwnGroupsTest {
             sent.clear()
         }
         // what a temporary mode reads of them, the keyboard in use the one told (EngineBridge.syncOwnKeys, before each key): the letter nearest each
-        NineKeyLetters.inUse(NineKeyLetters.custom(EngineState.ownKeys!!))
+        NineKeyLetters.inUse(letters)
         val typed = listOf(0.1f to 0.1f, 0.9f to 0.1f, 0.1f to 0.9f, 0.9f to 0.9f).map { (x, y) ->
             keyboard.touch(pqrs, x, y)
-            Keyboard.typedLetter((sent.single() as KeyAction.SymAction).sym.sym - UNICODE).also { sent.clear() }
+            Keyboard.typedLetter(symOf(sent.single())).also { sent.clear() }
         }
         assertEquals(listOf('p', 'q', 'r', 's'), typed)
         // a key of one row: across as ever, down too (the engine's middle row for it)
@@ -201,6 +275,7 @@ class GroupedKeyboardOwnGroupsTest {
             val keyboard = grouped(ownGroups = false)
             val labels = keyboard.shownKeys().map { it.label }
             assertTrue(labels.toString(), "PQRS" !in labels && "BN" in labels)
+            keyboard.onAttach()
             assertNull(EngineState.ownKeys)
             val bn = keyboard.shownKey("BN")
             keyboard.touch(bn, 0.75f, 0.5f)

@@ -83,11 +83,13 @@ class GroupedKeyboard private constructor(
     theme: Theme,
     // the built-in keyboard this one is (G14, G18): its layout's id, its theme board, its keys' names
     builtIn: NineKeyLetters,
-    wire: (Char) -> Int,
-    semicolon: Boolean,
+    // named apart from the properties below, which an initializer would otherwise not see (review L4: the
+    // 18 keys' wire reached a layout's own codes through sceneTable)
+    builtInWire: (Char) -> Int,
+    builtInSemicolon: Boolean,
     private val grouping: Grouping,
 ) : BaseKeyboard(
-    context, theme, layout(builtIn, wire, semicolon, ::symbolsOf),
+    context, theme, layout(builtIn, builtInWire, builtInSemicolon, ::symbolsOf),
     themeBoard = shapeOf(builtIn).board,
     shortcuts = true,
 ) {
@@ -106,13 +108,16 @@ class GroupedKeyboard private constructor(
     private val letters: NineKeyLetters = grouping.letters
 
     // a layout's own groups' codes go as they are (NineKeyLetters.CUSTOM_BLOCK); the built-in ones' as [wire] has them
-    private val wire: (Char) -> Int = if (grouping.own != null) Char::code else wire
+    private val wire: (Char) -> Int = if (grouping.own != null) Char::code else builtInWire
 
     // a layout's own groups shown as written, a `;` among them too
-    private val semicolon: Boolean = semicolon || grouping.own != null
+    private val semicolon: Boolean = builtInSemicolon || grouping.own != null
 
     // the groups in the engine's order: a layout's own key's code is its group's place among them
     private val groups: List<String> = letters.tag().split(',')
+
+    // a layout's own groups' keys, in the same order: the place of a key whose letters another key has too (review L3)
+    private val ownIds: List<String> = grouping.layout?.takeIf { grouping.own != null }?.let { SceneGroups.ids(it.layout, it.fragments) }.orEmpty()
 
     companion object {
         const val Name14 = "Grouped14"
@@ -357,10 +362,15 @@ class GroupedKeyboard private constructor(
         filters = { InputMethodCatalog.filtersByStrokes(imeName) },
     ) { _, _ -> }
 
-    // the code of the key of [group]'s letters: the built-in keyboard's of its first letter (as always), a
-    // layout's own its group's place among the engine's (a letter may be on more than one key of its own)
-    private fun codeOf(group: String): Char? =
-        if (grouping.own == null) letters.key(group[0]) else groups.indexOf(group).takeIf { it >= 0 }?.let(letters.codes::get)
+    // the code of the key [id] of [group]'s letters: the built-in keyboard's of its first letter (as always), a
+    // layout's own its key's place among the engine's groups (a letter may be on more than one key of its own,
+    // the same letters too); a key not found by its id (one of a when=, its id another's too), its group's first place
+    private fun codeOf(group: String, id: String): Char? = if (grouping.own == null) {
+        letters.key(group[0])
+    } else {
+        val place = ownIds.indexOf(id).takeIf { it >= 0 && groups.getOrNull(it) == group } ?: groups.indexOf(group)
+        place.takeIf { it >= 0 }?.let(letters.codes::get)
+    }
 
     // the group and corner of the key [ref] whose long press is its letters' (no popup written, or from="group"):
     // by its node's letters= and swipe; null for one whose layout wrote its own (060-render-p3 T9b)
@@ -380,7 +390,7 @@ class GroupedKeyboard private constructor(
     // first letter is in, sent as [wire] has it (a tap's place added by [pressed]); its letters around its
     // corner, made again as it opens ([onPopupAction])
     override val sceneTable = object : SceneKeyDef.Table {
-        override fun group(letters: String, node: KeyNode): KeyAction? = codeOf(letters)?.let { code(it, wire) }
+        override fun group(letters: String, node: KeyNode): KeyAction? = codeOf(letters, node.id)?.let { code(it, wire) }
 
         override fun groupPopup(letters: String, node: KeyNode): KeyDef.Popup.Keyboard =
             longPressOf(shown(letters), cornerOf(node), ::symbolsOf)
@@ -476,20 +486,17 @@ class GroupedKeyboard private constructor(
         return SceneEnvs.of(this, look, theme.isDark, width, height, input = state.input(), texts = texts, marks = SceneBoard.marks(layout, charShortcutMarks))
     }
 
-    // a layout's own groups told the engine as this keyboard is made and shown, before any of its keys is
-    // tapped: a keyboard kept while another's own groups were shown tells its own again (EngineState.ownKeys)
-    private fun tellOwnKeys() {
-        grouping.own?.let { EngineState.ownKeys = it }
-    }
-
+    // a layout's own groups told the engine as this keyboard is shown, before any of its keys is tapped
+    // (KeyboardWindow attaches a keyboard as it makes it): a keyboard kept while another's own groups were
+    // shown tells its own again (EngineState.ownKeys). Not as it is made: one made and never shown (a
+    // preview) would change the groups the keyboard shown is read by (review L2)
     override fun onAttach() {
         super.onAttach()
-        tellOwnKeys()
+        grouping.own?.let { EngineState.ownKeys = it }
     }
 
     // last: the scene reads the state above (the keys drawn by the scene engine, each as its layout says)
     init {
-        tellOwnKeys()
         drawKeysWithScene(grouping.layout)
     }
 }
