@@ -119,6 +119,21 @@ class ZipStreamTest {
         )
     }
 
+    // a theme 4.0 pack's: its top and layouts/ unpacked, the rest counted and metered, every name told
+    @Test
+    fun keepPicksWhatIsUnpackedAndEveryNameIsTold() {
+        val names = mutableListOf<String>()
+        var metered = 0L
+        val keep = { name: String -> '/' !in name || name.startsWith("layouts/") }
+        zip("theme.xml" to "t", "layouts/" to null, "layouts/q.xml" to "q", "other/x.png" to "xyz", "__MACOSX/" to null).use {
+            it.extract(dest, keep = keep, names = names) { _, s, t -> metered = maxOf(metered, s + t) }
+        }
+        assertEquals(listOf("theme.xml", "layouts/", "layouts/q.xml", "other/x.png", "__MACOSX/"), names)
+        assertEquals(setOf("theme.xml", "layouts"), dest.list()!!.toSet())
+        assertEquals("q", File(dest, "layouts/q.xml").readText())
+        assertEquals(5L, metered)
+    }
+
     @Test
     fun aCheckThatThrowsStopsBeforeTheChunkPastTheLimitIsWritten() {
         val big = "x".repeat(3 * DEFAULT_BUFFER_SIZE)

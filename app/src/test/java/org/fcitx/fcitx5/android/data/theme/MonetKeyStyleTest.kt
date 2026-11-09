@@ -10,10 +10,12 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.scene.look.LegacyLook
+import org.fcitx.fcitx5.android.scene.look.LookDefaults
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -104,13 +106,19 @@ class MonetKeyStyleTest {
         ThemeManager.onSystemPlatteChange(appContext.resources.configuration)
         val monet = monet()
         val bytes = ByteArrayOutputStream()
-        ThemeFilesManager.exportTheme(monet.toCustom(), bytes).getOrThrow()
-        // gone from this app since: the file keeps it
+        val fixed = monet.toCustom()
+        fixed.styled()
+        ThemeFilesManager.exportTheme(fixed, bytes).getOrThrow()
+        // gone from this app since: the file keeps it, a theme 4.0 (060-render-p3 Q5) drawn as the key style was
         ThemeLookMigration.monetLook = null
-        val (_, imported, _) = ThemeFilesManager.importTheme(ByteArrayInputStream(bytes.toByteArray())).getOrThrow()
-        imported.styled()
+        val opened = ThemeFilesManager.openTheme(ByteArrayInputStream(bytes.toByteArray())).getOrThrow() as ThemeFilesManager.Opened.Pack
+        val imported = opened.commit().getOrThrow().single()
+        assertEquals(ThemePackFiles.of(fixed.look, fixed.name, fixed.isDark).first, imported.source)
+        assertNotEquals(ThemePackFiles.of(LookDefaults.look(fixed.look.palette), fixed.name, fixed.isDark).first, imported.source)
         assertEquals(monet.look.palette, imported.look.palette)
+        ThemeManager.refreshThemes()
         ThemeManager.deleteTheme(imported.name)
+        assertEquals(emptyList<Theme.Pack>(), ThemeManager.Packs)
     }
 
     // the Monet themes' key style is no managed preference, so it was not copied to the device-protected
