@@ -21,9 +21,9 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.NavbarBackground
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.NavigationBarManager
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
@@ -222,7 +222,7 @@ class WindowThemeTest {
     fun aThemeOfNoneIsTheAppsLookOfBefore() {
         prefs.set(theme.floatingKeyboard, true)
         prefs.set(theme.floatingHandle, FloatingHandleSide.Top)
-        val t = ThemePreset.PixelLight
+        val t = TestThemes.PixelLight
         KeyboardHarness(t).use { h ->
             started(h)
             // FloatingController's corners of 0.5.2: the keys' radius and their least margin, truncated px
@@ -262,7 +262,7 @@ class WindowThemeTest {
         SceneThemes.source = { _, _, _ -> "<theme/>" }
         prefs.set(theme.floatingKeyboard, true)
         prefs.set(theme.floatingHandle, FloatingHandleSide.Top)
-        val t = ThemePreset.PixelLight
+        val t = TestThemes.PixelLight
         KeyboardHarness(t).use { h ->
             started(h)
             val keys = ThemeManager.shownLook(t).keys
