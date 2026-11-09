@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemeMonet
+import org.fcitx.fcitx5.android.scene.theme.ColorExpr
 import org.fcitx.fcitx5.android.scene.theme.SystemColors
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
@@ -105,9 +106,45 @@ class DarkModeThemeTest {
             }
             // the system's, not the fallbacks
             assertNotEquals(0xff415f91.toInt(), light.accentKeyBackgroundColor)
+            // every name a theme's system() may take, in both (none its fallback for a role missed)
+            val system = ThemeMonet.systemColors(appContext)
+            assertEquals(ColorExpr.SYSTEM_NAMES, system.light.keys)
+            assertEquals(ColorExpr.SYSTEM_NAMES, system.dark.keys)
         }
         // the press highlight the text's at 12% (light) and 20% (dark), as 0.5 had it
         assertEquals(light.keyTextColor and 0xffffff or (0x1f shl 24), light.keyPressHighlightColor)
         assertEquals(dark.keyTextColor and 0xffffff or (0x33 shl 24), dark.keyPressHighlightColor)
+    }
+
+    // Android 12 and 13 have no roles: the palette's tones 0.5 took for them (ThemeMonet's approximations),
+    // the two 0.5 had none for (the light high, the dark highest) too. Not run at 29 (its task's SDK alone)
+    @Test
+    @Config(sdk = [Build.VERSION_CODES.TIRAMISU])
+    fun onAndroid13MonetIsThePalettesTonesForTheRoles() {
+        fun color(id: Int) = appContext.getColor(id)
+        val system = ThemeMonet.systemColors(appContext)
+        assertEquals(ColorExpr.SYSTEM_NAMES, system.light.keys)
+        assertEquals(ColorExpr.SYSTEM_NAMES, system.dark.keys)
+        fun light(role: String) = system.light.getValue(role).value
+        fun dark(role: String) = system.dark.getValue(role).value
+        assertEquals(color(android.R.color.system_neutral1_50), light("surface-container"))
+        assertEquals(color(android.R.color.system_neutral1_100), light("surface-container-high"))
+        assertEquals(color(android.R.color.system_neutral2_100), light("surface-container-highest"))
+        assertEquals(color(android.R.color.system_accent1_600), light("primary"))
+        assertEquals(color(android.R.color.system_neutral1_900), dark("surface-container"))
+        assertEquals(color(android.R.color.system_neutral2_1000), dark("surface-container-high"))
+        assertEquals(color(android.R.color.system_neutral2_800), dark("surface-container-highest"))
+        assertEquals(color(android.R.color.system_accent1_200), dark("primary"))
+        // the tones as they are
+        assertEquals(color(android.R.color.system_accent3_300), light("accent3-300"))
+        // Monet's versions drawn with them: 0.5's bar (light the highest, dark the high) and keys
+        val monetLight = ThemeManager.builtin("monet#light")
+        val monetDark = ThemeManager.builtin("monet#dark")
+        assertEquals(light("surface-container"), monetLight.backgroundColor)
+        assertEquals(light("surface-container-highest"), monetLight.barColor)
+        assertEquals(light("primary"), monetLight.accentKeyBackgroundColor)
+        assertEquals(dark("surface-container"), monetDark.backgroundColor)
+        assertEquals(dark("surface-container-high"), monetDark.barColor)
+        assertEquals(dark("primary"), monetDark.accentKeyBackgroundColor)
     }
 }

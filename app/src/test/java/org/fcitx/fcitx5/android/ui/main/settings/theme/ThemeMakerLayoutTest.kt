@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.SCREENSHOT_SDK
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.core.FormattedText
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeMakerTestdata
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -134,6 +135,11 @@ class ThemeMakerLayoutTest {
 
     @Test
     fun theLayoutsAndIconsThePageDraws() {
+        // the floating keyboard where it is at first: a test before in the same JVM may have dragged it
+        // (the preferences are one for every test), and the page's floating views would be measured there
+        val internal = AppPrefs.getInstance().internal
+        prefs.set(internal.floatingKeyboardX, internal.floatingKeyboardX.defaultValue)
+        prefs.set(internal.floatingKeyboardY, internal.floatingKeyboardY.defaultValue)
         // the bar as every build has it, its microphone too
         val icons = sortedSetOf<String>()
         val views = shots().map { measure(it, icons) }
