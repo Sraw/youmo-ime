@@ -41,10 +41,10 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.input.keyboard.LetterCaseChoice
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
-import org.fcitx.fcitx5.android.input.theme.BoardBase
-import org.fcitx.fcitx5.android.input.theme.Crop
-import org.fcitx.fcitx5.android.input.theme.Keys
-import org.fcitx.fcitx5.android.input.theme.Picture
+import org.fcitx.fcitx5.android.scene.look.BoardBase
+import org.fcitx.fcitx5.android.scene.look.Crop
+import org.fcitx.fcitx5.android.scene.look.Keys
+import org.fcitx.fcitx5.android.scene.look.Picture
 import org.fcitx.fcitx5.android.utils.inputMethodManager
 import org.junit.After
 import org.junit.Assume.assumeTrue

@@ -318,9 +318,9 @@ key views and the 开发者 → 新绘制键盘 switch, its stored key retired):
 and 18 keys: k14.xml, k18.xml, their bottom row grouped-bottom.xml), since S4b `NumberKeyboard` (number.xml,
 its seven pads by `when="pad=…"`) and, since S4c, `ZhuyinKeyboard`'s 大千
 (zhuyin.xml) and, since S4d, its 注音九键 (zhuyin-nine.xml) draw their keys with a `KeyboardCanvasView`,
-no view a key — the next paragraph but one says how a keyboard moves. The canvas draws the scene `lib/keyboard-scene` makes of its layout in the look converted by ime-core's
-`LookTheme` (a 3.0 single key's name a selector with what selectors read escaped in the key: `zhuyin/,` its comma
-key, `number/*` the star; `ScenePainter`: one `RenderNode` a key a face, both kept in the tree and a press only their alpha, since a node left out of a frame loses its recording; a
+no view a key — the next paragraph but one says how a keyboard moves. The canvas draws the scene `lib/keyboard-scene` makes of its layout in the look converted by keyboard-scene's
+`LookTheme` (`scene/look/`) (a 3.0 single key's name the selector of that key, written by `ThemeWriter` with what selectors read escaped: `zhuyin/,` its comma
+key, `number/*` the star; a board's key of a role, `qwerty/shift`, has on its own styles what it does not set of the role's `*/shift`, as 3.0's `KeyStyleResolver` drew it, and a key of a face of its own and no pressed one its kind's pressed face by its name; the look's files named as theme 4 takes a file's name (`LookTheme.fileNames`: `a (1).png` is `a__1_.png`, at most 128 characters, numbered where two meet), the theme's name cut to 64; `ScenePainter`: one `RenderNode` a key a face, both kept in the tree and a press only their alpha, since a node left out of a frame loses its recording; a
 software canvas, a screenshot's, gets the ops drawn straight); `TextKeyboard.scene` builds the
 `Env` from its state (`TextBoardState`, `SceneMarks`, the texts) through `SceneEnvs.of`, which adds
 what every keyboard's has alike (size, density, landscape, compact, floating's text scale in the input
@@ -915,7 +915,7 @@ A custom theme is `files/host-theme/<name>.json` and the files it names beside i
 (a picture's source and its portrait and landscape cuts, key images, fonts). The json is format
 **3.0**: `version` first, then `name`, `isDark`, `palette` (24 colours: the 21 of 2.1 and
 `keyBorderColor`, `keyHintColor`, `toolbarIconColor`), `picture` (or null), `base`, `bar`, `keys`,
-`text`. It is ime-core's `ThemeLook` (`input/theme/`) one to one, through `ThemeLookJson.kt` (the
+`text`. It is keyboard-scene's `ThemeLook` (`scene/look/`, with `LookDefaults` and `LookTheme`: the web converts 3.0 with the same code, and reads its json with `ThemeLookReader`, held to this one by `ThemeLookReaderParityTest`) one to one, through `ThemeLookJson.kt` (the
 only place the two meet): no field has a default, a field missing or not known is an error, and a
 value out of range is refused as the `ThemeLook` is made. `keys.overrides` maps a key's name
 (`KeyNames`: `<board>/<key>`, `*/<role>` for a function key on every board) to its own fill,
