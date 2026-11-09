@@ -357,6 +357,9 @@ class Engines(
     // whether [settings] name a layout's own keyboard (EngineSettings.ownKeyboard): what its codes are read by
     private var ownKeys = false
 
+    // a layout's own keyboard's code or tap: none but that keyboard reads it
+    private fun isOwnKeysCode(c: Int) = c in NineKeyLetters.CUSTOM_BLOCK || c in Keyboard.PLACES
+
     private val latin = LatinSync { w -> assets.englishData?.let { it.id(w) != NO_WORD } == true }
 
     // off with the habits (U-93): nothing English learned is spelled, and no user model is made for it
@@ -379,7 +382,7 @@ class Engines(
         if (im == PINYIN) syncLatin()
         // a layout's own keyboard's code (a tap's too) with none told: no keys to read it by, swallowed, what is
         // shown left as it is, never handed back to be typed as it is (the app tells its keyboard first: EngineBridge)
-        if (!ownKeys && event == EngineEvent.CHAR && (arg in NineKeyLetters.CUSTOM_BLOCK || arg in Keyboard.PLACES)) {
+        if (!ownKeys && event == EngineEvent.CHAR && isOwnKeysCode(arg)) {
             return annotated(im, (pairs[im]?.showing ?: keyboard(im).showing).copy(commit = "", deleteBefore = 0, handled = true))
         }
         val s = pairs[im]?.onEvent(event, arg, learning, payload)
