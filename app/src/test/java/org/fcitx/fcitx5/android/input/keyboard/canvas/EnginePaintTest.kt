@@ -22,8 +22,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.SCREENSHOT_SDK
 import org.fcitx.fcitx5.android.data.theme.BoardImages
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeMakerTestdata
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Scene
@@ -65,7 +65,7 @@ import kotlin.math.roundToLong
 @Config(application = FcitxApplication::class, sdk = [SCREENSHOT_SDK])
 class EnginePaintTest {
     private val context = RuntimeEnvironment.getApplication()
-    private val look = ThemePreset.PixelLight.look
+    private val look = TestThemes.PixelLight.look
 
     @Test
     fun theLibrarysShotsAreDrawnAsWrittenDown() {

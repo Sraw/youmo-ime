@@ -119,7 +119,13 @@ test("the app's layouts are the library's, a layout of a page's reads with its o
   let themeFiles = [];
   try { themeFiles = readdirSync(themesDir).filter((f) => f.endsWith('.xml')).map((f) => f.slice(0, -4)).sort(); } catch (e) { /* none yet */ }
   assert.deepEqual([...E.themes()], themeFiles);
-  for (const f of themeFiles) assert.equal(E.themeSource(f), read(themesDir, f + '.xml'));
+  for (const f of themeFiles) {
+    assert.equal(E.themeSource(f), read(themesDir, f + '.xml'));
+    // each reads and builds in the library, each of its versions
+    const t = E.readTheme(E.themeSource(f), null, null);
+    assert.ok(t.ok, f + ': ' + JSON.stringify(t.problems));
+    for (const v of t.theme.variants) assert.ok(E.buildScene('qwerty', t.theme, { width: 1080, height: 702, density: 2.625, dark: v === 'dark' }, fixed).ok, f + ' ' + v);
+  }
 
   const k14 = read(dir, 'k14.xml');
   const own = E.readLayout(k14, null);
