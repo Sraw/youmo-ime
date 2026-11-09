@@ -6,8 +6,10 @@ package org.fcitx.fcitx5.android.data.theme
 
 import android.content.Context
 import android.os.Environment
+import android.os.Looper
 import androidx.core.content.edit
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.core.EngineNotices
 import org.fcitx.fcitx5.android.core.HostConfigDir
 import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.utils.appContext
@@ -16,11 +18,13 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowEnvironment
 import java.io.File
@@ -54,6 +58,12 @@ class ThemeNameClashTest {
         // the process's first listing done
         ThemeFilesManager.listThemes()
         sp.edit(commit = true) { clear() }
+    }
+
+    // no theme left for a later test's list (the theme page's screenshots), nor a json that does not read
+    @After
+    fun noThemesLeft() {
+        dir.listFiles()?.forEach { it.deleteRecursively() }
     }
 
     private fun store(vararg names: String) = sp.edit(commit = true) { slots.zip(names).forEach { (k, v) -> putString(k, v) } }
@@ -159,9 +169,19 @@ class ThemeNameClashTest {
     @Test
     fun aThemeNotListedMayHoldAName() {
         assertFalse(ThemeFilesManager.mayHoldTheme("MonetLight"))
-        // a json that does not read (a later build's): not listed, its name the user's all the same
-        File(dir, "MonetLight.json").writeText("""{"version":"9.0"}""")
-        assertTrue(ThemeFilesManager.listThemes().none { it.name == "MonetLight" })
+        // a json that does not read (a later build's): not listed, its name the user's all the same. The
+        // user told it does not read: said here, not left for a later test's keyboard to show
+        val before = EngineNotices.sayer
+        EngineNotices.forgetToldOnce()
+        EngineNotices.sayer = EngineNotices.Sayer { _, _ -> true }
+        try {
+            File(dir, "MonetLight.json").writeText("""{"version":"9.0"}""")
+            assertTrue(ThemeFilesManager.listThemes().none { it.name == "MonetLight" })
+            shadowOf(Looper.getMainLooper()).idle()
+        } finally {
+            EngineNotices.sayer = before
+            EngineNotices.forgetToldOnce()
+        }
         assertTrue(ThemeFilesManager.mayHoldTheme("MonetLight"))
         assertFalse(ThemeFilesManager.mayHoldTheme("MonetDark"))
     }
