@@ -69,6 +69,9 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
     // aimed at, a lift is dragged off it. The key's width, its margins too (its cell's)
     private var downAt = Float.NaN
 
+    // where down the key it came down, 0 its top and 1 its bottom: its cell's height, as [downAt]'s width
+    private var downDown = Float.NaN
+
     /**
      * Where across the key the touch that clicks it came down ([downAt]), for the click listener
      * alone: set as the finger lifts, before the touch's state is reset, cleared once the click
@@ -76,6 +79,10 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
      * threshold, and for a swipe's own click (KeySwipe's Tap, made at the Up before this is set).
      */
     var clickAt = Float.NaN
+        private set
+
+    /** Where down the key that touch came down ([clickAt]'s y: 0 its top, 1 its bottom), NaN as [clickAt] is: a layout's own groups' taps (060-render-p3 T9b). */
+    var clickDown = Float.NaN
         private set
 
     var longPressEnabled
@@ -135,9 +142,11 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
 
     private fun across(x: Float) = if (key.keyWidth > 0) x / key.keyWidth else Float.NaN
 
-    // where the touch came down, if it stayed a tap: on the key, swiped past no threshold
-    private fun tapPlace() =
-        if (!recognizer.touchMovedOutside && recognizer.swipeTotalX == 0 && recognizer.swipeTotalY == 0) downAt else Float.NaN
+    private fun downward(y: Float) = if (key.keyHeight > 0) y / key.keyHeight else Float.NaN
+
+    // where the touch came down ([downAt] across, [downDown] down), if it stayed a tap: on the key, swiped past no threshold
+    private fun tapPlace(at: Float = downAt) =
+        if (!recognizer.touchMovedOutside && recognizer.swipeTotalX == 0 && recognizer.swipeTotalY == 0) at else Float.NaN
 
     private fun resetState() {
         stopTimers()
@@ -182,6 +191,7 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
             MotionEvent.ACTION_MOVE -> return move(x, y)
             MotionEvent.ACTION_CANCEL -> {
                 clickAt = Float.NaN
+                clickDown = Float.NaN
                 dispatchGestureEvent(GestureType.Up, x, y, cancelled = true)
                 cancelGestures()
             }
@@ -194,7 +204,9 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
         // split from the keyboard's touch, the event keeps the finger's id
         touchPointer = pointerId
         downAt = across(x)
+        downDown = downward(y)
         clickAt = Float.NaN
+        clickDown = Float.NaN
         key.hotspot(x, y)
         key.showPressed(true)
         InputFeedbacks.hapticFeedback(key.feedback)
@@ -241,11 +253,13 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
         // a swipe past the threshold, or off the key, is no tap. The total is signed, so one
         // swiped a step and back counts as a tap, as it clicks anyway
         clickAt = tapPlace()
+        clickDown = tapPlace(downDown)
         resetState()
         if (outcome.performClick) {
             if (outcome.isDoubleTap) key.doubleTap() else key.click()
         }
         clickAt = Float.NaN
+        clickDown = Float.NaN
     }
 
     private fun move(x: Float, y: Float): Boolean {

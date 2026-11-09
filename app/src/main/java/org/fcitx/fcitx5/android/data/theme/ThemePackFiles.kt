@@ -24,7 +24,6 @@ import org.fcitx.fcitx5.android.scene.theme.Selector
 import org.fcitx.fcitx5.android.scene.theme.Style
 import org.fcitx.fcitx5.android.scene.theme.SystemColors
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
-import org.fcitx.fcitx5.android.scene.theme.ThemeWriter
 import org.fcitx.fcitx5.android.scene.theme.Value
 import org.fcitx.fcitx5.android.utils.errorRuntime
 import org.fcitx.fcitx5.android.utils.isPlainFileName
@@ -56,9 +55,6 @@ object ThemePackFiles {
     const val FOLDER = "v4"
     const val THEME_XML = "theme.xml"
     const val LAYOUTS = "layouts"
-
-    /** The font a 3.0 theme's candidate font is exported as (`<style select="candidate" font="candidate">`). */
-    const val CANDIDATE_FONT = "candidate"
 
     private const val SAVING = ".saving"
     private const val MACOS = "__MACOSX"
@@ -395,24 +391,9 @@ object ThemePackFiles {
 
     /**
      * [look] (a 3.0 theme's, named [name]) as a pack's `theme.xml` and its files by the names it gives them
-     * ([LookTheme.fileNames]): drawn as the 3.0 theme is ([LookTheme.theme]), and its candidate font, which
-     * theme 4 has no drawing of yet (060-render-p3 T6a), kept as `candidate`'s ([CANDIDATE_FONT]).
+     * ([LookTheme.fileNames]): drawn as the 3.0 theme is ([LookTheme.xml], its candidates' font and weight
+     * with it since 060-render-p3 T6a).
      */
-    fun of(look: ThemeLook, name: String, dark: Boolean): Pair<String, Map<String, String>> {
-        val names = LookTheme.fileNames(look)
-        val t = LookTheme.theme(look, name, dark)
-        val candidate = look.text.candidateFont?.let { names.getValue(it) }
-        val theme = if (candidate == null && look.text.candidateWeight == LookDefaults.TEXT.candidateWeight) t else {
-            val values = buildMap<String, Value> {
-                if (candidate != null) put("font", Value.Word(CANDIDATE_FONT))
-                put("weight", Value.Number(look.text.candidateWeight.toDouble()))
-            }
-            val style = Style(listOf(Selector(emptySet(), "candidate")), values, t.styles.size, 0)
-            SceneTheme(
-                t.name, t.dark, t.version, t.colors, t.styles + style, t.fonts + listOfNotNull(candidate?.let { CANDIDATE_FONT to it }),
-                t.icons, t.picture, t.variants, t.baseColors, t.darkColors, t.meta, t.systemColors,
-            )
-        }
-        return ThemeWriter.write(theme) to names
-    }
+    fun of(look: ThemeLook, name: String, dark: Boolean): Pair<String, Map<String, String>> =
+        LookTheme.xml(look, name, dark) to LookTheme.fileNames(look)
 }

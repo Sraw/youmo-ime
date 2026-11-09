@@ -112,6 +112,12 @@ object SceneLayouts {
         return readFrom(first, id) ?: readFrom(fallback(app), id)
     }
 
+    /**
+     * The layout [id] as the app has it ([fallback]'s), whatever [source] has: what a keyboard that cannot
+     * take its source's layout draws instead, the block gone by whole (a grouping it cannot type, 060-render-p3 T9b).
+     */
+    fun builtIn(context: Context, id: String): SceneLayout? = readFrom(fallback(context.applicationContext ?: context), id)
+
     /** The layouts read from the source of [key] (all of them where null) read again when next asked for: P3, a theme pack changed. */
     fun invalidate(key: String? = null) {
         if (key == null) read.clear() else read.keys.removeAll { it.first == key }

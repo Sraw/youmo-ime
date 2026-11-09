@@ -175,6 +175,21 @@ class KeyboardPairTest {
         assertFalse((full.actions.single() as Action.Context).offers)
     }
 
+    // 060-render-p3 T9b review M1: a keyed session dropped alone (a layout's own groups told anew) is made again at
+    // its next code, told the last context as one made later
+    @Test
+    fun aKeyedSessionDroppedAloneIsMadeAgainToldTheLastContext() {
+        pair.context("我", learning = true)
+        type(nihao14.take(1))
+        val first = keyed
+        pair.dropKeyed("keys")
+        assertFalse(pair.keyedActive)
+        type(nihao14.take(1))
+        assertEquals(2, made)
+        assertTrue(keyed !== first)
+        assertEquals("我", (keyed!!.actions.first() as Action.Context).before)
+    }
+
     // review S2: a context made old by a commit is not told to the 14 keys' session made after it
     @Test
     fun aContextACommitMadeOldIsNotToldToTheFourteenKeysMadeAfter() {

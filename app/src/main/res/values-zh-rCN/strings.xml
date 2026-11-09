@@ -579,6 +579,7 @@
     <string name="im_pinyin_keys18">拼音 · 18 键</string>
     <string name="im_shuangpin_keys14">双拼 · 14 键</string>
     <string name="learning_kind_keys18">拼音 18 键</string>
+    <string name="learning_kind_keys_own">拼音 主题键盘</string>
     <string name="learning_kind_shuangpin_keys14">双拼 14 键</string>
     <string name="english_keyboard">键盘</string>
     <string name="english_keyboard_summary">屏幕上打英文用的键盘。实体键盘仍按字母打。</string>

@@ -5,6 +5,7 @@
 
 package org.fcitx.fcitx5.android.input.candidates.expanded.window
 
+import android.graphics.Color
 import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.RectShape
 import android.util.DisplayMetrics
@@ -28,6 +29,7 @@ import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
 import org.fcitx.fcitx5.android.input.candidates.expanded.CandidatesPagingSource
+import org.fcitx.fcitx5.android.input.candidates.SceneBar
 import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateLayout
 import org.fcitx.fcitx5.android.input.candidates.expanded.PagingCandidateViewAdapter
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateComponent
@@ -68,12 +70,16 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
 
     private lateinit var candidateLayout: ExpandedCandidateLayout
 
+    // the theme's candidates (T6a), the bar's: their look, the lines between them, the panel under them
+    private val barLook by lazy { SceneBar.of(context, theme) }
+
     protected val dividerDrawable by lazy {
         ShapeDrawable(RectShape()).apply {
             val intrinsicSize = max(1, context.dp(1))
             intrinsicWidth = intrinsicSize
             intrinsicHeight = intrinsicSize
-            paint.color = theme.dividerColor
+            // none drawn: its room kept
+            paint.color = barLook.divider?.value ?: Color.TRANSPARENT
         }
     }
 
@@ -96,7 +102,8 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
     }
 
     final override fun onCreateView(): View {
-        candidateLayout = ExpandedCandidateLayout(context, theme).apply {
+        adapter.bar = barLook
+        candidateLayout = ExpandedCandidateLayout(context, theme, barLook).apply {
             recyclerView.apply {
                 adapter = this@BaseExpandedCandidateWindow.adapter
                 layoutManager = this@BaseExpandedCandidateWindow.layoutManager

@@ -349,9 +349,9 @@ class ThemePackImportTest {
         val out = ByteArrayOutputStream()
         ThemeFilesManager.exportTheme(custom, out).getOrThrow()
         val pack = opened(out.toByteArray())
-        // drawn as LookTheme draws the 3.0 theme, its candidates' font kept as candidate's
-        assertEquals(LookTheme.theme(custom.look, "c", true).styles.size + 1, pack.staged.theme.styles.size)
-        assertEquals(mapOf(LookTheme.KEY_FONT to "k.ttf", ThemePackFiles.CANDIDATE_FONT to "c.ttf"), pack.staged.theme.fonts)
+        // drawn as LookTheme draws the 3.0 theme, its candidates' font and weight with it (T6a)
+        assertEquals(LookTheme.xml(custom.look, "c", true), pack.staged.source)
+        assertEquals(mapOf(LookTheme.KEY_FONT to "k.ttf", LookTheme.CANDIDATE_FONT to "c.ttf"), pack.staged.theme.fonts)
         val imported = pack.commit().getOrThrow().single()
         assertEquals(custom.look.palette, imported.look.palette)
         assertEquals(File(packs, "c/c.ttf").path, imported.look.text.candidateFont)

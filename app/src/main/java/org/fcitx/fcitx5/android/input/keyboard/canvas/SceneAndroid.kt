@@ -32,16 +32,22 @@ import org.fcitx.fcitx5.android.data.theme.Theme as AppTheme
 
 /**
  * A scene's text in [look]'s fonts: `system` the system's, [LookTheme.KEY_FONT] the theme's key font,
- * a pack's ([files]: its fonts by name, each its file's path) any of its own, at the weight asked
- * (ThemeAssets); null the default one.
+ * [LookTheme.CANDIDATE_FONT] its candidates' (060-render-p3 T6a), a pack's ([files]: its fonts by name, each its
+ * file's path, T8a) any of its own, at the weight asked (ThemeAssets); null the default one.
  */
 class SceneFonts(private val look: ThemeLook, private val files: Map<String, String> = emptyMap()) {
-    fun typeface(font: String, weight: Int): Typeface? =
-        ThemeAssets.typeface(look, files[font] ?: if (font == LookTheme.KEY_FONT) look.text.keyFont else null, weight)
+    fun typeface(font: String, weight: Int): Typeface? = ThemeAssets.typeface(look, files[font] ?: path(look, font), weight)
 
     companion object {
         /** [theme]'s fonts, [look] the one it is drawn in (ThemeManager.shownLook). */
         fun of(theme: AppTheme, look: ThemeLook) = SceneFonts(look, (theme as? AppTheme.Pack)?.drawn?.fonts.orEmpty())
+
+        /** The file of [font] in [look]; null, the system's. */
+        fun path(look: ThemeLook, font: String): String? = when (font) {
+            LookTheme.KEY_FONT -> look.text.keyFont
+            LookTheme.CANDIDATE_FONT -> look.text.candidateFont
+            else -> null
+        }
     }
 }
 
