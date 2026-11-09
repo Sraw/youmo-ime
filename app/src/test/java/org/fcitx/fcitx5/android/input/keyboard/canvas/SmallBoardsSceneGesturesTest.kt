@@ -13,10 +13,12 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
 import org.fcitx.fcitx5.android.input.bar.ui.idle.NumberRow
 import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateLayout
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardCanvasViewTest
 import org.fcitx.fcitx5.android.input.picker.EmojiSearchUi
+import org.fcitx.fcitx5.android.input.picker.PickerLayout
 import org.fcitx.fcitx5.android.input.picker.PickerGridView
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.uat.PrefsRule
@@ -53,6 +55,32 @@ class SmallBoardsSceneGesturesTest {
     private fun drawnByScene(root: View) = KeyboardHarness.all(root).any { it is KeyboardCanvasView && it.visibility == View.VISIBLE }
 
     private fun KeyboardHarness.sent() = api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
+
+    // the emoji panel's full stop (emoji.xml): its face as punctuation maps it, the key it sends the one the input
+    // panel commits mapped the same way, no bubble (popups="off"): with Chinese punctuation 。, without it .
+    @Test
+    fun thePickersFullStopShowsWhatItTypes() = KeyboardHarness().start().use { h ->
+        h.tap(h.described(h.service.getString(R.string.a11y_key_emoji)))
+        h.relayout()
+        val kb = KeyboardHarness.all(h.inputView).filterIsInstance<PickerLayout.Keyboard>().first { h.shown(it) }
+        for ((mapping, face) in listOf(mapOf("." to "。", "," to "，") to "。", emptyMap<String, String>() to ".")) {
+            // the input method's punctuation component, which broadcasts to the panel and its keyboard
+            val punctuation = h.inputView.javaClass.getDeclaredField("punctuation").apply { isAccessible = true }
+                .get(h.inputView) as PunctuationComponent
+            punctuation.update(mapping)
+            h.relayout()
+            val period = h.keys(kb).single { it.id == "period" }
+            assertEquals(face, period.label)
+            h.api.calls.clear()
+            h.press(period)
+            assertEquals("no bubble", emptyList<Any>(), h.popupChoices())
+            h.release()
+            // typed as the face shows it (committed by the panel as punctuation maps it, not through the engine)
+            assertEquals(h.api.calls.toString(), face, h.field.text.toString())
+            h.field.setText("")
+            h.idle()
+        }
+    }
 
     @Test
     fun emojiSearch() {

@@ -15,17 +15,17 @@ key back kind=function role=back a11y="ABC"
     text "ABC" 1392.13,280.25 system 700 42 #ff7a858a
   pressed
     +2 fill rect(1366.13,10.5,1498.13,518.5 r=10.5,10.5,10.5,10.5) #1f000000
-key comma kind=function a11y=","
+key comma kind=function a11y="，"
   bounds 1506,0,1604,529
   shape rect(1513.88,10.5,1596.13,518.5 r=10.5,10.5,10.5,10.5)
   hit rect(1506,0,1604,529)
   anchor 1555,264.5 up 0,-1
   actions send=","
-  text label=","
+  text label="，"
   normal
     shadow rect(1513.88,10.5,1596.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1513.88,10.5,1596.13,518.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    text "," 1536.89,287.14 system 400 60.38 #ff7a858a
+    text "，" 1524.81,287.14 system 400 60.38 #ff7a858a
   pressed
     +2 fill rect(1513.88,10.5,1596.13,518.5 r=10.5,10.5,10.5,10.5) #1f000000
 key emoji kind=letter a11y="a11y_key_emoji"
@@ -52,17 +52,17 @@ key space kind=space role=space a11y="a11y_key_space"
     fill rect(1709.88,10.5,1939.13,518.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
   pressed
     +2 fill rect(1709.88,10.5,1939.13,518.5 r=10.5,10.5,10.5,10.5) #1f000000
-key period kind=function a11y="."
+key period kind=function a11y="。"
   bounds 1947,0,2045,529
   shape rect(1954.88,10.5,2037.13,518.5 r=10.5,10.5,10.5,10.5)
   hit rect(1947,0,2045,529)
   anchor 1996,264.5 up 0,-1
   actions send="."
-  text label="."
+  text label="。"
   normal
     shadow rect(1954.88,10.5,2037.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1954.88,10.5,2037.13,518.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    text "." 1977.89,287.14 system 400 60.38 #ff7a858a
+    text "。" 1965.81,287.14 system 400 60.38 #ff7a858a
   pressed
     +2 fill rect(1954.88,10.5,2037.13,518.5 r=10.5,10.5,10.5,10.5) #1f000000
 key backspace kind=function role=backspace a11y="a11y_key_backspace"

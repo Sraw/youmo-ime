@@ -51,17 +51,17 @@ key space kind=space role=space a11y="a11y_key_space"
     fill rect(385.88,18.38,640.13,449.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
   pressed
     +2 fill rect(385.88,18.38,640.13,449.63 r=10.5,10.5,10.5,10.5) #1f000000
-key period kind=function a11y="."
+key period kind=function a11y="。"
   bounds 648,0,756,468
   shape rect(655.88,18.38,748.13,449.63 r=10.5,10.5,10.5,10.5)
   hit rect(648,0,756,468)
   anchor 702,234 up 0,-1
   actions send="."
-  text label="."
+  text label="。"
   normal
     shadow rect(655.88,18.38,748.13,452.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(655.88,18.38,748.13,449.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    text "." 685.7,254.38 system 400 54.34 #ff7a858a
+    text "。" 674.83,254.38 system 400 54.34 #ff7a858a
   pressed
     +2 fill rect(655.88,18.38,748.13,449.63 r=10.5,10.5,10.5,10.5) #1f000000
 key backspace kind=function role=backspace a11y="a11y_key_backspace"

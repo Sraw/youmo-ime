@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.core.KeyState
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
+import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
@@ -45,6 +46,10 @@ class PickerWindow(
     private val search: Boolean = false,
 ) : InputWindow.ExtendedInputWindow<PickerWindow>(), EssentialWindow, InputBroadcastReceiver {
 
+    override fun onPunctuationUpdate(mapping: Map<String, String>) {
+        if (::pickerLayout.isInitialized) pickerLayout.embeddedKeyboard.onPunctuationUpdate(mapping)
+    }
+
     enum class Key : EssentialWindow.Key {
         Symbol,
         Emoji,
@@ -60,6 +65,7 @@ class PickerWindow(
     private val commonKeyActionListener: CommonKeyActionListener by manager.must()
     private val popup: PopupComponent by manager.must()
     private val returnKeyDrawable: ReturnKeyDrawableComponent by manager.must()
+    private val punctuation: PunctuationComponent by manager.must()
 
     private var locked by AppPrefs.getInstance().internal.symbolPanelLocked
 
@@ -105,9 +111,10 @@ class PickerWindow(
             }
 
             is KeyAction.HostKeyAction -> {
-                // we want the behavior of CommitAction (commit the character as-is),
-                // but don't want to include it in recently used list
-                commonKeyActionListener.listener.onKeyAction(KeyAction.CommitAction(it.act), source)
+                // we want the behavior of CommitAction (commit the character, not through the engine),
+                // but don't want to include it in recently used list; as punctuation maps it, as its face
+                // shows it ({punct:.} in emoji.xml, emoticon.xml): 显示和输出一致
+                commonKeyActionListener.listener.onKeyAction(KeyAction.CommitAction(punctuation.mapping[it.act] ?: it.act), source)
             }
 
             KeyAction.PanelBackAction -> backToKeyboard()
@@ -253,6 +260,8 @@ class PickerWindow(
     override val title: String get() = if (panel) context.getString(R.string.picker_title) else ""
 
     override fun onAttached() {
+        // the punctuation as it is now: changed while another window was shown, not told here
+        pickerLayout.embeddedKeyboard.onPunctuationUpdate(punctuation.mapping)
         adapter.habits = habits.getValue()
         // a view made anew mid-field (a dark-mode switch replaces it) is told of no start: the field is asked
         service.currentInputEditorInfo?.let {

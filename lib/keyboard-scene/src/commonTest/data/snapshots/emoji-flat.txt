@@ -44,15 +44,15 @@ key space kind=space role=space a11y="a11y_key_space"
     fill rect(404.25,42,621.75,660 r=7.88,7.88,7.88,7.88) #ffc9ced1
   pressed
     +1 fill rect(404.25,42,621.75,660 r=7.88,7.88,7.88,7.88) #1f000000
-key period kind=function a11y="."
+key period kind=function a11y="。"
   bounds 648,0,756,702
   shape rect(655.88,18.38,748.13,683.63)
   hit rect(648,0,756,702)
   anchor 702,351 up 0,-1
   actions send="."
-  text label="."
+  text label="。"
   normal
-    text "." 683.89,373.64 system 400 60.38 #ff7a858a
+    text "。" 671.81,373.64 system 400 60.38 #ff7a858a
   pressed
     +0 fill rect(655.88,18.38,748.13,683.63) #1f000000
 key backspace kind=function role=backspace a11y="a11y_key_backspace"
