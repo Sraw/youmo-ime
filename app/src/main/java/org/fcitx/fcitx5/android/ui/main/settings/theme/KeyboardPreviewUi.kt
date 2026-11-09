@@ -61,6 +61,9 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
 
     private val navbarBackground = ThemeManager.prefs.navbarBackground
     private val keyboardBottomFlush = keyboardPrefs.keyboardBottomFlush
+    private val followPrefs = with(keyboardPrefs) {
+        listOf(keyboardHeightFollowTheme, keyboardSidePaddingFollowTheme, keyboardBottomPaddingFollowTheme)
+    }
 
     private val sizeChangeListener = ManagedPreference.OnChangeListener<Any> { _, _ ->
         recalculateSize()
@@ -106,6 +109,8 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
             ThemeManager.prefs.codeRow.registerOnChangeListener(sizeChangeListener)
             // the bar's height follows the candidate text size (KawaiiBarComponent.heightDp)
             ThemeManager.prefs.candidateTextSize.registerOnChangeListener(sizeChangeListener)
+            // 跟随主题 picked or left: a level of the numbers already stored changes the flag alone
+            followPrefs.forEach { it.registerOnChangeListener(sizeChangeListener) }
         }
 
         override fun onConfigurationChanged(newConfig: Configuration?) {
@@ -120,6 +125,7 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
             ThemeManager.prefs.alwaysShowHandle.unregisterOnChangeListener(sizeChangeListener)
             ThemeManager.prefs.codeRow.unregisterOnChangeListener(sizeChangeListener)
             ThemeManager.prefs.candidateTextSize.unregisterOnChangeListener(sizeChangeListener)
+            followPrefs.forEach { it.unregisterOnChangeListener(sizeChangeListener) }
             super.onDetachedFromWindow()
         }
     }
@@ -185,6 +191,8 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
     }
 
     fun setTheme(theme: Theme) {
+        // the first, from init: measured there, and again as it is attached
+        val switched = ::shownTheme.isInitialized
         val look = ThemeManager.shownLook(theme)
         // as the input view draws it: the keys over the picture find it here (PictureHost)
         bkg.background = ThemePictureDrawable.board(look)
@@ -193,6 +201,10 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         fakeKawaiiBar.background = ThemePictureDrawable.bar(look)
         shownTheme = theme
         makeKeyboard()
+        if (!switched) return
+        // another theme's keyboard size where the settings follow it (KeyboardArea.sizes)
+        recalculateSize()
+        onSizeMeasured?.invoke(intrinsicWidth, intrinsicHeight)
     }
 
     // what setTheme was last given: lateinit, as the init block above sets it

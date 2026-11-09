@@ -209,6 +209,8 @@ class ThemeFragment : Fragment() {
                     keyboardHeightPercent, keyboardHeightPercentLandscape,
                     keyboardSidePadding, keyboardSidePaddingLandscape,
                     keyboardBottomPadding, keyboardBottomPaddingLandscape,
+                    // 跟随主题: picking a level whose numbers are stored already changes only these
+                    keyboardHeightFollowTheme, keyboardSidePaddingFollowTheme, keyboardBottomPaddingFollowTheme,
                 ).mapTo(HashSet()) { it.key }
             }
         }
