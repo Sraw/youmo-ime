@@ -72,11 +72,16 @@ object ThemeMonet {
             "on-surface-variant" to android.R.color.system_on_surface_variant_dark,
         )
 
-    // 0.5's: monet.xml's light bar is the highest container, its dark one the high
+    // 0.5's: monet.xml's light bar is the highest container, its dark one the high. 0.5 had no light high
+    // and no dark highest; every role is here all the same (any theme's system() may name one, and would
+    // get its fallback on 12 and 13 alone), each the palette's tone nearest Material's for it between
+    // its neighbours: the light high (92) the 90 of neutral1, darker than the container's 95 and of the
+    // grey the container is; the dark highest (22) the 20 of neutral2, lighter than the high, of its grey
     private val APPROXIMATE_LIGHT
         @RequiresApi(Build.VERSION_CODES.S)
         get() = mapOf(
             "surface-container" to android.R.color.system_neutral1_50, // neutral94
+            "surface-container-high" to android.R.color.system_neutral1_100, // neutral92
             "surface-container-highest" to android.R.color.system_neutral2_100, // neutral92
             "surface-bright" to android.R.color.system_neutral1_10, // neutral98
             "on-surface" to android.R.color.system_neutral1_900,
@@ -91,6 +96,7 @@ object ThemeMonet {
         get() = mapOf(
             "surface-container" to android.R.color.system_neutral1_900, // neutral12
             "surface-container-high" to android.R.color.system_neutral2_1000, // neutral17
+            "surface-container-highest" to android.R.color.system_neutral2_800, // neutral22
             "surface-bright" to android.R.color.system_neutral1_800, // neutral24
             "on-surface" to android.R.color.system_neutral1_100,
             "primary" to android.R.color.system_accent1_200,

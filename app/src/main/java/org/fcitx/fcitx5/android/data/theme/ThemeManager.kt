@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.data.theme
 import android.content.res.Configuration
 import android.widget.Toast
 import androidx.annotation.Keep
+import androidx.annotation.VisibleForTesting
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import org.fcitx.fcitx5.android.R
@@ -48,16 +49,39 @@ object ThemeManager {
     }
 
     // before the themes, which an older format's are read with (the key style settings before 3.0)
-    private val customThemes: MutableList<Theme.Custom> = ThemeFilesManager.listThemes(prefs.legacyLook())
+    private val customThemes: MutableList<Theme.Custom> = listCustomThemes(prefs).first.toMutableList()
 
-    init {
-        // 0.5's names of the built-in themes in the settings (060-render-p3 T3), before a theme is read of them
-        prefs.migrateThemeRefs(customThemes.mapTo(HashSet()) { it.name })
+    /**
+     * The user's themes ([ThemeFilesManager.listThemes]; [ThemePrefs.legacyLook] for an older format's),
+     * the settings naming themes made right with them (060-render-p3 T3), as a start does and a refresh
+     * again (themes not settled at the start may be since: A4). One named as a built-in theme is now
+     * (`monokai`, which 0.5 let in) would hide it: saved again under a UUID, the settings naming it with
+     * it ([ThemeFilesManager.moveClashing]); then 0.5's names of the built-in themes in the settings
+     * moved ([ThemePrefs.migrateThemeRefs]), not one a theme of the user's may have though it is not
+     * listed ([ThemeFilesManager.mayHoldThemes]). With whether a setting was changed.
+     */
+    @VisibleForTesting
+    internal fun listCustomThemes(prefs: ThemePrefs): Pair<List<Theme.Custom>, Boolean> {
+        var changed = false
+        val themes = ThemeFilesManager.moveClashing(
+            ThemeFilesManager.listThemes(prefs.legacyLook()),
+            clashes = { BuiltinThemeFiles.find(builtinThemes, it) != null },
+            repoint = { from, to -> prefs.renameThemeRefs(from, to).also { changed = changed || it } },
+        )
+        val customs = themes.mapTo(HashSet()) { it.name }
+        customs += ThemeFilesManager.mayHoldThemes(BuiltinThemeFiles.LEGACY.keys)
+        if (prefs.migrateThemeRefs(customs)) changed = true
+        return themes to changed
     }
 
-    /** The theme [name] refers to: the user's of that name, else the built-in one ([BuiltinThemeFiles.find]); null where none is. */
+    /**
+     * The theme [name] refers to: the user's of that name, else the built-in one ([BuiltinThemeFiles.find]),
+     * else the built-in one of that 0.5 name (a setting not moved yet: [ThemePrefs.migrateThemeRefs]); null
+     * where none is.
+     */
     fun getTheme(name: String): Theme? =
         customThemes.find { it.name == name } ?: BuiltinThemeFiles.find(builtinThemes, name)
+            ?: BuiltinThemeFiles.LEGACY[name]?.let { BuiltinThemeFiles.find(builtinThemes, it) }
 
     fun getAllThemes(): List<Theme> = customThemes + builtinThemes
 
@@ -73,8 +97,11 @@ object ThemeManager {
     }
 
     fun refreshThemes() {
+        val (themes, changed) = listCustomThemes(prefs)
         customThemes.clear()
-        customThemes.addAll(ThemeFilesManager.listThemes(prefs.legacyLook()))
+        customThemes.addAll(themes)
+        // the copy for before the first unlock names what this one does (the start syncs it after init)
+        if (changed) syncToDeviceEncryptedStorage()
         activeTheme = evaluateActiveTheme()
     }
 
