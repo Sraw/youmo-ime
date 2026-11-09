@@ -184,6 +184,22 @@ class ThemeWriterTest {
         assertEquals("0", ThemeWriter.value("offset", assertNotNull(Values.read("offset", "-0dp"))))
     }
 
+    // T7b's: the panels' and the handwriting pad's, the blur and the ink's width dp; read back the same
+    @Test
+    fun thePanelsValuesAreWrittenAndReadBack() {
+        val theme = read("writer-every.xml")
+        val text = ThemeWriter.write(theme)
+        assertTrue("<style select=\"voice\" fill=\"#c0000000\" blur=\"12.5dp\"/>" in text, text)
+        assertTrue("ink-color=\"#ff0000\" ink-width=\"1dp\" grid-color=\"alpha(@divider,50%)\" grid=\"true\"" in text, text)
+        assertTrue("<style select=\"@dark picker:selected categories\"" in text, text)
+        for ((property, raw) in listOf("blur" to "0", "blur" to "25dp", "ink-width" to "8dp", "grid" to "false")) {
+            val v = assertNotNull(Values.read(property, raw), raw)
+            assertEquals(raw, ThemeWriter.value(property, v))
+        }
+        val back = ThemeReader.theme(text).ok()
+        assertEquals(theme.styles.map { it.values }, back.styles.map { it.values })
+    }
+
     // T7a's: a handle's grip (dp, a number of a handle alone), the navigation bar's follow; read back the same
     @Test
     fun theWindowsValuesAreWrittenAndReadBack() {

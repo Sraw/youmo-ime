@@ -286,6 +286,7 @@ object ThemeReader {
         selectors?.let { readElsewhere(it, values.keys, el.line, p) }
         reserved += selectors?.let { shapes(it, values, el.line, p) } ?: 0
         selectors?.let { unreadByWindow(it, values.keys, el.line, p) }
+        selectors?.let { unreadByPanel(it, values.keys, el.line, p) }
         if (values.isEmpty() && reserved == 0) a.problem("a style that sets nothing")
         return selectors?.let { Style(it, values, order, el.line) }
     }
@@ -384,6 +385,40 @@ object ThemeReader {
         widget == "side-button" && states == setOf("pressed") -> listOf("overlay")
         else -> emptyList()
     }
+
+    // a panel's property it has no use for (`clipboard shadow=`), as the window's; the voice mask's blur and the
+    // handwriting pad's ink and grid set on what does not read them, too
+    private fun unreadByPanel(selectors: List<Selector>, props: Set<String>, line: Int, p: Problems) {
+        for (s in selectors.filter { it.widget in Selector.PANEL_WIDGETS }.map { Selector.Target(it.widget, states = it.states, part = it.part) }.distinct()) {
+            val selected = s.widget == "picker" && s.states == setOf("selected")
+            val reads = if (s.states.isEmpty() || selected) PANEL_READS.getValue(s.part?.let { "${s.widget} $it" } ?: s.widget) else emptyList()
+            val at = s.widget + s.states.sorted().joinToString("") { ":$it" } + s.part?.let { " $it" }.orEmpty()
+            val said = if (reads.isEmpty()) "it reads nothing in that state" else "it reads ${reads.joinToString(" ")}"
+            props.filter { it !in reads }.forEach { p.warn(line, "$it= on $at does nothing: $said") }
+        }
+        for (prop in props) {
+            val (widget, whose) = when (prop) {
+                "blur" -> "voice" to "the voice mask's"
+                in PAD_PROPERTIES -> "key" to "the handwriting pad's (handwriting/pad)"
+                else -> continue
+            }
+            selectors.map { it.widget }.filter { it != widget && it !in Selector.PANEL_WIDGETS }.distinct()
+                .forEach { p.warn(line, "$prop= on $it does nothing: it is $whose") }
+        }
+    }
+
+    // what each panel reads, and each part of one (060-render-p3 T7b, engine/PanelLooks): `color` and `icon-color`
+    // on the picker and the voice mask are their parts', inherited
+    private val PANEL_READS = mapOf(
+        "clipboard" to listOf("fill", "radius", "color"),
+        "picker" to listOf("fill", "color"),
+        "picker categories" to listOf("fill", "color"),
+        "editing" to listOf("fill", "radius"),
+        "voice" to listOf("fill", "blur", "icon-color"),
+        "voice mic" to listOf("fill", "icon-color"),
+    )
+
+    private val PAD_PROPERTIES = setOf("ink-color", "ink-width", "grid-color", "grid")
 
     // what each widget of the window round the keys reads (060-render-p3 T7a, engine/WindowLooks, SceneBuilder's split gap)
     private val WINDOW_READS = mapOf(
