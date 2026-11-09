@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -109,6 +110,21 @@ class LookThemeTest {
         assertTrue(w.ops(false).none { it is Op.NineSlice })
         assertTrue(w.ops(false).any { it is Op.Fill && it.color == keyColor })
         assertTrue(key(scene, "space").ops(false).any { it is Op.NineSlice })
+    }
+
+    // a 3.0 file's insets have no bound: one past any key image's side is that side (theme 4 takes four
+    // digits at most, so 10000 unclamped would leave the theme written unread and the keyboard not shown)
+    @Test
+    fun anInsetPastAnyImagesSideIsThatSide() {
+        val big = NineSlice("/data/themes/t/key.png", Insets(10000, 0, NineSlice.MAX_SIDE, 10000), 1)
+        val base = LookDefaults.look(palette(themeFile("material-light.xml")))
+        val look = base.copy(keys = base.keys.copy(letter = KindStyle(KeyFill.Image(big), KeyPressed.Image(big))))
+        val q = key(scene(theme(LookTheme.xml(look, "big", false)), portrait), "q")
+        val max = NineSlice.MAX_SIDE
+        assertEquals(listOf(max, 0, max, max), q.ops(false).filterIsInstance<Op.NineSlice>().single().insets)
+        assertTrue(q.ops(true).filterIsInstance<Op.NineSlice>().all { it.insets == listOf(max, 0, max, max) })
+        // a negative one never reaches a look: ThemeLook refuses it, and so a 3.0 file of one (ThemeLookReaderTest)
+        assertFailsWith<IllegalArgumentException> { Insets(-5, 0, 0, 0) }
     }
 
     // a single key's own face over its kind's colour, as theme 3.0's (ThemeColors.face for every key):

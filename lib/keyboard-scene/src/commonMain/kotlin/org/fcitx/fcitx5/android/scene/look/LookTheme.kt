@@ -81,6 +81,9 @@ object LookTheme {
         }
     }
 
+    // every file a theme names is one of ThemeLook.files, named by fileNames: one not is a bug of ours
+    private fun notAFile(path: String): Nothing = error("$path is not among the look's files (ThemeLook.files)")
+
     // a file's name of the characters theme 4 takes in one, one at least
     private fun safe(name: String): String = name.map { if (it in UNSAFE || it.isWhitespace()) '_' else it }.joinToString("").ifEmpty { "_" }
 
@@ -107,7 +110,7 @@ object LookTheme {
     fun theme(look: ThemeLook, name: String, dark: Boolean): Theme {
         val keys = look.keys
         val names = fileNames(look)
-        fun fileName(path: String) = names.getOrElse(path) { safe(LookTheme.fileName(path)) }
+        fun fileName(path: String) = names[path] ?: notAFile(path)
         val s = Styles(names)
         // the board: the picture under it, or ThemeColors.board's colour (block: background, flat: keyboard)
         if (look.picture != null && look.base == BoardBase.Picture) {
@@ -307,9 +310,14 @@ object LookTheme {
             }
         }
 
-        // [fallback]: the kind's colour, which theme 3.0 showed where the image was not (yet) there
-        private fun image(s: NineSlice, fallback: ColorExpr?) =
-            Fill.Image(names[s.file] ?: safe(fileName(s.file)), listOf(s.insets.left, s.insets.top, s.insets.right, s.insets.bottom), s.pxPerDp, fallback)
+        // [fallback]: the kind's colour, which theme 3.0 showed where the image was not (yet) there; an inset
+        // past any key image's side (a 3.0 file has no bound) at that side: theme 4 takes four digits at most
+        private fun image(s: NineSlice, fallback: ColorExpr?) = Fill.Image(
+            names[s.file] ?: notAFile(s.file),
+            listOf(s.insets.left, s.insets.top, s.insets.right, s.insets.bottom).map { it.coerceIn(0, NineSlice.MAX_SIDE) },
+            s.pxPerDp,
+            fallback,
+        )
     }
 
     /**

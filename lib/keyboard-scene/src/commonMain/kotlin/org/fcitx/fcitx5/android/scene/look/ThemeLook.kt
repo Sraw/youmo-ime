@@ -179,6 +179,9 @@ data class NineSlice(val file: String, val insets: Insets, val pxPerDp: Int) {
 
     companion object {
         const val MAX_PX_PER_DP = 8
+
+        /** A key image's longest side, px, as the app takes one in (ThemeAssetLimits): no inset is past it. */
+        const val MAX_SIDE = 1024
     }
 }
 
