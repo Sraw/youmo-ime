@@ -61,35 +61,41 @@ object Faces {
         val capped = face != Face.None && (path != null || shape !in listOf("bar", "circle"))
         val depth = if (capped) min(look.depth * density, maxOf(0.0, inner.height / 2)) else 0.0
         val top = inner.inset(0.0, 0.0, 0.0, depth)
-        val faceShape: Shape = if (path != null) path.flatten(top) else when (shape) {
-            "bar" -> {
-                val h = SPACE_H_INSET_DP * density
-                val v = if (cell.height < SPACE_MIN_HEIGHT_DP * density) 0.0 else min((cell.height - SPACE_MIN_HEIGHT_DP * density) / 2, SPACE_MAX_V_INSET_DP * density)
-                val bar = cell.inset(h, v, h, v)
-                Shape.Rect(bar, radii(look.radius, bar, density))
-            }
-            "circle" -> {
-                val size = min(min(cell.width, cell.height), ENTER_MAX_DP * density)
-                val left = cell.left + (cell.width - size) / 2
-                val y = cell.top + (cell.height - size) / 2
-                Shape.Rect(Box(left, y, left + size, y + size), List(CORNERS) { size / 2 })
-            }
-            else -> Shape.Rect(top, radii(look.radius, top, density))
-        }
+        val faceShape: Shape = path?.flatten(top) ?: rect(shape, cell, top, look, density)
         val drawn = faceShape.takeIf { face != Face.None && it.bounds.hasSize }
         // the cap: the face's outline moved down by the depth (a path's, or the rectangle the face is up from)
         val cap = drawn?.takeIf { depth > 0 }?.moved(0.0, depth)
-        val whole = drawn?.let { if (cap == null) it else outline(it, cap) }
-        val s = look.shadow
-        val shadow = whole?.takeIf { s.color != null && (s.dx != 0.0 || s.dy != 0.0 || s.blur != 0.0) }?.let {
-            when (it) {
-                is Shape.Rect -> Shape.Rect(it.box.union(it.box.moved(s.dx * density, s.dy * density)).intersect(cell), it.radii)
-                is Shape.Path -> within(it.moved(s.dx * density, s.dy * density), cell)
-            }
-        }
+        val shadow = drawn?.let { shadow(if (cap == null) it else outline(it, cap), look, cell, density) }
         val border = if (drawn == null) 0.0 else look.border.width * density
         val line = drawn?.takeIf { border > 0 }?.let { line(it, border, path, top) }
         return FaceGeometry(drawn, shadow, border, faceShape, top, line, cap)
+    }
+
+    // a face of [shape]: the flat space's bar, Return's circle, else the rectangle [top] rounded
+    private fun rect(shape: String, cell: Box, top: Box, look: KeyLook, density: Double): Shape.Rect = when (shape) {
+        "bar" -> {
+            val h = SPACE_H_INSET_DP * density
+            val v = if (cell.height < SPACE_MIN_HEIGHT_DP * density) 0.0 else min((cell.height - SPACE_MIN_HEIGHT_DP * density) / 2, SPACE_MAX_V_INSET_DP * density)
+            val bar = cell.inset(h, v, h, v)
+            Shape.Rect(bar, radii(look.radius, bar, density))
+        }
+        "circle" -> {
+            val size = min(min(cell.width, cell.height), ENTER_MAX_DP * density)
+            val left = cell.left + (cell.width - size) / 2
+            val y = cell.top + (cell.height - size) / 2
+            Shape.Rect(Box(left, y, left + size, y + size), List(CORNERS) { size / 2 })
+        }
+        else -> Shape.Rect(top, radii(look.radius, top, density))
+    }
+
+    // what casts the shadow, moved by its offset and kept in the cell (never on the row below); none where it is none
+    private fun shadow(whole: Shape, look: KeyLook, cell: Box, density: Double): Shape? {
+        val s = look.shadow.takeIf { it.dx != 0.0 || it.dy != 0.0 || it.blur != 0.0 } ?: return null
+        if (s.color == null) return null
+        return when (whole) {
+            is Shape.Rect -> Shape.Rect(whole.box.union(whole.box.moved(s.dx * density, s.dy * density)).intersect(cell), whole.radii)
+            is Shape.Path -> within(whole.moved(s.dx * density, s.dy * density), cell)
+        }
     }
 
     /**

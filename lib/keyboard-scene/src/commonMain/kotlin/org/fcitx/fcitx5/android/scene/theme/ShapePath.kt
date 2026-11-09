@@ -144,96 +144,106 @@ data class ShapePath(val segments: List<Segment>) {
          */
         fun parse(data: String): ShapePath? {
             if (data.length > MAX_LENGTH) return null
-            val tokens = tokens(data) ?: return null
-            val out = ArrayList<Segment>()
-            var i = 0
-            var cmd: Char? = null
-            var x = 0.0
-            var y = 0.0
-            var sx = 0.0
-            var sy = 0.0
-            var points = 0
-            var edges = 0
-            var most = 0
-            fun num(): Double? = (tokens.getOrNull(i) as? Double)?.also { i++ }
-            fun inBox(v: Double): Double? = if (v < -SLACK || v > 1 + SLACK) null else v.coerceIn(0.0, 1.0)
-            while (i < tokens.size) {
-                val t = tokens[i]
-                if (t is Char) {
-                    cmd = t
-                    i++
-                } else if (cmd == null || cmd == 'Z' || cmd == 'z') {
-                    return null // numbers with no command to take them
+            return Reader(tokens(data) ?: return null).read()
+        }
+
+        // the tokens made segments, every point absolute, the counts as [parse] checks them
+        private class Reader(private val tokens: List<Any>) {
+            private val out = ArrayList<Segment>()
+            private var i = 0
+            private var x = 0.0
+            private var y = 0.0
+            private var startX = 0.0
+            private var startY = 0.0
+            private var points = 0
+            private var edges = 0
+            private var most = 0
+
+            fun read(): ShapePath? {
+                var cmd: Char? = null
+                while (i < tokens.size) {
+                    val t = tokens[i]
+                    if (t is Char) {
+                        cmd = t
+                        i++
+                    } else if (cmd == null || cmd == 'Z' || cmd == 'z') {
+                        return null // numbers with no command to take them; a Z takes none
+                    }
+                    val c = cmd ?: return null
+                    if (out.isEmpty() && c != 'M' && c != 'm') return null
+                    add(segment(c) ?: return null)
+                    if (points > MAX_POINTS) return null
+                    // more pairs after a move are lines (SVG's)
+                    cmd = when (c) {
+                        'M' -> 'L'
+                        'm' -> 'l'
+                        else -> c
+                    }
                 }
-                val c = cmd ?: return null
-                if (out.isEmpty() && c != 'M' && c != 'm') return null
-                val rel = c.isLowerCase()
-                val ox = if (rel) x else 0.0
-                val oy = if (rel) y else 0.0
-                when (c.uppercaseChar()) {
-                    'M' -> {
-                        x = inBox(ox + (num() ?: return null)) ?: return null
-                        y = inBox(oy + (num() ?: return null)) ?: return null
-                        out += Segment.Move(x, y)
-                        sx = x
-                        sy = y
-                        points++
-                        edges = 0
-                        // more pairs after a move are lines (SVG's)
-                        cmd = if (rel) 'l' else 'L'
-                    }
-                    'L' -> {
-                        x = inBox(ox + (num() ?: return null)) ?: return null
-                        y = inBox(oy + (num() ?: return null)) ?: return null
-                        out += Segment.Line(x, y)
-                        points++
-                        edges++
-                    }
-                    'H' -> {
-                        x = inBox(ox + (num() ?: return null)) ?: return null
-                        out += Segment.Line(x, y)
-                        points++
-                        edges++
-                    }
-                    'V' -> {
-                        y = inBox(oy + (num() ?: return null)) ?: return null
-                        out += Segment.Line(x, y)
-                        points++
-                        edges++
-                    }
+                return if (most >= 2) ShapePath(out) else null
+            }
+
+            // [c]'s numbers read, made absolute (a lower-case command's from the current point)
+            private fun segment(c: Char): Segment? {
+                val ox = if (c.isLowerCase()) x else 0.0
+                val oy = if (c.isLowerCase()) y else 0.0
+                return when (c.uppercaseChar()) {
+                    'M' -> pair(ox, oy)?.let { (px, py) -> Segment.Move(px, py) }
+                    'L' -> pair(ox, oy)?.let { (px, py) -> Segment.Line(px, py) }
+                    'H' -> coord(ox)?.let { Segment.Line(it, y) }
+                    'V' -> coord(oy)?.let { Segment.Line(x, it) }
                     'Q' -> {
-                        val cx = inBox(ox + (num() ?: return null)) ?: return null
-                        val cy = inBox(oy + (num() ?: return null)) ?: return null
-                        x = inBox(ox + (num() ?: return null)) ?: return null
-                        y = inBox(oy + (num() ?: return null)) ?: return null
-                        out += Segment.Quad(cx, cy, x, y)
-                        points += 2
-                        edges++
+                        val (cx, cy) = pair(ox, oy) ?: return null
+                        pair(ox, oy)?.let { (px, py) -> Segment.Quad(cx, cy, px, py) }
                     }
                     'C' -> {
-                        val c1x = inBox(ox + (num() ?: return null)) ?: return null
-                        val c1y = inBox(oy + (num() ?: return null)) ?: return null
-                        val c2x = inBox(ox + (num() ?: return null)) ?: return null
-                        val c2y = inBox(oy + (num() ?: return null)) ?: return null
-                        x = inBox(ox + (num() ?: return null)) ?: return null
-                        y = inBox(oy + (num() ?: return null)) ?: return null
-                        out += Segment.Cubic(c1x, c1y, c2x, c2y, x, y)
-                        points += 3
-                        edges++
+                        val (c1x, c1y) = pair(ox, oy) ?: return null
+                        val (c2x, c2y) = pair(ox, oy) ?: return null
+                        pair(ox, oy)?.let { (px, py) -> Segment.Cubic(c1x, c1y, c2x, c2y, px, py) }
                     }
-                    'Z' -> {
-                        out += Segment.Close
-                        edges++
-                        x = sx
-                        y = sy
-                        // a Z takes no numbers: one after it is a problem (above)
-                    }
-                    else -> return null
+                    'Z' -> Segment.Close
+                    else -> null
                 }
-                if (points > MAX_POINTS) return null
+            }
+
+            private fun add(s: Segment) {
+                out += s
+                when (s) {
+                    is Segment.Move -> {
+                        startX = s.x
+                        startY = s.y
+                        edges = 0
+                        moveTo(s.x, s.y, 1)
+                    }
+                    is Segment.Line -> moveTo(s.x, s.y, 1)
+                    is Segment.Quad -> moveTo(s.x, s.y, 2)
+                    is Segment.Cubic -> moveTo(s.x, s.y, CUBIC_POINTS)
+                    Segment.Close -> {
+                        x = startX
+                        y = startY
+                    }
+                }
+                if (s !is Segment.Move) edges++
                 most = maxOf(most, edges)
             }
-            return if (most >= 2) ShapePath(out) else null
+
+            private fun moveTo(px: Double, py: Double, written: Int) {
+                x = px
+                y = py
+                points += written
+            }
+
+            // the next number from [o], or null where there is none or it is out of the box
+            private fun coord(o: Double): Double? {
+                val v = tokens.getOrNull(i) as? Double ?: return null
+                i++
+                return (o + v).takeIf { it >= -SLACK && it <= 1 + SLACK }?.coerceIn(0.0, 1.0)
+            }
+
+            private fun pair(ox: Double, oy: Double): Pair<Double, Double>? {
+                val a = coord(ox) ?: return null
+                return coord(oy)?.let { a to it }
+            }
         }
 
         // its commands (Char) and numbers (Double), or null where something is neither
@@ -243,36 +253,42 @@ data class ShapePath(val segments: List<Segment>) {
             while (i < s.length) {
                 val ch = s[i]
                 when {
-                    ch == ' ' || ch == ',' || ch == '\t' || ch == '\n' || ch == '\r' -> i++
+                    ch in SPACES -> i++
                     ch in COMMANDS -> {
                         out += ch
                         i++
                     }
-                    ch == '-' || ch == '+' || ch == '.' || ch in '0'..'9' -> {
-                        val start = i
-                        if (ch == '-' || ch == '+') i++
-                        var digits = 0
-                        while (i < s.length && s[i] in '0'..'9') {
-                            i++
-                            digits++
-                        }
-                        // a second '.' starts the next number (SVG's "0.5.5")
-                        if (i < s.length && s[i] == '.') {
-                            i++
-                            while (i < s.length && s[i] in '0'..'9') {
-                                i++
-                                digits++
-                            }
-                        }
-                        if (digits == 0) return null
-                        out += s.substring(start, i).toDoubleOrNull() ?: return null
+                    else -> {
+                        val end = number(s, i)
+                        if (end < 0) return null
+                        out += s.substring(i, end).toDoubleOrNull() ?: return null
+                        i = end
                     }
-                    else -> return null
                 }
             }
             return out
         }
 
+        // where a number starting at [start] ends: a sign, digits, a point and digits (a second point starts
+        // the next number, SVG's "0.5.5"); -1 where there is none
+        private fun number(s: String, start: Int): Int {
+            var i = start
+            if (s[i] == '-' || s[i] == '+') i++
+            fun digits(): Int {
+                val from = i
+                while (i < s.length && s[i] in '0'..'9') i++
+                return i - from
+            }
+            var n = digits()
+            if (i < s.length && s[i] == '.') {
+                i++
+                n += digits()
+            }
+            return if (n == 0) -1 else i
+        }
+
+        private const val SPACES = " ,\t\n\r"
+        private const val CUBIC_POINTS = 3
         private const val COMMANDS = "MmLlHhVvCcQqZz"
 
         /**
@@ -282,7 +298,10 @@ data class ShapePath(val segments: List<Segment>) {
          */
         fun roundedOutline(box: Box, radii: List<Double>, tail: Pair<Double, Double>? = null, tolerance: Double = TOLERANCE): Shape.Path {
             val ops = ArrayList<Shape.Path.Op>()
-            val (tl, tr, br, bl) = radii
+            val tl = radii[0]
+            val tr = radii[1]
+            val br = radii[2]
+            val bl = radii[CORNER_BOTTOM_LEFT]
             ops += Shape.Path.Op.MoveTo(box.left + tl, box.top)
             ops += Shape.Path.Op.LineTo(box.right - tr, box.top)
             arc(ops, box.right - tr, box.top + tr, tr, -HALF_PI, tolerance)
@@ -316,6 +335,7 @@ data class ShapePath(val segments: List<Segment>) {
         }
 
         private const val HALF_PI = PI / 2
+        private const val CORNER_BOTTOM_LEFT = 3
 
         /** How far [p] is from the segment [a]–[b]. */
         internal fun distance(px: Double, py: Double, ax: Double, ay: Double, bx: Double, by: Double): Double {

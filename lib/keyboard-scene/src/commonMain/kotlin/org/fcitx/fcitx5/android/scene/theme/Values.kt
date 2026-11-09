@@ -234,15 +234,21 @@ object Values {
         "font" -> raw.takeIf(FONT::matches)?.let(Value::Word)
         "weight" -> raw.takeIf { it in listOf("300", "400", "700") }?.let { Value.Number(it.toDouble()) }
         "scale" -> percent(raw)?.takeIf { it in MIN_SCALE..MAX_SCALE }?.let(Value::Number)
-        "size" -> SP.matchEntire(raw)?.groupValues?.get(1)?.toDouble()?.takeIf { it > 0 && it <= MAX_SP }?.let(Value::Number)
-            ?: percent(raw)?.takeIf { it in MIN_BUBBLE..MAX_BUBBLE }?.let(Value::Percent)
-        "hidden" -> when (raw) {
-            "true" -> Value.Flag(true)
-            "false" -> Value.Flag(false)
-            else -> null
-        }
+        "size" -> size(raw)
+        "hidden" -> flag(raw)
         "press" -> raw.takeIf { it in listOf("tint", "ripple", "face") }?.let(Value::Word)
         else -> textOnAKey(property, raw) ?: capAndBubble(property, raw)
+    }
+
+    // a text's size in sp, or the bubble's in % (T4b)
+    private fun size(raw: String): Value? =
+        SP.matchEntire(raw)?.groupValues?.get(1)?.toDouble()?.takeIf { it > 0 && it <= MAX_SP }?.let(Value::Number)
+            ?: percent(raw)?.takeIf { it in MIN_BUBBLE..MAX_BUBBLE }?.let(Value::Percent)
+
+    private fun flag(raw: String): Value? = when (raw) {
+        "true" -> Value.Flag(true)
+        "false" -> Value.Flag(false)
+        else -> null
     }
 
     // `rect`, `bar`, `circle`, the bubble's `bubble`, or `path(…)` (T4b)
@@ -257,11 +263,7 @@ object Values {
         "inner-shadow" -> shadow(raw)?.let(Value::OfShadow)
         "depth" -> dp(raw, MAX_DEPTH_DP)?.let(Value::Number)
         "depth-color" -> ColorExpr.parse(raw)?.let(Value::OfColor)
-        "tail" -> when (raw) {
-            "true" -> Value.Flag(true)
-            "false" -> Value.Flag(false)
-            else -> null
-        }
+        "tail" -> flag(raw)
         "offset" -> dp(raw, MAX_LENGTH_DP, signed = true)?.let(Value::Number)
         else -> null
     }
