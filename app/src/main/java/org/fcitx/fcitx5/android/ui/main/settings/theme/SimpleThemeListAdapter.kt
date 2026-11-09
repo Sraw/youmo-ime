@@ -12,6 +12,8 @@ import splitties.views.dsl.core.Ui
 /**
  * A theme to pick of [themes], one card a built-in theme of two versions ([ThemeCards]): [dark]'s
  * version shown at first (a slot's: the light slot's light), the one [select]ed if it is of a pair.
+ * The theme picked is a theme, not a card: its card's 浅/深 shows the other version, unmarked, and
+ * picks nothing (060-render-p3 T3 review: it once changed the pick unseen).
  */
 open class SimpleThemeListAdapter(themes: List<Theme>, dark: Boolean = false) :
     RecyclerView.Adapter<SimpleThemeListAdapter.ViewHolder>() {
@@ -20,23 +22,36 @@ open class SimpleThemeListAdapter(themes: List<Theme>, dark: Boolean = false) :
 
     private val cards = ThemeCards(themes, dark)
 
-    var selected = -1
+    /** The theme picked: the card tapped, the version it showed, or the one [select]ed. */
+    var selectedTheme: Theme? = null
         private set(value) {
-            val last = field
+            val last = cards.indexOf(field)
             field = value
-            if (last != -1)
-                notifyItemChanged(last)
-            if (field != -1)
-                notifyItemChanged(field)
+            if (last != -1) notifyItemChanged(last)
+            cards.indexOf(value).let { if (it != -1 && it != last) notifyItemChanged(it) }
         }
 
-    /** The theme picked: the card selected, the version it shows. */
-    val selectedTheme
-        get() = selected.takeIf { it != -1 }?.let { cards.shown[it] }
-
-    /** Selects [theme]'s card, showing it. */
+    /** Selects [theme], its card showing it; none if no card has it. */
     fun select(theme: Theme?) {
-        selected = cards.show(theme)
+        selectedTheme = theme?.takeIf { cards.show(it) != -1 }
+    }
+
+    /** The theme the card at [position] shows. */
+    fun shownAt(position: Int): Theme = cards.shown[position]
+
+    /** Whether the card at [position] is marked: only while the version picked is the one it shows. */
+    fun checkedAt(position: Int): Boolean = cards.shown[position].name == selectedTheme?.name
+
+    /** The card at [position] tapped: the version it shows picked. */
+    fun pick(position: Int) {
+        val theme = cards.shown[position]
+        onClick(theme)
+        selectedTheme = theme
+    }
+
+    /** The 浅/深 of the card at [position] tapped: its other version shown, the pick as it was. */
+    fun switchVersion(position: Int) {
+        if (cards.switch(position)) notifyItemChanged(position)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder =
@@ -46,14 +61,12 @@ open class SimpleThemeListAdapter(themes: List<Theme>, dark: Boolean = false) :
         (holder.ui as ThemeThumbnailUi).apply {
             val theme = cards.shown[position]
             setTheme(theme)
-            setChecked(position == selected)
+            setChecked(checkedAt(position))
             setVersion(theme.takeIf { cards.other(it) != null }?.isDark) {
-                val at = holder.bindingAdapterPosition
-                if (at != RecyclerView.NO_POSITION && cards.switch(at)) notifyItemChanged(at)
+                holder.bindingAdapterPosition.takeIf { it != RecyclerView.NO_POSITION }?.let(::switchVersion)
             }
             root.setOnClickListener {
-                onClick(theme)
-                selected = position
+                holder.bindingAdapterPosition.takeIf { it != RecyclerView.NO_POSITION }?.let(::pick)
             }
         }
     }
