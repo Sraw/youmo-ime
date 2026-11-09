@@ -46,6 +46,8 @@ object ThemeManager {
     val prefs = AppPrefs.getInstance().registerProvider(::ThemePrefs).also {
         // before a Monet theme's look is made
         ThemeLookMigration.monetLook = it.monetLook()
+        // before the keyboard's size is read
+        it.migrateSizeFollow()
     }
 
     private var monetThemes = listOf(ThemeMonet.getLight(), ThemeMonet.getDark())

@@ -310,6 +310,9 @@ class InputView(
     private val keyboardBottomPadding = keyboardPrefs.keyboardBottomPadding
     private val keyboardBottomPaddingLandscape = keyboardPrefs.keyboardBottomPaddingLandscape
     private val keyboardBottomFlush = keyboardPrefs.keyboardBottomFlush
+    private val keyboardHeightFollowTheme = keyboardPrefs.keyboardHeightFollowTheme
+    private val keyboardSidePaddingFollowTheme = keyboardPrefs.keyboardSidePaddingFollowTheme
+    private val keyboardBottomPaddingFollowTheme = keyboardPrefs.keyboardBottomPaddingFollowTheme
 
     private val advancedPrefs = AppPrefs.getInstance().advanced
     private val keyboardHeightPercentBase = advancedPrefs.keyboardHeightPercentBase
@@ -322,6 +325,9 @@ class InputView(
         keyboardBottomPadding,
         keyboardBottomPaddingLandscape,
         keyboardBottomFlush,
+        keyboardHeightFollowTheme,
+        keyboardSidePaddingFollowTheme,
+        keyboardBottomPaddingFollowTheme,
         keyboardHeightPercentBase,
     )
 
@@ -335,8 +341,8 @@ class InputView(
     private val onKeyboardSizeChangeListener = ManagedPreferenceProvider.OnChangeListener { key ->
         if (keyboardSizePrefs.any { it.key == key }) {
             SceneTrace.section("keyboard resized") { updateKeyboardSize() }
-            // 贴底 is applied with the insets
-            if (key == keyboardBottomFlush.key) requestApplyInsets()
+            // 贴底 is applied with the insets; a theme's bottom padding followed leaves it aside (KeyboardSizes.flush)
+            if (key == keyboardBottomFlush.key || key == keyboardBottomPaddingFollowTheme.key) requestApplyInsets()
         }
     }
 
@@ -625,7 +631,7 @@ class InputView(
         )
         bottomPaddingSpace.updateLayoutParams<LayoutParams> {
             // 贴底: no room for the bar, for ROMs whose hidden gesture line still takes it
-            bottomMargin = if (floating || keyboardPrefs.bottomFlush) 0 else navBar
+            bottomMargin = if (floating || KeyboardArea.bottomFlush()) 0 else navBar
         }
         return insets
     }

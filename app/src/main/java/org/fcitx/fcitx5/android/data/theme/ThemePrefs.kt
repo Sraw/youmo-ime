@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceCategory
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
+import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceUi
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceUi.Levels.Level
 import org.fcitx.fcitx5.android.input.bar.CandidateBarHeight
 import org.fcitx.fcitx5.android.input.floating.FloatingHandleSide
@@ -60,7 +61,8 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
             listOf(R.string.level_compact, R.string.level_low, R.string.level_standard, R.string.level_tall, R.string.level_taller)
                 // a level added or taken away in ime-core is a label to add or take away here, not one cut off
                 .also { require(it.size == KeyboardHeightLevels.ALL.size) { "a label for each keyboard height level" } }
-                .zip(KeyboardHeightLevels.ALL) { label, l -> Level(label, l.portrait, l.landscape) }
+                .zip(KeyboardHeightLevels.ALL) { label, l -> Level(label, l.portrait, l.landscape) },
+            follow = keyboard.keyboardHeightFollowTheme,
         )
         levels(
             R.string.keyboard_side_padding, "keyboard_side_padding_level",
@@ -69,7 +71,8 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
                 Level(R.string.level_none, 0, 0),
                 Level(R.string.level_narrow, 8, 48),
                 Level(R.string.level_wide, 24, 120),
-            )
+            ),
+            follow = keyboard.keyboardSidePaddingFollowTheme,
         )
         levels(
             R.string.keyboard_bottom_padding, "keyboard_bottom_padding_level",
@@ -79,8 +82,27 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
                 Level(R.string.level_none, 0, 0, 0),
                 Level(R.string.level_little, 8, 4, 0),
                 Level(R.string.level_more, 20, 12, 0),
-            )
+            ),
+            follow = keyboard.keyboardBottomPaddingFollowTheme,
         )
+    }
+
+    /**
+     * Once (060-render-p3 T5): each size an older version had at its default follows the theme, one
+     * set otherwise stays as it is, not following; [SIZES_FOLLOW_MIGRATED] marks it done. A backup of
+     * an older version brought back has no mark, its sizes their own: done again at the next start.
+     * The mark is a key of no preference, so the hidden settings' reset leaves it.
+     */
+    fun migrateSizeFollow() {
+        if (sharedPreferences.getBoolean(SIZES_FOLLOW_MIGRATED, false)) return
+        val lists = managedPreferencesUi.filterIsInstance<ManagedPreferenceUi.Levels>().filter { it.follow != null }
+        sharedPreferences.edit {
+            lists.forEach { list ->
+                val set = list.keys.any { (name, default) -> sharedPreferences.getInt(name, default) != default }
+                putBoolean(list.follow!!.first, !set)
+            }
+            putBoolean(SIZES_FOLLOW_MIGRATED, true)
+        }
     }
 
     // the code being typed over the app, outside the keyboard (FloatingCodeStrip), or in it above the
@@ -241,4 +263,9 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         lightModeTheme.key,
         darkModeTheme.key
     )
+
+    companion object {
+        /** [migrateSizeFollow] done. */
+        const val SIZES_FOLLOW_MIGRATED = "keyboard_sizes_follow_migrated"
+    }
 }
