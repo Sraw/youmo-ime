@@ -276,8 +276,11 @@ abstract class BaseKeyboard(
     /** What swiping the key of [def] types where the user chose it ([TextKeyboard]): [SwipeChoice.BuiltIn] for what its key says. */
     protected open fun swipeText(def: KeyDef): SwipeChoice = SwipeChoice.BuiltIn
 
-    /** What a tap sends for its key's [action]: the action itself, but where a keyboard adds where it fell, [clickAt] ([KeyGesture.clickAt]). */
-    protected open fun pressed(clickAt: Float, action: KeyAction): KeyAction = action
+    /**
+     * What a tap sends for its key's [action]: the action itself, but where a keyboard adds where it fell,
+     * [clickAt] across and [clickDown] down ([KeyGesture.clickAt], [KeyGesture.clickDown]).
+     */
+    protected open fun pressed(clickAt: Float, clickDown: Float, action: KeyAction): KeyAction = action
 
     /**
      * What [key] of [def], a key the scene draws (060-render-p2 S1), does: its sound, the space's and
@@ -370,7 +373,7 @@ abstract class BaseKeyboard(
         val g = key.keyGesture
         def.behaviors.forEach {
             when (it) {
-                is KeyDef.Behavior.Press -> key.onClick { k -> onAction(pressed(k.keyGesture.clickAt, it.action)) }
+                is KeyDef.Behavior.Press -> key.onClick { k -> onAction(pressed(k.keyGesture.clickAt, k.keyGesture.clickDown, it.action)) }
                 // hold to talk follows the finger that holds the space
                 is KeyDef.Behavior.LongPress -> key.onLongClick { k ->
                     val action = it.action
@@ -498,8 +501,10 @@ abstract class BaseKeyboard(
      * Called last in a keyboard's init: the scene reads its state ([sceneEnv]). Each key wired as
      * its layout's node says ([SceneKeyDef], [sceneTable] the keyboard's own words: U4 B).
      */
-    protected fun drawKeysWithScene(layoutName: String) {
-        val layout = SceneLayouts.of(context, layoutName)
+    protected fun drawKeysWithScene(layoutName: String) = drawKeysWithScene(SceneLayouts.of(context, layoutName))
+
+    /** As [drawKeysWithScene] by its id, [layout] read already (null: none read, nothing drawn): a grouped keyboard's, its groups checked first. */
+    protected fun drawKeysWithScene(layout: SceneLayout?) {
         val board = SceneBoard(context, theme, layout) { look, read, width, height -> sceneEnv(look, read, width, height) }
         sceneBoard = board
         val view = board.view(keyImages, ::sceneString, { node -> sceneKey(node) }) { onSceneBuilt(it) }

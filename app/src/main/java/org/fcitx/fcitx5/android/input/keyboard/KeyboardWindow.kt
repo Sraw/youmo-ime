@@ -118,10 +118,11 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         TextKeyboard.Name to { TextKeyboard(context, theme) },
         T9Keyboard.Name to { nineKeys(english = false) },
         T9Keyboard.EnglishName to { nineKeys(english = true) },
-        GroupedKeyboard.Name14 to { GroupedKeyboard(context, theme) },
+        // pinyin's: a theme's layout of its own groups typed as such (060-render-p3 T9b); 双拼's take the built-in groups alone
+        GroupedKeyboard.Name14 to { GroupedKeyboard(context, theme, ownGroups = true) },
         GroupedKeyboard.Name18 to { GroupedKeyboard(context, theme, NineKeyLetters.G18) },
         GroupedKeyboard.Name18Plain to { GroupedKeyboard(context, theme, NineKeyLetters.G18, semicolon = false) },
-        GroupedKeyboard.NamePinyin18 to { GroupedKeyboard(context, theme, NineKeyLetters.G18, Keyboard::pinyin18Key, semicolon = false) },
+        GroupedKeyboard.NamePinyin18 to { GroupedKeyboard(context, theme, NineKeyLetters.G18, Keyboard::pinyin18Key, semicolon = false, ownGroups = true) },
         GroupedKeyboard.NameShuangpin14 to { GroupedKeyboard(context, theme, NineKeyLetters.G14, Keyboard::shuangpin14Key) },
         // the user's 按键字符 (its symbols) as 九键拼音 has them; its letters are 全拼's alone
         T9Keyboard.ShuangpinName to { T9Keyboard(context, theme, symbols = NineKeySymbols.parse(AppPrefs.getInstance().keyboard.t9Symbols.getValue()), shuangpin = true, semicolon = true) },

@@ -75,13 +75,13 @@ class GroupedKeyboardTapTest {
 
     private fun tap(c: Char, at: Float) = KeyAction.SymAction(KeySym(UNICODE + Keyboard.tapKey(c, at)), KeyStates.Virtual)
 
-    // a touch on [key]: down at [x] across it, then each move by (dx, dy) from there, then up where the last
-    // left it; to the keyboard (whose touches go to the scene's keys) at the key's place
-    private fun touch(key: ShownKey, x: Float, vararg moves: Pair<Float, Float>) {
+    // a touch on [key]: down at [x] across it ([down] its height down it), then each move by (dx, dy) from there, then
+    // up where the last left it; to the keyboard (whose touches go to the scene's keys) at the key's place
+    private fun touch(key: ShownKey, x: Float, vararg moves: Pair<Float, Float>, down: Float = 0.5f) {
         key as SceneShownKey
         // the bounds the canvas's own (no window here): its place in the keyboard added
         val (view, left, top) = Triple(keyboard, key.canvas.left + key.bounds.left, key.canvas.top + key.bounds.top)
-        val y = top + key.height / 2f
+        val y = top + key.height * down
         var time = 1_000L
         fun send(action: Int, ex: Float, ey: Float) {
             val event = MotionEvent.obtain(1_000L, time, action, ex, ey, 0)
@@ -107,6 +107,21 @@ class GroupedKeyboardTapTest {
         sent.clear()
         touch(bn, bn.width * 0.25f)
         assertEquals(listOf<KeyAction>(tap(g14Code('b'), 0.25f)), sent)
+    }
+
+    // 060-render-p3 T9b: the 14 keys' taps send what they always did, wherever down the key the finger came, the
+    // same touch the same character (where down goes with a layout's own groups' codes alone)
+    @Test
+    fun theFourteenKeysTapsAreTheSameWhereverDownTheKey() = drawn {
+        for (face in listOf("QW", "BN", "AS", "CV")) {
+            val key = key(face)
+            val first = key.label.lowercase()[0]
+            for (x in listOf(0.1f, 0.25f, 0.5f, 0.75f, 0.9f)) {
+                for (down in listOf(0.1f, 0.5f, 0.9f)) touch(key, key.width * x, down = down)
+                assertEquals("$face $x", List(3) { tap(g14Code(first), x) }, sent)
+                sent.clear()
+            }
+        }
     }
 
     @Test
@@ -149,8 +164,9 @@ class GroupedKeyboardTapTest {
         }
     }
 
-    // 060-render-v2 §15: groups a layout writes that are not the keyboard's (G14) make no codes of their
-    // own (P3): logged, and the keyboard's groups typed, its codes, record and leaning as ever (its lean= gone by too)
+    // 060-render-v2 §15, 060-render-p3 T9b: groups a layout writes that are not the keyboard's (G14), on a keyboard
+    // that types none of its own (made here as 双拼's is: ownGroups off), make no codes of their own: logged, and the
+    // keyboard's groups typed, its codes, record and leaning as ever (GroupedKeyboardOwnGroupsTest: pinyin's own)
     @Test
     fun aLayoutsOtherGroupsAreLoggedAndTheKeyboardsKept() {
         val builtIn = SceneLayouts.source

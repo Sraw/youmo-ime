@@ -60,6 +60,16 @@ object EngineState {
     var englishSuggests = true
         internal set
 
+    /**
+     * The letter groups of the layout of its own a grouped keyboard shows (060-render-p3 T9b: a theme's 17
+     * keys in place of pinyin's 14 or 18; SceneGroups.Taken.Own's written), the last one shown; null till
+     * one is. Written on the main thread as that keyboard is made and shown, before any of its keys can be
+     * tapped; read on the fcitx thread before each key ([EngineBridge.syncOwnKeys]), so its codes reach
+     * the engine read by these groups. The keyboard's, not the engine's: kept over [reset].
+     */
+    @Volatile
+    var ownKeys: List<String>? = null
+
     internal val candidateReadingState = MutableStateFlow(ReadingStyle.OFF)
 
     /**
