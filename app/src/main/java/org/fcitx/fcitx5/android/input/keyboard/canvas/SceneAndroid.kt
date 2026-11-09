@@ -184,11 +184,23 @@ object SceneThemes {
     // key that changes what shows, Shift, Return); a look edited is another look, read
     private val refused = LinkedHashMap<Triple<ThemeLook, String, Boolean>, Unit>(KEPT, 0.75f, true)
 
+    /**
+     * A look's theme file ([LookTheme]); a test's own, one setting more than a look can (060-render-p3
+     * T7a: the window round the keys), the themes kept forgotten as it is set.
+     */
+    @VisibleForTesting
+    internal var source: (ThemeLook, String, Boolean) -> String = LookTheme::xml
+        set(value) {
+            field = value
+            made.clear()
+            refused.clear()
+        }
+
     fun of(look: ThemeLook, name: String, dark: Boolean): Theme? {
         val key = Triple(look, name, dark)
         made[key]?.let { return it.theme }
         if (refused.containsKey(key)) return null
-        return when (val t = ThemeReader.theme(LookTheme.xml(look, name, dark), maxStyles = LookTheme.MAX_STYLES)) {
+        return when (val t = ThemeReader.theme(source(look, name, dark), maxStyles = LookTheme.MAX_STYLES)) {
             is Parsed.Ok -> t.value.also {
                 made[key] = Made(it)
                 if (made.size > KEPT) made.remove(made.keys.first())

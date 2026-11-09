@@ -232,18 +232,35 @@ One-handed (`ThemePrefs.oneHanded`: off / right / left, read live the same way; 
 单手模式 turns it on at the side last used, hidden `ThemePrefs.oneHandedSide`, right at first, or off): while the letters do not split, every board, the letters
 too, goes to that side, 80% of the width, a phone's 420 dp at most (`SplitKeyboard.placement`, which
 decides both). The room beside it has the arrow, which then sets `oneHanded` rather than
-`splitDock`, and a button back to the whole width.
+`splitDock`, and a button back to the whole width. These side buttons, split's and one-handed's, are
+drawn as the theme's `side-button` says (060-render-p3 T7a, `SceneWindow.sideButton`; none set: the
+function keys' text colour on nothing, a round ripple of the pressed colour, as before); split's room
+between the halves is filled with the theme's `split-gap` where it sets one (the engine draws it,
+`SceneBuilder`), else it shows the keyboard's own.
+
+The navigation bar under a docked keyboard is the theme's `navbar { color }` where it sets a colour
+(T7a; `follow`, the default, and floating: as before, the colour under the keys): where the keyboard
+is drawn behind the bar (导航栏背景 全部; always from Android 15) a strip in the bar's room under the
+keys has it (`InputView.navbarStrip`), and 仅颜色 sets the window's bar colour
+(`NavigationBarManager`, its buttons drawn dark on a colour of luminance over 0.5).
 
 Floating (`ThemePrefs.floatingKeyboard`, the status area's 悬浮键盘; the input view is made anew for
 it): `keyboardView` is `FloatingKeyboard.widthDp` wide (70% of the screen, 300–420 dp), its boards as
 much shorter (85% at least), with `FloatingHandle` at the bottom (24 dp: a short bar and the dock button;
 `ThemePrefs.floatingHandle` puts it on top, the view made anew). The dock button is 56×24 dp, a
 smaller touch target than 48 dp, traded for a thin handle (review R11). The view is clipped to rounded corners
-with a shadow (`FloatingCorners`; users asked for both). The radius is the keys' radius plus their
-least margin to the edge (`FloatingKeyboard.cornerDp`, the nested-corner rule: the curve runs
+with a shadow (`FloatingCorners`; users asked for both). Frame and handle are the theme's `frame` and
+`handle` (060-render-p3 T7a: radius, border, shadow; fill, grip colour, dock icon colour, grip
+width and height), read through `SceneWindow` from the engine's `WindowLooks`, whose defaults are the
+rules the app worked out itself before: the radius is the keys' radius plus their
+least margin to the edge (`WindowLooks.cornerDp`, held to theme 3.0's `FloatingKeyboard.cornerDp` at
+every width by ime-core's `WindowDefaultsTest`; the nested-corner rule: the curve runs
 alongside the corner keys' and clips none), square where the keys are (按键圆角 直角, the owner's one setting for corners); the
-handle is a shade of the bar towards the key text (`FloatingKeyboard.handleColor`), as some themes'
-bar is the keyboard's colour (on top; at the bottom it is the keyboard's own). As Gboard's, it never
+handle is a shade of the bar towards the key text (`WindowLooks.handleColor`), as some themes'
+bar is the keyboard's colour (on top; at the bottom it is the keyboard's own); the grip 36×4 dp of
+the function keys' text colour; the shadow 6 dp. A frame's border is a stroke over the keyboard
+(`FloatingCorners.border`), its shadow's colour the outline shadow's (Android 9+; its offset is the
+system's, a theme's ignored). As Gboard's, it never
 goes into a strip of `FloatingPlacer.DOCK_MARK_DP` above the bottom (the IME's own nav bar, gesture
 navigation's switch/collapse row, counted by `BaseInputView.floatingBottomInset`); dragged down to that
 it is in the docking zone (`FloatingDrag` in ime-core; where a drag began at the bottom, it first

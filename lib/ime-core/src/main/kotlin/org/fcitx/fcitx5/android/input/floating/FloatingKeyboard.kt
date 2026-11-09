@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.input.floating
 
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 /**
  * The keyboard floating over the app, as Gboard's and Sogou's on a tablet: smaller than docked,
@@ -86,26 +85,12 @@ object FloatingKeyboard {
      * keys ([keyRadius] 0, 直角), square corners: the user's one setting for corners. Keys not
      * [bordered] are drawn square whatever their radius: the margin alone, or a big radius would
      * clip a corner key's face.
+     *
+     * Theme 3.0's rule, which the app no longer works out (060-render-p3 T7a): the engine's default
+     * of a theme's `frame` (WindowLooks.cornerDp) is, held to this at every look by WindowDefaultsTest.
      */
     fun cornerDp(keyRadius: Int, hMargin: Int, vMargin: Int, bordered: Boolean = true): Int =
         if (keyRadius == 0) 0 else (if (bordered) keyRadius else 0) + minOf(hMargin, vMargin)
-
-    /** How much of the keys' text colour the drag handle's strip has over the bar's. */
-    const val HANDLE_INK = 0.1f
-
-    /**
-     * The drag handle's colour: [base], the bar's, with [ink], the keys' text colour, laid over by
-     * [HANDLE_INK]. In a theme whose bar is the keyboard's colour the strip was not told apart from
-     * the bar under it; the text's colour makes it a shade darker on a light theme, lighter on a dark.
-     */
-    fun handleColor(base: Int, ink: Int): Int {
-        fun mix(shift: Int): Int {
-            val b = base ushr shift and 0xFF
-            val i = ink ushr shift and 0xFF
-            return (b + (i - b) * HANDLE_INK).roundToInt() shl shift
-        }
-        return (base and 0xFF000000.toInt()) or mix(16) or mix(8) or mix(0)
-    }
 
     // where in a room [room] wide [at] is; no room, the far edge, which is where it is all the same
     private fun share(at: Float, room: Float) = if (room <= 0f) 1f else (at / room).coerceIn(0f, 1f)

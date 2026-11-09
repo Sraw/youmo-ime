@@ -70,15 +70,6 @@ class FloatingKeyboardTest {
     }
 
     @Test
-    fun theHandleIsAShadeOfTheBarTowardsTheText() {
-        // a light bar with dark text: a little darker; a dark bar with light text: a little lighter
-        assertEquals(0xFFE6E6E6.toInt(), FloatingKeyboard.handleColor(0xFFFFFFFF.toInt(), 0xFF000000.toInt()))
-        assertEquals(0xFF1A1A1A.toInt(), FloatingKeyboard.handleColor(0xFF000000.toInt(), 0xFFFFFFFF.toInt()))
-        // the bar's alpha kept, each channel on its own
-        assertEquals(0x80F2ECE9.toInt(), FloatingKeyboard.handleColor(0x80FFFFFF.toInt(), 0x00804020))
-    }
-
-    @Test
     fun theKeysTextIsAsMuchSmallerAsTheKeysAreShorter() {
         // a phone: 70% as wide, its keys 85% as tall, and their text
         assertEquals(FloatingKeyboard.MIN_HEIGHT_SHARE, FloatingKeyboard.textScale(300, 411), 1e-6f)

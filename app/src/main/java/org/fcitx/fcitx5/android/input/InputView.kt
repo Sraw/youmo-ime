@@ -76,6 +76,7 @@ import org.fcitx.fcitx5.android.input.keyboard.SplitDock
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneWindow
 import org.fcitx.fcitx5.android.input.picker.PickerData
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.picker.emojiPicker
@@ -88,7 +89,6 @@ import org.fcitx.fcitx5.android.input.preedit.PreeditComponent
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.scene.engine.section
-import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
 import org.fcitx.fcitx5.android.utils.unset
 import org.mechdancer.dependency.DynamicScope
 import org.mechdancer.dependency.UniqueComponent
@@ -131,6 +131,10 @@ class InputView(
     // under the whole keyboard: the theme's picture (laid as CENTER_CROP lays it, PictureHost) or its colour
     private val customBackground = view(::View)
 
+    // the room the navigation bar takes under the keys, drawn behind it (导航栏背景 全部): the theme's `navbar`
+    // colour where it sets one (060-render-p3 T7a), else none, the keyboard's under it as ever
+    private val navbarStrip = view(::View) { visibility = GONE }
+
     // the bar's base, under the bar and the row above it for the code being typed: one taller bar.
     // None (the keyboard's base seen through), its colour, or the picture's part there
     private val barBackground = view(::View) {
@@ -139,10 +143,9 @@ class InputView(
 
     private val placeholderOnClickListener = OnClickListener { }
 
+    // dressed as the theme has them ([dressSideButtons]) as they are shown
     private fun sideButton(icon: Int, description: Int, onClick: () -> Unit) = imageView {
         imageResource = icon
-        colorFilter = PorterDuffColorFilter(theme.altKeyTextColor, PorterDuff.Mode.SRC_IN)
-        background = borderlessRippleDrawable(theme.keyPressHighlightColor)
         scaleType = ImageView.ScaleType.CENTER
         contentDescription = context.getString(description)
         visibility = GONE
@@ -418,6 +421,12 @@ class InputView(
                 centerVertically()
                 centerHorizontally()
             })
+            add(navbarStrip, lParams(0, 0) {
+                leftToLeft = LayoutParams.PARENT_ID
+                rightToRight = LayoutParams.PARENT_ID
+                topToBottom = bottomPaddingSpace.existingOrNewId
+                bottomOfParent()
+            })
             add(barBackground, lParams(0, 0) {
                 topOfParent()
                 bottomToBottomOf(kawaiiBar.view)
@@ -593,6 +602,7 @@ class InputView(
 
     // in the room beside a board at [side]: the arrow across, and one-handed the way back to the whole width
     private fun showSideButtons(side: SplitKeyboard.Dock?) {
+        if (side != null) dressSideButtons()
         moveLeft.isVisible = side == SplitKeyboard.Dock.RIGHT
         moveRight.isVisible = side == SplitKeyboard.Dock.LEFT
         fullWidthLeft.isVisible = oneHandedPlaced && side == SplitKeyboard.Dock.RIGHT
@@ -603,6 +613,16 @@ class InputView(
         moveRight.translationY = -apart
         fullWidthLeft.translationY = apart
         fullWidthRight.translationY = apart
+    }
+
+    // the theme's `side-button` (060-render-p3 T7a) in the scenes now, one-handed or a board at the side of the letters split
+    private fun dressSideButtons() {
+        val scenes = SceneWindow.scenes(context, theme, oneHanded = oneHandedPlaced, split = !oneHandedPlaced)
+        val look = SceneWindow.sideButton(theme, scenes)
+        for (b in listOf(moveLeft, moveRight, fullWidthLeft, fullWidthRight)) {
+            b.colorFilter = PorterDuffColorFilter(look.iconColor.value, PorterDuff.Mode.SRC_IN)
+            b.background = SceneWindow.sideButtonBackground(context, look, dp(SIDE_BUTTON_DP))
+        }
     }
 
     /** Where the board shown goes, while the letters split or one-handed, or null for the whole width. */
@@ -633,6 +653,10 @@ class InputView(
             // 贴底: no room for the bar, for ROMs whose hidden gesture line still takes it
             bottomMargin = if (floating || KeyboardArea.bottomFlush()) 0 else navBar
         }
+        // the theme's colour of the bar, as the screen is turned now
+        val navbar = if (floating) null else SceneWindow.navbar(theme, SceneWindow.scenes(context, theme))
+        navbarStrip.isVisible = navbar != null
+        navbar?.let(navbarStrip::setBackgroundColor)
         return insets
     }
 

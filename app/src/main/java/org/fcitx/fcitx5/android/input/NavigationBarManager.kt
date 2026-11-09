@@ -9,10 +9,12 @@ import android.graphics.Color
 import android.os.Build
 import android.view.Window
 import androidx.annotation.ColorInt
+import androidx.core.graphics.ColorUtils
 import androidx.core.view.WindowCompat
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.NavbarBackground
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneWindow
 import org.fcitx.fcitx5.android.input.theme.BoardBase
 import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import org.fcitx.fcitx5.android.utils.DeviceUtil
@@ -91,15 +93,22 @@ class NavigationBarManager {
 
     private fun update(window: Window) {
         val theme = ThemeManager.activeTheme
+        // the theme's (`navbar { color }`, 060-render-p3 T7a); null, follow: the colour under the keys
+        val set = if (ThemeManager.prefs.floatingKeyboard.getValue()) null else SceneWindow.navbar(theme, SceneWindow.scenes(window.context, theme))
         if (shouldUpdateNavbarForeground) {
             WindowCompat.getInsetsController(window, window.decorView)
-                .isAppearanceLightNavigationBars = !theme.isDark
+                .isAppearanceLightNavigationBars = set?.let { ColorUtils.calculateLuminance(it) > LIGHT } ?: !theme.isDark
         }
         if (shouldUpdateNavbarBackground) {
             window.setNavbarBackgroundColor(
                 // the colour under the keys, as the theme has it; under a picture the theme's dark of it
-                if (ThemeManager.shownLook(theme).base == BoardBase.Picture) theme.backgroundColor else ThemeColors.board(ThemeManager.shownLook(theme).palette, ThemeManager.shownLook(theme).keys)
+                set ?: if (ThemeManager.shownLook(theme).base == BoardBase.Picture) theme.backgroundColor else ThemeColors.board(ThemeManager.shownLook(theme).palette, ThemeManager.shownLook(theme).keys)
             )
         }
+    }
+
+    private companion object {
+        // a colour this light has the bar's buttons drawn dark
+        const val LIGHT = 0.5
     }
 }
