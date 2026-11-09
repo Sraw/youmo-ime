@@ -282,6 +282,7 @@ object ThemeReader {
         selectors?.mapNotNull { it.reserved }?.distinct()?.forEach { p.warn(el.line, ignored(it)) }
         named(values, a, colors, fonts)
         selectors?.let { readElsewhere(it, values.keys, el.line, p) }
+        selectors?.let { shapes(it, values, el.line, p) }
         if (values.isEmpty() && reserved == 0) a.problem("a style that sets nothing")
         return selectors?.let { Style(it, values, order, el.line) }
     }
@@ -313,6 +314,22 @@ object ThemeReader {
     }
 
     private val LABEL_READ = setOf("align", "space-content")
+
+    // T4b's that do nothing where they are set, which a warning says: the bubble's shape, tail, size and
+    // offset on anything but the bubble, a cap's depth on anything but a key, a radius beside a path
+    private fun shapes(selectors: List<Selector>, values: Map<String, Value>, line: Int, p: Problems) {
+        val bubbly = listOfNotNull(
+            "shape=\"bubble\"".takeIf { (values["shape"] as? Value.Word)?.word == Values.BUBBLE },
+            "size= in %".takeIf { values["size"] is Value.Percent },
+            "tail=".takeIf { "tail" in values },
+            "offset=".takeIf { "offset" in values },
+        )
+        val widgets = selectors.map { it.widget }.distinct()
+        for (w in widgets.filter { it != "preview" }) bubbly.forEach { p.warn(line, "$it on $w does nothing: only the preview (the key's bubble) has it") }
+        val capped = listOf("depth", "depth-color").filter { it in values }
+        for (w in widgets.filter { it != "key" }) capped.forEach { p.warn(line, "$it= on $w does nothing: only a key has a cap") }
+        if (values["shape"] is Value.OfPath && "radius" in values) p.warn(line, "radius= does nothing beside a path(…): the path is the outline")
+    }
 
     // a property of today's value a later stage reads ([Values.reservedValue]): ignored
     private val RESERVED_VALUE = Value.Flag(false)

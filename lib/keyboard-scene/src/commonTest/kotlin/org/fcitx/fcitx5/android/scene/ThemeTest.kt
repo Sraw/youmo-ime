@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.scene.theme.Value
 import org.fcitx.fcitx5.android.scene.theme.Values
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -376,9 +377,8 @@ class ThemeTest {
     fun reservedNamesWarnNotFail() {
         // each of a later stage's style properties, of its form: a warning, the style kept
         val reserved = listOf(
-            "inner-shadow=\"none\"", "side-padding=\"2% 5%\"", "bottom-padding=\"1%\"",
+            "side-padding=\"2% 5%\"", "bottom-padding=\"1%\"",
             "underline=\"none\"", "cursor-color=\"system(primary, @keyText)\"",
-            "inner-shadow=\"0 1dp 2dp @keyShadow\"", "depth=\"2dp\"", "depth-color=\"@keyShadow\"", "tail=\"true\"", "offset=\"-4dp\"",
             "height=\"38% 52%\"", "width=\"24dp\"", "side-padding=\"8dp 48dp\"", "bottom-padding=\"0 0\"", "gap=\"4dp\"",
             "label-style=\"dot\"", "underline=\"1dp @keyText\"", "cursor-color=\"@keyText\"", "blur=\"12dp\"",
             "ink-color=\"@keyText\"", "ink-width=\"3dp\"", "grid-color=\"@divider\"", "grid=\"false\"",
@@ -391,10 +391,10 @@ class ThemeTest {
             assertTrue(w.single().contains("${attr.substringBefore('=')}= is not supported"), "$attr: $w")
         }
         // with a property of today: that one works
-        val t = ThemeReader.theme(withStyle("<style select=\"key\" fill=\"#123456\" depth=\"2dp\"/>")).getOr { error("$it") }
+        val t = ThemeReader.theme(withStyle("<style select=\"key\" fill=\"#123456\" press-sink=\"2dp\"/>")).getOr { error("$it") }
         assertTrue(t.styles.last().values.keys == setOf("fill"))
         // a later stage's value of a property of today
-        for (attr in listOf("shape=\"path(M0 0 L1 0 L1 1 Z)\"", "shape=\"bubble\"", "size=\"120%\"", "color=\"follow\"")) {
+        for (attr in listOf("color=\"follow\"")) {
             assertTrue(warnings(withStyle("<style select=\"preview\" $attr/>")).single().contains("is not supported"), attr)
         }
         // of the wrong form, or misspelt: refused as ever
@@ -406,14 +406,58 @@ class ThemeTest {
         for (attr in listOf("ink-color=\"rgb(0,0,0)\"", "cursor-color=\"nonsense(x)\"")) {
             assertTrue(problems(withStyle("<style select=\"key\" $attr/>")).single().contains("is not a value of"), attr)
         }
-        assertEquals(listOf("<style>: @keyShadw is no colour"), problems(withStyle("<style select=\"key\" depth-color=\"@keyShadw\"/>")))
-        // a reserved value of the wrong form, an empty path
-        assertTrue(problems(withStyle("<style select=\"preview\" size=\"12\"/>")).any { it.contains("size=\"12\" is not") })
-        assertTrue(problems(withStyle("<style select=\"preview\" shape=\"path( )\"/>")).any { it.contains("shape=\"path( )\" is not") })
+        assertEquals(listOf("<style>: @keyShadw is no colour"), problems(withStyle("<style select=\"key\" ink-color=\"@keyShadw\"/>")))
         // elements: a sound pack, whatever it holds; an animated picture
         val sounds = "<sounds><sound key=\"key\" src=\"tap.ogg\"/></sounds>"
         assertTrue(warnings(source.replace("</theme>", "$sounds\n</theme>")).single().contains("<sounds> is not supported"))
         assertTrue(problems(source.replace("</theme>", "<noises/>\n</theme>")).single().contains("<noises> is not allowed"))
+    }
+
+    // 060-render-p3 T4b: a key's shape and cap, the bubble's shape, size, tail and place, read; of the wrong
+    // form or out of range refused; where they do nothing, a warning
+    @Test
+    fun theCapAndTheBubbleRead() {
+        fun read(attr: String, select: String = "key") = ThemeReader.theme(withStyle("<style select=\"$select\" $attr/>")).ok().styles.last().values
+        fun refused(attr: String, select: String = "key") =
+            assertTrue(problems(withStyle("<style select=\"$select\" $attr/>")).any { it.contains(attr) }, attr)
+        val path = assertIs<Value.OfPath>(read("shape=\"path(M0 0 H1 V1 H0 Z)\"")["shape"]).path
+        assertEquals(5, path.segments.size, "M H V H Z")
+        assertEquals(Value.Word("bubble"), read("shape=\"bubble\"", "preview")["shape"])
+        assertEquals(Value.OfShadow(Shadow(0.0, 1.0, 2.0, ColorExpr.parse("#40000000"))), read("inner-shadow=\"0 1dp 2dp #40000000\"")["inner-shadow"])
+        assertEquals(Value.OfShadow(Shadow.NONE), read("inner-shadow=\"none\"")["inner-shadow"])
+        for (dp in listOf(0.0, 2.5, 8.0)) assertEquals(Value.Number(dp), read("depth=\"${SceneText.n(dp)}dp\"")["depth"])
+        assertEquals(Value.OfColor(assertNotNull(ColorExpr.parse("@keyShadow"))), read("depth-color=\"@keyShadow\"")["depth-color"])
+        assertEquals(Value.Flag(false), read("tail=\"false\"", "preview")["tail"])
+        assertEquals(Value.Flag(true), read("tail=\"true\"", "preview")["tail"])
+        for (dp in listOf(-24.0, 0.0, 24.0)) assertEquals(Value.Number(dp), read("offset=\"${SceneText.n(dp)}dp\"", "preview")["offset"])
+        for (pct in listOf(100.0, 120.0, 160.0)) assertEquals(Value.Percent(pct), read("size=\"${SceneText.n(pct)}%\"", "preview")["size"])
+        assertEquals(Value.Number(14.0), read("size=\"14sp\"")["size"], "a text's size as ever")
+        listOf(
+            "shape=\"path()\"", "shape=\"path(L1 1 L0 1 Z)\"", "shape=\"path(M0 0 L2 0 L1 1 Z)\"", "shape=\"blob\"",
+            "inner-shadow=\"0 17dp 0 #000000\"", "inner-shadow=\"0 1dp\"", "depth=\"9dp\"", "depth=\"-1dp\"", "depth=\"2px\"",
+            "depth-color=\"nonsense(x)\"", "tail=\"yes\"", "offset=\"25dp\"", "offset=\"-25dp\"", "size=\"99%\"", "size=\"161%\"", "size=\"12\"",
+        ).forEach { refused(it, "preview") }
+        assertEquals(listOf("<style>: @keyShadw is no colour"), problems(withStyle("<style select=\"key\" depth-color=\"@keyShadw\"/>")))
+        // where they do nothing: a bubble's on a key, a cap on the bubble, a radius beside a path
+        assertTrue(warnings(withStyle("<style select=\"preview\" shape=\"bubble\" tail=\"false\" size=\"120%\" offset=\"-4dp\"/>")).isEmpty())
+        assertEquals(4, warnings(withStyle("<style select=\"key\" shape=\"bubble\" tail=\"false\" size=\"120%\" offset=\"-4dp\"/>")).count { it.contains("only the preview") })
+        assertTrue(warnings(withStyle("<style select=\"preview\" depth=\"2dp\"/>")).single().contains("only a key has a cap"))
+        assertTrue(warnings(withStyle("<style select=\"key\" shape=\"path(M0 0 H1 V1 Z)\" radius=\"4dp\"/>")).single().contains("radius= does nothing"))
+        // the cascade: unset, nothing; the band's colour a solid fill's darker, else a translucent black
+        val t = ThemeReader.theme(withStyle("<style select=\"key\" depth=\"3dp\"/><style select=\"key.letter\" fill=\"linear(90deg, @key 0%, @altKey 100%)\"/>")).ok()
+        val c = Cascade(t, emptySet())
+        val letter = KeyLook(c.of(Selector.Target("key", "qwerty", "a", "letter", setOf("letter"), emptySet())), t)
+        assertEquals(3.0, letter.depth)
+        assertEquals(Argb(0x40000000), letter.depthColor, "a gradient: a translucent black")
+        val plain = KeyLook(Cascade(ThemeReader.theme(source).ok(), emptySet()).of(Selector.Target("key", "qwerty", "a", "letter", setOf("letter"), emptySet())), t)
+        assertEquals(0.0, plain.depth)
+        assertNull(plain.path)
+        assertNull(plain.innerShadow)
+        assertEquals(1.0, plain.size)
+        assertEquals(0.0, plain.offset)
+        assertTrue(plain.tail)
+        val keyFill = (plain.fill as Fill.Solid).color
+        assertEquals(t.color(ColorExpr.Fn("darker", listOf(keyFill), 20.0)), plain.depthColor, "the fill's 20% darker")
     }
 
     // 060-render-p3 T4a: the text on a key, read; of the wrong form or out of its range refused
@@ -488,16 +532,15 @@ class ThemeTest {
 
     @Test
     fun aThemeOfEveryLaterStageImports() {
-        // reserved.xml: theme-4.xsd's example of T1 (xmllint-checked), T4a's names (read now), T4b–A3's and a sound pack in it
+        // reserved.xml: theme-4.xsd's example of T1 (xmllint-checked), T4a's and T4b's names (read now), T5–A3's and a sound pack in it
         val t = ThemeReader.theme(testData("reserved.xml"))
         assertTrue(t is Parsed.Ok, "${t.problems()}")
         assertEquals(setOf(false, true), t.value.variants)
         assertEquals(Argb(0xFF303030.toInt()), t.value.variant(dark = true).colors["key"])
         assertEquals("0.6.0", t.value.meta?.minApp)
         val ignored = listOf(
-            "83|<sounds>", "79|transition=", "79|@im=wubi", "79|clipboard", "79|:first", "80|depth=",
-            "80|press-scale=", "80|effect=", "80|sticker=", "81|shape=\"path(M0 0 L1 0 L1 1 Z)\"", "81|size=\"120%\"", "81|tail=",
-            "81|appear=", "82|height=", "82|side-padding=",
+            "83|<sounds>", "79|transition=", "79|@im=wubi", "79|clipboard", "79|:first",
+            "80|press-scale=", "80|effect=", "80|sticker=", "81|appear=", "82|height=", "82|side-padding=",
         ).map { "$it is not supported by this version, ignored" }
         assertEquals(ignored, t.warnings().map { "${it.line}|${it.message}" })
     }
