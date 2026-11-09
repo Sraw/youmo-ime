@@ -1017,6 +1017,29 @@ colour only over flat keys (`ThemeColors.panel`). Key text is `keyScale` of its 
 font (`ThemeAssets.typeface`, the weight asked); hints, marks and the bar's icons take
 `keyHintColor` and `toolbarIconColor`.
 
+The app's own panels take what the theme in use sets of them (060-render-p3 T7b; §16: their native
+views know the colours and a few properties), read through `ScenePanels` (input/keyboard/canvas) from the
+engine's `PanelLooks`, whose defaults are the look the app worked out itself before, so a theme 3.0's
+looks as it did; the scenes are the window's (`SceneWindow.scenes`: not `@floating` nor a placement's), a fill a
+colour alone (a picture's warned of and ignored), and a look that made no theme has that
+look of before worked out of its colours. `clipboard` (fill, radius, color): an entry's card and a split
+entry's pieces (`ClipboardEntryUi`, `ClipboardChunksUi`), not set the `clipboardEntry` colour, the keys'
+text, half the keys' radius (as 按键圆角 sets it, whatever `@flat`: the P2 rule, once
+`ThemeColors.entryRadius`). `picker` (fill, under the grid) and its part `categories` (fill, color; the one
+shown `picker:selected categories`): the symbols' column (`PickerSideUi`: the bar's colour, the one shown
+the keyboard's, the text the keys' at 60% and, shown, opaque) and the emoji's tabs (`PickerTabsUi`: on the bar, at 50%).
+`editing` (fill, radius): its buttons (`TextEditingButton`), not set the keys' colours, blocks or the flat
+grid of lines as the keys (a radius then nothing), the corners twice the keys' dp as as many px (its old
+setting's look), pills where the keys are; a fill set is a block whatever the keys. `voice` (fill, blur 0–25 dp) and its part `mic` (fill, icon-color): the mask's
+colour (not set, the keyboard's at `PanelLooks.MASK_ALPHA`), its frosted glass (`VoiceGlass.Blur.of`: three
+box blurs of the radius, as the picture's, on the keys taken 2 to 8 times smaller, under 4 px a little more; 0, none, the keys plain
+under the colour; not set, the glass of before), the microphone's bubble and bars (the accent colour at
+`MIC_ALPHA`, and whole). The glass is one picture of the keys taken once on every API: RenderEffect is API 31's
+and blurs a view's own drawing, not what is under it. The handwriting pad's `ink-color`, `ink-width` (1–8 dp)
+and `grid` / `grid-color` are on its slot's style (`handwriting/pad`, as its fill): the engine puts the
+strokes' `Ink` on the slot (`HandwritingKeyboard` gives it to `HandwritingPadView`; not set, the keys' text,
+3.5 dp) and a 田字格 of 1 dp lines over the pad's face in its ops (`engine/Pads`; not set, none).
+
 `ThemeAssets` (`data/theme/`) decodes off the main thread and caches for one theme's files at a time:
 the picture once an orientation at the width it is drawn (halved while wider, and till it is at most
 2048² pixels and 4096 high, so a 4096 cut is not held whole), its blurs from that (`BoxBlur`), each

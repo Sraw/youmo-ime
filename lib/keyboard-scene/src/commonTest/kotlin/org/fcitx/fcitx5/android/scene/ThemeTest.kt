@@ -382,8 +382,7 @@ class ThemeTest {
             "side-padding=\"2% 5%\"", "bottom-padding=\"1%\"",
             "underline=\"none\"", "cursor-color=\"system(primary, @keyText)\"",
             "height=\"38% 52%\"", "width=\"24dp\"", "side-padding=\"8dp 48dp\"", "bottom-padding=\"0 0\"", "gap=\"4dp\"",
-            "label-style=\"dot\"", "underline=\"1dp @keyText\"", "cursor-color=\"@keyText\"", "blur=\"12dp\"",
-            "ink-color=\"@keyText\"", "ink-width=\"3dp\"", "grid-color=\"@divider\"", "grid=\"false\"",
+            "label-style=\"dot\"", "underline=\"1dp @keyText\"", "cursor-color=\"@keyText\"",
             "transition=\"150ms ease-out\"", "press-scale=\"95%\"", "press-sink=\"2dp\"", "appear=\"scale 150ms\"",
             "effect=\"particles(star.png, 12, 24dp, 600ms)\"", "sticker=\"cat.png\"",
         )
@@ -403,10 +402,10 @@ class ThemeTest {
         assertTrue(problems(withStyle("<style select=\"key\" alignn=\"center\"/>")).any { it.contains("unknown attribute alignn=") })
         assertTrue(problems(withStyle("<style select=\"key\" shape=\"blob\"/>")).isNotEmpty())
         // colours in a reserved property: a colour, naming colours there
-        for (attr in listOf("ink-color=\"rgb(0,0,0)\"", "cursor-color=\"nonsense(x)\"")) {
+        for (attr in listOf("underline=\"1dp rgb(0,0,0)\"", "cursor-color=\"nonsense(x)\"")) {
             assertTrue(problems(withStyle("<style select=\"key\" $attr/>")).single().contains("is not a value of"), attr)
         }
-        assertEquals(listOf("<style>: @keyShadw is no colour"), problems(withStyle("<style select=\"key\" ink-color=\"@keyShadw\"/>")))
+        assertEquals(listOf("<style>: @keyShadw is no colour"), problems(withStyle("<style select=\"key\" cursor-color=\"@keyShadw\"/>")))
         // elements: a sound pack, whatever it holds; an animated picture
         val sounds = "<sounds><sound key=\"key\" src=\"tap.ogg\"/></sounds>"
         assertTrue(warnings(source.replace("</theme>", "$sounds\n</theme>")).single().contains("<sounds> is not supported"))
@@ -463,7 +462,7 @@ class ThemeTest {
         val sizedA = Cascade(sized, emptySet()).of(Selector.Target("key", "qwerty", "a", "letter", setOf("letter"), emptySet()))
         assertEquals(Value.Number(14.0), sizedA["size"], "the key's sp kept")
         // a later stage's widget beside the preview (warned of, selecting nothing) does not drop it
-        val withReserved = withStyle("<style select=\"preview, clipboard\" size=\"120%\"/>")
+        val withReserved = withStyle("<style select=\"preview, toolbar\" size=\"120%\"/>")
         assertEquals(Value.Percent(120.0), ThemeReader.theme(withReserved).ok().styles.last().values["size"])
         assertTrue(warnings(withReserved).none { it.startsWith("size= in % is ignored") })
         // the cascade: unset, nothing; the band's colour a solid fill's darker, else a translucent black
@@ -563,7 +562,7 @@ class ThemeTest {
         assertEquals("0.6.0", t.value.meta?.minApp)
         // T5 made its scenes and the keyboard's size work: no warning of them
         val ignored = listOf(
-            "83|<sounds>", "79|transition=", "79|clipboard", "79|:first",
+            "83|<sounds>", "79|transition=", "79|:first",
             "80|press-scale=", "80|effect=", "80|sticker=", "81|appear=",
         ).map { "$it is not supported by this version, ignored" } +
             // its preview a path with a tail, which only a bubble has
@@ -582,8 +581,13 @@ class ThemeTest {
         assertNull(Selector.parse("@im=Wubi key"))
         assertNull(Selector.parse("@colour=red key"))
         for (w in Selector.RESERVED_WIDGETS) assertEquals(w, s(w).reserved)
-        // T7a's: they select (WindowLooksTest)
-        for (w in Selector.WINDOW_WIDGETS) assertNull(s(w).reserved, w)
+        // T7a's and T7b's: they select (WindowLooksTest, PanelLooksTest)
+        for (w in Selector.WINDOW_WIDGETS + Selector.PANEL_WIDGETS) assertNull(s(w).reserved, w)
+        assertEquals("categories", s("picker:selected categories").part)
+        assertEquals("mic", s("@dark voice mic").part)
+        assertNull(Selector.parse("picker mic"), "a voice mask's part")
+        assertNull(Selector.parse("clipboard label"), "a key's part")
+        assertNull(Selector.parse("frame categories"))
         assertEquals("candidate comment", s("candidate comment").reserved)
         assertEquals(":first", s("candidate:first").reserved)
         assertNull(Selector.parse("candidate mark"))
@@ -592,7 +596,7 @@ class ThemeTest {
         assertNull(s("key:pressed").reserved)
         assertNull(s("@dark key").reserved)
         // such a style reads, warns, and selects nothing yet
-        val src = withStyle("<style select=\"toolbar, clipboard\" fill=\"#123456\"/>")
+        val src = withStyle("<style select=\"toolbar, preedit\" fill=\"#123456\"/>")
         assertEquals(2, warnings(src).size)
         val t = ThemeReader.theme(src).getOr { error("$it") }
         val target = Selector.Target("key", "qwerty", "q", null, setOf("letter"))
