@@ -27,9 +27,9 @@ class ThemeSelectPreference(context: Context, private val defaultTheme: Theme) :
             // force AlertDialog's customPanel to grow
             minimumHeight = Int.MAX_VALUE
         }
-        val allThemes = ThemeManager.getAllThemes()
-        val adapter = SimpleThemeListAdapter(allThemes).apply {
-            selected = allThemes.indexOfFirst { it.name == currentThemeName }
+        // the slot's version of a pair shown (the light slot's default is light), the one picked marked
+        val adapter = SimpleThemeListAdapter(ThemeManager.getAllThemes(), dark = defaultTheme.isDark).apply {
+            select(ThemeManager.getTheme(currentThemeName))
         }
         view.adapter = adapter
         AlertDialog.Builder(context)

@@ -4,8 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.learning
 
-import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.Contrast
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -13,10 +12,8 @@ import org.junit.Test
 /** 撤销 reads on the chip in every built-in theme: 4.5:1, normal-size text's (§4). */
 class UndoChipColourTest {
 
-    // found by reflection, so a preset added is checked too
-    private val presets = ThemePreset::class.java.declaredFields
-        .filter { Theme.Builtin::class.java.isAssignableFrom(it.type) }
-        .map { it.isAccessible = true; it.get(ThemePreset) as Theme.Builtin }
+    // every built-in theme's version, as its file has it (a file added is checked too), and Transparent's two
+    private val presets = TestThemes.builtins.map { it.second } + TestThemes.TransparentLight + TestThemes.TransparentDark
 
     @Test
     fun undoIsLegibleOnThePopupColourInEveryTheme() {

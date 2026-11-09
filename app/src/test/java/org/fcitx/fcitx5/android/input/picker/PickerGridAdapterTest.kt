@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android.input.picker
 
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -39,7 +39,7 @@ class PickerGridAdapterTest {
     }
 
     private val grid by lazy {
-        PickerGridView(RuntimeEnvironment.getApplication(), ThemePreset.PixelDark, PickerGridView.Density.Medium)
+        PickerGridView(RuntimeEnvironment.getApplication(), TestThemes.PixelDark, PickerGridView.Density.Medium)
     }
 
     private fun adapter(policy: PickerPolicy, vararg data: Pair<PickerData.Category, Array<String>>) =

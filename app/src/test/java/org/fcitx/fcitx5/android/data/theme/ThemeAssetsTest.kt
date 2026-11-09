@@ -104,7 +104,7 @@ class ThemeAssetsTest {
         while (queued.isNotEmpty()) queued.removeAt(0).run()
     }
 
-    private val look = ThemePreset.PixelLight.look
+    private val look = TestThemes.PixelLight.look
 
     private fun slice(file: String) = NineSlice(file, Insets(0, 0, 0, 0), 3)
 
@@ -164,7 +164,7 @@ class ThemeAssetsTest {
         fun board(l: ThemeLook) = ThemeAssets.boardImages(l, "qwerty", listOf(slice("a.png"))).also { runQueued() }
         val first = board(pictured())
         // the same files, a brightness and a colour changed: kept
-        val recoloured = pictured().let { it.copy(picture = it.picture!!.copy(brightness = 40), palette = ThemePreset.PixelDark.look.palette) }
+        val recoloured = pictured().let { it.copy(picture = it.picture!!.copy(brightness = 40), palette = TestThemes.PixelDark.look.palette) }
         assertSame(first, board(recoloured))
         // another picture: let go
         val other = pictured().let { it.copy(picture = it.picture!!.copy(portrait = Crop("q.png", null, 0))) }
@@ -310,7 +310,7 @@ class ThemeAssetsTest {
     fun theBuiltInsSystemFontLetsGoOfNoneOfTheDrawnThemesFiles() {
         use("p.png" to intArrayOf(1000, 800))
         val own = pictured().let { it.copy(text = it.text.copy(keyFont = "f.ttf")) }
-        val builtIn = SceneFonts(ThemePreset.PixelDark.look)
+        val builtIn = SceneFonts(TestThemes.PixelDark.look)
         assertNotNull(ThemeAssets.typeface(own, "f.ttf", 400))
         var told = 0
         assertNull(ThemeAssets.pictureOrLater(own, false, 0, 1000, 2f) { told++ })

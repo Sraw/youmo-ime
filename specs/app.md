@@ -583,7 +583,7 @@ again when that moves (one-handed to the other side, the floating window dragged
 (`PictureHost.decoding`), not for one that never will be (no host, a file that does not read).
 
 No scene of the theme (one the engine refuses or cannot build): the built-in theme of its lightness
-(`ThemePreset.PixelLight`/`PixelDark`, 060-render-p2 U8) is drawn instead, the whole of it: its look,
+(`pixel#light`/`pixel#dark`, 060-render-p2 U8) is drawn instead, the whole of it: its look,
 its fonts and measurer, its painter (`KeyboardCanvasView.Drawn`), none of the broken theme's; the
 warning logged once a theme's look (`TextKeyboard.fellBack`). That failing too (a layout that does not
 read, the builder's problems), nothing is drawn and an error logged, never the views again (they go
@@ -985,7 +985,7 @@ too; put the copy in its place, remove the settings, tell once) runs at `ThemeMa
 settled or a migration's write-back failed this start (`ThemeFilesManager.rewriteFailed`): a copy
 not saved leaves its slot and every setting for the next start. A Monet theme in use is not copied
 (its colours follow the wallpaper): the settings are kept, encoded, as hidden `monet_key_style`
-(`ThemeLookMigration.MONET_KEY`), and `Theme.Monet`'s look is the defaults with them
+(`ThemeLookMigration.MONET_KEY`), and Monet's look (`Theme.Builtin.followsSystem`) is the defaults with them
 (`ThemeLookMigration.monetLook`). The page's 按键样式 has three settings of its own, new keys (`key_border_choice`, `key_spacing_choice`, `key_radius_choice`; not 0.5.0's, which the migration reads): each 跟随主题 (the default) or a value over the theme's `blocks`, `gap`, `radiusDp` (ime-core's `KeyStyleChoice`; a block theme made flat gets a transparent bar's colour, as `LegacyLook.applyTo`); then a line on what following means (标点位置 moved to 按键).
 
 ### Drawing a theme
@@ -1054,12 +1054,41 @@ same thread, blurred as on the keyboard, 12 MB of them kept; one that does not r
 The app does not edit themes (user, 2026-11-03) and in 0.5.x does not link the web theme maker
 (user, 2026-11-04: making themes moves to a later version, now 0.6.0): 新增主题 opens the import picker directly, no menu; the page
 (`web/theme-maker`) stays on GitHub Pages for 0.6.0, unlinked from the app and the user docs. A theme file is `<name>.theme`, a zip inside (user, 2026-11-04, so it is not taken for any zip): exported under that name as `application/octet-stream` (a provider may add `.zip` for `application/zip`), and the import picker shows every file (`*/*`, `.theme` has no MIME type) and takes only a display name ending `.theme` (ime-core's `ThemeFileName`; `.zip`, an earlier 0.5.1's or the page's, or no name, is refused with `exception_theme_filename`, which says to rename it). The format version is unchanged. The theme list
-applies, imports, and on a long press exports or deletes one of the user's (a Monet theme exports
-`Theme.Monet.toCustom()`: its colours now and the key style it keeps, fixed). The fcitx edit page
+applies, imports, and on a long press exports or deletes one of the user's (Monet exports
+`Theme.Builtin.toCustom()`: its colours now and the key style it keeps, fixed, named as 0.5 named it,
+`MonetLight#<primary>`). A built-in theme of two versions is one card (`ThemeCards`, the theme page's
+list and the light and dark slots' dialogs alike): a small 浅/深 on its thumbnail shows the other version,
+a tap on the card picks the one shown; the version a slot or the theme in use is shows, and its mark
+only while it is shown (dark over light over in use; a slot's dialog opens on the slot's version). The fcitx edit page
 (`CustomThemeActivity`, its cropper) went with the old 选择图片… and 复制内置主题…; themes made by them
 before are listed, used, exported and deleted like any other. Thumbnails (`ThemeThumbnailUi`) draw four rows of the
 theme's keys in little (`ThemeThumbnailKeys`, colours only: no key image decoded) over its base
 (its colour, or its picture: `ThemeAssets.thumbnail`).
+
+**Built-in themes** (060-render-p3 T3) are theme 4.0 files, `lib/keyboard-scene/src/commonMain/themes/`
+(material, pixel, nord, monet with `variants="light dark"`; deep-blue, monokai, amoled-black dark only),
+which the web reads as well; the build copies them as raw resources `scene_theme_<name>` (`-` → `_`)
+beside the layouts. `BuiltinThemeFiles` reads them (`ThemeManager.BuiltinThemes`, Monet's first): each
+version a `Theme.Builtin` of that version's 24 colours (ThemeReader.REQUIRED_COLORS; the native code reads
+those as before) drawn as `LookDefaults` with them, which is what the files' styles say
+(keyboard-scene's `BuiltinThemeEquivalenceTest`: every version × board × form × popup, scene text alike;
+the colours were held to the deleted `ThemePreset`/`Theme.Monet` by `BuiltinThemesPresetTest`, commit
+bb317aba3). Monet's colours are `system(role, fallback)`: `ThemeMonet.systemColors` gives the roles from
+Android 14 (the light bar `surface-container-highest`, the dark `surface-container-high`), on 12 and 13
+the palette tones 0.5 approximated them with, before 12 none (the fallbacks: 0.5's static MD3 colours);
+re-read on a configuration change (`onSystemPlatteChange`) and when the key style is settled. Transparent's
+two are no built-in theme: test data, `commonTest/data/transparent.xml`.
+
+The settings name a built-in theme by **reference**: its file's name and version, `pixel#dark`, or its
+name alone where it has one (`deep-blue`; `deep-blue#dark` finds it too). `ThemeManager.getTheme` finds
+the user's theme of that name first, then the built-in. `ThemePrefs.migrateThemeRefs` (from
+`ThemeManager`'s start, the custom themes listed) moves a slot (`normal_mode_theme`, `light_mode_theme`,
+`dark_mode_theme`) naming one by its 0.5 name (`PixelDark`, `MonetLight`, `BuiltinThemeFiles.LEGACY`)
+to its reference, unless a theme of the user's has that name; a name of no theme stays (the default). No
+mark: no old name is written any more and an import of one (or of a reference) is refused
+(`exception_theme_name_clash`), so it runs at every start and a backup of an older version, or the
+device-encrypted copy an older version wrote, is moved as it is read; `syncToDeviceEncryptedStorage`
+copies the references as they are now.
 
 Import (`ThemeFilesManager.importTheme`) takes the json and every file it names, by file name only
 (never a path, never a `.json`, never `.saving`); it checks all before copying any, so a refusal leaves nothing.

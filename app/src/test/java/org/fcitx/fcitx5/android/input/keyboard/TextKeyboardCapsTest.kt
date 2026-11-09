@@ -6,8 +6,8 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.view.accessibility.AccessibilityNodeInfo
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.SceneShownKey
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -28,7 +28,7 @@ class TextKeyboardCapsTest {
 
     private val typed = ArrayList<String>()
 
-    private val keyboard = TextKeyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark).apply {
+    private val keyboard = TextKeyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark).apply {
         keyActionListener = KeyActionListener { action, _ -> if (action is KeyAction.HostKeyAction) typed += action.act }
     }.laidOut()
 

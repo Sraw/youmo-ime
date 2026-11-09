@@ -19,7 +19,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardEntryUi
 import org.fcitx.fcitx5.android.input.editing.TextEditingButton
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPadView
@@ -71,7 +71,7 @@ class PanelThemeTest {
         SceneThemes.source = { look, name, dark -> LookTheme.xml(look, name, dark).replace("</theme>", "$STYLES\n</theme>") }
     }
 
-    private val theme: Theme = ThemePreset.PixelLight
+    private val theme: Theme = TestThemes.PixelLight
 
     private val ctx by lazy { Robolectric.buildActivity(Activity::class.java).setup().get() }
 

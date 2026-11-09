@@ -353,7 +353,7 @@ class ThemeMakerRulesTest {
     // a theme with everything 3.0 has: the picture cut for portrait and (turned) for landscape, blurred,
     // letters on it blurred, a nine-slice space, an image and a colour pressed, a role's key, a board's
     // key, a later build's board's key (kept, drawn by none), both fonts
-    private val full = ThemePreset.PixelDark.deriveCustomNoBackground("full").let { t ->
+    private val full = TestThemes.PixelDark.deriveCustomNoBackground("full").let { t ->
         t.copy(
             look = t.look.copy(
                 picture = Picture(

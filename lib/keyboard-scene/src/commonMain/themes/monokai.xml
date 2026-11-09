@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  内置主题 Monokai（0.5 的 Monokai），只有深色一版。
+  3.0 的内置主题只给颜色，外观全是 LookDefaults（块状、圆角 4dp、阴影 1dp、键缝 h3 v7、横屏 v4、按下 Tint）；
+  下面的样式就是 LookTheme 把它们写成 4.0 的样子，App 也照这些画（BuiltinThemeEquivalenceTest 逐字比场景）。
+  keyBorder、keyHint、toolbarIcon 3.0 没单给，取 Palette 的默认（= keyShadow、altKeyText、altKeyText）。
+-->
+<theme xmlns="https://youmo-ime/theme/4" name="monokai" variants="dark" version="4.0">
+  <colors>
+    <color name="background" value="#272822"/>
+    <color name="bar" value="#1f201b"/>
+    <color name="keyboard" value="#272822"/>
+    <color name="key" value="#33342c"/>
+    <color name="keyText" value="#d6d6d6"/>
+    <color name="candidateText" value="#d6d6d6"/>
+    <color name="candidateLabel" value="#d6d6d6"/>
+    <color name="candidateComment" value="#797979"/>
+    <color name="altKey" value="#2d2e27"/>
+    <color name="altKeyText" value="#797979"/>
+    <color name="accentKey" value="#b05279"/>
+    <color name="accentKeyText" value="#d6d6d6"/>
+    <color name="keyPressHighlight" value="#33ffffff"/>
+    <color name="keyShadow" value="#171813"/>
+    <color name="popupBackground" value="#1f201b"/>
+    <color name="popupText" value="#d6d6d6"/>
+    <color name="spaceBar" value="#373830"/>
+    <color name="divider" value="#1fffffff"/>
+    <color name="clipboardEntry" value="#33342c"/>
+    <color name="genericActiveBackground" value="#b05279"/>
+    <color name="genericActiveForeground" value="#d6d6d6"/>
+    <color name="keyBorder" value="@keyShadow"/>
+    <color name="keyHint" value="@altKeyText"/>
+    <color name="toolbarIcon" value="@altKeyText"/>
+  </colors>
+  <style select="keyboard" fill="@background"/>
+  <style select="@flat keyboard" fill="@keyboard"/>
+  <style select="bar" fill="transparent"/>
+  <style select="panel" fill="transparent"/>
+  <style select="@flat panel" fill="@bar"/>
+  <style select="key" fill="@key" radius="4dp" border="none" shadow="0 1dp 0 @keyShadow" inset="7dp 3dp" color="@keyText" font="system" weight="400" scale="100%" icon-color="@keyText" press="tint"/>
+  <style select="@landscape key" inset="4dp 3dp"/>
+  <style select="key:pressed" overlay="@keyPressHighlight"/>
+  <style select="key.function" fill="@altKey" color="@altKeyText" icon-color="@altKeyText"/>
+  <style select="key.enter" fill="@accentKey" color="@accentKeyText" icon-color="@accentKeyText"/>
+  <style select="key.space" fill="@key"/>
+  <style select="key.alt-text" color="@altKeyText" icon-color="@altKeyText"/>
+  <style select="key mark, key shortcut" color="@keyHint" icon-color="@keyHint"/>
+  <style select="key shortcut" scale="100%"/>
+  <style select="key.enter mark" color="@accentKeyText"/>
+  <style select="key badge" icon-color="@altKeyText"/>
+  <style select="*/reading:on" color="@accentKey" icon-color="@accentKey"/>
+  <style select="@flat key" fill="transparent" radius="0" shadow="none"/>
+  <style select="@flat key.space" fill="@spaceBar" shape="bar" radius="3dp"/>
+  <style select="@flat key.enter" fill="@accentKey" shape="circle"/>
+  <style select="preview, popup" fill="@popupBackground" radius="4dp" shadow="0 2dp 2dp #33000000" color="@popupText"/>
+  <style select="popup:selected" fill="@genericActiveBackground" color="@genericActiveForeground"/>
+  <style select="menu" fill="@accentKey" radius="50%" color="@accentKeyText" icon-color="@accentKeyText"/>
+  <style select="menu:selected" overlay="@keyPressHighlight"/>
+  <style select="@floating keyboard" radius="7dp"/>
+</theme>

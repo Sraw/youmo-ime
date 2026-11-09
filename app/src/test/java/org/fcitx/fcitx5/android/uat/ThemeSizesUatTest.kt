@@ -6,8 +6,8 @@ package org.fcitx.fcitx5.android.uat
 
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
@@ -99,19 +99,19 @@ class ThemeSizesUatTest {
     @Test
     fun anotherThemesHeightIsThePreviews() {
         ThemeManager.prefs.followSystemDayNightTheme.setValue(false)
-        ThemeManager.setNormalModeTheme(ThemePreset.PixelLight)
+        ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
         prefs.later {
-            ThemeManager.setNormalModeTheme(ThemePreset.PixelLight)
+            ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
             ThemeManager.prefs.followSystemDayNightTheme.setValue(ThemeManager.prefs.followSystemDayNightTheme.defaultValue)
         }
         // the dark one's keyboard taller, the light one's none
         KeyboardArea.themeSizes = {
-            if (ThemeManager.activeTheme.name == ThemePreset.PixelDark.name) ThemeSizes(height = Twin(45.0, 60.0)) else ThemeSizes()
+            if (ThemeManager.activeTheme.name == TestThemes.PixelDark.name) ThemeSizes(height = Twin(45.0, 60.0)) else ThemeSizes()
         }
         val st = SettingsHarness().also { settings = it }
         st.open(SettingsRoute.Theme)
         val height = q(st).height
-        ThemeManager.setNormalModeTheme(ThemePreset.PixelDark)
+        ThemeManager.setNormalModeTheme(TestThemes.PixelDark)
         st.idle()
         // 45% over 30%: the rows half as tall again, the bar aside
         assertTrue("${q(st).height} of $height", q(st).height > height * 1.3f)

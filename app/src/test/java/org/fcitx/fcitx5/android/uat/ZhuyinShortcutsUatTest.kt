@@ -11,7 +11,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -57,7 +57,7 @@ class ZhuyinShortcutsUatTest {
     // the 简繁 hint not said, its "told" put back after (KeyboardPickerUatTest reads it)
     private fun harness(keyboard: ImKeyboard): KeyboardHarness {
         prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
-        return KeyboardHarness(ThemePreset.PixelLight, keyboards = ImKeyboards.Chosen(pinyin = keyboard)).also { made = it }.start()
+        return KeyboardHarness(TestThemes.PixelLight, keyboards = ImKeyboards.Chosen(pinyin = keyboard)).also { made = it }.start()
     }
 
     @Test

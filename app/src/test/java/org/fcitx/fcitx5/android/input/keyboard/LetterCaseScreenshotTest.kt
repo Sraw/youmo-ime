@@ -8,7 +8,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
@@ -49,9 +49,9 @@ class LetterCaseScreenshotTest {
 
     @Test
     fun pinyinAlwaysUpper() {
-        val heard = KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN).start().use { h -> h.letter("q").description }
+        val heard = KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).start().use { h -> h.letter("q").description }
         setting.setValue(LetterCaseChoice.Upper)
-        KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN).start().use { h ->
+        KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).start().use { h ->
             val q = h.letter("q")
             assertEquals("Q", q.label)
             assertEquals("read as it was", heard, q.description)
@@ -65,7 +65,7 @@ class LetterCaseScreenshotTest {
     @Test
     fun pinyinAlwaysLowerWithShiftOn() {
         setting.setValue(LetterCaseChoice.Lower)
-        KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN).start().use { h ->
+        KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).start().use { h ->
             h.shift()
             val q = h.letter("q")
             assertEquals("q", q.label)
@@ -79,7 +79,7 @@ class LetterCaseScreenshotTest {
 
     @Test
     fun pinyinFollowingShift() {
-        KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN).start().use { h ->
+        KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).start().use { h ->
             assertEquals("q", h.letter("q").label)
             h.shift()
             assertEquals("Q", h.letter("q").label)
@@ -91,13 +91,13 @@ class LetterCaseScreenshotTest {
     @Test
     fun englishIgnoresIt() {
         setting.setValue(LetterCaseChoice.Upper)
-        KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.ENGLISH).start().use { h ->
+        KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.ENGLISH).start().use { h ->
             assertEquals("q", h.letter("q").label)
             h.shift()
             assertEquals("Q", h.letter("q").label)
         }
         setting.setValue(LetterCaseChoice.Lower)
-        KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.ENGLISH).start().use { h ->
+        KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.ENGLISH).start().use { h ->
             h.shift()
             assertEquals("Q", h.letter("q").label)
         }
@@ -106,16 +106,16 @@ class LetterCaseScreenshotTest {
     @Test
     fun fourteenAndNineKeysAlwaysLower() {
         val fourteen = ImKeyboards.Chosen(pinyin = ImKeyboard.KEYS14)
-        val heard14 = KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN, keyboards = fourteen).start().use { h -> h.letter("r1c1").description }
-        val heard9 = KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN, keyboards = KeyboardHarness.NINE_KEYS).start().use { h -> h.letter("2").description }
+        val heard14 = KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN, keyboards = fourteen).start().use { h -> h.letter("r1c1").description }
+        val heard9 = KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN, keyboards = KeyboardHarness.NINE_KEYS).start().use { h -> h.letter("2").description }
         setting.setValue(LetterCaseChoice.Lower)
-        KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN, keyboards = fourteen).start().use { h ->
+        KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN, keyboards = fourteen).start().use { h ->
             val qw = h.letter("r1c1")
             assertEquals("qw", qw.label)
             assertEquals(heard14, qw.description)
             h.captureBoard("LetterCaseScreenshotTest/keys14_lower")
         }
-        KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN, keyboards = KeyboardHarness.NINE_KEYS).start().use { h ->
+        KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN, keyboards = KeyboardHarness.NINE_KEYS).start().use { h ->
             val abc = h.letter("2")
             assertEquals("abc", abc.label)
             assertEquals(heard9, abc.description)
@@ -127,11 +127,11 @@ class LetterCaseScreenshotTest {
     @Test
     fun englishNineKeysIgnoreIt() {
         setting.setValue(LetterCaseChoice.Upper)
-        KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.ENGLISH, keyboards = ENGLISH_NINE).start().use { h ->
+        KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.ENGLISH, keyboards = ENGLISH_NINE).start().use { h ->
             assertEquals("abc", h.letter("2").label)
         }
         setting.setValue(LetterCaseChoice.Lower)
-        KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.ENGLISH, keyboards = ENGLISH_NINE).start().use { h ->
+        KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.ENGLISH, keyboards = ENGLISH_NINE).start().use { h ->
             h.shift()
             assertEquals("ABC", h.letter("2").label)
         }
@@ -141,7 +141,7 @@ class LetterCaseScreenshotTest {
     @Test
     fun switchingInputMethodsInOneKeyboard() {
         setting.setValue(LetterCaseChoice.Upper)
-        KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN).start().use { h ->
+        KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).start().use { h ->
             assertEquals("Q", h.letter("q").label)
             h.switchTo(KeyboardHarness.ENGLISH)
             assertEquals("q", h.letter("q").label)
@@ -155,7 +155,7 @@ class LetterCaseScreenshotTest {
     fun whatIsTypedIsUnchanged() {
         fun typed(choice: LetterCaseChoice, shift: Boolean, keyboards: ImKeyboards.Chosen? = null, id: String = "q"): List<String> {
             setting.setValue(choice)
-            return KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN, keyboards = keyboards).start().use { h ->
+            return KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN, keyboards = keyboards).start().use { h ->
                 if (shift) h.shift()
                 h.api.calls.clear()
                 h.tap(h.letter(id))
@@ -182,7 +182,7 @@ class LetterCaseScreenshotTest {
     @Test
     fun aTableLetterWithNoRootIsReadAsEver() {
         val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false)
-        fun z() = KeyboardHarness(ThemePreset.PixelLight, wubi).start().use { h ->
+        fun z() = KeyboardHarness(TestThemes.PixelLight, wubi).start().use { h ->
             EngineState.tableKeyboardState.value = TableKeyboard(InputMethodCatalog.WUBI, emptySet(), false, KeyLabels.ROOTS, TableRoots.WUBI86)
             h.idle()
             h.relayout()

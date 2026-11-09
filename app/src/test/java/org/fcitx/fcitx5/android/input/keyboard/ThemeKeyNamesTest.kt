@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.FcitxApplication
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.picker.PickerLayout
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
@@ -94,7 +94,7 @@ class ThemeKeyNamesTest {
 
     @Test
     fun aBoardsKeysCarryTheirNames() {
-        val keyboard = NumberKeyboard(context, ThemePreset.PixelDark).laidOut()
+        val keyboard = NumberKeyboard(context, TestThemes.PixelDark).laidOut()
         assertEquals(KeyNames.NUMBER, keyboard.themeBoard)
         val names = keyboard.shownKeys().mapNotNull { it.id }
         assertTrue(names.toString(), "backspace" in names && "1" in names)

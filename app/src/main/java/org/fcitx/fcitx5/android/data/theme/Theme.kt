@@ -11,7 +11,7 @@ import kotlinx.parcelize.TypeParceler
 import org.fcitx.fcitx5.android.scene.look.LookDefaults
 import org.fcitx.fcitx5.android.scene.look.Palette
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
-import org.fcitx.fcitx5.android.utils.alpha
+import org.fcitx.fcitx5.android.scene.theme.Theme as SceneTheme
 
 sealed class Theme : Parcelable {
 
@@ -49,17 +49,8 @@ sealed class Theme : Parcelable {
     abstract val genericActiveBackgroundColor: Int
     abstract val genericActiveForegroundColor: Int
 
-    /** All the theme draws with: a custom theme's own, a built-in or Monet one's its colours with [LookDefaults]. */
+    /** All the theme draws with: a custom theme's own, a built-in one's its colours with [LookDefaults]. */
     abstract val look: ThemeLook
-
-    /** The colours as [ThemeLook] holds them; the three of 3.0 as they were drawn before. */
-    protected fun palette() = Palette(
-        backgroundColor, barColor, keyboardColor, keyBackgroundColor, keyTextColor, candidateTextColor,
-        candidateLabelColor, candidateCommentColor, altKeyBackgroundColor, altKeyTextColor,
-        accentKeyBackgroundColor, accentKeyTextColor, keyPressHighlightColor, keyShadowColor,
-        popupBackgroundColor, popupTextColor, spaceBarColor, dividerColor, clipboardEntryColor,
-        genericActiveBackgroundColor, genericActiveForegroundColor,
-    )
 
     /**
      * The user's own, saved as a file: all of it is its [look] (theme file 3.0), the colours too;
@@ -95,10 +86,20 @@ sealed class Theme : Parcelable {
         override val genericActiveForegroundColor get() = look.palette.genericActiveForegroundColor
     }
 
+    /**
+     * A built-in theme's version: one of the files of keyboard-scene's src/commonMain/themes ([BuiltinThemeFiles]),
+     * its colours that version's colour table (the 24 of ThemeReader.REQUIRED_COLORS), drawn as LookDefaults with
+     * them, which is what the file's styles say (BuiltinThemeEquivalenceTest). [name] is how the settings refer to
+     * it: the file's name, and its version where it has two (`pixel#dark`). Monet's ([followsSystem]) colours are
+     * the system's, read again when they change; its keys may keep the key style of before 3.0 (ThemeLookMigration).
+     */
     @Parcelize
     data class Builtin(
         override val name: String,
         override val isDark: Boolean,
+        /** Its file's theme: the versions of one file are one card in the list. */
+        val file: String,
+        val followsSystem: Boolean,
         override val backgroundColor: Int,
         override val barColor: Int,
         override val keyboardColor: Int,
@@ -119,138 +120,47 @@ sealed class Theme : Parcelable {
         override val dividerColor: Int,
         override val clipboardEntryColor: Int,
         override val genericActiveBackgroundColor: Int,
-        override val genericActiveForegroundColor: Int
+        override val genericActiveForegroundColor: Int,
+        val keyBorderColor: Int,
+        val keyHintColor: Int,
+        val toolbarIconColor: Int,
     ) : Theme() {
 
-        // an alias to use 0xAARRGGBB color literal in code
-        // because kotlin compiler treats `0xff000000` as Long, not Int
-        constructor(
-            name: String,
-            isDark: Boolean,
-            backgroundColor: Number,
-            barColor: Number,
-            keyboardColor: Number,
-            keyBackgroundColor: Number,
-            keyTextColor: Number,
-            candidateTextColor: Number,
-            candidateLabelColor: Number,
-            candidateCommentColor: Number,
-            altKeyBackgroundColor: Number,
-            altKeyTextColor: Number,
-            accentKeyBackgroundColor: Number,
-            accentKeyTextColor: Number,
-            keyPressHighlightColor: Number,
-            keyShadowColor: Number,
-            popupBackgroundColor: Number,
-            popupTextColor: Number,
-            spaceBarColor: Number,
-            dividerColor: Number,
-            clipboardEntryColor: Number,
-            genericActiveBackgroundColor: Number,
-            genericActiveForegroundColor: Number
-        ) : this(
-            name,
-            isDark,
-            backgroundColor.toInt(),
-            barColor.toInt(),
-            keyboardColor.toInt(),
-            keyBackgroundColor.toInt(),
-            keyTextColor.toInt(),
-            candidateTextColor.toInt(),
-            candidateLabelColor.toInt(),
-            candidateCommentColor.toInt(),
-            altKeyBackgroundColor.toInt(),
-            altKeyTextColor.toInt(),
-            accentKeyBackgroundColor.toInt(),
-            accentKeyTextColor.toInt(),
-            keyPressHighlightColor.toInt(),
-            keyShadowColor.toInt(),
-            popupBackgroundColor.toInt(),
-            popupTextColor.toInt(),
-            spaceBarColor.toInt(),
-            dividerColor.toInt(),
-            clipboardEntryColor.toInt(),
-            genericActiveBackgroundColor.toInt(),
-            genericActiveForegroundColor.toInt()
+        /** Its colours as [ThemeLook] holds them. */
+        fun palette() = Palette(
+            backgroundColor, barColor, keyboardColor, keyBackgroundColor, keyTextColor, candidateTextColor,
+            candidateLabelColor, candidateCommentColor, altKeyBackgroundColor, altKeyTextColor,
+            accentKeyBackgroundColor, accentKeyTextColor, keyPressHighlightColor, keyShadowColor,
+            popupBackgroundColor, popupTextColor, spaceBarColor, dividerColor, clipboardEntryColor,
+            genericActiveBackgroundColor, genericActiveForegroundColor, keyBorderColor, keyHintColor, toolbarIconColor,
         )
 
-        @IgnoredOnParcel
-        override val look: ThemeLook by lazy { LookDefaults.look(palette()) }
-    }
-
-    @Parcelize
-    data class Monet(
-        override val name: String,
-        override val isDark: Boolean,
-        override val backgroundColor: Int,
-        override val barColor: Int,
-        override val keyboardColor: Int,
-        override val keyBackgroundColor: Int,
-        override val keyTextColor: Int,
-        override val candidateTextColor: Int,
-        override val candidateLabelColor: Int,
-        override val candidateCommentColor: Int,
-        override val altKeyBackgroundColor: Int,
-        override val altKeyTextColor: Int,
-        override val accentKeyBackgroundColor: Int,
-        override val accentKeyTextColor: Int,
-        override val keyPressHighlightColor: Int,
-        override val keyShadowColor: Int,
-        override val popupBackgroundColor: Int,
-        override val popupTextColor: Int,
-        override val spaceBarColor: Int,
-        override val dividerColor: Int,
-        override val clipboardEntryColor: Int,
-        override val genericActiveBackgroundColor: Int,
-        override val genericActiveForegroundColor: Int
-    ) : Theme() {
-        constructor(
-            isDark: Boolean,
-            surfaceContainer: Int,
-            surfaceContainerHigh: Int,
-            surfaceBright: Int,
-            onSurface: Int,
-            primary: Int,
-            onPrimary: Int,
-            secondaryContainer: Int,
-            onSurfaceVariant: Int,
-        ) : this(
-            name = "Monet" + if (isDark) "Dark" else "Light",
-            isDark = isDark,
-            backgroundColor = surfaceContainer,
-            barColor = surfaceContainerHigh,
-            keyboardColor = surfaceContainer,
-            keyBackgroundColor = surfaceBright,
-            keyTextColor = onSurface,
-            candidateTextColor = onSurface,
-            candidateLabelColor = onSurface,
-            candidateCommentColor = onSurfaceVariant,
-            altKeyBackgroundColor = secondaryContainer,
-            altKeyTextColor = onSurfaceVariant,
-            accentKeyBackgroundColor = primary,
-            accentKeyTextColor = onPrimary,
-            keyPressHighlightColor = onSurface.alpha(if (isDark) 0.2f else 0.12f),
-            keyShadowColor = 0x000000,
-            popupBackgroundColor = surfaceContainer,
-            popupTextColor = onSurface,
-            spaceBarColor = surfaceBright,
-            dividerColor = surfaceBright,
-            clipboardEntryColor = surfaceBright,
-            genericActiveBackgroundColor = primary,
-            genericActiveForegroundColor = onPrimary
-        )
-
-        // the key style settings before 3.0, if one was in use when they were settled: not copied, to follow the wallpaper
         @IgnoredOnParcel
         override val look: ThemeLook by lazy {
-            LookDefaults.look(palette()).let { ThemeLookMigration.monetLook?.applyTo(it) ?: it }
+            LookDefaults.look(palette()).let { if (followsSystem) ThemeLookMigration.monetLook?.applyTo(it) ?: it else it }
         }
 
+        /** Monet's look as it is now, fixed, as a theme of the user's: exported, it no longer follows the wallpaper. */
         @OptIn(ExperimentalStdlibApi::class)
         fun toCustom() = Custom(
-            name = name + "#" + this.accentKeyBackgroundColor.toHexString(), // Use primary color as identifier
+            // its primary colour tells two apart; named as 0.5 named it (MonetLight#ff415f91)
+            name = (BuiltinThemeFiles.legacyName(name) ?: name) + "#" + accentKeyBackgroundColor.toHexString(),
             isDark = isDark,
-            look = look
+            look = look,
         )
+
+        companion object {
+            /** [theme], a built-in file read and picked as one of its versions, referred to as [name]. */
+            fun of(theme: SceneTheme, name: String, followsSystem: Boolean): Builtin {
+                fun c(n: String) = theme.colors.getValue(n).value
+                return Builtin(
+                    name, theme.dark, theme.name, followsSystem,
+                    c("background"), c("bar"), c("keyboard"), c("key"), c("keyText"), c("candidateText"), c("candidateLabel"),
+                    c("candidateComment"), c("altKey"), c("altKeyText"), c("accentKey"), c("accentKeyText"), c("keyPressHighlight"),
+                    c("keyShadow"), c("popupBackground"), c("popupText"), c("spaceBar"), c("divider"), c("clipboardEntry"),
+                    c("genericActiveBackground"), c("genericActiveForeground"), c("keyBorder"), c("keyHint"), c("toolbarIcon"),
+                )
+            }
+        }
     }
 }

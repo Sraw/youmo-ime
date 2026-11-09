@@ -5,8 +5,8 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -22,7 +22,7 @@ import org.robolectric.annotation.Config
 class TextKeyboardSplitTest {
 
     // the scene's letters in its order, row by row
-    private fun letters() = TextKeyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark).laidOut()
+    private fun letters() = TextKeyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark).laidOut()
         .shownKeys().filter { it.id!!.length == 1 && it.id!![0] in 'a'..'z' }.sortedWith(compareBy({ it.bounds.top }, { it.bounds.left }))
         .joinToString("") { it.label }.lowercase()
 

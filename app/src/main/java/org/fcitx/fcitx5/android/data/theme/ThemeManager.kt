@@ -29,19 +29,16 @@ object ThemeManager {
         fun onThemeChange(theme: Theme)
     }
 
-    val BuiltinThemes = listOf(
-        ThemePreset.MaterialLight,
-        ThemePreset.MaterialDark,
-        ThemePreset.PixelLight,
-        ThemePreset.PixelDark,
-        ThemePreset.NordLight,
-        ThemePreset.NordDark,
-        ThemePreset.DeepBlue,
-        ThemePreset.Monokai,
-        ThemePreset.AMOLEDBlack,
-    )
+    // the built-in themes' files with the system's colours (Monet's): first, the settings' defaults are of them
+    private var builtinThemes: List<Theme.Builtin> = BuiltinThemeFiles.load(appContext.resources, ThemeMonet.systemColors(appContext))
 
-    val DefaultTheme = ThemePreset.PixelDark
+    /** The built-in themes, each version of a file one ([BuiltinThemeFiles]): Monet's first. */
+    val BuiltinThemes: List<Theme.Builtin> get() = builtinThemes
+
+    /** The built-in theme [ref] names (`pixel#dark`); thrown where none is, a bug: for the app's own refs. */
+    fun builtin(ref: String): Theme.Builtin = BuiltinThemeFiles.find(builtinThemes, ref) ?: error("no built-in theme $ref")
+
+    val DefaultTheme: Theme.Builtin get() = builtin("pixel#dark")
 
     val prefs = AppPrefs.getInstance().registerProvider(::ThemePrefs).also {
         // before a Monet theme's look is made
@@ -50,15 +47,30 @@ object ThemeManager {
         it.migrateSizeFollow()
     }
 
-    private var monetThemes = listOf(ThemeMonet.getLight(), ThemeMonet.getDark())
-
     // before the themes, which an older format's are read with (the key style settings before 3.0)
     private val customThemes: MutableList<Theme.Custom> = ThemeFilesManager.listThemes(prefs.legacyLook())
 
-    fun getTheme(name: String) =
-        customThemes.find { it.name == name } ?: BuiltinThemes.find { it.name == name }
+    init {
+        // 0.5's names of the built-in themes in the settings (060-render-p3 T3), before a theme is read of them
+        prefs.migrateThemeRefs(customThemes.mapTo(HashSet()) { it.name })
+    }
 
-    fun getAllThemes() = customThemes + monetThemes + BuiltinThemes
+    /** The theme [name] refers to: the user's of that name, else the built-in one ([BuiltinThemeFiles.find]); null where none is. */
+    fun getTheme(name: String): Theme? =
+        customThemes.find { it.name == name } ?: BuiltinThemeFiles.find(builtinThemes, name)
+
+    fun getAllThemes(): List<Theme> = customThemes + builtinThemes
+
+    // Monet's versions read again with the system's colours as they are now (and its keys' look as it is)
+    private fun reloadMonet() {
+        val monet = BuiltinThemeFiles.load(
+            appContext.resources, ThemeMonet.systemColors(appContext),
+            BuiltinThemeFiles.FILES.filter { it.first == BuiltinThemeFiles.MONET },
+        )
+        val others = builtinThemes.filter { it.file != BuiltinThemeFiles.MONET }
+        // Monet's first, as the files are
+        builtinThemes = monet + others
+    }
 
     fun refreshThemes() {
         customThemes.clear()
@@ -241,16 +253,16 @@ object ThemeManager {
         }
         val tell = prefs.settleLook(slots, ::saveTheme)
         // a Monet theme's look made again with what it keeps
-        monetThemes = listOf(ThemeMonet.getLight(), ThemeMonet.getDark())
+        reloadMonet()
         _activeTheme = evaluateActiveTheme()
         if (tell) appContext.toast(R.string.key_style_moved, Toast.LENGTH_LONG)
     }
 
     fun onSystemPlatteChange(newConfig: Configuration) {
         isDarkMode = newConfig.isDarkMode()
-        monetThemes = listOf(ThemeMonet.getLight(), ThemeMonet.getDark())
-        // `ManagedThemePreference` finds a theme with same name in `getAllThemes()`
-        // thus `evaluateActiveTheme()` should be called after updating `monetThemes`
+        reloadMonet()
+        // `ManagedThemePreference` finds the theme its name refers to ([getTheme]),
+        // thus `evaluateActiveTheme()` should be called after Monet's are read again
         val before = _activeTheme
         activeTheme = evaluateActiveTheme()
         // turned (or another change of the configuration): the picture's cut for it decoded ahead, as

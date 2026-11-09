@@ -8,7 +8,7 @@ import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.core.FakeHostApi
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -27,7 +27,7 @@ class CandidateViewHolderTest {
 
     @Test
     fun aTapPicksWhatTheHolderShowedThenNotWhatItIsBoundToWhenThePickRuns() {
-        val holder = CandidateViewHolder(CandidateItemUi(RuntimeEnvironment.getApplication(), ThemePreset.PixelDark))
+        val holder = CandidateViewHolder(CandidateItemUi(RuntimeEnvironment.getApplication(), TestThemes.PixelDark))
         holder.update(1, CandidateWord("", "你", ""))
         val pick = holder.pick()
         holder.update(1, CandidateWord("", "拟", ""))

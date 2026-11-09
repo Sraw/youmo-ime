@@ -11,8 +11,8 @@ import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Shader
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.scene.look.BarBase
 import org.fcitx.fcitx5.android.scene.look.BoardBase
 import org.fcitx.fcitx5.android.scene.look.Crop
@@ -78,9 +78,9 @@ class ThemeLookSamples(private val dir: File) {
 
     class Sample(val name: String, val look: (Palette, Boolean) -> ThemeLook)
 
-    private fun palette(dark: Boolean) = (if (dark) ThemePreset.PixelDark else ThemePreset.PixelLight).look.palette
+    private fun palette(dark: Boolean) = (if (dark) TestThemes.PixelDark else TestThemes.PixelLight).look.palette
 
-    private fun glassPalette(dark: Boolean) = (if (dark) ThemePreset.TransparentDark else ThemePreset.TransparentLight).look.palette
+    private fun glassPalette(dark: Boolean) = (if (dark) TestThemes.TransparentDark else TestThemes.TransparentLight).look.palette
 
     val samples = listOf(
         // 纯色分块: the defaults, blocks, a bigger radius and a border

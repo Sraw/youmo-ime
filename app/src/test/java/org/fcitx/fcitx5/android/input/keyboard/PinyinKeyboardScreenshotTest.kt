@@ -10,7 +10,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -41,7 +41,7 @@ class PinyinKeyboardScreenshotTest {
     @Test
     fun theFourteenKeys() {
         setting.setValue(PinyinKeyboard.Keys14)
-        KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN).use { h ->
+        KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).use { h ->
             h.start()
             val labels = h.texts()
             for (l in listOf("QW", "ER", "OP", "AS", "L", "ZX", "BN", "M", "分词")) assertTrue("$l in $labels", l in labels)
@@ -55,7 +55,7 @@ class PinyinKeyboardScreenshotTest {
     @Test
     fun theCodeRowFollowsTheInputMethod() {
         setting.setValue(PinyinKeyboard.Keys14)
-        KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN).use { h ->
+        KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).use { h ->
             h.start()
             h.relayout()
             val density = h.inputView.resources.displayMetrics.density
@@ -83,7 +83,7 @@ class PinyinKeyboardScreenshotTest {
         val level = AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape
         level.setValue(60)
         try {
-            KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN).use { h ->
+            KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).use { h ->
                 h.start()
                 h.relayout()
                 val density = h.inputView.resources.displayMetrics.density

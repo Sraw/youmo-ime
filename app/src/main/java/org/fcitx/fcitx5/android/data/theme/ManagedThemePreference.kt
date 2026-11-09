@@ -22,7 +22,7 @@ class ManagedThemePreference(
 
     override fun getValue(): Theme =
         sharedPreferences.getString(key, null)?.let { name ->
-            ThemeManager.getAllThemes().find { it.name == name }
+            ThemeManager.getTheme(name)
         } ?: defaultValue
 
     override fun putValueTo(editor: SharedPreferences.Editor) {

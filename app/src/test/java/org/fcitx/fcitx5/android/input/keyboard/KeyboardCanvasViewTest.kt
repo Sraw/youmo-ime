@@ -22,10 +22,10 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
@@ -174,7 +174,8 @@ class KeyboardCanvasViewTest {
         }
         Timber.plant(tree)
         try {
-            for (builtIn in listOf(ThemePreset.PixelLight, ThemePreset.PixelDark)) {
+            // the app's own (its look the object the fallback paints in)
+            for (builtIn in listOf(ThemeManager.builtin("pixel#light"), ThemeManager.builtin("pixel#dark"))) {
                 val look = builtIn.look
                 val many = (0..LookTheme.MAX_STYLES / 2).associate { i -> "b$i/k" to KeyOverride(null, KeyPressed.Color(i), KeyLabel.Show) }
                 val broken = Theme.Custom(
@@ -417,7 +418,7 @@ class KeyboardCanvasViewTest {
     // a text measured once at a font and size, then kept; the least recently asked let go past the limit
     @Test
     fun aTextMeasuredOnce() {
-        val m = AndroidTextMeasurer(SceneFonts(org.fcitx.fcitx5.android.data.theme.ThemePreset.PixelLight.look))
+        val m = AndroidTextMeasurer(SceneFonts(org.fcitx.fcitx5.android.data.theme.TestThemes.PixelLight.look))
         val a = m.measure("a", "system", 400, 40.0)
         assertEquals(a, m.measure("a", "system", 400, 40.0))
         assertEquals(1, m.measured)
@@ -605,7 +606,7 @@ class KeyboardCanvasViewTest {
 
     // the light theme with a picture (a file that is not there: it never reads) shown through the function keys
     private fun pictured(): Theme.Custom {
-        val light = org.fcitx.fcitx5.android.data.theme.ThemePreset.PixelLight.look
+        val light = org.fcitx.fcitx5.android.data.theme.TestThemes.PixelLight.look
         return Theme.Custom(
             "pictured", false,
             light.copy(
@@ -620,7 +621,7 @@ class KeyboardCanvasViewTest {
     // a theme's fall back logged once a look, the last 16 kept: a set no theme switching grows past that
     @Test
     fun aFallBackIsLoggedOnceALookTheLastSixteenKept() {
-        val look = ThemeManager.shownLook(ThemePreset.PixelLight)
+        val look = ThemeManager.shownLook(TestThemes.PixelLight)
         val names = (0 until 17).map { "fell-back-$it" }
         assertTrue(org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard.firstFallBack(names[0], look))
         assertFalse(org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard.firstFallBack(names[0], look))
@@ -635,7 +636,7 @@ class KeyboardCanvasViewTest {
     @Test
     fun aHarnessClosedLetsGoOfItsWindow() {
         val windows = (0 until 3).map {
-            KeyboardHarness(ThemePreset.PixelLight).start().use { h ->
+            KeyboardHarness(TestThemes.PixelLight).start().use { h ->
                 val w = h.service.window
                 assertTrue(org.robolectric.shadows.ShadowDialog.getShownDialogs().any { it === w })
                 w

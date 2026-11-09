@@ -12,7 +12,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.CandidateWord
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -46,7 +46,7 @@ class PagedCandidatesUiTest {
     @Config(sdk = [35], application = FcitxApplication::class)
     fun aRecycledCandidateHoldsNeitherItsTapNorItsLongPress() {
         val ui = PagedCandidatesUi(
-            PlainRecyclerViews(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark, {},
+            PlainRecyclerViews(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, {},
             onCandidateClick = { _, _ -> }, onCandidateAction = { _, _, _ -> }, onPrevPage = {}, onNextPage = {}
         )
         // no page before or after: the list is the candidate alone

@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android.input.popup
 
 import android.graphics.Rect
 import android.view.View
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -27,7 +27,7 @@ class PopupContainerUiTest {
 
     private val outer = Rect(0, 0, 1000, 600)
 
-    private val ui = object : PopupContainerUi(RuntimeEnvironment.getApplication(), ThemePreset.PixelDark, outer, Rect(), {}) {
+    private val ui = object : PopupContainerUi(RuntimeEnvironment.getApplication(), TestThemes.PixelDark, outer, Rect(), {}) {
         override val root = View(ctx)
         override val offsetX = 0
         override val offsetY = 0

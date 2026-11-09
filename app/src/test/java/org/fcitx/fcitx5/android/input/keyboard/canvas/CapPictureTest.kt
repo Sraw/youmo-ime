@@ -10,7 +10,7 @@ import android.graphics.Color
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.theme.BoardImages
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Shape
@@ -46,7 +46,7 @@ import kotlin.math.roundToInt
 @Config(application = FcitxApplication::class)
 class CapPictureTest {
     private val context = RuntimeEnvironment.getApplication()
-    private val look = ThemePreset.PixelLight.look
+    private val look = TestThemes.PixelLight.look
     private val density = 2.625
     private val env = Env(1080.0, 720.0, density)
 

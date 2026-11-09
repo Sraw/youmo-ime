@@ -102,9 +102,11 @@ object ThemeLookMigration {
             // one try a theme, a failed one too (null): getOrPut would try a null again, a second copy saved
             val copies = HashMap<String, Theme.Custom?>()
             for (slot in slots) {
-                when (val theme = slot.get()) {
-                    is Theme.Custom -> Unit
-                    is Theme.Monet -> monet = true
+                val theme = slot.get()
+                when {
+                    theme is Theme.Custom -> Unit
+                    // Monet's
+                    theme is Theme.Builtin && theme.followsSystem -> monet = true
                     else -> {
                         if (theme.name !in copies) {
                             copies[theme.name] =

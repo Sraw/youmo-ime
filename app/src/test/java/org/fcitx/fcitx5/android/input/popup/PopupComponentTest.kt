@@ -10,8 +10,8 @@ import android.view.ContextThemeWrapper
 import android.view.View
 import android.widget.FrameLayout
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
@@ -69,7 +69,7 @@ class PopupComponentTest {
         val scope = DynamicScope()
         // the types the popups find them by
         val context: ContextThemeWrapper = ContextThemeWrapper(RuntimeEnvironment.getApplication(), android.R.style.Theme_DeviceDefault)
-        val theme: Theme = ThemePreset.PixelDark
+        val theme: Theme = TestThemes.PixelDark
         scope += context.wrapToUniqueComponent()
         scope += theme.wrapToUniqueComponent()
         // off (no engine here): a symbol shown as it is

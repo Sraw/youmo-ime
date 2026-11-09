@@ -12,9 +12,9 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -55,7 +55,7 @@ class CandidateReadingsUatTest {
     private val writtenPinyin = listOf(listOf("xíng/háng…"), listOf("yǎn"), listOf("jiē"), listOf("páng/fǎng"), listOf("hé/hè…"))
     private val writtenZhuyin = listOf(listOf("ㄒㄧㄥˊ/ㄏㄤˊ…"), listOf("ㄧㄢˇ"), listOf("ㄐㄧㄝ"), listOf("ㄆㄤˊ/ㄈㄤˇ"), listOf("ㄏㄜˊ/ㄏㄜˋ…"))
 
-    private fun shown(style: ReadingStyle, sp: Int, name: String, handwriting: Boolean = false, theme: Theme = ThemePreset.PixelLight) {
+    private fun shown(style: ReadingStyle, sp: Int, name: String, handwriting: Boolean = false, theme: Theme = TestThemes.PixelLight) {
         ThemeManager.prefs.candidateTextSize.setValue(sp)
         EngineState.candidateReadingState.value = style
         val h = KeyboardHarness(theme).also { harness = it }.start()
@@ -125,7 +125,7 @@ class CandidateReadingsUatTest {
     @Test
     @Uat("HW-27")
     fun handwritingPortrait() {
-        for (theme in listOf(ThemePreset.PixelLight, ThemePreset.PixelDark)) for (style in listOf(ReadingStyle.PINYIN, ReadingStyle.ZHUYIN)) for (sp in listOf(20, 28)) {
+        for (theme in listOf(TestThemes.PixelLight, TestThemes.PixelDark)) for (style in listOf(ReadingStyle.PINYIN, ReadingStyle.ZHUYIN)) for (sp in listOf(20, 28)) {
             val dark = if (theme.isDark) "_dark" else ""
             shown(style, sp, "handwriting_${style.key.lowercase()}_${sp}sp_port$dark", handwriting = true, theme = theme)
         }

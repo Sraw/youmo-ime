@@ -8,7 +8,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
 import org.fcitx.fcitx5.android.data.theme.BoardImages
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Shape
@@ -26,7 +26,7 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ScenePainterImageTest {
-    private val look = ThemePreset.PixelLight.look
+    private val look = TestThemes.PixelLight.look
     private val face = Op.NineSlice(Shape.Rect(Box(0.0, 0.0, 20.0, 20.0)), "k.png", listOf(1, 1, 1, 1), 1, Argb(0xFF336699.toInt()))
 
     private fun drawn(images: BoardImages): Pair<ScenePainter, Bitmap> {

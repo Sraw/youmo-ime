@@ -9,7 +9,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -59,7 +59,7 @@ class GroupedSceneGesturesTest {
             e.setText(TEXT)
             e.setSelection(TEXT.length)
         }
-        return KeyboardHarness(ThemePreset.PixelLight, im).start(inputType, prefill = prefill).use { h ->
+        return KeyboardHarness(TestThemes.PixelLight, im).start(inputType, prefill = prefill).use { h ->
             h.relayout()
             assertTrue(KeyboardHarness.all(h.keyboard).any { it is KeyboardCanvasView && it.visibility == android.view.View.VISIBLE })
             val ids = h.keys().mapNotNull { it.id }.filter { it !in SWITCHING }
