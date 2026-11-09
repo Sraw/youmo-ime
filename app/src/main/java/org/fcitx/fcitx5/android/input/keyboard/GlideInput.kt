@@ -10,6 +10,7 @@ import android.graphics.Path
 import android.graphics.Rect
 import android.view.MotionEvent
 import android.view.ViewGroup
+import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import splitties.dimensions.dp
@@ -91,20 +92,36 @@ class GlideInput(
     private fun down(event: MotionEvent): GlideTouch.Route {
         stroking = strokes()
         val keys = if (stroking || enabled()) letters() else emptyList()
+        // the keys' size from any letter, all the same: read before the one rect is used for the others
+        val first = keys.firstOrNull()?.let { bounds(it.second) }
+        val keyWidth = first?.width()?.toFloat() ?: 0f
+        val keyHeight = first?.height()?.toFloat() ?: 0f
         val x = event.x.toInt()
         val y = event.y.toInt()
         val onLetter = keys.any { (_, v) -> bounds(v).contains(x, y) }
         // a stroke may start between a split keyboard's halves too: no key there to tap
-        val inGap = stroking && !onLetter && keys.isNotEmpty() &&
-            SplitGap.contains(boxes(keys), event.x, event.y, bounds(keys.first().second).width().toFloat())
-        // the keys' size from any letter: all the same; nothing measured on a tap off the letters
-        if (onLetter || inGap) bounds(keys.first().second)
+        val inGap = stroking && !onLetter && inGap(keys, event.x, event.y, keyWidth)
         touch.down(
             event.getPointerId(0), event.x, event.y, event.eventTime, onLetter,
-            rect.width().toFloat(), rect.height().toFloat(), longPressMillis(), stroke = stroking, inGap = inGap,
+            keyWidth, keyHeight, longPressMillis(), stroke = stroking, inGap = inGap,
         )
         return GlideTouch.Route.KEYS
     }
+
+    /** Whether [x], [y] (the keyboard's) is between a split keyboard's halves ([SplitGap]), as a finger down there is told. */
+    @VisibleForTesting
+    internal fun inGap(x: Float, y: Float): Boolean {
+        val keys = letters()
+        val keyWidth = keys.firstOrNull()?.let { bounds(it.second).width().toFloat() } ?: 0f
+        return inGap(keys, x, y, keyWidth)
+    }
+
+    private fun inGap(keys: List<Pair<Char, KeyPlace>>, x: Float, y: Float, keyWidth: Float) =
+        keys.isNotEmpty() && SplitGap.contains(boxes(keys), x, y, keyWidth)
+
+    /** Whether the path of a glide or stroke is drawn now (its trail). */
+    @VisibleForTesting
+    internal val trailShown: Boolean get() = touch.gliding
 
     private fun move(event: MotionEvent): GlideTouch.Route {
         val i = event.findPointerIndex(touch.pointer).takeIf { it >= 0 } ?: return touch.missing()

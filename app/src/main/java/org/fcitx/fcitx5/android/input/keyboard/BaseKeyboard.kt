@@ -158,6 +158,9 @@ abstract class BaseKeyboard(
      */
     protected open val glide: GlideInput? = null
 
+    /** [glide], for a test to ask where the split gap is and whether a trail is drawn. */
+    internal val glideForTest: GlideInput? get() = glide
+
     /** Whether the layout shows the syllables to take itself (九键's column): the code row's then show none. */
     open val ownsSyllables: Boolean get() = false
 
