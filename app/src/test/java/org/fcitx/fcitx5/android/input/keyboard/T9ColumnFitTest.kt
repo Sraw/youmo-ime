@@ -16,6 +16,8 @@ import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -48,6 +50,30 @@ class T9ColumnFitTest {
 
     @get:Rule
     val prefs = PrefsRule()
+
+    // no scene yet (never laid out): the column not shown; then shown in its slot, and laid out again at the same
+    // size nothing changes: its layout params the same object, no layout asked for (a loop once: 0bfe7fa6b)
+    @Test
+    fun theColumnWaitsForTheSceneAndThenStaysPut() {
+        val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark)
+        val column = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single()
+        assertEquals(View.INVISIBLE, column.visibility)
+        val density = keyboard.resources.displayMetrics.density
+        val w = (NARROWEST_DP * density).toInt()
+        val h = (HEIGHT_DP * density).toInt()
+        fun pass() {
+            keyboard.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
+            keyboard.layout(0, 0, w, h)
+        }
+        pass()
+        assertEquals(View.VISIBLE, column.visibility)
+        pass()
+        val params = column.layoutParams
+        pass()
+        assertSame(params, column.layoutParams)
+        assertFalse(column.isLayoutRequested)
+        assertFalse(keyboard.isLayoutRequested)
+    }
 
     private fun fits(scale: Float, moved: Boolean = false) {
         RuntimeEnvironment.setFontScale(scale)
