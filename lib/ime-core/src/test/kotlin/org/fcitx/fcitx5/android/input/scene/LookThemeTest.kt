@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.input.theme.Palette
 import org.fcitx.fcitx5.android.input.theme.Picture
 import org.fcitx.fcitx5.android.input.theme.PressEffect
 import org.fcitx.fcitx5.android.input.theme.Text
+import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Scene
@@ -135,6 +136,7 @@ class LookThemeTest {
                     "*/shift" to KeyOverride(KeyFill.Image(slice), KeyPressed.Image(down), KeyLabel.Show),
                     "*/backspace" to KeyOverride(KeyFill.Color, null, KeyLabel.Show),
                     "*/enter" to KeyOverride(null, KeyPressed.Image(down), KeyLabel.Show),
+                    "qwerty/w" to KeyOverride(KeyFill.Image(slice), KeyPressed.Color(0xff445566.toInt()), KeyLabel.Show),
                 ),
             ),
         )
@@ -152,6 +154,32 @@ class LookThemeTest {
         // a flat space's pressed image over the space bar's colour, as its face is
         val flat = scene(theme, SceneData.portrait.copy(flat = true))
         assertTrue(key(flat, "space").ops(true).any { it is Op.NineSlice && it.fallback == Argb(p.spaceBarColor) })
+        // flat, a letter or function key has no face, its own or pressed (3.0's face=null); Return keeps its own
+        for (id in listOf("q", "w", "shift", "backspace")) {
+            for (down in listOf(false, true)) {
+                val ops = key(flat, id).ops(down)
+                assertTrue("$id $down $ops", ops.none { it is Op.Picture || it is Op.NineSlice || (it is Op.Fill && it.color.value ushr 24 != 0 && it.color != Argb(p.keyPressHighlightColor)) })
+            }
+        }
+        assertTrue(key(flat, "enter").ops(true).any { it is Op.NineSlice && it.fallback == Argb(p.accentKeyBackgroundColor) })
+    }
+
+    // the most single keys a 3.0 theme brings (ThemeAssetLimits), each a face and a pressed one of its own:
+    // the theme written still reads, its styles more than a theme file's
+    @Test
+    fun theMostSingleKeysOfTheirOwnRead() {
+        val base = LookDefaults.look(palette(SceneData.theme("material-light.xml")))
+        val overrides = (0 until ThemeAssetLimits.MAX_OVERRIDES).associate { i ->
+            "b$i/k" to KeyOverride(
+                KeyFill.Image(NineSlice("/data/themes/t/k$i.png", Insets(1, 1, 1, 1), 1)),
+                KeyPressed.Image(NineSlice("/data/themes/t/d$i.png", Insets(1, 1, 1, 1), 1)),
+                KeyLabel.Hide,
+            )
+        }
+        val xml = LookTheme.xml(base.copy(keys = base.keys.copy(overrides = overrides)), "T", false)
+        val styles = Regex("<style ").findAll(xml).count()
+        assertTrue("$styles", styles in (ThemeReader.MAX_STYLES + 1)..LookTheme.MAX_STYLES)
+        assertTrue(ThemeReader.theme(xml, maxStyles = LookTheme.MAX_STYLES) is Parsed.Ok)
     }
 
     // 3.0's single keys by their names (KeyNames): 大千's , . ; / - selected as the keys of those ids, a

@@ -173,7 +173,7 @@ object SceneThemes {
         val key = Triple(look, name, dark)
         made[key]?.let { return it.theme }
         if (refused.containsKey(key)) return null
-        return when (val t = ThemeReader.theme(LookTheme.xml(look, name, dark))) {
+        return when (val t = ThemeReader.theme(LookTheme.xml(look, name, dark), maxStyles = LookTheme.MAX_STYLES)) {
             is Parsed.Ok -> t.value.also {
                 made[key] = Made(it)
                 if (made.size > KEPT) made.remove(made.keys.first())

@@ -17,7 +17,8 @@ import org.fcitx.fcitx5.android.scene.xml.XmlElement
  */
 object ThemeReader {
     const val NAMESPACE = "https://youmo-ime/theme/4"
-    private const val MAX_STYLES = 1000
+    /** A theme file's styles at most; one the app writes itself may say more (`maxStyles`). */
+    const val MAX_STYLES = 1000
     private const val MAX_FONTS = 4
     private const val MAX_ICONS = 200
     private const val MAX_COLORS = 200
@@ -49,10 +50,10 @@ object ThemeReader {
      * the app (T8a) passes its release's base version (`Versions.baseVersionName`, `0.6.0`), not a
      * development build's `0.6.0-12-gabcdef`, whose suffix [newer] would drop anyway.
      */
-    fun theme(source: String, systemColors: SystemColors = SystemColors.NONE, appVersion: String? = null): Parsed<Theme> =
+    fun theme(source: String, systemColors: SystemColors = SystemColors.NONE, appVersion: String? = null, maxStyles: Int = MAX_STYLES): Parsed<Theme> =
         when (val xml = Xml.parse(source)) {
             is Parsed.Failed -> xml
-            is Parsed.Ok -> theme(xml.value, systemColors, appVersion)
+            is Parsed.Ok -> theme(xml.value, systemColors, appVersion, maxStyles)
         }
 
     /**
@@ -60,13 +61,13 @@ object ThemeReader {
      * finds, a stack it overflows) is a problem of the file, never a crash of the keyboard.
      */
     @Suppress("TooGenericExceptionCaught")
-    fun theme(root: XmlElement, systemColors: SystemColors = SystemColors.NONE, appVersion: String? = null): Parsed<Theme> = try {
-        read(root, systemColors, appVersion)
+    fun theme(root: XmlElement, systemColors: SystemColors = SystemColors.NONE, appVersion: String? = null, maxStyles: Int = MAX_STYLES): Parsed<Theme> = try {
+        read(root, systemColors, appVersion, maxStyles)
     } catch (e: Throwable) {
         Parsed.Failed(root.line, "the theme could not be read: ${e::class.simpleName}")
     }
 
-    private fun read(root: XmlElement, system: SystemColors, appVersion: String?): Parsed<Theme> {
+    private fun read(root: XmlElement, system: SystemColors, appVersion: String?, maxStyles: Int): Parsed<Theme> {
         if (root.name != "theme") return Parsed.Failed(root.line, "the root is <${root.name}>, not <theme>")
         val p = Problems()
         val a = Attributes(root, p)
@@ -95,9 +96,9 @@ object ThemeReader {
         if (iconEls.size > MAX_ICONS) p.add(iconEls[MAX_ICONS].line, "over $MAX_ICONS icons")
         val icons = iconEls.take(MAX_ICONS).mapNotNull { named(it, p, "src") }.toMap()
         val styleEls = root.all("style")
-        if (styleEls.size > MAX_STYLES) p.add(styleEls[MAX_STYLES].line, "over $MAX_STYLES styles")
+        if (styleEls.size > maxStyles) p.add(styleEls[maxStyles].line, "over $maxStyles styles")
         // the rest not read: the file is refused already, and a million styles would each be a problem
-        val styles = styleEls.take(MAX_STYLES).mapIndexedNotNull { i, el -> style(el, i, p, colors.keys, fonts.keys) }
+        val styles = styleEls.take(maxStyles).mapIndexedNotNull { i, el -> style(el, i, p, colors.keys, fonts.keys) }
         return p.result {
             val drawn = if (dark) darkColors ?: colors else colors
             Theme(name.orEmpty(), dark, version.orEmpty(), drawn, styles, fonts, icons, picture, variants, colors, darkColors, meta, system)
