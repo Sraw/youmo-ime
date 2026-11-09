@@ -93,7 +93,7 @@ class T9Segmenter(
         val regular = HashSet<String>()
 
         // on a grouped keyboard, beside each of whole, starts and initials: which of its key's letters
-        // the spelling kept for each syllable has at each key, two bits a key, the first key lowest
+        // the spelling kept for each syllable has at each key, LETTER_BITS a key, the first key lowest
         val wholeLetters = HashMap<String, IntArray>()
         val startLetters = HashMap<String, IntArray>()
         val initialLetters = HashMap<String, IntArray>()
@@ -164,7 +164,7 @@ class T9Segmenter(
             initialChoices.forEach { (k, m) -> initialLetters[k] = m.values.toIntArray() }
         }
 
-        // which of its key's letters each of [typed] is, [keys] the keys typing it: two bits a key
+        // which of its key's letters each of [typed] is, [keys] the keys typing it: LETTER_BITS a key
         private fun choiceOf(keys: String, typed: String): Int {
             var choice = 0
             for (k in keys.indices) choice = choice or (letters.letters(keys[k]).indexOf(typed[k]).coerceIn(0, LETTER_MASK) shl (LETTER_BITS * k))
@@ -247,7 +247,7 @@ class T9Segmenter(
                 val tap = taps.getOrElse(at + k) { Float.NaN }
                 // a letter typed as itself, a key of one letter: nothing to weigh
                 if (tap.isNaN() || !letters.isCode(typed[k]) || letters.letters(typed[k]).length < 2) continue
-                sum += letters.against((choice shr (LETTER_BITS * k)) and LETTER_MASK, tap)
+                sum += letters.against(typed[k], (choice shr (LETTER_BITS * k)) and LETTER_MASK, tap)
             }
             if (sum > 0f) any = true
             sum
@@ -343,9 +343,9 @@ class T9Segmenter(
         /** The letters that are an initial alone. */
         private const val INITIAL_LETTERS = "bcdfghjklmnpqrstwxyz"
 
-        // a key's letter, the group's first or second, in a choice of [choiceOf]
-        private const val LETTER_BITS = 2
-        private const val LETTER_MASK = 3
+        // a key's letter, its index in the group, in a choice of [choiceOf]: of up to NineKeyLetters.MAX (5): three bits, six keys in an Int
+        private const val LETTER_BITS = 3
+        private const val LETTER_MASK = 7
 
         /** A letter typed as itself, as it stands in the input: see the class. */
         val FIXED = 'A'..'Z'

@@ -84,6 +84,104 @@ object Values {
         "hidden", "icon-color", "press", "padding",
     )
 
+    private const val LEN = "(-?[0-9]+(\\.[0-9]+)?dp|0)"
+    private const val PERCENT_FORM = "[0-9]+(\\.[0-9]+)?%"
+    private const val LEN_OR_PERCENT = "($LEN|$PERCENT_FORM)( ($LEN|$PERCENT_FORM))?"
+    private const val MS = "[0-9]{1,3}ms"
+    private const val NAME = "[a-zA-Z][a-zA-Z0-9_-]{0,31}"
+    private const val ICON_OR_TEXT = "icon\\([a-z0-9]+(-[a-z0-9]+)*\\)|text\\([^()]{1,32}\\)"
+
+    // ASCII white space spelt out: `\s` is more on JS than on the JVM, and a file must read the same on both
+    private const val FILE = "[^,()/\\\\:*?\"<>| \\t\\n\\r\\f\\x0B]{1,128}"
+    private val LENGTH = Regex("(?:$LEN)$")
+
+    /** A reserved property's value read: the colours in it (maybe none), or null where it is not of the form. */
+    fun interface Reserved {
+        fun read(raw: String): List<ColorExpr>?
+    }
+
+    // anchored: Kotlin/JS matches a whole value by the first alternative that starts one (FONT above), so "ease" would end "ease-out"
+    private fun form(pattern: String): Reserved = Regex("(?:$pattern)$").let { r -> Reserved { if (r.matches(it)) emptyList() else null } }
+
+    private val COLOR = Reserved { ColorExpr.parse(it)?.let(::listOf) }
+
+    // lengths then a colour (which may hold spaces: system(a, b)); also `none` where [none]
+    private fun lengthsThenColor(lengths: Int, none: Boolean): Reserved = Reserved { raw ->
+        val p = raw.split(' ', limit = lengths + 1)
+        when {
+            none && raw == "none" -> emptyList()
+            p.size != lengths + 1 || p.take(lengths).any { !LENGTH.matches(it) } -> null
+            else -> ColorExpr.parse(p.last())?.let(::listOf)
+        }
+    }
+
+    private val SHADOW = lengthsThenColor(3, none = true)
+
+    /**
+     * Style properties of a later stage of 0.6.0 (060-render-p3: T4a–T7b, A1–A3, the sounds' `sticker`),
+     * each with its value's form: read where it is of the form, ignored with a warning (a theme made
+     * for a newer app still imports); a value not of the form, or naming a colour not there, is a
+     * problem like any. A stage that makes one work moves it to [PROPERTIES].
+     */
+    val RESERVED: Map<String, Reserved> = mapOf(
+        // T4a: the text on a key
+        "align" to form("center|top-left|top-center"),
+        "letter-spacing" to form("-?[0-9](\\.[0-9]{1,3})?em"),
+        "stroke" to lengthsThenColor(1, none = false),
+        "text-shadow" to SHADOW,
+        "font-han" to form(NAME),
+        "font-latin" to form(NAME),
+        "space-content" to form("ime-name|none|$ICON_OR_TEXT"),
+        "return-icon-send" to form(ICON_OR_TEXT),
+        "return-icon-search" to form(ICON_OR_TEXT),
+        "return-icon-go" to form(ICON_OR_TEXT),
+        "return-icon-next" to form(ICON_OR_TEXT),
+        "return-icon-done" to form(ICON_OR_TEXT),
+        "return-icon-newline" to form(ICON_OR_TEXT),
+        // T4b: shapes, the bubble
+        "inner-shadow" to SHADOW,
+        "depth" to form(LEN),
+        "depth-color" to COLOR,
+        "tail" to form("true|false"),
+        "offset" to form(LEN),
+        // T5 (the keyboard, portrait then landscape), T6b (the bar), T7a (the handle)
+        "height" to form(LEN_OR_PERCENT),
+        "width" to form(LEN),
+        "side-padding" to form(LEN_OR_PERCENT),
+        "bottom-padding" to form(LEN_OR_PERCENT),
+        // T6a, T6b: the candidates, the pre-edit text
+        "gap" to form(LEN),
+        "label-style" to form("none|number|dot"),
+        "underline" to lengthsThenColor(1, none = true),
+        "cursor-color" to COLOR,
+        // T7b: the panels, the handwriting pad
+        "blur" to form(LEN),
+        "ink-color" to COLOR,
+        "ink-width" to form(LEN),
+        "grid-color" to COLOR,
+        "grid" to form("true|false"),
+        // A1–A3: motion
+        "transition" to form("$MS (linear|ease|ease-in|ease-out|ease-in-out)"),
+        "press-scale" to form(PERCENT_FORM),
+        "press-sink" to form(LEN),
+        "appear" to form("(fade|scale|rise) $MS"),
+        "effect" to form("none|ripple-image\\($FILE, ?$PERCENT_FORM, ?$MS\\)|particles\\($FILE, ?[0-9]{1,2}, ?$LEN, ?$MS\\)"),
+        // §16's second tier: a key's sticker layer
+        "sticker" to form("none|$FILE"),
+    )
+
+    /**
+     * Values of a property of today that a later stage gives a new form: `shape="path(…)"`, `bubble`
+     * (T4b), a bubble's `size="120%"` (T4b), the navigation bar's `color="follow"` (T7a). Ignored with
+     * a warning as [RESERVED]'s are.
+     */
+    fun reservedValue(property: String, raw: String): Boolean = when (property) {
+        "shape" -> raw == "bubble" || raw.startsWith("path(") && raw.endsWith(")") && raw.removeSurrounding("path(", ")").isNotBlank()
+        "size" -> PCT.matches(raw)
+        "color" -> raw == "follow"
+        else -> false
+    }
+
     fun read(property: String, raw: String): Value? = when (property) {
         "fill" -> fill(raw)?.let(Value::OfFill)
         "overlay", "color", "icon-color" -> ColorExpr.parse(raw)?.let(Value::OfColor)

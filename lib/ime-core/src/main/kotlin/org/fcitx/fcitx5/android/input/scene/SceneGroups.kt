@@ -15,15 +15,19 @@ import org.fcitx.fcitx5.android.scene.layout.Row
  * A layout's letter groups (its keys' `letters=`, 060-render-v2 §15) as the engine reads a grouped
  * keyboard: [NineKeyLetters], whose codes, learning record and wiring a keyboard's taps go by.
  *
- * The groups are collected the one way whatever the layout ([of]); which keyboard they make is the
+ * The groups are collected the one way whatever the layout ([of]); the keyboard they make is the
  * built-in one with exactly those groups ([letters]: the 14 keys' G14, the 18 keys' G18), so neither
- * codes nor what was learnt change. Any other grouping (a layout's own 17 keys) makes none yet: codes
- * of its own, its engine settings and its record are P3's.
+ * codes nor what was learnt change; any other grouping that covers a to z (a layout's own 17 keys)
+ * one of its own ([NineKeyLetters.custom]), its letters' rows as written ([written]).
  */
 object SceneGroups {
     /** [layout]'s groups, row by row as written, an included fragment's where it is included; a key's own letters, whatever its condition. */
     fun of(layout: Layout, fragments: Map<String, Fragment> = emptyMap()): List<String> =
         keys(layout, fragments).mapNotNull { it.letters?.group }
+
+    /** [layout]'s groups as [of] has them, each its rows apart by a space as written (`pq rs`): what [letters] takes for where a tap falls. */
+    fun written(layout: Layout, fragments: Map<String, Fragment> = emptyMap()): List<String> =
+        keys(layout, fragments).mapNotNull { it.letters?.rows?.joinToString(" ") }
 
     /**
      * [layout]'s groups whose tap leans to the letter it fell nearest (their keys' `lean=`, 按落点加权,
@@ -56,8 +60,13 @@ object SceneGroups {
         }
     }.flatMap { row -> row.cells.filterIsInstance<Key>() }
 
-    /** The grouped keyboard [groups] make: the built-in one with exactly these; null for none, or any other (P3). */
-    fun letters(groups: List<String>): NineKeyLetters? = if (groups.isEmpty()) null else NineKeyLetters.grouped(groups.joinToString(","))
+    /**
+     * The grouped keyboard [groups] make ([NineKeyLetters.custom]): the built-in one with exactly these
+     * letters, else one of their own; null where they make none ([NineKeyLetters.problem]). Pure: it is
+     * not the keyboard in use till the session typing on it says so ([NineKeyLetters.inUse]). Rows or
+     * not ([of], [written]), the same keyboard (its keys and codes).
+     */
+    fun letters(groups: List<String>): NineKeyLetters? = if (NineKeyLetters.problem(groups) != null) null else NineKeyLetters.custom(groups)
 
     /**
      * What is wrong with [groups] for a keyboard the engine reads as [expected]: null where they are its
@@ -67,7 +76,7 @@ object SceneGroups {
         val made = letters(groups)
         return when {
             made == expected -> null
-            made == null -> "the layout's groups ${groups.joinToString(",")} are no grouped keyboard the engine has (P3); ${expected.tag()} kept"
+            made == null -> "the layout's groups ${groups.joinToString(",")} make no keyboard (${NineKeyLetters.problem(groups)}); ${expected.tag()} kept"
             else -> "the layout's groups are ${made.tag()}, the keyboard's ${expected.tag()}; ${expected.tag()} kept"
         }
     }

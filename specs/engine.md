@@ -436,7 +436,7 @@ are offered where nothing is learned (a password field, `Session.learning` false
   tapped (`PinyinSessionTapsTest`, uatTest `Keys14UatTest`). `T9Segmenter.segment(input, taps)`
   (grouped layouts only; `Segmenter`'s default ignores taps) gives each edge, per match,
   `against = Σ max(0, ±2(at − 0.5))` over its keys of two letters, the sign by whether the
-  spelling typed for that syllable (a fuzzy partner's, üe's ue: a table beside the index, two bits
+  spelling typed for that syllable (a fuzzy partner's, üe's ue: a table beside the index, three bits
   a key, ties none: `letterTies`) has the key's first or second letter. The decoder adds
   `Penalties.tap × against` (−1, no dead zone) in `collect` and `collectStart`; at the centre, or
   with no place, the graph and the scores are byte for byte as before (both sets: 0 won, 0 lost).
@@ -526,6 +526,28 @@ setting either: it reads the codes.
   settles nothing. Learning under a dropped scheme (`sp:Ziguang`, `spk:Ziguang:…`) is kept as it
   is, listed and forgotten by its old name (`ShuangpinNames` names all eight).
 - No tap position on G18 yet; `Keyboard.TAPS` leaves indices 26–51 for it (design k14-tap §1.4).
+- **A layout's own groups** (060-render-p3 T9a; the engine part, the app wires it in T9b).
+  `NineKeyLetters.custom(groups)` (each a key's `letters=`, rows apart by a space): `problem` refuses
+  groups that leave a letter of a–z on no key (ü as v), a key of 0 or more than 5 letters (a–z, `;`), a
+  letter twice on one key, or more than 30 keys. Groups whose letters are G14's or G18's are those
+  keyboards (their codes, their `qk:`/`spk:` record: the built-in keys move no data); any other gets
+  codes `NineKeyLetters.CUSTOM_BLOCK` (U+F840 + its key's index, freed by `Action.Syllable.IDS` 98 → 97,
+  so `Keyboard.SYLLABLES` ends at U+F83F): a stable encoding, kept in its `qk:<tag>` record (and backups),
+  never to move; the record filed under its `tag()` (the keys' letters, commas between;
+  `NineKeyLetters.filedAs` reads one back, G14, G18 or a layout's own, never NINE_SP). Making,
+  comparing (`SceneGroups.letters`, `mismatch`, `leaningOf`) and filing are pure; `ofCode` reads a
+  custom code as the keyboard `NineKeyLetters.inUse` last named (the session typing on it, T9b), none
+  past its keys. Rows are where a tap falls, not the keyboard: with or without them it is equal. Pinyin reads them (`readsCode`), never text (`isCode`).
+  A tap is `Keyboard.tapKey(code, x, y)`: `Keyboard.PLACES` (U+F1000 on, 30 × 17 × 9), decoded into
+  `Action.Key(code, at = NineKeyLetters.place(x, y))`, x and y packed into the one value the taps carry
+  (`2 × (1 + y step) + x`; a one dimensional place, the 14 keys', is x alone); a custom code's
+  `tapKey(code, at)` is its middle row, and a G14 code's `tapKey(code, x, y)` its `TAPS` character as always.
+  Against: `NineKeyLetters.against(code, index, place)`: a key of one row of two by the halves' rule above;
+  any other by `against(index, x, y, rows)` = the distance from the tap to the letter's cell (rows share the
+  key's height, a row's letters its width) over the distance from that cell to the key's farthest corner,
+  0 to 1 (a row of two equals the halves' rule at every place, `NineKeyLettersCustomTest`). The segmenter
+  keeps three bits a key for which letter (five letters a key). `typedLetter` gives the letter the tap went
+  least against. `lean` stays the layout's (`Key.leans`; `lean="off"` sends the code alone).
 
 ### 注音 on the nine keys and on 大千
 

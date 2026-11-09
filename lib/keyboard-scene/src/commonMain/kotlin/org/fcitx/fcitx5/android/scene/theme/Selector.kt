@@ -42,6 +42,17 @@ data class Selector(
         (a * WEIGHT + b) * WEIGHT + c
     }
 
+    /**
+     * What of it a later stage makes work ([RESERVED_WIDGETS], [RESERVED_STATES], a candidate's part,
+     * an `@im=` `@field=` `@keyboard=` scene), null where none: read, but it selects nothing yet.
+     */
+    val reserved: String? = when {
+        widget in RESERVED_WIDGETS -> widget
+        states.any { it in RESERVED_STATES } -> ":" + states.first { it in RESERVED_STATES }
+        widget == "candidate" && part != null -> "candidate $part"
+        else -> scenes.firstOrNull { '=' in it }?.let { "@$it" }
+    }
+
     /** Whether it selects [target] in [scene] (the scenes the environment is in). */
     fun matches(target: Target, scene: Set<String>): Boolean = scene.containsAll(scenes) && selects(target)
 
@@ -70,9 +81,24 @@ data class Selector(
         private const val WEIGHT = 100
 
         val SCENES = setOf("compact", "landscape", "floating", "split", "one-handed", "dark", "flat")
-        val WIDGETS = setOf("keyboard", "bar", "candidate", "popup", "preview", "menu", "handle", "panel", "key")
+        /** Widgets of a later stage of 0.6.0 (060-render-p3: T6a, T6b, T7a, T7b), read but selecting nothing yet. */
+        val RESERVED_WIDGETS = setOf(
+            "clipboard", "picker", "editing", "voice", "frame", "side-button", "split-gap", "navbar", "preedit", "toolbar",
+            "candidates-panel", "candidates-divider",
+        )
+        val WIDGETS = setOf("keyboard", "bar", "candidate", "popup", "preview", "menu", "handle", "panel", "key") + RESERVED_WIDGETS
         val PARTS = setOf("label", "mark", "shortcut", "root", "icon", "hint", "badge")
-        val STATES = setOf("pressed", "locked", "shifted", "disabled", "selected", "on")
+
+        /** A candidate's parts (T6a): its number and its comment. */
+        val CANDIDATE_PARTS = setOf("label", "comment")
+
+        /** States of a later stage (T6a: the first candidate). */
+        val RESERVED_STATES = setOf("first")
+        val STATES = setOf("pressed", "locked", "shifted", "disabled", "selected", "on") + RESERVED_STATES
+
+        /** The scenes of what is typed (T5): `@im=<input method>`, `@field=<kind>`, `@keyboard=<board>`. */
+        val FIELDS = setOf("password", "url", "number", "email")
+        private val IM = Regex("[a-z0-9]+(-[a-z0-9]+)*")
         private val BOARD = Regex("[a-z0-9]+(-[a-z0-9]+)*")
         private val CLASS = Regex("[a-z][a-z0-9-]*")
         private val ROLE = Regex("[a-z-]+")
@@ -88,13 +114,25 @@ data class Selector(
         private fun parse(chars: List<Ch>): Selector? {
             val words = chars.splitAt(' ').filter { it.isNotEmpty() }
             val scenes = words.takeWhile { it[0].plain('@') }.map { it.plain()?.drop(1) ?: return null }
-            if (scenes.any { it !in SCENES }) return null
+            if (scenes.any { it !in SCENES && !typed(it) }) return null
             val rest = words.drop(scenes.size)
             if (rest.isEmpty() || rest.size > 2) return null
-            val part = rest.getOrNull(1)?.let { it.plain()?.takeIf(PARTS::contains) ?: return null }
             val head = head(rest[0]) ?: return null
-            if (part != null && head.widget != "key") return null
+            val parts = if (head.widget == "candidate") CANDIDATE_PARTS else PARTS
+            val part = rest.getOrNull(1)?.let { it.plain()?.takeIf(parts::contains) ?: return null }
+            if (part != null && head.widget != "key" && head.widget != "candidate") return null
             return head.copy(scenes = scenes.toSet(), part = part)
+        }
+
+        // `im=wubi`, `field=password`, `keyboard=nine`
+        private fun typed(scene: String): Boolean {
+            val value = scene.substringAfter('=', "")
+            return when (scene.substringBefore('=')) {
+                "im" -> IM.matches(value)
+                "field" -> value in FIELDS
+                "keyboard" -> BOARD.matches(value)
+                else -> false
+            }
         }
 
         // the widget or key name, then its qualifiers; but a key's name, nothing escaped
@@ -185,6 +223,7 @@ data class Selector(
                 }
             }
             if (sel.widget != "key" && (sel.classes.isNotEmpty() || sel.roles.isNotEmpty())) return null
+            if ("first" in sel.states && sel.widget != "candidate") return null
             return sel
         }
     }

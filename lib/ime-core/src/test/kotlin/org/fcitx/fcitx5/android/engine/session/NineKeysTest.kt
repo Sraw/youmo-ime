@@ -111,6 +111,26 @@ class NineKeysTest {
         return keys.offered
     }
 
+    // a layout's own key of two rows (pq rs): a tap low on its left is r's, the bar and the graph weigh p against it
+    @Test
+    fun aTapAcrossAndDownWeighsTheLetterTappedOn() {
+        val groups = listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m", "pq rs")
+        val letters = NineKeyLetters.custom(groups)
+        val segmenter = T9Segmenter(abbreviations = false, letters = letters)
+        val data = pinyinDataOf(Triple("皮", "pi", -2f), Triple("日", "ri", -3f))
+        val input = "${letters.codes[14]}${letters.codes[3]}"
+        // 皮 the commoner: pi first with no place, and with a tap on p's cell
+        assertEquals(listOf("pi", "ri"), offeredOn(data, segmenter, input, 0, Float.NaN).filter { it == "pi" || it == "ri" })
+        assertEquals(listOf("pi", "ri"), offeredOn(data, segmenter, input, 0, NineKeyLetters.place(0.125f, 0.125f)).filter { it == "pi" || it == "ri" })
+        // low on the left: r's cell, p's (above) goes against it
+        val low = NineKeyLetters.place(0.125f, 0.875f)
+        assertEquals(listOf("ri", "pi"), offeredOn(data, segmenter, input, 0, low).filter { it == "pi" || it == "ri" })
+        val graph = segmenter.segment(input, floatArrayOf(low, Float.NaN))
+        val against = (0 until graph.edgeCount).flatMap { e -> (0 until graph.matches(e).size).map { Syllables.spelling(graph.matches(e).syllable(it)) to graph.against(e, it) } }.toMap()
+        assertEquals(0f, against.getValue("ri"), 0f)
+        assertTrue(against.toString(), against.getValue("pi") > 0.5f)
+    }
+
     private class OwnPresses(val why: String, val segmenter: KeyedSegmenter, val input: String, val index: Int, val tap: Float)
 
     // a syllable's bar is weighed against its own presses alone, not a tap on the next syllable's key

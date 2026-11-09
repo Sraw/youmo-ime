@@ -14,7 +14,8 @@ data class Problem(val line: Int, val message: String) {
  * layout is data, and the theme maker shows every problem at once, with its line.
  */
 sealed interface Parsed<out T> {
-    data class Ok<out T>(val value: T) : Parsed<T>
+    /** [warnings]: what was read but is ignored (a name of a later version: ThemeReader's reserved ones), each with its line. */
+    data class Ok<out T>(val value: T, val warnings: List<Problem> = emptyList()) : Parsed<T>
 
     data class Failed(val problems: List<Problem>) : Parsed<Nothing> {
         constructor(line: Int, message: String) : this(listOf(Problem(line, message)))
@@ -25,6 +26,9 @@ sealed interface Parsed<out T> {
 
     /** The problems, none where it did not fail. */
     fun problems(): List<Problem> = (this as? Failed)?.problems.orEmpty()
+
+    /** The warnings, none where it failed. */
+    fun warnings(): List<Problem> = (this as? Ok)?.warnings.orEmpty()
 }
 
 /** The value of this, or what [onFailure] makes of the problems (a test's `error`, a caller's fallback). */
@@ -36,6 +40,7 @@ inline fun <T> Parsed<T>.getOr(onFailure: (List<Problem>) -> T): T = when (this)
 /** Collects problems while reading, so one pass reports them all. */
 class Problems {
     private val list = ArrayList<Problem>()
+    private val warned = ArrayList<Problem>()
 
     val all: List<Problem> get() = list
 
@@ -45,10 +50,15 @@ class Problems {
         list += Problem(line, message)
     }
 
+    /** Something read and ignored: not a reason to refuse the file, shown with it. */
+    fun warn(line: Int, message: String) {
+        warned += Problem(line, message)
+    }
+
     fun addAll(problems: List<Problem>) {
         list += problems
     }
 
     /** [value] when nothing went wrong, else the problems. */
-    fun <T> result(value: () -> T): Parsed<T> = if (list.isEmpty()) Parsed.Ok(value()) else Parsed.Failed(list.toList())
+    fun <T> result(value: () -> T): Parsed<T> = if (list.isEmpty()) Parsed.Ok(value(), warned.toList()) else Parsed.Failed(list.toList())
 }
