@@ -480,6 +480,9 @@ class EngineBridge {
      * made again after [close] too). Before each key, on the fcitx thread: the keyboard wrote them before any
      * of its keys could be tapped. The same ones (the same list, as a rule): nothing to do.
      */
+    /** Whether the groups [syncOwnKeys] would tell differ from the ones it last told. */
+    fun ownKeysChange(): Boolean = EngineState.ownKeys != inUseOf
+
     fun syncOwnKeys() {
         val own = EngineState.ownKeys
         if (own != inUseOf) {

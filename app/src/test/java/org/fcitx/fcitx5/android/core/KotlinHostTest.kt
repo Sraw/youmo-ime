@@ -124,6 +124,24 @@ class KotlinHostTest {
         assertEquals(other, NineKeyLetters.ofCode(other.codes[0].code))
     }
 
+    // T9b's leftover: other groups told while something is typed on the ones before end it as leaving the
+    // field does (the panel cleared, the engine reset) before the key, not carried into the new groups
+    @Test
+    fun otherGroupsWhileTypingEndWhatWasTypedFirst() = runBlocking {
+        fcitx.activate(1, "org.example")
+        fcitx.setCapFlags(CapabilityFlags.DefaultFlags)
+        fcitx.focus(true)
+        val own = listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m", "pq rs", "abc", "xyz")
+        EngineState.ownKeys = own
+        "ni".forEach { fcitx.sendKey(it, 0u, 0, false, 0) }
+        assertEquals("ni", fcitx.inputPanelCached.preedit.toString())
+        fcitx.sendKey('h', 0u, 0, false, 0)
+        assertEquals("the same groups: typed on", "nih", fcitx.inputPanelCached.preedit.toString())
+        EngineState.ownKeys = own.reversed()
+        fcitx.sendKey('a', 0u, 0, false, 0)
+        assertEquals("a", fcitx.inputPanelCached.preedit.toString())
+    }
+
     @Test
     fun readyIsTheFirstEventAndPinyinLeadsTheGroupOnTheFirstRun() = runBlocking {
         assertTrue(events.first() is HostEvent.Ready)

@@ -317,6 +317,9 @@ class KotlinHost(
     // the frontend's keyEvent: virtual is the state's bit, as fcitx's KeyEvent::isVirtual reads it
     private fun HostCore.key(sym: Int, states: Int, up: Boolean, timestamp: Int) {
         // a layout's own keyboard's groups as it last told them, before its key reaches a temporary mode or the engine
+        // other groups while something is typed on the ones before (060-render-p3 T10): ended as leaving the
+        // field ends it (ViewRebuild.SETTING's endComposition), not left half in a session made anew
+        if (bridge.ownKeysChange() && !isEmpty()) focusOutIn()
         bridge.syncOwnKeys()
         sendKey(Key(sym, states), release = up, virtual = states and HostKeyStates.VIRTUAL != 0, timestamp = timestamp)
     }
