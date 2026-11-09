@@ -197,6 +197,9 @@ class PopupKeyboardUi(
         return true
     }
 
+    private val inOrder = inRow >= 0
+    private val edgeMargin = EDGE_MARGIN * ctx.resources.displayMetrics.density
+
     // by how far the finger moves from where it was when the popup opened, not where it is
     private val focus = PopupFocus(
         rows = keyOrders.toList(),
@@ -207,9 +210,12 @@ class PopupKeyboardUi(
         cancelBelow = triggerBounds.height().toFloat(),
         // the key's bottom edge, in onChangeFocus's coordinates (the popup's, offsetY up)
         cancelAt = (triggerBounds.height() - offsetY).toFloat(),
-        // the screen's edges, in onChangeFocus's coordinates (the popup's, offsetX across)
-        leftEdge = if (outerBounds.isEmpty) Float.NEGATIVE_INFINITY else (outerBounds.left - triggerBounds.left - offsetX).toFloat(),
-        rightEdge = if (outerBounds.isEmpty) Float.POSITIVE_INFINITY else (outerBounds.right - triggerBounds.left - offsetX).toFloat(),
+        // the screen's edges, in onChangeFocus's coordinates (the popup's, offsetX across), EDGE_MARGIN
+        // in: the finger's x is from the key's cell, the trigger its face, inset a few dp in it; and
+        // the last key is picked a little short of the edge. A row in order only: the full keyboard's
+        // and the pickers' popups as before
+        leftEdge = if (outerBounds.isEmpty || !inOrder) Float.NEGATIVE_INFINITY else outerBounds.left - triggerBounds.left - offsetX + edgeMargin,
+        rightEdge = if (outerBounds.isEmpty || !inOrder) Float.POSITIVE_INFINITY else outerBounds.right - triggerBounds.left - offsetX - edgeMargin,
         minStepX = keyWidth * PopupFocus.MIN_STEP,
     )
 
@@ -232,6 +238,9 @@ class PopupKeyboardUi(
     }
 
     companion object {
+        /** How far in from the screen's edge, in dp, the finger picks a row's last key: more than a key face's inset in its cell. */
+        const val EDGE_MARGIN = 8f
+
         /** What picking [key] types: from the long press, and from a letter's swipe (its first). */
         fun keyAction(key: String): KeyAction =
             // one character goes through fcitx like any key; anything longer (a user-entered word, or

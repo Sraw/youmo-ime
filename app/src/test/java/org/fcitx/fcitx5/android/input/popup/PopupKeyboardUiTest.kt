@@ -268,11 +268,24 @@ class PopupKeyboardUiTest {
         NineKeySymbols.STANDARD.symbols(digit),
     )
 
-    // [ui]'s focus after the finger, from [trigger]'s middle, goes to [screenX] (the screen's) across
-    private fun PopupKeyboardUi.slideTo(trigger: Rect, screenX: Int): KeyAction? {
-        val y = -offsetY.toFloat() + trigger.height() / 2f
-        onChangeFocus(trigger.width() / 2f - offsetX, y)
-        onChangeFocus((screenX - trigger.left - offsetX).toFloat(), y)
+    private val density get() = context.resources.displayMetrics.density
+
+    // a key's face inset in its cell, as the default theme draws it: the popup is placed by the face
+    // (KeyboardCanvasView.popupBounds), the finger's x is from the cell (SceneTouch)
+    private fun Rect.face() = Rect(this).apply { inset((3 * density).toInt(), 0) }
+
+    // [ui]'s focus after the finger, from [cell]'s middle, slides a pixel at a time to [screenX] (the
+    // screen's) across, as a device reports it
+    private fun PopupKeyboardUi.slideTo(cell: Rect, screenX: Int): KeyAction? {
+        val y = -offsetY.toFloat() + cell.height() / 2f
+        val from = cell.centerX()
+        val dir = if (screenX >= from) 1 else -1
+        var x = from
+        onChangeFocus(x - cell.left - offsetX.toFloat(), y)
+        while (x != screenX) {
+            x += dir
+            onChangeFocus(x - cell.left - offsetX.toFloat(), y)
+        }
         return onTrigger()
     }
 
@@ -283,30 +296,46 @@ class PopupKeyboardUiTest {
         val wide = 120
         val right = Rect(800, 500, 1000, 550)
         val left = Rect(0, 500, 200, 550)
-        for (shuangpin in listOf(false, true)) for ((digits, trigger) in listOf("369" to right, "47" to left)) for (d in digits) {
+        // a few dp short of the edge
+        val short = (2 * density).toInt()
+        for (shuangpin in listOf(false, true)) for ((digits, cell) in listOf("369" to right, "47" to left)) for (d in digits) {
             val popup = nine(d, shuangpin)
             val row = popup.items.take(popup.symbolsFrom)
-            val what = "$d${if (shuangpin) " 双拼" else ""} at ${trigger.left}: $row"
-            val ui = { popup(popup.items, trigger, minKeyWidth = wide, split = popup.symbolsFrom, inRow = popup.inRow) }
-            // to the screen's last pixel either way, never past it
-            assertEquals(what, PopupKeyboardUi.keyAction(row.last()), ui().slideTo(trigger, outer.right - 1))
-            assertEquals(what, PopupKeyboardUi.keyAction(row.first()), ui().slideTo(trigger, outer.left))
+            val what = "$d${if (shuangpin) " 双拼" else ""} at ${cell.left}: $row"
+            val ui = { popup(popup.items, cell.face(), minKeyWidth = wide, split = popup.symbolsFrom, inRow = popup.inRow) }
+            fun picked(x: Int) = row.indexOfFirst { PopupKeyboardUi.keyAction(it) == ui().slideTo(cell, x) }
+            // the last either way a few dp short of the screen's edge (九键's 7 at the left: P)
+            assertEquals(what, row.lastIndex, picked(outer.right - 1 - short))
+            assertEquals(what, 0, picked(outer.left + short))
             // let go where it opened: the digit
-            assertEquals(what, PopupKeyboardUi.keyAction(d.toString()), ui().slideTo(trigger, trigger.centerX()))
+            assertEquals(what, popup.inRow, picked(cell.centerX()))
+            // halfway to the edge, a key between the digit and the last
+            val toward = if (cell == right) outer.right else outer.left
+            assertTrue("$what halfway", picked((cell.centerX() + toward) / 2) in (minOf(popup.inRow, if (cell == right) row.lastIndex else 0) + 1) until
+                maxOf(popup.inRow, if (cell == right) row.lastIndex else 0))
+            // a whole step away from the edge, one key as ever (toward it the steps are as short as
+            // the room makes them: 9's four letters in under a step's room, halfway above)
+            val step = (ui().keyWidth * PopupFocus.STEP).toInt() * (if (cell == right) 1 else -1)
+            assertEquals("$what away", 1, kotlin.math.abs(picked(cell.centerX() - step) - popup.inRow))
         }
+        // 九键's 7 at the left: P, not Q (the face's inset once counted as room)
+        val seven = nine('7', false)
+        val ui = popup(seven.items, left.face(), minKeyWidth = wide, split = seven.symbolsFrom, inRow = seven.inRow)
+        assertEquals(KeyAction.HostKeyAction("P"), ui.slideTo(left, outer.left))
     }
 
     @Test
     fun awayFromTheEdgesAStepIsAsBefore() {
-        val trigger = Rect(450, 500, 550, 550)
+        val cell = Rect(450, 500, 550, 550)
         val popup = nine('5', shuangpin = false)
         val row = popup.items.take(popup.symbolsFrom)
-        val ui = { popup(popup.items, trigger, split = popup.symbolsFrom, inRow = popup.inRow) }
-        val step = (keyWidth * PopupFocus.STEP).toInt()
-        // a step (and a bit, past the middle's slack) is the next key, a little less none
-        assertEquals(PopupKeyboardUi.keyAction(row[popup.inRow + 1]), ui().slideTo(trigger, trigger.centerX() + step))
-        assertEquals(PopupKeyboardUi.keyAction(row[popup.inRow - 1]), ui().slideTo(trigger, trigger.centerX() - step))
-        assertEquals(PopupKeyboardUi.keyAction("5"), ui().slideTo(trigger, trigger.centerX() + step / 2))
+        val ui = { popup(popup.items, cell.face(), split = popup.symbolsFrom, inRow = popup.inRow) }
+        // the next key past half a step and the slack (0.65 of a step), not before
+        val next = (ui().keyWidth * PopupFocus.STEP * 0.65f).toInt() + 1
+        assertEquals(PopupKeyboardUi.keyAction(row[popup.inRow + 1]), ui().slideTo(cell, cell.centerX() + next))
+        assertEquals(PopupKeyboardUi.keyAction(row[popup.inRow - 1]), ui().slideTo(cell, cell.centerX() - next))
+        assertEquals(PopupKeyboardUi.keyAction("5"), ui().slideTo(cell, cell.centerX() + next - 2))
+        assertEquals(PopupKeyboardUi.keyAction("5"), ui().slideTo(cell, cell.centerX() - next + 2))
     }
 
     @Test
@@ -472,15 +501,15 @@ class PopupKeyboardUiTest {
     @Test
     fun atAnEdgeTheDigitIsInFocusAndAStepPicksItsNeighbours() {
         // 九键's 2 at the left: seven keys fit across only narrower, the row fills the screen and
-        // its digit is in the middle, not over the key; the finger steps from it all the same
+        // its digit is in the middle, not over the key; the finger steps from it all the same, toward
+        // the near edge in shorter steps
         val keys = arrayOf("A", "B", "C", "2", "a", "b", "c")
         val ui = popup(keys, Rect(0, 500, 40, 550), outerBounds = Rect(0, 0, 7 * keyWidth / 2, 2000), split = 7, inRow = 3)
         val step = ui.keyWidth * PopupFocus.STEP
         assertFalse(ui.changeFocus(25f, 20f))
         assertEquals(KeyAction.HostKeyAction("2"), ui.onTrigger())
-        ui.changeFocus(25f - step, 20f)
-        assertEquals(KeyAction.HostKeyAction("C"), ui.onTrigger())
-        ui.changeFocus(25f - 3 * step, 20f)
+        // 25 to the screen's edge for three keys: shorter steps that way, A a few pixels short of it
+        ui.changeFocus(4f, 20f)
         assertEquals(KeyAction.HostKeyAction("A"), ui.onTrigger())
         ui.changeFocus(25f + 2 * step, 20f)
         assertEquals(KeyAction.HostKeyAction("b"), ui.onTrigger())

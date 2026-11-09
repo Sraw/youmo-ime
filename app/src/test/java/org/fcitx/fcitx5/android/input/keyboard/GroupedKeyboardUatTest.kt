@@ -474,7 +474,8 @@ class GroupedKeyboardUatTest {
     // 九键's right side: the row (6's capitals, 6, its letters) wider than the symbols above, pushed
     // in from the edge on a narrow screen, left the last letter more steps right than the finger had
     // room for. The steps right are shorter where the room is: a slide to the screen's last pixel
-    // picks it (here, with room enough, at whole steps as ever)
+    // picks it. Not the evidence for that: this screen leaves 6 room for whole steps, so it passes
+    // with them too; PopupKeyboardUiTest's edge cases (keys wide enough to be pushed in) are
     @Test
     @Uat("SP-24")
     fun aNineKeyAtTheRightReachesItsLastLetterOnScreen() {
