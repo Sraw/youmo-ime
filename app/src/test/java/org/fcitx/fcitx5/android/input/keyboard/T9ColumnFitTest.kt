@@ -9,7 +9,7 @@ import android.view.ViewGroup
 import android.widget.ScrollView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.EngineState
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.uat.PrefsRule
@@ -55,7 +55,7 @@ class T9ColumnFitTest {
     // once, 0bfe7fa6b)
     @Test
     fun theColumnWaitsForTheSceneAndThenStaysPut() {
-        val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark, semicolon = false)
+        val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, semicolon = false)
         val column = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single()
         assertEquals(View.INVISIBLE, column.visibility)
         val density = keyboard.resources.displayMetrics.density
@@ -77,7 +77,7 @@ class T9ColumnFitTest {
 
     private fun fits(scale: Float, moved: Boolean = false) {
         RuntimeEnvironment.setFontScale(scale)
-        val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark, semicolon = false)
+        val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, semicolon = false)
         val longest = listOf("shuang", "zhuang", "chuang", "shuan")
         keyboard.show(EngineState.T9State(composing = true, syllables = longest, id = 1))
         val density = keyboard.resources.displayMetrics.density

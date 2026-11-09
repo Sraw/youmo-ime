@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -20,7 +20,7 @@ import org.robolectric.annotation.Config
 @Config(application = FcitxApplication::class)
 class TextKeyboardAddressTest {
 
-    private val keyboard = TextKeyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark)
+    private val keyboard = TextKeyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark)
 
     private val ids = listOf(R.id.button_comma, R.id.button_slash, R.id.button_at, R.id.button_period, R.id.button_dot, R.id.button_domain)
 

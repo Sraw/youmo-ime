@@ -15,7 +15,7 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.NoticeState.Companion.SAID_MS
 import org.fcitx.fcitx5.android.input.NoticeState.Companion.UNDO_MS
 import org.fcitx.fcitx5.android.input.UndoChipPlacement
@@ -60,7 +60,7 @@ class UndoChipTest {
     private val settled = Motion.entries.maxOf { it.enter(Motion.Settings.DEFAULT) } + FRAME_MS
 
     private fun chip(motion: Motion.Settings = off) =
-        UndoChip(anchor, ThemePreset.PixelDark, { _, _, _ -> UndoChipPlacement.Place(0, 0, UndoChipPlacement.Slide.Up) }, { motion })
+        UndoChip(anchor, TestThemes.PixelDark, { _, _, _ -> UndoChipPlacement.Place(0, 0, UndoChipPlacement.Slide.Up) }, { motion })
 
     // the chips up: panels, the activity's own window left out
     private fun windows(): List<View> {
@@ -310,7 +310,7 @@ class UndoChipTest {
         activity.windowManager.addView(unlaid, WindowManager.LayoutParams(0, 0, WindowManager.LayoutParams.TYPE_APPLICATION, 0, 0))
         idle()
         assertEquals("the anchor's window has no width yet", 0, unlaid.rootView.width)
-        val early = UndoChip(unlaid, ThemePreset.PixelDark, { _, _, _ -> UndoChipPlacement.Place(0, 0, UndoChipPlacement.Slide.Up) }, { off })
+        val early = UndoChip(unlaid, TestThemes.PixelDark, { _, _, _ -> UndoChipPlacement.Place(0, 0, UndoChipPlacement.Slide.Up) }, { off })
         assertTrue(early.show(message))
         val before = shownRow(message).layoutParams.width
         early.dismiss()
@@ -339,7 +339,7 @@ class UndoChipTest {
     @Test
     fun withTheKeyboardNotShownNothingOpensAndTheActStands() {
         val detached = FrameLayout(PlaceholderStrings(activity))
-        val chip = UndoChip(detached, ThemePreset.PixelDark, { _, _, _ -> UndoChipPlacement.Place(0, 0, UndoChipPlacement.Slide.Up) }, { off })
+        val chip = UndoChip(detached, TestThemes.PixelDark, { _, _, _ -> UndoChipPlacement.Place(0, 0, UndoChipPlacement.Slide.Up) }, { off })
         val r = Record()
         assertFalse("not shown, for the caller to say otherwise (F3530)", chip.show("删掉了", r.undo("删")))
         assertFalse(chip.showing)
@@ -416,7 +416,7 @@ class UndoChipTest {
     // review L5: the menu meets only the notices where it is: one over the bar (a word's 撤销) is left as it is
     @Test
     fun theMenuLeavesANoticeElsewhereAlone() {
-        val chip = UndoChip(anchor, ThemePreset.PixelDark, { _, _, aboveKeys ->
+        val chip = UndoChip(anchor, TestThemes.PixelDark, { _, _, aboveKeys ->
             UndoChipPlacement.Place(0, if (aboveKeys) 0 else 400, UndoChipPlacement.Slide.Up)
         }, { off })
         chip.show("记住了「你好」", UndoChip.Undo({}), aboveKeys = false)

@@ -7,8 +7,8 @@ package org.fcitx.fcitx5.android.input.keyboard
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
@@ -45,7 +45,7 @@ class KeyShortcutsScreenshotTest {
     }
 
     // [moved]: a keyboard the canvas draws where it is on (060-render-p2 S4: the 14 keys), its golden `canvas_`
-    private fun shot(name: String, theme: Theme = ThemePreset.PixelLight, moved: Boolean = false) =
+    private fun shot(name: String, theme: Theme = TestThemes.PixelLight, moved: Boolean = false) =
         KeyboardHarness(theme, KeyboardHarness.PINYIN).use { h ->
             h.start()
             if (moved) h.captureBoard("KeyShortcutsScreenshotTest/$name") else h.capture("KeyShortcutsScreenshotTest/$name")
@@ -54,14 +54,14 @@ class KeyShortcutsScreenshotTest {
     @Test
     fun theDefaultMarksLightAndDark() {
         prefs.internal.keyShortcuts.setValue(KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好")).serialize())
-        KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN).use { h ->
+        KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).use { h ->
             h.start()
             // a's select all top left, its @ top right: the two settings' defaults
             assertNotNull("a's symbol shown", h.key("a").alt)
             assertTrue(h.texts().contains("你好"))
             h.capture("KeyShortcutsScreenshotTest/default_light")
         }
-        shot("default_dark", ThemePreset.PixelDark)
+        shot("default_dark", TestThemes.PixelDark)
     }
 
     @Test
@@ -89,7 +89,7 @@ class KeyShortcutsScreenshotTest {
     // the space swiped up: the edit menu over it, paste (straight up) picked, the cells the finger reaches next beside it
     @Test
     fun theEditMenuOverTheSpace() {
-        KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN).use { h ->
+        KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).use { h ->
             h.start()
             // the icons up outside the keys: the bar's, then the menu's cells as well, whichever draws them
             fun icons() = h.shownIcons().size

@@ -10,7 +10,6 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutsCache
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
@@ -74,7 +73,7 @@ class SceneBoard(
     private fun drawn(look: ThemeLook, width: Int, height: Int): KeyboardCanvasView.Drawn? {
         if (layout == null) return null
         drawn(theme, look, width, height)?.let { return it }
-        val builtIn = if (theme.isDark) ThemePreset.PixelDark else ThemePreset.PixelLight
+        val builtIn = ThemeManager.builtin(if (theme.isDark) "pixel#dark" else "pixel#light")
         if (builtIn.name == theme.name) return null
         // logged once a look: asked again each time what shows changes
         if (firstFallBack(theme.name, look)) Timber.w("keyboard canvas: no scene of theme %s; the built-in %s's drawn", theme.name, builtIn.name)

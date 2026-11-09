@@ -158,11 +158,13 @@ class ThemeMakerFormatTest {
 
     @Test
     fun thePagesBuiltInThemesAreTheApps() {
-        // as the app lists them (ThemeManager.BuiltinThemes), then the two a picture's theme starts from
-        val themes = ThemeManager.BuiltinThemes + listOf(ThemePreset.TransparentDark, ThemePreset.TransparentLight)
+        // read from their files (src/commonMain/themes) as the app lists them, by the names the page has for
+        // them (0.5's); not Monet's, the wallpaper's colours. Then the two a picture's theme starts from
+        val themes = TestThemes.builtins.filterNot { it.second.followsSystem } +
+            listOf("TransparentDark" to TestThemes.TransparentDark, "TransparentLight" to TestThemes.TransparentLight)
         val presets = buildJsonArray {
-            for (t in themes) add(buildJsonObject {
-                put("name", t.name)
+            for ((name, t) in themes) add(buildJsonObject {
+                put("name", name)
                 put("isDark", t.isDark)
                 put("palette", Json.encodeToJsonElement(PaletteJson.of(t.look.palette)))
             })

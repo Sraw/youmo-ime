@@ -16,8 +16,8 @@ import org.fcitx.fcitx5.android.core.keyboardOn
 import org.fcitx.fcitx5.android.core.startedHost
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -68,7 +68,7 @@ class StuckBarUatTest {
         if (::home.isInitialized) home.deleteRecursively()
         keyboard.pinyinKeyboard.let { it.setValue(it.defaultValue) }
         ThemeManager.prefs.floatingKeyboard.let { it.setValue(it.defaultValue) }
-        ThemeManager.setNormalModeTheme(ThemePreset.PixelLight)
+        ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
     }
 
     private fun until(what: String, state: () -> String = { "" }, done: () -> Boolean) {
@@ -126,7 +126,7 @@ class StuckBarUatTest {
         start()
         ni()
         engine.events.clear()
-        ThemeManager.setNormalModeTheme(ThemePreset.PixelDark)
+        ThemeManager.setNormalModeTheme(TestThemes.PixelDark)
         h.idle()
         nothingLeft()
         haoFollows()
@@ -160,7 +160,7 @@ class StuckBarUatTest {
         // English's word is the field's composing text, not a code above the bar
         until("he composing", ::state) { BaseInputConnection.getComposingSpanStart(h.field.text) >= 0 && h.field.text.toString() == "he" }
         engine.events.clear()
-        ThemeManager.setNormalModeTheme(ThemePreset.PixelDark)
+        ThemeManager.setNormalModeTheme(TestThemes.PixelDark)
         h.idle()
         until("he committed", ::state) { BaseInputConnection.getComposingSpanStart(h.field.text) < 0 }
         assertEquals(state(), "he", h.field.text.toString())
@@ -184,7 +184,7 @@ class StuckBarUatTest {
         h.service.postFcitxJob { sendKey('z') }
         until("中 composing", ::state) { BaseInputConnection.getComposingSpanStart(h.field.text) >= 0 && h.field.text.toString() == ScriptedEngine.WRITTEN }
         engine.events.clear()
-        ThemeManager.setNormalModeTheme(ThemePreset.PixelDark)
+        ThemeManager.setNormalModeTheme(TestThemes.PixelDark)
         h.idle()
         until("中 committed", ::state) { BaseInputConnection.getComposingSpanStart(h.field.text) < 0 }
         assertEquals(state(), ScriptedEngine.WRITTEN, h.field.text.toString())

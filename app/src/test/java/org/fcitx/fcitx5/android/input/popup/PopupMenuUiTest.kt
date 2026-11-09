@@ -7,7 +7,7 @@ package org.fcitx.fcitx5.android.input.popup
 import android.graphics.Rect
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
@@ -49,14 +49,14 @@ class PopupMenuUiTest {
         measuring: (TextMeasurer) -> TextMeasurer = { it },
     ) = PopupMenuUi(
         ctx = RuntimeEnvironment.getApplication(),
-        theme = ThemePreset.PixelDark,
+        theme = TestThemes.PixelDark,
         outerBounds = Rect(0, 0, 1000, 600),
         triggerBounds = trigger,
         onDismissSelf = { dismissed = true },
         items = items,
         onFocusMoved = { moved++ },
         fixed = fixed,
-        scenes = PopupScenes(View(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark, measuring),
+        scenes = PopupScenes(View(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, measuring),
     )
 
     // the handwriting pad's 注: words, no icons

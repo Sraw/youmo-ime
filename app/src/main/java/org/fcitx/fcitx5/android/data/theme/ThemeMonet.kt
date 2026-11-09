@@ -4,92 +4,140 @@
  */
 package org.fcitx.fcitx5.android.data.theme
 
+import android.content.Context
 import android.os.Build
-import org.fcitx.fcitx5.android.utils.appContext
+import androidx.annotation.RequiresApi
+import org.fcitx.fcitx5.android.scene.theme.Argb
+import org.fcitx.fcitx5.android.scene.theme.SystemColors
 
 // Ref:
 // https://github.com/material-components/material-components-android/blob/master/docs/theming/Color.md
 // https://www.figma.com/community/file/809865700885504168/material-3-android-15
 // https://material-foundation.github.io/material-theme-builder/
 
-// FIXME: SDK < 34 can only have approximate color values, maybe we can implement our own color algorithm.
-// See: https://github.com/XayahSuSuSu/Android-DataBackup/blob/e8b087fb55519c659bebdc46c0217731fe80a0d7/source/core/ui/src/main/kotlin/com/xayah/core/ui/material3/DynamicTonalPalette.kt#L185
-
+/**
+ * The system's colours a theme's `system(name, fallback)` takes (ColorExpr.SYSTEM_NAMES): the Monet
+ * theme's (monet.xml), and any other's.
+ *
+ * - Android 14 on: Material's roles (`system_primary_light`…) and the palette's tones.
+ * - Android 12 and 13 have no roles: each is the palette's tone 0.5's ThemeMonet took for it there, an
+ *   approximation (the comments: the tone the role is); the tones as they are.
+ * - Before: none, every colour its fallback (monet.xml's: 0.5's static colours there, MD3 of #769CDF).
+ */
 object ThemeMonet {
-    fun getLight(): Theme.Monet =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) // Real Monet colors
-            Theme.Monet(
-                isDark = false,
-                surfaceContainer = appContext.getColor(android.R.color.system_surface_container_light),
-                surfaceContainerHigh = appContext.getColor(android.R.color.system_surface_container_highest_light),
-                surfaceBright = appContext.getColor(android.R.color.system_surface_bright_light),
-                onSurface = appContext.getColor(android.R.color.system_on_surface_light),
-                primary = appContext.getColor(android.R.color.system_primary_light),
-                onPrimary = appContext.getColor(android.R.color.system_on_primary_light),
-                secondaryContainer = appContext.getColor(android.R.color.system_secondary_container_light),
-                onSurfaceVariant = appContext.getColor(android.R.color.system_on_surface_variant_light)
-            )
-        else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) // Approximate color values
-            Theme.Monet(
-                isDark = false,
-                surfaceContainer = appContext.getColor(android.R.color.system_neutral1_50), // neutral94
-                surfaceContainerHigh = appContext.getColor(android.R.color.system_neutral2_100), // neutral92
-                surfaceBright = appContext.getColor(android.R.color.system_neutral1_10), // neutral98
-                onSurface = appContext.getColor(android.R.color.system_neutral1_900),
-                primary = appContext.getColor(android.R.color.system_accent1_600),
-                onPrimary = appContext.getColor(android.R.color.system_accent1_0),
-                secondaryContainer = appContext.getColor(android.R.color.system_accent2_100),
-                onSurfaceVariant = appContext.getColor(android.R.color.system_accent2_700)
-            )
-        else // Static MD3 colors, based on #769CDF
-            Theme.Monet(
-                isDark = false,
-                surfaceContainer = 0xffededf4.toInt(),
-                surfaceContainerHigh = 0xffe7e8ee.toInt(),
-                surfaceBright = 0xfff9f9ff.toInt(),
-                onSurface = 0xff191c20.toInt(),
-                primary = 0xff415f91.toInt(),
-                onPrimary = 0xffffffff.toInt(),
-                secondaryContainer = 0xffdae2f9.toInt(),
-                onSurfaceVariant = 0xff44474e.toInt(),
-            )
 
-    fun getDark(): Theme.Monet =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) // Real Monet colors
-            Theme.Monet(
-                isDark = true,
-                surfaceContainer = appContext.getColor(android.R.color.system_surface_container_dark),
-                surfaceContainerHigh = appContext.getColor(android.R.color.system_surface_container_high_dark),
-                surfaceBright = appContext.getColor(android.R.color.system_surface_bright_dark),
-                onSurface = appContext.getColor(android.R.color.system_on_surface_dark),
-                primary = appContext.getColor(android.R.color.system_primary_dark),
-                onPrimary = appContext.getColor(android.R.color.system_on_primary_dark),
-                secondaryContainer = appContext.getColor(android.R.color.system_secondary_container_dark),
-                onSurfaceVariant = appContext.getColor(android.R.color.system_on_surface_variant_dark)
-            )
-        else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) // Approximate color values
-            Theme.Monet(
-                isDark = true,
-                surfaceContainer = appContext.getColor(android.R.color.system_neutral1_900), // neutral12
-                surfaceContainerHigh = appContext.getColor(android.R.color.system_neutral2_1000), // neutral17
-                surfaceBright = appContext.getColor(android.R.color.system_neutral1_800), // neutral24
-                onSurface = appContext.getColor(android.R.color.system_neutral1_100),
-                primary = appContext.getColor(android.R.color.system_accent1_200),
-                onPrimary = appContext.getColor(android.R.color.system_accent1_800),
-                secondaryContainer = appContext.getColor(android.R.color.system_accent2_700),
-                onSurfaceVariant = appContext.getColor(android.R.color.system_accent2_200)
-            )
-        else // Static MD3 colors, based on #769CDF
-            Theme.Monet(
-                isDark = true,
-                surfaceContainer = 0xff1d2024.toInt(),
-                surfaceContainerHigh = 0xff282a2f.toInt(),
-                surfaceBright = 0xff37393e.toInt(),
-                onSurface = 0xffe2e2e9.toInt(),
-                primary = 0xffaac7ff.toInt(),
-                onPrimary = 0xff0a305f.toInt(),
-                secondaryContainer = 0xff3e4759.toInt(),
-                onSurfaceVariant = 0xffc4c6d0.toInt(),
-            )
+    fun systemColors(context: Context): SystemColors = when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> {
+            val tones = tones(context)
+            SystemColors(of(context, ROLES_LIGHT) + tones, of(context, ROLES_DARK) + tones)
+        }
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            val tones = tones(context)
+            SystemColors(of(context, APPROXIMATE_LIGHT) + tones, of(context, APPROXIMATE_DARK) + tones)
+        }
+        else -> SystemColors.NONE
+    }
 
+    private fun of(context: Context, colors: Map<String, Int>): Map<String, Argb> = colors.mapValues { (_, id) -> Argb(context.getColor(id)) }
+
+    @RequiresApi(Build.VERSION_CODES.S)
+    private fun tones(context: Context): Map<String, Argb> =
+        TONES.flatMap { (group, ids) -> STEPS.zip(ids.toList()) { step, id -> "$group-$step" to Argb(context.getColor(id)) } }.toMap()
+
+    private val ROLES_LIGHT
+        @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+        get() = mapOf(
+            "surface-container" to android.R.color.system_surface_container_light,
+            "surface-container-high" to android.R.color.system_surface_container_high_light,
+            "surface-container-highest" to android.R.color.system_surface_container_highest_light,
+            "surface-bright" to android.R.color.system_surface_bright_light,
+            "on-surface" to android.R.color.system_on_surface_light,
+            "primary" to android.R.color.system_primary_light,
+            "on-primary" to android.R.color.system_on_primary_light,
+            "secondary-container" to android.R.color.system_secondary_container_light,
+            "on-surface-variant" to android.R.color.system_on_surface_variant_light,
+        )
+
+    private val ROLES_DARK
+        @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+        get() = mapOf(
+            "surface-container" to android.R.color.system_surface_container_dark,
+            "surface-container-high" to android.R.color.system_surface_container_high_dark,
+            "surface-container-highest" to android.R.color.system_surface_container_highest_dark,
+            "surface-bright" to android.R.color.system_surface_bright_dark,
+            "on-surface" to android.R.color.system_on_surface_dark,
+            "primary" to android.R.color.system_primary_dark,
+            "on-primary" to android.R.color.system_on_primary_dark,
+            "secondary-container" to android.R.color.system_secondary_container_dark,
+            "on-surface-variant" to android.R.color.system_on_surface_variant_dark,
+        )
+
+    // 0.5's: monet.xml's light bar is the highest container, its dark one the high
+    private val APPROXIMATE_LIGHT
+        @RequiresApi(Build.VERSION_CODES.S)
+        get() = mapOf(
+            "surface-container" to android.R.color.system_neutral1_50, // neutral94
+            "surface-container-highest" to android.R.color.system_neutral2_100, // neutral92
+            "surface-bright" to android.R.color.system_neutral1_10, // neutral98
+            "on-surface" to android.R.color.system_neutral1_900,
+            "primary" to android.R.color.system_accent1_600,
+            "on-primary" to android.R.color.system_accent1_0,
+            "secondary-container" to android.R.color.system_accent2_100,
+            "on-surface-variant" to android.R.color.system_accent2_700,
+        )
+
+    private val APPROXIMATE_DARK
+        @RequiresApi(Build.VERSION_CODES.S)
+        get() = mapOf(
+            "surface-container" to android.R.color.system_neutral1_900, // neutral12
+            "surface-container-high" to android.R.color.system_neutral2_1000, // neutral17
+            "surface-bright" to android.R.color.system_neutral1_800, // neutral24
+            "on-surface" to android.R.color.system_neutral1_100,
+            "primary" to android.R.color.system_accent1_200,
+            "on-primary" to android.R.color.system_accent1_800,
+            "secondary-container" to android.R.color.system_accent2_700,
+            "on-surface-variant" to android.R.color.system_accent2_200,
+        )
+
+    private val STEPS = listOf(0, 10, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000)
+
+    private val TONES: List<Pair<String, IntArray>>
+        @RequiresApi(Build.VERSION_CODES.S)
+        get() = listOf(
+            "accent1" to intArrayOf(
+                android.R.color.system_accent1_0, android.R.color.system_accent1_10, android.R.color.system_accent1_50,
+                android.R.color.system_accent1_100, android.R.color.system_accent1_200, android.R.color.system_accent1_300,
+                android.R.color.system_accent1_400, android.R.color.system_accent1_500, android.R.color.system_accent1_600,
+                android.R.color.system_accent1_700, android.R.color.system_accent1_800, android.R.color.system_accent1_900,
+                android.R.color.system_accent1_1000,
+            ),
+            "accent2" to intArrayOf(
+                android.R.color.system_accent2_0, android.R.color.system_accent2_10, android.R.color.system_accent2_50,
+                android.R.color.system_accent2_100, android.R.color.system_accent2_200, android.R.color.system_accent2_300,
+                android.R.color.system_accent2_400, android.R.color.system_accent2_500, android.R.color.system_accent2_600,
+                android.R.color.system_accent2_700, android.R.color.system_accent2_800, android.R.color.system_accent2_900,
+                android.R.color.system_accent2_1000,
+            ),
+            "accent3" to intArrayOf(
+                android.R.color.system_accent3_0, android.R.color.system_accent3_10, android.R.color.system_accent3_50,
+                android.R.color.system_accent3_100, android.R.color.system_accent3_200, android.R.color.system_accent3_300,
+                android.R.color.system_accent3_400, android.R.color.system_accent3_500, android.R.color.system_accent3_600,
+                android.R.color.system_accent3_700, android.R.color.system_accent3_800, android.R.color.system_accent3_900,
+                android.R.color.system_accent3_1000,
+            ),
+            "neutral1" to intArrayOf(
+                android.R.color.system_neutral1_0, android.R.color.system_neutral1_10, android.R.color.system_neutral1_50,
+                android.R.color.system_neutral1_100, android.R.color.system_neutral1_200, android.R.color.system_neutral1_300,
+                android.R.color.system_neutral1_400, android.R.color.system_neutral1_500, android.R.color.system_neutral1_600,
+                android.R.color.system_neutral1_700, android.R.color.system_neutral1_800, android.R.color.system_neutral1_900,
+                android.R.color.system_neutral1_1000,
+            ),
+            "neutral2" to intArrayOf(
+                android.R.color.system_neutral2_0, android.R.color.system_neutral2_10, android.R.color.system_neutral2_50,
+                android.R.color.system_neutral2_100, android.R.color.system_neutral2_200, android.R.color.system_neutral2_300,
+                android.R.color.system_neutral2_400, android.R.color.system_neutral2_500, android.R.color.system_neutral2_600,
+                android.R.color.system_neutral2_700, android.R.color.system_neutral2_800, android.R.color.system_neutral2_900,
+                android.R.color.system_neutral2_1000,
+            ),
+        )
 }

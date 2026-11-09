@@ -14,48 +14,43 @@ import splitties.views.dsl.core.Ui
 abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHolder>() {
     class ViewHolder(val ui: Ui) : RecyclerView.ViewHolder(ui.root)
 
-    val entries = mutableListOf<Theme>()
+    // a built-in theme of two versions one card (ThemeCards)
+    private var cards = ThemeCards(emptyList())
 
+    /** The cards' themes as shown, in the list's order. */
+    val entries: MutableList<Theme> get() = cards.shown
+
+    // the cards marked; a mark is shown on its card while the version marked is the one shown
     private var activeIndex = -1
     private var lightIndex = -1
     private var darkIndex = -1
+    private var activeName: String? = null
+    private var lightName: String? = null
+    private var darkName: String? = null
 
     private fun entryAt(position: Int) = entries.getOrNull(position - OFFSET)
 
-    private fun positionOf(theme: Theme? = null): Int {
-        if (theme == null) return -1
-        return entries.indexOfFirst { it.name == theme.name } + OFFSET
-    }
+    private fun positionOf(theme: Theme?): Int = cards.indexOf(theme).let { if (it < 0) -1 else it + OFFSET }
 
     fun setThemes(themes: List<Theme>) {
-        entries.clear()
-        entries.addAll(themes)
-        notifyItemRangeInserted(OFFSET, themes.size)
+        cards = ThemeCards(themes)
+        notifyItemRangeInserted(OFFSET, entries.size)
     }
 
+    /**
+     * Marks [active], and [light] and [dark] where the theme follows the system's: each card one of them
+     * is on shows its version (the one in use last, of a pair both slots have).
+     */
     fun setSelectedThemes(active: Theme, light: Theme? = null, dark: Theme? = null) {
-        val oldActive = entryAt(activeIndex)
-        if (oldActive != active) {
-            notifyItemChanged(activeIndex)
-            activeIndex = positionOf(active)
-            notifyItemChanged(activeIndex)
-        }
-        val oldLight = entryAt(lightIndex)
-        if (oldLight != light) {
-            notifyItemChanged(lightIndex)
-            lightIndex = positionOf(light)
-            if (lightIndex >= OFFSET) {
-                notifyItemChanged(lightIndex)
-            }
-        }
-        val oldDark = entryAt(darkIndex)
-        if (oldDark != dark) {
-            notifyItemChanged(darkIndex)
-            darkIndex = positionOf(dark)
-            if (darkIndex >= OFFSET) {
-                notifyItemChanged(darkIndex)
-            }
-        }
+        val before = listOf(activeIndex, lightIndex, darkIndex)
+        listOf(light, dark, active).forEach(cards::show)
+        activeIndex = positionOf(active)
+        lightIndex = positionOf(light)
+        darkIndex = positionOf(dark)
+        activeName = active.name
+        lightName = light?.name
+        darkName = dark?.name
+        (before + listOf(activeIndex, lightIndex, darkIndex)).filter { it >= OFFSET }.distinct().forEach(::notifyItemChanged)
     }
 
     private fun prependOffset(index: Int): Int {
@@ -104,11 +99,19 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
         notifyItemChanged(OFFSET)
     }
 
-    internal fun stateAt(position: Int) = when (position) {
-        darkIndex -> ThemeThumbnailUi.State.DarkMode
-        lightIndex -> ThemeThumbnailUi.State.LightMode
-        activeIndex -> ThemeThumbnailUi.State.Selected
-        else -> ThemeThumbnailUi.State.Normal
+    internal fun stateAt(position: Int): ThemeThumbnailUi.State {
+        val shown = entryAt(position)?.name
+        return when {
+            position == darkIndex && shown == darkName -> ThemeThumbnailUi.State.DarkMode
+            position == lightIndex && shown == lightName -> ThemeThumbnailUi.State.LightMode
+            position == activeIndex && shown == activeName -> ThemeThumbnailUi.State.Selected
+            else -> ThemeThumbnailUi.State.Normal
+        }
+    }
+
+    /** The card at [position] shows its other version (浅/深), its mark if that one has one. */
+    internal fun switchVersion(position: Int) {
+        if (position >= OFFSET && cards.switch(position - OFFSET)) notifyItemChanged(position)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
@@ -127,14 +130,15 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
                 val theme = entryAt(position)!!
                 setTheme(theme)
                 setChecked(stateAt(position))
+                setVersion(theme.takeIf { cards.other(it) != null }?.isDark) { switchVersion(holder.bindingAdapterPosition) }
                 root.setOnClickListener {
                     onSelectTheme(theme)
                 }
                 root.setOnLongClickListener {
-                    when (theme) {
-                        is Theme.Custom -> onThemeActions(theme)
-                        // its look the wallpaper's colours now, its key style with them: a fixed copy
-                        is Theme.Monet -> onExportTheme(theme.toCustom())
+                    when {
+                        theme is Theme.Custom -> onThemeActions(theme)
+                        // Monet's: its look the wallpaper's colours now, its key style with them: a fixed copy
+                        theme is Theme.Builtin && theme.followsSystem -> onExportTheme(theme.toCustom())
                         else -> return@setOnLongClickListener false
                     }
                     true

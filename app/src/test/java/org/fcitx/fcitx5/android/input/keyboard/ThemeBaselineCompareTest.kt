@@ -15,12 +15,11 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemeMonet
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -131,14 +130,17 @@ class ThemeBaselineCompareTest {
 
     private val looks by lazy { ThemeLookSamples(dir.root) }
 
+    // the built-in themes by their 0.5 names, the record's (Transparent's two test data)
     private fun builtinLooks() = listOf(
-        ThemePreset.MaterialLight, ThemePreset.MaterialDark, ThemePreset.PixelLight, ThemePreset.PixelDark,
-        ThemePreset.NordLight, ThemePreset.NordDark, ThemePreset.DeepBlue, ThemePreset.Monokai, ThemePreset.AMOLEDBlack,
-        ThemePreset.TransparentLight, ThemePreset.TransparentDark,
-    ).map { t -> Look(t.name) { t } } + listOf(
+        "MaterialLight" to TestThemes.MaterialLight, "MaterialDark" to TestThemes.MaterialDark,
+        "PixelLight" to TestThemes.PixelLight, "PixelDark" to TestThemes.PixelDark,
+        "NordLight" to TestThemes.NordLight, "NordDark" to TestThemes.NordDark, "DeepBlue" to TestThemes.DeepBlue,
+        "Monokai" to TestThemes.Monokai, "AMOLEDBlack" to TestThemes.AMOLEDBlack,
+        "TransparentLight" to TestThemes.TransparentLight, "TransparentDark" to TestThemes.TransparentDark,
+    ).map { (id, t) -> Look(id) { t } } + listOf(
         // Android's own colours here (Robolectric's)
-        Look("MonetLight") { ThemeMonet.getLight() },
-        Look("MonetDark") { ThemeMonet.getDark() },
+        Look("MonetLight") { ThemeManager.builtin("monet#light") },
+        Look("MonetDark") { ThemeManager.builtin("monet#dark") },
     )
 
     private fun sampleLooks() = SAMPLES.flatMap { s ->

@@ -24,8 +24,8 @@ import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
@@ -74,7 +74,7 @@ class GroupedKeyboardUatTest {
     private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
     private val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false)
 
-    private fun keys14(im: InputMethodEntry = KeyboardHarness.PINYIN, theme: Theme = ThemePreset.PixelLight): KeyboardHarness {
+    private fun keys14(im: InputMethodEntry = KeyboardHarness.PINYIN, theme: Theme = TestThemes.PixelLight): KeyboardHarness {
         prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, PinyinKeyboard.Keys14)
         return KeyboardHarness(theme, im).also {
             harness = it
@@ -203,7 +203,7 @@ class GroupedKeyboardUatTest {
     @Test
     @Uat("PY-89")
     fun aLooseKeyAtTheLeftReachesItsFirstLetterAtTheEdge() {
-        val loose = Theme.Custom("loose", false, ThemePreset.PixelLight.look.let { it.copy(keys = it.keys.copy(gap = Gap(5, 9, 5, 6))) })
+        val loose = Theme.Custom("loose", false, TestThemes.PixelLight.look.let { it.copy(keys = it.keys.copy(gap = Gap(5, 9, 5, 6))) })
         keys14(theme = loose).start()
         typing(InputMethodCatalog.PINYIN, "ni", "bu")
         val qw = group("QW")
@@ -256,7 +256,7 @@ class GroupedKeyboardUatTest {
         // globe's switch back would show instead
         prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, PinyinKeyboard.Full)
         prefs.set(AppPrefs.getInstance().keyboard.shuangpinKeyboard, ShuangpinKeyboard.Keys18)
-        return KeyboardHarness(ThemePreset.PixelLight, shuangpin).also {
+        return KeyboardHarness(TestThemes.PixelLight, shuangpin).also {
             harness = it
             it.api.availableIme = arrayOf(KeyboardHarness.PINYIN, shuangpin, KeyboardHarness.ENGLISH)
             it.api.enabledIme = it.api.availableIme
@@ -330,7 +330,7 @@ class GroupedKeyboardUatTest {
         fun area() = h.box(h.board).bottom - h.box(h.inputView.findViewById<View>(R.id.code_row_text)).top
         fun keys() = h.box(h.board).height()
         // the full keyboard first
-        harness = KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN)
+        harness = KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN)
         h.start()
         h.relayout()
         assertEquals(CodeRowHeight.THIN_DP.toFloat(), row(), 1f)
@@ -358,7 +358,7 @@ class GroupedKeyboardUatTest {
         // 双拼's 18 keys the same, its row alone
         prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, PinyinKeyboard.Full)
         prefs.set(AppPrefs.getInstance().keyboard.shuangpinKeyboard, ShuangpinKeyboard.Keys18)
-        harness = KeyboardHarness(ThemePreset.PixelLight, shuangpin)
+        harness = KeyboardHarness(TestThemes.PixelLight, shuangpin)
         h.start()
         h.relayout()
         assertEquals(CodeRowHeight.STRIP_DP.toFloat(), row(), 1f)
@@ -369,7 +369,7 @@ class GroupedKeyboardUatTest {
         h.close()
         harness = null
         // pinyin's nine keys: the thin row (their column shows what is typed), switched to and from 双拼's 18 keys
-        harness = KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN, keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS, shuangpin = ImKeyboard.KEYS18))
+        harness = KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN, keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS, shuangpin = ImKeyboard.KEYS18))
         h.start()
         h.relayout()
         assertEquals(CodeRowHeight.THIN_DP.toFloat(), row(), 1f)
@@ -386,7 +386,7 @@ class GroupedKeyboardUatTest {
         val scheme = EngineState.shuangpinScheme
         EngineState.shuangpinScheme = ShuangpinScheme.MICROSOFT
         prefs.later { EngineState.shuangpinScheme = scheme }
-        harness = KeyboardHarness(ThemePreset.PixelLight, shuangpin)
+        harness = KeyboardHarness(TestThemes.PixelLight, shuangpin)
         h.start()
         val semicolon = h.keyWithId(R.id.button_semicolon)!!
         val l = h.key("l").bounds
@@ -450,7 +450,7 @@ class GroupedKeyboardUatTest {
 
     private fun nineSp(type: Int = InputType.TYPE_CLASS_TEXT): KeyboardHarness {
         prefs.set(AppPrefs.getInstance().keyboard.shuangpinKeyboard, ShuangpinKeyboard.NineKeys)
-        return KeyboardHarness(ThemePreset.PixelLight, shuangpin).also {
+        return KeyboardHarness(TestThemes.PixelLight, shuangpin).also {
             harness = it
             it.start(type)
             it.relayout()
@@ -469,7 +469,7 @@ class GroupedKeyboardUatTest {
     @Uat("SP-21")
     fun theEighteenAndNineKeysInAnAddressField() {
         prefs.set(AppPrefs.getInstance().keyboard.shuangpinKeyboard, ShuangpinKeyboard.Keys18)
-        harness = KeyboardHarness(ThemePreset.PixelLight, shuangpin)
+        harness = KeyboardHarness(TestThemes.PixelLight, shuangpin)
         for ((type, tail) in listOf(InputType.TYPE_TEXT_VARIATION_URI to ".com", InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS to "@")) {
             h.start(InputType.TYPE_CLASS_TEXT or type)
             h.relayout()
@@ -562,13 +562,13 @@ class GroupedKeyboardUatTest {
         EngineState.syllablesState.value = EngineState.SyllableState()
         h.close()
         // pinyin's nine keys the same symbols
-        harness = KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN, keyboards = KeyboardHarness.NINE_KEYS).also { it.start() }
+        harness = KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN, keyboards = KeyboardHarness.NINE_KEYS).also { it.start() }
         chinesePunctuation(KeyboardHarness.PINYIN, "~" to "～")
         h.relayout()
         assertTrue("～" in h.longPress(h.nineKey("2")))
         h.close()
         // 拼音 on the full keyboard keeps its thin row
-        harness = KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN).also { it.start() }
+        harness = KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).also { it.start() }
         typing(InputMethodCatalog.PINYIN, code = "ni")
         assertEquals(18f, row(), 1f)
     }

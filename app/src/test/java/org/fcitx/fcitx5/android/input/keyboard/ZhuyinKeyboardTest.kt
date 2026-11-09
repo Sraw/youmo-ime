@@ -10,10 +10,10 @@ import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import android.graphics.Rect
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.scene.KeyRef
@@ -44,7 +44,7 @@ class ZhuyinKeyboardTest {
     // KeySwipes.preview), as the key shows it and types it (060-render-p2 S4d H1)
     @Test
     fun aBubbleShowsThePunctuationAsMapped() {
-        val keyboard = ZhuyinKeyboard(RuntimeEnvironment.getApplication(), ThemePreset.PixelLight, nine = true)
+        val keyboard = ZhuyinKeyboard(RuntimeEnvironment.getApplication(), TestThemes.PixelLight, nine = true)
         keyboard.onPunctuationUpdate(mapOf("?" to "？"))
         val shown = ArrayList<PopupAction>()
         keyboard.popupActionListener = PopupActionListener { shown += it }

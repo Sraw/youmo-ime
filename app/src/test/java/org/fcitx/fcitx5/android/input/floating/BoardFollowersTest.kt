@@ -10,7 +10,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import androidx.constraintlayout.widget.ConstraintLayout
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.Assert.assertEquals
@@ -34,7 +34,7 @@ class BoardFollowersTest {
     // the board one-handed at the right, 400 of 1000 wide
     private val board = View(context).apply { id = View.generateViewId() }
 
-    private val strip = FloatingHandle(context, ThemePreset.PixelDark, FloatingHandleSide.Bottom, FloatingHandle.Mode.Docked { x, _, _ -> detached += x })
+    private val strip = FloatingHandle(context, TestThemes.PixelDark, FloatingHandleSide.Bottom, FloatingHandle.Mode.Docked { x, _, _ -> detached += x })
 
     init {
         root.addView(board, ConstraintLayout.LayoutParams(400, 300).apply {

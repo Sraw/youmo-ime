@@ -80,9 +80,9 @@ object CustomThemeSerializer : JsonTransformingSerializer<Theme.Custom>(ThemeFil
                     // `"backgroundImage": null` decodes to JsonNull, not a Kotlin null
                     if ((get("backgroundImage") ?: JsonNull) !is JsonNull) {
                         val popupBkgColor = if (getValue("isDark").jsonPrimitive.boolean) {
-                            ThemePreset.PixelDark.popupBackgroundColor
+                            0xff373737.toInt() // the built-in PixelDark's of then (pixel#dark's)
                         } else {
-                            ThemePreset.PixelLight.popupBackgroundColor
+                            0xffeeeeee.toInt() // PixelLight's
                         }
                         put("popupBackgroundColor", JsonPrimitive(popupBkgColor))
                         put("popupTextColor", getValue("keyTextColor"))

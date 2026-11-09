@@ -10,7 +10,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.preedit.SyllableStrip
@@ -43,7 +43,7 @@ class ShuangpinKeyboardScreenshotTest {
     @Test
     fun theEighteenKeys() {
         setting.setValue(ShuangpinKeyboard.Keys18)
-        KeyboardHarness(ThemePreset.PixelLight, shuangpin).use { h ->
+        KeyboardHarness(TestThemes.PixelLight, shuangpin).use { h ->
             h.start()
             val labels = h.texts()
             for (l in listOf("Q", "WE", "IO", "SD", "L", "XC", "BN", "M", "分词")) assertTrue("$l in $labels", l in labels)
@@ -56,7 +56,7 @@ class ShuangpinKeyboardScreenshotTest {
     @Test
     fun theNineKeys() {
         setting.setValue(ShuangpinKeyboard.NineKeys)
-        KeyboardHarness(ThemePreset.PixelLight, shuangpin).use { h ->
+        KeyboardHarness(TestThemes.PixelLight, shuangpin).use { h ->
             h.start()
             val labels = h.texts()
             for (l in listOf("ABC", "JKL", "WXYZ", "重输", "符", "123")) assertTrue("$l in $labels", l in labels)

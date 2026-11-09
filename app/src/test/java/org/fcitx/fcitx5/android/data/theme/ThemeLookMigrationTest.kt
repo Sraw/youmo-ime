@@ -70,10 +70,10 @@ class ThemeLookMigrationTest {
             putInt("clipboard_entry_radius", 12)
         }
         assertTrue(ThemeLookMigration.legacy(prefs)!!.isDefault)
-        val s = Slots(ThemePreset.PixelLight)
+        val s = Slots(TestThemes.PixelLight)
         assertFalse("nobody told", ThemeLookMigration.settle(prefs, s.slots, s.saved::add))
         assertEquals(emptyList<Theme.Custom>(), s.saved)
-        assertSame(ThemePreset.PixelLight, s.chosen[0])
+        assertSame(TestThemes.PixelLight, s.chosen[0])
         assertTrue(ThemeLookMigration.KEYS.none(prefs::contains))
     }
 
@@ -86,9 +86,9 @@ class ThemeLookMigrationTest {
     @Test
     fun aBuiltInThemeInUseIsCopiedWithTheSettingsOnceAndTheSettingsGo() {
         prefs.edit(commit = true) { putBoolean("key_border", false); putInt("key_radius", 10) }
-        val mine = ThemePreset.PixelDark.deriveCustomNoBackground("mine")
+        val mine = TestThemes.PixelDark.deriveCustomNoBackground("mine")
         // light and dark the same preset: one copy for both
-        val s = Slots(ThemePreset.PixelLight, ThemePreset.PixelLight, mine)
+        val s = Slots(TestThemes.PixelLight, TestThemes.PixelLight, mine)
         assertTrue(ThemeLookMigration.settle(prefs, s.slots, s.saved::add))
         val copy = s.saved.single()
         assertSame(copy, s.chosen[0])
@@ -96,8 +96,8 @@ class ThemeLookMigrationTest {
         assertSame(mine, s.chosen[2])
         assertFalse(copy.look.keys.blocks)
         assertEquals(10, copy.look.keys.radiusDp)
-        assertEquals(ThemePreset.PixelLight.look.palette, copy.look.palette)
-        assertEquals(ThemePreset.PixelLight.isDark, copy.isDark)
+        assertEquals(TestThemes.PixelLight.look.palette, copy.look.palette)
+        assertEquals(TestThemes.PixelLight.isDark, copy.isDark)
         assertTrue(ThemeLookMigration.KEYS.none(prefs::contains))
         // again: nothing to do, nobody told
         assertFalse(ThemeLookMigration.settle(prefs, s.slots, s.saved::add))
@@ -107,22 +107,22 @@ class ThemeLookMigrationTest {
     @Test
     fun defaultSettingsCopyNothingButAreRemoved() {
         prefs.edit(commit = true) { putBoolean("key_border", true); putInt("text_editing_button_radius", 4) }
-        val s = Slots(ThemePreset.PixelLight)
+        val s = Slots(TestThemes.PixelLight)
         assertFalse(ThemeLookMigration.settle(prefs, s.slots, s.saved::add))
         assertEquals(emptyList<Theme.Custom>(), s.saved)
-        assertSame(ThemePreset.PixelLight, s.chosen[0])
+        assertSame(TestThemes.PixelLight, s.chosen[0])
         assertTrue(ThemeLookMigration.KEYS.none(prefs::contains))
     }
 
     @Test
     fun aCopyNotSavedKeepsTheSettingsForTheNextStart() {
         prefs.edit(commit = true) { putInt("key_radius", 0) }
-        val s = Slots(ThemePreset.PixelLight, ThemePreset.PixelDark)
+        val s = Slots(TestThemes.PixelLight, TestThemes.PixelDark)
         // the disk full for the second copy: the first in its slot, the second slot as it was
         var saves = 0
         assertFalse(ThemeLookMigration.settle(prefs, s.slots) { saves++ == 0 })
         assertTrue(s.chosen[0] is Theme.Custom)
-        assertSame(ThemePreset.PixelDark, s.chosen[1])
+        assertSame(TestThemes.PixelDark, s.chosen[1])
         assertTrue(prefs.contains("key_radius"))
         // the next start: the copy is the user's now, the other copied
         assertTrue(ThemeLookMigration.settle(prefs, s.slots, s.saved::add))
@@ -134,12 +134,12 @@ class ThemeLookMigrationTest {
     @Test
     fun aBuiltInThemeNotSavedIsTriedOnceAStartThoughInTwoSlots() {
         prefs.edit(commit = true) { putInt("key_radius", 0) }
-        val s = Slots(ThemePreset.PixelLight, ThemePreset.PixelLight)
+        val s = Slots(TestThemes.PixelLight, TestThemes.PixelLight)
         var saves = 0
         assertFalse(ThemeLookMigration.settle(prefs, s.slots) { saves++; false })
         assertEquals(1, saves)
-        assertSame(ThemePreset.PixelLight, s.chosen[0])
-        assertSame(ThemePreset.PixelLight, s.chosen[1])
+        assertSame(TestThemes.PixelLight, s.chosen[0])
+        assertSame(TestThemes.PixelLight, s.chosen[1])
         assertTrue(prefs.contains("key_radius"))
     }
 
@@ -147,7 +147,7 @@ class ThemeLookMigrationTest {
     fun aMonetThemeInUseIsNotCopiedButKeepsTheSettingsForItsKeys() {
         ThemeLookMigration.monetLook = null
         prefs.edit(commit = true) { putBoolean("key_border", false); putBoolean("key_ripple_effect", true) }
-        val monet = ThemeMonet.getLight()
+        val monet = TestThemes.MonetLight
         val s = Slots(monet)
         assertTrue(ThemeLookMigration.settle(prefs, s.slots, s.saved::add))
         assertSame(monet, s.chosen[0])
@@ -156,7 +156,7 @@ class ThemeLookMigrationTest {
         assertEquals(kept, ThemeLookMigration.monet(prefs))
         assertEquals(kept, ThemeLookMigration.monetLook)
         // a Monet theme made now draws its keys so, its colours the wallpaper's still
-        val drawn = ThemeMonet.getLight().look
+        val drawn = TestThemes.MonetLight.look
         assertFalse(drawn.keys.blocks)
         assertEquals(monet.look.palette, drawn.palette)
         assertTrue(ThemeLookMigration.KEYS.none(prefs::contains))

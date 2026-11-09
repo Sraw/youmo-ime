@@ -122,6 +122,9 @@
     <string name="follow_system_day_night_theme_summary">覆盖手动主题选择</string>
     <string name="light_mode_theme">亮色模式主题</string>
     <string name="dark_mode_theme">暗色模式主题</string>
+    <string name="theme_version_light">浅</string>
+    <string name="theme_version_dark">深</string>
+    <string name="theme_version_switch">切换浅色、深色版本</string>
     <string name="new_theme">新增主题</string>
     <string name="skip">跳过</string>
     <string name="theme_migrated">主题已迁移到当前版本</string>

@@ -255,7 +255,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     val lightModeTheme = themePreference(
         R.string.light_mode_theme,
         "light_mode_theme",
-        if (BuildConfig.DEBUG) ThemePreset.MaterialLight else ThemePreset.PixelLight,
+        ThemeManager.builtin(if (BuildConfig.DEBUG) "material#light" else "pixel#light"),
         enableUiOn = {
             followSystemDayNightTheme.getValue()
         })
@@ -263,10 +263,28 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     val darkModeTheme = themePreference(
         R.string.dark_mode_theme,
         "dark_mode_theme",
-        if (BuildConfig.DEBUG) ThemePreset.MaterialDark else ThemePreset.PixelDark,
+        ThemeManager.builtin(if (BuildConfig.DEBUG) "material#dark" else "pixel#dark"),
         enableUiOn = {
             followSystemDayNightTheme.getValue()
         })
+
+    /**
+     * 060-render-p3 T3: a slot ([normalModeTheme], [lightModeTheme], [darkModeTheme]) naming a built-in theme
+     * by its 0.5 name (`PixelDark`, `MonetLight`) names it as it is now (`pixel#dark`, `monet#light`,
+     * [BuiltinThemeFiles.LEGACY]): what each showed it shows. One naming a theme of the user's
+     * ([customs]) is left, which it was before as well (the user's first). Run at every start, no mark:
+     * no old name is written any more (an import of one is refused), so a backup of an older version
+     * brought back, and the copy for before the first unlock (written by an older version, read with
+     * this one's), are moved as they are read. A name of no theme (one deleted) is left: the default.
+     */
+    fun migrateThemeRefs(customs: Set<String>) {
+        val moved = listOf(normalModeTheme.key, lightModeTheme.key, darkModeTheme.key).mapNotNull { key ->
+            // a value not a string (a damaged file) is no name: left, read as the default
+            val name = runCatching { sharedPreferences.getString(key, null) }.getOrNull() ?: return@mapNotNull null
+            BuiltinThemeFiles.LEGACY[name]?.takeIf { name !in customs }?.let { key to it }
+        }
+        if (moved.isNotEmpty()) sharedPreferences.edit { moved.forEach { (key, ref) -> putString(key, ref) } }
+    }
 
     val dayNightModePrefNames = setOf(
         followSystemDayNightTheme.key,

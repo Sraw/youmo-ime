@@ -11,7 +11,7 @@ import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.scene.SceneGroups
@@ -124,12 +124,12 @@ class GroupedKeyboard18Test {
     @Test
     @Uat("SP-21")
     fun theSpaceIsAtLeast15PercentOfTheRowInEveryField() {
-        assertSpaceAtLeast15Percent(GroupedKeyboard(context, ThemePreset.PixelDark, NineKeyLetters.G18))
+        assertSpaceAtLeast15Percent(GroupedKeyboard(context, TestThemes.PixelDark, NineKeyLetters.G18))
     }
 
     @Test
     fun theKeyboardHasItsBottomRowAndTalkBackReadsEachGroup() {
-        val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark, NineKeyLetters.G18).laidOut()
+        val keyboard = GroupedKeyboard(context, TestThemes.PixelDark, NineKeyLetters.G18).laidOut()
         listOf(R.id.button_lang, R.id.button_space, R.id.button_return, R.id.button_comma, R.id.button_backspace).forEach {
             assertTrue(keyboard.resources.getResourceEntryName(it), keyboard.shownKeyWithId(it) != null)
         }

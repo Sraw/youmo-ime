@@ -12,9 +12,9 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.floating.FloatingHandleSide
@@ -130,7 +130,7 @@ class FloatingUatTest {
         assertTrue("rounded by default", cornerRadius(h) > 0f)
         h.close()
         // a theme of square keys (the edit page's 直角)
-        val light = ThemePreset.PixelLight.look
+        val light = TestThemes.PixelLight.look
         val square = KeyboardHarness(Theme.Custom("square", false, light.copy(keys = light.keys.copy(radiusDp = 0))))
         try {
             square.start()
