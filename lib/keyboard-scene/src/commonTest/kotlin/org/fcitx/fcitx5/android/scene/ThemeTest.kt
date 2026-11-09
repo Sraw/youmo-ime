@@ -509,4 +509,39 @@ class ThemeTest {
         assertTrue(!ThemeReader.newer("0.6.0", ""))
         assertTrue(!ThemeReader.newer("1.0.0", "0.6.0.1"))
     }
+
+    @Test
+    fun aDarkVersionWithoutDarkColoursTakesTheDarkRoles() {
+        val sys = SystemColors(mapOf("primary" to Argb(0xFF0000AA.toInt())), mapOf("primary" to Argb(0xFF0000DD.toInt())))
+        val s = source.replace(root, "variants=\"light dark\"")
+            .replace("<color name=\"key\" value=\"#fbfbfc\"/>", "<color name=\"key\" value=\"system(primary, #fbfbfc)\"/>")
+        val t = ThemeReader.theme(s, systemColors = sys).getOr { error("$it") }
+        assertEquals(Argb(0xFF0000AA.toInt()), t.colors["key"])
+        assertEquals(Argb(0xFF0000DD.toInt()), t.variant(dark = true).colors["key"])
+        assertEquals(Argb(0xFF0000AA.toInt()), t.variant(dark = true).variant(dark = false).colors["key"])
+        // a light theme has none
+        assertNull(ThemeReader.theme(source).getOr { error("$it") }.darkColors)
+    }
+
+    @Test
+    fun picturesAndPreviewsAreStrict() {
+        val picture = "<picture src=\"bg.png\" animated=\"1\"><cut orientation=\"portrait\" file=\"p.png\"/></picture>"
+        assertTrue(problems(source.replace("</colors>", "</colors>\n$picture")).single().contains("animated=\"1\""))
+        // a no-break space first: a white space on JS's \s, not the JVM's; refused on both
+        val nbsp = " bg.png"
+        assertTrue(problems(source.replace("</colors>", "</colors>\n" + picture.replace("animated=\"1\" ", "").replace("bg.png", nbsp))).isNotEmpty())
+        val meta = "<meta preview=\"${nbsp}\"/>".replace("bg.png", "p.png")
+        assertTrue(problems(source.replace("  <colors>", "$meta\n  <colors>")).single().contains("preview="))
+    }
+
+    @Test
+    fun problemsAreKeyedByColourAndTable() {
+        // two colours on one line, both naming @nothing: two problems
+        val oneLine = source.replace("<color name=\"key\" value=\"#fbfbfc\"/>", "<color name=\"key\" value=\"@nothing\"/><color name=\"x1\" value=\"@nothing\"/>")
+        assertEquals(2, problems(oneLine).count { it == "@nothing is no colour" }, "${problems(oneLine)}")
+        // the dark set overriding a colour with the light one's very problem: reported for each
+        val both = oneLine.replace(root, "variants=\"light dark\"")
+            .replace("</colors>", "</colors>\n<colors variant=\"dark\"><color name=\"key\" value=\"@nothing\"/></colors>")
+        assertEquals(listOf("@nothing is no colour", "@nothing is no colour", "@nothing is no colour in the dark colours"), problems(both).filter { "@nothing" in it })
+    }
 }

@@ -23,7 +23,10 @@ class Theme(
     val variants: Set<Boolean> = setOf(dark),
     /** `<colors>` resolved: the light version's, or the only one's. */
     val baseColors: Map<String, Argb> = colors,
-    /** The dark version's colours where `<colors variant="dark">` gave some (each one it did not give, [baseColors]'). */
+    /**
+     * The dark version's colours where it has one: `<colors>` with what `<colors variant="dark">` gives
+     * instead, resolved again with the dark `system()` roles; null where it has no dark version.
+     */
     val darkColors: Map<String, Argb>? = null,
     val meta: Meta? = null,
     /** The system's colours it was read with: a style's `system()` takes [dark]'s. */

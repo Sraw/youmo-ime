@@ -25,7 +25,7 @@ object ThemeReader {
     private val VERSION = Regex("4\\.[0-9]+")
     private val VAR_NAME = Regex("[a-zA-Z][a-zA-Z0-9_-]{0,31}")
     // ASCII white space spelt out: `\s` is more on JS than on the JVM, and a file must read the same on both
-    private val FILE = Regex("[^/\\\\:*?\"<>| \\t\\n\\r\\f\\x0B][^/\\\\:*?\"<>|]{0,127}")
+    private val FILE = Regex("[^/\\\\:*?\"<>| \\t\\n\\r\\f\\x0B\\u00A0][^/\\\\:*?\"<>|]{0,127}")
     private val ICON = Regex("[a-z0-9]+(-[a-z0-9]+)*")
 
     /** The colours the app's own widgets take by name (theme 3.0's, less their Color suffix). */
@@ -111,12 +111,13 @@ object ThemeReader {
         if (darkEls.size > 1) p.add(darkEls[1].line, "<colors variant=\"dark\"> given twice")
         if (darkEls.isNotEmpty() && true !in variants) p.add(darkEls[0].line, "<colors variant=\"dark\"> in a theme with no dark variant")
         val baseRaw = baseEls.firstOrNull()?.let { rawColors(it, p, required = true) }.orEmpty()
-        val reported = HashSet<Pair<String, String>>()
-        val colors = resolved(baseRaw, p, system.of(variants == setOf(true)), reported, "")
-        val darkColors = darkEls.firstOrNull()?.let { el ->
-            val over = rawColors(el, p, required = false)
+        val reported = HashSet<Triple<Boolean, String, String>>()
+        val colors = resolved(baseRaw, p, system.of(variants == setOf(true)), reported, null)
+        // the dark version's whenever there is one: its system() colours are the dark roles, a <colors variant="dark"> or not
+        val darkColors = if (true !in variants) null else {
+            val over = darkEls.firstOrNull()?.let { rawColors(it, p, required = false) }.orEmpty()
             over.filterKeys { it !in baseRaw }.forEach { (k, v) -> p.add(v.second, "the colour $k is not in the light <colors>") }
-            resolved(baseRaw + over, p, system.dark, reported, " in the dark colours")
+            resolved(baseRaw + over, p, system.dark, reported, over.keys)
         }
         return colors to darkColors
     }
@@ -141,7 +142,7 @@ object ThemeReader {
     private const val MAX_META = 64
     private const val THREE = 3
     private val APP_VERSION = Regex("[0-9]{1,4}\\.[0-9]{1,4}\\.[0-9]{1,4}")
-    private val PREVIEW = Regex("[^/\\\\:*?\"<>| \\t\\n\\r\\f\\x0B][^/\\\\:*?\"<>|]{0,122}\\.(png|webp)")
+    private val PREVIEW = Regex("[^/\\\\:*?\"<>| \\t\\n\\r\\f\\x0B\\u00A0][^/\\\\:*?\"<>|]{0,122}\\.(png|webp)")
 
     private fun meta(el: XmlElement, p: Problems, appVersion: String?): Meta {
         val a = Attributes(el, p)
@@ -198,18 +199,19 @@ object ThemeReader {
     }
 
     // every colour variable resolved, those that name what is not there or themselves left out (and a
-    // problem, [where] the table says which; each colour's once in [reported]: the dark colours resolve
-    // the light ones they do not give again)
+    // problem; each once in [reported] by its table, colour and message: the dark colours resolve the
+    // light ones they do not give again, [dark] those they give, said to be the dark colours')
     private fun resolved(
         raw: Map<String, Pair<ColorExpr, Int>>,
         p: Problems,
         system: Map<String, Argb>,
-        reported: MutableSet<Pair<String, String>>,
-        where: String,
+        reported: MutableSet<Triple<Boolean, String, String>>,
+        dark: Set<String>?,
     ): Map<String, Argb> {
         val done = HashMap<String, Argb>()
+        val where = if (dark != null) " in the dark colours" else ""
         fun problem(colour: String, line: Int, message: String) {
-            if (reported.add(colour to message)) p.add(line, message + where)
+            if (reported.add(Triple(dark?.contains(colour) == true, colour, message))) p.add(line, message + where)
         }
         fun resolve(name: String, seen: Set<String>): Argb? {
             done[name]?.let { return it }
