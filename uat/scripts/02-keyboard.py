@@ -152,7 +152,7 @@ case("KB-39", needs="jvm:KeyboardUatTest.shiftChangesAllThreeRows")(lambda d: No
 case("KB-41", needs="jvm:KeyboardUatTest.aFirstMoveSidewaysAfterSlippingOffKeepsThePopup")(lambda d: None)
 
 
-case("KB-42", needs="jvm:StrokeUatTest.aStrokeDrawnWhilePinyinIsTypedIsSentAsOneTheKeysNone、StrokeUatTest.theNineAndFourteenKeysSendAStrokeToo")(lambda d: None)
+case("KB-42", needs="jvm:StrokeUatTest.aStrokeDrawnWhilePinyinIsTypedIsSentAsOneTheKeysNone、StrokeUatTest.theNineAndFourteenKeysSendAStrokeToo、StrokeUatTest.aStrokeStartsInTheSplitGapTooATapOrAGlideThereDoNothing、StrokeUatTest.aSecondFingerOnALetterWhileOneRestsInTheGapTypesIt、StrokeUatTest.aStrokeFromTheGapCancelledSendsNothingAndLeavesNoTrail、StrokeUatTest.noOtherLayoutHasAGap、StrokeUatTest.theSweepFindsTheSplitGap")(lambda d: None)
 
 
 case("KB-43", needs="jvm:StrokeUatTest.withNothingTypedGlideChosenOrEnglishNoStrokeIsSent")(lambda d: None)

@@ -234,9 +234,9 @@
 
 ### KB-42 [P1] 打着拼音时在键上画一笔：发出这一笔，不打字母
 - **前提**：笔画开。
-- **操作**：打 hao；从 w 往右划过三个键抬起（横）；从 t 往下划两行（竖）；从 o 往左下划（撇）；从 e 往右下划（点）；从 e 往右划再往下拐（折）；再从 x 往上划两行；接着从 x（最下一行）往下划半个键、在 e 上往右下短短点一下、在 a 上往右划半个键；再点一下 q。然后在 **输入法 → 拼音** 里把 **键盘** 选成「14 键」，打 hao，从 GH 往下划两行；再把键盘选成「九键」，点 9 2 6 4，从 2 往右下划。
-- **预期**：划的时候画出手指走过的线，抬手后编码行末尾依次多出 一 丨 丿 丶 乛，候选跟着筛，没有打出字母，也没有滑行出词。往上划不算一笔，编码行不变。短的那三下也各是一笔（竖、点、横），不打出角标；点一下 q 照常打出 q。14 键、九键上一样能画（14 键上竖、九键上点）。
-- **JVM**：`StrokeUatTest.aStrokeDrawnWhilePinyinIsTypedIsSentAsOneTheKeysNone`（26 键短的、长的五种笔画都只发笔画键，没有滑行，向上不发，点按照旧；门槛见 `GlideGestureTest`）、`StrokeUatTest.theNineAndFourteenKeysSendAStrokeToo`（拼音九键、14 键、18 键和双拼九键各发一笔，不发别的键）；筛候选见 `StrokeFilterUatTest`；设备上不跑。
+- **操作**：打 hao；从 w 往右划过三个键抬起（横）；从 t 往下划两行（竖）；从 o 往左下划（撇）；从 e 往右下划（点）；从 e 往右划再往下拐（折）；再从 x 往上划两行；接着从 x（最下一行）往下划半个键、在 e 上往右下短短点一下、在 a 上往右划半个键；再点一下 q。然后在 **输入法 → 拼音** 里把 **键盘** 选成「14 键」，打 hao，从 GH 往下划两行；再把键盘选成「九键」，点 9 2 6 4，从 2 往右下划。最后键盘换回全键盘，横过手机（分体），打 hao，从 T 和 Y 中间的空白处往下划两行，再在空白处点一下。
+- **预期**：划的时候画出手指走过的线，抬手后编码行末尾依次多出 一 丨 丿 丶 乛，候选跟着筛，没有打出字母，也没有滑行出词。往上划不算一笔，编码行不变。短的那三下也各是一笔（竖、点、横），不打出角标；点一下 q 照常打出 q。14 键、九键上一样能画（14 键上竖、九键上点）。分体时从中间空白处起笔也是一笔（竖），点一下空白处什么也不发生。
+- **JVM**：`StrokeUatTest.aStrokeDrawnWhilePinyinIsTypedIsSentAsOneTheKeysNone`（26 键短的、长的五种笔画都只发笔画键，没有滑行，向上不发，点按照旧；门槛见 `GlideGestureTest`）、`StrokeUatTest.theNineAndFourteenKeysSendAStrokeToo`（拼音九键、14 键、18 键和双拼九键各发一笔，不发别的键）、`StrokeUatTest.aStrokeStartsInTheSplitGapTooATapOrAGlideThereDoNothing`（横屏分体，从中间空白起笔发一笔，点空白不发键，开滑行输入时从空白划不滑行；空白怎么认见 `SplitGapTest`）、`aSecondFingerOnALetterWhileOneRestsInTheGapTypesIt`（一指停在空白、另一指点字母照常打字母）、`aStrokeFromTheGapCancelledSendsNothingAndLeavesNoTrail`（划到一半被取消不发、线消失）、`noOtherLayoutHasAGap` 和 `theSweepFindsTheSplitGap`（不分体的全键盘、单手、14 键、18 键、九键、注音都没有空白，分体的有）；筛候选见 `StrokeFilterUatTest`；设备上不跑。
 
 ### KB-43 [P1] 没打字、开着滑行输入、快速输入、英文和码表里划，都不是笔画
 - **前提**：笔画开。

@@ -54,14 +54,17 @@ class GlideTouch(private val downKeys: Float = GlideGesture.DOWN) {
     /**
      * The first finger down, [pointerId] at [x], [y] at [time]: it may glide if [onLetter] (a glide
      * taken now, and on a letter), keys [keyWidth] by [keyHeight]; a [stroke] drawn if so (GlideGesture's).
+     * A stroke may start [inGap] too, between a split keyboard's halves ([SplitGap]): no key is there to
+     * tap, and a stroke's shape needs no key under it; a glide's path is read from the letters it starts on, so it starts on one.
      */
     fun down(
         pointerId: Int, x: Float, y: Float, time: Long, onLetter: Boolean, keyWidth: Float, keyHeight: Float, longPressMillis: Long,
-        stroke: Boolean = false,
+        stroke: Boolean = false, inGap: Boolean = false,
     ) {
         reset()
         glided = null
-        if (!onLetter || keyWidth <= 0f || keyHeight <= 0f) return
+        val starts = onLetter || stroke && inGap
+        if (!starts || keyWidth <= 0f || keyHeight <= 0f) return
         val same = made != null && keyWidth == this.keyWidth && keyHeight == this.keyHeight && longPressMillis == this.longPressMillis &&
             stroke == this.stroke
         if (!same) made = GlideGesture(keyWidth, keyHeight, longPressMillis, downKeys, stroke)

@@ -311,7 +311,11 @@ a glide (`STROKE`, 0.3 of a key any way, keys counted as wide and tall, before t
 竖 from the bottom row or a short 点 must be one before the key's swipe (36dp) is, so while pinyin
 is typed a key's swipe is a stroke; on the lift the path, in key widths both ways, is read by `StrokeShape` (ime-core) and
 sent as the engine's stroke key, `KeyAction.SymAction` of `Keyboard.strokeKey`; a shape it reads
-as none (up, up to the left) is dropped.
+as none (up, up to the left) is dropped. A stroke may also start between a split keyboard's halves
+(`SplitGap`, ime-core: in a row of letters, room between two of them at least half a key wide, found
+from where the letters are, so only the 26 keys split have it), passed to `GlideTouch.down` as
+`inGap`, and `GlideInput` keeps that down though no key takes it (else its moves would go nowhere);
+a tap there still does nothing, and a glide starts on a letter only.
 
 The 060 redraw (`input/keyboard/canvas/`; the only drawing since 060-render-p2 S8a, which deleted the
 key views and the 开发者 → 新绘制键盘 switch, its stored key retired): `TextKeyboard` (qwerty.xml) and, since 060-render-p2 S4a, `GroupedKeyboard` (the 14
