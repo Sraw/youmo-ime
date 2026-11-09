@@ -22,6 +22,9 @@
   let scene = null;
   let pressed = null;
   let assets = { key: null, images: {}, fonts: {}, cuts: {} };
+  let loading = 0; // which loadAssets is the latest: an older one finishing late is dropped
+  let edited = false; // the draft is kept only once the user has changed something
+  let keeping = null;
   const store = (() => { try { return M.idbStore(window.indexedDB); } catch (e) { return null; } })();
 
   function toast(text) {
@@ -37,7 +40,15 @@
   function set(d, { fresh = false } = {}) {
     if (fresh || !history) history = new M.History(d);
     else if (!history.push(d)) return;
+    else edited = true;
     changed();
+  }
+
+  // the draft written a moment after the last change, not on every key
+  function keep() {
+    if (!store || !edited || !history) return;
+    clearTimeout(keeping);
+    keeping = setTimeout(() => M.keepDraft(store, history.current, env), 500);
   }
 
   function changed() {
@@ -46,19 +57,24 @@
     $('name').textContent = M.themeName(d.xml) || '（无名）';
     $('undo').disabled = !history.canUndo;
     $('redo').disabled = !history.canRedo;
-    if (store) M.keepDraft(store, d, env);
-    loadAssets(d).then(preview);
+    keep();
+    loadAssets(d).then((current) => { if (current) preview(); });
   }
 
   // the theme's files as the painter takes them: its images decoded, its fonts loaded under a family of their own
+  // an image is decoded only where its header says the app would take it: a pack's bytes are not trusted, and a
+  // decode past the browser's memory takes the tab down (a draft restored would do it again each time)
   async function loadAssets(d) {
-    if (assets.key === d.files) return;
+    if (assets.key === d.files) return true;
+    const mine = ++loading;
     const images = {};
     const fonts = {};
     const cuts = {};
+    const safe = new Set(M.decodableImages(L, FORMAT, d.files));
     for (const [name, bytes] of Object.entries(d.files)) {
       try {
         if (IMAGE.test(name)) {
+          if (!safe.has(name)) continue;
           const bmp = await createImageBitmap(new Blob([bytes]));
           images[name] = { image: bmp, width: bmp.width, height: bmp.height };
           cuts[name] = bmp;
@@ -75,7 +91,13 @@
         // a file the browser cannot decode: the engine draws without it, as the app would refuse it on import
       }
     }
+    if (mine !== loading) {
+      for (const b of Object.values(cuts)) b.close();
+      return false;
+    }
+    for (const b of Object.values(assets.cuts)) if (!Object.values(cuts).includes(b)) b.close();
     assets = { key: d.files, images, fonts, cuts };
+    return true;
   }
 
   // the <font name=… src=…> of the theme, by the CSS family its file was loaded under
@@ -182,20 +204,47 @@
     }
   }
 
+  // the picture drawn at [w]×[h] and encoded: JPEG, or PNG where any pixel is see-through
+  async function encodePicture(bytes, w, h, quality) {
+    const bmp = await createImageBitmap(new Blob([bytes]));
+    try {
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      const g = c.getContext('2d');
+      g.drawImage(bmp, 0, 0, w, h);
+      const px = g.getImageData(0, 0, w, h).data;
+      let alpha = false;
+      for (let i = 3; i < px.length && !alpha; i += 4) alpha = px[i] < 255;
+      const type = alpha ? 'png' : 'jpg';
+      const blob = await new Promise((ok) => c.toBlob(ok, alpha ? 'image/png' : 'image/jpeg', quality));
+      return { bytes: new Uint8Array(await blob.arrayBuffer()), type };
+    } finally {
+      bmp.close();
+    }
+  }
+
   async function fromImage() {
     const f = await pick($('image-input'));
     if (!f) return;
-    const type = /png/.test(f.type) ? 'png' : /webp/.test(f.type) ? 'webp' : 'jpeg';
-    const base = M.fromBuiltin(E, $('builtins').dataset.chosen || 'material');
-    set(M.withPicture(base, new Uint8Array(await f.arrayBuffer()), type));
-    $('new-panel').close();
-    toast('图片已做键盘背景；配色可在源码里改');
+    const chosen = document.querySelector('input[name="image-base"]:checked');
+    try {
+      const made = await M.pictureFile(L, FORMAT, new Uint8Array(await f.arrayBuffer()), encodePicture);
+      set(M.withPicture(M.fromBuiltin(E, chosen ? chosen.value : 'material'), made.bytes, made.type));
+      $('new-panel').close();
+      toast('图片已做键盘背景；配色可在源码里改');
+    } catch (e) {
+      toast(e && e.code === 'limit' ? '图片太大，打不开' : '这张图片用不了（只认 PNG、JPEG、WebP）');
+    }
   }
 
   function save() {
+    if (!history) return;
     const d = history.current;
     const bad = M.check(E, d, env.board, M.envJson(env), null).problems.filter((p) => p.level === 'error');
     if (bad.length) { toast('有 ' + bad.length + ' 个错误，App 导入不了，先改好'); return; }
+    const refused = M.saveProblems(L, FORMAT, d);
+    if (refused.length) { toast('App 会拒绝导入：' + refused.map((p) => p.message).join('；')); return; }
     const { name, bytes } = M.save(L, d);
     const a = document.createElement('a');
     // octet-stream, as the app exports it: a browser adds no .zip to a name it takes for a zip (specs/app.md)
@@ -227,6 +276,7 @@
     if (e && e.target === $('env-device')) {
       const dev = M.DEVICES.find((x) => x.id === $('env-device').value);
       if (dev) Object.assign(env, { device: dev.id, w: dev.w, h: dev.h, density: dev.density });
+      else env.device = 'custom';
     } else {
       const num = (id, v) => (Number.isFinite(+$(id).value) && +$(id).value > 0 ? +$(id).value : v);
       Object.assign(env, { w: num('env-w', env.w), h: num('env-h', env.h), density: num('env-density', env.density) });
@@ -234,8 +284,8 @@
     }
     Object.assign(env, { landscape: $('env-landscape').checked, board: $('env-board').value, form: $('env-form-kind').value, shift: $('env-shift').value });
     fillEnvForm();
-    if (store) M.keepDraft(store, history.current, env);
-    preview();
+    keep();
+    if (history) preview();
   }
 
   // ---- start ----
@@ -250,13 +300,23 @@
     $('env').addEventListener('click', () => $('env-panel').showModal());
     $('dark').addEventListener('click', () => { env.dark = !env.dark; readEnvForm(); });
 
+    // the picture's colours: a radio group, so a touch picks one (a button's focus is no choice on a phone)
+    for (const id of E.themes()) {
+      const label = document.createElement('label');
+      const r = document.createElement('input');
+      r.type = 'radio';
+      r.name = 'image-base';
+      r.value = id;
+      r.checked = id === 'material';
+      label.append(r, ' ' + (THEME_LABEL[id] || id));
+      $('image-base').append(label);
+    }
     const cards = $('builtins');
     for (const id of E.themes()) {
       const b = document.createElement('button');
       b.type = 'button';
       b.textContent = THEME_LABEL[id] || id;
       b.addEventListener('click', () => { set(M.fromBuiltin(E, id)); $('new-panel').close(); });
-      b.addEventListener('focus', () => { cards.dataset.chosen = id; });
       cards.append(b);
     }
     $('from-image').addEventListener('click', fromImage);
@@ -270,8 +330,8 @@
       else if (act === 'open') openFile();
       else if (act === 'save') save();
     });
-    $('undo').addEventListener('click', () => { history.undo(); changed(); });
-    $('redo').addEventListener('click', () => { history.redo(); changed(); });
+    $('undo').addEventListener('click', () => { if (history && history.canUndo) { history.undo(); edited = true; changed(); } });
+    $('redo').addEventListener('click', () => { if (history && history.canRedo) { history.redo(); edited = true; changed(); } });
     document.addEventListener('keydown', (e) => {
       if (!(e.ctrlKey || e.metaKey) || e.target === $('source')) return;
       if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); $('undo').click(); }
@@ -281,7 +341,7 @@
     let typing = null;
     $('source').addEventListener('input', () => {
       clearTimeout(typing);
-      typing = setTimeout(() => set(M.doc($('source').value, history.current.files, history.current.layouts)), 400);
+      typing = setTimeout(() => { if (history) set(M.doc($('source').value, history.current.files, history.current.layouts)); }, 400);
     });
 
     // a key tapped is the key picked (the editing's 按键 goes to it, M2); held, it shows pressed
@@ -293,11 +353,12 @@
       return k >= 0 ? scene.json().keys[k].id : null;
     };
     canvas.addEventListener('pointerdown', (e) => {
+      if (!history) return;
       pressed = keyAt(e);
       $('picked').textContent = pressed ? '选中的键：' + pressed : '';
       preview();
     });
-    const up = () => { if (pressed) { pressed = null; preview(); } };
+    const up = () => { if (pressed && history) { pressed = null; preview(); } };
     canvas.addEventListener('pointerup', up);
     canvas.addEventListener('pointerleave', up);
   }
@@ -316,15 +377,25 @@
     const kept = store ? await M.draft(store) : null;
     if (kept) {
       $('restore-text').textContent = '上次的草稿「' + (M.themeName(kept.doc.xml) || '无名') + '」（' + new Date(kept.at).toLocaleString() + '）还在，恢复吗？';
+      // Esc or back keeps the draft: only 恢复 or an explicit 丢弃 answers
+      $('restore-panel').addEventListener('cancel', (e) => e.preventDefault());
+      $('restore-panel').returnValue = '';
       $('restore-panel').showModal();
       const answer = await new Promise((ok) => $('restore-panel').addEventListener('close', () => ok($('restore-panel').returnValue), { once: true }));
       if (answer === 'restore') {
-        if (kept.env) env = Object.assign({}, M.ENV, kept.env);
-        fillEnvForm();
-        set(kept.doc, { fresh: true });
-        return;
-      }
-      await M.dropDraft(store);
+        try {
+          if (kept.env) env = Object.assign({}, M.ENV, kept.env);
+          fillEnvForm();
+          set(kept.doc, { fresh: true });
+          await loadAssets(kept.doc);
+          preview();
+          return;
+        } catch (e) {
+          history = null;
+          env = Object.assign({}, M.ENV);
+          if (confirm('草稿打不开（' + (e.message || e) + '），丢弃它吗？')) await M.dropDraft(store);
+        }
+      } else if (answer === 'discard') await M.dropDraft(store);
     }
     fillEnvForm();
     set(M.fromBuiltin(E, 'material'), { fresh: true });

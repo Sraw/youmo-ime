@@ -75,7 +75,7 @@ test('a bare theme.xml opens; a zip past the limits or not a theme is refused', 
 });
 
 test('a picture made the keyboard\'s: the file in the pack, the engine draws it', () => {
-  const d = M.withPicture(M.fromBuiltin(E, 'material'), new Uint8Array([9]), 'jpeg');
+  const d = M.withPicture(M.fromBuiltin(E, 'material'), new Uint8Array([9]), 'jpg');
   assert.ok('picture.jpg' in d.files);
   const r = E.readTheme(d.xml, null, null);
   assert.ok(r.ok, JSON.stringify(r.problems));
@@ -83,7 +83,96 @@ test('a picture made the keyboard\'s: the file in the pack, the engine draws it'
   // a second picture replaces the first
   const twice = M.withPicture(d, new Uint8Array([8]), 'png');
   assert.equal(twice.xml.match(/<picture\b/g).length, 1);
+  assert.equal(twice.xml.match(/fill="picture"/g).length, 1, 'the keyboard style not added twice');
+  assert.ok(!('picture.jpg' in twice.files), 'the old picture file goes with it');
   assert.ok(E.readTheme(twice.xml, null, null).ok);
+  // a self-closing picture and one inside a comment
+  const odd = M.doc(d.xml.replace(/<picture\b[\s\S]*?<\/picture>/, '<!-- <picture src="c.png"/> --><picture src="old.png"/>'), { 'old.png': new Uint8Array([1]) });
+  const fixed = M.withPicture(odd, new Uint8Array([8]), 'png');
+  assert.ok(!('old.png' in fixed.files));
+  assert.match(fixed.xml, /<!-- <picture src="c.png"\/> -->/);
+  assert.equal(fixed.xml.replace(/<!--[\s\S]*?-->/g, '').match(/<picture\b/g).length, 1);
+});
+
+// a PNG [w]×[h] by its header alone (what the page's checks read), [alpha] its colour type
+function pngHeader(w, h) {
+  const b = new Uint8Array(33);
+  b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
+  new DataView(b.buffer).setUint32(16, w);
+  new DataView(b.buffer).setUint32(20, h);
+  return b;
+}
+function jpegHeader(w, h) {
+  return new Uint8Array([0xff, 0xd8, 0xff, 0xc0, 0, 17, 8, h >> 8, h & 255, w >> 8, w & 255, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xd9]);
+}
+
+test('a picture picked is always encoded anew, its long side at most PICTURE_SAVE.longSide; one not an image is refused', async () => {
+  assert.deepEqual(M.PICTURE_SAVE, { longSide: 2560, quality: 0.85 });
+  const asked = [];
+  const encode = async (b, w, h, q) => { asked.push([w, h, q]); return { bytes: jpegHeader(w, h), type: 'jpg' }; };
+  const big = await M.pictureFile(L, FORMAT, jpegHeader(4608, 3456), encode);
+  assert.deepEqual(asked.pop(), [2560, 1920, 0.85]);
+  assert.equal(big.type, 'jpg');
+  // within the side: encoded all the same, never made bigger
+  await M.pictureFile(L, FORMAT, pngHeader(800, 600), encode);
+  assert.deepEqual(asked.pop(), [800, 600, 0.85]);
+  for (const bad of [new Uint8Array([1, 2, 3]), enc('<svg/>'), new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 1, 0, 1, 0])]) {
+    await assert.rejects(M.pictureFile(L, FORMAT, bad, encode), (e) => e.code === 'image');
+  }
+  // too big to decode at all: refused before the browser tries
+  await assert.rejects(M.pictureFile(L, FORMAT, pngHeader(60000, 60000), encode), (e) => e.code === 'limit');
+  assert.equal(asked.length, 0);
+});
+
+test('save refuses what the app would: the name, files missing, images past their sides, the zip\'s limits', () => {
+  const ok = M.fromBuiltin(E, 'nord');
+  assert.deepEqual(M.saveProblems(L, FORMAT, ok), []);
+  for (const name of ['a/b', '.hidden', 'x#dark', 'y#light', '']) {
+    assert.equal(M.saveProblems(L, FORMAT, M.doc(M.withName(ok.xml, name))).length, 1, name);
+  }
+  const pic = M.withPicture(ok, pngHeader(100, 100), 'png');
+  assert.deepEqual(M.saveProblems(L, FORMAT, pic), []);
+  assert.match(M.saveProblems(L, FORMAT, M.doc(pic.xml)).map((p) => p.message).join(), /缺少文件 picture.png/);
+  assert.match(M.saveProblems(L, FORMAT, M.withPicture(ok, pngHeader(5000, 10), 'png'))[0].message, /太大/);
+  assert.match(M.saveProblems(L, FORMAT, M.withPicture(ok, new Uint8Array([1]), 'png'))[0].message, /不是 App 认得的图片/);
+  const files = Object.fromEntries(Array.from({ length: FORMAT.limits.entries }, (_, i) => ['f' + i + '.bin', new Uint8Array(1)]));
+  assert.match(M.saveProblems(L, FORMAT, M.doc(ok.xml, files))[0].message, /限制/);
+});
+
+test('only images the app would take are decoded: a pack\'s headers are not trusted', () => {
+  const files = { 'a.png': pngHeader(100, 100), 'b.png': pngHeader(60000, 60000), 'c.jpg': new Uint8Array([1]), 'd.ttf': new Uint8Array([0]) };
+  assert.deepEqual(M.decodableImages(L, FORMAT, files), ['a.png']);
+});
+
+test('a pack of odd entries opens as the app unpacks it: the last theme.xml, paths resolved, the rest dropped', async () => {
+  const xml = M.fromBuiltin(E, 'pixel').xml;
+  const z = L.writeZip([['theme.xml', enc('<theme name="first"/>')], ['a/../b.png', new Uint8Array([1])], ['__proto__', new Uint8Array([2])], ['notes/x.txt', enc('x')], ['layouts/k.txt', enc('x')], ['x/../theme.xml', enc(xml)]]);
+  const { doc, notes } = await M.open(E, L, FORMAT, z);
+  assert.equal(doc.xml, xml);
+  assert.deepEqual(Object.keys(doc.files).sort(), ['__proto__', 'b.png']);
+  assert.deepEqual(doc.files.__proto__, new Uint8Array([2]));
+  assert.deepEqual(notes, [{ kind: 'dropped', names: ['notes/x.txt', 'layouts/k.txt'] }]);
+  await assert.rejects(M.open(E, L, FORMAT, L.writeZip([['theme.xml', enc(xml)], ['../up.png', new Uint8Array(1)]])), (e) => e.code === 'not-theme');
+  // a bare file must be XML, no bigger than a file the app takes
+  await assert.rejects(M.open(E, L, FORMAT, new Uint8Array([0x25, 0x50, 0x44, 0x46])), (e) => e.code === 'not-theme');
+  await assert.rejects(M.open(E, L, FORMAT, new Uint8Array(FORMAT.limits.fileBytes + 1)), (e) => e.code === 'limit');
+  assert.equal((await M.open(E, L, FORMAT, enc('\uFEFF' + xml))).doc.xml, xml);
+});
+
+test('a converted theme keeps its files byte for byte', async () => {
+  const opened = await L.openZip(FORMAT, bytes('from-web.theme'));
+  const { doc } = await M.open(E, L, FORMAT, bytes('from-web.theme'));
+  const sources = Object.values(opened.files).map((b) => Buffer.from(b).toString('hex')).sort();
+  const now = Object.values(doc.files).map((b) => Buffer.from(b).toString('hex')).sort();
+  assert.ok(now.length > 0);
+  for (const f of now) assert.ok(sources.includes(f));
+});
+
+test('the engine throwing is a problem said, not a throw', () => {
+  const bad = { readTheme: () => { throw new Error('boom'); } };
+  const r = M.check(bad, M.doc('<x/>'), 'qwerty', M.envJson(M.ENV), null);
+  assert.equal(r.scene, null);
+  assert.match(r.problems[0].message, /boom/);
 });
 
 test('undo and redo walk the documents back and forth, at most 100 back; a new edit drops what was undone', () => {
@@ -153,4 +242,12 @@ test('the page saves from-maker.theme, byte for byte', () => {
   const made = M.save(L, M.fromBuiltin(E, 'nord')).bytes;
   if (process.env.UPDATE) writeFileSync(join(testdata, 'from-maker.theme'), made);
   assert.deepEqual(new Uint8Array(made), bytes('from-maker.theme'));
+});
+
+// and from-maker-picture.theme: a picture's save, a real 4×4 PNG
+test('the page saves from-maker-picture.theme, byte for byte', () => {
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEElEQVR4nGPQCFgARwzEcQC/wxGBfpfKIQAAAABJRU5ErkJggg==', 'base64');
+  const made = M.save(L, M.withPicture(M.fromBuiltin(E, 'nord'), new Uint8Array(png), 'png')).bytes;
+  if (process.env.UPDATE) writeFileSync(join(testdata, 'from-maker-picture.theme'), made);
+  assert.deepEqual(new Uint8Array(made), bytes('from-maker-picture.theme'));
 });
