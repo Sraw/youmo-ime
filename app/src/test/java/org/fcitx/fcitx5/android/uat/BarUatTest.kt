@@ -219,6 +219,21 @@ class BarUatTest {
         assertFalse(h.texts(h.inputView).toString(), "字20" in h.texts(h.inputView))
     }
 
+    // the toolbar expanded by hand over a copy's suggestion stays expanded when the bar is next evaluated (the
+    // field's input restarted): the clip let go, not taken back to it
+    @Test
+    fun theToolbarExpandedOverAClipStaysExpanded() {
+        val h = harness().start()
+        h.copied("公园")
+        fun has(d: Int) = KeyboardHarness.all(h.inputView).any { h.shown(it) && it.contentDescription?.toString() == h.service.getString(d) }
+        h.waitFor("公园 offered") { KeyboardHarness.all(h.inputView).any { h.shown(it) && it is TextView && it.text == "公园" } }
+        h.tap(h.described(h.service.getString(R.string.expand_toolbar)))
+        h.relayout()
+        assertTrue("expanded", has(R.string.clipboard))
+        h.restart()
+        assertTrue("still expanded: ${h.texts()}", has(R.string.clipboard))
+    }
+
     @Test
     @Uat("TB-08")
     fun clipboardEntryPastes() {

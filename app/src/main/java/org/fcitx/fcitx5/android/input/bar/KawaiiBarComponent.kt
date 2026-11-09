@@ -328,6 +328,11 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     }
                     else -> {
                         isToolbarManuallyToggled = !expandToolbarByDefault
+                        // expanded by hand: a clip's suggestion let go, or the next evaluation (a field started
+                        // again) would take the toolbar back to it
+                        isClipboardFresh = false
+                        clipboardTimeoutJob?.cancel()
+                        clipboardTimeoutJob = null
                         idleUi.updateState(IdleUiPolicy.Display.Toolbar, fromUser = true)
                     }
                 }
