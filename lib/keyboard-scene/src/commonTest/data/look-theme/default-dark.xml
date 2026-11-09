@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<theme xmlns="https://youmo-ime/theme/4" name="default-dark" dark="true" version="4.0">
+  <colors>
+    <color name="background" value="#ff263238"/>
+    <color name="bar" value="#ff21272b"/>
+    <color name="keyboard" value="#ff263238"/>
+    <color name="key" value="#ff404a50"/>
+    <color name="keyText" value="#ffd9dbdc"/>
+    <color name="candidateText" value="#ffd9dbdc"/>
+    <color name="candidateLabel" value="#ffd9dbdc"/>
+    <color name="candidateComment" value="#ffadb1b3"/>
+    <color name="altKey" value="#ff313c42"/>
+    <color name="altKeyText" value="#ffadb1b3"/>
+    <color name="accentKey" value="#ff6eaca8"/>
+    <color name="accentKeyText" value="#ffffffff"/>
+    <color name="keyPressHighlight" value="#33ffffff"/>
+    <color name="keyShadow" value="#ff1f292e"/>
+    <color name="popupBackground" value="#ff3c474c"/>
+    <color name="popupText" value="#ffffffff"/>
+    <color name="spaceBar" value="#ff3b464c"/>
+    <color name="divider" value="#1fffffff"/>
+    <color name="clipboardEntry" value="#ff404a50"/>
+    <color name="genericActiveBackground" value="#ff4db6ac"/>
+    <color name="genericActiveForeground" value="#ffffffff"/>
+    <color name="keyBorder" value="#ff1f292e"/>
+    <color name="keyHint" value="#ffadb1b3"/>
+    <color name="toolbarIcon" value="#ffadb1b3"/>
+  </colors>
+  <style select="keyboard" fill="@background"/>
+  <style select="@flat keyboard" fill="@keyboard"/>
+  <style select="bar" fill="transparent"/>
+  <style select="panel" fill="transparent"/>
+  <style select="@flat panel" fill="@bar"/>
+  <style select="key" fill="@key" radius="4dp" border="none" shadow="0 1dp 0 @keyShadow" inset="7dp 3dp" color="@keyText" icon-color="@keyText" font="system" weight="400" scale="100%" press="tint"/>
+  <style select="@landscape key" inset="4dp 3dp"/>
+  <style select="key:pressed" overlay="@keyPressHighlight"/>
+  <style select="key.function" fill="@altKey" color="@altKeyText" icon-color="@altKeyText"/>
+  <style select="key.enter" fill="@accentKey" color="@accentKeyText" icon-color="@accentKeyText"/>
+  <style select="key.space" fill="@key"/>
+  <style select="key.alt-text" color="@altKeyText" icon-color="@altKeyText"/>
+  <style select="key mark, key shortcut" color="@keyHint" icon-color="@keyHint"/>
+  <style select="key shortcut" scale="100%"/>
+  <style select="key.enter mark" color="@accentKeyText"/>
+  <style select="key badge" icon-color="@altKeyText"/>
+  <style select="*/reading:on" color="@accentKey" icon-color="@accentKey"/>
+  <style select="@flat key" fill="transparent" shadow="none" radius="0"/>
+  <style select="@flat key.space" fill="@spaceBar" shape="bar" radius="3dp"/>
+  <style select="@flat key.enter" fill="@accentKey" shape="circle"/>
+  <style select="preview, popup" fill="@popupBackground" color="@popupText" radius="4dp" shadow="0 2dp 2dp #33000000"/>
+  <style select="popup:selected" fill="@genericActiveBackground" color="@genericActiveForeground"/>
+  <style select="menu" fill="@accentKey" color="@accentKeyText" icon-color="@accentKeyText" radius="50%"/>
+  <style select="menu:selected" overlay="@keyPressHighlight"/>
+  <style select="@floating keyboard" radius="7dp"/>
+  <style select="handle" fill="mix(@background, @keyText, 10%)"/>
+</theme>
