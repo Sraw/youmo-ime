@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
 import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
 import org.fcitx.fcitx5.android.engine.pinyin.KeyedSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
@@ -325,8 +326,8 @@ class PinyinSession(
         return snapshot()
     }
 
-    private fun type(c: Char, glided: Boolean = false, at: Float = Float.NaN): Snapshot {
-        if (endsInput(c)) return leave()
+    private fun type(typed: Char, glided: Boolean = false, at: Float = Float.NaN): Snapshot {
+        val c = if (endsInput(typed)) return leave() else semicolonRead(typed, keyed, input, readFrom(), cursor) ?: return snapshot()
         // on the nine keys 1 is 分词; on 大千 a space after a syllable with no tone its first tone
         insert((if (c == NINE_KEYS_SEPARATOR && nineKeys?.oneSeparates == true) SyllableGraph.SEPARATOR else if (c == ' ') keyed?.spaceTone ?: c else c).toString(), glided, at)
         read()
@@ -1129,3 +1130,33 @@ private fun ownWord(user: UserModel?, decoded: String, learned: String): Int =
 private fun isOneHan(text: String) = text.codePointCount(0, text.length) == 1 && Character.isIdeographic(text.codePointAt(0))
 
 private fun separates(c: Char, nineKeysSeparate: Boolean) = c == SyllableGraph.SEPARATOR || c == PinyinSession.NINE_KEYS_SEPARATOR && nineKeysSeparate
+
+/**
+ * What [c] types at [cursor] of [input] (read from [from]) on [keyed]: 九键双拼's 1 sends 微软's `;`
+ * while typing ([NineKeyLetters.NINE_SP_SEMICOLON]), a final where one goes ([finalNext]), else the
+ * separator, or nothing with no key before it; any other key itself.
+ */
+private fun semicolonRead(c: Char, keyed: KeyedSegmenter?, input: CharSequence, from: Int, cursor: Int): Char? = when {
+    c != NineKeyLetters.NINE_SP_SEMICOLON || keyed?.letters != NineKeyLetters.NINE_SP -> c
+    finalNext(input, from, cursor, keyed::isKey) -> c
+    cursor == from -> null
+    else -> SyllableGraph.SEPARATOR
+}
+
+/**
+ * Whether the key typed next at [cursor] of [input] (read from [from]) is a syllable's second, two
+ * keys a syllable: an odd number of keys ([isKey]) since the last separator, a syllable taken or
+ * [from]; an initial taken off the bar (its letters, then a separator) binds the key after it as its final.
+ */
+private fun finalNext(input: CharSequence, from: Int, cursor: Int, isKey: (Char) -> Boolean): Boolean {
+    var i = cursor
+    while (i > from && isKey(input[i - 1])) i--
+    var keys = cursor - i
+    if (i - 1 > from && input[i - 1] == SyllableGraph.SEPARATOR && input[i - 2] in 'a'..'z') {
+        var start = i - 2
+        while (start > from && input[start - 1] in 'a'..'z') start--
+        val taken = input.substring(start, i - 1)
+        if (Syllables.id(taken) < 0 || Syllables.split(taken) == null) keys++
+    }
+    return keys % 2 == 1
+}

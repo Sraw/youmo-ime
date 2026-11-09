@@ -119,7 +119,8 @@ class NineKeyLettersTest {
         assertEquals("q,we,rt,y,u,io,p,a,sd,fg,h,jk,l;,z,xc,v,bn,m".split(',').joinToString("") { ('\uF8C0' + (it[0] - 'a')).toString() }, g18.codes)
         assertEquals("q,we,rt,y,u,io,p,a,sd,fg,h,jk,l;,z,xc,v,bn,m", g18.tag())
         assertEquals("abc,def,ghi,jkl;,mno,pqrs,tuv,wxyz", nine.tag())
-        assertEquals(nineSp("23456789"), nine.codes)
+        // the tag of ; on 5, kept when ; went to 1: the record's codes of 2 to 9 are what they were
+        assertEquals(nineSp("23456789") + '\uF8FC', nine.codes)
         // contract: U+F8C0 plus the key's first letter, private use past the syllables', no case, no digit
         g18.codes.forEach { c ->
             assertEquals('\uF8C0' + (g18.letters(c)[0] - 'a'), c)
@@ -161,7 +162,7 @@ class NineKeyLettersTest {
         for (keys in all) keys.codes.forEach { c -> assertSame(keys, NineKeyLetters.ofCode(c.code)) }
         // no character is two keyboards' code; the codes of an earlier build (⒜–⒵, ⒉–⒐) are text now
         assertEquals(all.sumOf { it.codes.length }, all.joinToString("") { it.codes }.toSet().size)
-        for (c in "23456789'a;⒈⒉⒐⒑⒜⒵\uF8BF\uF8FC\uF8FF") assertNull(c.toString(), NineKeyLetters.ofCode(c.code))
+        for (c in "23456789'a;⒈⒉⒐⒑⒜⒵\uF8BF\uF8FD\uF8FF") assertNull(c.toString(), NineKeyLetters.ofCode(c.code))
         assertNull(NineKeyLetters.ofCode(0xF0200))
     }
 
@@ -184,9 +185,10 @@ class NineKeyLettersTest {
     fun semicolonIsTypedOnTheKeysHoldingIt() {
         // 微软's ing, on L: never normalized away
         assertEquals('\uF8CB', NineKeyLetters.G18.key(';'))
-        assertEquals(nineSpCode('5'), NineKeyLetters.NINE_SP.key(';'))
+        assertEquals('\uF8FC', NineKeyLetters.NINE_SP.key(';'))
         assertEquals("l;", NineKeyLetters.G18.letters('\uF8CB'))
-        assertEquals("jkl;", NineKeyLetters.NINE_SP.letters(nineSpCode('5')))
+        assertEquals("jkl", NineKeyLetters.NINE_SP.letters(nineSpCode('5')))
+        assertEquals(";", NineKeyLetters.NINE_SP.letters('\uF8FC'))
         // no key holds it: itself, as before
         assertEquals(';', NineKeyLetters.G14.key(';'))
         assertEquals(';', NineKeyLetters.STANDARD.key(';'))

@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   九键（T9Keyboard：拼音 T9、英文 T9English、双拼 T9Shuangpin/T9ShuangpinPlain，rules C §2），一块板 nine，差别在 when= 和
-  App 给的 {nine-letters:N}（拼音读用户的 t9_letters、双拼固定 NINE_SP，5 为 JKL; 或 JKL；英文跟 Shift 大小写，引擎按输入法定大小写）。
+  App 给的 {nine-letters:N}（拼音读用户的 t9_letters、双拼固定 NINE_SP，5 为 JKL；英文跟 Shift 大小写，引擎按输入法定大小写）。
+  微软双拼（scheme-types=semicolon）的 1 键打字时兼作 ;（ing），角标写成 1;。
   宽度为行宽的百分之几：左列 16、数字键 22、右列 18。左列是跨三行的 slot（原生滚动列表），画功能键面，平铺也画块（face="keep"），
   不画按下；它下面不再有占位键，第 2、3 行从它右边排起。数字键的长按是组合式的（大写 + 数字 + 小写 + t9_symbols），App 按 from="nine" 拼；1 没有气泡（preview="off"，旧 KeyDef 也没有）。
 -->
@@ -13,6 +14,8 @@
       <!-- 1 键随输入中变（T9Keyboard.kt:672,683-687）：第一个成立的 variant 盖上去 -->
       <variant when="ime=english composing" label="'"/>
       <variant when="ime=english" label=".,?!"/>
+      <variant when="scheme-types=semicolon composing" label="分词" alt="1;"/>
+      <variant when="scheme-types=semicolon" alt="1;"/>
       <variant when="composing" label="分词"/>
       <popup from="nine"/>
     </key>

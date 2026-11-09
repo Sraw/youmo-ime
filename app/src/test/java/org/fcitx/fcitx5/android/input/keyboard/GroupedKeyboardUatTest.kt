@@ -465,8 +465,9 @@ class GroupedKeyboardUatTest {
         h.relayout()
         val five = h.longPress(h.nineKey("5"))
         h.field.setText("")
-        assertTrue("$five", listOf("j", "k", "l").all { l -> five.any { it.lowercase() == l } } && "：" in five && "；" in five)
-        assertEquals("$five", 1, five.count { it == "；" || it == ";" })
+        // 5 is JKL alone: 微软's ; is 1's, none of ; : on 5's long press
+        assertTrue("$five", listOf("j", "k", "l").all { l -> five.any { it.lowercase() == l } })
+        assertTrue("$five", five.none { it == "；" || it == ";" || it == "：" || it == ":" })
         val two = h.longPress(h.nineKey("2"), "～")
         assertTrue("$two", "～" in two)
         // the mark to the engine, which types its Chinese ～ (KeyboardHalvesUatTest)

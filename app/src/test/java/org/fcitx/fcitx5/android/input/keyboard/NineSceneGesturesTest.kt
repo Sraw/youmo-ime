@@ -123,7 +123,9 @@ class NineSceneGesturesTest {
     @Test
     fun shuangpinsEveryKeyAsItsView() {
         val scene = gestures(Variant(SHUANGPIN, ImKeyboards.Chosen(shuangpin = ImKeyboard.NINE_KEYS), ShuangpinScheme.MICROSOFT))
-        assertTrue(scene.first(), "5=JKL;/5" in scene.first())
+        assertTrue(scene.first(), "5=JKL/5" in scene.first())
+        // 微软's ; on 1, beside its digit, as the views have it
+        assertTrue(scene.first(), "/1;" in scene.first())
     }
 
     @Test
@@ -302,10 +304,10 @@ class NineSceneGesturesTest {
             return k.sceneKey(canvas.keyAt(id)!!)!!.def.popup!!.filterIsInstance<KeyDef.Popup.Keyboard.Explicit>().singleOrNull()
         }
         val pinyin2 = "[A, B, C, 2, a, b, c, @, !, \"] 7 3 false"
-        val shuangpin5 = "[J, K, L, :, 5, j, k, l, ;, #, (, )] 9 4 false"
+        val shuangpin5 = "[J, K, L, 5, j, k, l, #, (, )] 7 3 false"
         val english1 = "[:, ;, \", (, ), @, &, /, *, ~] 10 -1 true"
         assertEquals(pinyin2, T9Keyboard.ninePopup('2', "ABC", NineKeySymbols.STANDARD.symbols('2')).said())
-        assertEquals(shuangpin5, T9Keyboard.ninePopup('5', "JKL;", NineKeySymbols.STANDARD.symbols('5')).said())
+        assertEquals(shuangpin5, T9Keyboard.ninePopup('5', "JKL", NineKeySymbols.STANDARD.symbols('5')).said())
         assertEquals(english1, T9Keyboard.onePopup(true, NineKeySymbols.STANDARD).said())
         assertEquals(pinyin2, sceneOf(T9Keyboard(app, ThemePreset.PixelLight), "2").said())
         assertEquals(shuangpin5, sceneOf(T9Keyboard(app, ThemePreset.PixelLight, shuangpin = true), "5").said())

@@ -44,10 +44,13 @@ class T9ShuangpinKeyboardTest {
     private fun code(c: Char) = KeyAction.SymAction(KeySym(UNICODE + c.code), KeyStates.Virtual)
 
     @Test
-    fun theDigitKeysShowTheStandardLettersAndJklSemicolon() {
-        val faces = T9Keyboard.layout(NineKeyLetters.STANDARD, shuangpin = true).flatten()
-            .mapNotNull { (it.appearance as? KeyDef.Appearance.AltText)?.displayText }
-        assertEquals(listOf("，。？！", "ABC", "DEF", "GHI", "JKL;", "MNO", "PQRS", "TUV", "WXYZ"), faces)
+    fun theDigitKeysShowTheStandardLettersAndOneMicrosoftsSemicolon() {
+        fun alts(semicolon: Boolean) = T9Keyboard.layout(NineKeyLetters.STANDARD, shuangpin = true, semicolon = semicolon).flatten()
+            .mapNotNull { it.appearance as? KeyDef.Appearance.AltText }
+        assertEquals(listOf("，。？！", "ABC", "DEF", "GHI", "JKL", "MNO", "PQRS", "TUV", "WXYZ"), alts(true).map { it.displayText })
+        // 1's ; beside its digit under 微软's alone
+        assertEquals("1;", alts(true).first().altText)
+        assertEquals("1", alts(false).first().altText)
     }
 
     @Test
@@ -66,6 +69,15 @@ class T9ShuangpinKeyboardTest {
         val tap = MultiTap(0)
         assertEquals(KeyAction.HostKeyAction("'"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("1"), keys, tap, 0L, composing = true))
         assertEquals(KeyAction.CommitAction("，"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("1"), keys, tap, 0L, composing = false))
+    }
+
+    // 微软's: 1 while typing is ;'s code, the engine reading it as ing or the separator; else punctuation as ever
+    @Test
+    fun oneIsTheSemicolonsCodeWhileTypingOnMicrosofts() {
+        val tap = MultiTap(0)
+        val one = KeyAction.HostKeyAction("1")
+        assertEquals(code(NineKeyLetters.NINE_SP_SEMICOLON), T9Keyboard.resolveShuangpin(one, keys, tap, 0L, composing = true, semicolon = true))
+        assertEquals(KeyAction.CommitAction("，"), T9Keyboard.resolveShuangpin(one, keys, tap, 0L, composing = false, semicolon = true))
     }
 
     @Test
