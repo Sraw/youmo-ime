@@ -33,7 +33,7 @@ class LabeledCandidateItemUi(
     override val ctx: Context,
     val theme: Theme,
     setupTextView: TextView.() -> Unit,
-    val bar: BarLook = SceneBar.look(ctx, theme),
+    val bar: BarLook = SceneBar.of(ctx, theme),
 ) : Ui {
 
     override val root = textView {

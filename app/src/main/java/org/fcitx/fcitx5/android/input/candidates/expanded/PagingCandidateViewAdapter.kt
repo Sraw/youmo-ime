@@ -41,7 +41,7 @@ open class PagingCandidateViewAdapter(val theme: Theme) :
     var bar: BarLook? = null
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CandidateViewHolder {
-        val look = bar ?: SceneBar.look(parent.context, theme).also { bar = it }
+        val look = bar ?: SceneBar.of(parent.context, theme).also { bar = it }
         return CandidateViewHolder(CandidateItemUi(parent.context, theme, look))
     }
 

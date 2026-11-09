@@ -139,7 +139,7 @@ class InputView(
     // the bar's base, under the bar and the row above it for the code being typed: one taller bar.
     // None (the keyboard's base seen through), its colour, or the picture's part there
     private val barBackground = view(::View) {
-        background = SceneBar.background(SceneBar.look(context, theme))
+        background = SceneBar.background(SceneBar.of(context, theme))
     }
 
     private val placeholderOnClickListener = OnClickListener { }

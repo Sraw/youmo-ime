@@ -142,7 +142,7 @@ class HorizontalCandidateComponent :
     }
 
     // the theme's candidates (T6a): the line between them, the room beside it
-    private val barLook by lazy { SceneBar.look(context, theme) }
+    private val barLook by lazy { SceneBar.of(context, theme) }
 
     private val gap by lazy { SceneBar.px(context, barLook.gapDp) }
 

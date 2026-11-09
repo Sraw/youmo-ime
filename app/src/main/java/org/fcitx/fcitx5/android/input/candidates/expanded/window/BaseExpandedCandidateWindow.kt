@@ -71,7 +71,7 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
     private lateinit var candidateLayout: ExpandedCandidateLayout
 
     // the theme's candidates (T6a), the bar's: their look, the lines between them, the panel under them
-    private val barLook by lazy { SceneBar.look(context, theme) }
+    private val barLook by lazy { SceneBar.of(context, theme) }
 
     protected val dividerDrawable by lazy {
         ShapeDrawable(RectShape()).apply {

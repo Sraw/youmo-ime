@@ -35,7 +35,7 @@ import kotlin.math.roundToInt
  * its fill and pressed colour, its colours and font, the first of the list in its own; the number or dot
  * before it its label-style asks for.
  */
-class CandidateItemUi(override val ctx: Context, val theme: Theme, val bar: BarLook = SceneBar.look(ctx, theme)) : Ui {
+class CandidateItemUi(override val ctx: Context, val theme: Theme, val bar: BarLook = SceneBar.of(ctx, theme)) : Ui {
 
     private val textSp = ThemeManager.prefs.candidateTextSize.getValue()
 

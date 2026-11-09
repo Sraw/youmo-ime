@@ -106,12 +106,12 @@ class BarThemeTest {
     fun aThemeOfNoneOfItIsTheBarOfBefore() {
         // every built-in theme, its look made a 4.0 theme as the app makes it: the bar of its 3.0 colours
         for (theme in ThemeManager.BuiltinThemes) {
-            assertEquals(theme.name, SceneBar.plain(theme), SceneBar.look(ctx, theme))
+            assertEquals(theme.name, SceneBar.plain(theme), SceneBar.of(ctx, theme))
         }
         // a look that made no theme: the same, worked out of its colours
         SceneThemes.source = { _, _, _ -> "not a theme" }
         val theme = ThemeManager.activeTheme
-        assertEquals(SceneBar.plain(theme), SceneBar.look(ctx, theme))
+        assertEquals(SceneBar.plain(theme), SceneBar.of(ctx, theme))
         // the item drawn as before: the pressed colour over the cell, no fill
         val ui = CandidateItemUi(ctx, theme)
         assertTrue(ui.root.background is android.graphics.drawable.StateListDrawable)
@@ -232,7 +232,7 @@ class BarThemeTest {
             val rv = bar(h)
             val items = items(rv)
             val theme = ThemeManager.activeTheme
-            val look = SceneBar.look(h.service, theme)
+            val look = SceneBar.of(h.service, theme)
             val d = h.service.resources.displayMetrics.density.toDouble()
             val m = BarSample.Metrics(
                 width = rv.width.toDouble(), height = rv.height.toDouble(), density = d, textSize = text(items[0]).textSize.toDouble(),

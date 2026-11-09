@@ -46,7 +46,7 @@ import splitties.views.dsl.core.add
 import splitties.views.dsl.recyclerview.recyclerView
 
 @SuppressLint("ViewConstructor")
-class ExpandedCandidateLayout(context: Context, theme: Theme, bar: BarLook = SceneBar.look(context, theme)) : ConstraintLayout(context) {
+class ExpandedCandidateLayout(context: Context, theme: Theme, bar: BarLook = SceneBar.of(context, theme)) : ConstraintLayout(context) {
 
     class Keyboard(context: Context, theme: Theme) : BaseKeyboard(context, theme, Layout) {
         companion object {
