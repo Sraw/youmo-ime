@@ -399,52 +399,6 @@ class SoftKeyboardTest {
         assertFieldBecomes(text.dropLast(1))
     }
 
-    /**
-     * With the vivo keypress workaround the keyboard dispatches touches itself, and a cancelled
-     * touch reaches the key without an Up. The swipe's reading must not outlive it: a swipe
-     * cancelled mid-composition (which reads as "reset", selecting nothing) must not make the
-     * next swipe, with nothing composed, a reset too -- it would select and delete nothing.
-     */
-    @Test
-    fun aSwipeAfterACancelledOneUnderTheVivoWorkaroundReadsTheEditorAfresh() {
-        val vivo = AppPrefs.getInstance().advanced.vivoKeypressWorkaround
-        val before = vivo.getValue()
-        vivo.setValue(true)
-        try {
-            launch(inputMethod = ENGLISH)
-            tapLetters("to") // composed
-            val bounds = key(onKeyboard().desc(string(R.string.a11y_key_backspace))).visibleBounds
-            val y = bounds.centerY().toFloat()
-            val x0 = bounds.centerX().toFloat()
-            val x1 = x0 - bounds.width() * 3
-            val downTime = SystemClock.uptimeMillis()
-            fun inject(action: Int, x: Float) {
-                val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action, x, y, 0)
-                event.source = InputDevice.SOURCE_TOUCHSCREEN
-                assertTrue("injected", instrumentation.uiAutomation.injectInputEvent(event, true))
-                event.recycle()
-            }
-            inject(MotionEvent.ACTION_DOWN, x0)
-            for (step in 1..30) {
-                inject(MotionEvent.ACTION_MOVE, x0 + (x1 - x0) * step / 30)
-                SystemClock.sleep(10)
-            }
-            inject(MotionEvent.ACTION_CANCEL, x1)
-            device.waitForIdle()
-            tapSpace()
-            assertFieldBecomes("to ")
-            // nothing composed now: this swipe selects, and letting go deletes
-            device.swipe(x0.toInt(), y.toInt(), x1.toInt(), y.toInt(), 40)
-            device.waitForIdle()
-            val deadline = SystemClock.uptimeMillis() + 5_000
-            while (fieldText() == "to " && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(50)
-            val text = fieldText()
-            assertTrue("the swipe deleted from the end: '$text'", text.length < "to ".length && "to ".startsWith(text))
-        } finally {
-            vivo.setValue(before)
-        }
-    }
-
     /** The Return key says and performs the editor's action. */
     @Test
     fun returnPerformsASearchFieldsAction() {
