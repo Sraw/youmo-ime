@@ -3,7 +3,7 @@
 // Run: ./gradlew :lib:keyboard-scene:youmoEngine, then node --test web/theme-maker/test/maker.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -145,4 +145,12 @@ test('what is wrong is said with its line: a theme the engine refuses has no sce
   const r = M.check(E, M.doc('<theme xmlns="https://youmo-ime/theme/4" version="4.0">\n<bogus/>\n</theme>'), 'qwerty', M.envJson(M.ENV));
   assert.equal(r.scene, null);
   assert.ok(r.problems.some((p) => p.level === 'error' && p.line > 0), JSON.stringify(r.problems));
+});
+
+// the app's side (ThemePackImportTest) imports testdata/from-maker.theme: a document of a built-in theme as
+// the page saves it; UPDATE=1 writes it again
+test('the page saves from-maker.theme, byte for byte', () => {
+  const made = M.save(L, M.fromBuiltin(E, 'nord')).bytes;
+  if (process.env.UPDATE) writeFileSync(join(testdata, 'from-maker.theme'), made);
+  assert.deepEqual(new Uint8Array(made), bytes('from-maker.theme'));
 });

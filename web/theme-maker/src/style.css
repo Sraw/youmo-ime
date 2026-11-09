@@ -13,13 +13,13 @@
 html, body { margin: 0; height: 100%; }
 body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-serif; display: flex; flex-direction: column; }
 button, select, input, textarea { font: inherit; color: inherit; }
-button { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+button { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; cursor: pointer; white-space: nowrap; }
 button:disabled { opacity: .4; cursor: default; }
 button[aria-pressed="true"], button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .muted { color: var(--muted); font-size: 12px; }
 .grow { flex: 1; }
 .link { color: var(--accent); font-size: 12px; }
-#top { display: flex; gap: 6px; align-items: center; padding: 6px 8px; background: var(--panel); border-bottom: 1px solid var(--line); position: relative; }
+#top { display: flex; gap: 4px; align-items: center; padding: 6px 8px; background: var(--panel); border-bottom: 1px solid var(--line); position: relative; }
 #top .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 30vw; }
 .menu { position: absolute; top: 100%; left: 8px; z-index: 5; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px; }
 .menu[hidden] { display: none; }

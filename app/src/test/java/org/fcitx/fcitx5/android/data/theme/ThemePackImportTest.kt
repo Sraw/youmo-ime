@@ -194,6 +194,17 @@ class ThemePackImportTest {
         assertEquals(emptyList<Theme.Pack>(), ThemeManager.Packs)
     }
 
+    // the theme maker's save (060-render-p3 M1: web/theme-maker/test/maker.test.mjs writes it) is a pack the app takes
+    @Test
+    fun theMakersSaveImports() {
+        val pack = opened(ThemeMakerTestdata.file("from-maker.theme").readBytes())
+        assertEquals("nord-mine", pack.staged.name)
+        assertEquals(emptyList<String>(), pack.staged.warnings)
+        val versions = pack.commit().getOrThrow()
+        assertEquals(listOf("nord-mine#light", "nord-mine#dark"), versions.map { it.name })
+        assertEquals(ThemeManager.builtin("nord#dark").palette(), versions[1].look.palette)
+    }
+
     @Test
     fun aPackIsDrawnFromItsOwnFileAndItsFolder() {
         val dark = opened(sample()).commit().getOrThrow()[1]
