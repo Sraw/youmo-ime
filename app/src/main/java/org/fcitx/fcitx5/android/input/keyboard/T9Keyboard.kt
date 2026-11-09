@@ -19,6 +19,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.annotation.Keep
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import kotlinx.coroutines.CoroutineScope
@@ -851,6 +852,18 @@ class T9Keyboard(
         column.isInvisible = !placed
         if (!placed) return
         columnSlot.offset(c.left, c.top)
+        // its layout params kept to the slot too, set only when the slot moved (one layout more, then the same): the
+        // constraint pass sizing it otherwise (0×0) and this pass back would change its size each time, its
+        // onSizeChanged posting a layout again, never done
+        val lp = column.layoutParams as ConstraintLayout.LayoutParams
+        if (lp.leftMargin != columnSlot.left || lp.topMargin != columnSlot.top ||
+            lp.width != columnSlot.width() || lp.height != columnSlot.height()
+        ) {
+            column.layoutParams = lParams(columnSlot.width(), columnSlot.height()) {
+                topOfParent(columnSlot.top)
+                leftOfParent(columnSlot.left)
+            }
+        }
         val exactly = { size: Int -> MeasureSpec.makeMeasureSpec(size, MeasureSpec.EXACTLY) }
         if (column.width != columnSlot.width() || column.height != columnSlot.height() || column.isLayoutRequested) {
             column.measure(exactly(columnSlot.width()), exactly(columnSlot.height()))
