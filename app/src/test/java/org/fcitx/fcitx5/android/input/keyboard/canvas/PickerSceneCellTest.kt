@@ -4,11 +4,14 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard.canvas
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Rect
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -21,6 +24,9 @@ import org.fcitx.fcitx5.android.input.picker.PickerGridView
 import org.fcitx.fcitx5.android.input.picker.PickerPolicy
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
+import org.fcitx.fcitx5.android.input.theme.Insets
+import org.fcitx.fcitx5.android.input.theme.KeyFill
+import org.fcitx.fcitx5.android.input.theme.NineSlice
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.engine.Content
 import org.fcitx.fcitx5.android.scene.layout.Text
@@ -129,6 +135,28 @@ class PickerSceneCellTest {
                 outside(cell)
             }
             assertEquals(emptyList<String>(), cut)
+        }
+    }
+
+    // a theme whose letters are a nine-slice image: the grid's cells have no images to draw it with, and
+    // show the letters' colour there, as theme 3.0's cells did (not the panel through an empty face)
+    @Test
+    fun aNineSliceThemesCellShowsTheKeyColour() {
+        val light = ThemePreset.PixelLight.look
+        val slice = NineSlice("/nowhere/k.png", Insets(1, 1, 1, 1), 1)
+        val framed = Theme.Custom(
+            "framed", false, light.copy(keys = light.keys.copy(letter = light.keys.letter.copy(fill = KeyFill.Image(slice)))),
+        )
+        KeyboardHarness(framed).start().use { h ->
+            h.tap(h.key("符"))
+            h.relayout()
+            val cell = h.shownCells().first()
+            val face = cell.keyNode!!.ops(false).filterIsInstance<Op.NineSlice>().single()
+            assertEquals(light.palette.keyBackgroundColor, face.fallback?.value)
+            val b = Bitmap.createBitmap(cell.width, cell.height, Bitmap.Config.ARGB_8888)
+            cell.draw(Canvas(b))
+            val box = face.shape.bounds
+            assertEquals(light.palette.keyBackgroundColor, b.getPixel(box.left.roundToInt() + 6, box.centerY.roundToInt()))
         }
     }
 

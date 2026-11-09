@@ -1,0 +1,437 @@
+# 060 P3 T0: how much of each picture of index.tsv the scene engine draws otherwise (ThemeBaselineCompareTest).
+# file, percent of pixels different (a channel off by more than 24), why. A run may not exceed a line by more
+# than 0.2 points; -PthemeBaseline.tighten=true lowers a line to what is drawn now. Over 1.5% (zhuyin_full 2%)
+# a line says why: "5.3: <known>" is what 060-render-p2.md 5.3 accepted.
+#file	percent	why
+AMOLEDBlack/english-port.png	0.287	
+AMOLEDBlack/handwriting-port.png	0.078	5.3: handwriting-fixed-fullwidth-punct
+AMOLEDBlack/k14-port.png	0.130	
+AMOLEDBlack/k18-port.png	0.143	
+AMOLEDBlack/nine-port.png	0.208	5.3: nine-syllables-sp
+AMOLEDBlack/number-port.png	0.181	
+AMOLEDBlack/pinyin-bubble_q.png	0.285	5.3: popup-sp-and-radius
+AMOLEDBlack/pinyin-edit_menu.png	0.253	5.3: popup-sp-and-radius
+AMOLEDBlack/pinyin-long_press_e.png	0.594	5.3: popup-sp-and-radius
+AMOLEDBlack/pinyin-port.png	0.287	
+AMOLEDBlack/pinyin-return_menu.png	0.289	5.3: popup-sp-and-radius
+AMOLEDBlack/symbols-port.png	0.165	
+AMOLEDBlack/zhuyin_full-port.png	1.584	
+AMOLEDBlack/zhuyin_nine-port.png	0.147	5.3: zhuyin-nine-shown-not-typed
+DeepBlue/english-port.png	0.283	
+DeepBlue/handwriting-port.png	0.078	5.3: handwriting-fixed-fullwidth-punct
+DeepBlue/k14-port.png	0.128	
+DeepBlue/k18-port.png	0.141	
+DeepBlue/nine-port.png	0.205	5.3: nine-syllables-sp
+DeepBlue/number-port.png	0.181	
+DeepBlue/pinyin-bubble_q.png	0.321	5.3: popup-sp-and-radius
+DeepBlue/pinyin-edit_menu.png	0.250	5.3: popup-sp-and-radius
+DeepBlue/pinyin-long_press_e.png	0.759	5.3: popup-sp-and-radius
+DeepBlue/pinyin-port.png	0.283	
+DeepBlue/pinyin-return_menu.png	0.283	5.3: popup-sp-and-radius
+DeepBlue/symbols-port.png	0.161	
+DeepBlue/zhuyin_full-port.png	1.545	
+DeepBlue/zhuyin_nine-port.png	0.146	5.3: zhuyin-nine-shown-not-typed
+MaterialDark/english-compact.png	0.192	
+MaterialDark/english-flat.png	0.280	
+MaterialDark/english-floating.png	0.998	5.3: floating-height-cap
+MaterialDark/english-land.png	0.091	
+MaterialDark/english-one_handed_left.png	0.337	
+MaterialDark/english-port.png	0.270	
+MaterialDark/english-split_land.png	0.150	
+MaterialDark/handwriting-compact.png	0.085	5.3: handwriting-fixed-fullwidth-punct
+MaterialDark/handwriting-flat.png	0.078	5.3: handwriting-fixed-fullwidth-punct
+MaterialDark/handwriting-floating.png	0.452	5.3: handwriting-fixed-fullwidth-punct,floating-height-cap
+MaterialDark/handwriting-land.png	0.029	5.3: handwriting-fixed-fullwidth-punct
+MaterialDark/handwriting-one_handed_left.png	0.124	5.3: handwriting-fixed-fullwidth-punct
+MaterialDark/handwriting-port.png	0.077	5.3: handwriting-fixed-fullwidth-punct
+MaterialDark/handwriting-split_land.png	0.074	5.3: handwriting-fixed-fullwidth-punct
+MaterialDark/k14-compact.png	0.165	
+MaterialDark/k14-flat.png	0.129	
+MaterialDark/k14-floating.png	1.263	5.3: floating-height-cap
+MaterialDark/k14-land.png	0.011	
+MaterialDark/k14-one_handed_left.png	0.165	
+MaterialDark/k14-port.png	0.125	
+MaterialDark/k14-split_land.png	0.055	
+MaterialDark/k18-compact.png	0.136	
+MaterialDark/k18-flat.png	0.142	
+MaterialDark/k18-floating.png	1.336	5.3: floating-height-cap
+MaterialDark/k18-land.png	0.016	
+MaterialDark/k18-one_handed_left.png	0.114	
+MaterialDark/k18-port.png	0.134	
+MaterialDark/k18-split_land.png	0.082	
+MaterialDark/nine-compact.png	0.096	5.3: nine-syllables-sp
+MaterialDark/nine-flat.png	0.206	5.3: nine-syllables-sp
+MaterialDark/nine-floating.png	1.578	5.3: nine-syllables-sp,floating-height-cap
+MaterialDark/nine-land.png	0.072	5.3: nine-syllables-sp
+MaterialDark/nine-one_handed_left.png	0.280	5.3: nine-syllables-sp
+MaterialDark/nine-port.png	0.202	5.3: nine-syllables-sp
+MaterialDark/nine-split_land.png	0.081	5.3: nine-syllables-sp
+MaterialDark/number-compact.png	0.416	
+MaterialDark/number-flat.png	0.184	
+MaterialDark/number-floating.png	0.615	5.3: floating-height-cap
+MaterialDark/number-land.png	0.016	
+MaterialDark/number-one_handed_left.png	0.160	
+MaterialDark/number-port.png	0.177	
+MaterialDark/number-split_land.png	0.085	
+MaterialDark/pinyin-bubble_q.png	0.267	5.3: popup-sp-and-radius
+MaterialDark/pinyin-compact.png	0.192	
+MaterialDark/pinyin-edit_menu.png	0.238	5.3: popup-sp-and-radius
+MaterialDark/pinyin-flat.png	0.280	
+MaterialDark/pinyin-floating.png	0.998	5.3: floating-height-cap
+MaterialDark/pinyin-land.png	0.091	
+MaterialDark/pinyin-long_press_e.png	0.577	5.3: popup-sp-and-radius
+MaterialDark/pinyin-one_handed_left.png	0.337	
+MaterialDark/pinyin-port.png	0.270	
+MaterialDark/pinyin-return_menu.png	0.270	5.3: popup-sp-and-radius
+MaterialDark/pinyin-split_land.png	0.150	
+MaterialDark/symbols-compact.png	0.001	
+MaterialDark/symbols-flat.png	0.158	
+MaterialDark/symbols-floating.png	0.355	5.3: floating-height-cap
+MaterialDark/symbols-land.png	0.000	
+MaterialDark/symbols-one_handed_left.png	0.152	
+MaterialDark/symbols-port.png	0.152	
+MaterialDark/symbols-split_land.png	0.000	
+MaterialDark/zhuyin_full-compact.png	1.845	
+MaterialDark/zhuyin_full-flat.png	1.525	
+MaterialDark/zhuyin_full-floating.png	2.265	5.3: floating-height-cap
+MaterialDark/zhuyin_full-land.png	0.011	
+MaterialDark/zhuyin_full-one_handed_left.png	1.515	
+MaterialDark/zhuyin_full-port.png	1.465	
+MaterialDark/zhuyin_full-split_land.png	0.671	
+MaterialDark/zhuyin_nine-compact.png	0.046	5.3: zhuyin-nine-shown-not-typed
+MaterialDark/zhuyin_nine-flat.png	0.148	5.3: zhuyin-nine-shown-not-typed
+MaterialDark/zhuyin_nine-floating.png	0.861	5.3: zhuyin-nine-shown-not-typed,floating-height-cap
+MaterialDark/zhuyin_nine-land.png	0.013	5.3: zhuyin-nine-shown-not-typed
+MaterialDark/zhuyin_nine-one_handed_left.png	1.709	5.3: zhuyin-nine-shown-not-typed
+MaterialDark/zhuyin_nine-port.png	0.145	5.3: zhuyin-nine-shown-not-typed
+MaterialDark/zhuyin_nine-split_land.png	0.054	5.3: zhuyin-nine-shown-not-typed
+MaterialLight/english-port.png	0.269	
+MaterialLight/handwriting-port.png	0.074	5.3: handwriting-fixed-fullwidth-punct
+MaterialLight/k14-port.png	0.117	
+MaterialLight/k18-port.png	0.125	
+MaterialLight/nine-port.png	0.188	5.3: nine-syllables-sp
+MaterialLight/number-port.png	0.169	
+MaterialLight/pinyin-bubble_q.png	0.320	5.3: popup-sp-and-radius
+MaterialLight/pinyin-edit_menu.png	0.237	5.3: popup-sp-and-radius
+MaterialLight/pinyin-long_press_e.png	0.755	5.3: popup-sp-and-radius
+MaterialLight/pinyin-port.png	0.269	
+MaterialLight/pinyin-return_menu.png	0.303	5.3: popup-sp-and-radius
+MaterialLight/symbols-port.png	0.155	
+MaterialLight/zhuyin_full-port.png	1.542	
+MaterialLight/zhuyin_nine-port.png	0.139	5.3: zhuyin-nine-shown-not-typed
+MonetDark/english-port.png	0.238	
+MonetDark/handwriting-port.png	0.061	5.3: handwriting-fixed-fullwidth-punct
+MonetDark/k14-port.png	0.084	
+MonetDark/k18-port.png	0.097	
+MonetDark/nine-port.png	0.140	5.3: nine-syllables-sp
+MonetDark/number-port.png	0.139	
+MonetDark/pinyin-bubble_q.png	0.238	5.3: popup-sp-and-radius
+MonetDark/pinyin-edit_menu.png	0.222	5.3: popup-sp-and-radius
+MonetDark/pinyin-long_press_e.png	0.556	5.3: popup-sp-and-radius
+MonetDark/pinyin-port.png	0.238	
+MonetDark/pinyin-return_menu.png	0.277	5.3: popup-sp-and-radius
+MonetDark/symbols-port.png	0.146	
+MonetDark/zhuyin_full-port.png	1.569	
+MonetDark/zhuyin_nine-port.png	0.119	5.3: zhuyin-nine-shown-not-typed
+MonetLight/english-port.png	0.241	
+MonetLight/handwriting-port.png	0.059	5.3: handwriting-fixed-fullwidth-punct
+MonetLight/k14-port.png	0.083	
+MonetLight/k18-port.png	0.091	
+MonetLight/nine-port.png	0.135	5.3: nine-syllables-sp
+MonetLight/number-port.png	0.136	
+MonetLight/pinyin-bubble_q.png	0.297	5.3: popup-sp-and-radius
+MonetLight/pinyin-edit_menu.png	0.216	5.3: popup-sp-and-radius
+MonetLight/pinyin-long_press_e.png	0.780	5.3: popup-sp-and-radius
+MonetLight/pinyin-port.png	0.241	
+MonetLight/pinyin-return_menu.png	0.278	5.3: popup-sp-and-radius
+MonetLight/symbols-port.png	0.147	
+MonetLight/zhuyin_full-port.png	1.596	
+MonetLight/zhuyin_nine-port.png	0.119	5.3: zhuyin-nine-shown-not-typed
+Monokai/english-port.png	0.244	
+Monokai/handwriting-port.png	0.064	5.3: handwriting-fixed-fullwidth-punct
+Monokai/k14-port.png	0.096	
+Monokai/k18-port.png	0.109	
+Monokai/nine-port.png	0.169	5.3: nine-syllables-sp
+Monokai/number-port.png	0.133	
+Monokai/pinyin-bubble_q.png	0.241	5.3: popup-sp-and-radius
+Monokai/pinyin-edit_menu.png	0.225	5.3: popup-sp-and-radius
+Monokai/pinyin-long_press_e.png	0.559	5.3: popup-sp-and-radius
+Monokai/pinyin-port.png	0.244	
+Monokai/pinyin-return_menu.png	0.244	5.3: popup-sp-and-radius
+Monokai/symbols-port.png	0.146	
+Monokai/zhuyin_full-port.png	1.462	
+Monokai/zhuyin_nine-port.png	0.129	5.3: zhuyin-nine-shown-not-typed
+NordDark/english-port.png	0.284	
+NordDark/handwriting-port.png	0.080	5.3: handwriting-fixed-fullwidth-punct
+NordDark/k14-port.png	0.134	
+NordDark/k18-port.png	0.147	
+NordDark/nine-port.png	0.214	5.3: nine-syllables-sp
+NordDark/number-port.png	0.189	
+NordDark/pinyin-bubble_q.png	0.282	5.3: popup-sp-and-radius
+NordDark/pinyin-edit_menu.png	0.249	5.3: popup-sp-and-radius
+NordDark/pinyin-long_press_e.png	0.578	5.3: popup-sp-and-radius
+NordDark/pinyin-port.png	0.284	
+NordDark/pinyin-return_menu.png	0.319	5.3: popup-sp-and-radius
+NordDark/symbols-port.png	0.159	
+NordDark/zhuyin_full-port.png	1.510	
+NordDark/zhuyin_nine-port.png	0.151	5.3: zhuyin-nine-shown-not-typed
+NordLight/english-port.png	0.288	
+NordLight/handwriting-port.png	0.080	5.3: handwriting-fixed-fullwidth-punct
+NordLight/k14-port.png	0.135	
+NordLight/k18-port.png	0.144	
+NordLight/nine-port.png	0.214	5.3: nine-syllables-sp
+NordLight/number-port.png	0.194	
+NordLight/pinyin-bubble_q.png	0.338	5.3: popup-sp-and-radius
+NordLight/pinyin-edit_menu.png	0.255	5.3: popup-sp-and-radius
+NordLight/pinyin-long_press_e.png	0.795	5.3: popup-sp-and-radius
+NordLight/pinyin-port.png	0.288	
+NordLight/pinyin-return_menu.png	0.322	5.3: popup-sp-and-radius
+NordLight/symbols-port.png	0.162	
+NordLight/zhuyin_full-port.png	1.544	
+NordLight/zhuyin_nine-port.png	0.151	5.3: zhuyin-nine-shown-not-typed
+PixelDark/english-port.png	0.276	
+PixelDark/handwriting-port.png	0.077	5.3: handwriting-fixed-fullwidth-punct
+PixelDark/k14-port.png	0.123	
+PixelDark/k18-port.png	0.135	
+PixelDark/nine-port.png	0.198	5.3: nine-syllables-sp
+PixelDark/number-port.png	0.174	
+PixelDark/pinyin-bubble_q.png	0.273	5.3: popup-sp-and-radius
+PixelDark/pinyin-edit_menu.png	0.242	5.3: popup-sp-and-radius
+PixelDark/pinyin-long_press_e.png	0.582	5.3: popup-sp-and-radius
+PixelDark/pinyin-port.png	0.276	
+PixelDark/pinyin-return_menu.png	0.276	5.3: popup-sp-and-radius
+PixelDark/symbols-port.png	0.159	
+PixelDark/zhuyin_full-port.png	1.536	
+PixelDark/zhuyin_nine-port.png	0.144	5.3: zhuyin-nine-shown-not-typed
+PixelLight/english-compact.png	0.200	
+PixelLight/english-flat.png	0.287	
+PixelLight/english-floating.png	1.057	5.3: floating-height-cap
+PixelLight/english-land.png	0.098	
+PixelLight/english-one_handed_left.png	0.356	
+PixelLight/english-port.png	0.279	
+PixelLight/english-split_land.png	0.159	
+PixelLight/handwriting-compact.png	0.084	5.3: handwriting-fixed-fullwidth-punct
+PixelLight/handwriting-flat.png	0.078	5.3: handwriting-fixed-fullwidth-punct
+PixelLight/handwriting-floating.png	0.444	5.3: handwriting-fixed-fullwidth-punct,floating-height-cap
+PixelLight/handwriting-land.png	0.028	5.3: handwriting-fixed-fullwidth-punct
+PixelLight/handwriting-one_handed_left.png	0.122	5.3: handwriting-fixed-fullwidth-punct
+PixelLight/handwriting-port.png	0.076	5.3: handwriting-fixed-fullwidth-punct
+PixelLight/handwriting-split_land.png	0.074	5.3: handwriting-fixed-fullwidth-punct
+PixelLight/k14-compact.png	0.174	
+PixelLight/k14-flat.png	0.130	
+PixelLight/k14-floating.png	1.302	5.3: floating-height-cap
+PixelLight/k14-land.png	0.010	
+PixelLight/k14-one_handed_left.png	0.170	
+PixelLight/k14-port.png	0.122	
+PixelLight/k14-split_land.png	0.054	
+PixelLight/k18-compact.png	0.141	
+PixelLight/k18-flat.png	0.139	
+PixelLight/k18-floating.png	1.382	5.3: floating-height-cap
+PixelLight/k18-land.png	0.015	
+PixelLight/k18-one_handed_left.png	0.111	
+PixelLight/k18-port.png	0.131	
+PixelLight/k18-split_land.png	0.082	
+PixelLight/nine-compact.png	0.098	5.3: nine-syllables-sp
+PixelLight/nine-flat.png	0.208	5.3: nine-syllables-sp
+PixelLight/nine-floating.png	1.609	5.3: nine-syllables-sp,floating-height-cap
+PixelLight/nine-land.png	0.070	5.3: nine-syllables-sp
+PixelLight/nine-one_handed_left.png	0.276	5.3: nine-syllables-sp
+PixelLight/nine-port.png	0.195	5.3: nine-syllables-sp
+PixelLight/nine-split_land.png	0.079	5.3: nine-syllables-sp
+PixelLight/number-compact.png	0.459	
+PixelLight/number-flat.png	0.184	
+PixelLight/number-floating.png	0.638	5.3: floating-height-cap
+PixelLight/number-land.png	0.016	
+PixelLight/number-one_handed_left.png	0.165	
+PixelLight/number-port.png	0.181	
+PixelLight/number-split_land.png	0.085	
+PixelLight/pinyin-bubble_q.png	0.330	5.3: popup-sp-and-radius
+PixelLight/pinyin-compact.png	0.200	
+PixelLight/pinyin-edit_menu.png	0.246	5.3: popup-sp-and-radius
+PixelLight/pinyin-flat.png	0.287	
+PixelLight/pinyin-floating.png	1.057	5.3: floating-height-cap
+PixelLight/pinyin-land.png	0.098	
+PixelLight/pinyin-long_press_e.png	0.796	5.3: popup-sp-and-radius
+PixelLight/pinyin-one_handed_left.png	0.356	
+PixelLight/pinyin-port.png	0.279	
+PixelLight/pinyin-return_menu.png	0.312	5.3: popup-sp-and-radius
+PixelLight/pinyin-split_land.png	0.159	
+PixelLight/symbols-compact.png	0.001	
+PixelLight/symbols-flat.png	0.163	
+PixelLight/symbols-floating.png	0.367	5.3: floating-height-cap
+PixelLight/symbols-land.png	0.000	
+PixelLight/symbols-one_handed_left.png	0.159	
+PixelLight/symbols-port.png	0.159	
+PixelLight/symbols-split_land.png	0.000	
+PixelLight/zhuyin_full-compact.png	1.940	
+PixelLight/zhuyin_full-flat.png	1.581	
+PixelLight/zhuyin_full-floating.png	2.361	5.3: floating-height-cap
+PixelLight/zhuyin_full-land.png	0.013	
+PixelLight/zhuyin_full-one_handed_left.png	1.623	
+PixelLight/zhuyin_full-port.png	1.581	
+PixelLight/zhuyin_full-split_land.png	0.740	
+PixelLight/zhuyin_nine-compact.png	0.046	5.3: zhuyin-nine-shown-not-typed
+PixelLight/zhuyin_nine-flat.png	0.148	5.3: zhuyin-nine-shown-not-typed
+PixelLight/zhuyin_nine-floating.png	0.896	5.3: zhuyin-nine-shown-not-typed,floating-height-cap
+PixelLight/zhuyin_nine-land.png	0.013	5.3: zhuyin-nine-shown-not-typed
+PixelLight/zhuyin_nine-one_handed_left.png	1.781	5.3: zhuyin-nine-shown-not-typed
+PixelLight/zhuyin_nine-port.png	0.144	5.3: zhuyin-nine-shown-not-typed
+PixelLight/zhuyin_nine-split_land.png	0.053	5.3: zhuyin-nine-shown-not-typed
+TransparentDark/english-port.png	0.280	
+TransparentDark/handwriting-port.png	0.081	5.3: handwriting-fixed-fullwidth-punct
+TransparentDark/k14-port.png	0.135	
+TransparentDark/k18-port.png	0.147	
+TransparentDark/nine-port.png	0.215	5.3: nine-syllables-sp
+TransparentDark/number-port.png	0.185	
+TransparentDark/pinyin-bubble_q.png	0.278	5.3: popup-sp-and-radius
+TransparentDark/pinyin-edit_menu.png	0.308	5.3: popup-sp-and-radius
+TransparentDark/pinyin-long_press_e.png	0.635	5.3: popup-sp-and-radius
+TransparentDark/pinyin-port.png	0.280	
+TransparentDark/pinyin-return_menu.png	0.314	5.3: popup-sp-and-radius
+TransparentDark/symbols-port.png	0.158	
+TransparentDark/zhuyin_full-port.png	1.492	
+TransparentDark/zhuyin_nine-port.png	0.152	5.3: zhuyin-nine-shown-not-typed
+TransparentLight/english-port.png	0.300	
+TransparentLight/handwriting-port.png	0.080	5.3: handwriting-fixed-fullwidth-punct
+TransparentLight/k14-port.png	0.137	
+TransparentLight/k18-port.png	0.146	
+TransparentLight/nine-port.png	0.218	5.3: nine-syllables-sp
+TransparentLight/number-port.png	0.196	
+TransparentLight/pinyin-bubble_q.png	0.355	5.3: popup-sp-and-radius
+TransparentLight/pinyin-edit_menu.png	0.267	5.3: popup-sp-and-radius
+TransparentLight/pinyin-long_press_e.png	0.817	5.3: popup-sp-and-radius
+TransparentLight/pinyin-port.png	0.300	
+TransparentLight/pinyin-return_menu.png	0.337	5.3: popup-sp-and-radius
+TransparentLight/symbols-port.png	0.173	
+TransparentLight/zhuyin_full-port.png	1.619	
+TransparentLight/zhuyin_nine-port.png	0.154	5.3: zhuyin-nine-shown-not-typed
+color_dark/english-port.png	0.614	
+color_dark/handwriting-port.png	0.150	5.3: handwriting-fixed-fullwidth-punct
+color_dark/k14-port.png	0.342	
+color_dark/k18-port.png	0.411	
+color_dark/nine-port.png	0.417	5.3: nine-syllables-sp
+color_dark/number-port.png	0.238	
+color_dark/pinyin-port.png	0.614	
+color_dark/symbols-port.png	0.159	
+color_dark/zhuyin_full-port.png	1.606	
+color_dark/zhuyin_nine-port.png	0.227	5.3: zhuyin-nine-shown-not-typed
+color_light/english-port.png	0.628	
+color_light/handwriting-port.png	0.151	5.3: handwriting-fixed-fullwidth-punct
+color_light/k14-port.png	0.349	
+color_light/k18-port.png	0.417	
+color_light/nine-port.png	0.417	5.3: nine-syllables-sp
+color_light/number-port.png	0.245	
+color_light/pinyin-port.png	0.628	
+color_light/symbols-port.png	0.159	
+color_light/zhuyin_full-port.png	1.647	
+color_light/zhuyin_nine-port.png	0.229	5.3: zhuyin-nine-shown-not-typed
+cutout_dark/english-port.png	0.254	
+cutout_dark/handwriting-port.png	0.081	5.3: handwriting-fixed-fullwidth-punct
+cutout_dark/k14-port.png	0.131	
+cutout_dark/k18-port.png	0.144	
+cutout_dark/nine-port.png	0.197	5.3: nine-syllables-sp
+cutout_dark/number-port.png	0.171	
+cutout_dark/pinyin-port.png	0.254	
+cutout_dark/symbols-port.png	0.125	
+cutout_dark/zhuyin_full-port.png	1.268	
+cutout_dark/zhuyin_nine-port.png	0.155	5.3: zhuyin-nine-shown-not-typed
+cutout_light/english-port.png	0.276	
+cutout_light/handwriting-port.png	0.076	5.3: handwriting-fixed-fullwidth-punct
+cutout_light/k14-port.png	0.116	
+cutout_light/k18-port.png	0.125	
+cutout_light/nine-port.png	0.195	5.3: nine-syllables-sp
+cutout_light/number-port.png	0.175	
+cutout_light/pinyin-port.png	0.276	
+cutout_light/symbols-port.png	0.158	
+cutout_light/zhuyin_full-port.png	1.599	
+cutout_light/zhuyin_nine-port.png	0.146	5.3: zhuyin-nine-shown-not-typed
+each_key_dark/english-port.png	0.280	
+each_key_dark/handwriting-port.png	0.077	5.3: handwriting-fixed-fullwidth-punct
+each_key_dark/k14-port.png	0.123	
+each_key_dark/k18-port.png	0.135	
+each_key_dark/nine-port.png	0.198	5.3: nine-syllables-sp
+each_key_dark/number-port.png	0.174	
+each_key_dark/pinyin-port.png	0.280	
+each_key_dark/symbols-port.png	0.159	
+each_key_dark/zhuyin_full-port.png	1.524	
+each_key_dark/zhuyin_nine-port.png	0.144	5.3: zhuyin-nine-shown-not-typed
+each_key_light/english-port.png	0.279	
+each_key_light/handwriting-port.png	0.076	5.3: handwriting-fixed-fullwidth-punct
+each_key_light/k14-port.png	0.122	
+each_key_light/k18-port.png	0.131	
+each_key_light/nine-port.png	0.195	5.3: nine-syllables-sp
+each_key_light/number-port.png	0.181	
+each_key_light/pinyin-port.png	0.279	
+each_key_light/symbols-port.png	0.159	
+each_key_light/zhuyin_full-port.png	1.581	
+each_key_light/zhuyin_nine-port.png	0.144	5.3: zhuyin-nine-shown-not-typed
+from-app-2.1/english-port.png	0.293	
+from-app-2.1/handwriting-port.png	0.080	5.3: handwriting-fixed-fullwidth-punct
+from-app-2.1/k14-port.png	0.133	
+from-app-2.1/k18-port.png	0.145	
+from-app-2.1/nine-port.png	0.212	5.3: nine-syllables-sp
+from-app-2.1/number-port.png	0.189	
+from-app-2.1/pinyin-port.png	0.293	
+from-app-2.1/symbols-port.png	0.171	
+from-app-2.1/zhuyin_full-port.png	1.616	
+from-app-2.1/zhuyin_nine-port.png	0.149	5.3: zhuyin-nine-shown-not-typed
+from-app/english-port.png	1.465	
+from-app/handwriting-port.png	0.257	5.3: handwriting-fixed-fullwidth-punct
+from-app/k14-port.png	0.310	
+from-app/k18-port.png	0.349	
+from-app/nine-port.png	0.386	5.3: nine-syllables-sp
+from-app/number-port.png	0.241	
+from-app/pinyin-port.png	1.465	
+from-app/symbols-port.png	0.303	
+from-app/zhuyin_full-port.png	2.288	注音 glyphs a pixel off as on every theme (060-render-p2.md S4c, the yield's rounding)
+from-app/zhuyin_nine-port.png	0.809	5.3: zhuyin-nine-shown-not-typed
+from-web/english-port.png	2.216	the theme's 1 KB font (full-font.ttf, no glyphs for most keys): its missing-glyph boxes placed a pixel or two otherwise than the old drawing's
+from-web/handwriting-port.png	0.342	5.3: handwriting-fixed-fullwidth-punct
+from-web/k14-port.png	1.096	
+from-web/k18-port.png	1.218	
+from-web/nine-port.png	1.025	5.3: nine-syllables-sp
+from-web/number-port.png	0.479	
+from-web/pinyin-port.png	2.209	the theme's 1 KB font (full-font.ttf, no glyphs for most keys): its missing-glyph boxes placed a pixel or two otherwise than the old drawing's
+from-web/symbols-port.png	0.346	
+from-web/zhuyin_full-port.png	2.230	the theme's 1 KB font (full-font.ttf, no glyphs for most keys): its missing-glyph boxes placed a pixel or two otherwise than the old drawing's
+from-web/zhuyin_nine-port.png	1.503	the theme's 1 KB font (full-font.ttf, no glyphs for most keys): its missing-glyph boxes placed a pixel or two otherwise than the old drawing's; 5.3: zhuyin-nine-shown-not-typed
+glass_dark/english-port.png	0.267	
+glass_dark/handwriting-port.png	0.080	5.3: handwriting-fixed-fullwidth-punct
+glass_dark/k14-port.png	0.131	
+glass_dark/k18-port.png	0.144	
+glass_dark/nine-port.png	0.211	5.3: nine-syllables-sp
+glass_dark/number-port.png	0.178	
+glass_dark/pinyin-port.png	0.267	
+glass_dark/symbols-port.png	0.144	
+glass_dark/zhuyin_full-port.png	1.387	
+glass_dark/zhuyin_nine-port.png	0.153	5.3: zhuyin-nine-shown-not-typed
+glass_light/english-port.png	0.284	
+glass_light/handwriting-port.png	0.078	5.3: handwriting-fixed-fullwidth-punct
+glass_light/k14-port.png	0.125	
+glass_light/k18-port.png	0.134	
+glass_light/nine-port.png	0.201	5.3: nine-syllables-sp
+glass_light/number-port.png	0.182	
+glass_light/pinyin-port.png	0.284	
+glass_light/symbols-port.png	0.160	
+glass_light/zhuyin_full-port.png	1.601	
+glass_light/zhuyin_nine-port.png	0.147	5.3: zhuyin-nine-shown-not-typed
+nine_slice_font_dark/english-port.png	0.298	
+nine_slice_font_dark/handwriting-port.png	0.079	5.3: handwriting-fixed-fullwidth-punct
+nine_slice_font_dark/k14-port.png	0.121	
+nine_slice_font_dark/k18-port.png	0.121	
+nine_slice_font_dark/nine-port.png	0.196	5.3: nine-syllables-sp
+nine_slice_font_dark/number-port.png	0.182	
+nine_slice_font_dark/pinyin-port.png	0.298	
+nine_slice_font_dark/symbols-port.png	0.162	
+nine_slice_font_dark/zhuyin_full-port.png	1.537	
+nine_slice_font_dark/zhuyin_nine-port.png	0.142	5.3: zhuyin-nine-shown-not-typed
+nine_slice_font_light/english-port.png	0.307	
+nine_slice_font_light/handwriting-port.png	0.078	5.3: handwriting-fixed-fullwidth-punct
+nine_slice_font_light/k14-port.png	0.119	
+nine_slice_font_light/k18-port.png	0.119	
+nine_slice_font_light/nine-port.png	0.193	5.3: nine-syllables-sp
+nine_slice_font_light/number-port.png	0.191	
+nine_slice_font_light/pinyin-port.png	0.307	
+nine_slice_font_light/symbols-port.png	0.164	
+nine_slice_font_light/zhuyin_full-port.png	1.574	
+nine_slice_font_light/zhuyin_nine-port.png	0.141	5.3: zhuyin-nine-shown-not-typed
