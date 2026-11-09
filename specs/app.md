@@ -251,6 +251,40 @@ keys has it (`InputView.navbarStrip`), and 仅颜色 sets the window's bar colou
 `SceneWindow.darkButtonsOn`; a mid grey's luminance is 0.22, yet black on it stands out more). The
 hardware keyboard's bar (its candidates alone) is the theme's whatever the floating setting says.
 
+The candidate bar, the expanded candidates and the hardware keyboard's window are drawn by their views
+as the theme's `candidate`, `candidates-divider`, `bar` and `candidates-panel` say (060-render-p3 T6a):
+the engine works out a `BarLook` (keyboard-scene `engine/BarLook`: per candidate plain, `:first`,
+`:selected` and both, its fill, pressed overlay, colours of the words, `label` and `comment`, font and
+weight; the corners, the inset from the cell, the padding, the `gap`, `label-style`, the lines' colour,
+the bar's base and the panel's) in the window's scenes but floating (`SceneWindow.scenes`), and
+`candidates/SceneBar` turns it into drawables, a typeface and px (`(dp × density).toInt()`, as the
+engine's sample bar). A theme setting none of it, every built-in one, has the bar as before: no fill,
+the pressed colour over the whole cell, 3.0's candidate colours and font (LookTheme writes 3.0's candidate
+font and weight as the theme's `candidate` style, its font `<font name="candidate">`; a font's name is read
+as the keys' are, `SceneFonts`: `candidate`, `key`, else the system's till a theme's own fonts are, T8a), the padding of 候选字号
+(`KawaiiBarComponent.candidatePaddingDp`), the divider's 1 dp line, the panel the bar's colour over flat
+keys; a look that made no theme the same of its colours (`SceneBar.plain`). A candidate's shape is a
+`LayerDrawable` inset, not an `InsetDrawable`, whose inset a view takes as its padding. `gap` widens
+the horizontal bar's room between two (the line in its middle, `FlexboxVerticalDecoration`); a
+transparent divider draws nothing but keeps its room. `label-style` (number: 1 2 3 of the whole list,
+the expanded grid's numbers going on from the bar's; dot: •; none, the default) stands before the
+words, a space after it; the hardware keyboard's window, whose default is fcitx's own label, shows
+fcitx's label for number; a screen reader reads the candidate without the theme's number or dot (the
+text's content description). `:first` is the list's first in the bar (scrolled, it is still the list's
+first, out of sight), the page's first in the hardware keyboard's window (each page's), and never in the
+expanded grid (its cells go on past the bar's). `gap` is the horizontal bar's alone; `padding` the bar's
+and the flexbox expanded window's (the grid one and the hardware keyboard's window keep their own); the
+hardware keyboard's window has no pressed colour.
+One BarLook is worked out for a bar and handed to its holders (`HorizontalCandidateViewAdapter.bar`,
+`PagingCandidateViewAdapter.bar`, `PagedCandidatesUi`). `CandidateViewHolder` draws a holder bound at another index again where its
+look or label differs (the first's own look, its number). The candidate's size is still 候选字号's
+(the bar's height and the grid's rows follow it): a theme's `size` there is warned of, not read.
+`BarThemeTest` holds the views to the theme, and to `BarSample.scene` (the engine's sample bar, its
+snapshots `bar-*.txt`): each candidate's box within a pixel, its fill and colours the same, of a theme of
+none of it, pills and a dotted one, a candidate with a comment among them. The sample is the bar at its words'
+own widths (`NeverFillWidth`); filling its width (Auto, Always), the app stretches each candidate, which the
+web's preview does not show.
+
 Floating (`ThemePrefs.floatingKeyboard`, the status area's 悬浮键盘; the input view is made anew for
 it): `keyboardView` is `FloatingKeyboard.widthDp` wide (70% of the screen, 300–420 dp), its boards as
 much shorter (85% at least), with `FloatingHandle` at the bottom (24 dp: a short bar and the dock button;

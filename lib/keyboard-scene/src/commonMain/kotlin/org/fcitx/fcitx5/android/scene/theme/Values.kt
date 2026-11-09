@@ -120,6 +120,8 @@ object Values {
         "align", "letter-spacing", "stroke", "text-shadow", "font-han", "font-latin", "space-content",
         // T4b: a key's shape and cap, the bubble's shape, size and place
         "inner-shadow", "depth", "depth-color", "tail", "offset",
+        // T6a: the candidates (BarLook)
+        "gap", "label-style",
         // T7b: the voice mask's frosted glass (engine/PanelLooks), the handwriting pad's ink and grid
         "blur", "ink-color", "ink-width", "grid-color", "grid",
     ) + RETURN_ACTIONS.map { "$RETURN_ICON$it" }
@@ -167,9 +169,7 @@ object Values {
         "width" to form(LEN),
         "side-padding" to form(LEN_OR_PERCENT),
         "bottom-padding" to form(LEN_OR_PERCENT),
-        // T6a, T6b: the candidates, the pre-edit text
-        "gap" to form(LEN),
-        "label-style" to form("none|number|dot"),
+        // T6b: the pre-edit text
         "underline" to lengthsThenColor(1, none = true),
         "cursor-color" to COLOR,
         // A1–A3: motion
@@ -238,6 +238,8 @@ object Values {
         "size" -> size(raw)
         "hidden" -> flag(raw)
         "press" -> raw.takeIf { it in listOf("tint", "ripple", "face") }?.let(Value::Word)
+        "gap" -> dp(raw)?.let(Value::Number)
+        "label-style" -> raw.takeIf { it in LABEL_STYLES }?.let(Value::Word)
         else -> textOnAKey(property, raw) ?: capAndBubble(property, raw) ?: panel(property, raw)
     }
 
@@ -256,6 +258,9 @@ object Values {
         "grid" -> flag(raw)
         else -> null
     }
+
+    /** A candidate's `label-style=` (T6a): no number before it, its number, a dot. */
+    val LABEL_STYLES = listOf("none", "number", "dot")
 
     // a text's size in sp, or the bubble's in % (T4b)
     private fun size(raw: String): Value? =

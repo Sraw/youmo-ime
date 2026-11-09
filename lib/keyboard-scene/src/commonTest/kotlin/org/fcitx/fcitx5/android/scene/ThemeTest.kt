@@ -381,8 +381,8 @@ class ThemeTest {
         val reserved = listOf(
             "side-padding=\"2% 5%\"", "bottom-padding=\"1%\"",
             "underline=\"none\"", "cursor-color=\"system(primary, @keyText)\"",
-            "height=\"38% 52%\"", "width=\"24dp\"", "side-padding=\"8dp 48dp\"", "bottom-padding=\"0 0\"", "gap=\"4dp\"",
-            "label-style=\"dot\"", "underline=\"1dp @keyText\"", "cursor-color=\"@keyText\"",
+            "height=\"38% 52%\"", "width=\"24dp\"", "side-padding=\"8dp 48dp\"", "bottom-padding=\"0 0\"",
+            "underline=\"1dp @keyText\"", "cursor-color=\"@keyText\"",
             "transition=\"150ms ease-out\"", "press-scale=\"95%\"", "press-sink=\"2dp\"", "appear=\"scale 150ms\"",
             "effect=\"particles(star.png, 12, 24dp, 600ms)\"", "sticker=\"cat.png\"",
         )
@@ -562,9 +562,11 @@ class ThemeTest {
         assertEquals("0.6.0", t.value.meta?.minApp)
         // T5 made its scenes and the keyboard's size work: no warning of them
         val ignored = listOf(
-            "83|<sounds>", "79|transition=", "79|:first",
-            "80|press-scale=", "80|effect=", "80|sticker=", "81|appear=",
+            "83|<sounds>", "79|transition=",
         ).map { "$it is not supported by this version, ignored" } +
+            // T6a's candidate:first comment selects: a fill does nothing on a part, its colour alone read
+            "79|fill= on candidate:first comment does nothing: it reads color" +
+            listOf("80|press-scale=", "80|effect=", "80|sticker=", "81|appear=").map { "$it is not supported by this version, ignored" } +
             // its preview a path with a tail, which only a bubble has
             "81|tail= does nothing beside a shape that is no bubble: only a bubble has a tail"
         assertEquals(ignored, t.warnings().map { "${it.line}|${it.message}" })
@@ -581,15 +583,15 @@ class ThemeTest {
         assertNull(Selector.parse("@im=Wubi key"))
         assertNull(Selector.parse("@colour=red key"))
         for (w in Selector.RESERVED_WIDGETS) assertEquals(w, s(w).reserved)
-        // T7a's and T7b's: they select (WindowLooksTest, PanelLooksTest)
-        for (w in Selector.WINDOW_WIDGETS + Selector.PANEL_WIDGETS) assertNull(s(w).reserved, w)
+        // T7a's, T7b's and T6a's: they select (WindowLooksTest, PanelLooksTest, BarLookTest)
+        for (w in Selector.WINDOW_WIDGETS + Selector.PANEL_WIDGETS + Selector.BAR_WIDGETS) assertNull(s(w).reserved, w)
         assertEquals("categories", s("picker:selected categories").part)
         assertEquals("mic", s("@dark voice mic").part)
         assertNull(Selector.parse("picker mic"), "a voice mask's part")
         assertNull(Selector.parse("clipboard label"), "a key's part")
         assertNull(Selector.parse("frame categories"))
-        assertEquals("candidate comment", s("candidate comment").reserved)
-        assertEquals(":first", s("candidate:first").reserved)
+        assertNull(s("candidate comment").reserved)
+        assertNull(s("candidate:first label").reserved)
         assertNull(Selector.parse("candidate mark"))
         assertNull(Selector.parse("toolbar label"))
         assertNull(Selector.parse("key:first"), ":first is a candidate's")

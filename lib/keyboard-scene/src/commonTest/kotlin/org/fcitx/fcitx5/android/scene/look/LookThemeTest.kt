@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.SceneText
+import org.fcitx.fcitx5.android.scene.engine.BarLook
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
@@ -75,6 +76,26 @@ class LookThemeTest {
         val t = theme(LookTheme.xml(look, "T", false))
         val radius = Cascades(t).of(setOf("floating")).of(Selector.Target("keyboard"))["radius"] as Value.OfRadius
         assertEquals(List(4) { Keys.MAX_RADIUS_DP.toDouble() }, radius.radius.corners)
+    }
+
+    // theme 3.0's candidate font and weight carried into the 4.0 theme (060-render-p3 T6a), so the web's
+    // conversion and an export keep them; a look of neither writes no candidate style at all
+    @Test
+    fun theCandidatesFontIsTheThemes() {
+        val base = LookDefaults.look(palette(themeFile("material-light.xml")))
+        val plain = theme(LookTheme.xml(base, "T", false))
+        assertEquals(null, BarLook.of(Cascades(plain), emptySet()).plain.font)
+        assertTrue(plain.styles.none { s -> s.selectors.any { it.widget == "candidate" } })
+        val text = base.text.copy(keyFont = "/data/themes/t/k.ttf", candidateFont = "/data/themes/t/kai.ttf", candidateWeight = 700)
+        val t = theme(LookTheme.xml(base.copy(text = text), "T", false))
+        assertEquals(mapOf(LookTheme.KEY_FONT to "k.ttf", LookTheme.CANDIDATE_FONT to "kai.ttf"), t.fonts)
+        val bar = BarLook.of(Cascades(t), emptySet())
+        assertEquals(LookTheme.CANDIDATE_FONT to 700, bar.plain.font to bar.plain.weight)
+        assertEquals(LookTheme.CANDIDATE_FONT to 700, bar.selected.font to bar.selected.weight)
+        // a weight alone: the system's font at it
+        val bold = theme(LookTheme.xml(base.copy(text = base.text.copy(candidateWeight = 700)), "T", false))
+        assertEquals("system" to 700, BarLook.of(Cascades(bold), emptySet()).plain.let { it.font to it.weight })
+        assertEquals(emptyMap(), bold.fonts)
     }
 
     @Test

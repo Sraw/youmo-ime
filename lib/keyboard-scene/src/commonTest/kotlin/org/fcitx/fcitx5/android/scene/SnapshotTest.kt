@@ -5,9 +5,12 @@
 package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
+import org.fcitx.fcitx5.android.scene.engine.BarLook
+import org.fcitx.fcitx5.android.scene.engine.BarSample
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.Shift
+import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import kotlin.test.Test
@@ -169,6 +172,35 @@ object Shots {
         PopupShot("popup-$name-block", Forms.block, asks.getValue(if (name.startsWith("keys")) "keys" else "preview-symbol"), styled(style))
     }
 
+    /**
+     * T6a's sample candidate bar ([BarSample]) on a phone (2.75 px a dp, 候选字号 20sp): material-light's, as
+     * the app drew it before; a theme's pills on a coloured bar, the first in another colour, numbered,
+     * the comment its own colour, spaced; dotted, no lines between, padded by the theme; in dark.
+     */
+    val bars: List<PopupShot> = listOf(
+        "default" to emptyList(),
+        "capsule" to listOf(
+            "<style select=\"bar\" fill=\"#ffeceff1\"/>",
+            "<style select=\"candidate\" fill=\"#ffffffff\" radius=\"50%\" inset=\"6dp 2dp\" gap=\"4dp\" label-style=\"number\"/>",
+            "<style select=\"candidate:first\" fill=\"@accentKey\" color=\"#ffffffff\"/>",
+            "<style select=\"candidate comment\" color=\"#ff1565c0\"/>",
+            "<style select=\"candidates-divider\" fill=\"transparent\"/>",
+        ),
+        "dot-padded" to listOf(
+            "<style select=\"candidate\" padding=\"0 16dp\" label-style=\"dot\" weight=\"700\"/>",
+            "<style select=\"candidate label\" color=\"#ffe53935\"/>",
+            "<style select=\"candidates-divider\" fill=\"#ff90a4ae\"/>",
+        ),
+        "dark" to listOf("<style select=\"@dark candidate\" fill=\"#ff263238\" color=\"#ffeceff1\"/>", "<style select=\"@dark bar\" fill=\"#ff000000\"/>"),
+    ).map { (name, styles) ->
+        PopupShot("bar-$name") {
+            val scenes = if (name == "dark") setOf("dark") else emptySet()
+            BarSample.scene(BarLook.of(Cascades(styled(*styles.toTypedArray())), scenes), BAR, FakeMeasurer)
+        }
+    }
+
+    private val BAR = BarSample.Metrics(width = 1080.0, height = 110.0, density = 2.75, textSize = 55.0, paddingDp = 9.0, minWidthDp = 32.0)
+
     // material-light with [styles] more, and [fonts]
     private fun styled(vararg styles: String, fonts: String = "") = ThemeSource("material-light.xml", styles.toList(), fonts)
 
@@ -200,6 +232,9 @@ class SnapshotTest {
     fun everyPopup() = check(Shots.popups.map { it.name to it.scene })
 
     @Test
+    fun theSampleCandidateBar() = check(Shots.bars.map { it.name to it.scene })
+
+    @Test
     fun noBoardWarnsInAnyForm() {
         val warned = Shots.forms.mapNotNull { s -> s.scene.warnings.takeIf { it.isNotEmpty() }?.let { "${s.name}: $it" } }
         assertTrue(warned.isEmpty(), warned.joinToString("\n"))
@@ -210,7 +245,7 @@ class SnapshotTest {
     fun everySnapshotIsAShot() {
         // recording, the shots may not all be written yet (the tests run in any order)
         if (recording()) return
-        val names = Shots.all.map { it.name } + Shots.popups.map { it.name }
+        val names = Shots.all.map { it.name } + Shots.popups.map { it.name } + Shots.bars.map { it.name }
         assertEquals(names.toSet().size, names.size, "two shots of one name")
         val files = listNames("$TEST_DATA/snapshots")
         assertEquals(names.map { "$it.txt" }.sorted(), files)
