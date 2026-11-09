@@ -133,10 +133,7 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
     @Volatile
     var lastEntry: ClipboardEntry? = null
 
-    // the listeners told before the entry is published: whoever sees [lastEntry] (this runs on Default, not main)
-    // knows they have been, so what they posted to the main thread is queued by then (a test's copy waits for
-    // lastEntry; told after, the bar's clipboard suggestion could land after the test's next tap, taking the
-    // toolbar it had just expanded: LandscapeUatTest.clipboardAtTheSide)
+    // listeners first: whoever sees [lastEntry] knows what they posted to the main thread is queued already
     @VisibleForTesting
     internal fun updateLastEntry(entry: ClipboardEntry) {
         synchronized(onUpdateListeners) { onUpdateListeners.toList() }.forEach { it.onUpdate(entry) }

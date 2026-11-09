@@ -563,7 +563,7 @@ class KeyboardHarness(
         service.getSystemService(android.content.ClipboardManager::class.java)
             .setPrimaryClip(ClipData.newPlainText("", text))
         waitFor("$text stored") { org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.lastEntry?.text == text }
-        // what its listeners posted to the main thread (told before lastEntry is set) done before the next tap
+        // its listeners' main-thread work (queued before lastEntry is set) done before the next tap
         idle()
     }
 
