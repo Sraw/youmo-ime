@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.graphics.Rect
+import android.view.MotionEvent
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.FormattedText
@@ -12,6 +13,7 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.assertRows
@@ -20,10 +22,18 @@ import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
+import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.GlideInput
+import org.fcitx.fcitx5.android.input.keyboard.GroupedKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.keyboard.OneHanded
+import org.fcitx.fcitx5.android.input.keyboard.T9Keyboard
+import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.ZhuyinKeyboard
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -161,15 +171,14 @@ class StrokeUatTest {
     // the split keyboard's gap: a stroke may start there (no key to tap); a tap there, or a glide, still does nothing
     @Test
     @Uat("KB-42")
-    @Config(qualifiers = "w851dp-h393dp-land-440dpi")
+    @Config(qualifiers = LANDSCAPE)
     fun aStrokeStartsInTheSplitGapTooATapOrAGlideThereDoNothing() {
         harness(KeyboardHarness.PINYIN)
-        assertEquals(h.texts().toString(), 2, h.keys().count { it.label.equals("g", ignoreCase = true) })
-        // between T and Y, the top row's halves
+        val gap = gap()
         val t = h.box(h.key("t"))
-        val y = h.box(h.key("y"))
-        assertTrue("$t $y", y.left - t.right > t.width())
-        val gap = Rect(t.right, t.top, y.left, t.bottom)
+        // what GlideInput is told there, and not on the letters beside it
+        assertTrue(gapAt(gap.exactCenterX(), gap.exactCenterY()))
+        assertFalse(gapAt(t.exactCenterX(), t.exactCenterY()))
         typed("hao")
         h.api.calls.clear()
         h.drag(gap, gap.exactCenterX(), gap.exactCenterY() + 2f * t.height())
@@ -185,6 +194,121 @@ class StrokeUatTest {
         h.api.calls.clear()
         h.drag(gap, gap.exactCenterX() + 3f * t.width(), gap.exactCenterY())
         assertTrue(h.api.calls.toString(), h.api.calls.none { it.startsWith("offerGlide") } && downs().isEmpty())
+    }
+
+    // a finger resting in the gap, another tapping a letter: the letter typed as ever, no stroke
+    @Test
+    @Uat("KB-42")
+    @Config(qualifiers = LANDSCAPE)
+    fun aSecondFingerOnALetterWhileOneRestsInTheGapTypesIt() {
+        harness(KeyboardHarness.PINYIN)
+        val gap = gap()
+        val k = h.box(h.key("k"))
+        typed("hao")
+        // what k typed alone sends
+        h.api.calls.clear()
+        h.drag(k, k.exactCenterX(), k.exactCenterY(), steps = 1)
+        val alone = downs()
+        assertEquals(alone.toString(), 1, alone.size)
+        typed("hao")
+        h.api.calls.clear()
+        h.drag(gap, gap.exactCenterX(), gap.exactCenterY(), steps = 1, lift = false)
+        h.secondFingerThenLift(k.exactCenterX(), k.exactCenterY())
+        assertEquals(alone, downs())
+        assertEquals(emptyList<String>(), strokesSent())
+    }
+
+    // a stroke from the gap cancelled midway (the system took the touch): nothing sent, its trail gone
+    @Test
+    @Uat("KB-42")
+    @Config(qualifiers = LANDSCAPE)
+    fun aStrokeFromTheGapCancelledSendsNothingAndLeavesNoTrail() {
+        harness(KeyboardHarness.PINYIN)
+        val gap = gap()
+        val keyHeight = h.box(h.key("t")).height()
+        typed("hao")
+        h.api.calls.clear()
+        val f = h.Finger { intArrayOf(gap.left, gap.top) }
+        val x = gap.width() / 2f
+        val y = gap.height() / 2f
+        f.send(MotionEvent.ACTION_DOWN, KeyboardHarness.Touch(x, y))
+        for (i in 1..6) {
+            h.advance(16)
+            f.move(KeyboardHarness.Touch(x, y + i * keyHeight / 3f))
+        }
+        assertTrue(glide().trailShown)
+        f.send(MotionEvent.ACTION_CANCEL, KeyboardHarness.Touch(x, y + 2f * keyHeight))
+        h.relayout()
+        assertFalse(glide().trailShown)
+        assertEquals(emptyList<String>(), downs())
+        // the next touch as ever: a stroke from the gap again
+        typed("hao")
+        h.api.calls.clear()
+        h.drag(gap, gap.exactCenterX(), gap.exactCenterY() + 2f * keyHeight)
+        assertEquals(downs().toString(), listOf(true), downs().map { stroke('s') in it })
+    }
+
+    // only the split 26 keys have a gap: no point of any other layout's keyboard is one, as GlideInput asks
+    @Test
+    @Uat("KB-42")
+    fun noOtherLayoutHasAGap() {
+        prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
+        class Board(val name: String, val board: PinyinKeyboard, val kind: Class<*>, val oneHanded: OneHanded = OneHanded.Off)
+        val boards = listOf(
+            Board("26 keys", PinyinKeyboard.Full, TextKeyboard::class.java),
+            Board("26 keys one-handed", PinyinKeyboard.Full, TextKeyboard::class.java, OneHanded.Right),
+            Board("14 keys", PinyinKeyboard.Keys14, GroupedKeyboard::class.java),
+            Board("18 keys", PinyinKeyboard.Keys18, GroupedKeyboard::class.java),
+            Board("nine keys", PinyinKeyboard.NineKeys, T9Keyboard::class.java),
+            Board("zhuyin", PinyinKeyboard.ZhuyinFull, ZhuyinKeyboard::class.java),
+            Board("zhuyin nine", PinyinKeyboard.ZhuyinNine, ZhuyinKeyboard::class.java),
+        )
+        for (b in boards) {
+            prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, b.board)
+            prefs.set(ThemeManager.prefs.oneHanded, b.oneHanded)
+            harness(KeyboardHarness.PINYIN)
+            val kb = board()
+            assertTrue("${b.name}: ${kb.javaClass}", b.kind.isInstance(kb))
+            // one-handed: the keyboard narrower than the screen, its letters as one block at a side
+            if (b.oneHanded != OneHanded.Off) assertTrue("${kb.width} of ${kb.rootView.width}", kb.width < kb.rootView.width * 0.9)
+            val found = grid(kb).filter { (x, y) -> kb.glideForTest?.inGap(x, y) == true }
+            assertEquals(b.name, emptyList<Pair<Float, Float>>(), found)
+            close()
+        }
+    }
+
+    // the same grid finds the split keyboard's gap: the sweep above would see one
+    @Test
+    @Uat("KB-42")
+    @Config(qualifiers = LANDSCAPE)
+    fun theSweepFindsTheSplitGap() {
+        harness(KeyboardHarness.PINYIN)
+        val kb = board()
+        assertTrue(grid(kb).any { (x, y) -> kb.glideForTest?.inGap(x, y) == true })
+    }
+
+    // the letters shown now
+    private fun board(): BaseKeyboard = KeyboardHarness.all(h.keyboard).filterIsInstance<BaseKeyboard>().first { h.shown(it) }
+
+    private fun glide(): GlideInput = board().glideForTest!!
+
+    // points every 1/40 across and 1/20 down the keyboard, in its pixels
+    private fun grid(kb: BaseKeyboard) = (0..40).flatMap { i -> (0..20).map { j -> kb.width * i / 40f to kb.height * j / 20f } }
+
+    // between T and Y, the top row's halves of the split letters, the screen's
+    private fun gap(): Rect {
+        assertEquals(h.texts().toString(), 2, h.keys().count { it.label.equals("g", ignoreCase = true) })
+        val t = h.box(h.key("t"))
+        val y = h.box(h.key("y"))
+        assertTrue("$t $y", y.left - t.right > t.width())
+        return Rect(t.right, t.top, y.left, t.bottom)
+    }
+
+    // whether GlideInput has [x], [y] (the screen's) in the gap
+    private fun gapAt(x: Float, y: Float): Boolean {
+        val kb = board()
+        val at = IntArray(2).also(kb::getLocationInWindow)
+        return kb.glideForTest!!.inGap(x - at[0], y - at[1])
     }
 
     @Test
@@ -221,5 +345,10 @@ class StrokeUatTest {
         draw(h.key("w"), across = 3f, down = 0f)
         assertEquals(emptyList<String>(), strokesSent())
         assertTrue(h.api.calls.toString(), h.api.calls.none { it.startsWith("offerGlide") })
+    }
+
+    companion object {
+        // wide enough to split (SplitKeyboard.AUTO_MIN_WIDTH_DP)
+        private const val LANDSCAPE = "w851dp-h393dp-land-440dpi"
     }
 }
