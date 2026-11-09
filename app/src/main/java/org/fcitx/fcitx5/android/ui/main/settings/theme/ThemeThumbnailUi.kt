@@ -7,7 +7,9 @@ package org.fcitx.fcitx5.android.ui.main.settings.theme
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
+import android.view.Gravity
 import android.view.View
 import android.view.ViewOutlineProvider
 import android.widget.ImageView
@@ -25,6 +27,7 @@ import splitties.views.dsl.constraintlayout.bottomOfParent
 import splitties.views.dsl.constraintlayout.centerHorizontally
 import splitties.views.dsl.constraintlayout.centerInParent
 import splitties.views.dsl.constraintlayout.constraintLayout
+import splitties.views.dsl.constraintlayout.endOfParent
 import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.constraintlayout.rightOfParent
 import splitties.views.dsl.constraintlayout.startOfParent
@@ -33,7 +36,9 @@ import splitties.views.dsl.core.Ui
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.imageView
 import splitties.views.dsl.core.matchParent
+import splitties.views.dsl.core.textView
 import splitties.views.dsl.core.view
+import splitties.views.dsl.core.wrapContent
 import splitties.views.imageDrawable
 import splitties.views.imageResource
 import splitties.views.setPaddingDp
@@ -61,6 +66,17 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
         imageResource = R.drawable.ic_baseline_auto_awesome_24
     }
 
+    // a built-in theme of two versions (ThemeCards): which is shown, tapped the other
+    val version = textView {
+        gravity = Gravity.CENTER
+        textSize = 12f
+        minWidth = dp(32)
+        minHeight = dp(32)
+        setPaddingDp(8, 0, 8, 0)
+        contentDescription = ctx.getString(R.string.theme_version_switch)
+        visibility = View.GONE
+    }
+
     override val root = constraintLayout {
         outlineProvider = ViewOutlineProvider.BOUNDS
         elevation = dp(2f)
@@ -73,6 +89,10 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
         add(dynamicIcon, lParams(dp(32), dp(32)) {
             topOfParent()
             startOfParent()
+        })
+        add(version, lParams(wrapContent, wrapContent) {
+            topOfParent()
+            endOfParent()
         })
     }
 
@@ -105,6 +125,25 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
             imageTintList = foregroundTint
         }
         checkMark.imageTintList = foregroundTint
+        version.setTextColor(theme.altKeyTextColor)
+        version.background = GradientDrawable().apply {
+            cornerRadius = ctx.dp(16f)
+            setColor(theme.altKeyBackgroundColor)
+        }
+    }
+
+    /**
+     * The 浅/深 of a built-in theme of two versions, [dark] the one shown, [switch] on a tap; none (null)
+     * for a theme of one.
+     */
+    fun setVersion(dark: Boolean?, switch: () -> Unit) {
+        version.isVisible = dark != null
+        if (dark == null) {
+            version.setOnClickListener(null)
+            return
+        }
+        version.setText(if (dark) R.string.theme_version_dark else R.string.theme_version_light)
+        version.setOnClickListener { switch() }
     }
 
     fun setChecked(checked: Boolean) {
