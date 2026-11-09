@@ -325,26 +325,26 @@ color_light/pinyin-port.png	0.628
 color_light/symbols-port.png	0.159	
 color_light/zhuyin_full-port.png	1.647	
 color_light/zhuyin_nine-port.png	0.229	5.3: zhuyin-nine-shown-not-typed
-cutout_dark/english-port.png	33.049	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-cutout_dark/handwriting-port.png	47.677	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board; 5.3: handwriting-fixed-fullwidth-punct
-cutout_dark/k14-port.png	35.696	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-cutout_dark/k18-port.png	34.612	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-cutout_dark/nine-port.png	30.093	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board; 5.3: nine-syllables-sp
-cutout_dark/number-port.png	31.637	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-cutout_dark/pinyin-port.png	33.069	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-cutout_dark/symbols-port.png	34.186	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-cutout_dark/zhuyin_full-port.png	35.782	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-cutout_dark/zhuyin_nine-port.png	27.957	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board; 5.3: zhuyin-nine-shown-not-typed
-cutout_light/english-port.png	33.181	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-cutout_light/handwriting-port.png	47.687	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board; 5.3: handwriting-fixed-fullwidth-punct
-cutout_light/k14-port.png	35.782	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-cutout_light/k18-port.png	34.708	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-cutout_light/nine-port.png	30.196	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board; 5.3: nine-syllables-sp
-cutout_light/number-port.png	31.686	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-cutout_light/pinyin-port.png	33.196	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-cutout_light/symbols-port.png	34.209	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-cutout_light/zhuyin_full-port.png	36.147	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-cutout_light/zhuyin_nine-port.png	28.080	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board; 5.3: zhuyin-nine-shown-not-typed
+cutout_dark/english-port.png	0.254	
+cutout_dark/handwriting-port.png	0.081	5.3: handwriting-fixed-fullwidth-punct
+cutout_dark/k14-port.png	0.131	
+cutout_dark/k18-port.png	0.144	
+cutout_dark/nine-port.png	0.197	5.3: nine-syllables-sp
+cutout_dark/number-port.png	0.171	
+cutout_dark/pinyin-port.png	0.254	
+cutout_dark/symbols-port.png	0.125	
+cutout_dark/zhuyin_full-port.png	1.268	
+cutout_dark/zhuyin_nine-port.png	0.155	5.3: zhuyin-nine-shown-not-typed
+cutout_light/english-port.png	0.276	
+cutout_light/handwriting-port.png	0.076	5.3: handwriting-fixed-fullwidth-punct
+cutout_light/k14-port.png	0.116	
+cutout_light/k18-port.png	0.125	
+cutout_light/nine-port.png	0.195	5.3: nine-syllables-sp
+cutout_light/number-port.png	0.175	
+cutout_light/pinyin-port.png	0.276	
+cutout_light/symbols-port.png	0.158	
+cutout_light/zhuyin_full-port.png	1.599	
+cutout_light/zhuyin_nine-port.png	0.146	5.3: zhuyin-nine-shown-not-typed
 each_key_dark/english-port.png	0.280	
 each_key_dark/handwriting-port.png	0.077	5.3: handwriting-fixed-fullwidth-punct
 each_key_dark/k14-port.png	0.123	
@@ -375,46 +375,46 @@ from-app-2.1/pinyin-port.png	0.293
 from-app-2.1/symbols-port.png	0.171	
 from-app-2.1/zhuyin_full-port.png	1.616	
 from-app-2.1/zhuyin_nine-port.png	0.149	5.3: zhuyin-nine-shown-not-typed
-from-app/english-port.png	36.780	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-from-app/handwriting-port.png	19.927	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board; 5.3: handwriting-fixed-fullwidth-punct
-from-app/k14-port.png	29.328	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-from-app/k18-port.png	30.459	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-from-app/nine-port.png	30.614	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board; 5.3: nine-syllables-sp
-from-app/number-port.png	26.104	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-from-app/pinyin-port.png	36.823	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-from-app/symbols-port.png	30.953	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-from-app/zhuyin_full-port.png	39.805	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-from-app/zhuyin_nine-port.png	31.942	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board; 5.3: zhuyin-nine-shown-not-typed
-from-web/english-port.png	37.276	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-from-web/handwriting-port.png	19.750	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board; 5.3: handwriting-fixed-fullwidth-punct
-from-web/k14-port.png	29.906	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-from-web/k18-port.png	31.114	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-from-web/nine-port.png	31.043	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board; 5.3: nine-syllables-sp
-from-web/number-port.png	26.334	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-from-web/pinyin-port.png	37.328	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-from-web/symbols-port.png	30.979	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-from-web/zhuyin_full-port.png	39.575	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-from-web/zhuyin_nine-port.png	32.477	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board; 5.3: zhuyin-nine-shown-not-typed
-glass_dark/english-port.png	39.243	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-glass_dark/handwriting-port.png	56.766	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board; 5.3: handwriting-fixed-fullwidth-punct
-glass_dark/k14-port.png	42.037	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-glass_dark/k18-port.png	41.025	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-glass_dark/nine-port.png	35.555	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board; 5.3: nine-syllables-sp
-glass_dark/number-port.png	37.588	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-glass_dark/pinyin-port.png	39.271	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-glass_dark/symbols-port.png	39.403	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-glass_dark/zhuyin_full-port.png	41.071	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-glass_dark/zhuyin_nine-port.png	33.387	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board; 5.3: zhuyin-nine-shown-not-typed
-glass_light/english-port.png	39.431	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-glass_light/handwriting-port.png	56.792	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board; 5.3: handwriting-fixed-fullwidth-punct
-glass_light/k14-port.png	42.213	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-glass_light/k18-port.png	41.210	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-glass_light/nine-port.png	35.734	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board; 5.3: nine-syllables-sp
-glass_light/number-port.png	37.666	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-glass_light/pinyin-port.png	39.455	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-glass_light/symbols-port.png	39.431	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-glass_light/zhuyin_full-port.png	41.331	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board
-glass_light/zhuyin_nine-port.png	33.544	not in 5.3, found by T0: a picture fill (brightness, blur) drawn brighter and stronger than the old drawing's, the keys over it and the board; 5.3: zhuyin-nine-shown-not-typed
+from-app/english-port.png	1.465	
+from-app/handwriting-port.png	0.257	5.3: handwriting-fixed-fullwidth-punct
+from-app/k14-port.png	0.310	
+from-app/k18-port.png	0.349	
+from-app/nine-port.png	0.386	5.3: nine-syllables-sp
+from-app/number-port.png	0.241	
+from-app/pinyin-port.png	1.465	
+from-app/symbols-port.png	0.303	
+from-app/zhuyin_full-port.png	2.288	注音 glyphs a pixel off as on every theme (060-render-p2.md S4c, the yield's rounding)
+from-app/zhuyin_nine-port.png	0.809	5.3: zhuyin-nine-shown-not-typed
+from-web/english-port.png	2.216	the theme's 1 KB font (full-font.ttf, no glyphs for most keys): its missing-glyph boxes placed a pixel or two otherwise than the old drawing's
+from-web/handwriting-port.png	0.342	5.3: handwriting-fixed-fullwidth-punct
+from-web/k14-port.png	1.096	
+from-web/k18-port.png	1.218	
+from-web/nine-port.png	1.025	5.3: nine-syllables-sp
+from-web/number-port.png	0.479	
+from-web/pinyin-port.png	2.209	the theme's 1 KB font (full-font.ttf, no glyphs for most keys): its missing-glyph boxes placed a pixel or two otherwise than the old drawing's
+from-web/symbols-port.png	0.346	
+from-web/zhuyin_full-port.png	2.230	the theme's 1 KB font (full-font.ttf, no glyphs for most keys): its missing-glyph boxes placed a pixel or two otherwise than the old drawing's
+from-web/zhuyin_nine-port.png	1.503	the theme's 1 KB font (full-font.ttf, no glyphs for most keys): its missing-glyph boxes placed a pixel or two otherwise than the old drawing's; 5.3: zhuyin-nine-shown-not-typed
+glass_dark/english-port.png	0.267	
+glass_dark/handwriting-port.png	0.080	5.3: handwriting-fixed-fullwidth-punct
+glass_dark/k14-port.png	0.131	
+glass_dark/k18-port.png	0.144	
+glass_dark/nine-port.png	0.211	5.3: nine-syllables-sp
+glass_dark/number-port.png	0.178	
+glass_dark/pinyin-port.png	0.267	
+glass_dark/symbols-port.png	0.144	
+glass_dark/zhuyin_full-port.png	1.387	
+glass_dark/zhuyin_nine-port.png	0.153	5.3: zhuyin-nine-shown-not-typed
+glass_light/english-port.png	0.284	
+glass_light/handwriting-port.png	0.078	5.3: handwriting-fixed-fullwidth-punct
+glass_light/k14-port.png	0.125	
+glass_light/k18-port.png	0.134	
+glass_light/nine-port.png	0.201	5.3: nine-syllables-sp
+glass_light/number-port.png	0.182	
+glass_light/pinyin-port.png	0.284	
+glass_light/symbols-port.png	0.160	
+glass_light/zhuyin_full-port.png	1.601	
+glass_light/zhuyin_nine-port.png	0.147	5.3: zhuyin-nine-shown-not-typed
 nine_slice_font_dark/english-port.png	0.298	
 nine_slice_font_dark/handwriting-port.png	0.079	5.3: handwriting-fixed-fullwidth-punct
 nine_slice_font_dark/k14-port.png	0.121	
@@ -422,7 +422,7 @@ nine_slice_font_dark/k18-port.png	0.121
 nine_slice_font_dark/nine-port.png	0.196	5.3: nine-syllables-sp
 nine_slice_font_dark/number-port.png	0.182	
 nine_slice_font_dark/pinyin-port.png	0.298	
-nine_slice_font_dark/symbols-port.png	31.509	not in 5.3, found by T0: the symbol grid's cells the key colour, not the theme's nine-slice image; its bottom row cut lower
+nine_slice_font_dark/symbols-port.png	0.162	
 nine_slice_font_dark/zhuyin_full-port.png	1.537	
 nine_slice_font_dark/zhuyin_nine-port.png	0.142	5.3: zhuyin-nine-shown-not-typed
 nine_slice_font_light/english-port.png	0.307	
@@ -432,6 +432,6 @@ nine_slice_font_light/k18-port.png	0.119
 nine_slice_font_light/nine-port.png	0.193	5.3: nine-syllables-sp
 nine_slice_font_light/number-port.png	0.191	
 nine_slice_font_light/pinyin-port.png	0.307	
-nine_slice_font_light/symbols-port.png	33.332	not in 5.3, found by T0: the symbol grid's cells the key colour, not the theme's nine-slice image; its bottom row cut lower
+nine_slice_font_light/symbols-port.png	0.164	
 nine_slice_font_light/zhuyin_full-port.png	1.574	
 nine_slice_font_light/zhuyin_nine-port.png	0.141	5.3: zhuyin-nine-shown-not-typed

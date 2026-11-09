@@ -187,8 +187,8 @@ views, drawn as the text build did), kept for 060's P3; S8a deleted the views an
 `ThemeBaselineCompareTest` draws its 432 pictures again with the scene engine (about 40 s) and compares each where
 it lies in the input view: a pixel differs when a channel is off by more than 24, and a picture's share of
 different pixels may not exceed its line in `baseline-060/limits.tsv` by more than 0.2 points (a ratchet).
-A line over 1.5% (注音大千 2%) says why: `5.3: …` for what P2 accepted, or the difference found when the
-test was added. `-PthemeBaseline.tighten=true` lowers the lines to what is drawn now (never raises one: that
+A line over 1.5% (注音大千 2%) says why: `5.3: …` for what P2 accepted, or what else it is (a test
+theme's own font, a rounding). `-PthemeBaseline.tighten=true` lowers the lines to what is drawn now (never raises one: that
 is an edit with its reason). Each picture that differs is written to `app/build/theme-baseline-diff/`, the
 different pixels in red over the record in grey, with what is drawn now beside it (`.now.png`).
 

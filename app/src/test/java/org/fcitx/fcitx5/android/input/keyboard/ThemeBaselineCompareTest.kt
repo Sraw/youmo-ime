@@ -328,7 +328,7 @@ class ThemeBaselineCompareTest {
             f.parentFile!!.mkdirs()
             ImageIO.write(out, "png", f)
             // and what is drawn now beside it
-            drawn.bitmap.compress(Bitmap.CompressFormat.PNG, 100, File(f.path.removeSuffix(".png") + ".now.png").outputStream().buffered())
+            File(f.path.removeSuffix(".png") + ".now.png").outputStream().use { drawn.bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         } else {
             f.delete()
         }
@@ -369,7 +369,8 @@ class ThemeBaselineCompareTest {
 
     private fun compare(group: String) {
         val index = index()
-        val limits = limits()
+        // while tightening another group's JVM may be writing the file: read under the same lock
+        val limits = if (tighten) locked { limits() } else limits()
         val shots = plan().filter { it.group == group }
         val measured = shots.associate { s -> s.file to measure(s, index.getValue(s.file)) }
         // every picture of the group compared
@@ -380,24 +381,28 @@ class ThemeBaselineCompareTest {
             val limit = limits[s.file] ?: return@mapNotNull "${s.file}: ${fmt(p)}%, no limit (-PthemeBaseline.tighten=true)"
             if (p > limit.percent + SLACK) "${s.file}: ${fmt(p)}% differs, limit ${fmt(limit.percent)}% (diff in $diffs)" else null
         }
+        // tightening never fails on them (nothing is raised), but says them
+        if (tighten && worse.isNotEmpty()) println("$group, worse than the record allows (left as they were):\n" + worse.joinToString("\n"))
         assertTrue("worse than the record allows:\n" + worse.joinToString("\n"), tighten || worse.isEmpty())
     }
 
     // [new] merged into limits.tsv, each limit lowered (never raised: that is an edit, with its reason); the
     // groups run in more than one JVM at once: the file locked across them
-    private fun write(new: Map<String, Limit>) {
+    private fun write(new: Map<String, Limit>) = locked {
+        val rows = limits().toMutableMap()
+        for ((f, l) in new) {
+            val was = rows[f]
+            rows[f] = if (was == null || l.percent < was.percent) Limit(ceil3(l.percent), was?.note ?: l.note) else was
+        }
+        limitsFile.writeText(
+            LIMITS_HEADER + rows.toSortedMap().entries.joinToString("\n", postfix = "\n") { (f, l) -> "$f\t${fmt(l.percent)}\t${l.note}" },
+        )
+    }
+
+    private fun <T> locked(block: () -> T): T {
         File("build").mkdirs()
-        FileChannel.open(File("build/theme-baseline.lock").toPath(), StandardOpenOption.CREATE, StandardOpenOption.WRITE).use { ch ->
-            ch.lock().use {
-                val rows = limits().toMutableMap()
-                for ((f, l) in new) {
-                    val was = rows[f]
-                    rows[f] = if (was == null || l.percent < was.percent) Limit(ceil3(l.percent), was?.note ?: l.note) else was
-                }
-                limitsFile.writeText(
-                    LIMITS_HEADER + rows.toSortedMap().entries.joinToString("\n", postfix = "\n") { (f, l) -> "$f\t${fmt(l.percent)}\t${l.note}" },
-                )
-            }
+        return FileChannel.open(File("build/theme-baseline.lock").toPath(), StandardOpenOption.CREATE, StandardOpenOption.WRITE).use { ch ->
+            ch.lock().use { block() }
         }
     }
 
