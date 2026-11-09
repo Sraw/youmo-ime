@@ -53,6 +53,9 @@ class ThemeTest {
         val p = ThemeReader.theme(withStyle("<style select=\"key\" fill=\"@nowhere\"/>")).problems()
         assertTrue(p.single().message.contains("@nowhere is no colour"), "$p")
         assertTrue(p.single().line > 70)
+        // the colour over a picture, under an image: a colour of the theme's too
+        assertTrue("@nope is no colour" in problems(withStyle("<style select=\"key\" fill=\"picture(10dp, 80%, @nope)\"/>")).single())
+        assertTrue("@nope is no colour" in problems(withStyle("<style select=\"key\" fill=\"image(key.png, 1 1 1 1, @nope)\"/>")).single())
         assertTrue(problems(withStyle("<style select=\"key!\" fill=\"@key\"/>")).single().contains("no selector"))
         assertTrue(problems(withStyle("<style select=\"key\" font=\"fancy\"/>")).single().contains("no <font>"))
         assertTrue(problems(withStyle("<style select=\"key\"/>")).single().contains("sets nothing"))

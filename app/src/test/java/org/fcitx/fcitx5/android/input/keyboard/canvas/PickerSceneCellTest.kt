@@ -4,11 +4,14 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard.canvas
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Rect
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -21,6 +24,9 @@ import org.fcitx.fcitx5.android.input.picker.PickerGridView
 import org.fcitx.fcitx5.android.input.picker.PickerPolicy
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
+import org.fcitx.fcitx5.android.input.theme.Insets
+import org.fcitx.fcitx5.android.input.theme.KeyFill
+import org.fcitx.fcitx5.android.input.theme.NineSlice
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.engine.Content
 import org.fcitx.fcitx5.android.scene.layout.Text
@@ -137,9 +143,9 @@ class PickerSceneCellTest {
     @Test
     fun aNineSliceThemesCellShowsTheKeyColour() {
         val light = ThemePreset.PixelLight.look
-        val slice = org.fcitx.fcitx5.android.input.theme.NineSlice("/nowhere/k.png", org.fcitx.fcitx5.android.input.theme.Insets(1, 1, 1, 1), 1)
-        val framed = org.fcitx.fcitx5.android.data.theme.Theme.Custom(
-            "framed", false, light.copy(keys = light.keys.copy(letter = light.keys.letter.copy(fill = org.fcitx.fcitx5.android.input.theme.KeyFill.Image(slice)))),
+        val slice = NineSlice("/nowhere/k.png", Insets(1, 1, 1, 1), 1)
+        val framed = Theme.Custom(
+            "framed", false, light.copy(keys = light.keys.copy(letter = light.keys.letter.copy(fill = KeyFill.Image(slice)))),
         )
         KeyboardHarness(framed).start().use { h ->
             h.tap(h.key("符"))
@@ -147,8 +153,8 @@ class PickerSceneCellTest {
             val cell = h.shownCells().first()
             val face = cell.keyNode!!.ops(false).filterIsInstance<Op.NineSlice>().single()
             assertEquals(light.palette.keyBackgroundColor, face.fallback?.value)
-            val b = android.graphics.Bitmap.createBitmap(cell.width, cell.height, android.graphics.Bitmap.Config.ARGB_8888)
-            cell.draw(android.graphics.Canvas(b))
+            val b = Bitmap.createBitmap(cell.width, cell.height, Bitmap.Config.ARGB_8888)
+            cell.draw(Canvas(b))
             val box = face.shape.bounds
             assertEquals(light.palette.keyBackgroundColor, b.getPixel(box.left.roundToInt() + 6, box.centerY.roundToInt()))
         }
