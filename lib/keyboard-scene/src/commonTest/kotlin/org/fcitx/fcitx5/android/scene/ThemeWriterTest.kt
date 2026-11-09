@@ -182,6 +182,20 @@ class ThemeWriterTest {
         assertEquals("path(M0.1 0 L0.9 0 Q1 0 1 0.1 Z L0.123457 0.2 L0.123457 0.3 Z)", ThemeWriter.value("shape", path))
         assertEquals(path, Values.read("shape", ThemeWriter.value("shape", path)))
         assertEquals("0", ThemeWriter.value("offset", assertNotNull(Values.read("offset", "-0dp"))))
+    }
+
+    // T7a's: a handle's grip (dp, a number of a handle alone), the navigation bar's follow; read back the same
+    @Test
+    fun theWindowsValuesAreWrittenAndReadBack() {
+        val theme = read("writer-every.xml")
+        val grip = theme.styles.single { s -> s.selectors.all { it.widget == "handle" } }.values
+        assertEquals(mapOf("width" to Value.Number(40.5), "height" to Value.Number(0.0)), grip.filterKeys { it == "width" || it == "height" })
+        val text = ThemeWriter.write(theme)
+        assertTrue("width=\"40.5dp\" height=\"0\"" in text, text)
+        assertTrue("<style select=\"navbar\" color=\"follow\"/>" in text, text)
+        // read back (the whole theme, as aThemeWrittenReadsBackAsItself's THEMES): the grip's numbers the same
+        val back = ThemeReader.theme(text).ok().styles.single { s -> s.selectors.all { it.widget == "handle" } }.values
+        assertEquals(grip, back)
         assertEquals(Values.read("offset", "0"), Values.read("offset", "-0dp"))
     }
 

@@ -76,6 +76,7 @@ import org.fcitx.fcitx5.android.input.keyboard.SplitDock
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneWindow
 import org.fcitx.fcitx5.android.input.picker.PickerData
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.picker.emojiPicker
@@ -88,7 +89,6 @@ import org.fcitx.fcitx5.android.input.preedit.PreeditComponent
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.scene.engine.section
-import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
 import org.fcitx.fcitx5.android.utils.unset
 import org.mechdancer.dependency.DynamicScope
 import org.mechdancer.dependency.UniqueComponent
@@ -131,6 +131,10 @@ class InputView(
     // under the whole keyboard: the theme's picture (laid as CENTER_CROP lays it, PictureHost) or its colour
     private val customBackground = view(::View)
 
+    // the room the navigation bar takes under the keys, drawn behind it (导航栏背景 全部): the theme's `navbar`
+    // colour where it sets one (060-render-p3 T7a), else none, the keyboard's under it as ever
+    private val navbarStrip = view(::View) { visibility = GONE }
+
     // the bar's base, under the bar and the row above it for the code being typed: one taller bar.
     // None (the keyboard's base seen through), its colour, or the picture's part there
     private val barBackground = view(::View) {
@@ -139,10 +143,9 @@ class InputView(
 
     private val placeholderOnClickListener = OnClickListener { }
 
+    // dressed as the theme has them ([dressSideButtons]) as they are shown
     private fun sideButton(icon: Int, description: Int, onClick: () -> Unit) = imageView {
         imageResource = icon
-        colorFilter = PorterDuffColorFilter(theme.altKeyTextColor, PorterDuff.Mode.SRC_IN)
-        background = borderlessRippleDrawable(theme.keyPressHighlightColor)
         scaleType = ImageView.ScaleType.CENTER
         contentDescription = context.getString(description)
         visibility = GONE
@@ -151,6 +154,13 @@ class InputView(
 
     // whether the board is at a side one-handed (not split): what the buttons beside it change
     private var oneHandedPlaced = false
+
+    // where the board is as the theme's scenes (SceneWindow.placement: `@one-handed`, `@split`), docked; null
+    // till placed first, when the service's navigation bar, which a view before may have placed, is told too
+    private var placedScenes: Set<String>? = null
+
+    // the window's scenes then (windowScenes): the keyboard's height changes `@compact` with the board where it was
+    private var placedWindowScenes: Set<String>? = null
 
     // the empty side of a board put at the other (SplitKeyboard.Dock): a button moves it across
     private fun moveButton(to: SplitKeyboard.Dock, icon: Int, description: Int) = sideButton(icon, description) {
@@ -418,6 +428,12 @@ class InputView(
                 centerVertically()
                 centerHorizontally()
             })
+            add(navbarStrip, lParams(0, 0) {
+                leftToLeft = LayoutParams.PARENT_ID
+                rightToRight = LayoutParams.PARENT_ID
+                topToBottom = bottomPaddingSpace.existingOrNewId
+                bottomOfParent()
+            })
             add(barBackground, lParams(0, 0) {
                 topOfParent()
                 bottomToBottomOf(kawaiiBar.view)
@@ -535,6 +551,7 @@ class InputView(
         }
         val bottomPadding = if (floating) 0 else keyboardBottomPaddingPx
         oneHandedPlaced = placement != null && !TextKeyboard.splits(context)
+        placeScenes(if (floating) emptySet() else SceneWindow.placement(oneHandedPlaced, TextKeyboard.splits(context)))
         val placing = listOf(boardHeight, bottomPadding, sidePadding, placement?.side?.ordinal, placement?.widthDp, if (oneHandedPlaced) 1 else 0)
         if (placing == placed) return
         boardMover.move(BoardMove.kind(slide, placed != null, placedSide, placement?.side))
@@ -591,8 +608,23 @@ class InputView(
         }
     }
 
+    // the board placed anew as the theme's scenes: what the theme has of them, the navigation bar, the docked handle
+    private fun placeScenes(scenes: Set<String>) {
+        val window = SceneWindow.scenes(context, theme, floating, scenes)
+        if (scenes == placedScenes && window == placedWindowScenes) return
+        placedScenes = scenes
+        placedWindowScenes = window
+        paintNavbar()
+        service.boardPlaced(scenes)
+        if (!floating) floatingHandle?.dress(floatingController.handleLook(window))
+    }
+
+    // the scenes the window round the keys is in now (SceneWindow.scenes)
+    private fun windowScenes() = SceneWindow.scenes(context, theme, floating, placedScenes.orEmpty())
+
     // in the room beside a board at [side]: the arrow across, and one-handed the way back to the whole width
     private fun showSideButtons(side: SplitKeyboard.Dock?) {
+        if (side != null) dressSideButtons()
         moveLeft.isVisible = side == SplitKeyboard.Dock.RIGHT
         moveRight.isVisible = side == SplitKeyboard.Dock.LEFT
         fullWidthLeft.isVisible = oneHandedPlaced && side == SplitKeyboard.Dock.RIGHT
@@ -603,6 +635,21 @@ class InputView(
         moveRight.translationY = -apart
         fullWidthLeft.translationY = apart
         fullWidthRight.translationY = apart
+    }
+
+    // the scenes the side buttons are dressed in last: dressed again only as they change (one-handed, split)
+    private var sideButtonsDressed: Set<String>? = null
+
+    // the theme's `side-button` (060-render-p3 T7a) in the scenes now, one-handed or a board at the side of the letters split
+    private fun dressSideButtons() {
+        val scenes = windowScenes()
+        if (scenes == sideButtonsDressed) return
+        sideButtonsDressed = scenes
+        val look = SceneWindow.sideButton(theme, scenes)
+        for (b in listOf(moveLeft, moveRight, fullWidthLeft, fullWidthRight)) {
+            b.colorFilter = PorterDuffColorFilter(look.iconColor.value, PorterDuff.Mode.SRC_IN)
+            b.background = SceneWindow.sideButtonBackground(context, look, dp(SIDE_BUTTON_DP))
+        }
     }
 
     /** Where the board shown goes, while the letters split or one-handed, or null for the whole width. */
@@ -633,7 +680,15 @@ class InputView(
             // 贴底: no room for the bar, for ROMs whose hidden gesture line still takes it
             bottomMargin = if (floating || KeyboardArea.bottomFlush()) 0 else navBar
         }
+        paintNavbar()
         return insets
+    }
+
+    // the theme's colour of the bar, as the screen is turned and the board placed now
+    private fun paintNavbar() {
+        val navbar = if (floating) null else SceneWindow.navbar(theme, windowScenes())
+        navbarStrip.isVisible = navbar != null
+        navbar?.let(navbarStrip::setBackgroundColor)
     }
 
     /**

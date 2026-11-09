@@ -20,9 +20,11 @@ import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.testData
 import org.fcitx.fcitx5.android.scene.theme.Argb
+import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.Selector
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
+import org.fcitx.fcitx5.android.scene.theme.Value
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -61,6 +63,18 @@ class LookThemeTest {
         assertEquals(q.bounds.left + 5 * d, shape.box.left, 1e-6)
         assertEquals(8 * d, shape.radii[0], 1e-6)
         assertTrue(q.ops(true).any { it is Op.Ripple })
+    }
+
+    // keys as round as can be (24 dp) with a margin: the floating keyboard's radius their sum, over the
+    // reader's 24 dp, refused the whole theme and nothing was drawn; at most 24 dp, it reads
+    @Test
+    fun aRadiusOf24WithAGapReads() {
+        val look = LookDefaults.look(palette(themeFile("material-light.xml"))).let {
+            it.copy(keys = it.keys.copy(radiusDp = Keys.MAX_RADIUS_DP, gap = Gap(3, 7, 3, 4)))
+        }
+        val t = theme(LookTheme.xml(look, "T", false))
+        val radius = Cascades(t).of(setOf("floating")).of(Selector.Target("keyboard"))["radius"] as Value.OfRadius
+        assertEquals(List(4) { Keys.MAX_RADIUS_DP.toDouble() }, radius.radius.corners)
     }
 
     @Test

@@ -160,7 +160,7 @@ object Values {
      * problem like any. A stage that makes one work moves it to [PROPERTIES].
      */
     val RESERVED: Map<String, Reserved> = mapOf(
-        // T5 (the keyboard, portrait then landscape), T6b (the bar), T7a (the handle)
+        // read on the keyboard (T5, [KEYBOARD_SIZES]) and the handle (T7a, [HANDLE_SIZES]); on another widget T6b's (the bar)
         "height" to form(LEN_OR_PERCENT),
         "width" to form(LEN),
         "side-padding" to form(LEN_OR_PERCENT),
@@ -188,8 +188,8 @@ object Values {
 
     /**
      * The keyboard's size (060-render-v2 §15, 主题管尺寸): set on `keyboard` alone, under no scene,
-     * portrait then landscape (one value: both). The same names on another widget are a later stage's
-     * ([RESERVED]: the bar's height, the handle's).
+     * portrait then landscape (one value: both). The same names on the handle are its grip's
+     * ([HANDLE_SIZES]), on another widget a later stage's ([RESERVED]: the bar's height).
      */
     val KEYBOARD_SIZES = listOf("height", "side-padding", "bottom-padding")
 
@@ -215,13 +215,18 @@ object Values {
     }
 
     /**
-     * Values of a property of today that a later stage gives a new form: the navigation bar's
-     * `color="follow"` (T7a). Ignored with a warning as [RESERVED]'s are.
+     * The drag handle's grip (060-render-p3 T7a): set on `handle` alone, its width and height, dp, as a
+     * [Value.Number]; no wider than [MAX_GRIP_WIDTH_DP], no taller than the handle's strip ([MAX_GRIP_HEIGHT_DP]).
      */
-    fun reservedValue(property: String, raw: String): Boolean = when (property) {
-        "color" -> raw == "follow"
-        else -> false
-    }
+    val HANDLE_SIZES = listOf("width", "height")
+    const val MAX_GRIP_WIDTH_DP = 160.0
+    const val MAX_GRIP_HEIGHT_DP = 24.0
+
+    /** A grip's size of [property] ([HANDLE_SIZES]); null where not one, or out of range. */
+    fun gripSize(property: String, raw: String): Double? = dp(raw, if (property == "width") MAX_GRIP_WIDTH_DP else MAX_GRIP_HEIGHT_DP)
+
+    /** The navigation bar's `color="follow"` (T7a): the keyboard's colour under it, as ever; on another widget, ignored. */
+    const val FOLLOW = "follow"
 
     fun read(property: String, raw: String): Value? = when (property) {
         "fill" -> fill(raw)?.let(Value::OfFill)

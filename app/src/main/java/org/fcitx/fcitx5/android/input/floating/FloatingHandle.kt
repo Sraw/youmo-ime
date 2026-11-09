@@ -17,6 +17,8 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneWindow
+import org.fcitx.fcitx5.android.scene.engine.WindowLooks
 import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
 import splitties.dimensions.dp
 
@@ -32,9 +34,10 @@ import splitties.dimensions.dp
 @SuppressLint("ViewConstructor")
 class FloatingHandle(
     context: Context,
-    theme: Theme,
+    private val theme: Theme,
     side: FloatingHandleSide,
     private val mode: Mode,
+    look: WindowLooks.Handle = SceneWindow.plainHandle(theme, side == FloatingHandleSide.Top),
 ) : FrameLayout(context) {
 
     /** Which of the two it is: one or the other's callbacks, never a mix. */
@@ -71,17 +74,27 @@ class FloatingHandle(
 
     private val detach = Runnable { if (press.fire()) (mode as? Mode.Docked)?.run { onDetach(lastX, lastY, touch) } }
 
+    // a short bar, a pill: the handle's whole strip drags, this only shows that it does
+    private val grip = View(context).apply { isClickable = false }
+
+    // floating, the button that docks the keyboard again
+    private val dock = (mode as? Mode.Floating)?.let { floating ->
+        ImageView(context).apply {
+            setImageResource(R.drawable.ic_baseline_open_in_full_24)
+            background = borderlessRippleDrawable(theme.keyPressHighlightColor)
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            contentDescription = context.getString(R.string.floating_keyboard_dock)
+            setPadding(dp(3), dp(3), dp(3), dp(3))
+            setOnClickListener { floating.onDock() }
+        }
+    }
+
+    // the look it is dressed in last ([dress])
+    private var dressed: WindowLooks.Handle? = null
+
     init {
-        // a shade of the bar: in a theme whose bar is the keyboard's colour it was not told apart
-        if (side == FloatingHandleSide.Top) setBackgroundColor(FloatingKeyboard.handleColor(theme.barColor, theme.keyTextColor))
-        // a short bar: the handle's whole strip drags, this only shows that it does
-        addView(View(context).apply {
-            background = GradientDrawable().apply {
-                cornerRadius = dp(2f)
-                setColor(theme.altKeyTextColor)
-            }
-            isClickable = false
-        }, LayoutParams(dp(BAR_WIDTH_DP), dp(BAR_HEIGHT_DP), Gravity.CENTER))
+        addView(grip, LayoutParams(0, 0, Gravity.CENTER))
+        dress(look)
         // TalkBack's long press is no touch: the grip's middle stands for the finger
         if (mode is Mode.Docked) {
             contentDescription = context.getString(R.string.floating_keyboard)
@@ -91,15 +104,30 @@ class FloatingHandle(
                 true
             }
         }
-        if (mode is Mode.Floating) addView(ImageView(context).apply {
-            setImageResource(R.drawable.ic_baseline_open_in_full_24)
-            colorFilter = PorterDuffColorFilter(theme.altKeyTextColor, PorterDuff.Mode.SRC_IN)
-            background = borderlessRippleDrawable(theme.keyPressHighlightColor)
-            scaleType = ImageView.ScaleType.CENTER_INSIDE
-            contentDescription = context.getString(R.string.floating_keyboard_dock)
-            setPadding(dp(3), dp(3), dp(3), dp(3))
-            setOnClickListener { mode.onDock() }
-        }, LayoutParams(dp(DOCK_WIDTH_DP), dp(HEIGHT_DP), Gravity.END or Gravity.CENTER_VERTICAL))
+        dock?.let { addView(it, LayoutParams(dp(DOCK_WIDTH_DP), dp(HEIGHT_DP), Gravity.END or Gravity.CENTER_VERTICAL)) }
+    }
+
+    /**
+     * As [look], the theme's `handle` (060-render-p3 T7a, `SceneWindow.handle`) worked out by who holds
+     * it: the docked one's as its board is placed (`@one-handed`, `@split`). Worked out there, as the
+     * scenes are of the settings, which a view of its own does not read. Not set, at the top a shade of
+     * the bar (in a theme whose bar is the keyboard's colour it was not told apart), at the bottom the
+     * keyboard's own under it.
+     */
+    fun dress(look: WindowLooks.Handle) {
+        if (look == dressed) return
+        dressed = look
+        val fill = look.fill
+        if (fill != null) setBackgroundColor(fill.value) else background = null
+        grip.background = GradientDrawable().apply {
+            cornerRadius = dp(look.heightDp.toFloat() / 2)
+            setColor(look.color.value)
+        }
+        grip.layoutParams = (grip.layoutParams as LayoutParams).apply {
+            width = SceneWindow.px(context, look.widthDp).toInt()
+            height = SceneWindow.px(context, look.heightDp).toInt()
+        }
+        dock?.colorFilter = PorterDuffColorFilter(look.iconColor.value, PorterDuff.Mode.SRC_IN)
     }
 
     // raw (screen) places: the handle moves with the keyboard under the finger
@@ -161,7 +189,5 @@ class FloatingHandle(
         // button is wider for it, the strip having nothing else beside the bar
         const val HEIGHT_DP = 24
         const val DOCK_WIDTH_DP = 56
-        private const val BAR_WIDTH_DP = 36
-        private const val BAR_HEIGHT_DP = 4
     }
 }
