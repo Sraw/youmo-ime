@@ -261,8 +261,6 @@
     <string name="a11y_syllable">拼音 %1$s</string>
     <string name="a11y_key_number_pad">数字键盘</string>
     <string name="a11y_key_emoji">表情</string>
-    <string name="voice_polish">语音整理</string>
-    <string name="voice_polish_summary">边说边去掉口头禅、重复和说错改口的部分，并加上标点</string>
     <string name="voice_end_mark">语音句末句号</string>
     <string name="voice_end_mark_auto">按输入框：聊天、搜索框和单行输入框里不加</string>
     <string name="voice_end_mark_keep">照说的保留</string>

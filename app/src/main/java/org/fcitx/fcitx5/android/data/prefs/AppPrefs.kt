@@ -220,7 +220,6 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             SpaceLongPressBehavior.Voice,
         )
         // what voice types
-        val voicePolish = switch(R.string.voice_polish, "voice_polish", true, R.string.voice_polish_summary)
         val voiceEndMark = enumList(R.string.voice_end_mark, "voice_end_mark", VoiceEndMark.Auto)
         val spaceSwipeMoveCursor =
             switch(R.string.space_swipe_move_cursor, "space_swipe_move_cursor", true)
@@ -824,7 +823,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         // 0.4's: English on the nine keys while 九键's 中/英 had brought it there, gone with the key (I1)
         private const val ENGLISH_ON_NINE_KEYS = "english_on_nine_keys"
-        private val RETIRED = listOf(ENGLISH_ON_NINE_KEYS, "canvas_keyboard", "vivo_keypress_workaround", "expand_keypress_area")
+        private val RETIRED = listOf(ENGLISH_ON_NINE_KEYS, "canvas_keyboard", "vivo_keypress_workaround", "expand_keypress_area", "voice_polish")
 
         // 0.5's swipe setting, and 0.5.1's that took its place
         private const val SWIPE_SYMBOL_BEHAVIOR = "swipe_symbol_behavior"

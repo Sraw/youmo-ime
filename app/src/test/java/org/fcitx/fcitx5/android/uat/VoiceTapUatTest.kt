@@ -234,11 +234,10 @@ class VoiceTapUatTest : VoiceTapUat() {
     @Uat("VO-29")
     fun polishedTheFrozenPartIsTypedAsItIsSaid() {
         allowMicrophone()
-        // 语音整理 on: a tagger deleting 嗯, a 。 after 了 (as VoiceLiveTest's)
-        val tags = VoicePolishTags(listOf("keep", "del"), listOf("", "，", "。"))
+        // the polish (always on): a tagger deleting 嗯, a 。 after 了 (as VoiceLiveTest's)
+        val tags = VoicePolishTags(listOf("keep", "del"), listOf("", "，", "。"), listOf("none"))
         val tagger = VoicePolishStream.Tagger { w ->
-            IntArray(w.size) { if (w[it] == '嗯'.code) VoicePolishTags.DEL else VoicePolishTags.KEEP } to
-                IntArray(w.size) { if (w[it] == '了'.code) 2 else 0 }
+            VoicePolishStream.Labels(IntArray(w.size) { if (w[it] == '嗯'.code) VoicePolishTags.DEL else VoicePolishTags.KEEP }, IntArray(w.size) { if (w[it] == '了'.code) 2 else 0 })
         }
         voice.polish = { VoicePolishStream(tags, tagger, freezeAfter = 2, window = 8) }
         h.start(MULTI_LINE)
@@ -258,10 +257,9 @@ class VoiceTapUatTest : VoiceTapUat() {
     @Uat("VO-29")
     fun polishedThenThePolishFailingAtTheEndOnlyWhatFollowsIsTyped() {
         allowMicrophone()
-        val tags = VoicePolishTags(listOf("keep", "del"), listOf("", "，", "。"))
+        val tags = VoicePolishTags(listOf("keep", "del"), listOf("", "，", "。"), listOf("none"))
         val tagger = VoicePolishStream.Tagger { w ->
-            IntArray(w.size) { if (w[it] == '嗯'.code) VoicePolishTags.DEL else VoicePolishTags.KEEP } to
-                IntArray(w.size) { if (w[it] == '了'.code) 2 else 0 }
+            VoicePolishStream.Labels(IntArray(w.size) { if (w[it] == '嗯'.code) VoicePolishTags.DEL else VoicePolishTags.KEEP }, IntArray(w.size) { if (w[it] == '了'.code) 2 else 0 })
         }
         voice.polish = { VoicePolishStream(tags, tagger, freezeAfter = 2, window = 8) }
         h.start(MULTI_LINE)

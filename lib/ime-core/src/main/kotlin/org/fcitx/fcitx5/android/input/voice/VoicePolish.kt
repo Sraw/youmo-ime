@@ -8,36 +8,67 @@ package org.fcitx.fcitx5.android.input.voice
  * The polish tagger's labels (060-voice-tagger.md; voice-eval's `tags.py`, which this follows
  * character for character): each character of the recognised text gets an op, kept, deleted or
  * written as one of [ops]' replacements, and an after, nothing or one of [afters]' marks written
- * after it. [ops] and [afters] are the model's own lists (its `polish-tagger.json`), in its order.
+ * after it, and a number class, none or one of [nums] ([ChineseNumbers.Kind]): adjacent characters of a
+ * class not none are a number, written as the class most of them have ([ChineseNumbers.written]).
+ * [ops], [afters] and [nums] are the model's own lists (its `polish-tagger.json`), in its order.
  *
  * Characters are code points, as the model's vocabulary and Python's strings have them.
  */
-class VoicePolishTags(val ops: List<String>, val afters: List<String>) {
+class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums: List<String>) {
+
+    private val kinds = nums.map(ChineseNumbers.Kind::of)
 
     init {
         require(ops.getOrNull(KEEP) == "keep" && ops.getOrNull(DEL) == "del") { "ops start keep, del: $ops" }
         require(afters.firstOrNull() == "") { "afters start with nothing: $afters" }
+        require(kinds.firstOrNull() == ChineseNumbers.Kind.NONE) { "nums start with none: $nums" }
     }
 
     /**
      * What the op and after labels of each character of [text] (normed, [norm]) write; a kept
      * character with [spaced] (the space [norm] took out between two English words, [spaces]) after
-     * an English letter or digit written with it.
+     * an English letter or digit written with it. [num]: each character's number class (none if
+     * not given); a character [op] deletes is in no number, so one that went (a pause's 「，」 inside
+     * it) leaves the number whole.
      */
-    fun apply(text: IntArray, op: IntArray, after: IntArray, spaced: BooleanArray? = null): String {
+    fun apply(text: IntArray, op: IntArray, after: IntArray, spaced: BooleanArray? = null, num: IntArray? = null): String {
         require(op.size == text.size && after.size == text.size) { "a label each: ${text.size}, ${op.size}, ${after.size}" }
+        require(num == null || num.size == text.size) { "a number class each: ${text.size}, ${num?.size}" }
         val out = StringBuilder()
-        for (i in text.indices) {
-            when (op[i]) {
-                KEEP -> {
-                    if (spaced?.getOrNull(i) == true && out.isNotEmpty() && isAsciiWord(out.last().code)) out.append(' ')
-                    out.appendCodePoint(text[i])
-                }
-                DEL -> {}
-                else -> out.append(ops[op[i]])
-            }
-            out.append(afters[after[i]])
+        val run = StringBuilder()
+        val runKinds = ArrayList<ChineseNumbers.Kind>()
+        fun flush() {
+            if (run.isEmpty()) return
+            // the class most of its characters have, the first of them on a tie
+            val kind = runKinds.groupingBy { it }.eachCount().let { counts -> runKinds.maxBy { counts.getValue(it) } }
+            out.append(ChineseNumbers.written(run.toString(), kind))
+            run.clear()
+            runKinds.clear()
         }
+        for (i in text.indices) {
+            val written = when (op[i]) {
+                KEEP -> String(Character.toChars(text[i]))
+                DEL -> ""
+                else -> ops[op[i]]
+            }
+            val kind = num?.let { kinds[it[i]] } ?: ChineseNumbers.Kind.NONE
+            if (written.isNotEmpty()) {
+                // an English letter or digit is no part of one (Windows11: the space before 11 kept)
+                if (kind != ChineseNumbers.Kind.NONE && written !in NUMBER_BREAKS && written.codePointAt(0) >= ASCII) {
+                    run.append(written)
+                    runKinds += kind
+                } else {
+                    flush()
+                    if (op[i] == KEEP && spaced?.getOrNull(i) == true && endsAWord(out)) out.append(' ')
+                    out.append(written)
+                }
+            }
+            if (after[i] != 0) {
+                flush()
+                out.append(afters[after[i]])
+            }
+        }
+        flush()
         // a pause's mark before another mark goes (。 written after a 、 the input had); 「……」 is one mark inside
         return PAUSE_BEFORE_MARK.replace(out, "").replace("…", "……")
     }
@@ -64,9 +95,17 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>) {
         // U+0085 too, which Python's \s takes and Kotlin's isWhitespace does not
         private const val DROPPED = "《》·\u0085"
 
+        private const val ASCII = 0x80
+
+        // marks end a number though the tagger put them in one (numeval.py render); each of VoiceLive.ENDS
+        // among them (VoicePolishTest checks), so what is typed as it is said is never cut inside a number
+        internal val NUMBER_BREAKS = setOf("，", "。", "？", "！", "、", "…", "：", "；", ",", "?", "!", ";")
+
         private val PAUSE_BEFORE_MARK = Regex("[，、；：]+(?=[。？！…，])")
 
         private fun isAsciiWord(c: Int) = c < 0x80 && Character.isLetterOrDigit(c)
+
+        private fun endsAWord(out: StringBuilder) = out.isNotEmpty() && isAsciiWord(out.last().code)
 
         /**
          * For each character of [norm]`(raw)`, whether [raw] had a space before it between two
@@ -154,10 +193,13 @@ class VoicePolishStream(
     /** the labels [VoicePolishTags.guarded]; false only for voice-eval's goldens, which have none */
     private val guard: Boolean = true,
 ) {
-    /** The op and after labels of [text] (code points), a character each; the model run. */
+    /** The op, after and number labels of [text] (code points), a character each; the model run. */
     fun interface Tagger {
-        fun labels(text: IntArray): Pair<IntArray, IntArray>
+        fun labels(text: IntArray): Labels
     }
+
+    /** A label each of the characters tagged; [num] none (0) if not given. */
+    class Labels(val op: IntArray, val after: IntArray, val num: IntArray = IntArray(op.size))
 
     /**
      * What to show: the frozen characters polished, then the rest of the text as recognised (normed).
@@ -177,6 +219,7 @@ class VoicePolishStream(
     private var done = 0
     private var seenOp = IntArray(0)
     private var seenAfter = IntArray(0)
+    private var seenNum = IntArray(0)
 
     // the frozen prefix's length; its labels are seen's
     private var frozen = 0
@@ -196,7 +239,7 @@ class VoicePolishStream(
         if (text.isEmpty()) return ""
         while (text.size - done > window - freezeAfter) step(done + window - freezeAfter, last = false)
         step(text.size, last = true)
-        return tags.apply(text, seenOp.copyOf(text.size), seenAfter.copyOf(text.size), spaced)
+        return tags.apply(text, seenOp.copyOf(text.size), seenAfter.copyOf(text.size), spaced, seenNum.copyOf(text.size))
     }
 
     /**
@@ -206,7 +249,7 @@ class VoicePolishStream(
      */
     fun frozenPrefix(count: Int): String {
         val n = minOf(count, frozen)
-        return tags.apply(text.copyOf(n), seenOp.copyOf(n), seenAfter.copyOf(n), spaced.copyOf(n))
+        return tags.apply(text.copyOf(n), seenOp.copyOf(n), seenAfter.copyOf(n), spaced.copyOf(n), seenNum.copyOf(n))
     }
 
     private fun take(raw: String) {
@@ -221,6 +264,7 @@ class VoicePolishStream(
         if (seenOp.size < text.size) {
             seenOp = seenOp.copyOf(text.size)
             seenAfter = seenAfter.copyOf(text.size)
+            seenNum = seenNum.copyOf(text.size)
         }
     }
 
@@ -229,18 +273,22 @@ class VoicePolishStream(
         // left the window before freezeAfter characters followed: frozen as last tagged
         frozen = maxOf(frozen, start)
         val part = text.copyOfRange(start, end)
-        val (op, after) = tagger.labels(part)
-        check(op.size == end - start && after.size == end - start) { "a label each of ${end - start} characters" }
+        val labels = tagger.labels(part)
+        val op = labels.op
+        val after = labels.after
+        val num = labels.num
+        check(op.size == end - start && after.size == end - start && num.size == end - start) { "a label each of ${end - start} characters" }
         if (guard) tags.guarded(part, op, after)
         // a frozen character keeps its labels, though tagged again in the window
         op.copyInto(seenOp, frozen, frozen - start, op.size)
         after.copyInto(seenAfter, frozen, frozen - start, after.size)
+        num.copyInto(seenNum, frozen, frozen - start, num.size)
         frozen = maxOf(frozen, if (last) end else end - freezeAfter)
         done = end
     }
 
     private fun shown(): Shown {
-        val polished = tags.apply(text.copyOf(frozen), seenOp.copyOf(frozen), seenAfter.copyOf(frozen), spaced)
+        val polished = tags.apply(text.copyOf(frozen), seenOp.copyOf(frozen), seenAfter.copyOf(frozen), spaced, seenNum.copyOf(frozen))
         val rest = StringBuilder()
         for (i in frozen until text.size) {
             if (spaced[i]) rest.append(' ')

@@ -16,7 +16,7 @@ class VoicePolishTest {
     private val golden = javaClass.getResourceAsStream("/voice/polish-golden.tsv")!!.bufferedReader().readLines()
         .filter { it.isNotEmpty() }.map { it.split('\t') }
 
-    private val tags = VoicePolishTags(golden.first { it[0] == "ops" }.drop(1), golden.first { it[0] == "afters" }.drop(1))
+    private val tags = VoicePolishTags(golden.first { it[0] == "ops" }.drop(1), golden.first { it[0] == "afters" }.drop(1), listOf("none"))
 
     private fun cases(kind: String) = golden.filter { it[0] == kind }.also { assertTrue("$kind cases", it.isNotEmpty()) }
 
@@ -25,7 +25,7 @@ class VoicePolishTest {
     private fun indices(s: String) = if (s.isEmpty()) IntArray(0) else s.split(' ').map { it.toInt() }.toIntArray()
 
     // polish_golden.py's fake(): labels from the character, where it is in the window and the window's length
-    private fun fake(w: IntArray): Pair<IntArray, IntArray> {
+    private fun fake(w: IntArray): VoicePolishStream.Labels {
         val reps = tags.ops.size - 2
         val op = IntArray(w.size) { i ->
             val r = (w[i] * 31 + i * 7 + w.size * 3) % 11
@@ -35,7 +35,7 @@ class VoicePolishTest {
             val r = (w[i] * 17 + i * 5 + w.size) % 9
             if (r < 6) 0 else 1 + (w[i] + i) % (tags.afters.size - 1)
         }
-        return op to after
+        return VoicePolishStream.Labels(op, after)
     }
 
     @Test
@@ -71,11 +71,11 @@ class VoicePolishTest {
         assertEquals("两个。", tags.apply(zh, zop, zafter))
         // the stream guards what the model says: 「I'm sorry.」 polished as it was said
         val stream = VoicePolishStream(tags, { t ->
-            IntArray(t.size) { if (t[it] == 'r'.code) VoicePolishTags.DEL else 0 } to IntArray(t.size) { if (t[it] == '.'.code) tags.afters.indexOf("。") else 0 }
+            VoicePolishStream.Labels(IntArray(t.size) { if (t[it] == 'r'.code) VoicePolishTags.DEL else 0 }, IntArray(t.size) { if (t[it] == '.'.code) tags.afters.indexOf("。") else 0 })
         })
         assertEquals("I'm sorry.", stream.finish("I'm sorry."))
         val bare = VoicePolishStream(tags, { t ->
-            IntArray(t.size) { if (t[it] == 'r'.code) VoicePolishTags.DEL else 0 } to IntArray(t.size)
+            VoicePolishStream.Labels(IntArray(t.size) { if (t[it] == 'r'.code) VoicePolishTags.DEL else 0 }, IntArray(t.size))
         }, guard = false)
         assertEquals("I'm soy.", bare.finish("I'm sorry."))
     }
@@ -100,7 +100,7 @@ class VoicePolishTest {
         val calls = ArrayList<String>()
         val keepAll = VoicePolishStream.Tagger { w ->
             calls += String(w, 0, w.size)
-            IntArray(w.size) to IntArray(w.size) { 1 } // keep, a comma after each
+            VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size) { 1 }) // keep, a comma after each
         }
         val stream = VoicePolishStream(tags, keepAll, freezeAfter = 2, window = 4)
         assertEquals(VoicePolishStream.Shown("", "一"), stream.update("一"))
@@ -114,7 +114,7 @@ class VoicePolishTest {
     @Test
     fun aRevisedCharacterIsTaggedAgainFrozenOrNot() {
         var mark = 1
-        val tagger = VoicePolishStream.Tagger { w -> IntArray(w.size) to IntArray(w.size) { mark } }
+        val tagger = VoicePolishStream.Tagger { w -> VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size) { mark }) }
         val stream = VoicePolishStream(tags, tagger, freezeAfter = 1, window = 8)
         assertEquals(VoicePolishStream.Shown("我，想，", "去"), stream.update("我想去"))
         mark = 2 // 。
@@ -125,7 +125,7 @@ class VoicePolishTest {
 
     @Test
     fun aShorterTextDropsWhatWentAndNormedMarksAreOne() {
-        val tagger = VoicePolishStream.Tagger { w -> IntArray(w.size) to IntArray(w.size) { 1 } }
+        val tagger = VoicePolishStream.Tagger { w -> VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size) { 1 }) }
         val stream = VoicePolishStream(tags, tagger, freezeAfter = 1, window = 8)
         assertEquals(VoicePolishStream.Shown("我，想，", "去"), stream.update("我想去"))
         // the frozen 我 stays as it was
@@ -138,11 +138,11 @@ class VoicePolishTest {
 
     @Test
     fun labelsAndTheirListsAreChecked() {
-        assertThrows(IllegalArgumentException::class.java) { VoicePolishTags(listOf("del", "keep"), listOf("")) }
-        assertThrows(IllegalArgumentException::class.java) { VoicePolishTags(listOf("keep", "del"), listOf("，")) }
+        assertThrows(IllegalArgumentException::class.java) { VoicePolishTags(listOf("del", "keep"), listOf(""), listOf("none")) }
+        assertThrows(IllegalArgumentException::class.java) { VoicePolishTags(listOf("keep", "del"), listOf("，"), listOf("none")) }
         assertThrows(IllegalArgumentException::class.java) { tags.apply(intArrayOf(1, 2), intArrayOf(0), intArrayOf(0, 0)) }
         assertThrows(IllegalArgumentException::class.java) { VoicePolishStream(tags, ::fake, freezeAfter = 4, window = 4) }
-        val short = VoicePolishStream(tags, { IntArray(0) to IntArray(0) })
+        val short = VoicePolishStream(tags, { VoicePolishStream.Labels(IntArray(0), IntArray(0)) })
         assertThrows(IllegalStateException::class.java) { short.finish("好") }
         assertThrows(IllegalArgumentException::class.java) { VoicePolishVocab.best(FloatArray(5), n = 2, width = 3) }
         // ties: the first; a word of two code points is no character's
@@ -154,7 +154,7 @@ class VoicePolishTest {
     @Test
     fun aJumpLongerThanAStepIsTaggedInSteps() {
         val lengths = ArrayList<Int>()
-        val tagger = VoicePolishStream.Tagger { w -> lengths += w.size; IntArray(w.size) to IntArray(w.size) }
+        val tagger = VoicePolishStream.Tagger { w -> lengths += w.size; VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size)) }
         val stream = VoicePolishStream(tags, tagger, freezeAfter = 2, window = 4)
         // ten characters at once: steps of window - freezeAfter, so none leaves the window untagged
         assertEquals("零一二三四五六七八九", stream.finish("零一二三四五六七八九"))
@@ -187,5 +187,70 @@ class VoicePolishTest {
         // a word deleted before: no space at the start
         val op = IntArray(normed.size).also { for (i in 1..6) it[i] = VoicePolishTags.DEL }
         assertEquals("用Maps和3 D打印", tags.apply(normed, op, keep, spaced))
+    }
+
+    // the number head (060-voice-tagger.md 数字头): num classes as N.json has them
+    private val numTags = VoicePolishTags(
+        listOf("keep", "del"),
+        listOf("", "，", "。"),
+        listOf("none", "value", "digits", "date", "time", "money", "percent", "model", "ratio"),
+    )
+
+    private fun classes(s: String) = s.map { if (it == '.') 0 else it.digitToInt() }.toIntArray()
+
+    @Test
+    fun adjacentMarkedCharactersAreOneNumberOfTheirMostClass() {
+        val text = codePoints("涨了百分之三点五共十二个")
+        val none = IntArray(text.size)
+        // 百分之三点五 percent but 五 value: most are percent
+        assertEquals("涨了3.5%共12个", numTags.apply(text, none, none, num = classes("..666661.11.")))
+        // a mark after a character ends the number there: two runs, 点五 no number
+        val after = IntArray(text.size).also { it[5] = 1 }
+        assertEquals("涨了3%，点五共12个", numTags.apply(text, none, after, num = classes("..666661.11.")))
+        // none given: as the tagger without the head
+        assertEquals("涨了百分之三点五共十二个", numTags.apply(text, none, none))
+        assertThrows(IllegalArgumentException::class.java) { numTags.apply(text, none, none, num = IntArray(1)) }
+        assertThrows(IllegalArgumentException::class.java) { VoicePolishTags(listOf("keep", "del"), listOf(""), listOf("value")) }
+    }
+
+    @Test
+    fun aDeletedCharacterIsInNoNumberAndLeavesItWhole() {
+        // 「幺三八，幺二三四」: the recognizer's pause comma deleted inside a phone number
+        val text = codePoints("幺三八，幺二三四")
+        val op = IntArray(text.size).also { it[3] = VoicePolishTags.DEL }
+        val none = IntArray(text.size)
+        assertEquals("1381234", numTags.apply(text, op, none, num = classes("22202222")))
+        // kept, the comma breaks the run though marked
+        assertEquals("138，1234", numTags.apply(text, none, none, num = classes("22222222")))
+    }
+
+    @Test
+    fun theStreamFreezesNumberClassesWithTheRest() {
+        var kind = 3
+        val tagger = VoicePolishStream.Tagger { w ->
+            VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size), IntArray(w.size) { if (w[it] == '年'.code) 0 else kind })
+        }
+        val stream = VoicePolishStream(numTags, tagger, freezeAfter = 1, window = 8)
+        assertEquals(VoicePolishStream.Shown("2026", "年"), stream.update("二零二六年"))
+        // tagged again as no number: the frozen digits keep their date
+        kind = 0
+        assertEquals("2026年", stream.finish("二零二六年"))
+        assertEquals("2026", stream.frozenPrefix(4))
+    }
+
+    @Test
+    fun anEnglishWordIsNoPartOfANumber() {
+        // the tagger marking 「Windows 11」's digits: they keep their space and stay as typed
+        val raw = "Windows 11"
+        val text = VoicePolishTags.norm(raw)
+        val none = IntArray(text.size)
+        val num = IntArray(text.size).also { it[7] = 7; it[8] = 7 }
+        assertEquals("Windows 11", numTags.apply(text, none, none, VoicePolishTags.spaces(raw, text), num))
+    }
+
+    // what is typed as it is said is cut after VoiceLive.ENDS: each ends a number, so no cut is inside one
+    @Test
+    fun everyMarkATalkIsTypedUpToEndsANumber() {
+        for (c in VoiceLive.ENDS) assertTrue("$c", "$c" in VoicePolishTags.NUMBER_BREAKS)
     }
 }

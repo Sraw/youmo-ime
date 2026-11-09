@@ -1089,10 +1089,14 @@ the tap's presses, what is typed as it is said) are in ime-core's `input/voice/`
   (written CER within ±0.5 points either way) and it is one model less.
 - `VoiceLive` (ime-core) keeps the closed segments and the one being said: joined with 「，」 where neither has a
   mark, a space between English words, and a segment that starts with a mark (the recognizer's context
-  outliving the reset) ends the one before with it. 语音整理 on (`keyboard.voicePolish`, default on), its
+  outliving the reset) ends the one before with it. 语音整理 is always on (no switch; `voice_polish` retired): its
   `VoicePolishStream` (K = 16, window 64) runs the polish tagger (`VoicePolisher`: ELECTRA-small int8 through
-  `OrtModel.runLongs`, `voice/polish-tagger.ort` + `.json`) on the text as it grows, freezing what is 16 characters
-  behind; `VoiceText.clean` (numbers, spaces) runs after it. A tagger that fails to load leaves voice on without it.
+  `OrtModel.runLongs`, `voice/polish-tagger.ort` + `.json`; outputs op, after and num) on the text as it grows,
+  freezing each character's three labels once 16 characters follow. Numbers are the tagger's alone: adjacent
+  characters of a num class not none (deleted ones skipped) are one run, written as its majority class by
+  `ChineseNumbers.written` (value, digits, date, time, money, percent, model, ratio; conversion only, no rules on
+  whether; a time's 半, 刻, 整 and a bare hour stay characters: 8点半, 7点整, 8点; hour and minutes 10:15). `VoiceText.clean` (spaces, spelled letters, noise) runs after it. A tagger that fails to load, or
+  fails at the end, leaves the raw recognized text typed, numbers in characters.
 - What is heard so far is the field's composing text (`FcitxInputMethodService.composeVoice`): voice's text is the
   text itself, as English's word (pitfalls.md). Not in a password field, a raw-key (`TYPE_NULL`) one, nor when the
   field composes a word of fcitx's when the talk starts (only the card or the mask shows it then), nor over a

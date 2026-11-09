@@ -11,12 +11,15 @@ import org.junit.Test
 
 class VoiceLiveTest {
 
-    private val tags = VoicePolishTags(listOf("keep", "del"), listOf("", "，", "。"))
+    private val tags = VoicePolishTags(listOf("keep", "del"), listOf("", "，", "。"), listOf("none", "value", "digits", "date"))
 
-    // 嗯 deleted, a 。 after 了: a tagger as small as the tests need
+    // 嗯 deleted, a 。 after 了, digits a date: a tagger as small as the tests need
     private val tagger = VoicePolishStream.Tagger { w ->
-        IntArray(w.size) { if (w[it] == '嗯'.code) VoicePolishTags.DEL else VoicePolishTags.KEEP } to
-            IntArray(w.size) { if (w[it] == '了'.code) 2 else 0 }
+        VoicePolishStream.Labels(
+            IntArray(w.size) { if (w[it] == '嗯'.code) VoicePolishTags.DEL else VoicePolishTags.KEEP },
+            IntArray(w.size) { if (w[it] == '了'.code) 2 else 0 },
+            IntArray(w.size) { if (w[it].toChar() in "零一二三四五六七八九") 3 else 0 },
+        )
     }
 
     @Test
@@ -48,8 +51,8 @@ class VoiceLiveTest {
         assertEquals("订了CEP的票，hello", live.heard("hello").text)
         assertEquals("订了CEP的票，hello world", live.heard("hello world").text)
         live.closed("hello world")
-        assertEquals("订了CEP的票，hello world，2026年", live.heard("二零二六年").text)
-        assertEquals("订了CEP的票，hello world，2026年", live.closed("二零二六年").text)
+        assertEquals("订了CEP的票，hello world，二零二六年", live.heard("二零二六年").text)
+        assertEquals("订了CEP的票，hello world，二零二六年", live.closed("二零二六年").text)
     }
 
     @Test
@@ -93,7 +96,7 @@ class VoiceLiveTest {
 
     @Test
     fun englishWordsKeepTheirSpacePolished() {
-        val keep = VoicePolishStream.Tagger { w -> IntArray(w.size) to IntArray(w.size) }
+        val keep = VoicePolishStream.Tagger { w -> VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size)) }
         val live = VoiceLive(VoicePolishStream(tags, keep, freezeAfter = 2, window = 8))
         live.closed("我用 Google Maps 找")
         assertEquals("我用Google Maps找", live.finish())
@@ -128,7 +131,7 @@ class VoiceLiveTest {
     // a tagger writing 「，」 after 到 and keeping a 。 the recognizer wrote: 「，。」 is 「。」 once both are polished
     @Test
     fun aPauseMarkAMarkMayTakeAwayIsNotSettledAtTheEnd() {
-        val comma = VoicePolishStream.Tagger { w -> IntArray(w.size) to IntArray(w.size) { if (w[it] == '到'.code) 1 else 0 } }
+        val comma = VoicePolishStream.Tagger { w -> VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size) { if (w[it] == '到'.code) 1 else 0 }) }
         val live = VoiceLive(VoicePolishStream(tags, comma, freezeAfter = 1, window = 8))
         live.closed("我到")
         // the closed segment polished alone is 「我到，」; the next starts with the recognizer's 。:

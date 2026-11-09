@@ -25,6 +25,8 @@ import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.voice.VoiceSession
 import org.fcitx.fcitx5.android.input.voice.VoicePermissionActivity
+import org.fcitx.fcitx5.android.input.voice.VoicePolishStream
+import org.fcitx.fcitx5.android.input.voice.VoicePolishTags
 import org.fcitx.fcitx5.android.input.voice.VoiceStyle
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -366,16 +368,38 @@ class VoiceHoldUatTest {
     @Uat("VO-06")
     fun numbersAreWrittenInDigits() {
         allowMicrophone()
+        voice.polish = { VoicePolishStream(numberTags, numberTagger) }
         h.start()
         say("二零零二年")
         say("百分之五十七")
         assertEquals("2002年57%", text().filter { it.isLetterOrDigit() || it == '%' })
     }
 
+    // the tagger failing as the talk ends (VoiceListener's fallback): the raw text, its numbers in characters
+    @Test
+    @Uat("VO-06")
+    fun aTaggerFailingTypesTheRawText() {
+        allowMicrophone()
+        voice.polish = { VoicePolishStream(numberTags, numberTagger) }
+        voice.finishRaw = true
+        h.start()
+        say("二零零二年")
+        assertEquals("二零零二年", text())
+    }
+
+    // the tagger's number head as the model has it: 二零零二 a date, 百分之五十七 a percentage
+    private val numberTags = VoicePolishTags(listOf("keep", "del"), listOf(""), listOf("none", "value", "digits", "date", "time", "money", "percent"))
+    private val numberTagger = VoicePolishStream.Tagger { w ->
+        val s = String(w, 0, w.size)
+        VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size), IntArray(w.size) { if (s[it] == '年') 0 else if ('百' in s) 6 else 3 })
+    }
+
     @Test
     @Uat("VO-07")
     fun wordsWithNumeralsAreLeftAlone() {
         allowMicrophone()
+        // whether 十分 is a number is the tagger's (measured in voice-eval's cases-N.tsv): this one marks none
+        voice.polish = { VoicePolishStream(numberTags, VoicePolishStream.Tagger { w -> VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size)) }) }
         h.start()
         say("这个电影十分有趣")
         assertEquals("这个电影十分有趣", text())

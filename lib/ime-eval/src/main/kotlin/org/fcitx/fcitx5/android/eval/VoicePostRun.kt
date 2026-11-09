@@ -9,7 +9,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.fcitx.fcitx5.android.input.voice.ChineseNumbers
 import org.fcitx.fcitx5.android.input.voice.VoicePost
 import java.io.File
 import java.util.Locale
@@ -93,11 +92,11 @@ internal object VoicePostRun {
     }
 
     /**
-     * One clip scored: [ref] the reference, [hyp] what was typed. The reference's numbers in digits as the
-     * app types them ([ChineseNumbers]; AISHELL writes 二六六万): what is measured is the post-processing, not that.
+     * One clip scored: [ref] the reference, [hyp] what was typed. Numbers are the tagger's (not run here):
+     * both are left as written.
      */
     fun score(ref: String, hyp: String, into: Score) {
-        val r = tokens(ChineseNumbers.convert(ref))
+        val r = tokens(ref)
         val h = tokens(hyp)
         into.clips++
         into.refWords += r.words.size

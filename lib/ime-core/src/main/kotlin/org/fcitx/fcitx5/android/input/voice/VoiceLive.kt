@@ -9,8 +9,8 @@ package org.fcitx.fcitx5.android.input.voice
  * the segments the recognizer's endpoints closed, each its chosen text ([VoiceChoice]), then the
  * one being said, joined as the tagger was measured on (voice-eval `fusion_exp.py`'s `joined`: a
  * segment ending in no mark of its own gets a 「，」, except between two English words, which keep
- * a space), polished as it streams ([polish]; none with 语音整理 off), then cleaned
- * ([VoiceText.clean]: no spaces in Chinese, numbers in digits). The field's end mark ([VoiceEnd]) is
+ * a space), polished as it streams ([polish]: marks, numbers in digits; none if the tagger did not load,
+ * the text then typed as recognised), then cleaned ([VoiceText.clean]: no spaces in Chinese). The field's end mark ([VoiceEnd]) is
  * the caller's. The rules come after the tagger: it was trained and measured on the recognizer's text.
  *
  * Not thread-safe: one thread, the recognizer's, as the tagger runs in [heard] and [closed].
@@ -78,14 +78,14 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
 
         // the marks a talk is typed up to as it goes: not 「.」 (3.5, e.g.), 「：」 (what follows
         // belongs to it) nor 「…」
-        private const val ENDS = "。？！；，、?!;,"
+        internal const val ENDS = "。？！；，、?!;,"
 
         /**
          * How much of [fixed] (text that stays) may be typed now: up to its last mark with a
          * character after it, not a mark nor a space, in [fixed] too, so that what follows it now
          * follows it in the end. Not up to a mark at its end: one coming next may change it
          * ([VoicePolishTags.apply] drops 「，」 before 「。」), and the clean-up may join what is on
-         * either side of a cut with no mark ([VoiceText.clean]: numbers, spelled letters). 0 if none.
+         * either side of a cut with no mark ([VoiceText.clean]: spelled letters). 0 if none.
          */
         fun settledEnd(fixed: String): Int {
             for (i in fixed.length - 1 downTo 1) {

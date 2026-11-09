@@ -58,14 +58,13 @@ object VoiceText {
     private const val LATIN_WORD = "\\p{IsLatin}0-9_"
 
     /**
-     * [raw] as typed: no spaces in Chinese, an abbreviation in one piece, numbers in digits
-     * ([ChineseNumbers]); null when nothing is left worth typing: punctuation alone, or a filler
+     * [raw] as typed: no spaces in Chinese, an abbreviation in one piece (numbers are the polish
+     * tagger's, [VoicePolishTags]); null when nothing is left worth typing: punctuation alone, or a filler
      * sound alone ("嗯。", "咳咳咳。", "Huh,"), which the recognizer writes for a noise as often as for a word.
      */
     fun clean(raw: String): String? {
         val text = raw.trim()
         if (text.isEmpty() || NOISE.any { it.matches(text) } || isLatinSound(text)) return null
-        val spaced = SPELLED.replace(SPACE_BY_CJK.replace(text, "")) { it.value.replace(" ", "") }
-        return ChineseNumbers.convert(spaced)
+        return SPELLED.replace(SPACE_BY_CJK.replace(text, "")) { it.value.replace(" ", "") }
     }
 }
