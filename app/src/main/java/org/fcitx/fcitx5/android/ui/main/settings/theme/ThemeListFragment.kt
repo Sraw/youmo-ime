@@ -145,11 +145,11 @@ class ThemeListFragment : Fragment() {
         themeListAdapter.setSelectedThemes(active, light, dark)
     }
 
-    // the app lists, picks, imports, exports and deletes themes; it makes none, so 新增主题 is the import's file picker
+    // the app makes no themes: 新增主题 imports a file, or opens the web theme maker to make one
     private fun addTheme() {
         // the themes not settled: an import would go nowhere the next start reads
         if (ThemeManager.refuseIfNotSettled()) return
-        importLauncher.launch("*/*")
+        ThemeAddMenu.show(requireContext()) { importLauncher.launch("*/*") }
     }
 
     private fun selectTheme(theme: Theme) {
