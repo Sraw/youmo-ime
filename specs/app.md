@@ -285,6 +285,29 @@ none of it, pills and a dotted one, a candidate with a comment among them. The s
 own widths (`NeverFillWidth`); filling its width (Auto, Always), the app stretches each candidate, which the
 web's preview does not show.
 
+T6b adds three to `BarLook`. `bar height=` (80%–140%, on a style of bars alone, a scene allowed) scales the
+bar 候选字号 gives (`CandidateBarHeight.dp(…, percent)`, rounded to a dp; a line of pinyin readings is added
+after, unscaled): `KawaiiBarComponent.heightDp(context)` takes the active theme's in the window's scenes of
+that context (`SceneBar.heightPercent`, kept per theme file and scenes), so every view sized by the bar follows,
+the expanded grid's rows and a hint reading's baseline (CandidateItemUi, the grid's measure) too; the keys
+keep their height, the keyboard grows by the difference (the 70% cap, `KeyboardHeightCap`, counts the bar as
+before), docked, floating and one-handed alike (`BarToolbarThemeTest`). The bar is one over every window
+form (`SceneWindow.scenes` is never floating, split or one-handed), so a bar widget's selector under
+`@floating`, `@split` or `@one-handed` never matches and is warned of. `toolbar` (fill, radius, icon-color;
+`:pressed` overlay; `:selected`, a toggle on, fill and icon-color) is every `ToolButton`'s (IdleUi works it
+out once for the bar's buttons): nothing set, the press highlight's circle and `toolbarIcon`, on `accentKey`,
+as before; a state with a fill or a radius is a shape (`SceneBar.shape`; no radius: a circle in the button's
+middle, `ToolButton.Circle`) with the overlay over it pressed, a state with neither the press highlight as
+ever (`toolbar:selected fill` alone leaves every button off as it was; `ToolButton.setOn`). `preedit` (color, cursor-color,
+underline) is the code row's, the floating strip's and the hardware keyboard window's code (`PreeditUi`)
+and the syllables' text colour: nothing set, `keyText` and fcitx's `UnderlineSpan`; an `underline` of the
+theme is drawn by `PreeditUi.PreeditTextView` under each span fcitx underlines, at the font's underline
+position (`Paint.underlinePosition`, API 29), to each line's end edge where it wraps (`segments`): no public
+API sets an underline's colour or thickness (`TextPaint.underlineColor`, `underlineThickness` are hidden at
+every level). `none`, or 0 wide, none. The floating code strip's colour and the settings
+page's preview bar (its base and height, of the theme shown) are the theme's `bar` too. A candidate's
+`size` stays unread: 候选字号 is the user's setting, and the bar's height the theme's.
+
 Floating (`ThemePrefs.floatingKeyboard`, the status area's 悬浮键盘; the input view is made anew for
 it): `keyboardView` is `FloatingKeyboard.widthDp` wide (70% of the screen, 300–420 dp), its boards as
 much shorter (85% at least), with `FloatingHandle` at the bottom (24 dp: a short bar and the dock button;

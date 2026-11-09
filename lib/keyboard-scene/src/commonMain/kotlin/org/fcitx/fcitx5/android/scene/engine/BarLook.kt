@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.scene.engine
 
 import org.fcitx.fcitx5.android.scene.theme.Argb
+import org.fcitx.fcitx5.android.scene.theme.Border
 import org.fcitx.fcitx5.android.scene.theme.Cascade
 import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.Fill
@@ -26,6 +27,10 @@ import org.fcitx.fcitx5.android.scene.theme.Value
  * `keyPressHighlight` over the whole of it, the lines between `divider`; selected (the physical keyboard's
  * window) `genericActiveBackground` behind it, all its text `genericActiveForeground`; the panel the
  * `panel`'s fill. Its size and spacing the app's own ([padding] null, [labelStyle] null).
+ *
+ * T6b's: the bar's height ([heightPercent], of the height 候选字号 gives it), the code being typed
+ * ([preedit]: `preedit`) and the toolbar's buttons ([toolbar]: `toolbar`, `:pressed`, `:selected` a
+ * toggle on); a theme setting none of it has them as before.
  */
 data class BarLook(
     /** Under the bar: null none (the keyboard's base seen through). */
@@ -49,6 +54,10 @@ data class BarLook(
     val divider: Argb?,
     /** The expanded candidates' panel; null none (the keyboard's base seen through). */
     val panel: Argb?,
+    /** The bar's height in % of what 候选字号 makes it (100: that). */
+    val heightPercent: Double = FULL,
+    val preedit: PreeditLook,
+    val toolbar: ToolbarLook,
 ) {
     /** A candidate's look: the [first] of the list, the [selected] one (the physical keyboard's cursor). */
     fun candidate(first: Boolean, selected: Boolean): CandidateLook = when {
@@ -94,6 +103,35 @@ data class BarLook(
                 labelStyle = (v["label-style"] as? Value.Word)?.word?.let(LabelStyle::of),
                 divider = solid(c.of(DIVIDER)["fill"], theme, variable(theme, DIVIDER_COLOR)),
                 panel = solid(c.of(PANEL)["fill"] ?: c.of(KEYBOARD_PANEL)["fill"], theme, null),
+                heightPercent = (c.of(BAR)["height"] as? Value.Percent)?.percent ?: FULL,
+                preedit = preedit(c, theme),
+                toolbar = toolbar(c, theme),
+            )
+        }
+
+        // the code being typed: in the keys' text colour, its cursor in its text's, the underline fcitx asks
+        // for the text's own (the font's thickness)
+        private fun preedit(c: Cascade, theme: Theme): PreeditLook {
+            val v = c.of(PREEDIT)
+            val color = color(v["color"], theme) ?: variable(theme, KEY_TEXT)
+            return PreeditLook(color, color(v["cursor-color"], theme) ?: color, (v["underline"] as? Value.OfBorder)?.border?.let { b ->
+                PreeditLook.Underline(b.width, b.color?.takeIf { b != Border.NONE && b.width > 0.0 }?.let(theme::color))
+            })
+        }
+
+        // a toolbar button: no fill, a circle pressed in the key press highlight, its icon in toolbarIcon, on in
+        // accentKey's colour (a toggle's)
+        private fun toolbar(c: Cascade, theme: Theme): ToolbarLook {
+            val v = c.of(TOOLBAR)
+            val on = c.stated(TOOLBAR.copy(states = setOf(SELECTED)), SELECTED)
+            val fill = solid(v["fill"], theme, null)
+            return ToolbarLook(
+                fill = fill,
+                radius = (v["radius"] as? Value.OfRadius)?.radius,
+                icon = color(v["icon-color"], theme) ?: variable(theme, TOOLBAR_ICON),
+                pressed = color(c.stated(TOOLBAR.copy(states = setOf(PRESSED)), PRESSED)["overlay"], theme) ?: variable(theme, PRESS),
+                onFill = if ("fill" in on) solid(on["fill"], theme, null) else fill,
+                onIcon = color(on["icon-color"], theme) ?: variable(theme, ACCENT),
             )
         }
 
@@ -159,6 +197,11 @@ data class BarLook(
         private const val PRESS = "keyPressHighlight"
         private const val DIVIDER_COLOR = "divider"
         private const val BAR_COLOR = "bar"
+        private const val KEY_TEXT = "keyText"
+        private const val TOOLBAR_ICON = "toolbarIcon"
+        private const val ACCENT = "accentKey"
+        private val PREEDIT = Selector.Target("preedit")
+        private val TOOLBAR = Selector.Target("toolbar")
         private val CANDIDATE = Selector.Target("candidate")
         private val BAR = Selector.Target("bar")
         private val DIVIDER = Selector.Target("candidates-divider")
@@ -182,4 +225,26 @@ data class CandidateLook(
     val commentColor: Argb,
     val font: String?,
     val weight: Int?,
+)
+
+/**
+ * The code being typed (编码行 and the floating strip; 060-render-p3 T6b): its text's [color], its
+ * cursor's, and the [underline] fcitx asks for under some of it: null the text's own (UnderlineSpan),
+ * else of its width in dp and colour (null none drawn: `none`, or 0 wide).
+ */
+data class PreeditLook(val color: Argb, val cursor: Argb, val underline: Underline?) {
+    data class Underline(val widthDp: Double, val color: Argb?)
+}
+
+/**
+ * A toolbar button (060-render-p3 T6b): its [fill] (null none) of its [radius] (null a circle, as ever),
+ * its [icon]'s colour, [pressed] the colour over it pressed; on (a toggle's) [onFill] and [onIcon].
+ */
+data class ToolbarLook(
+    val fill: Argb?,
+    val radius: Radius?,
+    val icon: Argb,
+    val pressed: Argb,
+    val onFill: Argb?,
+    val onIcon: Argb,
 )

@@ -199,6 +199,6 @@ class TextEditingUi(
     }
 
     val extension = horizontalLayout {
-        add(clipboardButton, lParams(dp(KawaiiBarComponent.buttonWidthDp()), dp(KawaiiBarComponent.heightDp())))
+        add(clipboardButton, lParams(dp(KawaiiBarComponent.buttonWidthDp(ctx)), dp(KawaiiBarComponent.heightDp(ctx))))
     }
 }

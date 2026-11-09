@@ -24,11 +24,14 @@ import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import org.fcitx.fcitx5.android.scene.engine.BarLook
 import org.fcitx.fcitx5.android.scene.engine.BarSample
 import org.fcitx.fcitx5.android.scene.engine.CandidateLook
+import org.fcitx.fcitx5.android.scene.engine.PreeditLook
+import org.fcitx.fcitx5.android.scene.engine.ToolbarLook
 import org.fcitx.fcitx5.android.scene.look.BarBase
 import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Inset
 import org.fcitx.fcitx5.android.scene.theme.Radius
+import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.pressHighlightDrawable
 
 /**
@@ -69,8 +72,30 @@ object SceneBar {
             radius = Radius(List(CORNERS) { 0.0 }), inset = Inset(0.0, 0.0, 0.0, 0.0), padding = null, gapDp = 0.0, labelStyle = null,
             divider = Argb(theme.dividerColor),
             panel = ThemeColors.panel(look.palette, look.keys)?.let(::Argb),
+            preedit = PreeditLook(Argb(theme.keyTextColor), Argb(theme.keyTextColor), null),
+            toolbar = Argb(look.palette.toolbarIconColor).let { ToolbarLook(null, null, it, press, null, Argb(theme.accentKeyBackgroundColor)) },
         )
     }
+
+    // the last theme file and scenes asked of and their bar's height: asked for by every view on the bar as it is made
+    private var shownHeight: Triple<Any?, Set<String>, Double>? = null
+
+    /**
+     * The bar's height in % of what 候选字号 makes it, the active theme's in the window's scenes now
+     * (KawaiiBarComponent.heightDp): 100 for a theme setting none.
+     */
+    fun heightPercent(context: Context = appContext): Double {
+        val theme = ThemeManager.activeTheme
+        val scenes = SceneWindow.scenes(context, theme)
+        // the theme file SceneThemes keeps: another look, or the same made anew, another file
+        val file = SceneThemes.of(ThemeManager.shownLook(theme), theme.name, theme.isDark)
+        shownHeight?.let { (f, s, h) -> if (f === file && s == scenes) return h }
+        val h = file?.let { BarLook.of(SceneThemes.cascades(it), scenes).heightPercent } ?: FULL
+        shownHeight = Triple(file, scenes, h)
+        return h
+    }
+
+    private const val FULL = 100.0
 
     /** The bar's base, under the bar and the row of the code being typed: none, a colour, the picture's part there. */
     fun background(bar: BarLook): Drawable? = when (val b = bar.base) {
@@ -86,16 +111,7 @@ object SceneBar {
     fun candidateBackground(context: Context, bar: BarLook, c: CandidateLook, pressable: Boolean = true): Drawable? {
         val plain = bar.radius == SQUARE && bar.inset == NO_INSET && c.fill == null
         if (plain) return if (pressable) pressHighlightDrawable(c.pressed.value) else null
-        fun shape(color: Argb) = inset(context, bar.inset, GradientDrawable().apply {
-            setColor(color.value)
-            if (bar.radius.half) {
-                // as round as it goes: GradientDrawable keeps each corner to half the shorter side
-                cornerRadius = Float.MAX_VALUE
-            } else {
-                // top left, top right, bottom right, bottom left: each corner its x and y
-                cornerRadii = bar.radius.corners.flatMap { listOf(it.toFloat() * density(context), it.toFloat() * density(context)) }.toFloatArray()
-            }
-        })
+        fun shape(color: Argb) = inset(context, bar.inset, shape(context, bar.radius, color))
         if (!pressable) return c.fill?.let(::shape)
         return StateListDrawable().apply {
             addState(PRESSED, LayerDrawable(listOfNotNull(c.fill?.let(::shape), shape(c.pressed)).toTypedArray()))
@@ -112,6 +128,18 @@ object SceneBar {
     fun typeface(theme: Theme, c: CandidateLook): Typeface? {
         val look = ThemeManager.shownLook(theme)
         return ThemeAssets.typeface(look, SceneFonts.path(look, c.font ?: SYSTEM), c.weight ?: NORMAL)
+    }
+
+    /** A [color] fill of [radius]'s corners: a candidate's, a toolbar button's. */
+    fun shape(context: Context, radius: Radius, color: Argb): GradientDrawable = GradientDrawable().apply {
+        setColor(color.value)
+        if (radius.half) {
+            // as round as it goes: GradientDrawable keeps each corner to half the shorter side
+            cornerRadius = Float.MAX_VALUE
+        } else {
+            // top left, top right, bottom right, bottom left: each corner its x and y
+            cornerRadii = radius.corners.flatMap { listOf(it.toFloat() * density(context), it.toFloat() * density(context)) }.toFloatArray()
+        }
     }
 
     /** Room left and right of a candidate's text, px: the theme's, else the app's of 候选字号. */

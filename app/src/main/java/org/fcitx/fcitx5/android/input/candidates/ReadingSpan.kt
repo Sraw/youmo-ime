@@ -39,7 +39,7 @@ class ReadingSpan(
     private val reading: String,
     private val color: Int,
     private val hintSize: Float = 0f,
-    private val hintRoom: Float = 0f,
+    internal val hintRoom: Float = 0f,
     private val floor: Float = 0f,
 ) : ReplacementSpan() {
 

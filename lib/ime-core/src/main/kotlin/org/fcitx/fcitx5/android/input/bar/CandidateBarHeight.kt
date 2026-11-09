@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 object CandidateBarHeight {
     const val DEFAULT_TEXT_SP = 20
     const val DEFAULT_DP = 40
+    private const val FULL = 100.0
 
     /** The readings' text size, of the candidates'. */
     const val READING_SCALE = 0.5f
@@ -53,8 +54,13 @@ object CandidateBarHeight {
         return (most * charWidth / width).coerceIn(minOf(floor, most), most)
     }
 
-    fun dp(textSp: Int, reading: ReadingStyle = ReadingStyle.OFF): Int {
-        val bar = DEFAULT_DP + 2 * (textSp - DEFAULT_TEXT_SP)
+    /**
+     * The bar's height in dp at [textSp], [reading] its readings, [percent] the theme's (060-render-p3 T6b:
+     * `bar height=`, 80–140, of the height 候选字号 gives it, rounded to a dp); a line of readings is the
+     * text's, added after.
+     */
+    fun dp(textSp: Int, reading: ReadingStyle = ReadingStyle.OFF, percent: Double = FULL): Int {
+        val bar = Math.round((DEFAULT_DP + 2 * (textSp - DEFAULT_TEXT_SP)) * percent / FULL).toInt()
         return if (reading == ReadingStyle.PINYIN) bar + Math.round(textSp * READING_LINE) else bar
     }
 }

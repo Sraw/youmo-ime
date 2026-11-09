@@ -30,7 +30,7 @@ class NumberRow(ctx: Context, theme: Theme) : BaseKeyboard(ctx, theme, Layout) {
     private var collapseGestureTriggered: Boolean = false
 
     // a swipe this far collapses the row: read once, not at each move (the bar height is a preference)
-    private val collapseDistance = dp(KawaiiBarComponent.heightDp())
+    private val collapseDistance = dp(KawaiiBarComponent.heightDp(ctx))
 
     var onCollapseListener: (() -> Unit)? = null
 

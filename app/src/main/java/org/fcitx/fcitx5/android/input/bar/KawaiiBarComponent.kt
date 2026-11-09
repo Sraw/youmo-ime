@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.bar
 
+import android.content.Context
 import android.os.Build
 import android.util.Size
 import android.view.KeyEvent
@@ -53,6 +54,7 @@ import org.fcitx.fcitx5.android.input.bar.ui.IdleUi
 import org.fcitx.fcitx5.android.input.bar.ui.TitleUi
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
+import org.fcitx.fcitx5.android.input.candidates.SceneBar
 import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateStyle
 import org.fcitx.fcitx5.android.input.candidates.expanded.window.FlexboxExpandedCandidateWindow
 import org.fcitx.fcitx5.android.input.candidates.expanded.window.GridExpandedCandidateWindow
@@ -82,6 +84,7 @@ import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.scene.engine.section
 import org.fcitx.fcitx5.android.utils.AppUtil
+import org.fcitx.fcitx5.android.utils.appContext
 import org.mechdancer.dependency.DynamicScope
 import org.mechdancer.dependency.manager.must
 import splitties.dimensions.dp
@@ -348,7 +351,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             hideKeyboardButton.apply {
                 setOnClickListener(hideKeyboardCallback)
                 swipeEnabled = true
-                swipeThresholdY = dp(heightDp().toFloat())
+                swipeThresholdY = dp(heightDp(context).toFloat())
                 swipeThresholdX = swipeThresholdY
                 onGestureListener = swipeHideKeyboardCallback
             }
@@ -420,7 +423,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         CandidateUi(context, theme, horizontalCandidate.view).apply {
             expandButton.apply {
                 swipeEnabled = true
-                swipeThresholdY = dp(heightDp().toFloat())
+                swipeThresholdY = dp(heightDp(context).toFloat())
                 onGestureListener = swipeDownExpandCallback
                 // with candidates or predictions shown the bar has no ⌄ of its own: this one hides
                 // the keyboard when held, as the swipe down does
@@ -656,7 +659,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     private val suggestionSize by lazy {
-        Size(ViewGroup.LayoutParams.WRAP_CONTENT, context.dp(heightDp()))
+        Size(ViewGroup.LayoutParams.WRAP_CONTENT, context.dp(heightDp(context)))
     }
 
     private val directExecutor by lazy {
@@ -718,16 +721,17 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     companion object {
         /**
-         * The bar's height in dp, from 候选字号 (a preference read, so read once a view); the input
-         * view is made anew when that changes.
+         * The bar's height in dp, from 候选字号 (a preference read, so read once a view) and the theme's
+         * `bar height=` ([SceneBar.heightPercent]); the input view is made anew when either changes.
          */
-        fun heightDp(): Int = CandidateBarHeight.dp(ThemeManager.prefs.candidateTextSize.getValue(), EngineState.candidateReading.value)
+        fun heightDp(context: Context = appContext, percent: Double = SceneBar.heightPercent(context)): Int =
+            CandidateBarHeight.dp(ThemeManager.prefs.candidateTextSize.getValue(), EngineState.candidateReading.value, percent)
 
         /** A candidate's side padding in dp, from 候选字号 ([CandidateSpacing]). */
         fun candidatePaddingDp(): Int = CandidateSpacing.paddingDp(ThemeManager.prefs.candidateTextSize.getValue())
 
         /** A bar button's width in dp: the bar's height, never under [MIN_TOUCH_DP]. */
-        fun buttonWidthDp(): Int = maxOf(heightDp(), MIN_TOUCH_DP)
+        fun buttonWidthDp(context: Context = appContext): Int = maxOf(heightDp(context), MIN_TOUCH_DP)
 
         /**
          * The row above the bar where the code being typed shows ([PreeditComponent]), in dp, for

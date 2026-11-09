@@ -8,6 +8,8 @@ import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.engine.BarLook
 import org.fcitx.fcitx5.android.scene.engine.BarSample
 import org.fcitx.fcitx5.android.scene.engine.CandidateLook
+import org.fcitx.fcitx5.android.scene.engine.PreeditLook
+import org.fcitx.fcitx5.android.scene.engine.ToolbarLook
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.Inset
@@ -232,5 +234,61 @@ class BarLookTest {
         assertEquals(Op.Fill(face, argb(0xFFFFFFFF)), s.keys[0].faces.getValue(emptySet()).first())
         assertEquals("•", BarSample.label(BarLook.LabelStyle.Dot, 3))
         assertEquals("", BarSample.label(null, 3))
+    }
+
+    // T6b: the bar's height, the code being typed, the toolbar's buttons
+    @Test
+    fun noneSetIsTheCodeAndToolbarAsBefore() {
+        val l = look()
+        assertEquals(100.0, l.heightPercent)
+        assertEquals(PreeditLook(text, text, null), l.preedit, "the keys' text colour, the underline fcitx's own")
+        assertEquals(ToolbarLook(null, null, argb(0xFF7A858A), press, null, argb(0xFF5CB5AB)), l.toolbar, "toolbarIcon, lit in accentKey")
+    }
+
+    @Test
+    fun theCodeAndToolbarAreTheThemes() {
+        val l = look(
+            theme(
+                "<style select=\"bar\" height=\"120%\"/>",
+                "<style select=\"@landscape bar\" height=\"90%\"/>",
+                "<style select=\"preedit\" color=\"#ff112233\" underline=\"2dp @accentKey\"/>",
+                "<style select=\"toolbar\" fill=\"#ffeeeeee\" radius=\"8dp\" icon-color=\"#ff445566\"/>",
+                "<style select=\"toolbar:pressed\" overlay=\"#33000000\"/>",
+                "<style select=\"toolbar:selected\" fill=\"@accentKey\" icon-color=\"#ffffffff\"/>",
+            ),
+        )
+        assertEquals(120.0, l.heightPercent)
+        assertEquals(PreeditLook(argb(0xFF112233), argb(0xFF112233), PreeditLook.Underline(2.0, argb(0xFF5CB5AB))), l.preedit, "the cursor the text's")
+        assertEquals(ToolbarLook(argb(0xFFEEEEEE), Radius(List(4) { 8.0 }), argb(0xFF445566), argb(0x33000000), argb(0xFF5CB5AB), argb(0xFFFFFFFF)), l.toolbar)
+        val turned = look(theme("<style select=\"bar\" height=\"120%\"/>", "<style select=\"@landscape bar\" height=\"90%\"/>"), setOf("landscape"))
+        assertEquals(90.0, turned.heightPercent)
+        // a cursor of its own; no underline at all
+        val p = look(theme("<style select=\"preedit\" cursor-color=\"#ffff0000\" underline=\"none\"/>")).preedit
+        assertEquals(PreeditLook(text, argb(0xFFFF0000), PreeditLook.Underline(0.0, null)), p)
+        // 0 wide is none too, not a hairline
+        assertEquals(PreeditLook.Underline(0.0, null), look(theme("<style select=\"preedit\" underline=\"0 @keyText\"/>")).preedit.underline)
+        // on, a fill unset: the button's own
+        assertEquals(argb(0xFFEEEEEE), look(theme("<style select=\"toolbar\" fill=\"#ffeeeeee\"/>")).toolbar.onFill)
+    }
+
+    @Test
+    fun whatTheCodeAndToolbarDoNotReadIsWarnedOf() {
+        assertTrue(warnings("<style select=\"preedit\" fill=\"#ff000000\"/>").single().contains("fill= on preedit does nothing"))
+        assertTrue(warnings("<style select=\"toolbar:selected\" radius=\"4dp\"/>").single().contains("radius= on toolbar:selected does nothing"))
+        assertTrue(warnings("<style select=\"key\" underline=\"none\"/>").single().contains("only the code being typed"))
+        assertTrue(warnings("<style select=\"toolbar\" cursor-color=\"@keyText\"/>").single().contains("cursor-color= on toolbar does nothing"))
+        assertTrue(ThemeReader.theme(withStyle("<style select=\"preedit\" underline=\"9dp @keyText\"/>")).problems().isNotEmpty(), "at most 3dp, a border's")
+        // the bar is not placed per window form: such a scene never matches
+        for (s in listOf("@floating bar", "@split toolbar", "@one-handed preedit", "@one-handed candidate")) {
+            assertTrue(warnings("<style select=\"$s\" fill=\"#ff000000\"/>").any { it.contains("$s never matches") }, s)
+        }
+        assertTrue(warnings("<style select=\"@landscape bar\" fill=\"#ff000000\"/>").isEmpty())
+    }
+
+    @Test
+    fun theBarsHeightAndTheCodesUnderlineAreWrittenAndReadBack() {
+        val t = theme("<style select=\"bar\" height=\"115%\"/>", "<style select=\"preedit\" underline=\"1.5dp @keyText\" cursor-color=\"@accentKey\"/>")
+        val text = ThemeWriter.write(t)
+        assertEquals(look(t), look(ThemeReader.theme(text).ok()), text)
     }
 }
