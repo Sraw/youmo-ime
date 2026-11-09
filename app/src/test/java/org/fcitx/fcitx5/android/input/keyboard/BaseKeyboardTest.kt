@@ -4,6 +4,9 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import android.os.SystemClock
+import android.view.MotionEvent
+import android.view.ViewConfiguration
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.InputMethodSubMode
@@ -86,6 +89,26 @@ class BaseKeyboardTest {
         assertFalse("no talking in a password", spaceLongPressTakesTouch(SpaceLongPressBehavior.Voice, voiceReady = true, inPasswordField = true))
         assertFalse("no voice pack", spaceLongPressTakesTouch(SpaceLongPressBehavior.Voice, voiceReady = false, inPasswordField = false))
         assertTrue("another behaviour needs no pack", spaceLongPressTakesTouch(SpaceLongPressBehavior.Enumerate, voiceReady = false, inPasswordField = false))
+    }
+
+    // hold to talk follows the finger holding the space: its long press told with that finger's pointer id
+    @Test
+    fun theSpacesLongPressCarriesTheFingersPointer() {
+        told { t ->
+        prefs.set(AppPrefs.getInstance().keyboard.spaceKeyLongPressBehavior, SpaceLongPressBehavior.Enumerate)
+        val h = t.h
+        val space = h.keyNamed("space")
+        val root = IntArray(2).also(h.inputView::getLocationInWindow)
+        val props = arrayOf(MotionEvent.PointerProperties().apply { id = 3; toolType = MotionEvent.TOOL_TYPE_FINGER })
+        val at = arrayOf(MotionEvent.PointerCoords().apply { x = space.bounds.exactCenterX() - root[0]; y = space.bounds.exactCenterY() - root[1] })
+        val down = SystemClock.uptimeMillis()
+        fun send(action: Int) = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, 1, props, at, 0, 0, 1f, 1f, 0, 0, 0, 0)
+            .also { h.inputView.dispatchTouchEvent(it); it.recycle() }
+        send(MotionEvent.ACTION_DOWN)
+        h.after(ViewConfiguration.getLongPressTimeout() + 500L)
+        assertTrue(t.actions.toString(), KeyAction.SpaceLongPressAction(pointer = 3) in t.actions)
+        send(MotionEvent.ACTION_UP)
+        }
     }
 
     // 滑动 at its default (shortcuts up, symbols down): a's select all up, its symbol down, s with nothing up a tap
