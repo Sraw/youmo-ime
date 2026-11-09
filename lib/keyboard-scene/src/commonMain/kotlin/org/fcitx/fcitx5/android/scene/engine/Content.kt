@@ -11,7 +11,9 @@ import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks.Slot
 import org.fcitx.fcitx5.android.scene.rules.KeyTextScale
+import org.fcitx.fcitx5.android.scene.theme.Shown
 import org.fcitx.fcitx5.android.scene.theme.TextLook
+import org.fcitx.fcitx5.android.scene.theme.Values
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -39,6 +41,11 @@ class KeyContent(
     val glyph: Drawn?, val marks: List<MarkDrawn>, val room: Box, val glyphClass: GlyphClass?, val baseline: Double, val yields: Boolean = true,
     /** How far out the marks go, their insets eaten, where nothing else keeps them all ([MARK_EDGE_DP] in from the face's sides, arcs and border). */
     val edge: KeyMarkYield.Edge = KeyMarkYield.Edge(room.toInk()),
+    /**
+     * Where a glyph a theme aligns (`align`, not centred) stays and is made smaller about: it never moves
+     * for its marks, they move for it, as a main character does on its row's baseline; null: centred.
+     */
+    val anchor: Pair<Double, Double>? = null,
 )
 
 /** What a key's content is drawn in, as the theme has it in its normal state: one per part. */
@@ -49,6 +56,7 @@ class Looks(private val of: (Part) -> TextLook) {
     val badge: TextLook get() = of(Part.Badge)
     val mark: TextLook get() = of(Part.Mark)
     val shortcut: TextLook get() = of(Part.Shortcut)
+    val hint: TextLook get() = of(Part.Hint)
 }
 
 /**
@@ -67,6 +75,14 @@ class Looks(private val of: (Part) -> TextLook) {
  * A table's roots (`{root:x}`, TextKeyboard's) are set as theme 3.0 set them: in lines, two in the
  * height of one ([ROOTS_LINES_SCALE] of the size), the whole shrunk to the face less [ROOTS_INSET_DP]
  * a side where it is wider (AutoScaleTextView's Proportional), each line centred.
+ *
+ * A theme's text look (060-render-p3 T4a): `align` puts the glyph (a label, a badge and its label, an
+ * icon alone) at the face's top left ([SYMBOL_SIDE_DP] in, as the symbol in its corner) or its top
+ * instead of its middle, by the same box; `letter-spacing` sets characters apart, measured; `font-han`
+ * and `font-latin` set each script's run in its own font ([Scripts]), measured run by run;
+ * `space-content` and `return-icon-<action>` give the space and Return a text, an icon or nothing of
+ * the theme's; `key mark { hidden }` leaves the symbol out, `key hint { hidden }` a function key's
+ * swipe marks.
  */
 class Content(private val env: Env, private val measurer: TextMeasurer, private val icons: IconSizes = IconSizes.MATERIAL) {
     private val d = env.density
@@ -77,18 +93,19 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         val hidden = looks.label.hidden
         val marks = marks(key, cell, content, looks, hidden, snap)
         val below = marks.firstOrNull { it.slot == Slot.Below }
-        val measured = key.label?.takeIf { it.isNotEmpty() }?.let { text ->
-            val size = (key.attrs.textSize ?: DEFAULT_TEXT_DP) * d * textScale * compactScale * looks.label.scale
-            val weight = if (key.attrs.bold == true) BOLD else looks.label.weight
-            Measured(text, measurer.measure(text, looks.label.font, weight, size), size, looks.label.font, weight)
+        val shows = shows(key, looks)
+        val measured = shows.label?.takeIf { it.isNotEmpty() }?.let { text ->
+            val size = (shows.textSize ?: DEFAULT_TEXT_DP) * d * textScale * compactScale * looks.label.scale
+            measure(text, looks.label, if (key.attrs.bold == true) BOLD else looks.label.weight, size)
         }
         val label = measured?.takeIf { !hidden }
         val roots = (key.attrs.label as? Text.Binding)?.name == ROOT
         val lines = roots && label != null && '\n' in label.text
-        val icon = key.icon?.takeIf { !hidden }
+        val icon = shows.icon?.takeIf { !hidden }
         val badge = key.badge
         val cy = if (below != null) (content.top + below.top) / 2 else content.centerY
-        val glyph = glyph(badge, measured, label, icon, roots, content, cy)
+        val align = looks.label.align.takeIf { !roots && (label == null || icon == null) } ?: Values.CENTER
+        val (glyph, anchor) = glyph(badge, measured, label, icon, roots, Placing(content, cy, align, looks.label))
         val room = content.inset(ROOM_H_DP * d, ROOM_V_DP * d, ROOM_H_DP * d, ROOM_V_DP * d)
         // by the key's kind (a layout's or a theme's own keys fall in by theirs) and what it shows: a function
         // key's text (符, 分词, the , . beside the space, a number pad's + -) is a function key's, whatever it types
@@ -98,6 +115,11 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
             badge == null && key.kind !in FUNCTION_KINDS -> GlyphClass.Main
             else -> GlyphClass.Label
         }
+        val edge = edge(content, face, snap)
+        return KeyContent(glyph, marks, room, glyphClass, glyph?.texts?.firstOrNull()?.baseline ?: 0.0, yields = !lines, edge = edge, anchor = anchor)
+    }
+
+    private fun edge(content: Box, face: FaceGeometry?, snap: Boolean): KeyMarkYield.Edge {
         // the face's corners where it is what the content is in (a bar's or a circle's are not: its box's then)
         val radii = face?.pressed?.takeIf { it.box == content }?.radii ?: Shape.NO_RADII
         val line = face?.border ?: 0.0
@@ -105,65 +127,144 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         // pixel's rounding takes off it, so what fits there fits the face as drawn
         val within = if (snap) content else content.inset(HALF_PX, HALF_PX, HALF_PX, HALF_PX)
         val half = minOf(within.width, within.height) / 2
-        val edge = KeyMarkYield.Edge(within.toInk(), if (snap) radii else radii.map { minOf(it, half) }, MARK_EDGE_DP * d + line, line)
-        return KeyContent(glyph, marks, room, glyphClass, glyph?.texts?.firstOrNull()?.baseline ?: 0.0, yields = !lines, edge = edge)
+        return KeyMarkYield.Edge(within.toInk(), if (snap) radii else radii.map { minOf(it, half) }, MARK_EDGE_DP * d + line, line)
     }
 
-    // the key's one thing in the middle: its badge and label, its label over its icon, its roots, its label, its icon
-    private fun glyph(badge: String?, measured: Measured?, label: Measured?, icon: String?, roots: Boolean, content: Box, cy: Double): Drawn? = when {
-        badge != null -> badged(badge, measured, label, content.centerX, cy)
-        label != null && icon != null -> {
-            val iconSize = ICON_WITH_LABEL_DP * d
-            val (labelPad, iconPad) = if (env.landscape) LANDSCAPE_PADS else PORTRAIT_PADS
-            val t = label.at(content.centerX, content.bottom - labelPad * d - label.box.height / 2, Part.Label)
-            val top = content.top + iconPad * d
-            val i = PlacedIcon(icon, Box(content.centerX - iconSize / 2, top, content.centerX + iconSize / 2, top + iconSize), Part.Icon)
-            Drawn(t.texts, listOf(i), t.ink.union(i.box))
+    /** What a key shows: the layout's label and icon, or the theme's for the space or Return; [textSize] dp, null: the default. */
+    private class Shows(val label: String?, val icon: String?, val textSize: Double?)
+
+    // the space's `space-content` (a text at the space's size); Return's `return-icon-<action>` where it shows the
+    // action's icon ({return-icon}), a text as large as the 确定 key's (16 dp: the layout's size is its letters')
+    private fun shows(key: ExpandedKey, looks: Looks): Shows {
+        val shown = when {
+            key.attrs.role == SPACE -> looks.label.spaceContent
+            key.attrs.role == ENTER && (key.attrs.icon as? Text.Binding)?.name == RETURN_ICON ->
+                RETURN_ACTION[env.texts.returnIcon]?.let { looks.icon.returnIcon(it) }
+            else -> null
         }
-        label != null && roots -> roots(label, content, cy)
-        label != null -> label.at(content.centerX, cy, Part.Label)
-        icon != null -> {
-            val (w, h) = icons.dp(icon).let { (w, h) -> w * d to h * d }
-            Drawn.of(PlacedIcon(icon, Box(content.centerX - w / 2, cy - h / 2, content.centerX + w / 2, cy + h / 2), Part.Icon))
+        return when (shown) {
+            null, Shown.ImeName -> Shows(key.label, key.icon, key.attrs.textSize)
+            Shown.None -> Shows(null, null, null)
+            is Shown.Text -> Shows(shown.text, null, if (key.attrs.role == ENTER) RETURN_TEXT_DP else key.attrs.textSize)
+            is Shown.Icon -> Shows(null, shown.name, null)
         }
-        else -> null
+    }
+
+    /** Where a key's glyph goes: centred at ([content]'s middle, [cy]), or as [align] has it in [content]. */
+    private class Placing(val content: Box, val cy: Double, val align: String, val look: TextLook)
+
+    // the middle of a box [w]×[h] placed as [p] has it, and where it stays (an aligned glyph's corner or top's middle)
+    private fun placed(p: Placing, w: Double, h: Double): Pair<Pair<Double, Double>, Pair<Double, Double>?> = when (p.align) {
+        Values.TOP_LEFT -> {
+            val left = p.content.left + SYMBOL_SIDE_DP * d
+            (left + w / 2 to p.content.top + h / 2) to (left to p.content.top)
+        }
+        Values.TOP_CENTER -> (p.content.centerX to p.content.top + h / 2) to (p.content.centerX to p.content.top)
+        else -> (p.content.centerX to p.cy) to null
+    }
+
+    // the key's one thing in the middle: its badge and label (or icon), its label over its icon, its roots, its
+    // label, its icon; where a theme aligns it, it and where it stays
+    private fun glyph(badge: String?, measured: Measured?, label: Measured?, icon: String?, roots: Boolean, p: Placing): Pair<Drawn?, Pair<Double, Double>?> {
+        val content = p.content
+        return when {
+            badge != null -> {
+                val (w, h) = badgedSize(measured, icon?.takeIf { measured == null })
+                val (c, anchor) = placed(p, w, h)
+                badged(badge, measured, label, icon?.takeIf { measured == null }, c) to anchor
+            }
+            label != null && icon != null -> {
+                val iconSize = ICON_WITH_LABEL_DP * d
+                val (labelPad, iconPad) = if (env.landscape) LANDSCAPE_PADS else PORTRAIT_PADS
+                val t = label.at(content.centerX, content.bottom - labelPad * d - label.box.height / 2, Part.Label)
+                val top = content.top + iconPad * d
+                val i = PlacedIcon(icon, Box(content.centerX - iconSize / 2, top, content.centerX + iconSize / 2, top + iconSize), Part.Icon)
+                Drawn(t.texts, listOf(i), t.ink.union(i.box)) to null
+            }
+            label != null && roots -> roots(label, p.look, content, p.cy) to null
+            label != null -> {
+                val (c, anchor) = placed(p, label.box.width, label.box.height)
+                label.at(c.first, c.second, Part.Label) to anchor
+            }
+            icon != null -> {
+                val (w, h) = icons.dp(icon).let { (w, h) -> w * d to h * d }
+                val (c, anchor) = placed(p, w, h)
+                Drawn.of(PlacedIcon(icon, Box(c.first - w / 2, c.second - h / 2, c.first + w / 2, c.second + h / 2), Part.Icon)) to anchor
+            }
+            else -> null to null
+        }
     }
 
     // [m]'s text in lines centred on the face at [cy], shrunk to fit it as a whole
-    private fun roots(m: Measured, content: Box, cy: Double): Drawn {
+    private fun roots(m: Measured, look: TextLook, content: Box, cy: Double): Drawn {
         val lines = m.text.split('\n')
         val first = if (lines.size > 1) m.size * ROOTS_LINES_SCALE else m.size
-        val at = lines.map { measurer.measure(it, m.font, m.weight, first) }
-        val wide = at.maxOf { it.advance }
-        val tall = at.first().let { it.bottom - it.top } * lines.size
+        val at = lines.map { measure(it, look, m.weight, first) }
+        val wide = at.maxOf { it.m.advance }
+        val tall = at.first().m.let { it.bottom - it.top } * lines.size
         val roomX = content.width - 2 * ROOTS_INSET_DP * d
         val fit = minOf(1.0, if (wide > 0) roomX / wide else 1.0, if (tall > 0) content.height / tall else 1.0)
         val size = if (fit < 1.0 && fit > 0.0) first * fit else first
-        val ms = if (size == first) at else lines.map { measurer.measure(it, m.font, m.weight, size) }
-        val lineHeight = ms.first().let { it.bottom - it.top }
+        val ms = if (size == first) at else lines.map { measure(it, look, m.weight, size) }
+        val lineHeight = ms.first().m.let { it.bottom - it.top }
         val top = cy - lineHeight * lines.size / 2
-        val texts = lines.mapIndexed { i, line ->
-            PlacedText(line, content.centerX - ms[i].advance / 2, top + i * lineHeight - ms[i].top, size, 1.0, m.font, m.weight, Part.Label)
-        }
-        val ink = texts.mapIndexed { i, t -> ms[i].ink.moved(t.x, t.baseline) }.reduce(Box::union)
-        return Drawn(texts, emptyList(), ink)
+        val drawn = ms.mapIndexed { i, line -> line.from(content.centerX - line.m.advance / 2, top + i * lineHeight - line.m.top, Part.Label) }
+        return Drawn(drawn.flatMap { it.texts }, emptyList(), drawn.map { it.ink }.reduce(Box::union))
     }
 
-    // the badge 15 dp, 3 dp, the label ([measured]'s room kept where it is hidden: [label] null), the two centred at [cx]
-    private fun badged(badge: String, measured: Measured?, label: Measured?, cx: Double, cy: Double): Drawn {
+    // the badge's and its label's (or icon's: a theme's `space-content`) width together, and their height
+    private fun badgedSize(measured: Measured?, icon: String?): Pair<Double, Double> {
         val iconSize = BADGE_DP * d
-        val labelWidth = measured?.box?.width ?: 0.0
-        val left = cx - (iconSize + BADGE_GAP_DP * d + labelWidth) / 2
+        val (w, h) = measured?.box?.let { it.width to it.height } ?: icon?.let { i -> icons.dp(i).let { (w, h) -> w * d to h * d } } ?: (0.0 to 0.0)
+        return iconSize + BADGE_GAP_DP * d + w to maxOf(iconSize, h)
+    }
+
+    // the badge 15 dp, 3 dp, the label ([measured]'s room kept where it is hidden: [label] null) or the [icon], the two centred at [c]
+    private fun badged(badge: String, measured: Measured?, label: Measured?, icon: String?, c: Pair<Double, Double>): Drawn {
+        val (cx, cy) = c
+        val iconSize = BADGE_DP * d
+        val (w, h) = icon?.let { i -> icons.dp(i).let { (w, h) -> w * d to h * d } } ?: ((measured?.box?.width ?: 0.0) to 0.0)
+        val left = cx - (iconSize + BADGE_GAP_DP * d + w) / 2
         val b = PlacedIcon(badge, Box(left, cy - iconSize / 2, left + iconSize, cy + iconSize / 2), Part.Badge)
-        val t = label?.at(left + iconSize + BADGE_GAP_DP * d + labelWidth / 2, cy, Part.Label)
+        val after = left + iconSize + BADGE_GAP_DP * d
+        if (icon != null) {
+            val i = PlacedIcon(icon, Box(after, cy - h / 2, after + w, cy + h / 2), Part.Icon)
+            return Drawn(emptyList(), listOf(b, i), b.box.union(i.box))
+        }
+        val t = label?.at(after + w / 2, cy, Part.Label)
         return if (t == null) Drawn.of(b) else Drawn(t.texts, listOf(b), t.ink.union(b.box))
+    }
+
+    /**
+     * [text] in [look]'s font (each script's run in its own: `font-han`, `font-latin`), its characters its
+     * `letter-spacing` apart, at [weight], [size] px: one run, as ever, where the theme sets neither.
+     */
+    internal fun measure(text: String, look: TextLook, weight: Int, size: Double): Measured {
+        val spacing = look.letterSpacing
+        val runs = Scripts.runs(text, look.font, look.fontHan, look.fontLatin)
+        if (runs.size == 1) {
+            val font = runs.single().second
+            return Measured(text, measurer.measure(text, font, weight, size, spacing), size, font, weight, spacing = spacing)
+        }
+        var pen = 0.0
+        var ink: Box? = null
+        var top = 0.0
+        var bottom = 0.0
+        val placed = runs.map { (t, font) ->
+            val m = measurer.measure(t, font, weight, size, spacing)
+            ink = m.ink.moved(pen, 0.0).let { i -> ink?.union(i) ?: i }
+            top = minOf(top, m.top)
+            bottom = maxOf(bottom, m.bottom)
+            Run(t, font, pen).also { pen += m.advance }
+        }
+        return Measured(text, TextMetrics(pen, ink!!, top, bottom), size, look.font, weight, spacing = spacing, runs = placed)
     }
 
     private fun marks(key: ExpandedKey, cell: Box, content: Box, looks: Looks, hidden: Boolean, snap: Boolean): List<MarkDrawn> {
         val m = env.marks
         val name = key.attrs.shortcut
         if (name == null || '/' in name) {
-            val symbol = key.alt?.takeIf { m.symbols && key.attrs.mark != false && !hidden }
+            val symbol = key.alt?.takeIf { m.symbols && key.attrs.mark != false && !hidden && !looks.mark.hidden }
             val shortcut = name?.let { m.shortcuts[it] }?.takeIf { m.charShortcuts }
             // KeyMarks.place's slots, by what each is: a symbol in the shortcut's slot takes it
             val symbolSlot = symbol?.let { KeyMarks.symbolSlot(m.symbolAt, m.shortcutAt, env.landscape, env.compact) }
@@ -174,6 +275,8 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
                 symbolSlot?.let { symbolMark(symbol, it, content, looks) },
             )
         }
+        // a function key's swipes (the space's cursor, ⌫'s sweep): a theme's `key hint { hidden }` leaves them out
+        if (looks.hint.hidden) return emptyList()
         val up = m.shortcuts["$name:up"]
         val down = m.shortcuts["$name:down"]
         val placed = KeyMarks.placeFunction(up, down, m.upOn, m.downOn, m.symbolAt, m.shortcutAt, env.landscape, env.compact)
@@ -187,7 +290,7 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
     private fun symbolMark(text: String, slot: Slot, content: Box, looks: Looks): MarkDrawn {
         val sizeDp = SYMBOL_DP * textScale * looks.mark.scale
         val size = sizeDp * d
-        val measured = Measured(text, measurer.measure(text, looks.mark.font, BOLD, size), size, looks.mark.font, BOLD)
+        val measured = measure(text, looks.mark, BOLD, size)
         val vPad = if (slot == Slot.Below) BELOW_DP * d else 0.0
         val box = slotBox(slot, measured.box.width, measured.box.height, content, SYMBOL_SIDE_DP * d, vPad)
         val drawn = measured.inBox(box, Part.Mark)
@@ -206,8 +309,7 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
             }
             is MarkContent.Text -> {
                 val sizeDp = SHORTCUT_TEXT_DP * textScale
-                val m = Measured(mark.text, measurer.measure(mark.text, looks.shortcut.font, looks.shortcut.weight, sizeDp * d), sizeDp * d, looks.shortcut.font, looks.shortcut.weight)
-                    .squeezed(SHORTCUT_TEXT_SHARE * cell.width)
+                val m = measure(mark.text, looks.shortcut, looks.shortcut.weight, sizeDp * d).squeezed(SHORTCUT_TEXT_SHARE * cell.width)
                 m.inBox(slotBox(slot, m.box.width, m.box.height, content, h, v), Part.Shortcut)
             }
         }
@@ -238,26 +340,38 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         return Box(x, y, x + w, y + h)
     }
 
-    /** Text measured: its [box] as AutoScaleTextView sizes it (a single character's ink across, longer text's advance; the font's extent up), from the pen's start. The popups' text is centred so too ([PopupBuilder]). */
-    internal class Measured(val text: String, val m: TextMetrics, val size: Double, val font: String, val weight: Int, val scaleX: Double = 1.0) {
+    /** A run of a text in one [font], [offset] px from the text's start ([Scripts]). */
+    internal class Run(val text: String, val font: String, val offset: Double)
+
+    /**
+     * Text measured: its [box] as AutoScaleTextView sizes it (a single character's ink across, longer text's
+     * advance; the font's extent up), from the pen's start; its [runs] each drawn in its font, its characters
+     * [spacing] em apart. The popups' text is centred so too ([PopupBuilder]).
+     */
+    internal class Measured(
+        val text: String, val m: TextMetrics, val size: Double, val font: String, val weight: Int, val scaleX: Double = 1.0,
+        val spacing: Double = 0.0, val runs: List<Run> = listOf(Run(text, font, 0.0)),
+    ) {
         val box: Box = if (codePoints(text) == 1) {
             Box(m.ink.left * scaleX, m.top, m.ink.right * scaleX, m.bottom)
         } else {
             Box(0.0, m.top, ceil(m.advance) * scaleX, m.bottom)
         }
 
-        fun squeezed(max: Double): Measured = if (box.width <= max || box.width <= 0) this else Measured(text, m, size, font, weight, max / box.width)
+        fun squeezed(max: Double): Measured =
+            if (box.width <= max || box.width <= 0) this else Measured(text, m, size, font, weight, max / box.width, spacing, runs)
 
         /** Drawn with its box centred on ([cx], [cy]). */
         fun at(cx: Double, cy: Double, part: Part): Drawn =
             inBox(Box(cx - box.width / 2, cy - box.height / 2, cx + box.width / 2, cy + box.height / 2), part)
 
         /** Drawn with its box at [b]. */
-        fun inBox(b: Box, part: Part): Drawn {
-            val x = b.left - box.left
-            val y = b.top - box.top
-            val ink = Box(m.ink.left * scaleX + x, m.ink.top + y, m.ink.right * scaleX + x, m.ink.bottom + y)
-            return Drawn.of(PlacedText(text, x, y, size, scaleX, font, weight, part), ink)
+        fun inBox(b: Box, part: Part): Drawn = from(b.left - box.left, b.top - box.top, part)
+
+        /** Drawn from the pen at ([x], [baseline]): each run from where the one before it ends. */
+        fun from(x: Double, baseline: Double, part: Part): Drawn {
+            val ink = Box(m.ink.left * scaleX + x, m.ink.top + baseline, m.ink.right * scaleX + x, m.ink.bottom + baseline)
+            return Drawn(runs.map { PlacedText(it.text, x + it.offset * scaleX, baseline, size, scaleX, it.font, weight, part, spacing) }, emptyList(), ink)
         }
     }
 
@@ -295,6 +409,17 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         const val ROOTS_INSET_DP = 6.0
 
         private const val ROOT = "root"
+        private const val SPACE = "space"
+        private const val ENTER = "enter"
+        private const val RETURN_ICON = "return-icon"
+
+        /** A text a theme gives Return: as large as the 确定 key's (`{confirm}`, text-size 16). */
+        const val RETURN_TEXT_DP = 16.0
+
+        /** Return's icon (the app's name of it, [Texts.returnIcon]) by the action a theme names (`return-icon-<action>`); `previous` none. */
+        private val RETURN_ACTION = mapOf(
+            "enter" to "newline", "send" to "send", "search" to "search", "go" to "go", "next" to "next", "done" to "done",
+        )
 
         /** The kinds of a function key: its label a [GlyphClass.Label] but a single character. */
         private val FUNCTION_KINDS = setOf("function", "enter", "space")

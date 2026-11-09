@@ -265,7 +265,11 @@ internal class PopupBuilder(
             is Op.Stroke -> op.copy(color = op.color.of())
             is Op.Ripple -> op.copy(color = op.color.of())
             is Op.Gradient -> op.copy(stops = op.stops.map { (c, at) -> c.of() to at })
-            is Op.Text -> op.copy(color = op.color.of())
+            is Op.Text -> op.copy(
+                color = op.color.of(),
+                stroke = op.stroke?.let { it.copy(color = it.color.of()) },
+                shadow = op.shadow?.let { it.copy(color = it.color.of()) },
+            )
             is Op.Icon -> op.copy(tint = op.tint.of())
             // an image or the picture has no colour to fade: as it is
             is Op.NineSlice, is Op.Picture -> op

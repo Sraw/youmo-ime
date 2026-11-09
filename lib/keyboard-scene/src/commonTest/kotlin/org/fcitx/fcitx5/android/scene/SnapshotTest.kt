@@ -4,9 +4,11 @@
  */
 package org.fcitx.fcitx5.android.scene
 
+import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.theme.Theme
+import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -75,7 +77,37 @@ object Shots {
         ) + PADS.map { pad -> Shot("number-pad-$pad", "number", on("number") { it.copy(input = it.input.copy(pad = pad)) }) }
     }
 
-    val all: List<Shot> get() = forms + states
+    /**
+     * 060-render-p3 T4a, the text on a key: material-light with one look more each, on the block qwerty
+     * (its letters with their symbols, the space and ⌫ with their swipes, Return with its icon).
+     */
+    val looks: List<Shot> by lazy {
+        val block = Forms.env("qwerty", Forms.block)
+        fun styled(vararg styles: String, fonts: String = "") = ThemeReader.theme(
+            testData("material-light.xml").replace("</colors>", "</colors>$fonts").replace("</theme>", styles.joinToString("\n", postfix = "\n</theme>")),
+        ).ok()
+        listOf(
+            Shot("qwerty-align-top-left", "qwerty", block, styled("<style select=\"key\" align=\"top-left\"/>")),
+            Shot("qwerty-align-top-center", "qwerty", block, styled("<style select=\"key\" align=\"top-center\"/>")),
+            Shot("qwerty-letter-spacing", "qwerty", block, styled("<style select=\"key\" letter-spacing=\"0.2em\"/>")),
+            Shot(
+                "qwerty-stroke-shadow", "qwerty", block,
+                styled("<style select=\"key\" stroke=\"1dp #000000\" text-shadow=\"0 1dp 2dp #80000000\"/>", "<style select=\"key mark\" stroke=\"0 #000000\"/>"),
+            ),
+            Shot(
+                "qwerty-fonts", "qwerty", block.copy(texts = block.texts.copy(imeName = "拼音 Pinyin")),
+                styled("<style select=\"key\" font-han=\"kai\" font-latin=\"mono\"/>", fonts = "\n<font name=\"kai\" src=\"kai.ttf\"/>\n<font name=\"mono\" src=\"mono.ttf\"/>"),
+            ),
+            Shot("qwerty-space-content", "qwerty", block, styled("<style select=\"*/space\" space-content=\"text(空格)\"/>")),
+            Shot(
+                "qwerty-return-icon", "qwerty", block.copy(texts = block.texts.copy(returnIcon = "send")),
+                styled("<style select=\"*/enter\" return-icon-send=\"text(发送)\"/>"),
+            ),
+            Shot("qwerty-hint-mark-hidden", "qwerty", block, styled("<style select=\"key hint\" hidden=\"true\"/>", "<style select=\"key mark\" hidden=\"true\"/>")),
+        )
+    }
+
+    val all: List<Shot> get() = forms + states + looks
 
     /** Each popup ([Forms.popups]) in the forms that change how one looks: block, flat, floating (its text smaller). */
     val popups: List<PopupShot> = listOf("block" to Forms.block, "flat" to Forms.flat, "floating" to Forms.floating).flatMap { (form, env) ->
@@ -99,6 +131,9 @@ class SnapshotTest {
 
     @Test
     fun theStatesThatChangeABoard() = checkAll(Shots.states)
+
+    @Test
+    fun theTextOnAKey() = checkAll(Shots.looks)
 
     @Test
     fun everyPopup() = check(Shots.popups.map { it.name to it.scene })

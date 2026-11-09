@@ -113,7 +113,10 @@ object SceneText {
         is Op.Stroke -> "stroke ${shape(o.shape)} ${n(o.width)} ${o.color}"
         is Op.Ripple -> "ripple ${shape(o.shape)} ${o.color}"
         is Op.Text -> "text ${q(o.text)} ${n(o.x)},${n(o.baseline)} ${o.font} ${o.weight} ${n(o.size)} ${o.color}" +
-            (if (o.scaleX != 1.0) " scale-x=${n(o.scaleX)}" else "") + (if (o.rotation != 0.0) " rotate=${n(o.rotation)}" else "")
+            (if (o.scaleX != 1.0) " scale-x=${n(o.scaleX)}" else "") + (if (o.rotation != 0.0) " rotate=${n(o.rotation)}" else "") +
+            (if (o.letterSpacing != 0.0) " spacing=${n(o.letterSpacing)}" else "") +
+            (o.stroke?.let { " stroke=${n(it.width)},${it.color}" } ?: "") +
+            (o.shadow?.let { " shadow=${n(it.dx)},${n(it.dy)},${n(it.blur)},${it.color}" } ?: "")
         is Op.Icon -> "icon ${o.name} ${box(o.box)} ${o.tint}" + (if (o.rotation != 0.0) " rotate=${n(o.rotation)}" else "")
     }
 

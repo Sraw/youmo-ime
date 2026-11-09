@@ -318,11 +318,11 @@ class SceneBuilder(
         if (g == null || g.texts.isEmpty() || g.ink.width <= 0) return c
         val classed = c.yields && c.glyphClass != null
         val least = if (classed) 1.0 - KeyMarkYield.MAX_CLASS_SHRINK else 1.0
-        val py = if (classed && c.glyphClass == GlyphClass.Main) c.baseline else g.ink.centerY
+        val py = c.anchor?.second ?: if (classed && c.glyphClass == GlyphClass.Main) c.baseline else g.ink.centerY
         // wider than the room still (the class to take it in): its ink's middle the room's, so the class, smaller
         // about it, leaves it within on both sides
         val placed = within(alone(g, c.room, least, py, warnings), c.room)
-        return if (placed === g) c else KeyContent(placed, c.marks, c.room, c.glyphClass, c.baseline, c.yields, c.edge)
+        return if (placed === g) c else KeyContent(placed, c.marks, c.room, c.glyphClass, c.baseline, c.yields, c.edge, c.anchor)
     }
 
     // [g] shrunk alone about (the room's middle, [py]) as far as its ink measured at [least] (its class's most:
@@ -369,13 +369,17 @@ class SceneBuilder(
         return g.mapTo(Box(left, g.ink.top, left + g.ink.width, g.ink.bottom), 1.0)
     }
 
-    // a key as its class's member: a main character about its baseline, where its row's stand, and never moved off it
+    // a key as its class's member: a main character about its baseline, where its row's stand, and never moved off
+    // it; a glyph a theme aligns about where it stays ([KeyContent.anchor]), never moved either
     private fun member(c: KeyContent): KeyMarkYield.Member {
         val cls = c.glyphClass?.takeIf { c.yields } ?: return KeyMarkYield.Member(KeyMarkYield.NO_GLYPH, 0.0, 0.0, c.marks.map(::mark), c.room.toInk(), c.edge, glyphClass = -1)
         val ink = c.glyph!!.ink.toInk()
         val main = cls == GlyphClass.Main
-        val y = if (main) c.baseline else (ink.top + ink.bottom) / 2
-        return KeyMarkYield.Member(ink, (ink.left + ink.right) / 2, y, c.marks.map(::mark), c.room.toInk(), c.edge, moves = !main, glyphClass = cls.ordinal, grows = c.glyph.grows(measurer), across = c.glyph.texts.isNotEmpty())
+        val (x, y) = c.anchor ?: (((ink.left + ink.right) / 2) to (if (main) c.baseline else (ink.top + ink.bottom) / 2))
+        return KeyMarkYield.Member(
+            ink, x, y, c.marks.map(::mark), c.room.toInk(), c.edge,
+            moves = !main && c.anchor == null, glyphClass = cls.ordinal, grows = c.glyph.grows(measurer), across = c.glyph.texts.isNotEmpty(),
+        )
     }
 
     private fun mark(m: MarkDrawn) = KeyMarkYield.Mark(m.drawn.ink.toInk(), m.slot, m.drop, m.drawn.grows(measurer))

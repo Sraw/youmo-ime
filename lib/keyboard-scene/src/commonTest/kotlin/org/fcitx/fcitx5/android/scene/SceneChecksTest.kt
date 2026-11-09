@@ -127,7 +127,7 @@ class SceneChecksTest {
     private fun contents(shot: Shot, k: KeyNode): List<Drawn> = k.ops(pressed = false).mapNotNull { op ->
         when (op) {
             is Op.Text -> {
-                val ink = FakeMeasurer.measure(op.text, op.font, op.weight, op.size).ink
+                val ink = FakeMeasurer.measure(op.text, op.font, op.weight, op.size, op.letterSpacing).ink
                 val box = Box(op.x + ink.left * op.scaleX, op.baseline + ink.top, op.x + ink.right * op.scaleX, op.baseline + ink.bottom)
                 Drawn("\"${op.text}\"", box, if (op.text == k.label) Part.LABEL else Part.MARK, text = true)
             }

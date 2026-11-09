@@ -14,6 +14,21 @@ import org.fcitx.fcitx5.android.scene.Box
 fun interface TextMeasurer {
     /** [text] in [font] ("system" or a theme's font) at [weight], [size] px. */
     fun measure(text: String, font: String, weight: Int, size: Double): TextMetrics
+
+    /**
+     * [text] set [letterSpacing] em apart (a theme's `letter-spacing`): as Android's Paint.letterSpacing
+     * sets it, half the space before each character and half after, so the advance grows by the space
+     * a character and the ink moves right by half of it, its right edge by all but half. A platform
+     * that measures it itself (Android's Paint) says so here; 0: [measure] as ever.
+     */
+    fun measure(text: String, font: String, weight: Int, size: Double, letterSpacing: Double): TextMetrics {
+        val m = measure(text, font, weight, size)
+        if (letterSpacing == 0.0) return m
+        val space = letterSpacing * size
+        val n = Content.codePoints(text)
+        val ink = m.ink
+        return m.copy(advance = m.advance + n * space, ink = Box(ink.left + space / 2, ink.top, ink.right + (n - 0.5) * space, ink.bottom))
+    }
 }
 
 /**
