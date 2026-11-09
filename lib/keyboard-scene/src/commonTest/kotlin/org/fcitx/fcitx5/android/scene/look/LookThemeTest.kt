@@ -183,6 +183,43 @@ class LookThemeTest {
         assertTrue(e.any { it is Op.Fill && it.color == Argb(look.palette.keyPressHighlightColor) }, "$e")
     }
 
+    // a board's key of a role as 3.0 drew it (KeyStyleResolver: own ?: the role's on every board ?: the kind's):
+    // its Darken with no fill of its own tints the role's fill, not its kind's
+    @Test
+    fun aBoardKeysDarkenTintsItsRolesFill() {
+        val image = NineSlice("/data/themes/t/shift.png", Insets(1, 1, 1, 1), 1)
+        val base = LookDefaults.look(palette(themeFile("material-light.xml")))
+        val look = base.copy(
+            keys = base.keys.copy(
+                overrides = mapOf(
+                    "*/shift" to KeyOverride(KeyFill.Image(image), null, KeyLabel.Show),
+                    "qwerty/shift" to KeyOverride(null, KeyPressed.Darken, KeyLabel.Show),
+                ),
+            ),
+        )
+        val shift = key(scene(theme(LookTheme.xml(look, "T", false)), portrait), "shift")
+        for (pressed in listOf(false, true)) assertTrue(shift.ops(pressed).any { it is Op.NineSlice && it.file == "shift.png" }, "$pressed ${shift.ops(pressed)}")
+        assertTrue(shift.ops(true).any { it is Op.Fill && it.color == Argb(look.palette.keyPressHighlightColor) }, "${shift.ops(true)}")
+        assertEquals(KeyOverride(KeyFill.Image(image), KeyPressed.Darken, KeyLabel.Show), LookTheme.resolved(look.keys.overrides)["qwerty/shift"])
+    }
+
+    // the same the other way: a board's key's own image, pressed, and label win over its role's on every board
+    @Test
+    fun aBoardKeysOwnWinsOverItsRoles() {
+        val slice = { f: String -> NineSlice("/data/themes/t/$f", Insets(1, 1, 1, 1), 1) }
+        val base = LookDefaults.look(palette(themeFile("material-light.xml")))
+        val all = KeyOverride(KeyFill.Image(slice("all.png")), KeyPressed.Image(slice("all-down.png")), KeyLabel.Hide)
+        val plain = base.copy(keys = base.keys.copy(overrides = mapOf("*/shift" to all)))
+        val look = base.copy(keys = base.keys.copy(overrides = mapOf("*/shift" to all, "qwerty/shift" to KeyOverride(KeyFill.Image(slice("own.png")), null, KeyLabel.Show))))
+        val hidden = key(scene(theme(LookTheme.xml(plain, "T", false)), portrait), "shift")
+        val shift = key(scene(theme(LookTheme.xml(look, "T", false)), portrait), "shift")
+        assertTrue(hidden.ops(false).none { it is Op.Icon }, "${hidden.ops(false)}")
+        assertTrue(shift.ops(false).any { it is Op.Icon }, "${shift.ops(false)}")
+        assertTrue(shift.ops(false).any { it is Op.NineSlice && it.file == "own.png" }, "${shift.ops(false)}")
+        // pressed: the role's pressed image, as 3.0 (own pressed none: the role's)
+        assertTrue(shift.ops(true).any { it is Op.NineSlice && it.file == "all-down.png" }, "${shift.ops(true)}")
+    }
+
     // the most single keys a 3.0 theme brings (Keys), each a face and a pressed one of its own:
     // the theme written still reads, its styles more than a theme file's
     @Test

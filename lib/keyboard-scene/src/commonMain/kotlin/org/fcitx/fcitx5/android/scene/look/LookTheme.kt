@@ -138,7 +138,7 @@ object LookTheme {
         s.add(key.with(FLAT, "space"), "fill" to solid(SPACE_BAR), "shape" to Value.Word("bar"), "radius" to radius(FLAT_SPACE_RADIUS_DP))
         s.add(key.with(FLAT, "enter"), "fill" to solid(ACCENT_KEY), "shape" to Value.Word("circle"))
         // single keys over their kinds, later so they win the tie
-        s.overrides(keys, keys.overrides.entries.sortedBy { it.key }.associate { selector(it.key) to it.value })
+        s.overrides(keys, keys.overrides.entries.sortedBy { it.key }.associate { it.key to it.value })
         val popupShadow = Shadow(0.0, POPUP_SHADOW_DP, POPUP_SHADOW_DP, ColorExpr.Literal(Argb(POPUP_SHADOW)))
         s.add(listOf(of("preview"), of("popup")), "fill" to solid(ref("popupBackground")), "color" to color("popupText"), "radius" to radius(keys.radiusDp), "shadow" to Value.OfShadow(popupShadow))
         s.add(of("popup", state = "selected"), "fill" to solid(ref("genericActiveBackground")), "color" to color("genericActiveForeground"))
@@ -162,8 +162,11 @@ object LookTheme {
     // alone, so a kind whose colour is not the letters' has its own style. Flat, a letter or function key has
     // no face at all, its own or pressed (3.0's face=null), the space and Return theirs. Keys of one face
     // share its styles (a list of selectors), and the styles go in this order for the ties: a key's, its
-    // function kind's, flat none, then Return's and the flat space's.
-    private fun Styles.overrides(keys: Keys, overrides: Map<Selector, KeyOverride>) {
+    // function kind's, flat none, then Return's and the flat space's. [named]: by the keys' names, each as 3.0
+    // drew it ([resolved]).
+    private fun Styles.overrides(keys: Keys, named: Map<String, KeyOverride>) {
+        val resolved = resolved(named)
+        val overrides = resolved.entries.associate { (n, o) -> selector(n) to o }
         val ripple = keys.press == PressEffect.Ripple
         val fills = overrides.entries.mapNotNull { (k, o) -> o.fill?.let { k to it } }.groupBy({ it.second }, { it.first })
         val pressed = overrides.entries.mapNotNull { (k, o) -> o.pressed?.takeIf { it != KeyPressed.Darken }?.let { k to it } }
@@ -202,6 +205,25 @@ object LookTheme {
         darkened(keys, darkened, beforeFlat = false)
         overrides.filterValues { it.label == KeyLabel.Hide }.keys.toList().takeIf { it.isNotEmpty() }
             ?.let { add(it.of(part = "label"), "hidden" to Value.Flag(true)) }
+        // a board's key that shows its label where its role's on every board hides theirs: as an id, it wins
+        named.keys.filter { n -> resolved.getValue(n).label == KeyLabel.Show && role(named, n)?.label == KeyLabel.Hide }
+            .takeIf { it.isNotEmpty() }?.let { ns -> add(ns.map { selector(it).with(part = "label") }, "hidden" to Value.Flag(false)) }
+    }
+
+    /**
+     * [overrides] as theme 3.0 drew each (KeyStyleResolver): a board's key of a role (`qwerty/shift`)
+     * takes what it does not set from the role's on every board (`*`/shift), so its own Darken tints the
+     * role's fill, not its kind's, and its own label wins; an id outranks a role in theme 4, so the key
+     * has it all on its own styles.
+     */
+    internal fun resolved(overrides: Map<String, KeyOverride>): Map<String, KeyOverride> = overrides.mapValues { (name, own) ->
+        role(overrides, name)?.let { all -> KeyOverride(own.fill ?: all.fill, own.pressed ?: all.pressed, own.label) } ?: own
+    }
+
+    // the override of [name]'s role on every board, where [name] is a board's key of a role
+    private fun role(overrides: Map<String, KeyOverride>, name: String): KeyOverride? {
+        val (board, key) = KeyNames.split(name)
+        return if (board != KeyNames.ALL && KeyNames.isRole(key)) overrides["${KeyNames.ALL}/$key"] else null
     }
 
     // [overrides]' Darken styles, before the flat ones (a key's, its function kind's, the space's) or after (Return's, the flat space's)
