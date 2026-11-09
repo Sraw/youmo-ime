@@ -85,6 +85,11 @@ fun Test.unitTestSettings() {
         .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
     // ThemeLookScreenshotTest's whole set of themes × keyboards × modes, for the eye: -PthemeShots=<dir>
     systemProperty("themeShots.dir", project.findProperty("themeShots")?.toString().orEmpty())
+    // ThemeBaselineCompareTest: -PthemeBaseline.tighten=true lowers limits.tsv to what is drawn now; the record and
+    // its limits are inputs (outside the test's sources and resources)
+    systemProperty("themeBaseline.tighten", project.findProperty("themeBaseline.tighten")?.toString().orEmpty())
+    inputs.dir(file("src/test/baseline-060")).withPropertyName("themeBaseline")
+        .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
     // the packs not read through 30 s into a test (PackStore.verifiesInBackground): PacksUatTest does it itself
     systemProperty("youmo.packs.verify", "off")
 }
