@@ -4,6 +4,11 @@
  */
 package org.fcitx.fcitx5.android.input.theme
 
+import org.fcitx.fcitx5.android.scene.look.Insets
+import org.fcitx.fcitx5.android.scene.look.KeyKind
+import org.fcitx.fcitx5.android.scene.look.Keys
+import org.fcitx.fcitx5.android.scene.look.LookDefaults
+import org.fcitx.fcitx5.android.scene.look.NineSlice
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

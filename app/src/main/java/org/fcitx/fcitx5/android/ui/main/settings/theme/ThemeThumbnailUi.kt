@@ -15,8 +15,8 @@ import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
-import org.fcitx.fcitx5.android.input.theme.BoardBase
 import org.fcitx.fcitx5.android.input.theme.ThemeColors
+import org.fcitx.fcitx5.android.scene.look.BoardBase
 import org.fcitx.fcitx5.android.utils.DarkenColorFilter
 import org.fcitx.fcitx5.android.utils.rippleDrawable
 import splitties.dimensions.dp

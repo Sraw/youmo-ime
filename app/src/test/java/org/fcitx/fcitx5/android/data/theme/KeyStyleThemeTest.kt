@@ -10,7 +10,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemePrefs.KeyBorderChoice
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.KeyRadiusChoice
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.KeySpacingChoice
 import org.fcitx.fcitx5.android.input.theme.KeyStyleChoice
-import org.fcitx.fcitx5.android.input.theme.LookDefaults
+import org.fcitx.fcitx5.android.scene.look.LookDefaults
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame

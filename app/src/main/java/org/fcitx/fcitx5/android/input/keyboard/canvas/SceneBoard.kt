@@ -17,7 +17,6 @@ import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
 import org.fcitx.fcitx5.android.input.keyboard.markSpots
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
-import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Scene
@@ -26,6 +25,7 @@ import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.engine.section
+import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import timber.log.Timber
 import org.fcitx.fcitx5.android.scene.theme.Theme as SceneTheme
 

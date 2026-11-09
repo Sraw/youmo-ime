@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android.data.theme
 
 import android.content.SharedPreferences
 import androidx.core.content.edit
-import org.fcitx.fcitx5.android.input.theme.LegacyLook
+import org.fcitx.fcitx5.android.scene.look.LegacyLook
 import java.util.UUID
 
 /**

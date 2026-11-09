@@ -16,9 +16,9 @@ import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
-import org.fcitx.fcitx5.android.input.theme.BarBase
-import org.fcitx.fcitx5.android.input.theme.Gap
-import org.fcitx.fcitx5.android.input.theme.ThemeLook
+import org.fcitx.fcitx5.android.scene.look.BarBase
+import org.fcitx.fcitx5.android.scene.look.Gap
+import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

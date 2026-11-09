@@ -23,8 +23,8 @@ import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SplitDock
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
-import org.fcitx.fcitx5.android.input.theme.Gap
 import org.fcitx.fcitx5.android.input.theme.KeyStyleChoice
+import org.fcitx.fcitx5.android.scene.look.Gap
 
 class ThemePrefs(sharedPreferences: SharedPreferences) :
     ManagedPreferenceCategory(R.string.theme, sharedPreferences) {

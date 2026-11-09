@@ -2,21 +2,8 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
  */
-package org.fcitx.fcitx5.android.input.scene
+package org.fcitx.fcitx5.android.scene.look
 
-import org.fcitx.fcitx5.android.input.theme.BarBase
-import org.fcitx.fcitx5.android.input.theme.BoardBase
-import org.fcitx.fcitx5.android.input.theme.KeyFill
-import org.fcitx.fcitx5.android.input.theme.KeyLabel
-import org.fcitx.fcitx5.android.input.theme.KeyOverride
-import org.fcitx.fcitx5.android.input.theme.KeyPressed
-import org.fcitx.fcitx5.android.input.theme.Keys
-import org.fcitx.fcitx5.android.input.theme.KindStyle
-import org.fcitx.fcitx5.android.input.theme.NineSlice
-import org.fcitx.fcitx5.android.input.theme.Palette
-import org.fcitx.fcitx5.android.input.theme.PressEffect
-import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
-import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.scene.theme.Argb
 
 /**
@@ -145,7 +132,7 @@ object LookTheme {
         style("@flat key.space", "fill" to "@spaceBar", "shape" to "bar", "radius" to "3dp")
         style("@flat key.enter", "fill" to "@accentKey", "shape" to "circle")
         // single keys over their kinds, later so they win the tie
-        overrides(names, keys, keys.overrides.toSortedMap().mapKeys { selector(it.key) })
+        overrides(names, keys, keys.overrides.entries.sortedBy { it.key }.associate { selector(it.key) to it.value })
         style("preview, popup", "fill" to "@popupBackground", "color" to "@popupText", "radius" to "${keys.radiusDp}dp", "shadow" to "0 2dp 2dp #33000000")
         style("popup:selected", "fill" to "@genericActiveBackground", "color" to "@genericActiveForeground")
         style("menu", "fill" to "@accentKey", "color" to "@accentKeyText", "icon-color" to "@accentKeyText", "radius" to "50%")
@@ -252,7 +239,7 @@ object LookTheme {
      * single key's face of its own (four its fill's, six its pressed one's) for each of the most a 3.0
      * theme brings, more than a theme file's `ThemeReader.MAX_STYLES` when they all differ.
      */
-    const val MAX_STYLES = 100 + 10 * ThemeAssetLimits.MAX_OVERRIDES
+    const val MAX_STYLES = 100 + 10 * Keys.MAX_OVERRIDES
 
     // a 3.0 key name as a selector: what a selector reads otherwise in the key's name escaped, so that
     // 大千's zhuyin/, is its comma key, not a list of two, and number/* the star key, not every key
@@ -264,7 +251,7 @@ object LookTheme {
         return name.substring(0, slash + 1) + key
     }
 
-    // the space is escaped only to be safe: KeyNames.parse takes no whitespace in a key's name, so none reaches here
+    // the space is escaped only to be safe: KeyNames.split takes no whitespace in a key's name, so none reaches here
     private const val SELECTOR_CHARS = ",.:[* \\"
 
     private fun escape(s: String) = s.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;")

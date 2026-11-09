@@ -20,9 +20,8 @@ import androidx.core.view.accessibility.AccessibilityEventCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.core.EngineState
-import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -31,6 +30,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.engine.table.TableRoots
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
@@ -42,14 +42,14 @@ import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
-import org.fcitx.fcitx5.android.input.theme.Crop
-import org.fcitx.fcitx5.android.input.theme.BoardBase
-import org.fcitx.fcitx5.android.input.theme.KeyFill
-import org.fcitx.fcitx5.android.input.theme.Picture
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.Shape
+import org.fcitx.fcitx5.android.scene.look.BoardBase
+import org.fcitx.fcitx5.android.scene.look.Crop
+import org.fcitx.fcitx5.android.scene.look.KeyFill
+import org.fcitx.fcitx5.android.scene.look.Picture
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -63,11 +63,11 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
-import timber.log.Timber
+import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import timber.log.Timber
 import kotlin.math.roundToInt
 
 /**

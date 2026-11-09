@@ -15,7 +15,7 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.ThemeManager.activeTheme
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.theme.KeyStyleChoice
-import org.fcitx.fcitx5.android.input.theme.ThemeLook
+import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import org.fcitx.fcitx5.android.utils.WeakHashSet
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.isDarkMode

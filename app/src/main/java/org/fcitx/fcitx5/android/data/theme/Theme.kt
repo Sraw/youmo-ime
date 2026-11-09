@@ -8,9 +8,9 @@ import android.os.Parcelable
 import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.TypeParceler
-import org.fcitx.fcitx5.android.input.theme.LookDefaults
-import org.fcitx.fcitx5.android.input.theme.Palette
-import org.fcitx.fcitx5.android.input.theme.ThemeLook
+import org.fcitx.fcitx5.android.scene.look.LookDefaults
+import org.fcitx.fcitx5.android.scene.look.Palette
+import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import org.fcitx.fcitx5.android.utils.alpha
 
 sealed class Theme : Parcelable {

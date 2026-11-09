@@ -16,11 +16,11 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.input.theme.Box
-import org.fcitx.fcitx5.android.input.theme.Crop
-import org.fcitx.fcitx5.android.input.theme.LookDefaults
-import org.fcitx.fcitx5.android.input.theme.Palette
-import org.fcitx.fcitx5.android.input.theme.Picture
+import org.fcitx.fcitx5.android.scene.look.Box
+import org.fcitx.fcitx5.android.scene.look.Crop
+import org.fcitx.fcitx5.android.scene.look.LookDefaults
+import org.fcitx.fcitx5.android.scene.look.Palette
+import org.fcitx.fcitx5.android.scene.look.Picture
 import org.fcitx.fcitx5.android.utils.NostalgicSerializer
 import org.fcitx.fcitx5.android.utils.appContext
 

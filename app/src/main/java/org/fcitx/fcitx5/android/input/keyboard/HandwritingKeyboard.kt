@@ -37,11 +37,11 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.theme.KeyNames
-import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.Texts
+import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.core.add
 

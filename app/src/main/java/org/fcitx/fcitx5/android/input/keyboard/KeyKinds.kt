@@ -8,7 +8,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef.Appearance.Border
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef.Appearance.Variant
 import org.fcitx.fcitx5.android.input.theme.KeyFaceGeometry
-import org.fcitx.fcitx5.android.input.theme.KeyKind
+import org.fcitx.fcitx5.android.scene.look.KeyKind
 
 /**
  * The kind a theme styles a key as ([KeyKind]): by the face colour it had before theme file 3.0, so
