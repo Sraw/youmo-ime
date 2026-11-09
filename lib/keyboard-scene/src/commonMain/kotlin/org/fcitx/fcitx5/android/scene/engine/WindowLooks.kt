@@ -83,11 +83,13 @@ class WindowLooks(private val cascades: Cascades) {
 
     /**
      * A button in the room beside a board at a side (`side-button`: one-handed, the boards but the
-     * letters split): its background, a circle or a rectangle, its icon's colour, the ripple pressed.
-     * Not set: no background, the function keys' text colour, the key pressed colour's ripple.
+     * letters split): its background, a circle or a rectangle, its icon's colour, the ripple pressed
+     * (its `overlay`, `side-button:pressed`'s over `side-button`'s, as a key's). Not set: no background,
+     * the function keys' text colour, the key pressed colour's ripple.
      */
     fun sideButton(scenes: Set<String>): SideButton {
-        val v = cascades.of(scenes).of(SIDE_BUTTON)
+        val cascade = cascades.of(scenes)
+        val v = cascade.of(SIDE_BUTTON)
         val look = KeyLook(v, theme)
         return SideButton(
             fill = fill(v),
@@ -95,7 +97,7 @@ class WindowLooks(private val cascades: Cascades) {
             circle = (v[SHAPE] as? Value.Word)?.word?.let { it == CIRCLE } ?: true,
             radiusDp = look.radius.corners.first(),
             round = look.radius.half,
-            pressed = look.overlay ?: variable(KEY_PRESS_HIGHLIGHT),
+            pressed = KeyLook(cascade.of(SIDE_BUTTON_PRESSED), theme).overlay ?: variable(KEY_PRESS_HIGHLIGHT),
         )
     }
 
@@ -168,6 +170,7 @@ class WindowLooks(private val cascades: Cascades) {
         private val FRAME = Selector.Target("frame")
         private val HANDLE = Selector.Target("handle")
         private val SIDE_BUTTON = Selector.Target("side-button")
+        private val SIDE_BUTTON_PRESSED = Selector.Target("side-button", states = setOf("pressed"))
         private val NAVBAR = Selector.Target("navbar")
 
         // the keys whose corners the frame's follow: the letters, most of them

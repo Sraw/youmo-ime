@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.input.theme.KeyFill
 import org.fcitx.fcitx5.android.input.theme.KeyLabel
 import org.fcitx.fcitx5.android.input.theme.KeyOverride
 import org.fcitx.fcitx5.android.input.theme.KeyPressed
+import org.fcitx.fcitx5.android.input.theme.Keys
 import org.fcitx.fcitx5.android.input.theme.KindStyle
 import org.fcitx.fcitx5.android.input.theme.LookDefaults
 import org.fcitx.fcitx5.android.input.theme.NineSlice
@@ -29,8 +30,11 @@ import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.theme.Argb
+import org.fcitx.fcitx5.android.scene.theme.Cascades
+import org.fcitx.fcitx5.android.scene.theme.Selector
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
+import org.fcitx.fcitx5.android.scene.theme.Value
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -292,6 +296,18 @@ class LookThemeTest {
         assertEquals("a.png", LookTheme.fileName("/x/y/a.png"))
         assertEquals("a.png", LookTheme.fileName("a.png"))
         assertEquals(24, LookTheme.colors(palette(SceneData.theme("material-light.xml"))).size)
+    }
+
+    // keys as round as can be (24 dp) with a margin: the floating keyboard's radius their sum, over the
+    // reader's 24 dp, refused the whole theme and nothing was drawn; at most 24 dp, it reads
+    @Test
+    fun aRadiusOf24WithAGapReads() {
+        val look = LookDefaults.look(palette(SceneData.theme("material-light.xml"))).let {
+            it.copy(keys = it.keys.copy(radiusDp = Keys.MAX_RADIUS_DP, gap = Gap(3, 7, 3, 4)))
+        }
+        val t = theme(LookTheme.xml(look, "T", false))
+        val radius = Cascades(t).of(setOf("floating")).of(Selector.Target("keyboard"))["radius"] as Value.OfRadius
+        assertEquals(List(4) { Keys.MAX_RADIUS_DP.toDouble() }, radius.radius.corners)
     }
 
     @Test

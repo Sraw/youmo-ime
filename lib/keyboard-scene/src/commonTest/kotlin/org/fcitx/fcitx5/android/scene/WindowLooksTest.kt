@@ -118,6 +118,13 @@ class WindowLooksTest {
             WindowLooks.SideButton(t.colors.getValue("key"), argb(0xff37474f), false, 8.0, false, argb(0x33000000)),
             looks(t).sideButton(setOf("one-handed")),
         )
+        // pressed as a key is: `side-button:pressed`'s overlay over `side-button`'s, either alone too
+        val pressed = theme(withStyle("<style select=\"side-button:pressed\" overlay=\"#44000000\"/>"))
+        assertEquals(argb(0x44000000), looks(pressed).sideButton(emptySet()).pressed)
+        val both = theme(
+            withStyle("<style select=\"side-button:pressed\" overlay=\"#44000000\"/><style select=\"side-button\" overlay=\"#33000000\"/>"),
+        )
+        assertEquals(argb(0x44000000), looks(both).sideButton(emptySet()).pressed, "the state's, more specific, wins")
     }
 
     @Test
@@ -172,6 +179,22 @@ class WindowLooksTest {
         // the frame's shadow has no offset
         assertTrue(warnings(withStyle("<style select=\"frame\" shadow=\"0 0 8dp #000000\"/>")).isEmpty())
         assertTrue(warnings(withStyle("<style select=\"frame\" shadow=\"0 2dp 8dp #000000\"/>")).single().contains("its x and y are ignored"))
+        // what a window widget does not read, warned of (in a list, of that widget alone); what it reads, not
+        val unread = mapOf(
+            "<style select=\"navbar\" fill=\"#ff0000\"/>" to "fill= on navbar does nothing: it reads color",
+            "<style select=\"frame\" fill=\"#ff0000\"/>" to "fill= on frame does nothing: it reads radius border shadow",
+            "<style select=\"handle\" radius=\"4dp\"/>" to "radius= on handle does nothing: it reads fill color icon-color width height",
+            "<style select=\"side-button\" color=\"#ff0000\"/>" to "color= on side-button does nothing: it reads fill icon-color shape radius overlay",
+            "<style select=\"split-gap, key\" color=\"#ff0000\"/>" to "color= on split-gap does nothing: it reads fill radius",
+        )
+        for ((style, warning) in unread) assertEquals(listOf(warning), warnings(withStyle(style)), style)
+        val read = listOf(
+            "<style select=\"frame\" radius=\"8dp\" border=\"1dp #ff0000\" shadow=\"none\"/>",
+            "<style select=\"handle\" fill=\"#ff0000\" color=\"#ff0000\" icon-color=\"#ff0000\" width=\"40dp\" height=\"4dp\"/>",
+            "<style select=\"side-button:pressed\" fill=\"#ff0000\" icon-color=\"#ff0000\" shape=\"rect\" radius=\"4dp\" overlay=\"#ff0000\"/>",
+            "<style select=\"split-gap\" fill=\"#ff0000\" radius=\"4dp\"/>",
+        )
+        for (style in read) assertEquals(emptyList(), warnings(withStyle(style)), style)
         // each a widget now, under a scene too
         for (w in listOf("frame", "handle", "side-button", "split-gap", "navbar")) {
             assertNull(Selector.parse("@dark $w")?.reserved, w)

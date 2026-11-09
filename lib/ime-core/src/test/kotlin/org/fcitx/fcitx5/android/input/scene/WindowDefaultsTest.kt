@@ -36,35 +36,29 @@ class WindowDefaultsTest {
         return WindowLooks(Cascades(theme))
     }
 
+    // the frame's radius is of the keys' alone, the keyboard's width and compact not in it: at every radius and
+    // margin, flat or not, upright and turned (the margins of the screen turned theirs)
     @Test
-    fun theFloatingCornersAreCornerDpsAtEveryWidth() {
+    fun theFloatingCornersAreCornerDps() {
         val radii = listOf(0, 1, 4, 7, 12, Keys.MAX_RADIUS_DP)
         val gaps = listOf(Gap(3, 7, 3, 4), Gap(0, 0, 0, 0), Gap(5, 2, 9, 1), Gap(1, 9, 6, 0), Gap(24, 24, 24, 24), Gap(0, 24, 24, 0))
-        var points = 0
-        for (r in radii) for (gap in gaps) for (blocks in listOf(true, false)) points += everyScreen(r, gap, blocks)
-        assertEquals(radii.size * gaps.size * 2 * 166 * 4, points)
+        for (r in radii) for (gap in gaps) for (blocks in listOf(true, false)) upAndTurned(r, gap, blocks)
     }
 
-    // every screen the floating keyboard is on, upright and turned, compact or not: its width is
-    // FloatingKeyboard.widthDp's, the corners the same at each; the points checked
-    private fun everyScreen(r: Int, gap: Gap, blocks: Boolean): Int {
+    // the keys [r] round, [gap] apart, [blocks]: the frame cornerDp's upright and turned
+    private fun upAndTurned(r: Int, gap: Gap, blocks: Boolean) {
         val l = looks(base.copy(keys = base.keys.copy(radiusDp = r, gap = gap, blocks = blocks)))
-        var points = 0
-        for (screen in 280..1600 step 8) for (landscape in listOf(false, true)) for (compact in listOf(false, true)) {
-            val width = FloatingKeyboard.widthDp(screen)
+        for (landscape in listOf(false, true)) {
             val scenes = buildSet {
                 add("floating")
                 if (landscape) add("landscape")
-                if (compact) add("compact")
                 if (!blocks) add("flat")
             }
             val h = if (landscape) gap.hLand else gap.h
             val v = if (landscape) gap.vLand else gap.v
             val want = FloatingKeyboard.cornerDp(r, h, v, blocks).toDouble()
-            assertEquals("r=$r $gap blocks=$blocks at $width dp of $screen $scenes", want, l.frame(scenes).radiusDp, 0.0)
-            points++
+            assertEquals("r=$r $gap blocks=$blocks $scenes", want, l.frame(scenes).radiusDp, 0.0)
         }
-        return points
     }
 
     @Test

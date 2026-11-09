@@ -286,6 +286,7 @@ object ThemeReader {
         selectors?.let { frame(it, values, el.line, p) }
         named(values, a, colors, fonts)
         selectors?.let { readElsewhere(it, values.keys, el.line, p) }
+        selectors?.let { unreadByWindow(it, values.keys, el.line, p) }
         if (values.isEmpty() && reserved == 0) a.problem("a style that sets nothing")
         return selectors?.let { Style(it, values, order, el.line) }
     }
@@ -365,6 +366,24 @@ object ThemeReader {
     }
 
     private val LABEL_READ = setOf("align", "space-content")
+
+    // a window widget's property it has no use for (`navbar fill=`, `frame fill=`): warned of, as one may think it does
+    // something; in a list, where another widget may read it, too (of that widget)
+    private fun unreadByWindow(selectors: List<Selector>, props: Set<String>, line: Int, p: Problems) {
+        for (w in selectors.map { it.widget }.filter { it in WINDOW_READS }.distinct()) {
+            val reads = WINDOW_READS.getValue(w)
+            props.filter { it !in reads }.forEach { p.warn(line, "$it= on $w does nothing: it reads ${reads.joinToString(" ")}") }
+        }
+    }
+
+    // what each widget of the window round the keys reads (060-render-p3 T7a, engine/WindowLooks, SceneBuilder's split gap)
+    private val WINDOW_READS = mapOf(
+        "frame" to listOf("radius", "border", "shadow"),
+        HANDLE to listOf("fill", "color", "icon-color", "width", "height"),
+        "side-button" to listOf("fill", "icon-color", "shape", "radius", "overlay"),
+        "split-gap" to listOf("fill", "radius"),
+        NAVBAR to listOf("color"),
+    )
 
     // a property of today's value a later stage reads ([Values.reservedValue]): ignored
     private val RESERVED_VALUE = Value.Flag(false)
