@@ -7,8 +7,13 @@ package org.fcitx.fcitx5.android.scene
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.engine.Content
 import org.fcitx.fcitx5.android.scene.engine.Input
+import org.fcitx.fcitx5.android.scene.engine.Part
 import org.fcitx.fcitx5.android.scene.engine.Scripts
+import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.theme.Argb
+import org.fcitx.fcitx5.android.scene.theme.Cascade
+import org.fcitx.fcitx5.android.scene.theme.Selector
+import org.fcitx.fcitx5.android.scene.theme.TextLook
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -100,7 +105,10 @@ class ContentLooksTest {
 
     @Test
     fun eachScriptInItsFont() {
-        assertEquals(listOf("拼音" to "kai", " " to "system", "Pinyin" to "mono"), Scripts.runs("拼音 Pinyin", "system", "kai", "mono"))
+        // a space with the run before it, a leading one with the run after it; a no-break one alike
+        assertEquals(listOf("拼音 " to "kai", "Pinyin" to "mono"), Scripts.runs("拼音 Pinyin", "system", "kai", "mono"))
+        assertEquals(listOf(" 拼音 " to "kai", "Pinyin " to "mono"), Scripts.runs(" 拼音 Pinyin ", "system", "kai", "mono"))
+        assertEquals(listOf("  " to "system"), Scripts.runs("  ", "system", "kai", "mono"))
         assertEquals(listOf("拼音 Pinyin" to "system"), Scripts.runs("拼音 Pinyin", "system", null, null))
         assertEquals(listOf("，。Ａ" to "kai", "é1" to "system", "😀" to "emoji"), Scripts.runs("，。Ａé1😀", "emoji", "kai", "system"))
         assertEquals(listOf("𠀀" to "kai"), Scripts.runs("𠀀", "system", "kai", null), "an ideograph past the BMP")
@@ -108,7 +116,7 @@ class ContentLooksTest {
         val t = styled("<style select=\"key\" font-han=\"kai\" font-latin=\"mono\"/>", fonts = fonts)
         val s = Fixtures.scene(env.copy(texts = env.texts.copy(imeName = "拼音 Pinyin")), theme = t)
         val runs = texts(s, "space")
-        assertEquals(listOf("kai", "system", "mono"), runs.map { it.font })
+        assertEquals(listOf("kai", "mono"), runs.map { it.font })
         // each run from where the one before it ends, the whole centred as one text
         for (i in 1 until runs.size) {
             val before = runs[i - 1]
@@ -131,9 +139,9 @@ class ContentLooksTest {
         val none = space("none")
         assertTrue(texts(none, "space").isEmpty())
         assertEquals(listOf("voice", "cursor-move"), icons(none, "space").map { it.name }, "the badge and the swipe kept")
-        val icon = space("icon(keyboard-space)")
+        val icon = space("icon(space)")
         val (badge, glyph) = icons(icon, "space").take(2)
-        assertEquals(listOf("voice", "keyboard-space"), listOf(badge.name, glyph.name))
+        assertEquals(listOf("voice", "space"), listOf(badge.name, glyph.name))
         near(badge.box.right + Content.BADGE_GAP_DP * d, glyph.box.left, "beside the badge")
         near(face(icon, "space").centerX, (badge.box.left + glyph.box.right) / 2, "the two centred")
         // the label's part as the key's: set on the label, the same
@@ -143,16 +151,91 @@ class ContentLooksTest {
 
     @Test
     fun returnShowsTheThemesForItsAction() {
-        val t = styled("<style select=\"*/enter\" return-icon-send=\"text(发送)\" return-icon-newline=\"icon(keyboard-return)\"/>")
+        val t = styled("<style select=\"*/enter\" return-icon-send=\"text(发送)\" return-icon-newline=\"icon(done)\"/>")
         fun enter(icon: String) = Fixtures.scene(env.copy(texts = env.texts.copy(returnIcon = icon)), theme = t)
         val send = enter("send")
         assertTrue(icons(send, "enter").isEmpty())
         val text = texts(send, "enter").single()
         assertEquals("发送", text.text)
         near(Content.RETURN_TEXT_DP * d, text.size)
-        assertEquals(listOf("keyboard-return"), icons(enter("enter"), "enter").map { it.name }, "enter's newline")
+        assertEquals(listOf("done"), icons(enter("enter"), "enter").map { it.name }, "enter's newline")
         assertEquals(listOf("go"), icons(enter("go"), "enter").map { it.name }, "none given for go: its own")
         assertEquals(listOf("previous"), icons(enter("previous"), "enter").map { it.name }, "no action of a theme's")
+    }
+
+    @Test
+    fun alignTakesTheBadgeAndAnIconButNotALabelOverAnIcon() {
+        // the space's badge and name: the two at the corner, the badge first
+        val voice = env.copy(input = Input(holdVoice = true))
+        val left = Fixtures.scene(voice, theme = styled("<style select=\"key\" align=\"top-left\"/>"))
+        val badge = icons(left, "space").first { it.name == "voice" }
+        near(face(left, "space").left + Content.SYMBOL_SIDE_DP * d, badge.box.left, "the badge at the corner")
+        val name = texts(left, "space").single()
+        assertTrue(name.x > badge.box.right, "its name after it")
+        assertTrue(badge.box.top >= face(left, "space").top - 0.01 && name.baseline - 1.05 * name.size >= face(left, "space").top - 0.01)
+        // an icon alone centred at the top
+        val top = Fixtures.scene(env, theme = styled("<style select=\"key\" align=\"top-center\"/>"))
+        val shift = icons(top, "shift").single()
+        near(face(top, "shift").centerX, shift.box.centerX)
+        near(face(top, "shift").top, shift.box.top)
+        // a label over its icon: where it was
+        val l = LayoutReader.layout(
+            "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"10\">" +
+                "<row><key id=\"a\" label=\"emoji\" icon=\"emoji\" width=\"10\"/></row></keyboard>",
+        ).ok()
+        assertEquals(SceneText.of(Fixtures.scene(env, l)), SceneText.of(Fixtures.scene(env, l, styled("<style select=\"key\" align=\"top-left\"/>"))))
+    }
+
+    @Test
+    fun anAlignedTextTooWideStaysAtItsCorner() {
+        val long = "text(${"空".repeat(30)})"
+        val s = Fixtures.scene(env, theme = styled("<style select=\"*/space\" align=\"top-left\" space-content=\"$long\"/>"))
+        val t = texts(s, "space").single()
+        val inkLeft = t.x + 0.05 * t.size * t.scaleX
+        val room = face(s, "space").left + Content.ROOM_H_DP * d
+        assertTrue(inkLeft >= room - 0.5 && inkLeft <= face(s, "space").left + Content.SYMBOL_SIDE_DP * d + 0.01, "$inkLeft from $room")
+    }
+
+    @Test
+    fun aLongTextOfTheThemesIsSmallerAlone() {
+        val send = env.copy(texts = env.texts.copy(returnIcon = "send"))
+        val plain = Fixtures.scene(send)
+        val long = Fixtures.scene(send, theme = styled("<style select=\"*/enter\" return-icon-send=\"text(发送这条消息)\"/>"))
+        val text = texts(long, "enter").single()
+        assertTrue(text.size < Content.RETURN_TEXT_DP * d, "smaller: ${text.size}")
+        for (id in listOf("symbols", "comma", "period")) assertEquals(texts(plain, id), texts(long, id), "$id as ever")
+        val space = Fixtures.scene(env, theme = styled("<style select=\"*/space\" space-content=\"text(${"空".repeat(20)})\"/>"))
+        for (id in listOf("symbols", "comma", "period")) assertEquals(texts(Fixtures.scene(env), id), texts(space, id), "$id as ever")
+    }
+
+    @Test
+    fun runsOutlinedAreDrawnOutlinesFirst() {
+        val fonts = "\n<font name=\"kai\" src=\"kai.ttf\"/>\n<font name=\"mono\" src=\"mono.ttf\"/>"
+        val t = styled("<style select=\"key\" font-han=\"kai\" font-latin=\"mono\" stroke=\"2dp #ff0000\" text-shadow=\"0 1dp 0 #0000ff\"/>", fonts = fonts)
+        val runs = texts(Fixtures.scene(env.copy(texts = env.texts.copy(imeName = "拼音 Pinyin")), theme = t), "space")
+        assertEquals(listOf("拼音 ", "Pinyin", "拼音 ", "Pinyin"), runs.map { it.text })
+        assertTrue(runs.take(2).all { it.color.transparent && it.stroke != null && it.shadow != null }, "outlines and shadows first")
+        assertTrue(runs.drop(2).all { !it.color.transparent && it.stroke == null && it.shadow == null }, "then the fills")
+        assertEquals(listOf("label"), runs.map { it.part }.distinct())
+        // one run: one op, as ever
+        assertEquals(1, texts(Fixtures.scene(env, theme = t), "q").count { it.text == "q" })
+        // a transparent text with a shadow: the shadow drawn
+        val shadowed = Fixtures.scene(env, theme = styled("<style select=\"key label\" color=\"#00000000\" text-shadow=\"0 1dp 0 #0000ff\"/>"))
+        assertTrue(texts(shadowed, "q").any { it.text == "q" && it.color.transparent && it.shadow != null && it.stroke == null })
+    }
+
+    @Test
+    fun runsAreSpacedAndSqueezedAsOne() {
+        val fonts = "\n<font name=\"kai\" src=\"kai.ttf\"/>\n<font name=\"mono\" src=\"mono.ttf\"/>"
+        val theme = styled("<style select=\"key\" font-han=\"kai\" font-latin=\"mono\" letter-spacing=\"0.2em\"/>", fonts = fonts)
+        val look = TextLook(Cascade(theme, emptySet()).of(Selector.Target("key", "qwerty", "space", "space", part = "label")), theme)
+        val m = Content.measure(FakeMeasurer, "拼音 Pinyin", look, 400, 20.0)
+        val first = FakeMeasurer.measure("拼音 ", "kai", 400, 20.0, 0.2)
+        near(first.advance + FakeMeasurer.measure("Pinyin", "mono", 400, 20.0, 0.2).advance, m.m.advance, "the advance, spaced")
+        val drawn = m.squeezed(m.box.width / 2).from(10.0, 50.0, Part.Label)
+        assertEquals(listOf(10.0), drawn.texts.take(1).map { it.x })
+        near(10.0 + first.advance * 0.5, drawn.texts[1].x, "the second run where the first ends, squeezed")
+        assertTrue(drawn.texts.all { it.scaleX == 0.5 && it.spacing == 0.2 })
     }
 
     @Test

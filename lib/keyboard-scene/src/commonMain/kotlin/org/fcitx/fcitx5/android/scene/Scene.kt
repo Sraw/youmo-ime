@@ -159,6 +159,8 @@ sealed interface Op {
         val letterSpacing: Double = 0.0,
         val stroke: TextStroke? = null,
         val shadow: TextShadow? = null,
+        /** The part of its key it is (`label`, `mark`, `shortcut`, `badge`…, a theme's part names; null: none), for what reads a scene: not drawn. */
+        val part: String? = null,
     ) : Op
 
     /** The icon [name] in [box], tinted [tint], turned [rotation] degrees about its middle. */

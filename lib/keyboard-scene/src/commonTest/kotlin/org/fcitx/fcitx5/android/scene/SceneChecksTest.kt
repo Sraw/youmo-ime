@@ -123,13 +123,13 @@ class SceneChecksTest {
     private class Drawn(val what: String, val box: Box, val part: Part, val text: Boolean = false)
 
     // what a key's drawing puts on it, each text's ink as the measurer has it and each icon's box: the
-    // label, a mark (any other text; an icon at a shortcut's 11 dp, 8 compact) or an icon (glyph, badge)
+    // label (its part's, each run of it), a mark (any other text; an icon at a shortcut's 11 dp, 8 compact) or an icon (glyph, badge)
     private fun contents(shot: Shot, k: KeyNode): List<Drawn> = k.ops(pressed = false).mapNotNull { op ->
         when (op) {
             is Op.Text -> {
                 val ink = FakeMeasurer.measure(op.text, op.font, op.weight, op.size, op.letterSpacing).ink
                 val box = Box(op.x + ink.left * op.scaleX, op.baseline + ink.top, op.x + ink.right * op.scaleX, op.baseline + ink.bottom)
-                Drawn("\"${op.text}\"", box, if (op.text == k.label) Part.LABEL else Part.MARK, text = true)
+                Drawn("\"${op.text}\"", box, if (op.part == "label") Part.LABEL else Part.MARK, text = true)
             }
             is Op.Icon -> {
                 val dp = if (shot.env.compact) SHORTCUT_ICON_COMPACT_DP else SHORTCUT_ICON_DP

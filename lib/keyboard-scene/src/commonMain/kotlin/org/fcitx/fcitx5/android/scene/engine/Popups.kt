@@ -119,7 +119,7 @@ internal class PopupBuilder(
     fun padding(): Double = px(Popups.TEXT_PADDING_DP)
 
     /** How wide [text] is drawn in the bubble at [size] px. */
-    fun previewWidth(text: String, size: Double): Double = look("preview").second.let { measurer.measure(text, it.font, it.weight, size).advance }
+    fun previewWidth(text: String, size: Double): Double = look("preview").second.let { Content.measure(measurer, text, it, it.weight, size).m.advance }
 
     private fun scale() = KeyTextScale.of(env.compact, env.floating)
 
@@ -132,7 +132,7 @@ internal class PopupBuilder(
     fun preview(text: String, keyWidth: Double, size: Double?): Scene {
         val (look, textLook) = look("preview")
         val px = size ?: (Popups.SYMBOL_DP * scale() * d)
-        val m = Content.Measured(text, measurer.measure(text, textLook.font, textLook.weight, px), px, textLook.font, textLook.weight)
+        val m = Content.measure(measurer, text, textLook, textLook.weight, px)
         val width = maxOf(px(Popups.PREVIEW_MIN_WIDTH_DP), keyWidth, ceil(m.m.advance) + 2 * padding())
         val box = Box(0.0, 0.0, width, px(Popups.PREVIEW_HEIGHT_DP))
         val face = face(box, look)
@@ -151,7 +151,7 @@ internal class PopupBuilder(
     fun popupKeys(labels: List<String>, columns: Int, room: Double?, minWidth: Double, height: Double): PopupKeys {
         val textLook = look("popup").second
         val size = Popups.KEY_TEXT_DP * d
-        val widest = labels.maxOfOrNull { measurer.measure(it, textLook.font, textLook.weight, size).advance } ?: 0.0
+        val widest = labels.maxOfOrNull { Content.measure(measurer, it, textLook, textLook.weight, size).m.advance } ?: 0.0
         val fitting = ceil(widest) + 2 * padding()
         val wanted = maxOf(minWidth, fitting)
         val width = if (room == null || columns <= 0) wanted else min(wanted, floor(room / columns))
@@ -177,7 +177,7 @@ internal class PopupBuilder(
                 val states = if (index == selected) setOf(KeyState.Selected) else emptySet()
                 val (cellLook, textLook) = look("popup", states)
                 val face = face(cell, cellLook)
-                val m = Content.Measured(label, measurer.measure(label, textLook.font, textLook.weight, keys.size), keys.size, textLook.font, textLook.weight)
+                val m = Content.measure(measurer, label, textLook, textLook.weight, keys.size)
                 val ops = listOfNotNull(paint.fill(face, cellLook.fill).takeIf { KeyState.Selected in states }) +
                     paint.content(m.at(cell.centerX, cell.centerY, Part.Label)) { textLook }
                 node("popup/$index", "popup", face, cell, states, ops, label)
@@ -216,7 +216,7 @@ internal class PopupBuilder(
                 val (w, h) = icons.dp(item.icon).let { (w, h) -> w * d to h * d }
                 Drawn.of(PlacedIcon(item.icon, Box(cell.centerX - w / 2, cell.centerY - h / 2, cell.centerX + w / 2, cell.centerY + h / 2), Part.Icon))
             } else {
-                val m = Content.Measured(item.label, measurer.measure(item.label, textLook.font, textLook.weight, keys.size), keys.size, textLook.font, textLook.weight)
+                val m = Content.measure(measurer, item.label, textLook, textLook.weight, keys.size)
                 m.at(cell.centerX, cell.centerY, Part.Label)
             }
             val drawn = paint.face(geometry(face, look), look, KeyState.Selected in states) + paint.content(content) { textLook }

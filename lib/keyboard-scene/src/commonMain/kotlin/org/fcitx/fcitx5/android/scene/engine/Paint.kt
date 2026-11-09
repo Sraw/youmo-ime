@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Shape
 import org.fcitx.fcitx5.android.scene.TextShadow
 import org.fcitx.fcitx5.android.scene.TextStroke
+import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Fill
 import org.fcitx.fcitx5.android.scene.theme.KeyLook
 import org.fcitx.fcitx5.android.scene.theme.TextLook
@@ -59,22 +60,35 @@ internal class Paint(private val theme: Theme, private val density: Double) {
 
     /**
      * [d]'s texts and icons, each coloured as [looks] has its part; a text outlined and shadowed as its
-     * part is (`stroke`, `text-shadow`), so a text of a transparent colour with an outline is still drawn.
+     * part is (`stroke`, `text-shadow`), so a text of a transparent colour with an outline or a shadow is
+     * still drawn (CSS's shadow of a transparent text). A text in runs (`font-han`, `font-latin`; a table's
+     * roots in lines) outlined or shadowed is drawn twice: every run's outline and shadow first, then every
+     * run's fill, so no run's outline is over the fill of the run before it.
      */
     fun content(d: Drawn, looks: (Part) -> TextLook): List<Op> = buildList {
         for (i in d.icons) {
             val tint = looks(i.part).iconColor
             if (!tint.transparent) add(Op.Icon(i.name, i.box, tint))
         }
-        for (t in d.texts) {
+        val texts = d.texts.mapNotNull { t ->
             val look = looks(t.part)
             val color = look.color
             val stroke = look.stroke?.let { s -> s.color?.let(theme::color)?.takeUnless { it.transparent }?.let { TextStroke(s.width * density, it) } }
-            if (color.transparent && stroke == null) continue
             val shadow = look.textShadow?.let { s ->
                 s.color?.let(theme::color)?.takeUnless { it.transparent }?.let { TextShadow(s.dx * density, s.dy * density, s.blur * density, it) }
             }
-            add(Op.Text(t.text, t.x, t.baseline, t.font, t.weight, t.size, color, t.scaleX, letterSpacing = t.spacing, stroke = stroke, shadow = shadow))
+            if (color.transparent && stroke == null && shadow == null) return@mapNotNull null
+            Op.Text(t.text, t.x, t.baseline, t.font, t.weight, t.size, color, t.scaleX, letterSpacing = t.spacing, stroke = stroke, shadow = shadow, part = t.part.xml)
         }
+        if (texts.size < 2 || texts.none { it.stroke != null || it.shadow != null }) {
+            addAll(texts)
+            return@buildList
+        }
+        texts.filter { it.stroke != null || it.shadow != null }.forEach { add(it.copy(color = NO_FILL)) }
+        texts.filter { !it.color.transparent }.forEach { add(it.copy(stroke = null, shadow = null)) }
+    }
+
+    private companion object {
+        val NO_FILL = Argb(0)
     }
 }

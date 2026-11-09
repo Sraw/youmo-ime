@@ -13,8 +13,9 @@ package org.fcitx.fcitx5.android.scene.engine
  *
  * Han: the CJK ideographs and their radicals, the CJK symbols and punctuation (，。「」), the full-width
  * forms (！？Ａ１) — what a CJK font is drawn for. Latin: ASCII's printing characters (letters, digits,
- * punctuation) and the Latin letters beyond (é, ß, ā). The rest (emoji, 注音, symbols, spaces) is in
- * the key's `font`.
+ * punctuation) and the Latin letters beyond (é, ß, ā). The rest (emoji, 注音, symbols) is in the key's
+ * `font`. A space (any Unicode space, a no-break one too) is of no script: it goes with the run before
+ * it, or the one after it where it leads, so `拼音 Pinyin` is two runs, not three.
  */
 object Scripts {
     enum class Script { Han, Latin, Other }
@@ -28,20 +29,25 @@ object Scripts {
         var i = 0
         while (i < text.length) {
             val cp = codePointAt(text, i)
-            val f = when (of(cp)) {
-                Script.Han -> han ?: font
-                Script.Latin -> latin ?: font
-                Script.Other -> font
+            // a space: the run it is in goes on (a leading one's is the first run that has a font)
+            val f = if (cp <= MAX_BMP && cp.toChar().isWhitespace()) {
+                null
+            } else {
+                when (of(cp)) {
+                    Script.Han -> han ?: font
+                    Script.Latin -> latin ?: font
+                    Script.Other -> font
+                }
             }
-            if (current != null && f != current) {
+            if (f != null && current != null && f != current) {
                 out += text.substring(start, i) to current
                 start = i
             }
-            current = f
+            if (f != null) current = f
             i += if (cp > MAX_BMP) 2 else 1
         }
-        if (current != null) out += text.substring(start) to current
-        return out.ifEmpty { listOf(text to font) }
+        out += text.substring(start) to (current ?: font)
+        return out
     }
 
     fun of(cp: Int): Script = when {

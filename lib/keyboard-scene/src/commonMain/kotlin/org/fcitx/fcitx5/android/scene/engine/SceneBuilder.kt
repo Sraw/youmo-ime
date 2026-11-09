@@ -288,15 +288,15 @@ class SceneBuilder(
         // a key with no glyph but marks (a space with no name) too, and one whose glyph stays as placed (a
         // table's roots in lines) as one with none: its marks are of their classes
         val members = keys.indices.filter { keys[it].content.let { c -> (c.yields && c.glyphClass != null) || c.marks.isNotEmpty() } }
-        val board = KeyMarkYield.board(members.map { member(loose[it]) }, gap)
+        val board = KeyMarkYield.board(members.map { member(loose[it], it) }, gap)
         val out = arrayOfNulls<Settled>(keys.size)
         members.forEachIndexed { n, i ->
             val c = keys[i].content
-            val onto = KeyMarkYield.onto(member(c), member(loose[i]), board, board.keys[n])
-            val drawn = c.glyphClass?.takeIf { c.yields }?.let { c.glyph?.drawnAt(onto.glyph.toBox(), board.scales.getValue(it.ordinal), c.glyph.grows(measurer)) }
-            val glyph = drawn?.let { within(it, c.room) } ?: c.glyph
+            val onto = KeyMarkYield.onto(member(c, i), member(loose[i], i), board, board.keys[n])
+            val drawn = c.glyphClass?.takeIf { c.yields }?.let { c.glyph?.drawnAt(onto.glyph.toBox(), board.scales.getValue(classOf(c, it, i)), c.glyph.grows(measurer)) }
+            val glyph = drawn?.let { within(it, c.room, c.anchor?.first) } ?: c.glyph
             // moved back within its room: its marks placed again where one it kept meets it there
-            val s = if (drawn != null && glyph !== drawn) KeyMarkYield.again(member(c), glyph!!.ink.toInk(), board, onto, gap) else onto
+            val s = if (drawn != null && glyph !== drawn) KeyMarkYield.again(member(c, i), glyph!!.ink.toInk(), board, onto, gap) else onto
             out[i] = Settled(glyph, c.marks.mapIndexed { j, m -> s.marks[j]?.let { m.drawn.drawnAt(it.toBox(), board.markScale(mark(m)), m.drawn.grows(measurer)) } })
         }
         keys.forEachIndexed { i, k ->
@@ -321,14 +321,14 @@ class SceneBuilder(
         val py = c.anchor?.second ?: if (classed && c.glyphClass == GlyphClass.Main) c.baseline else g.ink.centerY
         // wider than the room still (the class to take it in): its ink's middle the room's, so the class, smaller
         // about it, leaves it within on both sides
-        val placed = within(alone(g, c.room, least, py, warnings), c.room)
-        return if (placed === g) c else KeyContent(placed, c.marks, c.room, c.glyphClass, c.baseline, c.yields, c.edge, c.anchor)
+        val placed = within(alone(g, c.room, least, py, c.anchor?.first, warnings), c.room, c.anchor?.first)
+        return if (placed === g) c else KeyContent(placed, c.marks, c.room, c.glyphClass, c.baseline, c.yields, c.edge, c.anchor, c.own)
     }
 
     // [g] shrunk alone about (the room's middle, [py]) as far as its ink measured at [least] (its class's most:
     // what the class's ask sees) is within [room]; as it is where it is so already. Not within it even at
     // [FIT_LEAST] of the first guess (a font's ink that grows as it shrinks): that size, and a warning in [warnings]
-    private fun alone(g: Drawn, room: Box, least: Double, py: Double, warnings: Problems? = null): Drawn {
+    private fun alone(g: Drawn, room: Box, least: Double, py: Double, ax: Double?, warnings: Problems? = null): Drawn {
         val grows = g.grows(measurer)
         // shrunk by [s], its ink as drawn at that size (§8b)
         fun shrunk(s: Double): Drawn {
@@ -336,7 +336,8 @@ class SceneBuilder(
             val w = g.ink.width * s + (d?.let { it.left + it.right } ?: 0.0)
             val top = py + (g.ink.top - py) * s - (d?.top ?: 0.0)
             val bottom = py + (g.ink.bottom - py) * s + (d?.bottom ?: 0.0)
-            return g.drawnAt(Box(room.centerX - w / 2, top, room.centerX + w / 2, bottom), s, grows)
+            val box = if (ax == null) Box(room.centerX - w / 2, top, room.centerX + w / 2, bottom) else across(room, ax, w).let { Box(it, top, it + w, bottom) }
+            return g.drawnAt(box, s, grows)
         }
         fun fits(f: Drawn) = f.ink.width * least + (f.grows(measurer)?.at(least)?.let { it.left + it.right } ?: 0.0) <= room.width
         // measured at the class's most, not scaled (§8b): a font's ink can be wider there than scaled
@@ -363,22 +364,32 @@ class SceneBuilder(
     // Out by half a px or less it stays: that is the glyph mapped onto whole pixels (KeyMarkYield.onto), and moved
     // in it would meet a mark kept at the gap and have them all placed again, a pixel's rounding moving a mark
     // px (060-render-p2 S4e, S7a review #4); the room is inside the face's padding, nothing is cut
-    private fun within(g: Drawn, room: Box): Drawn {
+    private fun within(g: Drawn, room: Box, ax: Double?): Drawn {
         if (g.texts.isEmpty() || (g.ink.left >= room.left - SNAP && g.ink.right <= room.right + SNAP)) return g
-        val left = if (g.ink.width > room.width + ROUNDING) room.centerX - g.ink.width / 2 else room.left.coerceAtLeast(minOf(g.ink.left, room.right - g.ink.width))
+        val left = if (g.ink.width > room.width + ROUNDING) across(room, ax, g.ink.width) else room.left.coerceAtLeast(minOf(g.ink.left, room.right - g.ink.width))
         return g.mapTo(Box(left, g.ink.top, left + g.ink.width, g.ink.bottom), 1.0)
     }
 
+    // where a glyph [w] wide that is wider than [room] starts: its middle the room's; one a theme aligns (its
+    // anchor at [ax] across), as far along it as [ax] is along the room, so it stays at its corner or its top
+    private fun across(room: Box, ax: Double?, w: Double): Double {
+        if (ax == null || room.width <= 0) return room.centerX - w / 2
+        return ax - ((ax - room.left) / room.width).coerceIn(0.0, 1.0) * w
+    }
+
+    // a glyph's class's number on the board: its [GlyphClass]'s, or one of its own ([KeyContent.own]) by its key's [index]
+    private fun classOf(c: KeyContent, cls: GlyphClass, index: Int): Int = if (c.own) GlyphClass.entries.size + index else cls.ordinal
+
     // a key as its class's member: a main character about its baseline, where its row's stand, and never moved off
     // it; a glyph a theme aligns about where it stays ([KeyContent.anchor]), never moved either
-    private fun member(c: KeyContent): KeyMarkYield.Member {
+    private fun member(c: KeyContent, index: Int): KeyMarkYield.Member {
         val cls = c.glyphClass?.takeIf { c.yields } ?: return KeyMarkYield.Member(KeyMarkYield.NO_GLYPH, 0.0, 0.0, c.marks.map(::mark), c.room.toInk(), c.edge, glyphClass = -1)
         val ink = c.glyph!!.ink.toInk()
         val main = cls == GlyphClass.Main
         val (x, y) = c.anchor ?: (((ink.left + ink.right) / 2) to (if (main) c.baseline else (ink.top + ink.bottom) / 2))
         return KeyMarkYield.Member(
             ink, x, y, c.marks.map(::mark), c.room.toInk(), c.edge,
-            moves = !main && c.anchor == null, glyphClass = cls.ordinal, grows = c.glyph.grows(measurer), across = c.glyph.texts.isNotEmpty(),
+            moves = !main && c.anchor == null, glyphClass = classOf(c, cls, index), grows = c.glyph.grows(measurer), across = c.glyph.texts.isNotEmpty(),
         )
     }
 

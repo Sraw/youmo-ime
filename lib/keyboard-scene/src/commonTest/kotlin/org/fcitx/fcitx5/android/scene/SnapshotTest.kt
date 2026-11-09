@@ -104,6 +104,11 @@ object Shots {
                 styled("<style select=\"*/enter\" return-icon-send=\"text(发送)\"/>"),
             ),
             Shot("qwerty-hint-mark-hidden", "qwerty", block, styled("<style select=\"key hint\" hidden=\"true\"/>", "<style select=\"key mark\" hidden=\"true\"/>")),
+            // a long one smaller by itself: the function keys' text as ever
+            Shot(
+                "qwerty-return-long", "qwerty", block.copy(texts = block.texts.copy(returnIcon = "send")),
+                styled("<style select=\"*/enter\" return-icon-send=\"text(发送这条消息)\"/>"),
+            ),
         )
     }
 
