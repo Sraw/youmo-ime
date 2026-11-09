@@ -34,6 +34,7 @@ class QuickPhraseKeysTest {
         assertEquals('5'.code, sp.shown)
         assertEquals("5JKLjkl", chars(sp))
         assertEquals('\''.code, of(NineKeyLetters.NINE_SP_SEMICOLON.code).shown)
+        assertEquals(setOf('\''.code, ';'.code), of(NineKeyLetters.NINE_SP_SEMICOLON.code).can)
     }
 
     @Test
