@@ -136,9 +136,20 @@ object SceneIcons {
     // icon="drawable:123") is no resource looked up that may not exist
     private val named = mutableSetOf<Int>()
 
+    /** The names it draws: the scene's own [org.fcitx.fcitx5.android.scene.Icons.ALL] (a test holds them alike), and none of the menus' ([nameOf]). */
+    val names: Set<String> get() = all.keys
+
+    // the names asked for that it has no drawable of: each logged once a process (a layout's or theme's
+    // name the app does not have draws nothing, every frame)
+    private val unknown = mutableSetOf<String>()
+
     @DrawableRes
-    fun of(name: String): Int? = all[name]
-        ?: name.takeIf { it.startsWith(DRAWABLE) }?.substring(DRAWABLE.length)?.toIntOrNull()?.takeIf { synchronized(named) { it in named } }
+    fun of(name: String): Int? {
+        val id = all[name]
+            ?: name.takeIf { it.startsWith(DRAWABLE) }?.substring(DRAWABLE.length)?.toIntOrNull()?.takeIf { synchronized(named) { it in named } }
+        if (id == null && synchronized(unknown) { unknown.add(name) }) Timber.w("scene icon %s: the app has none, drawn as nothing", name)
+        return id
+    }
 
     /**
      * [icon]'s name for a scene (a menu's item, KeyDef's drawable): its own where it has one, else

@@ -214,7 +214,10 @@ class ScenePainter(
     }
 
     // a theme's text-shadow under the glyphs (the outline's, where there is one), then the outline, then the
-    // fill over it: the stroke's paint twice its width, half of it under the fill, so its width shows outside
+    // fill over it: the stroke's paint twice its width, half of it under the fill, so its width shows outside.
+    // The shadow is the glyphs again, moved, in its colour, blurred as a key's shadow is (BlurMaskFilter's
+    // radius, setShadowLayer's too): drawn so, not by setShadowLayer, it is there under a transparent fill as
+    // CSS has it (setShadowLayer's of an opaque colour takes the fill's alpha) and sharp where it has no blur (setShadowLayer's draws none)
     private fun text(canvas: Canvas, op: Op.Text) {
         val x = op.x.toFloat()
         val y = op.baseline.toFloat()
@@ -222,21 +225,19 @@ class ScenePainter(
             canvas.save()
             canvas.rotate(op.rotation.toFloat(), x, y)
         }
-        val shadow = op.shadow
-        // setShadowLayer of no blur draws no shadow at all: a sharp one is the glyphs again, moved
-        if (shadow != null && shadow.blur <= 0.0) {
+        op.shadow?.let { shadow ->
             textPaint(op, shadow.color.value, op.stroke)
+            if (shadow.blur > 0.0) paint.maskFilter = BlurMaskFilter(shadow.blur.toFloat(), BlurMaskFilter.Blur.NORMAL)
             canvas.drawText(op.text, x + shadow.dx.toFloat(), y + shadow.dy.toFloat(), paint)
+            // what comes next starts from a paint of none (fill keeps a shadow's mask: Op.Shadow's)
+            paint.maskFilter = null
         }
-        val blurred = shadow?.takeIf { it.blur > 0.0 }
         op.stroke?.let { stroke ->
             textPaint(op, stroke.color.value, stroke)
-            blurred?.let { paint.setShadowLayer(it.blur.toFloat(), it.dx.toFloat(), it.dy.toFloat(), it.color.value) }
             canvas.drawText(op.text, x, y, paint)
         }
         if (!op.color.transparent) {
             textPaint(op, op.color.value, null)
-            if (op.stroke == null) blurred?.let { paint.setShadowLayer(it.blur.toFloat(), it.dx.toFloat(), it.dy.toFloat(), it.color.value) }
             canvas.drawText(op.text, x, y, paint)
         }
         if (op.rotation != 0.0) canvas.restore()

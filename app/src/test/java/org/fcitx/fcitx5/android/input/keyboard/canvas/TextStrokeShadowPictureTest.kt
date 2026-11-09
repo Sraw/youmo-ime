@@ -14,11 +14,14 @@ import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.scene.LookTheme
 import org.fcitx.fcitx5.android.scene.Op
+import org.fcitx.fcitx5.android.scene.TextShadow
+import org.fcitx.fcitx5.android.scene.TextStroke
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.getOr
+import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -146,6 +149,63 @@ class TextStrokeShadowPictureTest {
         assertEquals(2, m.measured)
         assertEquals(plain, m.measure("abc", "system", 400, 60.0, 0.0))
         assertEquals(2, m.measured)
+    }
+
+    @Test
+    fun aTransparentTextsShadowIsDrawn() {
+        // as CSS has it: the fill not there, its shadow is (setShadowLayer's took the fill's alpha: none)
+        val (b, texts) = drawn("<style select=\"key, key label, key mark\" color=\"#00000000\" text-shadow=\"2dp 2dp 2dp #ff0000ff\"/>")
+        val q = texts.first { it.text == "q" }
+        assertTrue(count(b, q, ::blue) > 40)
+        assertEquals(0, count(b, q, ::white))
+    }
+
+    private fun ops(ops: List<Op>): Bitmap = Bitmap.createBitmap(400, 200, Bitmap.Config.ARGB_8888).also { b ->
+        b.eraseColor(Color.BLACK)
+        ScenePainter(View(context), look, BoardImages.NONE, SceneFonts(look)).draw(Canvas(b), ops)
+    }
+
+    private fun Bitmap.pixels(): IntArray = IntArray(width * height).also { getPixels(it, 0, width, 0, 0, width, height) }
+
+    // a text outlined and blurred-shadowed, then one plain: the plain one as drawn alone (no mask, no
+    // shadow layer, no stroke kept from the one before)
+    @Test
+    fun nothingOfAnOpIsLeftForTheNext() {
+        val white = Argb(Color.WHITE)
+        val plain = Op.Text("W", 220.0, 120.0, "system", 400, 80.0, white)
+        val fancy = plain.copy(
+            "A", x = 20.0, stroke = TextStroke(6.0, Argb(Color.RED)), shadow = TextShadow(4.0, 4.0, 6.0, Argb(Color.BLUE)),
+        )
+        val both = ops(listOf(fancy, plain)).pixels()
+        val alone = ops(listOf(plain)).pixels()
+        val w = 400
+        for (y in 0 until 200) for (x in 200 until w) assertEquals("($x, $y)", alone[y * w + x], both[y * w + x])
+    }
+
+    // a text in two runs with a thick outline: the second's outline not over the first's fill, as Paint.content
+    // orders them (every outline, then every fill); one run after the other would cover it
+    @Test
+    fun runsOutlinedKeepEachFill() {
+        val m = AndroidTextMeasurer(SceneFonts(look))
+        val stroke = TextStroke(20.0, Argb(Color.RED))
+        val a = Op.Text("H", 20.0, 120.0, "system", 400, 80.0, Argb(Color.WHITE), stroke = stroke)
+        val b = a.copy(x = 20.0 + m.measure("H", "system", 400, 80.0).advance)
+        fun outline(t: Op.Text) = t.copy(color = Argb(0))
+        fun fill(t: Op.Text) = t.copy(stroke = null)
+        val twoPass = ops(listOf(outline(a), outline(b), fill(a), fill(b)))
+        val oneByOne = ops(listOf(outline(a), fill(a), outline(b), fill(b)))
+        save(twoPass, "runs-two-pass.png")
+        save(oneByOne, "runs-one-by-one.png")
+        val alone = ops(listOf(outline(a), fill(a))).pixels()
+        val wFill = ops(listOf(fill(b))).pixels()
+        val two = twoPass.pixels()
+        val one = oneByOne.pixels()
+        // the first H's fill (where the second's is not): all there two-pass, a part of it under the second's outline
+        // one run by one (an outline wider than an H's sides)
+        val aFill = alone.indices.filter { white(alone[it]) && !white(wFill[it]) }
+        assertTrue(aFill.size > 40)
+        assertEquals(aFill.size, aFill.count { white(two[it]) })
+        assertTrue("${aFill.count { white(one[it]) }} of ${aFill.size}", aFill.count { white(one[it]) } < aFill.size)
     }
 
     private companion object {
