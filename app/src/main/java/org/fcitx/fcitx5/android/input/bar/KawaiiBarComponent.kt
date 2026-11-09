@@ -69,6 +69,7 @@ import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
 import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
@@ -79,6 +80,7 @@ import org.fcitx.fcitx5.android.input.status.PanelActions
 import org.fcitx.fcitx5.android.input.status.StatusAreaWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
+import org.fcitx.fcitx5.android.scene.engine.section
 import org.fcitx.fcitx5.android.utils.AppUtil
 import org.mechdancer.dependency.DynamicScope
 import org.mechdancer.dependency.manager.must
@@ -513,7 +515,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         }
     }
 
-    override fun onScopeSetupFinished(scope: DynamicScope) {
+    override fun onScopeSetupFinished(scope: DynamicScope) = SceneTrace.section("bar setup") {
         showDictionaryUpgrade(idleUi)
         ClipboardManager.lastEntry?.let {
             val now = System.currentTimeMillis()

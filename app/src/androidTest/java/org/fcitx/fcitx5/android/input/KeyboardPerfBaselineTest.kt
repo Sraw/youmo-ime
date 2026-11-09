@@ -111,6 +111,7 @@ class KeyboardPerfBaselineTest {
             if ("build" in only) buildEachKeyboard()
             if ("press" in only) pressFeedback()
             if ("popup" in only) popupSlide()
+            if ("rebuild" in only) rebuilds()
             return
         }
         memory("no keyboard shown yet")

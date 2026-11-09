@@ -103,6 +103,7 @@ import org.fcitx.fcitx5.android.input.editing.KeyEventRelay
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import org.fcitx.fcitx5.android.input.hardware.TakenKey
 import org.fcitx.fcitx5.android.input.handwriting.ReadingToggle
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
 import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
 import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
 import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
@@ -111,6 +112,7 @@ import org.fcitx.fcitx5.android.input.shortcut.ClearedText
 import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.pack.PackStatus
 import org.fcitx.fcitx5.android.input.voice.VoiceCommit
+import org.fcitx.fcitx5.android.scene.engine.section
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.fcitx.fcitx5.android.utils.Locales
 import org.fcitx.fcitx5.android.utils.alpha
@@ -329,28 +331,30 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     // whether it was made with the voice pack: the space's hold to talk, its microphone badge, with it only
     private var voiceBuilt = false
 
-    private fun replaceInputView(theme: Theme, start: Boolean = false): InputView {
+    private fun replaceInputView(theme: Theme, start: Boolean = false): InputView = SceneTrace.section("replaceInputView") {
         compactBuilt = keyboardCompact()
         readingBuilt = EngineState.candidateReading.value
-        val newInputView = InputView(this, fcitx, theme)
+        val newInputView = SceneTrace.section("new InputView") { InputView(this, fcitx, theme) }
         // no text pack (or not one this app reads): the keyboard cannot type, and says so over all of it
         val text = PackStore.status(PackKind.TEXT)
         gateBuilt = text !is PackStatus.Ready
         voiceBuilt = PackStore.ready(PackKind.VOICE)
         if (gateBuilt) newInputView.overKeys(PackGateView(this, theme, text), underBar = false)
-        setInputView(newInputView)
-        inputDeviceMgr.setInputView(newInputView)
+        SceneTrace.section("setInputView") {
+            setInputView(newInputView)
+            inputDeviceMgr.setInputView(newInputView)
+        }
         inputView = newInputView
         // rebuilt in a field already started (floating toggled from the keyboard): its editor info,
         // as onStartInputView would give it. Not when onStartInputView follows (onCreateInputView, a
         // language picked anew): it starts the view itself, and twice would start input twice
         if (start && inputViewStarted && inputDeviceMgr.isVirtualKeyboard) {
-            currentInputEditorInfo?.let { newInputView.startInput(it, capabilityFlags) }
+            currentInputEditorInfo?.let { SceneTrace.section("startInput") { newInputView.startInput(it, capabilityFlags) } }
         }
-        return newInputView
+        newInputView
     }
 
-    private fun replaceCandidateView(theme: Theme): CandidatesView {
+    private fun replaceCandidateView(theme: Theme): CandidatesView = SceneTrace.section("replaceCandidateView") {
         val newCandidatesView = CandidatesView(this, fcitx, theme)
         // replace CandidatesView manually
         contentView.removeView(candidatesView)
@@ -358,7 +362,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         contentView.addView(newCandidatesView)
         inputDeviceMgr.setCandidatesView(newCandidatesView)
         candidatesView = newCandidatesView
-        return newCandidatesView
+        newCandidatesView
     }
 
     private fun replaceInputViews(theme: Theme, start: Boolean = false) {
@@ -373,7 +377,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * their code row and bar.
      */
     private fun rebuilding(why: ViewRebuild) {
-        if (why.endsComposition) endComposition()
+        if (why.endsComposition) SceneTrace.section("endComposition") { endComposition() }
     }
 
     /**

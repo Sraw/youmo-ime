@@ -75,6 +75,7 @@ import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SplitDock
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
 import org.fcitx.fcitx5.android.input.picker.PickerData
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.picker.emojiPicker
@@ -86,6 +87,7 @@ import org.fcitx.fcitx5.android.input.preedit.FloatingCodeStrip
 import org.fcitx.fcitx5.android.input.preedit.PreeditComponent
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
+import org.fcitx.fcitx5.android.scene.engine.section
 import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
 import org.fcitx.fcitx5.android.utils.unset
 import org.mechdancer.dependency.DynamicScope
@@ -332,7 +334,7 @@ class InputView(
     @Keep
     private val onKeyboardSizeChangeListener = ManagedPreferenceProvider.OnChangeListener { key ->
         if (keyboardSizePrefs.any { it.key == key }) {
-            updateKeyboardSize()
+            SceneTrace.section("keyboard resized") { updateKeyboardSize() }
             // 贴底 is applied with the insets
             if (key == keyboardBottomFlush.key) requestApplyInsets()
         }
@@ -375,7 +377,7 @@ class InputView(
         setupScope()
 
         // make sure KeyboardWindow's view has been created before it receives any broadcast
-        windowManager.addEssentialWindow(keyboardWindow, createView = true)
+        SceneTrace.section("keyboard window") { windowManager.addEssentialWindow(keyboardWindow, createView = true) }
         // the punctuation keys as the last run's host started with them, till this one says (its status, or the
         // replay below): none kept, they are held back (PunctuationComponent.known)
         punctuation.update(PunctuationStartKeys.known)
@@ -466,7 +468,7 @@ class InputView(
             })
         }
 
-        updateKeyboardSize()
+        SceneTrace.section("updateKeyboardSize") { updateKeyboardSize() }
         // the board at a side or across, as it changes, while the letters split: once laid out
         scope += DockFollower()
         keyboardWindow.onLayoutShown = { updateKeyboardSize() }
@@ -807,7 +809,7 @@ class InputView(
         if (!viewScope.isActive) Timber.e(IllegalStateException("InputView re-attached after detach"))
     }
 
-    override fun onDetachedFromWindow() {
+    override fun onDetachedFromWindow() = SceneTrace.section("InputView detached") {
         // the window's tree outlives this view, made anew in the same window
         viewTreeObserver.removeOnPreDrawListener(codeStripPlacer)
         floatingController.detached()
