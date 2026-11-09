@@ -411,9 +411,8 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private fun typingChanged() {
         val scenes = SceneTyping.scenes(typingIm, typingField)
-        if (scenes == SceneEnvs.typing) return
+        // the keyboards shown told (BaseKeyboard), this one as it is attached again too
         SceneEnvs.typing = scenes
-        currentKeyboard?.typingChanged()
     }
 
     override fun onImeUpdate(ime: InputMethodEntry) {

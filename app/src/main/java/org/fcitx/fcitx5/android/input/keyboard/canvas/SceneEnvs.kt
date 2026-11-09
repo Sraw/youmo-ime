@@ -29,9 +29,27 @@ object SceneEnvs {
     /**
      * What is typed now as a theme's scenes (`im=wubi`, `field=password`; SceneTyping): KeyboardWindow's
      * as the input method and the field change (main thread). Null before it tells: then, and outside
-     * the input method (a settings page), what each keyboard's Input says.
+     * the input method (a settings page), what each keyboard's Input says. Each keyboard shown is told
+     * ([watch]), the number row's and the expanded candidates' too, not only KeyboardWindow's.
      */
     var typing: Set<String>? = null
+        set(value) {
+            if (field == value) return
+            field = value
+            // a copy: one told may come or go
+            watching.toList().forEach { it() }
+        }
+
+    private val watching = LinkedHashSet<() -> Unit>()
+
+    /** [onTyping] called as [typing] changes, till [unwatch]: a keyboard's while it is shown (BaseKeyboard). */
+    fun watch(onTyping: () -> Unit) {
+        watching += onTyping
+    }
+
+    fun unwatch(onTyping: () -> Unit) {
+        watching -= onTyping
+    }
 
     /**
      * [view]'s keys at [width] × [height] px in [look] ([dark] its theme's): landscape as the screen is,
