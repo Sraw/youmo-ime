@@ -233,6 +233,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 要在这份用例下跑另一个检出构建的包（语音的设备用例要调试版的片段麦克风，R15 这类没有它的旧版跑不了），加 `UAT_APK_REPO=<那个检出的路径>`：装包时取它的 `app/build/outputs` 里最新的 APK，用例和脚本仍用这一份。
 测试页的本地网页服务按第一台设备取端口（5554 → 8800，5556 → 8801，……，5584 → 8815，每台各一个）；端口被占时运行器直接退出，
 停掉占用的服务或用 `UAT_HTTP_PORT=<端口>` 换一个。
+运行器要 Pillow（截图、拼图）：不往系统 python 装，建个 venv（`python3 -m venv <目录> && <目录>/bin/pip install Pillow`），用 `<目录>/bin/python uat/tools/uat.py …` 跑。
 
 ```sh
 BUILD_ABI=arm64-v8a ./gradlew :app:assembleDebug :app:packs   # 没有 debug 包或资源包时（运行器只要 arm64-v8a）
