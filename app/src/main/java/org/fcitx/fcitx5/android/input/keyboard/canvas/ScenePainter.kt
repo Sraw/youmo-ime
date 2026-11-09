@@ -249,8 +249,9 @@ class ScenePainter(
         @Suppress("DEPRECATION") // the matrix the canvas draws with so far: its scale is what the raster is made at
         canvas.getMatrix(scale)
         scale.getValues(scaleValues)
-        val pw = (w * abs(scaleValues[Matrix.MSCALE_X])).roundToInt()
-        val ph = (h * abs(scaleValues[Matrix.MSCALE_Y])).roundToInt()
+        // a scale not finite (a matrix gone NaN) taken as 1: roundToInt throws on NaN, and this is the draw
+        val pw = (w * scaleOf(scaleValues[Matrix.MSCALE_X])).roundToInt()
+        val ph = (h * scaleOf(scaleValues[Matrix.MSCALE_Y])).roundToInt()
         val d = icons.getOrPut(IconKey(op.name, op.tint.value, w, h, pw, ph)) {
             SceneIcons.of(op.name)?.let { ContextCompat.getDrawable(view.context, it)?.mutate() }?.also {
                 it.setTint(op.tint.value)
@@ -264,7 +265,10 @@ class ScenePainter(
         canvas.restore()
     }
 
-    private companion object {
+    internal companion object {
+        /** A canvas's scale as an icon's raster size reads it: its size, 1 when not finite. */
+        fun scaleOf(v: Float): Float = abs(v).takeIf { it.isFinite() } ?: 1f
+
         const val RADII = 8
         private const val KEPT_ICONS = 64
 
