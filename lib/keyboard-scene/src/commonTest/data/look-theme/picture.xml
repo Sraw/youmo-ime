@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<theme xmlns="https://youmo-ime/theme/4" name="picture" dark="false" version="4.0">
+<theme xmlns="https://youmo-ime/theme/4" name="picture" variants="light" version="4.0">
   <colors>
     <color name="background" value="#ffeceff1"/>
     <color name="bar" value="#ffe4e7e9"/>
@@ -26,7 +26,7 @@
     <color name="keyHint" value="#ff7a858a"/>
     <color name="toolbarIcon" value="#ff7a858a"/>
   </colors>
-  <picture src="src.jpg" brightness="70%" blur="0dp">
+  <picture src="src.jpg" brightness="70%" blur="0">
     <cut orientation="portrait" file="port.png"/>
     <cut orientation="landscape" file="land.png"/>
   </picture>
@@ -35,7 +35,7 @@
   <style select="bar" fill="picture(12dp, 60%)"/>
   <style select="panel" fill="transparent"/>
   <style select="@flat panel" fill="@bar"/>
-  <style select="key" fill="picture(10dp, 80%, @key)" radius="8dp" border="1dp @keyBorder" shadow="none" inset="7dp 3dp" color="@keyText" icon-color="@keyText" font="key" weight="700" scale="115%" press="tint"/>
+  <style select="key" fill="picture(10dp, 80%, @key)" radius="8dp" border="1dp @keyBorder" shadow="none" inset="7dp 3dp" color="@keyText" font="key" weight="700" scale="115%" icon-color="@keyText" press="tint"/>
   <style select="@landscape key" inset="4dp 3dp"/>
   <style select="key:pressed" overlay="@keyPressHighlight"/>
   <style select="key.function" fill="@altKey" color="@altKeyText" icon-color="@altKeyText"/>
@@ -49,12 +49,12 @@
   <style select="key.enter mark" color="@accentKeyText"/>
   <style select="key badge" icon-color="@altKeyText"/>
   <style select="*/reading:on" color="@accentKey" icon-color="@accentKey"/>
-  <style select="@flat key" fill="transparent" shadow="none" radius="0"/>
+  <style select="@flat key" fill="transparent" radius="0" shadow="none"/>
   <style select="@flat key.space" fill="@spaceBar" shape="bar" radius="3dp"/>
   <style select="@flat key.enter" fill="@accentKey" shape="circle"/>
-  <style select="preview, popup" fill="@popupBackground" color="@popupText" radius="8dp" shadow="0 2dp 2dp #33000000"/>
+  <style select="preview, popup" fill="@popupBackground" radius="8dp" shadow="0 2dp 2dp #33000000" color="@popupText"/>
   <style select="popup:selected" fill="@genericActiveBackground" color="@genericActiveForeground"/>
-  <style select="menu" fill="@accentKey" color="@accentKeyText" icon-color="@accentKeyText" radius="50%"/>
+  <style select="menu" fill="@accentKey" radius="50%" color="@accentKeyText" icon-color="@accentKeyText"/>
   <style select="menu:selected" overlay="@keyPressHighlight"/>
   <style select="@floating keyboard" radius="11dp"/>
   <style select="handle" fill="mix(@background, @keyText, 10%)"/>

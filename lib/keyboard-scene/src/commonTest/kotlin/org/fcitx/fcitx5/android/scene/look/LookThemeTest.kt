@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.testData
 import org.fcitx.fcitx5.android.scene.theme.Argb
+import org.fcitx.fcitx5.android.scene.theme.Selector
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import kotlin.test.Test
@@ -220,10 +221,11 @@ class LookThemeTest {
         // the others their kind's: the comma of the bottom row (its id "comma") too
         for (id in listOf("w", "comma", "period")) assertTrue(key(scene, id).ops(false).none { it is Op.NineSlice }, id)
         // number/* the pad's star, not every key of the pad; a role and a plain key as written
-        assertEquals("number/\\*", LookTheme.selector("number/*"))
-        assertEquals("*/space", LookTheme.selector("*/space"))
-        assertEquals("zhuyin/q", LookTheme.selector("zhuyin/q"))
-        assertEquals("zhuyin//", LookTheme.selector("zhuyin//"))
+        assertEquals(Selector(emptySet(), "key", board = "number", key = "*"), LookTheme.selector("number/*"))
+        assertEquals(Selector(emptySet(), "key", starRole = "space"), LookTheme.selector("*/space"))
+        assertEquals(Selector(emptySet(), "key", board = "zhuyin", key = "q"), LookTheme.selector("zhuyin/q"))
+        assertEquals(Selector(emptySet(), "key", board = "zhuyin", key = "/"), LookTheme.selector("zhuyin//"))
+        assertTrue("number/\\*" in LookTheme.xml(base.copy(keys = base.keys.copy(overrides = mapOf("number/*" to KeyOverride(null, null, KeyLabel.Hide)))), "T", false))
     }
 
     // 注音九键's 3.0 single keys by their place in its grid (zhuyin-nine/r1c1: a tone, r1c2 a group, r4c4 the

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<theme xmlns="https://youmo-ime/theme/4" name="legacy-flat" dark="false" version="4.0">
+<theme xmlns="https://youmo-ime/theme/4" name="legacy-flat" variants="light" version="4.0">
   <colors>
     <color name="background" value="#ffeceff1"/>
     <color name="bar" value="#ffe4e7e9"/>
@@ -31,8 +31,8 @@
   <style select="bar" fill="@bar"/>
   <style select="panel" fill="transparent"/>
   <style select="@flat panel" fill="@bar"/>
-  <style select="key" fill="@key" radius="0dp" border="1dp @keyBorder" shadow="none" inset="0dp 0dp" color="@keyText" icon-color="@keyText" font="system" weight="400" scale="100%" press="ripple"/>
-  <style select="@landscape key" inset="0dp 0dp"/>
+  <style select="key" fill="@key" radius="0" border="1dp @keyBorder" shadow="none" inset="0 0" color="@keyText" font="system" weight="400" scale="100%" icon-color="@keyText" press="ripple"/>
+  <style select="@landscape key" inset="0 0"/>
   <style select="key:pressed" overlay="@keyPressHighlight"/>
   <style select="key.function" fill="@altKey" color="@altKeyText" icon-color="@altKeyText"/>
   <style select="key.enter" fill="@accentKey" color="@accentKeyText" icon-color="@accentKeyText"/>
@@ -43,13 +43,13 @@
   <style select="key.enter mark" color="@accentKeyText"/>
   <style select="key badge" icon-color="@altKeyText"/>
   <style select="*/reading:on" color="@accentKey" icon-color="@accentKey"/>
-  <style select="@flat key" fill="transparent" shadow="none" radius="0"/>
+  <style select="@flat key" fill="transparent" radius="0" shadow="none"/>
   <style select="@flat key.space" fill="@spaceBar" shape="bar" radius="3dp"/>
   <style select="@flat key.enter" fill="@accentKey" shape="circle"/>
-  <style select="preview, popup" fill="@popupBackground" color="@popupText" radius="0dp" shadow="0 2dp 2dp #33000000"/>
+  <style select="preview, popup" fill="@popupBackground" radius="0" shadow="0 2dp 2dp #33000000" color="@popupText"/>
   <style select="popup:selected" fill="@genericActiveBackground" color="@genericActiveForeground"/>
-  <style select="menu" fill="@accentKey" color="@accentKeyText" icon-color="@accentKeyText" radius="50%"/>
+  <style select="menu" fill="@accentKey" radius="50%" color="@accentKeyText" icon-color="@accentKeyText"/>
   <style select="menu:selected" overlay="@keyPressHighlight"/>
-  <style select="@floating keyboard" radius="0dp"/>
+  <style select="@floating keyboard" radius="0"/>
   <style select="handle" fill="mix(@background, @keyText, 10%)"/>
 </theme>

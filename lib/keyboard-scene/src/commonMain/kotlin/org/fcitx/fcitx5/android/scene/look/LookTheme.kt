@@ -4,15 +4,29 @@
  */
 package org.fcitx.fcitx5.android.scene.look
 
+import org.fcitx.fcitx5.android.scene.rules.KeyNames
 import org.fcitx.fcitx5.android.scene.theme.Argb
+import org.fcitx.fcitx5.android.scene.theme.Border
+import org.fcitx.fcitx5.android.scene.theme.ColorExpr
+import org.fcitx.fcitx5.android.scene.theme.Fill
+import org.fcitx.fcitx5.android.scene.theme.Inset
+import org.fcitx.fcitx5.android.scene.theme.Picture
+import org.fcitx.fcitx5.android.scene.theme.Radius
+import org.fcitx.fcitx5.android.scene.theme.Selector
+import org.fcitx.fcitx5.android.scene.theme.Shadow
+import org.fcitx.fcitx5.android.scene.theme.Style
+import org.fcitx.fcitx5.android.scene.theme.Theme
+import org.fcitx.fcitx5.android.scene.theme.ThemeReader
+import org.fcitx.fcitx5.android.scene.theme.ThemeWriter
+import org.fcitx.fcitx5.android.scene.theme.Value
 
 /**
- * A theme 3.0 look as a theme 4.0 file (theme-4.xsd) for the scene engine, written as the built-in
- * themes' are (keyboard-scene's material-light.xml: LookDefaults as styles): the palette as its
- * colours, the shape, gaps and press as `key` styles, each kind's fill and pressed face as its
- * class's, single keys' overrides by their names, which theme 4 selects by the same `board/key` and
- * `*`/role. Files are named by their names alone (4.0 takes no path): [fileNames] is what the app
- * looks a file up by.
+ * A theme 3.0 look as a theme 4.0 ([theme]; its file, [xml], as [ThemeWriter] writes it) for the scene
+ * engine, made as the built-in themes' are (keyboard-scene's material-light.xml: LookDefaults as
+ * styles): the palette as its colours, the shape, gaps and press as `key` styles, each kind's fill and
+ * pressed face as its class's, single keys' overrides by their names, which theme 4 selects by the
+ * same `board/key` and `*`/role. Files are named by their names alone (4.0 takes no path):
+ * [fileNames] is what the app looks a file up by.
  */
 object LookTheme {
 
@@ -64,174 +78,177 @@ object LookTheme {
     /** The font's name in the file written, for the look's key font (theme 4 names a `<font>`). */
     const val KEY_FONT = "key"
 
-    fun xml(look: ThemeLook, name: String, dark: Boolean): String = buildString {
+    /** The look as a 4.0 theme's text: [theme], as [ThemeWriter] writes every theme. */
+    fun xml(look: ThemeLook, name: String, dark: Boolean): String = ThemeWriter.write(theme(look, name, dark))
+
+    /** The look as a 4.0 theme: what [ThemeReader] reads [xml]'s text as (its styles at no line). */
+    fun theme(look: ThemeLook, name: String, dark: Boolean): Theme {
         val keys = look.keys
         val names = fileNames(look)
         fun fileName(path: String) = names.getOrElse(path) { LookTheme.fileName(path) }
-        appendLine("""<?xml version="1.0" encoding="UTF-8"?>""")
-        appendLine("""<theme xmlns="https://youmo-ime/theme/4" name="${escape(name)}" dark="$dark" version="4.0">""")
-        appendLine("  <colors>")
-        colors(look.palette).forEach { (n, c) -> appendLine("""    <color name="$n" value="${Argb(c)}"/>""") }
-        appendLine("  </colors>")
-        look.picture?.let { p ->
-            appendLine("""  <picture src="${escape(fileName(p.src))}" brightness="${p.brightness}%" blur="${p.blurDp}dp">""")
-            appendLine("""    <cut orientation="portrait" file="${escape(fileName(p.portrait.file))}"/>""")
-            p.landscape?.let { appendLine("""    <cut orientation="landscape" file="${escape(fileName(it.file))}"/>""") }
-            appendLine("  </picture>")
-        }
-        look.text.keyFont?.let { appendLine("""  <font name="$KEY_FONT" src="${escape(fileName(it))}"/>""") }
+        val s = Styles(names)
         // the board: the picture under it, or ThemeColors.board's colour (block: background, flat: keyboard)
         if (look.picture != null && look.base == BoardBase.Picture) {
-            style("keyboard", "fill" to "picture")
+            s.add(of("keyboard"), "fill" to Value.OfFill(Fill.Picture(null, null)))
         } else {
-            style("keyboard", "fill" to "@background")
-            style("@flat keyboard", "fill" to "@keyboard")
+            s.add(of("keyboard"), "fill" to solid(ref("background")))
+            s.add(of("keyboard", FLAT), "fill" to solid(ref("keyboard")))
         }
-        style(
-            "bar",
-            "fill" to when (val bar = look.bar) {
-                BarBase.Transparent -> "transparent"
-                BarBase.Color -> "@bar"
-                is BarBase.Picture -> picture(bar.blurDp, bar.brightness)
-            },
-        )
-        style("panel", "fill" to "transparent")
-        style("@flat panel", "fill" to "@bar")
+        val bar = when (val b = look.bar) {
+            BarBase.Transparent -> TRANSPARENT
+            BarBase.Color -> solid(ref("bar"))
+            is BarBase.Picture -> Value.OfFill(Fill.Picture(b.blurDp.toDouble(), b.brightness.toDouble()))
+        }
+        s.add(of("bar"), "fill" to bar)
+        s.add(of("panel"), "fill" to TRANSPARENT)
+        s.add(of("panel", FLAT), "fill" to solid(ref("bar")))
         val text = look.text
-        style(
-            "key",
-            "fill" to fill(names, keys.letter.fill, "@key"),
-            "radius" to "${keys.radiusDp}dp",
-            "border" to if (keys.borderDp > 0) "${keys.borderDp}dp @keyBorder" else "none",
-            "shadow" to if (keys.shadowDp > 0) "0 ${keys.shadowDp}dp 0 @keyShadow" else "none",
-            "inset" to "${keys.gap.v}dp ${keys.gap.h}dp",
-            "color" to "@keyText",
-            "icon-color" to "@keyText",
-            "font" to if (text.keyFont != null) KEY_FONT else "system",
-            "weight" to "${text.keyWeight}",
-            "scale" to "${text.keyScale}%",
-            "press" to if (keys.press == PressEffect.Ripple) "ripple" else "tint",
+        val key = of("key")
+        s.add(
+            key,
+            "fill" to s.face(keys.letter.fill, KEY),
+            "radius" to radius(keys.radiusDp),
+            "border" to Value.OfBorder(if (keys.borderDp > 0) Border(keys.borderDp.toDouble(), ref("keyBorder")) else Border.NONE),
+            "shadow" to Value.OfShadow(if (keys.shadowDp > 0) Shadow(0.0, keys.shadowDp.toDouble(), 0.0, ref("keyShadow")) else Shadow.NONE),
+            "inset" to inset(keys.gap.v, keys.gap.h),
+            "color" to color("keyText"),
+            "icon-color" to color("keyText"),
+            "font" to Value.Word(if (text.keyFont != null) KEY_FONT else "system"),
+            "weight" to Value.Number(text.keyWeight.toDouble()),
+            "scale" to Value.Number(text.keyScale.toDouble()),
+            "press" to press(keys),
         )
-        style("@landscape key", "inset" to "${keys.gap.vLand}dp ${keys.gap.hLand}dp")
-        style("key:pressed", "overlay" to "@keyPressHighlight")
-        style("key.function", "fill" to fill(names, keys.function.fill, "@altKey"), "color" to "@altKeyText", "icon-color" to "@altKeyText")
-        style("key.enter", "fill" to fill(names, keys.enter.fill, "@accentKey"), "color" to "@accentKeyText", "icon-color" to "@accentKeyText")
-        style("key.space", "fill" to fill(names, keys.space.fill, "@key"))
-        listOf(Triple("letter", keys.letter, "@key"), Triple("function", keys.function, "@altKey"), Triple("enter", keys.enter, "@accentKey"), Triple("space", keys.space, "@key"))
-            .forEach { (kind, k, color) -> pressed(names, "key.$kind:pressed", k.pressed, color) }
+        s.add(key.with(LANDSCAPE), "inset" to inset(keys.gap.vLand, keys.gap.hLand))
+        s.add(key.with(state = PRESSED), "overlay" to color("keyPressHighlight"))
+        s.add(key.with(kind = "function"), "fill" to s.face(keys.function.fill, ALT_KEY), "color" to color("altKeyText"), "icon-color" to color("altKeyText"))
+        s.add(key.with(kind = "enter"), "fill" to s.face(keys.enter.fill, ACCENT_KEY), "color" to color("accentKeyText"), "icon-color" to color("accentKeyText"))
+        s.add(key.with(kind = "space"), "fill" to s.face(keys.space.fill, KEY))
+        listOf(Triple("letter", keys.letter, KEY), Triple("function", keys.function, ALT_KEY), Triple("enter", keys.enter, ACCENT_KEY), Triple("space", keys.space, KEY))
+            .forEach { (kind, k, color) -> s.pressed(listOf(key.with(kind = kind, state = PRESSED)), k.pressed, color) }
         // a flat space's colour is the space bar's (ThemeColors.face), its pressed image's too
-        pressed(names, "@flat key.space:pressed", keys.space.pressed, "@spaceBar")
-        style("key.alt-text", "color" to "@altKeyText", "icon-color" to "@altKeyText")
-        style("key mark, key shortcut", "color" to "@keyHint", "icon-color" to "@keyHint")
+        s.pressed(listOf(key.with(FLAT, "space", PRESSED)), keys.space.pressed, SPACE_BAR)
+        s.add(key.with(kind = "alt-text"), "color" to color("altKeyText"), "icon-color" to color("altKeyText"))
+        s.add(listOf(key.with(part = "mark"), key.with(part = "shortcut")), "color" to color("keyHint"), "icon-color" to color("keyHint"))
         // a shortcut's text is not of the theme's size (rules B §6: keyScale leaves it be)
-        style("key shortcut", "scale" to "100%")
-        style("key.enter mark", "color" to "@accentKeyText")
-        style("key badge", "icon-color" to "@altKeyText")
-        style("*/reading:on", "color" to "@accentKey", "icon-color" to "@accentKey")
-        style("@flat key", "fill" to "transparent", "shadow" to "none", "radius" to "0")
-        style("@flat key.space", "fill" to "@spaceBar", "shape" to "bar", "radius" to "3dp")
-        style("@flat key.enter", "fill" to "@accentKey", "shape" to "circle")
+        s.add(key.with(part = "shortcut"), "scale" to Value.Number(FULL))
+        s.add(key.with(kind = "enter", part = "mark"), "color" to color("accentKeyText"))
+        s.add(key.with(part = "badge"), "icon-color" to color("altKeyText"))
+        s.add(selector("*/reading").with(state = "on"), "color" to color("accentKey"), "icon-color" to color("accentKey"))
+        s.add(key.with(FLAT), "fill" to TRANSPARENT, "shadow" to Value.OfShadow(Shadow.NONE), "radius" to radius(0))
+        s.add(key.with(FLAT, "space"), "fill" to solid(SPACE_BAR), "shape" to Value.Word("bar"), "radius" to radius(FLAT_SPACE_RADIUS_DP))
+        s.add(key.with(FLAT, "enter"), "fill" to solid(ACCENT_KEY), "shape" to Value.Word("circle"))
         // single keys over their kinds, later so they win the tie
-        overrides(names, keys, keys.overrides.entries.sortedBy { it.key }.associate { selector(it.key) to it.value })
-        style("preview, popup", "fill" to "@popupBackground", "color" to "@popupText", "radius" to "${keys.radiusDp}dp", "shadow" to "0 2dp 2dp #33000000")
-        style("popup:selected", "fill" to "@genericActiveBackground", "color" to "@genericActiveForeground")
-        style("menu", "fill" to "@accentKey", "color" to "@accentKeyText", "icon-color" to "@accentKeyText", "radius" to "50%")
+        s.overrides(keys, keys.overrides.entries.sortedBy { it.key }.associate { selector(it.key) to it.value })
+        val popupShadow = Shadow(0.0, POPUP_SHADOW_DP, POPUP_SHADOW_DP, ColorExpr.Literal(Argb(POPUP_SHADOW)))
+        s.add(listOf(of("preview"), of("popup")), "fill" to solid(ref("popupBackground")), "color" to color("popupText"), "radius" to radius(keys.radiusDp), "shadow" to Value.OfShadow(popupShadow))
+        s.add(of("popup", state = "selected"), "fill" to solid(ref("genericActiveBackground")), "color" to color("genericActiveForeground"))
+        s.add(of("menu"), "fill" to solid(ACCENT_KEY), "color" to color("accentKeyText"), "icon-color" to color("accentKeyText"), "radius" to Value.OfRadius(Radius(List(CORNERS) { 0.0 }, half = true)))
         // theme 3.0's cell in focus: the key's pressed colour over its own
-        style("menu:selected", "overlay" to "@keyPressHighlight")
-        style("@floating keyboard", "radius" to "${keys.radiusDp + minOf(keys.gap.h, keys.gap.v)}dp")
-        style("handle", "fill" to "mix(@background, @keyText, 10%)")
-        appendLine("</theme>")
+        s.add(of("menu", state = "selected"), "overlay" to color("keyPressHighlight"))
+        s.add(of("keyboard", FLOATING), "radius" to radius(keys.radiusDp + minOf(keys.gap.h, keys.gap.v)))
+        s.add(of("handle"), "fill" to solid(ColorExpr.Fn("mix", listOf(ref("background"), ref("keyText")), HANDLE_MIX)))
+        val picture = look.picture?.let { p ->
+            val cuts = listOfNotNull("portrait" to fileName(p.portrait.file), p.landscape?.let { "landscape" to fileName(it.file) }).toMap()
+            Picture(fileName(p.src), p.brightness.toDouble(), p.blurDp.toDouble(), cuts)
+        }
+        val fonts = look.text.keyFont?.let { mapOf(KEY_FONT to fileName(it)) } ?: emptyMap()
+        val colors = colors(look.palette).associate { (n, c) -> n to Argb(c) }
+        // one version, light or dark; the dark one's colours its dark version's too, as a file of it reads
+        return Theme(name, dark, VERSION, colors, s.styles, fonts, emptyMap(), picture, darkColors = colors.takeIf { dark })
     }
 
     // Single keys' faces, each over its kind's colour as ThemeColors.face gives it (under a picture, while an
     // image loads or cannot be read, and as fill=Color's face): a key and its kind together outrank the key
-    // alone, so a kind whose colour is not the letters' has its own line. Flat, a letter or function key has
+    // alone, so a kind whose colour is not the letters' has its own style. Flat, a letter or function key has
     // no face at all, its own or pressed (3.0's face=null), the space and Return theirs. Keys of one face
-    // share its lines (a list of selectors), and the lines go in this order for the ties: a key's, its
+    // share its styles (a list of selectors), and the styles go in this order for the ties: a key's, its
     // function kind's, flat none, then Return's and the flat space's.
-    private fun StringBuilder.overrides(names: Map<String, String>, keys: Keys, overrides: Map<String, KeyOverride>) {
+    private fun Styles.overrides(keys: Keys, overrides: Map<Selector, KeyOverride>) {
         val ripple = keys.press == PressEffect.Ripple
         val fills = overrides.entries.mapNotNull { (k, o) -> o.fill?.let { k to it } }.groupBy({ it.second }, { it.first })
         val pressed = overrides.entries.mapNotNull { (k, o) -> o.pressed?.takeIf { it != KeyPressed.Darken }?.let { k to it } }
             .groupBy({ it.second }, { it.first })
         // Darken, a key's own: its face tinted as it is, not its kind's pressed one (3.0's own won); by its own fill
         val darkened = overrides.entries.filter { it.value.pressed == KeyPressed.Darken }.groupBy({ it.value.fill }, { it.key })
-        fun List<String>.of(suffix: String, scene: String = "") = joinToString(", ") { "$scene$it$suffix" }
+        fun List<Selector>.of(scene: String? = null, kind: String? = null, state: String? = null, part: String? = null) =
+            map { it.with(scene, kind, state, part) }
         fills.forEach { (f, ks) ->
-            style(ks.of(""), "fill" to fill(names, f, "@key"))
-            style(ks.of(".function"), "fill" to fill(names, f, "@altKey"))
+            add(ks, "fill" to face(f, KEY))
+            add(ks.of(kind = "function"), "fill" to face(f, ALT_KEY))
         }
         pressed.forEach { (p, ks) ->
-            pressed(names, ks.of(":pressed"), p, "@key")
-            if (p is KeyPressed.Image) pressed(names, ks.of(".function:pressed"), p, "@altKey")
+            pressed(ks.of(state = PRESSED), p, KEY)
+            if (p is KeyPressed.Image) pressed(ks.of(kind = "function", state = PRESSED), p, ALT_KEY)
         }
-        darkened(names, keys, darkened, beforeFlat = true)
-        fills.values.flatten().takeIf { it.isNotEmpty() }?.let { style(it.of("", "@flat "), "fill" to "transparent") }
+        darkened(keys, darkened, beforeFlat = true)
+        fills.values.flatten().takeIf { it.isNotEmpty() }?.let { add(it.of(FLAT), "fill" to TRANSPARENT) }
         // flat, nothing pressed either: no face, and no tint where 3.0 drew none over a pressed face of its own
         pressed.values.flatten().takeIf { it.isNotEmpty() }
-            ?.let { style(it.of(":pressed", "@flat "), "fill" to "transparent", "press" to if (ripple) "ripple" else "face") }
-        darkened.values.flatten().takeIf { it.isNotEmpty() }?.let { style(it.of(":pressed", "@flat "), "fill" to "transparent") }
+            ?.let { add(it.of(FLAT, state = PRESSED), "fill" to TRANSPARENT, "press" to Value.Word(if (ripple) "ripple" else "face")) }
+        darkened.values.flatten().takeIf { it.isNotEmpty() }?.let { add(it.of(FLAT, state = PRESSED), "fill" to TRANSPARENT) }
         fills.forEach { (f, ks) ->
-            style(ks.of(".enter"), "fill" to fill(names, f, "@accentKey"))
-            style(ks.of(".space", "@flat "), "fill" to fill(names, f, "@spaceBar"))
+            add(ks.of(kind = "enter"), "fill" to face(f, ACCENT_KEY))
+            add(ks.of(FLAT, "space"), "fill" to face(f, SPACE_BAR))
         }
         pressed.forEach { (p, ks) ->
             when (p) {
                 is KeyPressed.Image -> {
-                    pressed(names, ks.of(".enter:pressed"), p, "@accentKey")
-                    pressed(names, ks.of(".space:pressed", "@flat "), p, "@spaceBar")
+                    pressed(ks.of(kind = "enter", state = PRESSED), p, ACCENT_KEY)
+                    pressed(ks.of(FLAT, "space", PRESSED), p, SPACE_BAR)
                 }
-                else -> pressed(names, ks.of(".enter:pressed") + ", " + ks.of(".space:pressed", "@flat "), p)
+                else -> pressed(ks.of(kind = "enter", state = PRESSED) + ks.of(FLAT, "space", PRESSED), p, null)
             }
         }
-        darkened(names, keys, darkened, beforeFlat = false)
-        overrides.filterValues { it.label == KeyLabel.Hide }.keys.toList().takeIf { it.isNotEmpty() }?.let { style(it.of(" label"), "hidden" to "true") }
+        darkened(keys, darkened, beforeFlat = false)
+        overrides.filterValues { it.label == KeyLabel.Hide }.keys.toList().takeIf { it.isNotEmpty() }
+            ?.let { add(it.of(part = "label"), "hidden" to Value.Flag(true)) }
     }
 
-    // [overrides]' Darken lines, before the flat ones (a key's, its function kind's, the space's) or after (Return's, the flat space's)
-    private fun StringBuilder.darkened(names: Map<String, String>, keys: Keys, darkened: Map<KeyFill?, List<String>>, beforeFlat: Boolean) {
+    // [overrides]' Darken styles, before the flat ones (a key's, its function kind's, the space's) or after (Return's, the flat space's)
+    private fun Styles.darkened(keys: Keys, darkened: Map<KeyFill?, List<Selector>>, beforeFlat: Boolean) {
         darkened.forEach { (f, ks) ->
-            fun of(suffix: String, scene: String = "") = ks.joinToString(", ") { "$scene$it$suffix" }
+            fun of(scene: String? = null, kind: String? = null) = ks.map { it.with(scene, kind, PRESSED) }
             if (beforeFlat) {
-                style(of(":pressed"), "fill" to fill(names, f ?: keys.letter.fill, "@key"), "press" to if (keys.press == PressEffect.Ripple) "ripple" else "tint")
-                style(of(".function:pressed"), "fill" to fill(names, f ?: keys.function.fill, "@altKey"))
-                style(of(".space:pressed"), "fill" to fill(names, f ?: keys.space.fill, "@key"))
+                add(of(), "fill" to face(f ?: keys.letter.fill, KEY), "press" to press(keys))
+                add(of(kind = "function"), "fill" to face(f ?: keys.function.fill, ALT_KEY))
+                add(of(kind = "space"), "fill" to face(f ?: keys.space.fill, KEY))
             } else {
-                style(of(".enter:pressed"), "fill" to fill(names, f ?: keys.enter.fill, "@accentKey"))
-                style(of(".space:pressed", "@flat "), "fill" to (f?.let { fill(names, it, "@spaceBar") } ?: "@spaceBar"))
+                add(of(kind = "enter"), "fill" to face(f ?: keys.enter.fill, ACCENT_KEY))
+                add(of(FLAT, "space"), "fill" to (f?.let { face(it, SPACE_BAR) } ?: solid(SPACE_BAR)))
             }
         }
     }
 
-    /** The kinds' fills as the look has them: what the kind's own [KindStyle] says. */
-    private fun fill(names: Map<String, String>, f: KeyFill, color: String): String = when (f) {
-        KeyFill.Color -> color
-        is KeyFill.Image -> image(names, f.slice, color)
-        // theme 3.0 laid the kind's colour over the picture (its face's colour, translucent or not)
-        is KeyFill.Picture -> picture(f.blurDp, f.brightness, color)
-    }
+    // the styles of the theme made, in order; the look's files by the names it gives them
+    private class Styles(private val names: Map<String, String>) {
+        val styles = ArrayList<Style>()
 
-    // a pressed face of its own is not tinted too (rules B §3): press="face"
-    private fun StringBuilder.pressed(names: Map<String, String>, select: String, p: KeyPressed, color: String = "") {
-        when (p) {
-            KeyPressed.Darken -> Unit
-            is KeyPressed.Color -> style(select, "fill" to Argb(p.argb).toString(), "press" to "face")
-            is KeyPressed.Image -> style(select, "fill" to image(names, p.slice, color), "press" to "face")
+        fun add(selectors: List<Selector>, vararg values: Pair<String, Value>) {
+            styles += Style(selectors, values.toMap(), styles.size, 0)
         }
-    }
 
-    // [fallback]: the kind's colour, which theme 3.0 showed where the image was not (yet) there
-    private fun image(names: Map<String, String>, s: NineSlice, fallback: String = "") =
-        "image(${names[s.file] ?: fileName(s.file)}, ${s.insets.left} ${s.insets.top} ${s.insets.right} ${s.insets.bottom}, ${s.pxPerDp}x" +
-            (if (fallback.isEmpty()) ")" else ", $fallback)")
+        fun add(selector: Selector, vararg values: Pair<String, Value>) = add(listOf(selector), *values)
 
-    private fun picture(blurDp: Int, brightness: Int, over: String = "") =
-        "picture(${blurDp}dp, $brightness%${if (over.isEmpty()) "" else ", $over"})"
+        /** A kind's or key's fill as the look has it, over [color], the kind's colour. */
+        fun face(f: KeyFill, color: ColorExpr): Value = when (f) {
+            KeyFill.Color -> solid(color)
+            is KeyFill.Image -> Value.OfFill(image(f.slice, color))
+            // theme 3.0 laid the kind's colour over the picture (its face's colour, translucent or not)
+            is KeyFill.Picture -> Value.OfFill(Fill.Picture(f.blurDp.toDouble(), f.brightness.toDouble(), color))
+        }
 
-    private fun StringBuilder.style(select: String, vararg props: Pair<String, String>) {
-        append("""  <style select="${escape(select)}"""")
-        props.forEach { (k, v) -> append(""" $k="${escape(v)}"""") }
-        appendLine("/>")
+        // a pressed face of its own is not tinted too (rules B §3): press="face"
+        fun pressed(selectors: List<Selector>, p: KeyPressed, color: ColorExpr?) {
+            when (p) {
+                KeyPressed.Darken -> Unit
+                is KeyPressed.Color -> add(selectors, "fill" to solid(ColorExpr.Literal(Argb(p.argb))), "press" to Value.Word("face"))
+                is KeyPressed.Image -> add(selectors, "fill" to Value.OfFill(image(p.slice, color)), "press" to Value.Word("face"))
+            }
+        }
+
+        // [fallback]: the kind's colour, which theme 3.0 showed where the image was not (yet) there
+        private fun image(s: NineSlice, fallback: ColorExpr?) =
+            Fill.Image(names[s.file] ?: fileName(s.file), listOf(s.insets.left, s.insets.top, s.insets.right, s.insets.bottom), s.pxPerDp, fallback)
     }
 
     /**
@@ -241,18 +258,53 @@ object LookTheme {
      */
     const val MAX_STYLES = 100 + 10 * Keys.MAX_OVERRIDES
 
-    // a 3.0 key name as a selector: what a selector reads otherwise in the key's name escaped, so that
-    // 大千's zhuyin/, is its comma key, not a list of two, and number/* the star key, not every key
-    // (theme-4 §selectors); a role's name (*/space) has none of them
-    internal fun selector(name: String): String {
-        val slash = name.indexOf('/')
-        if (slash < 0) return name
-        val key = name.substring(slash + 1).map { c -> if (c in SELECTOR_CHARS) "\\$c" else "$c" }.joinToString("")
-        return name.substring(0, slash + 1) + key
+    /**
+     * A 3.0 key's name (`board/key`, `*`/role) as the selector of that key: `*`/role every board's key of
+     * the role, any other the board's key of that id, whatever characters it has (大千's `zhuyin/,` is
+     * its comma key, the number pad's star its star key, not every key: ThemeWriter escapes them).
+     */
+    internal fun selector(name: String): Selector = KeyNames.split(name).let { (board, key) ->
+        if (board == KeyNames.ALL) Selector(emptySet(), "key", starRole = key) else Selector(emptySet(), "key", board = board, key = key)
     }
 
-    // the space is escaped only to be safe: KeyNames.split takes no whitespace in a key's name, so none reaches here
-    private const val SELECTOR_CHARS = ",.:[* \\"
+    // a widget's selector: in [scene], of [kind], in [state], its [part]
+    private fun of(widget: String, scene: String? = null, kind: String? = null, state: String? = null, part: String? = null) =
+        Selector(setOfNotNull(scene), widget, classes = setOfNotNull(kind), states = setOfNotNull(state), part = part)
 
-    private fun escape(s: String) = s.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+    private fun Selector.with(scene: String? = null, kind: String? = null, state: String? = null, part: String? = null) = copy(
+        scenes = scenes + setOfNotNull(scene),
+        classes = classes + setOfNotNull(kind),
+        states = states + setOfNotNull(state),
+        part = part ?: this.part,
+    )
+
+    private fun ref(name: String): ColorExpr = ColorExpr.Ref(name)
+
+    private fun solid(c: ColorExpr): Value = Value.OfFill(Fill.Solid(c))
+
+    private fun color(name: String): Value = Value.OfColor(ref(name))
+
+    private fun radius(dp: Int): Value = Value.OfRadius(Radius(List(CORNERS) { dp.toDouble() }))
+
+    // vertical, horizontal
+    private fun inset(v: Int, h: Int): Value = Value.OfInset(Inset(v.toDouble(), h.toDouble(), v.toDouble(), h.toDouble()))
+
+    private fun press(keys: Keys): Value = Value.Word(if (keys.press == PressEffect.Ripple) "ripple" else "tint")
+
+    private val KEY = ref("key")
+    private val ALT_KEY = ref("altKey")
+    private val ACCENT_KEY = ref("accentKey")
+    private val SPACE_BAR = ref("spaceBar")
+    private val TRANSPARENT = solid(ColorExpr.Literal(Argb.TRANSPARENT))
+    private const val FLAT = "flat"
+    private const val LANDSCAPE = "landscape"
+    private const val FLOATING = "floating"
+    private const val PRESSED = "pressed"
+    private const val VERSION = "4.0"
+    private const val CORNERS = 4
+    private const val FULL = 100.0
+    private const val FLAT_SPACE_RADIUS_DP = 3
+    private const val POPUP_SHADOW_DP = 2.0
+    private const val POPUP_SHADOW = 0x33000000
+    private const val HANDLE_MIX = 10.0
 }

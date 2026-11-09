@@ -4,7 +4,10 @@
  */
 package org.fcitx.fcitx5.android.scene.look
 
+import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.TEST_DATA
+import org.fcitx.fcitx5.android.scene.assertSameTheme
+import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.scene.look.LookThemeTest.Companion.palette
 import org.fcitx.fcitx5.android.scene.look.LookThemeTest.Companion.themeFile
 import org.fcitx.fcitx5.android.scene.readText
@@ -34,6 +37,16 @@ class LookThemeTextTest {
             }
         }
         assertTrue(failed.isEmpty(), failed.joinToString("\n"))
+    }
+
+    // the theme made is the file's, read: what the app draws (it reads the text) is what LookTheme made
+    @Test
+    fun theThemeIsTheFileRead() {
+        for ((name, look) in LOOKS) {
+            val file = readText("$TEST_DATA/look-theme/$name.xml") ?: error("no file of $name")
+            val read = ThemeReader.theme(file, maxStyles = LookTheme.MAX_STYLES).ok()
+            assertSameTheme(read, LookTheme.theme(look, name, name.endsWith("dark")), name)
+        }
     }
 
     companion object {
