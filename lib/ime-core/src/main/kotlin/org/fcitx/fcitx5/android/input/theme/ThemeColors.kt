@@ -39,9 +39,4 @@ object ThemeColors {
 
     /** The black laid over the picture at [brightness] percent, its alpha 0..255. */
     fun dim(brightness: Int): Int = (100 - brightness) * 255 / 100
-
-    /** The clipboard entries' corners and the editing buttons', dp: as their own settings had them, half and twice the keys'. */
-    fun entryRadius(keys: Keys): Float = keys.radiusDp / 2f
-
-    fun buttonRadius(keys: Keys): Float = keys.radiusDp * 2f
 }

@@ -117,7 +117,8 @@ class BarUatTest {
         }
         if (!has(R.string.hide_toolbar)) tap(described(service.getString(R.string.expand_toolbar)))
         tap(described(service.getString(R.string.status_area)))
-        until("the panel") { has(R.string.open_input_method_settings) }
+        // 输入法设置 is there at once; the entries (主题 and the host's toggles) come together later, with the host's status
+        until("the panel") { has(R.string.open_input_method_settings) && service.getString(R.string.theme) in texts(inputView) }
         return texts(inputView)
     }
 

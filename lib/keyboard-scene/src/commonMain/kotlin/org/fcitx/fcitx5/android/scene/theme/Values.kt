@@ -120,6 +120,8 @@ object Values {
         "align", "letter-spacing", "stroke", "text-shadow", "font-han", "font-latin", "space-content",
         // T4b: a key's shape and cap, the bubble's shape, size and place
         "inner-shadow", "depth", "depth-color", "tail", "offset",
+        // T7b: the voice mask's frosted glass (engine/PanelLooks), the handwriting pad's ink and grid
+        "blur", "ink-color", "ink-width", "grid-color", "grid",
     ) + RETURN_ACTIONS.map { "$RETURN_ICON$it" }
 
     private const val LEN = "(-?[0-9]+(\\.[0-9]+)?dp|0)"
@@ -170,12 +172,6 @@ object Values {
         "label-style" to form("none|number|dot"),
         "underline" to lengthsThenColor(1, none = true),
         "cursor-color" to COLOR,
-        // T7b: the panels, the handwriting pad
-        "blur" to form(LEN),
-        "ink-color" to COLOR,
-        "ink-width" to form(LEN),
-        "grid-color" to COLOR,
-        "grid" to form("true|false"),
         // A1–A3: motion
         "transition" to form("$MS (linear|ease|ease-in|ease-out|ease-in-out)"),
         "press-scale" to form(PERCENT_FORM),
@@ -242,7 +238,23 @@ object Values {
         "size" -> size(raw)
         "hidden" -> flag(raw)
         "press" -> raw.takeIf { it in listOf("tint", "ripple", "face") }?.let(Value::Word)
-        else -> textOnAKey(property, raw) ?: capAndBubble(property, raw)
+        else -> textOnAKey(property, raw) ?: capAndBubble(property, raw) ?: panel(property, raw)
+    }
+
+    /** The voice mask's frosted glass at most (`blur`), dp: as the keyboard's picture's. */
+    const val MAX_PANEL_BLUR_DP = 25.0
+
+    /** The handwriting pad's ink (`ink-width`), dp. */
+    const val MIN_INK_DP = 1.0
+    const val MAX_INK_DP = 8.0
+
+    // T7b's: the voice mask's blur, the handwriting pad's ink and grid
+    private fun panel(property: String, raw: String): Value? = when (property) {
+        "blur" -> dp(raw, MAX_PANEL_BLUR_DP)?.let(Value::Number)
+        "ink-width" -> dp(raw, MAX_INK_DP)?.takeIf { it >= MIN_INK_DP }?.let(Value::Number)
+        "ink-color", "grid-color" -> ColorExpr.parse(raw)?.let(Value::OfColor)
+        "grid" -> flag(raw)
+        else -> null
     }
 
     // a text's size in sp, or the bubble's in % (T4b)

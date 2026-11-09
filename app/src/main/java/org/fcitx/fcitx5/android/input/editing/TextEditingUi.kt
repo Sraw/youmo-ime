@@ -34,16 +34,18 @@ class TextEditingUi(
     private val theme: Theme,
     private val ripple: Boolean,
     private val border: Boolean,
-    private val radius: Float
+    private val radius: Float,
+    // the theme's `editing { fill }` (060-render-p3 T7b): every button's, drawn as a block; null, the keys' colours
+    private val fill: Int? = null,
 ) : Ui {
 
     private fun textButton(@StringRes id: Int, altStyle: Boolean = false) =
-        TextEditingButton(ctx, theme, ripple, border, radius, altStyle).apply {
+        TextEditingButton(ctx, theme, ripple, border, radius, altStyle, fill).apply {
             setText(id)
         }
 
     private fun iconButton(@DrawableRes icon: Int, altStyle: Boolean = false) =
-        TextEditingButton(ctx, theme, ripple, border, radius, altStyle).apply {
+        TextEditingButton(ctx, theme, ripple, border, radius, altStyle, fill).apply {
             setIcon(icon)
         }
 

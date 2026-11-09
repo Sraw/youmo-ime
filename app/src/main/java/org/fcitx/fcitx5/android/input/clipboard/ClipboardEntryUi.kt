@@ -13,6 +13,7 @@ import android.text.TextUtils
 import android.view.View
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.scene.engine.PanelLooks
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import splitties.dimensions.dp
 import splitties.resources.drawable
@@ -31,7 +32,8 @@ import splitties.views.dsl.core.wrapContent
 import splitties.views.imageDrawable
 import splitties.views.setPaddingDp
 
-class ClipboardEntryUi(override val ctx: Context, private val theme: Theme, radius: Float) : Ui {
+/** An entry's card, [look] the theme's (060-render-p3 T7b: its fill, corners, [radius] px of them, and text colour). */
+class ClipboardEntryUi(override val ctx: Context, private val theme: Theme, look: PanelLooks.Clipboard, radius: Float) : Ui {
 
     val textView = textView {
         minLines = 1
@@ -39,7 +41,7 @@ class ClipboardEntryUi(override val ctx: Context, private val theme: Theme, radi
         textSize = 14f
         setPaddingDp(8, 4, 8, 4)
         ellipsize = TextUtils.TruncateAt.END
-        setTextColor(theme.keyTextColor)
+        setTextColor(look.color.value)
     }
 
     val pin = imageView {
@@ -72,7 +74,7 @@ class ClipboardEntryUi(override val ctx: Context, private val theme: Theme, radi
         )
         background = GradientDrawable().apply {
             cornerRadius = radius
-            setColor(theme.clipboardEntryColor)
+            setColor(look.fill.value)
         }
         add(layout, lParams(matchParent, matchParent))
     }
