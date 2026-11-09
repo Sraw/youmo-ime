@@ -88,6 +88,9 @@
   <style select="@flat */lang.space:pressed, @flat qwerty/e.space:pressed" fill="@spaceBar"/>
   <style select="qwerty/r.enter:pressed" fill="image(r.png, 12 12 12 12, 3x, @accentKey)"/>
   <style select="@flat qwerty/r.space:pressed" fill="image(r.png, 12 12 12 12, 3x, @spaceBar)"/>
+  <style select="*/backspace.enter:pressed, qwerty/a.enter:pressed, qwerty/q.enter:pressed" fill="#112233" press="face"/>
+  <style select="*/backspace.space:pressed, qwerty/a.space:pressed, qwerty/q.space:pressed" fill="image(down.png, 1 1 1 1, 1x, @key)" press="face"/>
+  <style select="@flat */backspace.space:pressed, @flat qwerty/a.space:pressed, @flat qwerty/q.space:pressed" fill="image(down.png, 1 1 1 1, 1x, @spaceBar)" press="face"/>
   <style select="*/space label, qwerty/r label, qwerty/w label" hidden="true"/>
   <style select="preview, popup" fill="@popupBackground" radius="4dp" shadow="0 2dp 2dp #33000000" color="@popupText"/>
   <style select="popup:selected" fill="@genericActiveBackground" color="@genericActiveForeground"/>

@@ -52,6 +52,7 @@
   <style select="@flat number/\*, @flat number/\:, @flat zhuyin-nine/r1c1, @flat zhuyin/\,, @flat zhuyin/\., @flat zhuyin//, @flat zhuyin/;" fill="#00000000"/>
   <style select="number/\*.enter, number/\:.enter, zhuyin-nine/r1c1.enter, zhuyin/\,.enter, zhuyin/\..enter, zhuyin//.enter, zhuyin/;.enter" fill="image(k.png, 12 12 12 12, 3x, @accentKey)"/>
   <style select="@flat number/\*.space, @flat number/\:.space, @flat zhuyin-nine/r1c1.space, @flat zhuyin/\,.space, @flat zhuyin/\..space, @flat zhuyin//.space, @flat zhuyin/;.space" fill="image(k.png, 12 12 12 12, 3x, @spaceBar)"/>
+  <style select="number/\*.letter:pressed, number/\:.letter:pressed, zhuyin-nine/r1c1.letter:pressed, zhuyin/\,.letter:pressed, zhuyin/\..letter:pressed, zhuyin//.letter:pressed, zhuyin/;.letter:pressed" fill="image(key~2.png, 0 0 0 0, 1x, @key)" press="face"/>
   <style select="number/\* label, number/\: label, zhuyin-nine/r1c1 label, zhuyin/\, label, zhuyin/\. label, zhuyin// label, zhuyin/; label" hidden="true"/>
   <style select="preview, popup" fill="@popupBackground" radius="4dp" shadow="0 2dp 2dp #33000000" color="@popupText"/>
   <style select="popup:selected" fill="@genericActiveBackground" color="@genericActiveForeground"/>

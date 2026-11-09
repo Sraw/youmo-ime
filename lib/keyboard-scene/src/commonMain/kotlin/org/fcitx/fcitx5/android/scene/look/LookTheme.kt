@@ -123,8 +123,7 @@ object LookTheme {
         s.add(key.with(kind = "function"), "fill" to s.face(keys.function.fill, ALT_KEY), "color" to color("altKeyText"), "icon-color" to color("altKeyText"))
         s.add(key.with(kind = "enter"), "fill" to s.face(keys.enter.fill, ACCENT_KEY), "color" to color("accentKeyText"), "icon-color" to color("accentKeyText"))
         s.add(key.with(kind = "space"), "fill" to s.face(keys.space.fill, KEY))
-        listOf(Triple("letter", keys.letter, KEY), Triple("function", keys.function, ALT_KEY), Triple("enter", keys.enter, ACCENT_KEY), Triple("space", keys.space, KEY))
-            .forEach { (kind, k, color) -> s.pressed(listOf(key.with(kind = kind, state = PRESSED)), k.pressed, color) }
+        kinds(keys).forEach { (kind, k, color) -> s.pressed(listOf(key.with(kind = kind, state = PRESSED)), k.pressed, color) }
         // a flat space's colour is the space bar's (ThemeColors.face), its pressed image's too
         s.pressed(listOf(key.with(FLAT, "space", PRESSED)), keys.space.pressed, SPACE_BAR)
         s.add(key.with(kind = "alt-text"), "color" to color("altKeyText"), "icon-color" to color("altKeyText"))
@@ -203,6 +202,12 @@ object LookTheme {
             }
         }
         darkened(keys, darkened, beforeFlat = false)
+        // a face of its own and no pressed one: pressed as its kind (3.0's own ?: all ?: kind), which its fill, an
+        // id's, would outrank; each kind's on the key's own name, after its flat style (the tie the kind's wins too)
+        overrides.filterValues { it.fill != null && it.pressed == null }.keys.toList().takeIf { it.isNotEmpty() }?.let { ks ->
+            kinds(keys).forEach { (kind, k, color) -> pressed(ks.of(kind = kind, state = PRESSED), k.pressed, color) }
+            pressed(ks.of(FLAT, "space", PRESSED), keys.space.pressed, SPACE_BAR)
+        }
         overrides.filterValues { it.label == KeyLabel.Hide }.keys.toList().takeIf { it.isNotEmpty() }
             ?.let { add(it.of(part = "label"), "hidden" to Value.Flag(true)) }
         // a board's key that shows its label where its role's on every board hides theirs: as an id, it wins
@@ -219,6 +224,14 @@ object LookTheme {
     internal fun resolved(overrides: Map<String, KeyOverride>): Map<String, KeyOverride> = overrides.mapValues { (name, own) ->
         role(overrides, name)?.let { all -> KeyOverride(own.fill ?: all.fill, own.pressed ?: all.pressed, own.label) } ?: own
     }
+
+    // each kind's class, its look and its colour
+    private fun kinds(keys: Keys) = listOf(
+        Triple("letter", keys.letter, KEY),
+        Triple("function", keys.function, ALT_KEY),
+        Triple("enter", keys.enter, ACCENT_KEY),
+        Triple("space", keys.space, KEY),
+    )
 
     // the override of [name]'s role on every board, where [name] is a board's key of a role
     private fun role(overrides: Map<String, KeyOverride>, name: String): KeyOverride? {
@@ -274,9 +287,10 @@ object LookTheme {
     }
 
     /**
-     * The styles a written theme may have ([ThemeReader]'s `maxStyles`): its own lines, and up to ten a
-     * single key's face of its own (four its fill's, six its pressed one's) for each of the most a 3.0
-     * theme brings, more than a theme file's `ThemeReader.MAX_STYLES` when they all differ.
+     * The styles a written theme may have ([ThemeReader]'s `maxStyles`), more than a theme file's
+     * `ThemeReader.MAX_STYLES` when single keys' faces all differ: the look's own (some 30), up to nine
+     * for each single key of the most a 3.0 theme brings (four its fill's, five its pressed face's, a
+     * Darken's), and a dozen the keys share (flat, the kinds' pressed faces on their names, labels).
      */
     const val MAX_STYLES = 100 + 10 * Keys.MAX_OVERRIDES
 

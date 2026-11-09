@@ -220,6 +220,45 @@ class LookThemeTest {
         assertTrue(shift.ops(true).any { it is Op.NineSlice && it.file == "all-down.png" }, "${shift.ops(true)}")
     }
 
+    // a single key's face of its own and no pressed one: pressed as its kind, as 3.0 drew it (own ?: all ?: kind),
+    // its own fill an id's not outranking the kind's pressed face; flat and not, as a key of no face of its own
+    @Test
+    fun aSingleKeysOwnFaceIsPressedAsItsKind() {
+        val slice = NineSlice("/data/themes/t/own.png", Insets(1, 1, 1, 1), 1)
+        val down = NineSlice("/data/themes/t/down.png", Insets(1, 1, 1, 1), 1)
+        val base = LookDefaults.look(palette(themeFile("material-light.xml")))
+        val kinds = base.keys.copy(
+            letter = KindStyle(KeyFill.Color, KeyPressed.Color(0xff123456.toInt())),
+            function = KindStyle(KeyFill.Color, KeyPressed.Image(down)),
+            space = KindStyle(KeyFill.Color, KeyPressed.Color(0xff654321.toInt())),
+        )
+        val own = KeyOverride(KeyFill.Image(slice), null, KeyLabel.Show)
+        val plain = theme(LookTheme.xml(base.copy(keys = kinds), "T", false))
+        val look = base.copy(keys = kinds.copy(overrides = mapOf("qwerty/q" to own, "*/shift" to own, "qwerty/space" to own)))
+        val theme = theme(LookTheme.xml(look, "T", false))
+        fun faces(k: org.fcitx.fcitx5.android.scene.KeyNode, pressed: Boolean) = k.ops(pressed).mapNotNull {
+            when (it) {
+                is Op.Fill -> "fill ${it.color}"
+                is Op.NineSlice -> "image ${it.file} ${it.fallback}"
+                else -> null
+            }
+        }
+        for (flat in listOf(false, true)) {
+            val env = portrait.copy(flat = flat)
+            val scene = scene(theme, env)
+            val kindOnly = scene(plain, env)
+            for (id in listOf("q", "shift", "space")) {
+                assertEquals(faces(key(kindOnly, id), true), faces(key(scene, id), true), "$id flat=$flat")
+            }
+            if (!flat) assertTrue(faces(key(scene, "q"), false).any { it.startsWith("image own.png") })
+        }
+        // its kind's Darken: its own face tinted
+        val darken = base.copy(keys = base.keys.copy(letter = KindStyle(KeyFill.Color, KeyPressed.Darken), overrides = mapOf("qwerty/q" to own)))
+        val q = key(scene(theme(LookTheme.xml(darken, "T", false)), portrait), "q")
+        assertTrue(faces(q, true).any { it.startsWith("image own.png") }, "${q.ops(true)}")
+        assertTrue(faces(q, true).contains("fill ${Argb(darken.palette.keyPressHighlightColor)}"), "${q.ops(true)}")
+    }
+
     // the most single keys a 3.0 theme brings (Keys), each a face and a pressed one of its own:
     // the theme written still reads, its styles more than a theme file's
     @Test
@@ -236,6 +275,23 @@ class LookThemeTest {
         val styles = Regex("<style ").findAll(xml).count()
         assertTrue(styles in (ThemeReader.MAX_STYLES + 1)..LookTheme.MAX_STYLES, "$styles")
         assertTrue(ThemeReader.theme(xml, maxStyles = LookTheme.MAX_STYLES) is Parsed.Ok)
+        // the most styles a key brings, a Darken of a face of its own (nine), and of every kind's pressed face, a
+        // key's label hidden and one shown over its role's: within it too
+        val most = (0 until Keys.MAX_OVERRIDES - 2).associate { i ->
+            "b$i/k" to KeyOverride(KeyFill.Image(NineSlice("/data/themes/t/k$i.png", Insets(1, 1, 1, 1), 1)), KeyPressed.Darken, KeyLabel.Hide)
+        } + mapOf(
+            "*/shift" to KeyOverride(KeyFill.Color, null, KeyLabel.Hide),
+            "qwerty/shift" to KeyOverride(null, null, KeyLabel.Show),
+        )
+        val down = KeyPressed.Image(NineSlice("/data/themes/t/down.png", Insets(1, 1, 1, 1), 1))
+        val kinds = base.keys.copy(
+            letter = KindStyle(KeyFill.Color, down), function = KindStyle(KeyFill.Color, down),
+            enter = KindStyle(KeyFill.Color, down), space = KindStyle(KeyFill.Color, down), overrides = most,
+        )
+        val mostXml = LookTheme.xml(base.copy(keys = kinds), "T", false)
+        val mostStyles = Regex("<style ").findAll(mostXml).count()
+        assertTrue(mostStyles in (ThemeReader.MAX_STYLES + 1)..LookTheme.MAX_STYLES, "$mostStyles")
+        assertTrue(ThemeReader.theme(mostXml, maxStyles = LookTheme.MAX_STYLES) is Parsed.Ok)
     }
 
     // 3.0's single keys by their names (KeyNames): 大千's , . ; / - selected as the keys of those ids, a
