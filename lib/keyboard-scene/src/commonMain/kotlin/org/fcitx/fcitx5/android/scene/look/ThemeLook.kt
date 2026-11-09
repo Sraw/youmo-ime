@@ -2,7 +2,9 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
  */
-package org.fcitx.fcitx5.android.input.theme
+package org.fcitx.fcitx5.android.scene.look
+
+import org.fcitx.fcitx5.android.scene.rules.KeyNames
 
 /**
  * All a theme draws the keyboard with (theme file 3.0): its colours, its picture, what is under the
@@ -177,6 +179,9 @@ data class NineSlice(val file: String, val insets: Insets, val pxPerDp: Int) {
 
     companion object {
         const val MAX_PX_PER_DP = 8
+
+        /** A key image's longest side, px, as the app takes one in (ThemeAssetLimits): no inset is past it. */
+        const val MAX_SIDE = 1024
     }
 }
 
@@ -239,7 +244,7 @@ data class Gap(val h: Int, val v: Int, val hLand: Int, val vLand: Int) {
 
 /**
  * The keys: [blocks] drawn as blocks, or flat (no face; the space a bar, Return a circle); the
- * shape; [press] how a press shows; each kind's style; [overrides] single keys' by name ([KeyNames]:
+ * shape; [press] how a press shows; each kind's style; [overrides] single keys' by name ([KeyNames.split]:
  * `qwerty/q`, `*`/backspace). A name of a board or key this build does not know is kept, not used.
  */
 data class Keys(
@@ -259,7 +264,7 @@ data class Keys(
         require(radiusDp in 0..MAX_RADIUS_DP) { "radiusDp $radiusDp out of 0..$MAX_RADIUS_DP" }
         require(borderDp in 0..MAX_BORDER_DP) { "borderDp $borderDp out of 0..$MAX_BORDER_DP" }
         require(shadowDp in 0..MAX_SHADOW_DP) { "shadowDp $shadowDp out of 0..$MAX_SHADOW_DP" }
-        overrides.keys.forEach { KeyNames.parse(it) }
+        overrides.keys.forEach { KeyNames.split(it) }
     }
 
     fun kind(kind: KeyKind) = when (kind) {
@@ -278,6 +283,9 @@ data class Keys(
         const val MAX_RADIUS_DP = 24
         const val MAX_BORDER_DP = 3
         const val MAX_SHADOW_DP = 3
+
+        /** The single keys a theme may style at most (an import refuses more: the app's ThemeAssetLimits). */
+        const val MAX_OVERRIDES = 400
     }
 }
 

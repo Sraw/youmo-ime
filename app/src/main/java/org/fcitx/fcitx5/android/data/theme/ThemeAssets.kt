@@ -12,8 +12,8 @@ import android.os.Looper
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.input.theme.BoxBlur
 import org.fcitx.fcitx5.android.input.theme.KeyImageBudget
-import org.fcitx.fcitx5.android.input.theme.NineSlice
-import org.fcitx.fcitx5.android.input.theme.ThemeLook
+import org.fcitx.fcitx5.android.scene.look.NineSlice
+import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import timber.log.Timber
 import java.io.File
 import java.util.concurrent.Executor

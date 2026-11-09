@@ -10,7 +10,6 @@ import android.view.MotionEvent
 import androidx.annotation.CallSuper
 import androidx.annotation.Keep
 import androidx.constraintlayout.widget.ConstraintLayout
-import kotlin.math.absoluteValue
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.InputMethodNames
@@ -26,8 +25,6 @@ import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.input.theme.KeyNames
-import org.fcitx.fcitx5.android.input.theme.KeyStyleResolver
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
@@ -40,16 +37,18 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKey
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTouch
-import org.fcitx.fcitx5.android.scene.KeyNode
-import org.fcitx.fcitx5.android.scene.Scene
-import org.fcitx.fcitx5.android.scene.engine.Env
-import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupKeyboardUi
 import org.fcitx.fcitx5.android.input.scene.KeyRef
-import org.fcitx.fcitx5.android.input.theme.ThemeLook
+import org.fcitx.fcitx5.android.input.theme.KeyNames
+import org.fcitx.fcitx5.android.input.theme.KeyStyleResolver
 import org.fcitx.fcitx5.android.pack.PackKind
+import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.Scene
+import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.Input
+import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.below
 import splitties.views.dsl.constraintlayout.bottomOfParent
@@ -58,6 +57,7 @@ import splitties.views.dsl.constraintlayout.leftOfParent
 import splitties.views.dsl.constraintlayout.rightOfParent
 import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.add
+import kotlin.math.absoluteValue
 
 abstract class BaseKeyboard(
     context: Context,

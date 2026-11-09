@@ -41,9 +41,14 @@ sealed interface Shape {
     /** Whether ([x], [y]) is in it: the hit test (§3.1: a rectangle's fast path, a path's ray cast). */
     fun contains(x: Double, y: Double): Boolean
 
+    /** The same, ([dx], [dy]) px away: a shadow's, an inner shadow's hole, a key cap's depth under its face. */
+    fun moved(dx: Double, dy: Double): Shape
+
     /** A rounded rectangle; [radii] its corners' (top left, top right, bottom right, bottom left), px. */
     data class Rect(val box: Box, val radii: List<Double> = NO_RADII) : Shape {
         override val bounds: Box get() = box
+
+        override fun moved(dx: Double, dy: Double): Rect = Rect(box.moved(dx, dy), radii)
 
         override fun contains(x: Double, y: Double): Boolean {
             if (!box.contains(x, y)) return false
@@ -65,7 +70,8 @@ sealed interface Shape {
 
     /**
      * An outline of straight edges, px: each sub-path [Path.Op.MoveTo] then [Path.Op.LineTo]s, closed.
-     * Arcs are left for when a layout arranges keys on one (`arrange="arc"`): a backend's path has them.
+     * Arcs are left for when a layout arranges keys on one (`arrange="arc"`): a backend's path has them;
+     * a theme's curves (`shape="path(…)"`) are made straight edges by the engine (ShapePath.flatten).
      */
     data class Path(val ops: List<Op>) : Shape {
         sealed interface Op {
@@ -73,6 +79,16 @@ sealed interface Shape {
             data class LineTo(val x: Double, val y: Double) : Op
             data object Close : Op
         }
+
+        override fun moved(dx: Double, dy: Double): Path = Path(
+            ops.map {
+                when (it) {
+                    is Op.MoveTo -> Op.MoveTo(it.x + dx, it.y + dy)
+                    is Op.LineTo -> Op.LineTo(it.x + dx, it.y + dy)
+                    Op.Close -> it
+                }
+            },
+        )
 
         override val bounds: Box
             get() {

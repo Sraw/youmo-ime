@@ -4,6 +4,11 @@
  */
 package org.fcitx.fcitx5.android.input.theme
 
+import org.fcitx.fcitx5.android.scene.look.BarBase
+import org.fcitx.fcitx5.android.scene.look.KeyKind
+import org.fcitx.fcitx5.android.scene.look.Keys
+import org.fcitx.fcitx5.android.scene.look.Palette
+
 /**
  * Which of the palette's colours each part is drawn in, the app's and the theme maker's alike. As
  * before theme file 3.0, where the key border setting chose them: a keyboard of blocks shows the

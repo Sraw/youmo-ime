@@ -9,7 +9,7 @@ import androidx.preference.PreferenceManager
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.phoneStorage
-import org.fcitx.fcitx5.android.input.theme.LegacyLook
+import org.fcitx.fcitx5.android.scene.look.LegacyLook
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
 import org.junit.Assert.assertEquals

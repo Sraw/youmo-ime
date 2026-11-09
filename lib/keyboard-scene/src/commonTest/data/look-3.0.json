@@ -1,0 +1,167 @@
+{
+    "version": "3.0",
+    "name": "full",
+    "isDark": true,
+    "palette": {
+        "backgroundColor": -13816531,
+        "barColor": -13158601,
+        "keyboardColor": -13816531,
+        "keyBackgroundColor": 1296451142,
+        "keyTextColor": -328966,
+        "candidateTextColor": -328966,
+        "candidateLabelColor": -328966,
+        "candidateCommentColor": -5460820,
+        "altKeyBackgroundColor": -13158601,
+        "altKeyTextColor": -5460820,
+        "accentKeyBackgroundColor": -10577930,
+        "accentKeyTextColor": -1,
+        "keyPressHighlightColor": 872415231,
+        "keyShadowColor": -14342875,
+        "popupBackgroundColor": -13158601,
+        "popupTextColor": -328966,
+        "spaceBarColor": -11908534,
+        "dividerColor": 536870911,
+        "clipboardEntryColor": -12171706,
+        "genericActiveBackgroundColor": -10577930,
+        "genericActiveForegroundColor": -328966,
+        "keyBorderColor": -14342875,
+        "keyHintColor": -5460820,
+        "toolbarIconColor": -5460820
+    },
+    "picture": {
+        "src": "full-src.png",
+        "portrait": {
+            "file": "full-portrait.png",
+            "cropRect": {
+                "bottom": 1800,
+                "left": 0,
+                "right": 1440,
+                "top": 300
+            },
+            "rotation": 0
+        },
+        "landscape": {
+            "file": "full-landscape.png",
+            "cropRect": {
+                "bottom": 1500,
+                "left": 0,
+                "right": 1440,
+                "top": 900
+            },
+            "rotation": 90
+        },
+        "brightness": 70,
+        "blurDp": 4
+    },
+    "base": {
+        "type": "picture"
+    },
+    "bar": {
+        "type": "picture",
+        "blurDp": 12,
+        "brightness": 60
+    },
+    "keys": {
+        "blocks": true,
+        "radiusDp": 8,
+        "borderDp": 1,
+        "shadowDp": 0,
+        "gap": {
+            "h": 3,
+            "v": 7,
+            "hLand": 3,
+            "vLand": 4
+        },
+        "press": "tint",
+        "letter": {
+            "fill": {
+                "type": "picture",
+                "blurDp": 10,
+                "brightness": 80
+            },
+            "pressed": {
+                "type": "darken"
+            }
+        },
+        "function": {
+            "fill": {
+                "type": "color"
+            },
+            "pressed": {
+                "type": "color",
+                "argb": -10577930
+            }
+        },
+        "space": {
+            "fill": {
+                "type": "image",
+                "file": "full-space.png",
+                "insets": [
+                    12,
+                    12,
+                    12,
+                    12
+                ],
+                "pxPerDp": 3
+            },
+            "pressed": {
+                "type": "darken"
+            }
+        },
+        "enter": {
+            "fill": {
+                "type": "color"
+            },
+            "pressed": {
+                "type": "image",
+                "file": "full-enter-down.png",
+                "insets": [
+                    8,
+                    6,
+                    8,
+                    6
+                ],
+                "pxPerDp": 2
+            }
+        },
+        "overrides": {
+            "*/enter": {
+                "fill": {
+                    "type": "image",
+                    "file": "full-enter.png",
+                    "insets": [
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    "pxPerDp": 3
+                },
+                "pressed": null,
+                "label": "hide"
+            },
+            "qwerty/q": {
+                "fill": null,
+                "pressed": {
+                    "type": "color",
+                    "argb": -1499549
+                },
+                "label": "show"
+            },
+            "k20/r1c1": {
+                "fill": {
+                    "type": "color"
+                },
+                "pressed": null,
+                "label": "show"
+            }
+        }
+    },
+    "text": {
+        "keyFont": "full-font.ttf",
+        "candidateFont": "full-candidates.ttf",
+        "keyWeight": 700,
+        "candidateWeight": 400,
+        "keyScale": 110
+    }
+}

@@ -5,7 +5,14 @@
 package org.fcitx.fcitx5.android.input.theme
 
 import org.fcitx.fcitx5.android.input.keyboard.NumberPad
-import org.fcitx.fcitx5.android.input.theme.ThemeLookTest.Companion.slice
+import org.fcitx.fcitx5.android.input.theme.LookFixtures.slice
+import org.fcitx.fcitx5.android.scene.look.KeyFill
+import org.fcitx.fcitx5.android.scene.look.KeyKind
+import org.fcitx.fcitx5.android.scene.look.KeyLabel
+import org.fcitx.fcitx5.android.scene.look.KeyOverride
+import org.fcitx.fcitx5.android.scene.look.KeyPressed
+import org.fcitx.fcitx5.android.scene.look.KindStyle
+import org.fcitx.fcitx5.android.scene.look.LookDefaults
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows

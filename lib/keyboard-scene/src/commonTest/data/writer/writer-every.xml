@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<theme xmlns="https://youmo-ime/theme/4" name="Every &quot;form&quot; &amp; &lt;more&gt;" variants="light dark" version="4.2">
+  <meta author="someone" license="CC0-1.0" min-app="0.6.0" preview="preview.webp"/>
+  <colors>
+    <color name="background" value="#eceff1"/>
+    <color name="bar" value="#e4e7e9"/>
+    <color name="keyboard" value="#eceff1"/>
+    <color name="key" value="#fbfbfc"/>
+    <color name="keyText" value="#37474f"/>
+    <color name="candidateText" value="#37474f"/>
+    <color name="candidateLabel" value="#37474f"/>
+    <color name="candidateComment" value="#7a858a"/>
+    <color name="altKey" value="#e2e2e3"/>
+    <color name="altKeyText" value="#7a858a"/>
+    <color name="accentKey" value="#5cb5ab"/>
+    <color name="accentKeyText" value="#ffffff"/>
+    <color name="keyPressHighlight" value="#1f000000"/>
+    <color name="keyShadow" value="#c0c3c4"/>
+    <color name="popupBackground" value="#d9dbdd"/>
+    <color name="popupText" value="#37474f"/>
+    <color name="spaceBar" value="#c9ced1"/>
+    <color name="divider" value="#1f000000"/>
+    <color name="clipboardEntry" value="#fbfbfc"/>
+    <color name="genericActiveBackground" value="#80cbc4"/>
+    <color name="genericActiveForeground" value="#37474f"/>
+    <color name="keyBorder" value="#c0c3c4"/>
+    <color name="keyHint" value="#7a858a"/>
+    <color name="toolbarIcon" value="#7a858a"/>
+    <color name="alpha" value="#00000000"/>
+    <color name="zeta" value="#123456"/>
+  </colors>
+  <colors variant="dark">
+    <color name="background" value="#202124"/>
+    <color name="keyboard" value="#202124"/>
+    <color name="zeta" value="#00ffffff"/>
+  </colors>
+  <picture src="src.jpg" brightness="72.5%" blur="0">
+    <cut orientation="portrait" file="port.png"/>
+    <cut orientation="landscape" file="land.png"/>
+  </picture>
+  <font name="afont" src="a.otf"/>
+  <font name="zfont" src="z.ttf"/>
+  <style select="keyboard" fill="picture"/>
+  <style select="@dark @flat keyboard" fill="linear(-45deg, @background 0%, alpha(@keyText,50%) 37.5%, #000000 100%)"/>
+  <style select="bar" fill="picture(4dp, 90%)"/>
+  <style select="key" fill="image(key.png, 1 2 3 4, 2x, @key)" overlay="#00000000" shape="rect" radius="1dp 2dp 3dp 0" border="0.5dp @keyBorder" shadow="-1.5dp 2dp 0 @keyShadow" inset="1dp 2dp 3dp 4dp" color="@keyText" font="afont" weight="700" scale="117.5%" icon-color="system(primary,mix(@key,@keyText,25%))" press="ripple"/>
+  <style select="@landscape key" radius="0" border="none" shadow="none" inset="0 0.25dp"/>
+  <style select="@compact @landscape @floating @split @one-handed @dark @flat key.alt-text.function[role=shift]:locked:pressed label" color="#33000000"/>
+  <style select="@field=password @im=wubi @keyboard=k18 key" fill="image(k.png, 0 0 0 0, 1x)"/>
+  <style select="qwerty/q" size="20.5sp" hidden="false" padding="2dp 2dp"/>
+  <style select="zhuyin/\,, zhuyin/\., zhuyin/\:, number/\*, zhuyin/\[x, odd/a\ b, odd/\\, zhuyin//" hidden="true"/>
+  <style select="qwerty/*, */enter:on, key[role=space]" fill="picture(0dp, 100%, @accentKey)"/>
+  <style select="menu" fill="#ff0000" radius="50%"/>
+  <style select="clipboard, candidate:first comment" fill="@key"/>
+  <style select="popup:selected" overlay="#80ffffff" font="system" press="face"/>
+  <style select="preview" shape="path(M0 0 L1 0 L1 1 Z)"/>
+  <style select="@dark preview" shape="bubble" size="125.5%" tail="false" offset="-3.25dp"/>
+  <style select="@flat preview" shape="bubble" size="160%" tail="true" offset="0"/>
+  <style select="@landscape preview" size="100%" offset="0.5dp"/>
+  <style select="@dark key.function" shape="path(M0.1 0 L0.9 0 Q1 0 1 0.1 L1 0.9 C1 0.95 0.95 1 0.9 1 L0.1 1 Q0 1 0 0.9 L0 0.1 Z M0.3 0.3 L0.7 0.3 L0.7 0.7 Z L0.25 0.75 L0.123457 0.2 Z)" inner-shadow="0 -1.5dp 2dp alpha(@keyShadow,40%)" depth="2.5dp" depth-color="darker(@key,20%)"/>
+  <style select="key:pressed" inner-shadow="none" depth="0"/>
+  <style select="popup" inner-shadow="none"/>
+  <style select="@flat key" depth="8dp" depth-color="#000000"/>
+  <style select="key label" align="top-left" letter-spacing="0.05em" stroke="0.5dp @keyShadow" text-shadow="0 1dp 1dp #80000000" font-han="afont" font-latin="system"/>
+  <style select="key[role=space] label" space-content="text(空 格)"/>
+  <style select="*/space label" space-content="ime-name"/>
+  <style select="*/enter label, key mark" align="top-center" letter-spacing="-0.1em" stroke="0 #00000000" text-shadow="none"/>
+  <style select="key[role=enter] icon" return-icon-send="icon(backspace)" return-icon-search="text(搜)"/>
+  <style select="keyboard" height="38% 52.5%" side-padding="8dp" bottom-padding="0 48dp"/>
+  <style select="keyboard" height="40%"/>
+  <icon name="a-icon" src="a.svg"/>
+  <icon name="z-icon" src="z.png"/>
+</theme>

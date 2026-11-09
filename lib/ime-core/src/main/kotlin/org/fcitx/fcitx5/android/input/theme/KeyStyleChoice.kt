@@ -4,6 +4,11 @@
  */
 package org.fcitx.fcitx5.android.input.theme
 
+import org.fcitx.fcitx5.android.scene.look.BarBase
+import org.fcitx.fcitx5.android.scene.look.Gap
+import org.fcitx.fcitx5.android.scene.look.Keys
+import org.fcitx.fcitx5.android.scene.look.ThemeLook
+
 /**
  * The key style settings (大小与样式 → 按键样式) over a theme's keys: each null follows the theme, else
  * it is used in place of the theme's. The theme itself is not changed: what is exported or saved is its own.

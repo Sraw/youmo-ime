@@ -6,19 +6,19 @@ package org.fcitx.fcitx5.android.input.bar.ui.idle
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.view.MotionEvent
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.data.theme.Theme
-import android.view.MotionEvent
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
-import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
+import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import splitties.dimensions.dp
 import timber.log.Timber
 import kotlin.math.abs

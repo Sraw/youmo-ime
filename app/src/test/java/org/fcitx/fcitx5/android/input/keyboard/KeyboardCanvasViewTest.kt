@@ -20,9 +20,8 @@ import androidx.core.view.accessibility.AccessibilityEventCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.core.EngineState
-import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -31,6 +30,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.engine.table.TableRoots
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
@@ -42,14 +42,18 @@ import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
-import org.fcitx.fcitx5.android.input.theme.Crop
-import org.fcitx.fcitx5.android.input.theme.BoardBase
-import org.fcitx.fcitx5.android.input.theme.KeyFill
-import org.fcitx.fcitx5.android.input.theme.Picture
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.Shape
+import org.fcitx.fcitx5.android.scene.look.BoardBase
+import org.fcitx.fcitx5.android.scene.look.Crop
+import org.fcitx.fcitx5.android.scene.look.KeyFill
+import org.fcitx.fcitx5.android.scene.look.KeyLabel
+import org.fcitx.fcitx5.android.scene.look.KeyOverride
+import org.fcitx.fcitx5.android.scene.look.KeyPressed
+import org.fcitx.fcitx5.android.scene.look.LookTheme
+import org.fcitx.fcitx5.android.scene.look.Picture
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -63,11 +67,11 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
-import timber.log.Timber
+import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import timber.log.Timber
 import kotlin.math.roundToInt
 
 /**
@@ -156,7 +160,8 @@ class KeyboardCanvasViewTest {
         // the hidden views are no one's to read
     }
 
-    // a theme the engine refuses (a font file's name 4.0 takes no file by): 060-render-p2 U8, the
+    // a theme the engine refuses (more single keys than a 3.0 file brings, each a pressed colour of its own: more
+    // styles than LookTheme.MAX_STYLES; a file's odd name no longer, LookTheme renames it): 060-render-p2 U8, the
     // built-in theme of its lightness drawn, logged; never the views again (they go in S8). Its keys
     // the built-in theme's as that theme draws them, touched and read as ever
     @Test
@@ -171,7 +176,11 @@ class KeyboardCanvasViewTest {
         try {
             for (builtIn in listOf(ThemePreset.PixelLight, ThemePreset.PixelDark)) {
                 val look = builtIn.look
-                val broken = Theme.Custom("broken", builtIn.isDark, look.copy(text = look.text.copy(keyFont = "/themes/x/bad:name.ttf")))
+                val many = (0..LookTheme.MAX_STYLES / 2).associate { i -> "b$i/k" to KeyOverride(null, KeyPressed.Color(i), KeyLabel.Show) }
+                val broken = Theme.Custom(
+                    "broken", builtIn.isDark,
+                    look.copy(keys = look.keys.copy(overrides = many), text = look.text.copy(keyFont = "/themes/x/bad.ttf")),
+                )
                 val drawn = KeyboardHarness(builtIn).start().use { h -> h.canvas()!!.scene!!.let { it.base to it.keys.map { k -> k.id to k.faces } } }
                 logged.clear()
                 KeyboardHarness(broken).start().use { h ->

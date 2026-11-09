@@ -63,6 +63,10 @@ sealed interface Shown {
 /** A style property's value as read; which kind each property takes is [Values.read]'s table. */
 sealed interface Value {
     data class OfShown(val shown: Shown) : Value
+    data class OfPath(val path: ShapePath) : Value
+
+    /** A percentage: the bubble's `size="120%"` (a `size` in sp is a [Number]). */
+    data class Percent(val percent: Double) : Value
     data class OfFill(val fill: Fill) : Value
     data class OfColor(val color: ColorExpr) : Value
     data class OfRadius(val radius: Radius) : Value
@@ -95,6 +99,9 @@ object Values {
     private const val MAX_BLUR_DP = 25
     private const val MAX_PERCENT = 100.0
     private const val FOUR = 4
+    private const val MAX_DEPTH_DP = 8.0
+    private const val MIN_BUBBLE = 100.0
+    private const val MAX_BUBBLE = 160.0
     private const val MIN_SPACING_EM = -0.1
     private const val MAX_SPACING_EM = 0.5
     private val EM = Regex("-?[0-9](\\.[0-9]{1,3})?em")
@@ -111,6 +118,8 @@ object Values {
         "hidden", "icon-color", "press", "padding",
         // T4a: the text on a key
         "align", "letter-spacing", "stroke", "text-shadow", "font-han", "font-latin", "space-content",
+        // T4b: a key's shape and cap, the bubble's shape, size and place
+        "inner-shadow", "depth", "depth-color", "tail", "offset",
     ) + RETURN_ACTIONS.map { "$RETURN_ICON$it" }
 
     private const val LEN = "(-?[0-9]+(\\.[0-9]+)?dp|0)"
@@ -145,18 +154,12 @@ object Values {
     private val SHADOW = lengthsThenColor(3, none = true)
 
     /**
-     * Style properties of a later stage of 0.6.0 (060-render-p3: T4b–T7b, A1–A3, the sounds' `sticker`),
+     * Style properties of a later stage of 0.6.0 (060-render-p3: T5–T7b, A1–A3, the sounds' `sticker`),
      * each with its value's form: read where it is of the form, ignored with a warning (a theme made
      * for a newer app still imports); a value not of the form, or naming a colour not there, is a
      * problem like any. A stage that makes one work moves it to [PROPERTIES].
      */
     val RESERVED: Map<String, Reserved> = mapOf(
-        // T4b: shapes, the bubble
-        "inner-shadow" to SHADOW,
-        "depth" to form(LEN),
-        "depth-color" to COLOR,
-        "tail" to form("true|false"),
-        "offset" to form(LEN),
         // T5 (the keyboard, portrait then landscape), T6b (the bar), T7a (the handle)
         "height" to form(LEN_OR_PERCENT),
         "width" to form(LEN),
@@ -212,13 +215,10 @@ object Values {
     }
 
     /**
-     * Values of a property of today that a later stage gives a new form: `shape="path(…)"`, `bubble`
-     * (T4b), a bubble's `size="120%"` (T4b), the navigation bar's `color="follow"` (T7a). Ignored with
-     * a warning as [RESERVED]'s are.
+     * Values of a property of today that a later stage gives a new form: the navigation bar's
+     * `color="follow"` (T7a). Ignored with a warning as [RESERVED]'s are.
      */
     fun reservedValue(property: String, raw: String): Boolean = when (property) {
-        "shape" -> raw == "bubble" || raw.startsWith("path(") && raw.endsWith(")") && raw.removeSurrounding("path(", ")").isNotBlank()
-        "size" -> PCT.matches(raw)
         "color" -> raw == "follow"
         else -> false
     }
@@ -226,7 +226,7 @@ object Values {
     fun read(property: String, raw: String): Value? = when (property) {
         "fill" -> fill(raw)?.let(Value::OfFill)
         "overlay", "color", "icon-color" -> ColorExpr.parse(raw)?.let(Value::OfColor)
-        "shape" -> raw.takeIf { it in listOf("rect", "bar", "circle") }?.let(Value::Word)
+        "shape" -> shape(raw)
         "radius" -> radius(raw)?.let(Value::OfRadius)
         "border" -> border(raw)?.let(Value::OfBorder)
         "shadow" -> shadow(raw)?.let(Value::OfShadow)
@@ -234,15 +234,42 @@ object Values {
         "font" -> raw.takeIf(FONT::matches)?.let(Value::Word)
         "weight" -> raw.takeIf { it in listOf("300", "400", "700") }?.let { Value.Number(it.toDouble()) }
         "scale" -> percent(raw)?.takeIf { it in MIN_SCALE..MAX_SCALE }?.let(Value::Number)
-        "size" -> SP.matchEntire(raw)?.groupValues?.get(1)?.toDouble()?.takeIf { it > 0 && it <= MAX_SP }?.let(Value::Number)
-        "hidden" -> when (raw) {
-            "true" -> Value.Flag(true)
-            "false" -> Value.Flag(false)
-            else -> null
-        }
+        "size" -> size(raw)
+        "hidden" -> flag(raw)
         "press" -> raw.takeIf { it in listOf("tint", "ripple", "face") }?.let(Value::Word)
-        else -> textOnAKey(property, raw)
+        else -> textOnAKey(property, raw) ?: capAndBubble(property, raw)
     }
+
+    // a text's size in sp, or the bubble's in % (T4b)
+    private fun size(raw: String): Value? =
+        SP.matchEntire(raw)?.groupValues?.get(1)?.toDouble()?.takeIf { it > 0 && it <= MAX_SP }?.let(Value::Number)
+            ?: percent(raw)?.takeIf { it in MIN_BUBBLE..MAX_BUBBLE }?.let(Value::Percent)
+
+    private fun flag(raw: String): Value? = when (raw) {
+        "true" -> Value.Flag(true)
+        "false" -> Value.Flag(false)
+        else -> null
+    }
+
+    // `rect`, `bar`, `circle`, the bubble's `bubble`, or `path(…)` (T4b)
+    private fun shape(raw: String): Value? = when {
+        raw in listOf("rect", "bar", "circle", BUBBLE) -> Value.Word(raw)
+        raw.startsWith("path(") && raw.endsWith(")") -> ShapePath.parse(raw.removeSurrounding("path(", ")"))?.let(Value::OfPath)
+        else -> null
+    }
+
+    // T4b's: a key's inner shadow and depth, the bubble's tail and offset
+    private fun capAndBubble(property: String, raw: String): Value? = when (property) {
+        "inner-shadow" -> shadow(raw)?.let(Value::OfShadow)
+        "depth" -> dp(raw, MAX_DEPTH_DP)?.let(Value::Number)
+        "depth-color" -> ColorExpr.parse(raw)?.let(Value::OfColor)
+        "tail" -> flag(raw)
+        "offset" -> dp(raw, MAX_LENGTH_DP, signed = true)?.let(Value::Number)
+        else -> null
+    }
+
+    /** `shape="bubble"`: the preview's rounded head over the key, a tail down to it unless `tail="false"`. */
+    const val BUBBLE = "bubble"
 
     // T4a's
     private fun textOnAKey(property: String, raw: String): Value? = when (property) {
@@ -280,7 +307,8 @@ object Values {
     /** `7dp` (or `0`) as dp, within ±[max]; negative only where [signed]. */
     fun dp(raw: String, max: Double = MAX_LENGTH_DP, signed: Boolean = false): Double? {
         if (!DP.matches(raw)) return null
-        val v = if (raw == "0") 0.0 else raw.removeSuffix("dp").toDouble()
+        // -0dp as 0: written back as 0, it reads as the same value
+        val v = (if (raw == "0") 0.0 else raw.removeSuffix("dp").toDouble()) + 0.0
         return v.takeIf { (signed || it >= 0) && it >= -max && it <= max }
     }
 

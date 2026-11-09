@@ -10,7 +10,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemePrefs.KeyBorderChoice
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.KeyRadiusChoice
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.KeySpacingChoice
 import org.fcitx.fcitx5.android.input.theme.KeyStyleChoice
-import org.fcitx.fcitx5.android.input.theme.LookDefaults
+import org.fcitx.fcitx5.android.scene.look.LookDefaults
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
@@ -91,7 +91,9 @@ class KeyStyleThemeTest {
         val files = File(root, "input").walk().filter { it.extension == "kt" } +
             File(root, "ui/main/settings/theme/KeyboardPreviewUi.kt")
         val readers = files.flatMap { f ->
-            f.readLines().withIndex().filter { Regex("""\.look\b""").containsMatchIn(it.value) }.map { "${f.name}:${it.index + 1}" }
+            // an import is no reader: keyboard-scene's package `scene.look` (060-render-p3 T2) has the word
+            f.readLines().withIndex().filter { !it.value.startsWith("import ") && Regex("""\.look\b""").containsMatchIn(it.value) }
+                .map { "${f.name}:${it.index + 1}" }
         }.toList()
         assertTrue(files.count() > 20)
         assertEquals(emptyList<String>(), readers)
