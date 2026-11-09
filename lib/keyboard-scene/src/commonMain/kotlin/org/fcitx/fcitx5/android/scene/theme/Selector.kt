@@ -81,12 +81,14 @@ data class Selector(
         private const val WEIGHT = 100
 
         val SCENES = setOf("compact", "landscape", "floating", "split", "one-handed", "dark", "flat")
-        /** Widgets of a later stage of 0.6.0 (060-render-p3: T6a, T6b, T7a, T7b), read but selecting nothing yet. */
+        /** Widgets of a later stage of 0.6.0 (060-render-p3: T6a, T6b, T7b), read but selecting nothing yet. */
         val RESERVED_WIDGETS = setOf(
-            "clipboard", "picker", "editing", "voice", "frame", "side-button", "split-gap", "navbar", "preedit", "toolbar",
-            "candidates-panel", "candidates-divider",
+            "clipboard", "picker", "editing", "voice", "preedit", "toolbar", "candidates-panel", "candidates-divider",
         )
-        val WIDGETS = setOf("keyboard", "bar", "candidate", "popup", "preview", "menu", "handle", "panel", "key") + RESERVED_WIDGETS
+
+        /** The keyboard's window round its keys (060-render-p3 T7a: [org.fcitx.fcitx5.android.scene.engine.WindowLooks], `split-gap` the scene's). */
+        val WINDOW_WIDGETS = setOf("frame", "handle", "side-button", "split-gap", "navbar")
+        val WIDGETS = setOf("keyboard", "bar", "candidate", "popup", "preview", "menu", "panel", "key") + WINDOW_WIDGETS + RESERVED_WIDGETS
         val PARTS = setOf("label", "mark", "shortcut", "root", "icon", "hint", "badge")
 
         /** A candidate's parts (T6a): its number and its comment. */

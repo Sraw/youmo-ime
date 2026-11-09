@@ -194,6 +194,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private var capabilityFlags = CapabilityFlags.DefaultFlags
 
+    /** The touch keyboard's board placed anew (`SceneWindow.placement`): the navigation bar the theme's of it. */
+    fun boardPlaced(placement: Set<String>) {
+        window.window?.let { navbarMgr.place(it, placement) }
+    }
+
     /**
      * [id] said for a moment above the keyboard. Not a toast: one from an input method is dropped
      * while its app may not post notifications, Android 13's default ("Suppressing toast … by user
