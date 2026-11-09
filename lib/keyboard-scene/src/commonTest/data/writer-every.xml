@@ -56,6 +56,14 @@
   <style select="clipboard, candidate:first comment" fill="@key"/>
   <style select="popup:selected" overlay="#80ffffff" press="face" font="system"/>
   <style select="preview" shape="path(M0 0 L1 0 L1 1 Z)"/>
+  <style select="@dark preview" shape="bubble" tail="false" size="125.5%" offset="-3.25dp"/>
+  <style select="@flat preview" shape="bubble" tail="true" size="160%" offset="-0dp"/>
+  <style select="@landscape preview" offset="0.5dp" size="100%"/>
+  <style select="@dark key.function" shape="path(m.1 0 h.8 q.1 0 .1 .1 v.8 c0 .05 -.05 .1 -.1 .1 H.1 Q0 1 0 .9 V.1 Z z M.3 .3 l.4 0 l0 .4 Z L.25 .75 L.1234567 .2 z)"
+         inner-shadow="0 -1.5dp 2dp alpha(@keyShadow, 40%)" depth="2.5dp" depth-color="darker(@key, 20%)"/>
+  <style select="key:pressed" inner-shadow="none" depth="0"/>
+  <style select="popup" inner-shadow="none"/>
+  <style select="@flat key" depth="8dp" depth-color="#000000"/>
   <style select="key label" font-latin="system" font-han="afont" text-shadow="0 1dp 1dp #80000000" stroke="0.5dp @keyShadow" letter-spacing="0.050em" align="top-left"/>
   <style select="key[role=space] label" space-content="text(空 格)"/>
   <style select="*/space label" space-content="ime-name"/>

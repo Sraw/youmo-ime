@@ -67,11 +67,18 @@ class Cascade(theme: Theme, private val scene: Set<String>) {
     @Suppress("UNCHECKED_CAST")
     fun <T : Any> kept(key: KeptKey<T>, make: () -> T): T = keptLooks.getOrPut(key, make) as T
 
-    // what the styles selecting [target] set, nothing inherited
-    private fun own(target: Selector.Target): Map<String, Value> {
+    /**
+     * What only the styles selecting [target] by a selector naming [state] set, laid over each other as
+     * [of]'s are: a long press's key in focus takes its border from `popup:selected`, not the panel's `popup`.
+     * Not kept: asked once a popup.
+     */
+    fun stated(target: Selector.Target, state: String): Map<String, Value> = own(general(target)) { state in it.states }
+
+    // what the styles selecting [target] set (by a selector [by] takes), nothing inherited
+    private fun own(target: Selector.Target, by: (Selector) -> Boolean = { true }): Map<String, Value> {
         val best = HashMap<Style, Int>()
         fun from(bucket: Bucket) = index[bucket]?.forEach { (sel, style) ->
-            if (sel.selects(target) && sel.specificity > (best[style] ?: -1)) best[style] = sel.specificity
+            if (by(sel) && sel.selects(target) && sel.specificity > (best[style] ?: -1)) best[style] = sel.specificity
         }
         from(Bucket(target.widget, target.part, null))
         if (target.key != null) from(Bucket(target.widget, target.part, target.key))
@@ -147,10 +154,33 @@ class KeyLook(private val v: Map<String, Value>, private val theme: Theme) {
     val inset: Inset get() = (v["inset"] as? Value.OfInset)?.inset ?: Inset(0.0, 0.0, 0.0, 0.0)
     val press: String get() = word("press") ?: "tint"
 
+    /** `shape="path(…)"`: the outline its face is (radius not applying); null: [shape]'s. */
+    val path: ShapePath? get() = (v["shape"] as? Value.OfPath)?.path
+
+    /** A shadow inside its face (`inner-shadow`), dp; none where not set or `none`. */
+    val innerShadow: Shadow? get() = (v["inner-shadow"] as? Value.OfShadow)?.shadow?.takeIf { it.color != null }
+
+    /** How thick its cap is (`depth`), dp: a band of [depthColor] under its face, the face that much up. */
+    val depth: Double get() = (v["depth"] as? Value.Number)?.number ?: 0.0
+
+    /** The band's colour: `depth-color`, else its fill's 20% darker, else a translucent black. */
+    val depthColor: Argb
+        get() = (v["depth-color"] as? Value.OfColor)?.color?.let(theme::color)
+            ?: (fill as? Fill.Solid)?.let { theme.color(ColorExpr.Fn("darker", listOf(it.color), DEPTH_DARKER)) }
+            ?: DEPTH_BLACK
+
+    /** The bubble's: a tail down to the key (`tail`; a `bubble`'s by default), its size (`size`, 1–1.6), moved down (`offset`, dp). */
+    val tail: Boolean get() = (v["tail"] as? Value.Flag)?.on ?: true
+    val size: Double get() = ((v["size"] as? Value.Percent)?.percent ?: PERCENT) / PERCENT
+    val offset: Double get() = (v["offset"] as? Value.Number)?.number ?: 0.0
+
     private fun word(name: String): String? = (v[name] as? Value.Word)?.word
 
     private companion object {
         const val CORNERS = 4
+        const val DEPTH_DARKER = 20.0
+        const val PERCENT = 100.0
+        val DEPTH_BLACK = Argb(0x40000000)
     }
 }
 

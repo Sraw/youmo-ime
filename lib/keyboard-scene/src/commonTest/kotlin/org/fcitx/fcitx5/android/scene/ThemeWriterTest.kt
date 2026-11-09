@@ -12,11 +12,13 @@ import org.fcitx.fcitx5.android.scene.theme.Fill
 import org.fcitx.fcitx5.android.scene.theme.Inset
 import org.fcitx.fcitx5.android.scene.theme.Selector
 import org.fcitx.fcitx5.android.scene.theme.Shadow
+import org.fcitx.fcitx5.android.scene.theme.ShapePath
 import org.fcitx.fcitx5.android.scene.theme.Style
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.scene.theme.ThemeWriter
 import org.fcitx.fcitx5.android.scene.theme.Value
+import org.fcitx.fcitx5.android.scene.theme.Values
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -156,6 +158,46 @@ class ThemeWriterTest {
         assertEquals("mix(darker(#123456,10%),system(primary,#00000000),50%)", written)
         assertEquals(ColorExpr.parse(spaced), ColorExpr.parse(written))
         assertEquals("#80123456", ThemeWriter.color(ColorExpr.parse("#80123456")!!))
+    }
+
+    // T4b's: a path (written absolute), the bubble's size in % and its offset and tail, an inner shadow, a cap's
+    // depth and its colour; each written as the reader takes it, and read back the same
+    @Test
+    fun aCapsAndABubblesValuesAreWrittenAndReadBack() {
+        val every = read("writer-every.xml").styles.flatMap { it.values.entries }
+        for (p in listOf("inner-shadow", "depth", "depth-color", "tail", "offset")) assertTrue(every.any { it.key == p }, p)
+        assertTrue(every.any { it.value is Value.OfPath } && every.any { it.value is Value.Percent })
+        val written = listOf(
+            "shape" to "path(M0.1 0 L0.9 0 Q1 0 1 0.1 C0 0.05 0.5 0.5 0.1 1 Z L0.3 0.3 Z)",
+            "size" to "125.5%", "offset" to "-3.25dp", "offset" to "0", "depth" to "2.5dp", "depth" to "0",
+            "inner-shadow" to "0 -1.5dp 2dp #66c0c3c4", "inner-shadow" to "none", "depth-color" to "darker(@key,20%)", "tail" to "false",
+        )
+        for ((property, raw) in written) {
+            val v = assertNotNull(Values.read(property, raw), raw)
+            assertEquals(raw, ThemeWriter.value(property, v))
+            assertEquals(v, Values.read(property, ThemeWriter.value(property, v)), raw)
+        }
+        // as an author may write them: relative, H and V, a second Z, digits past six decimals; -0dp
+        val path = assertNotNull(Values.read("shape", "path(m.1 0 h.8 q.1 0 .1 .1 Z z L.1234567 .2 v.1 z)"))
+        assertEquals("path(M0.1 0 L0.9 0 Q1 0 1 0.1 Z L0.123457 0.2 L0.123457 0.3 Z)", ThemeWriter.value("shape", path))
+        assertEquals(path, Values.read("shape", ThemeWriter.value("shape", path)))
+        assertEquals("0", ThemeWriter.value("offset", assertNotNull(Values.read("offset", "-0dp"))))
+        assertEquals(Values.read("offset", "0"), Values.read("offset", "-0dp"))
+    }
+
+    // the longest path, its points past six decimals, a Z after every third (after each, it would be lines, no
+    // outline): written no longer than a path is read, and read back
+    @Test
+    fun theLongestPathWrittenReadsBack() {
+        val raw = (0 until ShapePath.MAX_POINTS).joinToString(" ") { i ->
+            val x = (123_457 + i * 3001).toString()
+            val y = (if (i % 2 == 0) "8" else "2") + (12_345 + i * 37).toString()
+            "${if (i == 0) 'M' else 'L'}0.${x}9 0.${y}1" + if (i % 3 == 2) " Z" else ""
+        }
+        val path = assertNotNull(Values.read("shape", "path($raw)"))
+        val written = ThemeWriter.value("shape", path)
+        assertTrue(written.removeSurrounding("path(", ")").length <= ShapePath.MAX_LENGTH, "${written.length}")
+        assertEquals(path, Values.read("shape", written))
     }
 
     private companion object {

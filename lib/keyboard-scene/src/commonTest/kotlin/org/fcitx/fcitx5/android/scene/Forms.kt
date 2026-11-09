@@ -131,8 +131,8 @@ object Forms {
      * column, the top row's last slot empty (PopupKeyboardUi's order); the edit menu's icons, its
      * middle in focus and its last disabled (a password field's); 手写's 注 menu of words.
      */
-    fun popups(env: Env): List<Pair<String, () -> Scene>> {
-        val b = SceneBuilder(Fixtures.materialLight, env, FakeMeasurer)
+    fun popups(env: Env, theme: Theme = Fixtures.materialLight): List<Pair<String, () -> Scene>> {
+        val b = SceneBuilder(theme, env, FakeMeasurer)
         val key = 36 * env.density
         val letters = listOf("a", "b", "c", "d", "e", "f", "g")
         val edit = listOf("select-all", "cut", "copy", "paste", "undo").map { MenuCell(it, it) }

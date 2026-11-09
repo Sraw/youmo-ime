@@ -20,6 +20,8 @@ package org.fcitx.fcitx5.android.scene.theme
  * - A style's selectors joined by `, `, each as [selector] writes it; its properties in
  *   [Values.PROPERTIES]' order and then [Values.KEYBOARD_SIZES]', each as [value] writes it. A style
  *   that sets nothing is left out.
+ * - A `path(…)` absolute (`M0 0 L1 0 Q1 1 0 1 Z`), a command to each segment; a bubble's size in %, a
+ *   depth and offset in dp.
  * - Fonts and icons by name.
  *
  * Not a faithful exporter of a 4.0 file whose `<colors>` use `system()` or other colours (`@name`,
@@ -136,6 +138,8 @@ object ThemeWriter {
         is Value.Word -> v.word
         is Value.Flag -> v.on.toString()
         is Value.Number -> number(property, v.number)
+        is Value.Percent -> "${number(v.percent)}%"
+        is Value.OfPath -> "path(${path(v.path)})"
         is Value.OfShown -> shown(v.shown)
         // one value where upright and turned are alike
         is Value.OfTwin -> listOf(v.twin.portrait, v.twin.landscape).distinct()
@@ -156,8 +160,23 @@ object ThemeWriter {
         "scale" -> "${number(n)}%"
         "size" -> "${number(n)}sp"
         "letter-spacing" -> "${number(n)}em"
+        "depth", "offset" -> length(n)
         else -> number(n)
     }
+
+    // every segment absolute, a command each: read back, the same segments (as read, to six decimals: the
+    // written text never longer than ShapePath.MAX_LENGTH)
+    private fun path(p: ShapePath): String = p.segments.joinToString(" ") { s ->
+        when (s) {
+            is ShapePath.Segment.Move -> "M${xy(s.x, s.y)}"
+            is ShapePath.Segment.Line -> "L${xy(s.x, s.y)}"
+            is ShapePath.Segment.Quad -> "Q${xy(s.cx, s.cy)} ${xy(s.x, s.y)}"
+            is ShapePath.Segment.Cubic -> "C${xy(s.c1x, s.c1y)} ${xy(s.c2x, s.c2y)} ${xy(s.x, s.y)}"
+            ShapePath.Segment.Close -> "Z"
+        }
+    }
+
+    private fun xy(x: Double, y: Double): String = "${number(x)} ${number(y)}"
 
     private fun shown(s: Shown): String = when (s) {
         Shown.ImeName -> "ime-name"

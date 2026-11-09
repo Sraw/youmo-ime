@@ -1,0 +1,13 @@
+scene 99x304
+key preview kind=preview a11y="g"
+  bounds 0,0,99,304
+  shape path(M0,0 L99,0 L99,182.4 L59.4,182.4 L49.5,228 L39.6,182.4 L0,182.4 Z)
+  hit rect(0,0,99,304)
+  anchor 49.5,152 up 0,-1
+  text label="g"
+  normal
+    shadow path(M0,5.25 L99,5.25 L99,187.65 L59.4,187.65 L49.5,233.25 L39.6,187.65 L0,187.65 Z) blur=5.25 #33000000
+    fill path(M0,0 L99,0 L99,182.4 L59.4,182.4 L49.5,228 L39.6,182.4 L0,182.4 Z) #ffd9dbdd
+    inner-shadow path(M0,0 L99,0 L99,182.4 L59.4,182.4 L49.5,228 L39.6,182.4 L0,182.4 Z) hole=path(M0,5.25 L99,5.25 L99,187.65 L59.4,187.65 L49.5,233.25 L39.6,187.65 L0,187.65 Z) ring=-11.5,-11.5,110.5,244.75 blur=5.25 #30000000
+    text "g" 31.39,85.64 system 400 60.38 #ff37474f
+  pressed the same

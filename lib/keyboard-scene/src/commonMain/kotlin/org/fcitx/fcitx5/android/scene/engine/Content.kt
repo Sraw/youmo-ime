@@ -128,8 +128,9 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
     }
 
     private fun edge(content: Box, face: FaceGeometry?, snap: Boolean): KeyMarkYield.Edge {
-        // the face's corners where it is what the content is in (a bar's or a circle's are not: its box's then)
-        val radii = face?.pressed?.takeIf { it.box == content }?.radii ?: Shape.NO_RADII
+        // the face's corners where it is what the content is in (a bar's or a circle's are not: its box's then;
+        // a path's neither, its marks kept in its box as a rectangle's)
+        val radii = (face?.pressed as? Shape.Rect)?.takeIf { it.box == content }?.radii ?: Shape.NO_RADII
         val line = face?.border ?: 0.0
         // where the yields are worked out (not [snap]): the face half a px in each side, the most a whole
         // pixel's rounding takes off it, so what fits there fits the face as drawn
