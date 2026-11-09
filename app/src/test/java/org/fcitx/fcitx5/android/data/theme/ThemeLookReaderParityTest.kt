@@ -79,7 +79,7 @@ class ThemeLookReaderParityTest {
             "duplicate key" to edited("\"isDark\": true", "\"isDark\": false, \"isDark\": true"),
             "quoted number" to edited("\"radiusDp\": 8", "\"radiusDp\": \"8\""),
             "quoted boolean" to edited("\"isDark\": true", "\"isDark\": \"true\""),
-            "byte order mark" to "﻿" + source,
+            "byte order mark" to "\uFEFF" + source,
             "control character" to edited("\"full\"", "\"fu\u0001ll\""),
             "raw tab" to edited("\"full\"", "\"fu\tll\""),
             "decimal int" to edited("\"radiusDp\": 8", "\"radiusDp\": 8.0"),

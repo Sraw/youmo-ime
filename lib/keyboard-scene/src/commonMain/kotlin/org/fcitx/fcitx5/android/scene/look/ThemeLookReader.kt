@@ -23,7 +23,8 @@ data class ThemeLookFile(val name: String, val dark: Boolean, val look: ThemeLoo
 object ThemeLookReader {
     const val VERSION = "3.0"
 
-    // whatever else goes wrong (a bug of ours a file finds) a problem of the file too, as ThemeReader has it
+    // whatever else goes wrong (a bug of ours a file finds) a problem of the file too, as ThemeReader has it;
+    // an exception, not an Error (out of memory is not the file's); the file's shape is fixed, no recursion
     @Suppress("TooGenericExceptionCaught")
     fun read(source: String): Parsed<ThemeLookFile> = when (val json = Json.parse(source)) {
         is Parsed.Failed -> json
@@ -31,7 +32,7 @@ object ThemeLookReader {
             Parsed.Ok(file(json.value))
         } catch (e: ShapeException) {
             Parsed.Failed(e.line, e.message.orEmpty())
-        } catch (e: Throwable) {
+        } catch (e: Exception) {
             Parsed.Failed(0, "the theme could not be read: ${e::class.simpleName}")
         }
     }

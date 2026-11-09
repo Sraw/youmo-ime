@@ -40,6 +40,9 @@ object Json {
     /**
      * The value [source] is, or why not. A file comes from anywhere: whatever else goes wrong reading
      * it (a bug of ours it finds) is a problem of the file too, never a crash, as ThemeReader has it.
+     * An exception only, not any Throwable: an Error (out of memory) is not the file's. No stack
+     * overflows here, the reader recursing [MAX_DEPTH] deep at most (and common Kotlin has no
+     * StackOverflowError to name).
      */
     @Suppress("TooGenericExceptionCaught")
     fun parse(source: String): Parsed<JsonValue> =
@@ -50,7 +53,7 @@ object Json {
                 Parsed.Ok(JsonReader(source).document())
             } catch (e: JsonException) {
                 Parsed.Failed(e.line, e.message.orEmpty())
-            } catch (e: Throwable) {
+            } catch (e: Exception) {
                 Parsed.Failed(0, "the file could not be read: ${e::class.simpleName}")
             }
         }
@@ -220,6 +223,6 @@ private class JsonReader(private val s: String) {
         const val HEX = "0123456789abcdefABCDEF"
         const val HEX_DIGITS = 4
         const val HEX_RADIX = 16
-        const val BOM = '﻿'
+        const val BOM = '\uFEFF'
     }
 }
