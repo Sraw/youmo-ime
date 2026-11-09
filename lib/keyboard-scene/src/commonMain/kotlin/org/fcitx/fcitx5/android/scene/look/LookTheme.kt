@@ -224,12 +224,7 @@ object LookTheme {
             }
         }
         darkened(keys, darkened, beforeFlat = false)
-        // a face of its own and no pressed one: pressed as its kind (3.0's own ?: all ?: kind), which its fill, an
-        // id's, would outrank; each kind's on the key's own name, after its flat style (the tie the kind's wins too)
-        overrides.filterValues { it.fill != null && it.pressed == null }.keys.toList().takeIf { it.isNotEmpty() }?.let { ks ->
-            kinds(keys).forEach { (kind, k, color) -> pressed(ks.of(kind = kind, state = PRESSED), k.pressed, color) }
-            pressed(ks.of(FLAT, "space", PRESSED), keys.space.pressed, SPACE_BAR)
-        }
+        kindsPressed(keys, overrides)
         overrides.filterValues { it.label == KeyLabel.Hide }.keys.toList().takeIf { it.isNotEmpty() }
             ?.let { add(it.of(part = "label"), "hidden" to Value.Flag(true)) }
         // a board's key that shows its label where its role's on every board hides theirs: as an id, it wins
@@ -245,6 +240,15 @@ object LookTheme {
      */
     internal fun resolved(overrides: Map<String, KeyOverride>): Map<String, KeyOverride> = overrides.mapValues { (name, own) ->
         role(overrides, name)?.let { all -> KeyOverride(own.fill ?: all.fill, own.pressed ?: all.pressed, own.label) } ?: own
+    }
+
+    // [overrides] of a face of their own and no pressed one: pressed as their kind (3.0's own ?: all ?: kind), which
+    // their fill, an id's, would outrank; each kind's on the keys' own names, after their flat style (the tie the
+    // kind's wins too), one style a kind for them all
+    private fun Styles.kindsPressed(keys: Keys, overrides: Map<Selector, KeyOverride>) {
+        val ks = overrides.filterValues { it.fill != null && it.pressed == null }.keys.toList().takeIf { it.isNotEmpty() } ?: return
+        kinds(keys).forEach { (kind, k, color) -> pressed(ks.map { it.with(kind = kind, state = PRESSED) }, k.pressed, color) }
+        pressed(ks.map { it.with(FLAT, "space", PRESSED) }, keys.space.pressed, SPACE_BAR)
     }
 
     // each kind's class, its look and its colour
