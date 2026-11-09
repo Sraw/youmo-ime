@@ -16,8 +16,11 @@ import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Cascade
 import org.fcitx.fcitx5.android.scene.theme.KeyLook
 import org.fcitx.fcitx5.android.scene.theme.Selector
+import org.fcitx.fcitx5.android.scene.theme.ShapePath
 import org.fcitx.fcitx5.android.scene.theme.TextLook
 import org.fcitx.fcitx5.android.scene.theme.Theme
+import org.fcitx.fcitx5.android.scene.theme.Values
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.min
@@ -68,6 +71,13 @@ object Popups {
     const val MENU_PILL_SIDE_DP = 2.0
     const val MENU_TEXT_DP = 14.0
 
+    /**
+     * A `shape="bubble"` bubble's tail (060-render-p3 T4b): this tall below its head, this wide at most (a
+     * third of the head at most, and clear of its corners), both by the bubble's `size`.
+     */
+    const val TAIL_DP = 10.0
+    const val TAIL_WIDTH_DP = 16.0
+
     /** A cell that picks nothing (the edit menu's in a password field) drawn this much of itself. */
     const val DISABLED_ALPHA = 0.3
 
@@ -90,7 +100,11 @@ data class MenuCell(val label: String, val icon: String?)
  * it draws the keyboard. Its looks are the theme's `preview`, `popup` and `menu`, the one in focus
  * `:selected`, a cell that picks nothing `:disabled`.
  *
- * The bubble is one key (its shape a rectangle for now; a tail, a path, is 4.0's). A long press's keys
+ * The bubble is one key: a rectangle down to the key's bottom as theme 3.0's, or (060-render-p3 T4b) the
+ * theme's `path(…)` in that box, or a `bubble`, a rounded head over the key with a tail down to it; at
+ * the theme's `size` (100–160%: its text, padding, least width, the key's width and its top row, the
+ * row growing up) and moved down by its `offset` (up where negative; never lower than the key's bottom,
+ * where the app puts the scene's). A long press's keys
  * are a panel (the scene's base: `popup`'s fill and shadow) and a key a cell, drawn its text only, the
  * one in focus its `popup:selected` fill as well: a cell drawn the panel's fill and shadow again would
  * lay a shadow over the row under it. A menu's cells are each a face of its own, the one in focus
@@ -131,14 +145,38 @@ internal class PopupBuilder(
      */
     fun preview(text: String, keyWidth: Double, size: Double?): Scene {
         val (look, textLook) = look("preview")
-        val px = size ?: (Popups.SYMBOL_DP * scale() * d)
+        val s = look.size
+        val px = (size ?: (Popups.SYMBOL_DP * scale() * d)) * s
         val m = Content.measure(measurer, text, textLook, textLook.weight, px)
-        val width = maxOf(px(Popups.PREVIEW_MIN_WIDTH_DP), keyWidth, ceil(m.m.advance) + 2 * padding())
-        val box = Box(0.0, 0.0, width, px(Popups.PREVIEW_HEIGHT_DP))
-        val face = face(box, look)
-        val ops = paint.face(geometry(face, look), look, false) +
-            paint.content(m.at(width / 2, px(Popups.PREVIEW_ROW_DP) / 2, Part.Label)) { textLook }
-        return Scene(box.width, box.height, emptyList(), listOf(node("preview", "preview", face, box, emptySet(), ops, text)), emptyList())
+        val width = maxOf(px(Popups.PREVIEW_MIN_WIDTH_DP) * s, keyWidth * s, ceil(m.m.advance) + 2 * padding() * s)
+        val row = px(Popups.PREVIEW_ROW_DP) * s
+        // as tall as theme 3.0's and its row's growth; the offset's way more (up) or less (down), whole
+        // pixels as the bubble's other sizes, as many up as down
+        val reach = px(Popups.PREVIEW_HEIGHT_DP) + ceil(row - px(Popups.PREVIEW_ROW_DP))
+        val moved = px(abs(look.offset)).let { if (look.offset < 0) -it else it }
+        val height = reach - moved
+        val box = Box(0.0, 0.0, width, min(height, reach))
+        val path = look.path
+        val face: Shape = when {
+            path != null -> path.flatten(box)
+            look.shape == Values.BUBBLE -> bubble(Box(0.0, 0.0, width, row), look, s)
+            else -> face(box, look)
+        }
+        val ops = paint.face(geometry(face, look, box), look, false) +
+            paint.content(m.at(width / 2, row / 2, Part.Label)) { textLook }
+        val bounds = Box(0.0, 0.0, width, height)
+        return Scene(width, height, emptyList(), listOf(node("preview", "preview", face, bounds, emptySet(), ops, text)), emptyList())
+    }
+
+    // a `bubble`: [head] rounded as the theme has it, a tail down from its middle unless `tail="false"`
+    private fun bubble(head: Box, look: KeyLook, s: Double): Shape {
+        val radii = Faces.radii(look.radius, head, d)
+        if (!look.tail) return Shape.Rect(head, radii)
+        // clear of the bottom corners, a third of the head at most
+        val room = head.width / 2 - maxOf(radii[2], radii[3])
+        val half = minOf(Popups.TAIL_WIDTH_DP * d * s / 2, head.width / TAIL_SHARE / 2, room)
+        if (half <= 0) return Shape.Rect(head, radii)
+        return ShapePath.roundedOutline(head, radii, half to Popups.TAIL_DP * d * s)
     }
 
     /**
@@ -168,7 +206,7 @@ internal class PopupBuilder(
         val columns = rows.maxOfOrNull { it.size } ?: 0
         val panel = Box(0.0, 0.0, columns * keys.width, rows.size * keys.height)
         val (look, _) = look("popup")
-        val base = paint.face(geometry(face(panel, look), look), look, false)
+        val base = paint.face(geometry(face(panel, look), look, panel), look, false)
         val nodes = rows.flatMapIndexed { r, row ->
             val top = panel.bottom - (r + 1) * keys.height
             row.mapIndexedNotNull { c, index ->
@@ -178,8 +216,14 @@ internal class PopupBuilder(
                 val (cellLook, textLook) = look("popup", states)
                 val face = face(cell, cellLook)
                 val m = Content.measure(measurer, label, textLook, textLook.weight, keys.size)
-                val ops = listOfNotNull(paint.fill(face, cellLook.fill).takeIf { KeyState.Selected in states }) +
-                    paint.content(m.at(cell.centerX, cell.centerY, Part.Label)) { textLook }
+                // the one in focus its face (`popup:selected`'s fill, radius, inner shadow, border), no shadow
+                val selected = if (KeyState.Selected in states) {
+                    val g = geometry(face, cellLook, cell)
+                    paint.face(FaceGeometry(face, null, g.border, face, cell, g.line), cellLook, false)
+                } else {
+                    emptyList()
+                }
+                val ops = selected + paint.content(m.at(cell.centerX, cell.centerY, Part.Label)) { textLook }
                 node("popup/$index", "popup", face, cell, states, ops, label)
             }
         }
@@ -211,7 +255,8 @@ internal class PopupBuilder(
             // theme 3.0's InsetDrawable: the cell less its inset, halved to whole pixels a side
             val half = floor((keys.height - px(if (index == selected) Popups.MENU_SELECTED_DP else Popups.MENU_FACE_DP)) / 2)
             val side = if (words) px(Popups.MENU_PILL_SIDE_DP) else half
-            val face = face(cell.inset(side, half, side, half), look)
+            val inset = cell.inset(side, half, side, half)
+            val face = face(inset, look)
             val content = if (item.icon != null) {
                 val (w, h) = icons.dp(item.icon).let { (w, h) -> w * d to h * d }
                 Drawn.of(PlacedIcon(item.icon, Box(cell.centerX - w / 2, cell.centerY - h / 2, cell.centerX + w / 2, cell.centerY + h / 2), Part.Icon))
@@ -219,27 +264,33 @@ internal class PopupBuilder(
                 val m = Content.measure(measurer, item.label, textLook, textLook.weight, keys.size)
                 m.at(cell.centerX, cell.centerY, Part.Label)
             }
-            val drawn = paint.face(geometry(face, look), look, KeyState.Selected in states) + paint.content(content) { textLook }
+            val drawn = paint.face(geometry(face, look, inset), look, KeyState.Selected in states) + paint.content(content) { textLook }
             val ops = if (KeyState.Disabled in states) drawn.map { faded(it, Popups.DISABLED_ALPHA) } else drawn
             node("menu/$index", "menu", face, cell, states, ops, item.label)
         }
         return Scene(order.size * keys.width, keys.height, emptyList(), nodes, emptyList())
     }
 
-    private fun face(box: Box, look: KeyLook) = Shape.Rect(box, Faces.radii(look.radius, box, d))
+    // a popup's face in [box]: the theme's path there (T4b), else a rectangle rounded as the theme has it
+    private fun face(box: Box, look: KeyLook): Shape = look.path?.flatten(box) ?: Shape.Rect(box, Faces.radii(look.radius, box, d))
 
     // the face's layers: its shadow as a key's (the face and its offset), but not kept within a cell,
-    // the popup over the keyboard
-    private fun geometry(face: Shape.Rect, look: KeyLook): FaceGeometry {
+    // the popup over the keyboard; its border's line as a key's ([box]: where a path is drawn)
+    private fun geometry(face: Shape, look: KeyLook, box: Box): FaceGeometry {
         val s = look.shadow
         val shadow = face.takeIf { s.color != null && (s.dx != 0.0 || s.dy != 0.0 || s.blur != 0.0) }?.let {
-            Shape.Rect(it.box.union(it.box.moved(s.dx * d, s.dy * d)), it.radii)
+            when (it) {
+                is Shape.Rect -> Shape.Rect(it.box.union(it.box.moved(s.dx * d, s.dy * d)), it.radii)
+                is Shape.Path -> it.moved(s.dx * d, s.dy * d)
+            }
         }
-        return FaceGeometry(face, shadow, look.border.width * d, face, face.box)
+        val border = look.border.width * d
+        val line = if (border > 0) Faces.line(face, border, look.path, box) else null
+        return FaceGeometry(face, shadow, border, face, face.bounds, line)
     }
 
     // a popup's piece as a key: never pressed, its pressed drawing its own (a backend asks for both)
-    private fun node(id: String, kind: String, shape: Shape.Rect, bounds: Box, states: Set<KeyState>, ops: List<Op>, label: String) = KeyNode(
+    private fun node(id: String, kind: String, shape: Shape, bounds: Box, states: Set<KeyState>, ops: List<Op>, label: String) = KeyNode(
         id = id,
         copy = 0,
         kind = kind,
@@ -262,6 +313,7 @@ internal class PopupBuilder(
         return when (op) {
             is Op.Fill -> op.copy(color = op.color.of())
             is Op.Shadow -> op.copy(color = op.color.of())
+            is Op.InnerShadow -> op.copy(color = op.color.of())
             is Op.Stroke -> op.copy(color = op.color.of())
             is Op.Ripple -> op.copy(color = op.color.of())
             is Op.Gradient -> op.copy(stops = op.stops.map { (c, at) -> c.of() to at })
@@ -278,6 +330,8 @@ internal class PopupBuilder(
     }
 
     private companion object {
+        // a tail a third of its head's width at most
+        const val TAIL_SHARE = 3.0
         const val RGB = 0x00FFFFFF
         const val ALPHA_SHIFT = 24
     }

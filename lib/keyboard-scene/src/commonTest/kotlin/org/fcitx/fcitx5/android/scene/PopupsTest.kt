@@ -20,6 +20,7 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -87,6 +88,84 @@ class PopupsTest {
         assertEquals(shape.box.bottom + 2 * d, shadow.shape.bounds.bottom, 1e-9)
         assertEquals(Op.Fill(shape, color("popupBackground")), ops[1])
         assertEquals("g", bubble.label)
+    }
+
+    private fun styled(styles: String) = SceneBuilder(
+        ThemeReader.theme(testData("material-light.xml").replace("</theme>", "$styles\n</theme>")).ok(),
+        Forms.block,
+        FakeMeasurer,
+    )
+
+    // 060-render-p3 T4b: `shape="bubble"`, a rounded head over the key, a tail down from its middle
+    @Test
+    fun aBubblesHeadIsItsTopRowItsTailDownToTheKey() {
+        val plain = builder().preview("g", 100.0).ok()
+        val s = styled("<style select=\"preview\" shape=\"bubble\"/>").preview("g", 100.0).ok()
+        assertEquals(plain.width, s.width)
+        assertEquals(plain.height, s.height, "the scene as tall: the app puts it as ever")
+        val bubble = s.keys.single()
+        val shape = assertIs<Shape.Path>(bubble.shape)
+        val row = px(Popups.PREVIEW_ROW_DP)
+        val tail = Popups.TAIL_DP * d
+        assertEquals(Box(0.0, 0.0, 100.0, row + tail), shape.bounds)
+        assertTrue(shape.contains(50.0, row + tail - 2) && !shape.contains(30.0, row + 2), "the tail in the middle, narrow")
+        assertFalse(shape.contains(0.5, 0.5), "its corners the theme's radius")
+        // drawn: its shadow, its fill, all the bubble's shape; the text in the head
+        val ops = bubble.ops(false)
+        assertEquals(Op.Fill(shape, color("popupBackground")), ops[1])
+        assertEquals(shape.moved(0.0, 2 * d), assertIs<Op.Shadow>(ops[0]).shape)
+        assertEquals(plain.texts().single(), s.texts().single())
+        // tail="false": the head alone, rounded
+        val head = styled("<style select=\"preview\" shape=\"bubble\" tail=\"false\"/>").preview("g", 100.0).ok().keys.single()
+        assertEquals(Shape.Rect(Box(0.0, 0.0, 100.0, row), List(4) { 4 * d }), head.shape)
+        // the tail a third of a narrow head at most, clear of its corners
+        val narrow = styled("<style select=\"preview\" shape=\"bubble\" radius=\"50%\"/>").preview("g", 20.0).ok().keys.single()
+        assertIs<Shape.Rect>(narrow.shape, "no room for a tail between the corners")
+        // a path: the theme's outline in the bubble's box
+        val path = styled("<style select=\"preview\" shape=\"path(M0 0 H1 V.5 L.5 1 L0 .5 Z)\"/>").preview("g", 100.0).ok().keys.single()
+        assertEquals(Box(0.0, 0.0, 100.0, plain.height), assertIs<Shape.Path>(path.shape).bounds)
+    }
+
+    // `size`: the whole bubble larger (its text, padding, width and top row, the row up), `offset` it moved
+    @Test
+    fun aBubblesSizeAndOffset() {
+        val plain = builder().preview("g", 100.0).ok()
+        val big = styled("<style select=\"preview\" size=\"150%\"/>").preview("g", 100.0).ok()
+        assertEquals(150.0, big.width)
+        val row = px(Popups.PREVIEW_ROW_DP)
+        assertEquals(plain.height + ceil(row * 1.5 - row), big.height, "taller by the row's growth: up")
+        val t = big.texts().single()
+        assertEquals(plain.texts().single().size * 1.5, t.size, 1e-9)
+        assertEquals(row * 1.5 / 2 - (-1.05 * t.size + 0.3 * t.size) / 2, t.baseline, 1e-9)
+        assertEquals(px(Popups.PREVIEW_MIN_WIDTH_DP) * 1.6, styled("<style select=\"preview\" size=\"160%\"/>").preview("g", 1.0).ok().width, 1e-9)
+        val words = styled("<style select=\"preview\" size=\"120%\"/>").preview("abcdefghij", 20.0, 16 * d).ok()
+        assertEquals(ceil(10 * 0.6 * 16 * d * 1.2) + 2 * px(Popups.TEXT_PADDING_DP) * 1.2, words.width, 1e-9)
+        // up: the scene taller by it, the bubble as tall, clear of the key's bottom; down: the scene shorter
+        val up = styled("<style select=\"preview\" offset=\"-4dp\"/>").preview("g", 100.0).ok()
+        val by = px(4.0)
+        assertEquals(plain.height + by, up.height)
+        assertEquals(plain.keys.single().shape, up.keys.single().shape)
+        val down = styled("<style select=\"preview\" offset=\"4dp\"/>").preview("g", 100.0).ok()
+        assertEquals(plain.height - by, down.height)
+        assertEquals(plain.height - by, down.keys.single().shape.bounds.bottom)
+    }
+
+    // `popup:selected`: the cell in focus a face, its radius and border the theme's (theme 3.0's had neither)
+    @Test
+    fun aLongPresssSelectedCellHasItsRadiusAndBorder() {
+        val b = styled("<style select=\"popup:selected\" radius=\"6dp\" border=\"1dp #ff112233\" inner-shadow=\"0 1dp 0 #40000000\"/>")
+        val keys = b.popupKeys(listOf("a", "b"), 2, null).ok()
+        val s = b.popup(listOf("a", "b"), listOf(listOf(0, 1)), keys, selected = 0).ok()
+        val a = s.keys.first { it.label == "a" }
+        assertEquals(listOf("Fill", "InnerShadow", "Stroke", "Text"), a.ops(false).map { it::class.simpleName })
+        val fill = assertIs<Op.Fill>(a.ops(false)[0])
+        assertEquals(List(4) { 6 * d }, assertIs<Shape.Rect>(fill.shape).radii)
+        val stroke = assertIs<Op.Stroke>(a.ops(false)[2])
+        assertEquals(d, stroke.width)
+        assertEquals(Argb(0xFF112233.toInt()), stroke.color)
+        assertEquals(fill.shape.bounds.inset(d / 2, d / 2, d / 2, d / 2), stroke.shape.bounds)
+        // the others: their text only, as ever
+        assertEquals(listOf("Text"), s.keys.first { it.label == "b" }.ops(false).map { it::class.simpleName })
     }
 
     @Test

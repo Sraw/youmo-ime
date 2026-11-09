@@ -49,6 +49,8 @@ object CanvasFrame {
             val reach = when (op) {
                 is Op.Shadow -> op.shape.bounds.let { s -> Box(s.left - op.blur, s.top - op.blur, s.right + op.blur, s.bottom + op.blur) }
                 is Op.Fill -> op.shape.bounds
+                // clipped to its shape
+                is Op.InnerShadow -> op.shape.bounds
                 is Op.Ripple -> op.shape.bounds
                 is Op.Stroke -> op.shape.bounds.let { s -> Box(s.left - op.width, s.top - op.width, s.right + op.width, s.bottom + op.width) }
                 is Op.Gradient -> op.shape.bounds

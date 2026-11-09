@@ -70,6 +70,9 @@ class CanvasFrameTest {
         // a shadow blurred 12 px reaches 7 past the bounds
         val shadow = Op.Shadow(Shape.Rect(Box(105.0, 60.0, 195.0, 150.0), listOf(0.0, 0.0, 0.0, 0.0)), 12.0, black)
         assertEquals(Box(93.0, 48.0, 207.0, 162.0), CanvasFrame.extent(bounds, listOf(shadow), 0.0))
+        // an inner shadow: clipped to its face, its ring however far out (T4b)
+        val inner = Op.InnerShadow(face, face.moved(0.0, 8.0), Box(0.0, 0.0, 400.0, 400.0), 12.0, black)
+        assertEquals(bounds, CanvasFrame.extent(bounds, listOf(inner), 0.0))
         // a text: a guess wider than its ink, never less than the bounds
         val text = Op.Text("q", 140.0, 110.0, "system", 400, 20.0, black)
         val t = CanvasFrame.extent(bounds, listOf(text), 0.0)

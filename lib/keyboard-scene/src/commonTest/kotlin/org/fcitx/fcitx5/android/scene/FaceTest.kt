@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.scene
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.engine.Faces
 import org.fcitx.fcitx5.android.scene.engine.Input
+import org.fcitx.fcitx5.android.scene.engine.Paint
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.layout.Face
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
@@ -30,6 +31,10 @@ class FaceTest {
 
     private fun look(vararg values: Pair<String, String>) =
         KeyLook(values.associate { (k, v) -> k to assertNotNull(Values.read(k, v), "$k=$v") }, theme)
+
+    // a rectangle's box and corners (a face of a path is [Shape.Path]: the tests of those say so)
+    private val Shape.box: Box get() = assertIs<Shape.Rect>(this).box
+    private val Shape.radii: List<Double> get() = assertIs<Shape.Rect>(this).radii
 
     private fun near(e: Box, a: Box) = assertTrue(
         listOf(e.left - a.left, e.top - a.top, e.right - a.right, e.bottom - a.bottom).all { abs(it) < 1e-9 },
@@ -84,6 +89,85 @@ class FaceTest {
         assertEquals(0.0, none.border)
         near(Box(2.0, 2.0, 98.0, 118.0), none.pressed.box)
         assertNull(Faces.of(Box(0.0, 0.0, 4.0, 4.0), look("inset" to "2dp"), Face.Default, true, false, d).face, "no size, no face")
+    }
+
+    // 060-render-p3 T4b: a path's face is drawn in the cell less its inset, its shadow the face moved
+    // kept in the cell; its marks' box the face's box; a flat keyboard's plain key a rectangle still
+    @Test
+    fun aPathFaceIsDrawnInTheCellLessItsInset() {
+        val triangle = "path(M.5 0 L1 1 L0 1 Z)"
+        val g = Faces.of(cell, look("shape" to triangle, "inset" to "7dp 3dp", "radius" to "8dp", "shadow" to "0 4dp 0 #ff000000"), Face.Default, true, false, d)
+        val face = assertIs<Shape.Path>(g.face)
+        near(Box(6.0, 14.0, 94.0, 106.0), face.bounds)
+        assertTrue(face.contains(50.0, 20.0) && !face.contains(10.0, 20.0), "the triangle, not its box; no radius")
+        assertEquals(g.face, g.pressed)
+        near(Box(6.0, 14.0, 94.0, 106.0), g.content)
+        val shadow = assertIs<Shape.Path>(g.shadow)
+        near(Box(6.0, 22.0, 94.0, 114.0), shadow.bounds)
+        val far = Faces.of(cell, look("shape" to triangle, "inset" to "1dp", "shadow" to "0 16dp 0 #ff000000"), Face.Default, true, false, d)
+        assertEquals(120.0, far.shadow?.bounds?.bottom, "never on the row below")
+        // its border's middle: the path again, half the border in from the box
+        val bordered = Faces.of(cell, look("shape" to triangle, "border" to "2dp #ff000000"), Face.Default, true, false, d)
+        assertEquals(4.0, bordered.border)
+        near(Box(2.0, 2.0, 98.0, 118.0), assertIs<Shape.Path>(bordered.line).bounds)
+        val flat = Faces.of(cell, look("shape" to triangle), Face.Default, true, flat = true, density = d)
+        assertIs<Shape.Rect>(flat.face, "a flat keyboard's plain key: a rectangle")
+        assertIs<Shape.Path>(Faces.of(cell, look("shape" to triangle), Face.Special, true, flat = true, density = d).face)
+        assertNull(Faces.of(cell, look("shape" to triangle), Face.None, true, false, d).face)
+    }
+
+    // `depth`: the face up by it, the band under it the face moved down, its colour the fill's darker
+    @Test
+    fun aCapsDepthIsABandUnderTheFace() {
+        val g = Faces.of(cell, look("inset" to "7dp 3dp", "radius" to "4dp", "depth" to "4dp", "shadow" to "0 1dp 0 #ff000000"), Face.Default, true, false, d)
+        val face = assertIs<Shape.Rect>(g.face)
+        near(Box(6.0, 14.0, 94.0, 98.0), face.box)
+        assertEquals(List(4) { 8.0 }, face.radii)
+        assertEquals(Shape.Rect(face.box.moved(0.0, 8.0), face.radii), g.depth)
+        assertEquals(g.face, g.pressed, "the pressed layer over the face, not the band")
+        near(Box(6.0, 14.0, 94.0, 98.0), g.content)
+        near(Box(6.0, 14.0, 94.0, 108.0), assertNotNull(g.shadow).bounds) // the shadow of the whole cap
+        // no more than half the face; a path's band its outline moved
+        val low = Faces.of(Box(0.0, 0.0, 100.0, 20.0), look("depth" to "8dp"), Face.Default, false, false, d)
+        assertEquals(10.0, assertNotNull(low.depth).bounds.top)
+        val path = Faces.of(cell, look("shape" to "path(M.5 0 L1 1 L0 1 Z)", "depth" to "2dp"), Face.Default, true, false, d)
+        assertEquals(assertNotNull(path.face).moved(0.0, 4.0), path.depth)
+        // not under a bar, a circle, a face of none; none by default
+        assertNull(Faces.of(cell, look("shape" to "bar", "depth" to "2dp"), Face.Special, true, true, d).depth)
+        assertNull(Faces.of(cell, look("shape" to "circle", "depth" to "2dp"), Face.Special, true, true, d).depth)
+        assertNull(Faces.of(cell, look("depth" to "2dp"), Face.None, true, false, d).depth)
+        assertNull(Faces.of(cell, look(), Face.Default, true, false, d).depth)
+    }
+
+    // the layers: shadow, band, fill, inner shadow, pressed, border (CSS's inset shadow over the background)
+    @Test
+    fun anInnerShadowIsInsideTheFaceUnderItsBorder() {
+        val look = look(
+            "fill" to "#ff808080", "overlay" to "#1f000000", "border" to "1dp #ff112233", "shadow" to "0 1dp 0 #ff000000",
+            "depth" to "2dp", "inner-shadow" to "1dp 2dp 3dp #80000000",
+        )
+        val g = Faces.of(cell, look, Face.Default, true, false, d)
+        val ops = Paint(theme, d).face(g, look, pressed = true)
+        assertEquals(listOf("Shadow", "Fill", "Fill", "InnerShadow", "Fill", "Stroke"), ops.map { it::class.simpleName })
+        val band = assertIs<Op.Fill>(ops[1])
+        assertEquals(g.depth, band.shape)
+        assertEquals(theme.color(assertNotNull(org.fcitx.fcitx5.android.scene.theme.ColorExpr.parse("darker(#ff808080, 20%)"))), band.color)
+        val inner = assertIs<Op.InnerShadow>(ops[3])
+        val face = assertNotNull(g.face)
+        assertEquals(face, inner.shape)
+        assertEquals(face.moved(2.0, 4.0), inner.hole)
+        assertEquals(6.0, inner.blur)
+        assertEquals(Argb(0x80000000.toInt()), inner.color)
+        // the ring as far out as the blur reaches, round the face and the hole
+        near(face.bounds.union(inner.hole.bounds).inset(-13.0, -13.0, -13.0, -13.0), inner.ring)
+        // none, transparent: no op; a path's hole is the path moved
+        assertTrue(Paint(theme, d).face(g, look("inner-shadow" to "none"), false).none { it is Op.InnerShadow })
+        assertTrue(Paint(theme, d).face(g, look("inner-shadow" to "0 1dp 0 #00000000"), false).none { it is Op.InnerShadow })
+        val pathLook = look("shape" to "path(M.5 0 L1 1 L0 1 Z)", "inner-shadow" to "0 1dp 0 #ff000000", "depth-color" to "#ff00ff00", "depth" to "1dp")
+        val pg = Faces.of(cell, pathLook, Face.Default, true, false, d)
+        val pathOps = Paint(theme, d).face(pg, pathLook, false)
+        assertEquals(Argb(0xFF00FF00.toInt()), pathOps.filterIsInstance<Op.Fill>().first().color, "depth-color")
+        assertEquals(assertNotNull(pg.face).moved(0.0, 2.0), pathOps.filterIsInstance<Op.InnerShadow>().single().hole)
     }
 
     @Test

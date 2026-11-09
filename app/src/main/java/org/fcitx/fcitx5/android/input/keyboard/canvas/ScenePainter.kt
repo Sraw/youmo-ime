@@ -88,6 +88,7 @@ class ScenePainter(
                 fill(canvas, op.shape, op.color.value)
                 paint.maskFilter = null
             }
+            is Op.InnerShadow -> innerShadow(canvas, op)
             is Op.Stroke -> {
                 plain(op.color.value)
                 paint.style = Paint.Style.STROKE
@@ -116,8 +117,31 @@ class ScenePainter(
         canvas.drawPath(pathOf(shape), paint)
     }
 
+    // inside the face, its ring less its hole filled even-odd and blurred (BlurMaskFilter draws on a hardware
+    // canvas since API 28): the face clipped first, so the ring's path may be built in the one path after
+    private fun innerShadow(canvas: Canvas, op: Op.InnerShadow) {
+        canvas.save()
+        canvas.clipPath(pathOf(op.shape))
+        path.rewind()
+        path.fillType = Path.FillType.EVEN_ODD
+        val r = op.ring
+        path.addRect(r.left.toFloat(), r.top.toFloat(), r.right.toFloat(), r.bottom.toFloat(), Path.Direction.CW)
+        add(path, op.hole)
+        plain(op.color.value)
+        if (op.blur > 0) paint.maskFilter = BlurMaskFilter(op.blur.toFloat(), BlurMaskFilter.Blur.NORMAL)
+        canvas.drawPath(path, paint)
+        paint.maskFilter = null
+        path.fillType = Path.FillType.WINDING
+        canvas.restore()
+    }
+
     private fun pathOf(shape: Shape): Path {
         path.rewind()
+        add(path, shape)
+        return path
+    }
+
+    private fun add(path: Path, shape: Shape) {
         when (shape) {
             is Shape.Rect -> {
                 val b = shape.box
@@ -138,7 +162,6 @@ class ScenePainter(
                 }
             }
         }
-        return path
     }
 
     // CSS's: 0deg up, 90deg right, the line long enough for the corners to reach the ends' colours

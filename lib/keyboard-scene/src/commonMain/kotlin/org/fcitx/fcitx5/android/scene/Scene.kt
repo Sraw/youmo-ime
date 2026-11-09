@@ -134,6 +134,14 @@ sealed interface Op {
     /** A shadow: [shape] drawn in [color], blurred [blur] px (none: a solid edge, theme 3.0's). */
     data class Shadow(val shape: Shape, val blur: Double, val color: Argb) : Op
 
+    /**
+     * A shadow inside [shape] (a theme's `inner-shadow`, CSS's inset box-shadow): [ring] less [hole] (the
+     * shape moved by the shadow's offset; the two filled even-odd) in [color], blurred [blur] px (none:
+     * sharp), and only what falls inside [shape] drawn. [ring] is far enough past [shape] that its blur is
+     * whole at [shape]'s edge.
+     */
+    data class InnerShadow(val shape: Shape, val hole: Shape, val ring: Box, val blur: Double, val color: Argb) : Op
+
     /** A line [width] px wide along [shape]'s edge, centred on it (the engine has inset it by half the width, so the line keeps inside the face). */
     data class Stroke(val shape: Shape, val width: Double, val color: Argb) : Op
 
