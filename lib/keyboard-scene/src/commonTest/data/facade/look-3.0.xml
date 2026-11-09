@@ -30,6 +30,7 @@
     <cut orientation="portrait" file="full-portrait.png"/>
     <cut orientation="landscape" file="full-landscape.png"/>
   </picture>
+  <font name="candidate" src="full-candidates.ttf"/>
   <font name="key" src="full-font.ttf"/>
   <style select="keyboard" fill="picture"/>
   <style select="bar" fill="picture(12dp, 60%)"/>
@@ -72,4 +73,5 @@
   <style select="menu" fill="@accentKey" radius="50%" color="@accentKeyText" icon-color="@accentKeyText"/>
   <style select="menu:selected" overlay="@keyPressHighlight"/>
   <style select="@floating keyboard" radius="11dp"/>
+  <style select="candidate" font="candidate" weight="400"/>
 </theme>

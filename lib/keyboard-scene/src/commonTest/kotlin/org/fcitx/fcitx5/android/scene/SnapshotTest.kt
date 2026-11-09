@@ -48,6 +48,11 @@ class PopupShot(val name: String, val env: Env, val ask: PopupAsk, val theme: Th
     val scene: Scene by lazy { ask.scene(SceneBuilder(theme.theme, env, FakeMeasurer), env) }
 }
 
+/** A sample candidate bar's scene (T6a): not a popup ask, so not in the library's shots.json. */
+class BarShot(val name: String, make: () -> Scene) {
+    val scene: Scene by lazy(make)
+}
+
 /**
  * Every scene the snapshots hold: every board of rules C in material-light in every form a phone
  * shows it in ([Forms.all]), and the states that change a board's look (dark, a table looking up,
@@ -177,7 +182,7 @@ object Shots {
      * the app drew it before; a theme's pills on a coloured bar, the first in another colour, numbered,
      * the comment its own colour, spaced; dotted, no lines between, padded by the theme; in dark.
      */
-    val bars: List<PopupShot> = listOf(
+    val bars: List<BarShot> = listOf(
         "default" to emptyList(),
         "capsule" to listOf(
             "<style select=\"bar\" fill=\"#ffeceff1\"/>",
@@ -193,9 +198,9 @@ object Shots {
         ),
         "dark" to listOf("<style select=\"@dark candidate\" fill=\"#ff263238\" color=\"#ffeceff1\"/>", "<style select=\"@dark bar\" fill=\"#ff000000\"/>"),
     ).map { (name, styles) ->
-        PopupShot("bar-$name") {
+        BarShot("bar-$name") {
             val scenes = if (name == "dark") setOf("dark") else emptySet()
-            BarSample.scene(BarLook.of(Cascades(styled(*styles.toTypedArray())), scenes), BAR, FakeMeasurer)
+            BarSample.scene(BarLook.of(Cascades(styled(*styles.toTypedArray()).theme), scenes), BAR, FakeMeasurer)
         }
     }
 
