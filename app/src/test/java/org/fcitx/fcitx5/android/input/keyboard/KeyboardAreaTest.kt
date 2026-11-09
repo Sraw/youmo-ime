@@ -78,6 +78,19 @@ class KeyboardAreaTest {
     }
 
     @Test
+    fun theKeyboardsWidthIsLessTheSidePaddingFollowed() {
+        // 393dp across: no padding, the setting's default
+        assertEquals(393, TextKeyboard.widthDp(ctx))
+        // the theme's, a fraction of a dp cut as KeyboardArea.sidePadding's: 393 - 9.5
+        theme(ThemeSizes(sidePadding = Twin(4.75, 30.0)))
+        assertEquals(383, TextKeyboard.widthDp(ctx))
+        // a level picked: the setting's
+        prefs.set(keyboard.keyboardSidePaddingFollowTheme, false)
+        prefs.set(keyboard.keyboardSidePadding, 8)
+        assertEquals(377, TextKeyboard.widthDp(ctx))
+    }
+
+    @Test
     fun aThemesHeightPastTheCapIsCut() {
         theme(ThemeSizes(height = Twin(90.0, 90.0), bottomPadding = Twin(10.0, 10.0)))
         val screen = ctx.resources.displayMetrics.heightPixels
