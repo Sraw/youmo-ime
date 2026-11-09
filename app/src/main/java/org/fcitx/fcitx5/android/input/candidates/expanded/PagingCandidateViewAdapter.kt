@@ -12,6 +12,8 @@ import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.candidates.CandidateItemUi
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
+import org.fcitx.fcitx5.android.input.candidates.SceneBar
+import org.fcitx.fcitx5.android.scene.engine.BarLook
 
 open class PagingCandidateViewAdapter(val theme: Theme) :
     PagingDataAdapter<CandidateWord, CandidateViewHolder>(diffCallback) {
@@ -35,8 +37,12 @@ open class PagingCandidateViewAdapter(val theme: Theme) :
         refresh()
     }
 
+    /** The theme's candidates (T6a): the window's, else worked out by the first candidate made. */
+    var bar: BarLook? = null
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CandidateViewHolder {
-        return CandidateViewHolder(CandidateItemUi(parent.context, theme))
+        val look = bar ?: SceneBar.look(parent.context, theme).also { bar = it }
+        return CandidateViewHolder(CandidateItemUi(parent.context, theme, look))
     }
 
     override fun onBindViewHolder(holder: CandidateViewHolder, position: Int) {

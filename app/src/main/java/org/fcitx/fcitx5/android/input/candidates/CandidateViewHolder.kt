@@ -18,10 +18,13 @@ class CandidateViewHolder(val ui: CandidateItemUi) : RecyclerView.ViewHolder(ui.
         private set
 
     fun update(newIndex: Int, newCandidate: CandidateWord) {
+        // a holder bound again at another index draws again where that changes its look (the first's own,
+        // its number: the theme's, T6a), not only its candidate
+        val moved = ui.byIndex(idx) != ui.byIndex(newIndex)
         idx = newIndex
-        if (candidate != newCandidate) {
+        if (candidate != newCandidate || moved) {
             candidate = newCandidate
-            ui.updateCandidate(newCandidate)
+            ui.updateCandidate(newCandidate, newIndex)
         }
     }
 

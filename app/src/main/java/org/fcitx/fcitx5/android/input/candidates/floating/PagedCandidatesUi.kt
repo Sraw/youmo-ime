@@ -77,7 +77,7 @@ class PagedCandidatesUi(
             when (holder) {
                 is UiHolder.Candidate -> {
                     val candidate = data.candidates[position]
-                    holder.ui.update(candidate, active = position == data.cursorIndex)
+                    holder.ui.update(candidate, active = position == data.cursorIndex, first = position == 0)
                     holder.ui.root.setOnClickListener {
                         onCandidateClick.invoke(position, candidate.text)
                     }

@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.input.bar.CandidateBarHeight
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
+import org.fcitx.fcitx5.android.input.candidates.SceneBar
 import org.fcitx.fcitx5.android.input.candidates.ReadingSpan
 import splitties.dimensions.dp
 import splitties.views.dsl.core.matchParent
@@ -52,11 +53,13 @@ abstract class GridPagingCandidateViewAdapter(theme: Theme) : PagingCandidateVie
     fun measureWidth(position: Int): Float {
         // the span lookup reads ahead of what is shown: getItem would have Paging load for it
         val candidate = peek(position) ?: return 0f
-        if (candidate.readings.isEmpty()) return measuredWidths[candidate.textWithComment()] * textScale
+        // the number or dot before it a theme asks for (T6a), as wide as drawn
+        val label = SceneBar.label(bar?.labelStyle, position + offset).let { if (it.isEmpty()) 0f else measuredWidths[it] * textScale }
+        if (candidate.readings.isEmpty()) return label + measuredWidths[candidate.textWithComment()] * textScale
         val hint = EngineState.candidateReading.value == ReadingStyle.OFF
         val key = listOf(hint, candidate.text, candidate.readings.joinToString("\u0001"), candidate.comment, candidate.spaceBetweenComment)
             .joinToString("\u0000")
-        return annotatedWidths[key] ?: annotatedWidth(candidate, hint).also { annotatedWidths.put(key, it) }
+        return label + (annotatedWidths[key] ?: annotatedWidth(candidate, hint).also { annotatedWidths.put(key, it) })
     }
 
     // the widths of words with readings, measured once each as the grid lays out again and again

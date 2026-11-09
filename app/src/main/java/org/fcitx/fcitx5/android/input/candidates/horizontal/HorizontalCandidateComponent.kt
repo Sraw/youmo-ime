@@ -5,6 +5,7 @@
 
 package org.fcitx.fcitx5.android.input.candidates.horizontal
 
+import android.graphics.Color
 import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.RectShape
 import androidx.core.view.updateLayoutParams
@@ -25,6 +26,7 @@ import org.fcitx.fcitx5.android.input.bar.CandidateSpacing
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
+import org.fcitx.fcitx5.android.input.candidates.SceneBar
 import org.fcitx.fcitx5.android.input.candidates.expanded.decoration.FlexboxVerticalDecoration
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode.AlwaysFillWidth
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode.AutoFillWidth
@@ -139,12 +141,18 @@ class HorizontalCandidateComponent :
         }
     }
 
+    // the theme's candidates (T6a): the line between them, the room beside it
+    private val barLook by lazy { SceneBar.look(context, theme) }
+
+    private val gap by lazy { SceneBar.px(context, barLook.gapDp) }
+
     private val dividerDrawable by lazy {
         ShapeDrawable(RectShape()).apply {
             val intrinsicSize = max(1, context.dp(1))
             intrinsicWidth = intrinsicSize
             intrinsicHeight = intrinsicSize
-            paint.color = theme.dividerColor
+            // none drawn: its room kept
+            paint.color = barLook.divider?.value ?: Color.TRANSPARENT
         }
     }
 
@@ -154,7 +162,7 @@ class HorizontalCandidateComponent :
             itemAnimator = null
             adapter = this@HorizontalCandidateComponent.adapter
             layoutManager = this@HorizontalCandidateComponent.layoutManager
-            addItemDecoration(FlexboxVerticalDecoration(dividerDrawable))
+            addItemDecoration(FlexboxVerticalDecoration(dividerDrawable, gap))
         }
     }
 
@@ -162,7 +170,7 @@ class HorizontalCandidateComponent :
         val candidates = data.candidates
         val total = data.total
         if (english) {
-            layoutMinWidth = view.width / ENGLISH_SLOTS - dividerDrawable.intrinsicWidth
+            layoutMinWidth = view.width / ENGLISH_SLOTS - dividerDrawable.intrinsicWidth - gap
             // fewer words keep their slots, not the whole bar
             layoutFlexGrow = if (candidates.size < ENGLISH_SLOTS) 0f else 1f
             secondLayoutPassNeeded = false
