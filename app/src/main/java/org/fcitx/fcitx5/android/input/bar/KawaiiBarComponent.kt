@@ -328,11 +328,13 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     }
                     else -> {
                         isToolbarManuallyToggled = !expandToolbarByDefault
-                        // expanded by hand: a clip's suggestion let go, or the next evaluation (a field started
-                        // again) would take the toolbar back to it
-                        isClipboardFresh = false
-                        clipboardTimeoutJob?.cancel()
-                        clipboardTimeoutJob = null
+                        // expanded by hand over the clip's suggestion: let go, or the next evaluation would take the
+                        // toolbar back to it; one under a calculation or the number row, not yet seen, kept
+                        if (idleUi.currentState == IdleUiPolicy.Display.Clipboard) {
+                            isClipboardFresh = false
+                            clipboardTimeoutJob?.cancel()
+                            clipboardTimeoutJob = null
+                        }
                         idleUi.updateState(IdleUiPolicy.Display.Toolbar, fromUser = true)
                     }
                 }
@@ -388,7 +390,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 }
                 setOnLongClickListener {
                     shownEntry?.let {
-                        AppUtil.launchClipboardEdit(context, it.id, true)
+                        AppUtil.launchClipboardEdit(context, it.id, lastEntry = it.id == ClipboardManager.lastEntry?.id)
                     }
                     true
                 }

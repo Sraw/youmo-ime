@@ -418,6 +418,27 @@ class ToolbarUatTest {
         assertEquals("12*3.5=42", h.field.text.toString())
     }
 
+    // a copy's suggestion under a sum's result, not yet seen: the toolbar expanded by hand then keeps it, offered
+    // once the result goes (the cursor moved off the =)
+    @Test
+    fun aClipUnderASumsResultOutlivesTheToolbarExpanded() {
+        harness = KeyboardHarness(im = KeyboardHarness.ENGLISH)
+        h.start()
+        h.copied("公园")
+        fun offered() = KeyboardHarness.all(h.inputView).any { h.shown(it) && it is TextView && it.text == "公园" }
+        h.waitFor("公园 offered") { offered() }
+        typed("12*3")
+        h.emit(HostEvent.Commit("=", -1))
+        button("= 36")
+        assertFalse("under the result", offered())
+        h.tap(h.described(s(R.string.expand_toolbar)))
+        h.relayout()
+        h.field.setSelection(0)
+        h.idle()
+        h.relayout()
+        assertTrue("offered again: ${h.texts()}", offered())
+    }
+
     @Test
     @Uat("TB-28")
     fun copyingNothingLeavesTheCursor() {
