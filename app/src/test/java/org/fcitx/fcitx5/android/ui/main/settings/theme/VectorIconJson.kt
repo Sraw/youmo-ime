@@ -14,12 +14,19 @@ import javax.xml.parsers.DocumentBuilderFactory
 /**
  * A vector drawable of the app's as the theme maker's page draws it (`youmo-icons`, `youmo-engine-icons`):
  * its viewport and paths, `{vw, vh, paths: [{d, rule?, stroke?, alpha?, transform?}]}`, each filled in the
- * tint unless stroked, a group's transform written as SVG's.
+ * tint unless stroked, a group's transform written as SVG's. What the page would draw otherwise than the app is
+ * refused, so a drawable that has it fails the test that writes the icons: a clip-path, a path of no colour or
+ * of both a fill and a stroke, a stroke's alpha, cap, join or miter limit other than VectorDrawable's defaults
+ * (the page's painter sets those: butt, miter, 4).
  */
 object VectorIconJson {
-    fun of(name: String): String {
-        val file = File("src/main/res/drawable/$name.xml").takeIf { it.exists() }
-            ?: File("app/src/main/res/drawable/$name.xml")
+    fun of(name: String): String = of(
+        name,
+        File("src/main/res/drawable/$name.xml").takeIf { it.exists() } ?: File("app/src/main/res/drawable/$name.xml"),
+    )
+
+    /** [file] (the drawable [name]) as the page draws it. */
+    fun of(name: String, file: File): String {
         val doc = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
             .newDocumentBuilder().parse(file)
         val root = doc.documentElement
@@ -30,14 +37,19 @@ object VectorIconJson {
                 for (i in 0 until children.length) {
                     val c = children.item(i) as? Element ?: continue
                     when (c.tagName) {
+                        "clip-path" -> error("$name: a clip-path, which the page does not draw")
                         "group" -> visit(c, listOfNotNull(transform, groupTransform(c, ::attr)).joinToString(" ").ifEmpty { null })
                         "path" -> add(
                             buildJsonObject {
+                                val fill = attr(c, "fillColor") != null
+                                val stroke = attr(c, "strokeColor") != null
+                                check(fill != stroke) { "$name: a path of ${if (fill) "both a fill and a stroke" else "no colour"}, which the page draws in one tint" }
+                                for ((a, default) in STROKE_DEFAULTS) {
+                                    attr(c, a)?.let { check(it == default) { "$name: $a=\"$it\", where the page draws VectorDrawable's $default" } }
+                                }
                                 put("d", attr(c, "pathData") ?: "")
                                 attr(c, "fillType")?.let { put("rule", if (it == "evenOdd") "evenodd" else "nonzero") }
-                                if (attr(c, "strokeColor") != null && attr(c, "fillColor") == null) {
-                                    put("stroke", attr(c, "strokeWidth")?.toDouble() ?: 1.0)
-                                }
+                                if (stroke) put("stroke", attr(c, "strokeWidth")?.toDouble() ?: 1.0)
                                 attr(c, "fillAlpha")?.let { put("alpha", it.toDouble()) }
                                 transform?.let { put("transform", it) }
                             },
@@ -68,4 +80,7 @@ object VectorIconJson {
     }
 
     private const val NS = "http://schemas.android.com/apk/res/android"
+
+    // a stroke's attributes the page's painter takes as these (CanvasPainter's icon)
+    private val STROKE_DEFAULTS = listOf("strokeAlpha" to "1", "strokeLineCap" to "butt", "strokeLineJoin" to "miter", "strokeMiterLimit" to "4")
 }
