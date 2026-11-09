@@ -20,7 +20,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
-import androidx.core.view.ViewCompat
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -516,8 +515,9 @@ class KeyboardPerfBaselineTest {
     }
 
     private fun shiftTap(at: PointF): KeyboardFrames.Sample {
-        val caps = onMain { capsState() }
-        val mark = onMain { frames.mark(0) { capsState() != caps } }
+        // Shift's state is the canvas's now (no button_caps view to ask): its scene made anew is the tap shown
+        val scene = onMain { canvasView()?.scene }
+        val mark = onMain { frames.mark(0) { canvasView()?.scene.let { it != null && it !== scene } } }
         val heap = Heap.now()
         val down = SystemClock.uptimeMillis()
         inject(MotionEvent.ACTION_DOWN, at, down, down)
@@ -527,9 +527,6 @@ class KeyboardPerfBaselineTest {
         inject(MotionEvent.ACTION_UP, at, down, up)
         return frames.await(mark).also { settle() }.heap(Heap.now() - heap)
     }
-
-    // Shift's state as its view tells a screen reader (set as Shift is tapped, before the frame showing it)
-    private fun capsState(): String? = keyboardFrame()?.findViewById<View>(R.id.button_caps)?.let { ViewCompat.getStateDescription(it)?.toString() }
 
     private fun canvasView(): KeyboardCanvasView? = keyboardFrame()?.let(::all)?.filterIsInstance<KeyboardCanvasView>()?.firstOrNull()
 
@@ -753,7 +750,7 @@ class KeyboardPerfBaselineTest {
         const val SHIFT_APART_MS = 400L
         const val ROTATE_SETTLE_MS = 1_000L
         const val LONG_PRESS_MS = 600L
-        const val POPUP_STEP = 0.75f
+        const val POPUP_STEP = 1f
         const val POPUP_MOVES = 5
         const val POPUP_GAP_MS = 60L
         const val POPUP_FRAME_WAIT_MS = 300L
