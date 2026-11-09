@@ -323,7 +323,14 @@ class KeyboardHarness(
     }
 
     fun idle() {
-        shadowOf(Looper.getMainLooper()).idle()
+        // as the looper's idle(), one task at a time, so that something posting itself again for ever (a layout
+        // setting off another) fails here and now, not a test hung at 100% CPU
+        val looper = shadowOf(Looper.getMainLooper())
+        var ran = 0
+        while (!looper.isIdle) {
+            check(++ran <= IDLE_TASKS) { "the main looper never idles: $IDLE_TASKS tasks run, more posted each time" }
+            looper.runOneTask()
+        }
         selectionDelivered()
     }
 
@@ -793,7 +800,9 @@ class KeyboardHarness(
     }
 
     companion object {
-        
+        // tasks one idle() runs before it calls the looper stuck: far more than any test posts in one go
+        private const val IDLE_TASKS = 10_000
+
         // a host never up fails the test, not hangs it
         private const val READY_TIMEOUT_MS = 30_000L
 
