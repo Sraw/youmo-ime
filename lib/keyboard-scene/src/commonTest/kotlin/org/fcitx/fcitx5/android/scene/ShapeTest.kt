@@ -98,6 +98,8 @@ class ShapeTest {
         assertEquals(ShapePath.parse("M0 0 L1 0 L1 1 L0 1 Z"), ShapePath.parse("M0 0 1 0 1 1 0 1Z"))
         assertEquals(ShapePath.parse("M0.5 0.5 L1 1 L0 1 Z"), ShapePath.parse("M.5.5L1 1 0 1z"))
         assertEquals(ShapePath.parse("M0.5 0 L1 1 L0 1 Z"), ShapePath.parse("m.5 0 l.5 1 h-1 z"))
+        // every point to six decimals (a relative sum's 0.30000000000000004 0.3), a second Z in a row dropped
+        assertEquals(ShapePath.parse("M0.1 0 L0.3 0 L0.123457 1 Z"), ShapePath.parse("m.1 0 h.2 L.1234567 1 Z z Z"))
         // a Z goes back to its sub-path's start; two sub-paths, each its own outline
         val two = assertNotNull(ShapePath.parse("M0 0 H.4 V1 Z M.6 0 H1 V1 Z")).flatten(Box(0.0, 0.0, 10.0, 10.0))
         assertEquals(2, two.ops.count { it is MoveTo })

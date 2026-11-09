@@ -307,7 +307,8 @@ object Values {
     /** `7dp` (or `0`) as dp, within ±[max]; negative only where [signed]. */
     fun dp(raw: String, max: Double = MAX_LENGTH_DP, signed: Boolean = false): Double? {
         if (!DP.matches(raw)) return null
-        val v = if (raw == "0") 0.0 else raw.removeSuffix("dp").toDouble()
+        // -0dp as 0: written back as 0, it reads as the same value
+        val v = (if (raw == "0") 0.0 else raw.removeSuffix("dp").toDouble()) + 0.0
         return v.takeIf { (signed || it >= 0) && it >= -max && it <= max }
     }
 

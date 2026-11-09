@@ -13,14 +13,17 @@ import kotlin.math.acos
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.round
 import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
  * `shape="path(…)"` (060-render-p3 T4b, 060-render-v2 §3.1): SVG's path data, M L H V C Q Z, absolute
  * and relative, its coordinates 0–1 across and down the box it is drawn in (a key's face: its cell less
- * its inset). Kept as written, curves and all, every point made absolute; [flatten] makes it the scene's
- * [Shape.Path] of straight edges at a size, so neither the scene, the backends nor the hit test know curves.
+ * its inset). Kept as written, curves and all, every point made absolute and to six decimals (a millionth
+ * of the box, so [ThemeWriter]'s absolute text of it, [MAX_POINTS] points at most, is never longer than
+ * [MAX_LENGTH] and reads back as it), a second Z in a row dropped (it draws nothing); [flatten] makes it the
+ * scene's [Shape.Path] of straight edges at a size, so neither the scene, the backends nor the hit test know curves.
  */
 data class ShapePath(val segments: List<Segment>) {
     sealed interface Segment {
@@ -252,6 +255,7 @@ data class ShapePath(val segments: List<Segment>) {
             }
 
             private fun add(s: Segment) {
+                if (s == Segment.Close && out.last() == Segment.Close) return
                 out += s
                 when (s) {
                     is Segment.Move -> {
@@ -275,11 +279,11 @@ data class ShapePath(val segments: List<Segment>) {
                 points += written
             }
 
-            // the next number from [o], or null where there is none or it is out of the box
+            // the next number from [o], to six decimals (never -0), or null where there is none or it is out of the box
             private fun coord(o: Double): Double? {
                 val v = tokens.getOrNull(i) as? Double ?: return null
                 i++
-                return (o + v).takeIf { it >= -SLACK && it <= 1 + SLACK }?.coerceIn(0.0, 1.0)
+                return (o + v).takeIf { it >= -SLACK && it <= 1 + SLACK }?.let { round(it.coerceIn(0.0, 1.0) * GRID) / GRID + 0.0 }
             }
 
             private fun pair(ox: Double, oy: Double): Pair<Double, Double>? {
@@ -329,6 +333,8 @@ data class ShapePath(val segments: List<Segment>) {
             return if (n == 0) -1 else i
         }
 
+        // a coordinate's steps: six decimals, each at most 8 characters written ("0.123456")
+        private const val GRID = 1e6
         private const val SPACES = " ,\t\n\r"
         private const val CUBIC_POINTS = 3
         private const val COMMANDS = "MmLlHhVvCcQqZz"
