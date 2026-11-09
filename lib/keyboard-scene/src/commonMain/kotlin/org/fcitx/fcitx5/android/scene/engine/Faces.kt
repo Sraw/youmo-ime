@@ -61,7 +61,8 @@ object Faces {
         val capped = face != Face.None && (path != null || shape !in listOf("bar", "circle"))
         val depth = if (capped) min(look.depth * density, maxOf(0.0, inner.height / 2)) else 0.0
         val top = inner.inset(0.0, 0.0, 0.0, depth)
-        val faceShape: Shape = path?.flatten(top) ?: rect(shape, cell, top, look, density)
+        // a path only in a box of some size: one turned inside out (an inset past the cell) would draw it mirrored, out of the cell
+        val faceShape: Shape = path?.takeIf { top.hasSize }?.flatten(top) ?: rect(shape, cell, top, look, density)
         val drawn = faceShape.takeIf { face != Face.None && it.bounds.hasSize }
         // the cap: the face's outline moved down by the depth (a path's, or the rectangle the face is up from)
         val cap = drawn?.takeIf { depth > 0 }?.moved(0.0, depth)

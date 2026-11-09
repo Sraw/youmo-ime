@@ -64,11 +64,18 @@ class Cascade(theme: Theme, private val scene: Set<String>) {
     @Suppress("UNCHECKED_CAST")
     fun <T : Any> kept(key: KeptKey<T>, make: () -> T): T = keptLooks.getOrPut(key, make) as T
 
-    // what the styles selecting [target] set, nothing inherited
-    private fun own(target: Selector.Target): Map<String, Value> {
+    /**
+     * What only the styles selecting [target] by a selector naming [state] set, laid over each other as
+     * [of]'s are: a long press's key in focus takes its border from `popup:selected`, not the panel's `popup`.
+     * Not kept: asked once a popup.
+     */
+    fun stated(target: Selector.Target, state: String): Map<String, Value> = own(general(target)) { state in it.states }
+
+    // what the styles selecting [target] set (by a selector [by] takes), nothing inherited
+    private fun own(target: Selector.Target, by: (Selector) -> Boolean = { true }): Map<String, Value> {
         val best = HashMap<Style, Int>()
         fun from(bucket: Bucket) = index[bucket]?.forEach { (sel, style) ->
-            if (sel.selects(target) && sel.specificity > (best[style] ?: -1)) best[style] = sel.specificity
+            if (by(sel) && sel.selects(target) && sel.specificity > (best[style] ?: -1)) best[style] = sel.specificity
         }
         from(Bucket(target.widget, target.part, null))
         if (target.key != null) from(Bucket(target.widget, target.part, target.key))

@@ -44,7 +44,8 @@ internal class Paint(private val theme: Theme, private val density: Double) {
             val c = theme.color(shadow.color)
             if (!c.transparent) add(Op.Shadow(g.shadow, shadow.blur * density, c))
         }
-        g.depth?.let { cap -> look.depthColor.takeUnless { it.transparent }?.let { add(Op.Fill(cap, it)) } }
+        // the band less the face, so a translucent face shows none of it through
+        g.depth?.let { cap -> look.depthColor.takeUnless { it.transparent }?.let { add(Op.Fill(cap, it, face)) } }
         if (face != null) fill(face, look.fill)?.let(::add)
         if (face != null) inner(face, look)?.let(::add)
         val overlay = look.overlay?.takeIf { !it.transparent && look.press != "face" }

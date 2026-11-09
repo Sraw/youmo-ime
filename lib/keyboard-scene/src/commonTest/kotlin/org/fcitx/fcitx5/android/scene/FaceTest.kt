@@ -89,6 +89,11 @@ class FaceTest {
         assertEquals(0.0, none.border)
         near(Box(2.0, 2.0, 98.0, 118.0), none.pressed.box)
         assertNull(Faces.of(Box(0.0, 0.0, 4.0, 4.0), look("inset" to "2dp"), Face.Default, true, false, d).face, "no size, no face")
+        // a path's neither: its box turned inside out would draw it mirrored, out of the cell
+        val path = Faces.of(Box(0.0, 0.0, 4.0, 4.0), look("inset" to "2dp", "shape" to "path(M0 0 H1 V1 Z)", "border" to "1dp #ff000000"), Face.Default, true, false, d)
+        assertNull(path.face, "no size, no path")
+        assertNull(path.line)
+        assertNull(path.depth)
     }
 
     // 060-render-p3 T4b: a path's face is drawn in the cell less its inset, its shadow the face moved
@@ -151,6 +156,8 @@ class FaceTest {
         assertEquals(listOf("Shadow", "Fill", "Fill", "InnerShadow", "Fill", "Stroke"), ops.map { it::class.simpleName })
         val band = assertIs<Op.Fill>(ops[1])
         assertEquals(g.depth, band.shape)
+        assertEquals(g.face, band.less, "the band less the face: none of it under a translucent face")
+        assertNull(assertIs<Op.Fill>(ops[2]).less)
         assertEquals(theme.color(assertNotNull(org.fcitx.fcitx5.android.scene.theme.ColorExpr.parse("darker(#ff808080, 20%)"))), band.color)
         val inner = assertIs<Op.InnerShadow>(ops[3])
         val face = assertNotNull(g.face)

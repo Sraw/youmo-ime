@@ -119,8 +119,11 @@ class SlotNode(val kind: String, val id: String?, val bounds: Box, val ops: List
  * A backend draws them in order and computes nothing.
  */
 sealed interface Op {
-    /** A solid colour over [shape]. */
-    data class Fill(val shape: Shape, val color: Argb) : Op
+    /**
+     * A solid colour over [shape], less what is inside [less] where given (a key cap's band under a face
+     * that may be translucent: only what shows below the face).
+     */
+    data class Fill(val shape: Shape, val color: Argb, val less: Shape? = null) : Op
 
     /** A linear gradient over [shape], [angle] degrees, its stops (colour, 0–1). */
     data class Gradient(val shape: Shape, val angle: Double, val stops: List<Pair<Argb, Double>>) : Op
@@ -136,7 +139,7 @@ sealed interface Op {
 
     /**
      * A shadow inside [shape] (a theme's `inner-shadow`, CSS's inset box-shadow): [ring] less [hole] (the
-     * shape moved by the shadow's offset; the two filled even-odd) in [color], blurred [blur] px (none:
+     * shape moved by the shadow's offset, filled by the same rule as [shape]) in [color], blurred [blur] px (none:
      * sharp), and only what falls inside [shape] drawn. [ring] is far enough past [shape] that its blur is
      * whole at [shape]'s edge.
      */

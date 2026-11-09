@@ -126,6 +126,32 @@ class PopupsTest {
         assertEquals(Box(0.0, 0.0, 100.0, plain.height), assertIs<Shape.Path>(path.shape).bounds)
     }
 
+    // a bubble's border inside it, its middle half its width in, as a rectangle's is: its tail's too
+    @Test
+    fun aBubblesBorderIsInsideIt() {
+        val bubble = styled("<style select=\"preview\" shape=\"bubble\" border=\"2dp #ff000000\"/>").preview("g", 100.0).ok().keys.single()
+        val face = assertIs<Shape.Path>(bubble.shape)
+        val line = assertIs<Shape.Path>(bubble.ops(false).filterIsInstance<Op.Stroke>().single().shape)
+        val w = d
+        val row = px(Popups.PREVIEW_ROW_DP)
+        val tail = Popups.TAIL_DP * d
+        val b = line.bounds
+        assertEquals(w, b.left, 1e-9)
+        assertEquals(w, b.top, 1e-9)
+        assertEquals(100.0 - w, b.right, 1e-9)
+        // the tip up by w over the sine of the tail's half angle, more than w: its edges w in
+        val half = minOf(Popups.TAIL_WIDTH_DP * d / 2, 100.0 / 6)
+        assertEquals(row + tail - w * kotlin.math.hypot(half, tail) / half, b.bottom, 1e-9)
+        for (op in line.ops) {
+            val (x, y) = when (op) {
+                is Shape.Path.Op.MoveTo -> op.x to op.y
+                is Shape.Path.Op.LineTo -> op.x to op.y
+                Shape.Path.Op.Close -> continue
+            }
+            assertTrue(face.contains(x, y), "($x, $y) inside the bubble")
+        }
+    }
+
     // `size`: the whole bubble larger (its text, padding, width and top row, the row up), `offset` it moved
     @Test
     fun aBubblesSizeAndOffset() {
@@ -137,17 +163,28 @@ class PopupsTest {
         val t = big.texts().single()
         assertEquals(plain.texts().single().size * 1.5, t.size, 1e-9)
         assertEquals(row * 1.5 / 2 - (-1.05 * t.size + 0.3 * t.size) / 2, t.baseline, 1e-9)
-        assertEquals(px(Popups.PREVIEW_MIN_WIDTH_DP) * 1.6, styled("<style select=\"preview\" size=\"160%\"/>").preview("g", 1.0).ok().width, 1e-9)
+        // its width whole pixels, as the view's is: up to the next where scaled to a fraction
+        assertEquals(ceil(px(Popups.PREVIEW_MIN_WIDTH_DP) * 1.6), styled("<style select=\"preview\" size=\"160%\"/>").preview("g", 1.0).ok().width, 1e-9)
         val words = styled("<style select=\"preview\" size=\"120%\"/>").preview("abcdefghij", 20.0, 16 * d).ok()
-        assertEquals(ceil(10 * 0.6 * 16 * d * 1.2) + 2 * px(Popups.TEXT_PADDING_DP) * 1.2, words.width, 1e-9)
-        // up: the scene taller by it, the bubble as tall, clear of the key's bottom; down: the scene shorter
+        assertEquals(ceil(ceil(10 * 0.6 * 16 * d * 1.2) + 2 * px(Popups.TEXT_PADDING_DP) * 1.2), words.width, 1e-9)
+        val larger = styled("<style select=\"preview\" size=\"130%\"/>")
+        assertEquals(129.0, larger.preview("g", 97.0).ok().width, "the least, 99 px, by 1.3: 128.7")
+        assertEquals(257.0, larger.preview("g", 197.0).ok().width, "the key's 197 px by 1.3: 256.1")
+        // up: the scene taller by it, the bubble as tall, clear of the key's bottom
         val up = styled("<style select=\"preview\" offset=\"-4dp\"/>").preview("g", 100.0).ok()
         val by = px(4.0)
         assertEquals(plain.height + by, up.height)
         assertEquals(plain.keys.single().shape, up.keys.single().shape)
+        // down: the scene shorter, the bubble as tall, its bottom past the scene's (the app draws it in the room round it)
         val down = styled("<style select=\"preview\" offset=\"4dp\"/>").preview("g", 100.0).ok()
         assertEquals(plain.height - by, down.height)
-        assertEquals(plain.height - by, down.keys.single().shape.bounds.bottom)
+        assertEquals(plain.keys.single().shape, down.keys.single().shape)
+        assertEquals(plain.height, down.keys.single().ops(false).filterIsInstance<Op.Fill>().single().shape.bounds.bottom)
+        // a bubble's head moved down as much, its tail too, the scene's top moved
+        val bubble = styled("<style select=\"preview\" shape=\"bubble\" offset=\"4dp\"/>").preview("g", 100.0).ok()
+        assertEquals(plain.height - by, bubble.height)
+        val path = styled("<style select=\"preview\" shape=\"path(M0 0 H1 V1 H0 Z)\" offset=\"4dp\"/>").preview("g", 100.0).ok()
+        assertEquals(Box(0.0, 0.0, 100.0, plain.height), path.keys.single().shape.bounds, "a path as tall too")
     }
 
     // `popup:selected`: the cell in focus a face, its radius and border the theme's (theme 3.0's had neither)
@@ -166,6 +203,28 @@ class PopupsTest {
         assertEquals(fill.shape.bounds.inset(d / 2, d / 2, d / 2, d / 2), stroke.shape.bounds)
         // the others: their text only, as ever
         assertEquals(listOf("Text"), s.keys.first { it.label == "b" }.ops(false).map { it::class.simpleName })
+    }
+
+    // the panel's border, inner shadow and shape its own: the cell in focus takes them only from a style naming
+    // `:selected`, its fill and radius as they cascade (decided 2026-11-09)
+    @Test
+    fun aLongPresssSelectedCellTakesItsBorderOnlyFromSelected() {
+        val panel = "<style select=\"popup\" radius=\"5dp\" border=\"2dp #ff445566\" inner-shadow=\"0 1dp 0 #40000000\" shape=\"path(M0 0 H1 V1 Z)\"/>"
+        fun cell(styles: String): KeyNode {
+            val b = SceneBuilder(ThemeReader.theme(testData("material-light.xml").replace("</theme>", "$styles\n</theme>")).ok(), Forms.block.copy(dark = true), FakeMeasurer)
+            val keys = b.popupKeys(listOf("a", "b"), 2, null).ok()
+            val s = b.popup(listOf("a", "b"), listOf(listOf(0, 1)), keys, selected = 0).ok()
+            assertTrue(s.base.any { it is Op.Stroke } && s.base.any { it is Op.InnerShadow }, "the panel's drawn on it")
+            return s.keys.first { it.label == "a" }
+        }
+        val plain = cell(panel)
+        assertEquals(listOf("Fill", "Text"), plain.ops(false).map { it::class.simpleName })
+        assertEquals(List(4) { 5 * d }, assertIs<Shape.Rect>(plain.shape).radii, "a rectangle, the panel's radius")
+        // a later style of the panel as specific as `popup:selected` (a scene's) does not take its border away
+        val selected = cell("<style select=\"popup:selected\" border=\"1dp #ff112233\"/>\n<style select=\"@dark popup\" border=\"3dp #ff000000\"/>\n$panel")
+        val stroke = selected.ops(false).filterIsInstance<Op.Stroke>().single()
+        assertEquals(d, stroke.width)
+        assertEquals(Argb(0xFF112233.toInt()), stroke.color)
     }
 
     @Test
