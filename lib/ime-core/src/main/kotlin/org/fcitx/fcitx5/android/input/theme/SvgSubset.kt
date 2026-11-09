@@ -84,8 +84,8 @@ object SvgSubset {
     private fun attribute(name: String, value: String): String? = when (name) {
         "fill" -> "a #hex colour, none or currentColor".unless(value in FILL_WORDS || COLOR.matches(value))
         "fill-rule" -> "nonzero or evenodd".unless(value in FILL_RULES)
-        "fill-opacity", "opacity" -> "a number 0–1".unless(NUMBER.matches(value) && value.toDouble() in 0.0..1.0)
-        "width", "height" -> "a number".unless(LENGTH.matches(value))
+        "fill-opacity", "opacity" -> "a number 0–1".unless(finite(value) && value.toDouble() in 0.0..1.0)
+        "width", "height" -> "a number".unless(LENGTH.matches(value) && finite(value.removeSuffix("px")))
         "viewBox" -> "four numbers, the last two over 0".unless(viewBox(value))
         "xmlns" -> "must be $NAMESPACE".unless(value == NAMESPACE)
         else -> null
@@ -93,9 +93,12 @@ object SvgSubset {
 
     private fun String.unless(ok: Boolean): String? = if (ok) null else this
 
+    // a number a double holds: 1e999 is written as one but read as Infinity, which no drawing scales by
+    private fun finite(value: String): Boolean = NUMBER.matches(value) && value.toDouble().isFinite()
+
     private fun viewBox(value: String): Boolean {
         val v = value.trim().split(Regex("[\\s,]+"))
-        if (v.size != VIEW_BOX || !v.all(NUMBER::matches)) return false
+        if (v.size != VIEW_BOX || !v.all(::finite)) return false
         return v[2].toDouble() > 0 && v[3].toDouble() > 0
     }
 
@@ -118,6 +121,7 @@ object SvgSubset {
                 else -> {
                     if (first) return "a path starts with M"
                     val number = NUMBER.matchAt(d, i) ?: return "'${d[i]}' at ${i + 1} is no command or number"
+                    if (!number.value.toDouble().isFinite()) return "${number.value} at ${i + 1} is past a number's range"
                     count.numbers++
                     i = number.range.last + 1
                 }

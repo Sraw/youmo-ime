@@ -58,6 +58,10 @@ class SvgSubsetTest {
         assertTrue(problems("""<svg><path d="M0 0" opacity="2"/></svg>""").single().startsWith("opacity="))
         assertTrue(problems("""<svg><path d="M0 0" fill-rule="odd"/></svg>""").single().startsWith("fill-rule="))
         assertTrue(problems("""<svg width="1em"/>""").single().startsWith("width="))
+        // written as a number, read as Infinity: past what a drawing can scale by
+        assertTrue(problems("""<svg viewBox="0 0 1e999 24"/>""").single().startsWith("viewBox="))
+        assertTrue(problems("""<svg width="1e999px"/>""").single().startsWith("width="))
+        assertEquals(listOf("d=: 1e999 at 2 is past a number's range"), problems("""<svg><path d="M1e999 0"/></svg>"""))
     }
 
     @Test
