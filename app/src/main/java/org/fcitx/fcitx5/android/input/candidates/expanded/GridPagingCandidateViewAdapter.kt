@@ -5,6 +5,7 @@
 
 package org.fcitx.fcitx5.android.input.candidates.expanded
 
+import android.content.Context
 import android.content.res.Resources
 import android.graphics.Paint
 import android.graphics.Rect
@@ -67,8 +68,9 @@ abstract class GridPagingCandidateViewAdapter(theme: Theme) : PagingCandidateVie
 
     private val readingPaint = TextPaint()
 
-    // the theme's `bar height=` (T6b): the rows a bar's height each, as the bar and the flexbox window's
-    private fun barPercent(): Double = bar?.heightPercent ?: SceneBar.heightPercent()
+    // the theme's `bar height=` (T6b): the rows a bar's height each, as the bar and the flexbox window's; with no
+    // bar yet, the window's own [context]'s scenes where there is one (a row made), the app's where none (measuring)
+    private fun barPercent(context: Context? = null): Double = bar?.heightPercent ?: context?.let(SceneBar::heightPercent) ?: SceneBar.heightPercent()
 
     /**
      * [candidate]'s width with its readings ([ReadingSpan]): measured as CandidateItemUi draws them, at the
@@ -96,7 +98,7 @@ abstract class GridPagingCandidateViewAdapter(theme: Theme) : PagingCandidateVie
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CandidateViewHolder {
         return super.onCreateViewHolder(parent, viewType).apply {
             itemView.apply {
-                layoutParams = GridLayoutManager.LayoutParams(matchParent, dp(CandidateBarHeight.dp(textSp, EngineState.candidateReading.value, barPercent())))
+                layoutParams = GridLayoutManager.LayoutParams(matchParent, dp(CandidateBarHeight.dp(textSp, EngineState.candidateReading.value, barPercent(context))))
             }
         }
     }
