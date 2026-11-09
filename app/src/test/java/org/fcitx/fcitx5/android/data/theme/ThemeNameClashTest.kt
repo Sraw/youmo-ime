@@ -174,19 +174,28 @@ class ThemeNameClashTest {
         saved("monokai", 1_000_000_000_000)
         File(dir, "monokai.json").renameTo(File(dir, "foo.json"))
         saved("mine", 1_000_000_001_000)
-        // a second json of a name listed already: not listed, left as it is
+        // a second json of a name listed already: not listed; a copy of its bytes deleted (else it would bring the
+        // theme back once that is deleted), one of other bytes left as it is
         File(dir, "mine.json").copyTo(File(dir, "bar.json"))
+        File(dir, "qux.json").writeText(File(dir, "mine.json").readText().replaceFirst("{", "{ "))
         store("monokai", "mine", "x")
         val moved = move()
         assertEquals(listOf("mine", uuid("monokai")), moved.map { it.name })
         assertEquals(listOf(uuid("monokai"), "mine", "x"), stored())
-        assertEquals(setOf("bar.json", "mine.json", uuid("monokai") + ".json"), jsons())
+        assertEquals(setOf("qux.json", "mine.json", uuid("monokai") + ".json"), jsons())
+        File(dir, "qux.json").delete()
+        // one of a name not clashing moved keeps its age (the list's order)
+        saved("kept", 1_000_000_000_500)
+        File(dir, "kept.json").renameTo(File(dir, "old.json"))
+        assertEquals(listOf("mine", "kept", uuid("monokai")), ThemeFilesManager.listThemes().map { it.name })
+        assertEquals(1_000_000_000_500, File(dir, "kept.json").lastModified())
+        ThemeFilesManager.deleteThemeFiles(ThemeFilesManager.listThemes().single { it.name == "kept" })
         // one not clashing deleted is gone: not listed again from its json of another name
         saved("other", 1_000_000_002_000)
         File(dir, "other.json").renameTo(File(dir, "baz.json"))
         ThemeFilesManager.deleteThemeFiles(ThemeFilesManager.listThemes().single { it.name == "other" })
         assertEquals(listOf("mine", uuid("monokai")), ThemeFilesManager.listThemes().map { it.name })
-        assertEquals(setOf("bar.json", "mine.json", uuid("monokai") + ".json"), jsons())
+        assertEquals(setOf("mine.json", uuid("monokai") + ".json"), jsons())
     }
 
     // a json that does not read (a later build's), not listed. The user told it does not read: said here,

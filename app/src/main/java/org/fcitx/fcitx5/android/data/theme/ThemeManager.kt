@@ -97,7 +97,8 @@ object ThemeManager {
             if (named && written) renamed = true
             written && replacedDeleted(custom).also { if (it) customThemes.remove(custom) }
         }
-        ThemeFilesManager.replaced(done)
+        // one not written (a full disk) is done again next time; thrown, every start would crash in onCreate
+        runCatching { ThemeFilesManager.replaced(done) }.onFailure { Timber.w(it, "Themes replaced by packs not recorded as done") }
         return renamed
     }
 
@@ -109,8 +110,7 @@ object ThemeManager {
     private var finishing = false
 
     private fun replacedDeleted(custom: Theme.Custom): Boolean = try {
-        ThemeFilesManager.deleteThemeFiles(custom)
-        true
+        ThemeFilesManager.deleteThemeFiles(custom).also { if (!it) Timber.w("Theme ${custom.name} replaced by its pack not deleted") }
     } catch (e: IOException) {
         Timber.w(e, "Theme ${custom.name} replaced by its pack not deleted")
         false

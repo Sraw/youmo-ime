@@ -457,6 +457,60 @@ class ThemePackImportTest {
         assertTrue(ThemeManager.getTheme("mine") is Theme.Custom)
     }
 
+    // T10a: the record not written again (a full disk) as one replacement finishes and another is left: not thrown
+    // (at the app's start that would crash every start), the record kept for the next listing
+    @Test
+    fun aRecordNotWrittenAgainIsLeftForTheNextListing() {
+        ThemeFilesManager.saveThemeFiles(TestThemes.TransparentDark.deriveCustomNoBackground("mine"))
+        ThemeManager.refreshThemes()
+        ThemeFilesManager.replacingFile().writeText("gone\nmine\n")
+        val blocked = File(ThemeFilesManager.replacingFile().path + ".new").apply { mkdirs(); resolve("x").writeText("") }
+        try {
+            ThemeManager.refreshThemes()
+            assertEquals(setOf("gone", "mine"), ThemeFilesManager.replacing())
+        } finally {
+            blocked.deleteRecursively()
+        }
+    }
+
+    // T10a: the replaced theme's json not deleted: its record kept, tried again, not dropped with the theme left
+    // beside the pack for good
+    @Test
+    fun aReplacedThemeNotDeletedIsTriedAgain() {
+        ThemeFilesManager.saveThemeFiles(TestThemes.TransparentDark.deriveCustomNoBackground("mine"))
+        ThemeManager.refreshThemes()
+        opened(sample()).commit().getOrThrow()
+        dir.setWritable(false)
+        try {
+            ThemeManager.refreshThemes()
+            assertTrue(File(dir, "mine.json").exists())
+            assertEquals(setOf("mine"), ThemeFilesManager.replacing())
+        } finally {
+            dir.setWritable(true)
+        }
+        ThemeManager.refreshThemes()
+        assertFalse(File(dir, "mine.json").exists())
+        assertEquals(emptySet<String>(), ThemeFilesManager.replacing())
+    }
+
+    // T10a Q1: a process's first sweep while an import writes its pack in .saving (a start not settled, then a
+    // listing): not swept under it, swept at a listing once it is done
+    @Test
+    fun aFirstSweepWhileAPackIsWrittenLeavesItBe() {
+        val pack = opened(sample())
+        File(packs, ".saving/left-by-a-kill").mkdirs()
+        ThemePackFiles.beforeInPlace = {
+            ThemeFilesManager.forgetSwept()
+            ThemeManager.refreshThemes()
+        }
+        assertTrue(pack.commit().isSuccess)
+        ThemePackFiles.beforeInPlace = null
+        assertTrue(File(packs, ".saving/left-by-a-kill").exists())
+        ThemeFilesManager.listPacks()
+        assertFalse(File(packs, ".saving").exists())
+        assertEquals(listOf("mine#light", "mine#dark"), ThemeFilesManager.listPacks().map { it.name })
+    }
+
     @Test
     fun aPacksTooManyOrForeignLayoutsAreRefused() {
         val many = (1..ThemeAssetLimits.MAX_LAYOUTS + 1).map { "layouts/l$it.xml" to "<layout/>" }.toTypedArray()
