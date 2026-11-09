@@ -60,7 +60,12 @@ object SceneGroups {
         }
     }.flatMap { row -> row.cells.filterIsInstance<Key>() }
 
-    /** The grouped keyboard [groups] make ([NineKeyLetters.custom]): the built-in one with exactly these letters, else one of their own; null where they make none ([NineKeyLetters.problem]). */
+    /**
+     * The grouped keyboard [groups] make ([NineKeyLetters.custom]): the built-in one with exactly these
+     * letters, else one of their own; null where they make none ([NineKeyLetters.problem]). Pure: it is
+     * not the keyboard in use till the session typing on it says so ([NineKeyLetters.inUse]). Rows or
+     * not ([of], [written]), the same keyboard (its keys and codes).
+     */
     fun letters(groups: List<String>): NineKeyLetters? = if (NineKeyLetters.problem(groups) != null) null else NineKeyLetters.custom(groups)
 
     /**

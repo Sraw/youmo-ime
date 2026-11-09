@@ -26,7 +26,20 @@ import org.junit.Test
 class KeyboardCustomTest {
 
     private val k17Layout = (LayoutReader.layout(SceneData.read("k17.xml")) as Parsed.Ok).value
-    private val k17 = SceneGroups.letters(SceneGroups.written(k17Layout))!!
+    private val k17 = SceneGroups.letters(SceneGroups.written(k17Layout))!!.also { NineKeyLetters.inUse(it) }
+
+    @Test
+    fun theLayoutsOwnKeyboardIsItsKeyboardRowsOrNot() {
+        // of() drops the rows, written() keeps them: one keyboard, no mismatch, lean kept
+        assertEquals(null, SceneGroups.mismatch(SceneGroups.of(k17Layout), NineKeyLetters.custom(SceneGroups.written(k17Layout))))
+        val leaning = SceneGroups.leaningOf(k17, k17Layout)
+        assertTrue("pqrs" in leaning && "bn" in leaning && "abc" !in leaning)
+        // comparing sets no keyboard in use
+        val other = NineKeyLetters.custom(SceneGroups.written(k17Layout).reversed())
+        SceneGroups.letters(SceneGroups.written(k17Layout).reversed())
+        SceneGroups.mismatch(SceneGroups.written(k17Layout).reversed(), other)
+        assertEquals(k17, NineKeyLetters.ofCode(k17.codes[0].code))
+    }
 
     private fun code(group: String) = k17.codes[k17.tag().split(',').indexOf(group)]
 

@@ -125,7 +125,7 @@ class NineKeyLetters private constructor(
         return if (isStandard) "" else keys.joinToString(",")
     }
 
-    override fun equals(other: Any?) = other is NineKeyLetters && other.keys == keys && other.codes == codes && other.rows == rows
+    override fun equals(other: Any?) = other is NineKeyLetters && other.keys == keys && other.codes == codes
 
     override fun hashCode() = keys.hashCode() * 31 + codes.hashCode()
 
@@ -204,7 +204,7 @@ class NineKeyLetters private constructor(
          * a private use character, U+F8DA plus its first letter's place, as [G18]'s and right after
          * its block (not ⒜ to ⒵ as before: text a user may type, a long press's character too).
          * Made as it is, not through [normalize]. The codes and [tag] go into the learning record:
-         * once in a release, never changed.
+         * once in a release, never changed. Nor are a layout's own keyboard's ([CUSTOM_BLOCK]).
          */
         val G14 = grouped(FIRST_G14_CODE, "qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m")
 
@@ -216,7 +216,7 @@ class NineKeyLetters private constructor(
          * after a switch the keyboard shown has not caught up with). Private use:
          * no text a user types (braille is: blind users'), no case, no digit, dropped wherever
          * the app keeps such characters from the field; in the BMP, as every code is a Char, past
-         * the syllables' (Keyboard.SYLLABLES ends at U+F87F, ZhuyinKeys' block U+F880–F8B4). As on [G14], a code less its
+         * the syllables' (Keyboard.SYLLABLES ends at U+F83F, a layout's own keyboard's [CUSTOM_BLOCK] U+F840–F85D, ZhuyinKeys' block U+F880–F8B4). As on [G14], a code less its
          * block's first is its key's first letter.
          */
         val G18 = grouped(FIRST_PRIVATE_CODE, "q", "we", "rt", "y", "u", "io", "p", "a", "sd", "fg", "h", "jk", "l;", "z", "xc", "v", "bn", "m")
@@ -251,12 +251,14 @@ class NineKeyLetters private constructor(
 
         /**
          * The codes of a layout's own keyboard ([custom]): its keys' in order from U+F840, at most
-         * [CUSTOM_MAX]. Numbered anew for each keyboard made, never kept: what is learnt is filed
-         * by the groups ([tag]), a code by its key's place among them.
+         * [CUSTOM_MAX]. U+F840 + a key's index is a stable encoding that is kept: the learning
+         * record's `qk:<tag>` rows (and so backups) hold these codes, read by the key's place among
+         * the tag's groups. Never move the block or renumber it. Which keyboard a code is of is the
+         * one in use ([inUse]); a code is read again by that when the keyboard changes.
          */
         val CUSTOM_BLOCK = FIRST_CUSTOM_CODE.code until FIRST_CUSTOM_CODE.code + CUSTOM_MAX
 
-        // the layout's own keyboard last made: its codes are the ones a custom block's code is read as ([ofCode])
+        // the layout's own keyboard in use ([inUse]): the one a custom block's code is read as ([ofCode])
         @Volatile
         private var current: NineKeyLetters? = null
 
@@ -284,9 +286,7 @@ class NineKeyLetters private constructor(
          * keyboards' (their codes, their record, so the built-in 14 and 18 keys move nothing),
          * otherwise one of its own, its codes from [CUSTOM_BLOCK], filed under its [tag].
          */
-        fun custom(groups: List<String>): NineKeyLetters = made(groups).also { if (it.codes[0].code in CUSTOM_BLOCK) current = it }
-
-        private fun made(groups: List<String>): NineKeyLetters {
+        fun custom(groups: List<String>): NineKeyLetters {
             problem(groups)?.let { throw IllegalArgumentException(it) }
             val keys = groups.map { it.replace(" ", "") }
             listOf(G14, G18).firstOrNull { it.keys == keys }?.let { return it }
@@ -294,8 +294,30 @@ class NineKeyLetters private constructor(
             return NineKeyLetters(keys, keys.indices.map { FIRST_CUSTOM_CODE + it }.joinToString(""), separator = null, rows = rows)
         }
 
-        /** The grouped keyboard what is learnt under [tag] was typed on: [grouped]'s, else a layout's own ([custom], a row a key); null for none. */
-        fun filedAs(tag: String): NineKeyLetters? = grouped(tag) ?: tag.split(',').takeIf { problem(it) == null }?.let(::made)
+        /**
+         * [keyboard], a layout's own ([custom]), as the one in use: its codes are read as its keys
+         * ([ofCode], Keyboard.typedLetter) until another is. The session that types on it says so
+         * when it is made; nothing else sets it (made, compared and filed keyboards do not).
+         */
+        fun inUse(keyboard: NineKeyLetters) {
+            if (keyboard.codes.firstOrNull()?.code in CUSTOM_BLOCK) current = keyboard
+        }
+
+        // filedAs's last tag and keyboard: SpelledForm asks for each code of each word read
+        @Volatile
+        private var lastFiled: Pair<String, NineKeyLetters?>? = null
+
+        /**
+         * The grouped keyboard what is learnt under `qk:` [tag] was typed on: [G14] or [G18], else a
+         * layout's own ([custom], a row a key); null for none. Not [NINE_SP] (双拼's, `spk:`): a layout
+         * of its groups is a keyboard of its own here.
+         */
+        fun filedAs(tag: String): NineKeyLetters? {
+            lastFiled?.let { (t, k) -> if (t == tag) return k }
+            val found = listOf(G14, G18).firstOrNull { it.tag() == tag } ?: tag.split(',').takeIf { problem(it) == null }?.let(::custom)
+            lastFiled = tag to found
+            return found
+        }
 
         /**
          * The blocks the grouped keyboards' codes are taken from, whole: [G18]'s U+F8C0 to U+F8D9,
@@ -323,6 +345,7 @@ class NineKeyLetters private constructor(
          * nine keys' digits too: one code is of one keyboard alone, so this is all a reader needs.
          */
         fun ofCode(c: Int): NineKeyLetters? = when {
+            // past the keyboard in use's keys: none (isCode)
             c > Char.MAX_VALUE.code -> null
             c in CUSTOM_BLOCK -> current?.takeIf { it.isCode(c.toChar()) }
             else -> GROUPED.firstOrNull { it.isCode(c.toChar()) }

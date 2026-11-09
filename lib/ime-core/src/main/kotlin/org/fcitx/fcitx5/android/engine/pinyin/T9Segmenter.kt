@@ -93,7 +93,7 @@ class T9Segmenter(
         val regular = HashSet<String>()
 
         // on a grouped keyboard, beside each of whole, starts and initials: which of its key's letters
-        // the spelling kept for each syllable has at each key, two bits a key, the first key lowest
+        // the spelling kept for each syllable has at each key, LETTER_BITS a key, the first key lowest
         val wholeLetters = HashMap<String, IntArray>()
         val startLetters = HashMap<String, IntArray>()
         val initialLetters = HashMap<String, IntArray>()
@@ -343,8 +343,7 @@ class T9Segmenter(
         /** The letters that are an initial alone. */
         private const val INITIAL_LETTERS = "bcdfghjklmnpqrstwxyz"
 
-        // a key's letter, the group's first or second, in a choice of [choiceOf]
-        // a key's letter of up to NineKeyLetters.MAX (5): three bits, six keys in an Int
+        // a key's letter, its index in the group, in a choice of [choiceOf]: of up to NineKeyLetters.MAX (5): three bits, six keys in an Int
         private const val LETTER_BITS = 3
         private const val LETTER_MASK = 7
 

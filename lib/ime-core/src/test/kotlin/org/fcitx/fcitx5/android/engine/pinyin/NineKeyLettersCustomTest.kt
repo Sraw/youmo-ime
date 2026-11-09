@@ -89,8 +89,21 @@ class NineKeyLettersCustomTest {
         assertEquals(listOf("bn"), made.rowsOf(made.codes[12]))
         // p is on two keys: two ways to type it
         assertEquals(2, made.keysOf('p').length)
-        // a code read back: the keyboard last made
+        // a code read back: the keyboard in use, which making one does not set
+        val other = NineKeyLetters.custom(k17.reversed())
+        NineKeyLetters.inUse(made)
         assertSame(made, NineKeyLetters.ofCode(made.codes[0].code))
+        NineKeyLetters.custom(k17.reversed())
+        assertSame(made, NineKeyLetters.ofCode(made.codes[0].code))
+        NineKeyLetters.inUse(other)
+        assertSame(other, NineKeyLetters.ofCode(made.codes[0].code))
+        // past its keys: none
+        val small = NineKeyLetters.custom(listOf("abcde", "fghij", "klmno", "pqrst", "uvwxy", "z"))
+        NineKeyLetters.inUse(small)
+        assertNull(NineKeyLetters.ofCode(made.codes[6].code))
+        NineKeyLetters.inUse(made)
+        // with rows or without, the same keyboard
+        assertEquals(made, NineKeyLetters.custom(k17.map { it.replace(" ", "") }))
         // its record found by its tag
         assertEquals(made.tag(), NineKeyLetters.filedAs(made.tag())?.tag())
         assertEquals(made.codes, NineKeyLetters.filedAs(made.tag())?.codes)
@@ -98,6 +111,12 @@ class NineKeyLettersCustomTest {
         assertSame(made, NineKeyLetters.ofCode(made.codes[0].code))
         assertSame(NineKeyLetters.G14, NineKeyLetters.filedAs(NineKeyLetters.G14.tag()))
         assertNull(NineKeyLetters.filedAs("ab,cd"))
+        // 双拼's nine keys' tag under qk: is a layout of those groups, not NINE_SP
+        val nineSp = NineKeyLetters.filedAs(NineKeyLetters.NINE_SP.tag())
+        assertNotNull(nineSp)
+        assertTrue(nineSp != NineKeyLetters.NINE_SP && nineSp!!.codes[0].code in NineKeyLetters.CUSTOM_BLOCK)
+        // asked again: the same
+        assertSame(nineSp, NineKeyLetters.filedAs(NineKeyLetters.NINE_SP.tag()))
     }
 
     @Test

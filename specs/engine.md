@@ -532,9 +532,12 @@ setting either: it reads the codes.
   letter twice on one key, or more than 30 keys. Groups whose letters are G14's or G18's are those
   keyboards (their codes, their `qk:`/`spk:` record: the built-in keys move no data); any other gets
   codes `NineKeyLetters.CUSTOM_BLOCK` (U+F840 + its key's index, freed by `Action.Syllable.IDS` 98 → 97,
-  so `Keyboard.SYLLABLES` ends at U+F83F), numbered anew for each keyboard, never kept, and its record
-  filed under its `tag()` (the keys' letters, commas between; `NineKeyLetters.filedAs` reads one back).
-  `ofCode` reads a custom code as the keyboard last made. Pinyin reads them (`readsCode`), never text (`isCode`).
+  so `Keyboard.SYLLABLES` ends at U+F83F): a stable encoding, kept in its `qk:<tag>` record (and backups),
+  never to move; the record filed under its `tag()` (the keys' letters, commas between;
+  `NineKeyLetters.filedAs` reads one back, G14, G18 or a layout's own, never NINE_SP). Making,
+  comparing (`SceneGroups.letters`, `mismatch`, `leaningOf`) and filing are pure; `ofCode` reads a
+  custom code as the keyboard `NineKeyLetters.inUse` last named (the session typing on it, T9b), none
+  past its keys. Rows are where a tap falls, not the keyboard: with or without them it is equal. Pinyin reads them (`readsCode`), never text (`isCode`).
   A tap is `Keyboard.tapKey(code, x, y)`: `Keyboard.PLACES` (U+F1000 on, 30 × 17 × 9), decoded into
   `Action.Key(code, at = NineKeyLetters.place(x, y))`, x and y packed into the one value the taps carry
   (`2 × (1 + y step) + x`; a one dimensional place, the 14 keys', is x alone); a custom code's
