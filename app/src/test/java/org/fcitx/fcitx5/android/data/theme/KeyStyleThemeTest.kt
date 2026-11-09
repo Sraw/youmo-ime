@@ -20,6 +20,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.File
 
 /** The key style settings (大小与样式) over the theme in use, as the keyboard reads it, and the theme left as it is. */
 @RunWith(RobolectricTestRunner::class)
@@ -82,4 +83,17 @@ class KeyStyleThemeTest {
         }
     }
 
+    // a reader of the theme's own look in the keyboard would draw over what is chosen: none there (specs/app.md)
+    // only `.look` as written is caught: `with(theme) { look }` or `Theme::look` would pass it (none of them now)
+    @Test
+    fun theKeyboardReadsNoThemesOwnLook() {
+        val root = File("src/main/java/org/fcitx/fcitx5/android")
+        val files = File(root, "input").walk().filter { it.extension == "kt" } +
+            File(root, "ui/main/settings/theme/KeyboardPreviewUi.kt")
+        val readers = files.flatMap { f ->
+            f.readLines().withIndex().filter { Regex("""\.look\b""").containsMatchIn(it.value) }.map { "${f.name}:${it.index + 1}" }
+        }.toList()
+        assertTrue(files.count() > 20)
+        assertEquals(emptyList<String>(), readers)
+    }
 }
