@@ -429,7 +429,22 @@ class KeyboardHarness(
     }
 
     /** The clock run on by [ms], and what came due. */
-    fun after(ms: Long) = shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(ms))
+    fun after(ms: Long) = idleFor(ms)
+
+    // as the looper's idleFor, the tasks due one at a time under the same limit as [idle]'s
+    private fun idleFor(ms: Long) {
+        val looper = shadowOf(Looper.getMainLooper())
+        val end = SystemClock.uptimeMillis() + ms
+        var ran = 0
+        while (true) {
+            val next = looper.nextScheduledTaskTime.toMillis()
+            if (looper.isIdle && (next == 0L || next > end)) break
+            check(++ran <= IDLE_TASKS) { "the main looper never idles: $IDLE_TASKS tasks run, more posted each time" }
+            looper.runOneTask()
+        }
+        // nothing due before the end left: the clock run on to it
+        looper.idleFor(java.time.Duration.ofMillis(maxOf(0L, end - SystemClock.uptimeMillis())))
+    }
 
     /** A finger put on [v]'s middle, slid by [dx], [dy] px in a few steps, lifted. */
     fun swipe(v: View, dx: Float, dy: Float) = swipe(box(v), dx, dy)
@@ -624,7 +639,7 @@ class KeyboardHarness(
 
     /** The clock run on [ms], and everything due in that time done. */
     fun advance(ms: Long) {
-        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(ms))
+        idleFor(ms)
         relayout()
     }
 
@@ -735,7 +750,7 @@ class KeyboardHarness(
 
     // a keyboard shown slides in, a panel fades: the clock run on past them so every image is the end state
     private fun settled() {
-        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(1))
+        idleFor(1_000)
         relayout()
     }
 
