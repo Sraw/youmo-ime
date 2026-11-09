@@ -8,52 +8,63 @@ import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.utils.appContext
 import timber.log.Timber
 import java.io.File
-import java.io.FileOutputStream
 import java.io.IOException
 
 /**
  * A theme 4.0 pack that took the keyboard down as it was first drawn (a font crafted to crash the text's layout,
- * a file the engine draws wrong): a mark naming the pack written before its first frame of a process and deleted
- * after it. Still there at the next start, the pack is not drawn again on its own: the settings naming it go back
- * to their defaults ([ThemeManager]), the user told. The mark is in the files not backed up (a crash is this
- * phone's), synced, as the process may die the moment after.
+ * a file the engine draws wrong): a mark naming the pack written as the keyboard shown is about to draw its first
+ * frame of a process (KeyboardCanvasView), deleted once that frame is committed, the glyphs and images drawn with
+ * it. Still there at the next start, the pack is not drawn again on its own: the settings naming it go back to
+ * their defaults ([ThemeManager]), the user told. Nothing built for a view not shown (a settings page, the keyboard
+ * made again while hidden) marks it, so a process ended otherwise (an update, the system's) resets nothing. The
+ * mark is in the files not backed up (a crash is this phone's); written, not synced: a process that dies leaves
+ * what it wrote, and the main thread does not wait on the disk.
  */
 object PackDrawGuard {
 
     private const val MARK = "theme-pack-drawing"
 
+    /** A pack as drawn: its name and its file's time (one imported again is another). */
+    data class Key(val file: String, val stamp: Long)
+
+    fun key(pack: Theme.Pack) = Key(pack.file, pack.stamp)
+
     @VisibleForTesting
     internal var dir: () -> File = { appContext.noBackupFilesDir }
 
-    // the packs drawn in this process (no mark for them again), and the one marked, its first frame awaited
-    private val drawn = HashSet<String>()
-
-    @Volatile
-    private var pending: String? = null
+    // the packs whose first frame this process drew (no mark for them again), and the one marked, its frame awaited
+    private val drawn = HashSet<Key>()
+    private var pending: Key? = null
 
     private fun mark() = File(dir(), MARK)
 
-    /** The pack [file] about to be drawn: marked, the first time in this process. On the main thread. */
-    fun drawing(file: String) {
-        if (file in drawn || pending == file) return
-        pending = file
+    /**
+     * The pack [key] about to be drawn in a frame shown: marked, till a frame of it of this process is drawn;
+     * whether one is still awaited (the frame's commit to call [frameDrawn]). On the main thread.
+     */
+    fun drawing(key: Key): Boolean {
+        if (key in drawn) return false
+        if (pending == key) return true
+        pending = key
         try {
-            FileOutputStream(mark()).use { out ->
-                out.write(file.encodeToByteArray())
-                out.fd.sync()
-            }
+            mark().writeText(key.file)
         } catch (e: IOException) {
             Timber.w(e, "Theme pack draw mark not written")
         }
+        return true
     }
 
-    /** A keyboard's frame drawn: the pack marked drew one, its mark gone. On the main thread, each frame. */
-    fun frameDrawn() {
-        val file = pending ?: return
+    /** The frame [drawing] marked [key] for committed: its mark gone. Another's frame clears nothing. On the main thread. */
+    fun frameDrawn(key: Key) {
+        if (pending != key) return
         pending = null
-        drawn.add(file)
+        drawn.add(key)
         mark().delete()
     }
+
+    /** Whether the pack [key]'s first frame of this process was drawn. */
+    @VisibleForTesting
+    internal fun confirmed(key: Key) = key in drawn
 
     /** The pack whose first frame a process did not live to draw, its mark gone; null where none. */
     fun crashed(): String? {

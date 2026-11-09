@@ -4,9 +4,18 @@
  */
 package org.fcitx.fcitx5.android.data.theme
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.RenderNode
+import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
+import org.junit.Assert.assertNotNull
+import org.robolectric.annotation.GraphicsMode
+import org.robolectric.util.ReflectionHelpers
 import kotlinx.serialization.json.Json
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.directBoot
 import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
@@ -365,6 +374,22 @@ class ThemePackImportTest {
     }
 
     @Test
+    fun aPackOfTwoVersionsReplacingATheme30OfItsBareNameKeepsTheSlotsNamingIt() {
+        // the user's dark 3.0 theme `mine`, in use; the pack `mine` of two versions has no version named so
+        ThemeFilesManager.saveThemeFiles(TestThemes.TransparentDark.deriveCustomNoBackground("mine"))
+        ThemeManager.refreshThemes()
+        ThemeManager.setNormalModeTheme(ThemeManager.getTheme("mine")!!)
+        val pack = opened(sample())
+        assertEquals(listOf("mine"), pack.customs.map { it.name })
+        val versions = pack.commit().getOrThrow()
+        ThemeManager.packPlaced(versions[0].file)
+        // its json gone; the setting naming it names the pack's dark version, not the default theme
+        assertFalse(File(dir, "mine.json").exists())
+        assertEquals("mine#dark", ThemeManager.prefs.normalModeTheme.getValue().name)
+        assertEquals(versions.single { it.isDark }, ThemeManager.activeTheme)
+    }
+
+    @Test
     fun aPacksTooManyOrForeignLayoutsAreRefused() {
         val many = (1..ThemeAssetLimits.MAX_LAYOUTS + 1).map { "layouts/l$it.xml" to "<layout/>" }.toTypedArray()
         assertEquals(
@@ -465,13 +490,35 @@ class ThemePackImportTest {
     }
 
     @Test
-    fun aPackFolderNotListedIsNotReplacedUnseen() {
-        // a later build's, or one cut short: there, not listed
+    fun aPackFolderNotListedIsReplacedUnlessALaterBuilds() {
+        val kept = appContext.getString(R.string.exception_theme_newer_kept)
         File(packs, "mine").mkdirs()
-        File(packs, "mine/theme.xml").writeText("<theme")
-        ThemeManager.refreshThemes()
-        assertEquals(appContext.getString(R.string.exception_theme_newer_kept), refusal(sample()))
-        assertEquals("<theme", File(packs, "mine/theme.xml").readText())
+        // a later build's not read here (a newer app's, a later format's): kept, said so (one that reads is listed)
+        val later = listOf(
+            xml(meta = """<meta min-app="99.0.0"/>""", styles = "<later/>"),
+            """<theme xmlns="${ThemeReader.NAMESPACE}" name="mine" version="5.0"><sound/></theme>""",
+        )
+        for (text in later) {
+            File(packs, "mine/theme.xml").writeText(text)
+            ThemeManager.refreshThemes()
+            assertEquals(kept, refusal(sample()))
+            assertEquals(text, File(packs, "mine/theme.xml").readText())
+        }
+        // one cut short (a restore killed half way: a file it names missing), or that no longer reads: not
+        // listed, so not to be deleted; imported again, replaced and listed
+        val cutShort: () -> Unit = { File(packs, "mine/round.ttf").delete() }
+        val broken: () -> Unit = { File(packs, "mine/theme.xml").writeText("<theme") }
+        for (spoil in listOf(cutShort, broken)) {
+            File(packs, "mine").deleteRecursively()
+            placed(sample())
+            spoil()
+            ThemeManager.refreshThemes()
+            assertTrue(ThemeManager.Packs.none { it.file == "mine" })
+            val pack = opened(sample())
+            assertTrue(pack.replaces)
+            pack.commit().getOrThrow().also { ThemeManager.packPlaced(it[0].file) }
+            assertEquals(listOf("mine#light", "mine#dark"), ThemeManager.Packs.map { it.name })
+        }
     }
 
     @Test
@@ -603,31 +650,84 @@ class ThemePackImportTest {
         assertFalse(File(packs, ".saving").exists())
     }
 
+    // a frame of the keyboard's canvas [c] recorded as the RenderThread draws it (hardware), not yet committed
+    private fun recordFrame(c: KeyboardCanvasView) {
+        val node = RenderNode("frame")
+        c.draw(node.beginRecording(c.width, c.height))
+        node.endRecording()
+    }
+
+    // the frame recorded committed: what the window's renderer calls back once it is drawn
+    private fun commitFrame(c: KeyboardCanvasView) {
+        ReflectionHelpers.callInstanceMethod<ArrayList<Runnable>?>(c.viewTreeObserver, "captureFrameCommitCallbacks")?.forEach(Runnable::run)
+    }
+
+    private fun softwareFrame(c: KeyboardCanvasView) = c.draw(Canvas(Bitmap.createBitmap(c.width, c.height, Bitmap.Config.ARGB_8888)))
+
     @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun aPackThatTookTheKeyboardDownIsNotDrawnAgainOnItsOwn() {
         val marks = File(appContext.cacheDir, "marks").apply { mkdirs() }
+        val mark = File(marks, "theme-pack-drawing")
         PackDrawGuard.dir = { marks }
         PackDrawGuard.reset()
         try {
-            // marked before its first frame, the mark gone after it
             val dark = placed(sample())[1]
-            PackDrawGuard.drawing(dark.file)
-            PackDrawGuard.frameDrawn()
-            assertNull(PackDrawGuard.crashed())
-            // drawn once in this process: not marked again
-            PackDrawGuard.drawing(dark.file)
-            assertNull(PackDrawGuard.crashed())
-            // its first frame of a process not drawn: at the next start the settings naming it back to their defaults
-            PackDrawGuard.reset()
+            val key = PackDrawGuard.key(dark)
+            // its theme built, for a keyboard made while hidden or a settings page's sizes, no frame drawn: nothing marked
+            assertNotNull(SceneThemes.of(dark, ThemeManager.shownLook(dark)))
             ThemeManager.setNormalModeTheme(dark)
-            PackDrawGuard.drawing(dark.file)
-            assertEquals("mine", PackDrawGuard.crashed())
-            assertNull(PackDrawGuard.crashed())
-            ThemeManager.packCrashed("mine")
+            SceneBar.heightPercent(appContext)
+            assertFalse(mark.exists())
+            KeyboardHarness(theme = dark).start().use { h ->
+                val c = KeyboardHarness.boardCanvas(h.inputView)!!
+                assertNotNull(c.scene)
+                // what the window drew as it was shown aside (Robolectric's renderer commits no frame): from none drawn
+                PackDrawGuard.reset()
+                mark.delete()
+                // a frame recorded: marked till the RenderThread has drawn it (its glyphs, its pictures)
+                recordFrame(c)
+                assertEquals("mine", mark.readText())
+                // another pack's frame clears nothing
+                PackDrawGuard.frameDrawn(PackDrawGuard.Key("other", 0))
+                assertTrue(mark.exists())
+                commitFrame(c)
+                assertFalse(mark.exists())
+                assertTrue(PackDrawGuard.confirmed(key))
+                // drawn once in this process: not marked again
+                recordFrame(c)
+                assertFalse(mark.exists())
+            }
+            // a frame drawn on a bitmap (software) is drawn then and there: no mark left
+            PackDrawGuard.reset()
+            KeyboardHarness(theme = dark).start().use { h ->
+                softwareFrame(KeyboardHarness.boardCanvas(h.inputView)!!)
+                assertFalse(mark.exists())
+                assertTrue(PackDrawGuard.confirmed(key))
+            }
+            // imported again (another file time): guarded again
+            val again = key.copy(stamp = key.stamp + 1)
+            assertTrue(PackDrawGuard.drawing(again))
+            PackDrawGuard.frameDrawn(again)
+            // its first frame of a process recorded, never committed: the process went down with it
+            PackDrawGuard.reset()
+            KeyboardHarness(theme = dark).start().use { h -> recordFrame(KeyboardHarness.boardCanvas(h.inputView)!!) }
+            assertTrue(mark.exists())
+            // the next start before the first unlock (the files not settled): nothing to reset, the mark kept for after
+            directBoot(true)
+            assertFalse(ThemeFilesManager.writable)
+            ThemeManager.consultPackCrash()
+            assertTrue(mark.exists())
+            assertEquals(dark.name, ThemeManager.prefs.normalModeTheme.getValue().name)
+            // settled: the settings naming it back to their defaults, the pack kept
+            directBoot(false)
+            ThemeManager.consultPackCrash()
+            assertFalse(mark.exists())
             assertEquals(ThemeManager.prefs.normalModeTheme.defaultValue, ThemeManager.prefs.normalModeTheme.getValue())
-            // the pack kept
+            ThemeManager.refreshThemes()
             assertEquals(listOf("mine#light", "mine#dark"), ThemeManager.Packs.map { it.name })
         } finally {
+            directBoot(false)
             PackDrawGuard.dir = { appContext.noBackupFilesDir }
             PackDrawGuard.reset()
             marks.deleteRecursively()

@@ -69,9 +69,10 @@ class KeyboardCanvasView(
     /**
      * A [scene] and the look it was made in ([shownLook], ThemeManager.shownLook's), with its [fonts]:
      * what paints it. The theme's, or the built-in theme's a theme that makes no scene falls back to
-     * (060-render-p2 U8), the whole of it.
+     * (060-render-p2 U8), the whole of it. [pack]: the theme 4.0 pack it is of, its first frame guarded
+     * ([PackDrawGuard]); null, another theme's.
      */
-    class Drawn(val scene: Scene, val shownLook: ThemeLook, val fonts: SceneFonts)
+    class Drawn(val scene: Scene, val shownLook: ThemeLook, val fonts: SceneFonts, val pack: PackDrawGuard.Key? = null)
 
     interface Host {
         /**
@@ -115,6 +116,8 @@ class KeyboardCanvasView(
     private var builtFor = 0 to 0
     private var dirty = true
     private var failed = false
+    // the pack the scene drawn is of (Drawn.pack)
+    private var pack: PackDrawGuard.Key? = null
     private var faces: List<Faces> = emptyList()
     private var base: RenderNode? = null
     private val speech = Speech()
@@ -198,6 +201,7 @@ class KeyboardCanvasView(
             if (repainted || under != drawnUnder) base = null
             drawnUnder = under
             built = s
+            pack = drawn.pack
             var said: MutableList<Int>? = null
             var worded: MutableList<Int>? = null
             faces = s.keys.mapIndexed { i, k ->
@@ -283,6 +287,9 @@ class KeyboardCanvasView(
     override fun onDraw(canvas: Canvas) {
         val s = scene ?: return
         val painter = painter ?: return
+        // a pack's first frame of the process about to be drawn, shown: marked till it is (PackDrawGuard), one
+        // that takes the keyboard down not drawn again on its own. A pack built and not drawn marks nothing
+        if (pack?.let(PackDrawGuard::drawing) == false) pack = null
         // an image or the picture in since it was recorded: recorded again
         if (painter.missed) {
             painter.missed = false
@@ -294,7 +301,8 @@ class KeyboardCanvasView(
             painter.missed = false
             painter.draw(canvas, drawnUnder)
             faces.forEach { painter.draw(canvas, it.node.ops(it.down)) }
-            PackDrawGuard.frameDrawn()
+            // drawn, glyphs and pictures, here and now
+            pack?.let(PackDrawGuard::frameDrawn)
             return
         }
         canvas.drawRenderNode(base.live() ?: record("base", Box(0.0, 0.0, width.toDouble(), height.toDouble()), drawnUnder).also { base = it })
@@ -312,8 +320,9 @@ class KeyboardCanvasView(
                 canvas.drawRenderNode(node)
             }
         }
-        // a pack's first frame drawn, not one that took the keyboard down
-        PackDrawGuard.frameDrawn()
+        // what the frame's nodes draw (a pack's fonts' glyphs, its pictures) is drawn on the RenderThread
+        // after this: the pack's first frame drawn once the frame is committed, not here
+        pack?.let { p -> viewTreeObserver.registerFrameCommitCallback { PackDrawGuard.frameDrawn(p) } }
     }
 
     // a node still holding what was recorded: one the renderer let go of (the window gone, memory

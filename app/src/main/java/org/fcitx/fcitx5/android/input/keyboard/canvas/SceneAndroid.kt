@@ -12,7 +12,6 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
-import org.fcitx.fcitx5.android.data.theme.PackDrawGuard
 import org.fcitx.fcitx5.android.data.theme.ThemePackFiles
 import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
@@ -223,8 +222,6 @@ object SceneThemes {
         if (theme !is AppTheme.Pack) return of(look, theme.name, theme.isDark)
         val key = theme to ThemePackFiles.systemColors
         packs[key]?.let { return it.theme }
-        // its first frame of this process awaited, marked: one that takes the keyboard down is not drawn again
-        PackDrawGuard.drawing(theme.file)
         return theme.drawn.also {
             packs[key] = Made(it)
             if (packs.size > KEPT) packs.remove(packs.keys.first())

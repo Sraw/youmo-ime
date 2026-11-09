@@ -445,7 +445,15 @@ object ThemeFilesManager {
                 try {
                     if (!writable) notSettled()
                     ThemePackFiles.place(dir, staged).also {
-                        // the settings naming a 3.0 theme it replaces name the pack now (ThemeManager.getTheme)
+                        // the settings naming a 3.0 theme it replaces name the pack now (ThemeManager.getTheme): one
+                        // named as a version is, one named as a pack of two versions is (`mine`, no version's name)
+                        // its version of the same lightness, before its json goes (a kill between, the slot still
+                        // finds the pack)
+                        val variants = staged.theme.variants
+                        val refs = ThemePackFiles.refs(staged.name, variants)
+                        val moved = customs.filter { it.name !in refs }
+                        moved.forEach { ThemeManager.prefs.renameThemeRefs(it.name, BuiltinThemeFiles.ref(staged.name, it.isDark, variants.size > 1)) }
+                        if (moved.isNotEmpty()) ThemeManager.syncToDeviceEncryptedStorage()
                         customs.forEach { deleteCustom(it, themes) }
                     }
                 } finally {
@@ -494,9 +502,14 @@ object ThemeFilesManager {
                 val staged = ThemePackFiles.check(temp, names, packChecks)
                 packClash(staged, themes)
                 val packs = themes.filterIsInstance<Theme.Pack>()
-                val there = File(ThemePackFiles.folder(dir), staged.name).exists()
-                // one there not listed (a later build's, one that does not read) is not replaced unseen, as a 3.0 theme's
-                if (there && packs.none { it.file == staged.name }) errorRuntime(R.string.exception_theme_newer_kept)
+                val folder = File(ThemePackFiles.folder(dir), staged.name)
+                val there = folder.exists()
+                // one there not listed of a later build is kept, as a 3.0 theme's json is (importJson); any other
+                // not listed (one that no longer reads, misses a file, past the packs listed) is replaced, the
+                // natural repair: not listed, it could not be deleted
+                if (there && packs.none { it.file == staged.name } && ThemePackFiles.laterBuilds(folder, BuildConfig.VERSION_NAME)) {
+                    errorRuntime(R.string.exception_theme_newer_kept)
+                }
                 if (!there && packs.distinctBy { it.file }.size >= ThemeAssetLimits.MAX_PACKS) {
                     errorRuntime(R.string.exception_theme_packs, ThemeAssetLimits.MAX_PACKS.toString())
                 }

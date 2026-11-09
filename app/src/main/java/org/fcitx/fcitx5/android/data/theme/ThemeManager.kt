@@ -67,6 +67,24 @@ object ThemeManager {
      * of its versions go back to their defaults (a built-in theme), the user told. The pack is kept, to be
      * deleted or picked again.
      */
+    // whether the mark of a pack that took the last process down was consulted: once a process, once
+    // the packs are listed (not while the files are not settled, A4: none to reset, the mark kept till
+    // then), before any of them is drawn
+    private var crashConsulted = false
+
+    private fun packsListed() {
+        if (crashConsulted || !ThemeFilesManager.writable) return
+        crashConsulted = true
+        PackDrawGuard.crashed()?.let(::packCrashed)
+    }
+
+    /** The mark consulted again, as a process's first listing of the packs would: a test's next start. */
+    @VisibleForTesting
+    internal fun consultPackCrash() {
+        crashConsulted = false
+        packsListed()
+    }
+
     @VisibleForTesting
     internal fun packCrashed(file: String) {
         val refs = packs.filter { it.file == file }.map { it.name }.filter { r -> customThemes.none { it.name == r } }
@@ -129,6 +147,7 @@ object ThemeManager {
         customThemes.clear()
         customThemes.addAll(themes)
         packs = ThemeFilesManager.listPacks()
+        packsListed()
         // the copy for before the first unlock names what this one does (the start syncs it after init)
         if (changed) syncToDeviceEncryptedStorage()
         activeTheme = evaluateActiveTheme()
@@ -307,7 +326,7 @@ object ThemeManager {
     fun init(configuration: Configuration) {
         isDarkMode = configuration.isDarkMode()
         // the app's start, on the main thread (the toast): before the theme in use is read
-        PackDrawGuard.crashed()?.let(::packCrashed)
+        packsListed()
         _activeTheme = evaluateActiveTheme()
         settleKeyStyle()
         // fire all `OnThemeChangedListener`s on theme preferences change
