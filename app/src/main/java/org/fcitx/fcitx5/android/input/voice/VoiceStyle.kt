@@ -4,11 +4,15 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
+import android.content.Context
 import android.text.TextUtils
 import android.view.View
 import android.widget.TextView
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.data.InputFeedbacks
+import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.keyboard.canvas.ScenePanels
+import org.fcitx.fcitx5.android.scene.engine.PanelLooks
 
 /**
  * What the two views talked in (VoiceHoldOverlay, held; VoiceTapOverlay, tapped) show alike: in
@@ -29,11 +33,18 @@ object VoiceStyle {
     /** the colour of the finger in the zone where lifting drops it */
     const val CANCEL_RED = 0xFFC62828.toInt()
 
-    /** the mask over the keys while talking, on their blur ([VoiceGlass]): shapes and colours seen, the text clear (user 2026-11-07) */
-    const val MASK_ALPHA = 0xE0
+    /**
+     * The mask as the theme has it (`voice`, `voice mic`; 060-render-p3 T7b): its colour over the keys, on their
+     * blur ([VoiceGlass]), the microphone's bubble and bars. Not set: the keyboard's colour a little see-through
+     * (PanelLooks.MASK_ALPHA: shapes and colours seen, the text clear, user 2026-11-07), the glass of before.
+     */
+    fun look(context: Context, theme: Theme): PanelLooks.Voice = ScenePanels.voice(context, theme)
 
-    /** [color] as the mask: its own alpha (a see-through theme) kept, scaled */
-    fun mask(color: Int): Int = (color and 0xFFFFFF) or ((color ushr 24) * MASK_ALPHA / 0xFF shl 24)
+    /** The mask's glass of [look] on [context]'s screen: its blur dp as px ([VoiceGlass.Blur.of]), not set the app's of before. */
+    fun glass(context: Context, look: PanelLooks.Voice): VoiceGlass {
+        val blur = look.blurDp.let { if (it == null) VoiceGlass.Blur.DEFAULT else VoiceGlass.Blur.of(it * context.resources.displayMetrics.density) }
+        return VoiceGlass(look.fill.value, blur)
+    }
 
     /** how long each change they show takes */
     const val ANIMATE_MS = 150L

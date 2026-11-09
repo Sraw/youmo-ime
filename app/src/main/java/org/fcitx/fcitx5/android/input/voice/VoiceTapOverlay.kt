@@ -16,7 +16,6 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.core.graphics.ColorUtils
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.BaseInputView
 import org.fcitx.fcitx5.android.input.InputView
@@ -40,6 +39,7 @@ class VoiceTapOverlay(
 ) : BaseInputView.Hold {
     private val theme = inputView.theme
     private val ctx = inputView.context
+    private val look = VoiceStyle.look(ctx, theme)
     private val service = inputView.service
 
     private val tap = VoiceTap()
@@ -85,13 +85,13 @@ class VoiceTapOverlay(
         visibility = if (session.composes) View.INVISIBLE else View.VISIBLE
     }
     private val wave = VoiceWaveView(ctx).apply {
-        color = theme.accentKeyBackgroundColor
+        color = look.micColor.value
         active = true
     }
     private val pill = FrameLayout(ctx).apply {
         background = GradientDrawable().apply {
             cornerRadius = ctx.dp(PILL_HEIGHT / 2).toFloat()
-            setColor(ColorUtils.setAlphaComponent(theme.accentKeyBackgroundColor, PILL_ALPHA))
+            setColor(look.micFill.value)
         }
         addView(wave, FrameLayout.LayoutParams(ctx.dp(WAVE_WIDTH), ctx.dp(WAVE_HEIGHT), Gravity.CENTER))
     }
@@ -109,7 +109,7 @@ class VoiceTapOverlay(
         setText(R.string.voice_tap_hint)
     }
 
-    private val glass = VoiceGlass(VoiceStyle.mask(theme.keyboardColor))
+    private val glass = VoiceStyle.glass(ctx, look)
 
     private val card: FrameLayout = FrameLayout(ctx).apply {
         background = glass
@@ -223,7 +223,6 @@ class VoiceTapOverlay(
     }
 
     companion object {
-        private const val PILL_ALPHA = 0x29
         private const val PILL_WIDTH = 168
         private const val PILL_HEIGHT = 52
         private const val WAVE_WIDTH = 104

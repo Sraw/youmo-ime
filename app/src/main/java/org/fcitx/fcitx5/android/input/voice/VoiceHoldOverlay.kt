@@ -17,7 +17,6 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.core.graphics.ColorUtils
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.BaseInputView
 import org.fcitx.fcitx5.android.input.InputView
@@ -46,8 +45,9 @@ class VoiceHoldOverlay(
     private val main = Handler(Looper.getMainLooper())
     private var gone = false
 
-    private val talkColor = VoiceStyle.mask(theme.keyboardColor)
-    private val glass = VoiceGlass(talkColor)
+    private val look = VoiceStyle.look(ctx, theme)
+    private val talkColor = look.fill.value
+    private val glass = VoiceStyle.glass(ctx, look)
     private var colorAnimator: ValueAnimator? = null
     private var currentColor = talkColor
 
@@ -58,12 +58,12 @@ class VoiceHoldOverlay(
         setTextColor(theme.keyTextColor)
     }
     private val wave = VoiceWaveView(ctx).apply {
-        color = theme.accentKeyBackgroundColor
+        color = look.micColor.value
         active = true
     }
 
     // the bars on a pill of their own, as a bubble the voice is in
-    private val pillColor = ColorUtils.setAlphaComponent(theme.accentKeyBackgroundColor, PILL_ALPHA)
+    private val pillColor = look.micFill.value
     private val pill = FrameLayout(ctx).apply {
         background = GradientDrawable().apply {
             cornerRadius = ctx.dp(PILL_HEIGHT / 2).toFloat()
@@ -201,7 +201,7 @@ class VoiceHoldOverlay(
         status.setTextColor(text)
         heard.setTextColor(text)
         hint.visibility = if (cancel) View.INVISIBLE else View.VISIBLE
-        wave.color = if (cancel) CANCEL_TEXT else theme.accentKeyBackgroundColor
+        wave.color = if (cancel) CANCEL_TEXT else look.micColor.value
         (pill.background as GradientDrawable).setColor(if (cancel) CANCEL_PILL else pillColor)
         colorAnimator?.cancel()
         colorAnimator = ValueAnimator.ofObject(ArgbEvaluator(), currentColor, if (cancel) VoiceStyle.CANCEL_RED else talkColor).apply {
@@ -241,7 +241,6 @@ class VoiceHoldOverlay(
         private const val FINGER = 32
         private const val CANCEL_PILL = 0x33FFFFFF
         private const val CANCEL_TEXT = 0xFFFFFFFF.toInt()
-        private const val PILL_ALPHA = 0x29
         private const val PILL_WIDTH = 168
         private const val PILL_HEIGHT = 52
         private const val WAVE_WIDTH = 104
