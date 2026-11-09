@@ -163,7 +163,16 @@ class SceneBuilder(
         }
         val whole = Box(0.0, 0.0, env.width, env.height)
         val side = sideRoom(board, whole)?.let { SlotNode(SIDE_BUTTONS, null, it) }
-        return Parsed.Ok(Scene(env.width, env.height, base(whole) + blanks, nodes, slots + listOfNotNull(side), board, layout.preview, layout.popups, warnings.all))
+        return Parsed.Ok(Scene(env.width, env.height, base(whole) + gaps(placed) + blanks, nodes, slots + listOfNotNull(side), board, layout.preview, layout.popups, warnings.all))
+    }
+
+    // the room between a split row's halves (`split-gap`, 060-render-p3 T7a): its fill and corners, each row's; none set, the keyboard's under it
+    private fun gaps(placed: List<Placed>): List<Op> {
+        val rooms = placed.filter { it.item === SplitRoom }
+        if (rooms.isEmpty()) return emptyList()
+        val look = KeyLook(cascade.of(Selector.Target("split-gap")), theme)
+        if (look.fill == null) return emptyList()
+        return rooms.mapNotNull { paint.fill(Shape.Rect(it.cell, Faces.radii(look.radius, it.cell, env.density)), look.fill) }
     }
 
     // a side of the keyboard one-handed, or split for a board but the letters; null: the whole of it

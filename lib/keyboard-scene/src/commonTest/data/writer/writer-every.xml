@@ -68,6 +68,13 @@
   <style select="key[role=enter] icon" return-icon-send="icon(backspace)" return-icon-search="text(搜)"/>
   <style select="keyboard" height="38% 52.5%" side-padding="8dp" bottom-padding="0 48dp"/>
   <style select="keyboard" height="40%"/>
+  <style select="@floating frame" radius="20dp" border="1.5dp #ff0000" shadow="0 0 12dp #4000ff00"/>
+  <style select="@one-handed handle" fill="mix(@background,@keyText,10%)" color="@altKeyText" icon-color="#00ffff" width="40.5dp" height="0"/>
+  <style select="side-button" fill="#ff00ff" overlay="#40000000" shape="rect" radius="50%" icon-color="@keyText"/>
+  <style select="side-button:pressed" overlay="#50000000"/>
+  <style select="split-gap" fill="@keyboard" radius="4dp"/>
+  <style select="navbar" color="follow"/>
+  <style select="@landscape navbar" color="#654321"/>
   <icon name="a-icon" src="a.svg"/>
   <icon name="z-icon" src="z.png"/>
 </theme>

@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.input.floating
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
-import android.content.res.Configuration
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
@@ -21,7 +20,10 @@ import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.floating.FloatingSwitch.Bounds
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneWindow
+import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
 import org.fcitx.fcitx5.android.input.motion.Motion
+import org.fcitx.fcitx5.android.scene.engine.WindowLooks
 import org.fcitx.fcitx5.android.utils.interpolator
 import org.fcitx.fcitx5.android.utils.motionSettings
 import splitties.dimensions.dp
@@ -51,10 +53,14 @@ class FloatingController(
 
     /** Floating, its handle; docked, the same strip if 始终显示悬浮条 (read once too), its grip held letting go. */
     val handle: FloatingHandle? = when {
-        floating -> FloatingHandle(context, theme, side, FloatingHandle.Mode.Floating(::drag, ::drop, ::dock))
-        prefs.alwaysShowHandle.getValue() -> FloatingHandle(context, theme, side, FloatingHandle.Mode.Docked(::detach))
+        floating -> FloatingHandle(context, theme, side, FloatingHandle.Mode.Floating(::drag, ::drop, ::dock), handleLook())
+        prefs.alwaysShowHandle.getValue() -> FloatingHandle(context, theme, side, FloatingHandle.Mode.Docked(::detach), handleLook())
         else -> null
     }
+
+    /** The theme's handle in [scenes] (SceneWindow.scenes: docked, as the board is placed), at the handle's side. */
+    fun handleLook(scenes: Set<String> = SceneWindow.scenes(context, theme, floating)): WindowLooks.Handle =
+        SceneWindow.handle(theme, scenes, side == FloatingHandleSide.Top)
 
     private val switch = FloatingSwitch()
     private lateinit var keyboard: View
@@ -92,7 +98,9 @@ class FloatingController(
                 bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID
             })
         }
-        FloatingCorners.frame(keyboard, ::cornerPx, context.dp(FloatingCorners.ELEVATION_DP).toFloat())
+        val frame = frame()
+        FloatingCorners.frame(keyboard, ::cornerPx, SceneWindow.px(context, frame.elevationDp), frame.shadowColor?.value)
+        frame.border?.let { FloatingCorners.border(keyboard, SceneWindow.px(context, it.widthDp), it.color.value, ::cornerPx) }
         placer = FloatingPlacer(root, keyboard).also { it.onZone = ::showDockMark }
         keyboard.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> laidOut() }
     }
@@ -235,13 +243,30 @@ class FloatingController(
         }
     }
 
-    // the keys' radius and margins as the scene draws them (KeyFaceGeometry); square where the keys are (按键圆角 直角)
+    // the theme's frame (`frame`) in the scenes now: not set, as round as the keys on their margins, which a
+    // turn of the screen changes (WindowLooks.cornerDp), square where the keys are (按键圆角 直角). Asked for
+    // each outline and border drawn: worked out once a screen ([screen]), its corner once a size too
+    private var framed: Pair<List<Int>, WindowLooks.Frame>? = null
+    private var cornered: Pair<List<Int>, Float>? = null
+
+    // what the frame's scenes change with: the screen turned or resized, the keyboard's height (`@compact`)
+    private fun screen() = context.resources.configuration.let {
+        listOf(it.orientation, it.screenWidthDp, it.screenHeightDp, if (keyboardCompact()) 1 else 0)
+    }
+
+    private fun frame(): WindowLooks.Frame {
+        val at = screen()
+        framed?.let { (on, frame) -> if (on == at) return frame }
+        return SceneWindow.frame(theme, SceneWindow.scenes(context, theme, floating = true)).also { framed = at to it }
+    }
+
     private fun cornerPx(): Float {
-        val landscape = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val keys = ThemeManager.shownLook(theme).keys
-        val h = if (landscape) keys.gap.hLand else keys.gap.h
-        val v = if (landscape) keys.gap.vLand else keys.gap.v
-        return context.dp(FloatingKeyboard.cornerDp(keys.radiusDp, h, v, keys.blocks)).toFloat()
+        val at = screen() + listOf(keyboard.width, keyboard.height)
+        cornered?.let { (on, px) -> if (on == at) return px }
+        val f = frame()
+        val px = if (f.round) minOf(keyboard.width, keyboard.height) / 2f else SceneWindow.px(context, f.radiusDp)
+        cornered = at to px
+        return px
     }
 
     private fun View.bounds() = Bounds(left.toFloat(), top.toFloat(), width.toFloat(), height.toFloat())

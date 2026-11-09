@@ -270,9 +270,9 @@ object ThemeReader {
         var reserved = 0
         for ((prop, what) in PROPERTY_VALUES) {
             val raw = el[prop] ?: continue
-            val v = a.value(prop, what) { Values.read(prop, it) ?: RESERVED_VALUE.takeIf { _ -> Values.reservedValue(prop, it) } }
-            if (v === RESERVED_VALUE) {
-                p.warn(el.line, ignored("$prop=\"$raw\""))
+            val v = a.value(prop, what) { Values.read(prop, it) ?: follow(prop, it) }
+            if (v == FOLLOW && selectors.orEmpty().any { it.widget != NAVBAR }) {
+                p.warn(el.line, "color=\"follow\" is the navigation bar's alone: ignored")
                 reserved++
             } else if (v != null) {
                 values[prop] = v
@@ -281,9 +281,11 @@ object ThemeReader {
         reserved += sizesAndReserved(el, a, p, colors, selectors.orEmpty(), values)
         a.done()
         selectors?.let { selectorWarnings(el, p, it) }
+        selectors?.let { frame(it, values, el.line, p) }
         named(values, a, colors, fonts)
         selectors?.let { readElsewhere(it, values.keys, el.line, p) }
         reserved += selectors?.let { shapes(it, values, el.line, p) } ?: 0
+        selectors?.let { unreadByWindow(it, values.keys, el.line, p) }
         if (values.isEmpty() && reserved == 0) a.problem("a style that sets nothing")
         return selectors?.let { Style(it, values, order, el.line) }
     }
@@ -296,7 +298,36 @@ object ThemeReader {
         val keyboard = selectors.any { it.widget == "keyboard" }
         val sized = if (keyboard) sizes(el, a, p, selectors, values) else 0
         val keyboards = keyboard && selectors.all { it.widget == "keyboard" }
-        return sized + reserved(el, a, p, colors, skip = if (keyboards) Values.KEYBOARD_SIZES else emptyList())
+        val handles = selectors.isNotEmpty() && selectors.all { it.widget == HANDLE }
+        if (handles) grip(el, a, values)
+        val skip = when {
+            keyboards -> Values.KEYBOARD_SIZES
+            handles -> Values.HANDLE_SIZES
+            else -> emptyList()
+        }
+        return sized + reserved(el, a, p, colors, skip)
+    }
+
+    // the handle's grip ([Values.HANDLE_SIZES]), on a style of handles alone (in a list with others, a later stage's)
+    private fun grip(el: XmlElement, a: Attributes, values: MutableMap<String, Value>) {
+        for (prop in Values.HANDLE_SIZES.filter { el[it] != null }) {
+            val max = if (prop == "width") Values.MAX_GRIP_WIDTH_DP else Values.MAX_GRIP_HEIGHT_DP
+            a.value(prop, "0–${max.toInt()}dp") { Values.gripSize(prop, it) }?.let { values[prop] = Value.Number(it) }
+        }
+    }
+
+    // `color="follow"` ([Values.FOLLOW]): the navigation bar's (a style of others warned of and ignoring it)
+    private fun follow(prop: String, raw: String): Value? = FOLLOW.takeIf { prop == "color" && raw == Values.FOLLOW }
+
+    // the frame is the system's outline, of one radius and an elevation's shadow (straight down, no offset of its own)
+    private fun frame(selectors: List<Selector>, values: Map<String, Value>, line: Int, p: Problems) {
+        if (selectors.none { it.widget == "frame" }) return
+        val shadow = (values["shadow"] as? Value.OfShadow)?.shadow
+        if (shadow != null && (shadow.dx != 0.0 || shadow.dy != 0.0)) {
+            p.warn(line, "shadow= of the frame has no offset (the system's, of its blur's height): its x and y are ignored")
+        }
+        val radius = (values["radius"] as? Value.OfRadius)?.radius
+        if (radius != null && radius.corners.distinct().size > 1) p.warn(line, "radius= of the frame is one radius: its first is taken")
     }
 
     // what of the selectors selects nothing: a later stage's, an input method this app has none of (a misspelt
@@ -335,6 +366,34 @@ object ThemeReader {
 
     private val LABEL_READ = setOf("align", "space-content")
 
+    // a window widget's property it has no use for (`navbar fill=`, `frame fill=`): warned of, as one may think it does
+    // something; in a list, where another widget may read it, too (of that widget)
+    private fun unreadByWindow(selectors: List<Selector>, props: Set<String>, line: Int, p: Problems) {
+        for ((w, states) in selectors.filter { it.widget in WINDOW_READS }.map { it.widget to it.states }.distinct()) {
+            val on = w + states.sorted().joinToString("") { ":$it" }
+            val reads = windowReads(w, states)
+            val said = if (reads.isEmpty()) "it reads nothing in that state" else "it reads ${reads.joinToString(" ")}"
+            props.filter { it !in reads }.forEach { p.warn(line, "$it= on $on does nothing: $said") }
+        }
+    }
+
+    // a window widget's properties read in [states]: in none all of WINDOW_READS; pressed, a side button's
+    // overlay (WindowLooks.sideButton's ripple); no other state of the window is ever asked for
+    private fun windowReads(widget: String, states: Set<String>): List<String> = when {
+        states.isEmpty() -> WINDOW_READS.getValue(widget)
+        widget == "side-button" && states == setOf("pressed") -> listOf("overlay")
+        else -> emptyList()
+    }
+
+    // what each widget of the window round the keys reads (060-render-p3 T7a, engine/WindowLooks, SceneBuilder's split gap)
+    private val WINDOW_READS = mapOf(
+        "frame" to listOf("radius", "border", "shadow"),
+        HANDLE to listOf("fill", "color", "icon-color", "width", "height"),
+        "side-button" to listOf("fill", "icon-color", "shape", "radius", "overlay"),
+        "split-gap" to listOf("fill", "radius"),
+        NAVBAR to listOf("color"),
+    )
+
     // T4b's that do nothing where they are set, which a warning says: the bubble's shape, tail, size and
     // offset on anything but the bubble, a cap's depth on anything but a key, a path or an inner shadow on
     // what has no face drawn of it (the keyboard's base a plain fill, the bar's and the rest the app's), a radius
@@ -368,8 +427,10 @@ object ThemeReader {
     // the widgets a face is drawn of, a path's or an inner shadow's
     private val FACED = setOf("key", "popup", "preview", "menu")
 
-    // a property of today's value a later stage reads ([Values.reservedValue]): ignored
-    private val RESERVED_VALUE = Value.Flag(false)
+    // the navigation bar's colour as the keyboard's under it ([org.fcitx.fcitx5.android.scene.engine.WindowLooks.navbar])
+    private val FOLLOW = Value.Word(Values.FOLLOW)
+    private const val NAVBAR = "navbar"
+    private const val HANDLE = "handle"
 
     // the keyboard's size, set where every selector is a `keyboard` under no scene or state ([Values.KEYBOARD_SIZES]);
     // else of its form, and ignored with a warning saying why (how many: a style of them alone sets something): a

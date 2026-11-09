@@ -169,8 +169,10 @@ object LookTheme {
         s.add(of("menu"), "fill" to solid(ACCENT_KEY), "color" to color("accentKeyText"), "icon-color" to color("accentKeyText"), "radius" to Value.OfRadius(Radius(List(CORNERS) { 0.0 }, half = true)))
         // theme 3.0's cell in focus: the key's pressed colour over its own
         s.add(of("menu", state = "selected"), "overlay" to color("keyPressHighlight"))
-        s.add(of("keyboard", FLOATING), "radius" to radius(keys.radiusDp + minOf(keys.gap.h, keys.gap.v)))
-        s.add(of("handle"), "fill" to solid(ColorExpr.Fn("mix", listOf(ref("background"), ref("keyText")), HANDLE_MIX)))
+        // no rounder than a radius is read (keys of 24 dp and a gap made no theme, and no keyboard was drawn); the
+        // frame round it is the app's outline, of no such limit (WindowLooks.cornerDp), so its corners are the same.
+        // The handle the engine's default (WindowLooks.handleColor), as the window's frame
+        s.add(of("keyboard", FLOATING), "radius" to radius(minOf(keys.radiusDp + minOf(keys.gap.h, keys.gap.v), Keys.MAX_RADIUS_DP)))
         val picture = look.picture?.let { p ->
             val cuts = listOfNotNull("portrait" to fileName(p.portrait.file), p.landscape?.let { "landscape" to fileName(it.file) }).toMap()
             Picture(fileName(p.src), p.brightness.toDouble(), p.blurDp.toDouble(), cuts)
@@ -376,5 +378,4 @@ object LookTheme {
     private const val FLAT_SPACE_RADIUS_DP = 3
     private const val POPUP_SHADOW_DP = 2.0
     private const val POPUP_SHADOW = 0x33000000
-    private const val HANDLE_MIX = 10.0
 }
