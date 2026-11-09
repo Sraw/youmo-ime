@@ -43,9 +43,13 @@ import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.theme.Crop
+import org.fcitx.fcitx5.android.input.theme.BoardBase
 import org.fcitx.fcitx5.android.input.theme.KeyFill
 import org.fcitx.fcitx5.android.input.theme.Picture
+import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Op
+import org.fcitx.fcitx5.android.scene.Scene
+import org.fcitx.fcitx5.android.scene.Shape
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -513,11 +517,15 @@ class KeyboardCanvasViewTest {
     // time under the keys, where a picture with alpha would come out darker than theme 3.0 drew it
     @Test
     fun theBoardsPictureIsNotDrawnTwice() {
-        val board = pictured().let { Theme.Custom(it.name, it.isDark, it.look.copy(base = org.fcitx.fcitx5.android.input.theme.BoardBase.Picture)) }
+        val board = pictured().let { Theme.Custom(it.name, it.isDark, it.look.copy(base = BoardBase.Picture)) }
         KeyboardHarness(board).start().use { h ->
             val scene = h.canvas()!!.scene!!
             assertTrue(scene.base.any { it is Op.Picture })
             assertTrue(scene.under(drawsBase = true).none { it is Op.Picture })
+            // a blank place's picture face (the number pads'): a key's, not the board's, and stays
+            val blank = Op.Picture(Shape.Rect(Box(0.0, 0.0, 40.0, 40.0)), 0.0, 90.0)
+            val padded = Scene(scene.width, scene.height, scene.base + blank, scene.keys, scene.slots)
+            assertEquals(listOf(blank), padded.under(drawsBase = true).filterIsInstance<Op.Picture>())
         }
     }
 
