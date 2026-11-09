@@ -656,8 +656,10 @@ class PinyinSession(
         return CommitRows.prevAfter(recorder.prev(), pieces.map { it.learned ?: return null })
     }
 
-    /** The pieces picked, and [rest] after them, written to the learning record as one commit, with the syllables taken. */
-    // a piece picked while learning was off (a password) has none: not part learned
+    /**
+     * The pieces picked, and [rest] after them, written to the learning record as one commit, with the syllables taken.
+     * A piece picked while learning was off (a password) has none: not part learned.
+     */
     private fun record(rest: CommitRows.Pick? = null) { if (learning && recorder.learns) recorder.commit(pieces.map { it.learned ?: return } + listOfNotNull(rest), nineKeys) }
 
     // [c], picked, as the learning record takes it: see CommitRecorder.pick. A phrase, an

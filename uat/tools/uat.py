@@ -2818,8 +2818,9 @@ def packs_state(d):
 
 def stop(d, msg):
     """inside a case (SET-01) or a device's thread: that case blocked, the run goes on (a SystemExit
-    there ended the device's thread unrecorded); outside one (up, packs): the command stops"""
-    if getattr(d, "case", None):
+    there ended the device's thread unrecorded, a reset before its first case too); outside one
+    on the main thread (up, packs): the command stops"""
+    if getattr(d, "case", None) or threading.current_thread() is not threading.main_thread():
         raise Blocked(msg)
     sys.exit(msg)
 
@@ -3012,6 +3013,10 @@ def down_all(ports):
 def run_on(a, cases, ports):
     global HTTP_PORT
     HTTP_PORT = HTTP_PORT or http_port(ports[0])
+    if BUILD != "debug":
+        # each reset imports them (clear_keeping_packs) on a device's thread, where a missing pack's
+        # exit would end that thread unrecorded: checked here, before any device starts
+        pack_files(voice=False)
     for p in ports:
         d = Device(p)
         if d.sh("getprop sys.boot_completed").strip() != "1":

@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.voice
 
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -257,6 +258,7 @@ class VoicePolishTest {
         for (c in VoiceLive.ENDS) assertTrue("$c", "$c" in VoicePolishTags.NUMBER_BREAKS)
     }
 
+    // review F5866
     @Test
     fun aNumberGoingOnPastTheFrozenEndShowsWholeInTheRest() {
         val tagger = VoicePolishStream.Tagger { w -> VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size), IntArray(w.size) { 3 }) }
@@ -266,20 +268,63 @@ class VoicePolishTest {
         assertEquals("2026", stream.finish("二零二六"))
     }
 
-    @Test
-    fun englishMarksStayEnglishWithTheirSpaces() {
-        val raw = "Yes, I know? 好的？"
+    // a raw text kept whole, as the stream polishes it: spaces and marks' widths from the raw text
+    private fun keptWhole(raw: String, t: VoicePolishTags = tags, num: IntArray? = null): String {
         val text = VoicePolishTags.norm(raw)
         val keep = IntArray(text.size)
-        assertEquals("Yes, I know?好的？", tags.apply(text, keep, keep, VoicePolishTags.spaces(raw, text)))
-        // a non-breaking space is one to spaces as to norm
-        val nb = "Windows\u00a011"
-        val t = VoicePolishTags.norm(nb)
-        assertEquals("Windows 11", tags.apply(t, IntArray(t.size), IntArray(t.size), VoicePolishTags.spaces(nb, t)))
-        // nothing after 。 either (。。 would read as an ellipsis)
+        return t.apply(text, keep, keep, VoicePolishTags.spaces(raw, text), num, VoicePolishTags.asciiMarks(raw, text))
+    }
+
+    // review F5885/F6280/F6490 (English marks and their spaces), F6513 (a full width mark said in Chinese stays)
+    @Test
+    @Uat("VO-36")
+    fun aMarkKeepsTheWidthTheRecognizerWroteItIn() = assertRows(
+        "an English sentence's marks stay ASCII, the space after its comma kept (F5885)" to {
+            assertEquals("Yes, I know?好的？", keptWhole("Yes, I know? 好的？"))
+        },
+        "ASCII English stays ASCII (F6513)" to { assertEquals("Hello, world", keptWhole("Hello, world")) },
+        "a full width comma after an English word in Chinese stays full width (F6513)" to {
+            assertEquals("我买了iPhone，很好用", keptWhole("我买了iPhone，很好用"))
+        },
+        "a full width ！ after an English word stays (F6513)" to { assertEquals("我喜欢Python！", keptWhole("我喜欢Python！")) },
+        "after a number written from Chinese, the mark follows the number, not the word before it (F6513)" to {
+            val num = IntArray(VoicePolishTags.norm("买了iPhone十五，").size).also { it[8] = 1; it[9] = 1 }
+            assertEquals("买了iPhone15，", keptWhole("买了iPhone十五，", numTags, num))
+        },
+        "after digits the full width comma stays (F6513)" to { assertEquals("Windows 11，", keptWhole("Windows 11，")) },
+        "a non-breaking space is one to spaces as to norm (F6490)" to { assertEquals("Windows 11", keptWhole("Windows\u00a011")) },
+    )
+
+    // review F6280: nothing after 。 either (。。 would read as an ellipsis)
+    @Test
+    fun nothingIsWrittenAfterAFullStop() {
         val stop = VoicePolishTags.norm("好。")
         val after = intArrayOf(0, tags.afters.indexOf("。"))
         tags.guarded(stop, IntArray(stop.size), after)
         assertEquals(0, after[1])
+    }
+
+    // review F6272: the polished prefix shown is cached while its characters, spaces and marks' widths hold
+    @Test
+    fun theShownPrefixFollowsAChangeInsideIt() {
+        fun stream() = VoicePolishStream(tags, { w -> VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size)) }, freezeAfter = 1, window = 8)
+        assertRows(
+            "a space coming between two frozen letters shows" to {
+                val s = stream()
+                assertEquals(VoicePolishStream.Shown("ab", "c"), s.update("abc"))
+                assertEquals(VoicePolishStream.Shown("a b", "c"), s.update("a bc"))
+                assertEquals("a bc", s.finish("a bc"))
+            },
+            "a frozen character revised shows revised" to {
+                val s = stream()
+                s.update("abc")
+                assertEquals(VoicePolishStream.Shown("xb", "c"), s.update("xbc"))
+            },
+            "a frozen mark recognised again in ASCII shows ASCII" to {
+                val s = stream()
+                assertEquals(VoicePolishStream.Shown("Hi，", "a"), s.update("Hi，a"))
+                assertEquals(VoicePolishStream.Shown("Hi,", " a"), s.update("Hi, a"))
+            },
+        )
     }
 }

@@ -135,8 +135,8 @@ class ZhuyinSceneGesturesTest {
                 sent("$id long press")
             }
         }
-        // ⌫ held: deletes over and over, as many either way give or take one (how many depends on where in a
-        // frame the hold began, which the steps above move: at SDK 29 the scene's came one short, 24 to 25)
+        // ⌫ held: deletes over and over, at least MIN_REPEATS; the record keeps what they are, not how many
+        // (that depends on where in a frame the hold began, which the steps above move)
         h.press(h.keyNamed("backspace"))
         h.after(HOLD_MS)
         h.release()
@@ -186,11 +186,11 @@ class ZhuyinSceneGesturesTest {
     @Test
     fun nineAddressFieldsKeys() {
         val nine = PinyinKeyboard.ZhuyinNine
-        gestures(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI, setOf("slash", "dot", "domain", "r4c4"), setOf("at", "comma", "period"), nine)
-        gestures(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, setOf("at", "dot", "domain", "r4c4"), setOf("slash", "comma", "period"), nine)
+        keysOf(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI, setOf("slash", "dot", "domain", "r4c4"), setOf("at", "comma", "period"), nine)
+        keysOf(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, setOf("at", "dot", "domain", "r4c4"), setOf("slash", "comma", "period"), nine)
     }
 
-    // the slot (C6.7–C6.9), whichever draws it: the comma as punctuation maps it, 分词 while typing (the engine
+    // the slot (C6.7–C6.9): the comma as punctuation maps it, 分词 while typing (the engine
     // telling, or a group sent to pinyin before it tells; a tone none, a group sent to another input method
     // none); its tap the separator while typing, the comma else
     @Test
@@ -251,8 +251,8 @@ class ZhuyinSceneGesturesTest {
         assertTrue(shown[6], "sendKey(sym=$sep," in shown[6])
     }
 
-    // ? ! ~ shown as punctuation maps them, as they are typed (060-render-p2 §5.3, rules C 疑问 5): the views
-    // showed them half-width; each types the same either way, the bubble its character as the comma's
+    // ? ! ~ shown as punctuation maps them, as they are typed (060-render-p2 §5.3, rules C 疑问 5): each
+    // types as punctuation maps it, the bubble its character as the comma's
     @Test
     fun nineQuestionMarkShownAsItIsTyped() {
         val mapping = mapOf("?" to "？", "!" to "！", "~" to "～", "," to "，", "." to "。")
@@ -300,7 +300,7 @@ class ZhuyinSceneGesturesTest {
     }
 
     // a keyboard kept while another was shown, shown again: its punctuation as it changed meanwhile (KeyboardWindow.attachLayout,
-    // 060-render-p2 S4d L1: it showed , where it typed ，), whichever draws it
+    // 060-render-p2 S4d L1: it showed , where it typed ，)
     @Test
     fun aKeyboardShownAgainShowsThePunctuationChangedMeanwhile() {
         run {
@@ -328,7 +328,7 @@ class ZhuyinSceneGesturesTest {
         return listOf(k.label, bubble)
     }
 
-    // a group's long press picks its symbol, ˉ's ˙, each sent as its code (C6.3, C6.5), whichever draws
+    // a group's long press picks its symbol, ˉ's ˙, each sent as its code (C6.3, C6.5)
     @Test
     fun nineLongPressesSymbolOrToneIsSentAsItsCode() {
         val sent = run {
@@ -406,7 +406,7 @@ class ZhuyinSceneGesturesTest {
         GestureSnapshot.check("zhuyin-full-compact", gestures(shown = setOf("q", "3", "7", "/", "comma", "period", "space", "enter")))
     }
 
-    // 大千 as shown, whichever draws it: each symbol and tone on its QWERTY place (its theme name, zhuyin/q),
+    // 大千 as shown: each symbol and tone on its QWERTY place (its theme name, zhuyin/q),
     // row by row as Taiwan's keyboards print them (C5.1), its shortcut by that place (zyfull/q, C5.7), its tap the code
     @Test
     fun dachenOnTheKeysAsShown() {
@@ -425,11 +425,19 @@ class ZhuyinSceneGesturesTest {
         }
     }
 
+    // the keys of a field of [inputType] on [board]: [shown] among them, [hidden] not (what the keys then do is
+    // the grouped boards' records': R20 F6594, no sweep whose lines no one reads)
+    private fun keysOf(inputType: Int, shown: Set<String>, hidden: Set<String>, board: PinyinKeyboard = PinyinKeyboard.ZhuyinFull) =
+        harness(inputType, board).use { h ->
+            val ids = h.keys().mapNotNull { it.id }
+            assertTrue("$ids", ids.containsAll(shown) && ids.none { it in hidden })
+        }
+
     // an address field's keys: a URL's / . and domains, an address's @ . and domains; neither a , or 。 of its own
     @Test
     fun theAddressFieldsKeys() {
-        gestures(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI, setOf("slash", "dot", "domain"), setOf("at", "comma", "period"))
-        gestures(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, setOf("at", "dot", "domain"), setOf("slash", "comma", "period"))
+        keysOf(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI, setOf("slash", "dot", "domain"), setOf("at", "comma", "period"))
+        keysOf(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, setOf("at", "dot", "domain"), setOf("slash", "comma", "period"))
     }
 
     // the language key as the setting says, shown again as it changes
@@ -485,7 +493,7 @@ class ZhuyinSceneGesturesTest {
         assertTrue(returnIcons.toString(), returnIcons[0] != returnIcons[2] && returnIcons[2] == returnIcons[3])
     }
 
-    // a long press's symbol or tone typed as the keyboard's code, whichever draws (C5.8): the comma's own,
+    // a long press's symbol or tone typed as the keyboard's code (C5.8): the comma's own,
     // the user's 按键字符 giving it ˊ and ㄅ; the comma's own ， as it is
     @Test
     fun aLongPressesSymbolOrToneIsSentAsItsCode() {
@@ -507,7 +515,8 @@ class ZhuyinSceneGesturesTest {
         assertTrue(sent.toString(), sent[2] != "， []" && "sym=$tone," !in sent[2] && "sym=$b," !in sent[2])
     }
 
-    // the symbols one size at each height (B6.5, C5.4)
+    // the symbols one size at each height (B6.5, C5.4); at 紧凑 KeyTextScale.dachen's 0.9 on top of the engine's
+    // compact scale (R20 F6640): ㄅ shrinks by 0.9 more than 注音九键's groups do, which have no such scale
     @Test
     fun theSymbolsOneSizeAtEachHeight() {
         val keyboard = AppPrefs.getInstance().keyboard
@@ -545,7 +554,7 @@ class ZhuyinSceneGesturesTest {
         // a swipe up this many of the key's heights: past the threshold, the shortcut's
         const val SWIPED = 1.3f
 
-        // ⌫ held this long repeats: some deletes at least, the same count each side
+        // ⌫ held this long repeats: some deletes at least
         const val HOLD_MS = 1500L
         const val MIN_REPEATS = 3
 

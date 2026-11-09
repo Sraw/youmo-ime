@@ -337,10 +337,13 @@ class KeyboardHarness(
 
     private var delivered = intArrayOf(-1, -1, -1, -1)
 
+    /** The field's selection changes not told to the service while set: its tracked selection lagging, as an editor's report can. */
+    var selectionLags = false
+
     // what the system's input method manager does as the field's selection or composing text
     // changes: Robolectric's tells the service nothing, whose tracking of the cursor would lag
     private fun selectionDelivered() {
-        if (!::field.isInitialized) return
+        if (!::field.isInitialized || selectionLags) return
         val text = field.text
         val now = intArrayOf(
             field.selectionStart, field.selectionEnd,

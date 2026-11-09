@@ -281,7 +281,8 @@ class HandwritingEngineUatTest {
         assertTrue("$page", at >= 0)
         val done = learn(org.fcitx.fcitx5.android.engine.learn.control.LearningOp.Block(at, "人"))
         assertTrue("$done", done is org.fcitx.fcitx5.android.engine.learn.control.LearningResult.Done)
-        assertTrue("after $page", "人" !in page)
+        // nor through a word: no candidate brings 人 back (天人 included)
+        assertTrue("after $page", page.none { "人" in it })
         // another of the ink's readings first in its place
         assertTrue("after $page", page.isNotEmpty())
     }

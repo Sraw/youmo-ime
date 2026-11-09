@@ -112,7 +112,8 @@ class BaseKeyboardTest {
     }
 
     // a long press that takes the touch (Enumerate; Voice with its pack in): a slow drag on the space past the slop,
-    // then held past the delay, is a swipe, its long press never fired (the scene's touch path, KeyGesture)
+    // then held past the delay, is a swipe, its long press never fired (the scene's touch path, KeyGesture;
+    // PY-41, R20 F5928: KeyboardUatTest's PY-41 rows are holds that do nothing, this one's takes the touch)
     @Test
     fun aSlowDragOnTheSpaceKeepsTheLongPressFromFiring() {
         for (behavior in listOf(SpaceLongPressBehavior.Enumerate, SpaceLongPressBehavior.Voice)) told { t ->

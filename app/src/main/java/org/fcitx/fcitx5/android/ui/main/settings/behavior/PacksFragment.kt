@@ -125,8 +125,9 @@ class PacksFragment : PaddingPreferenceFragment() {
             .setTitle(R.string.pack_import_results)
             .setMessage((lines + listOfNotNull(hint)).joinToString("\n\n"))
             .setPositiveButton(android.R.string.ok, null)
-            // seen once read: a rotation or the process recreated takes the dialog away unread, and the
-            // results stay to be shown again (a refused file's reason seen nowhere else)
+            // seen once read: a rotation (the activity recreated) takes the dialog away unread, and the
+            // results stay to be shown again (a refused file's reason seen nowhere else). Kept in memory
+            // only: a process killed loses them
             .setOnDismissListener { PackImports.seen() }
             .show()
         show()

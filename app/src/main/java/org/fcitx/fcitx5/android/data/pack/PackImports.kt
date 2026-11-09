@@ -84,7 +84,8 @@ object PackImports {
             throw e
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
             // for the log: no paths, no names of the user's (a provider's message may carry them)
-            Timber.w("pack import: %s", e.javaClass.simpleName)
+            // (its frames kept: an importer's own bug is found by them)
+            Timber.w(Throwable(e.javaClass.name).apply { stackTrace = e.stackTrace }, "pack import")
             ImportResult.Refused(Refusal.Unreadable(e.message ?: e.javaClass.simpleName))
         }
         return Outcome(name, result)

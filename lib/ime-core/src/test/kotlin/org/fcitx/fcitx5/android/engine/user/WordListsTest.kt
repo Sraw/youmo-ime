@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.user
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.fcitx.fcitx5.android.engine.platform.UserFiles
@@ -211,6 +212,10 @@ class WordListsTest {
         assertEquals("ni hao", WordLists.blockedEntry("😃", "ni'hao")?.spelled())
         // a letter not ASCII is no word's (ℹ️, review R3): read so too
         assertEquals("xin", WordLists.blockedEntry("ℹ️", "xin")?.spelled())
+        // a keycap (1️⃣, #️⃣) is no word though its digit is: read as an emoji, no table hides it (R20 F6481)
+        assertFalse(WordLists.isWordly("1️⃣"))
+        assertFalse(WordLists.isWordly("#️⃣"))
+        assertEquals("yi", WordLists.blockedEntry("1️⃣", "yi")?.spelled())
         // a text of letters or digits as any word: a syllable a character, or none
         assertNull(WordLists.blockedEntry("abc", "a'o"))
         // a file's line read so, its cost a number or none
@@ -219,8 +224,9 @@ class WordListsTest {
         assertEquals(listOf("👍🏻", "😃", "ℹ️"), WordLists(dir).blockedWords.map { it.text })
     }
 
-    // a Latin candidate blocked in pinyin is written as its upper-case letter syllables: it reads back after a restart
+    // a Latin candidate blocked in pinyin is written as its upper-case letter syllables: it reads back after a restart (R20 F5772)
     @Test
+    @Uat("PY-117")
     fun aBlockedLatinWordReadsBackAsItsLetters() {
         val dir = MemoryFiles()
         dir.file(WordLists.BLOCKED).write("hello H'E'L'L'O\niPhone I'P'H'O'N'E\n".toByteArray())

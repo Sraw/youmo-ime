@@ -237,7 +237,7 @@ class CompactKeyboardUatTest {
     private fun lettersStayClearOfTheirSymbols(dropped: Boolean = false): List<ShownKey> {
         val letters = h.keys().filter { it.label.length == 1 && it.label[0].isLetter() && it.alt != null }
         assertTrue(letters.size.toString(), letters.size >= 26)
-        // left out only where it does not fit: a few capitals (decision 62: A, W, M), never the board's all
+        // left out only where it does not fit: a few wide capitals (A, W, M; docs/keyboard.md's marks' steps), never the board's all
         val left = letters.filter { it.alt !in it.drawnTexts }.map { it.label }
         assertTrue("left out: $left", if (dropped) left.size <= 3 else left.isEmpty())
         for (k in letters) {

@@ -130,4 +130,5 @@ def hw31(d):
     after = d.cands()
     d.shot("kb", "屏蔽「人」后")
     check("人" not in after, f"屏蔽后候选还有「人」：{after[:6]}")
+    check(after, "屏蔽后候选空了")
     return f"「天」「人」的菜单都有屏蔽；屏蔽后候选 {after[:4]}（设置里恢复由 JVM 管）"

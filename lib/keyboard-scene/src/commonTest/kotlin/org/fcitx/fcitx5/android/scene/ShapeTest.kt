@@ -88,6 +88,9 @@ class ShapeTest {
     @Test
     fun aPathReadsAsSvgs() {
         val square = assertNotNull(ShapePath.parse("M0 0 H1 V1 H0 Z"))
+        // an exponent is read; an 'e' with no digits is no number
+        assertNotNull(ShapePath.parse("M0 0 H1e0 V5e-1 H0 Z"))
+        assertNull(ShapePath.parse("M0 0 H1e V1 H0 Z"))
         val box = Box(10.0, 20.0, 110.0, 70.0)
         assertEquals(
             listOf(MoveTo(10.0, 20.0), LineTo(110.0, 20.0), LineTo(110.0, 70.0), LineTo(10.0, 70.0), Close),

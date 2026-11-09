@@ -28,8 +28,8 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // recreated (a rotation): the page shown then, which open() kept in the intent of this instance only
-        show(savedInstanceState?.getString(EXTRA_PAGE) ?: pageOf(intent))
+        // recreated (a rotation): the page shown then (null: the list), not the starting intent's page
+        show(if (savedInstanceState != null) savedInstanceState.getString(EXTRA_PAGE) else pageOf(intent))
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

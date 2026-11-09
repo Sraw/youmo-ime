@@ -128,7 +128,10 @@ class VoiceSegments<R>(
 
     private companion object {
         // the recognizer's backlog at an endpoint, a chunk and its context at most; well inside the
-        // trailing silence an endpoint needs, so no speech before it is counted
+        // trailing silence a silence endpoint needs, so no speech before it is counted. After an
+        // endpoint for length (rule 3, no silence) it is the segment before's speech: a short Latin
+        // phrase the room said next may then be typed (accepted; exact would be the
+        // recognizer's own start time of the segment, not exposed)
         const val UNDECODED_SECONDS = 0.5
     }
 }

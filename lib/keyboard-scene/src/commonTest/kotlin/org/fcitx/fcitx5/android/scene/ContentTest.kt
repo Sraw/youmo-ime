@@ -202,6 +202,27 @@ class ContentTest {
     }
 
     @Test
+    fun theFloatingBoardsTheSweepLeavesOutKeepTheirIconsWithinTheArcs() {
+        // what the sweep above does not run: floating compact qwerty, k14, zhuyin and handwriting at every density,
+        // and every floating board at 2.625 and 3.0 px a dp; from their height down to 55% of it, a px or two either
+        // way, every shortcut's and ⌫'s icon within its face's arcs (R20 F6519: the check F5911 merged away)
+        val heights = listOf(1.0, 0.9, 0.8, 0.7, 0.65, 0.6, 0.55).flatMap { part -> listOf(0.0, 1.0, 2.0).map { px -> part to px } }
+        val compactBoards = listOf("qwerty", "k14", "zhuyin", "handwriting")
+        val runs = listOf(2.0, 2.625, 2.75, 3.0, 3.5).flatMap { d -> compactBoards.map { Triple(d, it, true) } } +
+            listOf(2.625, 3.0).flatMap { d -> listOf("qwerty", "k14", "k18", "zhuyin", "handwriting").map { Triple(d, it, false) } + Triple(d, "zhuyin-nine", true) }
+        var against = 0
+        for ((d, board, compact) in runs) {
+            val k = d / Forms.DENSITY
+            against += heights.sumOf { (part, px) ->
+                val e = Forms.floating.copy(width = Forms.floating.width * k, height = Forms.floating.height * k * part - px, density = d, compact = compact)
+                val at = "at $d, ${if (compact) "compact " else ""}$board $part of its height less $px px"
+                Forms.scene(board, Forms.env(board, e)).keys.sumOf { iconsWithinArcs(it, at) }
+            }
+        }
+        assertTrue(against >= 10, "against the arcs: $against")
+    }
+
+    @Test
     fun aCompactBoardsClassesShrinkSmoothlyAndItsIconsKeepWithinTheArcs() {
         // the same for compact and small compact qwerty, k14 and k18; where a key's face is shorter than its
         // text (small compact k18 near 55%: 21 px of face, 36 px of text) the text gives a px for each px of

@@ -40,9 +40,12 @@ class XmlTest {
     @Test
     fun strayTextAndNonAsciiNamesAreProblems() {
         // nothing the formats read is text: a stray word is a slip (L7)
-        val p = assertIs<Parsed.Failed>(Xml.parse("<a>\n<b/>\n  oops\n</a>"))
-        assertEquals(3, p.problems.single().line)
-        assertTrue(p.problems.single().message.contains("oops"), "${p.problems}")
+        // a line ended by LF, by a lone CR (XML 1.0 §2.11), or by CRLF (one line, not two): the stray word on line 3
+        for (nl in listOf("\n", "\r", "\r\n")) {
+            val p = assertIs<Parsed.Failed>(Xml.parse("<a>$nl<b/>$nl  oops$nl</a>"))
+            assertEquals(3, p.problems.single().line, "line end ${nl.map { it.code }}")
+            assertTrue(p.problems.single().message.contains("oops"), "${p.problems}")
+        }
         assertIs<Parsed.Failed>(Xml.parse("<键/>"))
         assertIs<Parsed.Failed>(Xml.parse("<a 名=\"1\"/>"))
         assertIs<Parsed.Failed>(Xml.parse("<a>&#99999999;</a>"))
@@ -90,12 +93,6 @@ class XmlTest {
         val a = Xml.parse("<a x=\"1\n2\r\n3\r4\t5\" y=\"6&#10;7\">\n</a>").ok()
         assertEquals("1 2 3 4 5", a["x"])
         assertEquals("6\n7", a["y"])
-    }
-
-    @Test
-    fun aLoneCrEndsALine() {
-        val p = assertIs<Parsed.Failed>(Xml.parse("<a>\r<b/>\r  oops\r</a>"))
-        assertEquals(3, p.problems.single().line)
     }
 
     @Test

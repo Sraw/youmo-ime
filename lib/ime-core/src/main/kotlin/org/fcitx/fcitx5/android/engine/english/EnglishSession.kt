@@ -420,11 +420,11 @@ class EnglishSession(
 
     // a word offered, as shown; not the letters typed, which are kept as typed whatever is blocked. On
     // the nine keys what is typed is the decoder's first word, itself blockable: only the letters
-    // pinned as typed (no digit among them) are kept so
+    // pinned as typed (no digit among them) are kept so; nor the word a glide just committed, in the text as typed
     private fun blockable(index: Int): Boolean {
         val word = candidates.getOrNull(index) ?: return false
         val asTyped = if (nineKeyed()) input.none { it in '2'..'9' } && word == capitalI(input.toString()) else word == typed()
-        return learning && blocks != null && EnglishText.isWord(word) && !(input.isNotEmpty() && asTyped)
+        return learning && blocks != null && EnglishText.isWord(word) && !(input.isNotEmpty() && asTyped) && !(input.isEmpty() && glided?.takeIf { it.committed == last }?.committed == "$word ")
     }
 
     // as written, the data's or the user's, not as the input's case shows it: the word blocked, or null

@@ -191,8 +191,8 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 ### WD-14q [P1] 只写了词的行：并入基础词库时按词库推拼音，推不出的单列
 - **前提**：B0-设置，`no-pinyin-some.txt`（60 行带拼音，1 行只有词「氪喵无音」）、`no-pinyin-most.txt`（3 行带拼音，7 行只有词，字都是常用字）已放到"下载"目录。
 - **操作**：**导入词库** 选 `no-pinyin-some.txt`，看标题，取消；再 **导入词库** 选 `no-pinyin-most.txt`，看标题，选"基础词库"点 **导入词库**。
-- **预期**：并入基础词库时只写词的行按词库推拼音（0.6.0 起）：`no-pinyin-some.txt` 的标题下面写着"61 个词"和"其中 1 个词的拼音按词库推出"；`no-pinyin-most.txt` 写着"10 个词"和"其中 7 个词的拼音按词库推出"，导入后词库页"基础词库"里多了它。只写词的行一个拼音也推不出时（比如全是词库里没有的字）才提示"格式不支持：有些行没有拼音；没有拼音的词只能并入用户词库"。
-- **JVM**：`DictionaryUatTest.wordsWithoutPinyinApartTooManyNotForTheBase`（不推拼音时的读法：60 个词、1 个没有拼音；太多的拒绝为有些行没有拼音）；推拼音的那半：`PinyinDictManagerTest.aListOfWordsAloneIsPreparedWithTheReadingsGuessed`、ime-core `DictionaryFormatTest.aGuessFillsInAmongWordsWithPinyinAndLeavesTheBlockedAlone`；设备上不跑。
+- **预期**：并入基础词库时只写词的行按词库推拼音（0.6.0 起）：`no-pinyin-some.txt` 的标题下面写着"61 个词"和"其中 1 个词的拼音按词库推出"；`no-pinyin-most.txt` 写着"10 个词"和"其中 7 个词的拼音按词库推出"，导入后词库页"基础词库"里多了它。有带拼音的行时，推不出拼音的只写词不算进 2% 的上限：照样能并入基础词库，标题下写「N 个词推不出拼音（并入基础词库时跳过）」，这些词跳过。只有没有一行带拼音或推出拼音（比如全是只写词的行、字都不在词库里），或者屏蔽行（`!` 开头）超过 2% 时，才提示"格式不支持：有些行没有拼音；没有拼音的词只能并入用户词库"。
+- **JVM**：`DictionaryUatTest.wordsWithoutPinyinApartTooManyNotForTheBase`（不推拼音时的读法：60 个词、1 个没有拼音；太多的拒绝为有些行没有拼音）；`DictionaryUatTest.wordsAloneGuessedAreCountedAndTheBaseTakesThem`（带推拼音：两个文件标题的计数，no-pinyin-most 并入基础词库，推不出的跳过并计数）；推拼音的那半：`PinyinDictManagerTest.aListOfWordsAloneIsPreparedWithTheReadingsGuessed`、ime-core `DictionaryFormatTest.aGuessFillsInAmongWordsWithPinyinAndLeavesTheBlockedAlone`；设备上不跑。
 
 ### WD-14r [P0] 从 0.3.2 升级：导入的大词库转换成压缩的，空间省下一大半
 - **前提**：装着 v0.3.2 正式版（不是要测的这一版），在它里面按 WD-14d 把雾凇拼音并入基础词库，等合好（候选里有「阿坝州」）；再导入 `dict-words.txt` 并入基础词库后把它 **关闭**；记下 **系统设置 → 应用 → 幽默输入法 → 存储** 的"用户数据"大小和词库目录（`adb shell ls -l /sdcard/Android/data/<包名>/files/data/pinyin/dictionaries`：`frost_dict_for_fcitx5.txt`、`dict-words.txt.disable`、`merged.ymd` 约 106 MB）。
@@ -334,3 +334,9 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **操作**：**词库与短语 → 自定义短语**，等 **+** 出现，右上角 ⋮ → **导入**，在下载里选 phrases.txt；返回，再进这一页看列表；回测试页打 s h；再回这一页 ⋮ → **导出**，在下载里保存；取回导出的文件看内容。
 - **预期**：导入后列表里「北京市海淀区」只有一条（已有的不重复加），多了 sh →「上海」，提示「导入了 1 条短语」（脚本截图留给人看）；离开再回来两条都在；sh 第一候选是「上海」；下载里多出一个导出的文件（同名的已有时存成「… (1).txt」），里面有 `dz,1=北京市海淀区` 和 `sh,1=上海` 两行。
 - **JVM**：`SettingsPagesUatTest.nothingIsAddedToTheCustomPhrasesBeforeTheirFileIsRead`（短语文件读完前没有 +、导入导出不可用；读完前送达的导入、导出等读完再做：导入不重复、离开页面时存下，导出不是空文件；这一状态手上看不到，只在 JVM 上断言）；设备上照跑：文件选择器、导入导出的真实文件只在设备上有。
+
+### WD-38 [P1] 带拼音的 GBK 词库里夹着几行只写词的，照样能导入
+- **前提**：无（JVM）。
+- **操作**：导入 GB18030 编码、约 100 行带拼音外加 1 行推不出拼音的只写词的文件。
+- **预期**：不因字和读音对不上被拒绝；标题下写"GBK 编码"和"1 个词推不出拼音（并入基础词库时跳过）"。只写词的行多于带拼音的行时才按读音核对（Big5 当 GBK 读的那种仍拒绝，见 WD-14p）。
+- **JVM**：`DictionaryFormatTest.aFewWordsAloneInAGbkFileWithPinyinRefuseNothing`；设备上不跑。

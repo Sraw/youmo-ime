@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.english
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.english.GlideDecoderTest.Companion.glided
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Offer
@@ -17,8 +18,9 @@ class EnglishBlockOffersTest {
 
     private val data = EnglishDecoderTest.data()
 
-    // the nine keys' first word is the decoder's, not letters the user typed: it can be blocked like any other
+    // the nine keys' first word is the decoder's, not letters the user typed: it can be blocked like any other (R20 F5865)
     @Test
+    @Uat("EN-28")
     fun theNineKeysFirstWordCanBeBlocked() {
         val blocks = EnglishBlocks(null)
         val s = EnglishSession(data, blocks = blocks)
@@ -30,8 +32,9 @@ class EnglishBlockOffersTest {
         assertFalse("the" in after.candidates)
     }
 
-    // a glide's other blocked leaves the rest offered: one of them still takes the glided word's place
+    // a glide's other blocked leaves the rest offered: one of them still takes the glided word's place (R20 F6046)
     @Test
+    @Uat("EN-28")
     fun aGlidesOtherBlockedLeavesTheRestToPick() {
         val blocks = EnglishBlocks(null)
         val s = EnglishSession(data, blocks = blocks).apply { apply(Action.Context("")) }
@@ -47,5 +50,18 @@ class EnglishBlockOffersTest {
         val picked = s.apply(Action.Pick(last))
         assertEquals("${after.candidates[last]} ", picked.commit)
         assertEquals("hello ".length, picked.deleteBefore)
+    }
+
+    // the word the glide committed is in the text, as letters typed are: not offered 屏蔽, a Block of it does nothing (R20 F6632)
+    @Test
+    fun aGlidesCommittedWordIsNotBlocked() {
+        val blocks = EnglishBlocks(null)
+        val s = EnglishSession(data, blocks = blocks).apply { apply(Action.Context("")) }
+        val shown = s.glided("helo")
+        assertEquals("hello", shown.candidates.first())
+        assertFalse(Offer.BLOCK in s.offers(0))
+        val after = s.apply(Action.Block(0))
+        assertEquals(emptyList<String>(), blocks.blocked)
+        assertEquals(shown.candidates, after.candidates)
     }
 }

@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
+import org.fcitx.fcitx5.android.input.keyboard.GestureSnapshot
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardCanvasViewTest
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.set
@@ -33,10 +34,10 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The symbol panel drawn by the scene (060-render-p2 S5c): its row of keys (⌫, space and Return tapped:
- * what reaches the engine), the
+ * The symbol panel drawn by the scene (060-render-p2 S5c): its row of keys (each tapped and held:
+ * what reaches the engine, against the record `gestures/symbols-row.txt`), the
  * categories and the grid in symbols.xml's slots over the canvas, the lock shut as its state and
- * said as its view said it (what a tap does), 返回 in the app's words.
+ * said as what a tap does, 返回 in the app's words.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -85,11 +86,13 @@ class SymbolsSceneGesturesTest {
         return out
     }
 
-    // the row's keys tapped: ⌫, space and Return each send their own key to the engine; ⌫ and space leave the panel up
+    // the row's keys tapped and held (R20 F5817: the long presses too), each line against the record;
+    // ⌫, space and Return each send their own key to the engine; ⌫ and space leave the panel up
     // (BackSpace 0xff08, space 0x20, Return 0xff0d, by name or keysym as the panel sends them)
     @Test
     fun theRowsKeysSendTheirOwnKeys() {
         val out = gestures()
+        GestureSnapshot.check("symbols-row", out)
         fun tap(id: String) = out.single { it.startsWith("$id tap: ") }
         assertRows(
             // ⌫ deletes as on the keyboard

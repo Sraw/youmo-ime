@@ -9,6 +9,8 @@ import org.fcitx.fcitx5.android.input.scene.CanvasFrame.Face
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Shape
+import org.fcitx.fcitx5.android.scene.TextShadow
+import org.fcitx.fcitx5.android.scene.TextStroke
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -71,5 +73,14 @@ class CanvasFrameTest {
         assertTrue("$turned", turned.bottom >= 110.0 + 30.0 && turned.left <= 140.0 - 40.0)
         assertTrue(CanvasFrame.showsPicture(listOf(Op.Fill(face, black), Op.Picture(face, null, null))))
         assertFalse(CanvasFrame.showsPicture(listOf(Op.Fill(face, black))))
+        // a text's letter spacing, stroke and shadow reach past its plain ink (R20 F5990)
+        val at = Box(140.0, 110.0, 140.0, 110.0)
+        val plain = CanvasFrame.extent(at, listOf(text), 0.0)
+        val spaced = CanvasFrame.extent(at, listOf(text.copy(letterSpacing = 0.5)), 0.0)
+        assertEquals(plain.right + 20.0 * 0.5, spaced.right, 1e-9)
+        val stroked = CanvasFrame.extent(at, listOf(text.copy(stroke = TextStroke(3.0, black))), 0.0)
+        assertEquals(Box(plain.left - 3.0, plain.top - 3.0, plain.right + 3.0, plain.bottom + 3.0), stroked)
+        val shadowed = CanvasFrame.extent(at, listOf(text.copy(shadow = TextShadow(4.0, 6.0, 2.0, black))), 0.0)
+        assertEquals(Box(plain.left, plain.top, plain.right + 6.0, plain.bottom + 8.0), shadowed)
     }
 }

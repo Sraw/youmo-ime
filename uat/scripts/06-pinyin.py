@@ -221,7 +221,7 @@ case("PY-87", needs="jvm:GroupedKeyboardUatTest.theSeparatorWithNothingTypedIsPa
 case("PY-88", needs="jvm:GroupedKeyboardUatTest.aSwipeDownTypesTheCornerAndWhileTypingPicksThatCandidate、KeyboardHalvesUatTest.aCornersDigitTypesItselfOrPicksThatCandidateWhileTyping")(lambda d: None)
 
 
-case("PY-89", needs="jvm:GroupedKeyboardUatTest.theLongPressIsTheGroupsLettersAroundTheCornerWithTheLettersSymbolsAbove、KeyboardHalvesUatTest.aLetterOfTheLongPressWhileTypingFollowsTheFirstCandidate")(lambda d: None)
+case("PY-89", needs="jvm:GroupedKeyboardUatTest.aLooseKeyAtTheLeftReachesItsFirstLetterAtTheEdge、GroupedKeyboardUatTest.theLongPressIsTheGroupsLettersAroundTheCornerWithTheLettersSymbolsAbove、KeyboardHalvesUatTest.aLetterOfTheLongPressWhileTypingFollowsTheFirstCandidate")(lambda d: None)
 
 
 case("PY-90", needs="jvm:Keys14UatTest.theFourteenKeysLearnApartFromTheFullKeyboardAndYourWordsAreBoths")(lambda d: None)
@@ -429,3 +429,6 @@ def py116(d):
     d.clear()
     check("国家" not in simp, f"屏蔽「國家」后简体下 guojia 还有「国家」：{simp[:6]}")
     return f"切到「{trad}」：长按「國家」菜单 {menu}；屏蔽后繁體 {after[:4]}，简体 {simp[:4]}"
+
+
+case("PY-117", needs="jvm:WordListsTest.aBlockedLatinWordReadsBackAsItsLetters")(lambda d: None)

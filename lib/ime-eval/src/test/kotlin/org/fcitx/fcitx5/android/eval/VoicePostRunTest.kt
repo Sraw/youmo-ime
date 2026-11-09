@@ -122,6 +122,34 @@ class VoicePostRunTest {
     }
 
     @Test
+    fun aNullWrittenIsNoWrittenReference() {
+        // "written": null reads as none (the set's ref, written false), not the text "null"; in a set with written
+        // references it is left out and counted as unwritten
+        val file = tmp.newFile("seg-n.jsonl")
+        file.writeText(
+            """{"wav": "1.wav", "ref": "我去", "written": "我去。", "stretches": [{"start": 0, "end": 1, "nbest": ["我去。"], "scores": [0], "app": "我去。"}]}""" + "\n" +
+                """{"wav": "2.wav", "ref": "他来", "written": null, "stretches": [{"start": 0, "end": 1, "nbest": ["她来。"], "scores": [0], "app": "她来。"}]}""" + "\n",
+        )
+        val clips = VoicePostRun.read(file, "app")
+        assertEquals(listOf(true, false), clips.map { it.written })
+        assertEquals("他来", clips[1].ref)
+        val out = StringBuilder()
+        VoicePostRun.run(listOf(file.path), "app", null, out)
+        val row = out.lines()[1].split('\t')
+        assertEquals(listOf("1", "0.00%"), listOf(row[1], row[3]))
+        assertEquals("1", row.last())
+    }
+
+    @Test
+    fun anEmptyNBestReadsAsNothingHeardWithTheTopSource() {
+        val file = tmp.newFile("seg-e.jsonl")
+        file.writeText(
+            """{"wav": "1.wav", "ref": "嗯", "stretches": [{"start": 0, "end": 1, "nbest": [], "scores": [], "app": ""}]}""" + "\n",
+        )
+        assertEquals(listOf(""), VoicePostRun.read(file, "top").single().stretches.map { it.raw })
+    }
+
+    @Test
     fun aSetWithoutMarksScoresNoMarks() {
         val s = VoicePostRun.Score()
         VoicePostRun.score("我去", "我去", s)

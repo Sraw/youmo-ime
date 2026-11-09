@@ -104,7 +104,7 @@ object VoiceEngine {
         main.removeCallbacks(letGo)
         // a voice pack imported since they were read: the new one's, once no talk holds the old
         val dir = PackStore.dir(PackKind.VOICE)
-        if (users == 0 && models != null && models?.dir != dir) unload()
+        if (modelsOutdated(users, models?.dir, models != null, dir)) unload()
         // counted before the load: offerVad, reading it without the lock, keeps the VAD for this talk
         users++
         try {
@@ -286,3 +286,10 @@ object VoiceEngine {
         hotwordsScore = VoiceHotwords.SCORE,
     )
 }
+
+/**
+ * The models read are another pack's than the one installed now ([dir]: a voice pack imported since) and no talk holds
+ * them: let go, to be read anew from [dir].
+ */
+internal fun modelsOutdated(users: Int, loadedDir: File?, loaded: Boolean, dir: File?): Boolean =
+    users == 0 && loaded && loadedDir != dir

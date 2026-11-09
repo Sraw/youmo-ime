@@ -132,7 +132,9 @@ class SceneSpeechTest {
         // the 26 keys all there, each with its words
         assertTrue(scene.keys.toString(), ('a'..'z').all { scene.keys.any { k -> k.equals("$it#0", ignoreCase = true) } })
         for ((key, told) in scene.filterKeys { it.length == 3 && it[0].isLetter() && it.endsWith("#0") }) {
-            assertTrue("$key: $told", told.clickable && told.enabled && told.reads.isNotEmpty() && told.className != null &&
+            // its words name its letter (reads is never empty: no description reads "null", an empty one [""]; R20 F6606)
+            val named = "null" !in told.reads && told.reads.any { it.contains(key[0], ignoreCase = true) }
+            assertTrue("$key: $told", told.clickable && told.enabled && named && told.className != null &&
                 AccessibilityNodeInfo.ACTION_CLICK in told.actions)
         }
     }

@@ -92,14 +92,16 @@ class GroupedSceneGesturesTest {
                     sent("$id long press")
                 }
             }
-            // ⌫ held: deletes over and over
-            val held = h.field.text.length
+            // ⌫ held: deletes over and over, at least MIN_REPEATS times; the record keeps what it sends, not
+            // how many (that depends on where in a frame the press fell) nor the field it left (R20 F6506)
             h.press(h.keyNamed("backspace"))
             h.after(HOLD_MS)
             h.release()
-            val deletes = h.api.calls.count { it.startsWith("sendKey") }
+            val held = h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") }
+            val deletes = held.count { it.startsWith("sendKey") }
             assertTrue("$deletes deletes", deletes >= MIN_REPEATS)
-            sent("backspace held $deletes from $held")
+            out += "backspace held: ${held.distinct()}"
+            h.api.calls.clear()
             out
         }
     }

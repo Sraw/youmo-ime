@@ -17,11 +17,9 @@ import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.picker.PickerGridAdapter
 import org.fcitx.fcitx5.android.input.picker.PickerGridView
 import org.fcitx.fcitx5.android.input.picker.PickerLayout
-import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -40,12 +38,6 @@ class HabitsUatTest {
 
     @get:Rule
     val prefs = PrefsRule()
-
-    // 表情 opens the panel last shown, which another test may have left at 颜文字 or the symbols: the emoji here
-    @Before
-    fun emojiShownLast() {
-        prefs.set(AppPrefs.getInstance().internal.lastPickerType, PickerWindow.Key.Emoji.name)
-    }
 
     private val habits = AppPrefs.getInstance().internal.useHabits
 

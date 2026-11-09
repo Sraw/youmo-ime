@@ -41,12 +41,16 @@ object PunctuationStartKeys {
     private fun file(ctx: Context) = File(ctx.createDeviceProtectedStorageContext().filesDir, FILE)
 
     // where 0.6's betas kept it (the credential store): moved over once, when the user has unlocked and the
-    // device-protected copy is not there yet, so an upgrade does not hold the punctuation keys back again
+    // device-protected copy is not there yet, so an upgrade does not hold the punctuation keys back again.
+    // One there already (the host wrote it before the first unlock after the upgrade): the old one only deleted
     internal fun migrate(ctx: Context) {
         val f = file(ctx)
-        if (f.exists()) return
         val old = File(ctx.filesDir, FILE)
         if (ctx.getSystemService(UserManager::class.java)?.isUserUnlocked != true || !old.isFile) return
+        if (f.exists()) {
+            old.delete()
+            return
+        }
         try {
             old.copyTo(f)
             old.delete()

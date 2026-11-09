@@ -328,11 +328,9 @@ class TextKeyboard(
         // another table's roots as well: 五笔's 键名 to 仓颉's, both NAMES, told before the switch shows
         val relabels = shown?.labels != table?.labels || shown?.roots !== table?.roots
         table = shown
+        // the keys' labels: the table's roots or none; another table's roots relabel the swipe marks too
         canvas?.invalidateScene()
-        if (relabels) {
-            canvas?.invalidateScene()
-            showSwipeMarks()
-        }
+        if (relabels) showSwipeMarks()
         showSemicolonKey()
     }
 
@@ -433,7 +431,6 @@ class TextKeyboard(
     }
 
     override fun onAttach() {
-        canvas?.invalidateScene()
         capsState = CapsState.None
         autoCaps.changed()
         canvas?.invalidateScene()
@@ -457,7 +454,6 @@ class TextKeyboard(
         canvas?.invalidateScene()
         // what the engine said last, if of this one: a table's state comes with its first answer
         showTable(EngineState.tableKeyboard.value)
-        canvas?.invalidateScene()
         showSemicolonKey()
         glides = InputMethodCatalog.glides(ime.uniqueName)
         if (capsState != CapsState.None) {

@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.set
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -90,7 +91,7 @@ class HandwritingSceneGesturesTest {
         return out
     }
 
-    // the one difference meant (060-render-p2 §5.3, C 疑问 3): 123 held is Unicode input, as on every board; its view had no long press
+    // each key against the record; 123 held is Unicode input, as on every board (060-render-p2 §5.3, C 疑问 3)
     @Test
     fun everyKeyDoesWhatItDid() {
         val scene = gestures()
@@ -243,7 +244,7 @@ class HandwritingSceneGesturesTest {
     }
 
     // a new gesture's first finger (id 0, as always) on the pad while the keys still hold a finger with
-    // id 0 (its stream cut short, no UP): the keys' side cancelled all the same, ⌫ repeats no more
+    // id 0 (its stream cut short, no UP): the keys' side cancelled all the same, ⌫ repeats no more (R20 F5886)
     @Test
     fun aNewGestureCancelsASideLeftWithTheSameFingerId() {
         harness().use { h ->
@@ -277,6 +278,22 @@ class HandwritingSceneGesturesTest {
             kb.requestLayout()
             h.relayout()
             assertEquals(View.VISIBLE, h.pad().visibility)
+        }
+    }
+
+    // R20 F5888: the scene made anew as it is drawn, not in a layout: none (failed) with the pad shown asks for a
+    // layout (which hides it); the same slot as placed asks nothing (a scene made again for Return alone)
+    @Test
+    fun aSceneMadeAsItIsDrawnPlacesThePadAgainOnlyWhenItsSlotChanged() {
+        harness().use { h ->
+            val kb = KeyboardHarness.find<HandwritingKeyboard>(h.keyboard)!!
+            val scene = checkNotNull(KeyboardHarness.boardCanvas(kb)!!.scene)
+            h.relayout()
+            assertFalse(kb.isLayoutRequested)
+            kb.onSceneBuilt(scene)
+            assertFalse("the slot where the pad is: nothing asked", kb.isLayoutRequested)
+            kb.onSceneBuilt(null)
+            assertTrue("no scene, the pad shown: a layout asked", kb.isLayoutRequested)
         }
     }
 
@@ -342,7 +359,7 @@ class HandwritingSceneGesturesTest {
         assertEquals(listOf(app.getString(R.string.hw_reading_key_off, name), app.getString(R.string.hw_reading_key_on, name)), said)
     }
 
-    // 注 found by its view's name (button_reading) on either drawing: uat and TalkBack's tools look it up by it
+    // 注 found by its view's name (button_reading): uat and TalkBack's tools look it up by it
     @Test
     fun readingKeyByItsViewsName() {
         harness().use { h -> assertEquals("button_reading", h.keyNamed("reading").resourceName) }
@@ -360,7 +377,8 @@ class HandwritingSceneGesturesTest {
         // a choice of the popup reaches the engine, not the comma tapped. Which one: the popup's focus follows the
         // finger's moves in steps (PopupFocus), which the harness's straight slide does not land exactly
         assertTrue("$sent field ${h.field.text}", sent.isNotEmpty() || h.field.text.isNotEmpty())
-        assertTrue("$sent", sent.none { "，" in it || "char=,," in it })
+        // the comma goes out as key=,, (gestures/handwriting.txt's comma tap): a pick falling back to it fails here (R20 F6507)
+        assertTrue("$sent", sent.none { "，" in it || "char=,," in it || "key=,," in it })
     }
 
     // 注's long press on the scene: each style in the settings' words, the one picked set (拼音, not the 关 it is at)

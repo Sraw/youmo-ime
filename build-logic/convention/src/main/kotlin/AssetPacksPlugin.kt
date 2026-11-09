@@ -237,6 +237,18 @@ class AssetPacksPlugin : Plugin<Project> {
             append('"')
         }
 
+        /** The signing key's path as set: `~/` is [home], a relative path [root]'s (not the Gradle daemon's directory); empty stays empty */
+        fun resolveKeyPath(value: String, root: File, home: String): String {
+            val path = value.trim().replaceFirst(Regex("^~(?=/)"), Regex.escapeReplacement(home))
+            return if (path.isEmpty() || File(path).isAbsolute) path else root.resolve(path).path
+        }
+
+        /** [minVersion], failing when above [version]: the app would refuse its own pack */
+        fun checkMinVersion(id: String, minVersion: Int, version: Int): Int {
+            if (minVersion > version) throw GradleException("$id.minVersion $minVersion above $id.version $version: the app would refuse its own pack")
+            return minVersion
+        }
+
         /**
          * The release's files in [out] (emptied first): the APK as `youmo-<version>.apk`, the text
          * bundle (APK + text pack) and the voice bundle (APK + both), each pack, and
@@ -284,8 +296,7 @@ class AssetPacksPlugin : Plugin<Project> {
         val keyPath = target.providers.environmentVariable(ENV_KEY)
             .orElse(target.providers.gradleProperty(PROPERTY_KEY))
             .orElse(local)
-            .map { it.trim().replaceFirst(Regex("^~(?=/)"), System.getProperty("user.home")) }
-            .map { if (it.isEmpty() || File(it).isAbsolute) it else root.file(it).asFile.path }
+            .map { resolveKeyPath(it, root.asFile, System.getProperty("user.home")) }
         val testKey = keysDir.file("test-ed25519.pem")
 
         val packs = OWNED.keys.associateWith { id ->
@@ -322,11 +333,9 @@ class AssetPacksPlugin : Plugin<Project> {
             )
             for (id in OWNED.keys) {
                 val up = id.uppercase()
-                val minVersion = prop("$id.minVersion")
-                val version = prop("$id.version")
-                require(minVersion == null || version == null || minVersion <= version) { "$id.minVersion $minVersion above $id.version $version: the app would refuse its own pack" }
+                val minVersion = checkMinVersion(id, prop("$id.minVersion"), prop("$id.version"))
                 fields.put("PACK_${up}_FORMAT", BuildConfigField("int", prop("$id.format").toString(), "the $id pack's data format this build reads"))
-                fields.put("PACK_${up}_MIN_VERSION", BuildConfigField("int", prop("$id.minVersion").toString(), "the oldest $id pack this build takes"))
+                fields.put("PACK_${up}_MIN_VERSION", BuildConfigField("int", minVersion.toString(), "the oldest $id pack this build takes"))
             }
             if (variant.buildType !in TEST_KEY_BUILDS && release.isEmpty()) {
                 // a release that trusted no key would take no pack, and one that trusted the test key anyone's

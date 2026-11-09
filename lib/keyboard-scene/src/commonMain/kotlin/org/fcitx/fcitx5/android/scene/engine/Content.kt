@@ -212,8 +212,8 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         val tall = at.first().m.let { it.bottom - it.top } * lines.size
         val roomX = maxOf(0.0, content.width - 2 * ROOTS_INSET_DP * d)
         val fit = minOf(1.0, if (wide > 0) roomX / wide else 1.0, if (tall > 0) content.height / tall else 1.0)
-        // no room at all: the least it is drawn at, never its full size
-        val size = if (fit < 1.0) first * maxOf(fit, ROOTS_MIN_FIT) else first
+        // no room at all (fit 0): the least it is drawn at, never its full size; any room, the fit it has, however small
+        val size = if (fit < 1.0) first * (if (fit > 0.0) fit else ROOTS_MIN_FIT) else first
         val ms = if (size == first) at else lines.map { measure(it, look, m.weight, size) }
         val lineHeight = ms.first().m.let { it.bottom - it.top }
         val top = cy - lineHeight * lines.size / 2
@@ -394,7 +394,7 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         /** The roots kept this far in from the face's sides (TextKeyboard's ROOTS_INSET_DP). */
         const val ROOTS_INSET_DP = 6.0
 
-        // the least a table's roots shrink to on a face too narrow for them
+        // what a table's roots shrink to on a face with no room for them at all (fit 0)
         private const val ROOTS_MIN_FIT = 0.1
 
         private const val ROOT = "root"

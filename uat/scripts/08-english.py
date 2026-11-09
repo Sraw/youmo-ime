@@ -115,3 +115,6 @@ def en27(d):
     t = d.field_text()
     check(t != "the ", f"thw 空格后框里「{t}」")
     return f"屏蔽前 {c[:4]}，屏蔽后 {again[:4]}，thw 空格「{t}」（设置里恢复由 JVM 管）"
+
+
+case("EN-28", needs="jvm:EnglishBlockOffersTest")(lambda d: None)

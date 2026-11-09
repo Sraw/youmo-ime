@@ -1,0 +1,25 @@
+keys [back, lock, numbers, space, backspace, enter]
+back said: Back as null
+back tap: [] field  panel false
+back long press: []
+back long press sent: [] field  panel false
+lock said: Stay after a symbol is picked as button_panel_lock
+lock tap: [] field  panel true
+lock long press: []
+lock long press sent: [] field  panel true
+numbers said: Number pad as null
+numbers tap: [] field  panel false
+numbers long press: []
+numbers long press sent: [] field  panel false
+space said: Space as button_space
+space tap: [sendKey(sym=32, states=536870912, code=0, up=false)] field  panel true
+space long press: []
+space long press sent: [] field  panel true
+backspace said: Backspace as button_backspace
+backspace tap: [sendKey(sym=65288, states=536870912, code=0, up=false)] field  panel true
+backspace long press: []
+backspace long press sent: [sendKey(sym=65288, states=536870912, code=0, up=false), sendKey(sym=65288, states=536870912, code=0, up=false), sendKey(sym=65288, states=536870912, code=0, up=false)] field  panel true
+enter said: Done as button_return
+enter tap: [sendKey(sym=65293, states=536870912, code=0, up=false)] field  panel true
+enter long press: []
+enter long press sent: [sendKey(sym=65293, states=536870912, code=0, up=false)] field  panel true

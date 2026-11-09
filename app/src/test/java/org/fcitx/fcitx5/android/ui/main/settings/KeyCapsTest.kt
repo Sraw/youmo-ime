@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.uat.PrefsRule
+import org.fcitx.fcitx5.android.utils.styledColor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -112,8 +113,8 @@ class KeyCapsTest {
     // theme's accent
     @Test
     fun theEnginesCapFadesItsWordsAloneAndOutlinesItsFace() {
-        fun cap(marked: Boolean, dimmed: Boolean): SceneKeyCell =
-            KeyCaps.key(ctx, "W", "2", marked = marked, dimmed = dimmed).let { k ->
+        fun cap(marked: Boolean, dimmed: Boolean, selected: Boolean = false): SceneKeyCell =
+            KeyCaps.key(ctx, "W", "2", marked = marked, dimmed = dimmed, selected = selected).let { k ->
                 k.measure(View.MeasureSpec.makeMeasureSpec(W, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(H, View.MeasureSpec.EXACTLY))
                 k.layout(0, 0, W, H)
                 (0 until k.childCount).map(k::getChildAt).filterIsInstance<SceneKeyCell>().single()
@@ -137,6 +138,13 @@ class KeyCapsTest {
         val line = drawn.last() as Op.Stroke
         assertEquals(edited.keyNode!!.shape, line.shape)
         assertEquals(Argb(ThemeManager.activeTheme.accentKeyBackgroundColor), line.color)
+        // the item acted on (selected) outlined in the settings' colour, alone or over the marked outline (R20 F6504)
+        val primary = Argb(ctx.styledColor(android.R.attr.colorPrimary))
+        for (marked in listOf(false, true)) {
+            val ops = cap(marked = marked, dimmed = false, selected = true).drawn()
+            assertEquals(plain, ops.dropLast(1))
+            assertEquals("marked=$marked", primary, (ops.last() as Op.Stroke).color)
+        }
     }
 
     // a cap is the keyboard's key made at its size and drawn shrunk to the cap (060-pending-decisions, the

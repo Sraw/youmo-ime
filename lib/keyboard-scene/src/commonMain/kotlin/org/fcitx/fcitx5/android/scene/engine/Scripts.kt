@@ -81,7 +81,8 @@ object Scripts {
         0x3400..0x4DBF, // extension A
         0x4E00..0x9FFF, // unified ideographs
         0xF900..0xFAFF, // compatibility ideographs
-        0xFF00..0xFFEF, // half- and full-width forms
+        0xFF00..0xFF64, // full-width forms, half-width CJK punctuation (not the half-width katakana, Hangul)
+        0xFFE0..0xFFEF, // full-width signs (￥￠), half-width arrows
         0x20000..0x3134F, // extensions B–G, compatibility supplement
     )
 

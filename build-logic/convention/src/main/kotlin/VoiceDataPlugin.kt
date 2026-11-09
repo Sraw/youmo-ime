@@ -90,6 +90,9 @@ class VoiceDataPlugin : Plugin<Project> {
          * in ~/.gradle/gradle.properties.
          */
         const val LOCAL_PROPERTY = "youmo.voiceModelDir"
+
+        /** [value] trimmed, a leading `~/` taken as [home] (as it is, a `$` in it no group reference) */
+        fun homed(value: String, home: String): String = value.trim().replaceFirst(Regex("^~(?=/)"), Regex.escapeReplacement(home))
         internal val TAGGER_FILES = listOf("polish-tagger.ort", "polish-tagger.json")
 
         // whether a stretch heard is speech at all (VoiceQuiet): not where it ends, as before 0.6.0
@@ -144,7 +147,7 @@ class VoiceDataPlugin : Plugin<Project> {
         target.tasks.register<CopyVoiceModels>(COPY_TASK) {
             // nothing downloaded for the model without it: copy() then fails, saying where it comes from
             if (localDir.isPresent) {
-                local.set(target.layout.projectDirectory.dir(localDir.get().trim().replaceFirst(Regex("^~(?=/)"), System.getProperty("user.home"))))
+                local.set(target.layout.projectDirectory.dir(homed(localDir.get(), System.getProperty("user.home"))))
             }
             this.hotwords.set(hotwords.flatMap { it.outputFile })
             this.vad.set(vad.flatMap { it.outputFile })

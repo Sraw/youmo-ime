@@ -46,14 +46,14 @@ class PopupScenes(
     /** The text measured through this: a test's, to make the engine fail. */
     @VisibleForTesting measuring: (TextMeasurer) -> TextMeasurer = { it },
 ) {
-    // the built-in where the engine makes nothing of the theme, as the keys are (U8): popups shown still
+    // the built-in where the engine makes nothing of the theme or refused its keys' scene, as the keys are (U8): popups shown still
     private val theme = SceneBoard.drawnTheme(theme)
     private val look = ThemeManager.shownLook(this.theme)
     private val fonts = SceneFonts(look)
     private val measurer = measuring(AndroidTextMeasurer(fonts))
     private val sceneTheme = SceneThemes.of(look, this.theme.name, this.theme.isDark)
 
-    /** Whether the theme converted: its popups drawn as scenes. */
+    /** Whether the theme or, where it fell back, the built-in converted: its popups drawn as scenes. */
     val ready: Boolean get() = sceneTheme != null
 
     /** A builder in the environment now; null where neither the theme nor the built-in converted (nothing drawn, logged). */

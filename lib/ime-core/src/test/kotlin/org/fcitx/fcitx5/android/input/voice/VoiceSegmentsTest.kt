@@ -87,6 +87,18 @@ class VoiceSegmentsTest {
         assertEquals(1, s.kept)
     }
 
+    // review F5918: the loud windows fed before an endpoint but decoded after it are the next segment's:
+    // its short word is typed (judged from the endpoint's fed count alone it would see only the quiet after)
+    @Test
+    fun windowsFedBeforeAnEndpointCountForTheNextSegment() {
+        val s = segments(Step("你"), *Array(4) { Step("你好") }, Step("你好", endpoint = true), Step("O"), Step("OK"), Step("OK", endpoint = true))
+        // 3 windows of no level (VoiceQuiet.SKIP), then 3 loud: the endpoint at the 6th
+        s.hear(-30.0, voiced = true, times = 6)
+        s.hear(-60.0, voiced = false, times = 3)
+        assertEquals(listOf("你好", "OK"), closes)
+        assertEquals(2, s.kept)
+    }
+
     @Test
     fun aLoudVoicedShortWordIsTyped() {
         // its 3rd loudest window read, the first 3 with sound being no level (VoiceQuiet.SKIP)
@@ -123,6 +135,7 @@ class VoiceSegmentsTest {
         assertEquals(listOf("你好"), closes)
     }
 
+    // review F5991: a blank result after something was shown is taken back
     @Test
     fun aShownSegmentTheRecognizerTookBackToNothingIsTakenBack() {
         val s = segments(Step("你"), Step("", endpoint = true))

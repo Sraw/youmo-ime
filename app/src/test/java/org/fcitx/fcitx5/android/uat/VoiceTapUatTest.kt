@@ -295,6 +295,7 @@ class VoiceTapUatTest : VoiceTapUat() {
         assertEquals(1, voice.closes)
     }
 
+    // R20 F5773: the tail typed once, not twice, when the views are made anew
     @Test
     @Uat("VO-29")
     fun theViewsMadeAnewWhileTalkingTheTailIsTypedOnce() {

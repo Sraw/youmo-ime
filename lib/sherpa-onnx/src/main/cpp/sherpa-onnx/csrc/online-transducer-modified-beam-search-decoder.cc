@@ -73,7 +73,7 @@ void OnlineTransducerModifiedBeamSearchDecoder::StripLeadingBlanks(
       continue;
     }
     // an all-blank path behind a best that heard something is no reading of
-    // it: kept, a rerank could pick "" and drop the segment
+    // it: dropped (were it kept, a rerank could pick "" and lose the segment)
     if (tokens.empty() && &h != &topk[0]) continue;
     r->nbest_tokens.push_back(std::move(tokens));
     r->nbest_scores.push_back(h.TotalLogProb() / h.ys.size());

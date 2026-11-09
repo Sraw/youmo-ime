@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
+import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -122,14 +124,30 @@ class VoiceTalkTest {
         assertEquals("你好", talk.rest("你好", raw = true))
     }
 
+    // review F5784, F6545, F6514: each form a number is written in, found in the raw text as said
     @Test
-    fun thePolishFailingAfterANumberWrittenInDigitsTypesWhatFollowsItOnce() {
+    @Uat("VO-29")
+    fun thePolishFailingAfterANumberWrittenInDigitsTypesWhatFollowsItOnce() = assertRows(
+        listOf(
+            // typed polished, settled; the raw text when the polish failed; what is left to type
+            Triple("我买了3个苹果。", "我买了三个苹果再见", "再见"),
+            Triple("涨了50%。", "涨了百分之五十然后", "然后"),
+            // a clock's 分 goes with it
+            Triple("8:05到。", "八点五分到再见", "再见"),
+            // 点 between two digits
+            Triple("长12.5米。", "长十二点五米然后", "然后"),
+            // a letter the polish cased otherwise
+            Triple("V1.23版。", "v一点二三版然后", "然后"),
+            // 万 and 亿 inside the number (F6514)
+            Triple("共336005元。", "共三十三万六千零五元再见", "再见"),
+            Triple("共100070000元。", "共一亿零七万元再见", "再见"),
+            // a 万 written as a character stays one
+            Triple("共5万元。", "共五万元再见", "再见"),
+        ),
+        { (typed, raw, _) -> "$typed then $raw" },
+    ) { (typed, raw, left) ->
         val talk = VoiceTalk(asItGoes = true)
-        assertEquals("我买了3个苹果。" to "", talk.step("我买了3个苹果。", 8))
-        // the raw text has the number as said: what was typed found in it, not typed again
-        assertEquals("再见", talk.rest("我买了三个苹果再见", raw = true))
-        val percent = VoiceTalk(asItGoes = true)
-        assertEquals("涨了50%。" to "", percent.step("涨了50%。", 6))
-        assertEquals("然后", percent.rest("涨了百分之五十然后", raw = true))
+        assertEquals(typed to "", talk.step(typed, typed.length))
+        assertEquals(left, talk.rest(raw, raw = true))
     }
 }

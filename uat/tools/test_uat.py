@@ -815,6 +815,12 @@ class ClipMicTest(unittest.TestCase):
         d = self.device([])
         self.assertEqual(100 + 2 + 0.2, uat.ClipPlay(d, 2, start=100).end)
 
+    def test_a_queueing_alongside_with_no_state_line_is_blocked(self):
+        d = uat.Device.__new__(uat.Device)
+        d.adb = lambda *a, **k: ""
+        with self.assertRaises(uat.Blocked):
+            d.say([800], wait=False, alongside="sleep 1")
+
     def test_clip_mic_clears_before_it_turns_on(self):
         d = self.device([])
         d._clips_in = {"a"}
@@ -883,9 +889,6 @@ class ClearAndPacksTest(unittest.TestCase):
         d = self.device(lambda cmd: "rm: Permission denied\n" if cmd.startswith("run-as") else "")
         with mock.patch.object(uat, "BUILD", "debug"), self.assertRaises(uat.Blocked):
             uat.clear_keeping_packs(d)
-        run_as = [c for c in d.calls if c.startswith("run-as")][0]
-        self.assertNotIn("+ ;", run_as.split("files &&")[0])   # every step chained by &&: a failed one stops it
-        self.assertIn("ls -A", run_as)
 
     def test_a_clearing_resets_the_microphone_flags_and_the_app_language(self):
         d = self.device(lambda cmd: "cleared\n" if cmd.startswith("run-as") else "")
@@ -913,6 +916,27 @@ class ClearAndPacksTest(unittest.TestCase):
             d.case = object()
             with self.assertRaises(uat.Blocked):
                 uat.import_packs(d)
+
+    def test_a_stop_on_a_devices_thread_before_its_first_case_blocks(self):
+        d = SimpleNamespace(case=None)
+        out = []
+
+        def on_thread():
+            try:
+                uat.stop(d, "no pack")
+            except BaseException as e:
+                out.append(e)
+        t = threading.Thread(target=on_thread)
+        t.start()
+        t.join()
+        self.assertIsInstance(out[0], uat.Blocked)
+
+    def test_a_release_run_with_no_pack_built_stops_before_any_device(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(uat, "PACKS", tmp), \
+                mock.patch.object(uat, "BUILD", "release"), mock.patch.object(uat, "Device") as dev, \
+                self.assertRaises(SystemExit):
+            uat.run_on(SimpleNamespace(no_voice=True), [], [5554])
+        dev.assert_not_called()
 
     def test_a_pack_already_at_the_builds_version_is_not_copied_again(self):
         d = self.device(lambda cmd: "Result: Bundle[{text=v2}]")

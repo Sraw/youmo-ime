@@ -69,6 +69,9 @@ class ThemeLookReaderParityTest {
         val presets = ThemeManager.BuiltinThemes
         assertTrue(presets.size >= 11)
         for (p in presets) same(exported(Theme.Custom(p.name, p.isDark, p.look)), p.name)
+        // Transparent's two, test data since Monet's took their places (R20 F6638): their translucent colours
+        // read alike too, which no built-in one has
+        for (p in listOf(TestThemes.TransparentLight, TestThemes.TransparentDark)) same(exported(Theme.Custom(p.name, p.isDark, p.look)), p.name)
     }
 
     // what is no file of the form: whether each reads it (true) or refuses it, the app's then the engine's

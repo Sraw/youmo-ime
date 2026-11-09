@@ -22,10 +22,16 @@ if [ "${INSTALL:-1}" != 0 ]; then
     for f in "$REPO"/app/build/packs/youmo-text-v*.youmopack; do
         n=$(basename "$f")
         v=${n#youmo-text-v}; v=${v%.youmopack}
-        # the same version already there: not written again (hundreds of MB)
-        case "$state" in *"text=v$v"[!0-9]*|*"text=v$v") continue ;; esac
+        # the same pack already there: not written again (hundreds of MB). The same version is not enough:
+        # a rebuild keeps text.version, so the file's SHA-256 last pushed to this device is kept on the host
+        sha=$(shasum -a 256 "$f" | cut -d' ' -f1)
+        mark="$HERE/build/eval/pushed-$(adb get-serialno | tr -d '\r')-$n.sha256"
+        case "$state" in
+            *"text=v$v"[!0-9]*|*"text=v$v") [ "$(cat "$mark" 2>/dev/null)" != "$sha" ] || continue ;;
+        esac
         adb shell content write --uri "$uri/$n" < "$f"
         adb shell content call --uri "$uri" --method import --arg "$n" | grep -Eq 'result=(imported|already)' || { echo "the text pack was not imported: $n" >&2; exit 1; }
+        mkdir -p "$(dirname "$mark")" && echo "$sha" > "$mark"
     done
 fi
 # the runner starts its own engine in the app's process; if fcitx were the active keyboard, its

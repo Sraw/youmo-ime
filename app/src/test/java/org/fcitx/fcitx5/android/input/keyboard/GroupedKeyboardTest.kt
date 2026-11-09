@@ -195,10 +195,13 @@ class GroupedKeyboardTest {
         keyboard.popupActionListener = PopupActionListener { previews += it }
         val key = keyboard.shownKey("ZX").ref()
         // a shortcut's name (Paste) and a user's text shortcut (ok, which types ok): the letters'
-        // case is the faces' and bubbles' alone
+        // case is the faces' and bubbles' alone (R20 F5867); a letter's bubble (words = false) still
+        // in the faces' case, capitals as ZX shows
         keyboard.onPopupAction(PopupAction.PreviewUpdateAction(key, "Paste", words = true))
         keyboard.onPopupAction(PopupAction.PreviewUpdateAction(key, "ok", words = true))
-        assertEquals(listOf("Paste", "ok"), previews.map { (it as PopupAction.PreviewUpdateAction).content })
+        keyboard.onPopupAction(PopupAction.PreviewUpdateAction(key, "x", words = false))
+        assertEquals("ZX", keyboard.shownKey("ZX").label)
+        assertEquals(listOf("Paste", "ok", "X"), previews.map { (it as PopupAction.PreviewUpdateAction).content })
     }
 
     @Test

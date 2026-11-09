@@ -766,8 +766,9 @@ class EditingSessionTest {
 
     private fun preedit(text: String, cursor: Int) = FormattedText(arrayOf(text), intArrayOf(0), cursor)
 
+    // the cursor left it (a tap or an arrow), the editor's span there or not: taken away, the cursor kept where it went
     @Test
-    fun aProvisionalCompositionTheEditorEndedOrTheUserTappedInto() = assertRows(
+    fun aProvisionalCompositionTheCursorLeft() = assertRows(
         "the cursor moved past it: still there, taken away" to {
             val (s, e) = session("abc", cursor = 2)
             val told = mutableListOf<Boolean>()
@@ -793,6 +794,43 @@ class EditingSessionTest {
             assertEquals("abc", e.text)
             assertEquals(3, e.selectionStart)
         },
+        "the cursor moved: taken away here, told so" to {
+            val (s, e) = session("ab", cursor = 2)
+            val told = mutableListOf<Boolean>()
+            s.provisionalTaken = { told += it }
+            s.updateComposingText(formatted("你好"), provisional = true)
+            e.setSelection(1, 1)
+            assertEquals(EditingSession.CursorUpdate.None, s.report(1))
+            assertEquals(listOf(false), told)
+            assertEquals("ab", e.text)
+        },
+        "the cursor moved before it: taken away, the cursor where it went" to {
+            // voice's text still to come, composing after "ab"; the user taps before "a"
+            val (s, e) = session("ab", cursor = 2)
+            s.updateComposingText(formatted("你好"), provisional = true)
+            assertEquals("ab你好", e.text)
+            assertTrue(s.provisional)
+            e.setSelection(0, 0)
+            assertEquals(EditingSession.CursorUpdate.None, s.report(0))
+            assertEquals("ab", e.text)
+            assertEquals(0, e.selectionStart)
+            assertFalse(s.provisional)
+            assertTrue(s.composing.isEmpty())
+        },
+        "the cursor moved forward past text after it: kept where it went" to {
+            val (s, e) = session("ab", cursor = 1)
+            s.updateComposingText(formatted("你好"), provisional = true)
+            assertEquals("a你好b", e.text)
+            // after "b": two places on once the composition is gone
+            e.setSelection(4, 4)
+            assertEquals(EditingSession.CursorUpdate.None, s.report(4))
+            assertEquals("ab", e.text)
+            assertEquals(2, e.selectionStart)
+        },
+    )
+
+    @Test
+    fun aProvisionalCompositionTheUserTappedInto() = assertRows(
         "the cursor tapped inside it: not fcitx's preedit, nothing moved" to {
             val (s, e) = session("ab", cursor = 2)
             s.updateComposingText(formatted("你好"), provisional = true)
@@ -803,7 +841,7 @@ class EditingSessionTest {
     )
 
     @Test
-    fun aProvisionalCompositionLeftOrTakenByTheApp() = assertRows(
+    fun aProvisionalCompositionTakenByTheApp() = assertRows(
         "the field cleared (a chat's text sent)" to {
             val (s, e) = session("ab", cursor = 2)
             val told = mutableListOf<Boolean>()
@@ -839,39 +877,6 @@ class EditingSessionTest {
             assertEquals(EditingSession.CursorUpdate.None, s.report(3))
             assertEquals(listOf(true), told)
             assertEquals("xyz", e.text)
-        },
-        "the cursor moved: taken away here, told so" to {
-            val (s, e) = session("ab", cursor = 2)
-            val told = mutableListOf<Boolean>()
-            s.provisionalTaken = { told += it }
-            s.updateComposingText(formatted("你好"), provisional = true)
-            e.setSelection(1, 1)
-            assertEquals(EditingSession.CursorUpdate.None, s.report(1))
-            assertEquals(listOf(false), told)
-            assertEquals("ab", e.text)
-        },
-        "the cursor moved before it: taken away, the cursor where it went" to {
-            // voice's text still to come, composing after "ab"; the user taps before "a"
-            val (s, e) = session("ab", cursor = 2)
-            s.updateComposingText(formatted("你好"), provisional = true)
-            assertEquals("ab你好", e.text)
-            assertTrue(s.provisional)
-            e.setSelection(0, 0)
-            assertEquals(EditingSession.CursorUpdate.None, s.report(0))
-            assertEquals("ab", e.text)
-            assertEquals(0, e.selectionStart)
-            assertFalse(s.provisional)
-            assertTrue(s.composing.isEmpty())
-        },
-        "the cursor moved forward past text after it: kept where it went" to {
-            val (s, e) = session("ab", cursor = 1)
-            s.updateComposingText(formatted("你好"), provisional = true)
-            assertEquals("a你好b", e.text)
-            // after "b": two places on once the composition is gone
-            e.setSelection(4, 4)
-            assertEquals(EditingSession.CursorUpdate.None, s.report(4))
-            assertEquals("ab", e.text)
-            assertEquals(2, e.selectionStart)
         },
         "the app shortened it: measured by the span reported" to {
             val (s, e) = session("abc", cursor = 1)
@@ -926,6 +931,18 @@ class EditingSessionTest {
             assertTrue(e.calls.none { it.startsWith("set") || it.startsWith("commit") })
             // the editor's composing region, if it kept one over the app's text, let go
             assertTrue("finishComposingText()" in e.calls)
+        },
+        "the same field, the cursor further from it than is read: still there, taken away, nothing that far read" to {
+            val far = "x".repeat(5000)
+            val (s, e) = session("ab$far", cursor = 2)
+            s.updateComposingText(formatted("你好"), provisional = true)
+            e.setSelection(4 + far.length, 4 + far.length)
+            e.calls.clear()
+            s.provisionalRestarted(sameField = true, 4 + far.length, 4 + far.length)
+            assertEquals("ab$far", e.text)
+            assertFalse(s.provisional)
+            // R20 F5987: no read across the IPC of maybe the whole document
+            assertTrue(e.calls.toString(), e.calls.none { it.startsWith("textBeforeCursor(") && it.removePrefix("textBeforeCursor(").removeSuffix(")").toInt() > 4096 })
         },
         "another field: left as text" to {
             val (s, e) = session("ab", cursor = 2)

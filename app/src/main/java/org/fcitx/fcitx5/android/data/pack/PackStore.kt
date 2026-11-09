@@ -69,9 +69,16 @@ object PackStore {
                 it.load(tidy = false)
                 Timber.i("packs: %s", PackKind.entries.joinToString { k -> "${k.id} ${describe(it.status(k))}" })
                 opened = it
-                thread(name = "packs-tidy") { it.tidy() }
+                // not after an import: it would delete the generation the import replaced, which the old
+                // host may still read till [changed] restarts it ([PackShelf.sweep] deletes it then). The
+                // check under the shelf's own lock, the one its import takes: an import begun after it waits
+                thread(name = "packs-tidy") { synchronized(it) { if (!imported) it.tidy() } }
             }
         }
+
+    // an import begun since the start: the start's tidy left to the next start
+    @Volatile
+    private var imported = false
 
     private val mutableState by lazy { MutableStateFlow(State(snapshot(), 0)) }
 
@@ -235,6 +242,7 @@ object PackStore {
     /** [input] imported, one import at a time; the settings page's, and the debug build's UAT import. */
     suspend fun import(input: InputStream, progress: (Long, Long) -> Unit = { _, _ -> }): ImportResult = importing.withLock {
         withContext(Dispatchers.IO) {
+            imported = true
             val result = shelf.import(input.buffered(BUFFER), progress)
             Timber.i("pack import: %s", describe(result))
             if (result is ImportResult.Imported) {

@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -76,6 +77,24 @@ class T9ColumnFitTest {
         keyboard.requestLayout()
         pass()
         assertSame(params, column.layoutParams)
+    }
+
+    // R20 F5933: the scene made anew as it is drawn, not in a layout: none (failed) with the column shown asks
+    // for a layout (which hides it); the same slot as placed asks nothing (a scene made again for Shift or Return)
+    @Test
+    fun aSceneMadeAsItIsDrawnPlacesTheColumnAgainOnlyWhenItsSlotChanged() {
+        val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, semicolon = false)
+        val density = keyboard.resources.displayMetrics.density
+        val w = (NARROWEST_DP * density).toInt()
+        val h = (HEIGHT_DP * density).toInt()
+        keyboard.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
+        keyboard.layout(0, 0, w, h)
+        val scene = checkNotNull(KeyboardHarness.all(keyboard).filterIsInstance<KeyboardCanvasView>().single().scene)
+        assertFalse(keyboard.isLayoutRequested)
+        keyboard.onSceneBuilt(scene)
+        assertFalse("the slot where the column is: nothing asked", keyboard.isLayoutRequested)
+        keyboard.onSceneBuilt(null)
+        assertTrue("no scene, the column shown: a layout asked", keyboard.isLayoutRequested)
     }
 
     // no scene made (its layout unreadable): the column hidden with the keys, as the new drawing failing shows

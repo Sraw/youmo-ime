@@ -73,7 +73,7 @@ class NumberSceneGesturesTest {
         }
         for (id in ids) {
             val k = { h.keyNamed(id) }
-            // no bubble as it is pressed (preview="off"), on either drawing
+            // no bubble as it is pressed (preview="off")
             h.press(k())
             assertFalse("$id pressed shows a popup", h.poppedUp())
             h.release()
@@ -102,13 +102,15 @@ class NumberSceneGesturesTest {
             assertTrue("blank $name: ${h.api.calls}", h.api.calls.none { it.startsWith("sendKey") || it.startsWith("commit") })
             sent("blank $name tap")
         }
-        // ⌫ held: deletes over and over
+        // ⌫ held: deletes over and over, at least MIN_REPEATS times; the record keeps what it sends, not
+        // how many (that depends on where in a frame the press fell; R20 F6506)
         h.press(h.keyNamed("backspace"))
         h.after(HOLD_MS)
         h.release()
-        val deletes = h.api.calls.count { it.startsWith("sendKey") }
-        assertTrue("$deletes deletes", deletes >= MIN_REPEATS)
-        sent("backspace held $deletes")
+        val deletes = h.api.calls.filter { it.startsWith("sendKey") }
+        assertTrue("${deletes.size} deletes", deletes.size >= MIN_REPEATS)
+        out += "backspace held: ${deletes.distinct()}"
+        h.api.calls.clear()
         out
     }
 
@@ -153,7 +155,7 @@ class NumberSceneGesturesTest {
         }
     }
 
-    // Return says the field's action (搜索, 完成…) as its view did, the scene made again as it changes
+    // Return says the field's action (搜索, 完成…), the scene made again as it changes
     @Test
     fun returnSaysTheFieldsAction() {
         val actions = listOf(EditorInfo.IME_ACTION_SEARCH, EditorInfo.IME_ACTION_DONE, EditorInfo.IME_ACTION_GO, EditorInfo.IME_ACTION_NEXT, 0)

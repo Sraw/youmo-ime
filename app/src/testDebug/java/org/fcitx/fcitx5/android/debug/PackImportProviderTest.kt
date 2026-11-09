@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.debug
 
 import android.app.Application
 import android.net.Uri
+import org.fcitx.fcitx5.android.assertRows
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -52,9 +53,15 @@ class PackImportProviderTest {
 
     @Test
     fun aNameNotAPath() {
-        for (bad in listOf("..", ".", "%2F..%2Fx")) {
-            assertThrows(IllegalArgumentException::class.java) { write(bad) }
-        }
+        fun refused(bad: String) = { assertThrows(bad, IllegalArgumentException::class.java) { write(bad) }; Unit }
+        assertRows(
+            // the cache's parent
+            ".." to refused(".."),
+            // the cache itself
+            "." to refused("."),
+            // a slash lastPathSegment decodes: a path out of the cache
+            "%2F..%2Fx" to refused("%2F..%2Fx"),
+        )
     }
 
     // a run stopped between its write and its import: the pack left is gone when the next is written

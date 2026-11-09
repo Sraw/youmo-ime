@@ -56,10 +56,10 @@ class AssetPacksBundleTest {
         assertEquals(setOf("text", "voice"), read.keys)
         assertEquals(2, read.getValue("voice").version)
         assertEquals("c-voice", read.getValue("voice").contentSha256)
-        val text = out.resolve("release-packs.json").readText()
+        val json = groovy.json.JsonSlurper().parseText(out.resolve("release-packs.json").readText()) as Map<*, *>
+        val changed = (json["packs"] as List<*>).associate { (it as Map<*, *>)["pack"] to it["changed"] }
         // the text pack as the last release had it: not uploaded again; the voice pack new
-        assertTrue(text, "\"pack\": \"text\"" in text && text.substringAfter("\"pack\": \"text\"").substringBefore("}").contains("\"changed\": false"))
-        assertTrue(text, text.substringAfter("\"pack\": \"voice\"").substringBefore("}").contains("\"changed\": true"))
+        assertEquals(mapOf("text" to false, "voice" to true), changed)
     }
 
     @Test
@@ -82,7 +82,7 @@ class AssetPacksBundleTest {
         assertEquals("\"文字\"", AssetPacksPlugin.jsonString("文字"))
     }
 
-    // the build's list of which pack owns which asset path is the app's PackKind's, repeated: one side
+    // contract: the build's list of which pack owns which asset path is the app's PackKind's, repeated: one side
     // changed alone would show only when a device imports the pack
     @Test
     fun theOwnedPathsAreTheAppsPackKinds() {
@@ -92,5 +92,23 @@ class AssetPacksBundleTest {
             m.groupValues[2] to Regex("\"([^\"]+)\"").findAll(m.groupValues[3]).map { it.groupValues[1] }.toList()
         }
         assertEquals(AssetPacksPlugin.OWNED, kinds)
+    }
+
+    // a minVersion above the version: the build would ship an app that refuses its own pack
+    @Test
+    fun aMinVersionAboveTheVersionFailsTheBuild() {
+        assertEquals(2, AssetPacksPlugin.checkMinVersion("text", 2, 2))
+        assertEquals(1, AssetPacksPlugin.checkMinVersion("text", 1, 3))
+        assertThrows(GradleException::class.java) { AssetPacksPlugin.checkMinVersion("voice", 3, 2) }
+    }
+
+    // the key set as `~/…` or relative: home's and the root project's, not the Gradle daemon's directory
+    @Test
+    fun theKeyPathIsHomesOrTheRootProjects() {
+        val root = File("/r/youmo")
+        assertEquals("/home/me/keys/k.pem", AssetPacksPlugin.resolveKeyPath(" ~/keys/k.pem ", root, "/home/me"))
+        assertEquals(File(root, "keys/k.pem").path, AssetPacksPlugin.resolveKeyPath("keys/k.pem", root, "/home/me"))
+        assertEquals("/abs/k.pem", AssetPacksPlugin.resolveKeyPath("/abs/k.pem", root, "/home/me"))
+        assertEquals("", AssetPacksPlugin.resolveKeyPath("", root, "/home/me"))
     }
 }

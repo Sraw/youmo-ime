@@ -77,7 +77,7 @@ class PopupComponent :
      * did not convert: no popup then, logged, never another drawing (060: the views are gone).
      */
     private fun scenesFor(key: KeyRef): PopupScenes? =
-        scenes.takeIf { it.ready } ?: null.also { Timber.w("no popup for %s: the theme's scene did not convert", key) }
+        scenes.takeIf { it.ready } ?: null.also { Timber.w("no popup for %s: neither the theme's scene nor the built-in's converted", key) }
 
     // [dp] in px as the engine's rules size a scene's popup ([Popups.px])
     private fun PopupScenes.px(dp: Double) = Popups.px(dp, density).toInt()

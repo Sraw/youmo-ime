@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.KeyState
+import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -73,6 +74,9 @@ class PickerWindow(
     private val sidePanel by lazy { SymbolPanel(adapter.categories.size, FirstCategory) }
 
     private lateinit var pickerLayout: PickerLayout
+
+    // the tap felt once while the panel's punctuation keys are held back
+    private var heldBackFelt = false
     private lateinit var adapter: PickerGridAdapter
 
     /** a tab tapped: shown as picked, though a short last section cannot scroll to the top */
@@ -117,7 +121,14 @@ class PickerWindow(
                 // shows it ({punct:.} in emoji.xml, emoticon.xml): 显示和输出一致. Before what it types is
                 // known (a first install, the host not up) dropped, as the text keyboards' punctuation keys are
                 if (!punctuation.known) punctuation.update(PunctuationStartKeys.known)
-                if (!punctuation.known) return@KeyActionListener
+                if (!punctuation.known) {
+                    // a tap felt once, as the text keyboards' held-back keys (KeyboardWindow.heldBack)
+                    if (!heldBackFelt && ::pickerLayout.isInitialized) {
+                        heldBackFelt = true
+                        InputFeedbacks.hapticFeedback(pickerLayout)
+                    }
+                    return@KeyActionListener
+                }
                 commonKeyActionListener.listener.onKeyAction(KeyAction.CommitAction(punctuation.mapping[it.act] ?: it.act), source)
             }
 

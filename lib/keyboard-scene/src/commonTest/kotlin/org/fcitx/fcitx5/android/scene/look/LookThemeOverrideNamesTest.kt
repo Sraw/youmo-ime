@@ -39,4 +39,19 @@ class LookThemeOverrideNamesTest {
         assertTrue("*/shift" in text, text)
         assertFalse("*/Shift" in text || "*/f1" in text || "q".repeat(33) in text, text)
     }
+
+    // R20 F6611: a 3.0 file named as theme 4 reads no file (dots alone, a control character) is renamed
+    // so it does: the theme written reads, its pictures among it
+    @Test
+    fun aFileNamedDotsAloneOrWithAControlCharacterIsRenamedReadable() {
+        val base = LookDefaults.look(palette(themeFile("material-light.xml")))
+        val look = base.copy(
+            keys = base.keys.copy(
+                letter = KindStyle(KeyFill.Image(NineSlice("/t/...", Insets(1, 1, 1, 1), 1)), KeyPressed.Image(NineSlice("/t/a\u0001.png", Insets(1, 1, 1, 1), 1))),
+            ),
+        )
+        val names = LookTheme.fileNames(look)
+        assertTrue(names.values.all(ThemeReader.FILE::matches), "$names")
+        ThemeReader.theme(LookTheme.xml(look, "T", false), maxStyles = LookTheme.MAX_STYLES).ok()
+    }
 }

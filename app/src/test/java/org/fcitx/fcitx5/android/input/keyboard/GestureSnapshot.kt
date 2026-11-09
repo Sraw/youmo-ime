@@ -12,6 +12,8 @@ import java.io.File
  * and the field), line by line, against the committed record: a key that stops sending, sends the
  * wrong thing or pops up where it should not shows as a changed line. `GESTURES_RECORD=1` records them
  * anew (review the diff before committing it).
+ *
+ * contract: the committed records in `src/test/resources/gestures`, which mutation cannot see.
  */
 internal object GestureSnapshot {
     // where GESTURES_RECORD=1 writes them (the module's directory the tests' working one); read from the classpath

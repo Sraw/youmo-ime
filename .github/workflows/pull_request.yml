@@ -71,13 +71,6 @@ jobs:
             .gradle/engine-downloads/onnxruntime-android-*.zip
           key: handwriting-downloads-${{ hashFiles('build-logic/convention/src/main/kotlin/HandwritingDataPlugin.kt', 'lib/handwriting/build.gradle.kts') }}
 
-      # the recognizer's model and the VAD (the voice pack's), keyed on VoiceDataPlugin, which names them
-      - name: Cache voice model downloads
-        uses: actions/cache@v6
-        with:
-          path: .gradle/engine-downloads/voice
-          key: voice-downloads-${{ hashFiles('build-logic/convention/src/main/kotlin/VoiceDataPlugin.kt') }}
-
       # the one APK (voice code and sherpa-onnx's native build included, through R8) and the text
       # pack, signed here with the committed test key: no release key on CI. Not the voice pack: its
       # model comes from youmo.voiceModelDir alone until the streaming model is released

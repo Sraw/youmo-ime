@@ -29,9 +29,17 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
      * character with [spaced] (the space [norm] took out between two English words, [spaces]) after
      * an English letter or digit written with it. [num]: each character's number class (none if
      * not given); a character [op] deletes is in no number, so one that went (a pause's 「，」 inside
-     * it) leaves the number whole.
+     * it) leaves the number whole. [ascii]: each character's [asciiMarks], a mark English wrote, kept
+     * so after an English letter (「Yes, I」; not 「iPhone，」, said in Chinese).
      */
-    fun apply(text: IntArray, op: IntArray, after: IntArray, spaced: BooleanArray? = null, num: IntArray? = null): String {
+    fun apply(
+        text: IntArray,
+        op: IntArray,
+        after: IntArray,
+        spaced: BooleanArray? = null,
+        num: IntArray? = null,
+        ascii: BooleanArray? = null,
+    ): String {
         require(op.size == text.size && after.size == text.size) { "a label each: ${text.size}, ${op.size}, ${after.size}" }
         require(num == null || num.size == text.size) { "a number class each: ${text.size}, ${num?.size}" }
         val out = StringBuilder()
@@ -47,7 +55,7 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
         }
         for (i in text.indices) {
             val written = when (op[i]) {
-                KEEP -> kept(text[i], out, spaced != null)
+                KEEP -> kept(text[i], run, out, ascii?.getOrNull(i) == true)
                 DEL -> ""
                 else -> ops[op[i]]
             }
@@ -108,9 +116,10 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
 
         private val PAUSE_BEFORE_MARK = Regex("[，、；：]+(?=[。？！…，])")
 
-        // a mark after an English letter as English writes it (「Yes, I know?」): norm made it full width
-        private fun kept(c: Int, out: StringBuilder, english: Boolean): String {
-            val afterLetter = out.lastOrNull()?.let { it.code < ASCII && it.isLetter() } == true
+        // a mark English wrote after an English letter (a number still pending in [run] is what it follows, not
+        // [out]'s last) as English writes it (「Yes, I know?」): norm made it full width
+        private fun kept(c: Int, run: CharSequence, out: CharSequence, english: Boolean): String {
+            val afterLetter = (run.lastOrNull() ?: out.lastOrNull())?.let { it.code < ASCII && it.isLetter() } == true
             return if (english && afterLetter && c in WIDE_MARKS) ASCII_MARKS[WIDE_MARKS.indexOf(c)].toString()
             else String(Character.toChars(c))
         }
@@ -149,6 +158,20 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
             }
             var k = 0
             return BooleanArray(normed.size) { i -> isAsciiWord(normed[i]) && wanted.getOrElse(k++) { false } }
+        }
+
+        /**
+         * For each character of [norm]`(raw)`, whether it is a mark [raw] had in ASCII (「,」, not 「，」):
+         * [norm] makes both full width, [apply] writes this one back after an English letter. [norm]
+         * neither drops nor adds one of ，？！：； or their ASCII, so the k-th of them is the raw text's k-th.
+         */
+        fun asciiMarks(raw: String, normed: IntArray): BooleanArray {
+            val wasAscii = ArrayList<Boolean>()
+            raw.codePoints().forEach { c ->
+                if (c in WIDE_MARKS || (c < ASCII && c.toChar() in ASCII_MARKS)) wasAscii += c < ASCII
+            }
+            var k = 0
+            return BooleanArray(normed.size) { i -> normed[i] in WIDE_MARKS && wasAscii.getOrElse(k++) { false } }
         }
 
         private fun isSpace(c: Int) = c == 0x85 || (Character.isBmpCodePoint(c) && c.toChar().isWhitespace())
@@ -233,6 +256,7 @@ class VoicePolishStream(
 
     private var text = IntArray(0)
     private var spaced = BooleanArray(0)
+    private var ascii = BooleanArray(0)
 
     // the length of the prefix last tagged, and each of its characters' labels as last tagged
     private var done = 0
@@ -258,7 +282,7 @@ class VoicePolishStream(
         if (text.isEmpty()) return ""
         while (text.size - done > window - freezeAfter) step(done + window - freezeAfter, last = false)
         step(text.size, last = true)
-        return tags.apply(text, seenOp.copyOf(text.size), seenAfter.copyOf(text.size), spaced, seenNum.copyOf(text.size))
+        return tags.apply(text, seenOp.copyOf(text.size), seenAfter.copyOf(text.size), spaced, seenNum.copyOf(text.size), ascii)
     }
 
     /**
@@ -268,7 +292,7 @@ class VoicePolishStream(
      */
     fun frozenPrefix(count: Int): String {
         val n = minOf(count, frozen)
-        return tags.apply(text.copyOf(n), seenOp.copyOf(n), seenAfter.copyOf(n), spaced.copyOf(n), seenNum.copyOf(n))
+        return tags.apply(text.copyOf(n), seenOp.copyOf(n), seenAfter.copyOf(n), spaced.copyOf(n), seenNum.copyOf(n), ascii.copyOf(n))
     }
 
     private fun take(raw: String) {
@@ -280,9 +304,11 @@ class VoicePolishStream(
         frozen = minOf(frozen, same)
         text = next
         val wasSpaced = spaced
+        val wasAscii = ascii
         spaced = VoicePolishTags.spaces(raw, next)
-        // the polished prefix shown holds while its characters and their spaces do
-        if (shownCut > frozen || (0 until shownCut).any { spaced[it] != wasSpaced[it] }) shownCut = -1
+        ascii = VoicePolishTags.asciiMarks(raw, next)
+        // the polished prefix shown holds while its characters, their spaces and marks' widths do
+        if (shownCut > frozen || (0 until shownCut).any { spaced[it] != wasSpaced[it] || ascii[it] != wasAscii[it] }) shownCut = -1
         if (seenOp.size < text.size) {
             seenOp = seenOp.copyOf(text.size)
             seenAfter = seenAfter.copyOf(text.size)
@@ -318,7 +344,7 @@ class VoicePolishStream(
         var cut = frozen
         if (cut < done && seenNum[cut] != 0) while (cut > 0 && seenNum[cut - 1] != 0) cut--
         if (cut != shownCut) {
-            shownPolished = tags.apply(text.copyOf(cut), seenOp.copyOf(cut), seenAfter.copyOf(cut), spaced, seenNum.copyOf(cut))
+            shownPolished = tags.apply(text.copyOf(cut), seenOp.copyOf(cut), seenAfter.copyOf(cut), spaced, seenNum.copyOf(cut), ascii)
             shownCut = cut
         }
         val polished = shownPolished

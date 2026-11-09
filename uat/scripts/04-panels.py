@@ -113,11 +113,13 @@ def pan23(d):
         n = s.find(desc=long, where="ime")
         if n:
             break
-        # up a third of the panel, at its middle: no screen size assumed
+        # from 70% to 30% of the panel's height, at its middle: the grid, above the picker's bottom row
+        # (a quarter of the panel: ABC，⌫); no screen size assumed
         w = s.find(rid="input_window", where="ime")
         if not w:
             raise Blocked("颜文字面板不在")
-        x, y0, y1 = (w.b[0] + w.b[2]) // 2, w.b[3] - (w.b[3] - w.b[1]) // 6, w.b[1] + (w.b[3] - w.b[1]) // 2
+        h = w.b[3] - w.b[1]
+        x, y0, y1 = (w.b[0] + w.b[2]) // 2, w.b[1] + h * 7 // 10, w.b[1] + h * 3 // 10
         d.swipe((x, y0), (x, y1), 300, 0.6)
     check(n is not None, f"颜文字里找不到 {long}")
     d.shot("kb", "颜文字长字")

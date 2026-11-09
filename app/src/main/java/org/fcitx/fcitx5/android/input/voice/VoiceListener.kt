@@ -129,7 +129,9 @@ class VoiceListener(
         scope.launch(Dispatchers.IO) { VoiceEngine.prepareVad { Timber.w(it, "voice vad") } }
         scope.launch {
             // asked for while the models load, not after: the engine may be busy a while
-            val user = async { userHotwords() }
+            // an Error of it caught in here: thrown out of the async it would cancel this launch and reach the
+            // scope's handler (told as the microphone's failure) whichever message came first
+            val user = async { caught { userHotwords() } }
             val loaded = try {
                 VoiceEngine.acquire()
             } catch (e: CancellationException) {
@@ -147,7 +149,12 @@ class VoiceListener(
             }
             val words = try {
                 user.await()
-            } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
+            } catch (e: CancellationException) {
+                // closed while they loaded: the models let go, the cancellation not taken for a failure
+                ready.cancel()
+                main.post { VoiceEngine.release() }
+                throw e
+            }.getOrElse { e ->
                 // an Error past the acquire (userHotwords falls back on exceptions only): the models
                 // let go, not held for good, and the decoder not left waiting for them; told as the
                 // models' failure, not the microphone's (the scope's handler)
@@ -182,6 +189,15 @@ class VoiceListener(
     }
 
     // voice input without them, not none
+    // [block]'s result, or what it threw but a cancellation (which goes on, as cancellations must)
+    private suspend fun <T> caught(block: suspend () -> T): Result<T> = try {
+        Result.success(block())
+    } catch (e: CancellationException) {
+        throw e
+    } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
+        Result.failure(e)
+    }
+
     private suspend fun userHotwords() = orFallback("voice hotwords", VoiceHotwords.Words.NONE) { hotwords() }
 
     /**

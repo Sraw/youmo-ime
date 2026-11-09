@@ -328,7 +328,7 @@ def vo10(d):
 case("VO-11", needs="jvm:VoiceKeyboardUatTest.aPasswordFieldHasNoVoice")(lambda d: None)
 
 
-case("VO-12", needs="jvm:VoiceHoldUatTest.onlyTheFieldItWasSaidForGetsIt")(lambda d: None)
+case("VO-12", needs="jvm:VoiceHoldUatTest.onlyTheFieldItWasSaidForGetsIt、VoiceHoldUatTest.whatWasHeardBeforeAnotherFieldGoesWithTheHold、VoiceHoldUatTest.inputRestartedInTheSameFieldWhileHoldingKeepsWhatIsSaid")(lambda d: None)
 
 
 case("VO-13", needs="jvm:VoiceHoldUatTest.holdingTheSpaceForThePickerDoesNotTalk")(lambda d: None)
@@ -369,13 +369,13 @@ case("VO-21", needs="jvm:VoiceUatTest.aWordDeletedOrBlockedIsNotListenedFor")(la
 case("VO-22", needs="jvm:VoiceUatTest.habitsOffListensForNoneOfTheirs")(lambda d: None)
 
 
-case("VO-29", needs="jvm:VoiceTapUatTest.whatIsSettledIsTypedAsItIsSaid、VoiceTapUatTest.theCursorMovedWhileTalkingTheTailComposesWhereItWent、VoiceTapUatTest.whatTheAppSentIsNotTypedAgain")(lambda d: None)
+case("VO-29", needs="jvm:VoiceTapUatTest.whatIsSettledIsTypedAsItIsSaid、VoiceTapUatTest.theCursorMovedWhileTalkingTheTailComposesWhereItWent、VoiceTapUatTest.whatTheAppSentIsNotTypedAgain、VoiceTapUatTest.theViewsMadeAnewWhileTalkingTheTailIsTypedOnce、VoiceTalkTest.thePolishFailingAfterANumberWrittenInDigitsTypesWhatFollowsItOnce")(lambda d: None)
 
 
 case("VO-30", needs="jvm:VoiceTapFieldUatTest.anotherFieldGetsNothingTheFirstGetsWhatWasSaid、VoiceTapFieldUatTest.theKeyboardHiddenStopsItAndTypesTheRestOnceRecognized、VoiceTapFieldUatTest.inputRestartedInTheSameFieldTalksOn")(lambda d: None)
 
 
-case("VO-31", needs="jvm:VoiceTapFieldUatTest.aMinuteWithNothingSaidStopsIt")(lambda d: None)
+case("VO-31", needs="jvm:VoiceTapFieldUatTest.aMinuteWithNothingSaidStopsIt、VoiceHoldUatTest.aHoldCutShortTypesWhatWasHeard")(lambda d: None)
 
 
 case("VO-27", needs="jvm:VoiceHoldUatTest.aSilentMicrophoneIsSaidAndListeningComesWithTheFirstSound、VoiceOnsetTest.twoSecondsOfZeroesIsASilentMicrophoneToldOnce、VoiceTapUatTest.aSilentMicrophoneIsSaid")(lambda d: None)
@@ -641,3 +641,4 @@ def vo28(d):
 
 case("VO-34", needs="jvm:PacksUatTest.withoutTheVoicePackTheMicrophoneAsksForItAndTheSpaceDoesNothing")(lambda d: None)
 case("VO-35", needs="jvm:VoiceEndTest.aChatLosesItsClosingMarkAQuestionKeepsItsOwn、VoiceEndTest.aLineLosesEveryEndMark、VoiceEndTest.elsewhereTheTextEndsAsSaidUnlessDropped、VoiceEndTest.aSearchAnAddressOrOneLineIsALine、VoicePolishTest.appliesAsPython")(lambda d: None)
+case("VO-36", needs="jvm:VoicePolishTest.aMarkKeepsTheWidthTheRecognizerWroteItIn")(lambda d: None)

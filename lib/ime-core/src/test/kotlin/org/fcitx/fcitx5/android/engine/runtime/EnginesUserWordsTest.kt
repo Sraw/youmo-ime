@@ -458,4 +458,24 @@ class EnginesUserWordsTest {
         }
         assertEquals(listOf(kept), Engines(::load, dir).use { it.userWords() })
     }
+
+    // a sentence picked twice is a habit: blocked whole, the habits do not put it back in (R20 F5914)
+    @Test
+    fun aSentenceUsedBeforeIsNotPutBackByTheHabitsOnceBlocked() {
+        Engines(::load, MemoryFiles()).use { engines ->
+            repeat(2) {
+                assertEquals("你好", engines.type(InputMethodCatalog.PINYIN, "nihao").candidates.first())
+                engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, 0)
+                engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
+            }
+            engines.type(InputMethodCatalog.PINYIN, "nihao")
+            engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.BLOCK, 0)
+            engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
+            for (keys in listOf("nihao", "nihaoni")) {
+                val shown = engines.type(InputMethodCatalog.PINYIN, keys).candidates
+                assertFalse("$keys $shown", "你好" in shown)
+                engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
+            }
+        }
+    }
 }

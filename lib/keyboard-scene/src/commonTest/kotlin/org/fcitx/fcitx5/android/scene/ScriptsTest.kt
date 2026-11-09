@@ -4,10 +4,7 @@
  */
 package org.fcitx.fcitx5.android.scene
 
-import org.fcitx.fcitx5.android.scene.engine.Expand
 import org.fcitx.fcitx5.android.scene.engine.Scripts
-import org.fcitx.fcitx5.android.scene.engine.Texts
-import org.fcitx.fcitx5.android.scene.layout.KeyAttrs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -28,10 +25,13 @@ class ScriptsTest {
     }
 
     @Test
-    fun aSpaceWithNoNameIsStillSaid() {
-        // an input method with no name (or a scene built before it is known): TalkBack says "Space", not nothing
-        assertEquals("a11y_key_space", Expand.spoken(KeyAttrs(role = "space"), false, "", null, Texts()))
-        assertEquals("a11y_key_space", Expand.spoken(KeyAttrs(role = "space"), false, null, null, Texts()))
-        assertEquals("Space, 拼音", Expand.spoken(KeyAttrs(role = "space"), false, "拼音", null, Texts()))
+    fun theFullWidthBlocksHalfWidthKanaAndHangulAreNotHan() {
+        // ！Ａ and ｢ (a half-width CJK bracket) are a CJK font's; ｶ and ﾡ (half-width katakana, Hangul) are not (F6589)
+        assertEquals(Scripts.Script.Han, Scripts.of(0xFF01))
+        assertEquals(Scripts.Script.Han, Scripts.of(0xFF21))
+        assertEquals(Scripts.Script.Han, Scripts.of(0xFF62))
+        assertEquals(Scripts.Script.Han, Scripts.of(0xFFE5))
+        assertEquals(Scripts.Script.Other, Scripts.of(0xFF76))
+        assertEquals(Scripts.Script.Other, Scripts.of(0xFFA1))
     }
 }

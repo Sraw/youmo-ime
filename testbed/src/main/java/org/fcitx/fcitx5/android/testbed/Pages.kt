@@ -18,6 +18,7 @@ import android.text.InputType
 import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.inputmethod.BaseInputConnection
@@ -301,7 +302,11 @@ object Pages {
             loadUrl("file:///android_asset/web.html")
         }
         // the page left: its renderer and scripts gone with it, not logging into the next page's log
-        onLeave += { web.destroy() }
+        // (detached first: a WebView destroyed while still in the window is warned against)
+        onLeave += {
+            (web.parent as? ViewGroup)?.removeView(web)
+            web.destroy()
+        }
         add(web)
     }
 

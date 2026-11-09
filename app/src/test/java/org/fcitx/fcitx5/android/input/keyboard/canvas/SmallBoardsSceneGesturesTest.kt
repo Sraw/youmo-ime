@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard.canvas
 
+import android.content.Context
 import android.text.InputType
 import android.view.View
 import android.view.accessibility.AccessibilityManager
@@ -11,6 +12,8 @@ import android.view.accessibility.AccessibilityNodeInfo
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.data.RecentlyUsed
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -67,6 +70,30 @@ class SmallBoardsSceneGesturesTest {
         h.typesAsShown("comma", "，", ",")
     }
 
+    // before what the marks type is known (none kept from the last run, the host not up): the panel's 。 types
+    // nothing, as the text keyboards' marks are held back; known, it types the mark mapped (R20 F6465)
+    @Test
+    fun thePickersFullStopTypesNothingBeforeTheMarksAreKnown() = KeyboardHarness().start().use { h ->
+        h.tap(h.described(h.service.getString(R.string.a11y_key_emoji)))
+        h.relayout()
+        val punctuation = h.inputView.javaClass.getDeclaredField("punctuation").apply { isAccessible = true }
+            .get(h.inputView) as PunctuationComponent
+        PunctuationStartKeys.forget(h.service)
+        PunctuationComponent::class.java.getDeclaredField("known").apply { isAccessible = true }.setBoolean(punctuation, false)
+        val kb = KeyboardHarness.all(h.inputView).filterIsInstance<PickerLayout.Keyboard>().first { h.shown(it) }
+        fun tapPeriod() {
+            h.press(h.keys(kb).single { it.id == "period" })
+            h.release()
+            h.idle()
+        }
+        tapPeriod()
+        assertEquals(h.api.calls.toString(), "", h.field.text.toString())
+        punctuation.update(mapOf("." to "。", "," to "，"))
+        h.relayout()
+        tapPeriod()
+        assertEquals("。", h.field.text.toString())
+    }
+
     // [id] on the picker shown: [chinese] with the Chinese punctuation mapping, [plain] with none, as its face and typed
     private fun KeyboardHarness.typesAsShown(id: String, chinese: String, plain: String) {
         val kb = KeyboardHarness.all(inputView).filterIsInstance<PickerLayout.Keyboard>().first { shown(it) }
@@ -85,6 +112,10 @@ class SmallBoardsSceneGesturesTest {
             // typed as the face shows it (committed by the panel as punctuation maps it, not through the engine)
             assertEquals(api.calls.toString(), face, field.text.toString())
             assertTrue(api.calls.toString(), api.calls.none { it.startsWith("sendKey") })
+            // a mark, not a symbol picked: not among the recently used (PAN-24)
+            val recent = FcitxApplication.getInstance().directBootAwareContext
+                .getSharedPreferences(RecentlyUsed.PREFERENCE_NAME, Context.MODE_PRIVATE).all.values.joinToString()
+            assertFalse(recent, face in recent)
             field.setText("")
             idle()
         }
@@ -194,9 +225,9 @@ class SmallBoardsSceneGesturesTest {
         }
         // independently: a page down moves past 字0, a page up at the top does nothing and back again goes to 字0;
         // ⌫ and Return reach the engine as BackSpace (0xff08) and Return (0xff0d)
-        // the column's keys: the two pages, ⌫ and Return among them
+        // the column's keys: the two pages, ⌫ and Return among them (Return said as the field's action: the harness's is Done)
         val app = RuntimeEnvironment.getApplication()
-        for (d in listOf(app.getString(R.string.a11y_candidates_prev_page), app.getString(R.string.a11y_candidates_next_page), "Backspace")) {
+        for (d in listOf(app.getString(R.string.a11y_candidates_prev_page), app.getString(R.string.a11y_candidates_next_page), "Backspace", app.getString(R.string.a11y_key_action_done))) {
             assertTrue(out[0], d in out[0])
         }
         assertEquals("first 字0", out[1])

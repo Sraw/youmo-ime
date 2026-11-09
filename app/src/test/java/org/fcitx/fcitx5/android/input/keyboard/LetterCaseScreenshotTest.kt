@@ -53,7 +53,6 @@ class LetterCaseScreenshotTest {
     }
 
     @Test
-
     @Uat("KB-68")
     fun pinyinAlwaysUpper() {
         val heard = KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).start().use { h -> h.letter("q").description }
@@ -70,7 +69,6 @@ class LetterCaseScreenshotTest {
     }
 
     @Test
-
     @Uat("KB-68")
     fun pinyinAlwaysLowerWithShiftOn() {
         setting.setValue(LetterCaseChoice.Lower)
@@ -87,7 +85,6 @@ class LetterCaseScreenshotTest {
     }
 
     @Test
-
     @Uat("KB-68")
     fun pinyinFollowingShift() {
         KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).start().use { h ->
@@ -116,7 +113,6 @@ class LetterCaseScreenshotTest {
     }
 
     @Test
-
     @Uat("KB-68")
     fun fourteenAndNineKeysAlwaysLower() {
         val fourteen = ImKeyboards.Chosen(pinyin = ImKeyboard.KEYS14)

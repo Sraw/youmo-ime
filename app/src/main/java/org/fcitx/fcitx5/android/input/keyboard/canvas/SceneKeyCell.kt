@@ -45,7 +45,7 @@ import timber.log.Timber
 @SuppressLint("ViewConstructor")
 open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boolean = false) : CustomGestureView(context) {
 
-    // the built-in where the engine makes nothing of the theme, as the keys are (U8): the cells drawn still
+    // the built-in where the engine makes nothing of the theme or refused its keys' scene, as the keys are (U8): the cells drawn still
     private val theme = SceneBoard.drawnTheme(theme)
     private val look = ThemeManager.shownLook(this.theme)
     private val fonts = SceneFonts(look)

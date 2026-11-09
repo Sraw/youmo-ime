@@ -195,6 +195,26 @@ class VoiceHoldUatTest {
     }
 
     @Test
+    fun onAScaledKeyboardTheCancelDistanceIsTheKeyboardAsSeen() {
+        allowMicrophone()
+        ThemeManager.prefs.floatingKeyboard.setValue(true)
+        restore += { ThemeManager.prefs.floatingKeyboard.setValue(false) }
+        h.start()
+        h.keyboard.scaleX = 0.8f
+        h.keyboard.scaleY = 0.8f
+        h.relayout()
+        // the cancel line: a quarter of the keyboard's height as seen (scaled), in dp
+        val line = h.keyboard.height * 0.8f * 0.25f / h.service.resources.displayMetrics.density
+        val f = holdSpace()
+        f.move(h.at(space, dy = -(line - 2f)))
+        assertTrue(shown().toString(), string(R.string.voice_hold_cancel) !in shown())
+        f.move(h.at(space, dy = -(line + 2f)))
+        assertTrue(shown().toString(), string(R.string.voice_hold_cancel) in shown())
+        f.lift(dy = -(line + 2f))
+        assertEquals("", text())
+    }
+
+    @Test
     @Uat("VO-02")
     fun whatIsSaidShowsThenIsTyped() {
         allowMicrophone()
@@ -215,8 +235,9 @@ class VoiceHoldUatTest {
         assertEquals(-1 to -1, composing())
     }
 
-    /** Input restarted in the same field while the finger is down (a WebView, restartInput): what is said is kept. */
+    /** Input restarted in the same field while the finger is down (a WebView, restartInput): what is said is kept (R20 F5794). */
     @Test
+    @Uat("VO-12")
     fun inputRestartedInTheSameFieldWhileHoldingKeepsWhatIsSaid() {
         allowMicrophone()
         h.start(MULTI_LINE, fieldId = 7)
@@ -230,8 +251,9 @@ class VoiceHoldUatTest {
         assertEquals("今天天气，很好。", text())
     }
 
-    // a hold whose recognizer never answers: what was heard is still typed when it is given up
+    // a hold whose recognizer never answers: what was heard is still typed when it is given up (R20 F5822)
     @Test
+    @Uat("VO-31")
     fun aHoldCutShortTypesWhatWasHeard() {
         allowMicrophone()
         h.start(MULTI_LINE)
@@ -477,7 +499,8 @@ class VoiceHoldUatTest {
     }
 
     // heard while the space is held, then another field: the hold dropped (VoiceHoldOverlay.inputEnded),
-    // what was heard with it; neither field gets it (a tap's talk, unlike a hold, types it into the first)
+    // what was heard with it; neither field gets it (a tap's talk, unlike a hold, types it into the first) (R20 F6354).
+    // Its own test, not a row beside onlyTheFieldItWasSaidForGetsIt's: rows would share one recognizer and harness
     @Test
     @Uat("VO-12")
     fun whatWasHeardBeforeAnotherFieldGoesWithTheHold() {

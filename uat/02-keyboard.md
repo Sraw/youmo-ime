@@ -374,9 +374,9 @@
 
 ### KB-65 [P2] 滑出快捷键时键上方小框里的字
 - **前提**：B0，**按键时弹出显示字符** 开着；**按键字符和快捷键** 里把 Q 设成文字「我的邮箱是 someone@example.com」，W 设成 **快速输入**，E 设成 **恢复刚删除的**。
-- **操作**：A、W、E、Q 各上滑过阈值不松手，看键上方的小框；键盘高度换成紧凑、悬浮键盘、横屏各看一次。
-- **预期**：小框里是「全选」「快速输入」「恢复刚删除的」「我的邮箱是 s…」，字比键上的字母小一号，和底排「符」「123」差不多；框最宽约五个字，没有横跨半个键盘、也不盖住工具栏；紧凑、悬浮时字跟着键上的字缩小。
-- **JVM**：`SwipePopupScreenshotTest.theBubbleSaysTheShortcutFitted`（三个键的框里的字）；规则见 ime-core `PreviewLabelTest`；样子见 `SwipePopupScreenshotTest` 的 `select_all_*`、`quick_input_*`、`restore_*`、`text_*`、`trad_simp_en` 金样。
+- **操作**：A、W、E、Q 各上滑过阈值不松手，看键上方的小框；键盘高度换成紧凑、悬浮键盘、横屏各看一次；拼音键盘换成 14 键，给 QW 键设同样的文字快捷键，按 Shift 后上滑看小框。
+- **预期**：小框里是「全选」「快速输入」「恢复刚删除的」「我的邮箱是 s…」，字比键上的字母小一号，和底排「符」「123」差不多；框最宽约五个字，没有横跨半个键盘、也不盖住工具栏；紧凑、悬浮时字跟着键上的字缩小。14 键上小框里的字照设的写（「someone@…」不变成大写）。
+- **JVM**：`SwipePopupScreenshotTest.theBubbleSaysTheShortcutFitted`（三个键的框里的字）；`GroupedKeyboardTest.aSwipesShortcutShowsAsItIsNamedNotInTheLettersCase`（14/18 键上快捷键的字不随字母大小写变）；规则见 ime-core `PreviewLabelTest`；样子见 `SwipePopupScreenshotTest` 的 `select_all_*`、`quick_input_*`、`restore_*`、`text_*`、`trad_simp_en` 金样。
 
 ### KB-66 [P1] 标点和快捷键图标各在自己选的位置，两项不能选同一处，第一次打开和改过设置后一样
 - **前提**：新装（B0），第一次打开键盘，滑动、标点位置、快捷键图标位置都是默认。
@@ -388,7 +388,7 @@
 - **前提**：任意。
 - **操作**：标点位置和快捷键图标位置的每种能选的组合（6×6 去掉两项相同的，都选无可以，共 31 种），在全键盘、九键、14 键、18 键、双拼九键 / 14 / 18、英文九键、大千、注音九键、手写、五笔两行字根、五笔键名、数字键盘、符号页上看，键盘高度标准和紧凑、悬浮、单手、横屏都看。
 - **预期**：每个键上字（或图标）、键角小字、快捷键图标两两不叠。同一类东西整个键盘一样大；碰上时：标记在自己的角里挪（不换到别的角），再字那一类整个键盘一起缩小（最多 6%），再标记那一类一起缩小（最小到 0.875）；还碰上就不画这个标记（先省功能键下滑的，再省快捷键，最后才是键角小字），滑动照常能打出它。名义高度下大多数键盘什么都不省；紧凑 + 单手、标点选左下 / 右下 / 底部时，全键盘省掉一些键角小字（比如 a 的 `@`、w 的 `2`，最多 28 个，060-pending-decisions S4e 记的）。
-- **JVM**：`KeyMarksEverywhereUatTest.noKeyDrawsTwoThingsOverEachOtherUpright`、`noKeyDrawsTwoThingsOverEachOtherTurned`（上面每种键盘的每个键 × 31 种组合 × 标准 / 紧凑 / 悬浮 / 单手 / 紧凑单手 / 横屏 / 横屏紧凑，系统字号不影响，按画出来的墨迹量，两两不相交，省掉的标记打印出来）；`KeyMarksScreenshotTest.noRoomAnotherCornerOfTheKey`（紧凑单手全键盘右下、五笔左下，悬浮大千底部的图）；keyboard-scene `KeyMarkYieldTest`（让的次序）。
+- **JVM**：`KeyMarksEverywhereUatTest.noKeyDrawsTwoThingsOverEachOtherUpright`、`noKeyDrawsTwoThingsOverEachOtherTurned`（上面每种键盘的每个键 × 31 种组合 × 标准 / 紧凑 / 悬浮 / 单手 / 紧凑单手 / 横屏 / 横屏紧凑，系统字号不影响，按画出来的墨迹量，两两不相交，省掉的标记打印出来）；`KeyMarksScreenshotTest.noRoomAnotherCornerOfTheKey`（紧凑单手全键盘右下、五笔左下，悬浮大千底部的图；测试名是旧规则（换到另一个角）留下的，现在图里标记只在自己的角里挪、放不下就不画，不换角）；keyboard-scene `KeyMarkYieldTest`（让的次序）。
 
 ### KB-68 [P2] 拼音键字母大小写三档
 - **前提**：拼音（全键盘）、英文都已启用。
