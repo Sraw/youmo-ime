@@ -46,6 +46,10 @@ object SceneText {
         appendLine("  anchor ${n(k.anchor.x)},${n(k.anchor.y)} up ${n(k.up.x)},${n(k.up.y)}")
         if (k.actions.isNotEmpty()) appendLine("  actions ${k.actions.entries.sortedBy { it.key }.joinToString(" ") { "${it.key}=${q(it.value)}" }}")
         interaction(k)
+        k.motion?.let { m ->
+            fun t(t: org.fcitx.fcitx5.android.scene.theme.Transition?) = t?.let { "${it.ms}ms,${it.easing}" } ?: "-"
+            appendLine("  motion transition=${t(m.transition)} press=${t(m.press)} scale=${n(m.pressScale)} sink=${n(m.pressSink)}")
+        }
         val normal = k.ops(pressed = false)
         appendLine("  normal")
         normal.forEach { appendLine("    ${op(it)}") }

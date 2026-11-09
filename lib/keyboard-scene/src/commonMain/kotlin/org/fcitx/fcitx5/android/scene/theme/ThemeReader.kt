@@ -419,7 +419,24 @@ object ThemeReader {
                 .forEach { p.warn(line, "fill= on $it is no colour: a panel's fill is a colour alone, ignored") }
         }
         unreadPad(selectors, values.keys, line, p)
+        unreadMotion(selectors, values.keys, line, p)
     }
+
+    // A1's motion a key's alone, not a part's; a pressed face's scale and sink in a pressed state alone. The window's,
+    // the panels' and the bar's widgets warned of by what they read (above)
+    private fun unreadMotion(selectors: List<Selector>, props: Set<String>, line: Int, p: Problems) {
+        val moving = MOTION.filter { it in props }
+        if (moving.isEmpty()) return
+        val others = selectors.filter { it.widget !in Selector.BAR_WIDGETS && it.widget !in Selector.PANEL_WIDGETS && it.widget !in WINDOW_READS }
+        for (w in others.map { it.widget }.filter { it != "key" }.distinct()) moving.forEach { p.warn(line, "$it= on $w does nothing: only a key moves") }
+        for (part in others.filter { it.widget == "key" }.mapNotNull { it.part }.distinct()) {
+            moving.forEach { p.warn(line, "$it= on a key's $part does nothing: the key moves as a whole") }
+        }
+        val unpressed = others.any { it.widget == "key" && it.part == null && "pressed" !in it.states }
+        if (unpressed) moving.filter { it != "transition" }.forEach { p.warn(line, "$it= on a key not pressed does nothing: it is a pressed face's (key:pressed)") }
+    }
+
+    private val MOTION = listOf("transition", "press-scale", "press-sink")
 
     // a panel's property it has no use for (`clipboard shadow=`), as the window's; the voice mask's blur and the
     // handwriting pad's ink and grid set on what does not read them, too

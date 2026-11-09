@@ -141,6 +141,7 @@ object ThemeWriter {
         is Value.Percent -> "${number(v.percent)}%"
         is Value.OfPath -> "path(${path(v.path)})"
         is Value.OfShown -> shown(v.shown)
+        is Value.OfTransition -> "${v.transition.ms}ms ${v.transition.easing}"
         // one value where upright and turned are alike
         is Value.OfTwin -> listOf(v.twin.portrait, v.twin.landscape).distinct()
             .joinToString(" ") { if (property == "height") "${number(it)}%" else length(it) }
@@ -157,11 +158,11 @@ object ThemeWriter {
     }
 
     private fun number(property: String, n: Double): String = when (property) {
-        "scale" -> "${number(n)}%"
+        "scale", "press-scale" -> "${number(n)}%"
         "size" -> "${number(n)}sp"
         "letter-spacing" -> "${number(n)}em"
         // T7a's grip on a handle (Values.HANDLE_SIZES): a keyboard's height and width are twins, not numbers
-        "depth", "offset", "width", "height", "gap", "blur", "ink-width" -> length(n)
+        "depth", "offset", "width", "height", "gap", "blur", "ink-width", "press-sink" -> length(n)
         else -> number(n)
     }
 

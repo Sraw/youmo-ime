@@ -381,7 +381,7 @@ class ThemeTest {
         val reserved = listOf(
             "side-padding=\"2% 5%\"", "bottom-padding=\"1%\"",
             "height=\"38% 52%\"", "width=\"24dp\"", "side-padding=\"8dp 48dp\"", "bottom-padding=\"0 0\"",
-            "transition=\"150ms ease-out\"", "press-scale=\"95%\"", "press-sink=\"2dp\"", "appear=\"scale 150ms\"",
+            "appear=\"scale 150ms\"",
             "effect=\"particles(star.png, 12, 24dp, 600ms)\"", "sticker=\"cat.png\"",
         )
         assertEquals(Values.RESERVED.size, reserved.map { it.substringBefore('=') }.toSet().size, "every one tried")
@@ -390,7 +390,7 @@ class ThemeTest {
             assertTrue(w.single().contains("${attr.substringBefore('=')}= is not supported"), "$attr: $w")
         }
         // with a property of today: that one works
-        val t = ThemeReader.theme(withStyle("<style select=\"key\" fill=\"#123456\" press-sink=\"2dp\"/>")).getOr { error("$it") }
+        val t = ThemeReader.theme(withStyle("<style select=\"key\" fill=\"#123456\" sticker=\"cat.png\"/>")).getOr { error("$it") }
         assertTrue(t.styles.last().values.keys == setOf("fill"))
         // no later stage's value of a property of today is left: T4b's path(…), bubble and a bubble's size in %
         // read (ThemeTest's shapes), T7a's color="follow" the navigation bar's (WindowLooksTest)
@@ -554,11 +554,17 @@ class ThemeTest {
         assertEquals("0.6.0", t.value.meta?.minApp)
         // T5 made its scenes and the keyboard's size work: no warning of them
         val ignored = listOf(
-            "83|<sounds>", "79|transition=",
+            "83|<sounds>",
         ).map { "$it is not supported by this version, ignored" } +
+            // A1 made a key's transition work: the clipboard and a candidate's part have none
+            "79|transition= on clipboard does nothing: it reads fill radius color" +
             // T6a's candidate:first comment selects: a fill does nothing on a part, its colour alone read
             "79|fill= on candidate:first comment does nothing: it reads color" +
-            listOf("80|press-scale=", "80|effect=", "80|sticker=", "81|appear=").map { "$it is not supported by this version, ignored" } +
+            "79|transition= on candidate:first comment does nothing: it reads color" +
+            listOf("80|effect=", "80|sticker=").map { "$it is not supported by this version, ignored" } +
+            // A1's press-scale a pressed face's
+            "80|press-scale= on a key not pressed does nothing: it is a pressed face's (key:pressed)" +
+            "81|appear= is not supported by this version, ignored" +
             // its preview a path with a tail, which only a bubble has
             "81|tail= does nothing beside a shape that is no bubble: only a bubble has a tail"
         assertEquals(ignored, t.warnings().map { "${it.line}|${it.message}" })

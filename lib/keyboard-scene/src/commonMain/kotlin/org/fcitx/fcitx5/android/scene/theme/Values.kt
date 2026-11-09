@@ -77,7 +77,14 @@ sealed interface Value {
     data class Number(val number: Double) : Value
     data class Flag(val on: Boolean) : Value
     data class OfTwin(val twin: Twin) : Value
+    data class OfTransition(val transition: Transition) : Value
 }
+
+/**
+ * `transition=` (060-render-p3 A1): how long a change into the state its style is of takes, [ms]
+ * (0–600), and its curve, one of [Values.EASINGS] (CSS's names).
+ */
+data class Transition(val ms: Int, val easing: String)
 
 /** Reading a style property's value: null where it is not one of that property. */
 object Values {
@@ -126,6 +133,8 @@ object Values {
         "underline", "cursor-color",
         // T7b: the voice mask's frosted glass (engine/PanelLooks), the handwriting pad's ink and grid
         "blur", "ink-color", "ink-width", "grid-color", "grid",
+        // A1: a key's motion (the scene's Motion)
+        "transition", "press-scale", "press-sink",
     ) + RETURN_ACTIONS.map { "$RETURN_ICON$it" }
 
     private const val LEN = "(-?[0-9]+(\\.[0-9]+)?dp|0)"
@@ -156,10 +165,7 @@ object Values {
         "width" to form(LEN),
         "side-padding" to form(LEN_OR_PERCENT),
         "bottom-padding" to form(LEN_OR_PERCENT),
-        // A1–A3: motion
-        "transition" to form("$MS (linear|ease|ease-in|ease-out|ease-in-out)"),
-        "press-scale" to form(PERCENT_FORM),
-        "press-sink" to form(LEN),
+        // A2–A3: motion
         "appear" to form("(fade|scale|rise) $MS"),
         "effect" to form("none|ripple-image\\($FILE, ?$PERCENT_FORM, ?$MS\\)|particles\\($FILE, ?[0-9]{1,2}, ?$LEN, ?$MS\\)"),
         // §16's second tier: a key's sticker layer
@@ -227,11 +233,31 @@ object Values {
         else -> textOnAKey(property, raw) ?: capAndBubble(property, raw) ?: panel(property, raw)
     }
 
+    /** `transition=`'s curves (CSS's) and longest, ms; `press-scale=`'s range, %; `press-sink=`'s most, dp. */
+    val EASINGS = listOf("linear", "ease", "ease-in", "ease-out", "ease-in-out")
+    const val MAX_TRANSITION_MS = 600
+    const val MIN_PRESS_SCALE = 85.0
+    const val MAX_PRESS_SCALE = 110.0
+    const val MAX_PRESS_SINK_DP = 4.0
+    private val TRANSITION = Regex("([0-9]{1,3})ms ([a-z-]+)")
+
+    // A1's: a key's transition into a state, its pressed face's scale and sink
+    private fun motion(property: String, raw: String): Value? = when (property) {
+        "transition" -> TRANSITION.matchEntire(raw)?.let { m ->
+            val ms = m.groupValues[1].toInt()
+            val easing = m.groupValues[2]
+            if (ms <= MAX_TRANSITION_MS && easing in EASINGS) Value.OfTransition(Transition(ms, easing)) else null
+        }
+        "press-scale" -> percent(raw)?.takeIf { it in MIN_PRESS_SCALE..MAX_PRESS_SCALE }?.let(Value::Number)
+        "press-sink" -> dp(raw, MAX_PRESS_SINK_DP)?.let(Value::Number)
+        else -> null
+    }
+
     // T6b's: the code being typed's underline (a border's form, or none) and cursor
     private fun preedit(property: String, raw: String): Value? = when (property) {
         "underline" -> border(raw)?.let(Value::OfBorder)
         "cursor-color" -> ColorExpr.parse(raw)?.let(Value::OfColor)
-        else -> null
+        else -> motion(property, raw)
     }
 
     /** The voice mask's frosted glass at most (`blur`), dp: as the keyboard's picture's. */

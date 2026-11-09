@@ -174,6 +174,13 @@ class KeyLook(private val v: Map<String, Value>, private val theme: Theme) {
     val size: Double get() = ((v["size"] as? Value.Percent)?.percent ?: PERCENT) / PERCENT
     val offset: Double get() = (v["offset"] as? Value.Number)?.number ?: 0.0
 
+    /** How a change into this look takes (`transition`, A1); null: at once, as ever. */
+    val transition: Transition? get() = (v["transition"] as? Value.OfTransition)?.transition
+
+    /** A pressed face's scale (`press-scale`, 1 none) and how far it sinks (`press-sink`, dp). */
+    val pressScale: Double get() = ((v["press-scale"] as? Value.Number)?.number ?: PERCENT) / PERCENT
+    val pressSink: Double get() = (v["press-sink"] as? Value.Number)?.number ?: 0.0
+
     private fun word(name: String): String? = (v[name] as? Value.Word)?.word
 
     private companion object {
