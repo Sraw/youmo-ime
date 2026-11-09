@@ -444,11 +444,9 @@ object ThemeFilesManager {
         // a built-in theme's name, or its 0.5 name, which the settings move to it (ThemePrefs.migrateThemeRefs);
         // a pack's or one of its versions' (the settings name one theme by it)
         val packs = themes.filterIsInstance<Theme.Pack>()
-        if (BuiltinThemeFiles.find(ThemeManager.BuiltinThemes, decoded.name) != null || decoded.name in BuiltinThemeFiles.LEGACY ||
-            BuiltinThemeFiles.find(packs, decoded.name) != null || packs.any { it.file == decoded.name }
-        ) {
-            errorRuntime(R.string.exception_theme_name_clash)
-        }
+        val builtin = BuiltinThemeFiles.find(ThemeManager.BuiltinThemes, decoded.name) != null || decoded.name in BuiltinThemeFiles.LEGACY
+        val pack = BuiltinThemeFiles.find(packs, decoded.name) != null || packs.any { it.file == decoded.name }
+        if (builtin || pack) errorRuntime(R.string.exception_theme_name_clash)
         val oldTheme = themes.find { it.name == decoded.name } as? Theme.Custom
         val newCreated = oldTheme == null
         // a json of that name not listed: a later build's is kept (this one cannot read it, nor

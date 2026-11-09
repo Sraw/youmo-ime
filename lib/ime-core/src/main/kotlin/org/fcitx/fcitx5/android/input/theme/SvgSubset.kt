@@ -82,16 +82,25 @@ object SvgSubset {
 
     // what is wrong with [value] of [name], null if nothing
     private fun attribute(name: String, value: String): String? = when (name) {
-        "fill" -> if (value == "none" || value == "currentColor" || COLOR.matches(value)) null else "a #hex colour, none or currentColor"
-        "fill-rule" -> if (value == "nonzero" || value == "evenodd") null else "nonzero or evenodd"
-        "fill-opacity", "opacity" -> if (NUMBER.matches(value) && value.toDouble() in 0.0..1.0) null else "a number 0–1"
-        "width", "height" -> if (LENGTH.matches(value)) null else "a number"
-        "viewBox" -> value.trim().split(Regex("[\\s,]+")).let { v ->
-            if (v.size == VIEW_BOX && v.all(NUMBER::matches) && v[2].toDouble() > 0 && v[3].toDouble() > 0) null else "four numbers, the last two over 0"
-        }
-        "xmlns" -> if (value == NAMESPACE) null else "must be $NAMESPACE"
+        "fill" -> "a #hex colour, none or currentColor".unless(value in FILL_WORDS || COLOR.matches(value))
+        "fill-rule" -> "nonzero or evenodd".unless(value in FILL_RULES)
+        "fill-opacity", "opacity" -> "a number 0–1".unless(NUMBER.matches(value) && value.toDouble() in 0.0..1.0)
+        "width", "height" -> "a number".unless(LENGTH.matches(value))
+        "viewBox" -> "four numbers, the last two over 0".unless(viewBox(value))
+        "xmlns" -> "must be $NAMESPACE".unless(value == NAMESPACE)
         else -> null
     }
+
+    private fun String.unless(ok: Boolean): String? = if (ok) null else this
+
+    private fun viewBox(value: String): Boolean {
+        val v = value.trim().split(Regex("[\\s,]+"))
+        if (v.size != VIEW_BOX || !v.all(NUMBER::matches)) return false
+        return v[2].toDouble() > 0 && v[3].toDouble() > 0
+    }
+
+    private val FILL_WORDS = setOf("none", "currentColor")
+    private val FILL_RULES = setOf("nonzero", "evenodd")
 
     // [d] as SVG's path data: commands and numbers, a move first; what is wrong with it, null if nothing
     private fun path(d: String, count: Count): String? {

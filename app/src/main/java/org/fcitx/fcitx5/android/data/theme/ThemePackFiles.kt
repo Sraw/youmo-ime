@@ -252,22 +252,31 @@ object ThemePackFiles {
         val xml = File(from, THEME_XML)
         ThemeAssetLimits.themeXml(xml.length())?.let(checks.refused)
         val source = xml.readText().removePrefix(BOM)
-        val read = ThemeReader.theme(source, systemColors, checks.appVersion)
-        val theme = when (read) {
-            is Parsed.Ok -> read.value
-            is Parsed.Failed -> {
-                // one this version is too old for, said so (the update is what helps), not as a broken file
-                val minApp = (ThemeReader.theme(source, systemColors) as? Parsed.Ok)?.value?.meta?.minApp
-                if (minApp != null && checks.appVersion != null && ThemeReader.newer(minApp, checks.appVersion)) {
-                    errorRuntime(R.string.exception_theme_min_app, minApp)
-                }
-                errorRuntime(R.string.exception_theme_invalid, read.problems.take(SHOWN).joinToString("\n"))
-            }
-        }
+        val read = readChecked(source, checks)
+        val theme = read.value
         ThemePackCheck.hidesRequired(theme).firstOrNull()?.let { errorRuntime(R.string.exception_theme_hidden_required, it.toString()) }
         val name = theme.name
         if (!isPlainFileName(name) || name.startsWith(".") || VERSIONS.any { name.endsWith(it) }) errorRuntime(R.string.exception_theme_pack_name, name)
         val files = ThemePackCheck.files(theme)
+        checkFiles(from, files, checks)
+        val layouts = checkLayouts(File(from, LAYOUTS), checks)
+        val warnings = read.warnings.map { it.toString() } + listOfNotNull(checks.lowContrast(ThemePackCheck.lowContrast(theme)))
+        return Staged(theme, source, from, files.all, layouts, warnings, files.preview?.let { File(from, it) })
+    }
+
+    private fun readChecked(source: String, checks: Checks): Parsed.Ok<SceneTheme> =
+        when (val read = ThemeReader.theme(source, systemColors, checks.appVersion)) {
+            is Parsed.Ok -> read
+            is Parsed.Failed -> {
+                // one this version is too old for, said so (the update is what helps), not as a broken file
+                val minApp = (ThemeReader.theme(source, systemColors) as? Parsed.Ok)?.value?.meta?.minApp
+                val app = checks.appVersion
+                if (minApp != null && app != null && ThemeReader.newer(minApp, app)) errorRuntime(R.string.exception_theme_min_app, minApp)
+                errorRuntime(R.string.exception_theme_invalid, read.problems.take(SHOWN).joinToString("\n"))
+            }
+        }
+
+    private fun checkFiles(from: File, files: ThemePackCheck.Files, checks: Checks) {
         files.all.firstOrNull { !inside(from, it) || it == THEME_XML }?.let { errorRuntime(R.string.exception_theme_file, it) }
         fun size(name: String) = checks.probe.imageSize(File(from, name)) ?: errorRuntime(R.string.exception_theme_image, name)
         files.pictures.forEach { n -> size(n).let { (w, h) -> ThemeAssetLimits.picture(w, h)?.let(checks.refused) } }
@@ -279,20 +288,19 @@ object ThemePackFiles {
             ThemeAssetLimits.icon(f.length())?.let(checks.refused)
             SvgSubset.check(f.readText()).firstOrNull()?.let { errorRuntime(R.string.exception_theme_icon, "$n: $it") }
         }
-        val layouts = File(from, LAYOUTS).let { dir ->
-            if (!dir.exists()) return@let emptyList()
-            val all = dir.listFiles().orEmpty().toList()
-            all.firstOrNull { !it.isFile || !it.name.endsWith(".xml") || !isPlainFileName(it.name) }
-                ?.let { errorRuntime(R.string.exception_theme_layout, it.name) }
-            ThemeAssetLimits.layouts(all.map { it.length() })?.let(checks.refused)
-            all.map { it.name }.sorted()
-        }
-        val warnings = read.warnings.map { it.toString() } + listOfNotNull(checks.lowContrast(ThemePackCheck.lowContrast(theme)))
-        return Staged(theme, source, from, files.all, layouts, warnings, files.preview?.let { File(from, it) })
+    }
+
+    private fun checkLayouts(dir: File, checks: Checks): List<String> {
+        if (!dir.exists()) return emptyList()
+        val all = dir.listFiles().orEmpty().toList()
+        all.firstOrNull { !it.isFile || !it.name.endsWith(".xml") || !isPlainFileName(it.name) }
+            ?.let { errorRuntime(R.string.exception_theme_layout, it.name) }
+        ThemeAssetLimits.layouts(all.map { it.length() })?.let(checks.refused)
+        return all.map { it.name }.sorted()
     }
 
     // a file saved with a byte-order mark (Windows' Notepad): the engine's reader wants `<` first
-    private const val BOM = "﻿"
+    private const val BOM = "\uFEFF"
     private const val SHOWN = 5
 
     /**
@@ -307,7 +315,7 @@ object ThemePackFiles {
         var old: File? = null
         var done = false
         try {
-            temp.mkdirs() || throw IOException("cannot make ${temp.name}")
+            need(temp.mkdirs(), "cannot make ${temp.name}")
             copy(File(staged.from, THEME_XML), File(temp, THEME_XML))
             staged.files.forEach { copy(File(staged.from, it), File(temp, it)) }
             if (staged.layouts.isNotEmpty()) {
@@ -318,12 +326,10 @@ object ThemePackFiles {
             sync(temp)
             if (target.exists()) {
                 old = File(saving, UUID.randomUUID().toString())
-                if (!target.renameTo(old)) throw IOException("cannot move ${target.name} aside")
+                need(target.renameTo(old), "cannot move ${target.name} aside")
             }
-            if (!temp.renameTo(target)) {
-                old?.renameTo(target)
-                throw IOException("cannot put ${target.name} in place")
-            }
+            if (!temp.renameTo(target)) old?.renameTo(target)
+            need(target.exists() && !temp.exists(), "cannot put ${target.name} in place")
             sync(root)
             done = true
         } finally {
@@ -331,6 +337,10 @@ object ThemePackFiles {
             old?.deleteRecursively()
         }
         return versions(staged.theme, staged.name, target, staged.source)
+    }
+
+    private fun need(ok: Boolean, what: String) {
+        if (!ok) throw IOException(what)
     }
 
     private fun copy(from: File, to: File) {
