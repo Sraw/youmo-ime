@@ -111,6 +111,8 @@ class KeyboardPerfBaselineTest {
             if ("press" in only) pressFeedback()
             if ("popup" in only) popupSlide()
             if ("rebuild" in only) rebuilds()
+            if ("anim" in only || "idle" in only) idleRows()
+            if ("anim" in only) animRowsNotYet()
             return
         }
         memory("no keyboard shown yet")
@@ -127,6 +129,7 @@ class KeyboardPerfBaselineTest {
         rebuilds()
         shiftWithLowerFaces()
         popupSlide()
+        idleRows()
         hideKeyboard()
         memory("after the runs (handwriting's models loaded), hidden")
         showKeyboard()
@@ -419,10 +422,13 @@ class KeyboardPerfBaselineTest {
             val single = mutableListOf<KeyboardFrames.Sample>()
             val run = mutableListOf<KeyboardFrames.Sample>()
             val runWorst = mutableListOf<Double>()
+            val runFrames = mutableListOf<KeyboardFrames.Frame>()
             repeat(warmUp + runs) { i ->
                 val one = presses(marks, listOf(at.getValue('a')), gapMs = HOLD_MS * 2)
                 endTyping(space)
+                val from = System.nanoTime()
                 val ten = presses(marks, letters.map(at::getValue), gapMs = FAST_GAP_MS)
+                if (i >= warmUp) runFrames += frames.between(from, System.nanoTime())
                 endTyping(space)
                 if (i >= warmUp) {
                     single += one
@@ -433,6 +439,8 @@ class KeyboardPerfBaselineTest {
             row("press", "single key", single)
             row("press", "10-key run, every key", run)
             log("press\t10-key run, slowest key of a run\t${Stats(runWorst)}")
+            // every frame of the runs (press and release), FrameTimingMetric's way: the reference for A1's
+            log("frames\t10-key run, every frame\t${frames.summary(runFrames)}")
             // a field that sends (a chat's): Return's label changes with the first key and the commit
             // (发送, then 换行 while composing), the scene made again for each, where a plain field keeps it
             fieldAction(EditorInfo.IME_ACTION_SEND)
@@ -662,6 +670,61 @@ class KeyboardPerfBaselineTest {
         row("popup", "focus moved a choice", moved)
     }
 
+    // ---- 3d. after the keys: the window idle (design 060-render-p3 §4.3)
+
+    /**
+     * Frames and CPU when nothing happens, on the static theme in use: the 2 s after a 10-key run
+     * (`anim | idle after`: no frame expected), the keyboard shown and left alone, and the keyboard
+     * hidden (`anim | hidden`'s reference: no frame, CPU about 0). The process's CPU is its share of a
+     * core over the wall time ([ProcessCpu]).
+     */
+    private fun idleRows() {
+        fresh()
+        val letters = "nihaoshiji"
+        val at = letters.toSet().associateWith { keyAt(onKeyboard().text("$it")) }
+        val space = keyAt(onKeyboard().res(imePkg, "button_space"))
+        val marks = onMain { DownMarks(service.window.window!!.callback, frames).also { service.window.window!!.callback = it } }
+        val after = mutableListOf<Int>()
+        try {
+            repeat(warmUp + runs) { i ->
+                presses(marks, letters.map(at::getValue), gapMs = FAST_GAP_MS)
+                // the release's frame and what follows it a little after the last key, then 2 s counted
+                SystemClock.sleep(IDLE_LEAD_MS)
+                val from = System.nanoTime()
+                SystemClock.sleep(IDLE_AFTER_MS)
+                if (i >= warmUp) after += frames.between(from, System.nanoTime()).size
+                endTyping(space)
+            }
+        } finally {
+            onMain { service.window.window!!.callback = marks.original }
+        }
+        log("anim\tidle after\tframes in 2 s ${Stats(after.map { it.toDouble() })} (median / p90)\tmax ${after.maxOrNull()}\tstatic theme")
+        idle("shown, static theme", IDLE_SHOWN_MS)
+        hideKeyboard()
+        idle("hidden, static theme", IDLE_HIDDEN_MS)
+        showKeyboard()
+    }
+
+    private fun idle(label: String, ms: Long) {
+        settle()
+        val cpu = ProcessCpu.ms()
+        val from = System.nanoTime()
+        SystemClock.sleep(ms)
+        val to = System.nanoTime()
+        val used = ProcessCpu.ms() - cpu
+        val count = frames.between(from, to).size
+        log("anim\t$label\t${ms / 1000} s\tframes $count\tprocess cpu %.2f%% of a core".format(Locale.ROOT, 100 * used / ((to - from) / NANOS_A_MS)))
+    }
+
+    // the §4.3 rows that need motion in the engine (A1-A4): told, not measured
+    private fun animRowsNotYet() {
+        for ((row, stage) in listOf(
+            "release fade" to "A1", "press scale" to "A1", "shift transition" to "A1", "switch off" to "A1", "power save" to "A1",
+            "popup appear" to "A2", "ripple image" to "A3", "particles" to "A3",
+            "picture idle" to "A4", "picture + press" to "A4",
+        )) log("anim\t$row\tnot yet ($stage)")
+    }
+
     // ---- 4. memory
 
     private fun memory(label: String) {
@@ -772,6 +835,10 @@ class KeyboardPerfBaselineTest {
         const val GC_WAIT_MS = 500L
         const val MEMORY_SAMPLES = 3
         const val SCREENSHOT_WAIT_MS = 1_000L
+        const val IDLE_LEAD_MS = 300L
+        const val IDLE_AFTER_MS = 2_000L
+        const val IDLE_SHOWN_MS = 10_000L
+        const val IDLE_HIDDEN_MS = 10_000L
         const val SCREENSHOT = "/data/local/tmp/keyboard-perf-picture.png"
 
         val instrumentation = InstrumentationRegistry.getInstrumentation()!!
