@@ -164,8 +164,8 @@ class TextKeyboard(
     private val showLangSwitchKey = AppPrefs.getInstance().keyboard.showLangSwitchKey
 
     @Keep
-    private val showLangSwitchKeyListener = ManagedPreference.OnChangeListener<Boolean> { _, v ->
-        updateLangSwitchKey(v)
+    private val showLangSwitchKeyListener = ManagedPreference.OnChangeListener<Boolean> { _, _ ->
+        updateLangSwitchKey()
     }
 
     private val keepLettersUppercase by AppPrefs.getInstance().keyboard.keepLettersUppercase
@@ -206,7 +206,7 @@ class TextKeyboard(
         // hidden until an input method says it types on it: shown, every one's A row had an 11th key
         // at a cold start, before fcitx reported the first
         showSemicolonKey()
-        updateLangSwitchKey(showLangSwitchKey.getValue())
+        updateLangSwitchKey()
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
         popupOverridesPref.registerOnChangeListener(popupOverridesListener)
         showLookUpKey()
@@ -552,7 +552,7 @@ class TextKeyboard(
         canvas?.invalidateScene()
     }
 
-    private fun updateLangSwitchKey(@Suppress("UNUSED_PARAMETER") visible: Boolean) {
+    private fun updateLangSwitchKey() {
         canvas?.invalidateScene()
     }
 
