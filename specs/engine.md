@@ -550,10 +550,11 @@ setting either: it reads the codes.
   least against. `lean` stays the layout's (`Key.leans`; `lean="off"` sends the code alone).
   Typed in pinyin by its own session `PINYIN_KEYS_OWN` (`engine-pinyin#keysOwn`; `KeyboardPair.pinyinKeyed`
   routes `CUSTOM_BLOCK` and `PLACES` to it): a `T9Segmenter` over `EngineSettings.ownKeyboard` (the
-  groups the app tells, `ownKeys`, rows kept, so a change of rows makes the sessions anew), no
+  groups the app tells, `ownKeys`, rows kept, so a change of rows makes it anew; a change of `ownKeys` alone
+  drops that session alone, `KeyboardPair.dropKeyed`, the field's last context told the new one), no
   abbreviations, `spell = true`, in `ForgetsInTables`, its letters `inUse` as it is made; learned under
   `qk:<tag>` (`EnginesOwnKeysTest`). Settings naming no keyboard (none, or groups `problem` refuses):
-  `Engines` swallows those codes, what is shown left as it is, never typed as characters. The learning
+  `Engines` swallows those codes, what is shown left as it is (no `refines` or `picked` carried), never typed as characters. The learning
   report and the learned list show a grouped kind's keys by `Kinds.keysOf` (`qk:` `filedAs`, `spk:` `grouped`).
 
 ### 注音 on the nine keys and on 大千

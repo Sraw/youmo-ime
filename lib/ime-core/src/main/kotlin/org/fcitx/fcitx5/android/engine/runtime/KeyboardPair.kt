@@ -74,6 +74,15 @@ internal class KeyboardPair(
         lastContext = null
     }
 
+    /**
+     * The keyed session [keyed] alone dropped, made again at its next code; the last context kept, told to
+     * it then as to any made later. Its input, if it was the active one, is gone with it: full's is shown.
+     */
+    fun dropKeyed(keyed: String) {
+        made.remove(keyed)
+        if (active == keyed) active = null
+    }
+
     /** As [Keyboard.onEvent]: [payload] goes with the key to the one that takes it. */
     fun onEvent(event: Int, arg: Int, learning: Boolean = true, payload: Action? = null): Snapshot {
         if (event == EngineEvent.RESET) return reset(arg, learning)

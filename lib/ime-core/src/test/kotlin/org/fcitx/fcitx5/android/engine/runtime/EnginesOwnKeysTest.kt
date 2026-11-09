@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -40,7 +41,7 @@ class EnginesOwnKeysTest : EnginesFixture() {
     // the keyboard in use is process-wide (NineKeyLetters.inUse): none of this test's left for the next
     @After
     fun noneInUse() {
-        NineKeyLetters.inUse(NineKeyLetters.G14)
+        NineKeyLetters.clearInUse()
     }
 
     private fun code(group: String, keys: NineKeyLetters = k17) = keys.codes[keys.tag().split(',').indexOf(group)]
@@ -125,10 +126,38 @@ class EnginesOwnKeysTest : EnginesFixture() {
             assertEquals(ni.preedit, out.preedit)
             assertEquals(ni.candidates, out.candidates)
         }
+        // review L7: a pick (space) or a refine the snapshot before had is not the swallowed key's
+        val picked = engines.onEvent(PINYIN, EngineEvent.CHAR, ' '.code)
+        assertTrue(picked.toString(), picked.picked)
+        val after = engines.onEvent(PINYIN, EngineEvent.CHAR, code("bn").code)
+        assertTrue(after.handled)
+        assertEquals("", after.commit)
+        assertFalse(after.picked)
+        assertFalse(after.refines)
         // groups that make no keyboard are none told
         val none = engines(ownKeys = listOf("ab", "cd"))
         assertEquals("", none.onEvent(PINYIN, EngineEvent.CHAR, code("bn").code).commit)
         none.close()
+        engines.close()
+    }
+
+    // review M1: other groups told at the field's first key, after its context: the new session on them knows the
+    // text before the cursor (好 puts 拟 first, as EnginesKeys14Test), and the others keep what they typed
+    @Test
+    fun otherGroupsToldKeepTheTextBeforeTheCursorAndTheOtherSessions() {
+        val engines = engines()
+        // the session on the groups made, then a field whose text before the cursor is 好
+        engines.typeCodes(listOf(code("bn").code))
+        engines.onEvent(PINYIN, EngineEvent.RESET, 0)
+        engines.context(PINYIN, "好")
+        val wubi = engines.type(InputMethodCatalog.WUBI, "vb")
+        val reversed = written.reversed()
+        val other = NineKeyLetters.custom(reversed)
+        engines.settings = engines.settings.copy(ownKeys = reversed)
+        val ni = engines.typeCodes(listOf("bn", "ui").map { code(it, other).code })
+        assertEquals(listOf("拟", "你"), ni.candidates.take(2))
+        // 五笔's input kept: its session not made anew
+        assertEquals(wubi.preedit + "g", engines.type(InputMethodCatalog.WUBI, "g").preedit.replace(" ", ""))
         engines.close()
     }
 

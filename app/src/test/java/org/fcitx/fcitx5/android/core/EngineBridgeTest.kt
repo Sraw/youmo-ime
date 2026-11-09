@@ -618,7 +618,7 @@ class EngineBridgeTest {
                 assertEquals(own, bridge.engines.settings.ownKeys)
             } finally {
                 EngineState.ownKeys = null
-                NineKeyLetters.inUse(NineKeyLetters.G14)
+                NineKeyLetters.clearInUse()
                 bridge.close()
             }
         }
