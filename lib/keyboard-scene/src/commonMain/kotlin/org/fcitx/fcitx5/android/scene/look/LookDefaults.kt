@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
  */
-package org.fcitx.fcitx5.android.input.theme
+package org.fcitx.fcitx5.android.scene.look
 
 /**
  * The look of a theme that sets none but its colours: a built-in one, Monet's, one of a file before

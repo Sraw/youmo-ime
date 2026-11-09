@@ -16,10 +16,10 @@ import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.data.theme.backgroundImage
 import org.fcitx.fcitx5.android.data.theme.deriveCustomBackground
 import org.fcitx.fcitx5.android.engine.assertRows
-import org.fcitx.fcitx5.android.input.theme.KeyLabel
-import org.fcitx.fcitx5.android.input.theme.KeyOverride
-import org.fcitx.fcitx5.android.input.theme.KeyPressed
-import org.fcitx.fcitx5.android.input.theme.LookDefaults
+import org.fcitx.fcitx5.android.scene.look.KeyLabel
+import org.fcitx.fcitx5.android.scene.look.KeyOverride
+import org.fcitx.fcitx5.android.scene.look.KeyPressed
+import org.fcitx.fcitx5.android.scene.look.LookDefaults
 import org.junit.Assert
 import org.junit.Test
 import org.junit.runner.RunWith

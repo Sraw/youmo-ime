@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.theme
 
+import org.fcitx.fcitx5.android.scene.rules.KeyNames as SceneKeyNames
+
 /** A key as a theme names it: [board]/[key], `qwerty/q`; [board] [KeyNames.ALL] for a function key on every board. */
 data class KeyName(val board: String, val key: String) {
     override fun toString() = "$board/$key"
@@ -63,21 +65,12 @@ object KeyNames {
 
     val BOARDS: Set<String> get() = POSITIONS.keys
 
-    private val boardSyntax = Regex("[a-z0-9]+(-[a-z0-9]+)*")
-
     /**
      * [text] read as a name; one not of the form board/key is an error. A board or key this build
-     * does not know reads (a newer app's theme): [isKnown] tells.
+     * does not know reads (a newer app's theme): [isKnown] tells. The engine's check, which a
+     * theme's single keys are held to as they are made (scene.look's `Keys`).
      */
-    fun parse(text: String): KeyName {
-        val slash = text.indexOf('/')
-        require(slash > 0) { "key name \"$text\" is not board/key" }
-        val board = text.substring(0, slash)
-        val key = text.substring(slash + 1)
-        require(board == ALL || boardSyntax.matches(board)) { "key name \"$text\" has a bad board" }
-        require(key.isNotEmpty() && key.none(Char::isWhitespace)) { "key name \"$text\" has a bad key" }
-        return KeyName(board, key)
-    }
+    fun parse(text: String): KeyName = SceneKeyNames.split(text).let { (board, key) -> KeyName(board, key) }
 
     /** The names a key of [board] can have: its places and every role. */
     fun on(board: String): Set<String> = POSITIONS[board].orEmpty().toSet() + ROLES

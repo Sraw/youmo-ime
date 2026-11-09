@@ -12,7 +12,6 @@ import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
-import org.fcitx.fcitx5.android.input.scene.LookTheme
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.TextShadow
 import org.fcitx.fcitx5.android.scene.TextStroke
@@ -21,6 +20,7 @@ import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.getOr
+import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.junit.Assert.assertEquals

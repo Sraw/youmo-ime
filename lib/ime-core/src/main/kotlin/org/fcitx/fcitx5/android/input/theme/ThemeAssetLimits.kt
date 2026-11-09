@@ -4,6 +4,10 @@
  */
 package org.fcitx.fcitx5.android.input.theme
 
+import org.fcitx.fcitx5.android.scene.look.Keys
+import org.fcitx.fcitx5.android.scene.look.NineSlice
+import org.fcitx.fcitx5.android.scene.look.ThemeLook
+
 /**
  * How big a theme may be as it is imported: a zip is counted as it is unpacked and refused at the
  * first entry past a limit (a zip bomb with it), an image by its size read before it is decoded.
@@ -16,9 +20,9 @@ object ThemeAssetLimits {
     const val MAX_FILE_BYTES = 32L * 1024 * 1024
     const val MAX_TOTAL_BYTES = 64L * 1024 * 1024
     const val MAX_PICTURE_SIDE = 4096
-    const val MAX_KEY_IMAGE_SIDE = 1024
+    const val MAX_KEY_IMAGE_SIDE = NineSlice.MAX_SIDE
     const val MAX_KEY_IMAGE_BYTES = 2L * 1024 * 1024
-    const val MAX_OVERRIDES = 400
+    const val MAX_OVERRIDES = Keys.MAX_OVERRIDES
 
     /** A limit passed, and by what. */
     enum class Breach { Entries, FileSize, TotalSize, PictureSide, KeyImageSide, KeyImageSize, Overrides }

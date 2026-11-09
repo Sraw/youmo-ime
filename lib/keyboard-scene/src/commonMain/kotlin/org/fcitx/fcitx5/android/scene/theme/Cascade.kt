@@ -7,8 +7,11 @@ package org.fcitx.fcitx5.android.scene.theme
 /**
  * A theme's styles laid over each other for one target, as CSS would (060-render-v2 §5): every style
  * one of whose selectors matches, the less specific first, ties in the order written; each property
- * the last one's. Property by property, so a key given only a fill by name keeps its kind's pressed
- * look: theme 3.0's KeyStyleResolver (rules B §4) is the case of `board/key` over `*`/role over kind.
+ * the last one's. Property by property, so a key given only a fill by name keeps what else its kind
+ * sets (its colours, its press), but not its kind's pressed face: that is a fill too, of `.kind:pressed`,
+ * which the name's outranks. Theme 3.0's KeyStyleResolver (rules B §4) took a key's pressed face from
+ * its kind where the key had none of its own; LookTheme gives such a key its kind's pressed face by
+ * its name.
  *
  * A key's parts (label, mark…) inherit what text is drawn in from the key ([INHERITED]) where no style
  * of the part sets it: `key.enter { color }` colours its label, not its mark, which `key mark` sets.

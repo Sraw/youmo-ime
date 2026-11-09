@@ -15,7 +15,7 @@ import android.widget.TextView
 import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.input.theme.PressEffect
+import org.fcitx.fcitx5.android.scene.look.PressEffect
 import org.fcitx.fcitx5.android.utils.alpha
 import org.fcitx.fcitx5.android.utils.pressHighlightDrawable
 import org.fcitx.fcitx5.android.utils.rippleDrawable

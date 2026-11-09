@@ -19,6 +19,29 @@ object KeyNames {
     /** The boards' names (`qwerty/q`'s first half). */
     val BOARDS: List<String> = listOf("qwerty", "zhuyin", "nine", "zhuyin-nine", "k14", "k18", "number", "symbols", "handwriting")
 
+    /** The board of a theme's single key that is a function key on every board (`*`/backspace). */
+    const val ALL = "*"
+
+    private val boardSyntax = Regex("[a-z0-9]+(-[a-z0-9]+)*")
+
+    /**
+     * [text] as a theme's single key's name, `board/key` (`qwerty/q`, `*`/backspace): its board and
+     * key; an error where it is not of that form. A board or key this build does not know reads (a
+     * newer app's theme): it is kept, not used.
+     */
+    fun split(text: String): Pair<String, String> {
+        val slash = text.indexOf('/')
+        require(slash > 0) { "key name \"$text\" is not board/key" }
+        val board = text.substring(0, slash)
+        val key = text.substring(slash + 1)
+        require(board == ALL || boardSyntax.matches(board)) { "key name \"$text\" has a bad board" }
+        require(key.isNotEmpty() && key.none(Char::isWhitespace)) { "key name \"$text\" has a bad key" }
+        return board to key
+    }
+
+    /** Whether [key] is a function key's role, which `*`/[key] styles on every board. */
+    fun isRole(key: String): Boolean = key in ROLES
+
     /** The letters the 26 keys are named by. */
     val LETTERS: List<String> = ('a'..'z').map(Char::toString)
 

@@ -8,7 +8,7 @@ import android.content.Context
 import androidx.core.content.edit
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceUi
-import org.fcitx.fcitx5.android.input.theme.LegacyLook
+import org.fcitx.fcitx5.android.scene.look.LegacyLook
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

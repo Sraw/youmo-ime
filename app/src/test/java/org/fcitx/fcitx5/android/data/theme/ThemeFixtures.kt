@@ -5,10 +5,10 @@
 package org.fcitx.fcitx5.android.data.theme
 
 import android.graphics.Rect
-import org.fcitx.fcitx5.android.input.theme.Box
-import org.fcitx.fcitx5.android.input.theme.Crop
-import org.fcitx.fcitx5.android.input.theme.LookDefaults
-import org.fcitx.fcitx5.android.input.theme.Picture
+import org.fcitx.fcitx5.android.scene.look.Box
+import org.fcitx.fcitx5.android.scene.look.Crop
+import org.fcitx.fcitx5.android.scene.look.LookDefaults
+import org.fcitx.fcitx5.android.scene.look.Picture
 
 // the tests' custom themes as the app made them before 3.0 (no editing in the app now): a built-in
 // theme's colours, with or without a picture under the keyboard
