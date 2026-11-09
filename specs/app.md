@@ -1230,7 +1230,11 @@ file too (`SceneBar`, `ScenePanels`: `SceneThemes.of(theme, look)`). `PackDrawGu
 time: one imported again is guarded again) and deletes it once that frame is drawn: at once on a software
 canvas, on a hardware one when a frame is committed (`registerFrameCommitCallback`, its glyphs and pictures
 drawn on the RenderThread; `ViewRootImpl.performDraw` takes the callbacks before it draws, so one registered in
-`onDraw` goes with the next frame, which `postInvalidateOnAnimation` asks for while the mark is pending), only for the pack marked (another view's frame clears nothing). A pack built and
+`onDraw` goes with the next frame, which `postInvalidateOnAnimation` asks for while the mark is pending, at most
+`PackDrawGuard.MAX_ASKED` (3) times a pack a process: a device that calls back no commit draws no more, the mark
+kept till a later frame's), only for the pack marked (another view's frame clears nothing). A window hidden
+before the frame after the first leaves the mark pending till the next show's first commit; a process ended in
+that gap resets the pack falsely. A pack built and
 not drawn (the keyboard made again while hidden, a settings page's sizes) marks nothing, so a process ended
 otherwise resets nothing. Found at the first listing of the packs of a process (`ThemeManager.init`, or the
 first `refreshThemes` once the files are settled: kept till then), the slots
@@ -1249,8 +1253,13 @@ Space or Enter's text, `ThemePackCheck.hidesRequired`), at most 1 MB, `LookTheme
 theme of 400 single keys written as 4.0) styles, 4 fonts, 200 icons (the reader's); its name plain, not
 `.`-led, not ending `#light`/`#dark`, no built-in's file or reference, no 0.5 name
 (`ThemePackFiles.builtinClash`). A 3.0 theme of the user's named by one of its references is replaced by it
-(`Opened.Pack.customs`; finished on the main thread once the pack is listed, `ThemeManager.finishReplacements`
-at `packPlaced`, or at the next start's listing after a kill: the slots keep the name, which then finds the
+(`Opened.Pack.customs`; their names recorded in `noBackupFilesDir/theme-pack-replaces` before the pack is placed,
+the record put back as it was where the place fails; finished on the main thread once the pack is listed, `ThemeManager.finishReplacements`
+at `packPlaced`, or at the next start's listing after a kill, for the recorded names only: a 3.0 theme beside a
+pack of its name no import recorded, as a backup restored over the pack leaves, is kept and found by its name;
+a recorded name no pack lists has its record dropped at a start's listing, not later, as an import may be
+placing it then; the slots written with the change fired once, as the list has the pack, and the copy for before
+the first unlock synced only where a slot named the theme: the slots keep the name, which then finds the
 pack; a theme named `mine` replaced by a pack `mine` of two versions, the slots naming it name its version of
 the same lightness, `mine#dark`, and the copy for before the first unlock is synced; then its json and the files
 no other theme names are deleted, not where the slots were not written: tried again at the next listing, the

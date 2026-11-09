@@ -63,34 +63,50 @@ object ThemeManager {
     val Packs: List<Theme.Pack> get() = packs
 
     /**
-     * The pack [file] took the keyboard down as it was first drawn ([PackDrawGuard]): the settings naming one
-     * of its versions go back to their defaults (a built-in theme), the user told. The pack is kept, to be
-     * deleted or picked again.
-     */
-    /**
-     * The user's 3.0 themes named as a listed pack or one of its versions: ones its import replaces
-     * ([ThemeFilesManager.Opened.Pack.customs]), the replacement finished here, on the main thread once the list
+     * The 3.0 themes a pack's import replaces ([ThemeFilesManager.Opened.Pack.customs], recorded before it was
+     * placed: [ThemeFilesManager.replacing]), the replacement finished here, on the main thread once the list
      * has the pack ([packPlaced]; a kill after the place, at the next start's listing). A slot naming one bare
      * where the pack has two versions (`mine`) names its version of the same lightness (`mine#dark`); one named
-     * as a version keeps the name, which then finds the pack. Then its json and files go. One whose slots were
-     * not written is left, found by its name till the next listing tries again. Whether a slot was renamed.
+     * as a version keeps the name, which then finds the pack. Then its json and files go, and its record. One
+     * whose slots were not written is left, found by its name till the next listing tries again. A 3.0 theme
+     * beside a pack of its name no import recorded (a backup restored over the pack) is left be, as listed.
+     * The slots written quietly ([finishing]): the change fired once, as the list is. A name no pack lists has its
+     * record dropped [atStart] only (the import failed, or a kill before the place): later, an import's place may
+     * be under way. Whether a slot was renamed.
      */
-    private fun finishReplacements(): Boolean {
-        if (!ThemeFilesManager.writable || packs.isEmpty()) return false
+    private fun finishReplacements(atStart: Boolean = false): Boolean {
+        val recorded = ThemeFilesManager.replacing()
+        if (!ThemeFilesManager.writable || recorded.isEmpty()) return false
         var renamed = false
-        customThemes.filter { c -> packs.any { it.name == c.name || it.file == c.name } }.forEach { custom ->
-            val versions = packs.filter { it.name == custom.name || it.file == custom.name }
+        val done = recorded.filterTo(HashSet()) { name ->
+            val custom = customThemes.find { it.name == name }
+            val versions = packs.filter { it.name == name || it.file == name }
+            // gone already, or no pack placed at the start: nothing to finish
+            if (custom == null || (versions.isEmpty() && atStart)) return@filterTo true
+            if (versions.isEmpty()) return@filterTo false
             // named bare, the pack of two versions: its version of the same lightness
-            val to = if (versions.any { it.name == custom.name }) null else (versions.firstOrNull { it.isDark == custom.isDark } ?: versions.first()).name
-            if (to != null && !prefs.renameThemeRefs(custom.name, to)) {
-                Timber.w("Settings naming theme ${custom.name} not written: replaced by its pack at the next listing")
-                return@forEach
+            val to = if (versions.any { it.name == name }) null else (versions.firstOrNull { it.isDark == custom.isDark } ?: versions.first()).name
+            val named = to != null && prefs.namesTheme(name)
+            finishing = true
+            val written = try {
+                !named || prefs.renameThemeRefs(name, to!!)
+            } finally {
+                finishing = false
             }
-            if (to != null) renamed = true
-            if (replacedDeleted(custom)) customThemes.remove(custom)
+            if (!written) Timber.w("Settings naming theme $name not written: replaced by its pack at the next listing")
+            if (named && written) renamed = true
+            written && replacedDeleted(custom).also { if (it) customThemes.remove(custom) }
         }
+        ThemeFilesManager.replaced(done)
         return renamed
     }
+
+    /** The replacements recorded finished as a process's start does: a test's next start. */
+    @VisibleForTesting
+    internal fun finishReplacementsAtStart() = finishReplacements(atStart = true)
+
+    // the slots being written by [finishReplacements]: the change fired once the list is, not with the theme replaced
+    private var finishing = false
 
     private fun replacedDeleted(custom: Theme.Custom): Boolean = try {
         ThemeFilesManager.deleteThemeFiles(custom)
@@ -118,6 +134,11 @@ object ThemeManager {
         packsListed()
     }
 
+    /**
+     * The pack [file] took the keyboard down as it was first drawn ([PackDrawGuard]): the settings naming one
+     * of its versions go back to their defaults (a built-in theme), the user told. The pack is kept, to be
+     * deleted or picked again.
+     */
     @VisibleForTesting
     internal fun packCrashed(file: String) {
         val refs = packs.filter { it.file == file }.map { it.name }.filter { r -> customThemes.none { it.name == r } }
@@ -339,6 +360,8 @@ object ThemeManager {
 
     @Keep
     private val onThemePrefsChange = ManagedPreferenceProvider.OnChangeListener { key ->
+        // a slot a replacement repoints (finishReplacements): the theme found by it changes once the list does
+        if (finishing) return@OnChangeListener
         when (key) {
             in prefs.dayNightModePrefNames -> activeTheme = evaluateActiveTheme()
             // InputView moves the board itself: made anew, the symbols shown would go back to the letters.
@@ -360,7 +383,7 @@ object ThemeManager {
     fun init(configuration: Configuration) {
         isDarkMode = configuration.isDarkMode()
         // the app's start, on the main thread (the toast): before the theme in use is read
-        finishReplacements()
+        finishReplacements(atStart = true)
         packsListed()
         _activeTheme = evaluateActiveTheme()
         settleKeyStyle()

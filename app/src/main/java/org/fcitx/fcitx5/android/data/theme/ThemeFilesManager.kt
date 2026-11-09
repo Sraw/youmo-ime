@@ -444,8 +444,15 @@ object ThemeFilesManager {
                 try {
                     if (!writable) notSettled()
                     // the 3.0 themes it replaces ([customs]) are, once the pack is listed (ThemeManager.packPlaced,
-                    // or the next start's listing after a kill: ThemeManager.finishReplacements), on the main thread
-                    ThemePackFiles.place(dir, staged)
+                    // or the next start's listing after a kill: ThemeManager.finishReplacements), on the main thread;
+                    // recorded first, so that one finishes only what an import began
+                    val before = replacing()
+                    val names = customs.map { it.name }.toSet() - before
+                    if (names.isNotEmpty()) record(before + names)
+                    val placed = runCatching { ThemePackFiles.place(dir, staged) }
+                    // not placed: nothing replaced, the record as it was
+                    if (placed.isFailure) replaced(names)
+                    placed.getOrThrow()
                 } finally {
                     discard()
                 }
@@ -455,6 +462,28 @@ object ThemeFilesManager {
                 unpacked.deleteRecursively()
             }
         }
+    }
+
+    /** Where the names of the 3.0 themes a pack's import replaces are kept till done: this phone's, not backed up. */
+    @VisibleForTesting
+    internal var replacingFile: () -> File = { File(appContext.noBackupFilesDir, "theme-pack-replaces") }
+
+    /** The 3.0 themes a pack's import replaces, recorded before it was placed and not finished yet (ThemeManager). */
+    fun replacing(): Set<String> = runCatching { replacingFile().readLines().filter { it.isNotEmpty() }.toSet() }.getOrDefault(emptySet())
+
+    /** [names] finished (or nothing to finish): their record gone. */
+    fun replaced(names: Set<String>) {
+        if (names.isEmpty()) return
+        val left = replacing() - names
+        if (left.isEmpty()) replacingFile().delete() else record(left)
+    }
+
+    // written whole aside, then renamed over the record: a kill leaves the old record or the new, not half of one
+    private fun record(names: Set<String>) {
+        val file = replacingFile()
+        val temp = File(file.parentFile, file.name + ".new")
+        temp.writeText(names.joinToString("\n", postfix = "\n"))
+        if (!temp.renameTo(file)) throw IOException("cannot record the themes replaced")
     }
 
     // where a pack is unpacked till the user takes it or not: the cache's, what a kill left cleared at the first open

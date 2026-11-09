@@ -75,6 +75,7 @@ class ThemePackImportTest {
         dir.deleteRecursively()
         dir.mkdirs()
         ThemeFilesManager.probe = PackProbe
+        ThemeFilesManager.replacingFile().delete()
         // the theme in use the normal mode's, not the day's or night's
         ThemeManager.prefs.followSystemDayNightTheme.setValue(false)
         ThemeFilesManager.listThemes()
@@ -374,10 +375,19 @@ class ThemePackImportTest {
         val pack = opened(sample())
         assertEquals(listOf("mine"), pack.customs.map { it.name })
         val versions = pack.commit().getOrThrow()
-        // placed, not listed yet (the list page's packPlaced to come, on the main thread): the theme still there, found
+        // placed, not listed yet (the list page's packPlaced to come, on the main thread): the theme still there, found,
+        // the replacement recorded
         assertTrue(File(dir, "mine.json").exists())
         assertTrue(ThemeManager.getTheme("mine") is Theme.Custom)
+        assertEquals(setOf("mine"), ThemeFilesManager.replacing())
+        // the keyboard told once, of the pack's version (not first of the theme it replaces, whose files go)
+        val told = mutableListOf<Theme>()
+        val listener = ThemeManager.OnThemeChangeListener { told += it }
+        ThemeManager.addOnChangedListener(listener)
         ThemeManager.packPlaced(versions[0].file)
+        ThemeManager.removeOnChangedListener(listener)
+        assertEquals(listOf(versions.single { it.isDark }), told)
+        assertEquals(emptySet<String>(), ThemeFilesManager.replacing())
         // its json gone; the setting naming it names the pack's dark version, not the default theme, the copy for
         // before the first unlock too
         assertFalse(File(dir, "mine.json").exists())
@@ -401,6 +411,50 @@ class ThemePackImportTest {
         assertEquals("mine#dark", ThemeManager.prefs.normalModeTheme.getValue().name)
         assertTrue(ThemeManager.getAllThemes().none { it is Theme.Custom && it.name == "mine" })
         assertEquals(listOf("mine#light", "mine#dark"), ThemeManager.Packs.map { it.name })
+    }
+
+    // D1: a 3.0 theme beside a pack of its name no import replaced (an older backup restored over the phone's pack):
+    // left be as listed, its json, its picture and the slot naming it kept (it is found by the name, as before)
+    @Test
+    fun aTheme30RestoredBesideAPackOfItsNameIsLeftBe() {
+        opened(sample()).commit().getOrThrow()
+        ThemeManager.refreshThemes()
+        assertEquals(emptySet<String>(), ThemeFilesManager.replacing())
+        File(dir, "own.png").writeText("10x10")
+        val own = TestThemes.TransparentDark.deriveCustomNoBackground("mine")
+        val picture = Picture(File(dir, "own.png").path, Crop(File(dir, "own.png").path, null, 0), null, 70, 0)
+        ThemeFilesManager.saveThemeFiles(own.copy(look = own.look.copy(picture = picture)))
+        ThemeManager.refreshThemes()
+        ThemeManager.setNormalModeTheme(ThemeManager.getTheme("mine")!!)
+        ThemeManager.refreshThemes()
+        ThemeManager.finishReplacementsAtStart()
+        assertTrue(File(dir, "mine.json").exists())
+        assertTrue(File(dir, "own.png").exists())
+        assertEquals("mine", ThemeManager.prefs.normalModeTheme.getValue().name)
+        assertTrue(ThemeManager.getTheme("mine") is Theme.Custom)
+        assertEquals(listOf("mine#light", "mine#dark"), ThemeManager.Packs.map { it.name })
+    }
+
+    // a replacement not placed: the 3.0 theme kept, its record gone (the import failed) or dropped at the next start
+    // (a kill before the place), not while an import may be placing it
+    @Test
+    fun aReplacementNotPlacedKeepsTheTheme30() {
+        ThemeFilesManager.saveThemeFiles(TestThemes.TransparentDark.deriveCustomNoBackground("mine"))
+        ThemeManager.refreshThemes()
+        ThemePackFiles.beforeInPlace = { throw java.io.IOException("full") }
+        assertTrue(opened(sample()).commit().isFailure)
+        ThemePackFiles.beforeInPlace = null
+        assertEquals(emptySet<String>(), ThemeFilesManager.replacing())
+        ThemeManager.refreshThemes()
+        assertTrue(File(dir, "mine.json").exists())
+        ThemeFilesManager.replacingFile().writeText("mine\n")
+        ThemeManager.refreshThemes()
+        assertEquals(setOf("mine"), ThemeFilesManager.replacing())
+        assertTrue(File(dir, "mine.json").exists())
+        ThemeManager.finishReplacementsAtStart()
+        assertEquals(emptySet<String>(), ThemeFilesManager.replacing())
+        assertTrue(File(dir, "mine.json").exists())
+        assertTrue(ThemeManager.getTheme("mine") is Theme.Custom)
     }
 
     @Test
