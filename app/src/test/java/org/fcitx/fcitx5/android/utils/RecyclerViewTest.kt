@@ -45,8 +45,16 @@ class RecyclerViewTest {
         assertEquals(0, list.asked)
         root.addView(list)
         assertTrue("asked once attached", list.asked > 0)
-        val insets = WindowInsetsCompat.Builder().setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, 0, 0, 48)).build()
-        ViewCompat.dispatchApplyWindowInsets(list, insets)
+        // from the window's root, as the system gives them: below API 30 compat reads the navigation bar off the
+        // system window insets cut to the stable ones, so both are set (a navigation bar alone is 0 at SDK 29)
+        val nav = Insets.of(0, 0, 0, 48)
+        @Suppress("DEPRECATION")
+        val insets = WindowInsetsCompat.Builder()
+            .setInsets(WindowInsetsCompat.Type.navigationBars(), nav)
+            .setSystemWindowInsets(nav)
+            .setStableInsets(nav)
+            .build()
+        activity.window.decorView.dispatchApplyWindowInsets(insets.toWindowInsets())
         assertEquals(48, list.paddingBottom)
         assertEquals(false, list.clipToPadding)
     }
