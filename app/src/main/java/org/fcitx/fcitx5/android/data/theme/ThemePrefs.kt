@@ -87,18 +87,28 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         )
     }
 
+    /** [migrateSizeFollow] done: copied with the managed preferences. */
+    val sizeFollowMigrated: Boolean get() = sharedPreferences.getBoolean(SIZES_FOLLOW_MIGRATED, false)
+
     /**
      * Once (060-render-p3 T5): each size an older version had at its default follows the theme, one
      * set otherwise stays as it is, not following; [SIZES_FOLLOW_MIGRATED] marks it done. A backup of
      * an older version brought back has no mark, its sizes their own: done again at the next start.
-     * The mark is a key of no preference, so the hidden settings' reset leaves it.
+     * The mark is a key of no preference, so the hidden settings' reset leaves it; it is copied for
+     * before the first unlock (ThemeManager.syncToDeviceEncryptedStorage). Done too where a 跟随主题 is
+     * stored: only this version writes one, so a copy of before the mark was copied is not moved again
+     * (a default level picked there would follow the theme). A number not an int (a damaged file) is
+     * taken as set: kept, not following.
      */
     fun migrateSizeFollow() {
-        if (sharedPreferences.getBoolean(SIZES_FOLLOW_MIGRATED, false)) return
+        if (sizeFollowMigrated) return
         val lists = managedPreferencesUi.filterIsInstance<ManagedPreferenceUi.Levels>().filter { it.follow != null }
+        val stored = lists.any { sharedPreferences.contains(it.follow!!.first) }
         sharedPreferences.edit {
-            lists.forEach { list ->
-                val set = list.keys.any { (name, default) -> sharedPreferences.getInt(name, default) != default }
+            if (!stored) lists.forEach { list ->
+                val set = list.keys.any { (name, default) ->
+                    runCatching { sharedPreferences.getInt(name, default) }.getOrNull() != default
+                }
                 putBoolean(list.follow!!.first, !set)
             }
             putBoolean(SIZES_FOLLOW_MIGRATED, true)

@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.data.theme
 
 import android.content.Context
 import androidx.core.content.edit
+import androidx.preference.PreferenceManager
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -86,6 +87,46 @@ class ThemePrefsMigrationTest {
         sp.edit(commit = true) { putBoolean("keyboard_bottom_padding_follow_theme", false) }
         ThemePrefs(sp).migrateSizeFollow()
         assertEquals(listOf(false, true, false), following())
+    }
+
+    @Test
+    fun beforeTheFirstUnlockADefaultLevelPickedIsKept() {
+        // the device's copy (ThemeManager.syncToDeviceEncryptedStorage) of a version that did not copy the
+        // mark: 标准 picked, at the defaults' numbers, not following; the start before the unlock reads it
+        sp.edit(commit = true) {
+            putBoolean("keyboard_height_follow_theme", false)
+            putInt("keyboard_height_percent", 30)
+            putInt("keyboard_height_percent_landscape", 49)
+            putBoolean("keyboard_side_padding_follow_theme", true)
+            putBoolean("keyboard_bottom_padding_follow_theme", true)
+        }
+        ThemePrefs(sp).migrateSizeFollow()
+        assertEquals(listOf(false, true, true), following())
+        assertTrue(sp.getBoolean(ThemePrefs.SIZES_FOLLOW_MIGRATED, false))
+    }
+
+    @Test
+    fun theMarkIsCopiedForBeforeTheFirstUnlock() {
+        // the app's own, moved as it started
+        assertTrue(ThemeManager.prefs.sizeFollowMigrated)
+        val app = RuntimeEnvironment.getApplication()
+        val device = PreferenceManager.getDefaultSharedPreferences(app.createDeviceProtectedStorageContext())
+        device.edit(commit = true) { remove(ThemePrefs.SIZES_FOLLOW_MIGRATED) }
+        ThemeManager.syncToDeviceEncryptedStorage()
+        assertTrue(device.getBoolean(ThemePrefs.SIZES_FOLLOW_MIGRATED, false))
+    }
+
+    @Test
+    fun aNumberNotAnIntIsTakenAsSet() {
+        // a damaged file's: no crash at the start, the height kept as it is, not following
+        sp.edit(commit = true) {
+            putString("keyboard_height_percent", "38")
+            putBoolean("keyboard_side_padding_landscape", true)
+        }
+        ThemePrefs(sp).migrateSizeFollow()
+        assertEquals(listOf(false, false, true), following())
+        assertEquals("38", sp.getString("keyboard_height_percent", null))
+        assertTrue(sp.getBoolean(ThemePrefs.SIZES_FOLLOW_MIGRATED, false))
     }
 
     @Test

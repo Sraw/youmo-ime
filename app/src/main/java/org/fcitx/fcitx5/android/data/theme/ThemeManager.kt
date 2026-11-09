@@ -269,6 +269,8 @@ object ThemeManager {
             val monet = prefs.monetLook()
             if (monet != null) putString(ThemeLookMigration.MONET_KEY, ThemeLookMigration.encode(monet))
             else remove(ThemeLookMigration.MONET_KEY)
+            // the sizes' 跟随主题 moved (no managed preference): before the first unlock not moved again
+            putBoolean(ThemePrefs.SIZES_FOLLOW_MIGRATED, prefs.sizeFollowMigrated)
         }
     }
 
