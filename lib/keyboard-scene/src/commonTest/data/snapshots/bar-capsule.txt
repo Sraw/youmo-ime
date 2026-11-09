@@ -1,0 +1,64 @@
+scene 1080x110 no-preview no-popups
+base
+  fill rect(0,0,1080,110) #ffeceff1
+key candidate/0 kind=candidate a11y="幽默"
+  bounds 0,0,224,110
+  shape rect(5,16,219,94 r=39,39,39,39)
+  hit rect(0,0,224,110)
+  anchor 112,55 up 0,-1
+  text label="幽默"
+  normal
+    fill rect(5,16,219,94 r=39,39,39,39) #ff5cb5ab
+    text "1 " 24,75.63 system 400 55 #ffffffff
+    text "幽默" 90,75.63 system 400 55 #ffffffff
+  pressed
+    +3 fill rect(5,16,219,94 r=39,39,39,39) #1f000000
+key candidate/1 kind=candidate a11y="输入法"
+  bounds 237,0,516,110
+  shape rect(242,16,511,94 r=39,39,39,39)
+  hit rect(237,0,516,110)
+  anchor 376.5,55 up 0,-1
+  text label="输入法"
+  normal
+    fill rect(242,16,511,94 r=39,39,39,39) #ffffffff
+    text "2 " 261,75.63 system 400 55 #ff37474f
+    text "输入法" 327,75.63 system 400 55 #ff37474f
+  pressed
+    +3 fill rect(242,16,511,94 r=39,39,39,39) #1f000000
+key candidate/2 kind=candidate a11y="有"
+  bounds 529,0,698,110
+  shape rect(534,16,693,94 r=39,39,39,39)
+  hit rect(529,0,698,110)
+  anchor 613.5,55 up 0,-1
+  text label="有"
+  normal
+    fill rect(534,16,693,94 r=39,39,39,39) #ffffffff
+    text "3 " 553,75.63 system 400 55 #ff37474f
+    text "有" 619,75.63 system 400 55 #ff37474f
+  pressed
+    +3 fill rect(534,16,693,94 r=39,39,39,39) #1f000000
+key candidate/3 kind=candidate a11y="油墨"
+  bounds 711,0,1166,110
+  shape rect(716,16,1161,94 r=39,39,39,39)
+  hit rect(711,0,1166,110)
+  anchor 938.5,55 up 0,-1
+  text label="油墨"
+  normal
+    fill rect(716,16,1161,94 r=39,39,39,39) #ffffffff
+    text "4 " 735,75.63 system 400 55 #ff37474f
+    text "油墨" 801,75.63 system 400 55 #ff37474f
+    text " yóu mò" 911,75.63 system 400 55 #ff1565c0
+  pressed
+    +4 fill rect(716,16,1161,94 r=39,39,39,39) #1f000000
+key candidate/4 kind=candidate a11y="又"
+  bounds 1179,0,1348,110
+  shape rect(1184,16,1343,94 r=39,39,39,39)
+  hit rect(1179,0,1348,110)
+  anchor 1263.5,55 up 0,-1
+  text label="又"
+  normal
+    fill rect(1184,16,1343,94 r=39,39,39,39) #ffffffff
+    text "5 " 1203,75.63 system 400 55 #ff37474f
+    text "又" 1269,75.63 system 400 55 #ff37474f
+  pressed
+    +3 fill rect(1184,16,1343,94 r=39,39,39,39) #1f000000

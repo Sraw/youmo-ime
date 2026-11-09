@@ -285,7 +285,10 @@ object ThemeReader {
         named(values, a, colors, fonts)
         selectors?.let { readElsewhere(it, values.keys, el.line, p) }
         reserved += selectors?.let { shapes(it, values, el.line, p) } ?: 0
-        selectors?.let { unreadByWindow(it, values.keys, el.line, p) }
+        selectors?.let {
+            unreadByWindow(it, values.keys, el.line, p)
+            unreadByBar(it, values, el.line, p)
+        }
         if (values.isEmpty() && reserved == 0) a.problem("a style that sets nothing")
         return selectors?.let { Style(it, values, order, el.line) }
     }
@@ -393,6 +396,51 @@ object ThemeReader {
         "split-gap" to listOf("fill", "radius"),
         NAVBAR to listOf("color"),
     )
+
+    // a property the bar or a candidate has no use for (`candidate size=`, `candidates-divider radius=`), or none in
+    // that state or part: warned of, as the window's are; the bar's base of a gradient or an image, which the
+    // bar's view does not draw (only a colour or the picture)
+    private fun unreadByBar(selectors: List<Selector>, values: Map<String, Value>, line: Int, p: Problems) {
+        val others = selectors.map { it.widget }.distinct().filter { it !in Selector.BAR_WIDGETS && it !in Selector.RESERVED_WIDGETS && it !in WINDOW_READS }
+        for (w in others) CANDIDATE_ONLY.filter { it in values }.forEach { p.warn(line, "$it= on $w does nothing: only a candidate has it") }
+        for (s in selectors.filter { it.widget in Selector.BAR_WIDGETS }.distinctBy { Triple(it.widget, it.states, it.part) }) {
+            val on = s.widget + s.states.sorted().joinToString("") { ":$it" } + (s.part?.let { " $it" } ?: "")
+            val reads = barReads(s.widget, s.states, s.part)
+            val said = if (reads.isEmpty()) "it reads nothing ${if (s.part != null) "of that part " else ""}in that state" else "it reads ${reads.joinToString(" ")}"
+            values.keys.filter { it !in reads }.forEach { p.warn(line, "$it= on $on does nothing: $said") }
+            val fill = (values["fill"] as? Value.OfFill)?.fill
+            if ("fill" !in reads || fill == null || fill is Fill.Solid) continue
+            if (s.widget != "bar") {
+                p.warn(line, "fill= on $on is a colour: a gradient, an image or the picture is not drawn there, none drawn")
+            } else if (fill !is Fill.Picture) {
+                p.warn(line, "fill= on bar is a colour or picture(…): a gradient or an image is not drawn there, none drawn")
+            }
+        }
+    }
+
+    // what each of the bar's widgets reads (060-render-p3 T6a, engine/BarLook) in [states], of [part]: a
+    // candidate's layout and pressed colour in no state, its colours and font when first or selected too; a
+    // part's colour alone (a candidate is one line of text: its number, words and comment in one font)
+    private fun barReads(widget: String, states: Set<String>, part: String?): List<String> = when {
+        widget != "candidate" -> if (states.isEmpty()) BAR_READS.getValue(widget) else emptyList()
+        part != null -> if ("pressed" in states) emptyList() else listOf("color")
+        states.isEmpty() -> BAR_READS.getValue(widget)
+        states == setOf("pressed") -> listOf("overlay")
+        "pressed" !in states -> CANDIDATE_STATE_READS
+        else -> emptyList()
+    }
+
+    private val BAR_READS = mapOf(
+        "bar" to listOf("fill"),
+        "candidate" to listOf("fill", "radius", "inset", "padding", "gap", "color", "font", "weight", "label-style"),
+        "candidates-divider" to listOf("fill"),
+        "candidates-panel" to listOf("fill"),
+    )
+
+    private val CANDIDATE_STATE_READS = listOf("fill", "color", "font", "weight")
+
+    // T6a's properties no widget but a candidate has
+    private val CANDIDATE_ONLY = listOf("gap", "label-style")
 
     // T4b's that do nothing where they are set, which a warning says: the bubble's shape, tail, size and
     // offset on anything but the bubble, a cap's depth on anything but a key, a path or an inner shadow on

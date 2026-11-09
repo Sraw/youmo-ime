@@ -78,6 +78,12 @@
   <style select="split-gap" fill="@keyboard" radius="4dp"/>
   <style select="navbar" color="follow"/>
   <style select="@landscape navbar" color="#654321"/>
+  <style select="candidate" fill="@key" radius="50%" inset="4dp 2dp" padding="0 12.5dp" gap="6dp" label-style="dot" font="system" weight="700"/>
+  <style select="candidate:first" fill="#ffff00" color="#000000"/>
+  <style select="candidate:selected label, candidate comment" color="@altKeyText"/>
+  <style select="candidate:pressed" overlay="#30000000"/>
+  <style select="candidates-divider" fill="transparent"/>
+  <style select="@dark candidates-panel" fill="@bar"/>
   <icon name="z-icon" src="z.png"/>
   <icon name="a-icon" src="a.svg"/>
 </theme>
