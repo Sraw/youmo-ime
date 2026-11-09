@@ -21,6 +21,7 @@ import com.google.android.flexbox.FlexboxLayoutManager
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.LayoutHint
+import org.fcitx.fcitx5.android.input.candidates.SceneBar
 import splitties.views.dsl.core.Ui
 import splitties.views.dsl.recyclerview.recyclerView
 
@@ -35,6 +36,9 @@ class PagedCandidatesUi(
 ) : Ui {
 
     private var data = HostEvent.Paged.EMPTY
+
+    // the theme's candidates (T6a), worked out once for every holder
+    private val bar = SceneBar.of(ctx, theme)
 
     private var isVertical = false
 
@@ -58,7 +62,7 @@ class PagedCandidatesUi(
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): UiHolder {
             return when (viewType) {
-                0 -> UiHolder.Candidate(LabeledCandidateItemUi(ctx, theme, setupTextView))
+                0 -> UiHolder.Candidate(LabeledCandidateItemUi(ctx, theme, setupTextView, bar))
                 else -> UiHolder.Pagination(PaginationUi(ctx, theme)).apply {
                     ui.prevIcon.setOnClickListener {
                         onPrevPage.invoke()

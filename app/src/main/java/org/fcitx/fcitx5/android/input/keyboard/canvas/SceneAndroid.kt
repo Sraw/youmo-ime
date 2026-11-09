@@ -29,11 +29,20 @@ import timber.log.Timber
 
 /**
  * A scene's text in [look]'s fonts: `system` the system's, [LookTheme.KEY_FONT] the theme's key font,
- * at the weight asked (ThemeAssets); null the default one.
+ * [LookTheme.CANDIDATE_FONT] its candidates' (060-render-p3 T6a), at the weight asked (ThemeAssets); null
+ * the default one. Another `<font>` a 4.0 theme names is the system's till its files are read (T8a).
  */
 class SceneFonts(private val look: ThemeLook) {
-    fun typeface(font: String, weight: Int): Typeface? =
-        ThemeAssets.typeface(look, if (font == LookTheme.KEY_FONT) look.text.keyFont else null, weight)
+    fun typeface(font: String, weight: Int): Typeface? = ThemeAssets.typeface(look, path(look, font), weight)
+
+    companion object {
+        /** The file of [font] in [look]; null, the system's. */
+        fun path(look: ThemeLook, font: String): String? = when (font) {
+            LookTheme.KEY_FONT -> look.text.keyFont
+            LookTheme.CANDIDATE_FONT -> look.text.candidateFont
+            else -> null
+        }
+    }
 }
 
 /**

@@ -94,5 +94,7 @@ class LabeledCandidateItemUi(
                 }
             }
         }
+        // a theme's dot is not read out, only the candidate (fcitx's own label is, as ever)
+        root.contentDescription = if (bar.labelStyle == BarLook.LabelStyle.Dot) root.text.subSequence(label.length, root.text.length) else null
     }
 }

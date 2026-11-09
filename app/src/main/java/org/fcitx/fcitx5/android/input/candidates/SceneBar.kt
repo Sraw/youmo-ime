@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.ThemePictureDrawable
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneWindow
 import org.fcitx.fcitx5.android.input.theme.ThemeColors
@@ -52,9 +53,11 @@ object SceneBar {
     fun plain(theme: Theme): BarLook {
         val look = ThemeManager.shownLook(theme)
         val press = Argb(theme.keyPressHighlightColor)
-        val plain = CandidateLook(null, press, Argb(theme.candidateTextColor), Argb(theme.candidateLabelColor), Argb(theme.candidateCommentColor), null, null)
+        // the candidates' font as LookTheme writes it into the theme
+        val font = LookTheme.candidateFont(look.text)
+        val plain = CandidateLook(null, press, Argb(theme.candidateTextColor), Argb(theme.candidateLabelColor), Argb(theme.candidateCommentColor), font?.first, font?.second)
         val active = Argb(theme.genericActiveForegroundColor)
-        val selected = CandidateLook(Argb(theme.genericActiveBackgroundColor), press, active, active, active, null, null)
+        val selected = CandidateLook(Argb(theme.genericActiveBackgroundColor), press, active, active, active, font?.first, font?.second)
         val bar = Argb(look.palette.barColor)
         return BarLook(
             base = when (val b = look.bar) {
@@ -101,18 +104,14 @@ object SceneBar {
     }
 
     /**
-     * A candidate's font: the theme's (`key`: the look's key font; another name, the system's, till a theme's
-     * own fonts are read), at its weight; none set, the look's candidate font as ever.
+     * A candidate's font: the theme's, its name read as the keys' are (`SceneFonts`: `candidate` the look's
+     * candidate font, `key` its key font, another the system's till a theme's own fonts are read, T8a), at
+     * its weight; none set, the system's at 400. A 3.0 look's candidate font is its theme's `candidate`
+     * style (LookTheme), so it is drawn as ever. Null: the default typeface.
      */
     fun typeface(theme: Theme, c: CandidateLook): Typeface? {
         val look = ThemeManager.shownLook(theme)
-        if (c.font == null && c.weight == null) return ThemeAssets.candidateTypeface(look)
-        val path = when (c.font) {
-            null -> look.text.candidateFont
-            LookTheme.KEY_FONT -> look.text.keyFont
-            else -> null
-        }
-        return ThemeAssets.typeface(look, path, c.weight ?: if (c.font == null) look.text.candidateWeight else NORMAL) ?: Typeface.DEFAULT
+        return ThemeAssets.typeface(look, SceneFonts.path(look, c.font ?: SYSTEM), c.weight ?: NORMAL)
     }
 
     /** Room left and right of a candidate's text, px: the theme's, else the app's of 候选字号. */
@@ -136,6 +135,7 @@ object SceneBar {
 
     private const val CORNERS = 4
     private const val NORMAL = 400
+    private const val SYSTEM = "system"
     private val SQUARE = Radius(List(CORNERS) { 0.0 })
     private val NO_INSET = Inset(0.0, 0.0, 0.0, 0.0)
     private val PRESSED = intArrayOf(android.R.attr.state_pressed)

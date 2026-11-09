@@ -88,7 +88,7 @@ class HorizontalCandidateComponent :
     }
 
     val adapter: HorizontalCandidateViewAdapter by lazy {
-        object : HorizontalCandidateViewAdapter(theme) {
+        object : HorizontalCandidateViewAdapter(theme, barLook) {
             override fun onBindViewHolder(holder: CandidateViewHolder, position: Int) {
                 super.onBindViewHolder(holder, position)
                 holder.itemView.updateLayoutParams<FlexboxLayoutManager.LayoutParams> {

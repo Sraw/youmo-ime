@@ -72,9 +72,12 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme, val bar: BarL
      * What [updateCandidate] draws of the candidate at [index] besides it: whether it is the first, its
      * number. Equal for two indices, the candidate drawn at one is drawn alike at the other.
      */
-    fun byIndex(index: Int): Pair<Boolean, String> = (index == 0) to SceneBar.label(bar.labelStyle, index)
+    fun byIndex(index: Int): Pair<Boolean, String> = (index == 0) to label(index)
 
-    /** Draws [candidate], the [index]th of the list (from 0; -1 none: drawn as any but the first). */
+    // none for a holder cleared (index -1): it is let go of, not shown
+    private fun label(index: Int) = if (index < 0) "" else SceneBar.label(bar.labelStyle, index)
+
+    /** Draws [candidate], the [index]th of the list (from 0; -1 none: drawn as any but the first, no label). */
     fun updateCandidate(candidate: CandidateWord, index: Int = -1) {
         val look = bar.candidate(first = index == 0, selected = false)
         if (look != shown) {
@@ -84,7 +87,7 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme, val bar: BarL
         }
         val fg = look.color.value
         val altFg = look.commentColor.value
-        val label = SceneBar.label(bar.labelStyle, index.coerceAtLeast(0))
+        val label = label(index)
         // pinyin above the words: the text centred below it, in the bar made taller for it (CandidateBarHeight)
         // or, the setting off, a hint's reading above them in the bar's own height, where plain words stand
         val hint = EngineState.candidateReading.value == ReadingStyle.OFF
@@ -111,5 +114,7 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme, val bar: BarL
                 }
             }
         }
+        // the theme's number or dot is not read out, only the candidate (a screen reader's, as before it)
+        text.contentDescription = if (label.isEmpty()) null else text.text.subSequence(label.length, text.text.length)
     }
 }
