@@ -1,0 +1,103 @@
+/*
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+ */
+package org.fcitx.fcitx5.android.scene.web
+
+import org.fcitx.fcitx5.android.scene.Box
+import org.fcitx.fcitx5.android.scene.Fixtures.ok
+import org.fcitx.fcitx5.android.scene.Parsed
+import org.fcitx.fcitx5.android.scene.layout.Layout
+import org.fcitx.fcitx5.android.scene.layout.LayoutReader
+import org.fcitx.fcitx5.android.scene.listNames
+import org.fcitx.fcitx5.android.scene.readText
+import org.fcitx.fcitx5.android.scene.testDataDir
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+/**
+ * The library's own layouts and themes (BuiltIns over the files the build put in, BuiltInFiles) and the browser's
+ * measurer, on fixtures: boards offered and fragments not, a board's includes found in the page's own fragments
+ * first, a missing one a problem; what the build put in is src/commonMain's files, the themes none while T3's are not.
+ */
+class BuiltInsTest {
+    private val ns = LayoutReader.NAMESPACE
+    private val board = "<keyboard xmlns=\"$ns\" id=\"b\" name=\"b\" family=\"symbols\" columns=\"10\">\n" +
+        "<row><key id=\"a\" label=\"a\" send=\"commit:a\"/></row>\n<include src=\"bottom\"/>\n</keyboard>"
+    private val bottom = "<fragment xmlns=\"$ns\" id=\"bottom\"><row><key id=\"z\" label=\"z\" send=\"commit:z\"/></row></fragment>"
+    private val fixture = BuiltIns(
+        mapOf("b" to board, "bottom" to bottom, "broken" to "<keyboard", "other" to board.replace("id=\"b\"", "id=\"other\"")),
+        mapOf("night" to "<theme/>", "day" to "<theme/>"),
+    )
+
+    @Test
+    fun boardsAreOfferedFragmentsAreWhatTheyInclude() {
+        assertEquals(listOf("b", "other"), fixture.layouts)
+        assertEquals(setOf("bottom"), fixture.fragments.keys)
+        assertEquals(board, fixture.layoutText("b"))
+        assertEquals(bottom, fixture.layoutText("bottom"))
+        assertNull(fixture.layoutText("nope"))
+        assertNull(fixture.layout("bottom"), "a fragment is no board")
+        assertNull(fixture.layout("broken"))
+        val b = assertIs<Parsed.Ok<*>>(fixture.layout("b"))
+        assertTrue(fixture.layout("b") === fixture.layout("b"), "read once")
+        assertEquals("b", (b.value as Layout).id)
+        assertEquals(listOf("day", "night"), fixture.themes)
+        assertEquals("<theme/>", fixture.themeText("day"))
+        assertNull(fixture.themeText("dusk"))
+    }
+
+    @Test
+    fun aBoardsIncludesAreThePagesOwnFirstThenTheLibrarysOrAProblem() {
+        val layout = LayoutReader.layout(board).ok()
+        assertEquals(fixture.fragments.getValue("bottom"), fixture.includes(layout).ok().getValue("bottom"))
+        val own = LayoutReader.fragment(bottom.replace("\"z\"", "\"y\"")).ok()
+        assertTrue(fixture.includes(layout, mapOf("bottom" to own)).ok().getValue("bottom") === own)
+        val missing = BuiltIns(mapOf("b" to board), emptyMap()).includes(layout)
+        val problem = assertIs<Parsed.Failed>(missing).problems.single()
+        assertEquals(3, problem.line)
+        assertTrue("bottom" in problem.message, problem.message)
+    }
+
+    // the build's BuiltInFiles are src/commonMain's layouts and themes, by name, as written
+    @Test
+    fun theBuildPutInTheAppsFiles() {
+        val main = "${testDataDir()}/../../commonMain"
+        val layouts = listNames("$main/layouts").filter { it.endsWith(".xml") }.map { it.removeSuffix(".xml") }.sorted()
+        assertEquals(layouts, BuiltInFiles.layouts.keys.sorted())
+        for (name in layouts) assertEquals(readText("$main/layouts/$name.xml"), BuiltInFiles.layouts[name], name)
+        // none yet (T3 writes them): no folder at all is none
+        val themes = if (!exists("$main/themes")) emptyList() else listNames("$main/themes").filter { it.endsWith(".xml") }.map { it.removeSuffix(".xml") }.sorted()
+        assertEquals(themes, BuiltInFiles.themes.keys.sorted())
+        for (name in themes) assertEquals(readText("$main/themes/$name.xml"), BuiltInFiles.themes[name], name)
+    }
+
+    @Test
+    fun theBrowsersMeasurerIsItsInkAndExtentKeptByWhatWasAsked() {
+        val ctx: dynamic = js(
+            """({ asked: [], measureText: function (t) { this.asked.push(this.font + '|' + this.letterSpacing + '|' + t);
+              return t === 'bare' ? { width: 40 } : { width: 10 * t.length, actualBoundingBoxLeft: 1, actualBoundingBoxRight: 9, actualBoundingBoxAscent: 7,
+              actualBoundingBoxDescent: 2, fontBoundingBoxAscent: 11, fontBoundingBoxDescent: 3 }; } })""",
+        )
+        val m = CanvasMeasurer(ctx) { "\"F-$it\"" }
+        val q = m.measure("qq", "system", 700, 20.0)
+        assertEquals(20.0, q.advance)
+        assertEquals(Box(-1.0, -7.0, 9.0, 2.0), q.ink)
+        assertEquals(-11.0, q.top)
+        assertEquals(3.0, q.bottom)
+        m.measure("qq", "system", 700, 20.0)
+        assertEquals(listOf("700 20px \"F-system\"|0px|qq"), (ctx.asked as Array<String>).toList(), "kept: asked once")
+        m.measure("qq", "system", 400, 20.0)
+        assertEquals(2, (ctx.asked as Array<String>).size, "another weight is another ask")
+        // a browser with no boxes: the advance, a Latin font's usual proportions
+        val bare = m.measure("bare", "system", 400, 10.0)
+        assertEquals(Box(-0.0, -7.0, 40.0, 0.0), bare.ink)
+        assertEquals(-10.5, bare.top)
+        assertEquals(3.0, bare.bottom)
+    }
+
+    private fun exists(path: String): Boolean = js("require('fs')").existsSync(path) as Boolean
+}
