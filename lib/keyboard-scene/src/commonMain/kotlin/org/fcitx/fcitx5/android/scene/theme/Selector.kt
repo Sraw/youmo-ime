@@ -102,6 +102,12 @@ data class Selector(
          * `@field=<kind>` of these, `@keyboard=<board>` (a layout's id, `nine`).
          */
         val FIELDS = setOf("password", "url", "number", "email")
+
+        /**
+         * The words of `@im=` that select (the app's SceneTyping, held to it by its test): the kinds, T9 and
+         * zhuyin `pinyin` as their engine is, and the tables' names. Another is read, warned of, selects nothing.
+         */
+        val IMS = setOf("pinyin", "shuangpin", "english", "table", "handwriting", "wubi", "cangjie", "ziranma", "erbi", "wubipinyin")
         private val IM = Regex("[a-z0-9]+(-[a-z0-9]+)*")
         private val BOARD = Regex("[a-z0-9]+(-[a-z0-9]+)*")
         private val CLASS = Regex("[a-z][a-z0-9-]*")

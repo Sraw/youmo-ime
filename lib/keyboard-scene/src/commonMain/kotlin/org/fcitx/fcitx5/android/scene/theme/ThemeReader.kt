@@ -275,12 +275,17 @@ object ThemeReader {
                 values[prop] = v
             }
         }
-        // a keyboard's size: on a keyboard alone, or (under a scene) read, warned of, ignored; the same names elsewhere a later stage's
+        // a keyboard's size: on a keyboard alone, or (under a scene, in a state, a list) read, warned of, ignored; the same
+        // names of another widget a later stage's, of one in a list with a keyboard too
         val keyboard = selectors?.any { it.widget == "keyboard" } == true
         if (keyboard) reserved += sizes(el, a, p, selectors.orEmpty(), values)
-        reserved += reserved(el, a, p, colors, skip = if (keyboard) Values.KEYBOARD_SIZES else emptyList())
+        val keyboards = keyboard && selectors.orEmpty().all { it.widget == "keyboard" }
+        reserved += reserved(el, a, p, colors, skip = if (keyboards) Values.KEYBOARD_SIZES else emptyList())
         a.done()
         selectors?.mapNotNull { it.reserved }?.distinct()?.forEach { p.warn(el.line, ignored(it)) }
+        // an input method this app has none of (a misspelt one, a table it lacks): it selects nothing
+        selectors?.flatMap { it.scenes }?.filter { it.startsWith("im=") && it.removePrefix("im=") !in Selector.IMS }?.distinct()
+            ?.forEach { p.warn(el.line, "@$it is no input method of this app: it selects nothing") }
         for (v in values.values) {
             colorsOf(v).flatMap { it.refs() }.filter { it !in colors }.forEach { a.problem("@$it is no colour") }
         }
@@ -293,11 +298,17 @@ object ThemeReader {
     private val RESERVED_VALUE = Value.Flag(false)
 
     // the keyboard's size, set where every selector is a `keyboard` under no scene or state ([Values.KEYBOARD_SIZES]);
-    // else of its form, and ignored with a warning (how many: a style of them alone sets something): a theme's keyboard
-    // has one size, its scenes cannot change it
+    // else of its form, and ignored with a warning saying why (how many: a style of them alone sets something): a
+    // theme's keyboard has one size, its scenes and states cannot change it, and a list's other widgets have none
     private fun sizes(el: XmlElement, a: Attributes, p: Problems, selectors: List<Selector>, values: MutableMap<String, Value>): Int {
         var ignored = 0
-        val alone = selectors.all { it.widget == "keyboard" && it.scenes.isEmpty() && it.states.isEmpty() }
+        val keyboards = selectors.filter { it.widget == "keyboard" }
+        val why = when {
+            keyboards.size < selectors.size -> "in a list of other widgets is ignored: a style of the keyboard alone sets its size"
+            keyboards.any { it.scenes.isNotEmpty() } -> "under a scene is ignored: a theme's keyboard has one size"
+            keyboards.any { it.states.isNotEmpty() } -> "in a state is ignored: a theme's keyboard has one size"
+            else -> null
+        }
         for (prop in Values.KEYBOARD_SIZES.filter { el[it] != null }) {
             val what = when (prop) {
                 "height" -> "10%–90%, portrait then landscape"
@@ -305,10 +316,10 @@ object ThemeReader {
                 else -> "0–100dp, portrait then landscape"
             }
             val v = a.value(prop, what) { Values.keyboardSize(prop, it) } ?: continue
-            if (alone) {
+            if (why == null) {
                 values[prop] = Value.OfTwin(v)
             } else {
-                p.warn(el.line, "$prop= of a keyboard under a scene is ignored: a theme's keyboard has one size")
+                p.warn(el.line, "$prop= of a keyboard $why")
                 ignored++
             }
         }

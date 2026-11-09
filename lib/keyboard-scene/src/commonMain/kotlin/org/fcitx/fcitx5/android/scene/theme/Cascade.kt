@@ -87,22 +87,34 @@ class Cascade(theme: Theme, private val scene: Set<String>) {
  * Kept by those of the scenes the theme names: a scene none of its selectors asks of changes nothing
  * a cascade works out, so the input method, the field and the board (`im=` `field=` `keyboard=`,
  * always in [org.fcitx.fcitx5.android.scene.engine.Env.scenes]) make no more cascades of a theme that
- * names none of them than before; one that does, one more for each it names (060-render-p3 T5: at
- * most 8 a board, CascadesTest).
+ * names none of them than before. One that names some has one for each set of them met together,
+ * so as many as it names allow (every input method, field and board it names, light and dark, ...):
+ * the last [KEPT] used kept, the least used let go first (060-render-p3 T5, ThemeTest). A cascade
+ * let go is made again as asked, its looks worked out again.
  */
 class Cascades(val theme: Theme) {
-    private val made = HashMap<Set<String>, Cascade>()
+    // in the order last used: the first is let go first
+    private val made = LinkedHashMap<Set<String>, Cascade>()
 
     // the scenes some selector of the theme asks of
     private val named: Set<String> = theme.styles.flatMapTo(HashSet()) { style -> style.selectors.flatMap { it.scenes } }
 
     fun of(scene: Set<String>): Cascade {
         val asked = if (named.containsAll(scene)) scene else scene.filterTo(HashSet()) { it in named }
-        return made.getOrPut(asked) { Cascade(theme, asked) }
+        // put last again: the order of use
+        val c = made.remove(asked) ?: Cascade(theme, asked)
+        made[asked] = c
+        if (made.size > KEPT) made.remove(made.keys.first())
+        return c
     }
 
     /** How many cascades are kept: what a test measures. */
     val size: Int get() = made.size
+
+    companion object {
+        /** The most kept of a theme: one of no scenes has one, one of `@dark` two. */
+        const val KEPT = 32
+    }
 }
 
 /** A key's look in one state, from its [Cascade]d properties: defaults for what no style sets. */

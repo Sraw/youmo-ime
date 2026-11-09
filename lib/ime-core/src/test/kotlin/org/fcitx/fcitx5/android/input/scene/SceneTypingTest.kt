@@ -35,6 +35,16 @@ class SceneTypingTest {
     }
 
     @Test
+    fun aThemeKnowsEachWordOfAnInputMethod() {
+        // what a theme's reader warns of as no input method (Selector.IMS): none of these, and each of them one
+        val all = listOf(
+            InputMethodCatalog.PINYIN, InputMethodCatalog.T9, InputMethodCatalog.ZHUYIN, InputMethodCatalog.SHUANGPIN,
+            InputMethodCatalog.HANDWRITING, InputMethodCatalog.ENGLISH,
+        ) + InputMethodCatalog.TABLES.keys
+        assertEquals(Selector.IMS, all.flatMap { SceneTyping.im(it) }.toSet())
+    }
+
+    @Test
     fun theFieldAPasswordFirst() {
         assertEquals("password", SceneTyping.field(EditorTraits(isNumber = true), password = true))
         assertEquals("url", SceneTyping.field(EditorTraits(isUri = true), password = false))
