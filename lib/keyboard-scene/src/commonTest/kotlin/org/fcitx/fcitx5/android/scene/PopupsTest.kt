@@ -6,11 +6,15 @@ package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.IconSizes
 import org.fcitx.fcitx5.android.scene.engine.MenuCell
+import org.fcitx.fcitx5.android.scene.engine.Paint
+import org.fcitx.fcitx5.android.scene.engine.PopupBuilder
 import org.fcitx.fcitx5.android.scene.engine.Popups
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.theme.Argb
+import org.fcitx.fcitx5.android.scene.theme.Cascade
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.test.Test
@@ -156,6 +160,19 @@ class PopupsTest {
         val faded = copy.ops(false).filterIsInstance<Op.Fill>().single().color
         assertEquals(Argb(color("accentKey").value and 0xFFFFFF or (77 shl 24)), faded)
         assertEquals("全选", all.a11y)
+    }
+
+    // a faded cell's picture and image as they are, the colour over the one and under the other faded
+    @Test
+    fun aFadedPictureOrImageFadesItsColour() {
+        val env = Forms.block
+        val faded = PopupBuilder(theme, env, FakeMeasurer, IconSizes.MATERIAL, Cascade(theme, env.scenes), Paint(theme, env.density))
+        val shape = Shape.Rect(Box(0.0, 0.0, 10.0, 10.0))
+        val red = Argb(0xFFFF0000.toInt())
+        val half = Argb(0x80FF0000.toInt())
+        assertEquals(Op.Picture(shape, 4.0, 90.0, half), faded.faded(Op.Picture(shape, 4.0, 90.0, red), 0.5))
+        assertEquals(Op.NineSlice(shape, "k.png", listOf(1, 1, 1, 1), 1, half), faded.faded(Op.NineSlice(shape, "k.png", listOf(1, 1, 1, 1), 1, red), 0.5))
+        assertEquals(Op.Picture(shape, 4.0, 90.0), faded.faded(Op.Picture(shape, 4.0, 90.0), 0.5))
     }
 
     @Test
