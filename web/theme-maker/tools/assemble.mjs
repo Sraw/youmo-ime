@@ -3,11 +3,14 @@
 // before 0.6.0, kept till 0.6.x ends) from src/classic/ (its page.html, style.css and ui.js, src/lib.js shared),
 // the CSP's script hashes worked out, and the generated blocks (youmo-format,
 // youmo-presets, youmo-layout, youmo-icons, youmo-engine-icons: the app's tests write them, never by
-// hand) kept from the index.html there is, the page's fonts (fonts/, tools/subset-fonts.py) put in.
+// hand) kept from the page there is, each page carrying only the blocks its page.html has a slot for
+// (the maker: youmo-format, youmo-engine-icons; classic: the four it reads), the page's fonts (fonts/,
+// tools/subset-fonts.py) put in.
 // The engine (060-render-p3 W1: lib/keyboard-scene's library, `./gradlew :lib:keyboard-scene:youmoEngine`)
 // is not in git: index.html holds NO_ENGINE in its place, and the engine goes in only where the page is
 // built (pages.yml; the tests, in memory), so a change to the engine's code never has to make the page
-// again. Classic takes its generated blocks from index.html (the app's tests write them there).
+// again (classic draws without it: its page has no engine slot). The app's tests write each block into
+// every page that has it (ThemeMakerTestdata.block).
 // Edit src/, then: node web/theme-maker/tools/assemble.mjs        (both pages, as git keeps them)
 // The pages with the engine: node web/theme-maker/tools/assemble.mjs --engine [out]   (out: build/index.html,
 // classic beside it at classic/index.html)
@@ -65,19 +68,21 @@ export function fontFaces(dir = join(root, 'fonts')) {
  * The page made of [src]'s files, the generated blocks taken from [old] (the index.html as it is), the
  * engine of [engine] (its file; null: NO_ENGINE, index.html as git keeps it), the fonts of [fonts] (their folder).
  */
-export function assemble(src = join(root, 'src'), old = readFileSync(join(root, 'index.html'), 'utf8'), engine = null, fonts = join(root, 'fonts'), lib = LIB) {
+export function assemble(src = join(root, 'src'), old = readFileSync(src === CLASSIC_SRC ? CLASSIC : join(root, 'index.html'), 'utf8'), engine = null, fonts = join(root, 'fonts'), lib = LIB) {
   const read = (f) => readFileSync(f, 'utf8').replace(/\n+$/, '');
   const page = readFileSync(join(src, 'page.html'), 'utf8');
   const seen = new Map();
   for (const m of page.matchAll(/\{\{([\w-]+)\}\}/g)) seen.set(m[1], (seen.get(m[1]) || 0) + 1);
-  const text = { css: read(join(src, 'style.css')), lib: read(lib), ui: read(join(src, 'ui.js')), engine: engine == null ? NO_ENGINE : engineText(engine), fonts: fontFaces(fonts) };
+  const text = { css: read(join(src, 'style.css')), lib: read(lib), ui: read(join(src, 'ui.js')), fonts: fontFaces(fonts) };
+  // the engine and the generated blocks: only where page.html has a slot for them
+  if (seen.has('engine')) text.engine = engine == null ? NO_ENGINE : engineText(engine);
   // a page's other scripts (the maker's maker.js): each slot of page.html no other text fills, src/<slot>.js
   for (const slot of seen.keys()) {
-    if (!(slot in text) && !GENERATED.includes(slot) && slot !== 'script-hashes') text[slot] = read(join(src, slot + '.js'));
+    if (!(slot in text) && !GENERATED.includes(slot) && slot !== 'script-hashes' && slot !== 'engine') text[slot] = read(join(src, slot + '.js'));
   }
-  for (const id of GENERATED) {
+  for (const id of GENERATED.filter((g) => seen.has(g))) {
     const kept = blockOf(old, id);
-    if (kept == null) throw new Error('index.html has no ' + id + ' block to keep');
+    if (kept == null) throw new Error('the page has no ' + id + ' block to keep');
     text[id] = kept;
   }
   // every slot of page.html filled in one pass, each exactly once: what is put in (a script that says

@@ -357,7 +357,7 @@ and both `from-app` theme files, and builds `from-web.theme` from `theme.json` (
 `from-app.theme` under its names, and `tiny.ttf`, a 1 KB font of square glyphs made by
 `make-tiny-font.py`), comparing it byte for byte; `UPDATE=1 node --test …` writes it again.
 `ThemeMakerFormatTest` (app JVM) closes the loop: `from-web.theme` imports as `theme.json`, and an app
-export of it imports the same; and the page's generated blocks in `index.html` (`youmo-format`: the
+export of it imports the same; and the pages' generated blocks (`youmo-format`: the
 file's version, every type's fields from `ThemeFileJson`'s descriptors, the limits, the defaults;
 `youmo-presets`: the eleven built-in palettes) are what the app has, through
 `ThemeMakerTestdata.block`, which `-PupdateThemeMaker` lets write them. `youmo-layout` and
@@ -371,16 +371,22 @@ Two pages (060-render-p3 M1): `index.html`, the maker (`src/`: `page.html` with 
 page), and `classic/index.html`, the maker before 0.6.0, kept till 0.6.x ends (`src/classic/`: its
 `page.html`, `style.css`, `ui.js`); both run `src/lib.js` (everything the tests hold to the app's
 3.0 rules and zip). Edit them, then `node web/theme-maker/tools/assemble.mjs`, which writes both: the
-sources put in, the generated blocks kept from the `index.html` there is (classic takes them from it
-too), and the Content-Security-Policy's `script-src` set to each script's SHA-256 (four on the maker,
-three on classic; nothing else runs, a script not hashed is refused, an edit by hand breaks them).
+sources put in, each page's generated blocks kept from that page as it is (each carries only the ones
+its `page.html` has a slot for: the maker `youmo-format` and `youmo-engine-icons`, classic
+`youmo-format`, `youmo-presets`, `youmo-layout`, `youmo-icons` and no engine; `ThemeMakerTestdata.block`
+writes a block into every page that has it), and the Content-Security-Policy's `script-src` set to each script's SHA-256 (four on the maker,
+two on classic; nothing else runs, a script not hashed is refused, an edit by hand breaks them).
 The page's test fails when either page is not what assemble makes of its sources and the fonts, and
 when the CSP's hashes are not its scripts'. Commit `src/` and both pages together.
 `test/maker.test.mjs` (node, needs the built engine; CI runs it with the other two): a document
 saved opens the same (theme.xml first, files, `layouts/` kept as they are), 3.0 and 2.1 files open
 as 4.0 through the engine's `convert30`, undo and redo (at most 100 back), the draft kept and given
 back (a failing store is no draft, never a throw), every board and form of the preview's
-environment builds. The
+environment builds; a picture picked always encoded anew (`PICTURE_SAVE`: long side ≤ 2560, JPEG
+0.85, PNG only with transparency; one not an image refused before a decode), only images within the
+app's limits decoded, save refusing what the import would (`saveProblems`), a pack's odd entries
+opened as the app unpacks them. `from-maker.theme` and `from-maker-picture.theme` (a real PNG) are
+its saves, which `ThemePackImportTest` imports. The
 site is `index.html` with the engine put in: the Pages workflow leaves `src/`, `tools/`, `test/`,
 `fonts/`, `dev/` and `build/` out and writes its `index.html` (and `classic/index.html` beside it) with `assemble.mjs --engine <file>`.
 
