@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<theme xmlns="https://youmo-ime/theme/4" name="full" variants="dark" version="4.0">
+  <colors>
+    <color name="background" value="#2d2d2d"/>
+    <color name="bar" value="#373737"/>
+    <color name="keyboard" value="#2d2d2d"/>
+    <color name="key" value="#4d464646"/>
+    <color name="keyText" value="#fafafa"/>
+    <color name="candidateText" value="#fafafa"/>
+    <color name="candidateLabel" value="#fafafa"/>
+    <color name="candidateComment" value="#acacac"/>
+    <color name="altKey" value="#373737"/>
+    <color name="altKeyText" value="#acacac"/>
+    <color name="accentKey" value="#5e97f6"/>
+    <color name="accentKeyText" value="#ffffff"/>
+    <color name="keyPressHighlight" value="#33ffffff"/>
+    <color name="keyShadow" value="#252525"/>
+    <color name="popupBackground" value="#373737"/>
+    <color name="popupText" value="#fafafa"/>
+    <color name="spaceBar" value="#4a4a4a"/>
+    <color name="divider" value="#1fffffff"/>
+    <color name="clipboardEntry" value="#464646"/>
+    <color name="genericActiveBackground" value="#5e97f6"/>
+    <color name="genericActiveForeground" value="#fafafa"/>
+    <color name="keyBorder" value="#252525"/>
+    <color name="keyHint" value="#acacac"/>
+    <color name="toolbarIcon" value="#acacac"/>
+  </colors>
+  <picture src="full-src.png" brightness="70%" blur="4dp">
+    <cut orientation="portrait" file="full-portrait.png"/>
+    <cut orientation="landscape" file="full-landscape.png"/>
+  </picture>
+  <font name="key" src="full-font.ttf"/>
+  <style select="keyboard" fill="picture"/>
+  <style select="bar" fill="picture(12dp, 60%)"/>
+  <style select="panel" fill="#00000000"/>
+  <style select="@flat panel" fill="@bar"/>
+  <style select="key" fill="picture(10dp, 80%, @key)" radius="8dp" border="1dp @keyBorder" shadow="none" inset="7dp 3dp" color="@keyText" font="key" weight="700" scale="110%" icon-color="@keyText" press="tint"/>
+  <style select="@landscape key" inset="4dp 3dp"/>
+  <style select="key:pressed" overlay="@keyPressHighlight"/>
+  <style select="key.function" fill="@altKey" color="@altKeyText" icon-color="@altKeyText"/>
+  <style select="key.enter" fill="@accentKey" color="@accentKeyText" icon-color="@accentKeyText"/>
+  <style select="key.space" fill="image(full-space.png, 12 12 12 12, 3x, @key)"/>
+  <style select="key.function:pressed" fill="#5e97f6" press="face"/>
+  <style select="key.enter:pressed" fill="image(full-enter-down.png, 8 6 8 6, 2x, @accentKey)" press="face"/>
+  <style select="key.alt-text" color="@altKeyText" icon-color="@altKeyText"/>
+  <style select="key mark, key shortcut" color="@keyHint" icon-color="@keyHint"/>
+  <style select="key shortcut" scale="100%"/>
+  <style select="key.enter mark" color="@accentKeyText"/>
+  <style select="key badge" icon-color="@altKeyText"/>
+  <style select="*/reading:on" color="@accentKey" icon-color="@accentKey"/>
+  <style select="@flat key" fill="#00000000" radius="0" shadow="none"/>
+  <style select="@flat key.space" fill="@spaceBar" shape="bar" radius="3dp"/>
+  <style select="@flat key.enter" fill="@accentKey" shape="circle"/>
+  <style select="*/enter" fill="image(full-enter.png, 0 0 0 0, 3x, @key)"/>
+  <style select="*/enter.function" fill="image(full-enter.png, 0 0 0 0, 3x, @altKey)"/>
+  <style select="k20/r1c1" fill="@key"/>
+  <style select="k20/r1c1.function" fill="@altKey"/>
+  <style select="qwerty/q:pressed" fill="#e91e63" press="face"/>
+  <style select="@flat */enter, @flat k20/r1c1" fill="#00000000"/>
+  <style select="@flat qwerty/q:pressed" fill="#00000000" press="face"/>
+  <style select="*/enter.enter" fill="image(full-enter.png, 0 0 0 0, 3x, @accentKey)"/>
+  <style select="@flat */enter.space" fill="image(full-enter.png, 0 0 0 0, 3x, @spaceBar)"/>
+  <style select="k20/r1c1.enter" fill="@accentKey"/>
+  <style select="@flat k20/r1c1.space" fill="@spaceBar"/>
+  <style select="qwerty/q.enter:pressed, @flat qwerty/q.space:pressed" fill="#e91e63" press="face"/>
+  <style select="*/enter.function:pressed, k20/r1c1.function:pressed" fill="#5e97f6" press="face"/>
+  <style select="*/enter.enter:pressed, k20/r1c1.enter:pressed" fill="image(full-enter-down.png, 8 6 8 6, 2x, @accentKey)" press="face"/>
+  <style select="*/enter label" hidden="true"/>
+  <style select="preview, popup" fill="@popupBackground" radius="8dp" shadow="0 2dp 2dp #33000000" color="@popupText"/>
+  <style select="popup:selected" fill="@genericActiveBackground" color="@genericActiveForeground"/>
+  <style select="menu" fill="@accentKey" radius="50%" color="@accentKeyText" icon-color="@accentKeyText"/>
+  <style select="menu:selected" overlay="@keyPressHighlight"/>
+  <style select="@floating keyboard" radius="11dp"/>
+  <style select="handle" fill="mix(@background,@keyText,10%)"/>
+</theme>

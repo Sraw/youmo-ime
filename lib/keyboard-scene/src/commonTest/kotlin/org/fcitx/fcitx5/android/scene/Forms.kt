@@ -133,18 +133,44 @@ object Forms {
      */
     fun popups(env: Env, theme: Theme = Fixtures.materialLight): List<Pair<String, () -> Scene>> {
         val b = SceneBuilder(theme, env, FakeMeasurer)
-        val key = 36 * env.density
+        return popupAsks.map { (name, ask) -> name to { ask.scene(b, env) } }
+    }
+
+    /** [popups]' asks, by name: what each is made of, as the theme maker's library is asked for it too (FacadeShotsTest). */
+    val popupAsks: List<Pair<String, PopupAsk>> by lazy {
         val letters = listOf("a", "b", "c", "d", "e", "f", "g")
         val edit = listOf("select-all", "cut", "copy", "paste", "undo").map { MenuCell(it, it) }
         val reading = listOf(MenuCell("关", null), MenuCell("拼音", null), MenuCell("注音符号", null))
-        return listOf(
-            "preview-symbol" to { b.preview("g", key).ok() },
-            "preview-words" to { b.preview("快速输入", key, b.previewWordsSize().ok().first).ok() },
-            "keys" to {
-                b.popup(letters, listOf(listOf(2, 0, 1, 3), listOf(6, 4, 5, -1)), b.popupKeys(letters, 4, env.width).ok(), selected = 0).ok()
-            },
-            "menu-icons" to { b.menu(edit, edit.indices.toList(), selected = 2, disabled = setOf(4)).ok() },
-            "menu-words" to { b.menu(reading, listOf(1, 0, 2), selected = 0).ok() },
+        listOf(
+            "preview-symbol" to PopupAsk.Preview("g", KEY_DP, words = false),
+            "preview-words" to PopupAsk.Preview("快速输入", KEY_DP, words = true),
+            "keys" to PopupAsk.Keys(letters, listOf(listOf(2, 0, 1, 3), listOf(6, 4, 5, -1)), columns = 4, selected = 0),
+            "menu-icons" to PopupAsk.Menu(edit, edit.indices.toList(), selected = 2, disabled = setOf(4)),
+            "menu-words" to PopupAsk.Menu(reading, listOf(1, 0, 2), selected = 0, disabled = emptySet()),
         )
+    }
+
+    // the key a bubble is over
+    private const val KEY_DP = 36.0
+}
+
+/**
+ * A popup's scene as asked for: a key's bubble ([Preview], over a key [Preview.keyDp] across, the
+ * words' size where [Preview.words]), a long press's keys ([Keys], the screen's width their room), a menu.
+ */
+sealed interface PopupAsk {
+    fun scene(b: SceneBuilder, env: Env): Scene
+
+    data class Preview(val text: String, val keyDp: Double, val words: Boolean) : PopupAsk {
+        override fun scene(b: SceneBuilder, env: Env): Scene =
+            b.preview(text, keyDp * env.density, if (words) b.previewWordsSize().ok().first else null).ok()
+    }
+
+    data class Keys(val labels: List<String>, val rows: List<List<Int>>, val columns: Int, val selected: Int) : PopupAsk {
+        override fun scene(b: SceneBuilder, env: Env): Scene = b.popup(labels, rows, b.popupKeys(labels, columns, env.width).ok(), selected).ok()
+    }
+
+    data class Menu(val cells: List<MenuCell>, val order: List<Int>, val selected: Int, val disabled: Set<Int>) : PopupAsk {
+        override fun scene(b: SceneBuilder, env: Env): Scene = b.menu(cells, order, selected, disabled).ok()
     }
 }

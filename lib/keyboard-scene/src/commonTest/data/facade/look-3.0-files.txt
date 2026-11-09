@@ -1,0 +1,8 @@
+full-src.png full-src.png
+full-portrait.png full-portrait.png
+full-landscape.png full-landscape.png
+full-space.png full-space.png
+full-enter-down.png full-enter-down.png
+full-enter.png full-enter.png
+full-font.ttf full-font.ttf
+full-candidates.ttf full-candidates.ttf
