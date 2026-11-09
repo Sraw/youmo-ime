@@ -18,10 +18,11 @@ import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneWindow
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.floating.FloatingSwitch.Bounds
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneWindow
 import org.fcitx.fcitx5.android.input.motion.Motion
+import org.fcitx.fcitx5.android.scene.engine.WindowLooks
 import org.fcitx.fcitx5.android.utils.interpolator
 import org.fcitx.fcitx5.android.utils.motionSettings
 import splitties.dimensions.dp
@@ -238,12 +239,26 @@ class FloatingController(
     }
 
     // the theme's frame (`frame`) in the scenes now: not set, as round as the keys on their margins, which a
-    // turn of the screen changes (WindowLooks.cornerDp), square where the keys are (按键圆角 直角)
-    private fun frame() = SceneWindow.frame(theme, SceneWindow.scenes(context, theme, floating = true))
+    // turn of the screen changes (WindowLooks.cornerDp), square where the keys are (按键圆角 直角). Asked for
+    // each outline and border drawn: worked out once a screen ([screen]), its corner once a size too
+    private var framed: Pair<List<Int>, WindowLooks.Frame>? = null
+    private var cornered: Pair<List<Int>, Float>? = null
+
+    private fun screen() = context.resources.configuration.let { listOf(it.orientation, it.screenWidthDp, it.screenHeightDp) }
+
+    private fun frame(): WindowLooks.Frame {
+        val at = screen()
+        framed?.let { (on, frame) -> if (on == at) return frame }
+        return SceneWindow.frame(theme, SceneWindow.scenes(context, theme, floating = true)).also { framed = at to it }
+    }
 
     private fun cornerPx(): Float {
+        val at = screen() + listOf(keyboard.width, keyboard.height)
+        cornered?.let { (on, px) -> if (on == at) return px }
         val f = frame()
-        return if (f.round) minOf(keyboard.width, keyboard.height) / 2f else SceneWindow.px(context, f.radiusDp)
+        val px = if (f.round) minOf(keyboard.width, keyboard.height) / 2f else SceneWindow.px(context, f.radiusDp)
+        cornered = at to px
+        return px
     }
 
     private fun View.bounds() = Bounds(left.toFloat(), top.toFloat(), width.toFloat(), height.toFloat())

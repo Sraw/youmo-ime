@@ -234,15 +234,21 @@ too, goes to that side, 80% of the width, a phone's 420 dp at most (`SplitKeyboa
 decides both). The room beside it has the arrow, which then sets `oneHanded` rather than
 `splitDock`, and a button back to the whole width. These side buttons, split's and one-handed's, are
 drawn as the theme's `side-button` says (060-render-p3 T7a, `SceneWindow.sideButton`; none set: the
-function keys' text colour on nothing, a round ripple of the pressed colour, as before); split's room
-between the halves is filled with the theme's `split-gap` where it sets one (the engine draws it,
-`SceneBuilder`), else it shows the keyboard's own.
+function keys' text colour on nothing, a round ripple of the pressed colour, as before; the ripple
+`side-button:pressed`'s overlay over `side-button`'s), dressed once a placement (`InputView.dressSideButtons`);
+split's room between the halves is filled with the theme's `split-gap` where it sets one (the engine draws it,
+`SceneBuilder`), else it shows the keyboard's own. The window's scenes are the screen's and settings' and the
+board's placement, `@one-handed` and `@split` (`SceneWindow.placement`, as the engine's `Env.scenes` has them):
+`InputView.placeScenes` tells the side buttons, the docked handle (`FloatingHandle.dress`) and the
+navigation bar as the board is placed anew.
 
 The navigation bar under a docked keyboard is the theme's `navbar { color }` where it sets a colour
 (T7a; `follow`, the default, and floating: as before, the colour under the keys): where the keyboard
 is drawn behind the bar (导航栏背景 全部; always from Android 15) a strip in the bar's room under the
 keys has it (`InputView.navbarStrip`), and 仅颜色 sets the window's bar colour
-(`NavigationBarManager`, its buttons drawn dark on a colour of luminance over 0.5).
+(`NavigationBarManager`, its buttons black or white, whichever stands out more on it:
+`SceneWindow.darkButtonsOn`; a mid grey's luminance is 0.22, yet black on it stands out more). The
+hardware keyboard's bar (its candidates alone) is the theme's whatever the floating setting says.
 
 Floating (`ThemePrefs.floatingKeyboard`, the status area's 悬浮键盘; the input view is made anew for
 it): `keyboardView` is `FloatingKeyboard.widthDp` wide (70% of the screen, 300–420 dp), its boards as
@@ -254,13 +260,17 @@ with a shadow (`FloatingCorners`; users asked for both). Frame and handle are th
 width and height), read through `SceneWindow` from the engine's `WindowLooks`, whose defaults are the
 rules the app worked out itself before: the radius is the keys' radius plus their
 least margin to the edge (`WindowLooks.cornerDp`, held to theme 3.0's `FloatingKeyboard.cornerDp` at
-every width by ime-core's `WindowDefaultsTest`; the nested-corner rule: the curve runs
+every radius and margin by ime-core's `WindowDefaultsTest`; the nested-corner rule: the curve runs
 alongside the corner keys' and clips none), square where the keys are (按键圆角 直角, the owner's one setting for corners); the
 handle is a shade of the bar towards the key text (`WindowLooks.handleColor`), as some themes'
 bar is the keyboard's colour (on top; at the bottom it is the keyboard's own); the grip 36×4 dp of
 the function keys' text colour; the shadow 6 dp. A frame's border is a stroke over the keyboard
 (`FloatingCorners.border`), its shadow's colour the outline shadow's (Android 9+; its offset is the
-system's, a theme's ignored). As Gboard's, it never
+system's, a theme's ignored; the system scales its alpha by its own shadow alphas, ~4% ambient and
+~19% spot, so a theme's shadow colour shows faintly). The frame is worked out once a screen, its corner
+once a size too (`FloatingController.frame`, `cornerPx`), as the outline and the border ask for it as they
+draw. A look that made no theme (`SceneThemes` refused it) has the window of its keys as before:
+`FloatingKeyboard.cornerDp`, the handle's shade of the bar (`SceneWindow`). As Gboard's, it never
 goes into a strip of `FloatingPlacer.DOCK_MARK_DP` above the bottom (the IME's own nav bar, gesture
 navigation's switch/collapse row, counted by `BaseInputView.floatingBottomInset`); dragged down to that
 it is in the docking zone (`FloatingDrag` in ime-core; where a drag began at the bottom, it first

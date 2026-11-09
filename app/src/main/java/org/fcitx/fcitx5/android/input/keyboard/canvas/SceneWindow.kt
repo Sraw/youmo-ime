@@ -7,11 +7,14 @@ package org.fcitx.fcitx5.android.input.keyboard.canvas
 import android.content.Context
 import android.content.res.ColorStateList
 import android.content.res.Configuration
+import android.graphics.Color
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
+import androidx.core.graphics.ColorUtils
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
 import org.fcitx.fcitx5.android.scene.engine.WindowLooks
 import org.fcitx.fcitx5.android.scene.theme.Argb
@@ -22,38 +25,51 @@ import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
  * keyboard's frame, its handle, the buttons beside a board at a side, the navigation bar's colour. A
  * theme that sets none of it, a theme 3.0's among them, has the engine's default rules: the look the
  * app worked out itself before. A look that made no theme (SceneThemes logs it; no key is drawn
- * either) has its colours alone and a square frame.
+ * either) has that look of before worked out here, of its keys and colours.
  */
 object SceneWindow {
+
+    /** The board at a side, one-handed: the theme's `@one-handed` scene. */
+    const val ONE_HANDED = "one-handed"
+
+    /** The letters split: the theme's `@split` scene. */
+    const val SPLIT = "split"
 
     // [theme]'s window, of the theme its keys are drawn in (a test's own: SceneThemes.source); null: its look made no theme
     private fun looks(theme: Theme): WindowLooks? =
         SceneThemes.of(ThemeManager.shownLook(theme), theme.name, theme.isDark)?.let { WindowLooks(SceneThemes.cascades(it)) }
 
+    /** Where the board is placed as the theme's scenes: [oneHanded] at a side, the letters [split]. */
+    fun placement(oneHanded: Boolean, split: Boolean): Set<String> = setOfNotNull(ONE_HANDED.takeIf { oneHanded }, SPLIT.takeIf { split })
+
     /**
      * The scenes the window is in: the screen's and the settings' (landscape, compact, the look's
-     * flat keys, dark), [floating], a board at a side [oneHanded] or [split]. Not what is typed: the
-     * window is every board's and field's.
+     * flat keys, dark), [floating], the board's [placement] (its [ONE_HANDED], [SPLIT]). Not what is
+     * typed: the window is every board's and field's.
      */
-    fun scenes(context: Context, theme: Theme, floating: Boolean = false, oneHanded: Boolean = false, split: Boolean = false): Set<String> =
+    fun scenes(context: Context, theme: Theme, floating: Boolean = false, placement: Set<String> = emptySet()): Set<String> =
         buildSet {
             if (keyboardCompact()) add("compact")
-            if (context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) add("landscape")
+            if (landscape(context)) add("landscape")
             if (floating) add("floating")
-            if (split) add("split")
-            if (oneHanded) add("one-handed")
+            addAll(placement)
             if (theme.isDark) add("dark")
             if (!ThemeManager.shownLook(theme).keys.blocks) add("flat")
         }
 
     /** The floating keyboard's frame (it is in `@floating` whatever [scenes] say). */
     fun frame(theme: Theme, scenes: Set<String>): WindowLooks.Frame =
-        looks(theme)?.frame(scenes) ?: WindowLooks.Frame(0.0, false, null, WindowLooks.ELEVATION_DP, null)
+        looks(theme)?.frame(scenes) ?: ThemeManager.shownLook(theme).keys.let { keys ->
+            val land = "landscape" in scenes
+            val radius = FloatingKeyboard.cornerDp(keys.radiusDp, if (land) keys.gap.hLand else keys.gap.h, if (land) keys.gap.vLand else keys.gap.v, keys.blocks)
+            WindowLooks.Frame(radius.toDouble(), false, null, WindowLooks.ELEVATION_DP, null)
+        }
 
     /** The drag handle at the keyboard's [top] or its bottom. */
     fun handle(theme: Theme, scenes: Set<String>, top: Boolean): WindowLooks.Handle =
-        looks(theme)?.handle(scenes, top) ?: theme.altKeyTextColor.let {
-            WindowLooks.Handle(null, Argb(it), Argb(it), WindowLooks.GRIP_WIDTH_DP, WindowLooks.GRIP_HEIGHT_DP)
+        looks(theme)?.handle(scenes, top) ?: Argb(theme.altKeyTextColor).let {
+            val fill = if (top) WindowLooks.handleColor(Argb(theme.barColor), Argb(theme.keyTextColor)) else null
+            WindowLooks.Handle(fill, it, it, WindowLooks.GRIP_WIDTH_DP, WindowLooks.GRIP_HEIGHT_DP)
         }
 
     /** A button beside a board at a side. */
@@ -80,6 +96,20 @@ object SceneWindow {
     /** The navigation bar's colour; null: the keyboard's under it, as ever. */
     fun navbar(theme: Theme, scenes: Set<String>): Int? = looks(theme)?.navbar(scenes)?.value
 
+    /**
+     * Whether the navigation bar's buttons are drawn dark on [color] (its alpha aside): the one of black
+     * and white that stands out more. Not its luminance over a half: a mid grey's (#808080, 0.22) white
+     * buttons stand out less than black ones.
+     */
+    fun darkButtonsOn(color: Int): Boolean {
+        val opaque = ColorUtils.setAlphaComponent(color, OPAQUE)
+        return ColorUtils.calculateContrast(Color.BLACK, opaque) > ColorUtils.calculateContrast(Color.WHITE, opaque)
+    }
+
     /** [dp] as the app's px of before (splitties' dp of a whole number: truncated). */
     fun px(context: Context, dp: Double): Float = (dp * context.resources.displayMetrics.density).toInt().toFloat()
+
+    private fun landscape(context: Context) = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    private const val OPAQUE = 0xFF
 }

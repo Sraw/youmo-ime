@@ -15,19 +15,26 @@ import android.graphics.drawable.RippleDrawable
 import android.os.Build
 import android.view.View
 import android.widget.ImageView
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.input.keyboard.OneHanded
-import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.NavbarBackground
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.NavigationBarManager
+import org.fcitx.fcitx5.android.input.keyboard.OneHanded
+import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneWindow
 import org.fcitx.fcitx5.android.input.scene.LookTheme
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -94,6 +101,21 @@ class WindowThemeTest {
         relayout()
     }
 
+    // the navigation bar [NAV] px tall under the keyboard, as the system tells it
+    private fun navigationBar(h: KeyboardHarness) {
+        val insets = WindowInsetsCompat.Builder().setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, 0, 0, NAV)).build()
+        ViewCompat.dispatchApplyWindowInsets(h.inputView, insets)
+        h.relayout()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun barColor(h: KeyboardHarness) = h.service.window.window!!.navigationBarColor
+
+    // the bar's buttons drawn dark (a light bar's appearance)
+    private fun darkButtons(h: KeyboardHarness) = h.service.window.window!!.let {
+        WindowCompat.getInsetsController(it, it.decorView).isAppearanceLightNavigationBars
+    }
+
     @Test
     fun floatingTheFrameAndTheHandleAreTheThemes() {
         everything()
@@ -115,8 +137,13 @@ class WindowThemeTest {
             val dock = h.described(h.service.getString(R.string.floating_keyboard_dock)) as ImageView
             assertEquals(PorterDuffColorFilter(CYAN, PorterDuff.Mode.SRC_IN), dock.colorFilter)
             // floating, the app is under the bar, not the keyboard: no colour of the theme's there
+            navigationBar(h)
             assertTrue(strips(h).isEmpty())
             keep(h, "floating")
+            // the hardware keyboard's candidates alone: the bar the theme's, the floating setting on or not
+            NavigationBarManager().evaluate(h.service.window.window!!, false)
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) assertEquals(BROWN, barColor(h))
+            assertFalse("light buttons on the dark brown", darkButtons(h))
         }
     }
 
@@ -124,22 +151,46 @@ class WindowThemeTest {
     fun oneHandedTheSideButtonsAndTheNavigationBarAreTheThemes() {
         everything()
         prefs.set(theme.oneHanded, OneHanded.Left)
-        prefs.set(theme.navbarBackground, NavbarBackground.ColorOnly)
+        prefs.set(theme.alwaysShowHandle, true)
         KeyboardHarness().use { h ->
             started(h)
             val shown = sideButtons(h).filter { h.shown(it) }
             assertEquals("the arrow across and the whole width again", 2, shown.size)
             for (b in shown) sideButton(h, b)
-            // below 35, 仅颜色: the bar's own colour, the keyboard not under it; 35 draws the window behind
-            // the bar whatever it is told (edge to edge), the strip in the bar's room under the keys has it
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-                @Suppress("DEPRECATION")
-                assertEquals(BROWN, h.service.window.window!!.navigationBarColor)
-            } else {
-                assertEquals(listOf(BROWN), strips(h))
-            }
+            // 全部 (the default), at 29 as at 35: the keyboard drawn behind the bar, a strip in the bar's room
+            // under the keys of the theme's colour, `@one-handed`'s; the docked handle's of it too
+            navigationBar(h)
+            assertEquals(listOf(NAV), strips(h, GREY))
+            assertEquals(NAVY, (handle(h).background as ColorDrawable).color)
             keep(h, "one_handed_left")
         }
+    }
+
+    @Test
+    fun colourOnlyTheBarsColourAndItsButtonsTheThemes() {
+        everything()
+        prefs.set(theme.oneHanded, OneHanded.Left)
+        prefs.set(theme.navbarBackground, NavbarBackground.ColorOnly)
+        KeyboardHarness().use { h ->
+            started(h)
+            // 仅颜色: the keyboard not under the bar, no strip; the bar's own colour (below 35: from it the
+            // window is drawn behind the bar whatever it is told), `@one-handed`'s mid grey, dark buttons on it
+            navigationBar(h)
+            assertTrue(strips(h, GREY).isEmpty())
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) assertEquals(GREY, barColor(h))
+            assertTrue("dark buttons on the mid grey", darkButtons(h))
+        }
+    }
+
+    @Test
+    fun theBarsButtonsAreTheColourThatStandsOutMore() {
+        // black on a mid grey stands out more than white, though its luminance is under a half (0.22)
+        assertTrue(SceneWindow.darkButtonsOn(GREY))
+        assertTrue(SceneWindow.darkButtonsOn(0xFFFFFFFF.toInt()))
+        assertTrue(SceneWindow.darkButtonsOn(0x00FFFFFF))
+        assertFalse(SceneWindow.darkButtonsOn(0xFF000000.toInt()))
+        assertFalse(SceneWindow.darkButtonsOn(BROWN))
+        assertFalse(SceneWindow.darkButtonsOn(0xFF595959.toInt()))
     }
 
     @Test
@@ -200,7 +251,24 @@ class WindowThemeTest {
                 assertEquals(PorterDuffColorFilter(t.altKeyTextColor, PorterDuff.Mode.SRC_IN), b.colorFilter)
                 assertEquals("the borderless ripple alone", 0, (b.background as RippleDrawable).numberOfLayers)
             }
-            assertTrue("no strip of a colour of its own", strips(h).isEmpty())
+            navigationBar(h)
+            assertTrue("no strip of a colour of its own", KeyboardHarness.all(h.inputView).none { it.isShown && it.height == NAV })
+        }
+    }
+
+    // a look that made no theme (SceneThemes refused it, its keys not drawn): the window the look's of before
+    @Test
+    fun aLookThatMadeNoThemeIsTheAppsLookOfBefore() {
+        SceneThemes.source = { _, _, _ -> "<theme/>" }
+        prefs.set(theme.floatingKeyboard, true)
+        prefs.set(theme.floatingHandle, FloatingHandleSide.Top)
+        val t = ThemePreset.PixelLight
+        KeyboardHarness(t).use { h ->
+            started(h)
+            val keys = ThemeManager.shownLook(t).keys
+            assertEquals(dp(h, FloatingKeyboard.cornerDp(keys.radiusDp, keys.gap.h, keys.gap.v, keys.blocks)).toFloat(), radius(card(h)), 0f)
+            assertEquals(dp(h, 6).toFloat(), card(h).elevation, 0f)
+            assertEquals(oldHandleColor(t.barColor, t.keyTextColor), (handle(h).background as ColorDrawable).color)
         }
     }
 
@@ -213,9 +281,9 @@ class WindowThemeTest {
         assertEquals(dp(h, 6).toFloat(), shape.cornerRadius, 0f)
     }
 
-    // the colours of the views shown of a colour of STYLES' navigation bar
-    private fun strips(h: KeyboardHarness): List<Int> = KeyboardHarness.all(h.inputView)
-        .filter { it.isShown && (it.background as? ColorDrawable)?.color == BROWN }.map { BROWN }.toList()
+    // the heights of the views shown, of some height, of [color] (STYLES' navigation bar's)
+    private fun strips(h: KeyboardHarness, color: Int = BROWN): List<Int> = KeyboardHarness.all(h.inputView)
+        .filter { it.isShown && it.height > 0 && (it.background as? ColorDrawable)?.color == color }.map { it.height }.toList()
 
     // FloatingKeyboard.handleColor of 0.5.2
     private fun oldHandleColor(base: Int, ink: Int): Int {
@@ -240,6 +308,11 @@ class WindowThemeTest {
         private const val ICON = 0xFF112233.toInt()
         private const val GAP = 0xFF123456.toInt()
         private const val BROWN = 0xFF654321.toInt()
+        private const val GREY = 0xFF808080.toInt()
+        private const val NAVY = 0xFF000080.toInt()
+
+        // the navigation bar's height, px
+        private const val NAV = 48
 
         // every T7a property, each of a colour of its own
         private const val STYLES = """
@@ -247,6 +320,9 @@ class WindowThemeTest {
   <style select="handle" fill="#0000ff" color="#ffff00" icon-color="#00ffff" width="60dp" height="8dp"/>
   <style select="side-button" fill="#ff00ff" icon-color="#112233" shape="rect" radius="6dp" overlay="#40000000"/>
   <style select="split-gap" fill="#123456"/>
-  <style select="navbar" color="#654321"/>"""
+  <style select="navbar" color="#654321"/>
+  <style select="@one-handed navbar" color="#808080"/>
+  <style select="@one-handed handle" fill="#000080"/>
+  <style select="side-button:pressed" overlay="#50000000"/>"""
     }
 }

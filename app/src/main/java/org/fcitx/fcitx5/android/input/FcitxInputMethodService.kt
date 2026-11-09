@@ -199,6 +199,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * while its app may not post notifications, Android 13's default ("Suppressing toast … by user
      * request"); one from no keyboard shown, as the settings' toasts are, still is.
      */
+    /** The touch keyboard's board placed anew (`SceneWindow.placement`): the navigation bar the theme's of it. */
+    fun boardPlaced(placement: Set<String>) {
+        window.window?.let { navbarMgr.place(it, placement) }
+    }
+
     fun say(@StringRes id: Int) = say(getString(id))
 
     /**

@@ -9,7 +9,6 @@ import android.graphics.Color
 import android.os.Build
 import android.view.Window
 import androidx.annotation.ColorInt
-import androidx.core.graphics.ColorUtils
 import androidx.core.view.WindowCompat
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -25,6 +24,11 @@ class NavigationBarManager {
 
     private var shouldUpdateNavbarForeground = false
     private var shouldUpdateNavbarBackground = false
+
+    // the touch keyboard is up (not the hardware keyboard's candidates alone), and where its board is
+    // ([SceneWindow.placement]): the theme's `@one-handed`, `@split` navigation bar
+    private var virtual = true
+    private var placement: Set<String> = emptySet()
 
     private fun Window.useSystemNavbarBackground(enabled: Boolean) {
         // 35+ enforces edge to edge and we must draw behind navbar
@@ -79,6 +83,7 @@ class NavigationBarManager {
     }
 
     fun evaluate(window: Window, isVirtualKeyboard: Boolean) {
+        virtual = isVirtualKeyboard
         if (isVirtualKeyboard) {
             evaluateWithVirtualKeyboard(window)
         } else {
@@ -91,13 +96,22 @@ class NavigationBarManager {
         update(window)
     }
 
+    /** The touch keyboard's board placed anew: the bar's colour of its [placement] ([SceneWindow.placement]). */
+    fun place(window: Window, placement: Set<String>) {
+        if (placement == this.placement) return
+        this.placement = placement
+        update(window)
+    }
+
     private fun update(window: Window) {
         val theme = ThemeManager.activeTheme
-        // the theme's (`navbar { color }`, 060-render-p3 T7a); null, follow: the colour under the keys
-        val set = if (ThemeManager.prefs.floatingKeyboard.getValue()) null else SceneWindow.navbar(theme, SceneWindow.scenes(window.context, theme))
+        // the theme's (`navbar { color }`, 060-render-p3 T7a); null, follow: the colour under the keys. The
+        // floating keyboard's is the app's under it; the hardware keyboard's (its candidates alone) the theme's
+        val floating = virtual && ThemeManager.prefs.floatingKeyboard.getValue()
+        val set = if (floating) null else SceneWindow.navbar(theme, SceneWindow.scenes(window.context, theme, placement = if (virtual) placement else emptySet()))
         if (shouldUpdateNavbarForeground) {
             WindowCompat.getInsetsController(window, window.decorView)
-                .isAppearanceLightNavigationBars = set?.let { ColorUtils.calculateLuminance(it) > LIGHT } ?: !theme.isDark
+                .isAppearanceLightNavigationBars = set?.let(SceneWindow::darkButtonsOn) ?: !theme.isDark
         }
         if (shouldUpdateNavbarBackground) {
             window.setNavbarBackgroundColor(
@@ -105,10 +119,5 @@ class NavigationBarManager {
                 set ?: if (ThemeManager.shownLook(theme).base == BoardBase.Picture) theme.backgroundColor else ThemeColors.board(ThemeManager.shownLook(theme).palette, ThemeManager.shownLook(theme).keys)
             )
         }
-    }
-
-    private companion object {
-        // a colour this light has the bar's buttons drawn dark
-        const val LIGHT = 0.5
     }
 }

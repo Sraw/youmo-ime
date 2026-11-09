@@ -155,6 +155,10 @@ class InputView(
     // whether the board is at a side one-handed (not split): what the buttons beside it change
     private var oneHandedPlaced = false
 
+    // where the board is as the theme's scenes (SceneWindow.placement: `@one-handed`, `@split`), docked; null
+    // till placed first, when the service's navigation bar, which a view before may have placed, is told too
+    private var placedScenes: Set<String>? = null
+
     // the empty side of a board put at the other (SplitKeyboard.Dock): a button moves it across
     private fun moveButton(to: SplitKeyboard.Dock, icon: Int, description: Int) = sideButton(icon, description) {
         if (oneHandedPlaced) ThemeManager.prefs.oneHanded.setValue(OneHanded.entries.first { it.dock == to })
@@ -544,6 +548,7 @@ class InputView(
         }
         val bottomPadding = if (floating) 0 else keyboardBottomPaddingPx
         oneHandedPlaced = placement != null && !TextKeyboard.splits(context)
+        placeScenes(if (floating) emptySet() else SceneWindow.placement(oneHandedPlaced, TextKeyboard.splits(context)))
         val placing = listOf(boardHeight, bottomPadding, sidePadding, placement?.side?.ordinal, placement?.widthDp, if (oneHandedPlaced) 1 else 0)
         if (placing == placed) return
         boardMover.move(BoardMove.kind(slide, placed != null, placedSide, placement?.side))
@@ -600,6 +605,18 @@ class InputView(
         }
     }
 
+    // the board placed anew as the theme's scenes: what the theme has of them, the navigation bar, the docked handle
+    private fun placeScenes(scenes: Set<String>) {
+        if (scenes == placedScenes) return
+        placedScenes = scenes
+        paintNavbar()
+        service.boardPlaced(scenes)
+        if (!floating) floatingHandle?.dress(windowScenes())
+    }
+
+    // the scenes the window round the keys is in now (SceneWindow.scenes)
+    private fun windowScenes() = SceneWindow.scenes(context, theme, floating, placedScenes.orEmpty())
+
     // in the room beside a board at [side]: the arrow across, and one-handed the way back to the whole width
     private fun showSideButtons(side: SplitKeyboard.Dock?) {
         if (side != null) dressSideButtons()
@@ -615,9 +632,14 @@ class InputView(
         fullWidthRight.translationY = apart
     }
 
+    // the scenes the side buttons are dressed in last: dressed again only as they change (one-handed, split)
+    private var sideButtonsDressed: Set<String>? = null
+
     // the theme's `side-button` (060-render-p3 T7a) in the scenes now, one-handed or a board at the side of the letters split
     private fun dressSideButtons() {
-        val scenes = SceneWindow.scenes(context, theme, oneHanded = oneHandedPlaced, split = !oneHandedPlaced)
+        val scenes = windowScenes()
+        if (scenes == sideButtonsDressed) return
+        sideButtonsDressed = scenes
         val look = SceneWindow.sideButton(theme, scenes)
         for (b in listOf(moveLeft, moveRight, fullWidthLeft, fullWidthRight)) {
             b.colorFilter = PorterDuffColorFilter(look.iconColor.value, PorterDuff.Mode.SRC_IN)
@@ -653,11 +675,15 @@ class InputView(
             // 贴底: no room for the bar, for ROMs whose hidden gesture line still takes it
             bottomMargin = if (floating || KeyboardArea.bottomFlush()) 0 else navBar
         }
-        // the theme's colour of the bar, as the screen is turned now
-        val navbar = if (floating) null else SceneWindow.navbar(theme, SceneWindow.scenes(context, theme))
+        paintNavbar()
+        return insets
+    }
+
+    // the theme's colour of the bar, as the screen is turned and the board placed now
+    private fun paintNavbar() {
+        val navbar = if (floating) null else SceneWindow.navbar(theme, windowScenes())
         navbarStrip.isVisible = navbar != null
         navbar?.let(navbarStrip::setBackgroundColor)
-        return insets
     }
 
     /**
