@@ -551,6 +551,7 @@
     <string name="im_pinyin_keys18">拼音 · 18 鍵</string>
     <string name="im_shuangpin_keys14">雙拼 · 14 鍵</string>
     <string name="learning_kind_keys18">拼音 18 鍵</string>
+    <string name="learning_kind_keys_own">拼音 主題鍵盤</string>
     <string name="learning_kind_shuangpin_keys14">雙拼 14 鍵</string>
     <string name="english_keyboard">鍵盤</string>
     <string name="english_keyboard_summary">螢幕上打英文用的鍵盤。實體鍵盤仍按字母打。</string>
