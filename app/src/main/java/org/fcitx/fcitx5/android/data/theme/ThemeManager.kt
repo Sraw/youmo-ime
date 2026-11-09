@@ -67,6 +67,39 @@ object ThemeManager {
      * of its versions go back to their defaults (a built-in theme), the user told. The pack is kept, to be
      * deleted or picked again.
      */
+    /**
+     * The user's 3.0 themes named as a listed pack or one of its versions: ones its import replaces
+     * ([ThemeFilesManager.Opened.Pack.customs]), the replacement finished here, on the main thread once the list
+     * has the pack ([packPlaced]; a kill after the place, at the next start's listing). A slot naming one bare
+     * where the pack has two versions (`mine`) names its version of the same lightness (`mine#dark`); one named
+     * as a version keeps the name, which then finds the pack. Then its json and files go. One whose slots were
+     * not written is left, found by its name till the next listing tries again. Whether a slot was renamed.
+     */
+    private fun finishReplacements(): Boolean {
+        if (!ThemeFilesManager.writable || packs.isEmpty()) return false
+        var renamed = false
+        val replaced = customThemes.filter { c -> packs.any { it.name == c.name || it.file == c.name } }
+        for (custom in replaced) {
+            val versions = packs.filter { it.name == custom.name || it.file == custom.name }
+            if (versions.none { it.name == custom.name }) {
+                val to = (versions.firstOrNull { it.isDark == custom.isDark } ?: versions.first()).name
+                if (!prefs.renameThemeRefs(custom.name, to)) {
+                    Timber.w("Settings naming theme ${custom.name} not written: replaced by its pack at the next listing")
+                    continue
+                }
+                renamed = true
+            }
+            try {
+                ThemeFilesManager.deleteThemeFiles(custom)
+            } catch (e: IOException) {
+                Timber.w(e, "Theme ${custom.name} replaced by its pack not deleted")
+                continue
+            }
+            customThemes.remove(custom)
+        }
+        return renamed
+    }
+
     // whether the mark of a pack that took the last process down was consulted: once a process, once
     // the packs are listed (not while the files are not settled, A4: none to reset, the mark kept till
     // then), before any of them is drawn
@@ -147,9 +180,10 @@ object ThemeManager {
         customThemes.clear()
         customThemes.addAll(themes)
         packs = ThemeFilesManager.listPacks()
+        val renamed = finishReplacements()
         packsListed()
         // the copy for before the first unlock names what this one does (the start syncs it after init)
-        if (changed) syncToDeviceEncryptedStorage()
+        if (changed || renamed) syncToDeviceEncryptedStorage()
         activeTheme = evaluateActiveTheme()
     }
 
@@ -326,6 +360,7 @@ object ThemeManager {
     fun init(configuration: Configuration) {
         isDarkMode = configuration.isDarkMode()
         // the app's start, on the main thread (the toast): before the theme in use is read
+        finishReplacements()
         packsListed()
         _activeTheme = evaluateActiveTheme()
         settleKeyStyle()

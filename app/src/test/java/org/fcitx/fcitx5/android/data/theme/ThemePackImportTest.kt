@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.junit.Assert.assertNotNull
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.util.ReflectionHelpers
+import androidx.preference.PreferenceManager
 import kotlinx.serialization.json.Json
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
@@ -382,11 +383,33 @@ class ThemePackImportTest {
         val pack = opened(sample())
         assertEquals(listOf("mine"), pack.customs.map { it.name })
         val versions = pack.commit().getOrThrow()
+        // placed, not listed yet (the list page's packPlaced to come, on the main thread): the theme still there, found
+        assertTrue(File(dir, "mine.json").exists())
+        assertTrue(ThemeManager.getTheme("mine") is Theme.Custom)
         ThemeManager.packPlaced(versions[0].file)
-        // its json gone; the setting naming it names the pack's dark version, not the default theme
+        // its json gone; the setting naming it names the pack's dark version, not the default theme, the copy for
+        // before the first unlock too
         assertFalse(File(dir, "mine.json").exists())
         assertEquals("mine#dark", ThemeManager.prefs.normalModeTheme.getValue().name)
         assertEquals(versions.single { it.isDark }, ThemeManager.activeTheme)
+        val beforeUnlock = PreferenceManager.getDefaultSharedPreferences(appContext.createDeviceProtectedStorageContext())
+        assertEquals("mine#dark", beforeUnlock.getString(ThemeManager.prefs.normalModeTheme.key, null))
+    }
+
+    @Test
+    fun aReplacementAKillCutShortIsFinishedAtTheNextStart() {
+        ThemeFilesManager.saveThemeFiles(TestThemes.TransparentDark.deriveCustomNoBackground("mine"))
+        ThemeManager.refreshThemes()
+        ThemeManager.setNormalModeTheme(ThemeManager.getTheme("mine")!!)
+        // placed, the process killed before the list had it: the 3.0 theme and the pack both there
+        opened(sample()).commit().getOrThrow()
+        assertTrue(File(dir, "mine.json").exists())
+        // the next start's listing finishes it: the slot names the pack's version, the json gone, one theme listed
+        ThemeManager.refreshThemes()
+        assertFalse(File(dir, "mine.json").exists())
+        assertEquals("mine#dark", ThemeManager.prefs.normalModeTheme.getValue().name)
+        assertTrue(ThemeManager.getAllThemes().none { it is Theme.Custom && it.name == "mine" })
+        assertEquals(listOf("mine#light", "mine#dark"), ThemeManager.Packs.map { it.name })
     }
 
     @Test
@@ -504,6 +527,11 @@ class ThemePackImportTest {
             assertEquals(kept, refusal(sample()))
             assertEquals(text, File(packs, "mine/theme.xml").readText())
         }
+        // one past a pack's theme.xml limit is not read whole to tell: replaced
+        val huge = "<!--" + "x".repeat(ThemeAssetLimits.MAX_THEME_XML_BYTES.toInt()) + "--></theme>"
+        File(packs, "mine/theme.xml").writeText(later[0].replace("</theme>", huge))
+        ThemeManager.refreshThemes()
+        opened(sample()).apply { assertTrue(replaces) }.discard()
         // one cut short (a restore killed half way: a file it names missing), or that no longer reads: not
         // listed, so not to be deleted; imported again, replaced and listed
         val cutShort: () -> Unit = { File(packs, "mine/round.ttf").delete() }
@@ -650,17 +678,18 @@ class ThemePackImportTest {
         assertFalse(File(packs, ".saving").exists())
     }
 
-    // a frame of the keyboard's canvas [c] recorded as the RenderThread draws it (hardware), not yet committed
-    private fun recordFrame(c: KeyboardCanvasView) {
+    // a frame of the window drawn on the RenderThread (hardware), in ViewRootImpl.performDraw's order: the commit
+    // callbacks registered till now taken first, then the keyboard's canvas [c] recorded; what is returned runs
+    // once this frame is committed ([commit]). Robolectric's own windows draw no frame, so none is drawn otherwise
+    private fun frame(c: KeyboardCanvasView): List<Runnable> {
+        val taken = ReflectionHelpers.callInstanceMethod<ArrayList<Runnable>?>(c.viewTreeObserver, "captureFrameCommitCallbacks").orEmpty()
         val node = RenderNode("frame")
         c.draw(node.beginRecording(c.width, c.height))
         node.endRecording()
+        return taken
     }
 
-    // the frame recorded committed: what the window's renderer calls back once it is drawn
-    private fun commitFrame(c: KeyboardCanvasView) {
-        ReflectionHelpers.callInstanceMethod<ArrayList<Runnable>?>(c.viewTreeObserver, "captureFrameCommitCallbacks")?.forEach(Runnable::run)
-    }
+    private fun commit(callbacks: List<Runnable>) = callbacks.forEach(Runnable::run)
 
     private fun softwareFrame(c: KeyboardCanvasView) = c.draw(Canvas(Bitmap.createBitmap(c.width, c.height, Bitmap.Config.ARGB_8888)))
 
@@ -682,21 +711,30 @@ class ThemePackImportTest {
             KeyboardHarness(theme = dark).start().use { h ->
                 val c = KeyboardHarness.boardCanvas(h.inputView)!!
                 assertNotNull(c.scene)
-                // what the window drew as it was shown aside (Robolectric's renderer commits no frame): from none drawn
-                PackDrawGuard.reset()
-                mark.delete()
-                // a frame recorded: marked till the RenderThread has drawn it (its glyphs, its pictures)
-                recordFrame(c)
+                assertFalse(mark.exists())
+                // its first frame: marked till the RenderThread has drawn it (its glyphs, its pictures)
+                val first = frame(c)
                 assertEquals("mine", mark.readText())
+                // that frame committed: its callback was registered as it drew, so it goes with the next frame
+                commit(first)
+                assertTrue(mark.exists())
+                // which is asked for (a keyboard shown and hidden untouched would draw no other)
+                assertFalse(c.isDirty)
+                h.after(50)
+                assertTrue("another frame asked for", c.isDirty)
                 // another pack's frame clears nothing
                 PackDrawGuard.frameDrawn(PackDrawGuard.Key("other", 0))
                 assertTrue(mark.exists())
-                commitFrame(c)
+                // the next frame committed: the first was drawn before it
+                commit(frame(c))
                 assertFalse(mark.exists())
                 assertTrue(PackDrawGuard.confirmed(key))
-                // drawn once in this process: not marked again
-                recordFrame(c)
+                // drawn once in this process: the frame the second asked for drawn, not marked again, none more asked for
+                h.after(50)
+                commit(frame(c))
                 assertFalse(mark.exists())
+                h.after(50)
+                assertFalse("no frame more asked for", c.isDirty)
             }
             // a frame drawn on a bitmap (software) is drawn then and there: no mark left
             PackDrawGuard.reset()
@@ -711,7 +749,7 @@ class ThemePackImportTest {
             PackDrawGuard.frameDrawn(again)
             // its first frame of a process recorded, never committed: the process went down with it
             PackDrawGuard.reset()
-            KeyboardHarness(theme = dark).start().use { h -> recordFrame(KeyboardHarness.boardCanvas(h.inputView)!!) }
+            KeyboardHarness(theme = dark).start().use { h -> frame(KeyboardHarness.boardCanvas(h.inputView)!!) }
             assertTrue(mark.exists())
             // the next start before the first unlock (the files not settled): nothing to reset, the mark kept for after
             directBoot(true)

@@ -1228,8 +1228,9 @@ file too (`SceneBar`, `ScenePanels`: `SceneThemes.of(theme, look)`). `PackDrawGu
 `noBackupFilesDir/theme-pack-drawing` (the pack's name; written, not synced: a crash keeps it) as a
 `KeyboardCanvasView` is about to draw a pack's first frame of a process (`onDraw`, keyed by name and file
 time: one imported again is guarded again) and deletes it once that frame is drawn: at once on a software
-canvas, on a hardware one when the frame is committed (`registerFrameCommitCallback`, its glyphs and pictures
-drawn on the RenderThread), only for the pack marked (another view's frame clears nothing). A pack built and
+canvas, on a hardware one when a frame is committed (`registerFrameCommitCallback`, its glyphs and pictures
+drawn on the RenderThread; `ViewRootImpl.performDraw` takes the callbacks before it draws, so one registered in
+`onDraw` goes with the next frame, which `postInvalidateOnAnimation` asks for while the mark is pending), only for the pack marked (another view's frame clears nothing). A pack built and
 not drawn (the keyboard made again while hidden, a settings page's sizes) marks nothing, so a process ended
 otherwise resets nothing. Found at the first listing of the packs of a process (`ThemeManager.init`, or the
 first `refreshThemes` once the files are settled: kept till then), the slots
@@ -1248,12 +1249,14 @@ Space or Enter's text, `ThemePackCheck.hidesRequired`), at most 1 MB, `LookTheme
 theme of 400 single keys written as 4.0) styles, 4 fonts, 200 icons (the reader's); its name plain, not
 `.`-led, not ending `#light`/`#dark`, no built-in's file or reference, no 0.5 name
 (`ThemePackFiles.builtinClash`). A 3.0 theme of the user's named by one of its references is replaced by it
-(`Opened.Pack.customs`: its json and the files no other theme names deleted after the place; the slots keep
-the name, which now finds the pack; a theme named `mine` replaced by a pack `mine` of two versions, the slots
-naming it name its version of the same lightness, `mine#dark`, before the json goes), while a 3.0 import named
-as a pack's reference is refused. A folder of its name there but not listed is refused only where its
+(`Opened.Pack.customs`; finished on the main thread once the pack is listed, `ThemeManager.finishReplacements`
+at `packPlaced`, or at the next start's listing after a kill: the slots keep the name, which then finds the
+pack; a theme named `mine` replaced by a pack `mine` of two versions, the slots naming it name its version of
+the same lightness, `mine#dark`, and the copy for before the first unlock is synced; then its json and the files
+no other theme names are deleted, not where the slots were not written: tried again at the next listing, the
+3.0 theme found by its name till then), while a 3.0 import named as a pack's reference is refused. A folder of its name there but not listed is refused only where its
 `theme.xml` is a later build's (`ThemeReader.laterBuilds`: a format past 4.x, or a newer `min-app`;
-`exception_theme_newer_kept`); any other (one that no longer reads, misses a file, hides required text, past
+`exception_theme_newer_kept`; a `theme.xml` past 1 MB is not read for it, so not); any other (one that no longer reads, misses a file, hides required text, past
 the packs listed) is replaced, as it could not be deleted otherwise. A new pack past `ThemeAssetLimits.MAX_PACKS` (100) too
 (`exception_theme_packs`). Every file it names inside its folder (never `theme.xml`) and present; pictures
 (the source photo too) and key images as a 3.0 theme's, a preview `.png`/`.webp` of 512 KB and 2048 px a side, fonts that load, icons of 64 KB in

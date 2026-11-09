@@ -432,9 +432,8 @@ object ThemeFilesManager {
         class Pack internal constructor(
             val staged: ThemePackFiles.Staged,
             private val packThere: Boolean,
-            /** The user's 3.0 themes named as it or one of its versions: replaced by it, their json deleted. */
+            /** The user's 3.0 themes named as it or one of its versions: replaced by it, their json deleted once it is listed. */
             internal val customs: List<Theme.Custom>,
-            private val themes: List<Theme>,
             private val unpacked: File,
         ) : Opened {
             /** A pack of its name, or a 3.0 theme named as it is, is there: taking it replaces that one. */
@@ -444,18 +443,9 @@ object ThemeFilesManager {
             fun commit(): Result<List<Theme.Pack>> = runCatching {
                 try {
                     if (!writable) notSettled()
-                    ThemePackFiles.place(dir, staged).also {
-                        // the settings naming a 3.0 theme it replaces name the pack now (ThemeManager.getTheme): one
-                        // named as a version is, one named as a pack of two versions is (`mine`, no version's name)
-                        // its version of the same lightness, before its json goes (a kill between, the slot still
-                        // finds the pack)
-                        val variants = staged.theme.variants
-                        val refs = ThemePackFiles.refs(staged.name, variants)
-                        val moved = customs.filter { it.name !in refs }
-                        moved.forEach { ThemeManager.prefs.renameThemeRefs(it.name, BuiltinThemeFiles.ref(staged.name, it.isDark, variants.size > 1)) }
-                        if (moved.isNotEmpty()) ThemeManager.syncToDeviceEncryptedStorage()
-                        customs.forEach { deleteCustom(it, themes) }
-                    }
+                    // the 3.0 themes it replaces ([customs]) are, once the pack is listed (ThemeManager.packPlaced,
+                    // or the next start's listing after a kill: ThemeManager.finishReplacements), on the main thread
+                    ThemePackFiles.place(dir, staged)
                 } finally {
                     discard()
                 }
@@ -515,7 +505,7 @@ object ThemeFilesManager {
                 }
                 val refs = ThemePackFiles.refs(staged.name, staged.theme.variants) + staged.name
                 val customs = themes.filterIsInstance<Theme.Custom>().filter { it.name in refs }
-                Opened.Pack(staged, there, customs, themes, temp).also { kept = true }
+                Opened.Pack(staged, there, customs, temp).also { kept = true }
             } finally {
                 if (!kept) temp.deleteRecursively()
             }

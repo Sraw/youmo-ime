@@ -321,8 +321,14 @@ class KeyboardCanvasView(
             }
         }
         // what the frame's nodes draw (a pack's fonts' glyphs, its pictures) is drawn on the RenderThread
-        // after this: the pack's first frame drawn once the frame is committed, not here
-        pack?.let { p -> viewTreeObserver.registerFrameCommitCallback { PackDrawGuard.frameDrawn(p) } }
+        // after this: the pack's first frame drawn once a frame is committed, not here. ViewRootImpl.performDraw
+        // takes the commit callbacks before it draws, so one registered here goes with the window's next
+        // frame, asked for (a keyboard shown and hidden untouched draws one): that one committed, the frames
+        // are drawn in order, this one was. Once it is, none is asked for again (drawing() false, pack null)
+        pack?.let { p ->
+            viewTreeObserver.registerFrameCommitCallback { PackDrawGuard.frameDrawn(p) }
+            postInvalidateOnAnimation()
+        }
     }
 
     // a node still holding what was recorded: one the renderer let go of (the window gone, memory

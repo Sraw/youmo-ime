@@ -182,9 +182,13 @@ object ThemePackFiles {
             .map { dark -> Theme.Pack(BuiltinThemeFiles.ref(file, dark, paired), dark, file, dir.path, stamp) }
     }
 
-    /** Whether the pack folder [dir] holds a later build's file than the app [appVersion]'s ([ThemeReader.laterBuilds]); one not read, not. */
-    fun laterBuilds(dir: File, appVersion: String): Boolean = runCatching { File(dir, THEME_XML).readText().removePrefix(BOM) }.getOrNull()
-        ?.let { ThemeReader.laterBuilds(it, appVersion) } == true
+    /**
+     * Whether the pack folder [dir] holds a later build's file than the app [appVersion]'s ([ThemeReader.laterBuilds]);
+     * one not read, or past a pack's [ThemeAssetLimits.MAX_THEME_XML_BYTES] (not read whole), not.
+     */
+    fun laterBuilds(dir: File, appVersion: String): Boolean = runCatching {
+        File(dir, THEME_XML).takeIf { it.length() <= ThemeAssetLimits.MAX_THEME_XML_BYTES }?.readText()?.removePrefix(BOM)
+    }.getOrNull()?.let { ThemeReader.laterBuilds(it, appVersion) } == true
 
     /** How the settings would refer to the versions of a pack named [name] of [variants] ([BuiltinThemeFiles.ref]). */
     fun refs(name: String, variants: Set<Boolean>): List<String> =
