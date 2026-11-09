@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.input.theme.KeyFill
 import org.fcitx.fcitx5.android.input.theme.KeyLabel
 import org.fcitx.fcitx5.android.input.theme.KeyOverride
 import org.fcitx.fcitx5.android.input.theme.KeyPressed
+import org.fcitx.fcitx5.android.input.theme.Keys
 import org.fcitx.fcitx5.android.input.theme.KindStyle
 import org.fcitx.fcitx5.android.input.theme.NineSlice
 import org.fcitx.fcitx5.android.input.theme.Palette
@@ -144,7 +145,7 @@ object LookTheme {
         style("@flat key.space", "fill" to "@spaceBar", "shape" to "bar", "radius" to "3dp")
         style("@flat key.enter", "fill" to "@accentKey", "shape" to "circle")
         // single keys over their kinds, later so they win the tie
-        overrides(names, keys.overrides.toSortedMap().mapKeys { selector(it.key) }, if (keys.press == PressEffect.Ripple) "ripple" else "tint")
+        overrides(names, keys, keys.overrides.toSortedMap().mapKeys { selector(it.key) })
         style("preview, popup", "fill" to "@popupBackground", "color" to "@popupText", "radius" to "${keys.radiusDp}dp", "shadow" to "0 2dp 2dp #33000000")
         style("popup:selected", "fill" to "@genericActiveBackground", "color" to "@genericActiveForeground")
         style("menu", "fill" to "@accentKey", "color" to "@accentKeyText", "icon-color" to "@accentKeyText", "radius" to "50%")
@@ -161,10 +162,13 @@ object LookTheme {
     // no face at all, its own or pressed (3.0's face=null), the space and Return theirs. Keys of one face
     // share its lines (a list of selectors), and the lines go in this order for the ties: a key's, its
     // function kind's, flat none, then Return's and the flat space's.
-    private fun StringBuilder.overrides(names: Map<String, String>, overrides: Map<String, KeyOverride>, press: String) {
+    private fun StringBuilder.overrides(names: Map<String, String>, keys: Keys, overrides: Map<String, KeyOverride>) {
+        val ripple = keys.press == PressEffect.Ripple
         val fills = overrides.entries.mapNotNull { (k, o) -> o.fill?.let { k to it } }.groupBy({ it.second }, { it.first })
         val pressed = overrides.entries.mapNotNull { (k, o) -> o.pressed?.takeIf { it != KeyPressed.Darken }?.let { k to it } }
             .groupBy({ it.second }, { it.first })
+        // Darken, a key's own: its face tinted as it is, not its kind's pressed one (3.0's own won); by its own fill
+        val darkened = overrides.entries.filter { it.value.pressed == KeyPressed.Darken }.groupBy({ it.value.fill }, { it.key })
         fun List<String>.of(suffix: String, scene: String = "") = joinToString(", ") { "$scene$it$suffix" }
         fills.forEach { (f, ks) ->
             style(ks.of(""), "fill" to fill(names, f, "@key"))
@@ -174,8 +178,16 @@ object LookTheme {
             pressed(names, ks.of(":pressed"), p, "@key")
             if (p is KeyPressed.Image) pressed(names, ks.of(".function:pressed"), p, "@altKey")
         }
+        darkened.forEach { (f, ks) ->
+            style(ks.of(":pressed"), "fill" to fill(names, f ?: keys.letter.fill, "@key"), "press" to if (ripple) "ripple" else "tint")
+            style(ks.of(".function:pressed"), "fill" to fill(names, f ?: keys.function.fill, "@altKey"))
+            style(ks.of(".space:pressed"), "fill" to fill(names, f ?: keys.space.fill, "@key"))
+        }
         fills.values.flatten().takeIf { it.isNotEmpty() }?.let { style(it.of("", "@flat "), "fill" to "transparent") }
-        pressed.values.flatten().takeIf { it.isNotEmpty() }?.let { style(it.of(":pressed", "@flat "), "fill" to "transparent", "press" to press) }
+        // flat, nothing pressed either: no face, and no tint where 3.0 drew none over a pressed face of its own
+        pressed.values.flatten().takeIf { it.isNotEmpty() }
+            ?.let { style(it.of(":pressed", "@flat "), "fill" to "transparent", "press" to if (ripple) "ripple" else "face") }
+        darkened.values.flatten().takeIf { it.isNotEmpty() }?.let { style(it.of(":pressed", "@flat "), "fill" to "transparent") }
         fills.forEach { (f, ks) ->
             style(ks.of(".enter"), "fill" to fill(names, f, "@accentKey"))
             style(ks.of(".space", "@flat "), "fill" to fill(names, f, "@spaceBar"))
@@ -188,6 +200,10 @@ object LookTheme {
                 }
                 else -> pressed(names, ks.of(".enter:pressed") + ", " + ks.of(".space:pressed", "@flat "), p)
             }
+        }
+        darkened.forEach { (f, ks) ->
+            style(ks.of(".enter:pressed"), "fill" to fill(names, f ?: keys.enter.fill, "@accentKey"))
+            style(ks.of(".space:pressed", "@flat "), "fill" to (f?.let { fill(names, it, "@spaceBar") } ?: "@spaceBar"))
         }
         overrides.filterValues { it.label == KeyLabel.Hide }.keys.toList().takeIf { it.isNotEmpty() }?.let { style(it.of(" label"), "hidden" to "true") }
     }
@@ -224,11 +240,11 @@ object LookTheme {
     }
 
     /**
-     * The styles a written theme may have ([ThemeReader]'s `maxStyles`): its own lines, and up to eight a
-     * single key's face of its own (four its fill's, four its pressed one's) for each of the most a 3.0
+     * The styles a written theme may have ([ThemeReader]'s `maxStyles`): its own lines, and up to ten a
+     * single key's face of its own (four its fill's, six its pressed one's) for each of the most a 3.0
      * theme brings, more than a theme file's `ThemeReader.MAX_STYLES` when they all differ.
      */
-    const val MAX_STYLES = 100 + 8 * ThemeAssetLimits.MAX_OVERRIDES
+    const val MAX_STYLES = 100 + 10 * ThemeAssetLimits.MAX_OVERRIDES
 
     // a 3.0 key name as a selector: what a selector reads otherwise in the key's name escaped, so that
     // 大千's zhuyin/, is its comma key, not a list of two, and number/* the star key, not every key

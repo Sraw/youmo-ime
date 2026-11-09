@@ -154,14 +154,41 @@ class LookThemeTest {
         // a flat space's pressed image over the space bar's colour, as its face is
         val flat = scene(theme, SceneData.portrait.copy(flat = true))
         assertTrue(key(flat, "space").ops(true).any { it is Op.NineSlice && it.fallback == Argb(p.spaceBarColor) })
-        // flat, a letter or function key has no face, its own or pressed (3.0's face=null); Return keeps its own
-        for (id in listOf("q", "w", "shift", "backspace")) {
-            for (down in listOf(false, true)) {
-                val ops = key(flat, id).ops(down)
-                assertTrue("$id $down $ops", ops.none { it is Op.Picture || it is Op.NineSlice || (it is Op.Fill && it.color.value ushr 24 != 0 && it.color != Argb(p.keyPressHighlightColor)) })
-            }
+        // flat, a letter or function key has no face, its own or pressed (3.0's face=null), and no tint over a
+        // pressed face of its own (3.0 drew none there); Return keeps its own
+        fun shown(op: Op) = op is Op.Picture || op is Op.NineSlice || (op is Op.Fill && op.color.value ushr 24 != 0)
+        for (id in listOf("q", "backspace")) assertTrue(id, key(flat, id).ops(false).none(::shown))
+        for (id in listOf("w", "shift")) {
+            assertTrue(id, key(flat, id).ops(false).none(::shown))
+            assertTrue(id, key(flat, id).ops(true).none(::shown))
         }
         assertTrue(key(flat, "enter").ops(true).any { it is Op.NineSlice && it.fallback == Argb(p.accentKeyBackgroundColor) })
+        // a ripple theme's press still ripples there
+        val rippled = theme(LookTheme.xml(look.copy(keys = look.keys.copy(press = PressEffect.Ripple)), "T", false))
+        val flatRipple = scene(rippled, SceneData.portrait.copy(flat = true))
+        for (id in listOf("w", "shift")) {
+            val ops = key(flatRipple, id).ops(true)
+            assertTrue("$id $ops", ops.none(::shown) && ops.any { it is Op.Ripple })
+        }
+    }
+
+    // a single key's Darken over its kind's pressed image: its own face tinted, as 3.0's own won
+    @Test
+    fun aSingleKeysDarkenIsItsOwn() {
+        val down = NineSlice("/data/themes/t/key-down.png", Insets(1, 1, 1, 1), 1)
+        val base = LookDefaults.look(palette(SceneData.theme("material-light.xml")))
+        val look = base.copy(
+            keys = base.keys.copy(
+                letter = KindStyle(KeyFill.Color, KeyPressed.Image(down)),
+                overrides = mapOf("qwerty/e" to KeyOverride(null, KeyPressed.Darken, KeyLabel.Show)),
+            ),
+        )
+        val scene = scene(theme(LookTheme.xml(look, "T", false)), SceneData.portrait)
+        assertTrue(key(scene, "q").ops(true).any { it is Op.NineSlice })
+        val e = key(scene, "e").ops(true)
+        assertTrue("$e", e.none { it is Op.NineSlice })
+        assertTrue("$e", e.any { it is Op.Fill && it.color == Argb(look.palette.keyBackgroundColor) })
+        assertTrue("$e", e.any { it is Op.Fill && it.color == Argb(look.palette.keyPressHighlightColor) })
     }
 
     // the most single keys a 3.0 theme brings (ThemeAssetLimits), each a face and a pressed one of its own:
