@@ -1,0 +1,120 @@
+/*
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+ */
+package org.fcitx.fcitx5.android.input.scene
+
+import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
+import org.fcitx.fcitx5.android.input.theme.Gap
+import org.fcitx.fcitx5.android.input.theme.Keys
+import org.fcitx.fcitx5.android.input.theme.LookDefaults
+import org.fcitx.fcitx5.android.input.theme.ThemeLook
+import org.fcitx.fcitx5.android.scene.Parsed
+import org.fcitx.fcitx5.android.scene.engine.WindowLooks
+import org.fcitx.fcitx5.android.scene.theme.Argb
+import org.fcitx.fcitx5.android.scene.theme.Cascades
+import org.fcitx.fcitx5.android.scene.theme.ThemeReader
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+/**
+ * 060-render-p3 T7a: a theme 3.0's window drawn by the engine's default rules ([WindowLooks]) as the app
+ * worked it out before, from the look's keys: the floating keyboard's corners [FloatingKeyboard.cornerDp]'s,
+ * the handle's strip a shade of the bar, its grip the function keys' text colour.
+ */
+class WindowDefaultsTest {
+
+    private val base = LookDefaults.look(LookThemeTest.palette(SceneData.theme("material-light.xml")))
+
+    private fun looks(look: ThemeLook, dark: Boolean = false): WindowLooks {
+        val xml = LookTheme.xml(look, "T", dark)
+        val theme = when (val t = ThemeReader.theme(xml, maxStyles = LookTheme.MAX_STYLES)) {
+            is Parsed.Ok -> t.value
+            is Parsed.Failed -> error("${t.problems}\n$xml")
+        }
+        return WindowLooks(Cascades(theme))
+    }
+
+    @Test
+    fun theFloatingCornersAreCornerDpsAtEveryWidth() {
+        val radii = listOf(0, 1, 4, 7, 12, Keys.MAX_RADIUS_DP)
+        val gaps = listOf(Gap(3, 7, 3, 4), Gap(0, 0, 0, 0), Gap(5, 2, 9, 1), Gap(1, 9, 6, 0), Gap(24, 24, 24, 24), Gap(0, 24, 24, 0))
+        var points = 0
+        for (r in radii) for (gap in gaps) for (blocks in listOf(true, false)) points += everyScreen(r, gap, blocks)
+        assertEquals(radii.size * gaps.size * 2 * 166 * 4, points)
+    }
+
+    // every screen the floating keyboard is on, upright and turned, compact or not: its width is
+    // FloatingKeyboard.widthDp's, the corners the same at each; the points checked
+    private fun everyScreen(r: Int, gap: Gap, blocks: Boolean): Int {
+        val l = looks(base.copy(keys = base.keys.copy(radiusDp = r, gap = gap, blocks = blocks)))
+        var points = 0
+        for (screen in 280..1600 step 8) for (landscape in listOf(false, true)) for (compact in listOf(false, true)) {
+            val width = FloatingKeyboard.widthDp(screen)
+            val scenes = buildSet {
+                add("floating")
+                if (landscape) add("landscape")
+                if (compact) add("compact")
+                if (!blocks) add("flat")
+            }
+            val h = if (landscape) gap.hLand else gap.h
+            val v = if (landscape) gap.vLand else gap.v
+            val want = FloatingKeyboard.cornerDp(r, h, v, blocks).toDouble()
+            assertEquals("r=$r $gap blocks=$blocks at $width dp of $screen $scenes", want, l.frame(scenes).radiusDp, 0.0)
+            points++
+        }
+        return points
+    }
+
+    @Test
+    fun theRestOfTheFrameIsTheAppsOfBefore() {
+        val f = looks(base).frame(emptySet())
+        // FloatingCorners' elevation, the system's shadow, no border; a corner of one radius
+        assertEquals(WindowLooks.ELEVATION_DP, f.elevationDp, 0.0)
+        assertNull(f.shadowColor)
+        assertNull(f.border)
+        assertEquals(false, f.round)
+    }
+
+    @Test
+    fun theHandleAndTheSideButtonsAreTheAppsOfBefore() {
+        for (dark in listOf(false, true)) {
+            val palette = LookThemeTest.palette(SceneData.theme(if (dark) "material-dark.xml" else "material-light.xml"))
+            val l = looks(LookDefaults.look(palette), dark)
+            val scenes = if (dark) setOf("dark") else emptySet()
+            // FloatingHandle's: the strip at the top the bar's with 10% of the keys' text, its alpha the bar's
+            val top = l.handle(scenes, top = true)
+            assertEquals(Argb(mix(palette.barColor, palette.keyTextColor)), top.fill)
+            assertNull(l.handle(scenes, top = false).fill)
+            assertEquals(Argb(palette.altKeyTextColor), top.color)
+            assertEquals(Argb(palette.altKeyTextColor), top.iconColor)
+            assertEquals(36.0 to 4.0, top.widthDp to top.heightDp)
+            // InputView's side buttons: the function keys' text colour on nothing, a round ripple of the pressed colour
+            val side = l.sideButton(scenes + "one-handed")
+            assertEquals(WindowLooks.SideButton(null, Argb(palette.altKeyTextColor), true, 0.0, false, Argb(palette.keyPressHighlightColor)), side)
+            assertNull(l.navbar(scenes))
+        }
+    }
+
+    @Test
+    fun theHandlesShadeIsTheOldOnesToTheLastChannel() {
+        // every pair of a channel's values, each channel in turn, the alpha one of a few
+        for (b in 0..255) for (i in 0..255) for (shift in listOf(0, 8, 16)) {
+            val alpha = listOf(0xFF, 0x80, 0x00)[(b + i) % 3] shl 24
+            val base = alpha or (b shl shift) or (0x33 shl ((shift + 8) % 24))
+            val ink = (0xC0 shl 24) or (i shl shift)
+            assertEquals("$b $i $shift", mix(base, ink), WindowLooks.handleColor(Argb(base), Argb(ink)).value)
+        }
+    }
+
+    // FloatingKeyboard.handleColor as it was (0.5.2): each of r, g, b 10% of the way to the ink, rounded; the base's alpha
+    private fun mix(base: Int, ink: Int): Int {
+        fun ch(shift: Int): Int {
+            val b = base ushr shift and 0xFF
+            val i = ink ushr shift and 0xFF
+            return Math.round(b + (i - b) * 0.1f) shl shift
+        }
+        return (base and 0xFF000000.toInt()) or ch(16) or ch(8) or ch(0)
+    }
+}

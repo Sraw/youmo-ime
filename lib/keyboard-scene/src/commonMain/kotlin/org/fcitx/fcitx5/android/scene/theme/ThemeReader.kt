@@ -269,9 +269,12 @@ object ThemeReader {
         var reserved = 0
         for ((prop, what) in PROPERTY_VALUES) {
             val raw = el[prop] ?: continue
-            val v = a.value(prop, what) { Values.read(prop, it) ?: RESERVED_VALUE.takeIf { _ -> Values.reservedValue(prop, it) } }
+            val v = a.value(prop, what) { Values.read(prop, it) ?: RESERVED_VALUE.takeIf { _ -> Values.reservedValue(prop, it) } ?: follow(prop, it) }
             if (v === RESERVED_VALUE) {
                 p.warn(el.line, ignored("$prop=\"$raw\""))
+                reserved++
+            } else if (v == FOLLOW && selectors.orEmpty().any { it.widget != NAVBAR }) {
+                p.warn(el.line, "color=\"follow\" is the navigation bar's alone: ignored")
                 reserved++
             } else if (v != null) {
                 values[prop] = v
@@ -280,6 +283,7 @@ object ThemeReader {
         reserved += sizesAndReserved(el, a, p, colors, selectors.orEmpty(), values)
         a.done()
         selectors?.let { selectorWarnings(el, p, it) }
+        selectors?.let { frame(it, values, el.line, p) }
         named(values, a, colors, fonts)
         selectors?.let { readElsewhere(it, values.keys, el.line, p) }
         if (values.isEmpty() && reserved == 0) a.problem("a style that sets nothing")
@@ -294,7 +298,36 @@ object ThemeReader {
         val keyboard = selectors.any { it.widget == "keyboard" }
         val sized = if (keyboard) sizes(el, a, p, selectors, values) else 0
         val keyboards = keyboard && selectors.all { it.widget == "keyboard" }
-        return sized + reserved(el, a, p, colors, skip = if (keyboards) Values.KEYBOARD_SIZES else emptyList())
+        val handles = selectors.isNotEmpty() && selectors.all { it.widget == HANDLE }
+        if (handles) grip(el, a, values)
+        val skip = when {
+            keyboards -> Values.KEYBOARD_SIZES
+            handles -> Values.HANDLE_SIZES
+            else -> emptyList()
+        }
+        return sized + reserved(el, a, p, colors, skip)
+    }
+
+    // the handle's grip ([Values.HANDLE_SIZES]), on a style of handles alone (in a list with others, a later stage's)
+    private fun grip(el: XmlElement, a: Attributes, values: MutableMap<String, Value>) {
+        for (prop in Values.HANDLE_SIZES.filter { el[it] != null }) {
+            val max = if (prop == "width") Values.MAX_GRIP_WIDTH_DP else Values.MAX_GRIP_HEIGHT_DP
+            a.value(prop, "0–${max.toInt()}dp") { Values.gripSize(prop, it) }?.let { values[prop] = Value.Number(it) }
+        }
+    }
+
+    // `color="follow"` ([Values.FOLLOW]): the navigation bar's (a style of others warned of and ignoring it)
+    private fun follow(prop: String, raw: String): Value? = FOLLOW.takeIf { prop == "color" && raw == Values.FOLLOW }
+
+    // the frame is the system's outline, of one radius and an elevation's shadow (straight down, no offset of its own)
+    private fun frame(selectors: List<Selector>, values: Map<String, Value>, line: Int, p: Problems) {
+        if (selectors.none { it.widget == "frame" }) return
+        val shadow = (values["shadow"] as? Value.OfShadow)?.shadow
+        if (shadow != null && (shadow.dx != 0.0 || shadow.dy != 0.0)) {
+            p.warn(line, "shadow= of the frame has no offset (the system's, of its blur's height): its x and y are ignored")
+        }
+        val radius = (values["radius"] as? Value.OfRadius)?.radius
+        if (radius != null && radius.corners.distinct().size > 1) p.warn(line, "radius= of the frame is one radius: its first is taken")
     }
 
     // what of the selectors selects nothing: a later stage's, an input method this app has none of (a misspelt
@@ -335,6 +368,11 @@ object ThemeReader {
 
     // a property of today's value a later stage reads ([Values.reservedValue]): ignored
     private val RESERVED_VALUE = Value.Flag(false)
+
+    // the navigation bar's colour as the keyboard's under it ([org.fcitx.fcitx5.android.scene.engine.WindowLooks.navbar])
+    private val FOLLOW = Value.Word(Values.FOLLOW)
+    private const val NAVBAR = "navbar"
+    private const val HANDLE = "handle"
 
     // the keyboard's size, set where every selector is a `keyboard` under no scene or state ([Values.KEYBOARD_SIZES]);
     // else of its form, and ignored with a warning saying why (how many: a style of them alone sets something): a

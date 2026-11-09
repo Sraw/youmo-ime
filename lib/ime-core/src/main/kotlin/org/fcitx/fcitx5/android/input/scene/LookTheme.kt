@@ -151,8 +151,9 @@ object LookTheme {
         style("menu", "fill" to "@accentKey", "color" to "@accentKeyText", "icon-color" to "@accentKeyText", "radius" to "50%")
         // theme 3.0's cell in focus: the key's pressed colour over its own
         style("menu:selected", "overlay" to "@keyPressHighlight")
-        style("@floating keyboard", "radius" to "${keys.radiusDp + minOf(keys.gap.h, keys.gap.v)}dp")
-        style("handle", "fill" to "mix(@background, @keyText, 10%)")
+        // no rounder than a radius is read (keys of 24 dp and a gap made no theme, and no keyboard was drawn); the
+        // frame round it is the app's outline, of no such limit (WindowLooks.cornerDp), so its corners are the same
+        style("@floating keyboard", "radius" to "${minOf(keys.radiusDp + minOf(keys.gap.h, keys.gap.v), MAX_RADIUS_DP)}dp")
         appendLine("</theme>")
     }
 
@@ -253,6 +254,9 @@ object LookTheme {
      * theme brings, more than a theme file's `ThemeReader.MAX_STYLES` when they all differ.
      */
     const val MAX_STYLES = 100 + 10 * ThemeAssetLimits.MAX_OVERRIDES
+
+    // the roundest a theme's radius= is read (theme-4.xsd's dp, Values.dp)
+    private const val MAX_RADIUS_DP = 24
 
     // a 3.0 key name as a selector: what a selector reads otherwise in the key's name escaped, so that
     // 大千's zhuyin/, is its comma key, not a list of two, and number/* the star key, not every key

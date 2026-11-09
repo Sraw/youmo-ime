@@ -70,7 +70,6 @@
   <style select="menu" fill="@accentKey" color="@accentKeyText" icon-color="@accentKeyText" radius="50%"/>
   <style select="menu:selected" overlay="@keyPressHighlight"/>
 
-  <!-- 悬浮：圆角 = 键圆角 + min(横缝, 竖缝) = 4 + 3（FloatingKeyboard.cornerDp）；把手 = 板底混 10% 字色 -->
+  <!-- 悬浮：圆角 = 键圆角 + min(横缝, 竖缝) = 4 + 3（FloatingKeyboard.cornerDp）；外框、把手不写，用引擎的默认（WindowLooks） -->
   <style select="@floating keyboard" radius="7dp"/>
-  <style select="handle" fill="mix(@background, @keyText, 10%)"/>
 </theme>

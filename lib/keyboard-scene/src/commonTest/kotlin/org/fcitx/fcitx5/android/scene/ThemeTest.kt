@@ -396,7 +396,7 @@ class ThemeTest {
         val t = ThemeReader.theme(withStyle("<style select=\"key\" fill=\"#123456\" depth=\"2dp\"/>")).getOr { error("$it") }
         assertTrue(t.styles.last().values.keys == setOf("fill"))
         // a later stage's value of a property of today
-        for (attr in listOf("shape=\"path(M0 0 L1 0 L1 1 Z)\"", "shape=\"bubble\"", "size=\"120%\"", "color=\"follow\"")) {
+        for (attr in listOf("shape=\"path(M0 0 L1 0 L1 1 Z)\"", "shape=\"bubble\"", "size=\"120%\"")) {
             assertTrue(warnings(withStyle("<style select=\"preview\" $attr/>")).single().contains("is not supported"), attr)
         }
         // of the wrong form, or misspelt: refused as ever
@@ -516,6 +516,8 @@ class ThemeTest {
         assertNull(Selector.parse("@im=Wubi key"))
         assertNull(Selector.parse("@colour=red key"))
         for (w in Selector.RESERVED_WIDGETS) assertEquals(w, s(w).reserved)
+        // T7a's: they select (WindowLooksTest)
+        for (w in Selector.WINDOW_WIDGETS) assertNull(s(w).reserved, w)
         assertEquals("candidate comment", s("candidate comment").reserved)
         assertEquals(":first", s("candidate:first").reserved)
         assertNull(Selector.parse("candidate mark"))
