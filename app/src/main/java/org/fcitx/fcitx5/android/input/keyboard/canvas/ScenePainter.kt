@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.input.theme.NineSliceLayout
 import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Shape
+import org.fcitx.fcitx5.android.scene.TextStroke
 import java.lang.ref.WeakReference
 import kotlin.math.abs
 import kotlin.math.cos
@@ -212,19 +213,46 @@ class ScenePainter(
         canvas.drawPath(pathOf(op.shape), paint)
     }
 
+    // a theme's text-shadow under the glyphs (the outline's, where there is one), then the outline, then the
+    // fill over it: the stroke's paint twice its width, half of it under the fill, so its width shows outside
     private fun text(canvas: Canvas, op: Op.Text) {
-        plain(op.color.value)
-        paint.typeface = fonts.typeface(op.font, op.weight)
-        paint.textSize = op.size.toFloat()
-        paint.textScaleX = op.scaleX.toFloat()
         val x = op.x.toFloat()
         val y = op.baseline.toFloat()
         if (op.rotation != 0.0) {
             canvas.save()
             canvas.rotate(op.rotation.toFloat(), x, y)
         }
-        canvas.drawText(op.text, x, y, paint)
+        val shadow = op.shadow
+        // setShadowLayer of no blur draws no shadow at all: a sharp one is the glyphs again, moved
+        if (shadow != null && shadow.blur <= 0.0) {
+            textPaint(op, shadow.color.value, op.stroke)
+            canvas.drawText(op.text, x + shadow.dx.toFloat(), y + shadow.dy.toFloat(), paint)
+        }
+        val blurred = shadow?.takeIf { it.blur > 0.0 }
+        op.stroke?.let { stroke ->
+            textPaint(op, stroke.color.value, stroke)
+            blurred?.let { paint.setShadowLayer(it.blur.toFloat(), it.dx.toFloat(), it.dy.toFloat(), it.color.value) }
+            canvas.drawText(op.text, x, y, paint)
+        }
+        if (!op.color.transparent) {
+            textPaint(op, op.color.value, null)
+            if (op.stroke == null) blurred?.let { paint.setShadowLayer(it.blur.toFloat(), it.dx.toFloat(), it.dy.toFloat(), it.color.value) }
+            canvas.drawText(op.text, x, y, paint)
+        }
         if (op.rotation != 0.0) canvas.restore()
+    }
+
+    private fun textPaint(op: Op.Text, color: Int, stroke: TextStroke?) {
+        plain(color)
+        paint.typeface = fonts.typeface(op.font, op.weight)
+        paint.textSize = op.size.toFloat()
+        paint.textScaleX = op.scaleX.toFloat()
+        paint.letterSpacing = op.letterSpacing.toFloat()
+        if (stroke != null) {
+            paint.style = Paint.Style.FILL_AND_STROKE
+            paint.strokeWidth = (2 * stroke.width).toFloat()
+            paint.strokeJoin = Paint.Join.ROUND
+        }
     }
 
     private val scale = Matrix()

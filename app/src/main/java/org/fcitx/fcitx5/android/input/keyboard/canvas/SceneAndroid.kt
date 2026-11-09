@@ -49,7 +49,7 @@ class AndroidTextMeasurer(val fonts: SceneFonts) : TextMeasurer {
     private val ink = Rect()
     private val metrics = Paint.FontMetrics()
 
-    private data class Asked(val text: String, val font: String, val weight: Int, val size: Double)
+    private data class Asked(val text: String, val font: String, val weight: Int, val size: Double, val spacing: Double)
 
     // the least recently asked let go first (access order), so a table's roots or another font for a
     // while do not keep growing it
@@ -62,15 +62,19 @@ class AndroidTextMeasurer(val fonts: SceneFonts) : TextMeasurer {
     var measured = 0
         private set
 
-    override fun measure(text: String, font: String, weight: Int, size: Double): TextMetrics =
-        kept.getOrPut(Asked(text, font, weight, size)) { measured(text, font, weight, size) }
+    override fun measure(text: String, font: String, weight: Int, size: Double): TextMetrics = measure(text, font, weight, size, 0.0)
 
-    private fun measured(text: String, font: String, weight: Int, size: Double): TextMetrics {
+    // Paint measures a theme's letter-spacing itself (its getTextBounds too), so not the default's arithmetic
+    override fun measure(text: String, font: String, weight: Int, size: Double, letterSpacing: Double): TextMetrics =
+        kept.getOrPut(Asked(text, font, weight, size, letterSpacing)) { measured(text, font, weight, size, letterSpacing) }
+
+    private fun measured(text: String, font: String, weight: Int, size: Double, letterSpacing: Double): TextMetrics {
         measured++
         Trace.beginSection("measure text")
         try {
             paint.typeface = fonts.typeface(font, weight)
             paint.textSize = size.toFloat()
+            paint.letterSpacing = letterSpacing.toFloat()
             val advance = paint.measureText(text)
             paint.getTextBounds(text, 0, text.length, ink)
             paint.getFontMetrics(metrics)
