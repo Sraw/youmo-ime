@@ -370,10 +370,20 @@ object ThemeReader {
     // a window widget's property it has no use for (`navbar fill=`, `frame fill=`): warned of, as one may think it does
     // something; in a list, where another widget may read it, too (of that widget)
     private fun unreadByWindow(selectors: List<Selector>, props: Set<String>, line: Int, p: Problems) {
-        for (w in selectors.map { it.widget }.filter { it in WINDOW_READS }.distinct()) {
-            val reads = WINDOW_READS.getValue(w)
-            props.filter { it !in reads }.forEach { p.warn(line, "$it= on $w does nothing: it reads ${reads.joinToString(" ")}") }
+        for ((w, states) in selectors.filter { it.widget in WINDOW_READS }.map { it.widget to it.states }.distinct()) {
+            val on = w + states.sorted().joinToString("") { ":$it" }
+            val reads = windowReads(w, states)
+            val said = if (reads.isEmpty()) "it reads nothing in that state" else "it reads ${reads.joinToString(" ")}"
+            props.filter { it !in reads }.forEach { p.warn(line, "$it= on $on does nothing: $said") }
         }
+    }
+
+    // a window widget's properties read in [states]: in none all of WINDOW_READS; pressed, a side button's
+    // overlay (WindowLooks.sideButton's ripple); no other state of the window is ever asked for
+    private fun windowReads(widget: String, states: Set<String>): List<String> = when {
+        states.isEmpty() -> WINDOW_READS.getValue(widget)
+        widget == "side-button" && states == setOf("pressed") -> listOf("overlay")
+        else -> emptyList()
     }
 
     // what each widget of the window round the keys reads (060-render-p3 T7a, engine/WindowLooks, SceneBuilder's split gap)

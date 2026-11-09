@@ -186,12 +186,18 @@ class WindowLooksTest {
             "<style select=\"handle\" radius=\"4dp\"/>" to "radius= on handle does nothing: it reads fill color icon-color width height",
             "<style select=\"side-button\" color=\"#ff0000\"/>" to "color= on side-button does nothing: it reads fill icon-color shape radius overlay",
             "<style select=\"split-gap, key\" color=\"#ff0000\"/>" to "color= on split-gap does nothing: it reads fill radius",
+            // pressed, a side button's overlay alone; another state of the window, nothing
+            "<style select=\"side-button:pressed\" fill=\"#ff0000\"/>" to "fill= on side-button:pressed does nothing: it reads overlay",
+            "<style select=\"navbar:pressed\" color=\"#ff0000\"/>" to "color= on navbar:pressed does nothing: it reads nothing in that state",
+            "<style select=\"handle:locked\" fill=\"#ff0000\"/>" to "fill= on handle:locked does nothing: it reads nothing in that state",
+            "<style select=\"side-button:disabled\" overlay=\"#ff0000\"/>" to "overlay= on side-button:disabled does nothing: it reads nothing in that state",
         )
         for ((style, warning) in unread) assertEquals(listOf(warning), warnings(withStyle(style)), style)
         val read = listOf(
             "<style select=\"frame\" radius=\"8dp\" border=\"1dp #ff0000\" shadow=\"none\"/>",
             "<style select=\"handle\" fill=\"#ff0000\" color=\"#ff0000\" icon-color=\"#ff0000\" width=\"40dp\" height=\"4dp\"/>",
-            "<style select=\"side-button:pressed\" fill=\"#ff0000\" icon-color=\"#ff0000\" shape=\"rect\" radius=\"4dp\" overlay=\"#ff0000\"/>",
+            "<style select=\"side-button\" fill=\"#ff0000\" icon-color=\"#ff0000\" shape=\"rect\" radius=\"4dp\" overlay=\"#ff0000\"/>",
+            "<style select=\"side-button:pressed\" overlay=\"#ff0000\"/>",
             "<style select=\"split-gap\" fill=\"#ff0000\" radius=\"4dp\"/>",
         )
         for (style in read) assertEquals(emptyList(), warnings(withStyle(style)), style)
