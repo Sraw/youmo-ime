@@ -8,6 +8,7 @@ import android.content.Context
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.BoardImages
+import org.fcitx.fcitx5.android.data.theme.PackDrawGuard
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
@@ -82,9 +83,9 @@ class SceneBoard(
 
     private fun drawn(of: Theme, look: ThemeLook, width: Int, height: Int): KeyboardCanvasView.Drawn? {
         val layout = layout ?: return null
-        val sceneTheme = SceneTrace.section("theme") { SceneThemes.of(look, of.name, of.isDark) } ?: return null
-        val measurer = measurer(look)
-        return scene(layout, sceneTheme, look, measurer, width, height)?.let { KeyboardCanvasView.Drawn(it, look, measurer.fonts) }
+        val sceneTheme = SceneTrace.section("theme") { SceneThemes.of(of, look) } ?: return null
+        val measurer = measurer(of, look)
+        return scene(layout, sceneTheme, look, measurer, width, height)?.let { KeyboardCanvasView.Drawn(it, look, measurer.fonts, (of as? Theme.Pack)?.let(PackDrawGuard::key)) }
     }
 
     // the scene of [sceneTheme] ([look]'s): the last kept for the same values, or made; null, the engine refused it
@@ -123,7 +124,8 @@ class SceneBoard(
         // a theme switched back to makes no scene again and measures no text again; what a switch allocates
         // more than the views' decides whether a GC stops its first frame (specs/app.md)
         private const val KEPT_SCENES = 4
-        private val measurers = LinkedHashMap<ThemeLook, AndroidTextMeasurer>(KEPT_SCENES, 0.75f, true)
+        // by the look and a pack's fonts (two packs of one look may name others)
+        private val measurers = LinkedHashMap<Pair<ThemeLook, Map<String, String>>, AndroidTextMeasurer>(KEPT_SCENES, 0.75f, true)
         private val scenesKept = ArrayDeque<Made>()
 
         // the themes (by name and look) that made no scene, the built-in drawn instead: logged once each,
@@ -141,8 +143,11 @@ class SceneBoard(
         private var namesMade: Pair<SceneLayout, Set<String>>? = null
         private var marksMade: Pair<MarksFor, MarkSettings>? = null
 
-        private fun measurer(look: ThemeLook): AndroidTextMeasurer = measurers.getOrPut(look) { AndroidTextMeasurer(SceneFonts(look)) }
-            .also { if (measurers.size > KEPT_SCENES) measurers.remove(measurers.keys.first()) }
+        private fun measurer(of: Theme, look: ThemeLook): AndroidTextMeasurer {
+            val fonts = SceneFonts.of(of, look)
+            return measurers.getOrPut(look to (of as? Theme.Pack)?.drawn?.fonts.orEmpty()) { AndroidTextMeasurer(fonts) }
+                .also { if (measurers.size > KEPT_SCENES) measurers.remove(measurers.keys.first()) }
+        }
 
         /** [layout]'s keys' shortcut names, its fragments' too. */
         fun names(layout: SceneLayout): Set<String> = namesMade?.takeIf { it.first === layout }?.second

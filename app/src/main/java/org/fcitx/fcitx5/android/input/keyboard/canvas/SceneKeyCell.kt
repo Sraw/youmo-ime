@@ -45,9 +45,9 @@ import timber.log.Timber
 open class SceneKeyCell(context: Context, private val theme: Theme, private val ownSize: Boolean = false) : CustomGestureView(context) {
 
     private val look = ThemeManager.shownLook(theme)
-    private val fonts = SceneFonts(look)
+    private val fonts = SceneFonts.of(theme, look)
     private val measurer = AndroidTextMeasurer(fonts)
-    private val sceneTheme = SceneThemes.of(look, theme.name, theme.isDark)
+    private val sceneTheme = SceneThemes.of(theme, look)
     private val painter = ScenePainter(this, look, BoardImages.NONE, fonts)
 
     /** The key: its face, its words, its marks' names. */

@@ -13,6 +13,8 @@ import org.fcitx.fcitx5.android.scene.look.ThemeLook
  * first entry past a limit (a zip bomb with it), an image by its size read before it is decoded.
  * Enough for every key's image, pressed and not, on every board. A font has no limit of its own: a
  * CJK one is often 10–30 MB, so it is held to a file's (design §3.6), checked as the zip is unpacked.
+ * A theme 4.0 pack (060-render-p3 T8a) is held to these and to its own: its `theme.xml`, its preview,
+ * its icons and the layouts in its `layouts/` (the engine holds it to 1000 styles, 4 fonts, 200 icons).
  */
 object ThemeAssetLimits {
 
@@ -24,8 +26,27 @@ object ThemeAssetLimits {
     const val MAX_KEY_IMAGE_BYTES = 2L * 1024 * 1024
     const val MAX_OVERRIDES = Keys.MAX_OVERRIDES
 
+    /** A pack's `theme.xml`: the engine reads no more than a million characters of one (Xml.MAX_CHARS). */
+    const val MAX_THEME_XML_BYTES = 1024L * 1024
+    const val MAX_LAYOUTS = 16
+    const val MAX_LAYOUT_BYTES = 64L * 1024
+    const val MAX_PREVIEW_BYTES = 512L * 1024
+    const val MAX_PREVIEW_SIDE = 2048
+
+    /** An SVG icon: a path and its fill take a few KB; more is a drawing, not an icon ([SvgSubset]). */
+    const val MAX_ICON_BYTES = 64L * 1024
+
+    /**
+     * The packs a phone keeps: each is read whole as the themes are listed (the keyboard's start), up to
+     * [MAX_THEME_XML_BYTES] a pack; past it a new one is refused, and a listing reads the newest this many.
+     */
+    const val MAX_PACKS = 100
+
     /** A limit passed, and by what. */
-    enum class Breach { Entries, FileSize, TotalSize, PictureSide, KeyImageSide, KeyImageSize, Overrides }
+    enum class Breach {
+        Entries, FileSize, TotalSize, PictureSide, KeyImageSide, KeyImageSize, Overrides,
+        ThemeXml, Layouts, LayoutSize, PreviewSize, PreviewSide, IconSize,
+    }
 
     /** The [count]th entry, [size] bytes, after [total] bytes before it. */
     fun entry(count: Int, size: Long, total: Long): Breach? = when {
@@ -43,6 +64,23 @@ object ThemeAssetLimits {
         bytes > MAX_KEY_IMAGE_BYTES -> Breach.KeyImageSize
         else -> null
     }
+
+    fun themeXml(bytes: Long): Breach? = if (bytes > MAX_THEME_XML_BYTES) Breach.ThemeXml else null
+
+    /** A pack's layouts, each by its size in bytes. */
+    fun layouts(sizes: List<Long>): Breach? = when {
+        sizes.size > MAX_LAYOUTS -> Breach.Layouts
+        sizes.any { it > MAX_LAYOUT_BYTES } -> Breach.LayoutSize
+        else -> null
+    }
+
+    fun preview(width: Int, height: Int, bytes: Long): Breach? = when {
+        bytes > MAX_PREVIEW_BYTES -> Breach.PreviewSize
+        maxOf(width, height) > MAX_PREVIEW_SIDE -> Breach.PreviewSide
+        else -> null
+    }
+
+    fun icon(bytes: Long): Breach? = if (bytes > MAX_ICON_BYTES) Breach.IconSize else null
 
     fun look(look: ThemeLook): Breach? = if (look.keys.overrides.size > MAX_OVERRIDES) Breach.Overrides else null
 }

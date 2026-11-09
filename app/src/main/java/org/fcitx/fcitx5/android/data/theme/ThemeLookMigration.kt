@@ -105,6 +105,8 @@ object ThemeLookMigration {
                 val theme = slot.get()
                 when {
                     theme is Theme.Custom -> Unit
+                    // a 4.0 pack's keys are its file's: the key style settings before 3.0 are not of it
+                    theme is Theme.Pack -> Unit
                     // Monet's
                     theme is Theme.Builtin && theme.followsSystem -> monet = true
                     else -> {

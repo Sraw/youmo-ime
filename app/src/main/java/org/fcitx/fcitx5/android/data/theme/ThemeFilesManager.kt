@@ -8,6 +8,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineNotices
 import org.fcitx.fcitx5.android.core.HostConfigDir
@@ -54,9 +55,9 @@ object ThemeFilesManager {
     private fun themeFile(theme: Theme.Custom) = File(dir, theme.name + ".json")
 
     // the file names in an imported json are untrusted: only their file name is kept, as in listThemes,
-    // and never a json's, which listThemes would load as one more theme, nor SAVING's
+    // and never a json's, which listThemes would load as one more theme, nor SAVING's or the packs' folder's
     private fun importedFile(path: String) =
-        File(path).name.takeIf { isPlainFileName(it) && !it.endsWith(".json", ignoreCase = true) && it != SAVING }
+        File(path).name.takeIf { isPlainFileName(it) && !it.endsWith(".json", ignoreCase = true) && it != SAVING && it != ThemePackFiles.FOLDER }
             ?.let { File(dir, it) }
 
     // where a file is written before it is renamed into place: a directory, so no import's file (a plain
@@ -115,10 +116,11 @@ object ThemeFilesManager {
     @VisibleForTesting
     internal fun forgetSwept() {
         swept = false
+        packsSwept = false
     }
 
     // a planted json (a crafted import, another app on shared storage) would aim delete and export at any file
-    private fun File.isThemeAsset() = exists() && try {
+    private fun File.isThemeAsset() = isFile && try {
         canonicalFile.parentFile == dir.canonicalFile
     } catch (_: IOException) {
         false
@@ -165,10 +167,30 @@ object ThemeFilesManager {
 
     fun deleteThemeFiles(theme: Theme.Custom) {
         if (!writable) notSettled()
+        deleteCustom(theme, ThemeManager.getAllThemes())
+    }
+
+    // [theme]'s json and its files, not a file another of [themes] names too, as an import leaves another's be
+    private fun deleteCustom(theme: Theme.Custom, themes: List<Theme>) {
         themeFile(theme).delete()
-        // not a file another theme names too, as an import leaves another's be
-        val others = othersFiles(theme.name, ThemeManager.getAllThemes())
+        val others = othersFiles(theme.name, themes)
         theme.look.files().map(::File).filter { it.isThemeAsset() && it.name !in others }.forEach { it.delete() }
+    }
+
+    // what a kill left of a pack being written is cleared at the process's first listing of them
+    private var packsSwept = false
+
+    /** The user's theme 4.0 packs, each version one ([ThemePackFiles.list]; none named as one of [builtins] is). */
+    fun listPacks(builtins: List<Theme.Builtin> = ThemeManager.BuiltinThemes): List<Theme.Pack> {
+        val sweep = writable && !packsSwept
+        if (sweep) packsSwept = true
+        return ThemePackFiles.list(dir, sweep, builtins)
+    }
+
+    /** Deletes the pack [file], every version of it. */
+    fun deletePack(file: String) {
+        if (!writable) notSettled()
+        ThemePackFiles.delete(dir, file)
     }
 
     /**
@@ -310,15 +332,56 @@ object ThemeFilesManager {
     }
 
     /**
-     * [dest] will be closed on finished
+     * [theme] as a theme 4.0 zip into [dest], closed when done (060-render-p3 Q5: an export is always 4.0): a
+     * pack as it is; a 3.0 theme as the engine draws it ([ThemePackFiles.of]), its files copied by the names its
+     * `theme.xml` gives them; Monet's as it is now, its colours fixed ([Theme.Builtin.toCustom]).
      */
-    fun exportTheme(theme: Theme.Custom, dest: OutputStream) =
-        runCatching {
-            // a planted json would aim it at any file of the app's: only the theme dir's go, checked before any is written
-            theme.look.files().map(::File).firstOrNull { !it.isThemeAsset() }?.let {
-                dest.close()
-                errorRuntime(R.string.exception_theme_file, it.name)
+    fun exportTheme(theme: Theme, dest: OutputStream): Result<Unit> = runCatching {
+        when (theme) {
+            is Theme.Pack -> ThemePackFiles.export(theme, dest)
+            is Theme.Custom -> exportCustom(theme, dest)
+            is Theme.Builtin -> exportCustom(theme.toCustom(), dest)
+        }
+    }
+
+    private fun exportCustom(theme: Theme.Custom, dest: OutputStream) {
+        ownFiles(theme, dest)
+        val (xml, names) = ThemePackFiles.of(exportedLook(theme.look), theme.name, theme.isDark)
+        ZipOutputStream(dest.buffered()).use { zip ->
+            zip.putNextEntry(ZipEntry(ThemePackFiles.THEME_XML))
+            zip.write(xml.encodeToByteArray())
+            names.forEach { (path, name) ->
+                zip.putNextEntry(ZipEntry(name))
+                File(path).inputStream().use { it.copyTo(zip) }
             }
+            zip.closeEntry()
+        }
+    }
+
+    // a 3.0 theme's source photo is not limited (only its cuts are drawn), a pack's is as its cuts: one past that
+    // exported as its portrait cut (the source is for cutting again, which the app does not), so the pack imports
+    private fun exportedLook(look: ThemeLook): ThemeLook {
+        val picture = look.picture ?: return look
+        val fits = probe.imageSize(File(picture.src))?.let { (w, h) -> ThemeAssetLimits.picture(w, h) == null } == true
+        return if (fits) look else look.copy(picture = picture.copy(src = picture.portrait.file))
+    }
+
+    // a planted json would aim an export at any file of the app's: only the theme dir's go, checked before any is written
+    private fun ownFiles(theme: Theme.Custom, dest: OutputStream) {
+        theme.look.files().map(::File).firstOrNull { !it.isThemeAsset() }?.let {
+            dest.close()
+            errorRuntime(R.string.exception_theme_file, it.name)
+        }
+    }
+
+    /**
+     * [theme] as a theme 3.0 zip (its files, then its json), as the app exported before 0.6.0 and the theme
+     * maker's page still makes and reads: the zips the page's tests read are written by it (ThemeMakerRulesTest).
+     */
+    @VisibleForTesting
+    internal fun exportJson(theme: Theme.Custom, dest: OutputStream) =
+        runCatching {
+            ownFiles(theme, dest)
             ZipOutputStream(dest.buffered()).use { zipStream ->
                 // the files it names, by name: we don't export their internal paths
                 theme.look.files().forEach { path ->
@@ -353,44 +416,190 @@ object ThemeFilesManager {
                     val extracted = zipStream.extract(tempDir, flat = true) { count, size, total ->
                         ThemeAssetLimits.entry(count, size, total)?.let(::refused)
                     }
-                    // not a Mac's "._<name>" beside it (its attributes, some zippers put at the top)
-                    val jsonFile = extracted.find { it.isFile && it.extension == "json" && !it.name.startsWith("._") }
-                        ?: errorRuntime(R.string.exception_theme_json)
-                    val (decoded, migrated) = Json.decodeFromString(
-                        CustomThemeSerializer.WithMigrationStatus,
-                        jsonFile.readText()
-                    )
-                    ThemeAssetLimits.look(decoded.look)?.let(::refused)
-                    // the name becomes a file name in dir, so a crafted one must not be a path out of it
-                    if (!isPlainFileName(decoded.name)) errorRuntime(R.string.invalid_value)
-                    // a built-in theme's name, or its 0.5 name, which the settings move to it (ThemePrefs.migrateThemeRefs)
-                    if (BuiltinThemeFiles.find(ThemeManager.BuiltinThemes, decoded.name) != null || decoded.name in BuiltinThemeFiles.LEGACY)
-                        errorRuntime(R.string.exception_theme_name_clash)
-                    val oldTheme = themes.find { it.name == decoded.name } as? Theme.Custom
-                    val newCreated = oldTheme == null
-                    // a json of that name not listed: a later build's is kept (this one cannot read it, nor
-                    // know its files); one that reads (a file of it missing) is replaced, its files with it; a
-                    // broken one is replaced
-                    val unlisted = if (oldTheme == null) themeFile(decoded).takeIf { it.isFile }?.let { file ->
-                        runCatching { Json.decodeFromString(CustomThemeSerializer, file.readText()) }.onFailure {
-                            if (it is CustomThemeSerializer.UnknownVersion) errorRuntime(R.string.exception_theme_newer_kept)
-                        }.getOrNull()
-                    } else null
-                    val files = foundFiles(decoded.look, extracted)
-                    // another theme's file is a clash; one no theme names (left by a backup from before 3.0 put
-                    // back over a 3.0 theme's json, say) is taken over, else its name could never be imported
-                    val others = othersFiles(decoded.name, themes)
-                    files.keys.firstOrNull { it in others }?.let { errorRuntime(R.string.exception_theme_file_clash, it) }
-                    val oldFiles = (oldTheme ?: unlisted)?.look?.files().orEmpty().map { File(it).name }.toSet()
-                    val newTheme = decoded.copy(look = decoded.look.mapFiles { File(dir, File(it).name).path })
-                    place(files, oldFiles, newTheme)
-                    // only once the json names the new files: one not written leaves the theme it replaces whole.
-                    // Never another theme's (a json not listed may name any), nor a json or SAVING (importedFile's rule)
-                    (oldFiles - files.keys - others).mapNotNull(::importedFile).forEach { it.delete() }
-                    Imported(newCreated, newTheme, migrated)
+                    importJson(extracted, themes)
                 }
             }
         }
+
+    /**
+     * What a theme zip held ([openTheme]): a 3.0 theme, imported as [importTheme] does; or a 4.0 pack, checked
+     * whole and not yet taken, for the user to see ([ThemePackFiles.Staged]) and take ([Pack.commit]) or not
+     * ([Pack.discard]).
+     */
+    sealed interface Opened {
+        data class Json(val imported: Imported) : Opened
+
+        class Pack internal constructor(
+            val staged: ThemePackFiles.Staged,
+            private val packThere: Boolean,
+            /** The user's 3.0 themes named as it or one of its versions: replaced by it, their json deleted once it is listed. */
+            internal val customs: List<Theme.Custom>,
+            private val unpacked: File,
+        ) : Opened {
+            /** A pack of its name, or a 3.0 theme named as it is, is there: taking it replaces that one. */
+            val replaces: Boolean get() = packThere || customs.isNotEmpty()
+
+            /** Put in place (off the main thread), its versions; what was unpacked gone either way. */
+            fun commit(): Result<List<Theme.Pack>> = runCatching {
+                try {
+                    if (!writable) notSettled()
+                    // the 3.0 themes it replaces ([customs]) are, once the pack is listed (ThemeManager.packPlaced,
+                    // or the next start's listing after a kill: ThemeManager.finishReplacements), on the main thread;
+                    // recorded first, so that one finishes only what an import began
+                    val before = replacing()
+                    val names = customs.map { it.name }.toSet() - before
+                    if (names.isNotEmpty()) record(before + names)
+                    val placed = runCatching { ThemePackFiles.place(dir, staged) }
+                    // not placed: nothing replaced, the record as it was
+                    if (placed.isFailure) replaced(names)
+                    placed.getOrThrow()
+                } finally {
+                    discard()
+                }
+            }
+
+            fun discard() {
+                unpacked.deleteRecursively()
+            }
+        }
+    }
+
+    /** Where the names of the 3.0 themes a pack's import replaces are kept till done: this phone's, not backed up. */
+    @VisibleForTesting
+    internal var replacingFile: () -> File = { File(appContext.noBackupFilesDir, "theme-pack-replaces") }
+
+    /** The 3.0 themes a pack's import replaces, recorded before it was placed and not finished yet (ThemeManager). */
+    fun replacing(): Set<String> = runCatching { replacingFile().readLines().filter { it.isNotEmpty() }.toSet() }.getOrDefault(emptySet())
+
+    /** [names] finished (or nothing to finish): their record gone. */
+    fun replaced(names: Set<String>) {
+        if (names.isEmpty()) return
+        val left = replacing() - names
+        if (left.isEmpty()) replacingFile().delete() else record(left)
+    }
+
+    // written whole aside, then renamed over the record: a kill leaves the old record or the new, not half of one
+    private fun record(names: Set<String>) {
+        val file = replacingFile()
+        val temp = File(file.parentFile, file.name + ".new")
+        temp.writeText(names.joinToString("\n", postfix = "\n"))
+        if (!temp.renameTo(file)) throw IOException("cannot record the themes replaced")
+    }
+
+    // where a pack is unpacked till the user takes it or not: the cache's, what a kill left cleared at the first open
+    private val unpacking get() = File(appContext.cacheDir, "theme-import")
+
+    @Volatile
+    private var unpackingSwept = false
+
+    /**
+     * Opens the theme zip [src] ([themes] as [importTheme]'s): one with a `theme.xml` at its top is a theme 4.0
+     * pack (060-render-p3 T8a), unpacked (its top and `layouts/`, counted and held to the limits as it is),
+     * checked whole ([ThemePackFiles.check]) and kept unpacked for [Opened.Pack.commit]; any other a 3.0 theme
+     * (or older), imported at once as before.
+     */
+    fun openTheme(src: InputStream, themes: List<Theme> = ThemeManager.getAllThemes()): Result<Opened> =
+        runCatching {
+            if (!writable) notSettled()
+            if (!unpackingSwept) {
+                unpackingSwept = true
+                unpacking.deleteRecursively()
+            }
+            val temp = File(unpacking, UUID.randomUUID().toString())
+            if (!temp.mkdirs()) throw IOException("Cannot create '${temp.name}'")
+            var kept = false
+            try {
+                val names = ArrayList<String>()
+                val extracted = ZipInputStream(src).use { zipStream ->
+                    zipStream.extract(temp, keep = ThemePackFiles::unpacked, names = names) { count, size, total ->
+                        ThemeAssetLimits.entry(count, size, total)?.let(::refused)
+                    }
+                }
+                // a folder zipped whole: its theme.xml in it, said so (a 3.0 theme's json read so is not a pack's)
+                if (ThemePackFiles.themeXmlInFolder(names)) errorRuntime(R.string.exception_theme_xml_top)
+                if (!File(temp, ThemePackFiles.THEME_XML).isFile) return@runCatching Opened.Json(importJson(extracted, themes))
+                val staged = ThemePackFiles.check(temp, names, packChecks)
+                packClash(staged, themes)
+                val packs = themes.filterIsInstance<Theme.Pack>()
+                val folder = File(ThemePackFiles.folder(dir), staged.name)
+                val there = folder.exists()
+                // one there not listed of a later build is kept, as a 3.0 theme's json is (importJson); any other
+                // not listed (one that no longer reads, misses a file, past the packs listed) is replaced, the
+                // natural repair: not listed, it could not be deleted
+                if (there && packs.none { it.file == staged.name } && ThemePackFiles.laterBuilds(folder, BuildConfig.VERSION_NAME)) {
+                    errorRuntime(R.string.exception_theme_newer_kept)
+                }
+                if (!there && packs.distinctBy { it.file }.size >= ThemeAssetLimits.MAX_PACKS) {
+                    errorRuntime(R.string.exception_theme_packs, ThemeAssetLimits.MAX_PACKS.toString())
+                }
+                val refs = ThemePackFiles.refs(staged.name, staged.theme.variants) + staged.name
+                val customs = themes.filterIsInstance<Theme.Custom>().filter { it.name in refs }
+                Opened.Pack(staged, there, customs, temp).also { kept = true }
+            } finally {
+                if (!kept) temp.deleteRecursively()
+            }
+        }
+
+    private val packChecks
+        get() = ThemePackFiles.Checks(probe, ::refused, BuildConfig.VERSION_NAME) { low ->
+            if (low.isEmpty()) {
+                null
+            } else {
+                val versions = low.joinToString("、") { appContext.getString(if (it) R.string.theme_pack_dark else R.string.theme_pack_light) }
+                appContext.getString(R.string.theme_pack_low_contrast, versions)
+            }
+        }
+
+    /**
+     * A pack named as a built-in theme is ([ThemePackFiles.builtinClash]: the settings name one theme by it). One
+     * named as a 3.0 theme of the user's replaces it ([Opened.Pack.customs]).
+     */
+    private fun packClash(staged: ThemePackFiles.Staged, themes: List<Theme>) {
+        val builtins = themes.filterIsInstance<Theme.Builtin>().ifEmpty { ThemeManager.BuiltinThemes }
+        if (ThemePackFiles.builtinClash(staged.name, staged.theme.variants, builtins)) errorRuntime(R.string.exception_theme_name_clash)
+    }
+
+    // the theme 3.0 json among [extracted] (an older one's too) imported with its files ([importTheme])
+    private fun importJson(extracted: List<File>, themes: List<Theme>): Imported {
+        // not a Mac's "._<name>" beside it (its attributes, some zippers put at the top)
+        val jsonFile = extracted.find { it.isFile && it.extension == "json" && !it.name.startsWith("._") }
+            ?: errorRuntime(R.string.exception_theme_json)
+        val (decoded, migrated) = Json.decodeFromString(
+            CustomThemeSerializer.WithMigrationStatus,
+            jsonFile.readText()
+        )
+        ThemeAssetLimits.look(decoded.look)?.let(::refused)
+        // the name becomes a file name in dir, so a crafted one must not be a path out of it
+        if (!isPlainFileName(decoded.name)) errorRuntime(R.string.invalid_value)
+        // a built-in theme's name, or its 0.5 name, which the settings move to it (ThemePrefs.migrateThemeRefs);
+        // a pack's or one of its versions' (the settings name one theme by it)
+        val packs = themes.filterIsInstance<Theme.Pack>()
+        val builtin = BuiltinThemeFiles.find(ThemeManager.BuiltinThemes, decoded.name) != null || decoded.name in BuiltinThemeFiles.LEGACY
+        val pack = BuiltinThemeFiles.find(packs, decoded.name) != null || packs.any { it.file == decoded.name }
+        if (builtin || pack) errorRuntime(R.string.exception_theme_name_clash)
+        val oldTheme = themes.find { it.name == decoded.name } as? Theme.Custom
+        val newCreated = oldTheme == null
+        // a json of that name not listed: a later build's is kept (this one cannot read it, nor
+        // know its files); one that reads (a file of it missing) is replaced, its files with it; a
+        // broken one is replaced
+        val unlisted = if (oldTheme == null) themeFile(decoded).takeIf { it.isFile }?.let { file ->
+            runCatching { Json.decodeFromString(CustomThemeSerializer, file.readText()) }.onFailure {
+                if (it is CustomThemeSerializer.UnknownVersion) errorRuntime(R.string.exception_theme_newer_kept)
+            }.getOrNull()
+        } else null
+        val files = foundFiles(decoded.look, extracted)
+        // another theme's file is a clash; one no theme names (left by a backup from before 3.0 put
+        // back over a 3.0 theme's json, say) is taken over, else its name could never be imported
+        val others = othersFiles(decoded.name, themes)
+        files.keys.firstOrNull { it in others }?.let { errorRuntime(R.string.exception_theme_file_clash, it) }
+        val oldFiles = (oldTheme ?: unlisted)?.look?.files().orEmpty().map { File(it).name }.toSet()
+        val newTheme = decoded.copy(look = decoded.look.mapFiles { File(dir, File(it).name).path })
+        place(files, oldFiles, newTheme)
+        // only once the json names the new files: one not written leaves the theme it replaces whole.
+        // Never another theme's (a json not listed may name any), nor a json or SAVING (importedFile's rule)
+        (oldFiles - files.keys - others).mapNotNull(::importedFile).forEach { it.delete() }
+        return Imported(newCreated, newTheme, migrated)
+    }
 
     // every file of [look] found among [extracted] (by name in dir) and checked before any is copied:
     // one refused would leave the others in dir
@@ -485,11 +694,18 @@ object ThemeFilesManager {
             ThemeAssetLimits.Breach.KeyImageSide -> R.string.exception_theme_key_image_side to ThemeAssetLimits.MAX_KEY_IMAGE_SIDE.toLong()
             ThemeAssetLimits.Breach.KeyImageSize -> R.string.exception_theme_key_image_size to ThemeAssetLimits.MAX_KEY_IMAGE_BYTES / MB
             ThemeAssetLimits.Breach.Overrides -> R.string.exception_theme_overrides to ThemeAssetLimits.MAX_OVERRIDES.toLong()
+            ThemeAssetLimits.Breach.ThemeXml -> R.string.exception_theme_xml_size to ThemeAssetLimits.MAX_THEME_XML_BYTES / KB
+            ThemeAssetLimits.Breach.Layouts -> R.string.exception_theme_layouts to ThemeAssetLimits.MAX_LAYOUTS.toLong()
+            ThemeAssetLimits.Breach.LayoutSize -> R.string.exception_theme_layout_size to ThemeAssetLimits.MAX_LAYOUT_BYTES / KB
+            ThemeAssetLimits.Breach.PreviewSize -> R.string.exception_theme_preview_size to ThemeAssetLimits.MAX_PREVIEW_BYTES / KB
+            ThemeAssetLimits.Breach.PreviewSide -> R.string.exception_theme_preview_side to ThemeAssetLimits.MAX_PREVIEW_SIDE.toLong()
+            ThemeAssetLimits.Breach.IconSize -> R.string.exception_theme_icon_size to ThemeAssetLimits.MAX_ICON_BYTES / KB
         }
         errorRuntime(message, limit.toString())
     }
 
     private const val MB = 1024L * 1024
+    private const val KB = 1024L
 
 }
 

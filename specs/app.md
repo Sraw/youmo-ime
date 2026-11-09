@@ -1122,7 +1122,7 @@ same thread, blurred as on the keyboard, 12 MB of them kept; one that does not r
 
 The app does not edit themes (user, 2026-11-03) and in 0.5.x does not link the web theme maker
 (user, 2026-11-04: making themes moves to a later version, now 0.6.0): 新增主题 opens the import picker directly, no menu; the page
-(`web/theme-maker`) stays on GitHub Pages for 0.6.0, unlinked from the app and the user docs. A theme file is `<name>.theme`, a zip inside (user, 2026-11-04, so it is not taken for any zip): exported under that name as `application/octet-stream` (a provider may add `.zip` for `application/zip`), and the import picker shows every file (`*/*`, `.theme` has no MIME type) and takes only a display name ending `.theme` (ime-core's `ThemeFileName`; `.zip`, an earlier 0.5.1's or the page's, or no name, is refused with `exception_theme_filename`, which says to rename it). The format version is unchanged. The theme list
+(`web/theme-maker`) stays on GitHub Pages for 0.6.0, unlinked from the app and the user docs. A theme file is `<name>.theme`, a zip inside (user, 2026-11-04, so it is not taken for any zip): exported under that name as `application/octet-stream` (a provider may add `.zip` for `application/zip`), and the import picker shows every file (`*/*`, `.theme` has no MIME type) and takes only a display name ending `.theme` (ime-core's `ThemeFileName`; `.zip`, an earlier 0.5.1's or the page's, or no name, is refused with `exception_theme_filename`, which says to rename it). An export is always a theme 4.0 pack (below). The theme list
 applies, imports, and on a long press exports or deletes one of the user's (Monet exports
 `Theme.Builtin.toCustom()`: its colours now and the key style it keeps, fixed, named as 0.5 named it,
 `MonetLight#<primary>`). A built-in theme of two versions is one card (`ThemeCards`, the theme page's
@@ -1201,10 +1201,94 @@ the files into place and the json last, and only then deletes the files the them
 it does not name (never one another theme names, a json or `.saving`); if any step fails, the files it added are deleted (one of the old theme's renamed
 over by then keeps the new bytes: only a rename in one directory can fail there). A migration saved
 again while listing that fails (a full disk) is logged and drawn migrated all the same, saved at the
-next start; `ThemeManager.saveTheme` tells the user (`theme_not_saved`, no path) and returns false. Export writes each named file once (only files of the theme dir:
-a planted json's other paths are refused before anything is written), then the json; delete removes
+next start; `ThemeManager.saveTheme` tells the user (`theme_not_saved`, no path) and returns false. Export (a 3.0 theme's, now as 4.0: below)
+takes only files of the theme dir (a planted json's other paths are refused before anything is written); 3.0's own zip
+(`exportJson`, each named file once, then the json) stays for the web theme maker's fixtures only; delete removes
 the json and every named file that is in the theme dir. Listing skips a theme with a file missing, and
 one that does not read (told once, `user_data_unreadable`), leaving its file as it is.
+
+### Theme 4.0 packs (060-render-p3 T8a)
+
+A pack is `files/host-theme/v4/<name>/`: its `theme.xml` (keyboard-scene's theme format 4, `ThemeReader`), the
+files it names (picture and cuts, `image()` fills, fonts, icons, the `<meta preview>`) and `layouts/*.xml`
+(`ThemePackFiles`). Each version of it (`variants`) is a `Theme.Pack` named as a built-in's are, `<name>#light`;
+one of no variants is `<name>`. Its keys, bar and popups are the engine's drawing of its own file (`Pack.drawn`:
+the file as read, its files' names made paths in its folder; `SceneThemes.of`, kept by the pack and the system
+colours, as `system()` colours are re-read on `onSystemPlatteChange`), not a look written again; the views drawn
+from a look (the theme page's preview, the thumbnail, the picture under the keys, key text font) read
+`Pack.look`: `LookDefaults` with its 24 colours, its picture, and the fonts its plain `key` and `candidate`
+styles name. Icons are checked and kept but not drawn yet (the engine draws its built-in icons by name).
+The list is packs, then 3.0 themes, then built-ins; a pack's versions are one card (`ThemeCards`);
+`getTheme` finds a 3.0 theme of the name first, then a pack's version, then a built-in, then the built-in of
+that 0.5 name (a pack is never named as either: refused at import, skipped at listing). A `Theme.Pack` keeps
+no text of its file (its `stamp` is the file's time, so one imported again is another theme): `scene` reads
+`theme.xml` when first drawn, and one that no longer reads is drawn as the built-in Pixel theme
+(`ThemePackFiles.scene`, `user_data_unreadable` told once). The bar and panels are drawn from the pack's own
+file too (`SceneBar`, `ScenePanels`: `SceneThemes.of(theme, look)`). `PackDrawGuard` writes
+`noBackupFilesDir/theme-pack-drawing` (the pack's name; written, not synced: a crash keeps it) as a
+`KeyboardCanvasView` is about to draw a pack's first frame of a process (`onDraw`, keyed by name and file
+time: one imported again is guarded again) and deletes it once that frame is drawn: at once on a software
+canvas, on a hardware one when a frame is committed (`registerFrameCommitCallback`, its glyphs and pictures
+drawn on the RenderThread; `ViewRootImpl.performDraw` takes the callbacks before it draws, so one registered in
+`onDraw` goes with the next frame, which `postInvalidateOnAnimation` asks for while the mark is pending, at most
+`PackDrawGuard.MAX_ASKED` (3) times a pack a process: a device that calls back no commit draws no more, the mark
+kept till a later frame's), only for the pack marked (another view's frame clears nothing). A window hidden
+before the frame after the first leaves the mark pending till the next show's first commit; a process ended in
+that gap resets the pack falsely. A pack built and
+not drawn (the keyboard made again while hidden, a settings page's sizes) marks nothing, so a process ended
+otherwise resets nothing. Found at the first listing of the packs of a process (`ThemeManager.init`, or the
+first `refreshThemes` once the files are settled: kept till then), the slots
+naming that pack's versions are reset to their defaults (`ThemePrefs.dropThemeRefs`) and
+`theme_pack_draw_failed` toasted; the pack is kept. `onSystemPlatteChange` reads the packs again (and draws
+a pack in use anew) only when `ThemeMonet.systemColors` differ from the ones they took.
+
+Import (`ThemeFilesManager.openTheme`): a zip with a top-level `theme.xml` is a pack, else it is 3.0
+(`importTheme`, as above). A pack is unpacked under `cacheDir/theme-import/<uuid>` (swept at the process's
+first open): its top-level files and `layouts/` only (`ZipStream.extract(keep = ...)`), the rest counted and
+metered as above; a folder but `layouts/` or `__MACOSX/`, or one in `layouts/`, is refused, and a zip whose
+`theme.xml` is only in a folder says it must be at the top (`exception_theme_xml_top`). It is checked whole before the user is
+asked (`ThemePackFiles.check`; `ThemeAssetLimits`): `theme.xml` read at this app's version (refused: does not
+read, the first five problems with their lines; `min-app` newer, said as such; `hidden` on Shift, Backspace,
+Space or Enter's text, `ThemePackCheck.hidesRequired`), at most 1 MB, `LookTheme.MAX_STYLES` (4100: a 3.0
+theme of 400 single keys written as 4.0) styles, 4 fonts, 200 icons (the reader's); its name plain, not
+`.`-led, not ending `#light`/`#dark`, no built-in's file or reference, no 0.5 name
+(`ThemePackFiles.builtinClash`). A 3.0 theme of the user's named by one of its references is replaced by it
+(`Opened.Pack.customs`; their names recorded in `noBackupFilesDir/theme-pack-replaces` before the pack is placed,
+the record put back as it was where the place fails; finished on the main thread once the pack is listed, `ThemeManager.finishReplacements`
+at `packPlaced`, or at the next start's listing after a kill, for the recorded names only: a 3.0 theme beside a
+pack of its name no import recorded, as a backup restored over the pack leaves, is kept and found by its name;
+a recorded name no pack lists has its record dropped at a start's listing, not later, as an import may be
+placing it then; the slots written with the change fired once, as the list has the pack, and the copy for before
+the first unlock synced only where a slot named the theme: the slots keep the name, which then finds the
+pack; a theme named `mine` replaced by a pack `mine` of two versions, the slots naming it name its version of
+the same lightness, `mine#dark`, and the copy for before the first unlock is synced; then its json and the files
+no other theme names are deleted, not where the slots were not written: tried again at the next listing, the
+3.0 theme found by its name till then), while a 3.0 import named as a pack's reference is refused. A folder of its name there but not listed is refused only where its
+`theme.xml` is a later build's (`ThemeReader.laterBuilds`: a format past 4.x, or a newer `min-app`;
+`exception_theme_newer_kept`; a `theme.xml` past 1 MB is not read for it, so not); any other (one that no longer reads, misses a file, hides required text, past
+the packs listed) is replaced, as it could not be deleted otherwise. A new pack past `ThemeAssetLimits.MAX_PACKS` (100) too
+(`exception_theme_packs`). Every file it names inside its folder (never `theme.xml`) and present; pictures
+(the source photo too) and key images as a 3.0 theme's, a preview `.png`/`.webp` of 512 KB and 2048 px a side, fonts that load, icons of 64 KB in
+`SvgSubset` (paths and plain fills only, numbers within ±1e6 and viewBox sides from 1e-3; no script, link, style or entity: `Xml.parse` takes no DTD); at most
+16 layouts, `.xml`, 64 KB each. Warnings (not refusals): what the reader skips (a later version's names), and
+key text under 3:1 on its keys in a version (`ThemePackCheck`'s contrast). The confirmation
+(`ThemePackDialogs`) shows the preview, author, version, license, the format, that it replaces a pack or a
+3.0 theme of the name, and the warnings; 导入 places it, 取消 (or back) deletes what was unpacked.
+
+Placing (`ThemePackFiles.place`) copies it into `v4/.saving/new-<uuid>/`, each file synced, renames an old
+pack of the name aside into `v4/.saving/old-<uuid>/<name>`, renames the new one into place, syncs `v4/`, and
+only then deletes the old; a failure deletes what it wrote and puts the old back. A kill between the renames
+leaves the old aside: the first listing of a process puts each `old-*/<name>` back where no `v4/<name>` took
+its place, then clears `v4/.saving`. A listing reads the newest `MAX_PACKS` folders and skips (logged, told
+once) a pack an import would refuse: one that does not read, whose name is not its folder's, a bad or a
+built-in's name, hiding the required keys' labels, or missing a file, leaving it as it is. Delete (either
+version) removes the folder. Export writes `theme.xml`, its files by name, then `layouts/`; a 3.0 theme
+exports as `LookTheme.theme` of its look through `ThemeWriter` (`ThemePackFiles.of`, its files named by
+`LookTheme.fileNames`, its candidates' font and weight as T6a's `candidate` style), Monet's as its
+colours now. Backups take `v4/` with the themes; a restore replaces each pack the backup has whole (the phone's folder of
+its name deleted first, `UserDataManager.dropRestoredPacks`), the phone's others kept; an older build restoring
+one lists json only. A 3.0 theme whose source photo is past `MAX_PICTURE_SIDE` exports with its portrait cut
+as the source (`ThemeFilesManager.exportedLook`), so the pack imports.
 
 ## Persistence and backups
 

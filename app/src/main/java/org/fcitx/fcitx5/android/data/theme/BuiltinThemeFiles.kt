@@ -85,9 +85,9 @@ object BuiltinThemeFiles {
 
     /**
      * The built-in theme of [themes] [ref] names: its name and version (`pixel#dark`), or its name alone where
-     * it has one version (`deep-blue`, `deep-blue#dark` too); null where none is.
+     * it has one version (`deep-blue`, `deep-blue#dark` too); null where none is. A pack's ([Theme.Pack]) the same way.
      */
-    fun find(themes: List<Theme.Builtin>, ref: String): Theme.Builtin? = themes.find { it.name == ref } ?: run {
+    fun <T : Theme.Versioned> find(themes: List<T>, ref: String): T? = themes.find { it.name == ref } ?: run {
         val name = ref.substringBeforeLast(SEPARATOR)
         val version = ref.substringAfterLast(SEPARATOR, "")
         val dark = when (version) {

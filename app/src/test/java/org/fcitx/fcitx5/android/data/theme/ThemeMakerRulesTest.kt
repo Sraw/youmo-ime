@@ -444,7 +444,7 @@ class ThemeMakerRulesTest {
         val dir = ThemeFilesManager.themeDir.apply { mkdirs() }
         files.forEach { (name, bytes) -> File(dir, name).writeBytes(bytes) }
         val out = ByteArrayOutputStream()
-        ThemeFilesManager.exportTheme(theme.copy(look = theme.look.mapFiles { File(dir, it).path }), out).getOrThrow()
+        ThemeFilesManager.exportJson(theme.copy(look = theme.look.mapFiles { File(dir, it).path }), out).getOrThrow()
         // its entries as it wrote them, in its order; only their times fixed (it stamps the time of the export)
         val exported = zip(entries(out.toByteArray()))
         assertEquals(theme.look.files() + "from-app.json", entries(exported).map { it.first })

@@ -30,8 +30,12 @@ object ThemeManager {
         fun onThemeChange(theme: Theme)
     }
 
-    // the built-in themes' files with the system's colours (Monet's): first, the settings' defaults are of them
-    private var builtinThemes: List<Theme.Builtin> = BuiltinThemeFiles.load(appContext.resources, ThemeMonet.systemColors(appContext))
+    // the built-in themes' files with the system's colours (Monet's): first, the settings' defaults are of them.
+    // The packs' system() take them too (ThemePackFiles.systemColors)
+    private var builtinThemes: List<Theme.Builtin> = ThemeMonet.systemColors(appContext).let {
+        ThemePackFiles.systemColors = it
+        BuiltinThemeFiles.load(appContext.resources, it)
+    }
 
     /** The built-in themes, each version of a file one ([BuiltinThemeFiles]): Monet's first. */
     val BuiltinThemes: List<Theme.Builtin> get() = builtinThemes
@@ -50,6 +54,97 @@ object ThemeManager {
 
     // before the themes, which an older format's are read with (the key style settings before 3.0)
     private val customThemes: MutableList<Theme.Custom> = listCustomThemes(prefs).first.toMutableList()
+
+    // the user's theme 4.0 packs, each version one (060-render-p3 T8a); listed after the 3.0 themes, whose
+    // listing clears what a kill left of a save first
+    private var packs: List<Theme.Pack> = ThemeFilesManager.listPacks(builtinThemes)
+
+    /** The user's theme 4.0 packs, each version one ([Theme.Pack]). */
+    val Packs: List<Theme.Pack> get() = packs
+
+    /**
+     * The 3.0 themes a pack's import replaces ([ThemeFilesManager.Opened.Pack.customs], recorded before it was
+     * placed: [ThemeFilesManager.replacing]), the replacement finished here, on the main thread once the list
+     * has the pack ([packPlaced]; a kill after the place, at the next start's listing). A slot naming one bare
+     * where the pack has two versions (`mine`) names its version of the same lightness (`mine#dark`); one named
+     * as a version keeps the name, which then finds the pack. Then its json and files go, and its record. One
+     * whose slots were not written is left, found by its name till the next listing tries again. A 3.0 theme
+     * beside a pack of its name no import recorded (a backup restored over the pack) is left be, as listed.
+     * The slots written quietly ([finishing]): the change fired once, as the list is. A name no pack lists has its
+     * record dropped [atStart] only (the import failed, or a kill before the place): later, an import's place may
+     * be under way. Whether a slot was renamed.
+     */
+    private fun finishReplacements(atStart: Boolean = false): Boolean {
+        val recorded = ThemeFilesManager.replacing()
+        if (!ThemeFilesManager.writable || recorded.isEmpty()) return false
+        var renamed = false
+        val done = recorded.filterTo(HashSet()) { name ->
+            val custom = customThemes.find { it.name == name }
+            val versions = packs.filter { it.name == name || it.file == name }
+            // gone already, or no pack placed at the start: nothing to finish
+            if (custom == null || (versions.isEmpty() && atStart)) return@filterTo true
+            if (versions.isEmpty()) return@filterTo false
+            // named bare, the pack of two versions: its version of the same lightness
+            val to = if (versions.any { it.name == name }) null else (versions.firstOrNull { it.isDark == custom.isDark } ?: versions.first()).name
+            val named = to != null && prefs.namesTheme(name)
+            finishing = true
+            val written = try {
+                !named || prefs.renameThemeRefs(name, to!!)
+            } finally {
+                finishing = false
+            }
+            if (!written) Timber.w("Settings naming theme $name not written: replaced by its pack at the next listing")
+            if (named && written) renamed = true
+            written && replacedDeleted(custom).also { if (it) customThemes.remove(custom) }
+        }
+        ThemeFilesManager.replaced(done)
+        return renamed
+    }
+
+    /** The replacements recorded finished as a process's start does: a test's next start. */
+    @VisibleForTesting
+    internal fun finishReplacementsAtStart() = finishReplacements(atStart = true)
+
+    // the slots being written by [finishReplacements]: the change fired once the list is, not with the theme replaced
+    private var finishing = false
+
+    private fun replacedDeleted(custom: Theme.Custom): Boolean = try {
+        ThemeFilesManager.deleteThemeFiles(custom)
+        true
+    } catch (e: IOException) {
+        Timber.w(e, "Theme ${custom.name} replaced by its pack not deleted")
+        false
+    }
+
+    // whether the mark of a pack that took the last process down was consulted: once a process, once
+    // the packs are listed (not while the files are not settled, A4: none to reset, the mark kept till
+    // then), before any of them is drawn
+    private var crashConsulted = false
+
+    private fun packsListed() {
+        if (crashConsulted || !ThemeFilesManager.writable) return
+        crashConsulted = true
+        PackDrawGuard.crashed()?.let(::packCrashed)
+    }
+
+    /** The mark consulted again, as a process's first listing of the packs would: a test's next start. */
+    @VisibleForTesting
+    internal fun consultPackCrash() {
+        crashConsulted = false
+        packsListed()
+    }
+
+    /**
+     * The pack [file] took the keyboard down as it was first drawn ([PackDrawGuard]): the settings naming one
+     * of its versions go back to their defaults (a built-in theme), the user told. The pack is kept, to be
+     * deleted or picked again.
+     */
+    @VisibleForTesting
+    internal fun packCrashed(file: String) {
+        val refs = packs.filter { it.file == file }.map { it.name }.filter { r -> customThemes.none { it.name == r } }
+        Timber.w("Theme pack $file did not draw its first frame: the settings naming it reset")
+        if (prefs.dropThemeRefs(refs.toSet())) appContext.toast(appContext.getString(R.string.theme_pack_draw_failed, file), Toast.LENGTH_LONG)
+    }
 
     /**
      * The user's themes ([ThemeFilesManager.listThemes]; [ThemePrefs.legacyLook] for an older format's),
@@ -75,33 +170,41 @@ object ThemeManager {
     }
 
     /**
-     * The theme [name] refers to: the user's of that name, else the built-in one ([BuiltinThemeFiles.find]),
-     * else the built-in one of that 0.5 name (a setting not moved yet: [ThemePrefs.migrateThemeRefs]); null
-     * where none is.
+     * The theme [name] refers to: the user's 3.0 theme of that name, else a pack's version ([BuiltinThemeFiles.find]:
+     * `name#dark`), else the built-in one, else the built-in one of that 0.5 name (a setting not moved yet:
+     * [ThemePrefs.migrateThemeRefs]); null where none is.
      */
     fun getTheme(name: String): Theme? =
-        customThemes.find { it.name == name } ?: BuiltinThemeFiles.find(builtinThemes, name)
+        customThemes.find { it.name == name } ?: BuiltinThemeFiles.find(packs, name) ?: BuiltinThemeFiles.find(builtinThemes, name)
             ?: BuiltinThemeFiles.LEGACY[name]?.let { BuiltinThemeFiles.find(builtinThemes, it) }
 
-    fun getAllThemes(): List<Theme> = customThemes + builtinThemes
+    /** The user's packs, the user's 3.0 themes, the built-in ones. */
+    fun getAllThemes(): List<Theme> = packs + customThemes + builtinThemes
 
-    // Monet's versions read again with the system's colours as they are now (and its keys' look as it is)
-    private fun reloadMonet() {
-        val monet = BuiltinThemeFiles.load(
-            appContext.resources, ThemeMonet.systemColors(appContext),
-            BuiltinThemeFiles.FILES.filter { it.first == BuiltinThemeFiles.MONET },
-        )
+    // Monet's versions read again with the system's colours as they are now (and its keys' look as it is);
+    // whether the packs were (the system's colours changed: a configuration's other changes leave them be)
+    private fun reloadMonet(): Boolean {
+        val colors = ThemeMonet.systemColors(appContext)
+        val monet = BuiltinThemeFiles.load(appContext.resources, colors, BuiltinThemeFiles.FILES.filter { it.first == BuiltinThemeFiles.MONET })
         val others = builtinThemes.filter { it.file != BuiltinThemeFiles.MONET }
         // Monet's first, as the files are
         builtinThemes = monet + others
+        if (colors == ThemePackFiles.systemColors) return false
+        // the packs' system() too: each read again (a copy reads its file anew)
+        ThemePackFiles.systemColors = colors
+        packs = packs.map { it.copy() }
+        return true
     }
 
     fun refreshThemes() {
         val (themes, changed) = listCustomThemes(prefs)
         customThemes.clear()
         customThemes.addAll(themes)
+        packs = ThemeFilesManager.listPacks()
+        val renamed = finishReplacements()
+        packsListed()
         // the copy for before the first unlock names what this one does (the start syncs it after init)
-        if (changed) syncToDeviceEncryptedStorage()
+        if (changed || renamed) syncToDeviceEncryptedStorage()
         activeTheme = evaluateActiveTheme()
     }
 
@@ -191,16 +294,24 @@ object ThemeManager {
         return true
     }
 
-    /** Deletes the theme [name]; whether it was let, none while the themes are not settled (the user told). */
+    /**
+     * Deletes the theme [name] (a pack's version: the pack, each of its versions); whether it was let, none while
+     * the themes are not settled (the user told).
+     */
     fun deleteTheme(name: String): Boolean {
         if (refuseIfNotSettled()) return false
         customThemes.find { it.name == name }?.also {
             ThemeFilesManager.deleteThemeFiles(it)
             customThemes.remove(it)
         }
+        val pack = packs.find { it.name == name }?.also { pack ->
+            ThemeFilesManager.deletePack(pack.file)
+            packs = packs.filter { it.file != pack.file }
+        }
         // its picture and thumbnail let go; one imported again under its name is decoded anew
         filesChanged(name) {
-            if (activeTheme.name == name) {
+            // a pack's other version in use is gone with it
+            if (activeTheme.name == name || (pack != null && (activeTheme as? Theme.Pack)?.file == pack.file)) {
                 activeTheme = evaluateActiveTheme()
             }
         }
@@ -225,6 +336,11 @@ object ThemeManager {
         }
     }
 
+    /** The pack [file] imported (put in place, a pack of its name replaced): listed again, the keyboard drawn anew if it is in use. */
+    fun packPlaced(file: String) {
+        filesChanged((_activeTheme as? Theme.Pack)?.takeIf { it.file == file }?.name ?: file) { refreshThemes() }
+    }
+
     fun setNormalModeTheme(theme: Theme) {
         // `normalModeTheme.setValue(theme)` would trigger `onThemePrefsChange` listener,
         // which calls `fireChange()`.
@@ -244,6 +360,8 @@ object ThemeManager {
 
     @Keep
     private val onThemePrefsChange = ManagedPreferenceProvider.OnChangeListener { key ->
+        // a slot a replacement repoints (finishReplacements): the theme found by it changes once the list does
+        if (finishing) return@OnChangeListener
         when (key) {
             in prefs.dayNightModePrefNames -> activeTheme = evaluateActiveTheme()
             // InputView moves the board itself: made anew, the symbols shown would go back to the letters.
@@ -264,6 +382,9 @@ object ThemeManager {
 
     fun init(configuration: Configuration) {
         isDarkMode = configuration.isDarkMode()
+        // the app's start, on the main thread (the toast): before the theme in use is read
+        finishReplacements(atStart = true)
+        packsListed()
         _activeTheme = evaluateActiveTheme()
         settleKeyStyle()
         // fire all `OnThemeChangedListener`s on theme preferences change
@@ -287,11 +408,17 @@ object ThemeManager {
 
     fun onSystemPlatteChange(newConfig: Configuration) {
         isDarkMode = newConfig.isDarkMode()
-        reloadMonet()
+        val packsRead = reloadMonet()
         // `ManagedThemePreference` finds the theme its name refers to ([getTheme]),
         // thus `evaluateActiveTheme()` should be called after Monet's are read again
         val before = _activeTheme
         activeTheme = evaluateActiveTheme()
+        // a pack's read again equals the one before (its file's the same): drawn anew all the same, its system() new
+        if (_activeTheme === before && before is Theme.Pack && packsRead) {
+            _activeTheme = evaluateActiveTheme()
+            fireChange()
+            return
+        }
         // turned (or another change of the configuration): the picture's cut for it decoded ahead, as
         // the theme picked is; a theme changed did that already
         if (_activeTheme === before) prefetch()

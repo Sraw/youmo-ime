@@ -233,7 +233,7 @@ class SettingsMenuUatTest {
             themeList().findViewHolderForAdapterPosition(0)!!.itemView.performClick()
             st.idle()
             assertEquals(Intent.ACTION_GET_CONTENT, shadowOf(st.activity).nextStartedActivity?.action)
-            // one's own theme: no edit button, its long press 导出 or 删除
+            // one's own theme: no edit button, its long press 信息 (060-render-p3 T8a), 导出 or 删除
             pick("mine")
             assertEquals("mine", ThemeManager.activeTheme.name)
             val at = (themeList().adapter as ThemeListAdapter).entries.indexOfFirst { it.name == "mine" } + 1
@@ -243,8 +243,8 @@ class SettingsMenuUatTest {
             row.performLongClick()
             st.idle()
             val actions = dialog().listView.adapter.let { a -> (0 until a.count).map { a.getItem(it).toString() } }
-            assertEquals(listOf("导出", "删除"), actions)
-            dialog().listView.performItemClick(null, 1, 1)
+            assertEquals(listOf("信息", "导出", "删除"), actions)
+            dialog().listView.performItemClick(null, 2, 2)
             st.idle()
             dialog().getButton(DialogInterface.BUTTON_POSITIVE).performClick()
             st.idle()

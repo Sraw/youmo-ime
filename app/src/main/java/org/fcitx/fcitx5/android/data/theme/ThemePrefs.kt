@@ -296,11 +296,23 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      * saved again under a new name, [ThemeFilesManager.moveClashing]); on disk before it returns, as the
      * old theme's json is deleted next. Whether it was written.
      */
+    /** Whether a slot names the theme [name]. */
+    fun namesTheme(name: String): Boolean = listOf(normalModeTheme.key, lightModeTheme.key, darkModeTheme.key)
+        .any { runCatching { sharedPreferences.getString(it, null) }.getOrNull() == name }
+
     fun renameThemeRefs(from: String, to: String): Boolean {
         val keys = listOf(normalModeTheme.key, lightModeTheme.key, darkModeTheme.key)
             .filter { runCatching { sharedPreferences.getString(it, null) }.getOrNull() == from }
         if (keys.isEmpty()) return true
         return sharedPreferences.edit().apply { keys.forEach { putString(it, to) } }.commit()
+    }
+
+    /** The slots naming one of [refs] back to their defaults ([PackDrawGuard]): whether any was. */
+    fun dropThemeRefs(refs: Set<String>): Boolean {
+        val keys = listOf(normalModeTheme.key, lightModeTheme.key, darkModeTheme.key)
+            .filter { runCatching { sharedPreferences.getString(it, null) }.getOrNull() in refs }
+        if (keys.isNotEmpty()) sharedPreferences.edit { keys.forEach(::remove) }
+        return keys.isNotEmpty()
     }
 
     val dayNightModePrefNames = setOf(

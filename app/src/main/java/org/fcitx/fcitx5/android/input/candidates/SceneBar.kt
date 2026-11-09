@@ -48,7 +48,7 @@ object SceneBar {
      * floating, the bar the same over a floating keyboard and a docked one).
      */
     fun of(context: Context, theme: Theme): BarLook =
-        SceneThemes.of(ThemeManager.shownLook(theme), theme.name, theme.isDark)
+        SceneThemes.of(theme, ThemeManager.shownLook(theme))
             ?.let { BarLook.of(SceneThemes.cascades(it), SceneWindow.scenes(context, theme)) }
             ?: plain(theme)
 
@@ -88,7 +88,7 @@ object SceneBar {
         val theme = ThemeManager.activeTheme
         val scenes = SceneWindow.scenes(context, theme)
         // the theme file SceneThemes keeps: another look, or the same made anew, another file
-        val file = SceneThemes.of(ThemeManager.shownLook(theme), theme.name, theme.isDark)
+        val file = SceneThemes.of(theme, ThemeManager.shownLook(theme))
         shownHeight?.let { (f, s, h) -> if (f === file && s == scenes) return h }
         val h = file?.let { BarLook.of(SceneThemes.cascades(it), scenes).heightPercent } ?: FULL
         shownHeight = Triple(file, scenes, h)
