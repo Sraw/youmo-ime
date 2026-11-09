@@ -62,6 +62,13 @@ class SvgSubsetTest {
         assertTrue(problems("""<svg viewBox="0 0 1e999 24"/>""").single().startsWith("viewBox="))
         assertTrue(problems("""<svg width="1e999px"/>""").single().startsWith("width="))
         assertEquals(listOf("d=: 1e999 at 2 is past a number's range"), problems("""<svg><path d="M1e999 0"/></svg>"""))
+        // a double's but a float's Infinity, or a side that scales by it: past it too
+        assertEquals(listOf("d=: 1e300 at 2 is past a number's range"), problems("""<svg><path d="M1e300 0"/></svg>"""))
+        assertEquals(listOf("d=: -2e6 at 4 is past a number's range"), problems("""<svg><path d="M0 -2e6"/></svg>"""))
+        assertTrue(problems("""<svg viewBox="0 0 1e-300 24"/>""").single().startsWith("viewBox="))
+        assertTrue(problems("""<svg width="4e38"/>""").single().startsWith("width="))
+        // an icon's numbers as they come: none
+        assertEquals(emptyList<String>(), problems("""<svg viewBox="0 0 1024 0.5"><path d="M-1e6 0 L1e6 1" opacity="0.5"/></svg>"""))
     }
 
     @Test

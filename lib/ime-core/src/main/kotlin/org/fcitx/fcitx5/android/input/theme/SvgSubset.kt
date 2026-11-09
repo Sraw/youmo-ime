@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Problem
 import org.fcitx.fcitx5.android.scene.xml.Xml
 import org.fcitx.fcitx5.android.scene.xml.XmlElement
+import kotlin.math.abs
 
 /**
  * The SVG a theme 4.0 pack's `<icon>` may be (060-render-p3 T8a): filled paths and nothing else. An
@@ -93,13 +94,21 @@ object SvgSubset {
 
     private fun String.unless(ok: Boolean): String? = if (ok) null else this
 
-    // a number a double holds: 1e999 is written as one but read as Infinity, which no drawing scales by
-    private fun finite(value: String): Boolean = NUMBER.matches(value) && value.toDouble().isFinite()
+    /** A number's size at most, and a viewBox side's least: an icon's, what a drawing in floats scales by finitely. */
+    const val MAX_NUMBER = 1e6
+    const val MIN_SIDE = 1e-3
 
+    // a number drawn as a float: 1e999 is written as one but read as Infinity, 1e300 a float's Infinity,
+    // which no drawing scales by
+    private fun inRange(value: Double): Boolean = abs(value) <= MAX_NUMBER
+
+    private fun finite(value: String): Boolean = NUMBER.matches(value) && inRange(value.toDouble())
+
+    // a side of 1e-300 would scale the icon by Infinity
     private fun viewBox(value: String): Boolean {
         val v = value.trim().split(Regex("[\\s,]+"))
         if (v.size != VIEW_BOX || !v.all(::finite)) return false
-        return v[2].toDouble() > 0 && v[3].toDouble() > 0
+        return v[2].toDouble() >= MIN_SIDE && v[3].toDouble() >= MIN_SIDE
     }
 
     private val FILL_WORDS = setOf("none", "currentColor")
@@ -121,7 +130,7 @@ object SvgSubset {
                 else -> {
                     if (first) return "a path starts with M"
                     val number = NUMBER.matchAt(d, i) ?: return "'${d[i]}' at ${i + 1} is no command or number"
-                    if (!number.value.toDouble().isFinite()) return "${number.value} at ${i + 1} is past a number's range"
+                    if (!inRange(number.value.toDouble())) return "${number.value} at ${i + 1} is past a number's range"
                     count.numbers++
                     i = number.range.last + 1
                 }
