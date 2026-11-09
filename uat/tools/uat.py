@@ -2855,7 +2855,8 @@ _fixtures_server = None
 def ensure_fixtures(d):
     """the test page served and reversed to [d] before it is opened, whoever opens it: run starts both,
     but reset or open_page called without run (up, packs, by hand) found nothing on 127.0.0.1:8000 and the
-    page said ERR_CONNECTION_REFUSED (a KB-01 time-out). A server already on this port's is taken as ours"""
+    page said ERR_CONNECTION_REFUSED (a KB-01 time-out). A server already on this port is used only when its
+    fields.html is this checkout's"""
     global HTTP_PORT, _fixtures_server
     HTTP_PORT = HTTP_PORT or http_port(d.port)
     s = __import__("socket").socket()
@@ -2864,8 +2865,26 @@ def ensure_fixtures(d):
     if not serving:
         _fixtures_server = start_server()
         __import__("atexit").register(_fixtures_server.terminate)
+    elif not serves_our_fixtures():
+        sys.exit(f"127.0.0.1:{HTTP_PORT} serves something else than {FIXTURES}/fields.html (another checkout's "
+                 "fixtures, another program): stop it or set UAT_HTTP_PORT")
     if f"tcp:8000 tcp:{HTTP_PORT}" not in d.adb("reverse", "--list"):
         d.adb("reverse", "tcp:8000", f"tcp:{HTTP_PORT}", check=True)
+
+
+FIXTURES = os.path.join(UAT, "fixtures")
+
+
+def serves_our_fixtures():
+    """the page on HTTP_PORT the same bytes as this checkout's uat/fixtures/fields.html"""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{HTTP_PORT}/fields.html", timeout=5) as r:
+            got = r.read()
+    except OSError:
+        return False
+    with open(os.path.join(FIXTURES, "fields.html"), "rb") as f:
+        return got == f.read()
 
 
 def start_server():

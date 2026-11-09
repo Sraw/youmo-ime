@@ -278,11 +278,51 @@ class FixturesTest(unittest.TestCase):
 
     def test_already_served_and_reversed_nothing_again(self):
         d = self.Dev("emulator-5556 tcp:8000 tcp:8801\n")
-        with unittest.mock.patch("socket.socket") as sock:
+        with unittest.mock.patch("socket.socket") as sock, \
+                unittest.mock.patch.object(uat, "serves_our_fixtures", return_value=True):
             sock.return_value.connect_ex.return_value = 0
             uat.ensure_fixtures(d)
         self.assertEqual(self.started, [])
         self.assertEqual(d.calls, [("reverse", "--list")])
+
+
+    def test_someone_elses_server_on_the_port_stops_with_why(self):
+        d = self.Dev()
+        with unittest.mock.patch("socket.socket") as sock, \
+                unittest.mock.patch.object(uat, "serves_our_fixtures", return_value=False):
+            sock.return_value.connect_ex.return_value = 0
+            with self.assertRaises(SystemExit) as e:
+                uat.ensure_fixtures(d)
+        self.assertIn("8801", str(e.exception.code))
+        self.assertEqual(self.started, [])
+        self.assertEqual(d.calls, [])
+
+    def test_our_page_is_told_from_another(self):
+        import http.server
+        import threading
+        served = {"body": b""}
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(served["body"])
+
+            def log_message(self, *a):
+                pass
+
+        srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            uat.HTTP_PORT = srv.server_address[1]
+            served["body"] = b"<html>another</html>"
+            self.assertFalse(uat.serves_our_fixtures())
+            with open(os.path.join(uat.FIXTURES, "fields.html"), "rb") as f:
+                served["body"] = f.read()
+            self.assertTrue(uat.serves_our_fixtures())
+        finally:
+            srv.shutdown()
+            srv.server_close()
 
 
 class HeavyTest(unittest.TestCase):
