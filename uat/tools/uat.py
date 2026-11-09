@@ -1350,6 +1350,7 @@ class Device:
         """the test page showing one field, tapped: the keyboard is up"""
         if "package:" not in self.sh("pm path org.chromium.webview_shell"):
             raise Blocked("这台没有测试页的浏览器（webview_shell 要 API 34+）")
+        ensure_fixtures(self)
         self.reload_n += 1
         url = f"http://127.0.0.1:8000/fields.html?r={self.reload_n}#{page}"
         self.sh(f"am start -a android.intent.action.VIEW -d '{url}' -n {BROWSER}")
@@ -2845,6 +2846,26 @@ def down(port="5556"):
 def version(d):
     m = re.search(r"versionName=(\S+)", d.sh(f"dumpsys package {PKG} | grep -m1 versionName"))
     return m.group(1) if m else "?"
+
+
+# the server ensure_fixtures started (not run's own): stopped when this process ends
+_fixtures_server = None
+
+
+def ensure_fixtures(d):
+    """the test page served and reversed to [d] before it is opened, whoever opens it: run starts both,
+    but reset or open_page called without run (up, packs, by hand) found nothing on 127.0.0.1:8000 and the
+    page said ERR_CONNECTION_REFUSED (a KB-01 time-out). A server already on this port's is taken as ours"""
+    global HTTP_PORT, _fixtures_server
+    HTTP_PORT = HTTP_PORT or http_port(d.port)
+    s = __import__("socket").socket()
+    serving = s.connect_ex(("127.0.0.1", HTTP_PORT)) == 0
+    s.close()
+    if not serving:
+        _fixtures_server = start_server()
+        __import__("atexit").register(_fixtures_server.terminate)
+    if f"tcp:8000 tcp:{HTTP_PORT}" not in d.adb("reverse", "--list"):
+        d.adb("reverse", "tcp:8000", f"tcp:{HTTP_PORT}", check=True)
 
 
 def start_server():

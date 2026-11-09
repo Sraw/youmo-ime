@@ -10,6 +10,7 @@ import tempfile
 import threading
 import time
 import unittest
+import unittest.mock
 from types import SimpleNamespace
 from unittest import mock
 
@@ -245,6 +246,43 @@ class DevicesTest(unittest.TestCase):
         self.assertEqual(uat.device_count(20 * G, 0, budget=3 * G, cap=3), 3)
         self.assertEqual(uat.device_count(4 * G, 2, budget=3 * G), 1)       # never under 1
         self.assertEqual(uat.device_count(99 * G, 0, budget=3 * G, ports=2), 2)
+
+
+class FixturesTest(unittest.TestCase):
+    """reset and open_page outside run (up, packs, by hand): the page's server and reverse made then"""
+
+    class Dev:
+        def __init__(self, reversed_=""):
+            self.port, self.calls, self.reversed = "5556", [], reversed_
+
+        def adb(self, *args, check=False):
+            self.calls.append(args)
+            return self.reversed if args == ("reverse", "--list") else ""
+
+    def setUp(self):
+        self._port, self._server = uat.HTTP_PORT, uat.start_server
+        uat.HTTP_PORT = None
+        self.started = []
+        uat.start_server = lambda: self.started.append(uat.HTTP_PORT) or unittest.mock.Mock()
+
+    def tearDown(self):
+        uat.HTTP_PORT, uat.start_server = self._port, self._server
+
+    def test_nothing_serving_starts_the_server_and_reverses_the_port(self):
+        d = self.Dev()
+        with unittest.mock.patch("socket.socket") as sock:
+            sock.return_value.connect_ex.return_value = 1   # refused
+            uat.ensure_fixtures(d)
+        self.assertEqual(self.started, [8801])
+        self.assertIn(("reverse", "tcp:8000", "tcp:8801"), d.calls)
+
+    def test_already_served_and_reversed_nothing_again(self):
+        d = self.Dev("emulator-5556 tcp:8000 tcp:8801\n")
+        with unittest.mock.patch("socket.socket") as sock:
+            sock.return_value.connect_ex.return_value = 0
+            uat.ensure_fixtures(d)
+        self.assertEqual(self.started, [])
+        self.assertEqual(d.calls, [("reverse", "--list")])
 
 
 class HeavyTest(unittest.TestCase):
