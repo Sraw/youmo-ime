@@ -122,6 +122,8 @@ object Values {
         "inner-shadow", "depth", "depth-color", "tail", "offset",
         // T6a: the candidates (BarLook)
         "gap", "label-style",
+        // T6b: the code being typed (BarLook.preedit)
+        "underline", "cursor-color",
         // T7b: the voice mask's frosted glass (engine/PanelLooks), the handwriting pad's ink and grid
         "blur", "ink-color", "ink-width", "grid-color", "grid",
     ) + RETURN_ACTIONS.map { "$RETURN_ICON$it" }
@@ -133,7 +135,6 @@ object Values {
 
     // ASCII white space spelt out: `\s` is more on JS than on the JVM, and a file must read the same on both
     private const val FILE = "[^,()/\\\\:*?\"<>| \\t\\n\\r\\f\\x0B]{1,128}"
-    private val LENGTH = Regex("(?:$LEN)$")
 
     /** A reserved property's value read: the colours in it (maybe none), or null where it is not of the form. */
     fun interface Reserved {
@@ -143,20 +144,6 @@ object Values {
     // anchored: Kotlin/JS matches a whole value by the first alternative that starts one (FONT above), so "ease" would end "ease-out"
     private fun form(pattern: String): Reserved = Regex("(?:$pattern)$").let { r -> Reserved { if (r.matches(it)) emptyList() else null } }
 
-    private val COLOR = Reserved { ColorExpr.parse(it)?.let(::listOf) }
-
-    // lengths then a colour (which may hold spaces: system(a, b)); also `none` where [none]
-    private fun lengthsThenColor(lengths: Int, none: Boolean): Reserved = Reserved { raw ->
-        val p = raw.split(' ', limit = lengths + 1)
-        when {
-            none && raw == "none" -> emptyList()
-            p.size != lengths + 1 || p.take(lengths).any { !LENGTH.matches(it) } -> null
-            else -> ColorExpr.parse(p.last())?.let(::listOf)
-        }
-    }
-
-    private val SHADOW = lengthsThenColor(3, none = true)
-
     /**
      * Style properties of a later stage of 0.6.0 (060-render-p3: T5–T7b, A1–A3, the sounds' `sticker`),
      * each with its value's form: read where it is of the form, ignored with a warning (a theme made
@@ -164,14 +151,11 @@ object Values {
      * problem like any. A stage that makes one work moves it to [PROPERTIES].
      */
     val RESERVED: Map<String, Reserved> = mapOf(
-        // read on the keyboard (T5, [KEYBOARD_SIZES]) and the handle (T7a, [HANDLE_SIZES]); on another widget T6b's (the bar)
+        // read on the keyboard (T5, [KEYBOARD_SIZES]), the handle (T7a, [HANDLE_SIZES]) and the bar (T6b, [barHeight]); on another widget ignored
         "height" to form(LEN_OR_PERCENT),
         "width" to form(LEN),
         "side-padding" to form(LEN_OR_PERCENT),
         "bottom-padding" to form(LEN_OR_PERCENT),
-        // T6b: the pre-edit text
-        "underline" to lengthsThenColor(1, none = true),
-        "cursor-color" to COLOR,
         // A1–A3: motion
         "transition" to form("$MS (linear|ease|ease-in|ease-out|ease-in-out)"),
         "press-scale" to form(PERCENT_FORM),
@@ -185,7 +169,7 @@ object Values {
     /**
      * The keyboard's size (060-render-v2 §15, 主题管尺寸): set on `keyboard` alone, under no scene,
      * portrait then landscape (one value: both). The same names on the handle are its grip's
-     * ([HANDLE_SIZES]), on another widget a later stage's ([RESERVED]: the bar's height).
+     * ([HANDLE_SIZES]), the bar's `height` its own ([barHeight]), on another widget ignored ([RESERVED]).
      */
     val KEYBOARD_SIZES = listOf("height", "side-padding", "bottom-padding")
 
@@ -243,6 +227,13 @@ object Values {
         else -> textOnAKey(property, raw) ?: capAndBubble(property, raw) ?: panel(property, raw)
     }
 
+    // T6b's: the code being typed's underline (a border's form, or none) and cursor
+    private fun preedit(property: String, raw: String): Value? = when (property) {
+        "underline" -> border(raw)?.let(Value::OfBorder)
+        "cursor-color" -> ColorExpr.parse(raw)?.let(Value::OfColor)
+        else -> null
+    }
+
     /** The voice mask's frosted glass at most (`blur`), dp: as the keyboard's picture's. */
     const val MAX_PANEL_BLUR_DP = 25.0
 
@@ -256,8 +247,15 @@ object Values {
         "ink-width" -> dp(raw, MAX_INK_DP)?.takeIf { it >= MIN_INK_DP }?.let(Value::Number)
         "ink-color", "grid-color" -> ColorExpr.parse(raw)?.let(Value::OfColor)
         "grid" -> flag(raw)
-        else -> null
+        else -> preedit(property, raw)
     }
+
+    /** The bar's `height` (T6b), of the height 候选字号 gives it: one value, upright and turned alike. */
+    const val MIN_BAR_HEIGHT = 80.0
+    const val MAX_BAR_HEIGHT = 140.0
+
+    /** The bar's `height="120%"`, in %; null where not one, or out of [MIN_BAR_HEIGHT]–[MAX_BAR_HEIGHT]. */
+    fun barHeight(raw: String): Double? = percent(raw)?.takeIf { it in MIN_BAR_HEIGHT..MAX_BAR_HEIGHT }
 
     /** A candidate's `label-style=` (T6a): no number before it, its number, a dot. */
     val LABEL_STYLES = listOf("none", "number", "dot")

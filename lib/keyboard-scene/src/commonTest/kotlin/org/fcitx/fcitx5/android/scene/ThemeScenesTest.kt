@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.scene.theme.Selector
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.scene.theme.Twin
+import org.fcitx.fcitx5.android.scene.theme.Value
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -148,7 +149,7 @@ class ThemeScenesTest {
         assertTrue(warnings(scened).single().contains("height= of a keyboard under a scene is ignored"))
         // in a state: the same, said so
         assertTrue(warnings(withStyle("<style select=\"keyboard:pressed\" height=\"40%\"/>")).single().contains("height= of a keyboard in a state is ignored"))
-        // in a list with another widget: said so, and the other's a later stage's (the bar's height, T6b)
+        // in a list with another widget: said so, and the other's ignored too (the bar's height read on a style of bars alone, T6b)
         val listed = warnings(withStyle("<style select=\"keyboard, bar\" height=\"40%\"/>"))
         assertEquals(2, listed.size, "$listed")
         assertTrue(listed[0].contains("height= of a keyboard in a list of other widgets is ignored"), "$listed")
@@ -156,8 +157,11 @@ class ThemeScenesTest {
         assertEquals(KeyboardSizes(), sizes("<style select=\"keyboard, bar\" height=\"40%\"/>"))
         assertEquals(KeyboardSizes(), sizes("<style select=\"@landscape keyboard\" height=\"40%\"/>"))
         assertTrue(problems(withStyle("<style select=\"@landscape keyboard\" height=\"95%\"/>")).isNotEmpty())
-        // another widget's: a later stage's (the bar's height, T6b), as before
-        assertTrue(warnings(withStyle("<style select=\"bar\" height=\"40dp\"/>")).single().contains("height= is not supported"))
+        // the bar's (T6b): 80%–140% of its height of 候选字号, under a scene too; else refused; on another widget ignored
+        val bar = ThemeReader.theme(withStyle("<style select=\"@landscape bar\" height=\"85%\"/>")).getOr { error("$it") }
+        assertEquals(Value.Percent(85.0), bar.styles.last().values["height"])
+        for (wrong in listOf("40dp", "79%", "141%", "100% 90%")) assertTrue(problems(withStyle("<style select=\"bar\" height=\"$wrong\"/>")).isNotEmpty(), wrong)
+        assertTrue(warnings(withStyle("<style select=\"candidate\" height=\"40dp\"/>")).single().contains("height= is not supported"))
         // with today's properties, the keyboard's fill still works
         val both = ThemeReader.theme(withStyle("<style select=\"keyboard\" fill=\"#123456\" height=\"40%\"/>")).getOr { error("$it") }
         assertEquals(setOf("fill", "height"), both.styles.last().values.keys)
