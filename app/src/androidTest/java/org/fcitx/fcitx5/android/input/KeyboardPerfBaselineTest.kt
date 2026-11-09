@@ -20,7 +20,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
-import androidx.core.view.ViewCompat
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -39,6 +38,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.input.keyboard.LetterCaseChoice
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.theme.BoardBase
@@ -82,6 +82,7 @@ class KeyboardPerfBaselineTest {
 
     private val runs = InstrumentationRegistry.getArguments().getString("perfRuns")?.toInt() ?: 20
     private val warmUp = 3
+    private val only = InstrumentationRegistry.getArguments().getString("perfOnly")?.split(',')
 
     // perfScreenshot=true: the picture theme's keyboard captured once, to see the picture is drawn
     private val screenshots = InstrumentationRegistry.getArguments().getString("perfScreenshot") == "true"
@@ -102,6 +103,13 @@ class KeyboardPerfBaselineTest {
         val sdk = android.os.Build.VERSION.SDK_INT
         log("device ${android.os.Build.MODEL} sdk $sdk runs $runs warm-up $warmUp")
         selectThisInputMethod()
+        if (only != null) {
+            // perfOnly=theme,shift: those parts alone, for a trace short enough to read
+            launch()
+            if ("theme" in only) switchThemes()
+            if ("shift" in only) sceneCosts()
+            return
+        }
         memory("no keyboard shown yet")
         launch()
         memory("26 keys shown, first time")
@@ -113,6 +121,9 @@ class KeyboardPerfBaselineTest {
         switchThemes()
         pressFeedback()
         sceneCosts()
+        rebuilds()
+        shiftWithLowerFaces()
+        popupSlide()
         hideKeyboard()
         memory("after the runs (handwriting's models loaded), hidden")
         showKeyboard()
@@ -512,8 +523,9 @@ class KeyboardPerfBaselineTest {
     }
 
     private fun shiftTap(at: PointF): KeyboardFrames.Sample {
-        val caps = onMain { capsState() }
-        val mark = onMain { frames.mark(0) { capsState() != caps } }
+        // Shift's state is the canvas's now (no button_caps view to ask): its scene made anew is the tap shown
+        val scene = onMain { canvasView()?.scene }
+        val mark = onMain { frames.mark(0) { canvasView()?.scene.let { it != null && it !== scene } } }
         val heap = Heap.now()
         val down = SystemClock.uptimeMillis()
         inject(MotionEvent.ACTION_DOWN, at, down, down)
@@ -524,14 +536,128 @@ class KeyboardPerfBaselineTest {
         return frames.await(mark).also { settle() }.heap(Heap.now() - heap)
     }
 
-    // Shift's state as its view tells a screen reader (set as Shift is tapped, before the frame showing it)
-    private fun capsState(): String? = keyboardFrame()?.findViewById<View>(R.id.button_caps)?.let { ViewCompat.getStateDescription(it)?.toString() }
-
     private fun canvasView(): KeyboardCanvasView? = keyboardFrame()?.let(::all)?.filterIsInstance<KeyboardCanvasView>()?.firstOrNull()
 
     private fun textKeyboard(): TextKeyboard = keyboardFrame()!!.let(::all).filterIsInstance<TextKeyboard>().first()
 
     private fun all(v: View): List<View> = listOf(v) + ((v as? ViewGroup)?.let { g -> (0 until g.childCount).flatMap { all(g.getChildAt(it)) } } ?: emptyList())
+
+    // ---- 3c. the keyboard made again for a new size, Shift with faces that do not follow it, a popup's focus moved
+
+    /**
+     * The keyboard's height setting changed (30% and 35% in turn: the input view laid out anew at a new
+     * size) and the screen turned (portrait and landscape in turn: the input view made anew), each
+     * counted from the change to the first frame at the new size.
+     */
+    private fun rebuilds() {
+        fresh()
+        val height = AppPrefs.getInstance().keyboard.keyboardHeightPercent
+        val heightWas = onMain { height.getValue() }
+        val resized = mutableListOf<KeyboardFrames.Sample>()
+        try {
+            repeat(warmUp + runs) { i ->
+                for (to in listOf(heightWas + 5, heightWas)) {
+                    val before = onMain { keyboardArea().height }
+                    val sample = measure({ keyboardFrame()?.let { shows(it, Board.FULL) && keyboardArea().height != before } == true }) { height.setValue(to) }
+                    if (i >= warmUp) resized += sample
+                }
+            }
+        } finally {
+            onMain { height.setValue(heightWas) }
+        }
+        row("rebuild", "height setting changed", resized)
+        val autoWas = shell("settings get system accelerometer_rotation")
+        val rotationWas = shell("settings get system user_rotation")
+        val turned = mutableListOf<KeyboardFrames.Sample>()
+        try {
+            shell("settings put system accelerometer_rotation 0")
+            repeat(warmUp + runs) { i ->
+                for (to in listOf(1, 0)) {
+                    val before = onMain { keyboardFrame() }
+                    val beforeWidth = onMain { before?.width }
+                    val mark = onMain { frames.mark(0) { keyboardFrame().let { it != null && shows(it, Board.FULL) && it.width != beforeWidth } } }
+                    val heap = Heap.now()
+                    mark.from = System.nanoTime()
+                    shell("settings put system user_rotation $to")
+                    val sample = runCatching { frames.await(mark).also { settle() }.heap(Heap.now() - heap) }.getOrNull()
+                    if (sample == null) log("rebuild\tturned to $to: no frame (the window made anew?)")
+                    else if (i >= warmUp) turned += sample
+                    SystemClock.sleep(ROTATE_SETTLE_MS)
+                }
+            }
+        } finally {
+            shell("settings put system user_rotation ${rotationWas.toIntOrNull() ?: 0}")
+            if (autoWas == "1") shell("settings put system accelerometer_rotation 1")
+            settle()
+        }
+        if (turned.isNotEmpty()) row("rebuild", "screen turned", turned)
+    }
+
+    /** Shift tapped as in [sceneCosts], with the letters' faces lower case whatever Shift is (the faces left as they are). */
+    private fun shiftWithLowerFaces() {
+        val case = AppPrefs.getInstance().keyboard.letterCase
+        val caseWas = onMain { case.getValue() }
+        log("shift\tletter case setting $caseWas (Shift: the faces follow it)")
+        try {
+            onMain { case.setValue(LetterCaseChoice.Lower) }
+            fresh()
+            val shift = keyAt(onKeyboard().res(imePkg, "button_caps"))
+            val taps = mutableListOf<KeyboardFrames.Sample>()
+            repeat(warmUp + runs) { i ->
+                repeat(2) {
+                    val sample = shiftTap(shift)
+                    if (i >= warmUp) taps += sample
+                    SystemClock.sleep(SHIFT_APART_MS)
+                }
+            }
+            row("shift", "tap, letter faces lower case always", taps)
+        } finally {
+            onMain { case.setValue(caseWas) }
+            fresh()
+        }
+    }
+
+    /**
+     * E held for its popup (13 choices), then the finger moved over it a choice at a time, right and
+     * back: each move counted from its event to the frame after it, then lifted on the choice and the
+     * field emptied. A move that drew no frame (the focus not moved) is told, not counted.
+     */
+    private fun popupSlide() {
+        fresh()
+        val e = keyAt(onKeyboard().text("e"))
+        val r = keyAt(onKeyboard().text("r"))
+        val step = (r.x - e.x) * POPUP_STEP
+        val space = keyAt(onKeyboard().res(imePkg, "button_space"))
+        val moved = mutableListOf<KeyboardFrames.Sample>()
+        var undrawn = 0
+        repeat(warmUp + runs) { i ->
+            val down = SystemClock.uptimeMillis()
+            inject(MotionEvent.ACTION_DOWN, e, down, down)
+            SystemClock.sleep(LONG_PRESS_MS)
+            settle()
+            val path = (1..POPUP_MOVES) + (POPUP_MOVES - 1 downTo 0)
+            val samples = mutableListOf<KeyboardFrames.Sample>()
+            val heap = Heap.now()
+            for (n in path) {
+                val at = PointF(e.x + step * n, e.y)
+                val mark = onMain { frames.mark(0) }
+                val time = SystemClock.uptimeMillis()
+                mark.from = time * DownMarks.NS_PER_MS
+                inject(MotionEvent.ACTION_MOVE, at, down, time)
+                val sample = runCatching { frames.await(mark, POPUP_FRAME_WAIT_MS) }.getOrNull()
+                if (sample == null) undrawn++ else samples += sample
+                SystemClock.sleep(POPUP_GAP_MS)
+            }
+            val alloc = Heap.now() - heap
+            samples.forEach { it.heap(alloc, samples.size) }
+            inject(MotionEvent.ACTION_UP, e, down, SystemClock.uptimeMillis())
+            settle()
+            endTyping(space)
+            if (i >= warmUp) moved += samples
+        }
+        if (undrawn > 0) log("popup\t$undrawn moves drew no frame")
+        row("popup", "focus moved a choice", moved)
+    }
 
     // ---- 4. memory
 
@@ -630,6 +756,12 @@ class KeyboardPerfBaselineTest {
         const val PICTURE_H = 900
         const val HOLD_MS = 80L
         const val SHIFT_APART_MS = 400L
+        const val ROTATE_SETTLE_MS = 1_000L
+        const val LONG_PRESS_MS = 600L
+        const val POPUP_STEP = 1f
+        const val POPUP_MOVES = 5
+        const val POPUP_GAP_MS = 60L
+        const val POPUP_FRAME_WAIT_MS = 300L
         const val NANOS_A_MS = 1e6
         const val KIB = 1024.0
         const val FAST_GAP_MS = 80L
