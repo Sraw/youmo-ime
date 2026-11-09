@@ -18,10 +18,10 @@ package org.fcitx.fcitx5.android.scene.theme
  *   arguments after a bare `,`; so a colour read (at most [ColorExpr.MAX_LENGTH] characters) is never
  *   written longer, and reads back. A style's colours are kept as written, `@name`, `system()` and all.
  * - A style's selectors joined by `, `, each as [selector] writes it; its properties in
- *   [Values.PROPERTIES]' order and then [Values.KEYBOARD_SIZES]', each as [value] writes it. A style
- *   that sets nothing is left out.
+ *   [Values.PROPERTIES]' order and then [Values.HANDLE_SIZES]' and [Values.KEYBOARD_SIZES]', each as
+ *   [value] writes it. A style that sets nothing is left out.
  * - A `path(…)` absolute (`M0 0 L1 0 Q1 1 0 1 Z`), a command to each segment; a bubble's size in %, a
- *   depth and offset in dp.
+ *   depth and offset in dp; a handle's grip, its width and height, in dp.
  * - Fonts and icons by name.
  *
  * Not a faithful exporter of a 4.0 file whose `<colors>` use `system()` or other colours (`@name`,
@@ -77,8 +77,8 @@ object ThemeWriter {
 
     private val CUTS = listOf("portrait", "landscape")
 
-    // a style's properties in the order written: PROPERTIES', then the keyboard's size
-    private val WRITTEN = Values.PROPERTIES + Values.KEYBOARD_SIZES
+    // a style's properties in the order written: PROPERTIES', then a handle's grip and the keyboard's size (one height)
+    private val WRITTEN = (Values.PROPERTIES + Values.HANDLE_SIZES + Values.KEYBOARD_SIZES).distinct()
 
     private fun StringBuilder.colors(colors: Map<String, Argb>) {
         val required = ThemeReader.REQUIRED_COLORS.filter { it in colors }
@@ -160,7 +160,8 @@ object ThemeWriter {
         "scale" -> "${number(n)}%"
         "size" -> "${number(n)}sp"
         "letter-spacing" -> "${number(n)}em"
-        "depth", "offset" -> length(n)
+        // T7a's grip on a handle (Values.HANDLE_SIZES): a keyboard's height and width are twins, not numbers
+        "depth", "offset", "width", "height" -> length(n)
         else -> number(n)
     }
 

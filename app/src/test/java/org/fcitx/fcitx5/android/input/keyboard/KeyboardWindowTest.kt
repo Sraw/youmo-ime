@@ -13,7 +13,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.core.InputMethodEntry
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
@@ -69,18 +69,18 @@ class KeyboardWindowTest {
 
     @Test
     fun goingBackToALayoutAnnouncesOnlyTheInputMethodGoneTo() {
-        val letters = TextKeyboard(context, ThemePreset.PixelDark)
+        val letters = TextKeyboard(context, TestThemes.PixelDark)
         show(letters, InputMethodCatalog.PINYIN)
         assertEquals("the window appearing, which TalkBack says itself", emptyList<String>(), frame.announced)
-        show(T9Keyboard(context, ThemePreset.PixelDark, shuangpin = true, semicolon = true), InputMethodCatalog.SHUANGPIN)
+        show(T9Keyboard(context, TestThemes.PixelDark, shuangpin = true, semicolon = true), InputMethodCatalog.SHUANGPIN)
         show(letters, InputMethodCatalog.PINYIN)
         assertEquals(listOf(placeholder(R.string.im_shuangpin), placeholder(R.string.im_pinyin)), frame.announced)
     }
 
     @Test
     fun aChangeUnderTheNumbersIsAnnouncedOnTheLetters() {
-        val letters = TextKeyboard(context, ThemePreset.PixelDark)
-        val numbers = NumberKeyboard(context, ThemePreset.PixelDark)
+        val letters = TextKeyboard(context, TestThemes.PixelDark)
+        val numbers = NumberKeyboard(context, TestThemes.PixelDark)
         show(letters, InputMethodCatalog.PINYIN)
         show(numbers, InputMethodCatalog.PINYIN)
         spaceKeys.current = InputMethodEntry(InputMethodCatalog.SHUANGPIN, InputMethodCatalog.SHUANGPIN, "", "", "", "zh", "", false)
@@ -121,11 +121,11 @@ class KeyboardWindowTest {
 
     @Test
     fun onlyTheNineKeysColumnsOwnTheSyllables() {
-        assertEquals(true, T9Keyboard(context, ThemePreset.PixelDark, shuangpin = true, semicolon = true).ownsSyllables)
-        assertEquals(true, T9Keyboard(context, ThemePreset.PixelDark, semicolon = false).ownsSyllables)
-        assertEquals(false, T9Keyboard(context, ThemePreset.PixelDark, english = true, semicolon = false).ownsSyllables)
-        assertEquals(false, GroupedKeyboard(context, ThemePreset.PixelDark, NineKeyLetters.G18).ownsSyllables)
-        assertEquals(false, TextKeyboard(context, ThemePreset.PixelDark).ownsSyllables)
+        assertEquals(true, T9Keyboard(context, TestThemes.PixelDark, shuangpin = true, semicolon = true).ownsSyllables)
+        assertEquals(true, T9Keyboard(context, TestThemes.PixelDark, semicolon = false).ownsSyllables)
+        assertEquals(false, T9Keyboard(context, TestThemes.PixelDark, english = true, semicolon = false).ownsSyllables)
+        assertEquals(false, GroupedKeyboard(context, TestThemes.PixelDark, NineKeyLetters.G18).ownsSyllables)
+        assertEquals(false, TextKeyboard(context, TestThemes.PixelDark).ownsSyllables)
     }
 
     @Test

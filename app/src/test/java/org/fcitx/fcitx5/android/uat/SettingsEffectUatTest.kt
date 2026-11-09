@@ -8,9 +8,9 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
@@ -46,11 +46,11 @@ class SettingsEffectUatTest {
     // a keyboard made anew, in [theme] if given: one closed is not started again
     private fun fresh(theme: Theme? = null): KeyboardHarness {
         made?.close()
-        return KeyboardHarness(theme ?: ThemePreset.PixelLight).also { made = it }
+        return KeyboardHarness(theme ?: TestThemes.PixelLight).also { made = it }
     }
 
     // the light preset as the theme edit page's choices [f] make it
-    private fun edited(f: (ThemeLook) -> ThemeLook): Theme = Theme.Custom("edited", false, f(ThemePreset.PixelLight.look))
+    private fun edited(f: (ThemeLook) -> ThemeLook): Theme = Theme.Custom("edited", false, f(TestThemes.PixelLight.look))
 
     @get:Rule
     val prefs = PrefsRule()

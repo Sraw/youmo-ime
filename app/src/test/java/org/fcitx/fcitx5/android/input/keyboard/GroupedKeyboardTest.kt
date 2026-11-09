@@ -13,7 +13,7 @@ import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.g14Code
@@ -141,7 +141,7 @@ class GroupedKeyboardTest {
         ) { (_, letters) ->
             val showLang = AppPrefs.getInstance().keyboard.showLangSwitchKey
             showLang.setValue(showLang.defaultValue)
-            val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark, letters).laidOut()
+            val keyboard = GroupedKeyboard(context, TestThemes.PixelDark, letters).laidOut()
             // English is the language key's round, as on the full keyboard
             assertTrue(keyboard.shownKeyWithId(R.id.button_lang) != null)
             listOf(R.id.button_space, R.id.button_return, R.id.button_comma, R.id.button_period, R.id.button_backspace).forEach {
@@ -149,7 +149,7 @@ class GroupedKeyboardTest {
             }
             showLang.setValue(false)
             assertEquals(null, keyboard.shownKeyWithId(R.id.button_lang))
-            assertEquals(null, GroupedKeyboard(context, ThemePreset.PixelDark, letters).laidOut().shownKeyWithId(R.id.button_lang))
+            assertEquals(null, GroupedKeyboard(context, TestThemes.PixelDark, letters).laidOut().shownKeyWithId(R.id.button_lang))
             showLang.setValue(showLang.defaultValue)
         }
     }
@@ -157,12 +157,12 @@ class GroupedKeyboardTest {
     @Test
     @Uat("PY-93")
     fun theSpaceIsAtLeast15PercentOfTheRowInEveryField() {
-        assertSpaceAtLeast15Percent(GroupedKeyboard(context, ThemePreset.PixelDark))
+        assertSpaceAtLeast15Percent(GroupedKeyboard(context, TestThemes.PixelDark))
     }
 
     @Test
     fun anAddressFieldShowsWhatAddressesAreMadeOf() {
-        val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark).laidOut()
+        val keyboard = GroupedKeyboard(context, TestThemes.PixelDark).laidOut()
         keyboard.address = AddressKeys.URL
         assertEquals(null, keyboard.shownKeyWithId(R.id.button_comma))
         assertTrue(keyboard.shownKeyWithId(R.id.button_slash) != null)
@@ -172,7 +172,7 @@ class GroupedKeyboardTest {
     @Test
     @Uat("PY-105")
     fun talkBackReadsAGroupLetterByLetterWithItsCorner() {
-        val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark).laidOut()
+        val keyboard = GroupedKeyboard(context, TestThemes.PixelDark).laidOut()
         val groups = keyboard.shownKeys().filter { it.id?.matches(PLACE) == true }
         val described = groups.associate { it.label to it.description }
         assertEquals(context.getString(R.string.a11y_key_grouped, "Q W", "1"), described["QW"])
@@ -182,7 +182,7 @@ class GroupedKeyboardTest {
         assertEquals(context.getString(R.string.a11y_key_separator), keyboard.shownKey("分词").description)
         // pinyin's 18 keys: the L key, shown without its `;`, is still a group key (its long press, corner, TalkBack
         // and a stroke drawn from it go by the groups the views were matched to; once it was matched against "L;" and left out)
-        val g18 = GroupedKeyboard(context, ThemePreset.PixelDark, NineKeyLetters.G18, Keyboard::pinyin18Key, semicolon = false).laidOut()
+        val g18 = GroupedKeyboard(context, TestThemes.PixelDark, NineKeyLetters.G18, Keyboard::pinyin18Key, semicolon = false).laidOut()
         val keys18 = g18.shownKeys().filter { it.id?.matches(PLACE) == true }
         val l = keys18.single { it.label == "L" }
         assertEquals(context.getString(R.string.a11y_key_grouped, "L", l.alt), l.description)
@@ -191,7 +191,7 @@ class GroupedKeyboardTest {
 
     @Test
     fun theCommaFullStopAndCornersShowWhatTheyType() {
-        val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark).laidOut()
+        val keyboard = GroupedKeyboard(context, TestThemes.PixelDark).laidOut()
         keyboard.onPunctuationUpdate(mapOf("," to "，", "." to "。", "~" to "～"))
         assertEquals("，", keyboard.shownKeyWithId(R.id.button_comma)!!.label)
         assertEquals("。", keyboard.shownKeyWithId(R.id.button_period)!!.label)
@@ -211,7 +211,7 @@ class GroupedKeyboardTest {
 
     @Test
     fun theLongPressIsReadAsItOpensFromTheUsersKeys() {
-        val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark).laidOut()
+        val keyboard = GroupedKeyboard(context, TestThemes.PixelDark).laidOut()
         val shown = ArrayList<PopupAction>()
         keyboard.popupActionListener = PopupActionListener { shown += it }
         val qw = keyboard.shownKey("QW")

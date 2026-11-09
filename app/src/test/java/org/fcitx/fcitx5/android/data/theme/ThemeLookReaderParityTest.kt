@@ -64,9 +64,9 @@ class ThemeLookReaderParityTest {
     @Test
     fun everyBuiltInThemeExported() {
         val presets = listOf(
-            ThemePreset.MaterialLight, ThemePreset.MaterialDark, ThemePreset.PixelLight, ThemePreset.PixelDark,
-            ThemePreset.DeepBlue, ThemePreset.AMOLEDBlack, ThemePreset.NordLight, ThemePreset.NordDark,
-            ThemePreset.Monokai, ThemePreset.TransparentDark, ThemePreset.TransparentLight,
+            TestThemes.MaterialLight, TestThemes.MaterialDark, TestThemes.PixelLight, TestThemes.PixelDark,
+            TestThemes.DeepBlue, TestThemes.AMOLEDBlack, TestThemes.NordLight, TestThemes.NordDark,
+            TestThemes.Monokai, TestThemes.TransparentDark, TestThemes.TransparentLight,
         )
         for (p in presets) same(exported(Theme.Custom(p.name, p.isDark, p.look)), p.name)
     }

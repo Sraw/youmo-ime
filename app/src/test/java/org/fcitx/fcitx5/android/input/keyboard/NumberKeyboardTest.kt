@@ -7,7 +7,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
@@ -39,7 +39,7 @@ class NumberKeyboardTest {
     val prefs = PrefsRule()
 
     private fun keyboard(pad: NumberPad = NumberPad.FULL) =
-        NumberKeyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark, pad).laidOut()
+        NumberKeyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, pad).laidOut()
 
     // the space found by its view's name (uat.py, TalkBack's node: KeyNames.BOARD_RESOURCES)
     @Test

@@ -15,7 +15,7 @@ import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
@@ -72,7 +72,7 @@ class ImKeyboardsUatTest {
         }
     }
 
-    private fun start(im: InputMethodEntry): KeyboardHarness = KeyboardHarness(ThemePreset.PixelLight, im).also {
+    private fun start(im: InputMethodEntry): KeyboardHarness = KeyboardHarness(TestThemes.PixelLight, im).also {
         harness = it
         it.api.availableIme = arrayOf(KeyboardHarness.PINYIN, shuangpin, KeyboardHarness.ENGLISH)
         it.api.enabledIme = it.api.availableIme

@@ -11,9 +11,9 @@ import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
@@ -142,7 +142,7 @@ class PickerSceneCellTest {
     // show the letters' colour there, as theme 3.0's cells did (not the panel through an empty face)
     @Test
     fun aNineSliceThemesCellShowsTheKeyColour() {
-        val light = ThemePreset.PixelLight.look
+        val light = TestThemes.PixelLight.look
         val slice = NineSlice("/nowhere/k.png", Insets(1, 1, 1, 1), 1)
         val framed = Theme.Custom(
             "framed", false, light.copy(keys = light.keys.copy(letter = light.keys.letter.copy(fill = KeyFill.Image(slice)))),
@@ -209,7 +209,7 @@ class PickerSceneCellTest {
     @Test
     fun aLongPressShowsThePopupOverTheFaceDrawn() {
         val actions = mutableListOf<PopupAction>()
-        val grid = PickerGridView(RuntimeEnvironment.getApplication(), ThemePreset.PixelDark, PickerGridView.Density.Medium)
+        val grid = PickerGridView(RuntimeEnvironment.getApplication(), TestThemes.PixelDark, PickerGridView.Density.Medium)
         val policy = object : PickerPolicy {
             override fun filter(raw: String) = true
             override fun transform(raw: String) = raw

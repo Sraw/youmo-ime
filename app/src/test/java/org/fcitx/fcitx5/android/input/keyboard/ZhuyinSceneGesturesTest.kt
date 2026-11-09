@@ -10,10 +10,10 @@ import android.widget.EditText
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.UNICODE
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
@@ -65,7 +65,7 @@ class ZhuyinSceneGesturesTest {
             e.setText(TEXT)
             e.setSelection(TEXT.length)
         }
-        return KeyboardHarness(ThemePreset.PixelLight, KeyboardHarness.PINYIN).start(inputType, prefill = prefill).also { h ->
+        return KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).start(inputType, prefill = prefill).also { h ->
             h.relayout()
             assertTrue(KeyboardHarness.all(h.keyboard).any { it is KeyboardCanvasView && it.visibility == View.VISIBLE })
         }

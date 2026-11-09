@@ -9,8 +9,8 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.shortcut.EditMenuLayout
@@ -92,7 +92,7 @@ class SwipePopupScreenshotTest {
         // and one stored late (the clipboard's own thread, a test run before in the same JVM) would still reach the bar
         org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.lastEntry = null
         prefs.set(AppPrefs.getInstance().clipboard.clipboardSuggestion, false)
-        KeyboardHarness(ThemePreset.PixelLight).use { h ->
+        KeyboardHarness(TestThemes.PixelLight).use { h ->
             h.start()
             h.symbolHeld("g", "${prefix}symbol_$suffix")
             h.held("a", "${prefix}select_all_$suffix")
@@ -128,7 +128,7 @@ class SwipePopupScreenshotTest {
     // team-lead, 0.5.1: the letter in the bubble scaled as the keys' text, 紧凑 0.9 of the standard's
     @Test
     fun theLetterIsScaledAsTheKeys() {
-        fun letterPx(): Float = KeyboardHarness(ThemePreset.PixelLight).use { h ->
+        fun letterPx(): Float = KeyboardHarness(TestThemes.PixelLight).use { h ->
             h.start()
             val key = h.key("g")
             val finger = h.finger(key, h.at(key))
@@ -147,7 +147,7 @@ class SwipePopupScreenshotTest {
     @Uat("KB-65")
     fun theBubbleSaysTheShortcutFitted() {
         longShortcuts()
-        KeyboardHarness(ThemePreset.PixelLight).use { h ->
+        KeyboardHarness(TestThemes.PixelLight).use { h ->
             h.start()
             fun bubble(label: String): String {
                 val key = h.key(label)
@@ -168,7 +168,7 @@ class SwipePopupScreenshotTest {
     @Test
     @Uat("KB-62")
     fun theEditMenuIsAboveTheKeyboardAndPicksAsBefore() {
-        KeyboardHarness(ThemePreset.PixelLight).use { h ->
+        KeyboardHarness(TestThemes.PixelLight).use { h ->
             h.start(prefill = { it.setText("hello") })
             h.service.say(R.string.text_copied)
             h.after(500)
@@ -197,7 +197,7 @@ class SwipePopupScreenshotTest {
     @Test
     @Uat("KB-62")
     fun aFailureIsHiddenUnderTheEditMenuAndBackAsItGoes() {
-        KeyboardHarness(ThemePreset.PixelLight).use { h ->
+        KeyboardHarness(TestThemes.PixelLight).use { h ->
             h.start(prefill = { it.setText("hello") })
             h.service.say("读不出来", steady = true)
             h.after(500)
@@ -223,7 +223,7 @@ class SwipePopupScreenshotTest {
     @Test
     @Uat("KB-62")
     fun theEditMenusCellsAreReadByTheirLabels() {
-        KeyboardHarness(ThemePreset.PixelLight).use { h ->
+        KeyboardHarness(TestThemes.PixelLight).use { h ->
             h.start(prefill = { it.setText("hello") })
             val before = h.shownIcons().toSet()
             val space = h.keyWithId(R.id.button_space)!!
@@ -241,7 +241,7 @@ class SwipePopupScreenshotTest {
     // failure back then, and the finger lifted after does not bring it back a second time
     @Test
     fun aFailureIsBackWhenTheMenuGoesWithEverythingAndOnlyOnce() {
-        KeyboardHarness(ThemePreset.PixelLight).use { h ->
+        KeyboardHarness(TestThemes.PixelLight).use { h ->
             h.start(prefill = { it.setText("hello") })
             h.service.say("读不出来", steady = true)
             h.after(500)
@@ -272,7 +272,7 @@ class SwipePopupScreenshotTest {
             AppPrefs.getInstance().internal.keyShortcuts,
             KeyShortcuts.Empty.with("full/w", KeyShortcut.Command(KeyCommand.TradSimp)).serialize(),
         )
-        KeyboardHarness(ThemePreset.PixelLight).use { h ->
+        KeyboardHarness(TestThemes.PixelLight).use { h ->
             h.start()
             h.held("w", "trad_simp_en")
         }

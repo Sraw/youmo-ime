@@ -11,8 +11,8 @@ import androidx.core.view.children
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -43,7 +43,7 @@ class FloatingControllerTest {
         val root = ConstraintLayout(context)
         val keyboard = View(context)
         root.addView(keyboard, ConstraintLayout.LayoutParams(400, 400))
-        val controller = FloatingController(root, ThemePreset.PixelDark) { null }
+        val controller = FloatingController(root, TestThemes.PixelDark) { null }
         controller.setUp(keyboard)
         before(controller)
         root.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(2000, View.MeasureSpec.EXACTLY))

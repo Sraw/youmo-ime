@@ -41,7 +41,8 @@ class Theme(
 
     /** The keyboard's size it sets ([Values.KEYBOARD_SIZES]), each null where it sets none: the later style's where two do. */
     val keyboardSizes: KeyboardSizes by lazy {
-        fun last(name: String) = styles.lastOrNull { name in it.values }?.let { (it.values[name] as? Value.OfTwin)?.twin }
+        // a keyboard's: the handle's `width` and `height` are its grip's ([Values.HANDLE_SIZES]), numbers
+        fun last(name: String) = styles.lastOrNull { it.values[name] is Value.OfTwin }?.let { (it.values[name] as Value.OfTwin).twin }
         KeyboardSizes(last("height"), last("side-padding"), last("bottom-padding"))
     }
 

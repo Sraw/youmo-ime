@@ -143,7 +143,7 @@ dependencies {
 }
 
 // The tests read src/commonTest/data (the example layouts and themes; the snapshots, which they also
-// write) and src/commonMain/layouts (the layouts the app draws) on both targets: told where by a system property (JVM) or the environment (node), so no
+// write), src/commonMain/layouts (the layouts the app draws) and src/commonMain/themes (its built-in themes) on both targets: told where by a system property (JVM) or the environment (node), so no
 // absolute path of this machine is compiled into anything
 val testData: String = layout.projectDirectory.dir("src/commonTest/data").asFile.absolutePath
 tasks.withType<org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest>().configureEach {
@@ -161,6 +161,10 @@ tasks.withType<AbstractTestTask>().configureEach {
     inputs.dir(layout.projectDirectory.dir("src/commonMain/layouts"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
         .withPropertyName("sceneLayouts")
+    // and the built-in themes (pixel.xml), from src/commonMain/themes
+    inputs.dir(layout.projectDirectory.dir("src/commonMain/themes"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+        .withPropertyName("sceneThemes")
     if (recording) outputs.upToDateWhen { false }
 }
 

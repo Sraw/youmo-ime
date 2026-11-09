@@ -21,9 +21,9 @@ import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -78,7 +78,7 @@ class FloatingCodeStripUatTest {
     private fun open(
         keyboards: ImKeyboards.Chosen = ImKeyboards.Chosen(),
         im: InputMethodEntry = KeyboardHarness.PINYIN,
-        theme: Theme = ThemePreset.PixelLight,
+        theme: Theme = TestThemes.PixelLight,
         style: CodeRowStyle = CodeRowStyle.Floating,
     ): KeyboardHarness {
         harness?.close()
@@ -278,7 +278,7 @@ class FloatingCodeStripUatTest {
     @Test
     @Uat("ST-48")
     fun theStripOnEachKeyboardLightAndDark() {
-        for ((theme, name) in listOf(ThemePreset.PixelLight to "light", ThemePreset.PixelDark to "dark")) {
+        for ((theme, name) in listOf(TestThemes.PixelLight to "light", TestThemes.PixelDark to "dark")) {
             open(theme = theme)
             typing("jin tian qing")
             h.capture("FloatingCodeStripUatTest/full_$name", h.inputView)
@@ -297,7 +297,7 @@ class FloatingCodeStripUatTest {
     @Test
     @Uat("ST-48")
     fun onTheTransparentThemesTheStripIsTheBarAsItLooks() {
-        for ((theme, name) in listOf(ThemePreset.TransparentLight to "light", ThemePreset.TransparentDark to "dark")) {
+        for ((theme, name) in listOf(TestThemes.TransparentLight to "light", TestThemes.TransparentDark to "dark")) {
             open(theme = theme)
             typing("jin tian qing")
             val colour = (strip().background as GradientDrawable).color!!.defaultColor
