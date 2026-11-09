@@ -300,9 +300,16 @@ object ThemeReader {
         val keyboards = keyboard && selectors.all { it.widget == "keyboard" }
         val handles = selectors.isNotEmpty() && selectors.all { it.widget == HANDLE }
         if (handles) grip(el, a, values)
+        // the bar's height (T6b), on a style of bars alone: under a scene too (a bar lower turned)
+        val bars = selectors.isNotEmpty() && selectors.all { it.widget == "bar" }
+        if (bars && el["height"] != null) {
+            val what = "${Values.MIN_BAR_HEIGHT.toInt()}%–${Values.MAX_BAR_HEIGHT.toInt()}%"
+            a.value("height", what) { Values.barHeight(it) }?.let { values["height"] = Value.Percent(it) }
+        }
         val skip = when {
             keyboards -> Values.KEYBOARD_SIZES
             handles -> Values.HANDLE_SIZES
+            bars -> listOf("height")
             else -> emptyList()
         }
         return sized + reserved(el, a, p, colors, skip)
@@ -474,6 +481,8 @@ object ThemeReader {
         val others = selectors.map { it.widget }.distinct()
             .filter { it !in Selector.BAR_WIDGETS && it !in Selector.RESERVED_WIDGETS && it !in WINDOW_READS && it !in Selector.PANEL_WIDGETS }
         for (w in others) CANDIDATE_ONLY.filter { it in values }.forEach { p.warn(line, "$it= on $w does nothing: only a candidate has it") }
+        for (w in others) PREEDIT_ONLY.filter { it in values }.forEach { p.warn(line, "$it= on $w does nothing: only the code being typed (preedit) has it") }
+        unplacedBar(selectors, line, p)
         for (s in selectors.filter { it.widget in Selector.BAR_WIDGETS }.distinctBy { Triple(it.widget, it.states, it.part) }) {
             val on = s.widget + s.states.sorted().joinToString("") { ":$it" } + (s.part?.let { " $it" } ?: "")
             val reads = barReads(s.widget, s.states, s.part)
@@ -493,6 +502,9 @@ object ThemeReader {
     // candidate's layout and pressed colour in no state, its colours and font when first or selected too; a
     // part's colour alone (a candidate is one line of text: its number, words and comment in one font)
     private fun barReads(widget: String, states: Set<String>, part: String?): List<String> = when {
+        // a toolbar button pressed its overlay; on (a toggle's, `:selected`) its fill and its icon's colour
+        widget == "toolbar" && states == setOf("pressed") -> listOf("overlay")
+        widget == "toolbar" && states == setOf("selected") -> listOf("fill", "icon-color")
         widget != "candidate" -> if (states.isEmpty()) BAR_READS.getValue(widget) else emptyList()
         part != null -> if ("pressed" in states) emptyList() else listOf("color")
         states.isEmpty() -> BAR_READS.getValue(widget)
@@ -503,16 +515,30 @@ object ThemeReader {
     }
 
     private val BAR_READS = mapOf(
-        "bar" to listOf("fill"),
+        "bar" to listOf("fill", "height"),
         "candidate" to listOf("fill", "radius", "inset", "padding", "gap", "color", "font", "weight", "label-style"),
         "candidates-divider" to listOf("fill"),
         "candidates-panel" to listOf("fill"),
+        // T6b's: the code being typed (its text, the underline fcitx asks for, the cursor), a toolbar button
+        "preedit" to listOf("color", "underline", "cursor-color"),
+        "toolbar" to listOf("fill", "radius", "icon-color"),
     )
 
     private val CANDIDATE_STATE_READS = listOf("fill", "color", "font", "weight")
 
     // T6a's properties no widget but a candidate has
     private val CANDIDATE_ONLY = listOf("gap", "label-style")
+
+    // T6b's properties no widget but the code being typed has
+    private val PREEDIT_ONLY = listOf("underline", "cursor-color")
+
+    // the window forms the bar is not placed by (060-render-p3 T6b review): it is drawn the same over each
+    private val UNPLACED = setOf("floating", "split", "one-handed")
+
+    // the bar is one over every window form (SceneWindow.scenes: never floating, split or one-handed): such a selector never matches
+    private fun unplacedBar(selectors: List<Selector>, line: Int, p: Problems) =
+        selectors.filter { it.widget in Selector.BAR_WIDGETS }.flatMap { s -> s.scenes.filter { it in UNPLACED }.map { "@$it ${s.widget}" } }.distinct()
+            .forEach { p.warn(line, "$it never matches: the bar is the same over a floating, split or one-handed keyboard") }
 
     // T4b's that do nothing where they are set, which a warning says: the bubble's shape, tail, size and
     // offset on anything but the bubble, a cap's depth on anything but a key, a path or an inner shadow on

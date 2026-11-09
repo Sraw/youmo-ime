@@ -21,7 +21,6 @@ import android.widget.ProgressBar
 import android.widget.ViewAnimator
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.bar.IdleUiPolicy.Display
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ToolbarButton
@@ -32,6 +31,7 @@ import org.fcitx.fcitx5.android.input.bar.ui.idle.CalculationUi
 import org.fcitx.fcitx5.android.input.bar.ui.idle.ClipboardSuggestionUi
 import org.fcitx.fcitx5.android.input.bar.ui.idle.InlineSuggestionsUi
 import org.fcitx.fcitx5.android.input.bar.ui.idle.NumberRow
+import org.fcitx.fcitx5.android.input.candidates.SceneBar
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
@@ -79,7 +79,10 @@ class IdleUi(
             else -> -90f * translateDirection
         }
 
-    val menuButton = ToolButton(ctx, R.drawable.ic_baseline_expand_more_24, theme).apply {
+    // the theme's toolbar button, worked out once for the bar's every button (T6b)
+    private val toolbar = SceneBar.of(ctx, theme).toolbar
+
+    val menuButton = ToolButton(ctx, R.drawable.ic_baseline_expand_more_24, theme, toolbar).apply {
         iconRotation = menuButtonRotation
         fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
     }
@@ -93,7 +96,7 @@ class IdleUi(
     /** Every button the user may put on the bar ([ToolbarConfig]), placed by [arrange]. */
     val buttons: Map<ToolbarButton, ToolButton> = ToolbarButton.entries.associateWith { button ->
         val looks = ToolbarButtonLooks.of(button)
-        ToolButton(ctx, looks.icon, theme).apply {
+        ToolButton(ctx, looks.icon, theme, toolbar).apply {
             contentDescription = ctx.getString(looks.label)
             fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
         }
@@ -120,8 +123,7 @@ class IdleUi(
     }
 
     /** A toggle's button drawn lit while on, as its entry in the ⋯ panel is. */
-    fun setActive(button: ToolbarButton, active: Boolean) =
-        buttons.getValue(button).setIconTint(if (active) theme.accentKeyBackgroundColor else ThemeManager.shownLook(theme).palette.toolbarIconColor)
+    fun setActive(button: ToolbarButton, active: Boolean) = buttons.getValue(button).setOn(active)
 
     // the bar's right, after the toolbar: there whenever the bar is idle
     private val pinnedBar = horizontalLayout()
@@ -136,7 +138,7 @@ class IdleUi(
      */
     private fun roomForPinned(width: Int): Int {
         if (width <= 0) return Int.MAX_VALUE
-        val button = ctx.dp(KawaiiBarComponent.buttonWidthDp())
+        val button = ctx.dp(KawaiiBarComponent.buttonWidthDp(ctx))
         return (width - button * (1 + MIDDLE_BUTTONS)) / button
     }
 
@@ -151,8 +153,8 @@ class IdleUi(
         arranged = layout
         buttons.values.forEach { (it.parent as? ViewGroup)?.removeView(it) }
         buttonsUi.show(layout.toolbar.map(buttons::getValue))
-        val size = ctx.dp(KawaiiBarComponent.heightDp())
-        val buttonWidth = ctx.dp(KawaiiBarComponent.buttonWidthDp())
+        val size = ctx.dp(KawaiiBarComponent.heightDp(ctx))
+        val buttonWidth = ctx.dp(KawaiiBarComponent.buttonWidthDp(ctx))
         layout.pinned.forEach { pinnedBar.addView(buttons.getValue(it), LinearLayout.LayoutParams(buttonWidth, size)) }
     }
 
@@ -241,8 +243,8 @@ class IdleUi(
 
     private val idleBody = constraintLayout {
         // as tall as the bar; at a small 候选字号 still 40 dp wide, a finger's target
-        val size = dp(KawaiiBarComponent.heightDp())
-        val buttonWidth = dp(KawaiiBarComponent.buttonWidthDp())
+        val size = dp(KawaiiBarComponent.heightDp(ctx))
+        val buttonWidth = dp(KawaiiBarComponent.buttonWidthDp(ctx))
         add(menuButton, lParams(buttonWidth, size) {
             startOfParent()
             centerVertically()

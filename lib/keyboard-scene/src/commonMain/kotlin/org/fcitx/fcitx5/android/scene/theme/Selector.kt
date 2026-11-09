@@ -80,15 +80,16 @@ data class Selector(
         private const val WEIGHT = 100
 
         val SCENES = setOf("compact", "landscape", "floating", "split", "one-handed", "dark", "flat")
-        /** Widgets of a later stage of 0.6.0 (060-render-p3: T6b), read but selecting nothing yet. */
-        val RESERVED_WIDGETS = setOf("preedit", "toolbar")
+        /** Widgets of a later stage: none left since T6b made the code being typed's and the toolbar's work. */
+        val RESERVED_WIDGETS = emptySet<String>()
 
         /**
          * The bar and the candidates, which the app's views draw (060-render-p3 T6a:
          * [org.fcitx.fcitx5.android.scene.engine.BarLook]): the bar's base, a candidate and its parts,
-         * the lines between candidates, the expanded candidates' panel.
+         * the lines between candidates, the expanded candidates' panel; T6b's code being typed (`preedit`) and
+         * the toolbar's buttons (`toolbar`, `:selected` a toggle on).
          */
-        val BAR_WIDGETS = setOf("bar", "candidate", "candidates-divider", "candidates-panel")
+        val BAR_WIDGETS = setOf("bar", "candidate", "candidates-divider", "candidates-panel", "preedit", "toolbar")
 
         /** The keyboard's window round its keys (060-render-p3 T7a: [org.fcitx.fcitx5.android.scene.engine.WindowLooks], `split-gap` the scene's). */
         val WINDOW_WIDGETS = setOf("frame", "handle", "side-button", "split-gap", "navbar")

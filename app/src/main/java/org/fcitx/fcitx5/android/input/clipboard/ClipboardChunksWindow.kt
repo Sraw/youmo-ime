@@ -96,8 +96,8 @@ class ClipboardChunksWindow(private val text: String) : InputWindow.ExtendedInpu
     private val extension by lazy {
         context.horizontalLayout {
             gravity = Gravity.END
-            add(ui.resetButton, lParams(wrapContent, dp(KawaiiBarComponent.heightDp())))
-            add(ui.commitButton, lParams(wrapContent, dp(KawaiiBarComponent.heightDp())))
+            add(ui.resetButton, lParams(wrapContent, dp(KawaiiBarComponent.heightDp(context))))
+            add(ui.commitButton, lParams(wrapContent, dp(KawaiiBarComponent.heightDp(context))))
         }
     }
 

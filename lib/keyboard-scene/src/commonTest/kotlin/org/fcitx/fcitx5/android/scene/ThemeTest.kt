@@ -380,9 +380,7 @@ class ThemeTest {
         // each of a later stage's style properties, of its form: a warning, the style kept
         val reserved = listOf(
             "side-padding=\"2% 5%\"", "bottom-padding=\"1%\"",
-            "underline=\"none\"", "cursor-color=\"system(primary, @keyText)\"",
             "height=\"38% 52%\"", "width=\"24dp\"", "side-padding=\"8dp 48dp\"", "bottom-padding=\"0 0\"",
-            "underline=\"1dp @keyText\"", "cursor-color=\"@keyText\"",
             "transition=\"150ms ease-out\"", "press-scale=\"95%\"", "press-sink=\"2dp\"", "appear=\"scale 150ms\"",
             "effect=\"particles(star.png, 12, 24dp, 600ms)\"", "sticker=\"cat.png\"",
         )
@@ -402,10 +400,8 @@ class ThemeTest {
         assertTrue(problems(withStyle("<style select=\"key\" alignn=\"center\"/>")).any { it.contains("unknown attribute alignn=") })
         assertTrue(problems(withStyle("<style select=\"key\" shape=\"blob\"/>")).isNotEmpty())
         // colours in a reserved property: a colour, naming colours there
-        for (attr in listOf("underline=\"1dp rgb(0,0,0)\"", "cursor-color=\"nonsense(x)\"")) {
-            assertTrue(problems(withStyle("<style select=\"key\" $attr/>")).single().contains("is not a value of"), attr)
-        }
-        assertEquals(listOf("<style>: @keyShadw is no colour"), problems(withStyle("<style select=\"key\" cursor-color=\"@keyShadw\"/>")))
+        assertTrue(problems(withStyle("<style select=\"key\" effect=\"ripple-image(a.png, 50%)\"/>")).single().contains("is not a value of"))
+        assertEquals(listOf("<style>: @keyShadw is no colour"), problems(withStyle("<style select=\"preedit\" cursor-color=\"@keyShadw\"/>")))
         // elements: a sound pack, whatever it holds; an animated picture
         val sounds = "<sounds><sound key=\"key\" src=\"tap.ogg\"/></sounds>"
         assertTrue(warnings(source.replace("</theme>", "$sounds\n</theme>")).single().contains("<sounds> is not supported"))
@@ -461,10 +457,6 @@ class ThemeTest {
         assertNull(sized.styles.last().values["size"], "dropped")
         val sizedA = Cascade(sized, emptySet()).of(Selector.Target("key", "qwerty", "a", "letter", setOf("letter"), emptySet()))
         assertEquals(Value.Number(14.0), sizedA["size"], "the key's sp kept")
-        // a later stage's widget beside the preview (warned of, selecting nothing) does not drop it
-        val withReserved = withStyle("<style select=\"preview, toolbar\" size=\"120%\"/>")
-        assertEquals(Value.Percent(120.0), ThemeReader.theme(withReserved).ok().styles.last().values["size"])
-        assertTrue(warnings(withReserved).none { it.startsWith("size= in % is ignored") })
         // the cascade: unset, nothing; the band's colour a solid fill's darker, else a translucent black
         val t = ThemeReader.theme(withStyle("<style select=\"key\" depth=\"3dp\"/><style select=\"key.letter\" fill=\"linear(90deg, @key 0%, @altKey 100%)\"/>")).ok()
         val c = Cascade(t, emptySet())
@@ -597,12 +589,11 @@ class ThemeTest {
         assertNull(Selector.parse("key:first"), ":first is a candidate's")
         assertNull(s("key:pressed").reserved)
         assertNull(s("@dark key").reserved)
-        // such a style reads, warns, and selects nothing yet
+        // T6b's: they select; the code being typed has no fill, said so (BarLookTest)
         val src = withStyle("<style select=\"toolbar, preedit\" fill=\"#123456\"/>")
-        assertEquals(2, warnings(src).size)
+        assertTrue(warnings(src).single().contains("fill= on preedit does nothing"), "${warnings(src)}")
         val t = ThemeReader.theme(src).getOr { error("$it") }
-        val target = Selector.Target("key", "qwerty", "q", null, setOf("letter"))
-        assertTrue(t.styles.last().selectors.none { it.matches(target, setOf("dark", "compact")) })
+        assertTrue(t.styles.last().selectors.any { it.matches(Selector.Target("toolbar"), setOf("dark")) })
     }
 
     @Test

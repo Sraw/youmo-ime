@@ -20,7 +20,6 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.input.theme.PictureWindow
 import org.fcitx.fcitx5.android.input.theme.ThemeColors
-import org.fcitx.fcitx5.android.scene.look.BarBase
 import org.fcitx.fcitx5.android.scene.look.BoardBase
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import org.fcitx.fcitx5.android.utils.DarkenColorFilter
@@ -219,13 +218,6 @@ class ThemePictureDrawable(
             } else {
                 ColorDrawable(color)
             }
-        }
-
-        /** Under [look]'s bar: none (the keyboard's base seen through), its colour, or the picture's part there. */
-        fun bar(look: ThemeLook): Drawable? = when (val bar = look.bar) {
-            BarBase.Transparent -> null
-            BarBase.Color -> ColorDrawable(look.palette.barColor)
-            is BarBase.Picture -> ThemePictureDrawable(bar.blurDp, bar.brightness, 0, look.palette.barColor)
         }
     }
 }

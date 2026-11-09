@@ -57,7 +57,7 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
     }
 
     val extension = horizontalLayout {
-        add(deleteAllButton, lParams(dp(KawaiiBarComponent.buttonWidthDp()), dp(KawaiiBarComponent.heightDp())))
+        add(deleteAllButton, lParams(dp(KawaiiBarComponent.buttonWidthDp(ctx)), dp(KawaiiBarComponent.heightDp(ctx))))
     }
 
     private fun setDeleteButtonShown(enabled: Boolean) {

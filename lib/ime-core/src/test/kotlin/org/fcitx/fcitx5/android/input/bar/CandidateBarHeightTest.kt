@@ -28,6 +28,16 @@ class CandidateBarHeightTest {
     }
 
     @Test
+    fun theThemesHeightScalesTheBarNotItsReadings() {
+        // 060-render-p3 T6b: `bar height=` of the bar 候选字号 gives, rounded; the readings' line added as it is
+        assertEquals(40, CandidateBarHeight.dp(20, ReadingStyle.OFF, 100.0))
+        assertEquals(48, CandidateBarHeight.dp(20, ReadingStyle.OFF, 120.0))
+        assertEquals(32, CandidateBarHeight.dp(20, ReadingStyle.OFF, 80.0))
+        assertEquals(39, CandidateBarHeight.dp(14, ReadingStyle.OFF, 140.0))
+        assertEquals(48 + 12, CandidateBarHeight.dp(20, ReadingStyle.PINYIN, 120.0))
+    }
+
+    @Test
     @Uat("PY-111")
     fun aHintsReadingFillsTheRoomBetweenItsBounds() {
         // text 40 px, a line 1.2 of its size: 12 px of room fits 10 px, 30 px no more than half the text, 2 px the floor

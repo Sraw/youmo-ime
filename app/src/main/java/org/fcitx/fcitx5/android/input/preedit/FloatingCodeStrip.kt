@@ -12,8 +12,8 @@ import android.widget.FrameLayout
 import androidx.core.graphics.ColorUtils
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.input.theme.ThemeColors
-import org.fcitx.fcitx5.android.scene.look.BarBase
+import org.fcitx.fcitx5.android.input.candidates.SceneBar
+import org.fcitx.fcitx5.android.scene.engine.BarLook
 import org.fcitx.fcitx5.android.scene.look.BoardBase
 import splitties.dimensions.dp
 
@@ -44,13 +44,13 @@ class FloatingCodeStrip(ctx: Context, theme: Theme, content: View) : FrameLayout
 
     private val radius = dp(CORNER_DP).toFloat()
 
-    // the colour the bar looks: the keyboard's under a bar of none, the bar's own else; a theme's
-    // picture is not carried out to the strip. A see-through bar (the Transparent themes, 15% black)
-    // is the keyboard's colour seen through it: made 90% opaque as it is, black text sat on black
+    // the colour the bar looks (the theme's `bar`, SceneBar): the keyboard's under a bar of none, the bar's
+    // own else; a theme's picture is not carried out to the strip. A see-through bar (the Transparent themes,
+    // 15% black) is the keyboard's colour seen through it: made 90% opaque as it is, black text sat on black
     private val shape = GradientDrawable().apply {
         val look = ThemeManager.shownLook(theme)
-        val picture = look.picture != null && (look.base == BoardBase.Picture || look.bar is BarBase.Picture)
-        val bar = ThemeColors.bar(look.palette, look.bar)
+        val picture = look.picture != null && look.base == BoardBase.Picture
+        val bar = (SceneBar.of(ctx, theme).base as? BarLook.Base.Solid)?.color?.value
         val looks = if (bar == null || picture) theme.backgroundColor else ColorUtils.compositeColors(bar, theme.backgroundColor)
         setColor(ColorUtils.setAlphaComponent(looks, ALPHA))
     }

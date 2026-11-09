@@ -524,8 +524,11 @@ class ThemePackImportTest {
 
     @Test
     fun aPacksBarAndPanelsAreDrawnFromItsOwnFile() {
-        val dark = placed(sample(xml(styles = """<style select="candidate" gap="7dp"/>""")))[1]
+        val dark = placed(sample(xml(styles = """<style select="candidate" gap="7dp"/><style select="bar" height="120%"/>""")))[1]
         assertEquals(7.0, SceneBar.of(appContext, dark).gapDp, 0.0)
+        // the bar's height (T6b) its file's too, in use
+        ThemeManager.setNormalModeTheme(dark)
+        assertEquals(120.0, SceneBar.heightPercent(appContext), 0.0)
     }
 
     @Test
