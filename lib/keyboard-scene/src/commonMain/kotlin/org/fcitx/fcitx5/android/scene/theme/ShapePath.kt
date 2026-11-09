@@ -5,8 +5,10 @@
 package org.fcitx.fcitx5.android.scene.theme
 
 import org.fcitx.fcitx5.android.scene.Box
+import org.fcitx.fcitx5.android.scene.Point
 import org.fcitx.fcitx5.android.scene.Shape
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.acos
 import kotlin.math.ceil
 import kotlin.math.cos
@@ -32,8 +34,25 @@ data class ShapePath(val segments: List<Segment>) {
     /**
      * Its outline in [box], px: each curve a polyline no further than [tolerance] px from it anywhere
      * (a chord over a parameter step h strays at most h²/8 of the curve's greatest second derivative).
+     * No more than [MAX_FLAT_POINTS] points in all: where so many curves would make more (some 85 from
+     * corner to corner of a big box), the whole path's tolerance coarser till they do not, each face's
+     * outline copied for its border, shadow, cap and inner shadow as it is.
      */
     fun flatten(box: Box, tolerance: Double = TOLERANCE): Shape.Path {
+        var t = tolerance
+        var p = outline(box, t)
+        var n = p.ops.count { it !is Shape.Path.Op.Close }
+        while (n > MAX_FLAT_POINTS) {
+            // a curve's chords go by the square root of the tolerance: the share too many, squared, at least fourfold
+            t *= maxOf(COARSER, (n.toDouble() / MAX_FLAT_POINTS).let { it * it })
+            p = outline(box, t)
+            n = p.ops.count { it !is Shape.Path.Op.Close }
+        }
+        return p
+    }
+
+    // [flatten]'s at [tolerance], however many points
+    private fun outline(box: Box, tolerance: Double): Shape.Path {
         fun x(v: Double) = box.left + v * box.width
         fun y(v: Double) = box.top + v * box.height
         val ops = ArrayList<Shape.Path.Op>()
@@ -123,6 +142,13 @@ data class ShapePath(val segments: List<Segment>) {
         /** A path's text this long at most: a theme comes from anywhere. */
         const val MAX_LENGTH = 8192
 
+        /**
+         * A flattened outline's points at most: every curve one chord, a path of [MAX_POINTS] has no more than
+         * twice that, so the tolerance coarsened always gets there.
+         */
+        const val MAX_FLAT_POINTS = 1024
+        private const val COARSER = 4.0
+
         // a curve's polyline this many edges at most: past the tolerance only on a curve some 20 000 px across
         private const val MAX_STEPS = 256
 
@@ -139,13 +165,31 @@ data class ShapePath(val segments: List<Segment>) {
 
         /**
          * [data] (what is between `path(` and `)`) read: every coordinate 0–1 when made absolute, at most
-         * [MAX_POINTS] points, starting with a move, and some sub-path of two edges or more, a Z closing it one (an outline, not
-         * a line); null where it is not (a theme's problem, not a crash).
+         * [MAX_POINTS] points, starting with a move, and some sub-path enclosing something (an outline, not a
+         * line there and back: `M0 0 L1 1 Z` is none); null where it is not (a theme's problem, not a crash).
          */
         fun parse(data: String): ShapePath? {
             if (data.length > MAX_LENGTH) return null
-            return Reader(tokens(data) ?: return null).read()
+            return Reader(tokens(data) ?: return null).read()?.takeIf { it.encloses() }
         }
+
+        // a sub-path's area (the shoelace's, closed back to its start, its curves fine chords in the unit box) not nought
+        private fun ShapePath.encloses(): Boolean {
+            val polygons = ArrayList<MutableList<Point>>()
+            for (op in outline(UNIT, UNIT_TOLERANCE).ops) {
+                when (op) {
+                    is Shape.Path.Op.MoveTo -> polygons += mutableListOf(Point(op.x, op.y))
+                    is Shape.Path.Op.LineTo -> polygons.last() += Point(op.x, op.y)
+                    Shape.Path.Op.Close -> Unit
+                }
+            }
+            return polygons.any { p ->
+                abs(p.indices.sumOf { i -> p[i].x * p[(i + 1) % p.size].y - p[(i + 1) % p.size].x * p[i].y }) / 2 > SLACK
+            }
+        }
+
+        private val UNIT = Box(0.0, 0.0, 1.0, 1.0)
+        private const val UNIT_TOLERANCE = 1e-3
 
         // the tokens made segments, every point absolute, the counts as [parse] checks them
         private class Reader(private val tokens: List<Any>) {
@@ -156,8 +200,6 @@ data class ShapePath(val segments: List<Segment>) {
             private var startX = 0.0
             private var startY = 0.0
             private var points = 0
-            private var edges = 0
-            private var most = 0
 
             fun read(): ShapePath? {
                 var cmd: Char? = null
@@ -180,7 +222,7 @@ data class ShapePath(val segments: List<Segment>) {
                         else -> c
                     }
                 }
-                return if (most >= 2) ShapePath(out) else null
+                return ShapePath(out)
             }
 
             // [c]'s numbers read, made absolute (a lower-case command's from the current point)
@@ -212,7 +254,6 @@ data class ShapePath(val segments: List<Segment>) {
                     is Segment.Move -> {
                         startX = s.x
                         startY = s.y
-                        edges = 0
                         moveTo(s.x, s.y, 1)
                     }
                     is Segment.Line -> moveTo(s.x, s.y, 1)
@@ -223,8 +264,6 @@ data class ShapePath(val segments: List<Segment>) {
                         y = startY
                     }
                 }
-                if (s !is Segment.Move) edges++
-                most = maxOf(most, edges)
             }
 
             private fun moveTo(px: Double, py: Double, written: Int) {

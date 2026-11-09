@@ -113,6 +113,7 @@ class ShapeTest {
         listOf(
             "", " ", "Z", "L1 1", "0 0 L1 1", // nothing, no move first, numbers with no command
             "M0 0 L1 1", "M0 0 Z", // a line, a point: no outline
+            "M0 0 L1 1 Z", "M0 0 L.5 .5 L1 1 Z", "M0 0 H1 M0 1 H1", "m.2 .2 l.1 .1 l.2 .2 z", // there and back, in a line: nothing enclosed
             "M0 0 L1 0 L1 1 Z 0", // a number after Z
             "M0 0 L1.5 0 L1 1 Z", "M0 0 L1 0 L1 -0.1 Z", "M.5 .5 l.6 0 l0 .1 z", // out of the box, relative too
             "M0 0 Q2 0 1 1 Z", // a control point out of it
@@ -180,6 +181,25 @@ class ShapeTest {
         }
         // a curve with no bend is one edge
         assertEquals(2, assertNotNull(ShapePath.parse("M0 0 Q.5 0 1 0 L1 1 Z")).flatten(box).ops.count { it is LineTo })
+        // one curve and its Z enclose something; a line and a sub-path of nothing beside an outline are fine
+        assertNotNull(ShapePath.parse("M0 1 Q.5 0 1 1 Z"))
+        assertNotNull(ShapePath.parse("M0 0 L1 1 Z M0 0 H1 V1 Z"))
+    }
+
+    // so many curves from corner to corner of a big box: no more than 1024 points in all, the whole path coarser
+    @Test
+    fun aFlattenedPathHasAThousandPointsAtMost() {
+        // a lens drawn over 42 times and a half: 256 points written, some 40 chords a curve at half a pixel
+        val p = assertNotNull(ShapePath.parse("M0 0 " + (1..85).joinToString(" ") { if (it % 2 == 1) "C1 0 1 0 1 1" else "C0 1 0 1 0 0" }))
+        val ops = p.flatten(Box(0.0, 0.0, 1000.0, 1000.0)).ops
+        val points = ops.count { it !is Close }
+        assertTrue(points in ShapePath.MAX_FLAT_POINTS / 2..ShapePath.MAX_FLAT_POINTS, "$points points")
+        // each curve still ends where it says, the coarser chords between
+        assertEquals(43, ops.count { it == LineTo(1000.0, 1000.0) })
+        assertEquals(42, ops.count { it == LineTo(0.0, 0.0) })
+        // at a key's size it is under the most: as fine as ever
+        val small = p.flatten(Box(0.0, 0.0, 50.0, 40.0)).ops
+        assertTrue(small.size in 2 * 85..ShapePath.MAX_FLAT_POINTS, "${small.size} points")
     }
 
     @Test
