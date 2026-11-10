@@ -109,10 +109,11 @@ private const val EFFECT_LEAD_MS = 1000L
 private const val RING_PX = 64
 private const val STAR_PX = 24
 
-// a [px]-square PNG of a white disc (a ring's or a star's stand-in: what costs is its size, not its shape)
-private fun disc(px: Int): ByteArray {
+// a [px]-square PNG of a translucent disc of [rgb] (a ring's or a star's stand-in: what costs is its size, not its shape;
+// coloured to be seen over material's white keys in a screen recording)
+private fun disc(px: Int, rgb: Int): ByteArray {
     val b = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
-    Canvas(b).drawCircle(px / 2f, px / 2f, px / 2f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(160, 255, 255, 255) })
+    Canvas(b).drawCircle(px / 2f, px / 2f, px / 2f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = (rgb and 0xffffff) or (160 shl 24) })
     return ByteArrayOutputStream().also { b.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
 }
 
@@ -127,9 +128,9 @@ private fun effectPack(resources: Resources, name: String, effect: String?): The
             it.putNextEntry(ZipEntry("theme.xml"))
             it.write(text.encodeToByteArray())
             it.putNextEntry(ZipEntry("ring.png"))
-            it.write(disc(RING_PX))
+            it.write(disc(RING_PX, Color.rgb(66, 133, 244)))
             it.putNextEntry(ZipEntry("star.png"))
-            it.write(disc(STAR_PX))
+            it.write(disc(STAR_PX, Color.rgb(255, 152, 0)))
         }
     }.toByteArray()
     val opened = ThemeFilesManager.openTheme(zip.inputStream(), ThemeManager.getAllThemes()).getOrThrow() as ThemeFilesManager.Opened.Pack
