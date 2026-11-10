@@ -98,6 +98,7 @@ object ThemeReader {
         if (styleEls.size > maxStyles) p.add(styleEls[maxStyles].line, "over $maxStyles styles")
         // the rest not read: the file is refused already, and a million styles would each be a problem
         val styles = styleEls.take(maxStyles).mapIndexedNotNull { i, el -> style(el, i, p, colors.keys, fonts.keys) }
+        if (picture?.animated == true) seeThroughWarnings(styles, picture.brightness, p)
         return p.result {
             val drawn = if (dark) darkColors ?: colors else colors
             Theme(name.orEmpty(), dark, version.orEmpty(), drawn, styles, fonts, icons, picture, variants, colors, darkColors, meta, system)
@@ -242,6 +243,18 @@ object ThemeReader {
         }
         raw.keys.forEach { resolve(it) }
         return raw.keys.mapNotNull { k -> done[k]?.let { k to it } }.toMap()
+    }
+
+    // over an animated picture a view showing it is see-through, darkened only (A4): a blur is not drawn, and
+    // it is never lighter than the board, so text meant over a lighter picture may not read
+    private fun seeThroughWarnings(styles: List<Style>, board: Double, p: Problems) = styles.forEach { s ->
+        s.values.forEach { (name, v) ->
+            val fill = (v as? Value.OfFill)?.fill as? Fill.Picture ?: return@forEach
+            if ((fill.blurDp ?: 0.0) > 0) p.warn(s.line, "$name=\"picture(…)\"'s blur over an animated <picture> is not drawn")
+            if ((fill.brightness ?: board) > board) {
+                p.warn(s.line, "$name=\"picture(…)\" over an animated <picture> is no lighter than its brightness: check the text reads")
+            }
+        }
     }
 
     private fun picture(el: XmlElement, p: Problems): Picture? {

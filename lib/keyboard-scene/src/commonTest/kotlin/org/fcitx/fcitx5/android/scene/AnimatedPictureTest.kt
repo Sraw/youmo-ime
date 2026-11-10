@@ -39,4 +39,16 @@ class AnimatedPictureTest {
         val again = ThemeReader.theme(ThemeWriter.write(read)).ok()
         assertTrue(assertNotNull(again.picture).animated)
     }
+
+    // over an animated picture a key showing it is see-through: its blur not drawn, never lighter than the board
+    @Test
+    fun aKeysPictureOverAnAnimatedOneIsWarnedOf() {
+        fun keys(fill: String, animated: Boolean) = warnings(
+            with("animated=\"$animated\" brightness=\"60%\"").replaceFirst("<style ", "<style select=\"key\" fill=\"$fill\"/>\n<style "),
+        )
+        assertTrue(keys("picture(4dp, 50%)", true).single().contains("blur"))
+        assertTrue(keys("picture(0dp, 90%)", true).single().contains("no lighter"))
+        assertEquals(emptyList(), keys("picture(0dp, 50%)", true))
+        assertEquals(emptyList(), keys("picture(4dp, 90%)", false))
+    }
 }
