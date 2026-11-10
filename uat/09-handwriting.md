@@ -158,9 +158,9 @@
 
 ### HW-33 [P1] 第一笔是点的字：先点的字母收回当第一笔
 - **前提**：键盘手写开。
-- **操作**：点一下 t（打出 t），马上（停笔时间内）在键上接着写「六」剩下的三笔；停笔。再清空，打 ni 后在停笔时间内在键上划一横；再清空，点 t，长按 g 选一个字母，马上划一横。
-- **预期**：第一次 t 被删掉，框里是带下划线的「六」（或候选里有「六」），没有多删框里别的字。打着 ni 时划一横不写字、ni 还在。点 t 再长按 g 后划一横：t 和长按打的字母都还在，什么都没删。
-- **JVM**：`KeyHandwritingUatTest.aTapThenAStrokeWithinThePauseTakesTheTapBackAsTheFirstDot`（点按放进书写板当第一笔，第一个读出带 takesBack，键盘不发退格）、`KeyInkGestureTest.aLongPressBetweenTheTapAndTheStrokeTakesNothingBack`、`KeyInkGestureTest.aCancelledTouchOrASecondFingerAfterTheTapTakesNothingBack`、`InkOverTest.anInkTakingBackDeletesTheOneLetterTypedThenIsWritten`、`InkOverTest.anInkTakingBackDeletesNothingWhereMoreThanTheTapIsTyped`、`InkOverTest.anInkTakingBackDeletesNothingOnceTheTapIsPickedAway`（ime-core：引擎只在正在打的正好是这一个字母时删）。
+- **操作**：点一下 t（打出 t），马上（停笔时间内）在键上接着写「六」剩下的三笔；停笔。再清空，点 a（整音节，拼音点完约 30 ms 会再排一次候选）后同样写完「六」。再清空，打 ni 后在停笔时间内在键上划一横；再清空，点 t，长按 g 选一个字母，马上划一横。
+- **预期**：第一次 t 被删掉（点 a 那次 a 也被删掉），框里是带下划线的「六」（或候选里有「六」），没有多删框里别的字。打着 ni 时划一横不写字、ni 还在。点 t 再长按 g 后划一横：t 和长按打的字母都还在，什么都没删。
+- **JVM**：`KeyHandwritingUatTest.aTapThenAStrokeWithinThePauseTakesTheTapBackAsTheFirstDot`（点按放进书写板当第一笔，第一个读出带 takesBack，键盘不发退格）、`KeyInkGestureTest.aLongPressBetweenTheTapAndTheStrokeTakesNothingBack`、`KeyInkGestureTest.aCancelledTouchOrASecondFingerAfterTheTapTakesNothingBack`、`InkOverTest.anInkTakingBackDeletesTheOneLetterTypedThenIsWritten`、`InkOverTest.anInkTakingBackDeletesNothingWhereMoreThanTheTapIsTyped`、`InkOverTest.anInkTakingBackDeletesNothingOnceTheTapIsPickedAway`、`InkOverTest.aVowelRefinedAfterItsKeyIsStillTakenBack`、`InkKeysTest.aKeyHeldBehindReadsKeepsTheStrokesDrawnWhileItWaited`（ime-core：引擎只在正在打的正好是这一个字母时删）。
 
 ### HW-34 [P1] 写字中途 ⌫ 撤一笔，空格先写完再上屏
 - **前提**：键盘手写开，**手写** 设置里停笔时间选最长。

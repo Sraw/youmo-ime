@@ -190,12 +190,21 @@ def hw33(d):
     check("t" not in f.lower(), f"t 没删：框里「{f}」")
     check("六" in c[:5] or "六" in f, f"候选 {c[:5]}，框里「{f}」")
     d.clear()
+    d.step("点 a 再写六的其余三笔（a 是整音节，拼音点完会再排一次候选）")
+    a = d.keys(refresh=True)["a"]
+    d.sh("; ".join(["input tap %d %d" % a, "sleep 0.15"] + key_strokes(d, STROKES["六"][1:])))
+    time.sleep(1.6)
+    fa = d.field_text()
+    ca = d.cands()
+    check("a" not in fa.lower(), f"a 没删：框里「{fa}」")
+    check("六" in ca[:5] or "六" in fa, f"候选 {ca[:5]}，框里「{fa}」")
+    d.clear()
     d.step("打着 ni 时划一横")
     d.type("ni")
     key_write(d, None, wait=1.0, strokes=[[(0.2, 0.5), (0.8, 0.5)]])
     p = d.preedit()
     check("ni" in p.replace(" ", "").replace("'", ""), f"组字「{p}」")
-    return f"「{f}」，打着 ni 时「{p}」"
+    return f"「{f}」，点 a 后「{fa}」，打着 ni 时「{p}」"
 
 
 case("HW-34", needs="jvm:KeyHandwritingUatTest.whileWritingATapIsAStrokeBackspaceTakesOneBackAndSpaceCommits")(lambda d: None)
