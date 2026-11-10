@@ -29,7 +29,10 @@ object TestShelves {
 
     /** A new shelf in a directory of its own, with the packs of [kinds] imported. */
     fun shelf(vararg kinds: PackKind): PackShelf {
-        val shelf = PackShelf(Files.createTempDirectory("packs").toFile().apply { deleteOnExit() }, listOf(packs.publicKey), requirements)
+        // deleteOnExit takes an empty directory only: the packs imported are gone with the JVM by a hook of their own
+        val dir = Files.createTempDirectory("packs").toFile()
+        Runtime.getRuntime().addShutdownHook(Thread { dir.deleteRecursively() })
+        val shelf = PackShelf(dir, listOf(packs.publicKey), requirements)
         shelf.load()
         for (kind in kinds) check(shelf.import(pack(kind).inputStream()) is ImportResult.Imported) { "$kind not imported" }
         return shelf

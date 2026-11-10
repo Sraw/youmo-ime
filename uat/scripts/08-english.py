@@ -98,7 +98,7 @@ case("EN-21", needs="jvm:EnglishCapsUatTest.aGlideTakesShiftWhereTheFieldAsksACa
 case("EN-26", needs="jvm:EnglishUatTest.theWordAsTypedPickedCountsAsACorrectionTakenBack、SettingsPagesUatTest.anEnglishWordNoLongerCorrectedIsMarkedAndCorrectedAgainOnATap")(lambda d: None)
 
 
-@case("EN-27", base="B0-英文", mutates="learn")
+@case("EN-27", base="B0-英文", mutates=True)
 def en27(d):
     d.type("th")
     c = d.cands()
@@ -115,3 +115,6 @@ def en27(d):
     t = d.field_text()
     check(t != "the ", f"thw 空格后框里「{t}」")
     return f"屏蔽前 {c[:4]}，屏蔽后 {again[:4]}，thw 空格「{t}」（设置里恢复由 JVM 管）"
+
+
+case("EN-28", needs="jvm:EnglishBlockOffersTest")(lambda d: None)

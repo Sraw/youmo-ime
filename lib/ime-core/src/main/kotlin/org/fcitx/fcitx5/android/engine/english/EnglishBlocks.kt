@@ -25,7 +25,7 @@ class EnglishBlocks(private val dir: UserFiles?, private val onError: (IOExcepti
     val blocked: List<String> get() = words.toList()
 
     /** Whether [text] is blocked: as written, or in lower case where it was blocked so. */
-    fun has(text: String): Boolean = words.isNotEmpty() && (text in words || text.lowercase() in words)
+    fun has(text: String): Boolean = words.isNotEmpty() && (text in words || text.any(Char::isUpperCase) && text.lowercase() in words)
 
     /** Blocks each of [texts] that English types ([EnglishText.isWord]), as written: those newly blocked. */
     fun block(texts: Collection<String>): List<String> =

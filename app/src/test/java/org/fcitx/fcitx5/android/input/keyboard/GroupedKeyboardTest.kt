@@ -150,7 +150,6 @@ class GroupedKeyboardTest {
             showLang.setValue(false)
             assertEquals(null, keyboard.shownKeyWithId(R.id.button_lang))
             assertEquals(null, GroupedKeyboard(context, TestThemes.PixelDark, letters).laidOut().shownKeyWithId(R.id.button_lang))
-            showLang.setValue(showLang.defaultValue)
         }
     }
 
@@ -190,6 +189,23 @@ class GroupedKeyboardTest {
     }
 
     @Test
+    @Uat("KB-65")
+    fun aSwipesShortcutShowsAsItIsNamedNotInTheLettersCase() {
+        val keyboard = GroupedKeyboard(context, TestThemes.PixelDark).laidOut()
+        val previews = ArrayList<PopupAction>()
+        keyboard.popupActionListener = PopupActionListener { previews += it }
+        val key = keyboard.shownKey("ZX").ref()
+        // a shortcut's name (Paste) and a user's text shortcut (ok, which types ok): the letters'
+        // case is the faces' and bubbles' alone (R20 F5867); a letter's bubble (words = false) still
+        // in the faces' case, capitals as ZX shows
+        keyboard.onPopupAction(PopupAction.PreviewUpdateAction(key, "Paste", words = true))
+        keyboard.onPopupAction(PopupAction.PreviewUpdateAction(key, "ok", words = true))
+        keyboard.onPopupAction(PopupAction.PreviewUpdateAction(key, "x", words = false))
+        assertEquals("ZX", keyboard.shownKey("ZX").label)
+        assertEquals(listOf("Paste", "ok", "X"), previews.map { (it as PopupAction.PreviewUpdateAction).content })
+    }
+
+    @Test
     fun theCommaFullStopAndCornersShowWhatTheyType() {
         val keyboard = GroupedKeyboard(context, TestThemes.PixelDark).laidOut()
         keyboard.onPunctuationUpdate(mapOf("," to "，", "." to "。", "~" to "～"))
@@ -221,7 +237,6 @@ class GroupedKeyboardTest {
         keyboard.onPopupAction(PopupAction.ShowKeyboardAction(qw.ref(), built, Rect()))
         val opened = (shown.single() as PopupAction.ShowKeyboardAction).keyboard as KeyDef.Popup.Keyboard.Explicit
         assertEquals(listOf("Q", "W", "1", "q", "w", "%", "^", "&"), opened.items.toList())
-        AppPrefs.getInstance().internal.popupOverrides.let { it.setValue(it.defaultValue) }
     }
 
     private companion object {

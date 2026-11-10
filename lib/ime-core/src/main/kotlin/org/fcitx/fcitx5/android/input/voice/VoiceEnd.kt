@@ -33,7 +33,7 @@ object VoiceEnd {
         /** as said, in a chat too */
         KEEP,
 
-        /** no 「。」 at the end of any field */
+        /** no closing mark (。 . ， , 、 ； ;) at the end of any field: a chat's end everywhere, "etc." too */
         DROP,
     }
 

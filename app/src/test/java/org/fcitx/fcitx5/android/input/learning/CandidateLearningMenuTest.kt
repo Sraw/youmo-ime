@@ -89,10 +89,12 @@ class CandidateLearningMenuTest {
         val connection = FakeHostConnection(this)
         connection.api.learned = { if (it is LearningOp.Menu) menu(WordKind.DICTIONARY) else LearningResult.Done(7) }
         val said = mutableListOf<Pair<String, Long>>()
-        val lines = CandidateLearningMenu(context, connection, this) { message, token -> said += message to token }.lines(2, "指导", paged = false)!!
+        val lines = CandidateLearningMenu(context, connection, this) { message, token -> said += message to token }.lines(2, "指導", paged = false)!!
         assertNull(lines[1].pick()!![2].pick())
         testScheduler.advanceUntilIdle()
         assertEquals(placeholder(R.string.learning_done_block) to 7L, said.single())
+        // shown converted (指導), the engine's text (指导) named: the engine finds the word it has (R20 F5887)
+        assertEquals("learning(Menu(index=2, text=指導))", connection.api.calls.first())
         assertEquals("learning(Block(index=2, text=指导))", connection.api.calls.last())
     }
 
@@ -114,10 +116,11 @@ class CandidateLearningMenuTest {
         connection.api.learned = { if ((it as LearningOp.OnPage).op is LearningOp.Menu) menu(WordKind.MINE) else LearningResult.Done(LearningResult.NO_UNDO) }
         val said = mutableListOf<Long>()
         val menu = CandidateLearningMenu(context, connection, this) { _, token -> said += token }
-        assertTrue(menu.forget(0, "指导", paged = true))
+        assertTrue(menu.forget(0, "指導", paged = true))
         testScheduler.advanceUntilIdle()
         // nothing to take it back with: the chip shows no 撤销
         assertEquals(listOf(LearningResult.NO_UNDO), said)
+        // shown converted (指導), the engine's text (指导) named: the engine finds the word it has (R20 F5887)
         assertEquals("learning(OnPage(op=Delete(index=0, text=指导)))", connection.api.calls.last())
     }
 }

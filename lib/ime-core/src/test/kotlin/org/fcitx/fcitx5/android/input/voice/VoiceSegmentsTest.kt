@@ -70,20 +70,33 @@ class VoiceSegmentsTest {
         assertEquals(listOf("你", "你好"), lives)
         assertEquals(listOf("你好"), closes)
         assertEquals(1, s.kept)
-        assertEquals(8000, s.speechStart)
+        // the second segment's timestamps count from the reset at the room's endpoint (3 windows of 512)
+        assertEquals(3 * 512 + 8000, s.speechStart)
     }
 
     @Test
     fun eachSegmentIsJudgedOnItsOwnWindows() {
-        // said loudly, then the room alone: the room's segment is not lifted by the speech before it
-        // loud enough to type a short word: 8 windows, 3 past the first with sound (VoiceQuiet.SKIP);
-        // counted into the room's span (no new start at the endpoint), they would type its 「I'm sorry.」
-        val loud = listOf(Step("你")) + List(6) { Step("你好") } + Step("你好", endpoint = true)
-        val s = segments(*loud.toTypedArray(), Step("I'm"), Step("I'm sorry."), Step("I'm sorry.", endpoint = true))
-        s.hear(-30.0, voiced = true, times = 8)
+        // said loudly, a silence the endpoint needs, then the room alone: the room's segment is not
+        // lifted by the speech before it (its window reaches back 0.5 s before the endpoint, into the silence)
+        val said = listOf(Step("你")) + List(6) { Step("你好") } + List(15) { Step("你好") } + Step("你好", endpoint = true)
+        val s = segments(*said.toTypedArray(), Step("I'm"), Step("I'm sorry."), Step("I'm sorry.", endpoint = true))
+        s.hear(-30.0, voiced = true, times = 7)
+        s.hear(-60.0, voiced = false, times = 16)
         s.hear(-60.0, voiced = false, times = 3)
         assertEquals(listOf("你好"), closes)
         assertEquals(1, s.kept)
+    }
+
+    // review F5918: the loud windows fed before an endpoint but decoded after it are the next segment's:
+    // its short word is typed (judged from the endpoint's fed count alone it would see only the quiet after)
+    @Test
+    fun windowsFedBeforeAnEndpointCountForTheNextSegment() {
+        val s = segments(Step("你"), *Array(4) { Step("你好") }, Step("你好", endpoint = true), Step("O"), Step("OK"), Step("OK", endpoint = true))
+        // 3 windows of no level (VoiceQuiet.SKIP), then 3 loud: the endpoint at the 6th
+        s.hear(-30.0, voiced = true, times = 6)
+        s.hear(-60.0, voiced = false, times = 3)
+        assertEquals(listOf("你好", "OK"), closes)
+        assertEquals(2, s.kept)
     }
 
     @Test
@@ -120,5 +133,15 @@ class VoiceSegmentsTest {
         go { s.finish(FloatArray(512)) }
         assertEquals(listOf("你", "你好"), lives)
         assertEquals(listOf("你好"), closes)
+    }
+
+    // review F5991: a blank result after something was shown is taken back
+    @Test
+    fun aShownSegmentTheRecognizerTookBackToNothingIsTakenBack() {
+        val s = segments(Step("你"), Step("", endpoint = true))
+        s.hear(-60.0, voiced = false, times = 2)
+        assertEquals(listOf("你"), lives)
+        assertEquals(listOf(""), closes)
+        assertEquals(0, s.kept)
     }
 }

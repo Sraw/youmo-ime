@@ -645,7 +645,7 @@ case("WD-14o", needs="jvm:DictionaryUatTest.theUsersCapCountsWhatWasImportedBefo
 case("WD-14p", needs="jvm:DictionaryUatTest.utf8TraditionalInBig5Not")(lambda d: None)
 
 
-case("WD-14q", needs="jvm:DictionaryUatTest.wordsWithoutPinyinApartTooManyNotForTheBase")(lambda d: None)
+case("WD-14q", needs="jvm:DictionaryUatTest.wordsWithoutPinyinApartTooManyNotForTheBase、DictionaryUatTest.wordsAloneGuessedAreCountedAndTheBaseTakesThem")(lambda d: None)
 
 
 # ---------------------------------------------------------------- phrases
@@ -783,3 +783,6 @@ case("WD-25", needs="jvm:LexiconUatTest.clearingTheLearnedKeepsYourWordsUnlessAl
 
 
 case("WD-30", needs="jvm:SettingsPagesUatTest.searchDeleteSeveralAndTakeThemBack")(lambda d: None)
+
+
+case("WD-38", needs="jvm:DictionaryFormatTest.aFewWordsAloneInAGbkFileWithPinyinRefuseNothing")(lambda d: None)

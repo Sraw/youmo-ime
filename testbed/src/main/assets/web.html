@@ -31,7 +31,9 @@
 <script>
   function value(el) { return el.isContentEditable ? el.textContent : el.value; }
   function log(el, event) {
-    var o = { field: el.id, event: event, value: value(el) };
+    // a password's length only, as the app's own password fields
+    var v = value(el);
+    var o = el.type === 'password' ? { field: el.id, event: event, length: v.length, value: v.length + ' 个字（密码只记长度）' } : { field: el.id, event: event, value: v };
     if (!el.isContentEditable && el.selectionStart != null) { o.selStart = el.selectionStart; o.selEnd = el.selectionEnd; }
     console.log(JSON.stringify(o));
   }

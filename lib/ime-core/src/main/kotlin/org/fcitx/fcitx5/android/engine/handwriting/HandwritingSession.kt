@@ -173,6 +173,15 @@ class HandwritingSession(
         offered.addLast(Offered(ink.reading, ink.piece))
     }
 
+    /**
+     * [ink] not to be shown (written over the keys while another input is typed, InkOver): taken, so not
+     * held again ([took]), and its piece ended, so the pad wipes it and its later readings are dropped.
+     */
+    fun drop(ink: Action.Ink) {
+        lastInk = ink
+        ended = maxOf(ended, ink.piece)
+    }
+
     // the last Ink this showed: one whose key it never had (see took) is held instead
     private var lastInk: Action.Ink? = null
 

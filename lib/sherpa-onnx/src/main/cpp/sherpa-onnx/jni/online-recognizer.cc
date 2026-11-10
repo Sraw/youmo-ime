@@ -280,40 +280,50 @@ JNIEXPORT void JNICALL Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_delete(
 
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT void JNICALL Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_reset(
-    JNIEnv * /*env*/, jobject /*obj*/, jlong ptr, jlong stream_ptr) {
+    JNIEnv *env, jobject /*obj*/, jlong ptr, jlong stream_ptr) {
   auto recognizer = reinterpret_cast<sherpa_onnx::OnlineRecognizer *>(ptr);
   auto stream = reinterpret_cast<sherpa_onnx::OnlineStream *>(stream_ptr);
-  recognizer->Reset(stream);
+  // youmo: what decoding throws (Ort::Exception, bad_alloc) is a Java
+  // RuntimeException here and below, caught by voice input; out of a JNI frame
+  // uncaught it ended the process
+  SafeJNI(env, "OnlineRecognizer_reset", [&]() { recognizer->Reset(stream); });
 }
 
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT jboolean JNICALL Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_isReady(
-    JNIEnv * /*env*/, jobject /*obj*/, jlong ptr, jlong stream_ptr) {
+    JNIEnv *env, jobject /*obj*/, jlong ptr, jlong stream_ptr) {
   auto recognizer = reinterpret_cast<sherpa_onnx::OnlineRecognizer *>(ptr);
   auto stream = reinterpret_cast<sherpa_onnx::OnlineStream *>(stream_ptr);
 
-  return recognizer->IsReady(stream);
+  return SafeJNI(
+      env, "OnlineRecognizer_isReady",
+      [&]() -> jboolean { return recognizer->IsReady(stream); },
+      (jboolean)JNI_FALSE);
 }
 
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT jboolean JNICALL
-Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_isEndpoint(JNIEnv * /*env*/,
+Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_isEndpoint(JNIEnv *env,
                                                        jobject /*obj*/,
                                                        jlong ptr,
                                                        jlong stream_ptr) {
   auto recognizer = reinterpret_cast<sherpa_onnx::OnlineRecognizer *>(ptr);
   auto stream = reinterpret_cast<sherpa_onnx::OnlineStream *>(stream_ptr);
 
-  return recognizer->IsEndpoint(stream);
+  return SafeJNI(
+      env, "OnlineRecognizer_isEndpoint",
+      [&]() -> jboolean { return recognizer->IsEndpoint(stream); },
+      (jboolean)JNI_FALSE);
 }
 
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT void JNICALL Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_decode(
-    JNIEnv * /*env*/, jobject /*obj*/, jlong ptr, jlong stream_ptr) {
+    JNIEnv *env, jobject /*obj*/, jlong ptr, jlong stream_ptr) {
   auto recognizer = reinterpret_cast<sherpa_onnx::OnlineRecognizer *>(ptr);
   auto stream = reinterpret_cast<sherpa_onnx::OnlineStream *>(stream_ptr);
 
-  recognizer->DecodeStream(stream);
+  SafeJNI(env, "OnlineRecognizer_decode",
+          [&]() { recognizer->DecodeStream(stream); });
 }
 
 SHERPA_ONNX_EXTERN_C
@@ -325,22 +335,22 @@ Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_createStream(JNIEnv *env,
   auto recognizer = reinterpret_cast<sherpa_onnx::OnlineRecognizer *>(ptr);
 
   const char *p = env->GetStringUTFChars(hotwords, nullptr);
-  std::unique_ptr<sherpa_onnx::OnlineStream> stream;
-
-  if (strlen(p) == 0) {
-    stream = recognizer->CreateStream();
-  } else {
-    stream = recognizer->CreateStream(p);
-  }
-
+  if (!p) return 0;  // OutOfMemoryError pending
+  std::string hws = p;
   env->ReleaseStringUTFChars(hotwords, p);
 
+  // youmo: building the hotwords' graph (~78k words) can throw (bad_alloc): a
+  // Java RuntimeException, as createStreamWithBlocked's
   // The user is responsible to free the returned pointer.
-  //
-  // See Java_com_k2fsa_sherpa_onnx_OfflineStream_delete() from
-  // ./offline-stream.cc
-  sherpa_onnx::OnlineStream *ans = stream.release();
-  return (jlong)ans;
+  return SafeJNI(
+      env, "OnlineRecognizer_createStream",
+      [&]() -> jlong {
+        std::unique_ptr<sherpa_onnx::OnlineStream> stream =
+            hws.empty() ? recognizer->CreateStream()
+                        : recognizer->CreateStream(hws);
+        return (jlong)stream.release();
+      },
+      (jlong)0);
 }
 
 // youmo: hotwords and phrases never to recognize, each "/"-separated
@@ -377,7 +387,16 @@ JNIEXPORT jobject JNICALL Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_getResult(
   auto recognizer = reinterpret_cast<sherpa_onnx::OnlineRecognizer *>(ptr);
   auto stream = reinterpret_cast<sherpa_onnx::OnlineStream *>(stream_ptr);
 
-  sherpa_onnx::OnlineRecognizerResult result = recognizer->GetResult(stream);
+  sherpa_onnx::OnlineRecognizerResult result;
+  if (!SafeJNI(
+          env, "OnlineRecognizer_getResult",
+          [&]() -> bool {
+            result = recognizer->GetResult(stream);
+            return true;
+          },
+          false)) {
+    return nullptr;
+  }
 
   // Find the OnlineRecognizerResult class
   jclass cls = env->FindClass("com/k2fsa/sherpa/onnx/OnlineRecognizerResult");
@@ -417,7 +436,6 @@ JNIEXPORT jobject JNICALL Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_getResult(
   // youmo: the beam's hypotheses, best first, and their scores
   jobjectArray nbest =
       env->NewObjectArray(result.nbest.size(), string_cls, nullptr);
-  env->DeleteLocalRef(string_cls);
   for (size_t i = 0; i < result.nbest.size(); ++i) {
     jstring s = SafeNewStringUTF(env, result.nbest[i]);
     env->SetObjectArrayElement(nbest, i, s);
@@ -430,10 +448,11 @@ JNIEXPORT jobject JNICALL Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_getResult(
   // Construct and return OnlineRecognizerResult
   jobject obj = env->NewObject(cls, ctor, text, tokens, timestamps, ys_probs,
                                nbest, nbest_scores);
-  env->DeleteLocalRef(nbest);
-  env->DeleteLocalRef(nbest_scores);
 
   // Delete local references
+  env->DeleteLocalRef(string_cls);
+  env->DeleteLocalRef(nbest);
+  env->DeleteLocalRef(nbest_scores);
   env->DeleteLocalRef(text);
   env->DeleteLocalRef(tokens);
   env->DeleteLocalRef(timestamps);

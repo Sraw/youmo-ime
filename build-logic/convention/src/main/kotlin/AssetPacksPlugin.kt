@@ -6,6 +6,7 @@
 import com.android.build.api.artifact.SingleArtifact
 import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import com.android.build.api.variant.BuildConfigField
+import com.android.build.api.variant.BuiltArtifactsLoader
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
@@ -13,6 +14,7 @@ import org.gradle.api.Project
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
@@ -34,10 +36,10 @@ import java.security.PrivateKey
 import java.security.Signature
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
+import java.time.LocalDateTime
 import java.util.Base64
 import java.util.Properties
 import java.util.zip.CRC32
-import java.time.LocalDateTime
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -222,7 +224,62 @@ class AssetPacksPlugin : Plugin<Project> {
         fun packKeys(buildType: String?, release: List<ByteArray>, test: List<ByteArray>): String =
             (if (buildType in TEST_KEY_BUILDS) release + test else release).joinToString(",") { Base64.getEncoder().encodeToString(it) }
 
-        fun jsonString(s: String) = "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+        /** [s] as a JSON string: `"`, `\` and the control characters escaped. */
+        fun jsonString(s: String) = buildString {
+            append('"')
+            for (c in s) {
+                when {
+                    c == '"' || c == '\\' -> append('\\').append(c)
+                    c < ' ' -> append("\\u%04x".format(c.code))
+                    else -> append(c)
+                }
+            }
+            append('"')
+        }
+
+        /** The signing key's path as set: `~/` is [home], a relative path [root]'s (not the Gradle daemon's directory); empty stays empty */
+        fun resolveKeyPath(value: String, root: File, home: String): String {
+            val path = value.trim().replaceFirst(Regex("^~(?=/)"), Regex.escapeReplacement(home))
+            return if (path.isEmpty() || File(path).isAbsolute) path else root.resolve(path).path
+        }
+
+        /** [minVersion], failing when above [version]: the app would refuse its own pack */
+        fun checkMinVersion(id: String, minVersion: Int, version: Int): Int {
+            if (minVersion > version) throw GradleException("$id.minVersion $minVersion above $id.version $version: the app would refuse its own pack")
+            return minVersion
+        }
+
+        /**
+         * The release's files in [out] (emptied first): the APK as `youmo-<version>.apk`, the text
+         * bundle (APK + text pack) and the voice bundle (APK + both), each pack, and
+         * `release-packs.json` (read back by [Listing.readAll] as the next release's [before]).
+         * Every check before anything is written: a failed run leaves nothing that looks releasable.
+         */
+        fun writeBundles(apk: File, text: Listing, voice: Listing, version: String, before: Map<String, Listing>, out: File) {
+            val packs = listOf(text, voice)
+            packs.forEach { check(it.releaseKey) { "the ${it.id} pack is signed with the test key: a release ships the release key's" } }
+            val changed = packs.map { changed(before[it.id], it) }
+            out.deleteRecursively()
+            out.mkdirs()
+            val apkName = "youmo-$version.apk"
+            apk.copyTo(out.resolve(apkName))
+            bundle(out.resolve("youmo-$version-text.zip"), apk, apkName, listOf(text), README_TEXT)
+            bundle(out.resolve("youmo-$version-voice.zip"), apk, apkName, listOf(text, voice), README_VOICE)
+            packs.forEach { it.file.copyTo(out.resolve(it.file.name)) }
+            val lines = packs.zip(changed) { p, c ->
+                "  {\"pack\": ${jsonString(p.id)}, \"version\": ${p.version}, \"format\": ${p.format}, \"file\": ${jsonString(p.file.name)}, " +
+                    "\"size\": ${p.file.length()}, \"sha256\": \"${p.sha256}\", \"contentSha256\": \"${p.contentSha256}\", \"changed\": $c}"
+            }
+            out.resolve("release-packs.json").writeText("{\"app\": ${jsonString(version)}, \"packs\": [\n${lines.joinToString(",\n")}\n]}\n")
+        }
+
+        private fun bundle(zip: File, apk: File, apkName: String, packs: List<Listing>, readme: String) {
+            ZipOutputStream(zip.outputStream().buffered(1 shl 16)).use { out ->
+                storedBytes(out, "安装说明.txt", readme.toByteArray())
+                storedFile(out, apkName, apk, sums(apk).first)
+                packs.forEach { storedFile(out, it.file.name, it.file, sums(it.file).first) }
+            }
+        }
     }
 
     override fun apply(target: Project) {
@@ -235,10 +292,11 @@ class AssetPacksPlugin : Plugin<Project> {
         val local = target.providers.fileContents(root.file("local.properties")).asText.map { text ->
             Properties().apply { load(text.reader()) }.getProperty(PROPERTY_KEY).orEmpty()
         }.orElse("")
+        // `~/` is home, and a relative path the root project's, not the Gradle daemon's directory
         val keyPath = target.providers.environmentVariable(ENV_KEY)
             .orElse(target.providers.gradleProperty(PROPERTY_KEY))
             .orElse(local)
-            .map { it.trim().replaceFirst(Regex("^~(?=/)"), System.getProperty("user.home")) }
+            .map { resolveKeyPath(it, root.asFile, System.getProperty("user.home")) }
         val testKey = keysDir.file("test-ed25519.pem")
 
         val packs = OWNED.keys.associateWith { id ->
@@ -250,9 +308,11 @@ class AssetPacksPlugin : Plugin<Project> {
                 format.set(prop("$id.format"))
                 owned.set(OWNED.getValue(id))
                 sources.from(SOURCES.getValue(id).map { target.tasks.named(it) })
-                key.set(keyPath.map { p -> if (p.isEmpty()) "" else p })
+                key.set(keyPath)
                 this.testKey.set(testKey)
                 releaseKeys.set(keysDir.file("release.pub"))
+                // both packs share build/packs (uat.py and emulator_test read build/packs/*.youmopack):
+                // each task deletes only its own `youmo-<id>-` files
                 outputDir.set(target.layout.buildDirectory.dir("packs"))
             }
         }
@@ -273,8 +333,9 @@ class AssetPacksPlugin : Plugin<Project> {
             )
             for (id in OWNED.keys) {
                 val up = id.uppercase()
+                val minVersion = checkMinVersion(id, prop("$id.minVersion"), prop("$id.version"))
                 fields.put("PACK_${up}_FORMAT", BuildConfigField("int", prop("$id.format").toString(), "the $id pack's data format this build reads"))
-                fields.put("PACK_${up}_MIN_VERSION", BuildConfigField("int", prop("$id.minVersion").toString(), "the oldest $id pack this build takes"))
+                fields.put("PACK_${up}_MIN_VERSION", BuildConfigField("int", minVersion.toString(), "the oldest $id pack this build takes"))
             }
             if (variant.buildType !in TEST_KEY_BUILDS && release.isEmpty()) {
                 // a release that trusted no key would take no pack, and one that trusted the test key anyone's
@@ -319,7 +380,7 @@ class AssetPacksPlugin : Plugin<Project> {
         abstract val format: Property<Int>
 
         @get:Input
-        abstract val owned: org.gradle.api.provider.ListProperty<String>
+        abstract val owned: ListProperty<String>
 
         /** The producing tasks' output directories, each of asset paths. */
         @get:InputFiles
@@ -368,8 +429,8 @@ class AssetPacksPlugin : Plugin<Project> {
             }
             if (!releaseKey) logger.warn("the $id pack is signed with the test key: debug builds take it, release builds do not")
 
-            val sums = files.map { (path, file) -> Triple(path, file, sums(file)) }
-            val entries = sums.joinToString(",\n    ") { (path, file, s) ->
+            val digests = files.map { (path, file) -> Triple(path, file, sums(file)) }
+            val entries = digests.joinToString(",\n    ") { (path, file, s) ->
                 "{\"path\": ${jsonString(path)}, \"size\": ${file.length()}, \"sha256\": \"${s.second}\"}"
             }
             val manifest = """
@@ -394,9 +455,9 @@ class AssetPacksPlugin : Plugin<Project> {
             ZipOutputStream(pack.outputStream().buffered(1 shl 16)).use { zip ->
                 storedBytes(zip, "manifest.json", manifest)
                 storedBytes(zip, "manifest.sig", signature)
-                sums.forEach { (path, file, s) -> storedFile(zip, path, file, s.first) }
+                digests.forEach { (path, file, s) -> storedFile(zip, path, file, s.first) }
             }
-            val content = contentSha256(format.get(), sums.map { (path, file, s) -> Triple(path, file.length(), s.second) })
+            val content = contentSha256(format.get(), digests.map { (path, file, s) -> Triple(path, file.length(), s.second) })
             out.resolve("$name.json").writeText(
                 """
                 |{"pack": ${jsonString(id)}, "version": ${version.get()}, "format": ${format.get()},
@@ -415,7 +476,7 @@ class AssetPacksPlugin : Plugin<Project> {
         abstract val apkDir: DirectoryProperty
 
         @get:Internal
-        abstract val loader: Property<com.android.build.api.variant.BuiltArtifactsLoader>
+        abstract val loader: Property<BuiltArtifactsLoader>
 
         @get:InputDirectory
         @get:PathSensitive(PathSensitivity.RELATIVE)
@@ -450,26 +511,9 @@ class AssetPacksPlugin : Plugin<Project> {
             val apks = checkNotNull(loader.get().load(apkDir.get())) { "no release APK" }.elements.map { File(it.outputFile) }
             val apk = apks.singleOrNull() ?: throw GradleException("one APK expected (-PbuildABI=arm64-v8a), found ${apks.map { it.name }}")
             val packs = listOf("text" to textPack, "voice" to voicePack).map { (id, dir) ->
-                val listing = dir.get().asFile.listFiles().orEmpty().single { it.name.startsWith("youmo-$id-") && it.name.endsWith(".json") }
-                Listing.read(listing).also { check(it.releaseKey) { "the $id pack is signed with the test key: a release ships the release key's" } }
+                Listing.read(dir.get().asFile.listFiles().orEmpty().single { it.name.startsWith("youmo-$id-") && it.name.endsWith(".json") })
             }
-            val out = outputDir.get().asFile
-            out.deleteRecursively()
-            out.mkdirs()
-            val version = versionName.get()
-            val apkName = "youmo-$version.apk"
-            apk.copyTo(out.resolve(apkName))
-            val text = packs[0]
-            val voice = packs[1]
-            bundle(out.resolve("youmo-$version-text.zip"), apk, apkName, listOf(text), README_TEXT)
-            bundle(out.resolve("youmo-$version-voice.zip"), apk, apkName, listOf(text, voice), README_VOICE)
-            packs.forEach { it.file.copyTo(out.resolve(it.file.name)) }
-            val lines = packs.map { p ->
-                val changed = changed(before[p.id], p)
-                "  {\"pack\": ${jsonString(p.id)}, \"version\": ${p.version}, \"format\": ${p.format}, \"file\": ${jsonString(p.file.name)}, " +
-                    "\"size\": ${p.file.length()}, \"sha256\": \"${p.sha256}\", \"contentSha256\": \"${p.contentSha256}\", \"changed\": $changed}"
-            }
-            out.resolve("release-packs.json").writeText("{\"app\": ${jsonString(version)}, \"packs\": [\n${lines.joinToString(",\n")}\n]}\n")
+            writeBundles(apk, packs[0], packs[1], versionName.get(), before, outputDir.get().asFile)
             logger.lifecycle(
                 packs.joinToString("\n") { p ->
                     val old = before[p.id]
@@ -481,20 +525,11 @@ class AssetPacksPlugin : Plugin<Project> {
                 },
             )
         }
-
-        private fun bundle(zip: File, apk: File, apkName: String, packs: List<Listing>, readme: String) {
-            ZipOutputStream(zip.outputStream().buffered(1 shl 16)).use { out ->
-                storedBytes(out, "安装说明.txt", readme.toByteArray())
-                storedFile(out, apkName, apk, sums(apk).first)
-                packs.forEach { storedFile(out, it.file.name, it.file, sums(it.file).first) }
-            }
-        }
     }
 
     /** A pack's listing, the `.json` beside it, or a line of a release's `release-packs.json`. */
     class Listing(val id: String, val version: Int, val format: Int, val file: File, val sha256: String, val contentSha256: String, val releaseKey: Boolean) {
         companion object {
-            @Suppress("UNCHECKED_CAST")
             private fun parse(text: String) = groovy.json.JsonSlurper().parseText(text)
 
             private fun of(m: Map<*, *>, dir: File) = Listing(

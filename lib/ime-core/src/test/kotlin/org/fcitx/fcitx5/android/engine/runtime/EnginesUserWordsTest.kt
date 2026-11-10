@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.learn.control.BlockScope
@@ -42,6 +43,9 @@ class EnginesUserWordsTest {
         .entry("星", syl("xing"))
         // a phrase as one word: voice blocking splits it again
         .unigram("你好拟", -3f, 0f)
+        // a Latin word of the dictionary, read as its letters in 全拼's 中英混输
+        .unigram("iPhone", -5f, 0f)
+        .entry("iPhone", syl("I", "P", "H", "O", "N", "E"))
         .build()
         .toByteArray()
 
@@ -73,6 +77,29 @@ class EnginesUserWordsTest {
             again.removeWord(blocked)
             assertEquals(listOf("你", "拟"), again.type(InputMethodCatalog.PINYIN, "ni").candidates)
             assertEquals(emptyList<UserWord>(), again.userWords())
+        }
+    }
+
+    // a Latin candidate blocked in pinyin: written so it reads back, not offered after a restart, till restored
+    @Test
+    @Uat("PY-117")
+    fun aLatinWordBlockedInPinyinStaysBlockedAfterARestartTillRestored() {
+        val dir = MemoryFiles()
+        Engines(::load, dir).use { engines ->
+            val shown = engines.type(InputMethodCatalog.PINYIN, "iphone").candidates
+            val at = shown.indexOf("iPhone")
+            assertTrue("$shown", at >= 0)
+            assertTrue(Offer.BLOCK in engines.offers(InputMethodCatalog.PINYIN, at))
+            assertFalse("iPhone" in engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.BLOCK, at).candidates)
+            assertEquals(listOf("iPhone"), engines.userWords().filter { it.kind == UserWord.Kind.BLOCKED }.map { it.text })
+        }
+        Engines(::load, dir).use { again ->
+            val blocked = again.userWords().single { it.text == "iPhone" }
+            assertEquals(UserWord.Kind.BLOCKED, blocked.kind)
+            assertFalse("iPhone" in again.type(InputMethodCatalog.PINYIN, "iphone").candidates)
+            again.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
+            again.removeWord(blocked)
+            assertTrue("iPhone" in again.type(InputMethodCatalog.PINYIN, "iphone").candidates)
         }
     }
 
@@ -457,5 +484,25 @@ class EnginesUserWordsTest {
             listed.first()
         }
         assertEquals(listOf(kept), Engines(::load, dir).use { it.userWords() })
+    }
+
+    // a sentence picked twice is a habit: blocked whole, the habits do not put it back in (R20 F5914)
+    @Test
+    fun aSentenceUsedBeforeIsNotPutBackByTheHabitsOnceBlocked() {
+        Engines(::load, MemoryFiles()).use { engines ->
+            repeat(2) {
+                assertEquals("你好", engines.type(InputMethodCatalog.PINYIN, "nihao").candidates.first())
+                engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, 0)
+                engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
+            }
+            engines.type(InputMethodCatalog.PINYIN, "nihao")
+            engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.BLOCK, 0)
+            engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
+            for (keys in listOf("nihao", "nihaoni")) {
+                val shown = engines.type(InputMethodCatalog.PINYIN, keys).candidates
+                assertFalse("$keys $shown", "你好" in shown)
+                engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
+            }
+        }
     }
 }

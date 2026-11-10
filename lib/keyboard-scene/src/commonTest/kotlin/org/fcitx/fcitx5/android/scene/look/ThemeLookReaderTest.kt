@@ -116,7 +116,8 @@ class ThemeLookReaderTest {
         val negative = Regex("\"insets\": \\[\\s*12,").replaceFirst(source, "\"insets\": [-5,")
         val problem = ThemeLookReader.read(negative).problems().single()
         assertTrue(problem.message.contains("negative insets"), problem.message)
-        assertTrue(problem.line in 1..negative.substringBefore("[-5,").count { it == '\n' } + 1, problem.toString())
+        val image = negative.substringBefore("[-5,").substringBeforeLast('{').count { it == '\n' } + 1
+        assertEquals(image, problem.line, "the image object's opening line: $problem")
         assertTrue(failed("\"label\": \"hide\"", "\"label\": \"shown\"").isNotEmpty())
         assertTrue(failed("\"qwerty/q\"", "\"qwerty\"").isNotEmpty())
         assertTrue(failed("\"rotation\": 90", "\"rotation\": 45").isNotEmpty())

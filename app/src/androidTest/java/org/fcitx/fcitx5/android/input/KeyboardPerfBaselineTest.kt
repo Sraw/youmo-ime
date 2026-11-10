@@ -89,6 +89,9 @@ class KeyboardPerfBaselineTest {
     // put back after the test, each once changed
     private var deviceIme: String? = null
     private var deviceImeEnabled = false
+    // the system's list as it was: the disable and enable below move this input method to its end, and `ime reset`
+    // would put the device's default list in its place
+    private var enabledIms: String? = null
     private var spellChecker: String? = null
     private var imsWere: Array<String>? = null
     private var imWas: String? = null
@@ -144,13 +147,15 @@ class KeyboardPerfBaselineTest {
     private fun selectThisInputMethod() {
         deviceIme = shell("settings get secure default_input_method").takeIf { it.isNotEmpty() && it != "null" }
         val self = ComponentName.unflattenFromString(imeId)
-        deviceImeEnabled = shell("settings get secure enabled_input_methods").split(':')
+        enabledIms = shell("settings get secure enabled_input_methods").takeIf { it.isNotEmpty() && it != "null" }
+        deviceImeEnabled = enabledIms.orEmpty().split(':')
             .any { ComponentName.unflattenFromString(it.substringBefore(';')) == self }
         // the system's spell checker would underline what the runs type, a frame of its own in the field
         spellChecker = shell("settings get secure spell_checker_enabled")
         shell("settings put secure spell_checker_enabled 0")
         shell("ime enable $imeId")
         shell("ime set $imeId")
+        bindInThisProcess(imeId, imePkg, ::shell)
     }
 
     private fun launch() {
@@ -186,7 +191,7 @@ class KeyboardPerfBaselineTest {
     fun putBack() {
         runCatching { if (::frames.isInitialized) onMain { frames.close() } }
         runCatching { putThemesBack() }
-        pinyinKeyboardWas?.let { onMain { AppPrefs.getInstance().keyboard.pinyinKeyboard.setValue(it) } }
+        runCatching { pinyinKeyboardWas?.let { onMain { AppPrefs.getInstance().keyboard.pinyinKeyboard.setValue(it) } } }
         runCatching {
             host {
                 imsWere?.let { setEnabledIme(it) }
@@ -196,6 +201,7 @@ class KeyboardPerfBaselineTest {
         if (::scenario.isInitialized) scenario.close()
         deviceIme.let { if (it == null) shell("ime reset") else shell("ime set $it") }
         if (!deviceImeEnabled) shell("ime disable $imeId")
+        enabledIms?.let { shell("settings put secure enabled_input_methods $it") }
         spellChecker.let {
             if (it.isNullOrEmpty() || it == "null") shell("settings delete secure spell_checker_enabled")
             else shell("settings put secure spell_checker_enabled $it")
@@ -376,7 +382,11 @@ class KeyboardPerfBaselineTest {
         repeat(warmUp + runs) { i ->
             val radius = (flat.look.keys.radiusDp + 1 + i) % (Keys.MAX_RADIUS_DP + 1)
             val new = Theme.Custom("$UNSEEN-$i", isDark = false, look = flat.look.copy(keys = flat.look.keys.copy(radiusDp = radius)))
-            assumeTrue("a theme could not be saved", onMain { ThemeManager.saveTheme(new) })
+            // one not saved: that sample alone left out, the runs after it measured
+            if (!onMain { ThemeManager.saveTheme(new) }) {
+                log("theme\t${new.name} could not be saved: left out")
+                return@repeat
+            }
             themesMade += new.name
             settle()
             val sample = theme(new)
@@ -650,30 +660,37 @@ class KeyboardPerfBaselineTest {
         val space = keyAt(onKeyboard().res(imePkg, "button_space"))
         val moved = mutableListOf<KeyboardFrames.Sample>()
         var undrawn = 0
-        repeat(warmUp + runs) { i ->
-            val down = SystemClock.uptimeMillis()
-            inject(MotionEvent.ACTION_DOWN, e, down, down)
-            SystemClock.sleep(LONG_PRESS_MS)
-            settle()
-            val path = (1..POPUP_MOVES) + (POPUP_MOVES - 1 downTo 0)
-            val samples = mutableListOf<KeyboardFrames.Sample>()
-            val heap = Heap.now()
-            for (n in path) {
-                val at = PointF(e.x + step * n, e.y)
-                val mark = onMain { frames.mark(0) }
-                val time = SystemClock.uptimeMillis()
-                mark.from = time * DownMarks.NS_PER_MS
-                inject(MotionEvent.ACTION_MOVE, at, down, time)
-                val sample = runCatching { frames.await(mark, POPUP_FRAME_WAIT_MS) }.getOrNull()
-                if (sample == null) undrawn++ else samples += sample
-                SystemClock.sleep(POPUP_GAP_MS)
+        // each move's mark made as the window gets it (a mark made before it would take a traversal already due)
+        val marks = onMain { DownMarks(service.window.window!!.callback, frames, MotionEvent.ACTION_MOVE).also { service.window.window!!.callback = it } }
+        try {
+            repeat(warmUp + runs) { i ->
+                val down = SystemClock.uptimeMillis()
+                inject(MotionEvent.ACTION_DOWN, e, down, down)
+                SystemClock.sleep(LONG_PRESS_MS)
+                settle()
+                val path = (1..POPUP_MOVES) + (POPUP_MOVES - 1 downTo 0)
+                val samples = mutableListOf<KeyboardFrames.Sample>()
+                val heap = Heap.now()
+                for (n in path) {
+                    val at = PointF(e.x + step * n, e.y)
+                    marks.marks.clear()
+                    marks.recording = true
+                    inject(MotionEvent.ACTION_MOVE, at, down, SystemClock.uptimeMillis())
+                    marks.recording = false
+                    val mark = marks.marks.firstOrNull()
+                    val sample = mark?.let { runCatching { frames.await(it, POPUP_FRAME_WAIT_MS) }.getOrNull() }
+                    if (sample == null) undrawn++ else samples += sample
+                    SystemClock.sleep(POPUP_GAP_MS)
+                }
+                val alloc = Heap.now() - heap
+                samples.forEach { it.heap(alloc, samples.size) }
+                inject(MotionEvent.ACTION_UP, e, down, SystemClock.uptimeMillis())
+                settle()
+                endTyping(space)
+                if (i >= warmUp) moved += samples
             }
-            val alloc = Heap.now() - heap
-            samples.forEach { it.heap(alloc, samples.size) }
-            inject(MotionEvent.ACTION_UP, e, down, SystemClock.uptimeMillis())
-            settle()
-            endTyping(space)
-            if (i >= warmUp) moved += samples
+        } finally {
+            onMain { service.window.window!!.callback = marks.original }
         }
         if (undrawn > 0) log("popup\t$undrawn moves drew no frame")
         row("popup", "focus moved a choice", moved)
@@ -717,18 +734,7 @@ class KeyboardPerfBaselineTest {
 
     // ---- 4. memory
 
-    private fun memory(label: String) {
-        repeat(2) {
-            Runtime.getRuntime().gc()
-            SystemClock.sleep(GC_WAIT_MS)
-        }
-        val samples = (1..MEMORY_SAMPLES).map {
-            SystemClock.sleep(GC_WAIT_MS)
-            Memory.parse(shell("dumpsys meminfo ${Process.myPid()}"))
-        }
-        fun median(of: (Memory) -> Int) = Stats(samples.map { of(it).toDouble() }).median.toInt()
-        log("memory\t$label\tjava ${median { it.javaHeap }} kB\tnative ${median { it.nativeHeap }} kB\tgraphics ${median { it.graphics }} kB\ttotal pss ${median { it.totalPss }} kB")
-    }
+    private fun memory(label: String) = log(memoryLine(label, ::shell))
 
     private fun hideKeyboard() {
         scenario.onActivity { context.inputMethodManager.hideSoftInputFromWindow(it.field.windowToken, 0) }
@@ -791,9 +797,7 @@ class KeyboardPerfBaselineTest {
         )
     }
 
-    internal fun log(line: String) {
-        Log.i(TAG, line)
-    }
+    internal fun log(line: String) = Unit.also { Log.i(TAG, line) }
 
     internal fun <T> onMain(block: () -> T): T {
         var result: Result<T>? = null
@@ -822,8 +826,6 @@ class KeyboardPerfBaselineTest {
         const val KIB = 1024.0
         const val FAST_GAP_MS = 80L
         const val SETTLE_MS = 150L
-        const val GC_WAIT_MS = 500L
-        const val MEMORY_SAMPLES = 3
         const val SCREENSHOT_WAIT_MS = 1_000L
         const val IDLE_LEAD_MS = 300L
         const val IDLE_AFTER_MS = 2_000L
@@ -844,4 +846,38 @@ class KeyboardPerfBaselineTest {
             HostDaemon.disconnect(TAG)
         }
     }
+}
+
+// bound anew in this process (as SoftKeyboardTest.selectThisInputMethod): am instrument force-stops this
+// package, and `ime set` on the one already chosen binds nothing anew on API 36: no keyboard to measure.
+// Out of the class, as [memoryLine]: its size (detekt LargeClass)
+private fun bindInThisProcess(imeId: String, imePkg: String, shell: (String) -> String) {
+    // the input method's service up in this process (the system's record of it, with this process's pid)
+    fun running() = shell("dumpsys activity services $imePkg").let {
+        FcitxInputMethodService::class.java.name in it && " ${Process.myPid()}:$imePkg" in it.replace("{", " ").replace("/", " ")
+    }
+    if (running()) return
+    shell("ime disable $imeId")
+    shell("ime enable $imeId")
+    shell("ime set $imeId")
+    val deadline = SystemClock.uptimeMillis() + 30_000
+    while (!running() && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(200)
+    check(running()) { "input method not running in this process" }
+}
+
+private const val GC_WAIT_MS = 500L
+private const val MEMORY_SAMPLES = 3
+
+// a [memory] row's line: the process's heaps, the median of MEMORY_SAMPLES after two collections
+private fun memoryLine(label: String, shell: (String) -> String): String {
+    repeat(2) {
+        Runtime.getRuntime().gc()
+        SystemClock.sleep(GC_WAIT_MS)
+    }
+    val samples = (1..MEMORY_SAMPLES).map {
+        SystemClock.sleep(GC_WAIT_MS)
+        Memory.parse(shell("dumpsys meminfo ${Process.myPid()}"))
+    }
+    fun median(of: (Memory) -> Int) = Stats(samples.map { of(it).toDouble() }).median.toInt()
+    return "memory\t$label\tjava ${median { it.javaHeap }} kB\tnative ${median { it.nativeHeap }} kB\tgraphics ${median { it.graphics }} kB\ttotal pss ${median { it.totalPss }} kB"
 }

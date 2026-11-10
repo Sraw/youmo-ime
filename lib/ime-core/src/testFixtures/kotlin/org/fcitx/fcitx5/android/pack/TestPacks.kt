@@ -39,7 +39,9 @@ class TestPacks(val keys: KeyPair = KeyPairGenerator.getInstance("Ed25519").gene
         sha: Map<String, String> = emptyMap(),
     ): ByteArray {
         val entries = files.entries.joinToString(",") { (path, bytes) ->
-            """{"path": "$path", "size": ${bytes.size}, "sha256": "${sha[path] ?: sha256(bytes)}"}"""
+            // a path's quote or backslash escaped, as JSON has them
+            val quoted = path.replace("\\", "\\\\").replace("\"", "\\\"")
+            """{"path": "$quoted", "size": ${bytes.size}, "sha256": "${sha[path] ?: sha256(bytes)}"}"""
         }
         val key = PackManifest.keyName(publicKey)
         return """{"pack": "${kind.id}", "version": $version, "format": $format, "key": "$key", "files": [$entries]}""".toByteArray()

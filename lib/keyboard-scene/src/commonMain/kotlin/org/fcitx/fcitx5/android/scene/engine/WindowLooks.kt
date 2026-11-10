@@ -39,7 +39,7 @@ class WindowLooks(private val cascades: Cascades) {
         }
         val shadow = (v[SHADOW] as? Value.OfShadow)?.shadow
         return Frame(
-            radiusDp = radius?.corners?.first() ?: cornerDp(at),
+            radiusDp = radius?.corners?.maxOrNull() ?: cornerDp(at),
             round = radius?.half == true,
             border = border,
             elevationDp = shadow?.let { if (it.color == null) 0.0 else it.blur } ?: ELEVATION_DP,

@@ -2,13 +2,13 @@
 // for test/pixel-smoke.mjs: the engine as the build writes it (./gradlew :lib:keyboard-scene:youmoEngine), the
 // page's fonts, the app's icons (index.html's youmo-engine-icons block) and lib/keyboard-scene's test data (the
 // snapshots' themes and how each was asked for, facade/shots.json); /page.html the theme maker with its engine
-// put in, as pages.yml publishes it. Not published (pages.yml leaves dev/ out).
+// put in, as pages.yml publishes it; /classic.html the maker before 0.6.0, the same. Not published (pages.yml leaves dev/ out).
 // Run: node web/theme-maker/dev/serve.mjs [port], then open http://127.0.0.1:<port>/
 import { createServer } from 'node:http';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { assemble, blockOf, ENGINE } from '../tools/assemble.mjs';
+import { assemble, blockOf, CLASSIC_SRC, ENGINE } from '../tools/assemble.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const maker = join(here, '..');
@@ -32,6 +32,8 @@ export function answer(path) {
   if (path === '/engine.js') return file(ENGINE);
   // the theme maker as the site has it: index.html with the engine put in
   if (path === '/page.html') return [TYPES.html, assemble(undefined, undefined, ENGINE)];
+  // the maker before 0.6.0 (classic/, 060-render-p3 M1)
+  if (path === '/classic.html') return [TYPES.html, assemble(CLASSIC_SRC, undefined, ENGINE)];
   if (path === '/icons.json') return [TYPES.json, blockOf(readFileSync(join(maker, 'index.html'), 'utf8'), 'youmo-engine-icons')];
   if (path === '/shots.json') return file(join(data, 'facade', 'shots.json'));
   if (path.startsWith('/fonts/')) { const n = name('/fonts/'); return n && n.endsWith('.woff2') ? file(join(maker, 'fonts', n)) : null; }

@@ -21,7 +21,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
@@ -74,9 +74,10 @@ class VoiceListener(
         tell { failed(Failure.NoMicrophone) }
     })
 
-    // the recognizer's thread: the stream, the hotwords and VoiceLive are its alone
-    @OptIn(ExperimentalCoroutinesApi::class)
-    private val decoder = Dispatchers.Default.limitedParallelism(1)
+    // the recognizer's thread: the stream, the hotwords and VoiceLive are its alone. One for every
+    // listener (VoiceEngine.decoder): the last talk's tail still decoding does not overlap the next
+    // one's stream made on the same recognizer
+    private val decoder = VoiceEngine.decoder
 
     private val main = Handler(Looper.getMainLooper())
 
@@ -128,7 +129,9 @@ class VoiceListener(
         scope.launch(Dispatchers.IO) { VoiceEngine.prepareVad { Timber.w(it, "voice vad") } }
         scope.launch {
             // asked for while the models load, not after: the engine may be busy a while
-            val user = async { userHotwords() }
+            // an Error of it caught in here: thrown out of the async it would cancel this launch and reach the
+            // scope's handler (told as the microphone's failure) whichever message came first
+            val user = async { caught { userHotwords() } }
             val loaded = try {
                 VoiceEngine.acquire()
             } catch (e: CancellationException) {
@@ -146,12 +149,20 @@ class VoiceListener(
             }
             val words = try {
                 user.await()
-            } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
-                // an Error past the acquire (userHotwords falls back on exceptions only): the models
-                // let go, not held for good, and the decoder not left waiting for them
+            } catch (e: CancellationException) {
+                // closed while they loaded: the models let go, the cancellation not taken for a failure
                 ready.cancel()
                 main.post { VoiceEngine.release() }
                 throw e
+            }.getOrElse { e ->
+                // an Error past the acquire (userHotwords falls back on exceptions only): the models
+                // let go, not held for good, and the decoder not left waiting for them; told as the
+                // models' failure, not the microphone's (the scope's handler)
+                Timber.w(e, "voice hotwords")
+                ready.cancel()
+                main.post { VoiceEngine.release() }
+                tell { failed(Failure.NoModel) }
+                return@launch
             }
             main.post {
                 if (closed) {
@@ -177,8 +188,20 @@ class VoiceListener(
             orFallback("voice log probs", null) { language.logProbs(texts) }
     }
 
-    // voice input without them, not none
-    private suspend fun userHotwords() = orFallback("voice hotwords", VoiceHotwords.Words.NONE) { hotwords() }
+    // [block]'s result, or what it threw but a cancellation (which goes on, as cancellations must)
+    private suspend fun <T> caught(block: suspend () -> T): Result<T> = try {
+        Result.success(block())
+    } catch (e: CancellationException) {
+        throw e
+    } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
+        Result.failure(e)
+    }
+
+    // voice input without them, not none: their read cancelled from elsewhere too (VoiceEngine's
+    // shared read, the host's scope ending), which is not this listener closing
+    private suspend fun userHotwords() = cancelledElsewhereAs(VoiceHotwords.Words.NONE) {
+        orFallback("voice hotwords", VoiceHotwords.Words.NONE) { hotwords() }
+    }
 
     /**
      * Opens the microphone, once; the caller has checked the permission. The models may still be
@@ -242,6 +265,9 @@ class VoiceListener(
         }
         val recognizer = models.recognizer
         val live = VoiceLive(models.polisher?.stream())
+        // the polish failing: the raw text as it is after this step (read once the step has run), told as such
+        fun polished(step: () -> VoiceLive.Heard) =
+            show(orFallback<VoiceLive.Heard?>("voice polish", null) { step() } ?: VoiceLive.Heard(live.raw, 0, fallback = true))
         val stream = try {
             VoiceEngine.stream(recognizer, words)
         } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
@@ -256,8 +282,8 @@ class VoiceListener(
                 Recognition(recognizer, stream),
                 VoiceEngine.SAMPLE_RATE,
                 choose = { result -> orFallback("voice choice", result.text) { VoiceEngine.choose(result, words, safeLanguage) } },
-                live = { heard -> show(orFallback("voice polish", VoiceLive.Heard(live.raw, 0, fallback = true)) { live.heard(heard) }) },
-                closed = { text -> show(orFallback("voice polish", VoiceLive.Heard(live.raw, 0, fallback = true)) { live.closed(text) }) },
+                live = { heard -> polished { live.heard(heard) } },
+                closed = { text -> polished { live.closed(text) } },
                 quiet,
             )
             for (samples in audio) {
@@ -315,6 +341,9 @@ class VoiceListener(
             stop = {
                 try {
                     record.stop()
+                } catch (e: IllegalStateException) {
+                    // what was read is in already: a stop failing is no microphone failure to end the talk on
+                    Timber.w(e, "voice record stop")
                 } finally {
                     record.release()
                     // numbers only, nothing said: the UAT's check of the tail's timing and the level (uat/12 VO-23/24)
@@ -411,6 +440,8 @@ class VoiceListener(
                 }
                 if (n == 0) {
                     if (over) return
+                    // nothing read (a read that does not block): not a core spun until the lift
+                    delay(EMPTY_READ_WAIT_MS)
                     continue
                 }
                 val onset = opening.onset.window(buffer, n)
@@ -487,5 +518,18 @@ class VoiceListener(
         private const val NS_PER_MS = 1_000_000L
         private const val NS_PER_US = 1_000L
         private const val BUFFER_S = 2
+        private const val EMPTY_READ_WAIT_MS = 5L
     }
+}
+
+/**
+ * [block]'s result, or [fallback] where it threw a cancellation while the caller is still active: a
+ * read it awaited cancelled from elsewhere, not the caller cancelled (that one goes on, as cancellations must).
+ */
+internal suspend fun <T> cancelledElsewhereAs(fallback: T, block: suspend () -> T): T = try {
+    block()
+} catch (e: CancellationException) {
+    if (!currentCoroutineContext().isActive) throw e
+    Timber.w(e, "cancelled elsewhere")
+    fallback
 }

@@ -131,14 +131,6 @@ class TablesKeysUatTest {
         assertTrue(h.keyWithId(R.id.button_lookup) == null && h.keyWithId(R.id.button_lookup_on) == null)
     }
 
-    // the canvas's 确定 is the view's word: the app's key_confirm (OK in English), not the layout's Chinese
-    @Test
-    fun theCanvasConfirmIsTheAppsWord() {
-        val h = harness(InputMethodCatalog.WUBI, "五笔", wubi())
-        h.typed("ggg")
-        assertEquals(h.service.getString(R.string.key_confirm), h.keyWithId(R.id.button_confirm)!!.label)
-    }
-
     @Test
     @Uat("TBL-48")
     fun returnSaysConfirmWhileATableHasACode() {
@@ -148,7 +140,8 @@ class TablesKeysUatTest {
         h.typed("ggg")
         assertNotNull(h.keyWithId(R.id.button_confirm))
         assertNull(h.keyWithId(R.id.button_return))
-        assertTrue(h.texts().toString(), h.service.getString(R.string.key_confirm) in h.texts())
+        // 确定 in the app's words, key_confirm (OK in English), not the layout's Chinese
+        assertEquals(h.service.getString(R.string.key_confirm), h.keyWithId(R.id.button_confirm)!!.label)
         h.capture("TablesKeysUatTest/wubi_confirm", h.inputView)
         h.tap(h.keyWithId(R.id.button_confirm)!!)
         assertTrue(h.api.calls.toString(), h.sentSyms().last().startsWith("sendKey(sym=${0xff0d},"))

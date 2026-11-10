@@ -4,9 +4,6 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings
 
-import org.fcitx.fcitx5.android.input.scene.SceneLetters
-import org.fcitx.fcitx5.android.input.popup.PopupPreset
-import org.fcitx.fcitx5.android.input.popup.PopupOverridesCache
 import android.content.Context
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -21,20 +18,23 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
-import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
-import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
-import org.fcitx.fcitx5.android.scene.theme.Argb
+import org.fcitx.fcitx5.android.input.keyboard.markSpots
+import org.fcitx.fcitx5.android.input.popup.PopupOverridesCache
+import org.fcitx.fcitx5.android.input.popup.PopupPreset
+import org.fcitx.fcitx5.android.input.scene.SceneLetters
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.layout.KeyAttrs
 import org.fcitx.fcitx5.android.scene.layout.Text as SceneText
-import org.fcitx.fcitx5.android.input.keyboard.markSpots
+import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import splitties.views.dsl.core.add
@@ -72,7 +72,14 @@ object KeyCaps {
     // face and marks as they are, as the key views fade theirs (060-render-p2 S6 review)
     private fun sceneKey(ctx: Context, text: String, hint: String, marked: Boolean, dimmed: Boolean, selected: Boolean, shortcut: Shortcut?) =
         SceneKeyCell(ctx, ThemeManager.activeTheme).apply {
-            if (marked) outline = Argb(ThemeManager.activeTheme.accentKeyBackgroundColor)
+            // the item a move or delete acts on (selected) outlined in the settings' own colour: the keyboard's
+            // styles draw no selected key of their own outside a popup, and it read as any other item; over the
+            // marked outline where it is both (the first item), the one acted on being what the user looks for
+            outline = when {
+                selected -> Argb(ctx.styledColor(android.R.attr.colorPrimary))
+                marked -> Argb(ThemeManager.activeTheme.accentKeyBackgroundColor)
+                else -> null
+            }
             labelAlpha = if (dimmed) DIMMED else 1.0
             isClickable = false
             isFocusable = false
@@ -107,7 +114,7 @@ object KeyCaps {
      * at its keys' size as InputView makes it (KeyboardArea: the height settings, the bar, the board's code row, the
      * paddings, the cap): [layout] the board, a function key's qwerty's unless given.
      */
-    fun board(ctx: Context, shortcut: String, layout: String = BOARDS[shortcut.substringBefore('/', "")]?.first ?: FUNCTION_BOARDS[shortcut] ?: KeyNames.QWERTY): SceneKeyCell.Board {
+    fun board(ctx: Context, shortcut: String, layout: String = defaultBoard(shortcut)): SceneKeyCell.Board {
         val codeRow = CODE_ROWS[layout] ?: ImKeyboards.Layout.TEXT
         val code = CodeRowHeight.keyboardDp(codeRow, KawaiiBarComponent.codeRowFloats())
         // the letters' corners as the keyboard draws them (TextKeyboard.alts: the long presses' firsts, the user's
@@ -117,6 +124,9 @@ object KeyCaps {
         return SceneKeyCell.Board(layout, shortcut, KeyboardArea.keysWidth(ctx), KeyboardArea.keysHeight(ctx, code), alts,
             AppPrefs.getInstance().keyboard.letterCase.getValue().case)
     }
+
+    private fun defaultBoard(shortcut: String) =
+        BOARDS[shortcut.substringBefore('/', "")]?.first ?: FUNCTION_BOARDS[shortcut] ?: KeyNames.QWERTY
 
     // a shortcut page's form: its board and the code row that board has
     private val BOARDS = mapOf(
@@ -157,7 +167,8 @@ object KeyCaps {
      * symbol, and [shortcut]'s marks, the engine placing both as on the keyboard (按键's 标点位置 and
      * 快捷键图标位置); [dimmed] for a key whose long press is turned off. [state] is what a screen
      * reader says of what the outline and the fading show, which only the caller knows; [said], what
-     * a screen reader says of the shortcut.
+     * a screen reader says of the shortcut. With a [shortcut] the cap is the keyboard's very key, drawn as
+     * the board has it: [text] and [hint] are then what a screen reader says alone.
      */
     fun key(
         ctx: Context, text: String, hint: String, marked: Boolean, dimmed: Boolean, selected: Boolean = false,
