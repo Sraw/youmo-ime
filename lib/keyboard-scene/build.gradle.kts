@@ -119,8 +119,8 @@ abstract class BuiltInFilesTask : DefaultTask() {
 // The theme maker's library as the page takes it (060-render-p3 W1): build/youmo-engine/youmo-engine.js,
 // which web/theme-maker/tools/assemble.mjs puts in the page as its youmo-engine block (the page's test
 // holds the two alike, and the block to its size budget). The production library, its lines' indents gone
-// (a sixth of it; Kotlin writes no string over two lines, so none is cut) and its source map's comment (the
-// page has no map). There is no minifier here: one is npm's, and the page's block is checked against this
+// (a sixth of it; Kotlin writes no string over two lines, so none is cut) and its line comments, the source
+// map's among them (the page has no map). There is no minifier here: one is npm's, and the page's block is checked against this
 // file in CI.
 val engineLink = tasks.named<org.jetbrains.kotlin.gradle.tasks.Kotlin2JsCompile>("compileProductionLibraryKotlinJs") {
     // the global a page reads it by (UMD's): `youmo-engine`, not the project's path. The library's link
@@ -134,7 +134,10 @@ val youmoEngine = tasks.register<Copy>("youmoEngine") {
     // and nothing a script element in a page ends or escapes at (the layouts' comments are in it, `<!--`): `<\!--`
     // and `<\/` are those texts again in a string or a regex, the only places Kotlin writes them
     filter { line: String ->
-        if (line.startsWith("//# sourceMappingURL=")) "" else line.trimStart().replace("<!--", "<\\!--").replace("</", "<\\/")
+        // the compiler's own line comments (`// Inline function 'kotlin.collections.map' call`, a tenth of it) gone too:
+        // a whole line of comment, never a string's (none goes over two lines)
+        val text = line.trimStart()
+        if (text.startsWith("//")) "" else text.replace("<!--", "<\\!--").replace("</", "<\\/")
     }
 }
 

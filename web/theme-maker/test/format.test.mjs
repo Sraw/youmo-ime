@@ -645,8 +645,8 @@ test("index.html holds no engine; the page built holds the build's, and no bigge
   // the plan's 600 KB is not met without a minifier (none without npm here): 1.09 MB as built, held below 1.2 MB
   // so that it grows only on purpose (1.20 MB with SvgSubset, the icons the page checks as the app does: 1.25 MB; M3's bar
   // sample and the window's and panels' looks for the preview: 1.264 MB; M4, the built-in layouts kept without their
-  // comments and indents: 1.239 MB, held below 1.25 MB)
-  assert.ok(Buffer.byteLength(engine) <= 1_250_000, 'the engine is ' + Buffer.byteLength(engine) + ' bytes');
+  // comments and indents: 1.239 MB; A1's motion: 1.250 MB; the compiler's line comments left out: 1.127 MB, held below 1.15 MB)
+  assert.ok(Buffer.byteLength(engine) <= 1_150_000, 'the engine is ' + Buffer.byteLength(engine) + ' bytes');
   // the global a page reads it by (build.gradle.kts: the library's link names it)
   assert.match(engine, /globalThis\['youmo-engine'\] = factory\(/);
   // all else as index.html: the engine's script and the CSP's hash of it the only difference
