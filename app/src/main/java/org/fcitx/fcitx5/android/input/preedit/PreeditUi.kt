@@ -192,7 +192,7 @@ open class PreeditUi(
                     val rtl = layout.getParagraphDirection(l) == Layout.DIR_RIGHT_TO_LEFT
                     val wraps = end >= layout.getLineEnd(l) && l < layout.lineCount - 1
                     val to = if (wraps) {
-                        val whole = layout.paint.measureText(layout.text, lineStart, layout.getLineEnd(l))
+                        val whole = Layout.getDesiredWidth(layout.text, lineStart, layout.getLineEnd(l), layout.paint)
                         layout.getPrimaryHorizontal(lineStart) + if (rtl) -whole else whole
                     } else {
                         layout.getPrimaryHorizontal(end)

@@ -579,9 +579,10 @@ it is, no `wire`; a letter, or the same letters, on two keys each key its own), 
 finger came down (`KeyGesture.clickAt`, `clickDown`; a click no touch made, the code alone), and the groups
 told the engine as the keyboard is shown, not as it is made (`onAttach`, `EngineState.ownKeys`; the bridge's `syncOwnKeys` before
 each key sets `NineKeyLetters.inUse` and `EngineSettings.ownKeys`, `configure` and `reload` keep them). Other groups told while
-something is typed on the ones before (`EngineBridge.ownKeysChange`): what was typed ends first as leaving the field ends
-it (`focusOutIn`, as `ViewRebuild.SETTING`: the code dropped, the panel cleared), not carried half into the session made anew
-(`KotlinHostTest.otherGroupsWhileTypingEndWhatWasTypedFirst`).
+a code is typed on the ones before (`EngineBridge.replaces`: groups told before, now others): the code is committed first
+as Return commits it (`HostCore.commitCode`, pinyin's letters as typed), not lost with the session made anew; no reset, so
+the next word keeps its 前文. The field's composing text (handwriting's, English's word) is no such code and is left alone
+(`KotlinHostOwnKeysTest`).
 Anything else is refused, logged with why, and the app's own layout drawn instead (`SceneLayouts.builtIn`):
 groups that make no keyboard, the other built-in keyboard's groups, and any grouping of its own on 双拼's
 keyboards (`GroupedKeyboardOwnGroupsTest`, `KeyboardCustomTest`). The theme's board stays `k14`/`k18`.
