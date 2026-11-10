@@ -39,6 +39,9 @@ object ChineseNumbers {
     private const val MINUTES = 60
     private const val HOURS = 24
     private const val HUNDRED = 100L
+
+    // the places a large value is a decimal of, smallest first
+    private val PLACES = listOf("万" to 10_000L, "亿" to 100_000_000L, "万亿" to 1_000_000_000_000L)
     private const val PERCENT = "百分之"
     private const val FRACTION = "分之"
 
@@ -118,7 +121,8 @@ object ChineseNumbers {
         }
         if (raw.none { it in BIG }) return value
         val n = value.toLongOrNull() ?: return value
-        val (name, unit) = BIG.entries.filter { it.value <= n }.maxByOrNull { it.value }?.toPair() ?: return value
+        // 万亿 one place: 三万亿五千万 is 3000050000000, not 30000.5亿
+        val (name, unit) = PLACES.lastOrNull { it.second <= n } ?: return value
         val hundredth = unit / HUNDRED
         if (n % hundredth != 0L) return value
         val fraction = "${n % unit / hundredth}".padStart(2, '0').trimEnd('0')
