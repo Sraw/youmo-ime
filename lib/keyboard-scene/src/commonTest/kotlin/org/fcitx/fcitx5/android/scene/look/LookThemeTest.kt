@@ -84,11 +84,18 @@ class LookThemeTest {
         assertEquals(4.0 to 5.0, inset(portrait.copy(compact = true)).let { round(it) })
         assertEquals(6.0 to 2.0, inset(landscape).let { round(it) })
         assertEquals(2.0 to 2.0, inset(landscape.copy(compact = true)).let { round(it) })
+        // the keyboard and its keys' cells as they were (the gap is inside a cell): the faces the room taller
+        val (normal, compact) = scene(t, portrait) to scene(t, portrait.copy(compact = true))
+        assertEquals(normal.width to normal.height, compact.width to compact.height, "the keyboard's size")
+        assertEquals(normal.keys.map { it.bounds }, compact.keys.map { it.bounds }, "the keys' cells")
+        fun face(s: Scene) = (key(s, "q").shape as org.fcitx.fcitx5.android.scene.Shape.Rect).box.height
+        assertEquals(face(normal) + 2 * (9 - 4) * d, face(compact), 1e-6)
     }
 
+    // a gap stays one: 1 dp at least, none only where there was none
     @Test
     fun theCompactGapIsFortyPercentToTheNearestDp() {
-        assertEquals(listOf(0, 0, 1, 1, 2, 2, 2, 3, 4, 4, 10), listOf(0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 24).map(Gap::compact))
+        assertEquals(listOf(0, 1, 1, 1, 2, 2, 2, 3, 4, 4, 10), listOf(0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 24).map(Gap::compact))
         assertEquals(3 to 2, Gap(3, 7, 3, 4).let { it.vCompact to it.vLandCompact })
     }
 

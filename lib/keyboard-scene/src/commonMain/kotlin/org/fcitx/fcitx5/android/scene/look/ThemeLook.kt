@@ -263,8 +263,8 @@ data class Gap(val h: Int, val v: Int, val hLand: Int, val vLand: Int) {
 
         private const val PERCENT = 100
 
-        /** [dp] at 紧凑: [COMPACT_V_PERCENT] of it, to the nearest dp (a half up). */
-        fun compact(dp: Int): Int = (dp * COMPACT_V_PERCENT + PERCENT / 2) / PERCENT
+        /** [dp] at 紧凑: [COMPACT_V_PERCENT] of it, to the nearest dp (a half up); a gap there stays one, 1 dp at least. */
+        fun compact(dp: Int): Int = if (dp <= 0) 0 else maxOf(1, (dp * COMPACT_V_PERCENT + PERCENT / 2) / PERCENT)
     }
 }
 
