@@ -31,7 +31,15 @@ class Theme(
     val meta: Meta? = null,
     /** The system's colours it was read with: a style's `system()` takes [dark]'s. */
     val systemColors: SystemColors = SystemColors.NONE,
+    /**
+     * `<sounds>`' `<sound key src>`s as written, a key this version does not know too: its file is kept,
+     * checked and exported all the same, and [ThemeWriter] writes them back as they are.
+     */
+    val soundFiles: List<Pair<String, String>> = emptyList(),
 ) {
+    /** The sounds of the classes this version knows, by class ([SoundKey]), from [soundFiles]. */
+    val sounds: Map<SoundKey, String> by lazy { soundFiles.mapNotNull { (k, f) -> SoundKey.of(k)?.let { it to f } }.toMap() }
+
     // once, not a function object each colour
     private val variable: (String) -> Argb? = colors::get
     private val system: (String) -> Argb? = systemColors.of(dark)::get
@@ -51,7 +59,7 @@ class Theme(
         this
     } else {
         val drawn = if (dark) darkColors ?: baseColors else baseColors
-        Theme(name, dark, version, drawn, styles, fonts, icons, picture, variants, baseColors, darkColors, meta, systemColors)
+        Theme(name, dark, version, drawn, styles, fonts, icons, picture, variants, baseColors, darkColors, meta, systemColors, soundFiles)
     }
 }
 
