@@ -23,9 +23,12 @@ import kotlin.math.min
  * A character is a grapheme cluster (a flag, a family, an accent are one) of the text read around the
  * selection as it begins; past what was read, or with nothing read (a password, an app that gives
  * none), a UTF-16 unit, the start of the field the end to the left. To the right, where the field
- * may end unseen, a step past what is known to be there is tried alone ([probe]): the next waits for
- * the editor to report it taken, as one past the field's end it ignores, its selection left as it
- * was; a step back from one not taken counts from where the editor still is.
+ * may end unseen, a step past what is known to be there is tried alone ([probe]): the steps after it
+ * wait, counted, for the editor to report it taken (every prediction reported, [move]'s `settled`, so
+ * an older report cannot pass for it), as one past the field's end it ignores, its selection left as
+ * it was; a step back from one not taken counts from the finger, the selection back where the editor
+ * still is till the finger is back on what is known. Given up so, or the touch [end]ing on it, its
+ * selection is given back ([untaken]), for the caller to stop predicting it.
  */
 class SwipeSelection {
 
@@ -46,8 +49,13 @@ class SwipeSelection {
     // the field known to reach this far: the selection as it began, what was read, a probe the editor took
     private var sure = 0
 
-    // a head past [sure] set, not yet seen in the editor's report: -1, none
+    // a head past [sure] set, not yet seen in the editor's report: -1, none; the steps moved since, waiting for it
     private var probe = -1
+    private var queued = 0
+
+    /** The selection of a probe given up by the last [move]: set, never reported, no longer to be predicted. */
+    var untaken: CursorRange? = null
+        private set
 
     // the selection the last touch left (none: -1), and its anchor: a touch beginning on it goes on from there.
     // Ints, not a CursorRange: its equality is its array's identity
@@ -64,9 +72,43 @@ class SwipeSelection {
         return touch
     }
 
-    /** The touch is over for it: another key acted (a second finger), its steps from here on nothing. */
-    fun end() {
+    /**
+     * The touch lifted: its steps from here on nothing, those moved before it [begin]s still taken
+     * there (what is typed committed first may take the host longer than a quick swipe), none past
+     * what is known to be in the field. The selection last set where it was a [probe] the editor has
+     * not reported taking, or null: the editor may never take it (one past the field's end), so the
+     * caller stops predicting it; the next touch goes on from where the editor was.
+     */
+    fun end(): CursorRange? {
         live = false
+        return giveBack()
+    }
+
+    /** As [end], the touch no longer to begin either: another key acted (a second finger), the field changed. */
+    fun cancel(): CursorRange? {
+        live = false
+        pending = 0
+        if (!begun) touch++
+        return giveBack()
+    }
+
+    private fun giveBack(): CursorRange? {
+        queued = 0
+        untaken = null
+        if (!begun || probe < 0) return null
+        val given = giveUp()
+        leftStart = min(anchor, head)
+        leftEnd = max(anchor, head)
+        leftAnchor = anchor
+        return given
+    }
+
+    // the probe not taken: the head back where the editor still has it, the probe's selection given back
+    private fun giveUp(): CursorRange {
+        val given = CursorRange(min(anchor, probe), max(anchor, probe))
+        head = sure
+        probe = -1
+        return given
     }
 
     /**
@@ -77,7 +119,7 @@ class SwipeSelection {
      * [touch] is no longer the one going on.
      */
     fun begin(touch: Int, selection: CursorRange, read: EditPlan.Field?, at: Int = -1): CursorRange? {
-        if (touch != this.touch || begun || !live) return null
+        if (touch != this.touch || begun) return null
         begun = true
         val start = min(selection.start, selection.end)
         val end = max(selection.start, selection.end)
@@ -94,6 +136,7 @@ class SwipeSelection {
         leftEnd = end
         leftAnchor = anchor
         probe = -1
+        queued = 0
         // the selection read is the one the editor has, where the read says (a cursor tracked behind
         // the editor's, its text shifted, would split a character): else its text is not what lies between
         text = read?.takeIf { it.selected.length == end - start && start - it.before.length >= 0 && (at < 0 || at == start) }?.let {
@@ -105,38 +148,55 @@ class SwipeSelection {
         sure = max(end, text?.let { base + it.length } ?: end)
         val steps = pending
         pending = 0
-        return if (steps != 0) move(steps, selection) else null
+        return if (steps != 0) step(steps, probing = live) else null
     }
 
     /**
-     * The free end moved [steps] characters, negative to the left, the editor's selection last
-     * reported [editor] (null: not known): the selection to set, or null where it did not move.
+     * The free end moved [steps] characters, negative to the left: the selection to set, or null where
+     * it did not move. [reported] the selection the editor last reported, [settled] whether it has
+     * reported every one predicted: a [probe] is taken only where both say so.
      */
-    fun move(steps: Int, editor: CursorRange? = null): CursorRange? {
+    fun move(steps: Int, reported: CursorRange? = null, settled: Boolean = false): CursorRange? {
+        untaken = null
         if (!live) return null
         if (!begun) {
             pending += steps
             return null
         }
+        var n = steps
         if (probe >= 0) {
-            if (editor != null && (editor.start == probe || editor.end == probe)) {
+            n += queued
+            queued = 0
+            if (settled && reported?.endsAt(probe) == true) {
                 sure = probe
                 probe = -1
-            } else if (steps > 0) {
+            } else if (n >= 0) {
+                // still waiting: kept, as far as the finger went
+                queued = n
                 return null
             } else {
-                // not taken: the editor's end is where it was, a step back counts from there
-                head = sure
-                probe = -1
+                // not taken: the editor's end is where it was, the probe's step, the finger's, counted
+                untaken = giveUp()
+                n++
             }
         }
+        return step(n, probing = true)
+    }
+
+    private fun CursorRange.endsAt(at: Int) = start == at || end == at
+
+    // [n] steps from [head]; [probing], one past what is known tried, else none
+    private fun step(n: Int, probing: Boolean): CursorRange? {
         var h = head
-        var left = abs(steps)
-        // a probe the last: none past it till the editor reports it
-        while (left-- > 0 && probe < 0) {
-            h = next(h, steps > 0) ?: break
+        var left = abs(n)
+        // a probe the last: the steps past it wait for it
+        while (left > 0 && probe < 0) {
+            val e = next(h, n > 0)?.takeIf { probing || it <= sure } ?: break
+            h = e
+            left--
             if (h > sure) probe = h
         }
+        if (probe >= 0) queued = left
         if (h == head) return null
         head = h
         leftStart = min(anchor, head)

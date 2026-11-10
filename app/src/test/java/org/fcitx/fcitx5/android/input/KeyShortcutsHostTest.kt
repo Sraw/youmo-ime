@@ -360,9 +360,7 @@ class KeyShortcutsHostTest {
         assertEquals("hello", h.field.text.toString())
     }
 
-    // a password's text is not read: units; past its end a step the editor ignores leaves no dead step back
-    @Test
-    fun swipeSelectInAPasswordGoesByUnitsAndStopsAtItsEnd() {
+    private fun passwordSecret() {
         swipeSelectOnQ()
         start()
         h.start(
@@ -370,14 +368,51 @@ class KeyShortcutsHostTest {
             prefill = { it.setText("secret"); it.setSelection(6) },
         )
         synced()
+    }
+
+    private fun tracked() = h.service.currentInputSelection.let { "${it.start}..${it.end}" }
+
+    // a password's text is not read: units. Past its end a step the editor ignores; the finger's steps
+    // after it kept, the selection follows the finger back
+    @Test
+    fun swipeSelectInAPasswordGoesByUnitsAndFollowsTheFingerBackFromItsEnd() {
+        passwordSecret()
         swipeSelect(-21f)
         until("et selected") { selected() == "4..6" }
-        // on from it, the right end free: three steps right reach past the end, which the editor ignores, the
-        // steps after it waiting; one back selects the t before the end, no step lost to the one ignored
-        // begun before the finger moves on (steps moved before it begins are taken together)
-        swipeSelect(0f, 31f, 41f, 51f, 39f) { if (it == 0) synced() }
+        synced()
+        h.field.setSelection(6)
+        synced()
+        // begun before the finger moves on: right a step (ignored), another, back two, back two more: a step left of the end
+        swipeSelect(0f, 11f, 21f, 9f, -11f) { if (it == 0) synced() }
         until("t selected") { selected() == "5..6" }
+        synced()
         assertEquals("secret", h.field.text.toString())
+        assertEquals("nothing predicted the editor did not take", "5..6", tracked())
+    }
+
+    // lifted on a step past the end the editor ignored: no selection is left predicted that is not
+    // there, for the next 滑选 and Backspace to act on
+    @Test
+    fun swipeSelectLiftedPastAPasswordsEndLeavesNothingPredicted() {
+        passwordSecret()
+        swipeSelect(0f, 11f, 21f) { if (it == 0) synced() }
+        synced()
+        assertEquals("6..6", selected())
+        assertEquals("the editor's, not the step it ignored", "6..6", tracked())
+        swipeSelect(0f, -11f) { if (it == 0) synced() }
+        until("t selected") { selected() == "5..6" }
+        h.tap(backspace)
+        until("the t deleted") { h.field.text.toString() == "secre" }
+    }
+
+    // the steps moved before it begins (the host still busy) taken together as it begins, past the end too
+    @Test
+    fun swipeSelectsStepsBeforeItBeginsAreTakenTogether() {
+        passwordSecret()
+        swipeSelect(11f, 21f, 9f, -11f)
+        until("t selected") { selected() == "5..6" }
+        synced()
+        assertEquals("5..6", tracked())
     }
 
     // 滑选 run by a tap (a theme's key of `shortcut swipe_select`) or from elsewhere: nothing, nothing committed

@@ -40,6 +40,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyAction.QuickPhraseAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.ShortcutAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.ShowInputMethodPickerAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.SpaceLongPressAction
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction.EndSwipeSelectAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.SwipeSelectAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.SymAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.UnicodeAction
@@ -110,6 +111,16 @@ class CommonKeyActionListener :
 
     private fun select(range: CursorRange) = service.select(range.start, range.end)
 
+    // the field 滑选 began in: a step in another (the field changed mid-touch) ends it
+    private var swipeSelectField: Any? = null
+
+    // 滑选's touch over, [lifted] (the steps before it began still taken) or not: a selection it set
+    // past the field's known end that the editor never took no longer predicted, in its field
+    private fun endSwipeSelect(lifted: Boolean = false) {
+        val untaken = (if (lifted) swipeSelection.end() else swipeSelection.cancel()) ?: return
+        if (service.startedField === swipeSelectField) service.forgetSelection(untaken)
+    }
+
     private fun showInputMethodPicker() {
         fcitx.launchOnReady {
             service.lifecycleScope.launch {
@@ -121,7 +132,7 @@ class CommonKeyActionListener :
     val listener: KeyActionListener by lazy {
         KeyActionListener { action, _ ->
             // another key acting (a second finger) ends a 滑选 under way: its steps no longer select
-            if (action !is BeginSwipeSelectAction && action !is SwipeSelectAction) swipeSelection.end()
+            if (action !is BeginSwipeSelectAction && action !is SwipeSelectAction) endSwipeSelect(lifted = action is EndSwipeSelectAction)
             when (action) {
                 // as the address keys are: through the engine a digit would pick a candidate, _ be ——
                 is HostKeyAction -> {
@@ -209,18 +220,30 @@ class CommonKeyActionListener :
                 }
                 // what is typed in first, as for any shortcut; the steps moved meanwhile are kept till it begins
                 is BeginSwipeSelectAction -> {
+                    endSwipeSelect()
+                    swipeSelectField = service.startedField
                     val touch = swipeSelection.reached()
                     afterPendingInput {
-                        ContextCompat.getMainExecutor(context).execute {
+                        ContextCompat.getMainExecutor(context).execute execute@{
+                            if (service.startedField !== swipeSelectField) return@execute
                             val read = service.readForSwipeSelect()
                             swipeSelection.begin(touch, service.currentInputSelection, read?.field, read?.at ?: -1)?.let(::select)
                         }
                     }
                 }
+                // ended above, as by any other key action
+                is EndSwipeSelectAction -> {}
                 // felt only where it moved: not at the field's end, nor past it waiting for the editor
-                is SwipeSelectAction -> swipeSelection.move(action.steps, service.reportedSelection)?.let {
-                    select(it)
-                    action.moved()
+                is SwipeSelectAction -> if (service.startedField !== swipeSelectField) {
+                    endSwipeSelect()
+                } else {
+                    val range = swipeSelection.move(action.steps, service.reportedSelection, service.selectionSettled)
+                    // a step past the end the editor ignored, given up: no longer predicted, before what is set next
+                    swipeSelection.untaken?.let(service::forgetSelection)
+                    range?.let {
+                        select(it)
+                        action.moved()
+                    }
                 }
                 is DeleteSelectionAction -> {
                     when (backspaceSwipe.onRelease(action.totalCnt)) {

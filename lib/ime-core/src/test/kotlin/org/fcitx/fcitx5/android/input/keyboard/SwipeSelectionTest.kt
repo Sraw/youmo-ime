@@ -64,15 +64,30 @@ class SwipeSelectionTest {
         assertEquals("back to the cursor, known to be there", "2..2", s.move(2).text())
     }
 
-    // no end known to the right: a step past what is known is tried alone, the next once the editor took it
+    // no end known to the right: a step past what is known is tried alone, the steps after it kept
+    // till the editor reports it taken
     @Test
-    fun pastWhatIsKnownToTheRightAStepWaitsForTheEditor() {
+    fun pastWhatIsKnownToTheRightTheStepsWaitForTheEditor() {
         val s = SwipeSelection()
         assertNull(s.begin(s.reached(), CursorRange(2, 2), null))
-        assertEquals("one tried", "2..3", s.move(3, CursorRange(2, 2)).text())
-        assertNull("not yet reported: no further", s.move(1, CursorRange(2, 2)))
-        assertEquals("taken: the next", "2..4", s.move(1, CursorRange(2, 3)).text())
-        assertEquals("back within what is known", "2..3", s.move(-1, CursorRange(2, 4)).text())
+        assertEquals("one tried", "2..3", s.move(1, CursorRange(2, 2), settled = true).text())
+        assertNull("not yet reported: kept", s.move(1, CursorRange(2, 2), settled = false))
+        assertNull(s.move(1, CursorRange(2, 2), settled = false))
+        assertEquals("taken: the next tried, the one after it kept", "2..4", s.move(0, CursorRange(2, 3), settled = true).text())
+        assertEquals("taken: the one kept", "2..5", s.move(0, CursorRange(2, 4), settled = true).text())
+        assertEquals("back within what is known", "2..4", s.move(-1, CursorRange(2, 5), settled = true).text())
+    }
+
+    // an older report that happens to end where the probe is does not pass for it: not all reported yet
+    @Test
+    fun aStaleReportDoesNotTakeAProbe() {
+        val s = SwipeSelection()
+        // a backspace from 4 to 3, its report not in: (4, 4) the last reported
+        assertNull(s.begin(s.reached(), CursorRange(3, 3), null))
+        assertEquals("3..4", s.move(1, CursorRange(4, 4), settled = false).text())
+        assertNull("(4, 4) is not of the probe", s.move(1, CursorRange(4, 4), settled = false))
+        assertEquals("ignored: as far back as the finger, from 3", "2..3", s.move(-3, CursorRange(3, 3), settled = false).text())
+        assertEquals("given back", "3..4", s.untaken.text())
     }
 
     // the editor ignored a step past its end: a step back counts from where its selection still is
@@ -80,9 +95,31 @@ class SwipeSelectionTest {
     fun aStepPastTheEndNotTakenLeavesNoDeadStepBack() {
         val s = SwipeSelection()
         assertNull(s.begin(s.reached(), CursorRange(6, 6), null))
-        assertEquals("6..7", s.move(1, CursorRange(6, 6)).text())
-        assertNull(s.move(1, CursorRange(6, 6)))
-        assertEquals("one back from the end the editor has", "5..6", s.move(-1, CursorRange(6, 6)).text())
+        assertEquals("6..7", s.move(1, CursorRange(6, 6), settled = true).text())
+        assertNull(s.move(1, CursorRange(6, 6), settled = false))
+        assertNull("the finger back on the probe: still waiting", s.move(-1, CursorRange(6, 6), settled = false))
+        assertNull(s.untaken)
+        assertNull("back off it: given up, the editor's end where it was, nothing to set", s.move(-1, CursorRange(6, 6), settled = false))
+        assertEquals("given back", "6..7", s.untaken.text())
+        assertEquals("a step back from the end, as the finger", "5..6", s.move(-1, CursorRange(6, 6), settled = true).text())
+        assertNull(s.untaken)
+    }
+
+    // lifted on a probe not taken: it is given back, and the next touch goes on from where the editor is
+    @Test
+    fun endedOnAProbeNotTakenGivesItBack() {
+        val s = SwipeSelection()
+        assertNull(s.begin(s.reached(), CursorRange(6, 6), null))
+        assertEquals("6..7", s.move(3, CursorRange(6, 6), settled = true).text())
+        assertEquals("given back", "6..7", s.end().text())
+        assertNull("once", s.end())
+        // the editor still at 6: the next touch from there
+        assertNull(s.begin(s.reached(), CursorRange(6, 6), null))
+        assertEquals("5..6", s.move(-1).text())
+        val none = SwipeSelection()
+        none.begin(none.reached(), CursorRange(1, 1), null)
+        none.move(-1)
+        assertNull("no probe: nothing given back", none.end())
     }
 
     // an app that gives less than asked before the cursor (review M7): its start is not the field's
@@ -106,13 +143,31 @@ class SwipeSelectionTest {
     fun anotherKeyActingEndsIt() {
         val s = begun()
         assertEquals("10..11", s.move(-1).text())
-        s.end()
+        s.cancel()
         assertNull(s.move(-1))
         val pending = SwipeSelection()
         val touch = pending.reached()
         pending.move(-1)
-        pending.end()
+        pending.cancel()
         assertNull("ended before it began", pending.begin(touch, CursorRange(5, 5), null))
+    }
+
+    // lifted before it began (the host busy committing what was typed): the steps moved still taken
+    // as it begins, none past what is known, nothing after the lift
+    @Test
+    fun liftedBeforeItBeganTakesTheStepsMoved() {
+        val s = SwipeSelection()
+        val touch = s.reached()
+        s.move(-2)
+        s.end()
+        assertNull(s.move(-1))
+        assertEquals("3..5", s.begin(touch, CursorRange(5, 5), null).text())
+        val past = SwipeSelection()
+        val t = past.reached()
+        past.move(2)
+        past.end()
+        assertNull("no end known: no step past it tried", past.begin(t, CursorRange(5, 5), null))
+        assertNull(past.end())
     }
 
     @Test

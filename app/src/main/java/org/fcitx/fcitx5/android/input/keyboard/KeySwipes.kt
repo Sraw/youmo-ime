@@ -169,6 +169,7 @@ internal class KeySwipes(
 
     // the selection stays as the finger left it, cancelled or not: nothing run, no tap
     private fun selectLifted(key: KeyHandle, held: Held): Boolean {
+        if (held.select) keyboard.onAction(KeyAction.EndSwipeSelectAction)
         held.select = false
         if (selecting == key.ref) selecting = null
         return true

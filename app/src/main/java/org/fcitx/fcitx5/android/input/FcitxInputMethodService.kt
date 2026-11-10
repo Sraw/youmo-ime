@@ -955,12 +955,28 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     fun select(start: Int, end: Int) = editingSession.select(start, end)
 
     /** The field around the selection as 滑选 begins, for its characters, and where it read the cursor; none in a password, whose text is not read. */
+    // none either with a selection predicted the editor has not reported: below Android 12 a read's
+    // cursor is the tracked one (FieldRead), so a read of a field the tracking is behind would pass for it
     fun readForSwipeSelect(): ClearedText.Read? =
-        if (inPasswordField) null else readAround(SwipeSelection.READ, SwipeSelection.READ, selected = selection.latest.isNotEmpty())
+        if (inPasswordField || !selection.settled) null else readAround(SwipeSelection.READ, SwipeSelection.READ, selected = selection.latest.isNotEmpty())
 
     /** The selection the editor last reported, none predicted since taken into account: what 滑选's steps past the field's known end wait for. */
     val reportedSelection: CursorRange
         get() = selection.current
+
+    /** Whether the editor reported every selection predicted: a report of 滑选's step past the known end is of that step, not an older one. */
+    val selectionSettled: Boolean
+        get() = selection.settled
+
+    /**
+     * [range], set by 滑选 past the field's known end, no longer predicted where the editor never
+     * reported it (one past the end, which it ignores without a word): else [currentInputSelection]
+     * would stay on it, for Backspace and the next 滑选 to act on a selection there is not.
+     */
+    fun forgetSelection(range: CursorRange) {
+        val reported = selection.current
+        if (selection.latest.rangeEquals(range) && !reported.rangeEquals(range)) selection.resetTo(reported.start, reported.end)
+    }
 
     private lateinit var lastKnownConfig: Configuration
 
