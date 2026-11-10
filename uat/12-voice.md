@@ -24,7 +24,7 @@
 
 ### VO-03 [P1] 说话时上滑取消
 - **前提**：B0-语音。
-- **操作**：长按空格说"你好"，手指上滑再松开。
+- **操作**：长按空格说"你好"，手指上滑再松开。再在工具栏 **⋯** 里开 **悬浮键盘** 并缩小，长按空格说话、慢慢上滑，看「松开手指，取消输入」出现的位置，松开。
 - **预期**：什么都不上屏，框里为空。悬浮键盘缩小后，同样要上滑过看得见的键盘高度的四分之一才显示「松开手指，取消输入」。
 - **JVM**：`VoiceHoldUatTest.slidingUpDropsIt`（上滑过键盘高度的四分之一显示「松开取消」，松开什么都不上屏，也不续录（松开时不调 `finish`）（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））、`VoiceHoldUatTest.onAScaledKeyboardTheCancelDistanceIsTheKeyboardAsSeen`（缩小的悬浮键盘上取消距离按看得见的键盘高度算）；设备上不跑。
 

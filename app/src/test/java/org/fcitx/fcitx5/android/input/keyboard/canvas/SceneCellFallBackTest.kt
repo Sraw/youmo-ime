@@ -22,6 +22,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -53,6 +54,7 @@ class SceneCellFallBackTest {
     fun tearDown() {
         SceneThemes.source = realSource
         SceneThemes.forgetAll()
+        SceneBoard.shown(null)
     }
 
     // a theme of its own name (the fall backs logged once a name and look, a process long), the built-in's look
@@ -106,13 +108,22 @@ class SceneCellFallBackTest {
         fun draw(b: SceneBoard) = b.view(BoardImages.NONE, key = { null }).apply { layout(0, 0, 1080, 700) }.scene
         assertNotNull(draw(board("k18")))
         assertSame(t, SceneBoard.drawnTheme(t))
+        // a cell made before the keys fell back: it follows them as it draws, its scene made again
+        val kept = cell(t)
+        assertTrue(kept.drawn().isNotEmpty())
+        assertEquals(t.name, kept.drawsIn)
+        val keptScene = kept.scene
         assertNull(draw(board("qwerty", refused = true)))
         assertEquals(builtIn.name, SceneBoard.drawnTheme(t).name)
         assertTrue(PopupScenes(View(context), t).ready)
         assertTrue(cell(t).drawn().isNotEmpty())
+        assertTrue(kept.drawn().isNotEmpty())
+        assertEquals(builtIn.name, kept.drawsIn)
+        assertNotSame(keptScene, kept.scene)
         // the other keyboard shown: its own keys, the popups' and cells' with them
         assertNotNull(draw(board("k18")))
         assertSame(t, SceneBoard.drawnTheme(t))
+        assertEquals(t.name, kept.drawsIn)
         // the refused one's keys drawn: the built-in's again; made again in its own: the theme's
         draw(board("qwerty", refused = true))
         assertEquals(builtIn.name, SceneBoard.drawnTheme(t).name)

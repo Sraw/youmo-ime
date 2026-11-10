@@ -82,6 +82,10 @@ class PopupComponent :
     @VisibleForTesting
     internal val scenesNow: PopupScenes get() = scenes
 
+    /** The popups kept for the next: a test's, that none made in an old theme is. */
+    @VisibleForTesting
+    internal val pooled: List<PopupEntryUi> get() = freeEntryUi
+
     /** The engine's text measured through this: a test's, to make it fail. */
     @VisibleForTesting
     internal var measuring: (TextMeasurer) -> TextMeasurer = { it }
@@ -149,7 +153,7 @@ class PopupComponent :
         }
         if (!show(popup, content, null, bounds.width())) {
             // the engine could not make it (logged): no bubble this time
-            freeEntryUi.add(popup)
+            pool(popup)
             return
         }
         place(popup, bounds)
@@ -427,7 +431,13 @@ class PopupComponent :
     private fun dismissPopupEntry(key: KeyRef, popup: PopupEntryUi) {
         showingEntryUi.remove(key)
         root.removeView(popup.root)
-        freeEntryUi.add(popup)
+        pool(popup)
+    }
+
+    // back to the pool only if made in the theme drawn now: one showing when it changed would
+    // otherwise come back from the pool drawing in the old
+    private fun pool(popup: PopupEntryUi) {
+        if (popup.scenes === scenesMade?.second) freeEntryUi.add(popup)
     }
 
     fun dismissAll() {
@@ -445,7 +455,7 @@ class PopupComponent :
         // too too
         showingEntryUi.forEach { (_, entry) ->
             root.removeView(entry.root)
-            freeEntryUi.add(entry)
+            pool(entry)
         }
         showingEntryUi.clear()
     }

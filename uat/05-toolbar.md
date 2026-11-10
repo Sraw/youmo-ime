@@ -193,9 +193,15 @@
 
 ### TB-32 [P2] 主题的按键圆角选"直角"：悬浮键盘四角也是直角
 - **前提**：B0-设置；"下载"里有 `square.theme`，从仓库的测试主题做：解开 `web/theme-maker/test/testdata/from-app.theme`，把 `from-app.json` 里的 `name` 和所有文件名里的 `from-app` 都换成新名字（json 里对文件的引用一起换；两个主题有同名文件时后导入的被拒），json 也改成 `<新名字>.json`，按下面改字段，再把这些文件放在 zip 顶层打包成 `<新名字>.theme`（例如 `python3 -c` 里用 `zipfile` 读改写，和 `uat/scripts/14-settings.py` 的 `push_theme` 一样）；`keys.radiusDp` 改成 0。App 里 **主题 → 新增主题** 导入它并用上（App 里不做、不编辑主题）。
-- **操作**：点「普通文本」框，在工具栏 **⋯** 里点 **悬浮键盘**。再换一个平面键（`keys.blocks` 为 `false`）的主题，竖屏、横屏各开一次悬浮键盘。
-- **预期**：悬浮键盘的四角是直角（左上角的像素就是横条的颜色）；按键圆角是默认的"圆角"时（TB-22）是圆角。平面键主题竖屏、横屏时，键盘背景的四角和外框一样圆（背景不露出外框的角）。
-- **JVM**：`FloatingUatTest.squareKeysASquareFloatingKeyboard`（默认圆角时悬浮键盘裁成圆角，直角时圆角为 0：卡片外框和画出的键盘背景都查）；平面键、横屏的圆角由 keyboard-scene `FloatingKeyboardCornerTest` 查（`:lib:keyboard-scene:check`，`uat.py jvm` 不记录）；设备上不跑。
+- **操作**：点「普通文本」框，在工具栏 **⋯** 里点 **悬浮键盘**。（平面键、横屏的四角是 TB-53，手工跑。）
+- **预期**：悬浮键盘的四角是直角（左上角的像素就是横条的颜色）；按键圆角是默认的"圆角"时（TB-22）是圆角。
+- **JVM**：`FloatingUatTest.squareKeysASquareFloatingKeyboard`（默认圆角时悬浮键盘裁成圆角，直角时圆角为 0：卡片外框和画出的键盘背景都查）；设备上不跑。
+
+### TB-53 [P2] 平面键时悬浮键盘竖屏、横屏的四角
+- **前提**：B0-设置，**外观 → 大小与样式 → 按键样式** 里 **按键边框** 选「无边框」（键平铺）。
+- **操作**：点「普通文本」框，在工具栏 **⋯** 里点 **悬浮键盘**，看四角；转成横屏再看；看完 **按键边框** 改回「跟随主题」。
+- **预期**：竖屏、横屏时键盘背景的四角都和外框一样圆（背景不露出外框的角）。
+- 真机或模拟器上手工跑（看图；keyboard-scene `FloatingKeyboardCornerTest` 在 `:lib:keyboard-scene:check` 里查同一件事，`uat.py jvm` 不记录），不在自动跑里。
 
 ### TB-34 [P1] 悬浮键盘拖到底边：出现落点框，松手放回底部，再悬浮回到原处
 - **前提**：B0，按 TB-22 开着悬浮键盘并拖到屏幕中间。

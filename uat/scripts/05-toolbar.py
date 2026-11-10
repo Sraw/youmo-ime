@@ -332,6 +332,7 @@ case("TB-31", needs="jvm:ToolbarUatTest.pasteStaysInTheClipboardWhenSoSet")(lamb
 
 
 case("TB-32", needs="jvm:FloatingUatTest.squareKeysASquareFloatingKeyboard")(lambda d: None)
+case("TB-53", needs="manual:平面键时悬浮键盘竖屏、横屏的四角，看图")(lambda d: None)
 
 
 @case("TB-41", mutates=True)

@@ -592,6 +592,7 @@ case("ST-61", needs="jvm:PacksUatTest.aTextPackTooOldSaysWhichVersionIsNeeded")(
 case("ST-62", needs="jvm:PacksUatTest.thePageListsEachPacksStateAndWhatItIsFor")(lambda d: None)
 case("ST-68", needs="manual:要另做一个同名、换了字体和背景图的主题文件，看键盘的字体")(lambda d: None)
 case("ST-69", needs="manual:要真麦克风说话，用过语音后再导入语音包")(lambda d: None)
+case("ST-70", needs="manual:按键字符里选中一项左移、删除，看轮廓和删掉的是哪个")(lambda d: None)
 
 
 case("ST-63", needs="release:多选文字包、语音包和一个非包文件导入，读逐文件的结果框、看下载里的原文件还在；结果框出现时转屏只一个框，点确定后再转屏、切到别的应用再回来不再弹出（手工）；结果的说法在 JVM 上：PacksUatTest.eachFilesOutcomeIsToldAndTheUserMayDeleteTheirFiles")(lambda d: None)

@@ -85,7 +85,7 @@ class HandwritingSceneGesturesTest {
                     val sent = h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") || it.startsWith("triggerUnicode") }
                     // ⌫ held repeats, how many times as the press falls in the frame: the record keeps that it
                     // repeats and what, not the count
-                    val shown = if (held && id == "backspace") "repeats ${sent.distinct()}".also { assertTrue(sent.toString(), sent.size >= 2) } else "$sent"
+                    val shown = if (held && id == "backspace") "repeats ${sent.distinct()}".also { assertTrue(sent.toString(), sent.size >= MIN_REPEATS) } else "$sent"
                     out += "$id ${if (held) "long press sent" else "tap"}: " + shown + " field ${h.field.text}"
                 }
             }
@@ -435,5 +435,10 @@ class HandwritingSceneGesturesTest {
     private fun View.relayoutAt(w: Int, h: Int) {
         measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
         layout(left, top, left + w, top + h)
+    }
+
+    private companion object {
+        // a hold of ⌫ deletes over and over: more than the one of a tap
+        const val MIN_REPEATS = 2
     }
 }

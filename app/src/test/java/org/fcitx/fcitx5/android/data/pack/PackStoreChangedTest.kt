@@ -89,8 +89,8 @@ class PackStoreChangedTest {
             assertTrue("$replaced", replaced.exists())
             PackStore.tidyAtStart(shelf)
             assertTrue("the start's tidy after an import: $replaced", replaced.exists())
-            // what the start's tidy would have deleted, no import begun
-            shelf.tidy()
+            // what the start's tidy deletes with no import begun
+            PackStore.tidyAtStart(shelf) { false }
             assertFalse("$replaced", replaced.exists())
         } finally {
             root.deleteRecursively()

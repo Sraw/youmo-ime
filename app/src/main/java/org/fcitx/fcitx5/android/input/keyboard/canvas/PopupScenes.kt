@@ -56,6 +56,10 @@ class PopupScenes(
     /** Whether the theme or, where it fell back, the built-in converted: its popups drawn as scenes. */
     val ready: Boolean get() = sceneTheme != null
 
+    /** The theme these popups draw in: a test's, that they follow the keys. */
+    @VisibleForTesting
+    internal val drawsIn: String get() = theme.name
+
     /** A builder in the environment now; null where neither the theme nor the built-in converted (nothing drawn, logged). */
     fun builder(): SceneBuilder? = sceneTheme?.let {
         val env = SceneEnvs.of(view, look, theme.isDark, view.width, view.height, Input())

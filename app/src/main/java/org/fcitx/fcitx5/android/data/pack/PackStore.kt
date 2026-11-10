@@ -81,9 +81,9 @@ object PackStore {
     @Volatile
     private var imported = false
 
-    /** The start's tidy of [shelf]: none once an import has begun ([imported]); a test's, which runs no start. */
+    /** The start's tidy of [shelf]: none once an import has [begun] ([imported]); a test's, which runs no start. */
     @VisibleForTesting
-    internal fun tidyAtStart(shelf: PackShelf) = synchronized(shelf) { if (!imported) shelf.tidy() }
+    internal fun tidyAtStart(shelf: PackShelf, begun: () -> Boolean = { imported }) = synchronized(shelf) { if (!begun()) shelf.tidy() }
 
     private val mutableState by lazy { MutableStateFlow(State(snapshot(), 0)) }
 

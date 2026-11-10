@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.popup
 
+import android.graphics.Rect
 import android.view.ContextThemeWrapper
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.theme.TestThemes
@@ -11,10 +12,10 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
+import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.After
-import org.junit.Assert.assertNotSame
-import org.junit.Assert.assertSame
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -61,22 +62,36 @@ class PopupFollowsTheKeysTest {
         SceneBoard.shown(null)
     }
 
+    private val builtIn = ThemeManager.builtin("pixel#dark").name
+
     @Test
     fun popupsMadeBeforeTheKeysFellBackFollowThemAsTheyDraw() {
         SceneBoard.shown("k18")
-        val own = popup.scenesNow
-        assertTrue(own.ready)
-        // asked again, nothing changed: the same, not made again
-        assertSame(own, popup.scenesNow)
+        assertTrue(popup.scenesNow.ready)
+        assertEquals(theme.name, popup.scenesNow.drawsIn)
         SceneBoard.keysFellBack(theme.name, look, "qwerty", true)
         // another keyboard's keys refused: not the one shown
-        assertSame(own, popup.scenesNow)
+        assertEquals(theme.name, popup.scenesNow.drawsIn)
         SceneBoard.shown("qwerty")
-        val fellBack = popup.scenesNow
-        assertNotSame(own, fellBack)
-        assertTrue(fellBack.ready)
+        assertTrue(popup.scenesNow.ready)
+        assertEquals(builtIn, popup.scenesNow.drawsIn)
         // the theme's own keyboard shown again: its own again
         SceneBoard.shown("k18")
-        assertNotSame(fellBack, popup.scenesNow)
+        assertEquals(theme.name, popup.scenesNow.drawsIn)
+    }
+
+    // a bubble still up as the keys fell back goes away and is not kept for the next: it would draw in the old theme
+    @Test
+    fun aPopupShowingAsTheKeysFellBackIsNotPooled() {
+        SceneBoard.shown("k18")
+        popup.listener.onPopupAction(PopupAction.PreviewAction(KeyRef("a"), "a", Rect(0, 0, 100, 100)))
+        SceneBoard.keysFellBack(theme.name, look, "qwerty", true)
+        SceneBoard.shown("qwerty")
+        assertEquals(builtIn, popup.scenesNow.drawsIn)
+        popup.dismissAll()
+        assertTrue(popup.pooled.all { it.scenes.drawsIn == builtIn })
+        popup.listener.onPopupAction(PopupAction.PreviewAction(KeyRef("b"), "b", Rect(0, 0, 100, 100)))
+        popup.dismissAll()
+        assertEquals(listOf(builtIn), popup.pooled.map { it.scenes.drawsIn })
     }
 }

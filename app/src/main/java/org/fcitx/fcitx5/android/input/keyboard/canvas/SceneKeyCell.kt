@@ -70,6 +70,10 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
             return drawnIn
         }
     private val theme get() = now.theme
+
+    /** The theme the cell draws in now: a test's, that it follows the keys. */
+    @VisibleForTesting
+    internal val drawsIn: String get() = theme.name
     private val look get() = now.shownLook
     private val measurer get() = now.measurer
     private val sceneTheme get() = now.sceneTheme

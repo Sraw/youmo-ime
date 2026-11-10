@@ -4,7 +4,9 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard.canvas
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.BoardImages
@@ -45,6 +47,8 @@ class SceneBoard(
     private val env: (look: ThemeLook, layout: SceneLayout, width: Int, height: Int) -> Env,
 ) {
 
+    private val inActivity: Boolean = generateSequence(context) { (it as? ContextWrapper)?.baseContext }.any { it is Activity }
+
     /** The scenes the engine made for this keyboard: a test's count of what was not kept. */
     var scenesMade = 0
         private set
@@ -72,8 +76,9 @@ class SceneBoard(
     // The fallback's the built-in theme's whole: its look, its fonts, its measurer, as it draws itself
     private fun drawn(look: ThemeLook, width: Int, height: Int): KeyboardCanvasView.Drawn? {
         if (layout == null) return null
-        // the keyboard drawn last is the one shown: the popups and cells follow its keys ([drawnTheme])
-        shownBoard = layout.id
+        // the keyboard drawn last is the one shown: the popups and cells follow its keys ([drawnTheme]);
+        // not one drawn in an activity (the theme's preview in the settings), never the input method's
+        if (!inActivity) shownBoard = layout.id
         drawn(theme, look, width, height)?.let { return it.also { keysFellBack(theme.name, look, layout.id, false) } }
         val builtIn = ThemeManager.builtin(if (theme.isDark) "pixel#dark" else "pixel#light")
         if (builtIn.name == theme.name) return null

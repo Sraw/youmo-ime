@@ -36,7 +36,6 @@ class ChineseNumbersTest {
     )
 
     @Test
-
     @Uat("VO-06")
     fun digitsAreDigitByDigit() = check(
         // with 点: read as a model, an address's parts (review F6386)
@@ -72,7 +71,6 @@ class ChineseNumbersTest {
     )
 
     @Test
-
     @Uat("VO-06")
     fun whatDoesNotReadAsItsKindStaysAsSaid() {
         check(

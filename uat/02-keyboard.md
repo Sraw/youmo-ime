@@ -374,7 +374,7 @@
 
 ### KB-65 [P2] 滑出快捷键时键上方小框里的字
 - **前提**：B0，**按键时弹出显示字符** 开着；**按键字符和快捷键** 里把 Q 设成文字「我的邮箱是 someone@example.com」，W 设成 **快速输入**，E 设成 **恢复刚删除的**。
-- **操作**：A、W、E、Q 各上滑过阈值不松手，看键上方的小框；键盘高度换成紧凑、悬浮键盘、横屏各看一次；拼音键盘换成 14 键，给 QW 键设同样的文字快捷键，按 Shift 后上滑看小框。
+- **操作**：A、W、E、Q 各上滑过阈值不松手，看键上方的小框；键盘高度换成紧凑、悬浮键盘、横屏各看一次；拼音键盘换成 14 键，给 QW 键设同样的文字快捷键，按 Shift 后上滑看小框；再按住 ZX 看小框。
 - **预期**：小框里是「全选」「快速输入」「恢复刚删除的」「我的邮箱是 s…」，字比键上的字母小一号，和底排「符」「123」差不多；框最宽约五个字，没有横跨半个键盘、也不盖住工具栏；紧凑、悬浮时字跟着键上的字缩小。14 键上小框里的字照设的写（「someone@…」不变成大写）；字母键自己的小框照键面的大小写（ZX 键上是 X）。
 - **JVM**：`SwipePopupScreenshotTest.theBubbleSaysTheShortcutFitted`（三个键的框里的字）；`GroupedKeyboardTest.aSwipesShortcutShowsAsItIsNamedNotInTheLettersCase`（14/18 键上快捷键的字不随字母大小写变，字母键的小框照键面的大小写）；规则见 ime-core `PreviewLabelTest`；样子见 `SwipePopupScreenshotTest` 的 `select_all_*`、`quick_input_*`、`restore_*`、`text_*`、`trad_simp_en` 金样。
 
