@@ -33,6 +33,8 @@
   <style select="@flat panel" fill="@bar"/>
   <style select="key" fill="@key" radius="0" border="1dp @keyBorder" shadow="none" inset="0 0" color="@keyText" font="system" weight="400" scale="100%" icon-color="@keyText" press="ripple"/>
   <style select="@landscape key" inset="0 0"/>
+  <style select="@compact key" inset="0 0"/>
+  <style select="@compact @landscape key" inset="0 0"/>
   <style select="key:pressed" overlay="@keyPressHighlight"/>
   <style select="key.function" fill="@altKey" color="@altKeyText" icon-color="@altKeyText"/>
   <style select="key.enter" fill="@accentKey" color="@accentKeyText" icon-color="@accentKeyText"/>

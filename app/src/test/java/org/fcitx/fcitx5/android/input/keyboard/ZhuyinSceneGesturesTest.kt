@@ -384,17 +384,15 @@ class ZhuyinSceneGesturesTest {
         }
     }
 
-    // a 360 dp phone compact (20%, 34% on its side: CompactKeyboardScreenshotTest's zhuyin_full_small_port): ⌫'s face 16 dp
-    // tall, its two shortcut icons do not both fit: the down one left out, the other kept (the engine's rule,
-    // ContentTest; here as the app draws it)
+    // a 360 dp phone compact (20%, 34% on its side: CompactKeyboardScreenshotTest's zhuyin_full_small_port): the
+    // rows' gaps 40% of the theme's there (060-key-spacing), ⌫'s face tall enough for both its shortcut icons,
+    // drawn one over the other (where one is left out: the engine's rule, ContentTest)
     @Test
     @Config(qualifiers = "w360dp-h740dp-port-440dpi")
-    fun aSmallPhonesCompactBackspaceLeavesOutItsDownIcon() {
-        // past the shortcuts' cap (060-render-p2 S4e: never smaller on its own, never another corner): the down
-        // one, the less swiped, left out; the swipe still works
+    fun aSmallPhonesCompactBackspaceKeepsBothItsIcons() {
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
-        assertEquals(2, harness(InputType.TYPE_CLASS_TEXT).use { h -> h.keyNamed("backspace").drawnIcons })
+        assertEquals(3, harness(InputType.TYPE_CLASS_TEXT).use { h -> h.keyNamed("backspace").drawnIcons })
     }
 
     // the same compact (the height setting's lowest, 20%, 34% on its side): the text 0.9, the marks smaller

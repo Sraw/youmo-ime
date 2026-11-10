@@ -66,6 +66,34 @@ class LookThemeTest {
         assertTrue(q.ops(true).any { it is Op.Ripple })
     }
 
+    // the keyboard height 紧凑: the room above and below a key 40% of the look's, upright and on its side, across the same
+    @Test
+    fun atCompactTheRowsAreCloser() {
+        val look = LookDefaults.look(palette(themeFile("material-light.xml"))).let {
+            it.copy(keys = it.keys.copy(gap = Gap(5, 9, 2, 6)))
+        }
+        val t = theme(LookTheme.xml(look, "T", false))
+        val d = portrait.density
+        fun inset(env: Env): Pair<Double, Double> {
+            val q = key(scene(t, env), "q")
+            val box = (q.shape as org.fcitx.fcitx5.android.scene.Shape.Rect).box
+            return (box.top - q.bounds.top) / d to (box.left - q.bounds.left) / d
+        }
+        val landscape = portrait.copy(landscape = true, width = 2000.0)
+        assertEquals(9.0 to 5.0, inset(portrait).let { round(it) })
+        assertEquals(4.0 to 5.0, inset(portrait.copy(compact = true)).let { round(it) })
+        assertEquals(6.0 to 2.0, inset(landscape).let { round(it) })
+        assertEquals(2.0 to 2.0, inset(landscape.copy(compact = true)).let { round(it) })
+    }
+
+    @Test
+    fun theCompactGapIsFortyPercentToTheNearestDp() {
+        assertEquals(listOf(0, 0, 1, 1, 2, 2, 2, 3, 4, 4, 10), listOf(0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 24).map(Gap::compact))
+        assertEquals(3 to 2, Gap(3, 7, 3, 4).let { it.vCompact to it.vLandCompact })
+    }
+
+    private fun round(p: Pair<Double, Double>) = kotlin.math.round(p.first * 1e6) / 1e6 to kotlin.math.round(p.second * 1e6) / 1e6
+
     // keys as round as can be (24 dp) with a margin: the floating keyboard's radius their sum, over the
     // reader's 24 dp, refused the whole theme and nothing was drawn; at most 24 dp, it reads
     @Test

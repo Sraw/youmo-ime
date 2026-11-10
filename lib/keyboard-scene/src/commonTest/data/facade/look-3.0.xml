@@ -38,6 +38,8 @@
   <style select="@flat panel" fill="@bar"/>
   <style select="key" fill="picture(10dp, 80%, @key)" radius="8dp" border="1dp @keyBorder" shadow="none" inset="7dp 3dp" color="@keyText" font="key" weight="700" scale="110%" icon-color="@keyText" press="tint"/>
   <style select="@landscape key" inset="4dp 3dp"/>
+  <style select="@compact key" inset="3dp 3dp"/>
+  <style select="@compact @landscape key" inset="2dp 3dp"/>
   <style select="key:pressed" overlay="@keyPressHighlight"/>
   <style select="key.function" fill="@altKey" color="@altKeyText" icon-color="@altKeyText"/>
   <style select="key.enter" fill="@accentKey" color="@accentKeyText" icon-color="@accentKeyText"/>

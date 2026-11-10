@@ -234,14 +234,37 @@ enum class KeyLabel { Show, Hide }
 /** One key's own face over its kind's: what is null is its kind's; [label] Hide when the image has the text already. */
 data class KeyOverride(val fill: KeyFill?, val pressed: KeyPressed?, val label: KeyLabel)
 
-/** The room round each key, dp, portrait and landscape: inside the key's cell, so a key is pressed where its gap is too. */
+/**
+ * The room round each key, dp, portrait and landscape: inside the key's cell, so a key is pressed where its gap is too.
+ * At the keyboard height 紧凑 the room above and below is [vCompact] and [vLandCompact] (the user, 2026-11-06: the
+ * rows closer, the keys taller in the same height); across, the keyboard is as wide as ever, so it is the same.
+ */
 data class Gap(val h: Int, val v: Int, val hLand: Int, val vLand: Int) {
     init {
         require(listOf(h, v, hLand, vLand).all { it in 0..MAX_GAP_DP }) { "gap out of 0..$MAX_GAP_DP" }
     }
 
+    /** [v] at 紧凑: [compact]. */
+    val vCompact: Int get() = compact(v)
+
+    /** [vLand] at 紧凑: [compact]. */
+    val vLandCompact: Int get() = compact(vLand)
+
     companion object {
         const val MAX_GAP_DP = 24
+
+        /**
+         * What of the room above and below a key is left at 紧凑, percent. One share for any gap, the theme's or
+         * the setting's, so a looser theme or level stays looser there too. 40 makes the default 7 dp 3 (as
+         * wide as the 3 dp across), keys some 8 dp taller on a phone upright; chosen from emulator shots of
+         * 70, 55, 40 and 25 (design 060-key-spacing).
+         */
+        const val COMPACT_V_PERCENT = 40
+
+        private const val PERCENT = 100
+
+        /** [dp] at 紧凑: [COMPACT_V_PERCENT] of it, to the nearest dp (a half up). */
+        fun compact(dp: Int): Int = (dp * COMPACT_V_PERCENT + PERCENT / 2) / PERCENT
     }
 }
 

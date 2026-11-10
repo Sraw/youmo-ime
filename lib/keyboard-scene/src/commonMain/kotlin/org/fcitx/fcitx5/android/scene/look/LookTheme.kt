@@ -167,6 +167,9 @@ object LookTheme {
             "press" to press(keys),
         )
         s.add(key.with(LANDSCAPE), "inset" to inset(keys.gap.vLand, keys.gap.hLand))
+        // the keyboard height 紧凑: the rows closer (Gap.vCompact); on its side both scenes, the more specific
+        s.add(key.with(COMPACT), "inset" to inset(keys.gap.vCompact, keys.gap.h))
+        s.add(key.with(COMPACT).with(LANDSCAPE), "inset" to inset(keys.gap.vLandCompact, keys.gap.hLand))
         s.add(key.with(state = PRESSED), "overlay" to color("keyPressHighlight"))
         s.add(key.with(kind = "function"), "fill" to s.face(keys.function.fill, ALT_KEY), "color" to color("altKeyText"), "icon-color" to color("altKeyText"))
         s.add(key.with(kind = "enter"), "fill" to s.face(keys.enter.fill, ACCENT_KEY), "color" to color("accentKeyText"), "icon-color" to color("accentKeyText"))
@@ -441,6 +444,7 @@ object LookTheme {
     private val TRANSPARENT = solid(ColorExpr.Literal(Argb.TRANSPARENT))
     private const val FLAT = "flat"
     private const val LANDSCAPE = "landscape"
+    private const val COMPACT = "compact"
     private const val FLOATING = "floating"
     private const val PRESSED = "pressed"
     private const val VERSION = "4.0"
