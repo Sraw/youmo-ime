@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.engine.english.EnglishUser
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.glide.GlideSession
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession
+import org.fcitx.fcitx5.android.engine.handwriting.InkOver
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.learn.Simplifier
 import org.fcitx.fcitx5.android.engine.learn.backup.AddressData
@@ -308,6 +309,15 @@ class Engines(
     // by the session made in its place ([HandwritingSession.latestPiece])
     private var inkEndedBefore = HandwritingSession.NO_PIECE
 
+    // every handwriting session made: handwriting's own and those written over the keys ([InkOver])
+    private fun handwritings(): List<HandwritingSession> = sessions.values.mapNotNull { (it as? HandwritingSession) ?: (it as? InkOver)?.handwritingMade }
+
+    // the latest piece any of them heard of: one made now starts with it ended, a pad numbering its pieces on across them
+    private fun latestPiece(): Int = handwritings().fold(inkEndedBefore) { m, h -> maxOf(m, h.latestPiece) }
+
+    // the session [im]'s ink goes to: handwriting's own, or the one [im] shows (a pair's keyed one)
+    private fun inkedSession(im: String) = if (im == HANDWRITING) im else pairs.shownSession(im)
+
     /**
      * Every session made anew at its next use, what was typed dropped, and what they share
      * ([SessionFactory.invalidate], the decoders' extensions): the user's words, the user model or
@@ -327,7 +337,7 @@ class Engines(
     // the sessions and what they share but the decoders' look-ahead, which is kept while nothing was
     // learned since it was made ([EngineAssets.dropDecoderExtensionsIfLearned])
     private fun dropSessions() {
-        (sessions[HANDWRITING] as? HandwritingSession)?.let { inkEndedBefore = maxOf(inkEndedBefore, it.latestPiece) }
+        inkEndedBefore = latestPiece()
         keyboards.clear()
         pairs.values.forEach(KeyboardPair::drop)
         sessions.clear()
@@ -386,7 +396,7 @@ class Engines(
     // internal: a test counts what the sessions made share (EnginesSessionFactoryTest)
     internal val factory: SessionFactory = SessionFactory(
         assets, lexicon, tables, learner, english, { settings }, latin.words,
-        englishData = { field.warmUpEnglish() }, inkEndedBefore = { inkEndedBefore },
+        englishData = { field.warmUpEnglish() }, inkEndedBefore = ::latestPiece,
         uptimeMillis = clock::uptimeMillis, learnClock = clock, simplifier = simplifier,
     )
 
@@ -550,11 +560,16 @@ class Engines(
     /**
      * Handwriting's session made for [ink], what the pad read or a piece of it finished, which the
      * [Keyboard.INK] sent with it ([shown]) shows; with none sent, handwriting not the input method,
-     * held for the next ([HandwritingSession.hold]). On the fcitx thread.
+     * held for the next ([HandwritingSession.hold]). [im] the input method written on: handwriting, or
+     * one written on over its keys ([InkOver], its handwriting made now). On the fcitx thread.
      */
-    fun ink(ink: Action.Ink, shown: Boolean) {
+    fun ink(ink: Action.Ink, shown: Boolean, im: String = HANDWRITING) {
         hostThread.check()
-        val s = session(HANDWRITING) as HandwritingSession
+        val s = when (val made = session(inkedSession(im))) {
+            is HandwritingSession -> made
+            is InkOver -> made.handwriting()
+            else -> return
+        }
         if (!shown) s.hold(ink)
     }
 
@@ -563,9 +578,13 @@ class Engines(
      * phrase or Unicode over handwriting, filtered the key; the field had lost focus) is held for the
      * next, as an [ink] told with no key is, so its piece is not lost. On the fcitx thread.
      */
-    fun inkSent(ink: Action.Ink) {
+    fun inkSent(ink: Action.Ink, im: String = HANDWRITING) {
         hostThread.check()
-        val s = sessions[HANDWRITING] as? HandwritingSession ?: return
+        val s = when (val made = sessions[inkedSession(im)]) {
+            is HandwritingSession -> made
+            is InkOver -> made.handwritingMade
+            else -> null
+        } ?: return
         if (!s.took(ink)) s.hold(ink)
     }
 
@@ -579,15 +598,15 @@ class Engines(
     fun glide(im: String, glide: Glide): Action.Glide? {
         hostThread.check()
         if (!glides(im)) return null
-        return when (val s = session(pairs[im]?.glidedBy(glide.layout) ?: im).let { (it as? StrokeFilter)?.session ?: it }) {
+        return when (val s = session(pairs[im]?.glidedBy(glide.layout) ?: im).let { (it as? InkOver)?.session ?: it }.let { (it as? StrokeFilter)?.session ?: it }) {
             is EnglishSession -> Action.Glide(glide)
             is GlideSession -> s.read(glide)
             else -> null
         }
     }
 
-    /** The latest piece of handwriting ended ([HandwritingSession.ended]), for the pad to wipe; on the fcitx thread. */
-    val inkEnded: Int get() = checked { (sessions[HANDWRITING] as? HandwritingSession)?.ended ?: inkEndedBefore }
+    /** The latest piece of handwriting ended ([HandwritingSession.ended]; of those written over the keys too, [InkOver]), for the pad to wipe; on the fcitx thread. */
+    val inkEnded: Int get() = checked { handwritings().fold(inkEndedBefore) { m, h -> maxOf(m, h.ended) } }
 
     /** Candidates of [im]'s input, from the [from]th, at most [count]; none if it has no session yet. */
     fun candidates(im: String, from: Int, count: Int): List<Choice> = checked {
