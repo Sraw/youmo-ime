@@ -74,17 +74,34 @@ class Cascade(theme: Theme, private val scene: Set<String>) {
      */
     fun stated(target: Selector.Target, state: String): Map<String, Value> = own(general(target)) { state in it.states }
 
+    /**
+     * Which style each property [of] gives [target] comes from (the maker's cascade check, 060-render-p3 §5.1):
+     * the same styles laid over each other the same way, each property the style whose value won. Not kept.
+     */
+    fun sources(target: Selector.Target): Map<String, Style> {
+        val general = general(target)
+        val own = winners(general).flatMap { s -> s.values.keys.map { it to s } }.toMap()
+        if (general.part == null) return own
+        val key = sources(general.copy(part = null)).filterKeys { it in INHERITED && !(it == HIDDEN && general.part == HINT) }
+        return key + own
+    }
+
     // what the styles selecting [target] set (by a selector [by] takes), nothing inherited
     private fun own(target: Selector.Target, by: (Selector) -> Boolean = { true }): Map<String, Value> {
+        val out = LinkedHashMap<String, Value>()
+        winners(target, by).forEach { out.putAll(it.values) }
+        return out
+    }
+
+    // the styles selecting [target] (by a selector [by] takes), the one that wins last
+    private fun winners(target: Selector.Target, by: (Selector) -> Boolean = { true }): List<Style> {
         val best = HashMap<Style, Int>()
         fun from(bucket: Bucket) = index[bucket]?.forEach { (sel, style) ->
             if (by(sel) && sel.selects(target) && sel.specificity > (best[style] ?: -1)) best[style] = sel.specificity
         }
         from(Bucket(target.widget, target.part, null))
         if (target.key != null) from(Bucket(target.widget, target.part, target.key))
-        val out = LinkedHashMap<String, Value>()
-        best.entries.sortedWith(compareBy({ it.value }, { it.key.order })).forEach { out.putAll(it.key.values) }
-        return out
+        return best.entries.sortedWith(compareBy({ it.value }, { it.key.order })).map { it.key }
     }
 
     companion object {

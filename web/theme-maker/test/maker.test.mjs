@@ -3,7 +3,7 @@
 // Run: ./gradlew :lib:keyboard-scene:youmoEngine, then node --test web/theme-maker/test/maker.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -297,7 +297,7 @@ test('the page saves from-maker.theme, byte for byte', () => {
   assert.deepEqual(new Uint8Array(made), bytes('from-maker.theme'));
 });
 
-// and from-maker-picture.theme (a picture's save, a real 4×4 PNG) and from-maker-30.theme (the app's own 3.0
+// and from-maker-picture.theme (the panels' save: a real 4×4 PNG cut for each orientation, keys see-through, a gradient, an icon) and from-maker-30.theme (the app's own 3.0
 // export converted: its Return an image, the label hidden, as 3.0 drew it)
 test('a 3.0 theme the app takes converts and saves to a pack the app takes', async () => {
   for (const f of ['from-web.theme', 'from-app.theme', 'from-app-2.1.theme']) {
@@ -311,7 +311,18 @@ test('a 3.0 theme the app takes converts and saves to a pack the app takes', asy
 
 test('the page saves from-maker-picture.theme, byte for byte', () => {
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEElEQVR4nGPQCFgARwzEcQC/wxGBfpfKIQAAAABJRU5ErkJggg==', 'base64');
-  const made = M.save(L, M.withPicture(M.fromBuiltin(E, 'nord'), new Uint8Array(png), 'png')).bytes;
+  // made as the panels make one: a picture with its two cuts, the keys see-through, a gradient, an icon of its own
+  for (const f of ['form.js']) vm.runInThisContext(readFileSync(join(src, f), 'utf8'), { filename: f });
+  globalThis.YoumoPanels = [];
+  for (const f of readdirSync(join(src, 'panels')).sort()) vm.runInThisContext(readFileSync(join(src, 'panels', f), 'utf8'), { filename: f });
+  const P = Object.fromEntries(globalThis.YoumoPanels.map((p) => [p.id, p]));
+  const px = new Uint8Array(png);
+  let d = P.background.ops.setPicture(M.fromBuiltin(E, 'nord'), { type: 'png', src: px, cuts: { portrait: { bytes: px, type: 'png', rect: [0, 0, 4, 2] }, landscape: { bytes: px, type: 'png', rect: [0, 1, 4, 2] } } });
+  d = P.background.ops.through(d, true);
+  d = P.keys.ops.fill(d, 'key.letter', { kind: 'linear', angle: 90, stops: [['#ff0000', 0], ['#0000ff', 100]] });
+  d = P.text.ops.setIcon(d, 'backspace', enc('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M2 12l6-6h14v12H8z"/></svg>'));
+  assert.deepEqual(M.saveProblems(E, L, FORMAT, d), []);
+  const made = M.save(L, d).bytes;
   if (process.env.UPDATE) writeFileSync(join(testdata, 'from-maker-picture.theme'), made);
   assert.deepEqual(new Uint8Array(made), bytes('from-maker-picture.theme'));
 });

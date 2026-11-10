@@ -2,11 +2,13 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
  */
-package org.fcitx.fcitx5.android.input.theme
+package org.fcitx.fcitx5.android.scene
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import org.fcitx.fcitx5.android.scene.theme.SvgSubset
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class SvgSubsetTest {
 
@@ -26,8 +28,23 @@ class SvgSubsetTest {
     }
 
     @Test
+    fun anIconIsReadAsItsFilledPaths() {
+        val icon = """<svg viewBox="0 0 48 32"><g fill-rule="evenodd" opacity="0.5"><path d="M0 0h1v1z" fill-opacity="0.5"/>""" +
+            """<path d="M2 2h1v1z" fill="none"/></g><path d="M4 4h1v1z"/></svg>"""
+        val read = SvgSubset.read(icon)
+        assertIs<Parsed.Ok<SvgSubset.Icon>>(read)
+        assertEquals(
+            SvgSubset.Icon(48.0, 32.0, listOf(SvgSubset.Path("M0 0h1v1z", true, 0.25), SvgSubset.Path("M4 4h1v1z", false, 1.0))),
+            read.value,
+        )
+        assertEquals(24.0, (SvgSubset.read("""<svg><path d="M0 0"/></svg>""") as Parsed.Ok).value.width)
+        assertEquals(10.0, (SvgSubset.read("""<svg width="10px" height="12"><path d="M0 0"/></svg>""") as Parsed.Ok).value.width)
+        assertIs<Parsed.Failed>(SvgSubset.read("""<svg><path d="M0 0" transform="scale(2)"/></svg>"""))
+    }
+
+    @Test
     fun whatReachesOutOrRunsIsRefused() {
-        fun refused(svg: String) = assertTrue(svg, problems(svg).isNotEmpty())
+        fun refused(svg: String) = assertTrue(problems(svg).isNotEmpty(), svg)
         refused("""<svg><script>alert(1)</script></svg>""")
         refused("""<svg><image href="http://x/y.png"/></svg>""")
         refused("""<svg><use href="#a"/></svg>""")
