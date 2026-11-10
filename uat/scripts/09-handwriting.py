@@ -146,15 +146,26 @@ def letters_box(d):
     return k["q"][0], k["q"][1], k["p"][0], k["m"][1]
 
 
-def key_strokes(d, strokes, gap=0.05):
+def key_box(d, key):
+    """a square two rows of letters tall whose top middle (a dot's place, 0.5 by 0.12) is on [key]: a character
+    written under the key just tapped, as large as a person writes on the keys (design 060-kbd-handwriting-start)"""
     x0, y0, x1, y1 = letters_box(d)
+    kx, ky = d.keys()[key]
+    side = y1 - y0
+    return kx - side / 2, ky - side * 0.12, kx + side / 2, ky + side * 0.88
+
+
+def key_strokes(d, strokes, gap=0.05, box=None):
+    x0, y0, x1, y1 = box or letters_box(d)
     cmds = []
     for st in strokes:
         pts = [(int(x0 + (x1 - x0) * x), int(y0 + (y1 - y0) * y)) for x, y in st]
         cmds.append("input motionevent DOWN %d %d" % pts[0])
+        # three moves a segment: each input call takes ~55 ms on the emulator, and a first stroke must be half a
+        # key long (KeyInkGesture.START) before the long press (300 ms): 人's first stroke is there at its second
         for (a, b), (c, e) in zip(pts, pts[1:]):
-            for i in range(1, 7):
-                cmds.append("input motionevent MOVE %d %d" % (a + (c - a) * i / 6, b + (e - b) * i / 6))
+            for i in range(1, 4):
+                cmds.append("input motionevent MOVE %d %d" % (a + (c - a) * i / 3, b + (e - b) * i / 3))
         cmds.append("input motionevent UP %d %d" % pts[-1])
         cmds.append(f"sleep {gap}")
     return cmds
@@ -166,9 +177,10 @@ def key_write(d, ch, wait=1.6, strokes=None):
 
 
 def tap_then_write(d, key, strokes):
-    """a tap on [key] and [strokes] after it in one shell, within the pause; what the field and candidates then hold"""
+    """a tap on [key] and [strokes] after it under the key (the stroke after a dot goes down near it), in one
+    shell, within the pause; what the field and candidates then hold"""
     k = d.keys(refresh=True)[key]
-    d.sh("; ".join(["input tap %d %d" % k, "sleep 0.15"] + key_strokes(d, strokes)))
+    d.sh("; ".join(["input tap %d %d" % k, "sleep 0.15"] + key_strokes(d, strokes, box=key_box(d, key))))
     time.sleep(1.6)
     return d.field_text(), d.preedit(), d.cands()
 
@@ -190,7 +202,7 @@ def hw33(d):
     glide_on(d, option="键盘手写")
     # the tapped letter is pinyin's composing input, shown in the composing row, not in the field (see HW-35)
     fs = []
-    for key, why in (("t", ""), ("a", "（a 是整音节，拼音点完会再排一次候选）")):
+    for key, why in (("t", ""), ("e", "（e 是整音节，拼音点完会再排一次候选）")):
         d.step(f"点 {key} 再写六的其余三笔{why}")
         f, p, c = tap_then_write(d, key, STROKES["六"][1:])
         check(key not in p.lower() and key not in f.lower(), f"{key} 没删：组字「{p}」，框里「{f}」")
@@ -203,7 +215,7 @@ def hw33(d):
     key_write(d, None, wait=1.0, strokes=[[(0.2, 0.5), (0.8, 0.5)]])
     p = d.preedit()
     check("ni" in p.replace(" ", "").replace("'", ""), f"组字「{p}」")
-    return f"「{f}」，点 a 后「{fa}」，打着 ni 时「{p}」"
+    return f"「{f}」，点 e 后「{fa}」，打着 ni 时「{p}」"
 
 
 case("HW-34", needs="jvm:KeyHandwritingUatTest.whileWritingATapIsAStrokeBackspaceTakesOneBackAndSpaceCommits")(lambda d: None)
@@ -224,3 +236,47 @@ def hw35(d):
 case("HW-36", needs="jvm:KeyHandwritingUatTest.theOtherKeyboardsAreWrittenOnToo")(lambda d: None)
 
 case("HW-37", needs="jvm:KeyHandwritingUatTest.notInAPasswordUrlOrEmailFieldNorEnglishNorWhileTalkBackExplores、KeyHandwritingUatTest.englishKeysGoStraightOnTheRecognizerNotMade")(lambda d: None)
+
+
+@case("HW-38", base="B0-设置", mutates=True)
+def hw38(d):
+    glide_on(d, option="键盘手写")
+    k = d.keys(refresh=True)
+    x0, y0, x1, y1 = letters_box(d)
+    kw, kh = (x1 - x0) / 9, (y1 - y0) / 2
+    # a drag within one input swipe: DOWN, MOVEs, UP in 80 ms, as a quick tap (tap_drift)
+    d.step("没打字时带拖 0.4 键点 n")
+    d.tap_drift(k["n"], dx=int(0.4 * kw), dy=0, ms=80, after=0.8)
+    p = d.preedit()
+    check(p.replace(" ", "").lower().startswith("n"), f"组字「{p}」（应打出 n）")
+    d.clear()
+    # half a key and more, right and down, inside the key and short of its swipe (36dp): a stroke if it could start
+    ddx, ddy = int(0.35 * kw), int(0.4 * kh)
+    d.step("点 w，马上在 o 上往右下拖半个多键")
+    d.sh("input tap %d %d; input swipe %d %d %d %d 80" % (*k["w"], *k["o"], k["o"][0] + ddx, k["o"][1] + ddy))
+    time.sleep(0.8)
+    p2 = d.preedit()
+    check(p2.replace(" ", "").replace("'", "").lower().startswith("wo"), f"组字「{p2}」（应是 wo）")
+    d.clear()
+    d.step("打 ni 空格，马上在 h 上往右下拖半个多键")
+    d.type("ni")
+    sp = d.keys()["space"]
+    d.sh("input tap %d %d; input swipe %d %d %d %d 80" % (*sp, *k["h"], k["h"][0] + ddx, k["h"][1] + ddy))
+    time.sleep(1.2)
+    f = d.field_text()
+    p3 = d.preedit()
+    d.shot("kb", "空格后马上划 h")
+    typed = p3.replace(" ", "").lower()[:1] or f[-1:].lower()
+    check(typed == "h", f"框里「{f}」组字「{p3}」（应打出 h，不写字）")
+    d.clear()
+    time.sleep(1.0)
+    got = []
+    for ch in "一十人":
+        d.step(f"停一下再写「{ch}」")
+        key_write(d, ch)
+        c = d.cands()
+        check(ch in c[:5], f"写「{ch}」候选 {c[:5]}")
+        got.append(f"{ch}:{c[:3]}")
+        d.clear()
+        time.sleep(1.0)
+    return f"n →「{p}」，w o →「{p2}」，空格后拖 h →「{f}」「{p3}」；" + "，".join(got)

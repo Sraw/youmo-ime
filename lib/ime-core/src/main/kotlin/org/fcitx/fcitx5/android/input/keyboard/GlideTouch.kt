@@ -25,6 +25,8 @@ class GlideTouch(private val downKeys: Float = GlideGesture.DOWN) {
     private var keyWidth = 0f
     private var keyHeight = 0f
     private var stroke = false
+    private var strokeKeys = GlideGesture.STROKE
+    private var strokeCap = Float.POSITIVE_INFINITY
     private var swallowing = false
     private var glided: FloatArray? = null
 
@@ -33,6 +35,8 @@ class GlideTouch(private val downKeys: Float = GlideGesture.DOWN) {
     private var inkFromDown = false
     // the touch went down on a letter, not a split keyboard's gap: a tap there sends its key
     private var onLetterDown = false
+    // the touch went down in a split keyboard's gap: no key, so no typing either
+    private var inGapDown = false
 
     /** The finger that may glide, [NO_POINTER] if none. */
     var pointer = NO_POINTER
@@ -63,21 +67,24 @@ class GlideTouch(private val downKeys: Float = GlideGesture.DOWN) {
      * A stroke may start [inGap] too, between a split keyboard's halves ([SplitGap]): no key is there to
      * tap, and a stroke's shape needs no key under it; a glide's path is read from the letters it starts on, so it starts on one.
      *
-     * Writing on the keys ([ink], [KeyInkGesture]): a touch is a stroke at [GlideGesture.STROKE], any
+     * Writing on the keys ([ink], [KeyInkGesture]): a touch is a stroke at [KeyInkGesture.START], any
      * way; while the writing goes on one is [gliding] from its down, so the caller presses no key (it
      * asks right after this). [typed], whether the input method has its own input typed (not what
      * handwriting shows), says whether one may start ([KeyInkGesture.mayWrite]); give [up] and [pointerUp]
-     * their times. The ink's places are the caller's to put on the pad from the events, in pixels:
+     * their times. A stroke drawn or written starts at [strokeCap] pixels at most, however tall the keys:
+     * before their own swipe does. The ink's places are the caller's to put on the pad from the events, in pixels:
      * [takeGlided] is in key units, scaled apart across and down, for the glide decoder alone.
      */
     fun down(
         pointerId: Int, x: Float, y: Float, time: Long, onLetter: Boolean, keyWidth: Float, keyHeight: Float, longPressMillis: Long,
         stroke: Boolean = false, inGap: Boolean = false, ink: KeyInkGesture? = null, typed: Boolean = false,
+        strokeCap: Float = Float.POSITIVE_INFINITY,
     ) {
         reset()
         glided = null
         this.ink = ink
         onLetterDown = onLetter
+        inGapDown = !onLetter && inGap
         val drawn = stroke || ink != null
         val starts = onLetter || drawn && inGap
         if (!starts || keyWidth <= 0f || keyHeight <= 0f) {
@@ -87,11 +94,15 @@ class GlideTouch(private val downKeys: Float = GlideGesture.DOWN) {
         }
         if (ink != null) {
             inkFromDown = ink.writing(time)
-            if (inkFromDown) ink.strokeStarted() else if (!ink.mayWrite(time, typed)) return
+            if (inkFromDown) ink.strokeStarted() else if (!ink.mayWrite(time, typed, x, y, keyWidth, keyHeight)) return
         }
+        // the first stroke written goes further than a stroke drawn while typing: a tap's wobble is no stroke
+        val keys = if (ink != null) KeyInkGesture.START else GlideGesture.STROKE
         val same = made != null && keyWidth == this.keyWidth && keyHeight == this.keyHeight && longPressMillis == this.longPressMillis &&
-            drawn == this.stroke
-        if (!same) made = GlideGesture(keyWidth, keyHeight, longPressMillis, downKeys, drawn)
+            drawn == this.stroke && keys == strokeKeys && strokeCap == this.strokeCap
+        if (!same) made = GlideGesture(keyWidth, keyHeight, longPressMillis, downKeys, drawn, keys, strokeCap)
+        strokeKeys = keys
+        this.strokeCap = strokeCap
         pointer = pointerId
         t0 = time
         this.keyWidth = keyWidth
@@ -169,6 +180,8 @@ class GlideTouch(private val downKeys: Float = GlideGesture.DOWN) {
                     it.tapped(time, points, count)
                 } else {
                     it.forgetTap()
+                    // another key (or a letter's long press) typed: the writing does not start right after it
+                    if (!cancelled && !inGapDown) it.keyLifted(time, letter = onLetterDown)
                 }
             }
             reset()

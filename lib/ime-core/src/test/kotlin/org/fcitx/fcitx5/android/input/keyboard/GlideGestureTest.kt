@@ -97,4 +97,20 @@ class GlideGestureTest {
         assertFalse(held.move(52f, 80f, 310))
         assertFalse(held.move(50f, 300f, 400))
     }
+
+    @Test
+    fun aStrokeGoesAsFarAsItIsToldCappedInPixels() {
+        // the first stroke written on the keys: half a key (KeyInkGesture.START)
+        fun written(cap: Float = Float.POSITIVE_INFINITY) =
+            GlideGesture(keyWidth = 100f, keyHeight = 150f, longPressMillis = 300, stroke = true, strokeKeys = 0.5f, strokeCap = cap)
+        val across = written()
+        across.down(50f, 75f, 0, onLetter = true)
+        assertFalse(across.move(95f, 75f, 40))
+        assertTrue(across.move(100f, 75f, 50))
+        // tall keys: 60 pixels down starts it, under the half key's 75
+        val tall = written(cap = 60f)
+        tall.down(50f, 75f, 0, onLetter = true)
+        assertFalse(tall.move(50f, 130f, 40))
+        assertTrue(tall.move(50f, 135f, 50))
+    }
 }

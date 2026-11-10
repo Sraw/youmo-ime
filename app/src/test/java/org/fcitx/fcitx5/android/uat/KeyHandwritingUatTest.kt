@@ -160,6 +160,51 @@ class KeyHandwritingUatTest {
         assertEquals(n, EngineState.keysHeard)
     }
 
+    // design 060-kbd-handwriting-start: a tap dragged a little while typing is the key's, no writing started
+    @Uat("HW-38")
+    @Test
+    fun aTapDraggedUnderHalfAKeyTypesItsLetter() {
+        harness()
+        h.api.calls.clear()
+        val n = h.key("n")
+        val b = h.box(n)
+        h.drag(n, b.exactCenterX() + 0.4f * b.width(), b.exactCenterY(), steps = 2)
+        h.advance(100)
+        h.idle()
+        assertEquals(emptyList<String>(), inks())
+        assertTrue(h.api.calls.toString(), keysSent().isNotEmpty())
+        assertFalse("no writing", board().keyInkForTest!!.shown)
+    }
+
+    @Uat("HW-38")
+    @Test
+    fun theSecondLetterDraggedFarFromTheFirstIsTypedNotTakingItBack() {
+        harness()
+        h.api.calls.clear()
+        touchTap(h.key("w"))
+        // o, seven keys off w: no dot character's second stroke
+        draw(h.key("o"), across = 0f, down = 0.6f)
+        h.advance(100)
+        h.idle()
+        assertEquals(emptyList<String>(), inks())
+        assertEquals(h.api.calls.toString(), 2, keysSent().size)
+    }
+
+    @Uat("HW-38")
+    @Test
+    fun noWritingStartsRightAfterAKeyTypedOnlyHalfASecondOn() {
+        harness()
+        touchTap(h.keys().first { it.description?.let { d -> d == "Space" || d.startsWith("Space,") } == true })
+        h.api.calls.clear()
+        draw(h.key("t"), down = 1f)
+        h.advance(100)
+        h.idle()
+        assertEquals(emptyList<String>(), inks())
+        h.advance(600)
+        draw(h.key("t"))
+        until("read") { inks().isNotEmpty() }
+    }
+
     @Test
     fun aStrokeWithNoTapBeforeTakesNothingBack() {
         harness()

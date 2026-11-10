@@ -158,8 +158,8 @@
 
 ### HW-33 [P1] 第一笔是点的字：先点的字母收回当第一笔
 - **前提**：键盘手写开。
-- **操作**：点一下 t（打出 t），马上（停笔时间内）在键上接着写「六」剩下的三笔；停笔。再清空，点 a（整音节，拼音点完约 30 ms 会再排一次候选）后同样写完「六」。再清空，打 ni 后在停笔时间内在键上划一横；再清空，点 t，长按 g 选一个字母，马上划一横。
-- **预期**：第一次 t 被删掉（点 a 那次 a 也被删掉），框里是带下划线的「六」（或候选里有「六」），没有多删框里别的字。打着 ni 时划一横不写字、ni 还在。点 t 再长按 g 后划一横：t 和长按打的字母都还在，什么都没删。
+- **操作**：点一下 t（打出 t），马上（停笔时间内）在 t 下面接着写「六」剩下的三笔（字约三排字母高，第二笔离 t 一个多键）；停笔。再清空，点 e（整音节，拼音点完约 30 ms 会再排一次候选）后同样在 e 下面写完「六」。再清空，打 ni 后在停笔时间内在键上划一横；再清空，点 t，长按 g 选一个字母，马上划一横。
+- **预期**：第一次 t 被删掉（点 e 那次 e 也被删掉），框里是带下划线的「六」（或候选里有「六」），没有多删框里别的字。打着 ni 时划一横不写字、ni 还在。点 t 再长按 g 后划一横：t 和长按打的字母都还在，什么都没删。
 - **JVM**：`KeyHandwritingUatTest.aTapThenAStrokeWithinThePauseTakesTheTapBackAsTheFirstDot`（点按放进书写板当第一笔，第一个读出带 takesBack，键盘不发退格）、`KeyInkGestureTest.aTapIsTakenBackOnlyAsTheFirstDotRightAfterIt`（长按、取消的触摸、第二个手指夹在中间时不收回）、`KeyInkGestureTest.onlyTheAnswerToTheTapsOwnKeyOrALaterOneReplacesItsMark`（点之前的迟到读出留下标记、一直没读出的标记只留到停笔）、`InkOverTest.anInkTakingBackDeletesTheOneLetterTypedThenIsWritten`、`InkOverTest.anInkTakingBackDeletesNothingWhereMoreThanTheTapIsTyped`（多于点的那个字母、点的字母已被选走时都不删）、`InkOverTest.aVowelRefinedAfterItsKeyIsStillTakenBack`（ime-core：引擎只在正在打的正好是这一个字母时删）、`InkKeysTest.aKeyHeldBehindReadsActsOnThePadAsItWasPressed`（等读出时按住的键保留期间画的笔迹）；设备上跑到「打着 ni 划一横」为止，点 t 后长按 g 那一步和「没有多删框里别的字」只在 JVM 上（adb 的长按和停笔时间掐不准）。
 
 ### HW-34 [P1] 写字中途 ⌫ 撤一笔，空格先写完再上屏
@@ -185,3 +185,9 @@
 - **操作**：在「密码」「网址」「邮箱」框里各在键上划一道；换到英文在键上划一道；打开 TalkBack 后在拼音键盘上划一道。
 - **预期**：都不出笔迹、不写字，键照原来的点按和划动处理。英文里按键直接打出，不等识别。
 - **JVM**：`KeyHandwritingUatTest.notInAPasswordUrlOrEmailFieldNorEnglishNorWhileTalkBackExplores`、`KeyHandwritingUatTest.englishKeysGoStraightOnTheRecognizerNotMade`；设备上不跑。
+
+### HW-38 [P0] 打字时带一点拖动的点按不起笔，写字照常
+- **前提**：键盘手写开。
+- **操作**：什么都没打时，在 n 上点一下、抬手前往右拖约 0.4 个键；清空。点 w，马上在 o 上点一下、抬手前往右下拖半个多键（右 0.35、下 0.4 个键，不出键、不到角标滑动）；清空。打 ni、点空格上屏，马上（半秒内）在 h 上同样往右下拖；清空。停 1 秒以上，在键上分别写「一」「十」「人」（每个字写完停笔约 1 秒，看候选，再清空）。
+- **预期**：带拖的 n 打出 n，没有笔迹；w 和 o 都打出（wo），w 没被收回；空格后马上拖的那一下打出 h，不出笔迹、不写字（停一下再这样拖就是写字的一笔）。停一下以后「一」「十」「人」都写得出：候选里有这个字。
+- **JVM**：`KeyHandwritingUatTest.aTapDraggedUnderHalfAKeyTypesItsLetter`、`KeyHandwritingUatTest.theSecondLetterDraggedFarFromTheFirstIsTypedNotTakingItBack`、`KeyHandwritingUatTest.noWritingStartsRightAfterAKeyTypedOnlyHalfASecondOn`、`KeyInkGestureTest.aTapDraggedUnderHalfAKeyIsTheKeysAndStartsNoWriting`、`KeyInkGestureTest.charactersFirstStrokesStartTheWriting`（一 十 口 中 的 人 的第一笔，按 em 2 键高写的长度）、`KeyInkGestureTest.noWritingStartsRightAfterAKeyTypedNorIsATapThenAFirstDot`、`KeyInkGestureTest.aKeyAfterTheWritingIsNoTypingTillALetterIsTyped`、`KeyInkGestureTest.onlyAStrokeNearTheTapTakesItBack`（ime-core）。

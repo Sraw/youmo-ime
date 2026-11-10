@@ -809,9 +809,12 @@ the handwriting too, so a sentence it put in and deleted at once is taken back (
 `Engines.ink`/`inkSent` take the input method (its shown session, a pair's keyed one), and `inkEnded`
 and the pieces ended over a drop of the sessions count every handwriting session made. When a touch
 on the letters is a stroke is `KeyInkGesture` (`input/keyboard`), which `GlideTouch.down` takes (`ink`,
-and `typed`: `Engines.typedOnKeys`, false while what shows is handwriting's): 0.3 of a key any way,
-then every touch a stroke from its down till the pause; a tap that started the input (nothing typed
-at its down), a stroke within the pause after it and no other key between (a long press, a cancel, a
+and `typed`: `Engines.typedOnKeys`, false while what shows is handwriting's): `START`, half a key any
+way (at most 32dp, `GlideInput`'s cap, so before the key's swipe), not within `TYPING_MILLIS` (500 ms)
+of a key typed (a letter, or another key lifted, `keyLifted`, unless after a stroke and no letter: a
+space in the writing is no typing; design 060-kbd-handwriting-start), then every touch a stroke from
+its down till the pause; a tap that started the input (nothing typed at its down, not typing), a
+stroke within the pause after it, `NEAR` it (2.5 keys), and no other key between (a long press, a cancel, a
 second finger, a touch in the gap forget it), taken back as the first dot (`takeTapped`), by state,
 not by text, as the nine keys and zhuyin show no letter of the key. The keyboard sends no backspace
 for it: the piece's first reading carries `Action.Ink.takesBack`, and `InkOver` deletes the letter

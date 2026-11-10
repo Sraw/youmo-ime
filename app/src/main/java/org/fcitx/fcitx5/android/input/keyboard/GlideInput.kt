@@ -51,6 +51,8 @@ class GlideInput(
     private val touch = GlideTouch(down)
     private val trail = Path()
     private val rect = Rect()
+    // a stroke starts before the letters' own swipe (BaseKeyboard's 36dp), however tall the keys
+    private val strokeCap = keyboard.dp(STROKE_CAP_DP)
 
     // the touch, as it went down, a stroke's
     private var stroking = false
@@ -122,7 +124,7 @@ class GlideInput(
         touch.down(
             event.getPointerId(0), event.x, event.y, event.eventTime, onLetter,
             keyWidth, keyHeight, longPressMillis(), stroke = stroking, inGap = inGap,
-            ink = inking?.gesture, typed = inking != null && typed(),
+            ink = inking?.gesture, typed = inking != null && typed(), strokeCap = strokeCap,
         )
         // the writing goes on: a stroke from its down, no key pressed
         if (inking == null || !touch.gliding) return GlideTouch.Route.KEYS
@@ -243,6 +245,7 @@ class GlideInput(
 
     companion object {
         private const val TRAIL_DP = 6f
+        private const val STROKE_CAP_DP = 32f
         private const val TRAIL_ALPHA = 0xB0
     }
 }
