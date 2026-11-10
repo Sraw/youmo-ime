@@ -67,7 +67,9 @@ class SmallBoardsSceneGesturesTest {
         h.tap(h.described(h.service.getString(R.string.a11y_key_emoji)))
         h.relayout()
         h.typesAsShown("period", "。", ".")
-        // the emoticon page's comma the same (emoticon.xml)
+        // the emoticon page's comma the same (emoticon.xml); remembered as the last picker, put back after
+        val last = AppPrefs.getInstance().internal.lastPickerType
+        prefs.set(last, last.getValue())
         h.tap(h.key(":-)"))
         h.relayout()
         h.typesAsShown("comma", "，", ",")
