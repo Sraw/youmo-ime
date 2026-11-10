@@ -21,7 +21,9 @@ object AnimatedWebp {
     /**
      * [source] ([length] bytes) as an animated WebP: null where it is none (not RIFF/WEBP, no VP8X with
      * its animation flag, no frame) or is cut short. Stops counting past [maxFrames] (the count then more
-     * than it, which is all a limit needs).
+     * than it, which is all a limit needs). VP8X only as the first chunk (libwebp's rule). At most
+     * [maxFrames] plus [OTHER_CHUNKS] chunks of any kind are walked, more refused (null): a file padded
+     * with half a million empty chunks is not walked chunk by chunk.
      */
     fun header(source: Source, length: Long, maxFrames: Int = Int.MAX_VALUE): Header? {
         val head = ByteArray(RIFF_HEAD)
@@ -35,13 +37,16 @@ object AnimatedWebp {
         var frames = 0
         var shortest = Int.MAX_VALUE
         val chunk = ByteArray(CHUNK_HEAD + ANMF_HEAD)
+        var chunks = 0L
+        val maxChunks = maxFrames.toLong() + OTHER_CHUNKS
         while (at + CHUNK_HEAD <= end) {
+            if (++chunks > maxChunks) return null
             val got = source.read(at, chunk)
             if (got < CHUNK_HEAD) return null
             val size = chunk.le32(FOURCC)
             when {
                 chunk.text(0, "VP8X") -> {
-                    if (got < CHUNK_HEAD + VP8X_SIZE) return null
+                    if (at != RIFF_HEAD.toLong() || got < CHUNK_HEAD + VP8X_SIZE) return null
                     animated = chunk[CHUNK_HEAD].toInt() and ANIMATION_FLAG != 0
                     width = chunk.le24(CHUNK_HEAD + VP8X_WIDTH) + 1
                     height = chunk.le24(CHUNK_HEAD + VP8X_HEIGHT) + 1
@@ -60,6 +65,9 @@ object AnimatedWebp {
         return Header(width, height, frames, shortest)
     }
 
+    /** [file] read once (it is no bigger than [ThemeAssetLimits.MAX_ANIMATED_BYTES] where this is asked) as [header] reads it. */
+    fun header(file: java.io.File, maxFrames: Int = Int.MAX_VALUE): Header? = header(file.readBytes(), maxFrames)
+
     /** [bytes] as [header] reads a file. */
     fun header(bytes: ByteArray, maxFrames: Int = Int.MAX_VALUE): Header? = header({ at, into ->
         if (at >= bytes.size) 0 else minOf(into.size, bytes.size - at.toInt()).also { bytes.copyInto(into, 0, at.toInt(), at.toInt() + it) }
@@ -69,6 +77,9 @@ object AnimatedWebp {
     private fun ByteArray.u8(at: Int) = this[at].toInt() and BYTE
     private fun ByteArray.le24(at: Int) = u8(at) or (u8(at + 1) shl 8) or (u8(at + 2) shl 16)
     private fun ByteArray.le32(at: Int) = (le24(at).toLong() or (u8(at + 3).toLong() shl 24))
+
+    /** Chunks walked besides the frames: VP8X, ICCP, ANIM, EXIF, XMP and a few unknown ones. */
+    const val OTHER_CHUNKS = 64
 
     private const val BYTE = 0xff
     private const val RIFF_HEAD = 12

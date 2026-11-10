@@ -50,8 +50,8 @@ object ThemeAssetLimits {
     const val MAX_ANIMATED_SIDE = 1440
     const val MAX_ANIMATED_FRAMES = 300
 
-    /** 30 fps at most: a frame shown no shorter than this (a frame of 0 ms, played as fast as it can, too). */
-    const val MIN_ANIMATED_FRAME_MS = 33
+    /** 20 fps at most (CPU: a full frame decoded in software each, 060-render-p3 A4): a frame shown no shorter than this (a frame of 0 ms, played as fast as it can, too). */
+    const val MIN_ANIMATED_FRAME_MS = 50
 
     /** A limit passed, and by what. */
     enum class Breach {
@@ -98,6 +98,17 @@ object ThemeAssetLimits {
      * An animated WebP of [bytes] whose header ([AnimatedWebp.header]) is [header] (null: it reads as none):
      * null where it may play.
      */
+    /**
+     * Why [file] is drawn still, null where it may play: its size first, then the file read once and its
+     * header walked ([AnimatedWebp.header], bounded). Off the main thread: a read of up to 4 MB.
+     */
+    fun animated(file: java.io.File): Still? {
+        val bytes = file.length()
+        if (bytes > MAX_ANIMATED_BYTES) return Still.Size
+        val header = runCatching { AnimatedWebp.header(file, MAX_ANIMATED_FRAMES) }.getOrElse { return Still.Unread }
+        return animated(bytes, header)
+    }
+
     fun animated(bytes: Long, header: AnimatedWebp.Header?): Still? = when {
         bytes > MAX_ANIMATED_BYTES -> Still.Size
         header == null -> Still.Unread
