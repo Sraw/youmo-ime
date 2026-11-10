@@ -128,6 +128,18 @@ class PopupMotionTest {
     }
 
     @Test
+    fun withTouchExplorationAPopupGoesAtOnce() {
+        val p = popups()
+        val am = appContext.getSystemService(android.view.accessibility.AccessibilityManager::class.java)
+        shadowOf(am).setTouchExplorationEnabled(true)
+        p.send(PopupAction.PreviewAction(ID, "q", key))
+        frames(300)
+        p.send(PopupAction.DismissAction(ID))
+        // no fade left to take TalkBack's hover
+        assertEquals(0, p.root.childCount)
+    }
+
+    @Test
     fun aBubbleSoonerThanTheMotionDoesNotMoveAndEndsTheFades() {
         val p = popups()
         p.send(PopupAction.PreviewAction(ID, "q", key))
