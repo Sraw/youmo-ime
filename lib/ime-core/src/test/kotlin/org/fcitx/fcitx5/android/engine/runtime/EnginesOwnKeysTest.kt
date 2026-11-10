@@ -6,11 +6,13 @@ package org.fcitx.fcitx5.android.engine.runtime
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
+import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
+import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.input.scene.SceneData
 import org.fcitx.fcitx5.android.input.scene.SceneGroups
 import org.fcitx.fcitx5.android.scene.Parsed
@@ -18,7 +20,9 @@ import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -32,13 +36,14 @@ class EnginesOwnKeysTest : EnginesFixture() {
     private val written = SceneGroups.written((LayoutReader.layout(SceneData.read("k17.xml")) as Parsed.Ok).value)
     private val k17 = NineKeyLetters.custom(written)
 
-    private fun engines(ownKeys: List<String>? = written) = Engines(::load, root, warmUps = inPlace).also {
+    private fun engines(ownKeys: List<String>? = written, files: MemoryFiles = root) = Engines(::load, files, warmUps = inPlace).also {
         it.settings = it.settings.copy(ownKeys = ownKeys)
         it.onEvent(PINYIN, EngineEvent.RESET, 0)
         it.context(PINYIN, "")
     }
 
-    // the keyboard in use is process-wide (NineKeyLetters.inUse): none of this test's left for the next
+    // the keyboard in use is process-wide (NineKeyLetters.inUse): none of another test's left for this, nor this one's for the next
+    @Before
     @After
     fun noneInUse() {
         NineKeyLetters.clearInUse()
@@ -90,7 +95,9 @@ class EnginesOwnKeysTest : EnginesFixture() {
         repeat(2) {
             engines.afresh()
             engines.typeCodes(ni)
-            engines.onEvent(PINYIN, EngineEvent.PICK, engines.texts().indexOf("拟"))
+            val pick = engines.texts().indexOf("拟")
+            assertTrue(engines.texts().toString(), pick >= 0)
+            engines.onEvent(PINYIN, EngineEvent.PICK, pick)
         }
         engines.afresh()
         engines.typeCodes(ni)
@@ -135,7 +142,7 @@ class EnginesOwnKeysTest : EnginesFixture() {
         assertFalse(after.picked)
         assertFalse(after.refines)
         // groups that make no keyboard are none told
-        val none = engines(ownKeys = listOf("ab", "cd"))
+        val none = engines(ownKeys = listOf("ab", "cd"), files = MemoryFiles())
         assertEquals("", none.onEvent(PINYIN, EngineEvent.CHAR, code("bn").code).commit)
         none.close()
         engines.close()
@@ -173,6 +180,40 @@ class EnginesOwnKeysTest : EnginesFixture() {
         val shown = engines.typeCodes(nihao.map { code(it, other).code })
         assertTrue(shown.candidates.toString(), "你好" in shown.candidates.take(3))
         assertEquals(other, NineKeyLetters.ofCode(other.codes[0].code))
+        engines.close()
+    }
+
+    // the keyboard told no more (another layout, no own groups): its codes no longer read by it anywhere in the
+    // process (NineKeyLetters.ofCode), not the last one kept
+    @Test
+    fun ownKeysToldNoMoreAreReadByNone() {
+        val engines = engines()
+        assertEquals(k17, NineKeyLetters.ofCode(code("bn").code))
+        engines.settings = engines.settings.copy(ownKeys = null)
+        assertNull(NineKeyLetters.ofCode(code("bn").code))
+        engines.close()
+    }
+
+    // other groups told make the session on them anew: a reading late for a piece written on the old one is
+    // not let in by the new one, as when every session is made anew (EnginesInkOverTest.madeAgainKeepsWhatWasEnded)
+    @Test
+    fun otherGroupsToldKeepThePieceOfHandwritingEnded() {
+        val engines = engines()
+        fun write(piece: Int, text: String) =
+            engines.onEvent(PINYIN, EngineEvent.CHAR, Keyboard.INK, payload = Action.Ink(piece, InkReading(listOf(text), DoubleArray(1))))
+        // the session on the groups made and shown, nothing typed on it: written on over its keys
+        engines.typeCodes(listOf(code("bn").code))
+        engines.onEvent(PINYIN, EngineEvent.BACKSPACE, 0)
+        assertEquals("好", write(0, "好").preedit)
+        write(1, "你")
+        val reversed = written.reversed()
+        engines.settings = engines.settings.copy(ownKeys = reversed)
+        assertEquals(1, engines.inkEnded)
+        // the new session on the other groups, nothing typed on it
+        engines.typeCodes(listOf(code("bn", NineKeyLetters.custom(reversed)).code))
+        engines.onEvent(PINYIN, EngineEvent.BACKSPACE, 0)
+        assertEquals("", write(1, "好").preedit)
+        assertFalse(write(2, "好").preedit.isEmpty())
         engines.close()
     }
 }

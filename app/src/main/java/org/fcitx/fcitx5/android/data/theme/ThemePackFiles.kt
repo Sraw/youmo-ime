@@ -6,14 +6,14 @@ package org.fcitx.fcitx5.android.data.theme
 
 import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
+import androidx.core.content.ContextCompat
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineNotices
 import org.fcitx.fcitx5.android.scene.theme.SvgSubset
 import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
 import org.fcitx.fcitx5.android.input.theme.ThemePackCheck
 import org.fcitx.fcitx5.android.scene.Parsed
-import org.fcitx.fcitx5.android.scene.layout.Include
-import org.fcitx.fcitx5.android.scene.layout.LayoutReader
+import org.fcitx.fcitx5.android.scene.layout.PackLayouts
 import org.fcitx.fcitx5.android.scene.look.Crop
 import org.fcitx.fcitx5.android.scene.look.Insets
 import org.fcitx.fcitx5.android.scene.look.LookDefaults
@@ -47,6 +47,8 @@ import java.nio.channels.FileChannel
 import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import org.fcitx.fcitx5.android.scene.theme.Picture as ScenePicture
@@ -74,6 +76,9 @@ object ThemePackFiles {
     private const val OLD = "old-"
     private const val GONE = "gone-"
     private const val MACOS = "__MACOSX"
+
+    // the listed packs whose parsed themes are kept: a screen of the theme page's cards and the one in use, mostly
+    private const val LISTED_KEPT = 16
     private val VERSIONS = listOf("#light", "#dark")
 
     /** The system's colours the packs' `system()` take now (Monet's, ThemeManager keeps them). */
@@ -96,16 +101,26 @@ object ThemePackFiles {
         ThemeReader.theme(source.removePrefix(BOM), systemColors, appVersion, LookTheme.MAX_STYLES)
 
     /**
-     * The pack in [dir], its version [dark], as it is drawn: read from its file when first drawn (no pack's text
-     * kept in memory). One that no longer reads (changed or removed since it was listed) is drawn as the built-in
+     * The pack in [dir], its version [dark], as it is drawn: the last listing's parse where it was kept and the file
+     * has not changed since ([lastListed]), else read from its file. One that no longer reads (changed or removed since it was listed) is drawn as the built-in
      * theme, the user told, never thrown where the keyboard draws.
      */
-    fun scene(dir: String, dark: Boolean): SceneTheme = runCatching { read(File(dir, THEME_XML).readText()).variant(dark) }
+    fun scene(dir: String, dark: Boolean): SceneTheme = runCatching { (readListed(dir) ?: read(File(dir, THEME_XML).readText())).variant(dark) }
         .getOrElse { e ->
             Timber.w(e, "Theme pack $dir drawn as the built-in theme")
             EngineNotices.failedOnce(R.string.user_data_unreadable)
             fallback(dark)
         }
+
+    // the newest packs ([LISTED_KEPT]) as the last listing read them, their file's time and the system's colours
+    // then: their versions' draws and the theme page's cards take it rather than read and parse the file again. A
+    // few only, replaced by the next listing: the IME's process lives long, and a hundred packs' themes are not held
+    private class Listed(val stamp: Long, val colors: SystemColors, val theme: SceneTheme)
+
+    private val lastListed = ConcurrentHashMap<String, Listed>()
+
+    private fun readListed(dir: String): SceneTheme? = lastListed[dir]
+        ?.takeIf { it.colors == systemColors && it.stamp == File(dir, THEME_XML).lastModified() }?.theme
 
     // the built-in theme a pack that does not read is drawn as (the settings' default's file)
     private fun fallback(dark: Boolean): SceneTheme =
@@ -229,19 +244,20 @@ object ThemePackFiles {
      * of its versions. Not listed, logged and the user told as a 3.0 theme's json is, a pack an import would refuse:
      * one whose `theme.xml` does not read (a later build's, one cut short), of a name not its folder's, not a pack's
      * or a built-in's ([builtins]: one restored, or a later build's built-in), hiding the keys' labels one cannot type
-     * without, or missing a file it names. [sweep]: what a kill left of a pack being written cleared first, the pack it
-     * was replacing put back.
+     * without, or missing a file it names. What a kill left of a pack being written is the caller's to clear first
+     * ([sweepPacks], under its lock). Newest by its `theme.xml`'s time (the
+     * import's), not the folder's: the check's stamp written in it changes that one.
      */
-    fun list(themes: File, sweep: Boolean, builtins: List<Theme.Builtin>): List<Theme.Pack> {
+    fun list(themes: File, builtins: List<Theme.Builtin>): List<Theme.Pack> {
         val root = folder(themes)
-        if (sweep) sweep(root)
+        lastListed.clear()
         val dirs = root.listFiles(FileFilter { it.isDirectory && !it.name.startsWith(".") }) ?: return emptyList()
         // the app's boards read once a listing, and only for a pack not checked yet (its stamp)
         val builtIn = lazy { builtInBoards() }
-        return dirs.sortedByDescending { it.lastModified() }.take(ThemeAssetLimits.MAX_PACKS).flatMap { listed(it, builtins, builtIn) }
+        return dirs.sortedByDescending { File(it, THEME_XML).lastModified() }.take(ThemeAssetLimits.MAX_PACKS).flatMap { listed(it, builtins, builtIn) }
     }
 
-    /** What a kill left in [themes]' packs' SAVING cleared, as [list] with `sweep` does. */
+    /** What a kill left in [themes]' packs' SAVING cleared. */
     fun sweepPacks(themes: File) = sweep(folder(themes))
 
     // a kill between a place's renames left the pack it replaced aside (`old-<random>/<name>`): put back where none
@@ -269,10 +285,11 @@ object ThemePackFiles {
         when {
             name != dir.name -> return skipped(dir, "is named $name", R.string.user_data_unreadable)
             badName(name) || builtinClash(name, theme.variants, builtins) -> return skipped(dir, "has a built-in's name", R.string.user_data_unreadable)
-            blankKeys(dir, theme, source, builtIn).isNotEmpty() -> return skipped(dir, "leaves keys blank", R.string.user_data_unreadable)
+            refusedByRecheck(dir, theme, source, builtIn) -> return skipped(dir, "leaves keys blank", R.string.user_data_unreadable)
         }
         val missing = ThemePackCheck.files(theme).all.firstOrNull { !inside(dir, it) }
         if (missing != null) return skipped(dir, "misses its file $missing", R.string.theme_file_missing)
+        if (lastListed.size < LISTED_KEPT) lastListed[dir.path] = Listed(File(dir, THEME_XML).lastModified(), systemColors, theme)
         return versions(theme, dir.name, dir)
     }
 
@@ -371,6 +388,8 @@ object ThemePackFiles {
         val source = xml.readText().removePrefix(BOM)
         val read = readChecked(source, checks)
         val theme = read.value
+        // the layouts held to their count and sizes before the blank-key check reads them all
+        val layouts = checkLayouts(File(from, LAYOUTS), checks)
         blankKeys(from, theme, source, lazy { builtInBoards() }, trustStamp = false).firstOrNull()?.let {
             if (it == BlankKeys.TOO_MANY) errorRuntime(R.string.exception_theme_too_many_scenes)
             errorRuntime(R.string.exception_theme_hidden_required, it.toString())
@@ -379,7 +398,6 @@ object ThemePackFiles {
         if (badName(name)) errorRuntime(R.string.exception_theme_pack_name, name)
         val files = ThemePackCheck.files(theme)
         checkFiles(from, files, checks)
-        val layouts = checkLayouts(File(from, LAYOUTS), checks)
         val still = theme.picture?.takeIf { it.animated }?.let { p ->
             ThemeAssetLimits.animated(File(from, p.src))
         }
@@ -427,26 +445,15 @@ object ThemePackFiles {
     }
 
     /**
-     * The boards a pack in [dir] may be shown on, for [ThemePackCheck.hidesRequired]: the app's, each replaced by the
-     * pack's own of its id (`layouts/<id>.xml`, its fragments the pack's, else the app's). One that does not read is
-     * left out: the layout checks refuse it.
+     * The boards a pack in [dir] would be shown on, for [ThemePackCheck.hidesRequired]: the app's, each replaced by the
+     * pack's own of its id only where the app would draw it (PackLayouts.drawn); one drawing refuses leaves the
+     * app's, as drawn.
      */
     internal fun boards(dir: File, builtInLayouts: List<SceneLayout> = builtInBoards()): List<BlankKeys.Board> {
         val own = File(dir, LAYOUTS)
-        fun text(id: String) = File(own, "$id.xml").takeIf { it.isFile }?.readText()?.removePrefix(BOM)
-        val ownLayouts = own.listFiles().orEmpty().mapNotNull { f ->
-            (LayoutReader.layout(f.readText().removePrefix(BOM)) as? Parsed.Ok)?.value
-        }
-        val builtIn = builtInLayouts
-            .filter { b -> ownLayouts.none { it.id == b.id } }
-            .map { BlankKeys.Board(it.layout, it.fragments) }
-        return builtIn + ownLayouts.map { l ->
-            val fragments = l.parts.filterIsInstance<Include>().map { it.src }.distinct().mapNotNull { src ->
-                val t = text(src) ?: BuiltInLayouts(appContext).text(src) ?: return@mapNotNull null
-                (LayoutReader.fragment(t) as? Parsed.Ok)?.value?.let { src to it }
-            }.toMap()
-            BlankKeys.Board(l, fragments)
-        }
+        // the pack's files the app would read (ThemePackLayouts.read: an id it has, within the limit)
+        val texts = BuiltInLayouts.RAW.keys.mapNotNull { id -> ThemePackLayouts.read(own, id)?.let { id to it } }.toMap()
+        return PackLayouts.drawn(builtInLayouts.map { BlankKeys.Board(it.layout, it.fragments) }, texts) { BuiltInLayouts(appContext).text(it) }
     }
 
     private fun builtInBoards(): List<SceneLayout> = BuiltInLayouts.RAW.keys.mapNotNull { SceneLayouts.parseBuiltIn(appContext, it) }
@@ -466,9 +473,9 @@ object ThemePackFiles {
         source: String,
         builtIn: Lazy<List<SceneLayout>>,
         trustStamp: Boolean = true,
+        want: String = stampOf(dir, source),
     ): List<BlankKeys.Blank> {
         val stamp = File(dir, CHECKED)
-        val want = stampOf(dir, source)
         // an import asks always: a stamp is the app's word, never a pack's
         if (trustStamp && stamp.isFile && stamp.readText() == want) return emptyList()
         stamp.delete()
@@ -477,6 +484,51 @@ object ThemePackFiles {
         if (found.isEmpty()) runCatching { stamp.writeText(want) }.onFailure { Timber.w(it, "cannot stamp ${dir.name}") }
         return found
     }
+
+    /**
+     * Whether a listing leaves out the pack in [dir] for keys left blank: a stamp that fits, no; one that does not
+     * (an app update changed the boards, a backup restored) checked again off the main thread ([recheck]: the check
+     * takes a good part of a second a pack), the pack listed meanwhile, and the list read again ([onRefused]) where
+     * the check refuses it; that refusal kept for the stamp it was asked for.
+     */
+    private fun refusedByRecheck(dir: File, theme: SceneTheme, source: String, builtIn: Lazy<List<SceneLayout>>): Boolean {
+        val want = stampOf(dir, source)
+        val stamp = File(dir, CHECKED)
+        if (stamp.isFile && runCatching { stamp.readText() }.getOrNull() == want) return false
+        val key = dir.path
+        if (asked.put(key, want) != want) {
+            val listing = Thread.currentThread()
+            recheck(Runnable {
+                val found = runCatching { blankKeys(dir, theme, source, builtIn, want = want) }
+                    .onFailure { Timber.w(it, "Theme pack ${dir.name} not checked again") }.getOrNull()
+                if (found.isNullOrEmpty()) return@Runnable
+                refused[key] = want
+                if (Thread.currentThread() !== listing) onRefused()
+            })
+        }
+        return refused[key] == want
+    }
+
+    // a listing's checks again, by folder: the stamp each was asked for, and the ones refused
+    private val asked = ConcurrentHashMap<String, String>()
+    private val refused = ConcurrentHashMap<String, String>()
+    /** A test's own process: the checks asked, refused and the listing's kept themes forgotten. */
+    @VisibleForTesting
+    internal fun forgetListings() {
+        asked.clear()
+        refused.clear()
+        lastListed.clear()
+    }
+
+    private val checker by lazy { Executors.newSingleThreadExecutor() }
+
+    /** Where a listing's check again runs ([refusedByRecheck]): a worker thread; a test's at once. */
+    @VisibleForTesting
+    internal var recheck: (Runnable) -> Unit = { checker.execute(it) }
+
+    /** A pack listed refused by its check again: the themes read again on the main thread, the pack left out. */
+    @VisibleForTesting
+    internal var onRefused: () -> Unit = { ContextCompat.getMainExecutor(appContext).execute { ThemeManager.refreshThemes() } }
 
     private fun stampOf(dir: File, source: String): String {
         val md = MessageDigest.getInstance("SHA-256")
@@ -596,15 +648,15 @@ object ThemePackFiles {
     }
 
     /** [pack] as a `.theme` zip into [dest]: its `theme.xml` first, then the files it names, then its layouts. */
-    internal fun export(pack: Theme.Pack, dest: OutputStream) {
+    internal fun export(pack: Theme.Pack, dest: OutputStream) = dest.use { exportTo(pack, it) }
+
+    // a read failing before the zip is opened closes [dest] all the same ([export]'s use)
+    private fun exportTo(pack: Theme.Pack, dest: OutputStream) {
         val dir = File(pack.dir)
         val source = File(dir, THEME_XML).readText()
         val theme = read(source)
         val names = ThemePackCheck.files(theme).all.sorted()
-        names.firstOrNull { !inside(dir, it) }?.let {
-            dest.close()
-            errorRuntime(R.string.exception_theme_file, it)
-        }
+        names.firstOrNull { !inside(dir, it) }?.let { errorRuntime(R.string.exception_theme_file, it) }
         ZipOutputStream(dest.buffered()).use { zip ->
             zip.putNextEntry(ZipEntry(THEME_XML))
             zip.write(source.encodeToByteArray())

@@ -60,9 +60,11 @@ class InkKeys(
             // what the pad held as the key was pressed: strokes drawn while it waited (a tap's dot taken back
             // and the stroke after it) are not the piece it commits
             val pressed = pad.pad.piece.takeIf { pad.pad.finished.isNotEmpty() } ?: NONE
+            val strokes = pad.pad.finished.size
             recognition.afterReads {
                 if (!attached() || at != since) return@afterReads
                 commits = pressed
+                commitsStrokes = strokes
                 try {
                     act()
                 } finally {
@@ -77,15 +79,28 @@ class InkKeys(
     // a held key's turn: the piece it commits ([NONE]: none), as the pad was when it was pressed; null, now
     private var commits: Int? = null
 
+    // a held key's turn: how many strokes the pad had finished as it was pressed
+    private var commitsStrokes = 0
+
     /**
      * [action] in its turn, before the engine has it: true where the pad took it (backspace with a
      * stroke to take back). Decided in its turn: behind a held key, the strokes it would take back are of
      * the piece that key commits. A key for the engine commits the piece: its strokes wiped now, not once
      * the engine's end of it comes back, else a backspace right behind (held with it) takes back a
-     * stroke of what is committed.
+     * stroke of what is committed. A held backspace takes back the stroke last as it was pressed: none
+     * where a stroke was drawn on it meanwhile (taken, nothing undone), and goes to the engine where the
+     * pad had none then.
      */
     fun took(action: KeyAction): Boolean {
-        if (action is KeyAction.SymAction && action.sym.sym == FcitxKeyMapping.FcitxKey_BackSpace && pad.undo()) return true
+        if (action is KeyAction.SymAction && action.sym.sym == FcitxKeyMapping.FcitxKey_BackSpace) {
+            val held = commits
+            when {
+                // as pressed: the stroke it takes back is the last one then, not one drawn while it waited
+                held == null || held == NONE -> if (held == null && pad.undo()) return true
+                held == pad.pad.piece && pad.pad.finished.size > commitsStrokes -> return true
+                held == pad.pad.piece && pad.undo() -> return true
+            }
+        }
         val wipes = commits?.let { it == pad.pad.piece } ?: pad.pad.finished.isNotEmpty()
         if ((action is KeyAction.SymAction || action is KeyAction.HostKeyAction) && wipes) pad.next()
         return false

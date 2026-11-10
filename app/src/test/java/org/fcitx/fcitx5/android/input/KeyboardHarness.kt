@@ -5,8 +5,6 @@
 package org.fcitx.fcitx5.android.input
 
 import android.app.Activity
-import org.fcitx.fcitx5.android.WAIT_MS
-import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
 import android.content.ClipData
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -37,8 +35,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.WAIT_MS
 import org.fcitx.fcitx5.android.comparesScreenshots
 import org.fcitx.fcitx5.android.data.theme.TestThemes
+import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
 import org.fcitx.fcitx5.android.until
 import org.fcitx.fcitx5.android.core.FakeHostApi
 import org.fcitx.fcitx5.android.core.FakeHostConnection
@@ -783,6 +783,10 @@ class KeyboardHarness(
             val cm = org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
             cm.purgeMarked(*cm.deleteAll(skipPinned = false))
         }
+        // the recognizer's reads posted back run first: their count, the JVM's, kept were they dropped with the looper.
+        // What that throws (a posted task's failure, the reads never in) is thrown once the rest is let go: a test
+        // passing does not hide it, and one failing keeps its own failure first (use's suppressed, JUnit's both)
+        val idleFailed = runCatching { idle() }.exceptionOrNull()
         // destroyed first: it learns the last field's address
         destroy()
         // Robolectric keeps every dialog shown till the test method ends (ShadowDialog.shownDialogs): the
@@ -808,6 +812,7 @@ class KeyboardHarness(
         codeRowWas?.let(ThemeManager.prefs.codeRow::setValue)
         HostDaemon.testConnection = null
         scope.cancel()
+        idleFailed?.let { throw it }
     }
 
     // the daemon's connection to a real host, which answers on its own thread

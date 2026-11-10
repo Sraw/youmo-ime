@@ -24,6 +24,10 @@
     return xml;
   }
 
+  // a file's content id, worked out once per bytes (the tab is drawn again after every change)
+  const ids = new WeakMap();
+  const contentIdOf = (lib, bytes) => { if (!ids.has(bytes)) ids.set(bytes, lib.contentId(bytes)); return ids.get(bytes); };
+
   const ops = {
     /**
      * [d] with [p] its picture: `{type, src: bytes, cuts: {portrait: {bytes, type, rect}, landscape: …}}` (the
@@ -31,7 +35,7 @@
      * colour again. Files the old one had that nothing else names go.
      */
     setPicture(d, p) {
-      let files = Object.assign(Object.create(null), d.files);
+      let files = panels.filesOf(d);
       let xml = d.xml;
       let written = null;
       if (p) {
@@ -42,7 +46,8 @@
           if (!c) continue;
           cuts[o] = { file: 'picture-' + o + '.' + c.type, rect: c.rect };
         }
-        written = { src, brightness: 100, blur: 0, cuts };
+        // a picture picked is encoded anew (never animated): an animated="true" of the one it replaces goes
+        written = { src, brightness: 100, blur: 0, cuts, animated: false };
         const old = F.picture(xml);
         if (old) Object.assign(written, { brightness: old.brightness, blur: old.blur });
       }
@@ -109,7 +114,7 @@
     const ratio = ops.ratio(env);
     const was = p.cuts[orientation] && p.cuts[orientation].rect;
     const bytes = d.files[p.src];
-    const key = [orientation, p.src, bytes ? api.lib.contentId(bytes) : '', bmp.width + 'x' + bmp.height, ratio, String(was)].join('|');
+    const key = [orientation, p.src, bytes ? contentIdOf(api.lib, bytes) : '', bmp.width + 'x' + bmp.height, ratio, String(was)].join('|');
     const state = moved.get(key) || { zoom: 1, cx: 0.5, cy: 0.5 };
     moved.set(key, state);
     if (was && state.zoom === 1 && state.cx === 0.5 && state.cy === 0.5) {
@@ -176,7 +181,7 @@
       const made = await api.choosePicture();
       if (made) api.apply((x) => ops.setPicture(x, made));
     } } }), ' ', p ? h('button', { type: 'button', textContent: '去掉图片', on: { click: () => api.apply((x) => ops.setPicture(x, null)) } }) : null));
-    el.append(h('p', { className: 'muted', textContent: '图片：PNG、JPEG、WebP；保存时重新编码，长边不超过 2560，JPEG（有透明的用 PNG）。动画 WebP 还不支持（动态背景在后面的版本）。' }));
+    el.append(h('p', { className: 'muted', textContent: '图片：PNG、JPEG、WebP；保存时重新编码，长边不超过 2560，JPEG（有透明的用 PNG）。动画 WebP 在这里选会存成静态图（第一帧）。' }));
     if (!p) return;
     el.append(
       row('亮度', number(p.brightness, (v) => api.apply((x) => ops.tune(x, { brightness: Math.max(0, Math.min(100, v ?? 100)) })), { min: 0, max: 100, unit: '%' })),

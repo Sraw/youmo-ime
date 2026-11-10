@@ -309,7 +309,19 @@ class ZhuyinKeyboard(
         canvas?.invalidateScene()
     }
 
+    // the input method shown, for whether 键盘手写 writes on the keys
+    private var imeName = ""
+
+    // no glide, no strokes: 键盘手写 alone, written over the symbol keys as the grouped keyboards' are. Their places
+    // are where a stroke may start (with none, GlideInput's down finds no key and nothing is written); the char is unread
+    override val glide = glideInput(
+        letters = { canvas?.shownKeys.orEmpty().filter { it.kind == "letter" }.map { ' ' to scenePlace(it.id, it.copy == 1) } },
+        enabled = { false },
+        writes = { InputMethodCatalog.writesOnKeys(imeName) },
+    ) { _, _ -> }
+
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
+        imeName = ime.uniqueName
         showInputMethodName(ime)
         canvas?.invalidateScene()
     }

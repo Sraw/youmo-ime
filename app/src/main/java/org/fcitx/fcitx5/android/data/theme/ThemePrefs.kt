@@ -283,18 +283,22 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      * Whether a slot was moved.
      */
     fun migrateThemeRefs(customs: Set<String>): Boolean {
-        val moved = listOf(normalModeTheme.key, lightModeTheme.key, darkModeTheme.key).mapNotNull { key ->
+        val moved = themeSlots.mapNotNull { key ->
             // a value not a string (a damaged file) is no name: left, read as the default
-            val name = runCatching { sharedPreferences.getString(key, null) }.getOrNull() ?: return@mapNotNull null
+            val name = slotValue(key) ?: return@mapNotNull null
             BuiltinThemeFiles.LEGACY[name]?.takeIf { name !in customs }?.let { key to it }
         }
         if (moved.isNotEmpty()) sharedPreferences.edit { moved.forEach { (key, ref) -> putString(key, ref) } }
         return moved.isNotEmpty()
     }
 
+    // the settings naming a theme, and one's name (a value not a string, a damaged file's, none)
+    private val themeSlots get() = listOf(normalModeTheme.key, lightModeTheme.key, darkModeTheme.key)
+
+    private fun slotValue(key: String): String? = runCatching { sharedPreferences.getString(key, null) }.getOrNull()
+
     /** Whether a slot names the theme [name]. */
-    fun namesTheme(name: String): Boolean = listOf(normalModeTheme.key, lightModeTheme.key, darkModeTheme.key)
-        .any { runCatching { sharedPreferences.getString(it, null) }.getOrNull() == name }
+    fun namesTheme(name: String): Boolean = themeSlots.any { slotValue(it) == name }
 
     /**
      * Each slot naming the user's theme [from] names [to] (060-render-p3 T3: one hiding a built-in theme
@@ -302,16 +306,14 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      * old theme's json is deleted next. Whether it was written.
      */
     fun renameThemeRefs(from: String, to: String): Boolean {
-        val keys = listOf(normalModeTheme.key, lightModeTheme.key, darkModeTheme.key)
-            .filter { runCatching { sharedPreferences.getString(it, null) }.getOrNull() == from }
+        val keys = themeSlots.filter { slotValue(it) == from }
         if (keys.isEmpty()) return true
         return sharedPreferences.edit().apply { keys.forEach { putString(it, to) } }.commit()
     }
 
     /** The slots naming one of [refs] back to their defaults ([PackDrawGuard]): whether any was. */
     fun dropThemeRefs(refs: Set<String>): Boolean {
-        val keys = listOf(normalModeTheme.key, lightModeTheme.key, darkModeTheme.key)
-            .filter { runCatching { sharedPreferences.getString(it, null) }.getOrNull() in refs }
+        val keys = themeSlots.filter { slotValue(it) in refs }
         if (keys.isNotEmpty()) sharedPreferences.edit { keys.forEach(::remove) }
         return keys.isNotEmpty()
     }

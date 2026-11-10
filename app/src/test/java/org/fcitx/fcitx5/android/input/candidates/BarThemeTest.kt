@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -27,7 +28,6 @@ import org.fcitx.fcitx5.android.input.candidates.floating.LabeledCandidateItemUi
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode
 import org.fcitx.fcitx5.android.input.keyboard.canvas.AndroidTextMeasurer
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
-import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Scene
@@ -102,7 +102,9 @@ class BarThemeTest {
     }
 
     // the picture for the reviewer's eye, in place of an emulator's (060-render-p3 T6a's)
+    // only asked for (-Dyoumo.keepBar=true): not written on every run, CI's too
     private fun keep(v: View, name: String) {
+        if (!java.lang.Boolean.getBoolean("youmo.keepBar")) return
         val dir = File("build/t6a-bar").also { it.mkdirs() }
         File(dir, "$name.png").outputStream().use { draw(v).compress(Bitmap.CompressFormat.PNG, 100, it) }
     }

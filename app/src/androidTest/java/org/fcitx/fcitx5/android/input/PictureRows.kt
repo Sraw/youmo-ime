@@ -23,7 +23,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 /**
- * perfOnly's motion rows: anim, A1's (motionRows) then A4's; anim,soak: the animated picture played 10 minutes
+ * perfOnly's motion rows: anim, A1's and A3's (motionRows, which runs effectRows) then A4's; anim,soak: the animated picture played 10 minutes
  * instead; picture: A4's alone (A5: one change to it measured in minutes).
  */
 internal fun KeyboardPerfBaselineTest.animRows(only: List<String>) {

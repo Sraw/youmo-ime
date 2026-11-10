@@ -221,6 +221,8 @@ class ClipboardChunksUi(
             holder.badge.isVisible = order >= 0
             holder.badge.text = (order + 1).toString()
             holder.cell.background = background(if (order >= 0) theme.genericActiveBackgroundColor else look.fill.value)
+            // picked: the colour made for the active background it sits on, as the bar's selected candidate
+            holder.label.setTextColor(if (order >= 0) theme.genericActiveForegroundColor else look.color.value)
             holder.cell.setOnClickListener { pick(if (order >= 0) picked - piece else picked + piece) }
         }
     }

@@ -5,13 +5,17 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.os.Looper
+import android.text.InputType
 import android.view.accessibility.AccessibilityManager
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
@@ -22,6 +26,7 @@ import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.T9Keyboard
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.ZhuyinKeyboard
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -108,10 +113,11 @@ class KeyHandwritingUatTest {
         assertTrue("ink shown", board().keyInkForTest!!.shown)
         // the pause: the piece finished
         h.advance(1500)
-        until("finished") { h.api.calls.any { it.startsWith("inkFinished(") && "keys" in it } }
+        until("finished") { h.api.calls.any { it.startsWith("inkFinished(") && ", keys" in it } }
         assertEquals(0, board().keyInkForTest!!.pad.finished.size)
     }
 
+    @Uat("HW-34")
     @Test
     fun whileWritingATapIsAStrokeBackspaceTakesOneBackAndSpaceCommits() {
         harness()
@@ -142,6 +148,18 @@ class KeyHandwritingUatTest {
         assertEquals("the dot, then the stroke", 2, board().keyInkForTest!!.pad.finished.size)
     }
 
+    // the number the gesture takes for a tap (EngineState.nextKey, told just before its key is sent) is the one the
+    // key's job hands the engine's answers as it is taken on the fcitx thread: else the keyboard reads an answer to
+    // this tap as one from before it, or the other way round
+    @Test
+    fun aTapsKeyIsTakenUnderTheNumberTheGestureTookForIt() {
+        harness()
+        val n = EngineState.nextKey()
+        touchTap(h.key("d"))
+        until("taken") { EngineState.keysHeard >= n }
+        assertEquals(n, EngineState.keysHeard)
+    }
+
     @Test
     fun aStrokeWithNoTapBeforeTakesNothingBack() {
         harness()
@@ -150,6 +168,7 @@ class KeyHandwritingUatTest {
         assertTrue(inks().toString(), inks().none { ", takesBack" in it })
     }
 
+    @Uat("HW-37")
     @Test
     fun englishKeysGoStraightOnTheRecognizerNotMade() {
         harness(KeyboardHarness.ENGLISH)
@@ -171,50 +190,151 @@ class KeyHandwritingUatTest {
         h.api.calls.clear()
         draw(h.key("t"))
         h.advance(100)
+        // the reads run on the recognizer's own thread: drained, so a read let through lands before this
+        h.idle()
         assertEquals(emptyList<String>(), inks())
     }
 
-    @Test
-    fun theNineAndFourteenKeysAreWrittenOnToo() {
-        harness(keyboards = KeyboardHarness.NINE_KEYS)
-        assertTrue(KeyboardHarness.find<T9Keyboard>(h.keyboard) != null)
-        draw(h.nineKey("5"))
-        until("read on the nine keys") { inks().isNotEmpty() }
-        h.close()
-        prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, PinyinKeyboard.Keys14)
+    // one reading only (人): the keyboards a stroke of one reading is written on
+    private fun oneReading() {
         shared.reader = object : HandwritingRecognition.Reader {
             override val loadable = true
             override fun load() = Unit
             override fun read(strokes: List<FloatArray>) = InkReading(listOf("人"), doubleArrayOf(-1.0))
         }
-        harness()
-        assertTrue(KeyboardHarness.find<GroupedKeyboard>(h.keyboard) != null)
-        h.api.calls.clear()
-        draw(h.key("GH"))
-        until("read on the 14 keys") { inks().isNotEmpty() }
+    }
+
+    // a keyboard shown ([shown] opens its harness and returns the key to draw on), checked, its harness closed
+    private class Board(val why: String, val shown: () -> ShownKey)
+
+    // each row from the test's own state (the reader, the pinyin keyboard, touch exploration off), whatever the rows
+    // before it set; a close that fails after the row's own failure is added to it, not put in its place
+    private fun onEach(rows: List<Board>, check: () -> Unit) {
+        val pinyinKeyboard = AppPrefs.getInstance().keyboard.pinyinKeyboard
+        val keys = pinyinKeyboard.getValue()
+        // the test's reader (人 入), not the native one [reader] keeps for after the test
+        val twoReadings = shared.reader
+        assertRows(rows, Board::why) { row ->
+            val failed = runCatching {
+                val k = row.shown()
+                h.api.calls.clear()
+                draw(k)
+                check()
+            }.exceptionOrNull()
+            val o = open
+            open = null
+            shared.reader = twoReadings
+            prefs.set(pinyinKeyboard, keys)
+            val closing = runCatching {
+                o?.let { shadowOf(it.keyboard.context.getSystemService(AccessibilityManager::class.java)).setTouchExplorationEnabled(false) }
+                o?.close()
+            }.exceptionOrNull()
+            if (failed != null) throw failed.apply { closing?.let(::addSuppressed) }
+            if (closing != null) throw closing
+        }
+    }
+
+    @Uat("HW-36")
+    @Test
+    fun theOtherKeyboardsAreWrittenOnToo() = onEach(
+        listOf(
+            Board("the nine keys") {
+                harness(keyboards = KeyboardHarness.NINE_KEYS)
+                assertTrue(KeyboardHarness.find<T9Keyboard>(h.keyboard) != null)
+                h.nineKey("5")
+            },
+            Board("a table's keys (五笔)") {
+                harness(InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false))
+                h.key("t")
+            },
+            Board("the 14 keys") {
+                prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, PinyinKeyboard.Keys14)
+                oneReading()
+                harness()
+                assertTrue(KeyboardHarness.find<GroupedKeyboard>(h.keyboard) != null)
+                h.key("GH")
+            },
+            Board("the Dachen zhuyin keys") {
+                prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, PinyinKeyboard.ZhuyinFull)
+                oneReading()
+                harness()
+                assertTrue(KeyboardHarness.find<ZhuyinKeyboard>(h.keyboard)?.keyInkForTest != null)
+                h.key("ㄅ")
+            },
+            Board("the zhuyin nine keys") {
+                prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, PinyinKeyboard.ZhuyinNine)
+                oneReading()
+                harness()
+                assertTrue(KeyboardHarness.find<ZhuyinKeyboard>(h.keyboard)?.keyInkForTest != null)
+                h.key("ㄅㄉㄚ")
+            },
+        ),
+    ) { until("read") { inks().isNotEmpty() } }
+
+    @Uat("HW-37", "AX-13")
+    @Test
+    fun notInAPasswordUrlOrEmailFieldNorEnglishNorWhileTalkBackExplores() = onEach(
+        listOf(
+            Board("a password field") {
+                harness()
+                board().inPasswordField = true
+                h.key("t")
+            },
+            Board("English") {
+                harness(KeyboardHarness.ENGLISH)
+                assertTrue(KeyboardHarness.find<TextKeyboard>(h.keyboard) != null)
+                h.key("t")
+            },
+            Board("a URL field") {
+                harness()
+                h.restart(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
+                h.idle()
+                h.key("t")
+            },
+            Board("an email field") {
+                harness()
+                h.restart(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
+                h.idle()
+                h.key("t")
+            },
+            Board("TalkBack exploring by touch") {
+                harness()
+                shadowOf(board().context.getSystemService(AccessibilityManager::class.java)).setTouchExplorationEnabled(true)
+                h.key("t")
+            },
+        ),
+    ) {
+        h.advance(100)
+        // the reads run on the recognizer's own thread: drained, so a read let through lands before this
+        h.idle()
+        assertEquals(emptyList<String>(), inks())
     }
 
     @Test
-    fun notInAPasswordNorEnglishNorWhileTalkBackExplores() {
+    fun aShortSwipeIsAStrokeNotTheKeysCorner() {
         harness()
-        board().inPasswordField = true
         h.api.calls.clear()
-        draw(h.key("t"))
-        h.advance(100)
-        assertEquals(emptyList<String>(), inks())
-        board().inPasswordField = false
-        val a11y = board().context.getSystemService(AccessibilityManager::class.java)
-        shadowOf(a11y).setTouchExplorationEnabled(true)
-        draw(h.key("t"))
-        h.advance(100)
-        assertEquals(emptyList<String>(), inks())
-        shadowOf(a11y).setTouchExplorationEnabled(false)
-        h.close()
-        harness(KeyboardHarness.ENGLISH)
-        assertTrue(KeyboardHarness.find<TextKeyboard>(h.keyboard) != null)
+        // nothing typed: a short swipe down on w is written, not w's corner symbol
+        draw(h.key("w"), down = 0.6f)
+        until("read") { inks().isNotEmpty() }
+        assertEquals(emptyList<String>(), keysSent())
+    }
+
+    @Test
+    fun aShortSwipeWhileTypingIsTheKeysCorner() {
+        harness()
+        touchTap(h.key("n"))
+        // the engine answered: its own input typed
+        EngineState.keysTypedState.value =
+            EngineState.KeysTyped(EngineState.keysTyped.value.answer + 1, true)
+        h.idle()
+        h.advance(1500)
         h.api.calls.clear()
-        draw(h.key("t"))
+        // typing: a short swipe down on w is w's corner symbol, not a stroke
+        draw(h.key("w"), down = 0.6f)
         h.advance(100)
+        h.idle()
         assertEquals(emptyList<String>(), inks())
+        assertTrue(h.api.calls.toString(), keysSent().isNotEmpty())
     }
 }

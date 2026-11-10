@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.handwriting
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
@@ -28,6 +29,11 @@ class InkOverTest {
         private var predicting = false
         override var learning = true
         var flags = 0
+        var passed = 0
+
+        override fun passedOn() {
+            passed++
+        }
 
         override fun reads(c: Char) = c in 'a'..'z'
 
@@ -182,22 +188,49 @@ class InkOverTest {
 
     @Test
     fun anInkTakingBackDeletesNothingWhereMoreThanTheTapIsTyped() {
-        // another key (a long press's letter) after the tap: neither deleted, the ink dropped
-        type("ni")
-        val s = over.apply(Action.Ink(0, read("天"), takesBack = true))
-        assertEquals("ni", s.preedit)
-        assertFalse(pinyin.actions.contains(Action.Backspace))
+        // each row its own pinyin and InkOver: what one row typed is not the next one's start
+        fun row(before: (InkOver) -> Unit, preedit: String, deleteBefore: Int = 0): () -> Unit = {
+            val p = FakePinyin(mapOf("n" to listOf("你", "呢"), "ni" to listOf("你", "泥")))
+            val o = InkOver(p) { HandwritingSession(handwritingDecoder(), TextWords(handwritingData.model, handwritingData.wordIndex)) }
+            before(o)
+            val s = o.apply(Action.Ink(0, read("天"), takesBack = true))
+            assertEquals(preedit, s.preedit)
+            assertEquals(deleteBefore, s.deleteBefore)
+            assertFalse(p.actions.contains(Action.Backspace))
+            assertFalse(s.refines)
+            assertFalse(s.picked)
+        }
+        fun keys(o: InkOver, k: String) = k.forEach { o.apply(Action.Key(it)) }
+        assertRows(
+            // another key (a long press's letter) after the tap: neither deleted, the ink dropped
+            "a second letter after the tap" to row({ keys(it, "ni") }, preedit = "ni"),
+            // the tap typed, then a pick before the stroke's reading came: the committed text is not touched
+            "the tap picked away before the reading" to row({ keys(it, "n"); it.apply(Action.Pick(0)) }, preedit = "天"),
+            // the cursor moved after the tap: the input is no longer the tap alone
+            "a cursor move after the tap" to row({ keys(it, "n"); it.apply(Action.Cursor(0)) }, preedit = "n"),
+            // a reset after the tap: nothing typed is left to take back
+            "a reset after the tap" to row({ keys(it, "n"); it.apply(Action.Reset) }, preedit = "天"),
+        )
     }
 
+    // a letter while the handwriting shows: what its answer deletes comes off the sentence put in first, then off the text before it
     @Test
-    fun anInkTakingBackDeletesNothingOnceTheTapIsPickedAway() {
-        // the tap typed, then a pick before the stroke's reading came: the committed text is not touched
-        type("n")
-        assertEquals("你", over.apply(Action.Pick(0)).commit)
-        val s = over.apply(Action.Ink(0, read("天"), takesBack = true))
-        assertEquals(0, s.deleteBefore)
-        assertFalse(pinyin.actions.contains(Action.Backspace))
-        assertEquals("天", s.preedit)
+    fun aLettersDeleteComesOffWhatWasPutInFirst() {
+        fun row(deletes: Int, commit: String, deleteBefore: Int): () -> Unit = {
+            val p = FakePinyin(emptyMap())
+            val o = InkOver(object : Session by p {
+                override fun apply(action: Action): Snapshot = p.apply(action).copy(deleteBefore = if (action is Action.Key) deletes else 0)
+            }) { HandwritingSession(handwritingDecoder(), TextWords(handwritingData.model, handwritingData.wordIndex)) }
+            o.apply(Action.Ink(0, read("天")))
+            val s = o.apply(Action.Key('n'))
+            assertEquals(commit, s.commit)
+            assertEquals(deleteBefore, s.deleteBefore)
+        }
+        assertRows(
+            "nothing deleted: the sentence stays" to row(0, "天", 0),
+            "one deleted: off the sentence put in" to row(1, "", 0),
+            "two deleted: the sentence, then one before it" to row(2, "", 1),
+        )
     }
 
     @Test
@@ -221,16 +254,6 @@ class InkOverTest {
         over.apply(ink)
         // Engines.inkSent asks with the action sent: not held again
         assertEquals(true, over.handwritingMade?.took(ink))
-    }
-
-    @Test
-    fun aCursorMoveOrAResetBetweenTakesNothingBack() {
-        type("n")
-        over.apply(Action.Cursor(0))
-        assertEquals("n", over.apply(Action.Ink(0, read("天"), takesBack = true)).preedit)
-        over.apply(Action.Reset)
-        over.apply(Action.Ink(1, read("天"), takesBack = true))
-        assertFalse(pinyin.actions.contains(Action.Backspace))
     }
 
     @Test
@@ -297,6 +320,11 @@ class InkOverTest {
         assertFalse(over.takesEveryCharacter)
         assertFalse(over.picksByDigit)
         assertTrue(over.rereads)
+        // a key the app took while the handwriting shows: the handwriting's, pinyin not told
         over.passedOn()
+        assertEquals(0, pinyin.passed)
+        over.apply(Action.Reset)
+        over.passedOn()
+        assertEquals(1, pinyin.passed)
     }
 }

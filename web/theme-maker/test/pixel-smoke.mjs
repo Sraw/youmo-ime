@@ -1,5 +1,5 @@
 // The engine's painting in a real browser against the app's on Robolectric (060-render-p3 W1's pixel smoke):
-// six shots drawn by dev/engine.html in headless Chromium, compared pixel by pixel with the PNGs the app's
+// eight shots in six groups drawn by dev/engine.html in headless Chromium, compared pixel by pixel with the PNGs the app's
 // EnginePaintTest drew (app/build/w1-pixel, written by `./gradlew :app:testDebugUnitTest --tests '*EnginePaintTest*'`),
 // within what anti-aliasing and two text rasterizers make different. Local only, not CI: it needs a Chromium.
 // Run: node web/theme-maker/test/pixel-smoke.mjs [chromium]   (default: Playwright's headless shell, the newest
@@ -24,8 +24,8 @@ const SHOTS = [
 ];
 // Two measures, as two rasterizers' text and edges differ in thin lines and a wrong colour or a missing thing
 // fills an area: a shot is unlike when more than ROUGH of its pixels are off by more than FAR in a channel
-// (edges, glyphs: 0.4-0.8% on the six), or when more than SOLID of its pixels are in a 5x5 block every pixel
-// of which is off by more than NEAR (an area: under 0.01% on the six; one key shown pressed is 1.4%)
+// (edges, glyphs: 0.4-0.8% on the eight), or when more than SOLID of its pixels are in a 5x5 block every pixel
+// of which is off by more than NEAR (an area: under 0.01% on the eight; one key shown pressed is 1.4%)
 const FAR = 48;
 const ROUGH = 0.02;
 const NEAR = 16;

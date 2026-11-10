@@ -83,8 +83,17 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
         else -> index
     }
 
-    fun removeTheme(name: String) {
-        val index = entries.indexOfFirst { it.name == name }
+    fun removeTheme(name: String) = removeAt(entries.indexOfFirst { it.name == name })
+
+    /** The card of [theme] itself removed: a pack and a 3.0 theme of the same name are two cards. */
+    fun removeTheme(theme: Theme) = removeAt(
+        entries.indexOfFirst {
+            it == theme || (it is Theme.Versioned && theme is Theme.Versioned && it::class == theme::class && it.file == theme.file)
+        }
+    )
+
+    private fun removeAt(index: Int) {
+        if (index < 0) return
         entries.removeAt(index)
         notifyItemRemoved(index + OFFSET)
         activeIndex = indexAfterRemoval(index, activeIndex)

@@ -36,6 +36,8 @@ import java.util.zip.ZipOutputStream
 internal fun KeyboardPerfBaselineTest.motionRows() {
     val advanced = AppPrefs.getInstance().advanced
     val motionWas = advanced.keyboardMotion.getValue()
+    // the user's battery saver: put back as it was, not turned off
+    val savingWas = service.getSystemService(PowerManager::class.java).isPowerSaveMode
     if (themeWas == null) themeWas = ThemeManager.prefs.normalModeTheme.getValue()
     // the same pack with no motion styles: what motion adds is measured against it, not against a built-in theme
     val still = onMain { pack(service.resources, STILL, emptyList()) }
@@ -112,7 +114,7 @@ internal fun KeyboardPerfBaselineTest.motionRows() {
         log("anim\tpower save\tbattery saver on: $saving")
         runs("power save")
     } finally {
-        runCatching { shell("cmd power set-mode 0") }
+        runCatching { shell("cmd power set-mode ${if (savingWas) 1 else 0}") }
         runCatching { shell("dumpsys battery reset") }
         onMain {
             advanced.keyboardMotion.setValue(motionWas)

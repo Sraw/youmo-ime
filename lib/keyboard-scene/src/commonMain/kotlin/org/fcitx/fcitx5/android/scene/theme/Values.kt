@@ -247,15 +247,21 @@ object Values {
         "border" -> border(raw)?.let(Value::OfBorder)
         "shadow" -> shadow(raw)?.let(Value::OfShadow)
         "inset", "padding" -> inset(raw)?.let(Value::OfInset)
-        "font" -> raw.takeIf(FONT::matches)?.let(Value::Word)
-        "weight" -> raw.takeIf { it in listOf("300", "400", "700") }?.let { Value.Number(it.toDouble()) }
         "scale" -> percent(raw)?.takeIf { it in MIN_SCALE..MAX_SCALE }?.let(Value::Number)
         "size" -> size(raw)
         "hidden" -> flag(raw)
-        "press" -> raw.takeIf { it in listOf("tint", "ripple", "face") }?.let(Value::Word)
         "gap" -> dp(raw)?.let(Value::Number)
+        else -> word(property, raw) ?: textOnAKey(property, raw) ?: capAndBubble(property, raw) ?: panel(property, raw) ?: preedit(property, raw)
+            ?: motion(property, raw)
+    }
+
+    // the properties of a word from a list (a font's name, a weight, a press, a label's style)
+    private fun word(property: String, raw: String): Value? = when (property) {
+        "font" -> raw.takeIf(FONT::matches)?.let(Value::Word)
+        "weight" -> raw.takeIf { it in listOf("300", "400", "700") }?.let { Value.Number(it.toDouble()) }
+        "press" -> raw.takeIf { it in listOf("tint", "ripple", "face") }?.let(Value::Word)
         "label-style" -> raw.takeIf { it in LABEL_STYLES }?.let(Value::Word)
-        else -> textOnAKey(property, raw) ?: capAndBubble(property, raw) ?: panel(property, raw)
+        else -> null
     }
 
     /** `transition=`'s curves (CSS's) and longest, ms; `press-scale=`'s range, %; `press-sink=`'s most, dp. */
@@ -316,7 +322,7 @@ object Values {
     private fun preedit(property: String, raw: String): Value? = when (property) {
         "underline" -> border(raw)?.let(Value::OfBorder)
         "cursor-color" -> ColorExpr.parse(raw)?.let(Value::OfColor)
-        else -> motion(property, raw)
+        else -> null
     }
 
     /** The voice mask's frosted glass at most (`blur`), dp: as the keyboard's picture's. */
@@ -332,7 +338,7 @@ object Values {
         "ink-width" -> dp(raw, MAX_INK_DP)?.takeIf { it >= MIN_INK_DP }?.let(Value::Number)
         "ink-color", "grid-color" -> ColorExpr.parse(raw)?.let(Value::OfColor)
         "grid" -> flag(raw)
-        else -> preedit(property, raw)
+        else -> null
     }
 
     /** The bar's `height` (T6b), of the height 候选字号 gives it: one value, upright and turned alike. */

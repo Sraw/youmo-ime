@@ -51,11 +51,15 @@ abstract class GridPagingCandidateViewAdapter(theme: Theme) : PagingCandidateVie
         }
     }
 
+    private val labelPaint = Paint().apply { textSize = TEXT_SIZE }
+
     fun measureWidth(position: Int): Float {
         // the span lookup reads ahead of what is shown: getItem would have Paging load for it
         val candidate = peek(position) ?: return 0f
         // the number or dot before it a theme asks for (T6a), as wide as drawn
-        val label = SceneBar.label(bar?.labelStyle, position + offset).let { if (it.isEmpty()) 0f else measuredWidths[it] * textScale }
+        // by its advance, not its ink: the space after the number is part of its width (in the plain face: a
+        // theme's own label font may come out a little wider or narrower)
+        val label = SceneBar.label(bar?.labelStyle, position + offset).let { if (it.isEmpty()) 0f else labelPaint.measureText(it) / TEXT_SIZE * textScale }
         if (candidate.readings.isEmpty()) return label + measuredWidths[candidate.textWithComment()] * textScale
         val hint = EngineState.candidateReading.value == ReadingStyle.OFF
         val key = listOf(hint, candidate.text, candidate.readings.joinToString("\u0001"), candidate.comment, candidate.spaceBetweenComment)

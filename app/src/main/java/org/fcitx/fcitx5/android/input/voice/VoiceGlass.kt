@@ -63,8 +63,9 @@ class VoiceGlass(color: Int, @get:VisibleForTesting internal val blur: Blur? = B
 
     @VisibleForTesting
     internal fun take(board: ViewGroup, card: View) {
+        val b = blur ?: return
         val start = SystemClock.elapsedRealtimeNanos()
-        shot = capture(board, card, blur ?: return)
+        shot = capture(board, card, b)
         failed = shot == null
         Timber.d("voice glass %d×%d taken and blurred in %.2f ms", card.width, card.height, (SystemClock.elapsedRealtimeNanos() - start) / 1e6)
         invalidateSelf()

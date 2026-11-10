@@ -116,8 +116,6 @@ class KeyboardPerfBaselineTest {
             if ("rebuild" in only) rebuilds()
             if ("anim" in only || "idle" in only) idleRows()
             animRows(only)
-            // the §4.3 rows that need motion in the engine (A2-A4): told, not measured
-            if ("anim" in only) ANIM_NOT_YET.forEach { (row, stage) -> log("anim\t$row\tnot yet ($stage)") }
             return
         }
         memory("no keyboard shown yet")
@@ -136,6 +134,8 @@ class KeyboardPerfBaselineTest {
         popupSlide()
         idleRows()
         motionRows().also { pictureRows(soak = false) }
+        // the theme of before the motion rows: the last memory rows not of the animated picture's decoder and frames
+        onMain { themeWas?.let { ThemeManager.prefs.normalModeTheme.setValue(it) } }
         hideKeyboard()
         memory("after the runs (handwriting's models loaded), hidden")
         showKeyboard()

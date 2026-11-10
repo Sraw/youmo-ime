@@ -73,7 +73,9 @@ class YoumoTheme internal constructor(internal val theme: Theme) {
             "colors" to SceneJs.map(t.colors.mapValues { it.value.toString() }),
             "fonts" to SceneJs.map(t.fonts),
             "icons" to SceneJs.map(t.icons),
-            "picture" to t.picture?.let { p -> obj("src" to p.src, "brightness" to p.brightness, "blurDp" to p.blurDp, "cuts" to SceneJs.map(p.cuts)) },
+            "picture" to t.picture?.let { p ->
+                obj("src" to p.src, "brightness" to p.brightness, "blurDp" to p.blurDp, "cuts" to SceneJs.map(p.cuts), "animated" to p.animated)
+            },
             "meta" to t.meta?.let { m -> obj("author" to m.author, "version" to m.version, "license" to m.license, "minApp" to m.minApp, "preview" to m.preview) },
         )
     }
@@ -111,7 +113,9 @@ class YoumoScene internal constructor(internal val scene: Scene, internal val de
  * The engine for the theme maker's page: read a theme (4.0) and a layout, build a scene in an environment,
  * paint it on a canvas; a theme 3.0 made 4.0, a theme written; the app's layouts and themes. Every answer
  * that may fail is `{ok, problems: [{line, message}], warnings, …}`, never a throw: a user's file is data, and
- * so is what a page passes (a value of the wrong type is a problem, line 0).
+ * so is what a page passes (a value of the wrong type is a problem, line 0). The few answering plainly (blankKeys,
+ * refuses, writeTheme, layouts, layout, layoutSource) take the engine's own objects, as Kotlin types them, and
+ * answer every file; a page passing another type there is a page's fault and throws.
  */
 @JsExport
 object YoumoEngine {
@@ -148,19 +152,22 @@ object YoumoEngine {
 
     /**
      * Where [theme] leaves Shift, Backspace, Space or Return blank (BlankKeys, the app's own import check): on the
-     * app's boards, each replaced by one of [layouts] (`{"<id>.xml": xml}`, a pack's `layouts/`) of its id. The first
-     * found, as text (`qwerty/enter @flat`), none: an empty array; too many scenes to try: `["*"]`. A layout of [layouts] that does not read is left
-     * out (readLayout says why).
+     * app's boards, each replaced by one of [layouts] (`{"<id>.xml": xml}`, a pack's `layouts/`, only those the app reads: PackLayouts.readable) of its id where the app would take it (PackLayouts.drawn). The first
+     * found, as text (`qwerty/enter @flat`), none: an empty array; too many scenes to try: `["*"]`. A layout of [layouts] the app would not take is not
+     * asked, the app's own in its place (readLayout and refuses say why).
      */
     fun blankKeys(theme: YoumoTheme, layouts: dynamic): Array<String> = run {
-        val own = HashMap<String, String>()
-        if (layouts != null) for (name in keys(layouts, "layouts")) own[name.removeSuffix(".xml")] = text(layouts[name], "layout $name")
-        val fragments = own.mapNotNull { (id, t) -> LayoutReader.fragment(t).orNull()?.let { id to it } }.toMap()
-        val ownBoards = own.values.mapNotNull { LayoutReader.layout(it).orNull() }
-        val boards = builtIns.layouts.filter { id -> ownBoards.none { it.id == id } }.mapNotNull { builtIns.layout(it)?.orNull() } + ownBoards
-        val withFragments = boards.mapNotNull { l -> builtIns.includes(l, fragments).orNull()?.let { BlankKeys.Board(l, it) } }
+        val files = HashMap<String, String>()
+        if (layouts != null) for (name in keys(layouts, "layouts")) files[name.removeSuffix(".xml")] = text(layouts[name], "layout $name")
+        // only the files the app reads: an id it has, within its size limit (PackLayouts.readable)
+        val own = PackLayouts.readable(files) { builtIns.layoutText(it) != null }
+        // the boards as the app draws them: a pack's only where the app takes it (PackLayouts.drawn), the app's
+        // with the app's fragments
+        val app = builtIns.layouts.mapNotNull { id ->
+            builtIns.layout(id)?.orNull()?.let { l -> builtIns.includes(l).orNull()?.let { BlankKeys.Board(l, it) } }
+        }
         // too many to try: its code, "*", the page says what it means
-        BlankKeys.find(theme.theme, withFragments).map { if (it == BlankKeys.TOO_MANY) "*" else it.toString() }.toTypedArray()
+        BlankKeys.find(theme.theme, PackLayouts.drawn(app, own) { builtIns.layoutText(it) }).map { if (it == BlankKeys.TOO_MANY) "*" else it.toString() }.toTypedArray()
     }
 
     /** The app's boards' ids (`qwerty`, `nine`…). */
@@ -259,6 +266,8 @@ object YoumoEngine {
             "icon" to obj(
                 "vw" to icon.width,
                 "vh" to icon.height,
+                "vx" to icon.x,
+                "vy" to icon.y,
                 "paths" to icon.paths.map { p -> obj("d" to p.d, "rule" to if (p.evenOdd) "evenodd" else "nonzero", "alpha" to p.alpha) }.toTypedArray(),
             )
         }
@@ -385,6 +394,8 @@ object YoumoEngine {
         val drawn = scene as? YoumoScene ?: throw NotOfType("scene: not a scene")
         val s = drawn.scene
         if (ctx == null || jsTypeOf(ctx.fill) != "function") throw NotOfType("ctx: not a 2D context")
+        // the painter draws its layers on the context's canvas's size: one with none is the page's to mend
+        if (ctx.canvas == null || ctx.canvas == undefined) throw NotOfType("ctx: a context with no canvas")
         val pressed: Set<String> = when (val p = member(state, "pressed")) {
             null -> emptySet()
             else -> if (jsTypeOf(p) == "string") setOf(p as String) else array(p, "pressed").mapIndexed { i, v -> text(v, "pressed[$i]") }.toSet()

@@ -41,6 +41,9 @@
 
   function toast(text) {
     const t = $('toast');
+    // inside a dialog open (the top layer): under it, a toast behind a tall dialog is never seen
+    const host = document.querySelector('dialog[open]') || document.body;
+    if (t.parentNode !== host) host.append(t);
     t.textContent = text;
     t.classList.add('on');
     clearTimeout(toast.timer);
@@ -60,7 +63,19 @@
   function keep() {
     if (!store || !edited || !history) return;
     clearTimeout(keeping);
-    keeping = setTimeout(() => M.keepDraft(store, history.current, env), 500);
+    keeping = setTimeout(keepNow, 500);
+  }
+  // the draft written now (the page hidden or closed: a change of the last moment is kept too); a store that
+  // refuses (its quota) said once, the page going on without drafts
+  let keepFailed = false;
+  function keepNow() {
+    clearTimeout(keeping);
+    keeping = null;
+    if (!store || !edited || !history) return;
+    M.keepDraft(store, history.current, env).then((ok) => {
+      if (!ok && !keepFailed) toast('草稿存不下了（浏览器的存储满了）：关掉页面前记得保存');
+      keepFailed = !ok;
+    });
   }
 
   function changed(external = false) {
@@ -104,11 +119,14 @@
       return true;
     }
     if (!kids || (to.tagName === 'INPUT' && to.type !== from.type)) return false;
+    // read before the children: an <option> synced across is moved out of [from], and its value with it
+    const value = 'value' in from ? from.value : undefined;
+    const checked = from.checked;
     for (let i = from.childNodes.length - 1; i >= 0; i--) if (!sync(to.childNodes[i], from.childNodes[i], skip)) return false;
     if (to.className !== from.className) to.className = from.className;
     if (to.matches(CONTROLS) && to !== skip) {
-      if ('value' in from && to.value !== from.value) to.value = from.value;
-      if (to.checked !== from.checked) to.checked = from.checked;
+      if (value !== undefined && to.value !== value) to.value = value;
+      if (to.checked !== checked) to.checked = checked;
       to.disabled = from.disabled;
       to.title = from.title;
     }
@@ -176,17 +194,21 @@
   async function loadAssets(d) {
     // the same files (an edit of theme.xml copies the object, not the bytes): nothing decoded again
     const same = (a, b) => a === b || (a && Object.keys(a).length === Object.keys(b).length && Object.keys(b).every((k) => a[k] === b[k]));
-    if (same(assets.key, d.files)) return true;
+    // the latest all the same: an older one still decoding is dropped when it lands
+    if (same(assets.key, d.files)) { ++loading; return true; }
     const mine = ++loading;
     const images = {};
     const fonts = {};
     const cuts = {};
+    const added = new Set(); // the fonts this call put in document.fonts
     const safe = new Set(M.decodableImages(L, FORMAT, d));
     for (const [name, bytes] of Object.entries(d.files)) {
       try {
         if (IMAGE.test(name)) {
           if (!safe.has(name)) continue;
-          const bmp = await createImageBitmap(new Blob([bytes]));
+          // a file of the same bytes as before: its bitmap kept, not decoded again (a cropper holds it)
+          const kept = assets.key && assets.key[name] === bytes && assets.cuts[name];
+          const bmp = kept || await createImageBitmap(new Blob([bytes]));
           images[name] = { image: bmp, width: bmp.width, height: bmp.height };
           cuts[name] = bmp;
         } else if (FONT.test(name)) {
@@ -195,6 +217,8 @@
             const face = new FontFace(family, bytes);
             await face.load();
             document.fonts.add(face);
+            faces.set(family, face);
+            added.add(family);
           }
           fonts[name] = family;
         }
@@ -203,18 +227,37 @@
       }
     }
     if (mine !== loading) {
-      for (const b of Object.values(cuts)) b.close();
+      const ours = Object.values(assets.cuts);
+      for (const b of Object.values(cuts)) if (!ours.includes(b)) b.close();
+      // the fonts this call added that the shown files do not use: out of the page (kept in faces, so a newer
+      // call that found one there puts it back when it lands)
+      const shown = new Set(Object.values(assets.fonts));
+      // (a newer call that landed first may have let one go already: no face left, nothing to take out)
+      for (const family of added) {
+        const face = faces.get(family);
+        if (face && !shown.has(family)) document.fonts.delete(face);
+      }
       return false;
     }
     for (const b of Object.values(assets.cuts)) if (!Object.values(cuts).includes(b)) b.close();
+    // a font no file has any more (replaced, deleted, undone) is let go
+    const families = new Set(Object.values(fonts));
+    for (const [family, face] of faces) {
+      if (!families.has(family)) { document.fonts.delete(face); faces.delete(family); } else if (!document.fonts.has(face)) document.fonts.add(face);
+    }
     assets = { key: d.files, images, fonts, cuts };
     return true;
   }
+  const faces = new Map(); // the fonts this page added to document.fonts, by family
 
   // the <font name=… src=…> of the theme, by the CSS family its file was loaded under
   function fontFamilies(xml) {
     const out = {};
-    for (const m of xml.matchAll(/<font\b[^>]*\bname="([^"]+)"[^>]*\bsrc="([^"]+)"/g)) if (assets.fonts[m[2]]) out[m[1]] = assets.fonts[m[2]];
+    // as XML has them: in any order, either quote, entities read, comments skipped
+    for (const f of F.elements(xml, 'font')) {
+      const a = Object.fromEntries(f.attrs);
+      if (a.name && assets.fonts[a.src]) out[a.name] = assets.fonts[a.src];
+    }
     return out;
   }
 
@@ -227,20 +270,65 @@
     const file = cuts[env.landscape ? 'landscape' : 'portrait'] || cuts.portrait || cuts.landscape;
     const bmp = file && assets.cuts[file];
     if (!bmp || !scene) return null;
-    const made = new Map();
+    // made once for a bitmap, a size and a blur and brightness: not blurred again on every preview (each tap)
+    if (pictures.bmp !== bmp || pictures.w !== scene.width || pictures.h !== scene.height || pictures.density !== env.density) Object.assign(pictures, { bmp, w: scene.width, h: scene.height, density: env.density, made: new Map() });
+    const made = pictures.made;
     return (blurDp, brightness) => {
       const b = blurDp == null ? p.blurDp : blurDp;
       const l = brightness == null ? p.brightness : brightness;
       const key = b + '/' + l;
       if (made.has(key)) return made.get(key);
       const c = document.createElement('canvas');
-      c.width = scene.width;
-      c.height = scene.height;
+      c.width = pictures.w;
+      c.height = pictures.h;
       const g = c.getContext('2d');
+      const px = b * env.density;
+      // centre-cropped to the canvas as the app crops it (never made bigger for the blur); where the browser has
+      // no filter, unblurred (the dimming is drawn, below)
+      const m = 'filter' in g && px > 0 ? Math.ceil(px * 3) : 0;
       const s = Math.max(c.width / bmp.width, c.height / bmp.height);
-      g.filter = 'blur(' + b * env.density + 'px) brightness(' + l + '%)';
-      g.drawImage(bmp, (c.width - bmp.width * s) / 2, (c.height - bmp.height * s) / 2, bmp.width * s, bmp.height * s);
+      const dw = bmp.width * s;
+      const dh = bmp.height * s;
+      const dx = (c.width - dw) / 2;
+      const dy = (c.height - dh) / 2;
+      if (!m) {
+        g.drawImage(bmp, dx, dy, dw, dh);
+      } else {
+        // the blur's edge as the app's (its box blur clamps there): the same crop on a canvas m px larger each
+        // side, its edge rows and columns stretched out over that margin, blurred, and its middle taken
+        const big = document.createElement('canvas');
+        big.width = c.width + 2 * m;
+        big.height = c.height + 2 * m;
+        const k = big.getContext('2d');
+        k.drawImage(bmp, m + dx, m + dy, dw, dh);
+        const [W, H] = [c.width, c.height];
+        k.drawImage(big, m, m, W, 1, m, 0, W, m); // top
+        k.drawImage(big, m, m + H - 1, W, 1, m, m + H, W, m); // bottom
+        k.drawImage(big, m, 0, 1, H + 2 * m, 0, 0, m, H + 2 * m); // left, corners with it
+        k.drawImage(big, m + W - 1, 0, 1, H + 2 * m, m + W, 0, m, H + 2 * m); // right
+        g.filter = 'blur(' + px + 'px)';
+        g.drawImage(big, -m, -m);
+        g.filter = 'none';
+      }
+      if (l < 100) {
+        g.fillStyle = 'rgba(0, 0, 0, ' + (1 - l / 100) + ')';
+        g.fillRect(0, 0, c.width, c.height);
+      }
       made.set(key, c);
+      return c;
+    };
+  }
+  const pictures = { bmp: null, w: 0, h: 0, density: 0, made: new Map() };
+
+  // [picture] (pictureOf's) as a part of the scene at [x, y] ([w] × [h] px) sees it: that part of it, not the whole squeezed in
+  function pictureAt(picture, x, y, w, h) {
+    if (!picture) return null;
+    return (blurDp, brightness) => {
+      const whole = picture(blurDp, brightness);
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(w));
+      c.height = Math.max(1, Math.round(h));
+      c.getContext('2d').drawImage(whole, -x, -y);
       return c;
     };
   }
@@ -382,12 +470,25 @@
     return { scene: p, x, y };
   }
 
+  // the measurer of the theme's fonts, kept while they are the same (its measures cached)
+  let measured = { key: null, canvas: null, fonts: null, m: null };
+  function measurerFor(canvas, xml) {
+    const fonts = Object.assign({ key: '"Youmo Latin", "Youmo Han", sans-serif' }, fontFamilies(xml));
+    const key = JSON.stringify(fonts);
+    if (measured.key !== key || measured.canvas !== canvas) measured = { key, canvas, fonts, m: E.canvasMeasurer(canvas.getContext('2d'), fonts) };
+    return measured.m;
+  }
+  let checked = null;
+
   function preview() {
     const d = history.current;
     const canvas = $('preview');
-    const fonts = Object.assign({ key: '"Youmo Latin", "Youmo Han", sans-serif' }, fontFamilies(d.xml));
-    const m = E.canvasMeasurer(canvas.getContext('2d'), fonts);
-    const r = M.check(E, d, env.board, M.envJson(env), m.ok ? m.measurer : null);
+    const m = measurerFor(canvas, d.xml);
+    const fonts = measured.fonts;
+    // a tap changes only what is pressed: the theme read and the scene built as they were
+    const envKey = JSON.stringify(env);
+    const r = checked && checked.d === d && checked.env === envKey && checked.m === m ? checked.r : M.check(E, d, env.board, M.envJson(env), m.ok ? m.measurer : null);
+    checked = { d, env: envKey, m, r };
     scene = r.scene;
     theme = r.theme;
     showProblems(r.problems);
@@ -408,7 +509,7 @@
     const state = { pressed, icons: ICONS, images: assets.images, fonts };
     const picture = pictureOf();
     if (picture) state.picture = picture;
-    if (bar) drawBar(ctx, bar, Object.assign({}, state, { pressed: null }), fonts);
+    if (bar) drawBar(ctx, bar, Object.assign({}, state, { pressed: null, picture: pictureAt(picture, 0, 0, scene.width, bar.height) }), fonts);
     ctx.save();
     ctx.translate(0, barH);
     const looks = env.panel && theme ? E.looks(theme, M.envJson(env)) : null;
@@ -418,7 +519,7 @@
     } else E.paint(scene, ctx, state);
     if (popup) {
       ctx.translate(popup.x, popup.y);
-      E.paint(popup.scene, ctx, state);
+      E.paint(popup.scene, ctx, Object.assign({}, state, { picture: pictureAt(picture, popup.x, popup.y, popup.scene.width, popup.scene.height) }));
     }
     ctx.restore();
   }
@@ -462,6 +563,7 @@
    * [m] (动效's sample: transition, scale, sink, appear) played on the preview: pressed at once (never faded in),
    * held, then faded back over the transition's time; the bubble appearing over its own. Stops when done.
    */
+  let plays = 0;
   function play(m) {
     if (!scene) return;
     const keys = scene.json().keys;
@@ -473,8 +575,8 @@
     const pressMs = Math.min(80, back || 80);
     const appearMs = m.appear ? m.appear.ms : 0;
     // drawn once for the play, not each frame (the theme read again, the scene built again: frames dropped on a phone)
-    const fonts = Object.assign({ key: '"Youmo Latin", "Youmo Han", sans-serif' }, fontFamilies(history.current.xml));
-    const state = { pressed: null, icons: ICONS, images: assets.images, fonts };
+    measurerFor($('preview'), history.current.xml);
+    const state = { pressed: null, icons: ICONS, images: assets.images, fonts: measured.fonts };
     const picture = pictureOf();
     if (picture) state.picture = picture;
     const layer = (pressedKey) => {
@@ -489,7 +591,10 @@
     const canvas = $('preview');
     const ctx = canvas.getContext('2d');
     const t0 = performance.now();
+    // played again before it is done: the one before stops (two loops would draw over each other)
+    const mine = ++plays;
     const step = (now) => {
+      if (mine !== plays) return;
       const t = now - t0;
       const pressIn = Math.min(1, t / pressMs);
       const release = t < HOLD ? 0 : back ? Math.min(1, (t - HOLD) / back) : 1;
@@ -540,7 +645,7 @@
     const start = lines.slice(0, line - 1).reduce((n, l) => n + l.length + 1, 0);
     ta.focus();
     ta.setSelectionRange(start, start + (lines[line - 1] || '').length);
-    ta.scrollTop = Math.max(0, (line - 3) * 17);
+    ta.scrollTop = Math.max(0, (line - 3) * (parseFloat(getComputedStyle(ta).lineHeight) || 17));
   }
 
   // ---- files ----
@@ -549,6 +654,7 @@
     return new Promise((ok) => {
       input.value = '';
       input.onchange = () => ok(input.files[0] || null);
+      input.oncancel = () => ok(null); // the dialog closed with nothing picked
       input.click();
     });
   }
@@ -560,20 +666,42 @@
       const { doc, notes } = await M.open(E, L, FORMAT, new Uint8Array(await f.arrayBuffer()));
       set(doc);
       $('new-panel').close();
+      // every note in one toast: one after another, only the last would be seen
+      const said = [];
       for (const n of notes) {
-        if (n.kind === 'converted') toast('这是 ' + n.from + ' 主题，已转成 4.0');
-        if (n.kind === 'layouts') toast('带自定义布局：' + n.ids.join('、') + '，保存时原样保留');
+        if (n.kind === 'converted') said.push('这是 ' + n.from + ' 主题，已转成 4.0');
+        if (n.kind === 'layouts') said.push('带自定义布局：' + n.ids.join('、') + '，保存时原样保留');
+        if (n.kind === 'dropped') said.push('包里有 App 不认的文件，已去掉：' + n.names.slice(0, 3).join('、') + (n.names.length > 3 ? ' 等 ' + n.names.length + ' 个' : ''));
       }
+      if (said.length) toast(said.join('；'));
     } catch (e) {
-      toast('打不开这个文件：' + (e.message || e));
+      toast('打不开这个文件：' + openError(e));
+    }
+  }
+
+  // a file refused (youmo-lib's ThemeError codes) in words that say what to do
+  function openError(e) {
+    switch (e && e.code) {
+      case 'limit': return '文件太大或文件太多，超过了 App 的限制';
+      case 'newer': return '它是更新版本的幽默输入法做的（' + e.detail + '），先刷新这个网页再试';
+      case 'older': return '它是很旧的版本（' + e.detail + '），先导入 App 再从 App 导出';
+      case 'not-theme': return '这不是主题文件（.theme 或 theme.xml）';
+      case 'missing': return '主题里写到的文件 ' + e.detail + ' 包里没有';
+      case 'bad': return '主题文件有错：' + e.detail;
+      default: return (e && e.message) || String(e);
     }
   }
 
   // the picture decoded (upright, as its EXIF says), drawn at sizeOf its decoded sides and encoded: JPEG, or PNG
   // where any pixel is see-through
   // [rect] (l t r b of the decoded picture): only that part of it
-  async function encodePicture(bytes, sizeOf, quality, rect = null) {
-    const bmp = await createImageBitmap(new Blob([bytes]));
+  // ([bytes] may be a bitmap decoded already: it is drawn, and stays the caller's to close; [jpg] then says
+  // whether it was decoded from a JPEG)
+  async function encodePicture(bytes, sizeOf, quality, rect = null, jpg = false) {
+    const given = bytes instanceof ImageBitmap;
+    const bmp = given ? bytes : await createImageBitmap(new Blob([bytes]));
+    // a JPEG has no alpha: its pixels are not looked through
+    const opaque = given ? jpg : L.imageType(bytes) === 'jpg';
     try {
       const [l, t, r, b] = rect || [0, 0, bmp.width, bmp.height];
       const [w, h] = sizeOf(r - l, b - t);
@@ -582,14 +710,16 @@
       c.height = h;
       const g = c.getContext('2d');
       g.drawImage(bmp, l, t, r - l, b - t, 0, 0, w, h);
-      const px = g.getImageData(0, 0, w, h).data;
       let alpha = false;
-      for (let i = 3; i < px.length && !alpha; i += 4) alpha = px[i] < 255;
+      if (!opaque) {
+        const px = g.getImageData(0, 0, w, h).data;
+        for (let i = 3; i < px.length && !alpha; i += 4) alpha = px[i] < 255;
+      }
       const type = alpha ? 'png' : 'jpg';
       const blob = await new Promise((ok) => c.toBlob(ok, alpha ? 'image/png' : 'image/jpeg', quality));
       return { bytes: new Uint8Array(await blob.arrayBuffer()), type };
     } finally {
-      bmp.close();
+      if (!given) bmp.close();
     }
   }
 
@@ -600,22 +730,30 @@
     if (!f) return null;
     try {
       const picked = new Uint8Array(await f.arrayBuffer());
-      const made = await M.pictureFile(L, FORMAT, picked, encodePicture);
-      const size = L.imageSize(made.bytes);
-      // the picked picture kept for this session's cuts (a cut of the saved JPEG would be a second generation)
-      if (size) {
-        const bmp = await createImageBitmap(new Blob([picked]));
+      // decoded once for the file and both cuts (after pictureFile's checks of its header: never one too big)
+      let bmp = null;
+      const jpg = L.imageType(picked) === 'jpg';
+      try {
+        const made = await M.pictureFile(L, FORMAT, picked, async (bytes, sizeOf, quality) => encodePicture(bmp ??= await createImageBitmap(new Blob([bytes])), sizeOf, quality, null, jpg));
+        const size = L.imageSize(made.bytes);
+        if (!size) throw new Error('no size');
+        const scale = bmp.width / size[0];
+        const bg = PANELS.find((p) => p.id === 'background').ops;
+        const side = Math.min(M.PICTURE_SAVE.longSide, FORMAT.limits.pictureSide);
+        const cuts = {};
+        for (const o of ['portrait', 'landscape']) {
+          const rect = F.cropRect(size[0], size[1], bg.ratio(Object.assign({}, env, { landscape: o === 'landscape' })));
+          const c = await encodePicture(bmp, (w, h) => L.resizeInside(w, h, side, side), M.PICTURE_SAVE.quality, rect.map((v) => v * scale), jpg);
+          cuts[o] = { bytes: c.bytes, type: c.type, rect };
+        }
+        // the picked picture kept for this session's cuts (a cut of the saved JPEG would be a second generation):
+        // the one before let go only now that this one is made
         originals.clear();
-        originals.set(L.contentId(made.bytes), { bytes: picked, scale: bmp.width / size[0] });
-        bmp.close();
+        originals.set(L.contentId(made.bytes), { bytes: picked, scale });
+        return { type: made.type, src: made.bytes, cuts };
+      } finally {
+        if (bmp) bmp.close();
       }
-      const bg = PANELS.find((p) => p.id === 'background').ops;
-      const cuts = {};
-      for (const o of ['portrait', 'landscape']) {
-        const rect = F.cropRect(size[0], size[1], bg.ratio(Object.assign({}, env, { landscape: o === 'landscape' })));
-        cuts[o] = await cutOf(made.bytes, rect);
-      }
-      return { type: made.type, src: made.bytes, cuts };
     } catch (e) {
       toast(e && e.code === 'limit' ? '图片太大，打不开' : '这张图片用不了（只认 PNG、JPEG、WebP）');
       return null;
@@ -682,7 +820,6 @@
     rerender: () => showTab(),
     problems: () => problems,
     play,
-    // the preview as a PNG at most [width] px across (信息's preview image)
     // the preview as an image at most [width] px across and [bytes] long (信息's preview image): a PNG where one fits,
     // else WebP at falling quality, then smaller, until it does (a picture background's PNG is past the App's 512 KB)
     async previewImage(width, bytes = Infinity) {
@@ -836,6 +973,9 @@
   // ---- start ----
 
   function wire() {
+    // the page hidden or closed: the draft written now, not half a second later (a tab closed is gone by then)
+    window.addEventListener('pagehide', () => { if (keeping) keepNow(); });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && keeping) keepNow(); });
     for (const d of M.DEVICES) $('env-device').add(new Option(d.label + '（' + d.w + '×' + d.h + '）', d.id));
     $('env-device').add(new Option('自定义', 'custom'));
     const boards = new Set(E.layouts());
@@ -914,8 +1054,10 @@
       if (!(e.ctrlKey || e.metaKey) || e.target === $('source') || e.target === dirty) return;
       // not under a dialog: the save's would write what it checked, not what an undo made
       if (document.querySelector('dialog[open]')) return;
-      if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); $('undo').click(); }
-      else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); $('redo').click(); }
+      // by the letter whatever the case (Shift, Caps Lock make it 'Z')
+      const k = e.key.toLowerCase();
+      if (k === 'z' && !e.shiftKey) { e.preventDefault(); $('undo').click(); }
+      else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); $('redo').click(); }
     });
     // the source read again as it is typed: one undo step per pause, not per letter
     let typing = null;
@@ -935,10 +1077,12 @@
     canvas.addEventListener('pointerdown', (e) => {
       if (!history) return;
       pressed = keyAt(e);
+      const before = picked;
       if (pressed) picked = { board: env.board, key: pressed };
       $('picked').textContent = picked ? '选中的键：' + picked.key + '（' + (BOARD_LABEL[picked.board] || picked.board) + '）' : '';
       preview();
-      showTab();
+      // the tab follows another key picked, its values put in place (a field being typed in keeps its text)
+      if (picked !== before && (!before || before.key !== picked.key || before.board !== picked.board)) refreshTab();
     });
     const up = () => { if (pressed && history) { pressed = null; preview(); } };
     canvas.addEventListener('pointerup', up);

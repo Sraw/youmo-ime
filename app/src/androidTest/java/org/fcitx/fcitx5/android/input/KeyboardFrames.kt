@@ -219,7 +219,7 @@ internal class KeyboardFrames(private val window: Window) : AutoCloseable {
         val period = (1e9 / (window.decorView.display?.refreshRate ?: DEFAULT_HZ)).toLong()
         val over = frames.map { ms(it.total - (if (it.deadline > 0) it.deadline else period)) }
         val late = over.count { it > 0 }
-        val approx = if (frames.all { it.deadline > 0 }) "" else " (API 30: past a refresh period, overcounts)"
+        val approx = if (frames.all { it.deadline > 0 }) "" else " (before API 31: past a refresh period, overcounts)"
         return "frames ${frames.size}\tcpu ms %.2f / %.2f / %.2f\toverrun p90 %.2f ms\tlate %.1f%%$approx".format(
             Locale.ROOT, cpu.median, cpu.p90, cpu.p99, Stats(over).p90, 100.0 * late / frames.size,
         )
@@ -249,7 +249,8 @@ internal class KeyboardFrames(private val window: Window) : AutoCloseable {
     }
 
     private companion object {
-        const val MAX_FRAMES = 400
+        // over the longest window counted (A4's 30 s idle at 120 Hz): trimmed inside one, it would count short
+        const val MAX_FRAMES = 4000
         const val TOP_THREADS = 4
         const val METRICS_WAIT_MS = 1_000L
         const val DEFAULT_HZ = 60f
@@ -319,10 +320,6 @@ internal class Stats(values: List<Double>) {
 
     override fun toString() = "%.1f / %.1f".format(Locale.ROOT, median, p90)
 }
-
-/** design 060-render-p3 §4.3's rows that need motion in the engine, and the stage that brings it. */
-internal val ANIM_NOT_YET = listOf<Pair<String, String>>(
-)
 
 /**
  * The CPU time this process has used, user and system ([/proc/self/stat]'s utime + stime), in ms:

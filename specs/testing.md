@@ -256,6 +256,13 @@ a settings page, rotation, a field type, an upgrade) is tried on a device before
   compared only from one emulator session, in at least three pairs, the order alternated (one first,
   then the other, ...): a run's medians move by up to 30% from session to session, and neither
   side should always be the one run on the emulator longer up. The canvas's gates are in specs/app.md.
+  `uat/tools/perf.py A [B]` does all of that for two commits or trees: builds each as benchmark with
+  its text pack, runs them alternately (A1 B1 B2 A2 ...), installs and imports the text pack through
+  `PackImportProvider` each run (not the connected task: it uninstalls the app and the pack with it),
+  keeps the `KeyboardPerf` lines and writes a table of both and B against A; `--trace` builds profileable
+  and sums the `canvas anim` sections, `--lock DIR` holds a mkdir mutex for each run on a shared device.
+  `uat/tools/perf_picture.py` makes the animated picture of the A4 rows (`perf-picture.webp` in
+  `app/src/androidTest/assets`).
   Systrace sections of the app: `adb shell atrace --async_start -c -b 32768
   -a io.github.sraw.youmo.bench view`, the test, then `atrace --async_dump` (a non-debuggable app's
   `Trace` sections show only when it is named with `-a`).
@@ -372,10 +379,11 @@ Two pages (060-render-p3 M1): `index.html`, the maker (`src/`: `page.html` with 
 `style.css`, `maker.js`: the document, held to the engine by `test/maker.test.mjs`, `form.js` and
 `panels/*.js`: the editing's forms (M2: one file a tab, put in as one script in their names' order),
 held to the engine by `test/form.test.mjs`, `ui.js`: the page), and `classic/index.html`, the maker before 0.6.0, kept till 0.6.x ends (`src/classic/`: its
-`page.html`, `style.css`, `ui.js`); both run `src/lib.js` (everything the tests hold to the app's
+`page.html`, `style.css`, `ui.js`), and `examples/` (`examples.json` and a folder of each example, put in the
+maker's `youmo-examples` block); both run `src/lib.js` (everything the tests hold to the app's
 3.0 rules and zip). Edit them, then `node web/theme-maker/tools/assemble.mjs`, which writes both: the
 sources put in, each page's generated blocks kept from that page as it is (each carries only the ones
-its `page.html` has a slot for: the maker `youmo-format` and `youmo-engine-icons`, classic
+its `page.html` has a slot for: the maker `youmo-format`, `youmo-engine-icons` and `youmo-examples`, classic
 `youmo-format`, `youmo-presets`, `youmo-layout`, `youmo-icons` and no engine; `ThemeMakerTestdata.block`
 writes a block into every page that has it), and the Content-Security-Policy's `script-src` set to each script's SHA-256 (six on the maker,
 two on classic; nothing else runs, a script not hashed is refused, an edit by hand breaks them).
@@ -393,9 +401,9 @@ the style text meant (a form edit changes the `<style>` of exactly that `select=
 the property, else adds one at the end; a style left with only its `select=` goes; what the form does
 not know, comments and spacing kept), the engine reads every result, and the cascade check
 (`YoumoEngine.sources`, `Cascade.sources`) names the style each value comes from; the forms write numbers within the engine's bounds (`YoumoEngine.limits`), and an icon the app would refuse (a PNG, an SVG past `SvgSubset`, which the engine's `readIcon` runs) is named and blocks the save. `from-maker.theme` and `from-maker-picture.theme` (the panels' save: a real PNG cut for each orientation, see-through keys, a gradient, an SVG icon) are
-its saves, which `ThemePackImportTest` imports. The
+its saves, which `ThemePackImportTest` imports. `test/names-and-files.test.mjs` (the same): names and files as theme.xml has them: a name with XML's special characters, values with `>`, which files are still named, the effect images the app checks (≤ 256 px a side, size limit, .png/.webp only), theme.xml's size limit, the draft's files written once. The
 site is `index.html` with the engine put in: the Pages workflow leaves `src/`, `tools/`, `test/`,
-`fonts/`, `dev/` and `build/` out and writes its `index.html` (and `classic/index.html` beside it) with `assemble.mjs --engine <file>`.
+`fonts/`, `examples/`, `dev/` and `build/` out and writes its `index.html` (and `classic/index.html` beside it) with `assemble.mjs --engine <file>`.
 
 ### The engine in the page (060-render-p3 W1)
 

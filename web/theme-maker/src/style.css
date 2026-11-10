@@ -68,3 +68,4 @@ dialog h2 { margin: 0; font-size: 16px; }
 .sources a { color: var(--accent); }
 .crop-canvas { max-width: 100%; touch-action: none; display: block; }
 .warnings { color: var(--warn); font-size: 12px; margin: 4px 0 8px; padding-left: 18px; }
+.bad { color: var(--err); }

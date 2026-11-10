@@ -37,14 +37,16 @@ object KeyboardLabels {
         val id = boardOf(keyboard)
         val shown = SceneLayouts.of(context, id) ?: return null
         if (shown === SceneLayouts.builtIn(context, id)) return null
-        val letters = when (id) {
-            "k14" -> NineKeyLetters.G14
-            "k18" -> NineKeyLetters.G18
-            else -> null
-        }
+        // the grouped keyboards' letters, by the layout they are drawn with
+        val letters = listOf(NineKeyLetters.G14, NineKeyLetters.G18).firstOrNull { GroupedKeyboard.layoutOf(it) == id }
         if (letters != null && GroupedKeyboard.grouping(context, letters, own = im == InputMethodCatalog.PINYIN, log = false).layout !== shown) return null
-        val name = shown.layout.name
-        return if (name.length > NAME_MAX) name.take(NAME_MAX) + "…" else name
+        return shortName(shown.layout.name)
+    }
+
+    /** A layout's [name] as shown: past [NAME_MAX] characters cut, with `…`; by characters, not UTF-16 units, so an emoji or an extension-B character is never cut in half. */
+    internal fun shortName(name: String): String {
+        if (name.codePointCount(0, name.length) <= NAME_MAX) return name
+        return name.substring(0, name.offsetByCodePoints(0, NAME_MAX)) + "…"
     }
 
     /** [label] (a keyboard's own name) with the theme's layout's it is drawn with ([themedName]). */

@@ -4,6 +4,10 @@
  */
 package org.fcitx.fcitx5.android.data.theme
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.view.View
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.utils.appContext
 import timber.log.Timber
@@ -38,6 +42,9 @@ object PackDrawGuard {
     private val drawn = HashSet<Key>()
     private var pending: Key? = null
 
+    // the frames asked for while a pack's mark is pending ([askFrame]), a pack
+    private val asked = HashMap<Key, Int>()
+
     private fun mark() = File(dir(), MARK)
 
     /**
@@ -56,6 +63,24 @@ object PackDrawGuard {
         return true
     }
 
+    /**
+     * [owner] about to draw a frame shown of the pack [key] (null: a theme not a pack's). Where a mark is pending
+     * (the keyboard's window hidden before its frame committed) and [owner] is a keyboard of the input method (a
+     * view not in an activity, whichever instance: a theme change builds the keyboard's views anew) drawing anything
+     * other than that pack (a built-in theme, another pack, even one already drawn this process), the mark is
+     * cleared: that pack is no longer what the keyboard shows. A view in an activity (a settings preview, a theme
+     * card) clears nothing. On the main thread.
+     */
+    fun shows(owner: View, key: Key?) {
+        val p = pending ?: return
+        if (p == key || inActivity(owner.context)) return
+        pending = null
+        mark().delete()
+    }
+
+    private fun inActivity(context: Context) =
+        generateSequence(context) { (it as? ContextWrapper)?.baseContext }.any { it is Activity }
+
     /** The frame [drawing] marked [key] for committed: its mark gone. Another's frame clears nothing. On the main thread. */
     fun frameDrawn(key: Key) {
         if (pending != key) return
@@ -63,9 +88,6 @@ object PackDrawGuard {
         drawn.add(key)
         mark().delete()
     }
-
-    // the frames asked for while a pack's mark is pending ([askFrame]), a pack
-    private val asked = HashMap<Key, Int>()
 
     /**
      * Whether the view drawing [key]'s pending frame may ask for another, whose commit tells that one drawn: the

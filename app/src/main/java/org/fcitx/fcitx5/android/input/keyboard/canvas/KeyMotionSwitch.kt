@@ -51,6 +51,10 @@ object KeyMotionSwitch {
         changes.remove(f)
     }
 
+    /**
+     * Whether keys may move now. Its first call in a process (and [listen]'s) starts watching battery saver:
+     * the receiver registered on the application, never unregistered (one a process, as long as it lives).
+     */
     fun on(context: Context): Boolean {
         val app = context.applicationContext
         if (watching !== app) watch(app)
@@ -58,6 +62,9 @@ object KeyMotionSwitch {
         return prefs.keyboardMotion.getValue() && !prefs.disableAnimation.getValue() && !powerSave && ValueAnimator.areAnimatorsEnabled()
     }
 
+    // battery saver's broadcast is the system's (protected): only the system sends it, so exported is safe.
+    // Not RECEIVER_NOT_EXPORTED: below Android 13 ContextCompat then asks for DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION,
+    // which the manifest removes (it throws)
     private fun watch(app: Context) {
         watching = app
         powerSave = app.getSystemService(PowerManager::class.java)?.isPowerSaveMode == true

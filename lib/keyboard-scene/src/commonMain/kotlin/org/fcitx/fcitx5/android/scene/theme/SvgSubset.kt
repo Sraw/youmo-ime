@@ -52,10 +52,13 @@ object SvgSubset {
         return problems
     }
 
-    /** An icon's outline as a drawer takes it: its viewBox's sides and its filled paths, in one tint. */
-    data class Icon(val width: Double, val height: Double, val paths: List<Path>)
+    /**
+     * An icon's outline as a drawer takes it: its viewBox's sides and its filled paths, in one tint; [x], [y] the
+     * viewBox's origin, the point drawn at the box's top left (Material Symbols' `0 -960 960 960`).
+     */
+    data class Icon(val width: Double, val height: Double, val paths: List<Path>, val x: Double = 0.0, val y: Double = 0.0)
 
-    /** A filled path: [d] as SVG has it, [evenOdd] its rule, [alpha] its opacity (fill-opacity times its groups'). */
+    /** A filled path: [d] as SVG has it, [evenOdd] its rule, [alpha] its opacity (its fill-opacity, its own or a group's, times its groups' opacity). */
     data class Path(val d: String, val evenOdd: Boolean, val alpha: Double)
 
     /**
@@ -71,17 +74,17 @@ object SvgSubset {
         val w = box?.get(2) ?: root["width"]?.removeSuffix("px")?.toDouble() ?: DEFAULT_SIDE
         val h = box?.get(3) ?: root["height"]?.removeSuffix("px")?.toDouble() ?: DEFAULT_SIDE
         val paths = ArrayList<Path>()
-        fun walk(el: XmlElement, fill: String?, rule: String?, alpha: Double) {
+        // fill, fill-rule and fill-opacity inherited as SVG's are (the nearest one's), opacity multiplied
+        fun walk(el: XmlElement, fill: String?, rule: String?, fillOpacity: Double, alpha: Double) {
             val f = el["fill"] ?: fill
             val r = el["fill-rule"] ?: rule
+            val fo = el["fill-opacity"]?.toDouble() ?: fillOpacity
             val a = alpha * (el["opacity"]?.toDouble() ?: 1.0)
-            if (el.name == "path" && f != "none") {
-                paths += Path(el["d"]!!, r == "evenodd", a * (el["fill-opacity"]?.toDouble() ?: 1.0))
-            }
-            el.children.forEach { walk(it, f, r, a) }
+            if (el.name == "path" && f != "none") paths += Path(el["d"]!!, r == "evenodd", a * fo)
+            el.children.forEach { walk(it, f, r, fo, a) }
         }
-        walk(root, null, null, 1.0)
-        return Parsed.Ok(Icon(w, h, paths))
+        walk(root, null, null, 1.0, 1.0)
+        return Parsed.Ok(Icon(w, h, paths, box?.get(0) ?: 0.0, box?.get(1) ?: 0.0))
     }
 
     private const val DEFAULT_SIDE = 24.0
@@ -120,7 +123,7 @@ object SvgSubset {
         "fill" -> "a #hex colour, none or currentColor".unless(value in FILL_WORDS || COLOR.matches(value))
         "fill-rule" -> "nonzero or evenodd".unless(value in FILL_RULES)
         "fill-opacity", "opacity" -> "a number 0–1".unless(finite(value) && value.toDouble() in 0.0..1.0)
-        "width", "height" -> "a number".unless(LENGTH.matches(value) && finite(value.removeSuffix("px")))
+        "width", "height" -> "a number $MIN_SIDE or over".unless(LENGTH.matches(value) && finite(value.removeSuffix("px")) && value.removeSuffix("px").toDouble() >= MIN_SIDE)
         "viewBox" -> "four numbers, the last two over 0".unless(viewBox(value))
         "xmlns" -> "must be $NAMESPACE".unless(value == NAMESPACE)
         else -> null
@@ -128,7 +131,7 @@ object SvgSubset {
 
     private fun String.unless(ok: Boolean): String? = if (ok) null else this
 
-    /** A number's size at most, and a viewBox side's least: an icon's, what a drawing in floats scales by finitely. */
+    /** A number's size at most, and a side's least (a viewBox's, width= and height=): an icon's, what a drawing in floats scales by finitely. */
     const val MAX_NUMBER = 1e6
     const val MIN_SIDE = 1e-3
 
@@ -138,7 +141,7 @@ object SvgSubset {
 
     private fun finite(value: String): Boolean = NUMBER.matches(value) && inRange(value.toDouble())
 
-    // a side of 1e-300 would scale the icon by Infinity
+    // a side of 1e-300 would scale the icon by Infinity (width= and height= too, the sides where no viewBox is)
     private fun viewBox(value: String): Boolean {
         val v = value.trim().split(Regex("[\\s,]+"))
         if (v.size != VIEW_BOX || !v.all(::finite)) return false

@@ -45,15 +45,39 @@ class KeyInkGesture {
     // dot then stroke must see the input the dot started
     private var sentTyped = false
 
+    /**
+     * The number the next key sent to the engine gets, counted where the keys are sent (every key, not only
+     * the taps: a space or a mark sent before the tap and answered after it is not the tap's answer). A tap is
+     * told ([tapped]) just before its key is sent, and remembers it. Unset (a caller that does not number its
+     * keys): one past the last heard.
+     */
+    var nextKey: () -> Long = { heard + 1 }
+
+    // the number of the last key the engine had taken by its last answer ([engineTyped]'s keysHeard), the
+    // number of the last tap sent, whose answer alone (or a later one) replaces its mark (an older one, late,
+    // leaves it), since when it is awaited (NONE: none), and what the last answer said, ignored or not
+    private var heard = 0L
+    private var awaited = 0L
+    private var awaitedSince = NONE
+    private var lastSaid = false
+
     /** Whether a touch down at [time] is a stroke from its down: the writing goes on. */
     fun writing(time: Long): Boolean = drawing || lastUp != NONE && time - lastUp < pauseMillis
 
     /**
-     * A touch down on a letter or a split keyboard's gap at [time], [typed] whether the input method has
-     * input typed: whether it may become a stroke once it moves. With input typed, only where the tap
+     * A touch down on a letter or a split keyboard's gap at [time], [typedSeen] whether the input method has
+     * input typed as the keyboard last heard (a letter tapped and sent since counts too): whether it may
+     * become a stroke once it moves. With input typed, only where the tap
      * just before started it, within the pause ([takeTapped] then gives that tap's places once it does).
      */
     fun mayWrite(time: Long, typedSeen: Boolean): Boolean {
+        // the tap's key not answered within the pause (one the engine never heard): its mark no longer
+        // held over what the engine last said, so writing is never blocked for good
+        if (awaitedSince != NONE && time - awaitedSince >= pauseMillis) {
+            awaitedSince = NONE
+            awaited = heard
+            sentTyped = lastSaid
+        }
         val typed = typedSeen || sentTyped
         tapTakable = typed && tapPoints != null && time - tapUp < pauseMillis
         if (!tapTakable) forgetTap()
@@ -80,6 +104,8 @@ class KeyInkGesture {
     fun tapped(time: Long, points: FloatArray, count: Int) {
         forgetTap()
         sentTyped = true
+        awaited = nextKey()
+        awaitedSince = time
         if (!startsInput) return
         tapUp = time
         tapPoints = points.copyOf(count)
@@ -87,10 +113,21 @@ class KeyInkGesture {
 
     /**
      * What the engine says once it has the keys sent so far (Engines.typedOnKeys): it replaces the mark a
-     * tap left, so the mark cannot stick. The caller tells it after every key the engine handled, not
-     * only when the answer changes.
+     * tap left. The caller tells it after every answer, not only when it changes. [keysHeard] is the number
+     * ([nextKey]'s) of the last key the engine had taken by this answer: one before the last tap's (a late
+     * answer, to a key or context before it) leaves the tap's mark; [ALL_HEARD]
+     * (the engine reset: nothing typed) replaces it whatever was sent. A tap whose key gets no answer
+     * holds its mark only till the pause ([mayWrite]), so the mark cannot stick.
      */
-    fun engineTyped(typed: Boolean) {
+    fun engineTyped(typed: Boolean, keysHeard: Long = ALL_HEARD) {
+        lastSaid = typed
+        if (keysHeard == ALL_HEARD) {
+            awaited = heard
+        } else {
+            heard = maxOf(heard, keysHeard)
+            if (keysHeard < awaited) return
+        }
+        awaitedSince = NONE
         sentTyped = typed
     }
 
@@ -116,7 +153,10 @@ class KeyInkGesture {
         tapTakable = false
     }
 
-    private companion object {
-        const val NONE = Long.MIN_VALUE
+    companion object {
+        private const val NONE = Long.MIN_VALUE
+
+        /** An answer about every key sent ([engineTyped]): the engine reset, or a caller that does not count. */
+        const val ALL_HEARD = Long.MAX_VALUE
     }
 }

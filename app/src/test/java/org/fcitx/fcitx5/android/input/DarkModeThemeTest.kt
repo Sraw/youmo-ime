@@ -132,7 +132,7 @@ class DarkModeThemeTest {
         assertEquals(color(android.R.color.system_neutral2_100), light("surface-container-highest"))
         assertEquals(color(android.R.color.system_accent1_600), light("primary"))
         assertEquals(color(android.R.color.system_neutral1_900), dark("surface-container"))
-        assertEquals(color(android.R.color.system_neutral2_1000), dark("surface-container-high"))
+        assertEquals(color(android.R.color.system_neutral2_900), dark("surface-container-high"))
         assertEquals(color(android.R.color.system_neutral2_800), dark("surface-container-highest"))
         assertEquals(color(android.R.color.system_accent1_200), dark("primary"))
         // the tones as they are

@@ -70,6 +70,7 @@
   <style select="*/enter label" hidden="true"/>
   <style select="@flat */enter label" hidden="false"/>
   <style select="@flat */enter.enter label, @flat */enter.space label" hidden="true"/>
+  <style select="*/enter.function:pressed label" hidden="false"/>
   <style select="preview, popup" fill="@popupBackground" radius="8dp" shadow="0 2dp 2dp #33000000" color="@popupText"/>
   <style select="popup:selected" fill="@genericActiveBackground" color="@genericActiveForeground"/>
   <style select="menu" fill="@accentKey" radius="50%" color="@accentKeyText" icon-color="@accentKeyText"/>

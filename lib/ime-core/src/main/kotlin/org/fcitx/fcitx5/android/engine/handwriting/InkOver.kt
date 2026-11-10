@@ -103,9 +103,12 @@ class InkOver(
             if (!typing) return ink(action, takeBack = false).let { it.copy(deleteBefore = it.deleteBefore + back.deleteBefore) }
         }
         if (typing) {
-            // dropped: taken, so not held for the next (Engines.inkSent), its piece ended, so the pad wipes it
+            // dropped: taken, so not held for the next (Engines.inkSent), its piece ended, so the pad wipes it.
+            // The handwriting is made for it if it was not: what it took and ended live there, read by Engines
+            // (inkSent, inkEnded); once per session, so not worth a second home for them here
             handwriting().drop(action)
-            inner?.let { return it.copy(commit = "", deleteBefore = 0, handled = true) }
+            // what [session] last showed, as it was; not what came with it then (a refine to run, a pick): not this Ink's
+            inner?.let { return it.copy(commit = "", deleteBefore = 0, handled = true, refines = false, picked = false) }
         }
         if (!inking) {
             // what [session] offered goes: told the text before again, its input none
@@ -121,7 +124,11 @@ class InkOver(
     private fun letter(action: Action): Snapshot {
         val put = inkApply(Action.CommitRaw)
         val typed = innerApply(action)
-        return typed.copy(commit = put.commit + typed.commit, deleteBefore = put.deleteBefore)
+        // what the letter's answer deletes comes off what was put in first, then off the text before it
+        val n = put.commit.codePointCount(0, put.commit.length)
+        val cut = minOf(typed.deleteBefore, n)
+        val kept = put.commit.substring(0, put.commit.offsetByCodePoints(0, n - cut))
+        return typed.copy(commit = kept + typed.commit, deleteBefore = put.deleteBefore + typed.deleteBefore - cut)
     }
 
     private fun typesLetter(action: Action) = when (action) {
@@ -163,7 +170,8 @@ class InkOver(
 
     private fun wrote(s: Snapshot) {
         if (s.deleteBefore == 0 && s.commit.isEmpty()) return
-        val kept = written.codePointCount(0, written.length) - minOf(s.deleteBefore, written.codePointCount(0, written.length))
+        val n = written.codePointCount(0, written.length)
+        val kept = n - minOf(s.deleteBefore, n)
         written = (written.substring(0, written.offsetByCodePoints(0, kept)) + s.commit).takeLast(Action.Context.HOST_CHARS)
     }
 
@@ -181,7 +189,8 @@ class InkOver(
 
     override fun blockScope(index: Int): BlockScope? = shown.blockScope(index)
 
-    override fun reread(): Snapshot? = made?.takeIf { inking }?.let { h -> h.reread()?.also { inked = it } } ?: session.reread()
+    // what shows asked alone: the handwriting's nothing to read again is not [session]'s snapshot, which does not show
+    override fun reread(): Snapshot? = if (inking) made?.reread()?.also { inked = it } else session.reread()
 
     override val rereads: Boolean get() = if (inking) true else session.rereads
 

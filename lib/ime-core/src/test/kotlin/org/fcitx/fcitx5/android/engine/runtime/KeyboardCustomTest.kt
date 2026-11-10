@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.input.scene.SceneData
 import org.fcitx.fcitx5.android.input.scene.SceneGroups
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -24,6 +25,10 @@ import org.junit.Test
 
 /** A layout's own letter groups typed (060-render-p3 T9a): the sample 17 keys, a tap's place across and down, the built-in keys' codes as they were. */
 class KeyboardCustomTest {
+    @After
+    fun noneInUse() {
+        NineKeyLetters.clearInUse()
+    }
 
     private val k17Layout = (LayoutReader.layout(SceneData.read("k17.xml")) as Parsed.Ok).value
     private val k17 = SceneGroups.letters(SceneGroups.written(k17Layout))!!.also { NineKeyLetters.inUse(it) }

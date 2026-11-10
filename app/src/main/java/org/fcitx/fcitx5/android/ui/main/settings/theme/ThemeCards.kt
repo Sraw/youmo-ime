@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.ui.main.settings.theme
 
 import org.fcitx.fcitx5.android.data.theme.Theme
+import kotlin.reflect.KClass
 
 /**
  * The theme lists' cards (060-render-p3 T3): a built-in theme or a pack (T8a) of two versions (`pixel#light`,
@@ -21,15 +22,18 @@ class ThemeCards(themes: List<Theme>, dark: Boolean = false) {
     init {
         // a built-in file's or a pack's (Theme.Versioned): one of each name, never both (an import refuses a built-in's)
         val versioned = themes.filter { it is Theme.Versioned }
-        val pairs = versioned.groupBy { it::class to (it as Theme.Versioned).file }.values.filter { it.size == 2 }
+        val pairs = versioned.groupBy(::family).values.filter { it.size == 2 }
         others = pairs.flatMap { (a, b) -> listOf(a.name to b, b.name to a) }.toMap()
-        val seen = HashSet<String>()
+        val seen = HashSet<Pair<KClass<out Theme>, String>>()
         // a pair's [dark] version shown at first (the light one in the list, the slot's in a slot's)
         shown = themes.mapNotNull { t ->
             if (t !is Theme.Versioned || t.name !in others) return@mapNotNull t
-            if (!seen.add(t::class.simpleName + "/" + t.file)) null else if (t.isDark == dark) t else others.getValue(t.name)
+            if (!seen.add(family(t))) null else if (t.isDark == dark) t else others.getValue(t.name)
         }.toMutableList()
     }
+
+    // a pair's key: its kind and file (a built-in's and a pack's never share a card)
+    private fun family(t: Theme): Pair<KClass<out Theme>, String> = t::class to (t as Theme.Versioned).file
 
     /** The other version of [theme]'s card, if it has two. */
     fun other(theme: Theme): Theme? = others[theme.name]

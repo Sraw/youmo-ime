@@ -10,6 +10,7 @@ import android.graphics.Path
 import android.os.SystemClock
 import android.view.View
 import androidx.annotation.VisibleForTesting
+import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
@@ -39,17 +40,24 @@ class KeyInk(
     override val pad = InkPad()
 
     /** When a touch on the letters is a stroke. */
-    val gesture = KeyInkGesture()
+    val gesture = KeyInkGesture().apply { nextKey = EngineState::nextKey }
 
     /** The keys typed while the pad is read, in order with it. */
     val keys: InkKeys by lazy {
-        InkKeys(reads.value, this, { reading, piece -> deliver(reading, piece, piece == takingBack.also { if (it == piece) takingBack = NO_PIECE }) }, finished)
+        InkKeys(reads.value, this, { reading, piece -> deliver(reading, piece, consumeTakeBack(piece)) }, finished)
     }
 
     private val reads = lazy(recognition)
 
     // the piece whose first dot was a tap taken back, till its first reading is delivered
     private var takingBack = NO_PIECE
+
+    // whether [piece]'s reading is the first since its tap was taken back: true once, the take-back spent
+    private fun consumeTakeBack(piece: Int): Boolean {
+        if (piece != takingBack) return false
+        takingBack = NO_PIECE
+        return true
+    }
 
     /** Whether a stroke was ever put on the pad: then the keys go in order with it ([keys]); else straight on. */
     var writtenOn = false
@@ -75,7 +83,8 @@ class KeyInk(
         if (reads.isInitialized()) keys.restart() else next()
     }
 
-    // the theme's ink as the handwriting pad's when its theme says none (HandwritingPadView)
+    // the theme's ink as the handwriting pad's when its theme says none (HandwritingPadView): on purpose, the
+    // typing boards have no ink slot of their own (the pad's is the handwriting board's scene, not theirs)
     private val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = theme.keyTextColor
         style = Paint.Style.STROKE

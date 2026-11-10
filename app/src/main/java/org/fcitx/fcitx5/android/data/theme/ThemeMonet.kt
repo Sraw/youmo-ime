@@ -95,7 +95,7 @@ object ThemeMonet {
         @RequiresApi(Build.VERSION_CODES.S)
         get() = mapOf(
             "surface-container" to android.R.color.system_neutral1_900, // neutral12
-            "surface-container-high" to android.R.color.system_neutral2_1000, // neutral17
+            "surface-container-high" to android.R.color.system_neutral2_900, // neutral17: no such tone (900 is 10, 1000 black)
             "surface-container-highest" to android.R.color.system_neutral2_800, // neutral22
             "surface-bright" to android.R.color.system_neutral1_800, // neutral24
             "on-surface" to android.R.color.system_neutral1_100,

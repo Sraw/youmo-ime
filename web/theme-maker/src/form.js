@@ -8,7 +8,7 @@
   // the comments of [xml] blanked (same length), so what is looked for is never found inside one
   const uncommented = (xml) => xml.replace(/<!--[\s\S]*?-->/g, (c) => c.replace(/[^\n]/g, ' '));
   const unescape = (v) => v.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-  const escape = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  const escape = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const lineAt = (xml, i) => xml.slice(0, i).split('\n').length;
   const ATTR = /([\w:-]+)\s*=\s*("([^"]*)"|'([^']*)')/g;
 
@@ -22,7 +22,8 @@
   /** The elements named [name] of [xml], not in comments: `[{start, end, line, tag, attrs}]` (end: past the element). */
   function elements(xml, name) {
     const plain = uncommented(xml);
-    const re = new RegExp('<' + name + '\\b[^>]*?(\\/>|>)', 'g');
+    // a '>' inside a quoted value does not end the tag
+    const re = new RegExp('<' + name + '\\b(?:[^>"\']|"[^"]*"|\'[^\']*\')*?(\\/>|>)', 'g');
     const out = [];
     for (const m of plain.matchAll(re)) {
       let end = m.index + m[0].length;
@@ -238,6 +239,8 @@
       let tag = withAttr(old.tag, 'src', p.src);
       tag = withAttr(tag, 'brightness', p.brightness != null && p.brightness !== 100 ? p.brightness + '%' : null);
       tag = withAttr(tag, 'blur', p.blur ? p.blur + 'dp' : null);
+      // a picture put in place of the old one says whether it is animated; one only tuned or cut keeps what it had
+      if ('animated' in p) tag = withAttr(tag, 'animated', p.animated ? 'true' : null);
       // a <picture …/>: an open and a close, so a cut has where to go
       const closed = /\/>$/.test(old.tag);
       let body = closed ? '\n  </picture>' : xml.slice(old.start + old.tag.length, old.end);
@@ -266,8 +269,7 @@
       if (old) xml = splice(xml, old.start, old.end, text);
       else if (text) xml = insert(xml, 'picture', text);
     }
-    const named = uncommented(xml);
-    const gone = [...before.matchAll(/\b(?:src|file)="([^"]+)"/g)].map((m) => m[1]).filter((f) => !named.includes('"' + f + '"') && !named.includes('(' + f));
+    const gone = [...before.matchAll(/\b(?:src|file)\s*=\s*(?:"([^"]+)"|'([^']+)')/g)].map((m) => unescape(m[1] ?? m[2])).filter((f) => !isNamed(xml, f));
     return { xml, gone: [...new Set(gone)] };
   }
 
@@ -316,15 +318,28 @@
     throw new Error('no fill of kind ' + f.kind);
   }
 
+  /**
+   * Whether [xml] (not its comments) still names the file [file]: as an attribute's whole value (src=, file=,
+   * preview=, an icon's), or as a function's first argument (image(…), ripple-image(…), particles(…)). The one rule
+   * every page uses before a file goes with what named it.
+   */
+  function isNamed(xml, file) {
+    const plain = uncommented(xml);
+    const lit = (v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp('(["\'])(?:' + lit(file) + '|' + lit(escape(file)) + ')\\1|\\(\\s*(["\']?)' + lit(file) + '\\2\\s*[,)]').test(plain);
+  }
+
   /** [text] (a fill=) as fillText takes it; `{kind: other, text}` for what the form does not edit (an image). */
   function parseFill(text) {
     if (text == null) return null;
     const t = text.trim();
-    let m = /^linear\((-?\d+)deg,\s*(.+)\)$/.exec(t);
+    let m = /^linear\((-?\d{1,3}(?:\.\d+)?)deg,\s*(.+)\)$/.exec(t);
     if (m) {
       const stops = splitTop(m[2]).map((s) => { const x = /^(.*\S)\s+(-?[\d.]+)%$/.exec(s.trim()); return x ? [x[1], +x[2]] : null; });
       if (stops.every(Boolean)) return { kind: 'linear', angle: +m[1], stops };
     }
+    // a bare picture: the engine's, unblurred and undimmed
+    if (t === 'picture') return { kind: 'picture', blur: 0, brightness: 100, over: null };
     m = /^picture\(([\s\S]*)\)$/.exec(t);
     if (m) {
       const [blur, brightness, over] = splitTop(m[1]).map((s) => s.trim());
@@ -454,7 +469,7 @@
   root.YoumoForm = {
     uncommented, styles, elements, valueOf, setProp, setProps, insert, sameSelect, LIMITS, clamp,
     COLOR_GROUPS, colors, setColor, variants, withDark, hexOf, parseHex,
-    picture, setPicture, cropRect,
+    picture, setPicture, cropRect, isNamed,
     fillText, parseFill, shadowText, parseShadow, borderText, parseBorder, parseInset, insetText, parseRadius, radiusText,
     meta, setMeta,
     keyName, RANGES, SCENES, STATES, selector,

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.theme
 
+import org.fcitx.fcitx5.android.scene.layout.PackLayouts
 import org.fcitx.fcitx5.android.scene.look.Keys
 import org.fcitx.fcitx5.android.scene.look.NineSlice
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
@@ -29,7 +30,7 @@ object ThemeAssetLimits {
     /** A pack's `theme.xml`: the engine reads no more than a million characters of one (Xml.MAX_CHARS). */
     const val MAX_THEME_XML_BYTES = 1024L * 1024
     const val MAX_LAYOUTS = 16
-    const val MAX_LAYOUT_BYTES = 64L * 1024
+    const val MAX_LAYOUT_BYTES = PackLayouts.MAX_BYTES
     const val MAX_PREVIEW_BYTES = 512L * 1024
     const val MAX_PREVIEW_SIDE = 2048
 

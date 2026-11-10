@@ -57,9 +57,10 @@ class PunctuationMapUatTest {
 
     // what the main thread posted to the host done, and what it told back shown
     private fun synced() {
-        var done = false
-        h.service.postFcitxJob { done = true }
-        until("the host's queue done") { done }
+        // set on the fcitx thread, read on this one
+        val done = java.util.concurrent.atomic.AtomicBoolean()
+        h.service.postFcitxJob { done.set(true) }
+        until("the host's queue done") { done.get() }
         h.idle()
     }
 

@@ -19,6 +19,7 @@ import android.widget.FrameLayout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.cancel
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyMotionSwitch
@@ -27,6 +28,7 @@ import org.fcitx.fcitx5.android.scene.look.Crop
 import org.fcitx.fcitx5.android.scene.look.Picture
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.utils.appContext
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -42,6 +44,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.util.ReflectionHelpers
 import java.io.File
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /**
  * 060-render-p3 A4: the animated picture plays only while it is shown and motion is allowed: the keyboard
@@ -214,6 +217,9 @@ class AnimatedPictureTest {
             gone.layout(0, 0, 400, 100)
             val none = load(gone, p)
             waitFor { decodedOn.size == 2 }
+            // its decode done and its turn back to the main thread posted, before the main thread runs
+            io.shutdown()
+            assertTrue(io.awaitTermination(5, TimeUnit.SECONDS))
             repeat(3) { idle() }
             assertTrue(none.isEmpty())
         } finally {
@@ -222,6 +228,9 @@ class AnimatedPictureTest {
     }
 
     private val scope = CoroutineScope(SupervisorJob())
+
+    @After
+    fun cancelScope() = scope.cancel()
 
     private fun waitFor(done: () -> Boolean) {
         val until = System.currentTimeMillis() + 5000

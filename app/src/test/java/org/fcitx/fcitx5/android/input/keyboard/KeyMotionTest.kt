@@ -212,7 +212,6 @@ class KeyMotionTest {
         assertEquals(1f, leaving.alpha, 1e-3f)
         at(c.animator("shift")!!, 100)
         assertEquals(0.5f, leaving.alpha, 1e-3f)
-        assertTrue("${leaving.alpha}", leaving.alpha > 0f && leaving.alpha < 1f)
         frames(300)
         assertNull(c.leavingNode("shift"))
         // its fade over, the old face's display list freed at once (not at GC)

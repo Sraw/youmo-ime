@@ -5,6 +5,16 @@
 (function (root) {
   'use strict';
 
+  // the comments of [xml] blanked (same length), so what is looked for is never found inside one
+  const uncommented = (xml) => xml.replace(/<!--[\s\S]*?-->/g, (c) => ' '.repeat(c.length));
+  const unescape = (v) => v.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const escape = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  // a file named by an attribute: either quote, spaces around '=' (as XML has it and the app reads it)
+  const srcOf = (tag, attr) => new RegExp('<(' + tag + ')\\b[^>]*?\\b(' + attr + ')\\s*=\\s*(?:"([^"]+)"|\'([^\']+)\')', 'g');
+  const fileOf = (m) => unescape(m[3] ?? m[4]);
+  // the image a style's function names: a key's image(…), an effect's ripple-image(…) or particles(…)
+  const IMAGE_FN = /(?<![\w-])(image|ripple-image|particles)\(\s*([^,)\s]+)/g;
+
   const THEME_XML = 'theme.xml';
   const LAYOUTS = 'layouts/';
   const UNDO_LIMIT = 100;
@@ -18,14 +28,22 @@
 
   /** The <theme>'s name= of [xml], null for none. */
   function themeName(xml) {
-    const m = /<theme\b[^>]*?\sname="([^"]*)"/.exec(xml);
-    return m ? m[1] : null;
+    const m = /<theme\b(?:[^>"']|"[^"]*"|'[^']*')*?\sname\s*=\s*("([^"]*)"|'([^']*)')/.exec(uncommented(xml));
+    return m ? unescape(m[2] ?? m[3]) : null;
   }
 
   /** [xml] with its <theme>'s name= [name] (one put in where it has none). */
   function withName(xml, name) {
-    if (themeName(xml) != null) return xml.replace(/(<theme\b[^>]*?\sname=")[^"]*(")/, (all, a, b) => a + name + b);
-    return xml.replace(/<theme\b/, (t) => t + ' name="' + name + '"');
+    const t = /<theme\b(?:[^>"']|"[^"]*"|'[^']*')*?\/?>/.exec(uncommented(xml));
+    if (!t) return xml;
+    const tag = xml.slice(t.index, t.index + t[0].length);
+    // its attributes one by one, so a ' name=' inside another's quoted value is never the one changed
+    let at = null;
+    for (const a of tag.matchAll(/(\s)([^\s=/>]+)\s*=\s*("[^"]*"|'[^']*')/g)) if (a[2] === 'name') { at = a; break; }
+    const named = at
+      ? tag.slice(0, at.index) + at[1] + 'name="' + escape(name) + '"' + tag.slice(at.index + at[0].length)
+      : tag.replace(/^<theme\b/, '<theme name="' + escape(name) + '"');
+    return xml.slice(0, t.index) + named + xml.slice(t.index + t[0].length);
   }
 
   /** A new document of the app's theme [id] (engine's themeSource), named apart from it so an import adds a theme. */
@@ -35,8 +53,6 @@
     return doc(withName(xml, id + '-mine'));
   }
 
-  // the comments of [xml] blanked (same length), so what is looked for is never found inside one
-  const uncommented = (xml) => xml.replace(/<!--[\s\S]*?-->/g, (c) => ' '.repeat(c.length));
 
   // a picture the user picks is never kept as it was (the user's ruling, 2026-11-09): always encoded anew, its long
   // side no more than longSide (never made bigger), JPEG at quality; PNG only where it has transparency
@@ -75,11 +91,13 @@
     if (!read.ok) return read.problems.map((p) => ({ level: 'error', line: p.line || 0, message: p.message }));
     const name = read.theme.name;
     if (name == null || !L.isPlainFileName(name) || name.startsWith('.') || /#(light|dark)$/.test(name)) bad('主题名 "' + name + '" 不能做文件名');
+    // the app refuses a pack named as a built-in theme (ThemeFilesManager.packClash): the names the page is given
+    else if ((format.builtinNames || []).includes(name)) bad('主题名 "' + name + '" 是 App 内置主题的名字，App 不会收；换一个名字');
     const xml = uncommented(d.xml);
     const named = new Set();
-    for (const m of xml.matchAll(/<(picture|cut|font|icon)\b[^>]*?\b(src|file)="([^"]+)"/g)) named.add(m[3] + '|' + m[1]);
-    for (const m of xml.matchAll(/\bimage\(\s*([^,)\s]+)/g)) named.add(m[1].replace(/^["']|["']$/g, '') + '|image');
-    for (const m of xml.matchAll(/<meta\b[^>]*?\bpreview="([^"]+)"/g)) named.add(m[1] + '|preview');
+    for (const m of xml.matchAll(srcOf('picture|cut|font|icon', 'src|file'))) named.add(fileOf(m) + '|' + m[1]);
+    for (const m of xml.matchAll(IMAGE_FN)) named.add(m[2].replace(/^["']|["']$/g, '') + '|' + (m[1] === 'image' ? 'image' : 'effect'));
+    for (const m of xml.matchAll(srcOf('meta', 'preview'))) named.add(fileOf(m) + '|preview');
     for (const key of named) {
       const [file, role] = key.split('|');
       const bytes = d.files[file];
@@ -90,6 +108,13 @@
         if (!s) bad(file + ' 不是 App 认得的图片');
         else if (Math.max(s[0], s[1]) > side) bad(file + ' 太大：' + s[0] + '×' + s[1] + '，最多 ' + side);
         else if (role === 'image' && bytes.length > lim.keyImageBytes) bad(file + ' 超过 ' + lim.keyImageBytes + ' 字节');
+      } else if (role === 'effect') {
+        // the app's ThemeAssetLimits.checkEffectImage: PNG or WebP by its name, its sides and bytes
+        const s = L.imageSize(bytes);
+        if (!/\.(png|webp)$/i.test(file)) bad(file + '：特效图片只能是 .png 或 .webp');
+        else if (!s) bad(file + ' 不是 App 认得的图片');
+        else if (lim.effectImageSide != null && Math.max(s[0], s[1]) > lim.effectImageSide) bad(file + ' 太大：' + s[0] + '×' + s[1] + '，特效图片最多 ' + lim.effectImageSide);
+        else if (lim.effectImageBytes != null && bytes.length > lim.effectImageBytes) bad(file + ' 超过 ' + lim.effectImageBytes + ' 字节（特效图片）');
       } else if (role === 'preview') {
         // the app's ThemeAssetLimits.preview
         const s = L.imageSize(bytes);
@@ -106,12 +131,12 @@
       }
     }
     // an animated <picture> (060-render-p3 A4): past the app's limits it is drawn still, with a warning on import
-    // either quote, spaces around '=': as XML has it and the app reads it
-    const anim = /<picture\b[^>]*?\banimated\s*=\s*(["'])true\1[^>]*>/.exec(xml);
-    const animSrc = anim && /\bsrc\s*=\s*(["'])(.+?)\1/.exec(anim[0]);
-    if (animSrc && d.files[animSrc[2]]) {
-      const why = animatedStill(lim, d.files[animSrc[2]]);
-      if (why) out.push({ level: 'warning', line: 0, message: animSrc[2] + ' 在 App 里会显示成静态图：' + why });
+    // the engine's reading of it (info().picture.animated), each version's
+    const animSrcs = new Set([false, true].map((dark) => read.theme.info(dark).picture).filter((p) => p && p.animated).map((p) => p.src));
+    for (const animSrc of animSrcs) {
+      if (!d.files[animSrc]) continue;
+      const why = animatedStill(lim, d.files[animSrc]);
+      if (why) out.push({ level: 'warning', line: 0, message: animSrc + ' 在 App 里会显示成静态图：' + why });
     }
     // the app's own check (BlankKeys): on its boards and the theme's own layouts, in every scene the styles name
     const layouts = Object.create(null);
@@ -131,6 +156,9 @@
       const id = n.replace(/\.xml$/, '');
       if (!boards.has(id) && E.layoutSource(id) == null) out.push({ level: 'warning', line: 0, message: 'layouts/' + n + '：App 没有这个键盘，不会用它' });
     }
+    // the app's ThemeAssetLimits.MAX_THEME_XML_BYTES
+    const xmlBytes = enc.encode(d.xml).length;
+    if (lim.themeXmlBytes != null && xmlBytes > lim.themeXmlBytes) bad('theme.xml 有 ' + xmlBytes + ' 字节，App 最多收 ' + lim.themeXmlBytes + ' 字节');
     let total = 0;
     const sizes = [enc.encode(d.xml).length, ...Object.values(d.files).map((b) => b.length), ...Object.values(d.layouts).map((t) => enc.encode(t).length)];
     for (const [i, size] of sizes.entries()) {
@@ -153,9 +181,10 @@
     const xml = uncommented(d.xml);
     const roles = new Map();
     const name = (n, role) => { if (!roles.has(n)) roles.set(n, role); };
-    for (const m of xml.matchAll(/<picture\b[^>]*?\bsrc="([^"]+)"/g)) name(m[1], 'source');
-    for (const m of xml.matchAll(/<cut\b[^>]*?\bfile="([^"]+)"/g)) name(m[1], 'picture');
-    for (const m of xml.matchAll(/\bimage\(\s*([^,)\s]+)/g)) name(m[1].replace(/^["']|["']$/g, ''), 'key');
+    for (const m of xml.matchAll(srcOf('picture', 'src'))) name(fileOf(m), 'source');
+    for (const m of xml.matchAll(srcOf('cut', 'file'))) name(fileOf(m), 'picture');
+    // an effect's image is not drawn by the preview: not decoded
+    for (const m of xml.matchAll(IMAGE_FN)) if (m[1] === 'image') name(m[2].replace(/^["']|["']$/g, ''), 'key');
     let spent = 0;
     const out = [];
     for (const [n, role] of roles) {
@@ -236,7 +265,7 @@
       const kx = Object.keys(x).sort();
       const ky = Object.keys(y).sort();
       if (kx.join('\n') !== ky.join('\n')) return false;
-      return kx.every((k) => (byte ? x[k].length === y[k].length && x[k].every((v, i) => v === y[k][i]) : x[k] === y[k]));
+      return kx.every((k) => (byte ? x[k] === y[k] || (x[k].length === y[k].length && x[k].every((v, i) => v === y[k][i])) : x[k] === y[k]));
     };
     return eq(a.files, b.files, true) && eq(a.layouts, b.layouts, false);
   }
@@ -276,31 +305,113 @@
   }
 
   /**
-   * The draft: the document as it is now, kept in [store] (`get(key)`, `put(key, value)`, `remove(key)`, each a
-   * promise) so a page opened again offers it back. A store that fails (a private window, no IndexedDB) is a
-   * page without drafts, never one that stops.
+   * The draft: the document as it is now, kept in [store] (`get(key)`, `put(key, value)`, `remove(key)`, `keys()`,
+   * each a promise; `lock(act)` where the tabs' writes can be made one at a time) so a page opened again offers it
+   * back. A store that fails (a private window, no IndexedDB) is a page without drafts, never one that stops.
    */
   const DRAFT = 'draft';
-  async function keepDraft(store, d, env) {
+  // the files apart from the text: written again only when they changed (an edit of theme.xml shares its files
+  // object with the document before it), not megabytes of pictures each time a value is typed
+  // the text names its files record by id (each set of files kept under its own key): the files are written
+  // first, then the text naming them, then this page's records before it are let go. A text read with files
+  // not its own is no draft, never a mix; two tabs each write their own files again when the other wrote last
+  const DRAFT_FILES = 'draft-files'; // the one files record of the pages before (drafts 2 and 3)
+  const filesKey = (id) => DRAFT_FILES + '-' + id;
+  // the store → { files, id, own }: the files last written to it, and the ids of the files records this page
+  // wrote and has not let go yet (a record of a write cut before its text, or the one an earlier text named)
+  const keptFiles = new WeakMap();
+  const wrote = new WeakSet(); // the pages whose text has gone in
+  // the tabs' writes one at a time where the store can (store.lock: the browser's Web Locks): a page's first write
+  // lets go of the record of a page closed before, which, without the lock, may be the record an open tab has read
+  // the text naming and is about to name again (its draft lost); without a lock that record is left
+  // (a lock refused, as browsers may for a file:// page, is a write without it; the write on hiding the page waits
+  // for another tab's write, a few IndexedDB transactions: a page closed while another tab writes may lose its
+  // last change)
+  async function locked(store, act) {
+    if (store.lock) {
+      try {
+        return await store.lock(() => act(true));
+      } catch (e) {
+        // no lock to be had: written as without one (act itself never throws)
+      }
+    }
+    return act(false);
+  }
+  function keepDraft(store, d, env) {
+    return locked(store, (serial) => keepDraftNow(store, d, env, serial));
+  }
+  async function keepDraftNow(store, d, env, serial) {
     try {
-      await store.put(DRAFT, { v: 1, doc: { xml: d.xml, files: d.files, layouts: d.layouts }, env, at: Date.now() });
+      const before = await store.get(DRAFT);
+      const prev = before && before.v === 4 ? before.files : null;
+      const first = !wrote.has(store);
+      let kept = keptFiles.get(store);
+      // files changed, or another tab's text is there now (its files may have replaced ours): written anew
+      if (!kept || kept.files !== d.files || prev !== kept.id) {
+        const id = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+        kept = { files: d.files, id, own: (kept ? kept.own : []).concat(id) };
+        keptFiles.set(store, kept);
+        await store.put(filesKey(id), { id, files: d.files });
+      }
+      await store.put(DRAFT, { v: 4, doc: { xml: d.xml, layouts: d.layouts }, files: kept.id, env, at: Date.now() });
+      wrote.add(store);
+      // only this page's own records are let go: another open tab may have read its text before we wrote and
+      // write it after, naming its record (removing that record lost its draft). The record of a page closed
+      // before is let go by the first write of the next page, only with the tabs' writes one at a time
+      const gone = kept.own.filter((x) => x !== kept.id);
+      if (first && serial) {
+        // under the lock any files record the text does not name is no open tab's to lose (an open tab writes its
+        // files again when the text names another's): the records of pages closed before, all of them
+        for (const k of await store.keys()) {
+          if (typeof k !== 'string' || !k.startsWith(DRAFT_FILES + '-')) continue;
+          const id = k.slice(DRAFT_FILES.length + 1);
+          if (id !== kept.id && !gone.includes(id)) gone.push(id);
+        }
+      }
+      kept.own = [kept.id];
+      for (const x of gone) await store.remove(filesKey(x));
+      if (before && before.v !== 4) await store.remove(DRAFT_FILES);
       return true;
     } catch (e) {
       return false;
     }
   }
-  async function draft(store) {
+  // read under the lock too: a write in between lets go of the record the text read before it named
+  function draft(store) {
+    return locked(store, () => draftNow(store));
+  }
+  async function draftNow(store) {
     try {
       const v = await store.get(DRAFT);
-      if (!v || v.v !== 1 || !v.doc || typeof v.doc.xml !== 'string') return null;
-      return { doc: doc(v.doc.xml, v.doc.files || {}, v.doc.layouts || {}), env: v.env || null, at: v.at };
+      if (!v || ![1, 2, 3, 4].includes(v.v) || !v.doc || typeof v.doc.xml !== 'string') return null;
+      // 1: the files kept with the text; 2: kept apart, with no id; 3: one record with an id; 4: a record per id
+      let files = v.doc.files;
+      if (v.v !== 1) {
+        const kept = await store.get(v.v === 4 ? filesKey(v.files) : DRAFT_FILES);
+        if (v.v === 2) {
+          if (kept && typeof kept.id === 'string') return null; // a newer page's files since
+          files = kept;
+        } else if (!kept || kept.id !== v.files) return null;
+        else files = kept.files;
+      }
+      return { doc: doc(v.doc.xml, files || {}, v.doc.layouts || {}), env: v.env || null, at: v.at };
     } catch (e) {
       return null;
     }
   }
-  async function dropDraft(store) {
+  function dropDraft(store) {
+    return locked(store, () => dropDraftNow(store));
+  }
+  async function dropDraftNow(store) {
     try {
+      const v = await store.get(DRAFT);
       await store.remove(DRAFT);
+      if (v && v.v === 4) await store.remove(filesKey(v.files));
+      const kept = keptFiles.get(store);
+      for (const x of kept ? kept.own : []) await store.remove(filesKey(x));
+      await store.remove(DRAFT_FILES);
+      keptFiles.delete(store);
+      wrote.delete(store);
     } catch (e) {
       // nothing kept: nothing to drop
     }
@@ -323,10 +434,13 @@
       tx.onerror = () => fail(tx.error);
       tx.onabort = () => fail(tx.error);
     }));
+    const locks = globalThis.navigator && navigator.locks;
     return {
       get: (k) => run('readonly', (s) => s.get(k)),
       put: (k, v) => run('readwrite', (s) => s.put(v, k)),
       remove: (k) => run('readwrite', (s) => s.delete(k)),
+      keys: () => run('readonly', (s) => s.getAllKeys()),
+      lock: locks ? (act) => locks.request('youmo-theme-maker-draft', act) : undefined,
     };
   }
 
@@ -346,7 +460,6 @@
   const FORMS = ['normal', 'compact', 'floating', 'left', 'right', 'split', 'flat'];
   const BOARDS = ['qwerty', 'nine', 'k14', 'k18', 'zhuyin', 'zhuyin-nine', 'number', 'symbols', 'handwriting'];
 
-  /** The environment's choices as the page starts. */
   /**
    * The preview's environment (060-render-p3 §5.1 预览环境): the device, the board and its form; the field and the
    * input method typed in (the theme's `@field=`, `@im=`); what is shown besides the keys: a popup (`show`: preview,

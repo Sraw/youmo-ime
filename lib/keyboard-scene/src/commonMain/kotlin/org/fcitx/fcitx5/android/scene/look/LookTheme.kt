@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.scene.look
 
 import org.fcitx.fcitx5.android.scene.rules.KeyNames
 import org.fcitx.fcitx5.android.scene.theme.Argb
+import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.scene.theme.Border
 import org.fcitx.fcitx5.android.scene.theme.ColorExpr
 import org.fcitx.fcitx5.android.scene.theme.Fill
@@ -204,7 +205,7 @@ object LookTheme {
         s.add(of("keyboard", FLOATING).with(FLAT).with(LANDSCAPE), "radius" to radius(floating(true, keys.gap.hLand, keys.gap.vLand)))
         val picture = look.picture?.let { p ->
             val cuts = listOfNotNull("portrait" to fileName(p.portrait.file), p.landscape?.let { "landscape" to fileName(it.file) }).toMap()
-            Picture(fileName(p.src), p.brightness.toDouble(), p.blurDp.toDouble(), cuts)
+            Picture(fileName(p.src), p.brightness.toDouble(), p.blurDp.toDouble(), cuts, p.animated)
         }
         // the candidates' font and weight (T6a): theme 3.0's own, so a theme exported or shown on the web keeps them
         candidateFont(text)?.let { (font, weight) -> s.add(of("candidate"), "font" to Value.Word(font), "weight" to Value.Number(weight.toDouble())) }
@@ -221,7 +222,8 @@ object LookTheme {
     // share its styles (a list of selectors), and the styles go in this order for the ties: a key's, its
     // function kind's, flat none, then Return's and the flat space's. [named]: by the keys' names, each as 3.0
     // drew it ([resolved]).
-    private val REQUIRED_KEYS = setOf("shift", "backspace", "space", "enter")
+    // the keys one cannot type without: BlankKeys' own, which refuses a pack that leaves one blank
+    private val REQUIRED_KEYS = BlankKeys.REQUIRED_ROLES
 
     private fun hidesLabel(k: Selector, o: KeyOverride) =
         o.label == KeyLabel.Hide && ((k.key ?: k.starRole) !in REQUIRED_KEYS || o.fill is KeyFill.Image)
@@ -266,6 +268,13 @@ object LookTheme {
         }
         darkened(keys, darkened, beforeFlat = false)
         kindsPressed(keys, overrides)
+        labels(keys, overrides, named, resolved)
+    }
+
+    // the keys' labels: hidden as 3.0 hid them, a key one cannot type without keeping its words
+    private fun Styles.labels(keys: Keys, overrides: Map<Selector, KeyOverride>, named: Map<String, KeyOverride>, resolved: Map<String, KeyOverride>) {
+        fun List<Selector>.of(scene: String? = null, kind: String? = null, state: String? = null, part: String? = null) =
+            map { it.with(scene, kind, state, part) }
         // a key one cannot type without (Shift, Backspace, Space, Return) keeps its words unless its face is an
         // image of its own, which is then what it shows: 4.0 refuses a blank one (ThemePackCheck.hidesRequired), and
         // a 3.0 theme the app took must convert to one it takes
@@ -278,6 +287,20 @@ object LookTheme {
                 hid.filter { (it.key ?: it.starRole) in REQUIRED_KEYS }.takeIf { it.isNotEmpty() }?.let {
                     add(it.of(FLAT, part = "label"), "hidden" to Value.Flag(false))
                     add(it.of(FLAT, "enter", part = "label") + it.of(FLAT, "space", part = "label"), "hidden" to Value.Flag(true))
+                }
+                // pressed, a face of a colour (its own, or its kind's where it names none) is no image: its words
+                // back there, flat too; Darken tints its image and an image (its own, or its kind's) is one
+                val required = hid.filter { (it.key ?: it.starRole) in REQUIRED_KEYS }
+                required.filter { overrides.getValue(it).pressed is KeyPressed.Color }.takeIf { it.isNotEmpty() }?.let {
+                    add(it.of(state = PRESSED, part = "label"), "hidden" to Value.Flag(false))
+                    add(it.of(FLAT, "enter", PRESSED, "label") + it.of(FLAT, "space", PRESSED, "label"), "hidden" to Value.Flag(false))
+                }
+                // none of its own: as each kind it may be pressed as, only where that kind's pressed face is a colour
+                required.filter { overrides.getValue(it).pressed == null }.takeIf { it.isNotEmpty() }?.let { ks ->
+                    kinds(keys).filter { (_, k, _) -> k.pressed is KeyPressed.Color }.forEach { (kind, _, _) ->
+                        add(ks.of(kind = kind, state = PRESSED, part = "label"), "hidden" to Value.Flag(false))
+                        if (kind == "enter" || kind == "space") add(ks.of(FLAT, kind, PRESSED, "label"), "hidden" to Value.Flag(false))
+                    }
                 }
             }
         // a board's key that shows its label where its role's on every board hides theirs: as an id, it wins

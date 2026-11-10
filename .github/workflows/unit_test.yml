@@ -122,12 +122,16 @@ jobs:
         with:
           node-version: "24"
 
-      # the page with its engine made as pages.yml makes it (the tests make it in memory too)
+      # the page with its engine made as pages.yml makes it; a step of its own, so an engine not built
+      # fails only this and the tests below still run (they make the page in memory, skipping what needs the engine)
+      - name: Assemble the theme maker with its engine
+        if: success() || failure()
+        run: node web/theme-maker/tools/assemble.mjs --engine
+
       - name: Run theme maker tests
         if: success() || failure()
         run: |
-          node web/theme-maker/tools/assemble.mjs --engine
-          node --test web/theme-maker/test/format.test.mjs web/theme-maker/test/engine.test.mjs web/theme-maker/test/maker.test.mjs web/theme-maker/test/form.test.mjs
+          node --test web/theme-maker/test/format.test.mjs web/theme-maker/test/engine.test.mjs web/theme-maker/test/maker.test.mjs web/theme-maker/test/form.test.mjs web/theme-maker/test/names-and-files.test.mjs
 
       # Findings already present are frozen in config/detekt/baseline-*.xml; this fails on new ones
       # only. Syntax rules only: type resolution does not work on this toolchain (see detekt.yml).

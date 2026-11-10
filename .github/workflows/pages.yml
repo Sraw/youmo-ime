@@ -16,7 +16,11 @@ on:
       - "lib/keyboard-scene/**"
       # what the engine is built with: the Kotlin version, the build's own plugins
       - "gradle/libs.versions.toml"
+      - "gradle/wrapper/**"
       - "build-logic/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "kotlin-js-store/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -52,7 +56,7 @@ jobs:
           node-version: "24"
 
       - name: Run theme maker tests
-        run: node --test web/theme-maker/test/format.test.mjs web/theme-maker/test/engine.test.mjs web/theme-maker/test/maker.test.mjs web/theme-maker/test/form.test.mjs
+        run: node --test web/theme-maker/test/format.test.mjs web/theme-maker/test/engine.test.mjs web/theme-maker/test/maker.test.mjs web/theme-maker/test/form.test.mjs web/theme-maker/test/names-and-files.test.mjs
 
       # the site: web/ as it is, the page's tests, sources, tools, fonts and examples (in index.html), dev pages and
       # build left out (index.html is all it needs), its index.html the page with its engine; the maker before 0.6.0

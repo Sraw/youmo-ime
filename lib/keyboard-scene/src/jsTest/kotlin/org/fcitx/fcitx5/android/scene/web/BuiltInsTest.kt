@@ -21,7 +21,7 @@ import kotlin.test.assertTrue
 /**
  * The library's own layouts and themes (BuiltIns over the files the build put in, BuiltInFiles) and the browser's
  * measurer, on fixtures: boards offered and fragments not, a board's includes found in the page's own fragments
- * first, a missing one a problem; what the build put in is src/commonMain's files, the themes none while T3's are not.
+ * first, a missing one a problem; what the build put in is src/commonMain's files, its layouts and its themes.
  */
 class BuiltInsTest {
     private val ns = LayoutReader.NAMESPACE
@@ -63,6 +63,7 @@ class BuiltInsTest {
     }
 
     // the build's BuiltInFiles are src/commonMain's layouts and themes, by name, as written (a layout packed)
+    // contract: what the build copies into the library is the app's own files
     @Test
     fun theBuildPutInTheAppsFiles() {
         val main = "${testDataDir()}/../../commonMain"
@@ -73,7 +74,7 @@ class BuiltInsTest {
             xml.replace(Regex("<!--[\\s\\S]*?-->")) { c -> "\n".repeat(c.value.count { it == '\n' }) }.replace(Regex("^[ \\t]+|[ \\t]+$", RegexOption.MULTILINE), "")
         }
         for (name in layouts) assertEquals(readText("$main/layouts/$name.xml")?.let(packed), BuiltInFiles.layouts[name], name)
-        // none yet (T3 writes them): no folder at all is none
+        // the built-in themes are the files of src/commonMain/themes (no folder: none)
         val themes = if (!exists("$main/themes")) emptyList() else listNames("$main/themes").filter { it.endsWith(".xml") }.map { it.removeSuffix(".xml") }.sorted()
         assertEquals(themes, BuiltInFiles.themes.keys.sorted())
         for (name in themes) assertEquals(readText("$main/themes/$name.xml"), BuiltInFiles.themes[name], name)

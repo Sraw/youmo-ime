@@ -154,6 +154,9 @@ class KeyboardCanvasView(
     private var failed = false
     // the pack the scene drawn is of (Drawn.pack)
     private var pack: PackDrawGuard.Key? = null
+
+    // the pack the scene built is of (Drawn.pack), kept once its first frame is drawn ([pack] cleared then)
+    private var scenePack: PackDrawGuard.Key? = null
     private var faces: List<Faces> = emptyList()
     private var base: RenderNode? = null
     private val speech = Speech()
@@ -248,6 +251,7 @@ class KeyboardCanvasView(
             drawnUnder = under
             built = s
             pack = drawn.pack
+            scenePack = drawn.pack
             var said: MutableList<Int>? = null
             var worded: MutableList<Int>? = null
             faces = s.keys.mapIndexed { i, k ->
@@ -371,8 +375,10 @@ class KeyboardCanvasView(
         val s = scene ?: return
         val painter = painter ?: return
         // a pack's first frame of the process about to be drawn, shown: marked till it is (PackDrawGuard), one
-        // that takes the keyboard down not drawn again on its own. A pack built and not drawn marks nothing
-        if (pack?.let(PackDrawGuard::drawing) == false) pack = null
+        // that takes the keyboard down not drawn again on its own. A pack built and not drawn marks nothing.
+        // A mark this view left pending (hidden before its frame committed) cleared as it draws another theme or pack
+        PackDrawGuard.shows(this, scenePack)
+        if (pack?.let { PackDrawGuard.drawing(it) } == false) pack = null
         // an image or the picture in since it was recorded: recorded again
         if (painter.missed) {
             painter.missed = false

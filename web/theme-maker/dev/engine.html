@@ -97,7 +97,10 @@ async function preview() {
     : choice.startsWith('app:') ? E.readTheme(E.themeSource(choice.slice(4)), null, null)
     : await themeOf({ file: choice });
   const env = { width: +$('width').value, height: +$('height').value, density: +$('density').value };
-  for (const k of ['dark', 'landscape', 'floating', 'split', 'oneHanded', 'compact', 'flat']) if ($(k).checked) env[k] = true;
+  for (const k of ['dark', 'landscape', 'split', 'compact', 'flat']) if ($(k).checked) env[k] = true;
+  // EnvJson's: floating is the text's scale, oneHanded the side
+  if ($('floating').checked) env.floating = 1;
+  if ($('oneHanded').checked) env.oneHanded = 'left';
   if ($('dock').value) env.dock = $('dock').value;
   const problems = [];
   if (!read.ok) problems.push(...read.problems);

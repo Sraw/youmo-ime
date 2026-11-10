@@ -50,7 +50,7 @@
       name = name.slice(0, FONT_NAME - 2).replace(/-+$/, '');
       const taken = (n) => fonts.some((f) => f.attrs.some((a) => a[0] === 'name' && a[1] === n)) || (n + '.' + type) in d.files;
       for (let i = 2; taken(name); i++) name = name.replace(/-\d+$/, '') + '-' + i;
-      const files = Object.assign(Object.create(null), d.files);
+      const files = panels.filesOf(d);
       files[name + '.' + type] = bytes;
       return { xml: F.insert(d.xml, 'font', '<font name="' + name + '" src="' + name + '.' + type + '"/>'), files, layouts: d.layouts };
     },
@@ -59,14 +59,15 @@
     setIcon(d, name, bytes) {
       const own = F.elements(d.xml, 'icon').find((e) => e.attrs.some((a) => a[0] === 'name' && a[1] === name));
       let xml = d.xml;
-      let files = Object.assign(Object.create(null), d.files);
+      let files = panels.filesOf(d);
       if (own) {
         const src = (own.attrs.find((a) => a[0] === 'src') || [])[1];
         xml = xml.slice(0, own.start).replace(/[ \t]*$/, '').replace(/\n$/, '') + xml.slice(own.end);
-        if (src && !F.uncommented(xml).includes('"' + src + '"')) files = panels.without(files, [src]);
+        if (src && !F.isNamed(xml, src)) files = panels.without(files, [src]);
       }
       if (bytes) {
-        const file = 'icon-' + name + '.svg';
+        // never over a file the theme has (another style may name it)
+        const file = panels.fileName(files, 'icon-', name, 'svg');
         files[file] = bytes;
         xml = F.insert(xml, 'icon', '<icon name="' + name + '" src="' + file + '"/>');
       }

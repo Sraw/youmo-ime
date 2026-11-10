@@ -182,9 +182,12 @@ class ThemeListFragment : Fragment() {
     private fun confirmPack(pack: ThemeFilesManager.Opened.Pack) {
         val ctx = requireContext()
         val title = ctx.getString(R.string.theme_pack_import_title, pack.staged.name)
-        val discard = { lifecycleScope.launch(Dispatchers.IO) { pack.discard() } }
+        // let go however the dialog closes but by 导入 (cancelled, dismissed); one left by a fragment destroyed
+        // with it open is cleared by a later open (ThemeFilesManager.openTheme)
+        var taken = false
         ThemePackDialogs.builder(ctx, title, ThemePackDialogs.confirmText(ctx, pack), pack.staged.preview)
             .setPositiveButton(R.string.theme_pack_import) { _, _ ->
+                taken = true
                 lifecycleScope.withLoadingDialog(ctx) {
                     try {
                         withContext(Dispatchers.IO) { pack.commit().getOrThrow() }
@@ -197,8 +200,8 @@ class ThemeListFragment : Fragment() {
                     }
                 }
             }
-            .setNegativeButton(android.R.string.cancel) { _, _ -> discard() }
-            .setOnCancelListener { discard() }
+            .setNegativeButton(android.R.string.cancel, null)
+            .setOnDismissListener { if (!taken) lifecycleScope.launch(Dispatchers.IO) { pack.discard() } }
             .show()
     }
 
@@ -215,7 +218,7 @@ class ThemeListFragment : Fragment() {
             .setTitle(R.string.delete_theme)
             .setMessage(R.string.delete_theme_msg)
             .setPositiveButton(android.R.string.ok) { _, _ ->
-                if (ThemeManager.deleteTheme(theme.name)) themeListAdapter.removeTheme(theme.name)
+                if (ThemeManager.deleteTheme(theme)) themeListAdapter.removeTheme(theme)
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()

@@ -45,8 +45,11 @@
         return { property: s.property, value: a ? a[1] : null, select: style ? style.select : null, line: s.line };
       });
     },
-    /** The theme's key images (files named `key-…`, what addKeyImage makes, and any an image() fill names). */
-    keyImages: (d) => Object.keys(d.files).filter((n) => /^key-/.test(n) || F.uncommented(d.xml).includes('image(' + n)).sort(),
+    /** The theme's key images (files named `key-…`, what addKeyImage makes, and any an image() fill names; not an effect's). */
+    keyImages: (d) => {
+      const named = new Set([...F.uncommented(d.xml).matchAll(/(?<![\w-])image\(\s*["']?([^,)\s"']+)/g)].map((m) => m[1]));
+      return Object.keys(d.files).filter((n) => /^key-/.test(n) || named.has(n)).sort();
+    },
     /**
      * [d] with [bytes] ([name]) a key's image, `key-<name>`: refused (throws) where the app would (a PNG, JPEG or WebP,
      * its long side and bytes in [lim]'s keyImageSide, keyImageBytes). `{…d, file}`.
@@ -58,7 +61,7 @@
       if (Math.max(s[0], s[1]) > lim.keyImageSide) throw new Error(name + ' 太大：最大 ' + lim.keyImageSide + '×' + lim.keyImageSide);
       if (bytes.length > lim.keyImageBytes) throw new Error(name + ' 超过 ' + lim.keyImageBytes + ' 字节');
       const file = panels.fileName(d.files, 'key-', name, type);
-      const files = Object.assign(Object.create(null), d.files);
+      const files = panels.filesOf(d);
       files[file] = bytes;
       return { xml: d.xml, files, layouts: d.layouts, file };
     },
@@ -134,7 +137,7 @@
       else if (k === 'image') {
         const file = ops.keyImages(api.doc())[0];
         if (file) set({ kind: 'image', file, insets: [0, 0, 0, 0], scale: 3, fallback: c.kind === 'solid' ? c.color : null });
-        else api.toast('先上传一张键面图片（下面的按钮）');
+        else { api.toast('先上传一张键面图片（下面的按钮）'); api.rerender(); } // the choice not made: the select shows what is
       }
     })));
     if (f.kind === 'none' || f.kind === 'solid' || f.kind === 'image') out.append(uploadImage(api, sel));

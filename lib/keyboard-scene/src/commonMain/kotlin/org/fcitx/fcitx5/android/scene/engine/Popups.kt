@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.scene.theme.KeyLook
 import org.fcitx.fcitx5.android.scene.theme.Selector
 import org.fcitx.fcitx5.android.scene.theme.ShapePath
 import org.fcitx.fcitx5.android.scene.theme.TextLook
+import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.scene.theme.Transition
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.Values
@@ -140,7 +141,7 @@ internal class PopupBuilder(
     fun motion(widget: String): PopupMotion? {
         val look = look(widget).first
         val appear = look.appear?.takeIf { it.ms > 0 }
-        val going = look.transition?.takeIf { it.ms > 0 && widget != "menu" }
+        val going = look.transition?.takeIf { it.ms > 0 && "transition" in ThemeReader.POPUP_MOTION[widget].orEmpty() }
         return if (appear == null && going == null) null else PopupMotion(appear, going)
     }
 

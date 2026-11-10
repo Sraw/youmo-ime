@@ -14,6 +14,8 @@ import kotlin.test.assertTrue
  * [Values.RESERVED], row for row, so the authors' reference and the engine cannot drift apart. A stage that
  * makes a reserved property work (A2–A4's motion) moves its row from the one table to the other.
  * On the JVM alone: the file is read by path, which the build hands in.
+ *
+ * contract: the authors' reference (docs/theme-format.md) and the engine's tables agree row for row
  */
 class ThemeFormatDocTest {
 

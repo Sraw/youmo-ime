@@ -1,5 +1,7 @@
 // The maker's document (src/maker.js, 060-render-p3 M1): opened and saved as the app imports it, kept as a
 // draft and given back, undone and redone, its preview's environment the engine's.
+// contract: the from-maker*.theme files it writes are what the app's ThemePackImportTest imports, and what save
+// refuses is what the app's ThemePackCheck would.
 // Run: ./gradlew :lib:keyboard-scene:youmoEngine, then node --test web/theme-maker/test/maker.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -366,6 +368,8 @@ test('a 3.0 theme the app exports with every override it allows opens, and stays
   const edited = M.doc(F.setProp(doc.xml, 'key', 'radius', '9dp'), doc.files, doc.layouts);
   assert.deepEqual(M.check(E, edited, 'qwerty', M.envJson(M.ENV), null).problems.filter((p) => p.level === 'error'), []);
   const editMs = performance.now() - at;
+  // loose: tens of ms here; a slip to seconds per edit (a quadratic cascade) is what this catches, not a slow machine
+  assert.ok(editMs < 5000, 'an edit and its check took ' + editMs.toFixed(0) + ' ms');
   console.log('# ' + names.length + ' overrides, ' + styles + ' styles: open ' + openMs.toFixed(0) + ' ms, check ' + checkMs.toFixed(0) + ' ms, edit and check ' + editMs.toFixed(0) + ' ms');
   assert.deepEqual(M.saveProblems(E, L, FORMAT, doc), []);
 });

@@ -68,12 +68,6 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme, val bar: BarL
     // the look last drawn: the first's and the others' drawables and font, set again only as it changes
     private var shown: CandidateLook = bar.plain
 
-    /**
-     * What [updateCandidate] draws of the candidate at [index] besides it: whether it is the first, its
-     * number. Equal for two indices, the candidate drawn at one is drawn alike at the other.
-     */
-    fun byIndex(index: Int): Pair<Boolean, String> = (index == 0) to label(index)
-
     // none for a holder cleared (index -1): it is let go of, not shown
     private fun label(index: Int) = if (index < 0) "" else SceneBar.label(bar.labelStyle, index)
 

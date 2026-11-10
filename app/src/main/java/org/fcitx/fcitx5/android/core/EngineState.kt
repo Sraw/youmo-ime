@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.KeyInkGesture
 
 /**
  * What the keyboards watch of the engine, as the [EngineBridge] last left it: written on the fcitx
@@ -63,7 +64,7 @@ object EngineState {
     /**
      * The letter groups of the layout of its own a grouped keyboard shows (060-render-p3 T9b: a theme's 17
      * keys in place of pinyin's 14 or 18; SceneGroups.Taken.Own's written), the last one shown; null till
-     * one is. Written on the main thread as that keyboard is made and shown, before any of its keys can be
+     * one is. Written on the main thread as that keyboard is attached (shown), before any of its keys can be
      * tapped; read on the fcitx thread before each key ([EngineBridge.syncOwnKeys]), so its codes reach
      * the engine read by these groups. The keyboard's, not the engine's: kept over [reset].
      */
@@ -86,8 +87,12 @@ object EngineState {
      */
     val handwritingEnded: StateFlow<Int> = inkEnded
 
-    /** Whether the input method has its own input typed ([typed], Engines.typedOnKeys), as its [answer]th answer said. */
-    data class KeysTyped(val answer: Long, val typed: Boolean)
+    /**
+     * Whether the input method has its own input typed ([typed], Engines.typedOnKeys), as its [answer]th answer
+     * said, with [keysHeard] of its keys heard by then ([keysHeard] of the state; KeyInkGesture.ALL_HEARD: the
+     * engine reset, about every key sent).
+     */
+    data class KeysTyped(val answer: Long, val typed: Boolean, val keysHeard: Long = KeyInkGesture.ALL_HEARD)
 
     internal val keysTypedState = MutableStateFlow(KeysTyped(0, false))
 
@@ -97,6 +102,35 @@ object EngineState {
      * Set on the fcitx thread, read on the main one.
      */
     val keysTyped: StateFlow<KeysTyped> = keysTypedState
+
+    /** An answer of the input method written on the keys: [typed], as a new value each time. */
+    internal fun answerKeysTyped(typed: Boolean, keysHeard: Long = KeyInkGesture.ALL_HEARD) {
+        keysTypedState.value = KeysTyped(keysTypedState.value.answer + 1, typed, keysHeard)
+    }
+
+    // the last number a key sent got ([keySent])
+    private val keysSentCount = java.util.concurrent.atomic.AtomicLong()
+
+    /**
+     * The next number, for a key the keyboard sends to the engine (every key: only an input method written on the keys
+     * answers with it, [KeysTyped.keysHeard]). On the main thread as the key's job is posted; the job calls [keyTaken] with it first.
+     */
+    internal fun keySent(): Long = keysSentCount.incrementAndGet()
+
+    /** The number the next key sent gets: a tap on a letter is told (KeyInkGesture.tapped) just before its key is sent. */
+    fun nextKey(): Long = keysSentCount.get() + 1
+
+    /** On the fcitx thread, as the job sending key [n] starts: the answers from here on carry it. */
+    internal fun keyTaken(n: Long) {
+        keysHeard = maxOf(keysHeard, n)
+    }
+
+    /**
+     * The number ([keySent]) of the last key sent whose job the fcitx thread has taken: an answer carries it
+     * ([KeysTyped.keysHeard]), so the keyboard tells one late, from before its last tap. Only the fcitx thread writes it.
+     */
+    @Volatile
+    internal var keysHeard = 0L
 
     internal val tableKeyboardState = MutableStateFlow<TableKeyboard?>(null)
 
@@ -137,7 +171,7 @@ object EngineState {
         syllablesState.value = SyllableState()
         englishTypingState.value = false
         inkEnded.value = HandwritingSession.NO_PIECE
-        keysTypedState.value = KeysTyped(keysTypedState.value.answer + 1, false)
+        answerKeysTyped(false)
         tableKeyboardState.value = null
     }
 }

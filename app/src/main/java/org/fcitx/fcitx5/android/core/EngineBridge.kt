@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.core
 
 import android.text.TextPaint
+import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
@@ -76,7 +77,11 @@ class EngineBridge {
      */
     fun sendInk(piece: Action.Ink, current: String, onKeys: Boolean = false, send: () -> Unit): Boolean {
         if (onKeys) {
-            if (!InputMethodCatalog.writesOnKeys(current)) return false
+            // an input method that cannot load writes on no keys: its session's failure is not handwriting's
+            if (!InputMethodCatalog.writesOnKeys(current) || current in unloadable) return false
+            // current's own session made first, under its own latch: a code table that cannot be read fails
+            // as current, not as handwriting (whose pad would then load nowhere)
+            if (!madeOnKeys(current)) return false
             if (!handwriting(current, onKeys = true) { engines.ink(piece, shown = true, im = current) }) return false
             send()
             engines.inkSent(piece, current)
@@ -92,6 +97,22 @@ class EngineBridge {
         send()
         engines.inkSent(piece)
         return true
+    }
+
+    /** How [sendInk] makes the session of the input method written on its keys: the engines'; a test's that throws. */
+    @VisibleForTesting
+    internal var makeOnKeys: (String) -> Unit = { engines.make(it) }
+
+    // [current]'s session, which writes on its keys, made under its own latch; whether it is
+    private fun madeOnKeys(current: String): Boolean = try {
+        unloadable.call(current) { makeOnKeys(current) }
+        true
+    } catch (e: IOException) {
+        Timber.w(e, "session of $current")
+        false
+    } catch (e: DataFormatException) {
+        Timber.w(e, "session of $current")
+        false
     }
 
     /**
@@ -511,7 +532,7 @@ class EngineBridge {
     fun syncOwnKeys(own: List<String>? = EngineState.ownKeys) {
         if (own != inUseOf) {
             inUseOf = own
-            own?.takeIf { NineKeyLetters.problem(it) == null }?.let(NineKeyLetters::custom)?.let(NineKeyLetters::inUse)
+            own?.takeIf { NineKeyLetters.problem(it) == null }?.let(NineKeyLetters::custom)?.let(NineKeyLetters::inUse) ?: NineKeyLetters.clearInUse()
         }
         made?.let { if (it.settings.ownKeys != own) it.settings = it.settings.copy(ownKeys = own) }
     }
@@ -561,7 +582,8 @@ class EngineBridge {
         if (InputMethodCatalog.writesOnKeys(im) && im !in unloadable) {
             val e = engines()
             EngineState.inkEnded.value = e.inkEnded
-            EngineState.keysTypedState.value = EngineState.KeysTyped(EngineState.keysTypedState.value.answer + 1, e.typedOnKeys(im))
+            // with the number of the last key sent the fcitx thread took (EngineState.keyTaken): which tap it is about
+            EngineState.answerKeysTyped(e.typedOnKeys(im), EngineState.keysHeard)
         }
         // a table's keyboard: its 拼 key turned, its settings changed (a field's context comes as it
         // shows); none of one that could not be read, whose keys say nothing

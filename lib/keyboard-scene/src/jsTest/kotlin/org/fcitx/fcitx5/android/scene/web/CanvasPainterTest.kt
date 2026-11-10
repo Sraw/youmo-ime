@@ -202,12 +202,18 @@ class CanvasPainterTest {
     fun anOutlineNotOpaqueIsLaidOnceNotOverItsOwnFill() {
         val calls = drawn(Op.Text("ab", 10.0, 50.0, "system", 400, 20.0, red, stroke = TextStroke(1.5, half)))
         val glyphs = listOf(
-            "font=400 20px sans-serif", "letterSpacing=0px", "textAlign=left", "textBaseline=alphabetic", "save()", "translate(10,50)",
+            "save()", "font=400 20px sans-serif", "letterSpacing=0px", "textAlign=left", "textBaseline=alphabetic", "translate(10,50)",
             "lineWidth=3", "lineJoin=round", "strokeText(ab,0,0)", "fillText(ab,0,0)", "restore()",
         )
+        // the layer over the text's room alone (its run 20 px, 20 px letters, the outline 1.5 px round), not the canvas:
+        // how generous its margins are is the painter's, not pinned here
+        val measured = listOf("save()", "font=400 20px sans-serif", "measureText(ab)", "restore()")
+        val rect = layerRect(calls.first { it.startsWith("drawImage(LAYER") })
+        assertLayerRound(rect, 8.5, 28.5, 31.5, 55.5)
+        val r = rect.joinToString(",") { it.toInt().toString() }
         assertEquals(
-            layer("0,0,400,300", "rgba(0,0,255,1)", *glyphs.toTypedArray()) +
-                listOf("save()", "setTransform(1,0,0,1,0,0)", "globalAlpha=0.502", "drawImage(LAYER,0,0,400,300,0,0,400,300)", "restore()") +
+            measured + layer(r, "rgba(0,0,255,1)", *glyphs.toTypedArray()) +
+                listOf("save()", "setTransform(1,0,0,1,0,0)", "globalAlpha=0.502", "drawImage(LAYER,$r,$r)", "restore()") +
                 listOf("fillStyle=rgba(255,0,0,1)") + glyphs.filter { !it.startsWith("line") && !it.startsWith("stroke") },
             calls,
         )
@@ -217,7 +223,12 @@ class CanvasPainterTest {
     @Test
     fun anOutlinedTextsShadowIsItsOutlineAndLettersBlurredAsOne() {
         val calls = drawn(Op.Text("ab", 10.0, 50.0, "system", 400, 20.0, red, stroke = TextStroke(1.0, red), shadow = TextShadow(2.0, 3.0, 4.0, half)))
-        val shadow = calls.subList(0, calls.indexOf("drawImage(LAYER,0,0,400,300,0,0,400,300)") + 1)
+        val shadow = calls.subList(0, calls.indexOfFirst { it.startsWith("drawImage(LAYER") } + 1)
+        // each laid over its own room: the shadow's moved and blurred 4 px round (its blur reaching twice that), the
+        // outline's where the text is
+        val (shadowLayer, outlineLayer) = calls.filter { it.startsWith("drawImage(LAYER") }.map(::layerRect)
+        assertLayerRound(shadowLayer, 3.0, 24.0, 41.0, 66.0)
+        assertLayerRound(outlineLayer, 9.0, 29.0, 31.0, 55.0)
         assertTrue("layer.translate(12,53)" in shadow && "layer.strokeText(ab,0,0)" in shadow && "layer.fillStyle=#000000" in shadow, "$shadow")
         assertEquals(listOf("shadowColor=$blue", "shadowBlur=5.619"), shadow.filter { it.startsWith("shadowColor") || it.startsWith("shadowBlur") })
         assertEquals(2, calls.count { it.startsWith("drawImage(LAYER") }, "the shadow, then the outline")
@@ -237,14 +248,24 @@ class CanvasPainterTest {
         assertEquals(listOf("letterSpacing=2px", "translate(11,50)", "fillText(ab,0,0)"), with.filter { it.startsWith("translate") || it.startsWith("fillText") || it.startsWith("letterSpacing") })
     }
 
-    // VectorDrawable's stroke: butt ends, mitred joins, its miter limit 4, whatever was set before
+    // VectorDrawable's stroke (after the viewBox's origin, translate(0,0) here): butt ends, mitred joins, its miter limit 4, whatever was set before
+    // a viewBox whose origin is not 0 0 (Material Symbols' 0 -960 960 960): moved to the key's corner after the
+    // scale, else the icon is drawn a whole key higher
+    @Test
+    fun anIconsViewBoxOriginIsMovedToTheCorner() {
+        val icon: dynamic = js("({ vx: 0, vy: -960, vw: 960, vh: 960, paths: [{ d: 'M0 0' }] })")
+        val calls = drawn(Op.Icon("x", Box(0.0, 0.0, 24.0, 24.0), red), Assets(icons = mapOf("x" to icon)))
+        val scale = calls.indexOfFirst { it.startsWith("scale(") }
+        assertEquals("translate(0,960)", calls.getOrNull(scale + 1), "$calls")
+    }
+
     @Test
     fun anIconsStrokeIsVectorDrawablesDefaults() {
         val icon: dynamic = js("({ vw: 24, vh: 24, paths: [{ d: 'M0 0L24 24', stroke: 2 }] })")
         val calls = drawn(Op.Icon("x", Box(0.0, 0.0, 24.0, 24.0), red), Assets(icons = mapOf("x" to icon)))
         assertEquals(
             listOf("save()", "strokeStyle=rgba(255,0,0,1)", "lineWidth=2", "lineCap=butt", "lineJoin=miter", "miterLimit=4", "stroke(PATH M0 0L24 24)", "restore()"),
-            calls.dropWhile { it != "scale(1,1)" }.drop(1).dropLast(1),
+            calls.dropWhile { it != "scale(1,1)" }.drop(2).dropLast(1),
         )
     }
 }
@@ -257,11 +278,26 @@ class CanvasPainterTest {
  */
 internal fun recorder(letterSpacing: Boolean = true): dynamic = makeRecorder(letterSpacing)
 
+// a layer's room (x, y, w, h) as its drawImage call wrote it
+private fun layerRect(call: String): List<Double> = call.substringAfter("drawImage(LAYER,").split(",").take(4).map { it.toDouble() }
+
+// [rect] within the recorder's canvas (400 × 300) and smaller, round the ink from [left], [top] to [right], [bottom]
+private fun assertLayerRound(rect: List<Double>, left: Double, top: Double, right: Double, bottom: Double) {
+    val x = rect[0]
+    val y = rect[1]
+    val w = rect[2]
+    val h = rect[3]
+    assertTrue(x >= 0 && y >= 0 && x + w <= 400 && y + h <= 300 && w * h < 400.0 * 300, "$rect: past the canvas")
+    assertTrue(x <= left && y <= top && x + w >= right && y + h >= bottom, "$rect: does not hold the ink")
+}
+
 private val makeRecorder: dynamic = js(
     """(function (spacing) {
   var calls = [];
   function str(a) { return typeof a === 'number' ? String(Math.round(a * 1000) / 1000 + 0) : String(a); }
   var gradient = { addColorStop: function (at, c) { calls.push('stop(' + str(at) + ',' + c + ')'); }, toString: function () { return 'GRADIENT'; } };
+  // a stand-in Path2D for the whole test run, on purpose: node has none, and every test that paints an icon or a
+  // shape needs one; a runtime with its own keeps it
   if (typeof globalThis.Path2D === 'undefined') {
     globalThis.Path2D = function (d) { this.d = d; };
     globalThis.Path2D.prototype.toString = function () { return 'PATH ' + this.d; };

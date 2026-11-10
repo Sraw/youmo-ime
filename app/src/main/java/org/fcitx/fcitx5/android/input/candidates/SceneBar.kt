@@ -28,9 +28,11 @@ import org.fcitx.fcitx5.android.scene.engine.PreeditLook
 import org.fcitx.fcitx5.android.scene.engine.ToolbarLook
 import org.fcitx.fcitx5.android.scene.look.BarBase
 import org.fcitx.fcitx5.android.scene.look.LookTheme
+import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Inset
 import org.fcitx.fcitx5.android.scene.theme.Radius
+import org.fcitx.fcitx5.android.scene.theme.Theme as SceneTheme
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.pressHighlightDrawable
 
@@ -52,16 +54,16 @@ object SceneBar {
         val file = SceneThemes.of(theme, look)
         val scenes = SceneWindow.scenes(context, theme)
         // asked for by each tool button as it is made (T6b review): worked out once while the same
-        shownBar?.takeIf { it.of(theme, look, file, scenes) }?.let { return it.bar }
+        shownBar?.takeIf { it.isFor(theme, look, file, scenes) }?.let { return it.bar }
         val bar = file?.let { BarLook.of(SceneThemes.cascades(it), scenes) } ?: plain(theme)
         shownBar = ShownBar(theme, look, file, scenes, bar)
         return bar
     }
 
     // the last bar worked out ([of]) and what it was of: the theme, its look and file (another made anew, another), the scenes
-    private class ShownBar(val theme: Theme, val shown: Any, val file: Any?, val scenes: Set<String>, val bar: BarLook) {
-        fun of(theme: Theme, shown: Any, file: Any?, scenes: Set<String>) =
-            listOf(this.theme, this.shown, this.file).zip(listOf(theme, shown, file)).all { (a, b) -> a === b } && this.scenes == scenes
+    private class ShownBar(val theme: Theme, val shown: ThemeLook, val file: SceneTheme?, val scenes: Set<String>, val bar: BarLook) {
+        fun isFor(theme: Theme, shown: ThemeLook, file: SceneTheme?, scenes: Set<String>) =
+            this.theme === theme && this.shown === shown && this.file === file && this.scenes == scenes
     }
 
     private var shownBar: ShownBar? = null
@@ -72,9 +74,15 @@ object SceneBar {
         val press = Argb(theme.keyPressHighlightColor)
         // the candidates' font as LookTheme writes it into the theme
         val font = LookTheme.candidateFont(look.text)
-        val plain = CandidateLook(null, press, Argb(theme.candidateTextColor), Argb(theme.candidateLabelColor), Argb(theme.candidateCommentColor), font?.first, font?.second)
+        val plain = CandidateLook(
+            fill = null, pressed = press, color = Argb(theme.candidateTextColor), labelColor = Argb(theme.candidateLabelColor),
+            commentColor = Argb(theme.candidateCommentColor), font = font?.first, weight = font?.second,
+        )
         val active = Argb(theme.genericActiveForegroundColor)
-        val selected = CandidateLook(Argb(theme.genericActiveBackgroundColor), press, active, active, active, font?.first, font?.second)
+        val selected = CandidateLook(
+            fill = Argb(theme.genericActiveBackgroundColor), pressed = press, color = active, labelColor = active,
+            commentColor = active, font = font?.first, weight = font?.second,
+        )
         val bar = Argb(look.palette.barColor)
         return BarLook(
             base = when (val b = look.bar) {
@@ -87,7 +95,10 @@ object SceneBar {
             divider = Argb(theme.dividerColor),
             panel = ThemeColors.panel(look.palette, look.keys)?.let(::Argb),
             preedit = PreeditLook(Argb(theme.keyTextColor), Argb(theme.keyTextColor), null),
-            toolbar = Argb(look.palette.toolbarIconColor).let { ToolbarLook(null, null, it, press, null, Argb(theme.accentKeyBackgroundColor)) },
+            toolbar = ToolbarLook(
+                fill = null, radius = null, icon = Argb(look.palette.toolbarIconColor), pressed = press, onFill = null,
+                onIcon = Argb(theme.accentKeyBackgroundColor),
+            ),
         )
     }
 

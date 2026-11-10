@@ -670,6 +670,7 @@ class ThemeTest {
     fun aLaterBuildsFileIsToldWhetherOrNotItReads() {
         val head = "<theme xmlns=\"${ThemeReader.NAMESPACE}\" name=\"x\""
         assertTrue(ThemeReader.laterBuilds("$head version=\"5.0\"><colors/></theme>", "0.6.0"), "a later format")
+        assertTrue(ThemeReader.laterBuilds("$head version=\"5\"><colors/></theme>", "0.6.0"), "a later format, its major alone")
         assertTrue(ThemeReader.laterBuilds("$head version=\"4.0\"><meta min-app=\"0.7.0\"/><whatever/></theme>", "0.6.0"), "a later app's, not read here")
         assertTrue(!ThemeReader.laterBuilds("$head version=\"4.3\"><meta min-app=\"0.6.0\"/></theme>", "0.6.0"))
         assertTrue(!ThemeReader.laterBuilds("$head version=\"4.0\"><colors/>", "0.6.0"), "no XML: cannot tell")

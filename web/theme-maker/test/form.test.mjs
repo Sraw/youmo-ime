@@ -1,6 +1,8 @@
 // The editing's forms (src/form.js and src/panels/, 060-render-p3 M2): each panel's operations write the style text
 // meant, find the style of exactly the same select= or add one, keep what they do not know, and the engine reads
 // the result; the cascade check names the style the engine says each value comes from.
+// contract: the forms' bounds (F.LIMITS) against the engine's E.limits(), and every value a form writes against what
+// the engine reads (no "does nothing" / "not supported" warning).
 // Run: ./gradlew :lib:keyboard-scene:youmoEngine, then node --test web/theme-maker/test/form.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -375,6 +377,41 @@ test('动效: each property written as the format writes it; whether this engine
   assert.throws(() => ops.addEffectImage(d, L, 'x.jpg', new Uint8Array([0xff, 0xd8, 0xff])));
 });
 
+test('动效: every MOTION property, each effect kind and a clamped value, written by the form, reads back as meant and is in its place for the engine', () => {
+  const ops = P.motion.ops;
+  const L = globalThis.YoumoLib;
+  const base = ops.addEffectImage({ xml: nord, files: {}, layouts: {} }, L, 'Dot.png', PNG4);
+  const file = base.file;
+  const parse = { transition: ops.parseTransition, appear: ops.parseAppear, effect: ops.parseEffect };
+  // [prop, value written, value read back], each the form's own: percent and dp as numbers, the rest objects
+  const rows = [
+    ['transition', { ms: 120, easing: 'ease-out' }, { ms: 120, easing: 'ease-out' }],
+    ['press-scale', 95, '95%'],
+    ['press-sink', 1, '1dp'],
+    ['appear', { kind: 'fade', ms: 200 }, { kind: 'fade', ms: 200 }],
+    ['effect', { kind: 'none' }, { kind: 'none' }],
+    ['effect', { kind: 'ripple-image', file, radius: 150, ms: 300 }, { kind: 'ripple-image', file, radius: 150, ms: 300 }],
+    // past the bounds: count 12 at most, spread 64dp at most
+    ['effect', { kind: 'particles', file, count: 40, spread: 99, ms: 400 }, { kind: 'particles', file, count: 12, spread: 64, ms: 400 }],
+    // a ripple's radius 10..200 %, its duration 1..600 ms (the engine's)
+    ['effect', { kind: 'ripple-image', file, radius: 0, ms: 0 }, { kind: 'ripple-image', file, radius: 10, ms: 1 }],
+    ['effect', { kind: 'ripple-image', file, radius: 999, ms: 300 }, { kind: 'ripple-image', file, radius: 200, ms: 300 }],
+  ];
+  for (const [prop, v, want] of rows) {
+    const m = ops.MOTION.find((x) => x.prop === prop);
+    for (const [select] of m.selects) {
+      const d = ops.set(base, select, prop, v);
+      const text = F.valueOf(d.xml, select, prop);
+      assert.deepEqual(parse[prop] ? parse[prop](text) : text, want, prop + ' on ' + select);
+      const r = E.readTheme(d.xml, null, null);
+      assert.ok(r.ok, JSON.stringify(r.problems));
+      // "not supported by this version" is this engine's answer (the panel greys the row); "does nothing" would be the form's mistake
+      const said = r.warnings.filter((w) => w.message.startsWith(prop + '=') && /does nothing/.test(w.message));
+      assert.deepEqual(said, [], prop + ' on ' + select);
+    }
+  }
+});
+
 test('信息: the name and <meta> written in place, taken out when emptied; a preview image the app takes', () => {
   const ops = P.info.ops;
   let d = { xml: nord, files: {}, layouts: {} };
@@ -417,7 +454,8 @@ test('the picture changed in place: an attribute and a comment of the user\'s ke
   p.brightness = 80;
   p.cuts.portrait = { file: 'b.png', rect: [0, 0, 10, 5] };
   const out = F.setPicture(xml, p);
-  const x = out.xml ?? out;
+  const x = out.xml;
+  assert.deepEqual(out.gone, [], 'a.png is still the picture\'s src=');
   assert.match(x, /rotation="0"/);
   assert.match(x, /<!-- mine -->/);
   assert.match(x, /note="x"/);
@@ -428,12 +466,10 @@ test('从背景图取色: one noisy pixel is not the accent; both versions each 
   const ops = P.colors.ops;
   const greys = Array.from({ length: 50 }, () => [120, 120, 120]);
   assert.notEqual(ops.fromPicture(greys.concat([[255, 0, 0]])).accentKey, '#ff0000');
-  const both = ops.fromPictureAll({ xml: F.withDark ? F.withDark(nord, true) : nord, files: {}, layouts: {} }, [[20, 20, 20], [40, 40, 40]]);
-  const vs = F.variants(both.xml);
-  if (vs.length > 1) {
-    assert.equal(F.colors(both.xml, 'light').key, '#66ffffff');
-    assert.equal(F.colors(both.xml, 'dark').key, '#4d000000');
-  }
+  const both = ops.fromPictureAll({ xml: F.withDark(nord, true), files: {}, layouts: {} }, [[20, 20, 20], [40, 40, 40]]);
+  assert.deepEqual(F.variants(both.xml), ['light', 'dark']);
+  assert.equal(F.colors(both.xml, 'light').key, '#66ffffff');
+  assert.equal(F.colors(both.xml, 'dark').key, '#4d000000');
   read(both.xml);
 });
 

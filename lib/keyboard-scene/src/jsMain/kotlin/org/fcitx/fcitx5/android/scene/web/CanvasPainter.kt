@@ -208,8 +208,6 @@ internal class CanvasPainter(
         return intArrayOf(left, top, max(0, right - left), max(0, bottom - top))
     }
 
-    // the whole canvas, on the device
-    private fun all(): IntArray = intArrayOf(0, 0, ctx.canvas.width as Int, ctx.canvas.height as Int)
 
     /**
      * [draw] (a path filled, a text set, an image laid: in the fill style it is given) blurred [radius] px in
@@ -310,10 +308,14 @@ internal class CanvasPainter(
         op.shadow?.let { s ->
             val x = op.x + s.dx
             val y = op.baseline + s.dy
-            if (stroke == null) blurred(s.blur, s.color) { glyphs(op, x, y, null) } else laid(all(), s.color, s.blur) { glyphs(op, x, y, stroke) }
+            if (stroke == null) {
+                blurred(s.blur, s.color) { glyphs(op, x, y, null) }
+            } else {
+                laid(textArea(op, x, y, stroke.width, s.blur), s.color, s.blur) { glyphs(op, x, y, stroke) }
+            }
         }
         // FILL_AND_STROKE: the outline and the letters one shape, its colour laid once
-        stroke?.let { s -> laid(all(), s.color, 0.0) { glyphs(op, op.x, op.baseline, s) } }
+        stroke?.let { s -> laid(textArea(op, op.x, op.baseline, s.width, 0.0), s.color, 0.0) { glyphs(op, op.x, op.baseline, s) } }
         if (!op.color.transparent) {
             c.fillStyle = css(op.color)
             glyphs(op, op.x, op.baseline, null)
@@ -321,14 +323,35 @@ internal class CanvasPainter(
         if (rotated) c.restore()
     }
 
+    // the room [op] set at ([x], [y]) takes on the device, its outline [stroke] wide and blurred [blur] round it: what
+    // a layer clears and lays for it, not the whole canvas (a theme outlining every key's words laid the canvas once
+    // a key). Its run measured; a letter's ascent and descent, an italic's lean, generously: a layer cut short
+    // would cut the letters, one too large costs only pixels
+    private fun textArea(op: Op.Text, x: Double, y: Double, stroke: Double, blur: Double): IntArray {
+        c.save()
+        c.font = font(op.weight, op.size, assets.family(op.font))
+        val m = c.measureText(op.text)
+        c.restore()
+        val run = (m.width as Number).toDouble()
+        // marks stacked past the generous ascent or descent (Thai, Vietnamese, some emoji fonts): the ink's own
+        // reach where the canvas tells it, so no layer cuts them
+        val ascent = maxOf(op.size * ASCENT, (m.actualBoundingBoxAscent as Number?)?.toDouble() ?: 0.0)
+        val descent = maxOf(op.size * DESCENT, (m.actualBoundingBoxDescent as Number?)?.toDouble() ?: 0.0)
+        val width = (run + op.letterSpacing * op.size * op.text.length) * op.scaleX
+        val pad = stroke + blur * BLUR_REACH
+        val lean = op.size * LEAN
+        return area(Box(x - pad - lean, y - ascent - pad, x + width + pad + lean, y + descent + pad))
+    }
+
     // the glyphs at ([x], [y]) in the styles set, outlined by [stroke] where given (its colour the fill's: FILL_AND_STROKE)
     private fun glyphs(op: Op.Text, x: Double, y: Double, stroke: TextStroke?) {
         val spacing = op.letterSpacing * op.size
+        // the text's styles within the save: the page's context is left as it was found
+        c.save()
         c.font = font(op.weight, op.size, assets.family(op.font))
         if (spaces) c.letterSpacing = "${spacing}px"
         c.textAlign = "left"
         c.textBaseline = "alphabetic"
-        c.save()
         // Paint spaces letters half before each, a canvas all after: moved by the half, squeezed as the
         // letters are (Minikin's spacing is the size times the scale; a canvas's is, under the scale below)
         c.translate(x + spacing * op.scaleX / 2, y)
@@ -372,6 +395,8 @@ internal class CanvasPainter(
             c.translate(-w / 2.0, -h / 2.0)
         }
         c.scale(w / (icon.vw as Number).toDouble(), h / (icon.vh as Number).toDouble())
+        // the viewBox's origin at the box's top left (a theme's own SVG's: Material Symbols' is 0 -960); the app's icons have none
+        c.translate(-((icon.vx as Number?)?.toDouble() ?: 0.0), -((icon.vy as Number?)?.toDouble() ?: 0.0))
         val tint = css(op.tint)
         val paths: Array<dynamic> = icon.paths.unsafeCast<Array<dynamic>>()
         for (p in paths) {
@@ -471,6 +496,13 @@ internal class CanvasPainter(
         private const val SIGMA_SCALE = 0.57735
         private const val SIGMA_BIAS = 0.5
         private const val MITER_LIMIT = 4.0
+
+        // a text's room round its run, in its size: above its baseline, below, either side (textArea); a blur's
+        // reach in its radii
+        private const val ASCENT = 1.25
+        private const val DESCENT = 0.5
+        private const val LEAN = 0.25
+        private const val BLUR_REACH = 3.0
         private const val HALF_TURN = 180.0
         private const val OPAQUE_ALPHA = 255
 
@@ -485,10 +517,12 @@ internal class CanvasPainter(
     }
 }
 
-private fun newPath2D(d: String): dynamic {
-    val make: dynamic = js("(function (d) { return new Path2D(d); })")
-    return make(d)
-}
+// made once, not a function a call (an icon's every path, a text's every letter)
+private val MAKE_PATH2D: dynamic = js("(function (d) { return new Path2D(d); })")
+private val HAS_LETTER_SPACING: dynamic = js("(function (c) { return 'letterSpacing' in c; })")
+private val CODE_POINTS: dynamic = js("(function (t) { return Array.from(t); })")
+
+private fun newPath2D(d: String): dynamic = MAKE_PATH2D(d)
 
 // a canvas [w] × [h]: an OffscreenCanvas where there is one, else one of [like]'s document
 private fun newCanvas(like: dynamic, w: Int, h: Int): dynamic {
@@ -499,13 +533,7 @@ private fun newCanvas(like: dynamic, w: Int, h: Int): dynamic {
     return make(like, w, h)
 }
 
-private fun hasLetterSpacing(ctx: dynamic): Boolean {
-    val has: dynamic = js("(function (c) { return 'letterSpacing' in c; })")
-    return has(ctx) as Boolean
-}
+private fun hasLetterSpacing(ctx: dynamic): Boolean = HAS_LETTER_SPACING(ctx) as Boolean
 
 // [text]'s letters: its code points (a canvas sets no fewer)
-private fun letters(text: String): Array<String> {
-    val split: dynamic = js("(function (t) { return Array.from(t); })")
-    return split(text).unsafeCast<Array<String>>()
-}
+private fun letters(text: String): Array<String> = CODE_POINTS(text).unsafeCast<Array<String>>()

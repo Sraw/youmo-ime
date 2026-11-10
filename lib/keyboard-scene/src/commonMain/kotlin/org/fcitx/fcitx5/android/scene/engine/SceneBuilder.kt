@@ -59,6 +59,9 @@ class SceneBuilder(
 
     // `face="keep"`: the face theme 3.0 drew whatever 按键样式 said (the lookup key on, 确定)
     private val unflat = cascades.of(env.scenes - "flat")
+
+    // a key's cascade by its face: one kept as 3.0 drew it, unflat
+    private fun cascadeFor(face: Face?) = if (face == Face.Keep) unflat else cascade
     private val paint = Paint(theme, env.density)
     private val content = Content(env, measurer, icons)
     private val popups by lazy { PopupBuilder(theme, env, measurer, icons, cascade, paint) }
@@ -130,13 +133,9 @@ class SceneBuilder(
 
     private fun scene(layout: Layout, fragments: Map<String, Fragment>): Parsed<Scene> {
         val warnings = Problems()
-        // rules C §7: a number pad the app named no pad for (a field it does not know) is the full one
-        val padless = layout.family == "number" && env.input.pad == null
-        if (padless) warnings.add(0, "a number pad with no pad= given: the full pad")
-        val expanding = if (padless) env.copy(input = env.input.copy(pad = FULL_PAD)) else env
+        if (padless(layout)) warnings.add(0, "a number pad with no pad= given: the full pad")
         val placement = placement(layout)
-        val splitSide = placement?.side?.takeIf { env.split }?.name?.lowercase()
-        val rows = phases.section("expand") { Expand.rows(layout, fragments, expanding, splitSide) }.getOr { return Parsed.Failed(it) }
+        val rows = phases.section("expand") { expand(layout, fragments) }.getOr { return Parsed.Failed(it) }
         val board = board(placement)
         val placed = phases.section("place") { Place.rows(rows, layout.columns, layout.onSplit, env, board, warnings) }.getOr { return Parsed.Failed(it) }
         // each key's looks cascaded, its face's layers and its texts placed (the texts measured): each a
@@ -229,7 +228,7 @@ class SceneBuilder(
         states: Set<String> = emptySet(),
     ): List<Op> {
         if (look == null || face == Face.None) return emptyList()
-        val c = if (face == Face.Keep) unflat else cascade
+        val c = cascadeFor(face)
         val l = KeyLook(c.of(Selector.Target("key", board, id, null, setOf(look) + classes, states, slot = slot)), theme)
         return paint.face(Faces.of(cell, l, face, true, env.flat && face != Face.Keep, env.density), l, false)
     }
@@ -237,8 +236,9 @@ class SceneBuilder(
     // the handwriting pad: its face, the grid over it the theme shows, the ink its strokes are drawn in (060-render-p3 T7b)
     private fun pad(board: String, s: Slot, cell: Box, face: List<Op>): SlotNode {
         val target = Selector.Target("key", board, s.id, null, setOfNotNull(s.look) + s.classes, emptySet(), slot = true)
+        // the grid and the ink are the scene's, flat or not; only the face keeps 3.0's
         val v = cascade.of(target)
-        val c = if (s.face == Face.Keep) unflat else cascade
+        val c = cascadeFor(s.face)
         val box = s.look?.takeIf { s.face != Face.None }?.let {
             Faces.of(cell, KeyLook(c.of(target), theme), s.face, true, env.flat && s.face != Face.Keep, env.density).face?.bounds
         } ?: cell
@@ -269,7 +269,7 @@ class SceneBuilder(
         Cascade.KeptKey<Styled>
 
     private fun styled(board: String, key: ExpandedKey): Styled {
-        val c = if (key.attrs.face == Face.Keep) unflat else cascade
+        val c = cascadeFor(key.attrs.face)
         val states = statesOf(key)
         val classes = setOf(key.kind) + key.attrs.classes.orEmpty()
         return c.kept(StyledFor(board, key.key.id, key.attrs.role, classes, states)) { styled(c, board, key, classes, states) }
@@ -293,17 +293,22 @@ class SceneBuilder(
      * The keys of [roles] on [layout] that this scene would draw blank: their words and icon hidden and their
      * face, as [styled] cascades it, not an image, in the states the environment puts them in plus each of
      * [stateSets], each pressed and not. `board/id` and the states for each, for [BlankKeys].
+     *
+     * [expanded] keeps the keys expanded across the scenes [BlankKeys] asks, by what of the environment expands
+     * them there: its board and form (its input and texts the same in each), not its colours or what is typed.
      */
     internal fun blanks(
         layout: Layout,
         fragments: Map<String, Fragment>,
         roles: Set<String>,
         stateSets: List<Set<KeyState>>,
+        expanded: MutableMap<List<Any>, List<ExpandedKey>> = HashMap(),
     ): List<Pair<ExpandedKey, Set<KeyState>>> {
         val out = ArrayList<Pair<ExpandedKey, Set<KeyState>>>()
-        for (key in expandedKeys(layout, fragments)) {
+        val form = listOf<Any>(layout.id, env.landscape, env.compact, env.floating != null, env.split, env.isOneHanded)
+        for (key in expanded.getOrPut(form) { expandedKeys(layout, fragments) }) {
             if (key.attrs.role !in roles) continue
-            val c = if (key.attrs.face == Face.Keep) unflat else cascade
+            val c = cascadeFor(key.attrs.face)
             val classes = setOf(key.kind) + key.attrs.classes.orEmpty()
             val own = statesOf(key)
             for (states in stateSets.map { own + it }.distinct().flatMap { listOf(it, it + KeyState.Pressed) }) {
@@ -321,10 +326,19 @@ class SceneBuilder(
     // the keys as the scene has them: a layout that does not expand here draws no keys here (its own problems
     // are the layout check's); expanded as [scene] does: a number pad the app named no pad for, the full one
     private fun expandedKeys(layout: Layout, fragments: Map<String, Fragment>): List<ExpandedKey> {
-        val splitSide = placement(layout)?.side?.takeIf { env.split }?.name?.lowercase()
-        val expanding = if (layout.family == "number" && env.input.pad == null) env.copy(input = env.input.copy(pad = FULL_PAD)) else env
-        val rows = Expand.rows(layout, fragments, expanding, splitSide).getOr { return emptyList() }
+        val rows = expand(layout, fragments).getOr { return emptyList() }
         return rows.flatMap { it.items }.filterIsInstance<ExpandedKey>()
+    }
+
+    // rules C §7: a number pad the app named no pad for (a field it does not know) is the full one
+    private fun padless(layout: Layout) = layout.family == "number" && env.input.pad == null
+
+    // [layout]'s rows as this scene expands them, the one rule [scene] and [expandedKeys] share: padless, the full
+    // pad; split, the half its placement puts it on
+    private fun expand(layout: Layout, fragments: Map<String, Fragment>): Parsed<List<ExpandedRow>> {
+        val expanding = if (padless(layout)) env.copy(input = env.input.copy(pad = FULL_PAD)) else env
+        val splitSide = placement(layout)?.side?.takeIf { env.split }?.name?.lowercase()
+        return Expand.rows(layout, fragments, expanding, splitSide)
     }
 
     /**
@@ -334,7 +348,7 @@ class SceneBuilder(
      */
     internal fun sources(layout: Layout, fragments: Map<String, Fragment>, id: String, part: String?, states: Set<String>): Map<String, Style> {
         val key = expandedKeys(layout, fragments).firstOrNull { it.key.id == id } ?: return emptyMap()
-        val c = if (key.attrs.face == Face.Keep) unflat else cascade
+        val c = cascadeFor(key.attrs.face)
         val classes = setOf(key.kind) + key.attrs.classes.orEmpty()
         val all = statesOf(key).mapTo(HashSet()) { it.xml } + states
         return c.sources(Selector.Target("key", layout.id, key.key.id, key.attrs.role, classes, all, part))
