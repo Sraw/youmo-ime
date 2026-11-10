@@ -107,6 +107,8 @@ class KeyboardCanvasView(
         var pressed: RenderNode? = null
         var down = false
         val pictured = node.faces.values.any(CanvasFrame::showsPicture)
+        // pressed sooner after the key before than its fade lasts (typing fast): it does not move, as with motion off
+        var fast = false
 
         // how it is moving (060-render-p3 A1): made only for a key of a theme's motion while 键盘动效 may
         // move it, so a theme without motion, or motion off, keeps none and draws as ever
@@ -244,6 +246,7 @@ class KeyboardCanvasView(
                 if (was != null) {
                     // drawn as before, it keeps its nodes: Shift relabels the letters, not the rest
                     f.down = was.down
+                    f.fast = was.fast
                     if (!repainted && was.node.faces == k.faces) {
                         f.normal = was.normal
                         f.pressed = was.pressed
@@ -427,12 +430,20 @@ class KeyboardCanvasView(
         val f = faces.firstOrNull { it.node.of(ref) } ?: return
         if (f.down == on) return
         f.down = on
-        if (on) endFades(f)
+        if (on) {
+            endFades(f)
+            val now = SystemClock.uptimeMillis()
+            f.fast = now - lastDownAt < (f.node.motion?.transition?.ms ?: 0)
+            lastDownAt = now
+        }
         f.node.motion?.let { pressMoves(f, on, it) }
         invalidate()
     }
 
     // the other keys' release fades ended (at rest) as a key goes down: typing fast, a key's frame draws no fades with it
+    // the last key's down (uptime ms): a key pressed within its fade's length of it is typed fast
+    private var lastDownAt = Long.MIN_VALUE / 2
+
     private fun endFades(pressed: Faces) {
         for (o in faces) {
             val m = o.moving ?: continue
@@ -461,7 +472,7 @@ class KeyboardCanvasView(
         val scale = motion.pressScale.toFloat()
         val sink = motion.pressSink.toFloat()
         if (on) {
-            val press = motion.press
+            val press = motion.press.takeUnless { f.fast }
             if (press != null && !interrupted) {
                 m.scale = 1f
                 m.sink = 0f
@@ -472,7 +483,7 @@ class KeyboardCanvasView(
             }
         } else {
             val fade = motion.transition
-            if (fade == null || f.pressed?.hasDisplayList() != true) {
+            if (fade == null || f.fast || f.pressed?.hasDisplayList() != true) {
                 m.scale = 1f
                 m.sink = 0f
             } else {

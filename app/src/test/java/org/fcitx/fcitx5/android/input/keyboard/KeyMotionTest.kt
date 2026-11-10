@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
+import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.Assert.assertEquals
@@ -227,6 +228,28 @@ class KeyMotionTest {
         assertEquals(0f, q.alpha, 1e-3f)
         assertEquals(1f, q.scaleX, 1e-4f)
         c.press("w", down = false)
+        h.idle()
+    }
+
+    @Test
+    fun typedFastTheKeysDoNotMove() = harness().use { h ->
+        val c = h.canvas()
+        // the canvas told of each press as a touch tells it, no time let run between: Robolectric's paused looper runs an
+        // animation to its end at the first frame let run, the clock with it, so keys a few ms apart are typed here at once
+        fun key(k: String, down: Boolean) = c.showPressed(KeyRef(k), down)
+        // the first key after a pause moves: its press and its fade
+        key("q", true)
+        c.pressedNode("q")
+        key("q", false)
+        val made = c.animatorsMade
+        assertEquals(2, made)
+        // then the keys sooner than the 150 ms fade after the one before: pressed (at its scale at once) and let go still
+        for (k in listOf("w", "e", "r")) {
+            key(k, true)
+            assertEquals(0.9f, c.pressedNode(k)!!.scaleX, 1e-4f)
+            key(k, false)
+        }
+        assertEquals(made, c.animatorsMade)
         h.idle()
     }
 
