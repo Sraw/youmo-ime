@@ -27,7 +27,7 @@ object AsideCandidates {
         read: List<T>,
         key: String,
         emoji: (String) -> List<String>,
-        chaizi: ((String) -> List<Pair<String, String>>)?,
+        chaizi: PartsLookup?,
         text: (T) -> String,
         whole: (T) -> Boolean,
         make: (String) -> T,
@@ -35,7 +35,7 @@ object AsideCandidates {
         first: () -> T? = { read.firstOrNull() },
         lifted: (T) -> Boolean = { false },
     ): Placed<T> {
-        val parts = if (chaizi == null || key.firstOrNull() != Chaizi.KEY) emptyList() else chaizi(key.substring(1).filter { it in 'a'..'z' })
+        val parts = if (chaizi == null || key.firstOrNull() != Chaizi.KEY) emptyList() else chaizi.of(key.substring(1).filter { it in 'a'..'z' })
         if (parts.isEmpty()) {
             val (withEmoji, added) = EmojiCandidates.placed(read, first(), emoji, text, whole, phrases, lifted, make)
             return Placed(withEmoji, added.associateWith { "" })

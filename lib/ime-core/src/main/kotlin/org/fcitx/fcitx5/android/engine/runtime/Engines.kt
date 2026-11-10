@@ -432,11 +432,8 @@ class Engines(
         return annotated(im, s)
     }
 
-    // 候选词注音 of the reading for each candidate shown; made at the first asked for
-    private val candidateReadings by lazy(LazyThreadSafetyMode.NONE) {
-        val simplified by lazy(LazyThreadSafetyMode.NONE, simplifier)
-        CandidateReadings(assets.pinyinData, assets.pinyinData.tones, { simplified.simplify(it) }) { assets.charSyllables }
-    }
+    // 候选词注音 of the reading for each candidate shown: the factory's, whose pinyin blocks a polyphone by its parts in the one shown
+    private val candidateReadings get() = factory.candidateReadings
 
     // the session [im]'s candidates are of, if they are any 候选词注音 reads: not English's
     private fun annotatedSession(im: String): Session? =

@@ -126,7 +126,7 @@ class CandidateReadings(
     fun ofHint(text: String, hint: String, style: ReadingStyle = ReadingStyle.PINYIN, before: String = ""): List<String> {
         if (hint.isBlank() || !text.codePoints().allMatch(Character::isIdeographic)) return emptyList()
         val several = hint.trim().split(SEPARATOR)
-        if (several.size > 1) return oneOf(text, several, style, before)
+        if (several.size > 1) return oneWritten(text, several, style, before)
         val parts = hint.trim().split(' ')
         if (parts.size != text.codePointCount(0, text.length) || parts.any { p -> p.isEmpty() || !p.all(Char::isLetter) }) return emptyList()
         val toned = parts.any { p -> p.any { it.code > ASCII } }
@@ -138,11 +138,19 @@ class CandidateReadings(
         return ids.mapIndexed { i, id -> Zhuyin.of(id)?.let { ToneMark.zhuyin(it, tones[i]) }.orEmpty() }
     }
 
-    // one character's [several] readings hinted as one, written as [style] has it: [ordered]'s first after
-    // [before]; the hint's first where the data has none of the character's own, or no way to write it
-    private fun oneOf(text: String, several: List<String>, style: ReadingStyle, before: String): List<String> {
+    /**
+     * The one reading a hint of [text]'s several is drawn as ([ofHint]), [text] one character: [ordered]'s
+     * first after [before]; null for any other text, or a character the data has no reading of. Blocking
+     * it by its parts blocks it in this reading, the one shown (PinyinSession).
+     */
+    fun oneOf(text: String, before: String = ""): Reading? =
+        if (text.isEmpty() || text.codePointCount(0, text.length) != 1) null else ordered(text.codePointAt(0), before).firstOrNull()
+
+    // one character's [several] readings hinted as one, written as [style] has it: [oneOf]; the hint's
+    // first where the data has none of the character's own, or no way to write it
+    private fun oneWritten(text: String, several: List<String>, style: ReadingStyle, before: String): List<String> {
         if (text.codePointCount(0, text.length) != 1 || several.any { p -> p.isEmpty() || !p.all(Char::isLetter) }) return emptyList()
-        val first = ordered(text.codePointAt(0), before).firstOrNull()?.let { written(it.syllable, it.tone, style) }
+        val first = oneOf(text, before)?.let { written(it.syllable, it.tone, style) }
         return if (!first.isNullOrEmpty()) listOf(first) else ofHint(text, several.first(), style)
     }
 

@@ -43,14 +43,17 @@ import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.LearnClock
 import org.fcitx.fcitx5.android.engine.learn.LearnTo
 import org.fcitx.fcitx5.android.engine.learn.Simplifier
+import org.fcitx.fcitx5.android.engine.phrase.PartsLookup
 import org.fcitx.fcitx5.android.engine.pinyin.GroupedShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
+import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.pinyin.UserLatinWords
+import org.fcitx.fcitx5.android.engine.reading.CandidateReadings
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action
@@ -94,6 +97,11 @@ internal class SessionFactory(
     simplifier: () -> Simplifier,
 ) {
     private val simplified by lazy(LazyThreadSafetyMode.NONE) { simplifier() }
+
+    /** 候选词注音's readings (Engines), made at the first asked for; pinyin's polyphone by its parts is blocked in the one they show. */
+    val candidateReadings by lazy(LazyThreadSafetyMode.NONE) {
+        CandidateReadings(assets.pinyinData, assets.pinyinData.tones, { simplified.simplify(it) }) { assets.charSyllables }
+    }
 
     // the coarse words of pinyin's vocabulary but those the user added, one for handwriting and every
     // table: made again once the sessions are dropped (a word added drops them; a long press's delete
@@ -369,7 +377,7 @@ internal class SessionFactory(
     private fun pinyinSession(
         segmenter: Segmenter,
         spell: Boolean,
-        chaizi: (String) -> List<Pair<String, String>> = { emptyList() },
+        chaizi: PartsLookup = PartsLookup { emptyList() },
         kind: String = Kinds.FULL,
     ): PinyinSession {
         val s = settings()
@@ -476,8 +484,12 @@ internal class SessionFactory(
         if (settings().builtInPhrases) { word -> lexicon.added.phrases().builtInsOf(word, learnClock::calendar) } else { _ -> emptyList() }
 
     /** The characters by their parts' pinyin, as full pinyin offers them, but those blocked: none, the setting off. */
-    private fun chaizi(): (String) -> List<Pair<String, String>> =
-        if (settings().chaizi) { letters -> assets.chaiziOf(letters).filterNot { lexicon.isBlocked(it.first) } } else { _ -> emptyList() }
+    private fun chaizi(): PartsLookup = if (!settings().chaizi) PartsLookup { emptyList() } else object : PartsLookup {
+        override fun of(letters: String) = assets.chaiziOf(letters).filterNot { lexicon.isBlocked(it.first) }
+
+        // a polyphone's reading as 候选词注音 draws it, blocked in that one
+        override fun shownIn(text: String, before: String) = candidateReadings.oneOf(text, before)?.let { Syllables.spelling(it.syllable) }
+    }
 
     /**
      * The one reranker over the model, for every session: they all run on the fcitx thread, one

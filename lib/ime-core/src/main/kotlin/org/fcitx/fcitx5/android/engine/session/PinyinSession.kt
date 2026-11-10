@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases.Phrase
 import org.fcitx.fcitx5.android.engine.phrase.Chaizi
 import org.fcitx.fcitx5.android.engine.phrase.AsideCandidates
+import org.fcitx.fcitx5.android.engine.phrase.PartsLookup
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
 import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
 import org.fcitx.fcitx5.android.engine.pinyin.KeyedSegmenter
@@ -110,7 +111,7 @@ class PinyinSession(
      * The characters whose parts' pinyin [Chaizi.KEY] and then the whole input is (Chaizi), each
      * with its reading; none for most. No pinyin starts with u, the stroke lookup's key too.
      */
-    private val chaizi: (String) -> List<Pair<String, String>> = { emptyList() },
+    private val chaizi: PartsLookup = PartsLookup { emptyList() },
     /** The time a dynamic phrase is filled in with. */
     private val now: () -> Calendar = JvmClock::calendar,
     private val refiner: SentenceRefiner? = null,
@@ -601,7 +602,7 @@ class PinyinSession(
 
     // what blocking [c] blocks: its words, or a sentence of them whole; an emoji or a character by its
     // parts by its text in the reading it stands for (a phrase, text kept as typed: nothing)
-    private fun blocked(c: Candidate): Entry? = lastRead.aside[c.text]?.let { aside -> AsideBlocks.entry(c.text, aside) { lastRead.candidates.firstOrNull { it.text !in lastRead.aside && c.text in emoji(it.text) }?.let(::entries) } } ?: entries(c)?.let { it.singleOrNull() ?: Entry.of(c.text, it) }
+    private fun blocked(c: Candidate): Entry? = lastRead.aside[c.text]?.let { aside -> AsideBlocks.entry(c.text, AsideBlocks.shown(c.text, aside) { chaizi.shownIn(it, pieces.joinToString("") { p -> p.text }) }) { lastRead.candidates.firstOrNull { it.text !in lastRead.aside && c.text in emoji(it.text) }?.let(::entries) } } ?: entries(c)?.let { it.singleOrNull() ?: Entry.of(c.text, it) }
 
     private fun block(index: Int): Snapshot {
         val word = candidates.getOrNull(index)?.takeIf { user != null && learning }?.let(::blocked)

@@ -411,7 +411,21 @@ def py115(d):
     u2 = [x.split()[0] for x in d.cands() if x]
     d.clear()
     check(ch not in u2, f"屏蔽后 uhs 还有「{ch}」：{u2[:8]}")
-    return f"表情「{emoji}」屏蔽后 dianzan {after[:4]}，重启输入法后 {restarted[:4]}；uhs「{ch}」屏蔽后 {u2[:4]}（拆字、滑行的其他读法由 JVM 管）"
+    # a polyphone by its parts (彳亍 行, shown xíng): blocked in that reading only (A5)
+    d.type("uchichu")
+    c = d.cands(want="行")
+    check("行" in c, f"uchichu 的候选里没有「行」：{c[:8]}")
+    block_candidate(d, "行", "长按拆字出的多音字「行」的菜单")
+    d.clear()
+    left = {}
+    for keys in ("uchichu", "xing", "hang"):
+        d.type(keys)
+        left[keys] = [x.split()[0] for x in d.cands() if x]
+        d.clear()
+    check("行" not in left["uchichu"], f"屏蔽后 uchichu 还有「行」：{left['uchichu'][:8]}")
+    check("行" not in left["xing"], f"屏蔽后 xing 还有「行」：{left['xing'][:8]}")
+    check("行" in left["hang"], f"屏蔽 xíng 后 hang 没有「行」：{left['hang'][:8]}")
+    return f"表情「{emoji}」屏蔽后 dianzan {after[:4]}，重启输入法后 {restarted[:4]}；uhs「{ch}」屏蔽后 {u2[:4]}；拆字「行」屏蔽后 xing {left['xing'][:3]}、hang {left['hang'][:3]}（单音字拆字、滑行的其他读法由 JVM 管）"
 
 
 # the input method's process killed and brought back, as a phone's restart would: what was learned read from its files

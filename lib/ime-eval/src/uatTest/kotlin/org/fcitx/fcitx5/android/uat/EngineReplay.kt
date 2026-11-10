@@ -239,7 +239,8 @@ class EngineReplay(
 
     /**
      * The reading shown above the candidate [text], its syllables space-separated, "" for none: with
-     * 候选词注音 off, a misreading's, a 拆字's or a stroke lookup's, once hints beside (CandidateReadings.ofHint).
+     * 候选词注音 off, a misreading's, a 拆字's or a stroke lookup's hint drawn above (CandidateReadings.ofHint),
+     * a polyphone's one of its several.
      */
     fun readingOf(text: String): String = choice(text).readings.joinToString(" ")
 

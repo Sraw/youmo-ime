@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.engine.learn.control.MenuItem
 import org.fcitx.fcitx5.android.engine.phrase.Chaizi
 import org.fcitx.fcitx5.android.engine.phrase.EmojiData
 import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
+import org.fcitx.fcitx5.android.engine.reading.ReadingData
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -67,6 +68,34 @@ class EnginesAsideBlockTest : EnginesFixture() {
             assertFalse("好" in e.typed("unvzi"))
             e.removeWord(UserWord("好", "hao", UserWord.Kind.BLOCKED))
             assertTrue("好" in e.typed("unvzi"))
+        }
+    }
+
+    // a polyphone by its parts, hinted "xing/hang/heng": blocked in the one reading shown above it (A5),
+    // its commonest alone, the one of the word it makes after what was picked before it (银 then 行: hang);
+    // still typed by its other readings
+    @Test
+    fun aPolyphoneByItsPartsIsBlockedInTheReadingShown() {
+        pinyin = ReadingData.bytes
+        chaizi = Chaizi.format(mapOf("chichu" to listOf("行"))).toByteArray()
+        Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+            val at = e.typed("uchichu").indexOf("行")
+            val menu = e.learning(PINYIN, LearningOp.Menu(at, "行")) as LearningResult.Menu
+            assertTrue(menu.items.toString(), MenuItem.BLOCK in menu.items)
+            assertTrue(e.learning(PINYIN, LearningOp.Block(at, "行")) is LearningResult.Done)
+            assertEquals(listOf(UserWord("行", "xing", UserWord.Kind.BLOCKED)), e.userWords())
+            assertFalse("行" in e.typed("uchichu"))
+            assertFalse("行" in e.typed("xing"))
+            assertTrue("行" in e.typed("hang"))
+        }
+        Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+            e.typed("yinuchichu")
+            val after = e.onEvent(PINYIN, EngineEvent.PICK, e.candidates(PINYIN, 0, 20).indexOfFirst { it.text == "银" })
+            val at = after.candidates.indexOf("行")
+            assertTrue(after.toString(), at >= 0)
+            assertTrue(e.learning(PINYIN, LearningOp.Block(at, "行")) is LearningResult.Done)
+            assertEquals(listOf(UserWord("行", "hang", UserWord.Kind.BLOCKED)), e.userWords())
+            assertTrue("行" in e.typed("xing"))
         }
     }
 }

@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.data.Misreadings
+import org.fcitx.fcitx5.android.engine.reading.CandidateReadings
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import org.fcitx.fcitx5.android.engine.user.WordLists
@@ -19,6 +20,15 @@ internal object AsideBlocks {
     /** The entry blocking [text] blocks; null where no reading is known. */
     fun entry(text: String, hint: String, standsFor: () -> List<Entry>?): Entry? =
         if (hint.isNotEmpty()) WordLists.entry(text, Misreadings.toneless(hint)) else standsFor()?.let { Entry.of(text, it) }
+
+    /**
+     * The reading [text], a character by its parts, is blocked in by its [hint]: a polyphone's several
+     * (`xing/hang`) the one shown above it ([shown], CandidateReadings.oneOf after what was picked before
+     * it; else the first), as a one-reading character is blocked in its own (A5). Not each: that would
+     * take it from the pinyin of its other readings too.
+     */
+    fun shown(text: String, hint: String, shown: (String) -> String?): String =
+        if (CandidateReadings.SEPARATOR !in hint) hint else shown(text) ?: hint.substringBefore(CandidateReadings.SEPARATOR)
 
     /** [emoji] but those [user] blocked in the reading of the word they stand for: that of [read] whose [text] it is, in its [words]. */
     fun <T> emoji(emoji: (String) -> List<String>, user: UserModel?, read: List<T>, text: (T) -> String, words: (T) -> List<Entry>?): (String) -> List<String> =
