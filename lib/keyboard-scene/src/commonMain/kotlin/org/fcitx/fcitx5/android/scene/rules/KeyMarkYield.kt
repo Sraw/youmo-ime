@@ -168,6 +168,14 @@ object KeyMarkYield {
      */
     const val HOPELESS_BAND = 0.15
 
+    /**
+     * How far short of its gap a mark may fall and still be kept (060-pending-decisions L62/L65/L72), in px:
+     * the half px L77 lets a label stand out of its room unmoved, too little to be seen as touching. The
+     * gap is asked less it wherever a mark is placed or found to fit, not only where nothing clears the full
+     * gap: there a mark would jump by it as the keyboard's size crosses.
+     */
+    const val FIT_SLACK = 0.5
+
     // how finely a class's scale is found; a mark's way out into its inset, in px; the marks' share of theirs
     private const val SCALE_STEP = 0.001
     private const val OUT_PX = 0.001
@@ -286,13 +294,16 @@ object KeyMarkYield {
      * again about the glyph where it is now, the glyph not moving, those still meeting it left out (060-render-p2 S7a).
      */
     fun again(key: Member, glyph: Ink, board: Board, settled: Settled, gap: Double): Settled {
-        if (settled.marks.none { it != null && it.meets(glyph, gap) }) return settled.copy(glyph = glyph)
+        if (settled.marks.none { it != null && it.meets(glyph, slack(gap)) }) return settled.copy(glyph = glyph)
         // kept apart first, as [board] and [onto] do: two marks that start out meeting are parted, not one left out
         val kept = key.marks.indices.filter { settled.marks[it] != null }
         val apart = keptApart(kept.map { i -> key.marks[i].let { m -> m.scaled(board.markScale(m)).within(key.edge) } }, key.edge)
         val marks = key.marks.indices.map { i -> kept.indexOf(i).let { at -> if (at < 0) null else apart[at] } }
         return settle(key.copy(moves = false), glyph, marks, gap)
     }
+
+    // the gap a mark is kept from the glyph by: [gap] less [FIT_SLACK]
+    private fun slack(gap: Double) = (gap - FIT_SLACK).coerceAtLeast(0.0)
 
     // this mark's size: [t] if of the class [symbol] (both if null), else [u]
     private fun Mark.sizeIn(t: Double, u: Double, symbol: Boolean?) = if (symbol == null || (drop == DROP_SYMBOL) == symbol) t else u
@@ -369,7 +380,7 @@ object KeyMarkYield {
             // the most expendable of those still meeting where they go furthest (none: of all)
             val far = maxOf(key.edge.face.width, key.edge.face.height)
             val out = live.map { out(glyph, it, key.room, key.edge, gap, inward = far) }
-            val clash = out.indices.filter { i -> out[i].meets(glyph, gap) || out.indices.any { j -> j != i && out[j].meets(out[i], 0.0) } }
+            val clash = out.indices.filter { i -> out[i].meets(glyph, slack(gap)) || out.indices.any { j -> j != i && out[j].meets(out[i], 0.0) } }
             val worst = clash.ifEmpty { live.indices.toList() }.maxBy { live[it].drop }
             kept[kept.indexOfFirst { it === live[worst] }] = null
         }
@@ -459,8 +470,9 @@ object KeyMarkYield {
     // inset (the least share of it), then in along its arc (the least); the glyph moved where it [Member.moves];
     // null where nothing clears, or where a mark's corners are not within [key]'s arcs (one taller than a short
     // key's face less its arcs)
+    // ([gap] less [FIT_SLACK], always: where only a mark short by less were, the step would make it jump)
     private fun place(glyph: Ink, marks: List<Mark>, key: Member, gap: Double): Settled? =
-        placed(glyph, marks, key, gap)?.takeIf { s -> s.marks.all { cornersIn(it!!, key.edge) } }
+        placed(glyph, marks, key, slack(gap))?.takeIf { s -> s.marks.all { cornersIn(it!!, key.edge) } }
 
     private fun placed(glyph: Ink, marks: List<Mark>, key: Member, gap: Double): Settled? {
         val room = key.room
