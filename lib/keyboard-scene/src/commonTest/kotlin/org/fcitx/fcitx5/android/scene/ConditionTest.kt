@@ -27,7 +27,7 @@ class ConditionTest {
         val c = "ime=shuangpin scheme-types=semicolon !split, table-extra=semicolon"
         val shuangpin = env.copy(input = Input(ime = "shuangpin", scheme = "Ziranma", schemeTypes = setOf("semicolon")))
         assertTrue(holds(c, shuangpin))
-        assertFalse(holds(c, shuangpin.copy(split = true)), "not split (TextKeyboard.kt:324)")
+        assertFalse(holds(c, shuangpin.copy(split = true)), "not split")
         assertFalse(holds(c, env), "pinyin")
         assertTrue(holds(c, env.copy(input = Input(ime = "table", table = "wubi", tableExtra = "semicolon"))))
         assertFalse(holds(c, env.copy(input = Input(ime = "table", table = "wubi", tableExtra = "star"))))

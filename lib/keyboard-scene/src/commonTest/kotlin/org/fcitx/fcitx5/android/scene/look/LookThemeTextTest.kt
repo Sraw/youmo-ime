@@ -23,6 +23,7 @@ import kotlin.test.assertTrue
  */
 class LookThemeTextTest {
 
+    // contract: the theme 3.0 text users exported and shared reads back as these files
     @Test
     fun theTextIsTheFiles() {
         val failed = LOOKS.mapNotNull { (name, look) ->
@@ -47,6 +48,19 @@ class LookThemeTextTest {
             val read = ThemeReader.theme(file, maxStyles = LookTheme.MAX_STYLES).ok()
             assertSameTheme(read, LookTheme.theme(look, name, name.endsWith("dark")), name)
         }
+    }
+
+    // a key one cannot type without hides its words only with an image face of its own (what 3.0 showed then);
+    // without one it keeps them, so the theme converted is one the app imports (ThemePackCheck.hidesRequired)
+    @Test
+    fun aRequiredKeyHidesItsLabelOnlyBehindItsOwnImage() {
+        fun xml(vararg o: Pair<String, KeyOverride>) = LookTheme.xml(material.copy(keys = material.keys.copy(overrides = mapOf(*o))), "t", false)
+        val image = xml("*/enter" to KeyOverride(KeyFill.Image(slice("enter.png")), null, KeyLabel.Hide))
+        assertTrue("""<style select="*/enter" fill="image(""" in image, image)
+        assertTrue("""<style select="*/enter label" hidden="true"/>""" in image, image)
+        val bare = xml("*/space" to KeyOverride(null, null, KeyLabel.Hide), "qwerty/enter" to KeyOverride(KeyFill.Color, null, KeyLabel.Hide), "qwerty/w" to KeyOverride(null, null, KeyLabel.Hide))
+        assertTrue("hidden=\"true\"" !in bare.substringBefore("qwerty/w label") + bare.substringAfter("qwerty/w label").substringAfter('\n'), bare)
+        assertTrue("""<style select="qwerty/w label" hidden="true"/>""" in bare, bare)
     }
 
     companion object {

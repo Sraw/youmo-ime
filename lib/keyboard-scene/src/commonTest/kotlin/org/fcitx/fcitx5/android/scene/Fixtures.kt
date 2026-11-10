@@ -35,7 +35,7 @@ object Fixtures {
     /** A phone upright, 411 dp wide, the keyboard 274 dp tall. */
     val portrait = Env(1080.0, 720.0, DENSITY, input = Input(langKey = true), texts = texts)
 
-    /** The same, the keyboard compact (its height setting's lowest, text 0.9). */
+    /** The same, the keyboard compact (text 0.9), 576 px: not the height setting's lowest (that is [Forms.compact]'s). */
     val compact = portrait.copy(height = 576.0, compact = true)
 
     /** A phone on its side, 914 dp: split (SplitKeyboard.Mode.AUTO splits from 600 dp). */

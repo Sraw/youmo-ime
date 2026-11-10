@@ -1,3 +1,7 @@
+import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsEnvSpec
+import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsPlugin
+import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootPlugin
+
 plugins {
     // the root's `clean` (deletes its build directory): base's, not one of its own, since Kotlin/JS
     // (lib/keyboard-scene) applies base's lifecycle to the root for its node and npm setup, and a
@@ -19,10 +23,7 @@ plugins {
 // node is fetched from the repository settings.gradle.kts declares (FAIL_ON_PROJECT_REPOS), not one
 // Kotlin/JS would add to the project (the root's setup and each JS module's)
 allprojects {
-    plugins.withType<org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootPlugin> {
-        the<org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsEnvSpec>().downloadBaseUrl.set(null as String?)
-    }
-    plugins.withType<org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsPlugin> {
-        the<org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsEnvSpec>().downloadBaseUrl.set(null as String?)
+    for (type in listOf(NodeJsRootPlugin::class.java, NodeJsPlugin::class.java)) {
+        plugins.withType(type) { the<NodeJsEnvSpec>().downloadBaseUrl.set(null as String?) }
     }
 }

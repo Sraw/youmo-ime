@@ -6,36 +6,38 @@ package org.fcitx.fcitx5.android.input.picker
 
 import android.graphics.Rect
 import android.view.View
-import org.fcitx.fcitx5.android.FcitxApplication
-import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.keyboard.KeyboardCanvasViewTest
-import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
-import org.fcitx.fcitx5.android.input.keyboard.canvas.set
-import org.fcitx.fcitx5.android.uat.PrefsRule
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityManager
 import androidx.core.view.AccessibilityDelegateCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityEventCompat
-import org.robolectric.Shadows.shadowOf
+import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.assertRows
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
+import org.fcitx.fcitx5.android.input.keyboard.GestureSnapshot
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardCanvasViewTest
+import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.set
+import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The symbol panel drawn by the scene (060-render-p2 S5c): its row of keys does what its views did
- * (each tapped and held, what reaches the engine and the field, a panel of its own each time), the
+ * The symbol panel drawn by the scene (060-render-p2 S5c): its row of keys (each tapped and held:
+ * what reaches the engine, against the record `gestures/symbols-row.txt`), the
  * categories and the grid in symbols.xml's slots over the canvas, the lock shut as its state and
- * said as its view said it (what a tap does), 返回 in the app's words.
+ * said as what a tap does, 返回 in the app's words.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -77,11 +79,34 @@ class SymbolsSceneGesturesTest {
                 h.api.calls.clear()
                 out += "$id long press: " + h.longPress(h.rowKeys().single { it.id == id })
                 h.idle()
-                out += "$id long press sent: " + h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") } +
+                val sent = h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") }
+                // ⌫ held repeats, how many times as the press falls in the frame (one fewer at SDK 29): the
+                // record keeps what it sends and that it repeats, not the count
+                val shown = if (id == "backspace") "repeats ${sent.distinct()}".also { assertTrue(sent.toString(), sent.size >= MIN_REPEATS) } else "$sent"
+                out += "$id long press sent: " + shown +
                     " field ${h.field.text} panel ${KeyboardHarness.find<PickerLayout>(h.inputView)?.isAttachedToWindow == true}"
             }
         }
         return out
+    }
+
+    // the row's keys tapped and held (R20 F5817: the long presses too), each line against the record;
+    // ⌫, space and Return each send their own key to the engine; ⌫ and space leave the panel up
+    // (BackSpace 0xff08, space 0x20, Return 0xff0d, by name or keysym as the panel sends them)
+    @Test
+    fun theRowsKeysSendTheirOwnKeys() {
+        val out = gestures()
+        GestureSnapshot.check("symbols-row", out)
+        fun tap(id: String) = out.single { it.startsWith("$id tap: ") }
+        assertRows(
+            // ⌫ deletes as on the keyboard
+            "backspace" to { assertTrue(tap("backspace"), Regex("key=BackSpace|sym=65288,").containsMatchIn(tap("backspace"))) },
+            // space types a space
+            "space" to { assertTrue(tap("space"), Regex("key=space|sym=32,|char= ,|commit\\( ").containsMatchIn(tap("space"))) },
+            // Return its own key, not a newline typed as text
+            "enter" to { assertTrue(tap("enter"), Regex("key=Return|sym=65293,").containsMatchIn(tap("enter"))) },
+        )
+        for (id in listOf("backspace", "space")) assertTrue(tap(id), tap(id).endsWith("panel true"))
     }
 
     @Test
@@ -174,20 +199,16 @@ class SymbolsSceneGesturesTest {
     @Test
     fun theLockShutAsItsStateSaidAsWhatATapDoes() {
         val app = org.robolectric.RuntimeEnvironment.getApplication()
-        val said = listOf(true).map { _ ->
-            panel().use { h ->
-                val open = h.rowKeys().single { it.id == "lock" }.description
-                h.tap(h.rowKeys().single { it.id == "lock" })
-                h.idle()
-                h.relayout()
-                run {
-                    val node = KeyboardHarness.find<KeyboardCanvasView>(KeyboardHarness.find<PickerLayout>(h.inputView)!!)!!.keyAt("lock")!!
-                    assertTrue(node.states.toString(), org.fcitx.fcitx5.android.scene.KeyState.Locked in node.states)
-                }
-                listOf(open, h.rowKeys().single { it.id == "lock" }.description)
-            }
+        val said = panel().use { h ->
+            val open = h.rowKeys().single { it.id == "lock" }.description
+            h.tap(h.rowKeys().single { it.id == "lock" })
+            h.idle()
+            h.relayout()
+            val node = KeyboardHarness.find<KeyboardCanvasView>(KeyboardHarness.find<PickerLayout>(h.inputView)!!)!!.keyAt("lock")!!
+            assertTrue(node.states.toString(), org.fcitx.fcitx5.android.scene.KeyState.Locked in node.states)
+            listOf(open, h.rowKeys().single { it.id == "lock" }.description)
         }
-        assertEquals(listOf(app.getString(R.string.picker_lock), app.getString(R.string.picker_unlock)), said[0])
+        assertEquals(listOf(app.getString(R.string.picker_lock), app.getString(R.string.picker_unlock)), said)
     }
 
     @Test
@@ -196,6 +217,8 @@ class SymbolsSceneGesturesTest {
     }
 
     private companion object {
+        // a hold of ⌫ deletes over and over: more than the one of a tap
+        const val MIN_REPEATS = 2
         val ROW = setOf("back", "lock", "numbers", "space", "backspace", "enter")
     }
 }

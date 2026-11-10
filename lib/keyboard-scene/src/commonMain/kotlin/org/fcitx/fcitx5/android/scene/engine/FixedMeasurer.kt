@@ -9,7 +9,8 @@ import org.fcitx.fcitx5.android.scene.Box
 /**
  * A font of fixed sizes, the same on every platform (060-render-v2 §6 step 5's fake): a Latin
  * character 0.6 of the size across, a wide (CJK) one 1.0, bold 5% wider; ink from 0.05 of the size
- * in from each side, cap height 0.7, descenders 0.2; the font's extent 1.05 above, 0.3 below.
+ * in from each side, cap height 0.7, descenders 0.2; the font's extent 1.05 above, 0.3 below. Widths go by
+ * UTF-16 unit: a character past the BMP (😀, 𠀀) counts twice; no test measures one.
  *
  * The engine's tests' (their snapshots are of it), and what the theme maker's library measures by where
  * its caller has no canvas (node: the library's own tests, which hold its scenes to those snapshots and

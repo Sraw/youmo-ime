@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.ColorExpr
 import org.fcitx.fcitx5.android.scene.theme.SystemColors
+import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.scene.theme.ThemeWriter
@@ -135,6 +136,23 @@ object YoumoEngine {
         val layout = LayoutReader.layout(text(xml, "layout"))
         if (layout !is Parsed.Ok) return@checked result(layout) { "layout" to null }
         result(builtIns.includes(layout.value, own)) { "layout" to YoumoLayout(layout.value, it) }
+    }
+
+    /**
+     * Where [theme] leaves Shift, Backspace, Space or Return blank (BlankKeys, the app's own import check): on the
+     * app's boards, each replaced by one of [layouts] (`{"<id>.xml": xml}`, a pack's `layouts/`) of its id. The first
+     * found, as text (`qwerty/enter @flat`), none: an empty array; too many scenes to try: `["*"]`. A layout of [layouts] that does not read is left
+     * out (readLayout says why).
+     */
+    fun blankKeys(theme: YoumoTheme, layouts: dynamic): Array<String> = run {
+        val own = HashMap<String, String>()
+        if (layouts != null) for (name in keys(layouts, "layouts")) own[name.removeSuffix(".xml")] = text(layouts[name], "layout $name")
+        val fragments = own.mapNotNull { (id, t) -> LayoutReader.fragment(t).orNull()?.let { id to it } }.toMap()
+        val ownBoards = own.values.mapNotNull { LayoutReader.layout(it).orNull() }
+        val boards = builtIns.layouts.filter { id -> ownBoards.none { it.id == id } }.mapNotNull { builtIns.layout(it)?.orNull() } + ownBoards
+        val withFragments = boards.mapNotNull { l -> builtIns.includes(l, fragments).orNull()?.let { BlankKeys.Board(l, it) } }
+        // too many to try: its code, "*", the page says what it means
+        BlankKeys.find(theme.theme, withFragments).map { if (it == BlankKeys.TOO_MANY) "*" else it.toString() }.toTypedArray()
     }
 
     /** The app's boards' ids (`qwerty`, `nine`…). */

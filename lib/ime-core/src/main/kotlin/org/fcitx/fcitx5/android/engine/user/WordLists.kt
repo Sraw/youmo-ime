@@ -126,6 +126,13 @@ class WordLists(private val dir: UserFiles?, private val onError: (IOException) 
         const val ADDED = "words.added"
         const val BLOCKED = "words.blocked"
 
+        /**
+         * Whether [text] is a word as the block lists take one: it has Han, or an ASCII letter or
+         * digit, and is no keycap emoji (1️⃣ is a digit and U+20E3, an emoji). Not a word, a text
+         * blocked is an emoji in its word's reading ([blockedEntry]), which no table hides.
+         */
+        fun isWordly(text: String): Boolean = KEYCAP !in text && text.codePoints().anyMatch(::wordly)
+
         // not toFloat's: 3D and NaN are words
         private val NUMBER = Regex("-?\\d+(\\.\\d+)?")
         private val SPACES = Regex("\\s+")
@@ -214,7 +221,9 @@ class WordLists(private val dir: UserFiles?, private val onError: (IOException) 
             val word = text.trim()
             val chars = word.codePointCount(0, word.length)
             // only a text of no Han nor ASCII letter or digit (an emoji, ℹ️ too): a word's are a syllable each
-            if (word.isEmpty() || word.codePoints().anyMatch(::wordly)) return entry(text, pinyin)
+            // a Latin candidate blocked in pinyin is its letters as spelled (hello H'E'L'L'O, iPhone I'P'H'O'N'E): as written first
+            if (word.isNotEmpty() && word.codePoints().noneMatch(Han::isHan)) WordText.entry(word, pieces(pinyin).joinToString("'"))?.let { return it }
+            if (word.isEmpty() || isWordly(word)) return entry(text, pinyin)
             val ids = pieces(pinyin.lowercase()).map { Syllables.id(WordText.spelling(it)) }
             return if (ids.isNotEmpty() && ids.none { it < 0 } && ids.size != chars) Entry(word, ids.toIntArray()) else entry(text, pinyin)
         }
@@ -256,6 +265,9 @@ class WordLists(private val dir: UserFiles?, private val onError: (IOException) 
 
 // below it, ASCII
 private const val ASCII_END = 0x80
+
+// what closes a keycap emoji (1️⃣, #️⃣)
+private const val KEYCAP = '\u20E3'
 
 // what makes a text a word: Han, an ASCII letter or digit
 private fun wordly(c: Int) = Han.isHan(c) || c < ASCII_END && Character.isLetterOrDigit(c)

@@ -37,7 +37,7 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
 | `glide` | Glide typing over Chinese keys: `Glide`, `GlideLayout` (the keys' places), `GlidePath`, `GlideSession`, `PinyinGlide` (a path → pinyin readings, full, 双拼, nine keys), `TableGlide` (→ a table's codes), `GlideReading` |
 | `english` | `EnglishData`, `EnglishDecoder` (keys → words with slips), `GlideDecoder` (a glide's path → words), `EnglishSession` (Gboard-like word-at-a-time typing, autocorrect, glides), `EnglishPhrases` (the custom phrases among its candidates, A1), `EnglishUser` (the user's words, a view of `learn.log`), `Corrections` (a field's last corrections, for a tap back), `EnglishText`, `Misspellings`, `EnglishDataBuilder` (compiles `english.data`) |
 | `stroke` | `Strokes` (by strokes, and a character's orders, `ordersOf`/`startsWith`), `StrokeLookup` (`u` then `h s p n z` inside pinyin), `StrokeFilter` (笔画筛选: a stroke drawn on the keyboard filters what pinyin shows) |
-| `handwriting` | `HandwritingSession` (the input method), `HandwritingDecoder` (the characters written read as a sentence with the pinyin model and the user's words), `InkRecognizer` (the character's two recognizers run as their training code runs them, over `InkNet`s the app supplies), `InkFeatures` (what each recognizer reads of the strokes, equal to the training code's) |
+| `handwriting` | `HandwritingSession` (the input method), `InkOver` (written on over another input method's keys), `HandwritingDecoder` (the characters written read as a sentence with the pinyin model and the user's words), `InkRecognizer` (the character's two recognizers run as their training code runs them, over `InkNet`s the app supplies), `InkFeatures` (what each recognizer reads of the strokes, equal to the training code's) |
 | `phrase` | `CustomPhrases` (libime's `customphrase` format, with date/time variables; keys kept lower case; `place`: each phrase a candidate of its own at its order, text, never learned; in a table, a code reached by a phrase alone shows it but commits it only by a tap (space, a selection key, a key no code starts, a key past the longest code drop the code: `TableSession`); a decoder's candidate of the same text stays where it is ranked and learned, the phrase not listed again after it (U-66); `CustomPhrases.BUILT_IN`: the date, time and weekday under `rq`, `sj`, `xq`, as keys on full pinyin's keyboards only (26, 18, 14, nine: `Segmenter.spellsFullPinyin`), under a key the user file has none of (in 双拼 `sj` and `xq` spell syllables), never in a table nor English; on a keyed keyboard `PhraseKeys` reads the keys (A1: a keyed keyboard's input as the keys' letters, each code any of its key's, an upper-case letter itself, a syllable taken off the bar its letters (`KeyedSegmenter.takenAs`: 双拼's the scheme's keys), separators skipped; `PhraseBook.typed`: what is offered and the keys an input reads, every phrase of them offered by order, then key, then file order); setting `BuiltInPhrases`, on 通用输入, off: none of them, the user's own as before), `PhraseBook` (a delete from the keyboard under such a key first copies that key's built-in phrases into the user file, so a deleted one stays off; a pin goes to the learning record, not here; `builtInsOf`: the words 日期, 时间, 星期 (`WORD_KEYS`) bring the built-in ones still on in every Chinese input method, placed by `EmojiCandidates` before the word's emoji, never twice where the input is the key itself); `EmojiData` (`engine/emoji.data`: the emoji panel's groups and the words emoji stand for) and `EmojiCandidates` (a word's emoji after the first two candidates, pinyin's and a table's alike; a table's word alone on its code commits itself as ever, and its emoji and built-in phrases come first in the 联想 after it, `TableSession.pickOffered` replacing the word (`Snapshot.deleteBefore`, in code points) — the offer ends with any other key or pick: setting `Emoji`, those the phone cannot draw left out by `Engines.emojiShows`); `Chaizi` (`engine/chaizi.data`: characters by the pinyin of their parts, full pinyin's after `u`, setting `Chaizi`, those the phone's font lacks left out by `Engines.textShows`) and `AsideCandidates` (where pinyin puts both: the emoji after the first two, the characters first) |
 | `data` | File formats: `DataFile` (the container), `PinyinData`, `CodeTable`, `NgramTables`, `BitPacked`, `EliasFano` (the trigram runs' starts; a lookup costs more, so not for the unigrams'), `Quantizer`, `StringTable`, `WordIndex`, `PinyinDataBuilder`, `CodeTableReader`, `NgramWords`, `SortedKeys`, readers of text sources, `Misreadings`, `DataAge` |
 | `store` | `RecordFormat` / `RecordStore`: append-only logs with CRC'd records, compacted by rename (over a `LogFile`); `ReplaceFile` (a file written whole, put in place by rename) |
@@ -793,6 +793,26 @@ pinyin set (`--shuangpin`, `--keys nine`, `--table`): on pinyin-chat (readings c
 96.5% in the first three, 0.4 ms; 双拼 (自然码) 82.1% / 94.2%; the nine keys 53.5% / 76.7% (a key three or four letters, the path reads far more; the weights moved it under a point); 五笔 70.6% / 90.0%,
 仓颉 94.5% / 99.3% (the characters it has). These times are with no user model: with one, a glide works out again only the words the user has counts of, at the nodes (pinyin) or entries (a table) it reaches, the rest kept till a word gets its first count, is forgotten or blocked; unmeasured. A table entry with no count of its own keeps its score meanwhile, though a counted word is in its likeliest split (你们 as 你 + 们). The setting is off by default: a sloppy fast tap may glide.
 
+Writing on the keys (键盘手写, design 060-kbd-handwriting): `InkOver` (`engine/handwriting`) wraps,
+outermost, the session of each input method that `InputMethodCatalog.writesOnKeys` (all but English
+and handwriting; over a `GlideSession` and a `StrokeFilter` where those are, which `Engines.glide`
+unwraps). An `Action.Ink` goes to a `HandwritingSession` of its own, made at the first as
+handwriting's is (`SessionFactory.handwritingSession`); while that shows anything (what is written,
+its 联想) every action is its, but a letter, which puts its best sentence in and is typed into the
+wrapped session in the same snapshot; what it put in is told the wrapped session as an
+`Action.Context`, and a new sentence written after the wrapped session put text in is told the text
+before anew. An Ink while the wrapped session has input typed (`InkOver.typing`, `Engines.typedOnKeys`)
+is dropped (`HandwritingSession.drop`: taken, so `inkSent` holds it not, its piece ended); one while it
+offers 联想 starts writing and drops the offer. A Backspace the app does and a key passed on reach
+the handwriting too, so a sentence it put in and deleted at once is taken back (U-03).
+`Engines.ink`/`inkSent` take the input method (its shown session, a pair's keyed one), and `inkEnded`
+and the pieces ended over a drop of the sessions count every handwriting session made. When a touch
+on the letters is a stroke is `KeyInkGesture` (`input/keyboard`), which `GlideTouch.down` takes (`ink`,
+and `typed`: `Engines.typedOnKeys`, false while what shows is handwriting's): 0.3 of a key any way,
+then every touch a stroke from its down till the pause; a tap that started the input (nothing typed
+at its down), a stroke within the pause after it and no other key between, taken back as the first
+dot (`takeTapped`), by state, not by text, as the nine keys and zhuyin show no letter of the key.
+
 ## Handwriting
 
 One character at a time: two recognizers, trained outside this repository on synthetic ink only
@@ -801,7 +821,7 @@ One character at a time: two recognizers, trained outside this repository on syn
 image (9 × 64 × 64 planes) and by its pen path, weighed 0.7 to 0.3 with 0.2 × its log frequency.
 Their dense and recurrent weights are int8 (the convolutions float): 121 MB → 43 MB in the APK, the
 same on CASIA to a hundredth of a point (`handwriting-models-20261015` against `-20261014b`). They
-are mapped from the APK where they lie (`OrtModel`: the asset uncompressed, the model's bytes used
+are mapped from their resource-pack file where they lie (`OrtModel`: the model's bytes used
 directly, prepacking off), so their weights are clean file pages, not the heap: on redroid after
 writing, the app's private memory is the same with either, its mapped APK 173 → 96 MB.
 `InkFeatures` is held to the training code by golden data (`ink-golden.json.gz`, the training

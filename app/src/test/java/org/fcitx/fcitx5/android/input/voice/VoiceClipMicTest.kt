@@ -4,9 +4,12 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.input.voice.VoiceClipMic.Part
+import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayOutputStream
@@ -34,6 +37,11 @@ class VoiceClipMicTest {
     }
 
     private fun clip(n: Int, v: Float) = Part.Clip("c", FloatArray(n) { v })
+
+    // the clip microphone is one object for the JVM: a test failing midway would leave it on, its clips queued,
+    // and a later test class's feed() reading them instead of the microphone
+    @After
+    fun tearDown() = VoiceClipMic.clear()
 
     @Test
     fun windowsComeAtTheMicrophonesPaceNotAllAtOnce() {
@@ -162,6 +170,8 @@ class VoiceClipMicTest {
         f.close()
     }
 
+    // the feed's own side of clearing, without the singleton: a generation changed mid clip stops it and says
+    // so once (busy true then false), which the test above, through clear(), does not see
     @Test
     fun clearingStopsTheClipPlaying() {
         var gen = 0
@@ -230,31 +240,24 @@ class VoiceClipMicTest {
         assertArrayEquals(want, VoiceClipMic.decode(raw), 0f)
     }
 
-    @Test(expected = IllegalArgumentException::class)
-    fun aWavAtAnotherRateIsRefused() {
-        VoiceClipMic.decode(wav(shortArrayOf(0, 1), rate = 44100))
-    }
-
-    @Test(expected = IllegalArgumentException::class)
-    fun aStereoWavIsRefused() {
-        VoiceClipMic.decode(wav(shortArrayOf(0, 1), channels = 2))
-    }
-
     @Test
-    fun aBrokenWavIsRefused() {
+    fun aWavItCannotReadIsRefused() {
         val good = wav(shortArrayOf(0, 1))
-        // RIFF but not WAVE
-        val riff = good.copyOf().also { "AVI ".toByteArray().copyInto(it, 8) }
-        // fmt cut short: its header says 16 bytes, 4 follow
-        val cut = good.copyOf(12 + 8 + 4)
-        // data before fmt
-        val dataFirst = good.copyOf(12) + "data".toByteArray() + byteArrayOf(4, 0, 0, 0, 0, 0, 1, 0)
-        for (bad in listOf(riff, cut, dataFirst)) {
-            try {
-                VoiceClipMic.decode(bad)
-                throw AssertionError("decoded")
-            } catch (_: IllegalArgumentException) {
-            }
-        }
+        assertRows(
+            // the voice models take 16 kHz: another rate would be heard sped up or slowed down
+            "a WAV at 44.1 kHz" to { refused(wav(shortArrayOf(0, 1), rate = 44100)) },
+            // the models take one channel: two interleaved would be heard as one at twice the rate
+            "a stereo WAV" to { refused(wav(shortArrayOf(0, 1), channels = 2)) },
+            // a RIFF file of another kind is not sound
+            "RIFF but not WAVE" to { refused(good.copyOf().also { "AVI ".toByteArray().copyInto(it, 8) }) },
+            // its header says 16 bytes of fmt, 4 follow
+            "fmt cut short" to { refused(good.copyOf(12 + 8 + 4)) },
+            // the samples' format not yet known when they come
+            "data before fmt" to { refused(good.copyOf(12) + "data".toByteArray() + byteArrayOf(4, 0, 0, 0, 0, 0, 1, 0)) },
+        )
+    }
+
+    private fun refused(bad: ByteArray) {
+        assertThrows(IllegalArgumentException::class.java) { VoiceClipMic.decode(bad) }
     }
 }

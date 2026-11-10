@@ -1,0 +1,102 @@
+keys [+, 1, 2, 3, -, *, 4, 5, 6, space, #, 7, 8, 9, backspace, (, 0, ), ,, enter]
++ tap: [sendKey(sym=65451, states=536870928, code=0, up=false)] field 12 34|5,5
++ up: [] field 12 34|5,5
++ down: [] field 12 34|5,5
++ long press: []
++ long press: [sendKey(sym=65451, states=536870928, code=0, up=false)] field 12 34|5,5
+1 tap: [sendKey(sym=65457, states=536870928, code=0, up=false)] field 12 34|5,5
+1 up: [sendKey(sym=65457, states=536870928, code=0, up=false)] field 12 34|5,5
+1 down: [sendKey(sym=65457, states=536870928, code=0, up=false)] field 12 34|5,5
+1 long press: []
+1 long press: [sendKey(sym=65457, states=536870928, code=0, up=false)] field 12 34|5,5
+2 tap: [sendKey(sym=65458, states=536870928, code=0, up=false)] field 12 34|5,5
+2 up: [sendKey(sym=65458, states=536870928, code=0, up=false)] field 12 34|5,5
+2 down: [sendKey(sym=65458, states=536870928, code=0, up=false)] field 12 34|5,5
+2 long press: []
+2 long press: [sendKey(sym=65458, states=536870928, code=0, up=false)] field 12 34|5,5
+3 tap: [sendKey(sym=65459, states=536870928, code=0, up=false)] field 12 34|5,5
+3 up: [sendKey(sym=65459, states=536870928, code=0, up=false)] field 12 34|5,5
+3 down: [sendKey(sym=65459, states=536870928, code=0, up=false)] field 12 34|5,5
+3 long press: []
+3 long press: [sendKey(sym=65459, states=536870928, code=0, up=false)] field 12 34|5,5
+- tap: [sendKey(sym=65453, states=536870928, code=0, up=false)] field 12 34|5,5
+- up: [] field 12 34|5,5
+- down: [] field 12 34|5,5
+- long press: []
+- long press: [sendKey(sym=65453, states=536870928, code=0, up=false)] field 12 34|5,5
+* tap: [sendKey(sym=65450, states=536870928, code=0, up=false)] field 12 34|5,5
+* up: [] field 12 34|5,5
+* down: [] field 12 34|5,5
+* long press: []
+* long press: [sendKey(sym=65450, states=536870928, code=0, up=false)] field 12 34|5,5
+4 tap: [sendKey(sym=65460, states=536870928, code=0, up=false)] field 12 34|5,5
+4 up: [sendKey(sym=65460, states=536870928, code=0, up=false)] field 12 34|5,5
+4 down: [sendKey(sym=65460, states=536870928, code=0, up=false)] field 12 34|5,5
+4 long press: []
+4 long press: [sendKey(sym=65460, states=536870928, code=0, up=false)] field 12 34|5,5
+5 tap: [sendKey(sym=65461, states=536870928, code=0, up=false)] field 12 34|5,5
+5 up: [sendKey(sym=65461, states=536870928, code=0, up=false)] field 12 34|5,5
+5 down: [sendKey(sym=65461, states=536870928, code=0, up=false)] field 12 34|5,5
+5 long press: []
+5 long press: [sendKey(sym=65461, states=536870928, code=0, up=false)] field 12 34|5,5
+6 tap: [sendKey(sym=65462, states=536870928, code=0, up=false)] field 12 34|5,5
+6 up: [sendKey(sym=65462, states=536870928, code=0, up=false)] field 12 34|5,5
+6 down: [sendKey(sym=65462, states=536870928, code=0, up=false)] field 12 34|5,5
+6 long press: []
+6 long press: [sendKey(sym=65462, states=536870928, code=0, up=false)] field 12 34|5,5
+space tap: [sendKey(sym=32, states=536870912, code=0, up=false)] field 12 34|5,5
+space up: [] field 12 34|5,5
+space down: [] field 12 34|5,5
+space left: [sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false)] field 12 34|5,5
+space right: [sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false)] field 12 34|5,5
+space long press: []
+space long press: [sendKey(sym=32, states=536870912, code=0, up=false)] field 12 34|5,5
+# tap: [] field 12 34#|6,6
+# up: [] field 12 34#|6,6
+# down: [] field 12 34#|6,6
+# long press: []
+# long press: [] field 12 34##|7,7
+7 tap: [sendKey(sym=65463, states=536870928, code=0, up=false)] field 12 34##|7,7
+7 up: [sendKey(sym=65463, states=536870928, code=0, up=false)] field 12 34##|7,7
+7 down: [sendKey(sym=65463, states=536870928, code=0, up=false)] field 12 34##|7,7
+7 long press: []
+7 long press: [sendKey(sym=65463, states=536870928, code=0, up=false)] field 12 34##|7,7
+8 tap: [sendKey(sym=65464, states=536870928, code=0, up=false)] field 12 34##|7,7
+8 up: [sendKey(sym=65464, states=536870928, code=0, up=false)] field 12 34##|7,7
+8 down: [sendKey(sym=65464, states=536870928, code=0, up=false)] field 12 34##|7,7
+8 long press: []
+8 long press: [sendKey(sym=65464, states=536870928, code=0, up=false)] field 12 34##|7,7
+9 tap: [sendKey(sym=65465, states=536870928, code=0, up=false)] field 12 34##|7,7
+9 up: [sendKey(sym=65465, states=536870928, code=0, up=false)] field 12 34##|7,7
+9 down: [sendKey(sym=65465, states=536870928, code=0, up=false)] field 12 34##|7,7
+9 long press: []
+9 long press: [sendKey(sym=65465, states=536870928, code=0, up=false)] field 12 34##|7,7
+backspace tap: [sendKey(sym=65288, states=536870912, code=0, up=false)] field 12 34##|7,7
+backspace up: [] field |0,0
+backspace down: [] field 12 34##|7,7
+backspace left: [] field |0,0
+backspace right: [] field |0,0
+( tap: [] field (|1,1
+( up: [] field (|1,1
+( down: [] field (|1,1
+( long press: []
+( long press: [] field ((|2,2
+0 tap: [sendKey(sym=65456, states=536870928, code=0, up=false)] field ((|2,2
+0 up: [sendKey(sym=65456, states=536870928, code=0, up=false)] field ((|2,2
+0 down: [sendKey(sym=65456, states=536870928, code=0, up=false)] field ((|2,2
+0 long press: []
+0 long press: [sendKey(sym=65456, states=536870928, code=0, up=false)] field ((|2,2
+) tap: [] field (()|3,3
+) up: [] field (()|3,3
+) down: [] field (()|3,3
+) long press: []
+) long press: [] field (())|4,4
+, tap: [sendKey(sym=65452, states=536870928, code=0, up=false)] field (())|4,4
+, up: [] field (())|4,4
+, down: [] field (())|4,4
+, long press: []
+, long press: [sendKey(sym=65452, states=536870928, code=0, up=false)] field (())|4,4
+enter tap: [sendKey(sym=65293, states=536870912, code=0, up=false)] field (())|4,4
+enter up: [] field (())|4,4
+enter down: [] field (())|4,4
+backspace held: [sendKey(sym=65288, states=536870912, code=0, up=false)]

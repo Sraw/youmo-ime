@@ -90,8 +90,8 @@ class OnlineRecognizer(
         return OnlineStream(p)
     }
 
-    // youmo: and phrases, "/"-separated as the hotwords, its result never contains
-    // (within a segment: an endpoint's reset starts the matching over)
+    // youmo: [blocked] is phrases, "/"-separated as the hotwords (characters space-separated), that
+    // its result never contains; an endpoint's reset starts their matching over
     fun createStream(hotwords: String, blocked: String): OnlineStream {
         val p = createStreamWithBlocked(ptr, hotwords, blocked)
         return OnlineStream(p)

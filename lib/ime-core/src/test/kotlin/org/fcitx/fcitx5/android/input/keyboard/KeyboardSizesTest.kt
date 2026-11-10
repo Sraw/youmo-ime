@@ -38,7 +38,9 @@ class KeyboardSizesTest {
         assertEquals(2.5, sizes.bottomPaddingDp(true), 0.0)
         // the cap still comes last: 52% of a short landscape screen (204) and bars of 100 pass 70% (275), and the keys give way
         val requested = sizes.heightPx(393, landscape = true)
-        val keys = KeyboardHeightCap.keysHeight(requested, 393, 100, sizes.bottomPaddingDp(true).toInt())
+        // a screen of density 1, where the app's ctx.dp(bottom padding) is its dp
+        val bottomPx = sizes.bottomPaddingDp(true).toInt()
+        val keys = KeyboardHeightCap.keysHeight(requested, 393, 100, bottomPx)
         assertEquals((393 * KeyboardHeightCap.MAX_FRACTION).toInt() - 100 - 2, keys)
         assertTrue(keys < requested)
     }

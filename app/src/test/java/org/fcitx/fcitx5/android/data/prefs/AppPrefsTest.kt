@@ -269,11 +269,11 @@ class AppPrefsTest {
         AppPrefs(sp).apply { dropRetired() }.let { assertEquals(KeyMarkPosition.BottomLeft, it.keyboard.punctuationPosition.getValue()) }
     }
 
-    // the old drawing's settings (the redraw's switch of 0.6's betas, vivo's touch routing, 扩大按键触摸区), stored
-    // as either type: dropped, read by nothing, no crash
+    // the old drawing's settings (the redraw's switch of 0.6's betas, vivo's touch routing, 扩大按键触摸区) and the
+    // voice's 整理 switch (voice_polish), stored as either type: dropped, read by nothing, no crash
     @Test
-    fun theOldDrawingsSettingsStoredAreDropped() {
-        for (key in listOf("canvas_keyboard", "vivo_keypress_workaround", "expand_keypress_area")) {
+    fun theRetiredSettingsStoredAreDropped() {
+        for (key in listOf("canvas_keyboard", "vivo_keypress_workaround", "expand_keypress_area", "voice_polish")) {
             for (put in listOf<SharedPreferences.Editor.() -> Unit>({ putBoolean(key, true) }, { putString(key, "x") })) {
                 sp.edit { clear(); put() }
                 AppPrefs(sp).dropRetired()

@@ -91,6 +91,8 @@ struct OnlineRecognizerResult {
    *     "start_time": x,
    *     "is_final": true|false
    *     "is_eof": true|false
+   *     "nbest": ["text", ...],  (youmo: the beam's texts, best first)
+   *     "nbest_scores": [x, x, x]  (youmo: their log prob over length)
    *   }
    */
   std::string AsJsonString() const;

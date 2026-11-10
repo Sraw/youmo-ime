@@ -35,15 +35,15 @@ object LayoutReader {
     @Suppress("TooGenericExceptionCaught")
     fun layout(root: XmlElement): Parsed<Layout> = try {
         readLayout(root)
-    } catch (e: Throwable) {
-        Parsed.Failed(root.line, "the layout could not be read: ${e::class.simpleName}")
+    } catch (e: Exception) {
+        Parsed.Failed(root.line, "the layout could not be read: $e")
     }
 
     @Suppress("TooGenericExceptionCaught")
     fun fragment(root: XmlElement): Parsed<Fragment> = try {
         readFragment(root)
-    } catch (e: Throwable) {
-        Parsed.Failed(root.line, "the fragment could not be read: ${e::class.simpleName}")
+    } catch (e: Exception) {
+        Parsed.Failed(root.line, "the fragment could not be read: $e")
     }
 
     private fun readLayout(root: XmlElement): Parsed<Layout> {
@@ -190,7 +190,7 @@ object LayoutReader {
 
     private fun key(el: XmlElement, p: Problems): Key {
         val a = Attributes(el, p)
-        val id = a.matching("id", KEY_ID, "a key id (1–32 characters, no spaces)") ?: a.required("id")
+        val id = a.matching("id", KEY_ID, "a key id (1–32 characters, no spaces, not starting view:)") ?: a.required("id")
         val condition = condition(a)
         val attrs = look(a).copy(width = width(a), rows = a.positiveInt("rows"))
         val letters = a.matching("letters", LETTERS, "a group's letters (a–z and ;, rows apart by a space)")?.let(Letters::of)
@@ -354,7 +354,7 @@ object LayoutReader {
     private const val DEFAULT_COLUMNS = 10.0
     private val IDENT = Regex("[a-z0-9]+(-[a-z0-9]+)*")
     // KeyNames': 大千's `/` and the number pad's are keys too (a theme's `zhuyin//` is its own: Selector)
-    private val KEY_ID = Regex("\\S{1,32}")
+    private val KEY_ID = Regex("(?!view:)\\S{1,32}")
     private val CLASSES = Regex("[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*")
     // a group of the 14/18 keys' kind: NineKeyLetters.MAX letters at most, ; (双拼's ing) one of them;
     // a row a space apart (060-render-v2 §15: where they sit on the key)

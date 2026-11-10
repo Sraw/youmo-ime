@@ -16,13 +16,15 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 
 // listeners added and removed on one thread while another tells them of entries: no
-// ConcurrentModificationException (the telling thread's scope has no handler: one would crash the app)
+// ConcurrentModificationException (the telling thread's scope has no handler: one would crash the app; the listeners
+// told from a copy since 02f50f466)
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class ClipboardListenersTest {
     @Test
     fun toldWhileAddedAndRemovedThrowsNothing() {
-        val kept = List(8) { ClipboardManager.OnClipboardUpdateListener { } }
+        // each its own object (a lambda capturing nothing is one instance): 8 in the set
+        val kept = List(8) { i -> ClipboardManager.OnClipboardUpdateListener { i.hashCode() } }
         kept.forEach(ClipboardManager::addOnUpdateListener)
         val failed = AtomicReference<Throwable?>()
         val go = CountDownLatch(1)

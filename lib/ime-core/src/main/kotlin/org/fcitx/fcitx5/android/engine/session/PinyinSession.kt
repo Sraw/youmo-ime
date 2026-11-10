@@ -656,11 +656,11 @@ class PinyinSession(
         return CommitRows.prevAfter(recorder.prev(), pieces.map { it.learned ?: return null })
     }
 
-    /** The pieces picked, and [rest] after them, written to the learning record as one commit, with the syllables taken. */
-    private fun record(rest: CommitRows.Pick? = null) {
-        // a piece picked while learning was off (a password) has none: not part learned
-        if (learning && recorder.learns) recorder.commit(pieces.map { it.learned ?: return } + listOfNotNull(rest), nineKeys)
-    }
+    /**
+     * The pieces picked, and [rest] after them, written to the learning record as one commit, with the syllables taken.
+     * A piece picked while learning was off (a password) has none: not part learned.
+     */
+    private fun record(rest: CommitRows.Pick? = null) { if (learning && recorder.learns) recorder.commit(pieces.map { it.learned ?: return } + listOfNotNull(rest), nineKeys) }
 
     // [c], picked, as the learning record takes it: see CommitRecorder.pick. A phrase, an
     // emoji or a character by its parts is no word picked (PLAN §2.7 U-66, U-67): its commit learns nothing
@@ -864,7 +864,9 @@ class PinyinSession(
         // the emoji and the characters by their parts, placed before the phrases so each is where its order says
         val asText = { text: String -> Candidate(text, rest, 0f, intArrayOf(NO_WORD), intArrayOf(rest)) }
         // a sentence the user blocked whole as it reads (its words blocked one by one are the decoder's to leave out)
-        val ordered = habitOrder.order(decoded.graph, (decoded.sentences + decoded.words).distinctBy { it.text }.filterNot { c -> c.words.size > 1 && user?.blocksSentence(c.text) { entries(c, decoded.graph) } == true }, decoded.sentences, decoded.levels, pageSize)
+        // left out of what the habits put in too: a sentence used before would come back by them
+        val sentenceBlocked = { c: Candidate -> c.words.size > 1 && user?.blocksSentence(c.text) { entries(c, decoded.graph) } == true }
+        val ordered = habitOrder.order(decoded.graph, (decoded.sentences + decoded.words).distinctBy { it.text }.filterNot(sentenceBlocked), decoded.sentences, decoded.levels.map { l -> HabitOrder.Level(l.end, l.code, l.prev, l.injected.filterNot(sentenceBlocked), l.habitsHere) }, pageSize)
         val read = ordered.list
         // a phrase of order k a place down where a pin leads: the pin stays first (U-83)
         val withPhrases = { list: List<Candidate> ->

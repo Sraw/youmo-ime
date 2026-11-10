@@ -190,7 +190,11 @@ object ThemeWriter {
     private fun fill(f: Fill): String = when (f) {
         is Fill.Solid -> color(f.color)
         is Fill.Linear -> "linear(${number(f.angle)}deg, ${f.stops.joinToString(", ") { (c, at) -> "${color(c)} ${number(at)}%" }})"
-        is Fill.Image -> "image(${f.file}, ${f.insets.joinToString(" ")}, ${f.pxPerDp}x" + (f.fallback?.let { ", ${color(it)})" } ?: ")")
+        is Fill.Image -> {
+            // image()'s grammar reads 1x to 8x: another would not read back
+            require(f.pxPerDp in 1..MAX_PX_PER_DP) { "image(): ${f.pxPerDp}x is not 1x–8x" }
+            "image(${f.file}, ${f.insets.joinToString(" ")}, ${f.pxPerDp}x" + (f.fallback?.let { ", ${color(it)})" } ?: ")")
+        }
         // its blur in dp always: picture()'s grammar has no bare 0
         is Fill.Picture -> when {
             f.blurDp == null && f.brightness == null && f.over == null -> "picture"
@@ -226,6 +230,7 @@ object ThemeWriter {
     // [Argb]'s `#aarrggbb`, its alpha left out where opaque
     private fun color(c: Argb): String = c.toString().let { if (c.alpha == OPAQUE) "#" + it.substring(ALPHA_DIGITS) else it }
 
+    private const val MAX_PX_PER_DP = 8
     private const val OPAQUE = 0xff
     private const val ALPHA_DIGITS = 3
 

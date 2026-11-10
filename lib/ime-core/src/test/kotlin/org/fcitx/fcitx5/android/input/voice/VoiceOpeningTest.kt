@@ -76,6 +76,32 @@ class VoiceOpeningTest {
         assertEquals(listOf("stop", "unload vad"), steps)
     }
 
+    private fun returningEarlyWithTheStopFailing(told: MutableList<String>) {
+        VoiceOpening.run({}, { "vad" }, { return }, { error("stop") }, { steps += "unload $it" }, { told += "${it.message}" })
+        steps += "after"
+    }
+
+    // R20 F5963: a return out of use with the stop failing: told, not thrown over the return
+    @Test
+    fun aReturnOutOfUseWithTheStopFailingTellsIt() {
+        val told = mutableListOf<String>()
+        returningEarlyWithTheStopFailing(told)
+        assertEquals(listOf("unload vad"), steps)
+        assertEquals(listOf("stop"), told)
+    }
+
+    // review F6388: the same throwable again is not suppressed into itself; another is
+    @Test
+    fun aThrowableIsNotSuppressedIntoItself() {
+        val e = IllegalStateException("first")
+        assertEquals(e, VoiceOpening.suppress(e, e))
+        assertEquals(0, e.suppressed.size)
+        val other = IllegalStateException("other")
+        assertEquals(e, VoiceOpening.suppress(e, other))
+        assertEquals(listOf<Throwable>(other), e.suppressed.toList())
+        assertEquals(other, VoiceOpening.suppress(null, other))
+    }
+
     @Test
     fun theRecordIsLetGoWhateverBreaks() {
         assertThrows(IllegalStateException::class.java) { open({ "vad" }) { error("read") } }
