@@ -35,6 +35,7 @@ import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.candidates.SceneBar
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
+import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import org.fcitx.fcitx5.android.utils.pressHighlightDrawable
 import splitties.dimensions.dp
 
@@ -58,7 +59,7 @@ class SyllableStrip(context: Context, private val theme: Theme) : HorizontalScro
     /** What a tap gives before its key: as 九键's column, the listener giving none of its own. */
     internal var feedback: (View) -> Unit = {
         InputFeedbacks.hapticFeedback(it)
-        InputFeedbacks.soundEffect(InputFeedbacks.SoundEffect.Standard)
+        InputFeedbacks.soundEffect(SoundKey.LETTER)
     }
 
     private val items = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }

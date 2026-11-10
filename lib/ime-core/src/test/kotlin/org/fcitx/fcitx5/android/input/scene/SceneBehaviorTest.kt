@@ -218,7 +218,7 @@ class SceneBehaviorTest {
         assertEquals(LongPopup.Preset(",", true), comma.popup)
         val space = k.getValue("space")
         assertTrue(space.bothWays)
-        assertEquals("space", space.sound)
+        assertEquals(org.fcitx.fcitx5.android.scene.theme.SoundKey.SPACE, space.sound)
         assertEquals(SceneAction.Command("space-long-press"), space.longPress)
         val backspace = k.getValue("backspace")
         assertEquals(SceneAction.Sym("BackSpace"), backspace.press)

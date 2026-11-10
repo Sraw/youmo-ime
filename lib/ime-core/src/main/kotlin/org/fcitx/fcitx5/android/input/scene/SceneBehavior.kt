@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.scene
 import org.fcitx.fcitx5.android.core.CoreLog
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
+import org.fcitx.fcitx5.android.scene.theme.SoundKey
 
 /**
  * One of a layout's actions (layout-1's words, LayoutReader's ACTION_PATTERNS) read as what it does
@@ -123,8 +124,13 @@ data class SceneBehavior(
     val bubble: Bubble?,
     val popup: LongPopup?,
     val menu: List<MenuChoice>,
-    /** `standard`, `space`, `delete`, `return` (layout-1's sound=). */
-    val sound: String,
+    /** Its class of sound: layout-1's sound= and, where that is `standard`, its kind (SoundKey.of). */
+    val sound: SoundKey,
+    /**
+     * The system's click it has played: its sound= alone, its kind not asked, so a key of no theme's sound
+     * clicks as it always has (an enter-kind key of `standard`, wubi's 查, the standard click).
+     */
+    val systemSound: SoundKey,
     /** Its swipes go both ways, each locked to its axis (the space's cursor, backspace's selection). */
     val bothWays: Boolean,
     val shortcut: String?,
@@ -184,7 +190,8 @@ data class SceneBehavior(
                 bubble = bubble,
                 popup = popupOf(node, press, typing),
                 menu = node.menu.map { MenuChoice(it.label, it.icon, SceneAction.of(it.action)) },
-                sound = node.sound,
+                sound = SoundKey.of(node.sound, node.kind),
+                systemSound = SoundKey.of(node.sound, "letter"),
                 bothWays = a["swipe-axis"] == "both",
                 shortcut = node.shortcut,
             )

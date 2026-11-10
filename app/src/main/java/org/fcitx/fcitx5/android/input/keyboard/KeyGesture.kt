@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.Event
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
+import org.fcitx.fcitx5.android.scene.theme.SoundKey
 
 /**
  * A key's touch, apart from whatever draws the key (060-render-p2 S1): a [CustomGestureView]'s, or a
@@ -138,7 +139,11 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
             recognizer.doubleTapEnabled = value
         }
 
-    var soundEffect: InputFeedbacks.SoundEffect = InputFeedbacks.SoundEffect.Standard
+    /** The class of key it sounds as (060-theme-sounds-icons: SoundKey.of). */
+    var soundEffect: SoundKey = SoundKey.LETTER
+
+    /** The system's click it plays where no theme's sound does (SceneBehavior.systemSound). */
+    var systemSound: SoundKey = SoundKey.LETTER
 
     private fun across(x: Float) = if (key.keyWidth > 0) x / key.keyWidth else Float.NaN
 
@@ -210,7 +215,7 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
         key.hotspot(x, y)
         key.showPressed(true)
         InputFeedbacks.hapticFeedback(key.feedback)
-        InputFeedbacks.soundEffect(soundEffect)
+        InputFeedbacks.soundEffect(soundEffect, systemSound)
         dispatchGestureEvent(GestureType.Down, x, y)
         if (longPressEnabled) {
             longPressJob?.cancel()

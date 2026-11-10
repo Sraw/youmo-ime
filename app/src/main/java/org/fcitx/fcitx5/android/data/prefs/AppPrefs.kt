@@ -10,6 +10,7 @@ import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.InputFeedbacks.InputFeedbackMode
+import org.fcitx.fcitx5.android.data.InputFeedbacks.KeySoundSource
 import org.fcitx.fcitx5.android.data.clipboard.CLIPBOARD_UNLIMITED
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceUi.Levels.Level
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
@@ -558,6 +559,15 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             "sound_on_keypress",
             InputFeedbackMode.FollowingSystem
         )
+        // 按键音音色 (060-theme-sounds-icons §1.4): which sound, apart from whether one plays; the theme's
+        // where it has one, so a theme without sounds sounds as before
+        val keySoundSource = enumList(
+            R.string.key_sound_source,
+            "key_sound_source",
+            KeySoundSource.FollowTheme
+        ) {
+            soundOnKeyPress.getValue() != InputFeedbackMode.Disabled
+        }
         val soundOnKeyPressVolume = hidden(setByLevels = true) {
             int(
                 R.string.button_sound_volume,

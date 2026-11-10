@@ -57,6 +57,8 @@ class ThemeAssetLimitsTest {
         assertEquals(ThemeAssetLimits.Breach.PreviewSide, l.preview(2049, 10, 1))
         assertNull(l.icon(l.MAX_ICON_BYTES))
         assertEquals(ThemeAssetLimits.Breach.IconSize, l.icon(l.MAX_ICON_BYTES + 1))
+        assertEquals(null, l.soundSize(100L * 1024))
+        assertEquals(ThemeAssetLimits.Breach.SoundSize, l.soundSize(100L * 1024 + 1))
     }
 
     // an animated WebP's head as a file has it: RIFF, VP8X (animation flag), ANIM, its frames (each a few bytes of data)

@@ -66,6 +66,7 @@ import org.fcitx.fcitx5.android.scene.engine.LetterCaseRule
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
+import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.constraintlayout.leftOfParent
@@ -699,7 +700,7 @@ class T9Keyboard(
         isClickable = true
         setOnClickListener {
             InputFeedbacks.hapticFeedback(this)
-            InputFeedbacks.soundEffect(InputFeedbacks.SoundEffect.Standard)
+            InputFeedbacks.soundEffect(SoundKey.LETTER)
             onAction(pick(columnState, i, english, address))
         }
     }

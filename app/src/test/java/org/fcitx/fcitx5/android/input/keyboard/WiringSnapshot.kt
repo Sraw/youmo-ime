@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.data.InputFeedbacks
+import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import org.junit.Assert.assertEquals
 import java.io.File
 
@@ -29,6 +31,17 @@ internal object WiringSnapshot {
             checkNotNull(javaClass.classLoader!!.getResource(file)) { "$file: none (WIRING_RECORD=1 records it)" }.readText()
         assertEquals("$file: the views' wiring", committed, was)
         assertEquals("$file: the scene's wiring", committed, now.sorted().joinToString("\n", postfix = "\n"))
+    }
+
+    /**
+     * [key] as the old views' click (KeyDef's SoundEffect): the layout's sound= alone, the function class (by
+     * kind, 060-theme-sounds-icons) one with the letters' as the system's click is the standard one for both.
+     */
+    fun layoutSound(key: SoundKey): InputFeedbacks.SoundEffect = when (key) {
+        SoundKey.SPACE -> InputFeedbacks.SoundEffect.SpaceBar
+        SoundKey.BACKSPACE -> InputFeedbacks.SoundEffect.Delete
+        SoundKey.ENTER -> InputFeedbacks.SoundEffect.Return
+        SoundKey.LETTER, SoundKey.FUNCTION -> InputFeedbacks.SoundEffect.Standard
     }
 
     /** One key's line: [id], then each of what it does, in a set's order sorted. */

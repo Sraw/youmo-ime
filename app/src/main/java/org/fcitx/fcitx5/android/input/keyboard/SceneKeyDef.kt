@@ -9,7 +9,6 @@ import org.fcitx.fcitx5.android.core.ScancodeMapping
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
-import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
@@ -20,6 +19,7 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.Scene
+import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import timber.log.Timber
 
 /**
@@ -36,14 +36,11 @@ class SceneKeyDef(
 
     override val swipesBothWays: Boolean get() = behavior.bothWays
 
-    /** Its sound (layout-1's sound=), as SpaceKey's, BackspaceKey's and ReturnKey's were theirs. */
-    val sound: InputFeedbacks.SoundEffect
-        get() = when (behavior.sound) {
-            "space" -> InputFeedbacks.SoundEffect.SpaceBar
-            "delete" -> InputFeedbacks.SoundEffect.Delete
-            "return" -> InputFeedbacks.SoundEffect.Return
-            else -> InputFeedbacks.SoundEffect.Standard
-        }
+    /** Its class of sound (layout-1's sound=, else its kind: SoundKey.of), as SpaceKey's, BackspaceKey's and ReturnKey's were theirs. */
+    val sound: SoundKey get() = behavior.sound
+
+    /** The system's click it plays where no theme's sound does: its sound= alone (SceneBehavior.systemSound). */
+    val systemSound: SoundKey get() = behavior.systemSound
 
     /** The space: its sideways swipe moves the cursor (BaseKeyboard.wireSpace). */
     val isSpace: Boolean get() = behavior.role == "space"

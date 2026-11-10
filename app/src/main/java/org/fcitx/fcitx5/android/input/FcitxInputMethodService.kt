@@ -1023,6 +1023,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         highlightColor =
             styledColorOrDefault(android.R.attr.colorAccent, DefaultHighlightColor).alpha(0.4f)
         InputFeedbacks.syncSystemPrefs()
+        InputFeedbacks.syncSounds()
         // a failure said as the host started, before any keyboard showed (A4: the settings unreadable)
         EngineNotices.keyboardShown()
     }
@@ -1744,6 +1745,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         prefs.candidates.unregisterOnChangeListener(recreateCandidatesViewListener)
         keyboardHeightPrefs.forEach { it.unregisterOnChangeListener(keyboardHeightListener) }
         ThemeManager.removeOnChangedListener(onThemeChangeListener)
+        InputFeedbacks.releaseSounds()
         // the last field learned from as the service goes (another keyboard picked, the system stopping it): not at a hide or
         // a bar made anew, the same field maybe to come back to. A process killed outright still loses it
         addressLearning.end(AddressStore.forgotten)?.let(AddressStore::learn)

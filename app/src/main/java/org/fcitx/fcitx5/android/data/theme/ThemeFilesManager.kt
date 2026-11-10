@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.scene.look.KeyPressed
 import org.fcitx.fcitx5.android.scene.look.LegacyLook
 import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
+import org.fcitx.fcitx5.android.scene.theme.SoundFile
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.errorRuntime
 import org.fcitx.fcitx5.android.utils.extract
@@ -805,6 +806,7 @@ object ThemeFilesManager {
             ThemeAssetLimits.Breach.EffectImageSide -> R.string.exception_theme_effect_image_side to ThemeAssetLimits.MAX_EFFECT_IMAGE_SIDE.toLong()
             ThemeAssetLimits.Breach.EffectImageSize -> R.string.exception_theme_effect_image_size to ThemeAssetLimits.MAX_EFFECT_IMAGE_BYTES / KB
             ThemeAssetLimits.Breach.EffectImageType -> R.string.exception_theme_effect_image_type to 0L
+            ThemeAssetLimits.Breach.SoundSize -> R.string.exception_theme_sound_size to SoundFile.MAX_BYTES / KB
         }
         errorRuntime(message, limit.toString())
     }

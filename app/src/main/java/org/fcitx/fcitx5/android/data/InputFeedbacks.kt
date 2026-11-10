@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.data
 
 import android.media.AudioManager
+import android.os.Trace
 import android.os.VibrationEffect
 import android.provider.Settings
 import android.view.HapticFeedbackConstants
@@ -12,6 +13,8 @@ import android.view.View
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
+import org.fcitx.fcitx5.android.input.feedback.KeySoundChoice
+import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.audioManager
 import org.fcitx.fcitx5.android.utils.getSystemSettings
@@ -99,30 +102,66 @@ object InputFeedbacks {
         }
     }
 
+    /**
+     * The four system clicks the old keys were made with (KeyDef.Appearance): kept for the tests that hold the
+     * layouts' keys to those (060-theme-sounds-icons); a press plays by [SoundKey].
+     */
     enum class SoundEffect {
         Standard, SpaceBar, Delete, Return
     }
 
+    /** 按键音音色: the selected theme's sounds where it has them, or the system's always. */
+    enum class KeySoundSource(override val stringRes: Int) : ManagedPreferenceEnum {
+        FollowTheme(R.string.key_sound_source_theme),
+        System(R.string.key_sound_source_system);
+    }
+
+    private val keySoundSource by keyboardPrefs.keySoundSource
+
     private val audioManager = appContext.audioManager
 
-    fun soundEffect(effect: SoundEffect) {
-        when (soundOnKeyPress) {
-            InputFeedbackMode.Enabled -> {}
-            InputFeedbackMode.Disabled -> return
-            InputFeedbackMode.FollowingSystem -> if (!systemSoundEffects) return
-        }
-        val fx = when (effect) {
-            SoundEffect.Standard -> AudioManager.FX_KEYPRESS_STANDARD
-            SoundEffect.SpaceBar -> AudioManager.FX_KEYPRESS_SPACEBAR
-            SoundEffect.Delete -> AudioManager.FX_KEYPRESS_DELETE
-            SoundEffect.Return -> AudioManager.FX_KEYPRESS_RETURN
-        }
-        val volume = soundOnKeyPressVolume
-        if (volume == 0) {
-            audioManager.playSoundEffect(fx, -1f)
-        } else {
-            audioManager.playSoundEffect(fx, volume / 100f)
+    /**
+     * A key of class [key] pressed (060-theme-sounds-icons §1.4): whether it sounds, then which and how loud
+     * (KeySoundChoice); [system] the system's click it plays where no theme's does.
+     */
+    fun soundEffect(key: SoundKey, system: SoundKey = key) {
+        Trace.beginSection("InputFeedbacks.soundEffect")
+        try {
+            val plays = soundPlays()
+            val fromTheme = keySoundSource == KeySoundSource.FollowTheme
+            ThemeSounds.sync(plays && fromTheme)
+            if (!plays) return
+            val sounds = ThemeSounds.shared
+            when (val c = KeySoundChoice.choose(key, sounds.given, sounds.loaded, fromTheme, soundOnKeyPressVolume, system)) {
+                is KeySoundChoice.Choice.Theme -> if (!sounds.play(c.key, c.volume)) system(system, soundOnKeyPressVolume)
+                is KeySoundChoice.Choice.System -> audioManager.playSoundEffect(fx(c.key), c.volume)
+            }
+        } finally {
+            Trace.endSection()
         }
     }
+
+    private fun soundPlays(): Boolean = when (soundOnKeyPress) {
+        InputFeedbackMode.Enabled -> true
+        InputFeedbackMode.Disabled -> false
+        InputFeedbackMode.FollowingSystem -> systemSoundEffects
+    }
+
+    /** The selected theme's sounds loaded ahead of the first press, where they would play (the keyboard shown). */
+    fun syncSounds() = ThemeSounds.sync(soundPlays() && keySoundSource == KeySoundSource.FollowTheme)
+
+    private fun system(key: SoundKey, volumePercent: Int) =
+        audioManager.playSoundEffect(fx(key), if (volumePercent == 0) -1f else volumePercent / 100f)
+
+    // a function key clicks as the standard one: the system has no click of its own for it
+    private fun fx(key: SoundKey): Int = when (key) {
+        SoundKey.SPACE -> AudioManager.FX_KEYPRESS_SPACEBAR
+        SoundKey.BACKSPACE -> AudioManager.FX_KEYPRESS_DELETE
+        SoundKey.ENTER -> AudioManager.FX_KEYPRESS_RETURN
+        SoundKey.LETTER, SoundKey.FUNCTION -> AudioManager.FX_KEYPRESS_STANDARD
+    }
+
+    /** No theme sounds held: the service is gone. */
+    fun releaseSounds() = ThemeSounds.shared.release()
 
 }

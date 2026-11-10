@@ -73,7 +73,7 @@ class NumberKeyboardTest {
                 val was = old.getValue(node.id)
                 val now = SceneKeyDef.of(SceneKeyDef.onBoard(SceneBehavior.of(node), scene), node, object : SceneKeyDef.Table {})
                 val at = "$pad ${node.id}"
-                assertEquals(at, soundOf(was), now.sound)
+                assertEquals(at, soundOf(was), WiringSnapshot.layoutSound(now.systemSound))
                 assertEquals(at, was.shortcut, now.shortcut)
                 assertEquals(at, was.swipesBothWays, now.swipesBothWays)
                 assertEquals(at, actions(was), actions(now))
