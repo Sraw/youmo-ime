@@ -61,7 +61,12 @@ class InkOver(
      * Whether [session] has input typed, not what the handwriting shows: then nothing is written (the
      * keyboard starts no stroke, KeyInkGesture.mayWrite's typed; Engines.typedOnKeys).
      */
-    val typing: Boolean get() = !inking && inner?.let { it.preedit.isNotEmpty() && !it.predicting } == true
+    val typing: Boolean get() = !inking && innerTyped(inner)
+
+    private fun innerTyped(s: Snapshot?) = s != null && s.preedit.isNotEmpty() && !s.predicting
+
+    // how many actions [session] was given since its input was last none: a take-back deletes one only
+    private var typedActions = 0
 
     // [session] put text in or deleted since the handwriting last heard of the text before
     private var innerWrote = false
@@ -89,6 +94,12 @@ class InkOver(
     }
 
     private fun ink(action: Action.Ink): Snapshot {
+        // a tap taken back as the first dot (KeyInkGesture): decided here, where what was typed is known, so a
+        // backspace deletes that tap's letter and nothing else (another key between, a pick, a long press: kept)
+        if (action.takesBack && typing && typedActions == 1) {
+            val back = innerApply(Action.Backspace)
+            if (!typing) return ink(action.copy(takesBack = false)).let { it.copy(deleteBefore = it.deleteBefore + back.deleteBefore) }
+        }
         if (typing) {
             // dropped: taken, so not held for the next (Engines.inkSent), its piece ended, so the pad wipes it
             handwriting().drop(action)
@@ -118,10 +129,17 @@ class InkOver(
     }
 
     private fun innerApply(action: Action): Snapshot = session.apply(action).also {
+        val was = innerTyped(inner)
+        inner = it
+        typedActions = when {
+            !innerTyped(it) -> 0
+            !was -> 1
+            action is Action.Context -> typedActions
+            else -> typedActions + 1
+        }
         val changed = it.commit.isNotEmpty() || it.deleteBefore > 0
         if (changed) innerWrote = true
         wrote(it)
-        inner = it
         // what [session] put in told the handwriting at once: its journal then knows the text after its
         // sentence is not its own, and a backspace deletes that first (U-03)
         if (it.commit.isNotEmpty()) made?.apply(Action.Context(written))?.let { h -> inked = h }

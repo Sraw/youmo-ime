@@ -22,14 +22,15 @@ import splitties.dimensions.dp
  * [view]'s pixels ([InkPad], read by [recognition] as the handwriting keyboard's are), when a touch is a
  * stroke ([gesture], told by [GlideTouch]), the keys typed beside it in order ([keys]), and the ink drawn
  * over the keys, which stay shown: the piece's strokes and the one under the pen, faded out once the piece
- * is done. What is read goes to [deliver], a piece done to [finished]; the pause is the user's
+ * is done. What is read goes to [deliver] (takesBack: the first reading of a piece whose first dot was a
+ * tap, [dot]; the engine deletes that tap's letter, Action.Ink.takesBack), a piece done to [finished]; the pause is the user's
  * (HandwritingPause, [pause]), read at each stroke.
  */
 class KeyInk(
     private val view: View,
     theme: Theme,
     private val pause: () -> Long,
-    private val deliver: (InkReading, piece: Int) -> Unit,
+    private val deliver: (InkReading, piece: Int, takesBack: Boolean) -> Unit,
     private val finished: (piece: Int) -> Unit,
     // asked for once written on: a keyboard of one who never writes makes no recognizer (its thread)
     recognition: () -> HandwritingRecognition = { HandwritingRecognition.shared },
@@ -41,12 +42,32 @@ class KeyInk(
     val gesture = KeyInkGesture()
 
     /** The keys typed while the pad is read, in order with it. */
-    val keys: InkKeys by lazy { InkKeys(reads.value, this, deliver, finished) }
+    val keys: InkKeys by lazy {
+        InkKeys(reads.value, this, { reading, piece -> deliver(reading, piece, piece == takingBack.also { if (it == piece) takingBack = NO_PIECE }) }, finished)
+    }
 
     private val reads = lazy(recognition)
 
-    /** Whether strokes can be read now: the recognizer not given up (no stroke starts else, the touch a tap as ever). */
-    val loadable: Boolean get() = reads.value.loadable
+    // the piece whose first dot was a tap taken back, till its first reading is delivered
+    private var takingBack = NO_PIECE
+
+    /** Whether written on yet: then the keys go in order with the pad ([keys]); else straight on. */
+    val writtenOn: Boolean get() = reads.isInitialized()
+
+    /**
+     * Whether strokes can be read now: the recognizer not given up (no stroke starts else, the touch a
+     * tap as ever). Asked as a touch may start one: the recognizer is made then, and loaded on its
+     * worker, so the first stroke does not wait for it.
+     */
+    val loadable: Boolean get() {
+        val r = reads.value
+        if (!warmed) {
+            warmed = true
+            r.warmUp()
+        }
+        return r.loadable
+    }
+    private var warmed = false
 
     /** Another input started: what was written dropped (InkKeys.restart); nothing to drop if never written on. */
     fun restart() {
@@ -102,8 +123,9 @@ class KeyInk(
         if (pad.finished.isNotEmpty()) checkLater()
     }
 
-    /** A tap's [points] (x and y in turn) put on the pad as a stroke lifted at [time]: a first dot taken back. */
+    /** A tap's [points] (x and y in turn) put on the pad as a stroke lifted at [time]: a first dot taken back, its letter deleted by the engine. */
     fun dot(points: FloatArray, time: Long) {
+        takingBack = pad.piece
         down(points[0], points[1])
         for (k in 2 until points.size step 2) pad.move(points[k], points[k + 1])
         pad.up(time)?.let(keys::read)
@@ -200,5 +222,6 @@ class KeyInk(
         const val INK_DP = 3.5f
         const val FADE_MILLIS = 150L
         const val DOT = 0.1f
+        const val NO_PIECE = Int.MIN_VALUE
     }
 }

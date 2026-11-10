@@ -27,7 +27,7 @@ import splitties.dimensions.dp
  * Where [writes] says so as the finger goes down, a stroke is written on the keys instead (键盘手写, [ink]):
  * put on its pad and drawn there in ink; while the writing goes on every touch on the letters is one
  * ([KeyInkGesture]). [typed] says whether the input method has its own input typed (no writing starts
- * then); [tookBack] deletes the letter of a tap taken back as a character's first dot.
+ * then); a tap taken back as a character's first dot goes on the pad, its letter deleted by the engine (KeyInk.dot).
  */
 class GlideInput(
     private val keyboard: ViewGroup,
@@ -45,7 +45,6 @@ class GlideInput(
     private val ink: KeyInk? = null,
     private val writes: () -> Boolean = { false },
     private val typed: () -> Boolean = { false },
-    private val tookBack: () -> Unit = {},
     private val glided: (path: FloatArray, layout: GlideLayout) -> Unit,
 ) {
     // which finger may glide, which events are the keys', the path in the decoder's units
@@ -132,15 +131,12 @@ class GlideInput(
     }
 
     // the touch's places not yet on the pad put there, a stroke started with the first; a tap before it
-    // taken back as its first dot (KeyInkGesture.takeTapped): its letter deleted, its places the first stroke
+    // taken back as its first dot (KeyInkGesture.takeTapped): its places the first stroke, its letter deleted by the engine
     private fun feed(time: Long) {
         val k = inking ?: return
         val p = touch.points
         if (fed < 0) {
-            k.gesture.takeTapped()?.let {
-                tookBack()
-                k.dot(it, time)
-            }
+            k.gesture.takeTapped()?.let { k.dot(it, time) }
             k.down(p[0], p[1])
             fed = 2
         }

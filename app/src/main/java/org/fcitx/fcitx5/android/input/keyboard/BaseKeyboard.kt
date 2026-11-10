@@ -164,12 +164,17 @@ abstract class BaseKeyboard(
     /** Set as a temporary mode (快速输入, Unicode) is on or off ([KeyboardWindow]): nothing is written on the keys in one. */
     var tempMode = false
 
-    /** Where what is written on the keys goes ([KeyboardWindow]): a reading of its piece, or null once the piece is done. */
-    var inkSink: ((InkReading?, piece: Int) -> Unit)? = null
+    /**
+     * Where what is written on the keys goes ([KeyboardWindow]): a reading of its piece, or null once the
+     * piece is done; takesBack, the first reading after a tap was taken back as its first dot (Action.Ink.takesBack).
+     */
+    var inkSink: ((InkReading?, piece: Int, takesBack: Boolean) -> Unit)? = null
 
     // 键盘手写's pad, made with the glide ([glideInput]); the engine's answers watched while shown
     private var keyInk: KeyInk? = null
     private var inkScope: CoroutineScope? = null
+    // whether the input method writes on the keys ([glideInput]'s writes)
+    private var inkIm: () -> Boolean = { false }
 
     /** [keyInk], for a test to see the ink drawn. */
     internal val keyInkForTest: KeyInk? get() = keyInk
@@ -203,8 +208,9 @@ abstract class BaseKeyboard(
     ): GlideInput {
         val ink = KeyInk(
             this, theme, pause = { prefs.keyboard.handwritingPause.getValue().millis },
-            deliver = { reading, piece -> inkSink?.invoke(reading, piece) }, finished = { inkSink?.invoke(null, it) },
+            deliver = { reading, piece, takesBack -> inkSink?.invoke(reading, piece, takesBack) }, finished = { inkSink?.invoke(null, it, false) },
         ).also { keyInk = it }
+        inkIm = writes
         return GlideInput(
         this, theme,
         enabled = { keyDrawing.getValue() == KeyDrawing.Glide && wordField() && enabled() },
@@ -218,8 +224,6 @@ abstract class BaseKeyboard(
         // temporary mode; not while TalkBack explores by touch, the finger feeling for keys, not writing
         writes = { writing() && !tempMode && !touchExploring() && writes() },
         typed = { EngineState.keysTyped.value.typed },
-        // the tap's letter deleted in its turn: behind its key, were that held behind a reading
-        tookBack = { ink.keys.onAction({ isAttachedToWindow }) { keyActionListener?.onKeyAction(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_BackSpace)), KeyActionListener.Source.Keyboard) } },
         glided = glided,
         )
     }
@@ -678,7 +682,8 @@ abstract class BaseKeyboard(
         source: KeyActionListener.Source = KeyActionListener.Source.Keyboard
     ) {
         val ink = keyInk
-        if (ink == null || !writing()) return keyActionListener?.onKeyAction(action, source) ?: Unit
+        // straight on unless written on, in an input method that writes (English's keys never wait on its reads)
+        if (ink == null || !ink.writtenOn || !writing() || !inkIm()) return keyActionListener?.onKeyAction(action, source) ?: Unit
         // in order with what is written on the keys: after its readings, backspace its strokes' first (InkKeys)
         ink.keys.onAction({ isAttachedToWindow }) { if (!ink.keys.took(action)) keyActionListener?.onKeyAction(action, source) }
     }

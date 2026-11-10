@@ -172,6 +172,43 @@ class InkOverTest {
     }
 
     @Test
+    fun anInkTakingBackDeletesTheOneLetterTypedThenIsWritten() {
+        type("n")
+        val s = over.apply(Action.Ink(0, read("天"), takesBack = true))
+        assertEquals("天", s.preedit)
+        assertEquals("", pinyin.input)
+        assertEquals(Action.Backspace, pinyin.actions.last { it !is Action.Context })
+    }
+
+    @Test
+    fun anInkTakingBackDeletesNothingWhereMoreThanTheTapIsTyped() {
+        // another key (a long press's letter) after the tap: neither deleted, the ink dropped
+        type("ni")
+        val s = over.apply(Action.Ink(0, read("天"), takesBack = true))
+        assertEquals("ni", s.preedit)
+        assertFalse(pinyin.actions.contains(Action.Backspace))
+    }
+
+    @Test
+    fun anInkTakingBackDeletesNothingOnceTheTapIsPickedAway() {
+        // the tap typed, then a pick before the stroke's reading came: the committed text is not touched
+        type("n")
+        assertEquals("你", over.apply(Action.Pick(0)).commit)
+        val s = over.apply(Action.Ink(0, read("天"), takesBack = true))
+        assertEquals(0, s.deleteBefore)
+        assertFalse(pinyin.actions.contains(Action.Backspace))
+        assertEquals("天", s.preedit)
+    }
+
+    @Test
+    fun anInkTakingBackAfterABackspaceAndALetterAgainCountsOnlyTheNewInput() {
+        type("n")
+        over.apply(Action.Backspace)
+        type("n")
+        assertEquals("天", over.apply(Action.Ink(0, read("天"), takesBack = true)).preedit)
+    }
+
+    @Test
     fun pinyinsFollowingWordsGoAsWritingStarts() {
         type("ni")
         val picked = over.apply(Action.Pick(0))
