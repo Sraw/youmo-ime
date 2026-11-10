@@ -345,7 +345,7 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **前提**：B0-设置；**词库与短语 → 常用词**，右上角 ⋮ → **导入**，选 `uat/fixtures/common-words.txt`（推到 `/sdcard/Download/`；「米字旁 → 米、糸」「中华人民共和国 → 中国」），确认框点确定。
 - **操作**：在「普通文本」框依次打 mizipang、mzp、zhonghuaren，每次看候选栏，再清掉打 mzp 点空格。
 - **预期**：mizipang、mzp 时候选前两个是「米」「糸」，mizipang 时后面照常有「米字旁」（词库里没有这个词，mzp 本来就打不出它）；zhonghuaren 时第一个是「中国」；最后框里是「米」。
-- **JVM**：`LexiconUatTest.aCommonWordsReplacementsFirstByItsPinyinInitialsAndFirstThree`（:lib:ime-eval:uatTest，真数据）、`SettingsPagesUatTest.aCommonWordAddedImportedAndExported`（+ 添加时拼音留空自动填、替换项一行一个、列表里写着打法）；设备上照跑：导入走真的文件选择器，候选看真引擎。
+- **JVM**：`LexiconUatTest.aCommonWordsReplacementsFirstByItsPinyinInitialsAndFirstThree`（:lib:ime-eval:uatTest，真数据）、`CommonWordsPageUatTest.aCommonWordAddedImportedAndExported`（+ 添加时拼音留空自动填、替换项一行一个、列表里写着打法）、`CommonWordsPageUatTest.aCommonWordEditedSwipedOffAndBackAndAllDeleted`（改、重名和带空格被拒、左滑删再撤销、全部删除；两个字的首字母写着只在全拼 26 键）、`CommonWordsPageUatTest.whatTheKeyboardDeletedStaysDeletedThroughThePagesEdits`（键盘删的替换项，页面再改也不会加回来）；设备上照跑：导入走真的文件选择器，候选看真引擎。
 
 ### WD-40 [P1] 常用词：九键、14 键、双拼
 - **前提**：同 WD-39；双拼方案自然码。
@@ -363,5 +363,5 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **前提**：B0-设置；把 `uat/fixtures/common-words-mixed.txt`（一行空格分隔的「木字旁 木」、一行带 [拼音] 的「中华人民共和国」、一行没有替换项的「米字旁」）推到 `/sdcard/Download/`。
 - **操作**：**词库与短语 → 常用词** ⋮ → **导入**，选它，读确认框，确定；⋮ → **导出**，在下载里保存，取回看内容；工具栏 ⋯ → **不用我的输入习惯**，打 mzp。
 - **预期**：确认框写着"新增 2 个，更新 0 个，跳过 1 行"，下面写着第 4 行「米字旁[mi'zi'pang]」没有替换项；列表里有「木字旁 → 木」「中华人民共和国 → 中国」；导出的文件第一行是 `# youmo-common-words 1`，每行用 Tab 分隔；借手机时打 mzp 前面没有「木」。
-- **JVM**：`SettingsPagesUatTest.aCommonWordAddedImportedAndExported`（确认框的数字和原因、导出的内容）、`EnginesTest.theCommonWordsAreTheAdditionsAndOffWithTheHabits`（:lib:ime-core，借手机时不出、键盘上删除后存下）；设备上跑导入导出（真的文件选择器），借手机那半不跑。
+- **JVM**：`CommonWordsPageUatTest.aCommonWordAddedImportedAndExported`（确认框的数字和原因、导出的内容）、`EnginesTest.theCommonWordsAreTheAdditionsAndOffWithTheHabits`（:lib:ime-core，借手机时不出、键盘上删除后存下）；设备上跑导入导出（真的文件选择器），借手机那半不跑。
 

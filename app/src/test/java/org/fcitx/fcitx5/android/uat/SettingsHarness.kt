@@ -70,6 +70,18 @@ class SettingsHarness(
 
     fun idle() = shadowOf(Looper.getMainLooper()).idle()
 
+    /**
+     * Another app gone to and come back from: the activity stopped and started again, its pages
+     * kept; [meanwhile] done while it is away.
+     */
+    fun leaveAndReturn(meanwhile: () -> Unit = {}) {
+        controller.pause().stop()
+        idle()
+        meanwhile()
+        controller.restart().start().resume()
+        idle()
+    }
+
     /** [intent] sent to the activity up (onNewIntent), as the keyboard's 存为 does with settings open. */
     fun newIntent(intent: Intent) {
         controller.newIntent(intent)

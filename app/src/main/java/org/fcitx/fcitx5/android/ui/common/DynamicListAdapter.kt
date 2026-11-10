@@ -216,6 +216,18 @@ abstract class DynamicListAdapter<T>(
         mainViewModel?.toolbarButton?.value = ButtonMode.EDIT
     }
 
+    /**
+     * Shows [items] in place of all those listed, as their file has them read anew: no change of
+     * the user's, so none told to the listener (nothing to save, nothing to undo).
+     */
+    fun showAll(items: List<T>) {
+        _entries.clear()
+        _entries.addAll(items)
+        // a list read anew: any row may have changed
+        notifyDataSetChanged()
+        mainViewModel?.toolbarButton?.value = if (entries.isEmpty()) ButtonMode.NONE else ButtonMode.EDIT
+    }
+
     /** Removes the [count] items from [start], drawn as one removal: the undo of [addItems]. */
     fun removeItems(start: Int, count: Int) {
         if (count == 0) return

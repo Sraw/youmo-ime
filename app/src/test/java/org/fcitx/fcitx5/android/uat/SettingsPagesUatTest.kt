@@ -26,10 +26,8 @@ import org.fcitx.fcitx5.android.core.FakeHostApi
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.ShuangpinNames
 import org.fcitx.fcitx5.android.core.phoneStorage
-import org.fcitx.fcitx5.android.data.pinyin.CommonWordsManager
 import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
 import org.fcitx.fcitx5.android.data.pinyin.customphrase.PinyinCustomPhrase
-import org.fcitx.fcitx5.android.engine.phrase.CommonWords
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
@@ -45,7 +43,6 @@ import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
-import org.fcitx.fcitx5.android.ui.main.settings.CommonWordsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.PinyinCustomPhraseFragment
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.ui.main.settings.UserWordsFragment
@@ -596,71 +593,6 @@ class SettingsPagesUatTest {
             read.countDown()
             PinyinCustomPhraseFragment.load = load
             CustomPhraseManager.save(emptyList())
-        }
-    }
-
-    private fun commonWordsSaved(): List<String> {
-        open(SettingsRoute.About)
-        until("saved") { "reloadEngine()" in api.calls }
-        api.calls.clear()
-        return CommonWordsManager.load().words.map { it.toString() }
-    }
-
-    // 常用词 (060-common-words): added with the pinyin left blank, filled as the dictionary reads it for
-    // the user to check, the replacements one a line; listed with the keys that type it; a file imported
-    // after saying what it adds and skips; exported tab-separated under its header
-    @Test
-    @Uat("WD-39", "WD-42")
-    fun aCommonWordAddedImportedAndExported() {
-        CommonWordsManager.write(CommonWords.EMPTY)
-        api.readings["米字旁"] = "mi zi pang"
-        try {
-            open(SettingsRoute.PinyinDict(""))
-            until("listed on the words page") {
-                preferences((page as PreferenceFragmentCompat).preferenceScreen).any { it.title == s(R.string.common_words) }
-            }
-            open(SettingsRoute.CommonWords)
-            KeyboardHarness.all(activity.window.decorView).filterIsInstance<FloatingActionButton>().single().performClick()
-            idle()
-            val d = dialog()
-            val (text, pinyin, replacements) = KeyboardHarness.all(d.window!!.decorView).filterIsInstance<EditText>().toList()
-            text.setText("米字旁")
-            replacements.setText("米字旁")
-            d.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
-            until("pinyin filled") { pinyin.text.toString() == "mi zi pang" }
-            assertEquals(s(R.string.common_word_same_as_word), d.getButton(AlertDialog.BUTTON_POSITIVE).let { it.performClick(); idle(); replacements.error?.toString() })
-            replacements.setText("米\n糸")
-            d.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
-            idle()
-            until("listed with its keys") { "米字旁 → 米、糸\nmizipang · mzp" in shown() }
-            assertEquals(listOf("米字旁[mi'zi'pang] 米 糸"), commonWordsSaved())
-            open(SettingsRoute.CommonWords)
-            until("read") { shown().any { "米字旁" in it } }
-            val file = Uri.parse("content://words.test/import.txt")
-            shadowOf(activity.contentResolver).registerInputStream(
-                file,
-                ByteArrayInputStream("木字旁 木\n中华人民共和国[zhong hua ren min gong he guo] 中国\n米字旁[mi'zi'pang]\n".toByteArray()),
-            )
-            api.readings["木字旁"] = "mu zi pang"
-            (page as CommonWordsFragment).importWords(file)
-            val asked = dialog()
-            val said = KeyboardHarness.all(asked.window!!.decorView).filterIsInstance<TextView>().joinToString("\n") { it.text }
-            assertTrue(said, s(R.string.common_words_import_counts, 2, 0, 1) in said)
-            assertTrue(said, s(R.string.common_words_import_line, 3, "米字旁[mi'zi'pang]", s(R.string.common_word_no_replacement)) in said)
-            asked.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
-            idle()
-            val exportTo = Uri.parse("content://words.test/export.txt")
-            val exported = ByteArrayOutputStream()
-            shadowOf(activity.contentResolver).registerOutputStream(exportTo, exported)
-            (page as CommonWordsFragment).exportWords(exportTo)
-            until("exported") { exported.size() > 0 }
-            assertEquals(
-                "# youmo-common-words 1\n米字旁[mi'zi'pang]\t米\t糸\n木字旁[mu'zi'pang]\t木\n中华人民共和国[zhong'hua'ren'min'gong'he'guo]\t中国\n",
-                exported.toString(Charsets.UTF_8),
-            )
-            assertEquals(3, commonWordsSaved().size)
-        } finally {
-            CommonWordsManager.write(CommonWords.EMPTY)
         }
     }
 

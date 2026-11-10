@@ -25,6 +25,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -59,7 +60,8 @@ import java.time.LocalDate
 
 /**
  * 常用词 (dev/design/060-common-words.md): a word, its pinyin and the replacements typing it offers
- * first. The list is the file's; saved, over what the keyboard deleted meanwhile, as the page is left.
+ * first. The list is the file's; saved, over what the keyboard deleted meanwhile, as the page is left,
+ * and read again as it comes back, so what the keyboard deleted is not saved back by the next edit.
  */
 class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> {
 
@@ -77,6 +79,9 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
     private var loaded = CommonWords.EMPTY
 
     private var dirty = false
+
+    // the save begun as the page was last left: read again after it as the page comes back
+    private var saving: Deferred<Boolean>? = null
 
     private lateinit var importLauncher: ActivityResultLauncher<String>
     private lateinit var exportLauncher: ActivityResultLauncher<String>
@@ -285,7 +290,8 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
         }, viewLifecycleOwner, Lifecycle.State.STARTED)
     }
 
-    private fun deleteAll() {
+    @VisibleForTesting
+    internal fun deleteAll() {
         if (ui.entries.isEmpty()) return
         AlertDialog.Builder(requireContext())
             .setMessage(getString(R.string.common_words_delete_all, ui.entries.size))
@@ -411,10 +417,39 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
                 false
             }
         }
+        saving = saved
         val fcitx = viewModel.fcitx
         fcitx.lifecycleScope.launch(Dispatchers.Main.immediate) {
             fcitx.runOnReady<Unit> { if (saved.await()) reloadEngine() }
         }
+    }
+
+    /**
+     * The file read again, once what the page saved as it was left is, and shown where the user
+     * changed nothing since: the keyboard may have deleted a replacement meanwhile, or the save laid
+     * the page's list over such a change ([CommonWordsManager.saveOver]); the rows shown are then the
+     * next save's list, which would put back what was deleted.
+     */
+    private fun readAgain() {
+        if (!readable || dirty) return
+        val pending = saving
+        viewLifecycleOwner.lifecycleScope.launch {
+            pending?.await()
+            val now = try {
+                withContext(Dispatchers.IO) { load() }
+            } catch (e: IOException) {
+                Timber.w(e, "common words: read again")
+                return@launch
+            }
+            if (dirty || now.newer) return@launch
+            loaded = now
+            if (now.words != ui.entries) ui.showAll(now.words)
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        readAgain()
     }
 
     override fun onStop() {
