@@ -133,6 +133,9 @@
     <string name="theme_pack_import_title">匯入主題 %1$s？</string>
     <string name="theme_pack_import">匯入</string>
     <string name="theme_pack_replaces">會取代你已有的同名主題。</string>
+    <string name="theme_pack_layouts">此主題包含自訂佈局：%1$s（其中 %2$d 個動作直接輸入佈局裡寫的文字）。</string>
+    <string name="theme_pack_layouts_unused">不會使用的佈局（讀不出、缺鍵盤必需的鍵，或不是已有的鍵盤）：%1$s</string>
+    <string name="keyboard_themed">%1$s（主題：%2$s）</string>
     <string name="theme_pack_warnings">注意：</string>
     <string name="theme_info">資訊</string>
     <string name="theme_info_author">作者：%1$s</string>
@@ -713,10 +716,10 @@
     <string name="im_word_hint_summary">顯示以已打字母開頭的單詞，以及拼錯時的改正；關閉後按鍵直接上屏</string>
     <string name="im_auto_caps">句首自動大寫</string>
     <string name="im_auto_caps_summary">在句子開頭自動開啟 Shift（應用的輸入框要求時）</string>
+    <string name="key_drawing">在鍵上劃</string>
+    <string name="key_drawing_handwriting">鍵盤手寫</string>
     <string name="glide_typing">滑行輸入</string>
-    <string name="glide_typing_summary">手指不離開鍵盤，依序劃過一個詞的鍵（拼音劃字母，九鍵劃數字鍵，碼表劃編碼；14 鍵、18 鍵、九鍵雙拼上沒有）。網址、電子郵件、密碼框裡不滑行。和筆畫篩選只能開一個：打開這個會關掉筆畫篩選</string>
     <string name="stroke_filter">筆畫篩選</string>
-    <string name="stroke_filter_summary">打了拼音後在鍵盤上畫一筆（橫、豎、撇、點、折），只留第一個字這樣起筆的候選，再畫就按這個字的筆順往下篩。網址、電子郵件、密碼框裡不能畫。和滑行輸入只能開一個：打開這個會關掉滑行輸入</string>
     <string name="status_punctuation_chinese">中文標點</string>
     <string name="status_punctuation_english">英文標點</string>
     <string name="status_full_width">全形</string>
