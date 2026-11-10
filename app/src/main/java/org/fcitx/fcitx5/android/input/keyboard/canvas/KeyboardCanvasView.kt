@@ -357,14 +357,10 @@ class KeyboardCanvasView(
                 }
                 node.alpha = face.alpha
                 // a key of a theme's motion: its pressed face as it moves (a node just recorded too)
-                if (face.pressed && f.node.motion != null) applyMotion(f)
+                if (face.pressed) applyMotion(f)
                 canvas.drawRenderNode(node)
             }
-            val m = f.moving
-            val leaving = m?.leaving
-            if (leaving != null) {
-                if (leaving.hasDisplayList()) canvas.drawRenderNode(leaving) else m.leaving = null
-            }
+            f.moving?.let { drawLeaving(canvas, it) }
         }
         // what the frame's nodes draw (a pack's fonts' glyphs, its pictures) is drawn on the RenderThread
         // after this: the pack's first frame drawn once a frame is committed, not here. ViewRootImpl.performDraw
@@ -376,6 +372,12 @@ class KeyboardCanvasView(
             viewTreeObserver.registerFrameCommitCallback { PackDrawGuard.frameDrawn(p) }
             if (PackDrawGuard.askFrame(p)) postInvalidateOnAnimation()
         }
+    }
+
+    // the face a state change left, fading over the new one; one the renderer let go of dropped
+    private fun drawLeaving(canvas: Canvas, m: Moving) {
+        val leaving = m.leaving ?: return
+        if (leaving.hasDisplayList()) canvas.drawRenderNode(leaving) else m.leaving = null
     }
 
     // a node still holding what was recorded: one the renderer let go of (the window gone, memory
@@ -470,7 +472,8 @@ class KeyboardCanvasView(
     private fun crossFade(was: Faces, f: Faces, repainted: Boolean) {
         val old = was.moving
         val t = f.node.motion?.transition
-        if (repainted || t == null || f.down || !KeyMotionSwitch.on(context)) {
+        val still = repainted || t == null || f.down
+        if (still || !KeyMotionSwitch.on(context)) {
             old?.stop()
             return
         }
@@ -517,6 +520,7 @@ class KeyboardCanvasView(
     // [f]'s pressed node's properties as it moves now: its alpha while let go fading, its scale about its key's
     // middle and its sink; as still where it is not moving
     private fun applyMotion(f: Faces) {
+        if (f.node.motion == null) return
         val node = f.pressed ?: return
         val m = f.moving
         if (m?.releasing == true) node.alpha = m.alpha

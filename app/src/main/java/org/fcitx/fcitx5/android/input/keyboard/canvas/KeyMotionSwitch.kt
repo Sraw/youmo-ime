@@ -45,7 +45,7 @@ object KeyMotionSwitch {
     private fun watch(app: Context) {
         watching = app
         powerSave = app.getSystemService(PowerManager::class.java)?.isPowerSaveMode == true
-        ContextCompat.registerReceiver(app, receiver, IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED), ContextCompat.RECEIVER_NOT_EXPORTED)
+        ContextCompat.registerReceiver(app, receiver, IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED), ContextCompat.RECEIVER_EXPORTED)
     }
 
     // CSS's curves (cubic-bezier), made once
