@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input
 
 import android.content.res.Resources
+import android.os.PowerManager
 import android.os.SystemClock
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -84,11 +85,16 @@ internal fun KeyboardPerfBaselineTest.motionRows() {
         onMain { advanced.keyboardMotion.setValue(false) }
         runs("switch off")
         onMain { advanced.keyboardMotion.setValue(true) }
+        // battery saver will not come on while the phone charges (USB's adb): told it is unplugged
+        shell("dumpsys battery unplug")
         shell("cmd power set-mode 1")
         settle()
+        val saving = service.getSystemService(PowerManager::class.java).isPowerSaveMode
+        log("anim\tpower save\tbattery saver on: $saving")
         runs("power save")
     } finally {
         runCatching { shell("cmd power set-mode 0") }
+        runCatching { shell("dumpsys battery reset") }
         onMain {
             advanced.keyboardMotion.setValue(motionWas)
             service.window.window!!.callback = marks.original
