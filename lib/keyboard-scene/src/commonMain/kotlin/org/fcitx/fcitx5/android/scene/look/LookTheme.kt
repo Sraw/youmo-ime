@@ -256,8 +256,11 @@ object LookTheme {
             ?.let { hid ->
                 add(hid.of(part = "label"), "hidden" to Value.Flag(true))
                 // flat draws no face (3.0's flat): a required key whose image is gone there keeps its words
-                hid.filter { (it.key ?: it.starRole) in REQUIRED_KEYS }.takeIf { it.isNotEmpty() }
-                    ?.let { add(it.of(FLAT, part = "label"), "hidden" to Value.Flag(false)) }
+                // (Return's and the space bar's kinds keep their image flat, above: hidden there still)
+                hid.filter { (it.key ?: it.starRole) in REQUIRED_KEYS }.takeIf { it.isNotEmpty() }?.let {
+                    add(it.of(FLAT, part = "label"), "hidden" to Value.Flag(false))
+                    add(it.of(FLAT, "enter", part = "label") + it.of(FLAT, "space", part = "label"), "hidden" to Value.Flag(true))
+                }
             }
         // a board's key that shows its label where its role's on every board hides theirs: as an id, it wins
         named.keys.filter { n -> resolved.getValue(n).label == KeyLabel.Show && role(named, n)?.label == KeyLabel.Hide }
