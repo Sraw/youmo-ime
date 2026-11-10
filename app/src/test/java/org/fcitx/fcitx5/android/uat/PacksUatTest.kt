@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.pack.Refusal
 import org.fcitx.fcitx5.android.ui.main.MainActivity
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.PacksFragment
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -58,6 +59,13 @@ class PacksUatTest {
     private fun openedPacks(intent: Intent?) =
         intent?.component?.className == MainActivity::class.java.name &&
             intent.getParcelableExtra<SettingsRoute>(MainActivity.EXTRA_SETTINGS_ROUTE) == SettingsRoute.Packs
+
+    // the test shelves back after each test, failed or not: a SettingsHarness test or one reading PackStore
+    // without a KeyboardHarness (whose init sets them) would else see the shelf a test before it left
+    @After
+    fun packsBack() {
+        TestShelves.use()
+    }
 
     @Test
     @Uat("ST-60")
@@ -122,21 +130,26 @@ class PacksUatTest {
     @Test
     @Uat("ST-61")
     fun aTextPackTooOldSaysWhichVersionIsNeeded() {
-        val shelf = PackShelf(Files.createTempDirectory("packs").toFile(), listOf(TestShelves.packs.publicKey), TestShelves.requirements)
-        shelf.load()
-        assertTrue(shelf.import(TestShelves.pack(PackKind.TEXT, version = 1).inputStream()) is ImportResult.Imported)
-        // the app now wants version 2 of the same format: what was imported stays, but is not used
-        val strict = PackShelf(
-            shelf.dir(PackKind.TEXT)!!.parentFile!!.parentFile!!,
-            listOf(TestShelves.packs.publicKey),
-            TestShelves.requirements + (PackKind.TEXT to PackRequirement(format = 1, minVersion = 2)),
-        )
-        strict.load()
-        KeyboardHarness().use { h ->
-            h.start()
-            PackStore.useShelf(strict)
-            h.idle()
-            assertEquals(h.service.getString(R.string.pack_text_needed_update, 2), gate(h)?.contentDescription)
+        val root = Files.createTempDirectory("packs").toFile()
+        try {
+            val shelf = PackShelf(root, listOf(TestShelves.packs.publicKey), TestShelves.requirements)
+            shelf.load()
+            assertTrue(shelf.import(TestShelves.pack(PackKind.TEXT, version = 1).inputStream()) is ImportResult.Imported)
+            // the app now wants version 2 of the same format: what was imported stays, but is not used
+            val strict = PackShelf(
+                root,
+                listOf(TestShelves.packs.publicKey),
+                TestShelves.requirements + (PackKind.TEXT to PackRequirement(format = 1, minVersion = 2)),
+            )
+            strict.load()
+            KeyboardHarness().use { h ->
+                h.start()
+                PackStore.useShelf(strict)
+                h.idle()
+                assertEquals(h.service.getString(R.string.pack_text_needed_update, 2), gate(h)?.contentDescription)
+            }
+        } finally {
+            root.deleteRecursively()
         }
     }
 
@@ -188,6 +201,7 @@ class PacksUatTest {
             }
         } finally {
             TestShelves.use()
+            dir.deleteRecursively()
         }
     }
 
@@ -428,6 +442,9 @@ class PacksUatTest {
             assertNotNull(on)
             assertTrue(on !== Thread.currentThread())
             assertTrue(PackStore.status(PackKind.TEXT) is PackStatus.Damaged)
+            // counted on the restart's thread, after it
+            val until = System.currentTimeMillis() + 5000
+            while (PackStore.state.value.generation == generation && System.currentTimeMillis() < until) Thread.sleep(10)
             assertTrue(PackStore.state.value.status(PackKind.TEXT) is PackStatus.Damaged)
             assertEquals(generation + 1, PackStore.state.value.generation)
             // no pack in use now: nothing to read

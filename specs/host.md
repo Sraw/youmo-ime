@@ -30,8 +30,8 @@ goes back to the application. The two flags are different things:
 |---|---|---|---|
 | 1 | — | `KeyEvent` normalizes `origKey` into `key` (`Key.normalize`, `fcitx-utils/key.cpp:493-533`); handlers match on `key` | — |
 | 2 | ReservedFirst | e.g. hide the input method name overlay on a press | `PreKeyHook` list |
-| 3 | PreInputMethod | an active temp mode takes every key; the engine never sees it. A grouped keyboard's code (`NineKeyLetters.CODES`: 18 键's U+F8C0–F8D9, 14 键's U+F8DA–F8F3, 九键双拼's U+F8F4–F8FB) or a tap (`Keyboard.TAPS`, a layout's own keyboard's `Keyboard.PLACES` and codes `NineKeyLetters.CUSTOM_BLOCK`) reaches the mode as its letter (`Keyboard.typedLetter`: the half tapped, the first at the centre; on its own keyboard the letter tapped nearest), and the modes type no private use character | `TempMode` list in `TempModeManager` |
-| 4 | InputMethod | the engine's `keyEvent`; a grouped keyboard's code goes only to the input method that reads it (`InputMethodCatalog.readsCode`: pinyin G14's U+F8DA–F8F3, 双拼 G18's U+F8C0–F8D9 and NINE_SP's U+F8F4–F8FB; see engine.md *Codes*), and a tap (`Keyboard.TAPS`, `Keyboard.PLACES`) and a layout's own keyboard's code (`NineKeyLetters.CUSTOM_BLOCK`) are pinyin's alone; `KeyRouter` swallows them for any other input method | `KeyEngine` (`KeyRouter`) |
+| 3 | PreInputMethod | an active temp mode takes every key; the engine never sees it. A grouped keyboard's code (`NineKeyLetters.CODES`: 18 键's U+F8C0–F8D9, 14 键's U+F8DA–F8F3, 九键双拼's U+F8F4–F8FC) or a tap (`Keyboard.TAPS`, a layout's own keyboard's `Keyboard.PLACES` and codes `NineKeyLetters.CUSTOM_BLOCK`) reaches the mode as its letter (`Keyboard.typedLetter`: the half tapped, the first at the centre; on its own keyboard the letter tapped nearest), and the modes type no private use character | `TempMode` list in `TempModeManager` |
+| 4 | InputMethod | the engine's `keyEvent`; a grouped keyboard's code goes only to the input method that reads it (`InputMethodCatalog.readsCode`: pinyin G14's U+F8DA–F8F3, 双拼 G18's U+F8C0–F8D9 and NINE_SP's U+F8F4–F8FC; see engine.md *Codes*), and a tap (`Keyboard.TAPS`, `Keyboard.PLACES`) and a layout's own keyboard's code (`NineKeyLetters.CUSTOM_BLOCK`) are pinyin's alone; `KeyRouter` swallows them for any other input method | `KeyEngine` (`KeyRouter`) |
 | 5 | PostInputMethod | temp mode triggers first, then the hooks: fullwidth's conversion, Ctrl+. (punctuation), Ctrl+Shift+F (chttrans) | `PostKeyHook` list |
 | 6 | ReservedLast | the engine's `filterKey`, then `KeyResultListener`s (punctuation's last letter/digit) | `KeyResultListener` list |
 | 7 | — | not accepted: `HostOutput.handBack(origKey, release, timestamp)`, **press and release alike** | — |
@@ -339,7 +339,7 @@ v0.3.0–0.3.2 devices' `androidengine.conf` from
 every call on `HostDispatcher`, the single "fcitx-main" thread ([architecture.md](architecture.md#processes-and-threads)).
 `startup` settles the host's config and data directories (`ConfigHome.settle`), starts the engine, reads the profile, `androidengine.conf`,
 `punctuation.conf` and `chttrans.conf`, starts the quick phrase tables loading on a thread of their own,
-builds `ChineseModules` and `HostCore`, then posts Ready. Built-in data comes from the APK's `pkgdata/`
+builds `ChineseModules` and `HostCore`, then posts Ready. What each punctuation key types (`HostCore.punctuationKeys`; before a context, `startPunctuationKeys`: under the group's first input method, full width off) is written for the next start (`KotlinHost.keepStartKeys` → the app's `PunctuationStartKeys`, `filesDir/punctuation-start-keys`, only when changed), so the keyboard draws the punctuation keys before the host is up ([app.md](app.md)). Built-in data comes from the APK's `pkgdata/`
 assets (`BUILT_IN`), OpenCC's from `engine/opencc-s2tw.data`, mapped at the first traditional text;
 the gettext translations are gone, the host's own texts are app resources (`AppHostStrings`).
 

@@ -7,7 +7,6 @@ package org.fcitx.fcitx5.android.input.theme
 import org.fcitx.fcitx5.android.input.theme.LookFixtures.PALETTE
 import org.fcitx.fcitx5.android.scene.look.KeyLabel
 import org.fcitx.fcitx5.android.scene.look.KeyOverride
-import org.fcitx.fcitx5.android.scene.look.Keys
 import org.fcitx.fcitx5.android.scene.look.LookDefaults
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -32,8 +31,10 @@ class ThemeAssetLimitsTest {
         assertNull(l.look(look))
         val many = (1..401).associate { "qwerty/k$it" to KeyOverride(null, null, KeyLabel.Show) }
         assertEquals(ThemeAssetLimits.Breach.Overrides, l.look(look.copy(keys = look.keys.copy(overrides = many))))
-        // the engine's limit, which its 3.0 reader holds a file to too
-        assertEquals(Keys.MAX_OVERRIDES, l.MAX_OVERRIDES)
+        // at the limits: taken
+        val most = (1..400).associate { "qwerty/k$it" to KeyOverride(null, null, KeyLabel.Show) }
+        assertNull(l.look(look.copy(keys = look.keys.copy(overrides = most))))
+        assertNull(l.entry(3, 1, l.MAX_TOTAL_BYTES - 1))
     }
 
     @Test

@@ -7,23 +7,23 @@ package org.fcitx.fcitx5.android.ui.main.settings
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
-import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
-import org.fcitx.fcitx5.android.scene.Op
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureScreenRoboImage
-import org.fcitx.fcitx5.android.comparesScreenshots
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.comparesScreenshots
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.uat.SettingsHarness
 import org.junit.After
@@ -101,6 +101,8 @@ class KeyShortcutsPageScreenshotTest {
         // a's select all top left and its @ top right (标点位置's default), as on the keyboard; s's * alone top right
         assertEquals(1, sceneIcons(key("a")))
         assertEquals(0, sceneIcons(key("s")))
+        // s's * in its corner, a text the engine draws
+        assertTrue(KeyboardHarness.all(key("s")).filterIsInstance<SceneKeyCell>().single().keyNode!!.ops(false).any { it is Op.Text && it.text == "*" })
         capture("full")
         for ((title, name) in listOf(
             R.string.shortcut_page_nine to "nine",
@@ -139,24 +141,9 @@ class KeyShortcutsPageScreenshotTest {
         assertTrue(caps.toString(), caps > 40)
     }
 
-    // the caps drawn by the engine where the canvas keyboard is on (060-render-p2 S6): the same marks as the
-    // views', read from each cap's scene: a's select all an icon, s none; ⌫'s clear up and restore down, two
+    // the icons drawn on a cap, read from its scene (060-render-p2 S6): a's select all an icon, s none; ⌫'s clear up and restore down
     private fun sceneIcons(v: View) = KeyboardHarness.all(v).filterIsInstance<SceneKeyCell>()
         .sumOf { c -> c.keyNode?.ops(false).orEmpty().count { it is Op.Icon } }
-
-    @Test
-    fun theEnginesCapsWithTheirMarks() {
-        open()
-        st.idle()
-        assertEquals(1, sceneIcons(key("a")))
-        assertEquals(0, sceneIcons(key("s")))
-        // s's * in its corner, a text the engine draws
-        assertTrue(KeyboardHarness.all(key("s")).filterIsInstance<SceneKeyCell>().single().keyNode!!.ops(false).any { it is Op.Text && it.text == "*" })
-        capture("canvas_full")
-        tab(R.string.shortcut_page_function)
-        assertEquals(3, sceneIcons(key(st.s(R.string.fn_key_backspace))))
-        capture("canvas_function")
-    }
 
     // the settings at night, the keyboard's theme as it is: the caps' faces, words and the edited one's outline the
     // keyboard theme's, as light or dark as on the keyboard, whatever the page's own (S6 review); b's words faded alone

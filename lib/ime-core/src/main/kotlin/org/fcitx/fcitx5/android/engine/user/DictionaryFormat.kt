@@ -17,6 +17,7 @@ import java.io.Reader
 import java.nio.charset.CharacterCodingException
 import java.nio.charset.Charset
 import java.nio.charset.CodingErrorAction
+import java.util.concurrent.CancellationException
 
 /**
  * What a text file to import is, told from the whole of it before a word is imported: its
@@ -180,9 +181,10 @@ object DictionaryFormat {
                     }
                 }
             }
+            // the last batch guessed inside the pass: its progress reaches 1 after it, not before
+            alone.flush()
         }
-        alone.flush()
-        if (!alone.agrees()) return Refused(Reason.MISMATCH)
+        if (!alone.agrees(words)) return Refused(Reason.MISMATCH)
         words += alone.guessed
         textOnly -= alone.guessed
         val unread = lines - words - textOnly
@@ -204,12 +206,19 @@ object DictionaryFormat {
         // of those the guess was asked for and answered, not one that threw
         private var failed = 0
 
-        fun agrees(): Boolean {
-            val asked = guessed + unguessed - failed
-            return !gbk || asked == 0 || guessed >= asked * AGREE
-        }
-
         private val waiting = ArrayList<Pair<String, Double>>()
+
+        /**
+         * Whether the guesses bear the encoding out: judged only where the words alone are the file's
+         * most (more than the [read] that had their own pinyin, which readingsHold judged). A few a
+         * GBK export with pinyin could not read (a rare name) refuse nothing. Only a guess that reads
+         * nothing much fails it: a real one reads Big5's wrong characters too, so it stops a file
+         * whose words alone are mostly no words, not every misread one.
+         */
+        fun agrees(read: Int): Boolean {
+            val asked = guessed + unguessed - failed
+            return !gbk || asked == 0 || asked <= read || guessed >= asked * AGREE
+        }
 
         fun add(text: String?, weight: Double) {
             if (guess == null || text == null) return
@@ -222,7 +231,7 @@ object DictionaryFormat {
         @Suppress("TooGenericExceptionCaught")
         private fun readings(guess: (List<String>) -> Map<String, String?>): Map<String, String?> = try {
             guess(waiting.mapTo(LinkedHashSet()) { it.first }.toList())
-        } catch (e: java.util.concurrent.CancellationException) {
+        } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
             failed += waiting.size

@@ -114,14 +114,15 @@ class SceneSpeechTest {
         return done
     }
 
-    // the keyboard told, [set] done to it: its table added to [compared]; no differences left to list
-    private fun differences(
+    // the keyboard told, [set] done to it: its table added to [compared]; each letter a clickable, enabled
+    // key with its own words, class and click (a drawn key has no view id, so no resource name)
+    private fun tell(
         im: InputMethodEntry = KeyboardHarness.PINYIN,
         inputType: Int = InputType.TYPE_CLASS_TEXT,
         imeOptions: Int = 0,
         prefill: (android.widget.EditText) -> Unit = {},
         set: (KeyboardHarness) -> Unit = {},
-    ): List<String> {
+    ) {
         val scene = harness(im, inputType, imeOptions, prefill).use { h ->
             set(h)
             h.relayout()
@@ -130,35 +131,37 @@ class SceneSpeechTest {
         compared += scene.values
         // the 26 keys all there, each with its words
         assertTrue(scene.keys.toString(), ('a'..'z').all { scene.keys.any { k -> k.equals("$it#0", ignoreCase = true) } })
-        return emptyList()
+        for ((key, told) in scene.filterKeys { it.length == 3 && it[0].isLetter() && it.endsWith("#0") }) {
+            // its words name its letter (reads is never empty: no description reads "null", an empty one [""]; R20 F6606)
+            val named = "null" !in told.reads && told.reads.any { it.contains(key[0], ignoreCase = true) }
+            assertTrue("$key: $told", told.clickable && told.enabled && named && told.className != null &&
+                AccessibilityNodeInfo.ACTION_CLICK in told.actions)
+        }
     }
 
     private val compared = mutableListOf<Told>()
 
     private val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false)
 
-    // the keys' table, one keyboard and state at a time, the views' against the scene's: text, corner,
-    // resource name, what is read, class, clicks, enabled, state, actions. The differences 060-render-p2
-    // §5.3 allows (the corner's place, U6) are not in what a reader is told, so none is allowed here
+    // the keys' table, one keyboard and state at a time: text, corner, resource name, what is read, class,
+    // clicks, enabled, state, actions; each letter whole (tell), and the states and names below told
     @Test
-    fun theKeysToldAsTheViewsToldThem() {
-        val all = mutableListOf<String>()
-        all += differences()
-        all += differences(KeyboardHarness.ENGLISH)
-        all += differences { h -> h.tap(h.keyNamed("shift")) }
+    fun theKeysTold() {
+        tell()
+        tell(KeyboardHarness.ENGLISH)
+        tell { h -> h.tap(h.keyNamed("shift")) }
         // caps lock: Shift long pressed by the reader, which the old view took as a long click
-        all += differences { h -> assertTrue(h.act("shift", AccessibilityNodeInfo.ACTION_LONG_CLICK)) }
-        all += differences(inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
-        all += differences(inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
+        tell { h -> assertTrue(h.act("shift", AccessibilityNodeInfo.ACTION_LONG_CLICK)) }
+        tell(inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
+        tell(inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
         // Return's words with its action (A4.4), an app's own label for its own action (A4.2)
-        all += differences(imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH)
-        all += differences(imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEND)
-        all += differences(prefill = { it.setImeActionLabel("Post it", 100) })
-        all += differences(wubi) { h ->
+        tell(imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH)
+        tell(imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEND)
+        tell(prefill = { it.setImeActionLabel("Post it", 100) })
+        tell(wubi) { h ->
             EngineState.tableKeyboardState.value = TableKeyboard(InputMethodCatalog.WUBI, emptySet(), false, KeyLabels.ROOTS, TableRoots.WUBI86)
             h.idle()
         }
-        assertEquals(all.joinToString("\n"), 0, all.size)
         // and they were told something: Shift's two states, corners, the names UAT finds keys by
         val c = RuntimeEnvironment.getApplication()
         assertTrue(compared.any { it.state == c.getString(R.string.a11y_state_shift_once) })
@@ -176,8 +179,7 @@ class SceneSpeechTest {
     @Test
     fun aCornerNotDrawnNotTold() {
         prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.None)
-        val none = differences()
-        assertEquals(none.joinToString("\n"), 0, none.size)
+        tell()
         assertTrue(compared.toString(), compared.none { it.alt != null || "1" in it.reads })
         harness().use { h ->
             assertEquals(null, h.key("q").alt)
@@ -188,8 +190,7 @@ class SceneSpeechTest {
         }
         compared.clear()
         prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.Bottom)
-        val bottom = differences()
-        assertEquals(bottom.joinToString("\n"), 0, bottom.size)
+        tell()
         assertTrue(compared.count { it.alt != null } >= 26)
     }
 
@@ -254,6 +255,8 @@ class SceneSpeechTest {
             }
         }
         assertTrue(scene.toString(), scene.size >= 4)
+        // the reader's long click told as a long click of e, not a click
+        assertTrue(scene.toString(), scene.any { it.startsWith("TYPE_VIEW_LONG_CLICKED") && "e" in words(it.substringAfter(" [").removeSuffix("]")) })
     }
 
     // a split row's second G and V (landscape): a tap on one, or TalkBack's click or long click on its
@@ -354,6 +357,8 @@ class SceneSpeechTest {
             told
         }
         assertTrue(scene.toString(), scene.count { it.startsWith("TYPE_VIEW_TEXT_TRAVERSED") } > 20)
+        // the cursor put where the reader said, the wider selection refused, the cursor left at 2
+        assertTrue(scene.toString(), "set true false 2" in scene)
     }
 
     // a node says what the scene says, its extras the key's id and corner

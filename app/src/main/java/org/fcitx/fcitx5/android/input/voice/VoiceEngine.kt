@@ -6,6 +6,9 @@ package org.fcitx.fcitx5.android.input.voice
 
 import android.os.Handler
 import android.os.Looper
+import androidx.annotation.VisibleForTesting
+import com.k2fsa.sherpa.onnx.EndpointConfig
+import com.k2fsa.sherpa.onnx.EndpointRule
 import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.OnlineModelConfig
 import com.k2fsa.sherpa.onnx.OnlineRecognizer
@@ -16,16 +19,21 @@ import com.k2fsa.sherpa.onnx.OnlineTransducerModelConfig
 import com.k2fsa.sherpa.onnx.SileroVadModelConfig
 import com.k2fsa.sherpa.onnx.Vad
 import com.k2fsa.sherpa.onnx.VadModelConfig
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withTimeoutOrNull
 import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.data.pack.AppData
+import org.fcitx.fcitx5.android.data.pack.PackStore
+import org.fcitx.fcitx5.android.pack.PackKind
 import timber.log.Timber
+import java.io.File
 
 /**
  * The streaming recognizer (X-ASR's 1920 ms streaming transducer, its encoder fine-tuned for
@@ -52,25 +60,41 @@ object VoiceEngine {
     // hypotheses kept: the n-best VoiceRerank ranks again, as measured (seg_app.py)
     private const val BEAM = 16
 
-    /** The recognizer and the tagger, if it loaded (none: the text as recognized, cleaned). */
-    class Models(val recognizer: OnlineRecognizer, val polisher: VoicePolisher?)
+    /**
+     * The recognizer and the tagger, if it loaded (none: the text as recognized, cleaned), read
+     * from the voice pack in [dir].
+     */
+    class Models(val recognizer: OnlineRecognizer, val polisher: VoicePolisher?, val dir: File?)
+
+    /**
+     * The recognizer's calls, every listener's, one at a time: a talk's tail still decoding and the
+     * next talk's stream made on the same recognizer (which keeps its last graph of hotwords) do not overlap.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val decoder: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1)
 
     private val lock = Any()
+    // written under [lock]; read without it by offerVad (the capture thread), which must not wait out a model load
+    @Volatile
     private var models: Models? = null
+    @Volatile
     private var users = 0
     private val main = Handler(Looper.getMainLooper())
     // on a worker: onnxruntime tearing its sessions down on the main thread could drop the keyboard's frames
     private val letGo = Runnable {
         Dispatchers.IO.asExecutor().execute {
             synchronized(lock) {
-                if (users == 0) {
-                    models?.recognizer?.release()
-                    models?.polisher?.close()
-                    models = null
-                    spareVad.clear()
-                }
+                if (users == 0) unload()
             }
         }
+    }
+
+    // under [lock], no talk holding them
+    private fun unload() {
+        models?.recognizer?.release()
+        models?.polisher?.close()
+        models = null
+        spareVad.clear()
     }
 
     /**
@@ -79,10 +103,30 @@ object VoiceEngine {
      */
     fun acquire(): Models = synchronized(lock) {
         main.removeCallbacks(letGo)
-        // the pack's files by their paths: sherpa-onnx maps the .ort ones (lib/sherpa-onnx README)
-        val loaded = models ?: Models(OnlineRecognizer(null, config()), polisher()).also { models = it }
+        // a voice pack imported since they were read: the new one's, once no talk holds the old
+        val dir = PackStore.dir(PackKind.VOICE)
+        if (modelsOutdated(users, models?.dir, models != null, dir)) unload()
+        // counted before the load: offerVad, reading it without the lock, keeps the VAD for this talk
         users++
-        loaded
+        try {
+            models ?: load(dir).also { models = it }
+        } catch (@Suppress("TooGenericExceptionCaught") t: Throwable) {
+            users--
+            throw t
+        }
+    }
+
+    // the pack's files by their paths: sherpa-onnx maps the .ort ones (lib/sherpa-onnx README)
+    private fun load(dir: File?): Models {
+        val recognizer = OnlineRecognizer(null, config())
+        val polisher = try {
+            polisher()
+        } catch (@Suppress("TooGenericExceptionCaught") t: Throwable) {
+            // an Error from the tagger (out of memory, a library not linked): the recognizer just made not left to its finalizer
+            recognizer.release()
+            throw t
+        }
+        return Models(recognizer, polisher, dir)
     }
 
     fun release() = synchronized(lock) {
@@ -133,11 +177,8 @@ object VoiceEngine {
         val read = remembered.shared<Deferred<VoiceHotwords.Words>>({ it.isActive }) { ticket ->
             reading.async { remembered.read(ticket, VoiceHotwords.ofUser(fcitx.runOnReady { userWords() })) }
         }
-        val inTime = withTimeoutOrNull(USER_WORDS_MS) { read.await() }
-        // a timeout was silent: the user's words were dropped and nothing said so
-        if (inTime == null) Timber.w("voice hotwords: no answer in %d ms, the last read used", USER_WORDS_MS)
         // how many, not which: they are the user's
-        return remembered.inTime(inTime).withHabits(habits).also { Timber.d("voice hotwords: %d listened for, %d blocked", it.hotwords.split('/').count { w -> w.isNotEmpty() }, it.blockedWords.size) }
+        return inTimeOrLast(read, remembered, USER_WORDS_MS).withHabits(habits).also { Timber.d("voice hotwords: %d listened for, %d blocked", it.hotwords.split('/').count { w -> w.isNotEmpty() }, it.blockedWords.size) }
     }
 
     // the engine still starting or busy: voice input with the words last read, not a wait
@@ -180,8 +221,13 @@ object VoiceEngine {
             vad.release()
             return
         }
-        // no talk holding the models and none loaded (they failed): let go now, no letGo would clear it
-        spareVad.offer(vad, wanted = synchronized(lock) { users > 0 || models != null })
+        // no talk holding the models and none loaded (they failed): let go now, no letGo would clear it.
+        // Read without the lock: a talk loading its models (seconds) is counted in users already
+        val clears = spareVad.clears
+        spareVad.offer(vad, wanted = users > 0 || models != null, clearsBefore = clears)
+        // letGo may have run between the read and the keep: not left without an owner until the next talk
+        // (a talk starting meanwhile at worst makes its VAD anew)
+        if (users == 0 && models == null) spareVad.clear()
     }
 
     /** The spare let go if no talk holds the models: one made for a talk whose models failed to load. */
@@ -208,6 +254,7 @@ object VoiceEngine {
     )
 
     private const val VAD_THRESHOLD = 0.2f
+    private const val RULE2_SILENCE_S = 1.2f
 
     // a voice pack file's path; without the pack, PackUnavailableException
     private fun path(name: String) = AppData.file("$DIR/$name").path
@@ -225,12 +272,34 @@ object VoiceEngine {
             modelingUnit = "bpe",
             bpeVocab = path("bpe.vocab"),
         ),
-        // a segment ends where its rules say (sherpa-onnx's defaults), its hypotheses carried over (lib/sherpa-onnx README)
+        // a segment ends where its rules say, its hypotheses carried over (lib/sherpa-onnx README):
+        // sherpa-onnx's defaults, rule2 (silence after text) as measured, 1.2 s (the C++ and
+        // Python default, voice-eval's); the Kotlin API's default is 1.4 s
         enableEndpoint = true,
+        endpointConfig = EndpointConfig(rule2 = EndpointRule(true, RULE2_SILENCE_S, 0.0f)),
         // hotwords and the n-best need the beam search
         decodingMethod = "modified_beam_search",
         maxActivePaths = BEAM,
         hotwordsFile = path("hotwords.txt"),
         hotwordsScore = VoiceHotwords.SCORE,
     )
+}
+
+/**
+ * The models read are another pack's than the one installed now ([dir]: a voice pack imported since) and no talk holds
+ * them: let go, to be read anew from [dir].
+ */
+internal fun modelsOutdated(users: Int, loadedDir: File?, loaded: Boolean, dir: File?): Boolean =
+    users == 0 && loaded && loadedDir != dir
+
+/**
+ * [read]'s words in [ms], or [remembered]'s last read where it took longer or was
+ * cancelled from elsewhere (its scope ending); the caller cancelled stays cancelled ([cancelledElsewhereAs])
+ */
+@VisibleForTesting
+internal suspend fun inTimeOrLast(read: Deferred<VoiceHotwords.Words>, remembered: VoiceHotwords.Remembered, ms: Long): VoiceHotwords.Words {
+    val inTime = withTimeoutOrNull(ms) { cancelledElsewhereAs(null) { read.await() } }
+    // a timeout was silent: the user's words were dropped and nothing said so
+    if (inTime == null) Timber.w("voice hotwords: no answer in %d ms or the read cancelled, the last read used", ms)
+    return remembered.inTime(inTime)
 }

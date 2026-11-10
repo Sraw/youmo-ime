@@ -41,6 +41,7 @@ class ThemeTest {
 
     private fun withStyle(style: String) = source.replace("</theme>", "$style\n</theme>")
 
+    // contract: the committed example theme reads as written; a reader change that breaks a shipped or shared theme fails here
     @Test
     fun theMaterialLightExampleReads() {
         val t = Fixtures.materialLight
@@ -368,8 +369,6 @@ class ThemeTest {
         assertTrue(ThemeReader.theme(s, appVersion = "0.6.0") is Parsed.Ok)
         assertTrue(ThemeReader.theme(s, appVersion = "0.6.1-beta2") is Parsed.Ok)
         assertTrue(ThemeReader.theme(s, appVersion = "0.5.2").problems().single().message.contains("needs the app 0.6.0"))
-        assertTrue(ThemeReader.newer("0.10.0", "0.9.9"))
-        assertTrue(!ThemeReader.newer("0.6.0", "0.6.0-beta1"))
         assertTrue(problems(s.replace("preview.png", "preview.jpg")).isNotEmpty())
         assertTrue(problems(s.replace("Ann", "A".repeat(65))).isNotEmpty())
         assertTrue(problems(s.replace("0.6.0", "six")).isNotEmpty())
@@ -481,7 +480,8 @@ class ThemeTest {
         val letter = KeyLook(c.of(Selector.Target("key", "qwerty", "a", "letter", setOf("letter"), emptySet())), t)
         assertEquals(3.0, letter.depth)
         assertEquals(Argb(0x40000000), letter.depthColor, "a gradient: a translucent black")
-        val plain = KeyLook(Cascade(ThemeReader.theme(source).ok(), emptySet()).of(Selector.Target("key", "qwerty", "a", "letter", setOf("letter"), emptySet())), t)
+        val untouched = ThemeReader.theme(source).ok()
+        val plain = KeyLook(Cascade(untouched, emptySet()).of(Selector.Target("key", "qwerty", "a", "letter", setOf("letter"), emptySet())), untouched)
         assertEquals(0.0, plain.depth)
         assertNull(plain.path)
         assertNull(plain.innerShadow)
@@ -562,6 +562,7 @@ class ThemeTest {
         assertTrue(warnings(withStyle("<style select=\"key label\" align=\"top-left\"/><style select=\"*/enter icon\" return-icon-go=\"text(Go)\"/>")).isEmpty())
     }
 
+    // contract: a theme written for a later stage (names reserved now) still imports in this app
     @Test
     fun aThemeOfEveryLaterStageImports() {
         // reserved.xml: theme-4.xsd's example of T1 (xmllint-checked), T4a's, T4b's and T5's names (read now), T6a–A3's and a sound pack in it
@@ -681,6 +682,8 @@ class ThemeTest {
         assertTrue(!ThemeReader.newer("0.6.0", "dev"), "garbage: cannot tell")
         assertTrue(!ThemeReader.newer("0.6.0", ""))
         assertTrue(!ThemeReader.newer("1.0.0", "0.6.0.1"))
+        assertTrue(ThemeReader.newer("0.10.0", "0.9.9"), "numbers, not text")
+        assertTrue(!ThemeReader.newer("0.6.0", "0.6.0-beta1"), "a beta of the version is not older")
     }
 
     @Test

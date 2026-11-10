@@ -160,9 +160,7 @@ class ScenePainter(
         null
     }
 
-    private val blurs = object : LinkedHashMap<Float, BlurMaskFilter>(KEPT_BLURS, LOAD, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Float, BlurMaskFilter>?) = size > KEPT_BLURS
-    }
+    private val blurs = lruMap<Float, BlurMaskFilter>(KEPT_BLURS)
 
     private fun pathOf(shape: Shape): Path {
         path.rewind()
@@ -373,13 +371,13 @@ class ScenePainter(
         // the icons drawn, every painter's (main thread), the last KEPT_ICONS used: a keyboard made again (a
         // theme switched) inflates none again; let go when what inflating one reads changes (night mode,
         // density, font scale), not for the rest of the configuration (turning the screen keeps them)
-        private val icons = object : LinkedHashMap<IconKey, Drawable>(KEPT_ICONS, LOAD, true) {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<IconKey, Drawable>?) = size > KEPT_ICONS
-        }
+        private val icons = lruMap<IconKey, Drawable>(KEPT_ICONS)
+
+        /** The icons kept let go ([SceneThemes.forgetAll]). */
+        fun forgetIcons() = icons.clear()
 
         // kept for a name with no icon (none in SceneIcons, or none inflated): not looked for again each frame
         private val NO_ICON: Drawable = ColorDrawable()
-        private const val LOAD = 0.75f
         private var iconsUiMode = 0
         private var iconsDensity = 0
         private var iconsFontScale = Float.NaN

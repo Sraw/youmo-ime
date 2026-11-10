@@ -15,13 +15,16 @@ import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
-import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.pinyin.g14Code
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
+import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.LayoutSource
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKey
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
+import org.fcitx.fcitx5.android.scene.KeyNode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -53,7 +56,8 @@ class GroupedKeyboardTapTest {
         laidOut(1080, 800)
     }
 
-    private var keyboard = grouped()
+    // made by each test ([drawn], or its own): none made for a test only to be made again
+    private lateinit var keyboard: GroupedKeyboard
 
     // the keyboard made again, nothing sent yet
     private fun drawn(check: () -> Unit) {
@@ -207,31 +211,41 @@ class GroupedKeyboardTapTest {
     }
 
     // a node a scene made anew does other than it did gets a key of its own: the old key's gestures cancelled,
-    // its long press pending never fires (review S4a #9)
+    // its long press pending never fires (the old key's gestures were left running)
     @Test
     fun aKeyANodeNoLongerDoesAsHasItsGesturesCancelled() {
-        run {
-            keyboard = grouped()
-            val canvas = keyboard.allViews.filterIsInstance<org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView>().single()
-            var fired = 0
-            val replaced = mutableListOf<org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKey>()
-            val keys = SceneKeys(keyboard) { key, _ -> key.onLongClick { fired++; true } }
-            keys.byNodes(canvas, object : SceneKeyDef.Table {}, replaced::add)
-            val n = canvas.scene!!.keys.first { it.id == "space" }
-            val old = keys.of(n)!!
-            // the same node again: the same key
-            assertTrue(old === keys.of(n))
-            old.touch(android.graphics.Rect(0, 0, 100, 100), MotionEvent.ACTION_DOWN, 50f, 50f, 0, android.os.SystemClock.uptimeMillis())
-            val other = org.fcitx.fcitx5.android.scene.KeyNode(
-                id = n.id, copy = n.copy, kind = n.kind, role = n.role, shape = n.shape, bounds = n.bounds, hit = n.hit, anchor = n.anchor,
-                up = n.up, states = n.states, faces = n.faces, a11y = n.a11y, actions = n.actions + ("send" to "sym:Tab"),
-            )
-            val new = keys.of(other)!!
-            assertTrue(new !== old)
-            assertEquals(listOf(old), replaced)
-            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(3))
-            assertEquals(0, fired)
-        }
+        keyboard = grouped()
+        val canvas = keyboard.allViews.filterIsInstance<KeyboardCanvasView>().single()
+        val looper = org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper())
+        val box = android.graphics.Rect(0, 0, 100, 100)
+        var fired = 0
+        val n = canvas.scene!!.keys.first { it.id == "space" }
+        // first, the same press on a key not replaced fires: the long press is wired here at all
+        val control = SceneKeys(keyboard) { key, _ -> key.onLongClick { fired++; true } }
+        control.byNodes(canvas, object : SceneKeyDef.Table {}) { }
+        val down = android.os.SystemClock.uptimeMillis()
+        control.of(n)!!.touch(box, MotionEvent.ACTION_DOWN, 50f, 50f, 0, down)
+        looper.idleFor(java.time.Duration.ofSeconds(3))
+        assertEquals("a key not replaced", 1, fired)
+        control.of(n)!!.touch(box, MotionEvent.ACTION_UP, 50f, 50f, 0, android.os.SystemClock.uptimeMillis())
+        fired = 0
+
+        val replaced = mutableListOf<SceneKey>()
+        val keys = SceneKeys(keyboard) { key, _ -> key.onLongClick { fired++; true } }
+        keys.byNodes(canvas, object : SceneKeyDef.Table {}, replaced::add)
+        val old = keys.of(n)!!
+        // the same node again: the same key
+        assertTrue(old === keys.of(n))
+        old.touch(box, MotionEvent.ACTION_DOWN, 50f, 50f, 0, android.os.SystemClock.uptimeMillis())
+        val other = KeyNode(
+            id = n.id, copy = n.copy, kind = n.kind, role = n.role, shape = n.shape, bounds = n.bounds, hit = n.hit, anchor = n.anchor,
+            up = n.up, states = n.states, faces = n.faces, a11y = n.a11y, actions = n.actions + ("send" to "sym:Tab"),
+        )
+        val new = keys.of(other)!!
+        assertTrue(new !== old)
+        assertEquals(listOf(old), replaced)
+        looper.idleFor(java.time.Duration.ofSeconds(3))
+        assertEquals(0, fired)
     }
 
     private companion object {

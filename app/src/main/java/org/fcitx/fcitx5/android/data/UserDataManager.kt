@@ -243,6 +243,9 @@ object UserDataManager {
         val packs = ThemePackFiles.folder(themes)
         ThemePackFiles.folder(from).listFiles(FileFilter { it.isDirectory && !it.name.startsWith(".") })
             ?.forEach { File(packs, it.name).deleteRecursively() }
+        // every pack checked again at the next listing: a backup's stamps are no check of the app's
+        ThemePackFiles.dropStamps(from)
+        ThemePackFiles.dropStamps(themes)
     }
 
     private fun copyDir(source: File, target: File) {

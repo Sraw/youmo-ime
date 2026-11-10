@@ -95,4 +95,19 @@ class VoiceSpareTest {
         assertFalse(spare.ready)
         assertEquals(listOf("a"), released)
     }
+
+    // review F6461: a clear between reading clears and the offer undoes the keep, released once; with none between, it is kept
+    @Test
+    fun anOfferAfterAClearItDidNotSeeIsUndone() {
+        val released = mutableListOf<String>()
+        val spare = VoiceSpare<String> { released += it }
+        val before = spare.clears
+        spare.clear()
+        assertFalse(spare.offer("a", wanted = true, clearsBefore = before))
+        assertFalse(spare.ready)
+        assertEquals(listOf("a"), released)
+        assertTrue(spare.offer("b", wanted = true, clearsBefore = spare.clears))
+        assertEquals(listOf("a"), released)
+        assertEquals("b", spare.take())
+    }
 }

@@ -116,10 +116,10 @@ class SceneShownKey(val canvas: KeyboardCanvasView, override val id: String, ove
     override val drawnTexts: List<String> get() = texts().map { it.text }
 
     override fun drawn(text: String): RectF? = texts().firstOrNull { it.text == text }?.let { t ->
-        val at = IntArray(2).also(canvas::getLocationInWindow)
-        // drawn from its left (ScenePainter), its width guessed: about 0.6 of its size a character
+        // drawn from its left (ScenePainter), its width guessed: about 0.6 of its size a character; mapped to the
+        // window as [bounds] is, a scaled keyboard (a floating one dragged smaller) the same as its keys
         val width = t.size * t.scaleX * WIDE * t.text.length
-        RectF((at[0] + t.x).toFloat(), (at[1] + t.baseline - t.size * INK).toFloat(), (at[0] + t.x + width).toFloat(), (at[1] + t.baseline).toFloat())
+        RectF(inWindow(org.fcitx.fcitx5.android.scene.Box(t.x, t.baseline - t.size * INK, t.x + width, t.baseline)))
     }
     override fun toString() = "scene key $id${if (copy != 0) " ($copy)" else ""}"
 

@@ -72,9 +72,12 @@ class NineKeyLettersCustomTest {
     fun groupsOfABuiltInKeyboardAreThatKeyboardAndItsRecord() {
         assertSame(NineKeyLetters.G14, NineKeyLetters.custom(NineKeyLetters.G14.tag().split(',')))
         assertSame(NineKeyLetters.G18, NineKeyLetters.custom(NineKeyLetters.G18.tag().split(',')))
-        // written in rows, the same letters: the same keyboard
         val rows = NineKeyLetters.G14.tag().split(',').map { it.toList().joinToString(" ") }
-        assertSame(NineKeyLetters.G14, NineKeyLetters.custom(rows))
+        // written in rows, the same letters: the same keyboard (codes, record), its rows kept so a tap across alone leans to no stacked letter
+        val stacked = NineKeyLetters.custom(rows)
+        assertEquals(NineKeyLetters.G14, stacked)
+        assertEquals(NineKeyLetters.G14.tag(), stacked.tag())
+        assertEquals(listOf("q", "w"), stacked.rowsOf(stacked.codes[0]))
     }
 
     @Test
@@ -115,6 +118,9 @@ class NineKeyLettersCustomTest {
         assertSame(made, NineKeyLetters.ofCode(made.codes[0].code))
         assertSame(NineKeyLetters.G14, NineKeyLetters.filedAs(NineKeyLetters.G14.tag()))
         assertNull(NineKeyLetters.filedAs("ab,cd"))
+        // a record of many tags (damaged, say) keeps no keyboard of each: past the few kept, read anew alike
+        repeat(100) { NineKeyLetters.filedAs("bad$it") }
+        assertEquals(made.codes, NineKeyLetters.filedAs(made.tag())?.codes)
         // 双拼's nine keys' tag under qk: is a layout of those groups, not NINE_SP
         val nineSp = NineKeyLetters.filedAs(NineKeyLetters.NINE_SP.tag())
         assertNotNull(nineSp)

@@ -7,8 +7,10 @@ package org.fcitx.fcitx5.android.scene.engine
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
 
-/** Which part of a key a piece is (the theme's part names), so each state colours it as its part. */
-/** [Hint]: what a function key's swipes do (its marks, drawn as [Shortcut]s); asked only whether it is hidden. */
+/**
+ * Which part of a key a piece is (the theme's part names), so each state colours it as its part.
+ * [Hint]: what a function key's swipes do (its marks, drawn as [Shortcut]s); asked only whether it is hidden.
+ */
 enum class Part(val xml: String) { Label("label"), Icon("icon"), Badge("badge"), Mark("mark"), Shortcut("shortcut"), Hint("hint") }
 
 /** Text placed: from ([x], [baseline]), [size] px, squeezed to [scaleX], its characters [spacing] em apart (a theme's letter-spacing). */

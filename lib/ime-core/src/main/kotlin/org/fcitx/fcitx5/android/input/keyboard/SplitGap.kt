@@ -12,7 +12,10 @@ package org.fcitx.fcitx5.android.input.keyboard
  * (⇧, ⌫) sits at a row's end, never between its letters.
  */
 object SplitGap {
-    /** In key widths: the narrowest room between the halves is wider than a key (SplitKeyboard.MIN_GAP). */
+    /**
+     * In key widths. SplitKeyboard.MIN_GAP is a share of the keyboard's width (0.12), not of a key's:
+     * a row of ten letters makes that about 1.2 keys, so half a key is well under the narrowest gap.
+     */
     const val MIN_WIDTH = 0.5f
 
     /**

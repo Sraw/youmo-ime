@@ -175,7 +175,8 @@ class EditingSession(
         // a selection (rather than a cursor) leaves the composition to the next cursor report
         if (selStart != selEnd) return CursorUpdate.None
         if (composing.contains(selStart)) {
-            if (ignoreSystemCursor) return CursorUpdate.None
+            // a provisional composition is not fcitx's preedit: nothing of fcitx's to move
+            if (ignoreSystemCursor || provisional) return CursorUpdate.None
             // fcitx's cursor is relative to the preedit
             val position = selStart - composing.start
             if (position == composingText.cursor) return CursorUpdate.None
@@ -186,14 +187,9 @@ class EditingSession(
             // editor reports its span, that (the app may have rewritten the text); many report
             // none at all, so none reported is not taken as gone: the span as composed
             val (start, end) = if (composingStart in 0..<composingEnd) composingStart to composingEnd else composing.start to composing.end
-            val p = if (selStart >= end) selStart - (end - start) else selStart
             CoreLog.d { "cursor left a provisional composition: taken away" }
             resetComposingState()
-            selection.predict(p)
-            editor.batchEdit {
-                editor.setComposingText("", 1)
-                editor.setSelection(p, p)
-            }
+            takeAwayProvisional(start, end, selStart)
             provisionalTaken?.invoke(false)
             return CursorUpdate.None
         }
@@ -206,7 +202,8 @@ class EditingSession(
     /**
      * Input restarted over a [provisional] composition, which the restart's focus out would leave as
      * text. [sameField]: taken away if still there as composed ([selStart]..[selEnd]: the restarted
-     * field's selection), for its owner to compose anew; if not there, the app took it. Another
+     * field's selection), for its owner to compose anew; if not there, or the selection unknown
+     * ([selStart] -1: nowhere to put the cursor), it is left as text and taken as the app's. Another
      * field (a WebView's inputs share one view): left in place as text, its owner's to forget.
      * Either way not it, the editor's composing region is let go. [provisionalTaken] told either
      * way; nothing done if not provisional.
@@ -219,20 +216,8 @@ class EditingSession(
         val there = sameField && selStart >= 0 && provisionalStillThere(selStart, selEnd)
         resetComposingState()
         if (there) {
-            // the cursor kept where it is, the composition's characters gone from before it; predicted,
-            // so the report it brings is not taken as the user's move (as the cursor leaving it)
-            val p = when {
-                selStart >= end -> selStart - (end - start)
-                selStart > start -> start
-                else -> selStart
-            }
             CoreLog.d { "input restarted over a provisional composition: taken away" }
-            selection.predict(p)
-            editor.batchEdit {
-                editor.setComposingRegion(start, end)
-                editor.setComposingText("", 1)
-                editor.setSelection(p, p)
-            }
+            takeAwayProvisional(start, end, selStart)
         } else {
             editor.finishComposingText()
         }
@@ -240,14 +225,37 @@ class EditingSession(
     }
 
     /**
+     * Removes [start]..[end] (the provisional composition) from the field. The region is set first:
+     * an editor that dropped its composing span would otherwise replace only the empty selection,
+     * leaving the text in place. The cursor kept where it is, the characters gone from before it
+     * (inside the range: at its start); predicted, so the report it brings is not taken as the
+     * user's move.
+     */
+    private fun takeAwayProvisional(start: Int, end: Int, selStart: Int) {
+        val p = when {
+            selStart >= end -> selStart - (end - start)
+            selStart > start -> start
+            else -> selStart
+        }
+        selection.predict(p)
+        editor.batchEdit {
+            editor.setComposingRegion(start, end)
+            editor.setComposingText("", 1)
+            editor.setSelection(p, p)
+        }
+    }
+
+    /**
      * Whether the provisional composition is still in the field as composed, the cursor now at
      * [selStart]..[selEnd]: read around the cursor, the editor reporting no span (it reports one
      * while the span is there; many report none at all). Text shorter than the range is gone; an
-     * editor that will not say, or a selection over it, is taken as still there.
+     * editor that will not say, a selection over it, or a cursor more than [MAX_STILL_THERE_READ]
+     * away (not read across the IPC: maybe the whole document) is taken as still there.
      */
     private fun provisionalStillThere(selStart: Int, selEnd: Int): Boolean {
         val start = composing.start
         val end = composing.end
+        if (selStart - start > MAX_STILL_THERE_READ || end - selEnd > MAX_STILL_THERE_READ) return true
         val text: String = when {
             selStart >= end -> {
                 val before = editor.textBeforeCursor(selStart - start) ?: return true
@@ -590,3 +598,6 @@ class EditingSession(
         editor.setComposingRegion(composing.start, composing.end)
     }
 }
+
+/** How far from the cursor a provisional composition is read back (characters, one IPC read). */
+private const val MAX_STILL_THERE_READ = 4096

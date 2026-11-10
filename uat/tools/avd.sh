@@ -19,6 +19,10 @@ export ANDROID_SERIAL=emulator-5554
 AVD=${UAT_AVD:-youmo}
 # another AVD's level said, not youmo's 36 taken under its name
 if [ "$AVD" != youmo ] && [ -z "$UAT_API" ]; then echo "UAT_AVD=${AVD}：也设 UAT_API（它的 API 级别）"; exit 1; fi
+# and the other way: youmo is the API 36 AVD, not rebuilt at another level for want of UAT_AVD
+if [ "$AVD" = youmo ] && [ -n "$UAT_API" ] && [ "$UAT_API" != 36 ]; then
+  echo "UAT_API=${UAT_API} 要配另一个 UAT_AVD（如 youmo${UAT_API}）：youmo 是 API 36 的"; exit 1
+fi
 API=${UAT_API:-36}
 booted() { [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ]; }
 wait_boot() { for i in $(seq 180); do booted && return; sleep 1; done; echo "没开机：$LOG/emulator-avd.log"; exit 1; }
@@ -45,7 +49,8 @@ if [ "$GPU" = host ] && [ "$(uname)" = Darwin ]; then
   if [ ! -f "$SHIM" ] || [ "$HERE/offline-gl.m" -nt "$SHIM" ]; then
     mkdir -p "$(dirname "$SHIM")"
     clang -dynamiclib -arch arm64 -o "$SHIM.$$" "$HERE/offline-gl.m" -framework AppKit -framework OpenGL
-    codesign -s - -f "$SHIM.$$" >/dev/null 2>&1; mv "$SHIM.$$" "$SHIM"
+    codesign -s - -f "$SHIM.$$" >/dev/null 2>&1 || { rm -f "$SHIM.$$"; echo "codesign $SHIM 失败"; exit 1; }
+    mv "$SHIM.$$" "$SHIM"
   fi
 fi
 DYLD_INSERT_LIBRARIES=$SHIM "$SDK/emulator/emulator" -avd "$AVD" -port 5554 -no-snapshot-load -no-window -no-audio -no-boot-anim \

@@ -78,8 +78,8 @@ class CompactKeyboardScreenshotTest {
         Board("zhuyin_full", keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_FULL)),
     )
 
-    // [board]: a keyboard moved to the scene its own golden where the canvas draws it (captureBoard, 060-render-p2
-    // S4c: the 注音 ones; the rest wait for S7)
+    // [board]: the golden named as captureBoard names it (canvas_, the 注音 ones since 060-render-p2 S4c), else as
+    // capture does; every keyboard is drawn by the canvas now, the two names kept so the goldens stay as recorded
     private fun shoot(orientation: String, boards: List<Board> = this.boards, board: Boolean = false) {
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)

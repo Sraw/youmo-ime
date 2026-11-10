@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.LetterCase
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
+import org.fcitx.fcitx5.android.scene.engine.Part
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.layout.Key
@@ -42,13 +43,41 @@ import timber.log.Timber
  * ([ownSize]) is the size its attrs give, not the keyboard's 紧凑 or floating; a key cap is as the keyboard.
  */
 @SuppressLint("ViewConstructor")
-open class SceneKeyCell(context: Context, private val theme: Theme, private val ownSize: Boolean = false) : CustomGestureView(context) {
+open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boolean = false) : CustomGestureView(context) {
 
-    private val look = ThemeManager.shownLook(theme)
-    private val fonts = SceneFonts.of(theme, look)
-    private val measurer = AndroidTextMeasurer(fonts)
-    private val sceneTheme = SceneThemes.of(theme, look)
-    private val painter = ScenePainter(this, look, BoardImages.NONE, fonts)
+    private val given = theme
+
+    // what the cell draws in: the built-in where the engine makes nothing of the theme or the keyboard
+    // shown refused its keys' scene, as the keys are (U8), asked as the cell draws: the keys falling
+    // back after it was made (or no longer), its scene made again in theirs
+    private inner class DrawnIn(val theme: Theme) {
+        val shownLook = ThemeManager.shownLook(theme)
+        val fonts = SceneFonts.of(theme, shownLook)
+        val measurer = AndroidTextMeasurer(fonts)
+        val sceneTheme = SceneThemes.of(theme, shownLook)
+        val painter = ScenePainter(this@SceneKeyCell, shownLook, BoardImages.NONE, fonts)
+    }
+
+    private var drawnIn = DrawnIn(SceneBoard.drawnTheme(given))
+    private val now: DrawnIn
+        get() {
+            val t = SceneBoard.drawnTheme(given)
+            if (t.name != drawnIn.theme.name) {
+                drawnIn = DrawnIn(t)
+                made = null
+                failed = false
+            }
+            return drawnIn
+        }
+    private val theme get() = now.theme
+
+    /** The theme the cell draws in now: a test's, that it follows the keys. */
+    @VisibleForTesting
+    internal val drawsIn: String get() = theme.name
+    private val look get() = now.shownLook
+    private val measurer get() = now.measurer
+    private val sceneTheme get() = now.sceneTheme
+    private val painter get() = now.painter
 
     /** The key: its face, its words, its marks' names. */
     var attrs: KeyAttrs = KeyAttrs()
@@ -67,7 +96,7 @@ open class SceneKeyCell(context: Context, private val theme: Theme, private val 
         }
 
     /** The marks a shortcut name of [attrs] reaches (the settings' caps): none by default. */
-    var marks: MarkSettings = NO_MARKS
+    var marks: MarkSettings = SceneEnvs.NO_MARKS
         set(value) {
             if (field == value) return
             field = value
@@ -148,6 +177,8 @@ open class SceneKeyCell(context: Context, private val theme: Theme, private val 
     val scene: Scene?
         get() {
             if (width <= 0 || height <= 0) return null
+            // the theme as the keys draw now: one changed drops the scene made
+            now
             if (made != null && madeFor == (width to height)) return made
             if (failed && madeFor == (width to height)) return null
             madeFor = width to height
@@ -228,7 +259,17 @@ open class SceneKeyCell(context: Context, private val theme: Theme, private val 
         val k = keyNode ?: return emptyList()
         val ops = k.ops(isPressed).let { ops ->
             if (labelAlpha == 1.0) ops
-            else ops.map { if (it is Op.Text && it.text == k.label) it.copy(color = it.color.times(labelAlpha)) else it }
+            // the label's every piece (a mixed-font label is several texts), its outline and shadow with it;
+            // never a mark that happens to read as the label
+            else ops.map {
+                if (it is Op.Text && it.part == Part.Label.xml) {
+                    it.copy(
+                        color = it.color.times(labelAlpha),
+                        stroke = it.stroke?.let { s -> s.copy(color = s.color.times(labelAlpha)) },
+                        shadow = it.shadow?.let { s -> s.copy(color = s.color.times(labelAlpha)) },
+                    )
+                } else it
+            }
         }
         val line = outline ?: return ops
         return ops + Op.Stroke(k.shape, OUTLINE_DP * resources.displayMetrics.density / shrink, line)
@@ -252,6 +293,5 @@ open class SceneKeyCell(context: Context, private val theme: Theme, private val 
         private const val OUTLINE_DP = 2.0
         private const val RGB = 0xFFFFFF
         private const val ALPHA_SHIFT = 24
-        private val NO_MARKS = MarkSettings(shortcuts = emptyMap())
     }
 }

@@ -431,6 +431,8 @@ class Node:
         self.b = (x0, y0, x1, y1)
         self.checked = e.get("checked") == "true"
         self.focused = e.get("focused") == "true"
+        # the screen reader's focus (Dumper's a11y-focused): read by no case yet; kept for the
+        # TalkBack cases of 20-accessibility, which step the focus by gestures, when they are scripted
         self.a11y = e.get("a11y-focused") == "true"
         self.selected = e.get("selected") == "true"
         self.clickable = e.get("clickable") == "true"
@@ -552,6 +554,7 @@ class Device:
         self._clips_in = set()   # the clips Device.say has written into the app's files
         self.run = run
         self.case = None
+        self._webview = False   # the test page's browser found installed (open_page asks once)
         self._keys = None
         self._plugged = None   # the USB keyboard plugged in, as kb up/down left it; None: not known yet
         # unique page URLs across runs: WebView caches a URL it loaded before (heuristic freshness)
@@ -619,7 +622,7 @@ class Device:
         return self._plugged
 
     def say(self, clip, wait=True, alongside=None):
-        """dev/uat-out/voice-clips/<clip>.wav as what the microphone hears: the voice debug build's clip
+        """dev/uat-out/voice-clips/<clip>.wav as what the microphone hears: the debug build's clip
         microphone (VoiceClipProvider), the file written into the app's files once, then queued; the
         talk open now (clip_mic() before it) or the next one reads it at the microphone's pace. clip:
         a name, or a list of names and pauses in ms ("a", 800, "b"). wait=False: returns at once
@@ -646,14 +649,19 @@ class Device:
                     raise Blocked(f"片段麦克风写不进 {c}.wav（debug 包？）：{(r.stdout + r.stderr).strip()[:120]}")
                 self._clips_in.add(c)
         arg = ",".join(str(int(c)) if isinstance(c, (int, float)) else f"{c}.wav" for c in parts)
+        # the clips' time counted from the queueing, not from the shell's return (alongside waits
+        # for its command: the lift came after the clip began)
+        t0 = time.time()
         if alongside:
-            self.adb("shell", f"({alongside}) & sleep 0.2; content call --uri {CLIP_URI} --method queue "
-                     f"--arg '{arg}' >/dev/null; wait", timeout=120)
+            out = self.adb("shell", f"({alongside}) & sleep 0.2; content call --uri {CLIP_URI} --method queue "
+                           f"--arg '{arg}'; wait", timeout=120)
+            if not re.search(r"state=(.*?)}", out):
+                raise Blocked(f"片段麦克风不应答（debug 包？）：{out.strip()[:120]}")
         else:
             self.clip_call("queue", arg)
-        p = ClipPlay(self, secs)
+        p = ClipPlay(self, secs, t0)
         if wait:
-            p.wait(30)
+            p.wait(secs + 30)
         return p
 
     def clip_call(self, method, arg=None):
@@ -1348,7 +1356,9 @@ class Device:
 
     def open_page(self, page="text"):
         """the test page showing one field, tapped: the keyboard is up"""
-        if "package:" not in self.sh("pm path org.chromium.webview_shell"):
+        if not self._webview:
+            self._webview = "package:" in self.sh("pm path org.chromium.webview_shell")
+        if not self._webview:
             raise Blocked("这台没有测试页的浏览器（webview_shell 要 API 34+）")
         ensure_fixtures(self)
         self.reload_n += 1
@@ -1752,12 +1762,21 @@ def clear_keeping_packs(d):
         d.sh(f"pm clear {PKG}")
         import_packs_ui(d)
         return
+    # what pm clear resets besides the files: the microphone's denial flags (a denied-for-good
+    # permission keeps VO-01's dialog away) and the per-app language (ST-25's English); both
+    # commands are absent on old releases (API 29: no per-app language there either)
     d.sh(f"ime disable {IME}; am force-stop {PKG}; pm revoke {PKG} android.permission.RECORD_AUDIO 2>/dev/null; "
-         f"rm -rf /sdcard/Android/data/{PKG}/* 2>/dev/null")
+         f"pm clear-permission-flags {PKG} android.permission.RECORD_AUDIO user-set user-fixed 2>/dev/null; "
+         f"cmd locale set-app-locales {PKG} --locales '' 2>/dev/null; "
+         f"rm -rf /sdcard/Android/data/{PKG}/* /sdcard/Android/data/{PKG}/.[!.]* 2>/dev/null")
+    # each step must succeed and the result is checked: a rm refused or a cd that failed would
+    # leave the last case's data under the next
     out = d.sh(f"run-as {PKG} sh -c " + shlex.quote(
-        f"find /data/user/0/{PKG} -mindepth 1 -maxdepth 1 -exec rm -rf {{}} + ; "
-        f"cd /data/user_de/0/{PKG} && find . -mindepth 1 -maxdepth 1 ! -name files -exec rm -rf {{}} + ; "
-        f"cd files 2>/dev/null && find . -mindepth 1 -maxdepth 1 ! -name packs -exec rm -rf {{}} + ; echo cleared"))
+        f"find /data/user/0/{PKG} -mindepth 1 -maxdepth 1 -exec rm -rf {{}} + && "
+        f"cd /data/user_de/0/{PKG} && find . -mindepth 1 -maxdepth 1 ! -name files -exec rm -rf {{}} + && "
+        f"{{ [ ! -d files ] || {{ cd files && find . -mindepth 1 -maxdepth 1 ! -name packs -exec rm -rf {{}} + ; }} ; }} && "
+        f"[ -z \"$(ls -A /data/user/0/{PKG})\" ] && "
+        f"[ -z \"$(ls -A /data/user_de/0/{PKG}/files 2>/dev/null | grep -vx packs)\" ] && echo cleared"))
     if "cleared" not in out:
         raise Blocked(f"run-as 清数据失败：{out.strip()[:120]}")
 
@@ -2207,10 +2226,12 @@ def run_case(d, c, run):
     d.after_case = []   # undone when the case ends, however it ends (open_host's package)
     t0 = time.time()
     run.started(d.port, c.id)
+    ran = False   # an unmet case touched nothing: no screen_back for it
     try:
         unmet = c.unmet(d)
         if unmet:
             raise unmet[0](unmet[1])
+        ran = True
         seen = c.fn(d) or ""
         state = "待看图" if c.visual else "通过"
     except Fail as e:
@@ -2230,7 +2251,8 @@ def run_case(d, c, run):
         except Exception:   # a cleanup that failed leaves the next reset to it
             pass
     try:
-        screen_back(d)
+        if ran:
+            screen_back(d)
     except Exception:   # the next case's reset does it
         pass
     run.record(c, state, seen, d.port, time.time() - t0)
@@ -2298,6 +2320,9 @@ class Scheduler:
         try:
             if not d.start_dumper():
                 d.stop_dumper()   # falls back to `uiautomator dump`, ~2 s a read
+                print(f"emulator-{port}: Dumper not up, reading the screen by `uiautomator dump`: the canvas "
+                      "keys' corners and scene ids are not read, so cases tapping a key by its corner digit "
+                      "or id fail as an unknown key", flush=True)
             while True:
                 g, stolen = self.next_group(port)
                 if g is None:
@@ -2483,7 +2508,11 @@ def table(results):
 
 def write_results(run, cases, version, ports, wall, sheets, voice=True):
     p = os.path.join(UAT, "runs", f"{run.name}.md")
-    dev = (f"- 设备：Android 模拟器（AVD {AVD}，android-36 google_apis {ABI}），1080×2340，"
+    try:   # the API level the run had (youmo29 is Android 10), not the main AVD's
+        sdk = Device(ports[0]).sh("getprop ro.build.version.sdk").strip() or "?"
+    except Exception:
+        sdk = "?"
+    dev = (f"- 设备：Android 模拟器（AVD {AVD}，android-{sdk} google_apis {ABI}），1080×2340，"
            f"440 dpi，简体中文；{len(ports)} 台（{', '.join('emulator-' + p for p in ports)}）；"
            f"实体键盘是 uat/tools/emu-keyboard.sh 的 uinput USB 键盘")
     lines = [f"# {run.name}", "", dev,
@@ -2610,14 +2639,16 @@ def clips_done(state):
     mid-clip ends the talk, what was left of the clip with it)"""
     v = dict(re.findall(r"(\w+)=(\S*)", state))
     return v.get("queued") == "" and (v.get("playing") == "false" or v.get("talking") == "false")
+    # clips still queued when the talk ends stay queued (the provider outlives a talk): a list
+    # ("a", 800, "b") lifted during "a" is never done; its caller kill()s it instead
 
 
 class ClipPlay:
     """Device.say's queue as a player: done once its clips' time has passed and the app says none is
     left; kill() drops what is left, the clip playing too (the clip microphone stays on)"""
 
-    def __init__(self, d, secs):
-        self.d, self.end = d, time.time() + secs + 0.2
+    def __init__(self, d, secs, start=None):
+        self.d, self.end = d, (start or time.time()) + secs + 0.2
 
     def poll(self):
         if time.time() < self.end:
@@ -2634,8 +2665,13 @@ class ClipPlay:
         return 0
 
     def kill(self):
-        self.d.clip_call("clear")
-        self.d.clip_call("on")
+        """called from a case's finally too: a provider that no longer answers does not hide the
+        case's own failure (the next case's clip_mic reports it)"""
+        try:
+            self.d.clip_call("clear")
+            self.d.clip_call("on")
+        except Blocked:
+            pass
 
 
 def need_root(d):
@@ -2721,7 +2757,7 @@ def up(port="5556"):
 
 
 
-def install(d, voice=True):
+def install(d, voice=True, packs=True):
     # UAT_APK_REPO: another checkout's build under this one's cases (the voice cases need a debug
     # build's clip microphone: R15 has none)
     apk_repo = os.environ.get("UAT_APK_REPO", REPO)
@@ -2751,7 +2787,8 @@ def install(d, voice=True):
     if on_device != [h.hexdigest()]:
         d.adb("install", "-r", apks[-1], check=True, timeout=600)
     d.sh(f"ime enable {IME}; ime set {IME}")
-    import_packs(d, voice)
+    if packs:
+        import_packs(d, voice)
 
 
 PACKS = os.path.join(REPO, "app/build/packs")   # :app:packs (AssetPacksPlugin)
@@ -2767,7 +2804,8 @@ def pack_files(voice=True):
                           key=lambda f: os.path.getmtime(os.path.join(PACKS, f)))
         if not listings:
             sys.exit(f"no {pid} pack in app/build/packs: ./gradlew :app:packs")
-        meta = json.load(open(os.path.join(PACKS, listings[-1])))
+        with open(os.path.join(PACKS, listings[-1])) as f:
+            meta = json.load(f)
         out[pid] = (os.path.join(PACKS, meta["file"]), meta["version"])
     return out
 
@@ -2778,10 +2816,22 @@ def packs_state(d):
     return dict(re.findall(r"\b(text|voice)=([\w:-]+)", out))
 
 
+def stop(d, msg):
+    """inside a case (SET-01) or a device's thread: that case blocked, the run goes on (a SystemExit
+    there ended the device's thread unrecorded, a reset before its first case too); outside one
+    on the main thread (up, packs): the command stops"""
+    if getattr(d, "case", None) or threading.current_thread() is not threading.main_thread():
+        raise Blocked(msg)
+    sys.exit(msg)
+
+
 def import_packs(d, voice=True):
     """the packs a run needs imported, once a device: those there at the build's version are kept
     (an import of the same pack again is a no-op the app tells apart, but costs a copy over adb)"""
-    files = pack_files(voice)
+    try:
+        files = pack_files(voice)
+    except SystemExit as e:
+        stop(d, e.code)
     if BUILD == "release":
         import_packs_ui(d, files)
         return
@@ -2794,10 +2844,10 @@ def import_packs(d, voice=True):
             w = subprocess.run(["adb", "-s", d.serial, "shell", "content", "write", "--uri", f"{PACK_URI}/{name}"],
                                stdin=src, capture_output=True, text=True, timeout=600)
         if w.returncode != 0:
-            sys.exit(f"{d.serial}: {name} not written in: {(w.stderr or w.stdout).strip()[:200]}")
+            stop(d, f"{d.serial}: {name} not written in: {(w.stderr or w.stdout).strip()[:200]}")
         out = d.sh(f"content call --uri {PACK_URI} --method import --arg {name}")
         if not re.search(r"result=(imported|already):", out):
-            sys.exit(f"{d.serial}: {name} not imported: {out.strip()[:200]}")
+            stop(d, f"{d.serial}: {name} not imported: {out.strip()[:200]}")
         print(f"{d.serial}: {name} imported", flush=True)
 
 
@@ -2816,10 +2866,10 @@ def import_packs_ui(d, files=None):
     if "documentsui" not in d.top_activity():
         raise Blocked(f"导入资源包没出文件选择：{d.top_activity()}")
     if d.screen().find(text="近期的文件"):
-        d.tap((77, 148), 1.0)
+        d.tap((77, 148), 1.0)   # the drawer's ☰ at the top left (1080×2340, 440 dpi)
         d.tap_text("下载", scroll=False, after=2.0)
     d.tap_text(name, scroll=False, after=1.0)
-    s = d.wait(lambda x: x if x.find(contains="导入结果") or x.find(contains=f"已导入") else None,
+    s = d.wait(lambda x: x if x.find(contains="导入结果") or x.find(contains="已导入") else None,
                timeout=180, step=1.0, what="导入结果")
     if not s.find(contains="文字包"):
         raise Blocked(f"文字包没导入：{s.texts()[:6]}")
@@ -2850,6 +2900,7 @@ def version(d):
 
 # the server ensure_fixtures started (not run's own): stopped when this process ends
 _fixtures_server = None
+_fixtures_checked = set()   # the HTTP ports found serving this checkout's fixtures
 
 
 def ensure_fixtures(d):
@@ -2859,17 +2910,22 @@ def ensure_fixtures(d):
     fields.html is this checkout's"""
     global HTTP_PORT, _fixtures_server
     HTTP_PORT = HTTP_PORT or http_port(d.port)
+    # checked once a process and once a device: open_page comes here on every reset
+    if HTTP_PORT in _fixtures_checked and getattr(d, "_fixtures_reversed", False):
+        return
     s = __import__("socket").socket()
     serving = s.connect_ex(("127.0.0.1", HTTP_PORT)) == 0
     s.close()
     if not serving:
         _fixtures_server = start_server()
         __import__("atexit").register(_fixtures_server.terminate)
-    elif not serves_our_fixtures():
-        sys.exit(f"127.0.0.1:{HTTP_PORT} serves something else than {FIXTURES}/fields.html (another checkout's "
+    elif HTTP_PORT not in _fixtures_checked and not serves_our_fixtures():
+        stop(d, f"127.0.0.1:{HTTP_PORT} serves something else than {FIXTURES}/fields.html (another checkout's "
                  "fixtures, another program): stop it or set UAT_HTTP_PORT")
+    _fixtures_checked.add(HTTP_PORT)
     if f"tcp:8000 tcp:{HTTP_PORT}" not in d.adb("reverse", "--list"):
         d.adb("reverse", "tcp:8000", f"tcp:{HTTP_PORT}", check=True)
+    d._fixtures_reversed = True
 
 
 FIXTURES = os.path.join(UAT, "fixtures")
@@ -2957,13 +3013,19 @@ def down_all(ports):
 def run_on(a, cases, ports):
     global HTTP_PORT
     HTTP_PORT = HTTP_PORT or http_port(ports[0])
+    if BUILD != "debug":
+        # each reset imports them (clear_keeping_packs) on a device's thread, where a missing pack's
+        # exit would end that thread unrecorded: checked here, before any device starts
+        pack_files(voice=False)
     for p in ports:
         d = Device(p)
         if d.sh("getprop sys.boot_completed").strip() != "1":
             sys.exit(f"{d.serial} is not up (uat.py up --port {p})")
         ours(d)
         need_root(d)   # one started by hand
-        install(d, not a.no_voice)
+        # the voice pack only where it is used (a release run has no voice cases); a release run's
+        # packs come with each reset's pm clear (clear_keeping_packs), so not here as well
+        install(d, not a.no_voice and BUILD == "debug", packs=BUILD == "debug")
         d.adb("reverse", "tcp:8000", f"tcp:{HTTP_PORT}", check=True)
     ver = version(Device(ports[0]))
     name = run_name(datetime.date.today(), ver, AVD)

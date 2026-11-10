@@ -5,7 +5,10 @@
 package org.fcitx.fcitx5.android.testbed
 
 import android.annotation.SuppressLint
+import android.annotation.TargetApi
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.Rect
 import android.os.Build
 import android.text.Editable
@@ -26,7 +29,6 @@ import android.view.inputmethod.SurroundingText
 import android.view.inputmethod.TextSnapshot
 import android.widget.EditText
 import android.widget.TextView
-import android.annotation.TargetApi
 import org.json.JSONObject
 import java.lang.ref.WeakReference
 
@@ -157,7 +159,9 @@ class TbEdit(context: Context, val name: String, private val log: EventLog) : Ed
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        log.event(name, "key", JSONObject().put("keyCode", keyCode).put("detail", KeyEvent.keyCodeToString(keyCode)))
+        // a password's keys unnamed: a number password's digits would be its content
+        if (password) log.event(name, "key", JSONObject().put("detail", "key（密码不记键名）"))
+        else log.event(name, "key", JSONObject().put("keyCode", keyCode).put("detail", KeyEvent.keyCodeToString(keyCode)))
         return super.onKeyDown(keyCode, event)
     }
 
@@ -307,9 +311,9 @@ class TbTerminal(context: Context, val name: String, private val log: EventLog) 
     }
 
     // the buffer drawn as plain text
-    private val paint = android.graphics.Paint().apply { textSize = TEXT_PX; isAntiAlias = true }
+    private val paint = Paint().apply { textSize = TEXT_PX; isAntiAlias = true }
 
-    override fun onDraw(canvas: android.graphics.Canvas) {
+    override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         canvas.drawColor(if (isFocused) FOCUSED_BG else IDLE_BG)
         canvas.drawText("$ " + buffer.toString().replace('\n', '⏎'), PAD_PX, TEXT_PX + PAD_PX, paint)

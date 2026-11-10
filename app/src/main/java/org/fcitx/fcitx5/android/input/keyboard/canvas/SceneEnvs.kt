@@ -25,6 +25,8 @@ import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
  * are views, the popups placed in the window): the keys fill what the view was given, so both FULL.
  */
 object SceneEnvs {
+    /** No marks on any key: the cells, the panels, the rows that show no shortcuts. */
+    val NO_MARKS = MarkSettings(shortcuts = emptyMap())
 
     /**
      * What is typed now as a theme's scenes (`im=wubi`, `field=password`; SceneTyping): KeyboardWindow's

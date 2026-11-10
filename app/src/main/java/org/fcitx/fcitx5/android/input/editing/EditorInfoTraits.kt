@@ -42,7 +42,8 @@ private fun numberKind(type: Int, variation: Int, flags: Int): NumberKind? = whe
 }
 
 /**
- * Decodes the bits of [EditorInfo] that [EditorKeyPolicy] and [EditingSession] act on. [ownPackage]
+ * Decodes the bits of [EditorInfo] that [EditorKeyPolicy] and [EditingSession] act on, and voice's end
+ * reads (VoiceEnd.field in ime-core: sends, isMultiLine, isShortMessage). [ownPackage]
  * given, a field of this app is sensitive as the service tells fcitx ([CapabilityFlags.forField]).
  */
 fun EditorInfo.toEditorTraits(ownPackage: String? = null): EditorTraits {
