@@ -744,7 +744,7 @@ def push_icons_pack(d, sounds=False):
     if sounds:
         names += [n for n in os.listdir(SOUNDS_ICONS) if n.rsplit(".", 1)[-1] in ("wav", "ogg", "mp3") and n != "short.mp3"]
     else:
-        xml = re.sub(r"\s*<sounds>.*?</sounds>", "", xml, flags=re.S)
+        xml = re.sub(r"(?m)^[ \t]*<sounds>.*?</sounds>\n", "", xml, flags=re.S)   # the element, not the comment that names it
     p = os.path.join(tempfile.gettempdir(), f"uat-sounds-icons-{d.port}.theme")
     with zipfile.ZipFile(p, "w") as z:
         z.writestr("theme.xml", xml)
@@ -784,22 +784,27 @@ def st90(d):
     for name, note in (("bksp", "按住退格"), ("enter", "按住回车"), ("shift", "按住 Shift")):
         if name not in k:
             continue
-        x, y = k[name].c
+        x, y = k[name]
         # the finger down while the screen is taken: a pressed key's look and its bubble, if the theme gives it one
         d.sh(f"input motionevent DOWN {x} {y}; sleep 0.15; screencap -p /sdcard/uat-p.png; input motionevent UP {x} {y}")
         d.shot("kb", note + "：按下的样子（有气泡时气泡上也是主题的图标）",
                png=d.adb("exec-out", "cat", "/sdcard/uat-p.png", binary=True))
     if "shift" in k:
-        x, y = k["shift"].c
-        # the "按住 Shift" above was a tap of its own: Shift is 单次 now
-        d.shot("kb", "Shift 单次：自带图标（主题没换 shift-once）")
+        x, y = k["shift"]
+        # the "按住 Shift" above outlasted the long-press delay, yet its release leaves Shift 单次 (seen on the
+        # emulator), not 锁定; each tap waits out the double-tap window (= the long-press delay), else it is
+        # a double tap and locks
+        d.shot("kb", "按住 Shift 松开后：单次，自带图标（主题没换 shift-once）")
+        time.sleep(1.0)
         d.tap((x, y), 0.6)
-        d.shot("kb", "再点一次：回到未按，主题的箭头")
-        d.touch(("down", x, y), ("up", x, y), ("down", x, y), ("up", x, y))
-        time.sleep(0.6)
-        d.shot("kb", "双击：锁定，自带图标（主题没换 shift-lock；仍是单次的样子就是双击没赶上，手点一次看）")
+        d.shot("kb", "再点一次：未按，主题的箭头")
+        time.sleep(1.0)
+        d.tap((x, y), 0.6)
+        d.shot("kb", "再点一次：单次，自带图标")
+        time.sleep(1.0)
+        d.tap((x, y), 0.6)   # back to 未按 for what follows
     if "enter" in k:
-        x, y = k["enter"].c
+        x, y = k["enter"]
         # Return's in-keyboard menu (Emoji): drawn by the keyboard; its icon is emoji, which the theme does not replace
         d.touch(("down", x, y), ("sleep", 0.9))
         d.shot("full", "长按回车：键盘里画的菜单（Emoji 是自带图标，主题没换 emoji），菜单用主题的颜色")
