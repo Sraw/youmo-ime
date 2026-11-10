@@ -7,9 +7,16 @@ package org.fcitx.fcitx5.android.input.keyboard
 import android.content.Context
 import android.graphics.Canvas
 import android.view.MotionEvent
+import android.view.accessibility.AccessibilityManager
 import androidx.annotation.CallSuper
 import androidx.annotation.Keep
 import androidx.constraintlayout.widget.ConstraintLayout
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.InputMethodNames
@@ -27,6 +34,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePackFiles
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
+import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
@@ -154,6 +162,19 @@ abstract class BaseKeyboard(
     var imTyping = false
     private val longPressDelay by prefs.keyboard.longPressDelay
 
+    /** Set as a temporary mode (快速输入, Unicode) is on or off ([KeyboardWindow]): nothing is written on the keys in one. */
+    var tempMode = false
+
+    /** Where what is written on the keys goes ([KeyboardWindow]): a reading of its piece, or null once the piece is done. */
+    var inkSink: ((InkReading?, piece: Int) -> Unit)? = null
+
+    // 键盘手写's pad, made with the glide ([glideInput]); the engine's answers watched while shown
+    private var keyInk: KeyInk? = null
+    private var inkScope: CoroutineScope? = null
+
+    /** [keyInk], for a test to see the ink drawn. */
+    internal val keyInkForTest: KeyInk? get() = keyInk
+
     /**
      * What a finger drawn over the layout's letters reads, if it has any ([glideInput]): glide typing
      * (滑行输入), a stroke for 笔画筛选, or both; a layout with no glide (the grouped keys) has it for the strokes alone.
@@ -178,8 +199,14 @@ abstract class BaseKeyboard(
         down: Float = GlideGesture.DOWN,
         enabled: () -> Boolean = { true },
         filters: () -> Boolean = { false },
+        writes: () -> Boolean = { false },
         glided: (path: FloatArray, layout: GlideLayout) -> Unit,
-    ) = GlideInput(
+    ): GlideInput {
+        val ink = KeyInk(
+            this, theme, pause = { prefs.keyboard.handwritingPause.getValue().millis },
+            deliver = { reading, piece -> inkSink?.invoke(reading, piece) }, finished = { inkSink?.invoke(null, it) },
+        ).also { keyInk = it }
+        return GlideInput(
         this, theme,
         enabled = { keyDrawing.getValue() == KeyDrawing.Glide && wordField() && enabled() },
         letters = letters,
@@ -187,8 +214,25 @@ abstract class BaseKeyboard(
         down = down,
         strokes = { keyDrawing.getValue() == KeyDrawing.StrokeFilter && wordField() && imTyping && filters() },
         stroked = { path -> StrokeShape.classify(path)?.let { onAction(KeyAction.SymAction(KeySym(UNICODE + Keyboard.strokeKey(it)), KeyStates.Virtual)) } },
+        ink = ink,
+        // 键盘手写: an input method written in [writes] says, in a field where words are typed, not in a
+        // temporary mode; not while TalkBack explores by touch, the finger feeling for keys, not writing
+        writes = { writing() && !tempMode && !touchExploring() && writes() },
+        typed = { EngineState.keysTyped.value.typed },
+        // the tap's letter deleted in its turn: behind its key, were that held behind a reading
+        tookBack = { ink.keys.onAction({ isAttachedToWindow }) { keyActionListener?.onKeyAction(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_BackSpace)), KeyActionListener.Source.Keyboard) } },
         glided = glided,
-    )
+        )
+    }
+
+    private fun writing() = keyDrawing.getValue() == KeyDrawing.Handwriting && wordField()
+
+    private fun touchExploring() = context.getSystemService(AccessibilityManager::class.java)?.isTouchExplorationEnabled == true
+
+    /** Another input started (a field): what was written on the keys dropped, as the handwriting keyboard's pad is. */
+    fun restartInk() {
+        keyInk?.keys?.restart()
+    }
 
     private fun wordField() = !inPasswordField && address == AddressKeys.NONE
 
@@ -638,7 +682,10 @@ abstract class BaseKeyboard(
         action: KeyAction,
         source: KeyActionListener.Source = KeyActionListener.Source.Keyboard
     ) {
-        keyActionListener?.onKeyAction(action, source)
+        val ink = keyInk
+        if (ink == null || !writing()) return keyActionListener?.onKeyAction(action, source) ?: Unit
+        // in order with what is written on the keys: after its readings, backspace its strokes' first (InkKeys)
+        ink.keys.onAction({ isAttachedToWindow }) { if (!ink.keys.took(action)) keyActionListener?.onKeyAction(action, source) }
     }
 
     @CallSuper
@@ -704,9 +751,20 @@ abstract class BaseKeyboard(
         SceneEnvs.watch(onTyping)
         typingChanged()
         showSwipeMarks()
+        keyInk?.let { ink ->
+            inkScope = CoroutineScope(Dispatchers.Main.immediate + Job()).also { s ->
+                s.launch { EngineState.handwritingEnded.collect(ink::ended) }
+                // every answer, the same or not: a tap's mark replaced (KeyInkGesture.engineTyped)
+                s.launch { EngineState.keysTyped.collect { ink.gesture.engineTyped(it.typed) } }
+            }
+        }
     }
 
     override fun onDetachedFromWindow() {
+        inkScope?.cancel()
+        inkScope = null
+        // hidden, or another layout shown: what was written is done, as a pause would have it
+        keyInk?.hidden()
         SceneEnvs.unwatch(onTyping)
         super.onDetachedFromWindow()
     }

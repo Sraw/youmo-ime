@@ -189,6 +189,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     override fun onInputPanelUpdate(data: HostEvent.InputPanel) {
         tempMode = data.auxUp.isNotEmpty()
         keyboards[currentKeyboardName]?.imTyping = composing && !tempMode
+        keyboards[currentKeyboardName]?.tempMode = tempMode
         val standIn = quickInputStandIn(currentKeyboardName)
         if (data.quickPhrase && standIn != null) {
             standingInFor = currentKeyboardName
@@ -275,6 +276,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             (it as? T9Keyboard)?.noSuggestions = noSuggestions
             it.address = address
             it.imTyping = composing && !tempMode
+            it.tempMode = tempMode
+            // written on the letters (键盘手写): the current input method's own handwriting's
+            it.inkSink = { reading, piece -> ink { if (reading != null) offerInk(reading, piece, onKeys = true) else inkFinished(piece, onKeys = true) } }
             stripOwned = it.ownsSyllables
             preedit.ui.syllables.owned = stripHidden()
             spaceKeys.attach(it) {
@@ -362,6 +366,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
         standingInFor = null
         (keyboards[HandwritingKeyboard.Name] as? HandwritingKeyboard)?.restart()
+        keyboards.values.forEach { it.restartInk() }
         noSuggestions = capFlags.has(CapabilityFlag.NoSpellCheck)
         (keyboards[T9Keyboard.EnglishName] as? T9Keyboard)?.noSuggestions = noSuggestions
         // the layout may stay as it is, so the one shown is told now

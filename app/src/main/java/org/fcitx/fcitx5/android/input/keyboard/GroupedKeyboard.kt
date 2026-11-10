@@ -361,6 +361,7 @@ class GroupedKeyboard private constructor(
         letters = { groupPlaces() },
         enabled = { false },
         filters = { InputMethodCatalog.filtersByStrokes(imeName) },
+        writes = { InputMethodCatalog.writesOnKeys(imeName) },
     ) { _, _ -> }
 
     // the code of the key [id] of [group]'s letters: the built-in keyboard's of its first letter (as always), a
