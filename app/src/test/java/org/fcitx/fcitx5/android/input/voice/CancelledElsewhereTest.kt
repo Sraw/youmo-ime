@@ -13,6 +13,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
+import org.fcitx.fcitx5.android.input.voice.VoiceHotwords.Words
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -48,5 +49,18 @@ class CancelledElsewhereTest {
         val thrown = runCatching { got.await() }.exceptionOrNull()
         assertTrue("$thrown", thrown is CancellationException)
         assertEquals(null, after)
+    }
+
+    // the shared read's scope ending (VoiceEngine.userHotwords, R20 F6700): the words last read, not none
+    @Test
+    fun aHotwordsReadCancelledElsewhereIsTheLastRead() = runBlocking {
+        val remembered = VoiceHotwords.Remembered()
+        val last = Words("你好", "")
+        remembered.read(remembered.start(), last)
+        val reading = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val read = reading.async<Words> { awaitCancellation() }
+        val got = async { inTimeOrLast(read, remembered, 10_000) }
+        reading.cancel()
+        assertEquals(last, got.await())
     }
 }

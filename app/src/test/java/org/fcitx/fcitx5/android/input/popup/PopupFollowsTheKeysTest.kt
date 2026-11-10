@@ -89,8 +89,9 @@ class PopupFollowsTheKeysTest {
         SceneBoard.shown("qwerty")
         assertEquals(builtIn, popup.scenesNow.drawsIn)
         popup.dismissAll()
-        assertTrue(popup.pooled.all { it.scenes.drawsIn == builtIn })
+        // the next bubble shown draws in the built-in, as the keys: none of the old theme's taken from the pool
         popup.listener.onPopupAction(PopupAction.PreviewAction(KeyRef("b"), "b", Rect(0, 0, 100, 100)))
+        assertEquals(builtIn, popup.showing(KeyRef("b"))?.scenes?.drawsIn)
         popup.dismissAll()
         assertEquals(listOf(builtIn), popup.pooled.map { it.scenes.drawsIn })
     }

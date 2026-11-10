@@ -86,6 +86,10 @@ class PopupComponent :
     @VisibleForTesting
     internal val pooled: List<PopupEntryUi> get() = freeEntryUi
 
+    /** [key]'s bubble up now: a test's, that it draws in the theme the keys do. */
+    @VisibleForTesting
+    internal fun showing(key: KeyRef): PopupEntryUi? = showingEntryUi[key]
+
     /** The engine's text measured through this: a test's, to make it fail. */
     @VisibleForTesting
     internal var measuring: (TextMeasurer) -> TextMeasurer = { it }

@@ -79,11 +79,12 @@ class SceneBoard(
         // the keyboard drawn last is the one shown: the popups and cells follow its keys ([drawnTheme]);
         // not one drawn in an activity (the theme's preview in the settings), never the input method's
         if (!inActivity) shownBoard = layout.id
-        drawn(theme, look, width, height)?.let { return it.also { keysFellBack(theme.name, look, layout.id, false) } }
+        drawn(theme, look, width, height)?.let { return it.also { if (!inActivity) keysFellBack(theme.name, look, layout.id, false) } }
         val builtIn = ThemeManager.builtin(if (theme.isDark) "pixel#dark" else "pixel#light")
         if (builtIn.name == theme.name) return null
-        // the popups and panel cells fall back with this keyboard's keys while it is shown ([drawnTheme])
-        keysFellBack(theme.name, look, layout.id, true)
+        // the popups and panel cells fall back with this keyboard's keys while it is shown ([drawnTheme]);
+        // a preview's keys are not the input method's
+        if (!inActivity) keysFellBack(theme.name, look, layout.id, true)
         // logged once a look: asked again each time what shows changes
         if (firstFallBack(theme.name, look)) Timber.w("keyboard canvas: no scene of theme %s; the built-in %s's drawn", theme.name, builtIn.name)
         return drawn(builtIn, ThemeManager.shownLook(builtIn), width, height)

@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.voice
 
 import android.os.Handler
 import android.os.Looper
+import androidx.annotation.VisibleForTesting
 import com.k2fsa.sherpa.onnx.EndpointConfig
 import com.k2fsa.sherpa.onnx.EndpointRule
 import com.k2fsa.sherpa.onnx.FeatureConfig
@@ -18,7 +19,6 @@ import com.k2fsa.sherpa.onnx.OnlineTransducerModelConfig
 import com.k2fsa.sherpa.onnx.SileroVadModelConfig
 import com.k2fsa.sherpa.onnx.Vad
 import com.k2fsa.sherpa.onnx.VadModelConfig
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -27,8 +27,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.async
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeoutOrNull
 import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.data.pack.AppData
@@ -179,19 +177,8 @@ object VoiceEngine {
         val read = remembered.shared<Deferred<VoiceHotwords.Words>>({ it.isActive }) { ticket ->
             reading.async { remembered.read(ticket, VoiceHotwords.ofUser(fcitx.runOnReady { userWords() })) }
         }
-        val inTime = withTimeoutOrNull(USER_WORDS_MS) {
-            try {
-                read.await()
-            } catch (e: CancellationException) {
-                // the shared read cancelled from elsewhere (its scope ending), not this caller: as a
-                // timeout, the words last read, the blocked still blocked
-                if (currentCoroutineContext().isActive) null else throw e
-            }
-        }
-        // a timeout was silent: the user's words were dropped and nothing said so
-        if (inTime == null) Timber.w("voice hotwords: no answer in %d ms or the read cancelled, the last read used", USER_WORDS_MS)
         // how many, not which: they are the user's
-        return remembered.inTime(inTime).withHabits(habits).also { Timber.d("voice hotwords: %d listened for, %d blocked", it.hotwords.split('/').count { w -> w.isNotEmpty() }, it.blockedWords.size) }
+        return inTimeOrLast(read, remembered, USER_WORDS_MS).withHabits(habits).also { Timber.d("voice hotwords: %d listened for, %d blocked", it.hotwords.split('/').count { w -> w.isNotEmpty() }, it.blockedWords.size) }
     }
 
     // the engine still starting or busy: voice input with the words last read, not a wait
@@ -304,3 +291,15 @@ object VoiceEngine {
  */
 internal fun modelsOutdated(users: Int, loadedDir: File?, loaded: Boolean, dir: File?): Boolean =
     users == 0 && loaded && loadedDir != dir
+
+/**
+ * [read]'s words in [ms], or [remembered]'s last read where it took longer or was
+ * cancelled from elsewhere (its scope ending); the caller cancelled stays cancelled ([cancelledElsewhereAs])
+ */
+@VisibleForTesting
+internal suspend fun inTimeOrLast(read: Deferred<VoiceHotwords.Words>, remembered: VoiceHotwords.Remembered, ms: Long): VoiceHotwords.Words {
+    val inTime = withTimeoutOrNull(ms) { cancelledElsewhereAs(null) { read.await() } }
+    // a timeout was silent: the user's words were dropped and nothing said so
+    if (inTime == null) Timber.w("voice hotwords: no answer in %d ms or the read cancelled, the last read used", ms)
+    return remembered.inTime(inTime)
+}

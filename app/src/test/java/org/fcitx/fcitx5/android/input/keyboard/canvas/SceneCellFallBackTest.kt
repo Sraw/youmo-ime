@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard.canvas
 
+import android.app.Activity
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.theme.BoardImages
@@ -28,6 +29,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
@@ -105,9 +107,19 @@ class SceneCellFallBackTest {
             val layout = if (refused) SceneLayout(id, LayoutReader.layout(TOO_WIDE.replace("ID", id)).let { it as? Parsed.Ok ?: error((it as Parsed.Failed).problems.toString()) }.value, emptyMap()) else SceneLayouts.of(context, id)!!
             return SceneBoard(context, t, layout) { look, _, w, h -> SceneEnvs.of(View(context), look, false, w, h, Input()) }
         }
+        fun preview(id: String): SceneBoard {
+            val layout = SceneLayout(id, LayoutReader.layout(TOO_WIDE.replace("ID", id)).let { it as? Parsed.Ok ?: error((it as Parsed.Failed).problems.toString()) }.value, emptyMap())
+            val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+            return SceneBoard(activity, t, layout) { look, _, w, h -> SceneEnvs.of(View(activity), look, false, w, h, Input()) }
+        }
         fun draw(b: SceneBoard) = b.view(BoardImages.NONE, key = { null }).apply { layout(0, 0, 1080, 700) }.scene
         assertNotNull(draw(board("k18")))
         assertSame(t, SceneBoard.drawnTheme(t))
+        // a refused keyboard drawn in an activity (the theme's preview in the settings, F6701/F6705): not the
+        // input method's, the shown keyboard's popups and cells keep their theme
+        assertNull(draw(preview("qwerty")))
+        assertSame(t, SceneBoard.drawnTheme(t))
+        assertSame(t, SceneBoard.drawnTheme(t, "qwerty"))
         // a cell made before the keys fell back: it follows them as it draws, its scene made again
         val kept = cell(t)
         assertTrue(kept.drawn().isNotEmpty())

@@ -67,7 +67,7 @@
 - **预期**：选 `.zip` 时提示只能导入主题文件（.theme），主题列表不多出主题；导入的主题出现在主题列表最前面，选用后键盘背景是那张图片；导出得到 `<主题名>.theme`；删除后主题列表里没有它，键盘回到默认主题（跟随系统夜间模式关着时的默认，和加主题前一样）；再导入后主题列表里又有这个主题，选用后键盘背景是那张图片。
 
 ### ST-68 [P1] 主题：用着时导入同名、换了字体和图的主题
-- **前提**：B0-设置，**外观 → 大小与样式** 里 **跟随系统夜间模式** 关掉；"下载"里有两个同名主题文件，都从 `web/theme-maker/test/testdata/from-app.theme` 做（解开改写再把文件放在 zip 顶层打包，同 TB-32）：第一个原样；第二个换一张不同的 `from-app-src.png`（和 `from-app-portrait.png`、`from-app-landscape.png`），再放进一个 .ttf 字体文件（如 `uat-font.ttf`，要和系统字体看得出不同），json 里 `text.keyFont` 设成这个文件名（原来是 `null`）。
+- **前提**：B0-设置，**外观 → 大小与样式** 里 **跟随系统夜间模式** 关掉；"下载"里有两个同名主题文件，都从 `web/theme-maker/test/testdata/from-app.theme` 做（解开改写再把文件放在 zip 顶层打包，同 TB-32）：第一个原样；第二个换一张不同的 `from-app-src.png`（和 `from-app-portrait.png`、`from-app-landscape.png`），再放进一个衬线字体文件：从模拟器取 `adb pull /system/fonts/NotoSerif-Regular.ttf`（系统字体是无衬线，看得出不同），json 里 `text.keyFont` 设成 `NotoSerif-Regular.ttf`（原来是 `null`）。
 - **操作**：**主题 → 新增主题** 导入第一个，在主题列表里点它，回测试页看键盘；再 **新增主题** 导入第二个（这个主题正用着），回测试页看键盘。
 - **预期**：主题列表里仍只有这一项，键盘马上换成新字体和新图片（不留旧的字体度量），键上的字没有被切掉或错位。
 - 真机或模拟器上手工跑（要另做两个主题文件、看字体），不在自动跑里。
@@ -195,19 +195,19 @@
 - **JVM**：`SettingsEffectUatTest.noLanguageKeyAWiderSpace`（关掉后底排没有地球键，空格变宽）；设备上不跑。
 
 ### ST-21 [P1] 按键字符：设为首选
-- **前提**：B0-设置，**按键 → 按键字符**。
+- **前提**：B0-设置，**按键 → 按键字符和快捷键**。
 - **操作**：点 q 键，在列表里把 `Q` **设为首选**；回测试页看 q 键的键角，向下滑 q。
 - **预期**：q 的键角显示 Q；下滑打出「Q」。
 - **JVM**：`SettingsEffectUatTest.aCharacterMadeFirstIsTheCornerAndTheSwipe`（Q 设为首选后 q 的角标是 Q，下滑打 Q）；设备上不跑。
 
 ### ST-22 [P1] 按键字符：添加、恢复默认
-- **前提**：B0-设置，**按键字符**。
+- **前提**：B0-设置，**按键 → 按键字符和快捷键**。
 - **操作**：点 a 键，**添加字符** `α β ⒜`；回测试页长按 a 看；再回来点 a 键，点列表里的 β 看；最后点 **恢复此键默认**。（β 的 **左移**、**删除** 是 ST-70，手工跑。）（仅 JVM）拼音键盘改成「14 键」，对 q 添加 `⒜`，回测试页长按 QW 选 ⒜；双拼键盘改成「九键」，**九键 → 按键长按** 对 2 添加 `⒉`，长按 2 选 ⒉。（仅 JVM）再点 q 键，在添加框里单独输入一个键盘内部码（如 U+F8C1）点确定：设备上手工输不进私用区字符，这一步只由 JVM 测试做。
 - **预期**：长按 a 时弹出里有 α、β 和 ⒜（⒜ 这类带圈、带括号的字母数字是普通文字，可以设）；点 β 后它有一圈主题主色的轮廓，和首位那一项的颜色不同。恢复默认后没有了。14 键上的 ⒜、九键双拼上的 ⒉ 作为文字上屏，拼音行是空的（不当成按键码读）。单独一个内部码：输入框下提示「U+F8C1 是键盘内部用的按键码，不能设成按键字符。」，确定不起作用、对话框不关，什么也没存。
 - **JVM**：`SettingsEffectUatTest.charactersAddedThenTheDefaultBack`（加了 α β ⒜ 后长按 a 有它们，恢复默认后没有）；`KotlinHostKeyboardTest.aCircledLetterLongPressedOnTheFourteenKeysIsTypedAsText`、`KotlinHostKeyboardTest.aParenthesisedDigitLongPressedOnShuangpinsNineKeysIsTypedAsText`（14 键长按 ⒜、九键双拼长按 ⒉：原样上屏，没有拼音）；`PopupOverridesFragmentTest$Dialog.aKeyCodeAloneIsRefusedAndTheDialogStays`（内部码单独输入：报错、对话框不关、设置不变）；`KeyCapsTest.theEnginesCapFadesItsWordsAloneAndOutlinesItsFace`（选中的一项有主色轮廓，单独时和叠在标记的轮廓上时都是）；设备上不跑。
 
 ### ST-70 [P1] 按键字符：选中的一项左移、删除
-- **前提**：B0-设置，**按键 → 按键字符**。
+- **前提**：B0-设置，**按键 → 按键字符和快捷键**。
 - **操作**：点 a 键，**添加字符** `α β ⒜`；点列表里的 β，用 **左移**，再点 **删除**；最后点 **恢复此键默认**。
 - **预期**：点 β 后它有一圈主题主色的轮廓；左移后 β 在 α 前面，轮廓跟着 β 走；删除删掉的是选中的 β（α、⒜ 还在）。恢复默认后加的都没有了。
 - 真机或模拟器上手工跑（左移、删除选中项没有 JVM 测试），不在自动跑里。
