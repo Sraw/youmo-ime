@@ -121,7 +121,7 @@ class KeyboardCanvasView(
     // a key's motion as it is now: its pressed face's alpha (fading when let go), scale and sink, and the
     // face it had before its state changed ([leaving], over the new one, fading). One animator at a time,
     // its frames changing these and the nodes' properties alone: nothing recorded, laid out or made
-    private class Moving {
+    private inner class Moving {
         var alpha = 1f
         var scale = 1f
         var sink = 0f
@@ -137,6 +137,7 @@ class KeyboardCanvasView(
             }
             alpha = 1f
             releasing = false
+            leaving?.let(::letGoOf)
             leaving = null
         }
     }
@@ -305,6 +306,8 @@ class KeyboardCanvasView(
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         viewTreeObserver.addOnPreDrawListener(moved)
+        // a keyboard attached after the picture began to play (symbols, numbers, another layout): on a layer too
+        if (PictureHost.of(this)?.animated != null) setLayerType(LAYER_TYPE_HARDWARE, null)
     }
 
     override fun onWindowVisibilityChanged(visibility: Int) {
@@ -417,6 +420,12 @@ class KeyboardCanvasView(
         }
     }
 
+    // a crossfade's old face, its fade over: its display list (the theme's bitmaps) freed now, not at GC; never
+    // one a key shows still
+    private fun letGoOf(node: RenderNode) {
+        if (faces.none { it.normal === node || it.pressed === node }) node.discardDisplayList()
+    }
+
     // the face a state change left, fading over the new one; one the renderer let go of dropped
     private fun drawLeaving(canvas: Canvas, m: Moving) {
         val leaving = m.leaving ?: return
@@ -455,9 +464,6 @@ class KeyboardCanvasView(
         val b = ceil(e.bottom).toInt()
         setPosition(l, t, r, b)
         setClipToBounds(false)
-        // a face fading (A1) drawn straight at its alpha, not through a layer of its own each frame: its fill,
-        // shadow and label blend one by one, too slight a change to see in a fade; at 0 or 1 (no motion) the same
-        setHasOverlappingRendering(false)
         val c = beginRecording(r - l, b - t)
         try {
             c.translate(-l.toFloat(), -t.toFloat())
@@ -590,7 +596,10 @@ class KeyboardCanvasView(
         val m = Moving().also { f.moving = it }
         m.leaving = from
         from.alpha = alpha
-        animate(f, m, t, { v -> from.alpha = alpha * (1f - v) }) { m.leaving = null }
+        animate(f, m, t, { v -> from.alpha = alpha * (1f - v) }) {
+            m.leaving = null
+            letGoOf(from)
+        }
     }
 
     // one animator for [m]: each frame [step] (the eased fraction) then the node's properties set and a frame asked

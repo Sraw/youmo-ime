@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Scene
+import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
@@ -68,9 +69,11 @@ class PopupScenes(
     @VisibleForTesting
     internal val drawsIn: String get() = theme.name
 
-    /** A builder in the environment now; null where neither the theme nor the built-in converted (nothing drawn, logged). */
-    fun builder(): SceneBuilder? = sceneTheme?.let {
-        val env = SceneEnvs.of(view, look, theme.isDark, view.width, view.height, Input())
+    /** The environment now: the size, and what `@im=`, `@field=`, `@landscape`… styles are scoped by. */
+    fun env(): Env = SceneEnvs.of(view, look, theme.isDark, view.width, view.height, Input())
+
+    /** A builder in [env]; null where neither the theme nor the built-in converted (nothing drawn, logged). */
+    fun builder(env: Env = env()): SceneBuilder? = sceneTheme?.let {
         SceneBuilder(it, env, measurer, cascades = SceneThemes.cascades(it))
     }
 

@@ -23,9 +23,18 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 /**
- * 060-render-p3 §4.3's rows of A4 (the animated picture): a pack whose picture is an animated WebP (1080 px
- * wide, 20 fps, [ASSET]) against the same pack with its first frame still, shown and left alone 30 s (frames, the
- * process's CPU, memory), a 10-key run over it, and hidden 10 s (no frame; the picture stopped). With
+ * perfOnly's motion rows: anim, A1's (motionRows) then A4's; anim,soak: the animated picture played 10 minutes
+ * instead; picture: A4's alone (A5: one change to it measured in minutes).
+ */
+internal fun KeyboardPerfBaselineTest.animRows(only: List<String>) {
+    if ("anim" in only) motionRows()
+    if ("anim" in only || "picture" in only) pictureRows(soak = "soak" in only)
+}
+
+/**
+ * 060-render-p3 §4.3's rows of A4 (the animated picture): a pack whose picture is an animated WebP (720 px,
+ * the widest one plays at, 20 fps, [ASSET]) against the same pack with its first frame still, shown and left
+ * alone 30 s (frames, the process's CPU, memory), a 10-key run over it, and hidden 10 s (no frame; the picture stopped). With
  * `perfOnly=anim,soak`, instead, it plays [SOAK_MS] (10 minutes) and the memory is told at its start and each [SOAK_STEP_MS]
  * (a decoder's leak: §4 A4). Kept out of the test's class for its size (detekt LargeClass).
  */
@@ -91,7 +100,7 @@ private fun KeyboardPerfBaselineTest.animatedBoard(): AnimatedBoardDrawable? {
 }
 
 /**
- * Material's file under [name] with [ASSET] under its keyboard (1080×720, 30 frames of 50 ms, made by
+ * Material's file under [name] with [ASSET] under its keyboard (720×480, 30 frames of 50 ms, made by
  * uat/tools/perf_picture.py: the SDK has no encoder of animated WebP), played ([animated]) or its first frame
  * still (the same files, `animated` false: what playing adds is measured against it).
  */

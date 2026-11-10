@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- nothing leaves the browser: no request of any kind, so the line on the page is true; a link someone adds later is refused too.
      Only the page's own scripts run (by their hashes: tools/assemble.mjs writes them, the page's test checks them) -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-jWixz42Dx7N2vA9pMl5ILrHeErYyM43hIdJ0Rm6Glhs=' 'sha256-baOACp34qL5yASv8iXN42e426MwQumWHB3nOAV2mLx0=' 'sha256-jEIiXImw0cIGjU26fKv5AiTIr+4sfvgnp/9Kv07lCR4=' 'sha256-mV8Ppohn7nsNEzOMmpqn+M0YNPzly9wTvCpb3DaEw1A='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-8s7UeSwhm39QYpZBYkkUd0yEl3IvLRJIk9winKqNxv0=' 'sha256-baOACp34qL5yASv8iXN42e426MwQumWHB3nOAV2mLx0=' 'sha256-jEIiXImw0cIGjU26fKv5AiTIr+4sfvgnp/9Kv07lCR4=' 'sha256-mV8Ppohn7nsNEzOMmpqn+M0YNPzly9wTvCpb3DaEw1A='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
 <meta name="color-scheme" content="light dark">
 <title>幽默输入法 · 主题制作</title>
 <style>
@@ -377,7 +377,7 @@ dialog h2 { margin: 0; font-size: 16px; }
         "layoutBytes": 65536,
         "boardImageBytes": 12582912,
         "animatedBytes": 4194304,
-        "animatedSide": 1440,
+        "animatedSide": 720,
         "animatedFrames": 300,
         "animatedFrameMs": 50
     },
@@ -1871,11 +1871,12 @@ dialog h2 { margin: 0; font-size: 16px; }
       }
     }
     // an animated <picture> (060-render-p3 A4): past the app's limits it is drawn still, with a warning on import
-    const anim = /<picture\b[^>]*?\banimated="true"[^>]*>/.exec(xml);
-    const animSrc = anim && /\bsrc="([^"]+)"/.exec(anim[0]);
-    if (animSrc && d.files[animSrc[1]]) {
-      const why = animatedStill(lim, d.files[animSrc[1]]);
-      if (why) out.push({ level: 'warning', line: 0, message: animSrc[1] + ' 在 App 里会显示成静态图：' + why });
+    // either quote, spaces around '=': as XML has it and the app reads it
+    const anim = /<picture\b[^>]*?\banimated\s*=\s*(["'])true\1[^>]*>/.exec(xml);
+    const animSrc = anim && /\bsrc\s*=\s*(["'])(.+?)\1/.exec(anim[0]);
+    if (animSrc && d.files[animSrc[2]]) {
+      const why = animatedStill(lim, d.files[animSrc[2]]);
+      if (why) out.push({ level: 'warning', line: 0, message: animSrc[2] + ' 在 App 里会显示成静态图：' + why });
     }
     // the app's own check (BlankKeys): on its boards and the theme's own layouts, in every scene the styles name
     const layouts = Object.create(null);

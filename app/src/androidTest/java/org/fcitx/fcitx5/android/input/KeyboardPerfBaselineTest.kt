@@ -106,7 +106,7 @@ class KeyboardPerfBaselineTest {
         log("device ${android.os.Build.MODEL} sdk $sdk runs $runs warm-up $warmUp")
         selectThisInputMethod()
         if (only != null) {
-            // perfOnly=theme,shift,build,press,popup: those parts alone, for a trace short enough to read (or an A/B of a few)
+            // perfOnly=theme,shift,build,press,popup,anim,picture: those parts alone, for a trace short enough to read (or an A/B of a few)
             launch()
             if ("theme" in only) switchThemes()
             if ("shift" in only) sceneCosts()
@@ -115,8 +115,7 @@ class KeyboardPerfBaselineTest {
             if ("popup" in only) popupSlide()
             if ("rebuild" in only) rebuilds()
             if ("anim" in only || "idle" in only) idleRows()
-            // A4's rows after A1's (PictureRows); perfOnly=anim,soak: the animated picture played 10 minutes instead
-            if ("anim" in only) motionRows().also { pictureRows(soak = "soak" in only) }
+            animRows(only)
             // the §4.3 rows that need motion in the engine (A2-A4): told, not measured
             if ("anim" in only) ANIM_NOT_YET.forEach { (row, stage) -> log("anim\t$row\tnot yet ($stage)") }
             return

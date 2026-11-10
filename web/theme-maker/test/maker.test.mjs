@@ -444,7 +444,7 @@ function animWebp(w, h, ms, { frames = ms.length, flag = true, pad = 0 } = {}) {
 
 test("an animated picture past the app's limits (youmo-format's, the app's ThemeAssetLimits) is warned of as drawn still", () => {
   const lim = FORMAT.limits;
-  assert.deepEqual([lim.animatedBytes, lim.animatedSide, lim.animatedFrames, lim.animatedFrameMs], [4194304, 1440, 300, 50]);
+  assert.deepEqual([lim.animatedBytes, lim.animatedSide, lim.animatedFrames, lim.animatedFrameMs], [4194304, 720, 300, 50]);
   const check = (image, attrs = 'animated="true" ') => {
     const d = withPicture(M.fromBuiltin(E, 'nord'), image, 'webp');
     return M.exportCheck(E, L, FORMAT, M.doc(d.xml.replace('<picture ', '<picture ' + attrs), d.files, d.layouts), ['qwerty'], M.envJson(M.ENV));
@@ -454,9 +454,15 @@ test("an animated picture past the app's limits (youmo-format's, the app's Theme
     assert.deepEqual(errors, []);
     return warnings.filter((p) => /静态图/.test(p.message)).map((p) => p.message).join();
   };
-  assert.equal(warned(animWebp(1080, 720, [50, 80])), '');
-  assert.match(warned(animWebp(1080, 720, [50, 33])), /短于 50 ms/);
-  assert.match(warned(animWebp(1441, 720, [50])), /长边/);
+  assert.equal(warned(animWebp(720, 480, [50, 80])), '');
+  assert.match(warned(animWebp(720, 480, [50, 33])), /短于 50 ms/);
+  // single quotes, spaces around '=': XML all the same, read by the app
+  for (const attrs of ["animated='true' ", 'animated = "true" ']) {
+    assert.ok(check(animWebp(720, 480, [50, 33]), attrs).warnings.some((p) => /短于 50 ms/.test(p.message)), attrs);
+  }
+  assert.match(warned(animWebp(721, 480, [50])), /长边/);
+  // a phone keyboard's width: past the 720 the app plays (060-render-perf 动效: CPU)
+  assert.match(warned(animWebp(1080, 720, [50])), /长边超过 720/);
   assert.match(warned(animWebp(100, 100, [50], { frames: 301 })), /300 帧/);
   assert.match(warned(animWebp(100, 100, [50], { flag: false })), /不是动画 WebP/);
   // padded with chunks: not walked one by one, refused

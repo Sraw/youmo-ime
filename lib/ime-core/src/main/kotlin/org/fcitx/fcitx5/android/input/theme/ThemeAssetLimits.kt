@@ -55,7 +55,9 @@ object ThemeAssetLimits {
      * picture (its first frame), with a warning: memory and battery, a decoder held while it plays.
      */
     const val MAX_ANIMATED_BYTES = 4L * 1024 * 1024
-    const val MAX_ANIMATED_SIDE = 1440
+    // 720: decoding is most of the cost and goes with the pixels (060-render-perf 动效: 1080×720 at 20 fps
+    // about 90% of a core on a OnePlus 6T, 540×360 about 39%); the decoder's target size saves nothing
+    const val MAX_ANIMATED_SIDE = 720
     const val MAX_ANIMATED_FRAMES = 300
 
     /** 20 fps at most (CPU: a full frame decoded in software each, 060-render-p3 A4): a frame shown no shorter than this (a frame of 0 ms, played as fast as it can, too). */

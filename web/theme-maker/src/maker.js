@@ -106,11 +106,12 @@
       }
     }
     // an animated <picture> (060-render-p3 A4): past the app's limits it is drawn still, with a warning on import
-    const anim = /<picture\b[^>]*?\banimated="true"[^>]*>/.exec(xml);
-    const animSrc = anim && /\bsrc="([^"]+)"/.exec(anim[0]);
-    if (animSrc && d.files[animSrc[1]]) {
-      const why = animatedStill(lim, d.files[animSrc[1]]);
-      if (why) out.push({ level: 'warning', line: 0, message: animSrc[1] + ' 在 App 里会显示成静态图：' + why });
+    // either quote, spaces around '=': as XML has it and the app reads it
+    const anim = /<picture\b[^>]*?\banimated\s*=\s*(["'])true\1[^>]*>/.exec(xml);
+    const animSrc = anim && /\bsrc\s*=\s*(["'])(.+?)\1/.exec(anim[0]);
+    if (animSrc && d.files[animSrc[2]]) {
+      const why = animatedStill(lim, d.files[animSrc[2]]);
+      if (why) out.push({ level: 'warning', line: 0, message: animSrc[2] + ' 在 App 里会显示成静态图：' + why });
     }
     // the app's own check (BlankKeys): on its boards and the theme's own layouts, in every scene the styles name
     const layouts = Object.create(null);

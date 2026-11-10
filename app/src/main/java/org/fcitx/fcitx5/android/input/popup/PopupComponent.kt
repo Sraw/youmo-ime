@@ -35,6 +35,7 @@ import org.fcitx.fcitx5.android.input.keyboard.keyTextScale
 import org.fcitx.fcitx5.android.input.keyboard.longPressOf
 import org.fcitx.fcitx5.android.input.shortcut.EditMenuLayout
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
+import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.PopupMotion
 import org.fcitx.fcitx5.android.scene.engine.Popups
 import org.fcitx.fcitx5.android.scene.theme.Transition
@@ -210,10 +211,19 @@ class PopupComponent :
      * now (键盘动效, battery saver: [KeyMotionSwitch], asked only of a theme that moves).
      */
     private fun motionOf(widget: String): PopupMotion? {
-        val s = scenes.takeIf { it.ready && it.moves } ?: return null
-        val m = s.made("popup's motion", s.builder()?.popupMotion(widget)) ?: return null
+        val s = scenes.takeIf { it.ready && it.moves } ?: return null.also { motions = null }
+        // read once for a theme's scenes in an environment (its size, and the input method, field, orientation… that
+        // `@im=`-like styles are scoped by: an Env is a value), not a SceneBuilder made for each bubble shown
+        val env = s.env()
+        val at = s to env
+        val known = motions?.takeIf { it.first == at }?.second ?: HashMap<String, PopupMotion?>().also { motions = at to it }
+        // none kept too (getOrPut would ask again for a null)
+        if (widget !in known) known[widget] = s.made("popup's motion", s.builder(env)?.popupMotion(widget))
+        val m = known[widget] ?: return null
         return m.takeIf { KeyMotionSwitch.on(context) }
     }
+
+    private var motions: Pair<Pair<PopupScenes, Env>, HashMap<String, PopupMotion?>>? = null
 
     // [view] gone from [root] in its fade, or at once ([atOnce], none set, or motion off now); then [gone]
     private fun goAway(view: View, atOnce: Boolean, gone: () -> Unit) {

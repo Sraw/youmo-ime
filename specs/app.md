@@ -150,7 +150,7 @@ it stops) and `KeyMotionSwitch.on` (键盘动效, 禁用动画, battery saver, t
 saver turned while shown (`KeyMotionSwitch.listen`) stop or start it at once. A key, the bar or anything else showing the
 picture (`Op.Picture`, `ThemePictureDrawable`) over it draws no picture of its own: see-through, only black over it to
 take it from the board's brightness to its own (`PictureWindow.seeThroughDarken`; never lighter). One past
-`ThemeAssetLimits`' animated limits (4 MB, 1440 px a side, 300 frames, a frame under 50 ms; read from its chunk heads,
+`ThemeAssetLimits`' animated limits (4 MB, 720 px a side (decoding is most of the cost and goes with the pixels: 060-render-perf, 2026-11-10), 300 frames, a frame under 50 ms; read from its chunk heads,
 `AnimatedWebp`), or not decoded as an animation, is drawn as a still picture (its cuts, as any picture), a warning as the
 pack is imported (`theme_pack_animated_still`). Elsewhere (the settings' preview, thumbnails, the voice glass, the
 floating code strip) it is still. `AnimatedPictureTest`.

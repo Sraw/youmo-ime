@@ -215,6 +215,9 @@ class KeyMotionTest {
         assertTrue("${leaving.alpha}", leaving.alpha > 0f && leaving.alpha < 1f)
         frames(300)
         assertNull(c.leavingNode("shift"))
+        // its fade over, the old face's display list freed at once (not at GC)
+        // (Robolectric's RenderNode at 29 keeps a display list discarded: checked from 30 on)
+        if (android.os.Build.VERSION.SDK_INT > 29) assertTrue(!leaving.hasDisplayList())
         // the letters relabelled have no transition of theirs: shown at once
         assertNull(c.leavingNode("q"))
     }
