@@ -175,7 +175,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         note(R.string.key_style_follow_theme, "key_style_note")
     }
 
-    /** What the three set over a theme's keys ([ThemeManager.shownLook]). */
+    /** What the four set over a theme's keys ([ThemeManager.shownLook]). */
     fun keyStyleChoice() = KeyStyleChoice(
         keyBorderChoice.getValue().blocks,
         keyHSpacingChoice.getValue().spacing,

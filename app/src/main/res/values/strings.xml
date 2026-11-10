@@ -947,8 +947,8 @@
     <string name="section_animation">Animation</string>
     <string name="section_key_style">Key style</string>
     <string name="key_border">Key borders</string>
-    <string name="key_h_spacing">Space between keys, across</string>
-    <string name="key_v_spacing">Space between keys, up and down</string>
+    <string name="key_h_spacing">Key spacing, across</string>
+    <string name="key_v_spacing">Key spacing, up and down</string>
     <string name="key_radius">Key corners</string>
     <string name="follow_theme">Follow the theme</string>
     <string name="key_border_on">Borders</string>

@@ -53,6 +53,16 @@ class KeySpacingMigrationTest {
         assertEquals(KeyStyleChoice.Spacing(5, 5) to KeyStyleChoice.Spacing(9, 6), choice.hGap to choice.vGap)
     }
 
+    // the theme manager's first read of the key style (a start after an upgrade, a restored 0.5.2 backup's
+    // restart) is of the two moved already: 0.5.2's 宽松, not following the theme
+    @Test
+    fun theThemeManagerMovesTheOneBeforeItReadsTheKeyStyle() {
+        sp.edit(commit = true) { putString(ThemePrefs.KEY_SPACING_052, "Loose") }
+        val choice = ThemeManager.startKeyStyle(ThemePrefs(sp))
+        assertEquals(KeyStyleChoice.Spacing(5, 5) to KeyStyleChoice.Spacing(9, 6), choice.hGap to choice.vGap)
+        assertFalse(sp.contains(ThemePrefs.KEY_SPACING_052))
+    }
+
     @Test
     fun oneOfTheTwoStoredAlreadyIsKept() {
         sp.edit(commit = true) {
