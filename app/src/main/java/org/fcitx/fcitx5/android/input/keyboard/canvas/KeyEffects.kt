@@ -264,31 +264,27 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
             var any = false
             for (i in ripples.indices) {
                 val r = ripples[i]
-                if (!r.live) continue
-                val f = fraction(r, now)
-                if (f >= 1f) {
-                    r.live = false
-                    continue
+                val f = if (r.live) fraction(r, now) else continue
+                r.live = f < 1f
+                if (r.live) {
+                    any = true
+                    val s = r.scale * easeOut(f)
+                    r.inner.scaleX = s
+                    r.inner.scaleY = s
+                    r.clip.alpha = 1f - f
                 }
-                any = true
-                val s = r.scale * easeOut(f)
-                r.inner.scaleX = s
-                r.inner.scaleY = s
-                r.clip.alpha = 1f - f
             }
             for (i in particles.indices) {
                 val p = particles[i]
-                if (!p.live) continue
-                val f = fraction(p, now)
-                if (f >= 1f) {
-                    p.live = false
-                    continue
+                val f = if (p.live) fraction(p, now) else continue
+                p.live = f < 1f
+                if (p.live) {
+                    any = true
+                    val e = easeOut(f)
+                    p.node.translationX = p.x + p.dx * e
+                    p.node.translationY = p.y + p.dy * e
+                    p.node.alpha = 1f - f
                 }
-                any = true
-                val e = easeOut(f)
-                p.node.translationX = p.x + p.dx * e
-                p.node.translationY = p.y + p.dy * e
-                p.node.alpha = 1f - f
             }
             if (!any && ticker.isStarted) ticker.end()
             view.invalidate()

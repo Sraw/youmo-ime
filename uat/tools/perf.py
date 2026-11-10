@@ -242,7 +242,7 @@ def main():
     p.add_argument('b', nargs='?')
     p.add_argument('--pairs', type=int, default=3)
     p.add_argument('--runs', type=int, default=20)
-    p.add_argument('--only', help='perfOnly: theme,shift,build,press,popup,rebuild,idle,anim,effects')
+    p.add_argument('--only', help='perfOnly: theme,shift,build,press,popup,rebuild,idle,anim')
     p.add_argument('--trace', action='store_true')
     p.add_argument('--out', default=os.path.join(ROOT, 'build/perf'))
     p.add_argument('--lock', help='a directory made (mkdir) as a mutex for each run; waited for, never taken over')

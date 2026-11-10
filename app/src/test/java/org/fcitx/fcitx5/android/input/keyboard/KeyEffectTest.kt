@@ -16,6 +16,8 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.data.theme.ThemePackFiles
+import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyEffects
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
@@ -219,6 +221,27 @@ class KeyEffectTest {
         c.press("q")
         c.press("q", down = false)
         assertEquals(0, c.keyEffects.pooled)
+    }
+
+    @Test
+    fun aPacksEffectImagesAreHeldToTheirSideAndDecodedByPath() {
+        // the one it names decoded with the key images, by the pack's path
+        val pack = particles() as Theme.Pack
+        assertEquals(listOf(java.io.File(pack.dir, "star.png").path), ThemePackFiles.images(pack.drawn).map { it.file })
+        // one past the side (its bytes and type by ThemeAssetLimitsTest): refused, said why
+        val side = ThemeAssetLimits.MAX_EFFECT_IMAGE_SIDE
+        val zip = ByteArrayOutputStream().also { bytes ->
+            ZipOutputStream(bytes).use {
+                it.putNextEntry(ZipEntry("theme.xml"))
+                it.write(java.io.File(pack.dir, "theme.xml").readBytes())
+                it.putNextEntry(ZipEntry("ring.png"))
+                it.write(png(RING_PX))
+                it.putNextEntry(ZipEntry("star.png"))
+                it.write(png(side + 1))
+            }
+        }.toByteArray()
+        val refused = ThemeFilesManager.openTheme(zip.inputStream(), ThemeManager.getAllThemes()).exceptionOrNull()!!.message
+        assertEquals(appContext.getString(R.string.exception_theme_effect_image_side, side.toString()), refused)
     }
 
     private companion object {

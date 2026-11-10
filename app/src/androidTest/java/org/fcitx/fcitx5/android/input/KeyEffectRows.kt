@@ -28,7 +28,7 @@ import java.util.zip.ZipOutputStream
  * 060-render-p3 §4.3's rows of A3 (a key's press effect), each against the same pack without it (material's
  * look): a ripple image (64 px, 100% of the key, 300 ms) and particles (12 a press, the most, 24dp, 600 ms).
  * A single press (its frame), 10-key runs typed fast (80 ms: effects play on every press, the pools full) and
- * slow (200 ms), every frame of them, and the frames of the 2 s after (none once they end). `perfOnly=effects`.
+ * slow (200 ms), every frame of them, and the frames of the 2 s after (none once they end). Run after A1's rows (`perfOnly=anim`).
  */
 internal fun KeyboardPerfBaselineTest.effectRows() {
     val advanced = AppPrefs.getInstance().advanced

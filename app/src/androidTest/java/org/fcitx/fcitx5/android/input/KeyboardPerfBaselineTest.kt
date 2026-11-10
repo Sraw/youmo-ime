@@ -116,7 +116,6 @@ class KeyboardPerfBaselineTest {
             if ("rebuild" in only) rebuilds()
             if ("anim" in only || "idle" in only) idleRows()
             if ("anim" in only) motionRows()
-            if ("anim" in only || "effects" in only) effectRows()
             // the §4.3 rows that need motion in the engine (A2-A4): told, not measured
             if ("anim" in only) ANIM_NOT_YET.forEach { (row, stage) -> log("anim\t$row\tnot yet ($stage)") }
             return
@@ -137,7 +136,6 @@ class KeyboardPerfBaselineTest {
         popupSlide()
         idleRows()
         motionRows()
-        effectRows()
         hideKeyboard()
         memory("after the runs (handwriting's models loaded), hidden")
         showKeyboard()
