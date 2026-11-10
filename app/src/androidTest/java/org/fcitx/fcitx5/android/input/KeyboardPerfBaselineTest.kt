@@ -113,6 +113,9 @@ class KeyboardPerfBaselineTest {
             if ("rebuild" in only) rebuilds()
             if ("anim" in only || "idle" in only) idleRows()
             if ("anim" in only) motionRows()
+            if ("anim" in only || "picture" in only) pictureRows(soak = false)
+            // perfOnly=soak: the animated picture played 10 minutes, its memory told (A4's leak check)
+            if ("soak" in only) pictureRows(soak = true)
             // the §4.3 rows that need motion in the engine (A2-A4): told, not measured
             if ("anim" in only) ANIM_NOT_YET.forEach { (row, stage) -> log("anim\t$row\tnot yet ($stage)") }
             return
@@ -133,6 +136,7 @@ class KeyboardPerfBaselineTest {
         popupSlide()
         idleRows()
         motionRows()
+        pictureRows(soak = false)
         hideKeyboard()
         memory("after the runs (handwriting's models loaded), hidden")
         showKeyboard()
@@ -717,7 +721,7 @@ class KeyboardPerfBaselineTest {
 
     // ---- 4. memory
 
-    private fun memory(label: String) {
+    internal fun memory(label: String) {
         repeat(2) {
             Runtime.getRuntime().gc()
             SystemClock.sleep(GC_WAIT_MS)
@@ -730,13 +734,13 @@ class KeyboardPerfBaselineTest {
         log("memory\t$label\tjava ${median { it.javaHeap }} kB\tnative ${median { it.nativeHeap }} kB\tgraphics ${median { it.graphics }} kB\ttotal pss ${median { it.totalPss }} kB")
     }
 
-    private fun hideKeyboard() {
+    internal fun hideKeyboard() {
         scenario.onActivity { context.inputMethodManager.hideSoftInputFromWindow(it.field.windowToken, 0) }
         device.wait(Until.gone(By.pkg(imePkg).res(imePkg, "keyboard_view")), 5_000)
         settle()
     }
 
-    private fun showKeyboard() {
+    internal fun showKeyboard() {
         scenario.onActivity {
             it.field.requestFocus()
             context.inputMethodManager.showSoftInput(it.field, 0)
