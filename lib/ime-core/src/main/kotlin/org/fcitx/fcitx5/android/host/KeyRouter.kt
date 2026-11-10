@@ -78,11 +78,14 @@ class KeyRouter(
      * typed, as libime's pinyin does ([switching]); losing focus drops it.
      */
     fun deactivate(ic: InputContext, im: String, switching: Boolean) {
-        if (switching) {
-            endPunctuation(ic, take = true)
-            send(ic, im, EngineEvent.ENTER)
-        }
+        if (switching) enter(ic, im)
         reset(ic, im)
+    }
+
+    /** What [im] shows committed as Return commits it (pinyin's code as typed), marks on offer taken first. */
+    fun enter(ic: InputContext, im: String) {
+        endPunctuation(ic, take = true)
+        send(ic, im, EngineEvent.ENTER)
     }
 
     // androidengine's branches one for one, in its order: kept so, to be read against it

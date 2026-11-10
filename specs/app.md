@@ -264,7 +264,11 @@ font and weight as the theme's `candidate` style, its font `<font name="candidat
 as the keys' are, `SceneFonts`: `candidate`, `key`, else the system's till a theme's own fonts are, T8a), the padding of 候选字号
 (`KawaiiBarComponent.candidatePaddingDp`), the divider's 1 dp line, the panel the bar's colour over flat
 keys; a look that made no theme the same of its colours (`SceneBar.plain`). A candidate's shape is a
-`LayerDrawable` inset, not an `InsetDrawable`, whose inset a view takes as its padding. `gap` widens
+`LayerDrawable` inset, not an `InsetDrawable`, whose inset a view takes as its padding. Corners not all the same
+(`radius="12 0 0 0"`) are clamped differently: the engine (`Faces.radii`, the sample bar and the web's preview) keeps each
+to half the box's shorter side, while `GradientDrawable` (Skia's round rect) keeps them as written unless two on one side add
+up to more than it, then scales all down together; so a corner over half the height but not over the side is rounder on the phone
+than in the preview (060-render-p3 T6a review L3, kept: the same where every corner fits, as every built-in theme's do). `gap` widens
 the horizontal bar's room between two (the line in its middle, `FlexboxVerticalDecoration`); a
 transparent divider draws nothing but keeps its room. `label-style` (number: 1 2 3 of the whole list,
 the expanded grid's numbers going on from the bar's; dot: •; none, the default) stands before the
@@ -587,7 +591,11 @@ its key's place among the keyboard's groups (`SceneGroups.ids`, by the node's id
 it is, no `wire`; a letter, or the same letters, on two keys each key its own), a leaning tap `Keyboard.tapKey(code, x, y)` with where across and down its scene cell the
 finger came down (`KeyGesture.clickAt`, `clickDown`; a click no touch made, the code alone), and the groups
 told the engine as the keyboard is shown, not as it is made (`onAttach`, `EngineState.ownKeys`; the bridge's `syncOwnKeys` before
-each key sets `NineKeyLetters.inUse` and `EngineSettings.ownKeys`, `configure` and `reload` keep them).
+each key sets `NineKeyLetters.inUse` and `EngineSettings.ownKeys`, `configure` and `reload` keep them). Other groups told while
+a code is typed on the ones before (`EngineBridge.replaces`: groups told before, now others): the code is committed first
+as Return commits it (`HostCore.commitCode`, pinyin's letters as typed), not lost with the session made anew; no reset, so
+the next word keeps its 前文. The field's composing text (handwriting's, English's word) is no such code and is left alone
+(`KotlinHostOwnKeysTest`).
 Anything else is refused, logged with why, and the app's own layout drawn instead (`SceneLayouts.builtIn`):
 groups that make no keyboard, the other built-in keyboard's groups, and any grouping of its own on 双拼's
 keyboards (`GroupedKeyboardOwnGroupsTest`, `KeyboardCustomTest`). The theme's board stays `k14`/`k18`.

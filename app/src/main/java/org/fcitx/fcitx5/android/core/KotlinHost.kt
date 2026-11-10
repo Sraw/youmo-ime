@@ -317,7 +317,11 @@ class KotlinHost(
     // the frontend's keyEvent: virtual is the state's bit, as fcitx's KeyEvent::isVirtual reads it
     private fun HostCore.key(sym: Int, states: Int, up: Boolean, timestamp: Int) {
         // a layout's own keyboard's groups as it last told them, before its key reaches a temporary mode or the engine
-        bridge.syncOwnKeys()
+        // other groups while a code is typed on the ones before (060-render-p3 T10): the code committed as
+        // Return commits it, not lost with the session made anew; the field's composing text is left alone
+        val own = EngineState.ownKeys
+        if (bridge.replaces(own)) commitCode()
+        bridge.syncOwnKeys(own)
         sendKey(Key(sym, states), release = up, virtual = states and HostKeyStates.VIRTUAL != 0, timestamp = timestamp)
     }
 
