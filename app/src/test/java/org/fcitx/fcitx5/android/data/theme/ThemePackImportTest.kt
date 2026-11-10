@@ -214,6 +214,16 @@ class ThemePackImportTest {
         assertEquals(listOf("nord-mine#light", "nord-mine#dark"), picture.commit().getOrThrow().map { it.name })
     }
 
+    // and its save of the app's own 3.0 export converted (Return an image, its label hidden, as 3.0 drew it):
+    // a theme the app took stays one it takes
+    @Test
+    fun theMakersConvertedSaveImports() {
+        ThemeFilesManager.probe = real
+        val converted = opened(ThemeMakerTestdata.file("from-maker-30.theme").readBytes())
+        assertEquals("from-app", converted.staged.name)
+        assertEquals(listOf("from-app"), converted.commit().getOrThrow().map { it.name })
+    }
+
     @Test
     fun aPackIsDrawnFromItsOwnFileAndItsFolder() {
         val dark = opened(sample()).commit().getOrThrow()[1]

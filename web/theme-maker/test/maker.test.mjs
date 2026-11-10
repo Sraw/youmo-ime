@@ -135,6 +135,13 @@ test('save refuses what the app would: the name, files missing, images past thei
   assert.match(M.saveProblems(L, FORMAT, M.doc(pic.xml)).map((p) => p.message).join(), /缺少文件 picture.png/);
   assert.match(M.saveProblems(L, FORMAT, M.withPicture(ok, pngHeader(5000, 10), 'png'))[0].message, /太大/);
   assert.match(M.saveProblems(L, FORMAT, M.withPicture(ok, new Uint8Array([1]), 'png'))[0].message, /不是 App 认得的图片/);
+  // the app's ThemePackCheck.hidesRequired: blank keys refused, a key faced with its own image let be
+  const hide = (styles) => M.saveProblems(L, FORMAT, M.doc(ok.xml.replace('</theme>', styles + '\n</theme>'))).length;
+  assert.equal(hide('<style select="key.enter" hidden="true"/>'), 1);
+  assert.equal(hide('<style select="*/backspace label" hidden="true"/>'), 1);
+  assert.equal(hide('<style select="key.letter" hidden="true"/>'), 0);
+  assert.equal(hide('<style select="*/enter" fill="image(nope.png, 0 0 0 0, 3x)"/><style select="*/enter label" hidden="true"/>'), 1, 'only the file missing');
+  assert.equal(hide('<style select="*/enter:pressed" fill="#fff"/><style select="*/enter label" hidden="true"/>'), 1);
   const files = Object.fromEntries(Array.from({ length: FORMAT.limits.entries }, (_, i) => ['f' + i + '.bin', new Uint8Array(1)]));
   assert.match(M.saveProblems(L, FORMAT, M.doc(ok.xml, files))[0].message, /限制/);
 });
@@ -244,7 +251,18 @@ test('the page saves from-maker.theme, byte for byte', () => {
   assert.deepEqual(new Uint8Array(made), bytes('from-maker.theme'));
 });
 
-// and from-maker-picture.theme: a picture's save, a real 4×4 PNG
+// and from-maker-picture.theme (a picture's save, a real 4×4 PNG) and from-maker-30.theme (the app's own 3.0
+// export converted: its Return an image, the label hidden, as 3.0 drew it)
+test('a 3.0 theme the app takes converts and saves to a pack the app takes', async () => {
+  for (const f of ['from-web.theme', 'from-app.theme', 'from-app-2.1.theme']) {
+    const { doc } = await M.open(E, L, FORMAT, bytes(f));
+    assert.deepEqual(M.saveProblems(L, FORMAT, doc), [], f);
+  }
+  const made = M.save(L, (await M.open(E, L, FORMAT, bytes('from-app.theme'))).doc).bytes;
+  if (process.env.UPDATE) writeFileSync(join(testdata, 'from-maker-30.theme'), made);
+  assert.deepEqual(new Uint8Array(made), bytes('from-maker-30.theme'));
+});
+
 test('the page saves from-maker-picture.theme, byte for byte', () => {
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEElEQVR4nGPQCFgARwzEcQC/wxGBfpfKIQAAAABJRU5ErkJggg==', 'base64');
   const made = M.save(L, M.withPicture(M.fromBuiltin(E, 'nord'), new Uint8Array(png), 'png')).bytes;

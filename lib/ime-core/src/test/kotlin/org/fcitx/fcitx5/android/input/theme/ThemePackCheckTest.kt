@@ -72,6 +72,11 @@ class ThemePackCheckTest {
         assertEquals(0, found("""<style select="key.letter" hidden="true"/>"""))
         assertEquals(0, found("""<style select="qwerty/q" hidden="true"/>"""))
         assertEquals(0, found("""<style select="*/comma" hidden="true"/>"""))
+        // a key whose face is an image of its own (as 3.0 drew one, converted): its label hidden is no blank key
+        assertEquals(0, found("""<style select="*/enter" fill="image(e.png, 0 0 0 0, 3x)"/><style select="*/enter label" hidden="true"/>"""))
+        // an image only when pressed, or on another key: still blank
+        assertEquals(1, found("""<style select="*/enter:pressed" fill="image(e.png, 0 0 0 0, 3x)"/><style select="*/enter label" hidden="true"/>"""))
+        assertEquals(1, found("""<style select="*/space" fill="image(e.png, 0 0 0 0, 3x)"/><style select="*/enter label" hidden="true"/>"""))
         assertEquals(0, found("""<style select="key mark" hidden="true"/>"""))
         assertEquals(0, found("""<style select="key" hidden="false"/>"""))
     }

@@ -121,6 +121,7 @@
         else if (role === 'image' && bytes.length > lim.keyImageBytes) bad(file + ' 超过 ' + lim.keyImageBytes + ' 字节');
       }
     }
+    for (const line of hidesRequired(xml)) bad('第 ' + line + ' 行把 Shift、退格、空格或回车的字藏了：这些键会是空白');
     let total = 0;
     const enc = new TextEncoder();
     const sizes = [enc.encode(d.xml).length, ...Object.values(d.files).map((b) => b.length), ...Object.values(d.layouts).map((t) => enc.encode(t).length)];
@@ -130,6 +131,34 @@
       total += size;
     }
     return out;
+  }
+
+  // ThemePackCheck.hidesRequired's rule (lib/ime-core) on the text, which is all the page has of it: a style hiding
+  // the words of a key one cannot type without (by kind, role or name, not when pressed) is refused, unless it is
+  // aimed at one key whose resting face is an image of its own (a 3.0 theme converted draws that key so)
+  const REQUIRED = ['shift', 'backspace', 'space', 'enter'];
+  const REQUIRED_KINDS = ['function', 'space', 'enter'];
+  function hidesRequired(xml) {
+    const styles = [...xml.matchAll(/<style\b[^>]*>/g)].map((m) => ({ tag: m[0], line: xml.slice(0, m.index).split('\n').length, sel: (/\sselect="([^"]*)"/.exec(m[0]) || [])[1] || '' }));
+    const faced = new Set();
+    for (const st of styles) if (/\sfill="image\(/.test(st.tag)) for (const one of st.sel.split(',')) if (/^\s*[\w*-]+\/[\w-]+\s*$/.test(one)) faced.add(one.trim());
+    const lines = [];
+    for (const st of styles) {
+      if (!/\shidden="true"/.test(st.tag)) continue;
+      const hits = st.sel.split(',').some((one) => {
+        const m = /^\s*(?:@[\w-]+\s+)*([\w*-]+\/)?([\w*-]+)((?:\.[\w-]+|\[role=[\w-]+\])*)(?:\s+(label|icon))?\s*$/.exec(one);
+        if (!m || /:/.test(one)) return false;
+        const [, board, name, rest] = m;
+        const classes = [...rest.matchAll(/\.([\w-]+)/g)].map((c) => c[1]);
+        const roles = [...rest.matchAll(/\[role=([\w-]+)\]/g)].map((c) => c[1]);
+        if (!board && name !== 'key') return false;
+        if (board && name !== '*' && !REQUIRED.includes(name)) return false;
+        if (!classes.every((c) => REQUIRED_KINDS.includes(c)) || !roles.every((r) => REQUIRED.includes(r))) return false;
+        return !(board && name !== '*' && faced.has(board + name));
+      });
+      if (hits) lines.push(st.line);
+    }
+    return lines;
   }
 
   /** Which of [files] the page may decode (images whose headers are within what the app takes): a pack's bytes are not trusted. */

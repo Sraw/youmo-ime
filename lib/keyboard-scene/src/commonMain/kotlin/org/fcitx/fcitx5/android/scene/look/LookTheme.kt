@@ -203,6 +203,8 @@ object LookTheme {
     // share its styles (a list of selectors), and the styles go in this order for the ties: a key's, its
     // function kind's, flat none, then Return's and the flat space's. [named]: by the keys' names, each as 3.0
     // drew it ([resolved]).
+    private val REQUIRED_KEYS = setOf("shift", "backspace", "space", "enter")
+
     private fun Styles.overrides(keys: Keys, named: Map<String, KeyOverride>) {
         val resolved = resolved(named)
         val overrides = resolved.entries.associate { (n, o) -> selector(n) to o }
@@ -243,7 +245,11 @@ object LookTheme {
         }
         darkened(keys, darkened, beforeFlat = false)
         kindsPressed(keys, overrides)
-        overrides.filterValues { it.label == KeyLabel.Hide }.keys.toList().takeIf { it.isNotEmpty() }
+        // a key one cannot type without (Shift, Backspace, Space, Return) keeps its words unless its face is an
+        // image of its own, which is then what it shows: 4.0 refuses a blank one (ThemePackCheck.hidesRequired), and
+        // a 3.0 theme the app took must convert to one it takes
+        overrides.filter { (k, o) -> o.label == KeyLabel.Hide && ((k.key ?: k.starRole) !in REQUIRED_KEYS || o.fill is KeyFill.Image) }
+            .keys.toList().takeIf { it.isNotEmpty() }
             ?.let { add(it.of(part = "label"), "hidden" to Value.Flag(true)) }
         // a board's key that shows its label where its role's on every board hides theirs: as an id, it wins
         named.keys.filter { n -> resolved.getValue(n).label == KeyLabel.Show && role(named, n)?.label == KeyLabel.Hide }
