@@ -80,6 +80,9 @@ sealed class ImportResult {
     class AlreadyThere(val manifest: PackManifest) : ImportResult()
 
     class Refused(val why: Refusal) : ImportResult()
+
+    /** [manifest] older than [installed], kept as the user asked: nothing copied (pending L8). */
+    class KeptNewer(val manifest: PackManifest, val installed: PackManifest) : ImportResult()
 }
 
 /**
@@ -362,6 +365,36 @@ class PackShelf(
         ImportResult.Refused(Refusal.Unreadable(e.message ?: e.javaClass.simpleName))
     }
 
+    /** The manifest of the pack of [kind] there, whatever its state; null where there is none. */
+    fun installed(kind: PackKind): PackManifest? = when (val status = state.getValue(kind).status) {
+        is PackStatus.Ready -> status.manifest
+        is PackStatus.NeedsUpdate -> status.manifest
+        is PackStatus.NeedsNewerApp -> status.manifest
+        is PackStatus.Damaged -> status.manifest
+        PackStatus.Missing -> null
+    }
+
+    /**
+     * The manifest at the head of the pack [input] reads, signed by a key of ours; null where it is none (what
+     * [import] would refuse, said by it). Only the head read: what an import would replace asked about first.
+     * [input] is not closed.
+     */
+    fun manifestOf(input: InputStream): PackManifest? = try {
+        ZipInputStream(object : FilterInputStream(input) {
+            override fun close() = Unit
+        }).use { zip ->
+            val manifestBytes = head(zip, PackManifest.NAME, PackManifest.MAX_BYTES)
+            val signature = head(zip, PackManifest.SIGNATURE, Ed25519.SIGNATURE_SIZE)
+            if (signed(manifestBytes, signature)) PackManifest.parse(manifestBytes) else null
+        }
+    } catch (_: Refused) {
+        null
+    } catch (_: IOException) {
+        null
+    } catch (_: IllegalArgumentException) {
+        null
+    }
+
     private class Refused(val why: Refusal, cause: Throwable? = null) : Exception(cause)
 
     private fun refuse(why: Refusal, cause: Throwable? = null): Nothing = throw Refused(why, cause)
@@ -382,13 +415,7 @@ class PackShelf(
         val status = judge(manifest)
         if (status !is PackStatus.Ready) refuse(Refusal.Incompatible(manifest, requirements.getValue(manifest.kind)))
         val before = state.getValue(manifest.kind).status
-        val installed = when (before) {
-            is PackStatus.Ready -> before.manifest
-            is PackStatus.NeedsUpdate -> before.manifest
-            is PackStatus.NeedsNewerApp -> before.manifest
-            is PackStatus.Damaged -> before.manifest
-            PackStatus.Missing -> null
-        }
+        val installed = installed(manifest.kind)
         // the same pack: nothing to copy, if what is in use still is it (its files read through
         // again, told as [progress]: a start reads only their sizes); else copied anew, the import
         // mending it. One that cannot be read now is copied anew too: the user asked for it

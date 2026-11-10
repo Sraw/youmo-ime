@@ -55,6 +55,9 @@ class BuiltInLayouts(private val context: Context) : LayoutSource {
         /** Whether the keyboard of the layout [id] is moved to the scene: the app has its layout (060-render-p2 S4). */
         fun has(id: String): Boolean = id in RAW
 
+        /** The ids of [RAW] that are fragments a keyboard includes, no keyboard's layout: not read as one. */
+        val FRAGMENTS: Set<String> = setOf("grouped-bottom")
+
         // named, not looked up by name (Resources.getIdentifier): the build keeps what is used
         val RAW: Map<String, Int> = mapOf(
             "qwerty" to R.raw.scene_layout_qwerty,

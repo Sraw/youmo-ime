@@ -90,6 +90,18 @@ class PackShelfTest {
         assertTrue(PackShelf.syncDirectory(root))
     }
 
+    // what an import would replace asked about first (pending L8): the head's manifest, ours only; the one there
+    @Test
+    fun `a pack's manifest is read from its head and the one there is known`() {
+        val shelf = shelf()
+        assertNull(shelf.installed(PackKind.TEXT))
+        assertEquals(4, shelf.manifestOf(ByteArrayInputStream(text(version = 4)))!!.version)
+        assertNull("another key's", shelf.manifestOf(ByteArrayInputStream(TestPacks().pack(PackKind.TEXT, TEXT_FILES, 4, 2))))
+        assertNull("no zip", shelf.manifestOf(ByteArrayInputStream(byteArrayOf(1, 2, 3))))
+        shelf.take(text(version = 4))
+        assertEquals(4, shelf.installed(PackKind.TEXT)!!.version)
+    }
+
     @Test
     fun `the same pack again copies nothing`() {
         val shelf = shelf()

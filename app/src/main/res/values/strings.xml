@@ -170,6 +170,7 @@
     <string name="theme_add_web_hint">Come back here to import it when done</string>
     <string name="skip">Skip</string>
     <string name="theme_migrated">Theme has been migrated to the current version</string>
+    <string name="theme_imported_renamed">“%1$s” is the name of another theme: saved as “%2$s”</string>
     <string name="keep_keyboard_letters_uppercase">Keep keyboard letters uppercase</string>
     <string name="choose_input_method">Choose input method</string>
     <string name="edit_clipboard">Edit clipboard</string>
@@ -1164,6 +1165,10 @@
     <string name="pack_imported">%1$s: imported v%2$d</string>
     <string name="pack_imported_older">%1$s: v%2$d imported in place of the newer v%3$d</string>
     <string name="pack_already_there">%1$s: v%2$d is imported already, nothing changed</string>
+    <string name="pack_kept_newer">%1$s: kept the newer v%2$d, v%3$d not imported</string>
+    <string name="pack_replace_newer">The phone has the newer v%1$d. Replace it with v%2$d?</string>
+    <string name="pack_replace">Replace</string>
+    <string name="pack_keep_newer">Keep</string>
     <string name="pack_not_a_pack">%1$s is not a Youmo IME resource pack</string>
     <string name="pack_bad_signature">%1$s: the signature does not match. It is not a pack released for this app, or it is damaged; download it again.</string>
     <string name="pack_bad_file">%1$s: the file %2$s in it is damaged; download it again.</string>

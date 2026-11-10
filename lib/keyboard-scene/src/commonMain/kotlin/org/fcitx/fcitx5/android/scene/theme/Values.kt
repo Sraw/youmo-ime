@@ -204,8 +204,10 @@ object Values {
      */
     val KEYBOARD_SIZES = listOf("height", "side-padding", "bottom-padding")
 
-    // what the settings' own ranges are (AppPrefs: 键盘高度 10–90%, 两侧边距 0–300dp, 底部边距 0–100dp)
-    private const val MIN_HEIGHT = 10.0
+    // the settings' own ranges (AppPrefs: 两侧边距 0–300dp, 底部边距 0–100dp; 键盘高度 90% at most), but a
+    // height of 20% at least, the settings' 紧凑's in portrait: a theme follows on import, and a lower keyboard
+    // is not typable (pending L262)
+    private const val MIN_HEIGHT = 20.0
     private const val MAX_HEIGHT = 90.0
     private const val MAX_SIDE_DP = 300.0
     private const val MAX_BOTTOM_DP = 100.0

@@ -10,6 +10,7 @@ import android.net.Uri
 import android.text.format.Formatter
 import androidx.annotation.VisibleForTesting
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +21,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.pack.ImportResult
 import org.fcitx.fcitx5.android.pack.PackKind
+import org.fcitx.fcitx5.android.pack.PackManifest
 import org.fcitx.fcitx5.android.pack.PackStatus
 import org.fcitx.fcitx5.android.pack.Refusal
 import org.fcitx.fcitx5.android.utils.queryFileName
@@ -42,10 +44,24 @@ object PackImports {
     private val done = MutableStateFlow<List<Outcome>?>(null)
     val results: StateFlow<List<Outcome>?> = done.asStateFlow()
 
+    /** The file [file], a pack of [kind] v[version], would replace the newer v[installed]: the page asks, [answer] takes it. */
+    class Older(val file: String, val kind: PackKind, val version: Int, val installed: Int) {
+        internal val answer = CompletableDeferred<Boolean>()
+    }
+
+    private val asking = MutableStateFlow<Older?>(null)
+    val older: StateFlow<Older?> = asking.asStateFlow()
+
+    /** The page's answer to [older]: replace the newer pack or keep it. One asked no more is let be. */
+    fun answer(question: Older, replace: Boolean) {
+        question.answer.complete(replace)
+        asking.compareAndSet(question, null)
+    }
+
     /** What imports a file: [PackStore]'s; a test's that throws, to see the files after it imported all the same. */
     @VisibleForTesting
-    internal var importer: suspend (ContentResolver, Uri, (Long, Long) -> Unit) -> ImportResult =
-        { resolver, uri, progress -> PackStore.import(resolver, uri, progress) }
+    internal var importer: suspend (ContentResolver, Uri, (Long, Long) -> Unit, suspend (PackManifest, PackManifest) -> Boolean) -> ImportResult =
+        { resolver, uri, progress, replaceNewer -> PackStore.import(resolver, uri, progress, replaceNewer) }
 
     /** [uris] imported in turn; false (nothing started) if an import is under way. */
     fun start(context: Context, uris: List<Uri>): Boolean {
@@ -76,9 +92,19 @@ object PackImports {
             // a provider's binder call, perhaps over the network: not on the main thread
             name = withContext(Dispatchers.IO) { resolver.queryFileName(uri) } ?: name
             runningNow.value = Running(name, 0)
-            importer(resolver, uri) { copied, total ->
+            val progress = { copied: Long, total: Long ->
                 val percent = if (total > 0) (copied * PERCENT / total).toInt() else 0
                 if (runningNow.value?.percent != percent) runningNow.value = Running(name, percent)
+            }
+            // an older pack over a newer one: asked on the page (shown again when it is opened again), answered there
+            importer(resolver, uri, progress) { manifest, installed ->
+                val question = Older(name, manifest.kind, manifest.version, installed.version)
+                asking.value = question
+                try {
+                    question.answer.await()
+                } finally {
+                    asking.compareAndSet(question, null)
+                }
             }
         } catch (e: CancellationException) {
             throw e
@@ -127,6 +153,9 @@ object PackImports {
                 context.getString(R.string.pack_imported_older, name(context, result.manifest.kind), result.manifest.version, it.version)
             } ?: context.getString(R.string.pack_imported, name(context, result.manifest.kind), result.manifest.version)
             is ImportResult.AlreadyThere -> context.getString(R.string.pack_already_there, name(context, result.manifest.kind), result.manifest.version)
+            is ImportResult.KeptNewer -> context.getString(
+                R.string.pack_kept_newer, name(context, result.manifest.kind), result.installed.version, result.manifest.version,
+            )
             is ImportResult.Refused -> when (val why = result.why) {
                 is Refusal.NotAPack -> context.getString(R.string.pack_not_a_pack, file)
                 is Refusal.BadSignature -> context.getString(R.string.pack_bad_signature, file)

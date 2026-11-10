@@ -395,16 +395,38 @@ object ThemeManager {
         // which calls `fireChange()`.
         // `activateTheme`'s setter would also trigger `fireChange()` when theme actually changes.
         // write to backing property directly to avoid unnecessary `fireChange()`
-        _activeTheme = theme
+        _activeTheme = systemVersion(theme)
         prefs.normalModeTheme.setValue(theme)
     }
 
     private fun evaluateActiveTheme(): Theme {
-        return if (prefs.followSystemDayNightTheme.getValue()) {
-            if (isDarkMode) prefs.darkModeTheme else prefs.lightModeTheme
-        } else {
-            prefs.normalModeTheme
-        }.getValue()
+        return systemVersion(
+            if (prefs.followSystemDayNightTheme.getValue()) {
+                if (isDarkMode) prefs.darkModeTheme else prefs.lightModeTheme
+            } else {
+                prefs.normalModeTheme
+            }.getValue(),
+        )
+    }
+
+    /**
+     * The version of [theme] the system's dark mode asks for, where [theme] is a version of an imported pack that
+     * has both (`variants="light dark"`: one theme following the system, docs/theme-format.md), whatever the slot
+     * naming it and 跟随系统夜间模式; else [theme]. The built-in pairs keep the version a slot names (pending L189:
+     * one not following the system sees what he saw before 0.6.0).
+     */
+    private fun systemVersion(theme: Theme): Theme {
+        if (theme !is Theme.Pack || theme.isDark == isDarkMode) return theme
+        return packs.firstOrNull { it.file == theme.file && it.isDark == isDarkMode } ?: theme
+    }
+
+    /** The versions of [theme] where it is a pack's that has both, light first; else null ([systemVersion]). */
+    fun packPair(theme: Theme): Pair<Theme.Pack, Theme.Pack>? {
+        if (theme !is Theme.Pack) return null
+        val versions = packs.filter { it.file == theme.file }
+        val light = versions.firstOrNull { !it.isDark } ?: return null
+        val dark = versions.firstOrNull { it.isDark } ?: return null
+        return light to dark
     }
 
     @Keep

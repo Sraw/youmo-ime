@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- nothing leaves the browser: no request of any kind, so the line on the page is true; a link someone adds later is refused too.
      Only the page's own scripts run (by their hashes: tools/assemble.mjs writes them, the page's test checks them) -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-Kilmu92zDioIG92/jMBeNFFS0us3TsbNV5+YjzcTG/w=' 'sha256-16ebXpQYnAgl9u2lSPRLdgwPR2A3omDskguIzzBoIhE=' 'sha256-ywaO7u9boc4zyTG9gTndCcQNBnAgM7raKIS4cZT1AAM=' 'sha256-ETs+YLQVlg6zlKl5D3ldT3sRXoXHz8t1+qMjX5KNgpQ='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-Kilmu92zDioIG92/jMBeNFFS0us3TsbNV5+YjzcTG/w=' 'sha256-16ebXpQYnAgl9u2lSPRLdgwPR2A3omDskguIzzBoIhE=' 'sha256-y2Js9LBVvf+sm/MnZjSiOsRny5ynKLTdOtB2qkhAsK8=' 'sha256-ETs+YLQVlg6zlKl5D3ldT3sRXoXHz8t1+qMjX5KNgpQ='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
 <meta name="color-scheme" content="light dark">
 <title>幽默输入法 · 主题制作</title>
 <style>
@@ -3941,7 +3941,7 @@ dialog h2 { margin: 0; font-size: 16px; }
   const panels = root.YoumoPanels;
   const PARTS = [
     { id: 'keyboard', title: '键盘', select: 'keyboard', fixed: true, note: '用户在 App 设置里选了具体值的，会盖过这里。', props: [
-      { prop: 'height', label: '高度', kind: 'twin', unit: '%', min: 10, max: 90, note: '屏幕高度的百分比' },
+      { prop: 'height', label: '高度', kind: 'twin', unit: '%', min: 20, max: 90, note: '屏幕高度的百分比' },
       { prop: 'side-padding', label: '两侧边距', kind: 'twin', unit: 'dp', min: 0, max: 300 },
       { prop: 'bottom-padding', label: '底部边距', kind: 'twin', unit: 'dp', min: 0, max: 100 },
     ] },

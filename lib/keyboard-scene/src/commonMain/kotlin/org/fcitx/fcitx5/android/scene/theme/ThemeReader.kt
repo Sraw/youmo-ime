@@ -678,7 +678,7 @@ object ThemeReader {
         }
         for (prop in Values.KEYBOARD_SIZES.filter { el[it] != null }) {
             val what = when (prop) {
-                "height" -> "10%–90%, portrait then landscape"
+                "height" -> "20%–90%, portrait then landscape"
                 "side-padding" -> "0–300dp, portrait then landscape"
                 else -> "0–100dp, portrait then landscape"
             }

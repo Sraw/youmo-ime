@@ -272,11 +272,29 @@ class ThemePackImportTest : ThemePackFixture() {
         assertEquals(clash, refusal(zip("theme.xml" to xml(name = "pixel"))))
         assertEquals(clash, refusal(zip("theme.xml" to xml(name = "MaterialLight"))))
         assertEquals(appContext.getString(R.string.exception_theme_pack_name, "x#dark"), refusal(zip("theme.xml" to xml(name = "x#dark"))))
-        // a 3.0 theme of one's own imported over a pack: the settings would name both by it
+        // a 3.0 theme of one's own imported over a pack: the settings would name both by it, saved as another
         opened(sample()).commit().getOrThrow()
         ThemeManager.refreshThemes()
         val again = Json.encodeToString(CustomThemeSerializer, TestThemes.TransparentDark.deriveCustomNoBackground("mine#dark"))
-        assertEquals(clash, ThemeFilesManager.importTheme(zip("t.json" to again).inputStream()).exceptionOrNull()!!.message)
+        val imported = ThemeFilesManager.importTheme(zip("t.json" to again).inputStream()).getOrThrow()
+        assertEquals("mine#dark-1" to "mine#dark", imported.theme.name to imported.renamedFrom)
+    }
+
+    // pending L463: a 0.5 export named as a built-in theme of 0.6.0 is no dead end, saved as `<name>-1`, `-2`…
+    @Test
+    fun aTheme30OfABuiltInsNameIsSavedUnderAnother() {
+        fun import(name: String) = ThemeFilesManager.importTheme(
+            zip("t.json" to Json.encodeToString(CustomThemeSerializer, TestThemes.TransparentDark.deriveCustomNoBackground(name))).inputStream(),
+        ).getOrThrow().also { ThemeManager.refreshThemes() }
+        val first = import("monokai")
+        assertEquals("monokai-1" to "monokai", first.theme.name to first.renamedFrom)
+        assertTrue(first.created)
+        // again: the name taken by the first, the next one
+        assertEquals("monokai-2", import("monokai").theme.name)
+        // a 0.5 name (the settings move it to a built-in one): the same
+        assertEquals("PixelDark-1", import("PixelDark").theme.name)
+        // its own name: as ever
+        assertEquals(null, import("own").renamedFrom)
     }
 
     @Test
@@ -298,7 +316,8 @@ class ThemePackImportTest : ThemePackFixture() {
         assertFalse(File(dir, "mine#light.json").exists())
         assertFalse(File(dir, "own.png").exists())
         assertEquals(versions[0], ThemeManager.getTheme("mine#light"))
-        assertEquals(versions[0], ThemeManager.activeTheme)
+        // the slot names the light one; shown, the night's (a pack of both follows the system)
+        assertEquals(versions[1], ThemeManager.activeTheme)
         // a 3.0 theme of another name left be
         assertTrue(opened(sample(xml(name = "other"))).customs.isEmpty())
     }

@@ -137,12 +137,12 @@ class ThemeScenesTest {
             KeyboardSizes(Twin(40.0, 40.0), Twin(0.0, 24.5), Twin(4.0, 0.0)),
             sizes("<style select=\"keyboard\" height=\"40%\" side-padding=\"0 24.5dp\" bottom-padding=\"4dp 0\"/>"),
         )
-        assertEquals(emptyList(), warnings(withStyle("<style select=\"keyboard\" height=\"10% 90%\"/>")))
+        assertEquals(emptyList(), warnings(withStyle("<style select=\"keyboard\" height=\"20% 90%\"/>")))
         // the later style's, a property at a time
         val two = "<style select=\"keyboard\" height=\"30% 40%\" side-padding=\"8dp\"/>\n<style select=\"keyboard\" height=\"35% 45%\"/>"
         assertEquals(KeyboardSizes(Twin(35.0, 45.0), Twin(8.0, 8.0)), sizes(two))
         // out of the settings' ranges, of another unit, three values: refused
-        for (bad in listOf("height=\"95%\"", "height=\"9%\"", "height=\"300dp\"", "side-padding=\"301dp\"", "side-padding=\"5%\"",
+        for (bad in listOf("height=\"95%\"", "height=\"9%\"", "height=\"19.5%\"", "height=\"300dp\"", "side-padding=\"301dp\"", "side-padding=\"5%\"",
             "bottom-padding=\"101dp\"", "bottom-padding=\"-1dp\"", "height=\"30% 40% 50%\"", "height=\"\"")) {
             assertTrue(problems(withStyle("<style select=\"keyboard\" $bad/>")).first().contains(bad.substringBefore('=')), bad)
         }
