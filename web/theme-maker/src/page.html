@@ -62,6 +62,11 @@
     <label>键盘 <select id="env-board"></select></label>
     <label>形态 <select id="env-form-kind"></select></label>
     <label>Shift <select id="env-shift"><option value="none">关</option><option value="once">一次</option><option value="lock">锁定</option></select></label>
+    <label>输入框 <select id="env-field"><option value="text">文本</option><option value="password">密码</option><option value="url">网址</option><option value="number">数字</option><option value="email">邮箱</option></select></label>
+    <label>输入法 <select id="env-ime"><option value="pinyin">拼音</option><option value="shuangpin">双拼</option><option value="english">英文</option><option value="wubi">五笔</option><option value="cangjie">仓颉</option><option value="handwriting">手写</option></select></label>
+    <label>显示 <select id="env-show"><option value="">只有键盘</option><option value="preview">按键气泡</option><option value="keys">长按弹出</option><option value="menu">菜单</option></select></label>
+    <label>候选栏样例 <select id="env-bar"><option value="">不显示</option><option value="idle">空闲（工具栏）</option><option value="typing">输入中（候选词）</option></select></label>
+    <label>面板样例 <select id="env-sheet"><option value="">不显示</option><option value="clipboard">剪贴板</option><option value="picker">符号、表情</option><option value="editing">编辑</option><option value="voice">语音</option></select></label>
     <button value="close">完成</button>
   </form>
 </dialog>
@@ -72,6 +77,7 @@
     <div id="builtins" class="cards"></div>
     <p>从一张图片开始（图片做键盘背景，之后在「背景」里裁切、在「配色」里取色）。先用这套配色：</p>
     <div id="image-base" class="cards" role="radiogroup" aria-label="图片主题的配色"></div>
+    <div class="cards" role="radiogroup" aria-label="浅色还是深色"><label><input type="radio" name="image-tone" value="light" checked> 浅色</label><label><input type="radio" name="image-tone" value="dark"> 深色</label></div>
     <button type="button" id="from-image">选图片…</button>
     <p>或者 <button type="button" id="from-file">打开文件…</button>（.theme：4.0、3.0、2.1）</p>
     <button value="cancel">取消</button>

@@ -181,6 +181,34 @@ async function main() {
     await wait(2500);
     const blue = await centre();
     check(/^25[45],0,0$/.test(red) && /^0,0,25[45]$/.test(blue), 'a picture replaced: the crop shows the new one (' + red + ' then ' + blue + ')');
+
+    // M3's tabs: each draws; an edit on one writes its style and keeps the tab (the row synced in place)
+    for (const id of ['bar', 'popup', 'window', 'size', 'motion', 'info']) {
+      await js(`document.querySelector('#tabs [data-tab=${id}]').click()`);
+      await wait(300);
+      const rows = await js(`document.querySelectorAll('#tab-${id} label.row').length`);
+      check(rows > 0, id + ': the tab draws (' + rows + ' rows)');
+    }
+    await js(`document.querySelector('#tabs [data-tab=info]').click()`);
+    await wait(200);
+    await click('作者');
+    await type('smoke');
+    await click('版本');
+    await wait(400);
+    check(/<meta [^>]*author="smoke"/.test(await source()), '信息: the author written to <meta>');
+    check(await js(`document.activeElement.closest('label.row') && document.activeElement.closest('label.row').querySelector('.what').textContent === '版本'`), '信息: the next field keeps the focus after the edit');
+    await js(`document.querySelector('#tabs [data-tab=motion]').click()`);
+    await wait(200);
+    const played = await js(`(async () => { [...document.querySelectorAll('#tab-motion button')].find((x) => x.textContent === '试一下').click(); await new Promise((ok) => setTimeout(ok, 1200)); return document.getElementById('preview').width; })()`);
+    check(played > 0, '动效: 试一下 plays and ends with the keys drawn');
+    // the environment's bar sample: the preview grows by the bar
+    const h0 = await js(`document.getElementById('preview').height`);
+    await js(`(() => { const s = document.getElementById('env-bar'); s.value = 'typing'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await wait(500);
+    const h1 = await js(`document.getElementById('preview').height`);
+    await js(`(() => { const s = document.getElementById('env-show'); s.value = 'preview'; s.dispatchEvent(new Event('change', { bubbles: true })); const t = document.getElementById('env-sheet'); t.value = 'clipboard'; t.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await wait(500);
+    check(h1 > h0, '环境: typing: the code strip over the bar (' + h0 + ' → ' + h1 + ')');
   } finally {
     b.close();
     server.close();
