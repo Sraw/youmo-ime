@@ -19,7 +19,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineState
-import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
@@ -29,7 +28,7 @@ import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPadView
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
-import org.fcitx.fcitx5.android.input.handwriting.InkPad
+import org.fcitx.fcitx5.android.input.handwriting.InkKeys
 import org.fcitx.fcitx5.android.input.handwriting.ReadingToggle
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
@@ -147,12 +146,15 @@ class HandwritingKeyboard(
         canvas?.invalidateScene()
     }
 
-    private val padView = HandwritingPadView(
+    private val padView: HandwritingPadView = HandwritingPadView(
         context, theme,
-        onRead = ::read,
+        onRead = { keys.read(it) },
         pause = { AppPrefs.getInstance().keyboard.handwritingPause.getValue().millis },
-        onFinish = ::finish,
+        onFinish = { keys.finish(it) },
     )
+
+    // the pad's readings and the keys beside it, in order
+    private val keys: InkKeys = InkKeys(recognition, padView, deliver, finished)
 
     private val padSlot = Rect()
 
@@ -213,30 +215,14 @@ class HandwritingKeyboard(
         scope = null
         // hidden, or the numbers shown: what was written is done, a key typed there commits it, so
         // finished as a pause would have (weighed again first); hidden, KeyboardWindow drops it
-        if (padView.pad.finished.isNotEmpty()) finish(padView.pad.piece)
+        if (padView.pad.finished.isNotEmpty()) keys.finish(padView.pad.piece)
         padView.next()
         super.onDetachedFromWindow()
     }
 
-    // the first piece of the field's input: those before were another input's
-    private var since = padView.pad.piece
-
     /** Another input started (a field, or the keyboard shown again): the pad starts afresh, what it was reading dropped. */
     fun restart() {
-        padView.next()
-        since = padView.pad.piece
-    }
-
-    private fun read(read: InkPad.Read) {
-        // delivered while the numbers or symbols are shown too: a key typed there commits it
-        recognition.read(read) { reading ->
-            if (read.piece >= since) deliver(reading, read.piece)
-        }
-    }
-
-    // after the piece's readings, as the engine must have them first
-    private fun finish(piece: Int) {
-        recognition.afterReads { if (piece >= since) finished(piece) }
+        keys.restart()
     }
 
     private val padHit = Rect()
@@ -362,12 +348,7 @@ class HandwritingKeyboard(
     public override fun onAction(action: KeyAction, source: KeyActionListener.Source) {
         // pressed while a stroke is read: in after its reading, as written before it; dropped if
         // another input started meanwhile (restart), it was not typed for that one
-        if (recognition.busy) {
-            val at = since
-            recognition.afterReads { if (isAttachedToWindow && at == since) act(action, source) }
-        } else {
-            act(action, source)
-        }
+        keys.onAction({ isAttachedToWindow }) { act(action, source) }
     }
 
     // 注 as 候选词注音 is: the accent's colour on, TalkBack told which (the style last used kept by FcitxInputMethodService)
@@ -380,7 +361,7 @@ class HandwritingKeyboard(
     // the piece on the pad finished first, as a pause does: in the engine's sentence, not committed, then the setting
     private fun toggleReading(action: KeyAction.ReadingAction) {
         if (padView.pad.finished.isNotEmpty()) {
-            finish(padView.pad.piece)
+            keys.finish(padView.pad.piece)
             padView.next()
         }
         val style = action.style ?: ReadingToggle.tapped(EngineState.candidateReading.value, lastReading)
@@ -389,12 +370,8 @@ class HandwritingKeyboard(
 
     private fun act(action: KeyAction, source: KeyActionListener.Source) {
         if (action is KeyAction.ReadingAction) return toggleReading(action)
-        // backspace takes the pad's last stroke back while it has one; else it is the engine's. Decided
-        // in its turn: behind a held key, the strokes it would take back are of the piece that key commits
-        if (action is KeyAction.SymAction && action.sym.sym == FcitxKeyMapping.FcitxKey_BackSpace && padView.undo()) return
-        // a key for the engine commits the piece: its strokes wiped now, not once the engine's end of it
-        // comes back, else a backspace right behind (held with it) takes back a stroke of what is committed
-        if ((action is KeyAction.SymAction || action is KeyAction.HostKeyAction) && padView.pad.finished.isNotEmpty()) padView.next()
+        // backspace takes the pad's last stroke back while it has one; else it is the engine's (InkKeys.took)
+        if (keys.took(action)) return
         super.onAction(action, source)
     }
 

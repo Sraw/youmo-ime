@@ -154,10 +154,10 @@ object InputMethodCatalog {
 
     /**
      * Whether input method [name] may be written on over its keys (键盘手写, design 060-kbd-handwriting §4):
-     * the Chinese ones on every keyboard they have, not English nor handwriting itself. Each is made a
+     * the Chinese ones on every keyboard they have, not English nor handwriting itself (nor none, a keyboard not told yet). Each is made a
      * session that reads the ink ([InkOver][org.fcitx.fcitx5.android.engine.handwriting.InkOver], SessionFactory.make).
      */
-    fun writesOnKeys(name: String): Boolean = name != ENGLISH && name != HANDWRITING
+    fun writesOnKeys(name: String): Boolean = name.isNotEmpty() && name != ENGLISH && name != HANDWRITING
 
     /** English: fcitx's own name for it, which fcitx falls back to, so a user's lists keep it. */
     const val ENGLISH = "keyboard-us"

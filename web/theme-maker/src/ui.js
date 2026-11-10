@@ -30,6 +30,12 @@
   let loading = 0; // which loadAssets is the latest: an older one finishing late is dropped
   let edited = false; // the draft is kept only once the user has changed something
   let keeping = null;
+  let problems = []; // the problems the preview last listed: a tab shows those of its styles
+  let barH = 0; // the bar's sample's height over the keys on the preview canvas (px), the keys under it
+  let playing = null; // 试一下's frame: {key, scale, sink, alpha, appear} while it plays
+  // the pictures picked this session as they were picked (L9): a cut is made from them, not from the re-encoded file.
+  // By the saved file's content id: `{bytes, scale}` (the picked one's decoded width over the saved one's)
+  const originals = new Map();
   const store = (() => { try { return M.idbStore(window.indexedDB); } catch (e) { return null; } })();
 
   function toast(text) {
@@ -60,6 +66,8 @@
     const d = history.current;
     if ($('source').value !== d.xml) $('source').value = d.xml;
     $('name').textContent = M.themeName(d.xml) || '（无名）';
+    // the page answers only once there is a document (m1-review L6): until then its buttons are inert
+    $('top').inert = $('main').inert = false;
     $('undo').disabled = !history.canUndo;
     $('redo').disabled = !history.canRedo;
     keep();
@@ -79,7 +87,7 @@
     if (to.nodeType !== Node.ELEMENT_NODE) return true;
     // a control's handlers hold what it was drawn for: the row's name (a colour's, a stop's), a box's data-key
     // (a picture decoded, its crop). Another, and the part is put in whole, never kept with old handlers
-    const what = (e) => (e.matches('label.row') ? e.querySelector('.what').textContent : null);
+    const what = (e) => (e.matches('label.row') ? e.querySelector('.what')?.textContent ?? null : null);
     if (to.dataset.key !== from.dataset.key || what(to) !== what(from)) {
       if (to.contains(skip)) return false;
       to.replaceWith(from);
@@ -119,8 +127,33 @@
     }
     const active = document.activeElement;
     const skip = !external && el.contains(active) && typedIn(active) ? active : null;
+    const key = el.contains(active) && active.matches(CONTROLS) ? controlKey(active) : null;
     const same = el.childNodes.length === fresh.childNodes.length && [...fresh.childNodes].every((n, i) => sync(el.childNodes[i], n, skip));
-    if (!same) showTab();
+    if (!same) { rebuildSoon(); return; }
+    // a row or box put in whole took the focused control with it (用这个裁切's button): focus its like in the new one
+    if (key && !el.contains(document.activeElement)) {
+      const again = [...el.querySelectorAll(CONTROLS)].find((c) => controlKey(c) === key);
+      if (again) again.focus({ preventScroll: true });
+    }
+  }
+
+  // a change that adds or takes away controls (a border's colour once it has a width) draws the tab anew, but a task
+  // later: on touch the old field's change comes inside the next tap's mousedown, before focus moves, so drawn at
+  // once the tab lost the field tapped. By then the focus is on it: showTab focuses its like by controlKey, and what
+  // was typed into it and not yet committed is kept with its caret
+  let rebuilding = null;
+  function rebuildSoon() {
+    clearTimeout(rebuilding);
+    rebuilding = setTimeout(() => {
+      const a = document.activeElement;
+      const typed = typedIn(a) && $('tab-' + tab).contains(a) ? { value: a.value, from: a.selectionStart, to: a.selectionEnd, key: controlKey(a) } : null;
+      showTab();
+      const b = document.activeElement;
+      if (typed && typedIn(b) && controlKey(b) === typed.key && b.value !== typed.value) {
+        b.value = typed.value;
+        try { b.setSelectionRange(typed.from, typed.to); } catch (e) { /* a number field has no caret */ }
+      }
+    }, 0);
   }
 
   // a control's place in a tab, the same in the tab drawn anew: its row's label, its place in the row (else its text)
@@ -206,6 +239,143 @@
     };
   }
 
+  // the bar's sample over the keys (环境 → 候选栏样例): the candidates typing, the toolbar's buttons idle; the code
+  // being typed over it. Its height in px, 0 for none
+  const PREEDIT_DP = 24;
+  function barOf(m) {
+    if (!env.bar || !theme) return null;
+    const r = E.buildBar(theme, M.envJson(env), m);
+    const l = E.looks(theme, M.envJson(env));
+    if (!r.ok || !l.ok) return null;
+    const pre = env.bar === 'typing' ? Math.round(PREEDIT_DP * env.density) : 0;
+    return { scene: r.scene, looks: l.looks, pre, height: pre + r.scene.height };
+  }
+
+  const css = (argb) => {
+    if (!argb) return null;
+    const v = argb.replace('#', '');
+    const a = parseInt(v.slice(0, 2), 16) / 255;
+    return 'rgba(' + parseInt(v.slice(2, 4), 16) + ',' + parseInt(v.slice(4, 6), 16) + ',' + parseInt(v.slice(6, 8), 16) + ',' + a.toFixed(3) + ')';
+  };
+
+  function drawBar(ctx, bar, state, fonts) {
+    const dp = env.density;
+    const lk = bar.looks;
+    ctx.save();
+    if (bar.pre) {
+      // the code being typed: its text, the underline fcitx asks for, the cursor at its end
+      const size = Math.round(14 * dp);
+      ctx.font = size + 'px ' + fonts.key;
+      ctx.fillStyle = css(lk.preedit.color) || '#000';
+      ctx.textBaseline = 'middle';
+      const text = 'you mo';
+      const x = 12 * dp;
+      const y = bar.pre / 2;
+      ctx.fillText(text, x, y);
+      const w = ctx.measureText(text).width;
+      if (lk.preedit.underline) {
+        ctx.fillStyle = css(lk.preedit.underline.color) || css(lk.preedit.color);
+        ctx.fillRect(x, y + size * 0.6, w, Math.max(1, lk.preedit.underline.widthDp * dp));
+      }
+      if (lk.preedit.cursor) {
+        ctx.fillStyle = css(lk.preedit.cursor);
+        ctx.fillRect(x + w + 1, y - size / 2, Math.max(1, dp), size);
+      }
+    }
+    ctx.translate(0, bar.pre);
+    if (env.bar === 'typing') E.paint(bar.scene, ctx, state);
+    else {
+      // idle: the bar's base and five toolbar buttons (a circle, or the toolbar's radius), the second one on
+      const h = bar.scene.height;
+      if (lk.bar) { ctx.fillStyle = css(lk.bar); ctx.fillRect(0, 0, bar.scene.width, h); }
+      const size = Math.min(h - 8 * dp, 36 * dp);
+      const step = bar.scene.width / 6;
+      for (let i = 0; i < 5; i++) {
+        const cx = step * (i + 0.5) + step / 2;
+        const on = i === 1;
+        const fill = on ? lk.toolbar.onFill : lk.toolbar.fill;
+        const r = lk.toolbar.radiusDp == null ? size / 2 : Math.min(size / 2, lk.toolbar.radiusDp * dp);
+        if (fill) {
+          ctx.fillStyle = css(fill);
+          ctx.beginPath();
+          ctx.roundRect(cx - size / 2, (h - size) / 2, size, size, r);
+          ctx.fill();
+        }
+        ctx.fillStyle = css(on ? lk.toolbar.onIcon : lk.toolbar.icon);
+        ctx.beginPath();
+        ctx.arc(cx, h / 2, size / 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  // a panel over the keys (环境 → 面板样例): blocks of what the app's views take of the theme (the engine's looks)
+  function drawPanel(ctx, lk, w, h) {
+    const dp = env.density;
+    const round = (x, y, ww, hh, r, fill) => { if (!fill) return; ctx.fillStyle = css(fill); ctx.beginPath(); ctx.roundRect(x, y, ww, hh, Math.max(0, r)); ctx.fill(); };
+    const text = (t, x, y, color) => { ctx.fillStyle = css(color) || '#000'; ctx.font = Math.round(13 * dp) + 'px "Youmo Han", sans-serif'; ctx.textBaseline = 'middle'; ctx.fillText(t, x, y); };
+    ctx.save();
+    const p = 8 * dp;
+    if (env.panel === 'clipboard') {
+      const c = lk.clipboard;
+      for (let i = 0; i < 4; i++) {
+        const x = p + (i % 2) * (w / 2);
+        const y = p + Math.floor(i / 2) * 64 * dp;
+        round(x, y, w / 2 - 2 * p, 56 * dp, c.radiusDp * dp, c.fill);
+        text(['复制的一段文字', '幽默输入法', 'https://…', '12345'][i], x + p, y + 28 * dp, c.color);
+      }
+    } else if (env.panel === 'picker') {
+      const c = lk.picker;
+      round(0, 0, w, h, 0, c.fill);
+      const bar = 40 * dp;
+      round(0, h - bar, w, bar, 0, c.categories);
+      const tabs = ['常用', '中文', '英文', '数学', '箭头'];
+      tabs.forEach((t, i) => {
+        if (i === 0) round(i * w / tabs.length, h - bar, w / tabs.length, bar, 0, c.selected);
+        text(t, i * w / tabs.length + p, h - bar / 2, i === 0 ? c.selectedColor : c.color);
+      });
+      '，。、？！：；“”（）《》'.split('').forEach((t, i) => text(t, p + (i % 6) * (w / 6), p + 20 * dp + Math.floor(i / 6) * 48 * dp, c.color));
+    } else if (env.panel === 'editing') {
+      const c = lk.editing;
+      round(0, 0, w, h, 0, c.fill);
+      ['全选', '复制', '粘贴', '剪切', '←', '→'].forEach((t, i) => {
+        const x = p + (i % 3) * (w - p) / 3;
+        const y = p + Math.floor(i / 3) * (h - p) / 2;
+        round(x, y, (w - p) / 3 - p, (h - p) / 2 - p, c.radiusDp * dp, lk.clipboard.fill);
+        text(t, x + p, y + ((h - p) / 2 - p) / 2, lk.clipboard.color);
+      });
+    } else if (env.panel === 'voice') {
+      const c = lk.voice;
+      round(0, 0, w, h, 0, c.fill);
+      const r = 36 * dp;
+      round(w / 2 - r, h / 2 - r, 2 * r, 2 * r, r, c.mic);
+      round(w / 2 - r / 4, h / 2 - r / 2, r / 2, r, r / 4, c.micColor);
+    }
+    ctx.restore();
+  }
+
+  // the popup 环境 → 显示 asks for, over the key picked (or the keyboard's middle key): `{scene, x, y}` px on the keys
+  function popupOf(m) {
+    if (!env.show || !scene || !theme) return null;
+    const keys = scene.json().keys;
+    const k = (picked && picked.board === env.board && keys.find((x) => x.id === picked.key)) || keys[Math.floor(keys.length / 3)];
+    if (!k) return null;
+    const [l, t, r] = k.bounds;
+    const label = k.label || 'a';
+    let req;
+    if (env.show === 'preview') req = { kind: 'preview', text: label, keyWidth: r - l };
+    else if (env.show === 'keys') req = { kind: 'keys', labels: ['à', 'á', 'â', 'ä', 'ā'], rows: [[0, 1, 2, 3, 4]], columns: 5, selected: 1 };
+    else req = { kind: 'menu', cells: [{ label: '剪贴板' }, { label: '表情' }, { label: '编辑' }, { label: '设置' }], order: [0, 1, 2, 3], selected: 0 };
+    const got = E.buildPopup(theme, M.envJson(env), req, m);
+    if (!got.ok) return null;
+    const p = got.scene;
+    const cx = (l + r) / 2;
+    const x = env.show === 'menu' ? (scene.width - p.width) / 2 : Math.max(0, Math.min(scene.width - p.width, cx - p.width / 2));
+    const y = env.show === 'menu' ? (scene.height - p.height) / 2 : t - p.height;
+    return { scene: p, x, y };
+  }
+
   function preview() {
     const d = history.current;
     const canvas = $('preview');
@@ -216,17 +386,133 @@
     theme = r.theme;
     showProblems(r.problems);
     if (!scene) return;
+    let bar = null;
+    let popup = null;
+    try {
+      bar = barOf(m.ok ? m.measurer : null);
+      popup = popupOf(m.ok ? m.measurer : null);
+    } catch (e) {
+      // a sample the engine could not make: the keys drawn without it
+    }
+    barH = bar ? bar.height : 0;
     canvas.width = scene.width;
-    canvas.height = scene.height;
+    canvas.height = scene.height + barH;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const state = { pressed, icons: ICONS, images: assets.images, fonts };
     const picture = pictureOf();
     if (picture) state.picture = picture;
-    E.paint(scene, ctx, state);
+    if (bar) drawBar(ctx, bar, Object.assign({}, state, { pressed: null }), fonts);
+    ctx.save();
+    ctx.translate(0, barH);
+    const looks = env.panel && theme ? E.looks(theme, M.envJson(env)) : null;
+    if (looks && looks.ok) {
+      E.paint(scene, ctx, Object.assign({}, state, { pressed: null }));
+      drawPanel(ctx, looks.looks, scene.width, scene.height);
+    } else E.paint(scene, ctx, state);
+    if (popup) {
+      ctx.translate(popup.x, popup.y);
+      E.paint(popup.scene, ctx, state);
+    }
+    ctx.restore();
+  }
+
+  // ---- 试一下 (动效): the press and its release, the bubble appearing, by requestAnimationFrame ----
+
+  // a frame of what plays ([c]: what play made once for it): the keys, the played key drawn pressed (scaled and sunk
+  // about its middle, see-through as it fades back), the bubble over it as it appears
+  function playFrame(ctx, c) {
+    ctx.drawImage(c.keys, 0, 0);
+    const [l, t, r, b] = c.bounds;
+    ctx.save();
+    ctx.globalAlpha = playing.alpha;
+    const cx = (l + r) / 2;
+    const cy = (t + b) / 2 + playing.sink * env.density;
+    ctx.translate(cx, cy);
+    ctx.scale(playing.scale, playing.scale);
+    ctx.drawImage(c.pressed, l, t, r - l, b - t, -(r - l) / 2, -(b - t) / 2, r - l, b - t);
+    ctx.restore();
+    if (playing.appear != null && c.bubble) {
+      const p = c.bubble;
+      const a = playing.appear;
+      ctx.save();
+      const kind = playing.appearKind;
+      ctx.globalAlpha = kind === 'fade' ? a : 1;
+      const x = Math.max(0, Math.min(scene.width - p.width, cx - p.width / 2));
+      const y = t - p.height + (kind === 'rise' ? (1 - a) * 12 * env.density : 0);
+      ctx.translate(x + p.width / 2, y + p.height);
+      if (kind === 'scale') ctx.scale(0.5 + a / 2, 0.5 + a / 2);
+      ctx.translate(-p.width / 2, -p.height);
+      E.paint(p, ctx, c.state);
+      ctx.restore();
+    }
+  }
+
+  const EASE = {
+    linear: (x) => x, ease: (x) => x * x * (3 - 2 * x), 'ease-in': (x) => x * x, 'ease-out': (x) => 1 - (1 - x) * (1 - x), 'ease-in-out': (x) => (x < 0.5 ? 2 * x * x : 1 - 2 * (1 - x) * (1 - x)),
+  };
+
+  /**
+   * [m] (动效's sample: transition, scale, sink, appear) played on the preview: pressed at once (never faded in),
+   * held, then faded back over the transition's time; the bubble appearing over its own. Stops when done.
+   */
+  function play(m) {
+    if (!scene) return;
+    const keys = scene.json().keys;
+    const k = (picked && keys.find((x) => x.id === picked.key)) || keys.find((x) => x.kind === 'letter') || keys[0];
+    if (!k) return;
+    const HOLD = 220;
+    const back = m.transition ? m.transition.ms : 0;
+    const ease = EASE[m.transition ? m.transition.easing : 'linear'] || EASE.linear;
+    const pressMs = Math.min(80, back || 80);
+    const appearMs = m.appear ? m.appear.ms : 0;
+    // drawn once for the play, not each frame (the theme read again, the scene built again: frames dropped on a phone)
+    const fonts = Object.assign({ key: '"Youmo Latin", "Youmo Han", sans-serif' }, fontFamilies(history.current.xml));
+    const state = { pressed: null, icons: ICONS, images: assets.images, fonts };
+    const picture = pictureOf();
+    if (picture) state.picture = picture;
+    const layer = (pressedKey) => {
+      const o = document.createElement('canvas');
+      o.width = scene.width;
+      o.height = scene.height;
+      E.paint(scene, o.getContext('2d'), Object.assign({}, state, { pressed: pressedKey }));
+      return o;
+    };
+    const got = E.buildPopup(theme, M.envJson(env), { kind: 'preview', text: k.label || 'a', keyWidth: k.bounds[2] - k.bounds[0] }, null);
+    const cache = { keys: layer(null), pressed: layer(k.id), bounds: k.bounds, bubble: got.ok ? got.scene : null, state };
+    const canvas = $('preview');
+    const ctx = canvas.getContext('2d');
+    const t0 = performance.now();
+    const step = (now) => {
+      const t = now - t0;
+      const pressIn = Math.min(1, t / pressMs);
+      const release = t < HOLD ? 0 : back ? Math.min(1, (t - HOLD) / back) : 1;
+      playing = {
+        key: k.id,
+        // the press's scale and sink come in over at most 80 ms (§4.1), its colour at once
+        scale: 1 + (m.scale / 100 - 1) * pressIn * (1 - ease(release)),
+        sink: m.sink * pressIn * (1 - ease(release)),
+        alpha: 1 - ease(release),
+        appear: t < HOLD + back ? (appearMs ? Math.min(1, t / appearMs) : 1) : null,
+        appearKind: m.appear ? m.appear.kind : 'fade',
+      };
+      if (t >= HOLD + back) {
+        playing = null;
+        preview();
+        return;
+      }
+      ctx.clearRect(0, barH, canvas.width, canvas.height - barH);
+      ctx.save();
+      ctx.translate(0, barH);
+      playFrame(ctx, cache);
+      ctx.restore();
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   }
 
   function showProblems(list) {
+    problems = list;
     const ul = $('problems');
     ul.textContent = '';
     for (const p of list) {
@@ -307,8 +593,16 @@
     const f = await pick($('image-input'));
     if (!f) return null;
     try {
-      const made = await M.pictureFile(L, FORMAT, new Uint8Array(await f.arrayBuffer()), encodePicture);
+      const picked = new Uint8Array(await f.arrayBuffer());
+      const made = await M.pictureFile(L, FORMAT, picked, encodePicture);
       const size = L.imageSize(made.bytes);
+      // the picked picture kept for this session's cuts (a cut of the saved JPEG would be a second generation)
+      if (size) {
+        const bmp = await createImageBitmap(new Blob([picked]));
+        originals.clear();
+        originals.set(L.contentId(made.bytes), { bytes: picked, scale: bmp.width / size[0] });
+        bmp.close();
+      }
       const bg = PANELS.find((p) => p.id === 'background').ops;
       const cuts = {};
       for (const o of ['portrait', 'landscape']) {
@@ -325,7 +619,11 @@
   // [rect] of the picture [bytes] as a file of its own, encoded as every picture is
   async function cutOf(bytes, rect) {
     const side = Math.min(M.PICTURE_SAVE.longSide, FORMAT.limits.pictureSide);
-    const made = await encodePicture(bytes, (w, h) => L.resizeInside(w, h, side, side), M.PICTURE_SAVE.quality, rect);
+    // [rect] is of the saved picture; the picked one it was made from (this session's) is cut instead, at its scale
+    const first = originals.get(L.contentId(bytes));
+    const from = first ? first.bytes : bytes;
+    const at = first ? rect.map((v) => v * first.scale) : rect;
+    const made = await encodePicture(from, (w, h) => L.resizeInside(w, h, side, side), M.PICTURE_SAVE.quality, at);
     return { bytes: made.bytes, type: made.type, rect };
   }
 
@@ -334,7 +632,18 @@
     const made = await choosePicture();
     if (!made) return;
     const bg = PANELS.find((p) => p.id === 'background').ops;
-    set(asDoc(bg.setPicture(M.fromBuiltin(E, chosen ? chosen.value : 'material'), made)));
+    const colors = PANELS.find((p) => p.id === 'colors').ops;
+    // 浅/深 (060-render-p3 §5.1 新建 2): the version shown and the colours worked out of the picture for it
+    const dark = !!(document.querySelector('input[name="image-tone"]:checked') || {}).value?.startsWith('dark');
+    env.dark = dark;
+    fillEnvForm();
+    let d = bg.setPicture(M.fromBuiltin(E, chosen ? chosen.value : 'material'), made);
+    // sampled from the picture just made (the preview's is still the last one's until it is drawn), as one step
+    const cut = made.cuts.portrait || { bytes: made.src };
+    const bmp = await createImageBitmap(new Blob([cut.bytes]));
+    d = colors.fromPictureAll(d, samplesOf(bmp), dark);
+    bmp.close();
+    set(asDoc(d));
     $('new-panel').close();
     tab = 'background';
     showTab();
@@ -365,6 +674,31 @@
       set(asDoc(next));
     },
     rerender: () => showTab(),
+    problems: () => problems,
+    play,
+    // the preview as a PNG at most [width] px across (信息's preview image)
+    // the preview as an image at most [width] px across and [bytes] long (信息's preview image): a PNG where one fits,
+    // else WebP at falling quality, then smaller, until it does (a picture background's PNG is past the App's 512 KB)
+    async previewImage(width, bytes = Infinity) {
+      const c = $('preview');
+      const encode = async (w, type, q) => {
+        const k = Math.min(1, w / c.width);
+        const o = document.createElement('canvas');
+        o.width = Math.max(1, Math.round(c.width * k));
+        o.height = Math.max(1, Math.round(c.height * k));
+        o.getContext('2d').drawImage(c, 0, 0, o.width, o.height);
+        const blob = await new Promise((ok) => o.toBlob(ok, type, q));
+        return blob && blob.type === type ? new Uint8Array(await blob.arrayBuffer()) : null;
+      };
+      let out = await encode(width, 'image/png');
+      for (let w = width; out && out.length > bytes && w >= 120; w = Math.round(w * 0.8)) {
+        for (const q of [0.9, 0.8, 0.7, 0.6]) {
+          out = (await encode(w, 'image/webp', q)) || (await encode(w, 'image/png')) || out;
+          if (out.length <= bytes) break;
+        }
+      }
+      return out;
+    },
     toast,
     lib: L,
     limits: () => FORMAT.limits,
@@ -383,18 +717,22 @@
     async pictureSamples() {
       const p = theme && theme.info(env.dark).picture;
       const bmp = p && assets.cuts[(p.cuts || {}).portrait || p.src];
-      if (!bmp) return null;
-      const c = document.createElement('canvas');
-      c.width = 24;
-      c.height = 16;
-      const g = c.getContext('2d');
-      g.drawImage(bmp, 0, 0, c.width, c.height);
-      const px = g.getImageData(0, 0, c.width, c.height).data;
-      const out = [];
-      for (let i = 0; i < px.length; i += 4) out.push([px[i], px[i + 1], px[i + 2]]);
-      return out;
+      return bmp ? samplesOf(bmp) : null;
     },
   };
+
+  // a few hundred of [bmp]'s pixels, `[[r, g, b]]`
+  function samplesOf(bmp) {
+    const c = document.createElement('canvas');
+    c.width = 24;
+    c.height = 16;
+    const g = c.getContext('2d');
+    g.drawImage(bmp, 0, 0, c.width, c.height);
+    const px = g.getImageData(0, 0, c.width, c.height).data;
+    const out = [];
+    for (let i = 0; i < px.length; i += 4) out.push([px[i], px[i + 1], px[i + 2]]);
+    return out;
+  }
 
   // the tab shown drawn anew from the document (the source tab is the text area, kept as it is typed)
   function showTab() {
@@ -448,6 +786,11 @@
     $('env-board').value = env.board;
     $('env-form-kind').value = env.form;
     $('env-shift').value = env.shift;
+    $('env-field').value = env.field;
+    $('env-ime').value = env.ime;
+    $('env-show').value = env.show;
+    $('env-bar').value = env.bar;
+    $('env-sheet').value = env.panel;
     $('dark').setAttribute('aria-pressed', String(env.dark));
     $('dark').textContent = env.dark ? '深色' : '浅色';
   }
@@ -462,7 +805,10 @@
       Object.assign(env, { w: num('env-w', env.w), h: num('env-h', env.h), density: num('env-density', env.density) });
       if (e && /env-(w|h|density)/.test(e.target.id)) env.device = 'custom';
     }
-    Object.assign(env, { landscape: $('env-landscape').checked, board: $('env-board').value, form: $('env-form-kind').value, shift: $('env-shift').value });
+    Object.assign(env, {
+      landscape: $('env-landscape').checked, board: $('env-board').value, form: $('env-form-kind').value, shift: $('env-shift').value,
+      field: $('env-field').value, ime: $('env-ime').value, show: $('env-show').value, bar: $('env-bar').value, panel: $('env-sheet').value,
+    });
     fillEnvForm();
     keep();
     if (history) { preview(); showTab(); }
@@ -542,7 +888,7 @@
     const keyAt = (e) => {
       if (!scene) return null;
       const r = canvas.getBoundingClientRect();
-      const k = scene.keyAt((e.clientX - r.left) * scene.width / r.width, (e.clientY - r.top) * scene.height / r.height);
+      const k = scene.keyAt((e.clientX - r.left) * canvas.width / r.width, (e.clientY - r.top) * canvas.height / r.height - barH);
       return k >= 0 ? scene.json().keys[k].id : null;
     };
     canvas.addEventListener('pointerdown', (e) => {

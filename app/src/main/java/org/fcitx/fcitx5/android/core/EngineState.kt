@@ -86,6 +86,18 @@ object EngineState {
      */
     val handwritingEnded: StateFlow<Int> = inkEnded
 
+    /** Whether the input method has its own input typed ([typed], Engines.typedOnKeys), as its [answer]th answer said. */
+    data class KeysTyped(val answer: Long, val typed: Boolean)
+
+    internal val keysTypedState = MutableStateFlow(KeysTyped(0, false))
+
+    /**
+     * What the last answer of an input method written on the keys (键盘手写, InputMethodCatalog.writesOnKeys)
+     * said of its own input: a new value at every answer, the same or not (KeyInkGesture.engineTyped).
+     * Set on the fcitx thread, read on the main one.
+     */
+    val keysTyped: StateFlow<KeysTyped> = keysTypedState
+
     internal val tableKeyboardState = MutableStateFlow<TableKeyboard?>(null)
 
     /**
@@ -125,6 +137,7 @@ object EngineState {
         syllablesState.value = SyllableState()
         englishTypingState.value = false
         inkEnded.value = HandwritingSession.NO_PIECE
+        keysTypedState.value = KeysTyped(keysTypedState.value.answer + 1, false)
         tableKeyboardState.value = null
     }
 }

@@ -274,12 +274,13 @@ class KotlinHost(
         }
     }
 
-    override suspend fun offerInk(reading: InkReading, piece: Int) = onHost { inkKey(Action.Ink(piece, reading)) }
+    override suspend fun offerInk(reading: InkReading, piece: Int, onKeys: Boolean) = onHost { inkKey(Action.Ink(piece, reading), onKeys) }
 
-    override suspend fun inkFinished(piece: Int) = onHost { inkKey(Action.Ink(piece)) }
+    override suspend fun inkFinished(piece: Int, onKeys: Boolean) = onHost { inkKey(Action.Ink(piece), onKeys) }
 
     // the Ink key carries what the pad told: it cannot come apart from it
-    private fun HostCore.inkKey(piece: Action.Ink) = bridge.sendInk(piece, inputMethodEntryCached.uniqueName) { sendVirtual(Keyboard.INK, piece) }
+    private fun HostCore.inkKey(piece: Action.Ink, onKeys: Boolean) =
+        bridge.sendInk(piece, inputMethodEntryCached.uniqueName, onKeys) { sendVirtual(Keyboard.INK, piece) }
 
     override suspend fun learning(op: LearningOp) = onHost {
         // 繁體: the menu names the candidate as shown, converted; the engine has it simplified. Each

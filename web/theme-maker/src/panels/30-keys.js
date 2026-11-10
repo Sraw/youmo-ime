@@ -45,6 +45,23 @@
         return { property: s.property, value: a ? a[1] : null, select: style ? style.select : null, line: s.line };
       });
     },
+    /** The theme's key images (files named `key-…`, what addKeyImage makes, and any an image() fill names). */
+    keyImages: (d) => Object.keys(d.files).filter((n) => /^key-/.test(n) || F.uncommented(d.xml).includes('image(' + n)).sort(),
+    /**
+     * [d] with [bytes] ([name]) a key's image, `key-<name>`: refused (throws) where the app would (a PNG, JPEG or WebP,
+     * its long side and bytes in [lim]'s keyImageSide, keyImageBytes). `{…d, file}`.
+     */
+    addKeyImage(d, L, lim, name, bytes) {
+      const type = L.imageType(bytes);
+      const s = L.imageSize(bytes);
+      if (!['png', 'jpg', 'webp'].includes(type) || !s) throw new Error(name + ' 不是 PNG、JPEG 或 WebP');
+      if (Math.max(s[0], s[1]) > lim.keyImageSide) throw new Error(name + ' 太大：最大 ' + lim.keyImageSide + '×' + lim.keyImageSide);
+      if (bytes.length > lim.keyImageBytes) throw new Error(name + ' 超过 ' + lim.keyImageBytes + ' 字节');
+      const file = panels.fileName(d.files, 'key-', name, type);
+      const files = Object.assign(Object.create(null), d.files);
+      files[file] = bytes;
+      return { xml: d.xml, files, layouts: d.layouts, file };
+    },
     /** The preview's environment [env] (the page's) as the scene [scene] (F.SCENES') has it: where the cascade check looks. */
     envOf(env, scene) {
       const e = Object.assign({}, env);
@@ -106,7 +123,7 @@
     const now = () => F.parseFill(F.valueOf(api.doc().xml, sel, 'fill')) || f;
     const out = h('div', { className: 'group' });
     const set = (fill) => api.apply((x) => ops.fill(x, sel, fill));
-    const kinds = [['none', '不设'], ['solid', '纯色'], ['linear', '渐变'], ['picture', '透出背景图']];
+    const kinds = [['none', '不设'], ['solid', '纯色'], ['linear', '渐变'], ['picture', '透出背景图'], ['image', '九宫格图片']];
     if (f.kind === 'other') kinds.push(['other', '图片（在源码里改）']);
     out.append(row('填充', select(kinds, f.kind, (k) => {
       const c = now();
@@ -114,7 +131,13 @@
       else if (k === 'solid') set({ kind: 'solid', color: c.kind === 'solid' ? c.color : '@key' });
       else if (k === 'linear') set({ kind: 'linear', angle: 90, stops: [[c.kind === 'solid' ? c.color : '#ffffff', 0], ['#c0c0c0', 100]] });
       else if (k === 'picture') set({ kind: 'picture', blur: 0, brightness: 100, over: '#66ffffff' });
+      else if (k === 'image') {
+        const file = ops.keyImages(api.doc())[0];
+        if (file) set({ kind: 'image', file, insets: [0, 0, 0, 0], scale: 3, fallback: c.kind === 'solid' ? c.color : null });
+        else api.toast('先上传一张键面图片（下面的按钮）');
+      }
     })));
+    if (f.kind === 'none' || f.kind === 'solid' || f.kind === 'image') out.append(uploadImage(api, sel));
     if (f.kind === 'solid') out.append(row('颜色', color(f.color, (c) => set(c ? { kind: 'solid', color: c } : null), F)));
     if (f.kind === 'linear') {
       const patch = (fn) => { const c = now(); if (c.kind === 'linear') set(fn(c)); };
@@ -136,7 +159,30 @@
         row('盖一层颜色', color(f.over, (v) => patch({ over: v }), F)),
       );
     }
+    if (f.kind === 'image') {
+      const patch = (p) => { const c = now(); if (c.kind === 'image') set(Object.assign({}, c, p)); };
+      const files = ops.keyImages(api.doc());
+      out.append(row('图片', select(files.concat(files.includes(f.file) ? [] : [f.file]).map((n) => [n, n]), f.file, (file) => patch({ file }))));
+      out.append(row('四角不拉伸', ...['上', '右', '下', '左'].map((side, k) => number(f.insets[k], (v) => { const c = now(); if (c.kind !== 'image') return; const ins = c.insets.slice(); ins[k] = v ?? 0; patch({ insets: ins }); }, { min: 0, max: 9999, unit: 'px ' + side }))));
+      out.append(row('图片密度', number(f.scale, (v) => patch({ scale: v ?? 1 }), { min: 1, max: 8, unit: '倍（像素每 dp）' })));
+      out.append(row('图片没有时的颜色', color(f.fallback, (v) => patch({ fallback: v }), F)));
+    }
     return out;
+  }
+
+  // a key's image put in the theme and made the fill: PNG, JPEG or WebP within the app's side and bytes for a key's
+  function uploadImage(api, sel) {
+    const { h } = panels.ui;
+    return h('button', { type: 'button', textContent: '上传键面图片…', on: { click: async () => {
+      const f = await api.pickFile('image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp');
+      if (!f) return;
+      // the image and the fill it is, one step (undone together: no file left that nothing names)
+      api.apply((x) => {
+        const made = ops.addKeyImage(x, api.lib, api.limits(), f.name, new Uint8Array(f.bytes));
+        const c = F.parseFill(F.valueOf(made.xml, sel, 'fill')) || { kind: 'none' };
+        return ops.fill(made, sel, c.kind === 'image' ? Object.assign({}, c, { file: made.file }) : { kind: 'image', file: made.file, insets: [0, 0, 0, 0], scale: 3, fallback: c.kind === 'solid' ? c.color : null });
+      });
+    } } });
   }
 
   /**
@@ -163,9 +209,7 @@
     const now = (p) => F.valueOf(api.doc().xml, sel, p);
     const set = (p) => (v) => api.apply((x) => ops.set(x, sel, p, v));
     el.append(fillForm(api, sel, val('fill')));
-    const radius = val('radius');
-    const oneRadius = radius && /^[\d.]+dp$/.test(radius);
-    el.append(row('圆角', number(oneRadius ? parseFloat(radius) : null, set('radius'), { min: 0, max: LIM.lengthDp, unit: 'dp' }), radius && !oneRadius ? h('code', { textContent: radius }) : null));
+    panels.ui.propRows(el, api, F, sel, [{ prop: 'radius', label: '圆角', kind: 'radius' }], true);
 
     const borderText = val('border');
     const border = F.parseBorder(borderText);
@@ -188,23 +232,7 @@
     const depth = val('depth');
     el.append(row('厚度', number(depth ? parseFloat(depth) : null, set('depth'), { min: 0, max: LIM.depthDp, step: 0.5, unit: 'dp' }), h('span', { className: 'muted', textContent: '颜色 ' }), color(val('depth-color'), set('depth-color'), F)));
 
-    // an inset of one value is both sides; one of four the form shows as written and its fields as the first two
-    const insetText = val('inset');
-    const insetOf = (t) => {
-      const v = (t || '').trim().split(/\s+/).map(parseFloat);
-      if (!t || !v.every(Number.isFinite)) return null;
-      return v.length === 1 ? [v[0], v[0]] : [v[0], v[1]];
-    };
-    const inset = insetOf(insetText);
-    const putInset = (i, v) => {
-      if (v == null) { set('inset')(null); return; }
-      const was = insetOf(now('inset')) || [3, 7];
-      was[i] = v;
-      set('inset')(was);
-    };
-    el.append(row('内缩', number(inset ? inset[0] : null, (v) => putInset(0, v), { min: 0, max: LIM.lengthDp, step: 0.5, unit: 'dp 上下' }),
-      number(inset ? inset[1] : null, (v) => putInset(1, v), { min: 0, max: LIM.lengthDp, step: 0.5, unit: 'dp 左右' }),
-      insetText && insetText.trim().split(/\s+/).length === 4 ? h('code', { textContent: insetText }) : null));
+    panels.ui.propRows(el, api, F, sel, [{ prop: 'inset', label: '内缩', kind: 'inset' }], true);
     el.append(row('形状', select([['', '不设'], ['rect', '方块'], ['circle', '圆'], ['bar', '条']], val('shape') || '', (v) => set('shape')(v || null))));
     el.append(row('按下效果', select([['', '不设'], ['tint', '变色'], ['ripple', '涟漪'], ['face', '换面']], val('press') || '', (v) => set('press')(v || null))));
     el.append(row('按下时盖的颜色', color(val('overlay'), set('overlay'), F), clear(set('overlay'))));

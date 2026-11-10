@@ -31,9 +31,9 @@ class HandwritingPadView(
     private val onRead: (InkPad.Read) -> Unit,
     private val pause: () -> Long = { InkPad.FINISH_MILLIS },
     private val onFinish: (piece: Int) -> Unit = {},
-) : View(context) {
+) : View(context), InkKeys.Pad {
 
-    val pad = InkPad()
+    override val pad = InkPad()
 
     private val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = theme.keyTextColor
@@ -78,7 +78,7 @@ class HandwritingPadView(
     private var pointer = MotionEvent.INVALID_POINTER_ID
 
     /** The piece ended as it is: InkPad.next. */
-    fun next() {
+    override fun next() {
         removeCallbacks(finishCheck)
         pointer = MotionEvent.INVALID_POINTER_ID
         pad.next()
@@ -94,7 +94,7 @@ class HandwritingPadView(
     }
 
     /** Backspace: the last stroke taken back, true; false with none to take back. */
-    fun undo(): Boolean {
+    override fun undo(): Boolean {
         val read = pad.undo(SystemClock.uptimeMillis()) ?: return false
         // timed again from here, else the strokes left end the piece before the one taken back is rewritten
         if (read.strokes.isEmpty()) removeCallbacks(finishCheck) else checkLater()
