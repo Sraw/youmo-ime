@@ -13,7 +13,7 @@ import { ENGINE } from '../tools/assemble.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const src = join(here, '..', 'src');
-for (const f of ['form.js', 'maker.js']) vm.runInThisContext(readFileSync(join(src, f), 'utf8'), { filename: f });
+for (const f of ['lib.js', 'form.js', 'maker.js']) vm.runInThisContext(readFileSync(join(src, f), 'utf8'), { filename: f });
 globalThis.YoumoPanels = [];
 for (const f of readdirSync(join(src, 'panels')).sort()) vm.runInThisContext(readFileSync(join(src, 'panels', f), 'utf8'), { filename: f });
 const F = globalThis.YoumoForm;
@@ -132,7 +132,7 @@ test('the 按键 panel writes each property as the engine reads it', () => {
     read(out.xml);
   }
   const all = [
-    ['radius', 8, '8dp'], ['border', { width: 1, color: '#33000000' }, '1dp #33000000'], ['border', null, 'none'],
+    ['radius', 8, '8dp'], ['border', { width: 1, color: '#33000000' }, '1dp #33000000'], ['border', 'none', 'none'],
     ['shadow', { dx: 0, dy: 2, blur: 3, color: '@keyShadow' }, '0dp 2dp 3dp @keyShadow'], ['inner-shadow', { dx: 0, dy: 1, blur: 2, color: '#40000000' }, '0dp 1dp 2dp #40000000'],
     ['depth', 3, '3dp'], ['inset', [6, 3], '6dp 3dp'], ['shape', 'circle', 'circle'], ['press', 'ripple', 'ripple'], ['overlay', '#22000000', '#22000000'],
   ];
@@ -142,6 +142,44 @@ test('the 按键 panel writes each property as the engine reads it', () => {
     read(out.xml);
   }
   assert.equal(F.valueOf(k.set(doc, 'key', 'radius', null).xml, 'key', 'radius'), null, 'cleared: the attribute gone');
+  assert.equal(F.valueOf(k.set(doc, 'key', 'border', null).xml, 'key', 'border'), null, '不设: the wider style shows');
+  // past what the engine reads: kept to it, and the engine reads what is written
+  const past = [['radius', 64, '24dp'], ['border', { width: 8, color: '#000000' }, '3dp #000000'], ['depth', 20, '8dp'],
+    ['shadow', { dx: 0, dy: 40, blur: 30, color: '#000000' }, '0dp 16dp 16dp #000000'], ['inset', [30, 2.25], '24dp 2.3dp']];
+  for (const [prop, v, text] of past) {
+    const out = k.set(doc, 'key.letter', prop, v);
+    assert.equal(F.valueOf(out.xml, 'key.letter', prop), text, prop);
+    read(out.xml);
+  }
+  const nine = { kind: 'linear', angle: 1000, stops: Array.from({ length: 9 }, (_, i) => ['#000000', i * 10]) };
+  const capped = F.parseFill(F.valueOf(k.fill(doc, 'key', nine).xml, 'key', 'fill'));
+  assert.equal(capped.stops.length, 8);
+  assert.equal(capped.angle, 360);
+  read(k.fill(doc, 'key', nine).xml);
+});
+
+test('an icon the app would refuse (a PNG, an SVG past its subset) is named, and a pack holding one cannot be saved', () => {
+  const t = P.text.ops;
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d]);
+  const stroked = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h24" stroke="#000" transform="scale(2)"/></svg>');
+  assert.equal(t.iconProblems(E, png, 65536).length, 1);
+  assert.ok(t.iconProblems(E, stroked, 65536).length > 0);
+  assert.ok(t.iconProblems(E, new Uint8Array(70000), 65536)[0].includes('65536'));
+  const L = globalThis.YoumoLib;
+  const FORMAT = { limits: { iconBytes: 65536, keyImageSide: 1024, pictureSide: 4096, keyImageBytes: 1 << 21, entries: 64, fileBytes: 1 << 25, totalBytes: 1 << 26 } };
+  for (const bad of [png, stroked]) {
+    const d = t.setIcon({ xml: nord, files: {}, layouts: {} }, 'backspace', bad);
+    assert.ok(globalThis.YoumoMaker.saveProblems(E, L, FORMAT, d).some((p) => p.message.includes('icon-backspace.svg')));
+  }
+});
+
+test('the forms\' bounds are the engine\'s', () => {
+  assert.deepEqual(F.LIMITS, JSON.parse(JSON.stringify(E.limits())));
+});
+
+test('a select= differing only in its spacing is the same style', () => {
+  assert.equal(F.valueOf(BASE, ' key.letter ', 'color'), '#222222');
+  assert.equal(F.setProp(BASE, 'key.letter ', 'color', '#444444'), BASE.replace('color="#222222"', 'color="#444444"'));
 });
 
 test('the 字和图标 panel: each part apart, its properties as the engine reads them; fonts and icons as files', () => {
@@ -160,7 +198,7 @@ test('the 字和图标 panel: each part apart, its properties as the engine read
       read(out.xml);
     }
   }
-  const ttf = new Uint8Array([0, 1, 0, 0, 1, 2, 3]);
+  const ttf = new Uint8Array([0, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8]);
   const withFont = t.addFont(doc, 'Hand.ttf', ttf);
   assert.equal(withFont.files['hand.ttf'], ttf);
   assert.match(withFont.xml, /<font name="hand" src="hand.ttf"\/>/);
@@ -171,11 +209,12 @@ test('the 字和图标 panel: each part apart, its properties as the engine read
   let four = doc;
   for (const n of ['a', 'b', 'c', 'd']) four = t.addFont(four, n + '.ttf', ttf);
   assert.throws(() => t.addFont(four, 'e.ttf', ttf), /4/);
-  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
-  const icon = t.setIcon(doc, 'backspace', 'png', png);
-  assert.match(icon.xml, /<icon name="backspace" src="icon-backspace.png"\/>/);
+  const svg = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h24v24z"/></svg>');
+  assert.deepEqual(t.iconProblems(E, svg, 65536), []);
+  const icon = t.setIcon(doc, 'backspace', svg);
+  assert.match(icon.xml, /<icon name="backspace" src="icon-backspace.svg"\/>/);
   assert.ok(icon.xml.lastIndexOf('<icon') > icon.xml.lastIndexOf('<style'), 'icons last');
-  assert.equal(read(icon.xml).theme.info(false).icons.backspace, 'icon-backspace.png');
+  assert.equal(read(icon.xml).theme.info(false).icons.backspace, 'icon-backspace.svg');
   const back = t.setIcon(icon, 'backspace', null);
   assert.equal(back.xml, nord);
   assert.deepEqual(Object.keys(back.files), []);
@@ -197,9 +236,12 @@ test('the 背景 panel: a picture with a cut for each orientation, its crop kept
   assert.equal(p.brightness, 70);
   assert.equal(p.blurDp, 6);
   const through = b.through(tuned, true);
-  assert.equal(F.valueOf(through.xml, 'key', 'fill'), 'picture(0dp, 100%, #66ffffff)');
+  for (const sel of ['key', 'key.function', 'key.enter', 'key.space']) assert.equal(F.valueOf(through.xml, sel, 'fill'), 'picture(0dp, 100%, #66ffffff)', sel);
   read(through.xml);
-  assert.equal(F.valueOf(b.through(through, false).xml, 'key', 'fill'), F.valueOf(nord, 'key', 'fill'), 'off: as it was');
+  assert.equal(b.through(through, false).xml, tuned.xml, 'off: as it was, every key');
+  const dropped = b.setPicture(through, null);
+  for (const sel of ['key', 'key.function', 'key.enter', 'key.space']) assert.equal(F.valueOf(dropped.xml, sel, 'fill'), F.valueOf(nord, sel, 'fill'), 'no picture: ' + sel + ' its colour again');
+  read(dropped.xml);
   const gone = b.setPicture(tuned, null);
   assert.equal(F.picture(gone.xml), null);
   assert.deepEqual(Object.keys(gone.files), []);
@@ -219,7 +261,7 @@ test('the cascade check names the style the engine says each value comes from', 
   const x = F.setProp(F.setProp(nord, 'key.letter', 'fill', 'linear(90deg, #ff0000 0%, #0000ff 100%)'), 'qwerty/q:pressed', 'overlay', '#40000000');
   const r = read(x);
   const lineOf = (sel) => F.styles(x).find((s) => s.select === sel).line;
-  const src = (key, part, pressed) => Object.fromEntries(E.sources('qwerty', r.theme, ENV, key, part, pressed).sources.map((s) => [s.property, s.line]));
+  const src = (key, part, pressed) => Object.fromEntries(E.sources('qwerty', r.theme, ENV, { widget: 'key', key, part, states: pressed ? ['pressed'] : [] }).sources.map((s) => [s.property, s.line]));
   assert.equal(src('q', null, false).fill, lineOf('key.letter'));
   assert.equal(src('q', null, false).radius, lineOf('key'));
   assert.equal(src('q', null, true).overlay, lineOf('qwerty/q:pressed'));
@@ -227,9 +269,10 @@ test('the cascade check names the style the engine says each value comes from', 
   assert.equal(src('enter', null, false).fill, lineOf('key.enter'));
   assert.equal(src('q', 'mark', false).color, lineOf('key mark, key shortcut'));
   assert.equal(src('q', 'label', false).color, lineOf('key'), 'inherited from the key');
-  assert.deepEqual(E.sources('qwerty', r.theme, ENV, 'no-such-key', null, false).sources, []);
+  assert.deepEqual(E.sources('qwerty', r.theme, ENV, { widget: 'key', key: 'no-such-key' }).sources, []);
+  assert.equal(E.sources('qwerty', r.theme, ENV, { widget: 'bar' }).ok, false);
   // what the panel shows: each property, its value, the style's select= and line
-  const rows = P.keys.ops.sources(E, F, { xml: x }, r.theme, 'qwerty', ENV, 'q', null, false);
+  const rows = P.keys.ops.sources(E, F, { xml: x }, r.theme, 'qwerty', ENV, { key: 'q' });
   const fill = rows.find((row) => row.property === 'fill');
   assert.deepEqual(fill, { property: 'fill', value: 'linear(90deg, #ff0000 0%, #0000ff 100%)', select: 'key.letter', line: lineOf('key.letter') });
   // every property's source has that property, as the engine read it

@@ -40,9 +40,20 @@
     return s;
   };
 
-  /** A number field ([unit] after it); empty means not set (null). */
+  /**
+   * A number field ([unit] after it); empty means not set (null). What is typed past [min]..[max] is taken as
+   * the bound (min= and max= do not stop typing); what is not a number (`1.2.3`, `-`) is not taken at all.
+   */
   const number = (value, change, { min, max, step = 1, unit = '' } = {}) => {
-    const i = h('input', { type: 'number', value: value ?? '', on: { change: () => change(i.value === '' ? null : +i.value) } });
+    const i = h('input', { type: 'number', value: value ?? '', on: { change: () => {
+      if (i.validity.badInput) return;
+      if (i.value === '') { change(null); return; }
+      let v = +i.value;
+      if (min != null && v < min) v = min;
+      if (max != null && v > max) v = max;
+      if (v !== +i.value) i.value = v;
+      change(v);
+    } } });
     if (min != null) i.min = min;
     if (max != null) i.max = max;
     i.step = step;
@@ -58,6 +69,12 @@
     const text = h('input', { type: 'text', className: 'expr', value: value ?? '', placeholder: '#rrggbb、@名字、darker(@key, 8%)…' });
     const pick = h('input', { type: 'color', value: hex ? hex.rgb : '#000000' });
     const alpha = h('input', { type: 'range', min: 0, max: 100, value: hex ? hex.opacity : 100, title: '不透明度' });
+    // an expression (`@key`, `darker(@key, 8%)`) is no colour the picker could show: touching it would write black
+    if (value != null && !hex) {
+      pick.disabled = true;
+      alpha.disabled = true;
+      pick.title = '这是表达式，在右边的文字框里改';
+    }
     const fromPicker = () => change(F.hexOf(pick.value, +alpha.value));
     pick.addEventListener('change', fromPicker);
     alpha.addEventListener('change', fromPicker);

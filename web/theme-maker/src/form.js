@@ -62,10 +62,14 @@
     return tag.replace(/\s*(\/?>)$/, (all, close) => ' ' + name + '="' + escape(value) + '"' + close);
   }
 
-  /** The style [select] gives [prop], null where no style of exactly that select= gives it (the last such style's). */
+  // two select= the same text but for their spacing (the engine reads " key  .letter " as "key .letter")
+  const spaced = (s) => String(s).trim().replace(/\s+/g, ' ');
+  const sameSelect = (a, b) => a != null && b != null && spaced(a) === spaced(b);
+
+  /** The style [select] gives [prop], null where no style of that select= (but for spacing) gives it (the last such style's). */
   function valueOf(xml, select, prop) {
     for (const s of styles(xml).reverse()) {
-      if (s.select !== select) continue;
+      if (!sameSelect(s.select, select)) continue;
       const a = s.attrs.find((x) => x[0] === prop);
       if (a) return a[1];
     }
@@ -94,7 +98,7 @@
    * A style left with only its select= is taken out.
    */
   function setProp(xml, select, prop, value) {
-    const all = styles(xml).filter((s) => s.select === select);
+    const all = styles(xml).filter((s) => sameSelect(s.select, select));
     const target = [...all].reverse().find((s) => s.attrs.some((a) => a[0] === prop)) || all[all.length - 1];
     if (!target) {
       if (value == null) return xml;
@@ -146,6 +150,12 @@
   /** [xml] with colour [name] of [variant] [value] (null: taken out); a <colors> made where there is none. */
   function setColor(xml, name, value, variant = 'light') {
     let b = colorsBlock(xml, variant);
+    // a <colors …/> with nothing in it: an open and a close, so a colour has where to go
+    if (b && /\/>$/.test(b.tag)) {
+      if (value == null) return xml;
+      xml = splice(xml, b.start, b.end, b.tag.replace(/\s*\/>$/, '>') + '\n  </colors>');
+      b = colorsBlock(xml, variant);
+    }
     if (!b) {
       if (value == null) return xml;
       xml = insert(xml, 'colors', variant === 'light' ? '<colors>\n  </colors>' : '<colors variant="' + variant + '">\n  </colors>');
@@ -256,11 +266,28 @@
 
   // ---- the forms' values ----
 
-  /** A fill's text: `{kind: solid, color}`, `{kind: linear, angle, stops: [[color, at%]]}`, `{kind: picture, blur?, brightness?, over?}`. */
+  /**
+   * The bounds the engine reads a style's numbers in (its Values; YoumoEngine.limits() says the same, form.test
+   * holds the two together): what the forms offer and write.
+   */
+  const LIMITS = {
+    lengthDp: 24, offsetDp: 16, borderDp: 3, blurDp: 25, depthDp: 8, scale: [85, 130], spacingEm: [-0.1, 0.5], stops: [2, 8],
+  };
+
+  /** [v] kept within [lo]..[hi] and rounded to [digits] decimals: a number as the engine reads it. */
+  function clamp(v, lo, hi, digits = 0) {
+    const k = 10 ** digits;
+    return Math.round(Math.max(lo, Math.min(hi, +v || 0)) * k) / k;
+  }
+
+  /**
+   * A fill's text: `{kind: solid, color}`, `{kind: linear, angle, stops: [[color, at%]]}`, `{kind: picture, blur?,
+   * brightness?, over?}`; its numbers kept to what the engine reads (an angle of 3 digits, 0–100 %, a blur to 25 dp).
+   */
   function fillText(f) {
     if (f.kind === 'solid') return f.color;
-    if (f.kind === 'linear') return 'linear(' + Math.round(f.angle) + 'deg, ' + f.stops.map(([c, at]) => c + ' ' + Math.round(at) + '%').join(', ') + ')';
-    if (f.kind === 'picture') return 'picture(' + (f.blur ?? 0) + 'dp, ' + (f.brightness ?? 100) + '%' + (f.over ? ', ' + f.over : '') + ')';
+    if (f.kind === 'linear') return 'linear(' + clamp(f.angle, -360, 360) + 'deg, ' + f.stops.map(([c, at]) => c + ' ' + clamp(at, 0, 100) + '%').join(', ') + ')';
+    if (f.kind === 'picture') return 'picture(' + clamp(f.blur ?? 0, 0, LIMITS.blurDp, 1) + 'dp, ' + clamp(f.brightness ?? 100, 0, 100) + '%' + (f.over ? ', ' + f.over : '') + ')';
     throw new Error('no fill of kind ' + f.kind);
   }
 
@@ -298,7 +325,8 @@
 
   /** `dx dy blur colour` (dp) of a shadow, `none` where it has no colour. */
   function shadowText(s) {
-    return s && s.color ? s.dx + 'dp ' + s.dy + 'dp ' + s.blur + 'dp ' + s.color : 'none';
+    const o = LIMITS.offsetDp;
+    return s && s.color ? clamp(s.dx, -o, o, 1) + 'dp ' + clamp(s.dy, -o, o, 1) + 'dp ' + clamp(s.blur, 0, o, 1) + 'dp ' + s.color : 'none';
   }
 
   /** A shadow= text read: `{dx, dy, blur, color}`, null for none or what is not one. */
@@ -309,7 +337,7 @@
 
   /** A border=/stroke= text: `width colour`, `none` for no width. */
   function borderText(b) {
-    return b && b.width > 0 && b.color ? b.width + 'dp ' + b.color : 'none';
+    return b && b.width > 0 && b.color ? clamp(b.width, 0, LIMITS.borderDp, 1) + 'dp ' + b.color : 'none';
   }
 
   function parseBorder(t) {
@@ -327,7 +355,7 @@
     ['all', '全部键'], ['letter', '字母'], ['function', '功能'], ['space', '空格'], ['enter', '回车'], ['picked', '选中的这个键'], ['board', '这块键盘的全部'],
   ];
   /** The scenes a range may be narrowed to (`@…`). */
-  const SCENES = [['', '任何时候'], ['compact', '紧凑时'], ['landscape', '横屏时'], ['flat', '平铺时'], ['floating', '悬浮时'], ['split', '分体时'], ['dark', '深色时'], ['field=password', '密码框里']];
+  const SCENES = [['', '任何时候'], ['compact', '紧凑时'], ['landscape', '横屏时'], ['flat', '平铺时'], ['floating', '悬浮时'], ['split', '分体时'], ['one-handed', '单手时'], ['dark', '深色时'], ['field=password', '密码框里']];
   /** The states (`:…`). */
   const STATES = [['', '普通'], ['pressed', '按下'], ['locked', '锁定'], ['shifted', 'Shift']];
 
@@ -345,7 +373,7 @@
   }
 
   root.YoumoForm = {
-    uncommented, styles, elements, valueOf, setProp, setProps, insert,
+    uncommented, styles, elements, valueOf, setProp, setProps, insert, sameSelect, LIMITS, clamp,
     COLOR_GROUPS, colors, setColor, variants, withDark, hexOf, parseHex,
     picture, setPicture, cropRect,
     fillText, parseFill, shadowText, parseShadow, borderText, parseBorder,

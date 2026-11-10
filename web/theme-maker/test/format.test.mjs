@@ -643,8 +643,8 @@ test("index.html holds no engine; the page built holds the build's, and no bigge
   const engine = blockOf(built(), 'youmo-engine');
   assert.equal(engine, engineText(), 'the page built has another engine');
   // the plan's 600 KB is not met without a minifier (none without npm here): 1.09 MB as built, held below 1.2 MB
-  // so that it grows only on purpose
-  assert.ok(Buffer.byteLength(engine) <= 1_200_000, 'the engine is ' + Buffer.byteLength(engine) + ' bytes');
+  // so that it grows only on purpose (1.20 MB with SvgSubset, the icons the page checks as the app does: 1.25 MB)
+  assert.ok(Buffer.byteLength(engine) <= 1_250_000, 'the engine is ' + Buffer.byteLength(engine) + ' bytes');
   // the global a page reads it by (build.gradle.kts: the library's link names it)
   assert.match(engine, /globalThis\['youmo-engine'\] = factory\(/);
   // all else as index.html: the engine's script and the CSP's hash of it the only difference

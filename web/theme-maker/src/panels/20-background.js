@@ -7,6 +7,22 @@
   const F = root.YoumoForm;
   const ORIENTATIONS = [['portrait', '竖屏'], ['landscape', '横屏']];
   const THROUGH = 'picture(0dp, 100%, #66ffffff)';
+  // the keys 透出 makes see-through (060-render-p3 §5.1 panel 2), each with the colour it has again when turned off
+  const THROUGH_KEYS = [['key', 'key'], ['key.function', 'altKey'], ['key.enter', 'accentKey'], ['key.space', 'key']];
+
+  // [xml] with every THROUGH_KEYS style see-through ([on]), or those whose fill [was] says back to their colour
+  // (the theme's colour of that name; none: the fill taken out, the wider style's shows)
+  function seeThrough(xml, on, was = (f) => f === THROUGH) {
+    const colors = F.colors(xml);
+    for (const [sel, color] of THROUGH_KEYS) {
+      if (on) xml = F.setProp(xml, sel, 'fill', THROUGH);
+      else {
+        const f = F.valueOf(xml, sel, 'fill');
+        if (f != null && was(f)) xml = F.setProp(xml, sel, 'fill', color in colors ? '@' + color : null);
+      }
+    }
+    return xml;
+  }
 
   const ops = {
     /**
@@ -37,7 +53,11 @@
         files[written.src] = p.src;
         for (const [o, c] of Object.entries(written.cuts)) files[c.file] = p.cuts[o].bytes;
         xml = F.setProp(xml, 'keyboard', 'fill', 'picture');
-      } else if (F.valueOf(xml, 'keyboard', 'fill') === 'picture') {
+      } else {
+        // keys see-through to a picture there no longer is: their colours again
+        xml = seeThrough(xml, false, (f) => /^\s*picture\(/.test(f));
+      }
+      if (!p && F.valueOf(xml, 'keyboard', 'fill') === 'picture') {
         xml = F.setProp(xml, 'keyboard', 'fill', 'background' in F.colors(xml) ? '@background' : null);
       }
       return { xml, files, layouts: d.layouts };
@@ -64,8 +84,7 @@
 
     /** [d] with every key see-through to the picture (a light veil over it), or its fill its colour again. */
     through(d, on) {
-      const back = 'key' in F.colors(d.xml) ? '@key' : null;
-      return panels.next(d, F.setProp(d.xml, 'key', 'fill', on ? THROUGH : back));
+      return panels.next(d, seeThrough(d.xml, on));
     },
 
     /** The keyboard's width over its height in [env] (the page's: its device and orientation): the crop's shape. */
@@ -154,7 +173,7 @@
     );
     const through = F.valueOf(d.xml, 'key', 'fill') === THROUGH;
     const box = h('input', { type: 'checkbox', checked: through, on: { change: () => api.apply((x) => ops.through(x, box.checked)) } });
-    el.append(row('键透出背景（全部键半透明，透出图片）', box));
+    el.append(row('键透出背景（字母、功能、回车、空格键都半透明，透出图片）', box));
     for (const [o, label] of ORIENTATIONS) {
       el.append(h('h3', { textContent: label + '裁切（框是这台设备' + label + '键盘的形状，拖动、放大）' }));
       el.append(cropper(api, d, o));

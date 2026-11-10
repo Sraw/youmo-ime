@@ -31,7 +31,7 @@ const ROUGH = 0.02;
 const NEAR = 16;
 const SOLID = 0.002;
 
-function chromium() {
+export function chromium() {
   const given = process.argv[2] || process.env.CHROMIUM;
   if (given) return given;
   for (const cache of [join(homedir(), 'Library', 'Caches', 'ms-playwright'), join(homedir(), '.cache', 'ms-playwright')]) {

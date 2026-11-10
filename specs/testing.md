@@ -392,7 +392,7 @@ opened as the app unpacks them. `test/form.test.mjs` (the same): each tab's form
 the style text meant (a form edit changes the `<style>` of exactly that `select=`, the last that gives
 the property, else adds one at the end; a style left with only its `select=` goes; what the form does
 not know, comments and spacing kept), the engine reads every result, and the cascade check
-(`YoumoEngine.sources`, `Cascade.sources`) names the style each value comes from. `from-maker.theme` and `from-maker-picture.theme` (a real PNG) are
+(`YoumoEngine.sources`, `Cascade.sources`) names the style each value comes from; the forms write numbers within the engine's bounds (`YoumoEngine.limits`), and an icon the app would refuse (a PNG, an SVG past `SvgSubset`, which the engine's `readIcon` runs) is named and blocks the save. `from-maker.theme` and `from-maker-picture.theme` (the panels' save: a real PNG cut for each orientation, see-through keys, a gradient, an SVG icon) are
 its saves, which `ThemePackImportTest` imports. The
 site is `index.html` with the engine put in: the Pages workflow leaves `src/`, `tools/`, `test/`,
 `fonts/`, `dev/` and `build/` out and writes its `index.html` (and `classic/index.html` beside it) with `assemble.mjs --engine <file>`.
@@ -459,6 +459,7 @@ What holds the library to the app:
   `CHROMIUM=`) draws six groups of shots in Chromium through `dev/engine.html` and compares them
   with `app/build/w1-pixel/`: under 2% of pixels off by more than 48, under 0.2% in 5x5 areas off by
   more than 16 (the plain board against the app's with q pressed must fail it, and does).
+- `node web/theme-maker/test/panels-smoke.mjs` (local, the same Chromium) drives the maker's 字和图标 tab: a field edited, then the next field typed into or a box clicked; both kept (a tab drawn anew under the user lost them).
 - `node web/theme-maker/dev/serve.mjs` serves `dev/engine.html`, a preview of any board, theme,
   size and form drawn by the engine; development only, never published.
 

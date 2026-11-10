@@ -63,14 +63,38 @@
     $('undo').disabled = !history.canUndo;
     $('redo').disabled = !history.canRedo;
     keep();
-    return loadAssets(d).then((current) => { if (current) { preview(); showTab(); } });
+    return loadAssets(d).then((current) => { if (current) { preview(); refreshTab(); } });
+  }
+
+  // a field the user types in: what a rebuild of its tab under it would take the typing from
+  const typedIn = (el) => !!el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !/^(checkbox|radio|button|range|color|file)$/.test(el.type)));
+  let stale = false; // the tab shown is older than the document: rebuilt when the field typed in is left
+
+  // the tab drawn anew after a change, unless a field of it is being typed in: a field commits on leaving it
+  // (change), so a rebuild then would take the field or button just tapped away (focus lost, its click never
+  // comes) or, done later (pictures and fonts decoded first), the characters typed into the next field; the
+  // controls read the document when used, not when drawn, so a tab left as it is still does the right thing
+  // a pointer held on the tab: a field left by pressing on another control commits (change) between the press
+  // and the release, and a tab drawn then would take the control pressed, its focus and its click
+  let held = false;
+  function refreshTab() {
+    const el = $('tab-' + tab);
+    if (held || (el && el.contains(document.activeElement) && typedIn(document.activeElement))) { stale = true; return; }
+    showTab();
+  }
+  // once the press is over (its click dispatched) a tab left stale is drawn anew, unless a field of it is typed in
+  function released() {
+    held = false;
+    setTimeout(() => { if (stale && !held) refreshTab(); }, 0);
   }
 
   // the theme's files as the painter takes them: its images decoded, its fonts loaded under a family of their own
   // an image is decoded only where its header says the app would take it: a pack's bytes are not trusted, and a
   // decode past the browser's memory takes the tab down (a draft restored would do it again each time)
   async function loadAssets(d) {
-    if (assets.key === d.files) return true;
+    // the same files (an edit of theme.xml copies the object, not the bytes): nothing decoded again
+    const same = (a, b) => a === b || (a && Object.keys(a).length === Object.keys(b).length && Object.keys(b).every((k) => a[k] === b[k]));
+    if (same(assets.key, d.files)) return true;
     const mine = ++loading;
     const images = {};
     const fonts = {};
@@ -282,12 +306,25 @@
     engine: E,
     doc: () => history.current,
     env: () => env,
-    envJson: () => M.envJson(env),
+    envJson: (e = env) => M.envJson(e),
     theme: () => theme,
     picked: () => picked,
-    apply: (fn) => { if (history) set(asDoc(fn(history.current))); },
+    // an op that throws (a document it cannot change: no <theme>) says so instead of failing silently
+    apply: (fn) => {
+      if (!history) return;
+      let next;
+      try {
+        next = fn(history.current);
+      } catch (e) {
+        toast(e.message || String(e));
+        return;
+      }
+      set(asDoc(next));
+    },
     rerender: () => showTab(),
     toast,
+    lib: L,
+    limits: () => FORMAT.limits,
     goToLine,
     bitmap: (name) => assets.cuts[name] || null,
     iconNames: () => Object.keys(ICONS).sort(),
@@ -324,12 +361,18 @@
     if (!panel || !history) return;
     const el = $('tab-' + tab);
     const scroll = $('edit').scrollTop;
+    // the control that had focus (a select just changed, a box ticked) has it again in the tab drawn anew: the
+    // same place among the tab's controls
+    const controls = () => [...el.querySelectorAll('input, select, textarea, button')];
+    const focused = controls().indexOf(document.activeElement);
+    stale = false;
     el.textContent = '';
     try {
       panel.render(el, api);
     } catch (e) {
       el.textContent = '这一页出错了：' + (e.message || e);
     }
+    if (focused >= 0 && controls()[focused]) controls()[focused].focus({ preventScroll: true });
     $('edit').scrollTop = scroll;
   }
 
@@ -426,6 +469,14 @@
       $('tab-source').before(el);
     }
     $('tabs').addEventListener('click', (e) => { if (e.target.dataset.tab) { tab = e.target.dataset.tab; showTab(); } });
+    // a tab left stale while its field was typed in (refreshTab) drawn anew once focus leaves the tab
+    $('edit').addEventListener('focusout', (e) => {
+      const el = $('tab-' + tab);
+      if (stale && !held && el && !(e.relatedTarget && el.contains(e.relatedTarget))) showTab();
+    });
+    $('edit').addEventListener('pointerdown', () => { held = true; }, true);
+    window.addEventListener('pointerup', released, true);
+    window.addEventListener('pointercancel', released, true);
     showTab();
     $('from-image').addEventListener('click', fromImage);
     $('from-file').addEventListener('click', openFile);
